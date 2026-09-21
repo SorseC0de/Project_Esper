@@ -490,6 +490,10 @@ final class GameScene: SKScene {
             case .doubleJumped(let index):
                 let player = match.players[index]
                 spawnJumpPlatform(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow))
+            case .warped(let index, let from, let to):
+                let colour = SKColor(rgb: sprites.look(for: index).glow)
+                spawnBlink(at: SpriteLibrary.point(from + Vec2(x: 0, y: BallRules.chestHeight)), colour: colour)
+                spawnBlink(at: SpriteLibrary.point(to + Vec2(x: 0, y: BallRules.chestHeight)), colour: colour)
             case .shot(let index), .thrown(let index), .dunked(let index):
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
                 ballHold = BallLook.holdFrames
@@ -541,6 +545,29 @@ final class GameScene: SKScene {
             drop.timingMode = .easeIn
             let shrink = SKAction.sequence([.wait(forDuration: 0.15), .scale(to: 0.66, duration: 0), .wait(forDuration: 0.1), .scale(to: 0.33, duration: 0)])
             square.run(.sequence([.wait(forDuration: hold), .group([drop, shrink]), .removeFromParent()]))
+        }
+    }
+
+    /// Flash Fizz's blink: a bright diamond, wide and low, that flares out and is gone.
+    private func spawnBlink(at point: CGPoint, colour: SKColor) {
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: -14, y: 0))
+        path.addLine(to: CGPoint(x: 0, y: 4))
+        path.addLine(to: CGPoint(x: 14, y: 0))
+        path.addLine(to: CGPoint(x: 0, y: -4))
+        path.closeSubpath()
+        for (scale, tint) in [(1.0, SKColor.white), (1.8, colour)] {
+            let blink = SKShapeNode(path: path)
+            blink.fillColor = tint
+            blink.strokeColor = .clear
+            blink.blendMode = .add
+            blink.position = point
+            blink.zPosition = 8
+            blink.setScale(0.2)
+            glowers.addChild(blink)
+            let flare = SKAction.scale(to: scale, duration: 0.12)
+            flare.timingMode = .easeOut
+            blink.run(.sequence([.group([flare, .fadeOut(withDuration: 0.2)]), .removeFromParent()]))
         }
     }
 
@@ -635,7 +662,7 @@ final class GameScene: SKScene {
                 // A faint line the way the shot would go.
                 shot.isHidden = false
                 shot.alpha = 0.3
-                shot.path = line(from: chest, to: SpriteLibrary.point(player.chest + player.webAimDirection * WebRules.shotRange))
+                shot.path = line(from: chest, to: SpriteLibrary.point(player.chest + player.webAimDirection * WebRules.lineRange))
             } else if let web = player.webLine {
                 shot.alpha = 1
                 let end: CGPoint

@@ -84,13 +84,23 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   of the court 35 units ahead, and the body swings under it on a pendulum arc past the
   mirrored angle, so it dips, then lets go higher than it stopped with the arc's speed.
   That least arc always happens; holding jump keeps swinging, up to twice the arc and never
-  over the anchor. It spends the double jump and works with the ball. The wall cling never
-  slides. The throw button without the ball is the web shot: held, it aims along the stick
-  with a faint line; let go, it fires, 120 units, and the first thing within 8 units of its
-  tip wins. A loose ball is reeled in and caught whatever its speed or facing. The opponent
+  over the anchor, and a full swing gives the double jump back. It spends the double jump
+  and works with the ball. The wall cling never slides. The throw button without the ball
+  is the web line, from the ground, the air or a wall: held, it aims along the stick with a
+  faint line; let go, it fires, 120 units. It bends to a loose ball or the opponent within
+  15° of the aim, and the first thing within 8 units of its tip wins. A loose ball is reeled in and caught whatever its speed or facing. The opponent
   holding the ball loses it to the reel. The opponent without it is reeled to 12 units in
   front of the shooter and dropped. A wall or block reels the shooter to it. With the ball
   the throw button is the ordinary throw. Numbers in `WebRules`.
+- Super Soda (C). Holding jump in the air is flight: the stick moves the body slowly in any
+  direction with gravity off, for two seconds of budget per airtime, refilled on landing.
+  Let go or run out and it falls. No double jump. With or without the ball, and a shot or
+  throw can be taken from flight. Numbers in `SodaRules`.
+- Flash Fizz (D). A shoot button with no ball warps the body to the ball and it arrives
+  holding it, but only while the ball is still its colour, the 45 frames after it let the
+  ball go: throw, warp, catch. One second between warps. A bright wide diamond blinks at
+  where it left and where it landed. Otherwise shoot does what it does without the ball.
+  Numbers in `FizzRules`.
 
 ## Tuning pickers
 
@@ -99,7 +109,7 @@ holds the variants; A is always the baseline as tuned.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
-- POWER: A none, B Web Water. The left bumper steps this one.
+- POWER: A none, B Web Water, C Super Soda, D Flash Fizz. The left bumper steps this one.
 
 ## Look
 

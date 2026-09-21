@@ -65,7 +65,7 @@ extension Player {
     /// the sim, so the drawing can never change the game.
     public var animationFrame: AnimationFrame {
         let t = stateTimer
-        if webShotPose > 0, state != .webSwing, state != .webPull, state != .webbed {
+        if webLinePose > 0, state != .webSwing, state != .webPull, state != .webbed {
             return AnimationFrame(.throwForward, 4)
         }
         switch state {
@@ -118,6 +118,8 @@ extension Player {
             return AnimationFrame(hasBall ? .airBall : .air, 0)
         case .webbed:
             return AnimationFrame(hasBall ? .airBall : .air, 2)
+        case .flying:
+            return AnimationFrame(hasBall ? .airBall : .air, 1)
         }
     }
 }

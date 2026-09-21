@@ -26,7 +26,8 @@ public struct Match: Equatable {
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
             let opponentX = players.indices.first { $0 != index }.map { players[$0].position.x }
-            guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX, events: &events) else { continue }
+            let ballOwner = ball.isLive ? ball.owner : nil
+            guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX, ballOwner: ballOwner, events: &events) else { continue }
             perform(action, by: index)
         }
 
@@ -77,8 +78,21 @@ public struct Match: Equatable {
             }
         case .dunk(let hoop):
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
-        case .webShot(let direction):
-            webShot(from: index, direction: direction)
+        case .webLine(let direction):
+            webLine(from: index, direction: direction)
+        case .warpToBall:
+            guard ball.isLive else { return }
+            let from = player.position
+            let feet = Vec2(x: ball.position.x, y: ball.position.y - BallRules.chestHeight)
+            players[index].warp(to: feet)
+            players[index].catchBall()
+            ball.holder = index
+            ball.straight = false
+            ball.thrown = false
+            ball.tether = nil
+            ball.resting = false
+            events.append(.warped(player: index, from: from, to: feet))
+            events.append(.caught(player: index))
         case .swat:
             if ball.isLive, player.canSwat(ballAt: ball.position) {
                 ball.velocity = -ball.velocity
@@ -91,16 +105,31 @@ public struct Match: Equatable {
         }
     }
 
-    /// Web Water's shot: the first thing along the line wins. A loose ball is reeled in; the
-    /// other with the ball loses it to the reel; the other without it is reeled to a spot in
-    /// front; a wall reels the shooter to it.
-    private mutating func webShot(from index: Int, direction: Vec2) {
+    /// Web Water's line: the first thing along it wins. A loose ball is reeled in; the other
+    /// with the ball loses it to the reel; the other without it is reeled to a spot in front;
+    /// a wall reels the shooter to it. The line bends toward a ball or body within the assist
+    /// angle of the aim first.
+    private mutating func webLine(from index: Int, direction aimed: Vec2) {
         let shooter = players[index]
         let origin = shooter.chest
         let opponent = players.indices.first { $0 != index }
+        var direction = aimed
+        var bestTurn = WebRules.assistAngle
+        var candidates: [Vec2] = []
+        if ball.isLive { candidates.append(ball.position) }
+        if let opponent { candidates.append(players[opponent].chest) }
+        for candidate in candidates {
+            let toward = candidate - origin
+            guard toward.length <= WebRules.lineRange, toward.length > 1 else { continue }
+            let turn = abs(atan2(toward.x * aimed.y - toward.y * aimed.x, toward.x * aimed.x + toward.y * aimed.y))
+            if turn < bestTurn {
+                bestTurn = turn
+                direction = toward.normalized
+            }
+        }
         var hit = false
         var travelled = 0.0
-        while travelled <= WebRules.shotRange {
+        while travelled <= WebRules.lineRange {
             let point = origin + direction * travelled
             if stage.overlapsSolid(Box(center: point, width: 1, height: 1)) {
                 let landing = origin + direction * max(travelled - 4, 0)
@@ -135,9 +164,9 @@ public struct Match: Equatable {
             travelled += 2
         }
         if !hit {
-            players[index].webLine = WebLine(target: .point(origin + direction * WebRules.shotRange), frames: WebRules.missFrames)
+            players[index].webLine = WebLine(target: .point(origin + direction * WebRules.lineRange), frames: WebRules.missFrames)
         }
-        events.append(.webShot(player: index, hit: hit))
+        events.append(.webLine(player: index, hit: hit))
     }
 
     /// A tethered ball comes straight to its puller and is caught on arrival, whatever its

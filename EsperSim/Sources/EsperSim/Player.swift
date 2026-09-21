@@ -5,6 +5,8 @@ import Foundation
 public enum Power: Equatable, Hashable {
     case none
     case webWater
+    case superSoda
+    case flashFizz
 }
 
 /// What a web line runs to.
@@ -28,6 +30,8 @@ public enum PlayerState: Equatable, Hashable {
     case catching, swatting, taunt
     /// Web Water: swinging under a web, reeling to a wall, and being reeled by the other.
     case webSwing, webPull, webbed
+    /// Super Soda: flying.
+    case flying
 
     public var isGroundState: Bool {
         switch self {
@@ -39,7 +43,7 @@ public enum PlayerState: Equatable, Hashable {
     /// States a ball can be caught out of.
     public var canCatch: Bool {
         switch self {
-        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull: true
+        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull, .flying: true
         default: false
         }
     }
@@ -107,11 +111,15 @@ public struct Player: Equatable {
     public var webAimDirection = Vec2.zero
     /// A shot's web, for drawing.
     public var webLine: WebLine?
-    public var webShotCooldown = 0
+    public var webLineCooldown = 0
     /// Where a reel is taking this body.
     public var pullTarget: Vec2?
-    /// Frames the shot's pose shows.
-    public var webShotPose = 0
+    /// Frames the line's pose shows.
+    public var webLinePose = 0
+    /// Super Soda: frames of flight left this airtime.
+    public var flightLeft = SodaRules.flightFrames
+    /// Flash Fizz: frames until the next warp.
+    public var warpCooldown = 0
     public var swatCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
@@ -166,13 +174,15 @@ public struct Player: Equatable {
 
     // MARK: Step
 
-    /// `opponentX` is where the other body stands; a walk always faces it.
-    public mutating func step(input: PlayerInput, stage: Stage, opponentX: Double? = nil, events: inout [MatchEvent]) -> PlayerAction? {
+    /// `opponentX` is where the other body stands; a walk always faces it. `ballOwner` is
+    /// whose the loose ball still is, for Flash Fizz.
+    public mutating func step(input: PlayerInput, stage: Stage, opponentX: Double? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         stateTimer += 1
         if catchCooldown > 0 { catchCooldown -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
-        if webShotCooldown > 0 { webShotCooldown -= 1 }
-        if webShotPose > 0 { webShotPose -= 1 }
+        if webLineCooldown > 0 { webLineCooldown -= 1 }
+        if warpCooldown > 0 { warpCooldown -= 1 }
+        if webLinePose > 0 { webLinePose -= 1 }
         if let line = webLine, case .point = line.target, state != .webPull {
             webLine = line.frames > 1 ? WebLine(target: line.target, frames: line.frames - 1) : nil
         }
@@ -189,14 +199,20 @@ public struct Player: Equatable {
 
         if input.jump && !lastInput.jump { jumpBuffer = 5 } else if jumpBuffer > 0 { jumpBuffer -= 1 }
         let jumpPressed = jumpBuffer > 0
-        let shootPressed = input.shoot && !lastInput.shoot
+        var shootPressed = input.shoot && !lastInput.shoot
         let throwPressed = input.throwBall && !lastInput.throwBall
         let tauntPressed = input.taunt && !lastInput.taunt
         let smash = abs(input.stick.x) >= spec.dashThreshold && stickAwayFrames <= 3
         var action: PlayerAction?
-        if state == .idle || state == .walk || state == .run || state == .dash || state == .air || state == .land {
-            action = webShotIfAsked(input, throwPressed: throwPressed)
+        let free = state == .idle || state == .walk || state == .run || state == .dash || state == .air || state == .land || state == .wallLand || state == .flying
+        if free {
+            action = webLineIfAsked(input, throwPressed: throwPressed)
         }
+        if action == nil, free || ((state == .shooting || state == .throwing) && !hasBall) {
+            action = warpIfAsked(input, shootPressed: shootPressed, ballOwner: ballOwner)
+        }
+        // A warp on a shoot press takes the press; nothing else reads it this frame.
+        if action == .warpToBall { shootPressed = false }
 
         switch state {
         case .idle:
@@ -311,7 +327,15 @@ public struct Player: Equatable {
                 facing = wall
                 velocity = .zero
                 enter(.wallLand)
-            } else if jumpPressed, jumpsLeft > 0 {
+            } else if power == .superSoda, jumpPressed, jumpsLeft > 0, flightLeft > 0 {
+                // A fresh press in the air starts flight; holding keeps it.
+                jumpBuffer = 0
+                jumpsLeft = 0
+                fastFalling = false
+                velocity = .zero
+                events.append(.flew(player: index))
+                enter(.flying)
+            } else if jumpPressed, jumpsLeft > 0, power != .superSoda {
                 if power == .webWater {
                     startWebSwing(in: stage, events: &events)
                 } else {
@@ -338,7 +362,8 @@ public struct Player: Equatable {
             velocity = Vec2(x: 0, y: power == .webWater ? 0 : -spec.wallSlideSpeed)
             if jumpPressed {
                 wallJump(off: facing, events: &events)
-            } else if wallSide == nil || stickFacing(input) != facing {
+            } else if wallSide == nil || (stickFacing(input) != facing && !webAiming) {
+                // Aiming a web line holds the cling whatever the stick does.
                 wallGraceSide = facing
                 wallGrace = spec.wallJumpGraceFrames
                 enter(.air)
@@ -502,9 +527,26 @@ public struct Player: Equatable {
             let swept = (swingAngle - swingStartAngle) * facing.sign
             let target = anchor + Vec2(x: sin(swingAngle), y: -cos(swingAngle)) * swingLength
             velocity = target - position
-            let done = swept >= swingLeastArc * WebRules.swingMaxArcShare || abs(swingAngle) >= WebRules.swingMaxAngle
-            if done || (swept >= swingLeastArc && !input.jump) {
+            let full = swept >= swingLeastArc * WebRules.swingMaxArcShare || abs(swingAngle) >= WebRules.swingMaxAngle
+            if full || (swept >= swingLeastArc && !input.jump) {
+                // A full swing gives the double jump back.
+                if full { jumpsLeft = max(jumpsLeft, spec.jumps - 1) }
                 webAnchor = nil
+                enter(.air)
+            }
+
+        case .flying:
+            // Any direction, slowly, gravity off, while jump is held and the budget lasts.
+            flightLeft -= 1
+            velocity = input.stick * SodaRules.flightSpeed
+            if hasBall, input.shoot, shootReady {
+                enterShootStance()
+            } else if hasBall, input.throwBall, throwReady {
+                throwDirection = .zero
+                quickThrow = false
+                throwStanceEntrySpeed = velocity.x
+                enter(.throwStance)
+            } else if !input.jump || flightLeft <= 0 {
                 enter(.air)
             }
 
@@ -552,11 +594,11 @@ public struct Player: Equatable {
         return true
     }
 
-    /// Web Water's shot, on the throw button with no ball: held, it aims along the stick;
+    /// Web Water's line, on the throw button with no ball: held, it aims along the stick;
     /// let go, it fires that way, or forward if the stick never moved.
-    private mutating func webShotIfAsked(_ input: PlayerInput, throwPressed: Bool) -> PlayerAction? {
+    private mutating func webLineIfAsked(_ input: PlayerInput, throwPressed: Bool) -> PlayerAction? {
         guard power == .webWater, !hasBall else { webAiming = false; return nil }
-        if throwPressed, webShotCooldown == 0, !webAiming {
+        if throwPressed, webLineCooldown == 0, !webAiming {
             webAiming = true
             webAimDirection = Vec2(x: facing.sign, y: 0)
         }
@@ -564,13 +606,21 @@ public struct Player: Equatable {
         let aim = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
         if aim != .zero {
             webAimDirection = aim.normalized
-            if aim.x != 0 { facing = aim.x > 0 ? .right : .left }
+            // On a wall the body keeps facing the wall; elsewhere it turns to the aim.
+            if aim.x != 0, state != .wallLand { facing = aim.x > 0 ? .right : .left }
         }
         guard !input.throwBall else { return nil }
         webAiming = false
-        webShotCooldown = WebRules.shotCooldownFrames
-        webShotPose = 8
-        return .webShot(direction: webAimDirection)
+        webLineCooldown = WebRules.lineCooldownFrames
+        webLinePose = 8
+        return .webLine(direction: webAimDirection)
+    }
+
+    /// Flash Fizz's warp, on a shoot button with no ball, when the ball is still yours.
+    private mutating func warpIfAsked(_ input: PlayerInput, shootPressed: Bool, ballOwner: Int?) -> PlayerAction? {
+        guard power == .flashFizz, !hasBall, shootPressed, warpCooldown == 0, ballOwner == index else { return nil }
+        warpCooldown = FizzRules.cooldownFrames
+        return .warpToBall
     }
 
     private mutating func enterShootStance() {
@@ -629,6 +679,16 @@ public struct Player: Equatable {
         if state == .webPull { webLine = nil }
         velocity = .zero
         enter(grounded ? .idle : .air)
+    }
+
+    /// Flash Fizz: put down at the ball, still, in the air or on the floor as it lands.
+    public mutating func warp(to feet: Vec2) {
+        position = feet
+        velocity = .zero
+        fastFalling = false
+        webAnchor = nil
+        pullTarget = nil
+        enter(.air)
     }
 
     /// The ball taken off this body by a web.
@@ -758,12 +818,16 @@ public struct Player: Equatable {
         if grounded {
             jumpsLeft = spec.jumps
             fastFalling = false
+            flightLeft = SodaRules.flightFrames
             switch state {
             case .air, .wallLand:
                 events.append(.landed(player: index))
                 enter(.land)
             case .webSwing:
                 webAnchor = nil
+                events.append(.landed(player: index))
+                enter(.land)
+            case .flying:
                 events.append(.landed(player: index))
                 enter(.land)
             default:

@@ -669,7 +669,41 @@ final class WebWaterTests: XCTestCase {
         XCTAssertEqual(match.players[0].position.y, height, accuracy: 0.001)
     }
 
-    func testWebShotReelsInALooseBall() {
+    func testFullSwingGivesTheDoubleJumpBack() {
+        var match = webbed()
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 10, input: { _ in .idle })
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertEqual(match.players[0].jumpsLeft, 0)
+        run(&match, frames: 120, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state != .webSwing }
+        XCTAssertEqual(match.players[0].jumpsLeft, 1)
+    }
+
+    func testWebLineFiresFromAWall() {
+        var match = webbed()
+        match.players[0].position = Vec2(x: 30, y: 10)
+        match.ball.respawn(at: Vec2(x: 90, y: 40))
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
+        XCTAssertEqual(match.players[0].state, .wallLand)
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: 70, y: 0))
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), throwBall: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .wallLand, "aiming shouldn't drop the cling")
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle])
+        XCTAssertEqual(match.ball.tether, 0)
+    }
+
+    func testWebLineBendsToANearbyBall() {
+        var match = webbed()
+        // The ball sits 60 out and 10 up: about 9 degrees off a flat aim, inside the assist.
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: 60, y: 10))
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.ball.tether, 0)
+    }
+
+    func testWebLineReelsInALooseBall() {
         var match = webbed()
         match.ball.respawn(at: match.players[0].chest + Vec2(x: 60, y: 0))
         match.ball.velocity = .zero
@@ -677,13 +711,13 @@ final class WebWaterTests: XCTestCase {
         XCTAssertTrue(match.players[0].webAiming)
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.ball.tether, 0)
-        XCTAssertTrue(match.events.contains(.webShot(player: 0, hit: true)))
+        XCTAssertTrue(match.events.contains(.webLine(player: 0, hit: true)))
         run(&match, frames: 30, input: { _ in .idle }) { $0.ball.holder != nil }
         XCTAssertEqual(match.ball.holder, 0)
         XCTAssertNil(match.players[0].webLine)
     }
 
-    func testWebShotTakesTheBallOffTheOpponent() {
+    func testWebLineTakesTheBallOffTheOpponent() {
         var match = webbed()
         match.players[1].hasBall = true
         match.ball.holder = 1
@@ -696,7 +730,7 @@ final class WebWaterTests: XCTestCase {
         XCTAssertEqual(match.ball.holder, 0)
     }
 
-    func testWebShotDragsTheOpponentInFront() {
+    func testWebLineDragsTheOpponentInFront() {
         var match = webbed()
         match.players[1].position.x = match.players[0].position.x + 60
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
@@ -707,7 +741,7 @@ final class WebWaterTests: XCTestCase {
         XCTAssertEqual(match.players[1].position.x, match.players[0].position.x + WebRules.dropDistance, accuracy: 1.5)
     }
 
-    func testWebShotAtAWallReelsTheShooterToIt() {
+    func testWebLineAtAWallReelsTheShooterToIt() {
         var match = webbed()
         match.players[0].position = Vec2(x: 60, y: 10)
         match.players[0].facing = .left
@@ -724,12 +758,82 @@ final class WebWaterTests: XCTestCase {
         plain.advance(inputs: [PlayerInput(throwBall: true), .idle])
         plain.advance(inputs: [.idle, .idle])
         XCTAssertNil(plain.ball.tether)
-        XCTAssertFalse(plain.events.contains { if case .webShot = $0 { return true } else { return false } })
+        XCTAssertFalse(plain.events.contains { if case .webLine = $0 { return true } else { return false } })
 
         var match = webbed()
         match.players[0].hasBall = true
         match.ball.holder = 0
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         XCTAssertEqual(match.players[0].state, .throwStance)
+    }
+}
+
+
+final class SodaAndFizzTests: XCTestCase {
+    private func with(_ power: Power) -> Match {
+        var match = Match()
+        match.players[0].power = power
+        match.players[1].power = power
+        return match
+    }
+
+    @discardableResult
+    private func run(_ match: inout Match, frames: Int, input: (Int) -> PlayerInput, until stop: ((Match) -> Bool)? = nil) -> Int {
+        for frame in 0..<frames {
+            match.advance(inputs: [input(frame), .idle])
+            if let stop, stop(match) { return frame }
+        }
+        return frames
+    }
+
+    func testHeldJumpInTheAirIsFlightThatIgnoresGravity() {
+        var match = with(.superSoda)
+        match.ball.respawn(at: Vec2(x: 300, y: 30))
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 10, input: { _ in .idle })
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .flying }
+        XCTAssertEqual(match.players[0].state, .flying)
+        let height = match.players[0].position.y
+        run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
+        XCTAssertEqual(match.players[0].state, .flying)
+        XCTAssertEqual(match.players[0].position.y, height, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, SodaRules.flightSpeed, accuracy: 0.001)
+        // Let go and it falls.
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .air)
+    }
+
+    func testFlightRunsOutAndRefillsOnLanding() {
+        var match = with(.superSoda)
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 10, input: { _ in .idle })
+        let ended = run(&match, frames: SodaRules.flightFrames + 20, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .air && $0.players[0].flightLeft <= 0 }
+        XCTAssertLessThan(ended, SodaRules.flightFrames + 20)
+        run(&match, frames: 200, input: { _ in .idle }) { $0.players[0].grounded }
+        XCTAssertEqual(match.players[0].flightLeft, SodaRules.flightFrames)
+    }
+
+    func testWarpToYourOwnBallAndCatchIt() {
+        var match = with(.flashFizz)
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
+        }
+        run(&match, frames: BallRules.throwReleaseFrames + 8, input: { _ in .idle })
+        XCTAssertEqual(match.ball.owner, 0)
+        let ballWas = match.ball.position
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertTrue(match.events.contains { if case .warped(player: 0, _, _) = $0 { return true } else { return false } })
+        XCTAssertEqual(match.ball.holder, 0)
+        XCTAssertEqual(match.players[0].position.x, ballWas.x, accuracy: 0.001)
+    }
+
+    func testNoWarpToABallThatIsNotYours() {
+        var match = with(.flashFizz)
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: 60, y: 0))
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertNil(match.ball.holder)
+        XCTAssertFalse(match.events.contains { if case .warped = $0 { return true } else { return false } })
     }
 }

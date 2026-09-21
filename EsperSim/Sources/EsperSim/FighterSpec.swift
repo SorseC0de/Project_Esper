@@ -295,6 +295,8 @@ public enum BallRules {
     public static let rimHalfWidth = 6.0
     /// Frames after a score before the ball comes back to centre.
     public static let respawnFrames = 90
+    /// Frames after a shot, throw or dunk the ball still counts as the thrower's.
+    public static let ownedFrames = 45
 }
 
 /// Web Water's numbers.
@@ -303,19 +305,32 @@ public enum WebRules {
     /// past the mirrored angle by the overshoot, over this many frames; holding jump keeps
     /// it going up to twice that arc, never past this angle over the anchor.
     public static let swingReach = 35.0
-    public static let swingFrames = 24
+    public static let swingFrames = 16
     public static let swingOvershoot = 1.15
     public static let swingMaxArcShare = 2.0
     public static let swingMaxAngle = 1.4
-    /// The shot reaches this far, snaps to a ball or body within this of its tip, reels at
-    /// this speed, can't repeat for this long, and a miss shows for this many frames.
-    public static let shotRange = 120.0
+    /// The line reaches this far, bends to a ball or body within this angle of the aim,
+    /// snaps to one within this of its tip, reels at this speed, can't repeat for this long,
+    /// and a miss shows for this many frames.
+    public static let lineRange = 120.0
+    public static let assistAngle = 0.26
     public static let snapRadius = 8.0
     public static let pullSpeed = 5.0
-    public static let shotCooldownFrames = 30
+    public static let lineCooldownFrames = 30
     public static let missFrames = 8
     /// A pulled body is dropped this far in front of the shooter's chest, and any pull
     /// gives up after this many frames.
     public static let dropDistance = 12.0
     public static let pullMaxFrames = 40
+}
+
+/// Super Soda's numbers: slow flight in any direction, gravity off, this long per airtime.
+public enum SodaRules {
+    public static let flightSpeed = 1.0
+    public static let flightFrames = 120
+}
+
+/// Flash Fizz's numbers: the warp to a ball that's still yours, this often.
+public enum FizzRules {
+    public static let cooldownFrames = 60
 }

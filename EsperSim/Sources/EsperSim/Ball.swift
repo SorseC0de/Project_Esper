@@ -16,6 +16,11 @@ public struct Ball: Equatable {
     public var lastTouched: Int?
     /// Reeled in by a web: the player pulling it.
     public var tether: Int?
+    /// Frames the ball still counts as `lastTouched`'s, after a release.
+    public var ownedFrames = 0
+
+    /// Whose the ball still is, if anyone's.
+    public var owner: Int? { ownedFrames > 0 ? lastTouched : nil }
     public var resting = false
     /// Counting down to the respawn after a score, 0 when live.
     public var respawnTimer = 0
@@ -33,6 +38,7 @@ public struct Ball: Equatable {
     /// Moves the loose ball one frame. Returns the hoop it fell through, if any.
     public mutating func step(stage: Stage, bodies: [Box], events: inout [MatchEvent]) -> Int? {
         previousY = position.y
+        if ownedFrames > 0 { ownedFrames -= 1 }
         var scoredHoop: Int?
 
         for hoop in stage.hoops where !thrown && velocity.y < 0 && position.y > hoop.position.y {
@@ -137,6 +143,7 @@ public struct Ball: Equatable {
         floater = 0
         thrown = straight
         lastTouched = player
+        ownedFrames = BallRules.ownedFrames
         resting = false
     }
 
@@ -158,6 +165,7 @@ public struct Ball: Equatable {
         thrown = false
         tether = nil
         lastTouched = nil
+        ownedFrames = 0
         resting = false
         respawnTimer = 0
     }

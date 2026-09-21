@@ -112,11 +112,14 @@ final class SpriteLibrary {
         SKTexture.preload(Array(cache.values), withCompletionHandler: completion)
     }
 
+    /// A clear canvas. The memory a context is given isn't promised to be clean, and a frame
+    /// drawn over leftovers keeps them in its transparent area, so it's wiped first.
     private func makeCanvas(width: Int, height: Int) -> (CGContext, UnsafeMutablePointer<UInt8>)? {
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
               let data = context.data else { return nil }
+        context.clear(CGRect(x: 0, y: 0, width: width, height: height))
         return (context, data.bindMemory(to: UInt8.self, capacity: width * height * 4))
     }
 

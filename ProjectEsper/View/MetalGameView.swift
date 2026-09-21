@@ -72,6 +72,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let composite: MTLRenderPipelineState
     private let sampler: MTLSamplerState
     private var sceneTexture: MTLTexture?
+    /// SpriteKit draws with the stencil buffer, so its pass needs one.
+    private var sceneDepthStencil: MTLTexture?
     private var glowA: MTLTexture?
     private var glowB: MTLTexture?
 
@@ -106,21 +108,22 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         sceneTexture = makeTexture(width: Int(size.width), height: Int(size.height))
+        sceneDepthStencil = makeTexture(width: Int(size.width), height: Int(size.height), pixelFormat: .depth32Float_stencil8)
         glowA = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
         glowB = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
         scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor)
     }
 
-    private func makeTexture(width: Int, height: Int) -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: max(width, 1), height: max(height, 1), mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
+    private func makeTexture(width: Int, height: Int, pixelFormat: MTLPixelFormat = .bgra8Unorm) -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: pixelFormat, width: max(width, 1), height: max(height, 1), mipmapped: false)
+        descriptor.usage = pixelFormat == .bgra8Unorm ? [.renderTarget, .shaderRead] : [.renderTarget]
         descriptor.storageMode = .private
         return device.makeTexture(descriptor: descriptor)!
     }
 
     func draw(in view: MTKView) {
         guard let drawable = view.currentDrawable, let screenPass = view.currentRenderPassDescriptor,
-              let sceneTexture, let glowA, let glowB,
+              let sceneTexture, let sceneDepthStencil, let glowA, let glowB,
               let commands = queue.makeCommandBuffer() else { return }
 
         skRenderer.update(atTime: CACurrentMediaTime())
@@ -133,6 +136,12 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 1
         background.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
         scenePass.colorAttachments[0].clearColor = MTLClearColor(red: red, green: green, blue: blue, alpha: 1)
+        scenePass.depthAttachment.texture = sceneDepthStencil
+        scenePass.depthAttachment.loadAction = .clear
+        scenePass.depthAttachment.storeAction = .dontCare
+        scenePass.stencilAttachment.texture = sceneDepthStencil
+        scenePass.stencilAttachment.loadAction = .clear
+        scenePass.stencilAttachment.storeAction = .dontCare
         skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: sceneTexture.width, height: sceneTexture.height),
                           commandBuffer: commands, renderPassDescriptor: scenePass)
 

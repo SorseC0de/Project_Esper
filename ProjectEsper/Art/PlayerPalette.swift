@@ -61,7 +61,7 @@ struct Look: Hashable {
     /// Drawn around the figure's silhouette, this many pixels thick. It follows the
     /// outside edge, in `glow` where it borders a glowing part and in `outline` elsewhere.
     var outline: RGB = 0x000000
-    var outlineWidth = 1
+    var outlineWidth = 2
     /// Parts also outlined where they lie over the rest of the body, so they read on their own.
     var strokedParts: Set<BodyPart> = []
 

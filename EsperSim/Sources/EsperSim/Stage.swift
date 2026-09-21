@@ -202,6 +202,19 @@ public struct Stage: Equatable {
         return false
     }
 
+    /// How far down from `y` to the top of the first floor under `x`, solid or one-way.
+    public func drop(fromX x: Double, y: Double) -> Double {
+        let column = column(at: x)
+        var row = row(at: y - Stage.edge)
+        while row >= 0 {
+            if tile(column: column, row: row) != .empty {
+                return y - Double(row + 1) * Stage.tileSize
+            }
+            row -= 1
+        }
+        return y
+    }
+
     /// The side with a wall pressed against the box, if either. Only within the court's
     /// rows: the walls up in the sky can't be clung to or jumped off.
     public func wall(beside box: Box) -> Facing? {

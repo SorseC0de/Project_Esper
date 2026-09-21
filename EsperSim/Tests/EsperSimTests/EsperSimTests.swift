@@ -303,15 +303,26 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity.length, BallRules.shotSpeed, accuracy: 0.2)
     }
 
-    func testReleaseWithoutFlickIsAPumpFake() {
+    func testReleaseWithoutFlickFollowsThroughOnThePresetArc() {
         var match = matchWithBallHeld()
         for _ in 0..<BallRules.shotWindupFrames + 5 {
             match.advance(inputs: [PlayerInput(shoot: true), .idle])
         }
         match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .shooting)
+        run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * BallRules.shotSpeed, accuracy: 0.001)
+    }
+
+    func testDownOnTheGroundCancelsTheShot() {
+        var match = matchWithBallHeld()
+        for _ in 0..<10 {
+            match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        }
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .idle)
         XCTAssertTrue(match.players[0].hasBall)
-        XCTAssertEqual(match.ball.holder, 0)
     }
 
     func testTapIsAQuickshotOnThePresetArc() {
@@ -360,7 +371,7 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].animationFrame.frame, Animation.shootAir.frameCount - 1)
     }
 
-    func testJumpShotReleasedOnTheWayDownWithoutAFlickIsAFake() {
+    func testJumpShotReleasedOnTheWayDownIsAnOrdinaryShot() {
         var match = matchWithBallHeld()
         for _ in 0..<BallRules.shotWindupFrames + 2 {
             match.advance(inputs: [PlayerInput(shoot: true), .idle])
@@ -368,8 +379,8 @@ final class BallTests: XCTestCase {
         match.advance(inputs: [PlayerInput(jump: true, shoot: true), .idle])
         run(&match, frames: 60, input: { _ in PlayerInput(shoot: true) }) { $0.players[0].velocity.y < 0 }
         match.advance(inputs: [.idle, .idle])
-        XCTAssertEqual(match.players[0].state, .air)
-        XCTAssertTrue(match.players[0].hasBall)
+        XCTAssertEqual(match.players[0].state, .shooting)
+        XCTAssertFalse(match.players[0].shotLift)
     }
 
     func testASecondShootButtonCancelsTheShot() {
@@ -409,14 +420,22 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .idle)
     }
 
-    func testReleaseBetweenTheTapAndTheHoldIsAFake() {
+    func testReleaseBeforeTheHoldFiresWhenTheWindupEnds() {
         var match = matchWithBallHeld()
-        for _ in 0..<BallRules.quickshotFrames + 4 {
+        for _ in 0..<10 {
             match.advance(inputs: [PlayerInput(shoot: true), .idle])
         }
         match.advance(inputs: [.idle, .idle])
-        XCTAssertEqual(match.players[0].state, .idle)
-        XCTAssertTrue(match.players[0].hasBall)
+        XCTAssertEqual(match.players[0].state, .shootStance)
+        run(&match, frames: BallRules.shotWindupFrames, input: { _ in .idle })
+        XCTAssertEqual(match.players[0].state, .shooting)
+    }
+
+    func testDropUnderALedgeReachesTheFloor() {
+        let stage = Stage.court
+        // Over the ledge itself there's no drop from its top; just past its end it's down to the floor.
+        XCTAssertEqual(stage.drop(fromX: 165, y: 40), 0, accuracy: 0.001)
+        XCTAssertEqual(stage.drop(fromX: 195, y: 40), 30, accuracy: 0.001)
     }
 
     func testFloaterCarriesTheRunItStartedFrom() {

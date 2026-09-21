@@ -151,20 +151,24 @@ final class SpriteLibrary {
             }
         }
 
-        // The head onto its own canvas, and off this one.
+        // The head onto its own canvas, and off this one; the ball off this one too, since
+        // it's drawn as its own sprite wherever the frame puts it.
         var head: SKTexture?
-        if detachHead, sums[.head] != nil, let (headContext, headPixels) = makeCanvas(width: width, height: height) {
-            for pixel in 0..<count where parts[pixel] == .head {
+        if detachHead {
+            let headCanvas = sums[.head] != nil ? makeCanvas(width: width, height: height) : nil
+            for pixel in 0..<count where parts[pixel] == .head || parts[pixel] == .ball {
                 let index = pixel * 4
-                paint(headPixels, index, look.colours[.head] ?? look.glow)
-                headPixels[index + 3] = 255
+                if parts[pixel] == .head, let (_, headPixels) = headCanvas {
+                    paint(headPixels, index, look.colours[.head] ?? look.glow)
+                    headPixels[index + 3] = 255
+                }
                 pixels[index] = 0
                 pixels[index + 1] = 0
                 pixels[index + 2] = 0
                 pixels[index + 3] = 0
                 parts[pixel] = nil
             }
-            head = headContext.makeImage().map { SKTexture(cgImage: $0) }
+            head = headCanvas?.0.makeImage().map { SKTexture(cgImage: $0) }
         }
 
         func neighbours(_ pixel: Int, _ body: (Int) -> Bool) -> Bool {

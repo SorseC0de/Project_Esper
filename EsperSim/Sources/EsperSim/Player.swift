@@ -320,18 +320,17 @@ public struct Player: Equatable {
                 jumpShot = true
                 events.append(.jumped(player: index))
             }
+            if grounded, downHeldFrames == 1 {
+                // Down on the ground: the cancel.
+                cancelShot()
+                break
+            }
             if !input.shoot, !quickShot {
-                if stateTimer <= BallRules.quickshotFrames {
-                    // A tap: the quickshot, on the preset arc when the windup ends.
+                // Letting go always follows through: now, or when the windup ends.
+                if stateTimer < BallRules.shotWindupFrames {
                     quickShot = true
-                } else if stateTimer < BallRules.shotWindupFrames {
-                    // Let go before the hold: the pump fake.
-                    enter(grounded ? .idle : .air)
-                } else if shotAim != .zero || (jumpShot && velocity.y > 0) {
-                    releaseShot()
                 } else {
-                    // Held to the hold and let go with no flick: also the pump fake.
-                    enter(grounded ? .idle : .air)
+                    releaseShot()
                 }
             }
             if quickShot, stateTimer >= BallRules.shotWindupFrames {

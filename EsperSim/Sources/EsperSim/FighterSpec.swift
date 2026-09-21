@@ -242,17 +242,17 @@ public enum BallRules {
     public static let shotAngleDefault = degrees(53)
     /// Aim length the flick has to reach to count.
     public static let flickThreshold = 0.5
-    /// Frames from taking the stance to being able to release. Let go within the quickshot
-    /// window and it fires on the preset arc when the windup ends; let go after the window
-    /// but before the windup ends and it's a cancel.
+    /// Frames from taking the stance to being able to release. Letting go always follows
+    /// through: before the windup ends it fires when it does, on the preset arc unless a
+    /// flick came first. Cancelling is another shoot button, the throw button, or down on
+    /// the ground.
     public static let shotWindupFrames = 20
-    public static let quickshotFrames = 6
     /// Frames from the release to the ball leaving the hand, then to acting again on the
     /// ground. In the air the body hangs, gravity off, for the hang frames instead, in the
     /// pose with the leg kick.
     public static let shotReleaseFrames = 5
     public static let shotRecoveryFrames = 10
-    public static let shotHangFrames = 12
+    public static let shotHangFrames = 18
     /// Frames after any release before the same player can catch it back.
     public static let catchCooldownFrames = 15
     /// In the air the stance holds the fall to this.

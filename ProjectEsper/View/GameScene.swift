@@ -13,6 +13,9 @@ final class GameScene: SKScene {
     private static let maxStepsPerFrame = 4
     private static let pixelsPerTile = CGFloat(Stage.tileSize * SpriteLibrary.pixelsPerUnit)
     private static let headScale: CGFloat = 1.25
+    /// Pixels above the feet the dribble's ball counts as in the hand, where a drop below
+    /// the platform stops mattering.
+    private static let dribbleHandHeight: CGFloat = 16
     /// Pixels the head floats above its place on the body, so scaling it up doesn't sink it in.
     private static let headLift: CGFloat = 1
 
@@ -35,7 +38,8 @@ final class GameScene: SKScene {
     /// Each head, drawn apart from its body and following it loosely.
     private var headNodes: [SKSpriteNode] = []
     private var headShown: [CGPoint] = []
-    /// The glow on the ball in each player's hands, and the fire off each head.
+    /// The ball in each player's hands, its glow, and the fire off each head.
+    private var handBalls: [SKSpriteNode] = []
     private var handHalos: [SKSpriteNode] = []
     private var headFires: [SKEmitterNode] = []
     private var wings: [Wing] = []
@@ -133,7 +137,8 @@ final class GameScene: SKScene {
                 if tile == .oneWay {
                     node.color = SKColor(rgb: CourtLook.ledge)
                 } else if !border, let hoop = stage.hoops.min(by: { $0.position.distance(to: Vec2(x: x, y: y)) < $1.position.distance(to: Vec2(x: x, y: y)) }) {
-                    node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: hoop.owner).glow))
+                    // You score on your opponent's basket, so the block wears the other colour.
+                    node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow))
                 } else {
                     node.color = courtColour
                     courtTiles.append(node)
@@ -164,6 +169,12 @@ final class GameScene: SKScene {
             headNodes.append(head)
             headShown.append(.zero)
             let colour = SKColor(rgb: sprites.look(for: player.index).glow)
+            let handBall = SKSpriteNode(texture: sprites.texture("ball", 0))
+            handBall.color = colour
+            handBall.colorBlendFactor = 1
+            handBall.zPosition = 3
+            glowers.addChild(handBall)
+            handBalls.append(handBall)
             let halo = makeHalo(colour)
             halo.zPosition = 2
             glowers.addChild(halo)
@@ -253,15 +264,15 @@ final class GameScene: SKScene {
     private func makeFire(_ colour: SKColor) -> SKEmitterNode {
         let fire = SKEmitterNode()
         fire.particleTexture = sprites.flatSquare(size: 4, alpha: 1)
-        fire.particleBirthRate = 20
-        fire.particleLifetime = 0.5
-        fire.particleLifetimeRange = 0.2
-        fire.particlePositionRange = CGVector(dx: 6, dy: 2)
-        fire.particleSpeed = 22
-        fire.particleSpeedRange = 8
+        fire.particleBirthRate = 40
+        fire.particleLifetime = 0.6
+        fire.particleLifetimeRange = 0.1
+        fire.particlePositionRange = CGVector(dx: 2, dy: 1)
+        fire.particleSpeed = 24
+        fire.particleSpeedRange = 4
         fire.emissionAngle = .pi / 2
-        fire.emissionAngleRange = .pi / 2.5
-        fire.yAcceleration = 20
+        fire.emissionAngleRange = .pi / 14
+        fire.yAcceleration = 10
         fire.particleSize = CGSize(width: 3, height: 3)
         let steps = SKKeyframeSequence(keyframeValues: [1, 0.66, 0.33], times: [0, 0.45, 0.75])
         steps.interpolationMode = .step
@@ -498,12 +509,23 @@ final class GameScene: SKScene {
             node.position = SpriteLibrary.point(player.position)
             node.xScale = CGFloat(player.facing.sign)
 
+            // The ball in hand rides the frame's ball, and when that hangs off a ledge the
+            // dribble reaches down to the real floor under it, over the same frames.
             let halo = handHalos[index]
+            let handBall = handBalls[index]
             if player.hasBall, let inHand = sprites.landmark(.ball, in: frame, player: index) {
+                let ballX = player.position.x + Double(inHand.x) * player.facing.sign / SpriteLibrary.pixelsPerUnit
+                let drop = match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit
+                let phase = min(max(inHand.y / GameScene.dribbleHandHeight, 0), 1)
+                let y = inHand.y - CGFloat(drop) * (1 - phase)
+                let at = CGPoint(x: node.position.x + inHand.x * CGFloat(player.facing.sign), y: node.position.y + y.rounded())
                 halo.isHidden = false
-                halo.position = CGPoint(x: node.position.x + inHand.x * CGFloat(player.facing.sign), y: node.position.y + inHand.y)
+                halo.position = at
+                handBall.isHidden = false
+                handBall.position = at
             } else {
                 halo.isHidden = true
+                handBall.isHidden = true
             }
 
             // The head follows its place on the body loosely and bobs, as if it only just belonged.
@@ -530,8 +552,9 @@ final class GameScene: SKScene {
                 headNode.position = shown
                 headFires[index].position = CGPoint(x: shown.x, y: shown.y + 4)
                 headFires[index].particleBirthRate = 24
-                // A slow sideways wind on the rising bits, so they wander rather than climb straight.
-                headFires[index].xAcceleration = CGFloat(sin(Double(match.frame) / 60 * 2 * .pi * 0.7 + Double(index))) * 40
+                // One sideways wind on all the bits at once, swinging back and forth, so the
+                // column bends as a whole like a scarf rather than scattering.
+                headFires[index].xAcceleration = CGFloat(sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(index) * 2)) * 140
             } else {
                 headNode.isHidden = true
                 headFires[index].particleBirthRate = 0

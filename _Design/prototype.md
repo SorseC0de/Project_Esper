@@ -99,15 +99,17 @@ in its colour. The library finds where the ball and the head sit in each frame s
 and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted a pixel off the body. Three dim
 yellow chevrons stack over a resting ball and light one after another from the top. A
 double jump leaves a short platform of loose digital squares under the feet where it was
-taken; they hang a moment, then drop away and cut out. The head bits wander sideways on a
-slow wind. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
+taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that one swinging wind bends as a whole, a scarf.
+The ball in hand is its own sprite on the frame's ball, and when that hangs off a ledge the
+dribble reaches down to the real floor under it over the same frames. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off.
 
 ## Court
 
 The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The
 floor and walls start purple and shift over 20 frames to the colour of whoever holds the
-ball, and back. The backboard blocks stay in their rim's owner's colour. The ledge is
+ball, and back. The backboard blocks wear the colour of the player who scores there's opponent, since you
+score on the other side's basket. The ledge is
 magenta. Three small faint green chevrons stack over the rim
 the holder scores on. The head particles are hard squares that step down in size, a
 digital dissolve rather than a flame.

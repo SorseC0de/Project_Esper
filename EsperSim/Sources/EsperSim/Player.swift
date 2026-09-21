@@ -362,7 +362,8 @@ public struct Player: Equatable {
             if input.aim.length >= BallRules.flickThreshold {
                 shotAim = input.aim
                 if shotAim.x != 0 { facing = shotAim.x > 0 ? .right : .left }
-            } else if stateTimer < BallRules.shotWindupFrames, let direction = stickFacing(input) {
+            } else if let direction = stickFacing(input) {
+                // The stick turns the body throughout, so touch can turn as the pad does.
                 facing = direction
             }
             if grounded, jumpPressed {
@@ -560,9 +561,10 @@ public struct Player: Equatable {
             webAimDirection = Vec2(x: facing.sign, y: 0)
         }
         guard webAiming else { return nil }
-        if input.stick != .zero {
-            webAimDirection = input.stick.normalized
-            if input.stick.x != 0 { facing = input.stick.x > 0 ? .right : .left }
+        let aim = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
+        if aim != .zero {
+            webAimDirection = aim.normalized
+            if aim.x != 0 { facing = aim.x > 0 ? .right : .left }
         }
         guard !input.throwBall else { return nil }
         webAiming = false

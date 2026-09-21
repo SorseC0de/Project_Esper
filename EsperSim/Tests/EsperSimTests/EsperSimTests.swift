@@ -237,6 +237,14 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].facing, .left)
     }
 
+    func testSkyWallsCannotBeClungTo() {
+        let stage = Stage.court
+        let inCourt = Box(min: Vec2(x: 10, y: 50), max: Vec2(x: 20, y: 65))
+        XCTAssertEqual(stage.wall(beside: inCourt), .left)
+        let inSky = inCourt.offset(by: Vec2(x: 0, y: stage.height))
+        XCTAssertNil(stage.wall(beside: inSky))
+    }
+
     func testSkyThenACeilingAndTheWallsGoUp() {
         let stage = Stage.court
         XCTAssertEqual(stage.tile(column: 10, row: stage.rows + 5), .empty)

@@ -23,8 +23,9 @@ final class GameScene: SKScene {
     private let hud = SKNode()
     private var controls: TouchControls?
     private var playerNodes: [SKSpriteNode] = []
-    /// The glow on the ball in each player's hands.
+    /// The glow on the ball in each player's hands, and the fire off each head.
     private var handHalos: [SKSpriteNode] = []
+    private var headFires: [SKEmitterNode] = []
     private var ballNode = SKSpriteNode()
     private var pointerNode = SKSpriteNode()
     private var rimNodes: [SKSpriteNode] = []
@@ -90,20 +91,25 @@ final class GameScene: SKScene {
         }
 
         for player in match.players {
-            let node = SKSpriteNode(texture: sprites.texture(player.animationFrame))
+            let node = SKSpriteNode(texture: sprites.texture(player.animationFrame, player: player.index))
             node.zPosition = 20
             world.addChild(node)
             playerNodes.append(node)
-            let halo = makeHalo()
+            let colour = SKColor(rgb: sprites.look(for: player.index).glow)
+            let halo = makeHalo(colour)
             halo.zPosition = 19
             world.addChild(halo)
             handHalos.append(halo)
+            let fire = makeFire(colour)
+            fire.zPosition = 18
+            world.addChild(fire)
+            headFires.append(fire)
         }
 
         ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
         ballNode.zPosition = 25
         world.addChild(ballNode)
-        let halo = makeHalo()
+        let halo = makeHalo(SKColor(rgb: BallLook.colour))
         halo.zPosition = -1
         ballNode.addChild(halo)
         pointerNode = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 14))
@@ -126,13 +132,36 @@ final class GameScene: SKScene {
 
     }
 
-    /// A soft orange glow, added, which the glow pass then picks up.
-    private func makeHalo() -> SKSpriteNode {
-        let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32, colour: SKColor(red: 1, green: 0.55, blue: 0.15, alpha: 1)))
+    /// A soft glow in the colour, added, which the glow pass then picks up.
+    private func makeHalo(_ colour: SKColor) -> SKSpriteNode {
+        let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32, colour: colour))
         halo.size = CGSize(width: 18, height: 18)
         halo.alpha = 0.5
         halo.blendMode = .add
         return halo
+    }
+
+    /// Sparks rising off a head as if it were burning, in the colour.
+    private func makeFire(_ colour: SKColor) -> SKEmitterNode {
+        let fire = SKEmitterNode()
+        fire.particleTexture = sprites.softGlow(diameter: 8, colour: .white)
+        fire.particleBirthRate = 24
+        fire.particleLifetime = 0.45
+        fire.particleLifetimeRange = 0.2
+        fire.particlePositionRange = CGVector(dx: 6, dy: 2)
+        fire.particleSpeed = 24
+        fire.particleSpeedRange = 10
+        fire.emissionAngle = .pi / 2
+        fire.emissionAngleRange = .pi / 5
+        fire.yAcceleration = 30
+        fire.particleSize = CGSize(width: 4, height: 4)
+        fire.particleScaleSpeed = -1.5
+        fire.particleAlpha = 0.9
+        fire.particleAlphaSpeed = -1.6
+        fire.particleColor = colour
+        fire.particleColorBlendFactor = 1
+        fire.particleBlendMode = .add
+        return fire
     }
 
     /// The rim's net, as GMS2 built it: six columns, five rows, tapering to half width.
@@ -263,17 +292,20 @@ final class GameScene: SKScene {
         for (index, player) in match.players.enumerated() {
             let node = playerNodes[index]
             let frame = player.animationFrame
-            node.texture = sprites.texture(frame)
+            node.texture = sprites.texture(frame, player: index)
             node.size = node.texture!.size()
             node.anchorPoint = sprites.anchor(for: frame.animation)
             node.position = SpriteLibrary.point(player.position)
             node.xScale = CGFloat(player.facing.sign)
             let halo = handHalos[index]
-            if player.hasBall, let inHand = sprites.ballInHand(frame) {
+            if player.hasBall, let inHand = sprites.landmark(.ball, in: frame, player: index) {
                 halo.isHidden = false
                 halo.position = CGPoint(x: node.position.x + inHand.x * CGFloat(player.facing.sign), y: node.position.y + inHand.y)
             } else {
                 halo.isHidden = true
+            }
+            if let head = sprites.landmark(.head, in: frame, player: index) {
+                headFires[index].position = CGPoint(x: node.position.x + head.x * CGFloat(player.facing.sign), y: node.position.y + head.y + 3)
             }
         }
 

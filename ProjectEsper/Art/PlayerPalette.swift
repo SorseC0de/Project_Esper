@@ -3,12 +3,14 @@ import Foundation
 /// A colour as the sheets store it, 0xRRGGBB.
 typealias RGB = UInt32
 
-/// The figure's parts, one flat colour each on the sheets. Two of the parts are drawn in
-/// two close shades across the sheets, so a part can own more than one source colour.
+/// The figure's parts, one flat colour each on the sheets, plus the ball in its hands.
+/// Two of the parts are drawn in two close shades across the sheets, so a part can own
+/// more than one source colour.
 enum BodyPart: CaseIterable {
     case backHand, backArm, backLeg, backThigh
     case pelvis, torso, head
     case frontThigh, frontLeg, frontArm, frontHand
+    case ball
 
     /// What the sheets paint this part with, as the artist named the colours.
     var sourceColours: [RGB] {
@@ -24,6 +26,7 @@ enum BodyPart: CaseIterable {
         case .frontLeg: [0xFBF236]                        // yellow
         case .frontArm: [0x6ABE30]                        // lime
         case .frontHand: [0x99E550]                       // yellow-green
+        case .ball: [0xFFFFFF]                            // white
         }
     }
 
@@ -33,41 +36,55 @@ enum BodyPart: CaseIterable {
         default: false
         }
     }
-}
 
-/// What each part is drawn in, and the line around the whole figure. A swap table for
-/// the sprite library.
-struct Look: Hashable {
-    var colours: [BodyPart: RGB]
-    /// Drawn around the figure's silhouette, this many pixels thick, or none. It follows
-    /// the outside edge only: parts that touch share no line.
-    var outline: RGB? = 0x000000
-    var outlineWidth = 1
+    /// The parts that burn: drawn in the team colour, outlined in it, and haloed.
+    var glows: Bool { self == .head || self == .ball }
 
-    /// Back limbs grey, everything else white, a black line round it all.
-    static let plain: Look = {
-        var colours: [BodyPart: RGB] = [:]
-        for part in BodyPart.allCases {
-            colours[part] = part.isBack ? 0x808080 : 0xFFFFFF
-        }
-        return Look(colours: colours)
-    }()
-
-    /// Every source colour to what it becomes.
-    var swaps: [RGB: RGB] {
-        var table: [RGB: RGB] = [:]
-        for (part, colour) in colours {
+    /// The part a source colour belongs to, within two steps per channel.
+    static func owning(_ colour: RGB) -> BodyPart? {
+        let r = Int((colour >> 16) & 0xFF), g = Int((colour >> 8) & 0xFF), b = Int(colour & 0xFF)
+        for part in allCases {
             for source in part.sourceColours {
-                table[source] = colour
+                let sr = Int((source >> 16) & 0xFF), sg = Int((source >> 8) & 0xFF), sb = Int(source & 0xFF)
+                if abs(sr - r) <= 2, abs(sg - g) <= 2, abs(sb - b) <= 2 { return part }
             }
         }
-        return table
+        return nil
     }
 }
 
-enum BallLook {
-    /// The sheets draw the ball white, in the player's hands too; it plays orange.
-    static let white: RGB = 0xFFFFFF
+/// What each part is drawn in, and the lines drawn on the figure.
+struct Look: Hashable {
+    var colours: [BodyPart: RGB]
+    /// The team colour: what the glowing parts are drawn and outlined in, and their halo.
+    var glow: RGB
+    /// Drawn around the figure's silhouette, this many pixels thick. It follows the
+    /// outside edge, in `glow` where it borders a glowing part and in `outline` elsewhere.
+    var outline: RGB = 0x000000
+    var outlineWidth = 1
+    /// Parts also outlined where they lie over the rest of the body, so they read on their own.
+    var strokedParts: Set<BodyPart> = []
+
+    /// Back limbs grey, the rest white, the head and the ball in the team colour, a black
+    /// line round it all, and the front arm stroked on its own.
+    static func team(_ glow: RGB) -> Look {
+        var colours: [BodyPart: RGB] = [:]
+        for part in BodyPart.allCases {
+            colours[part] = part.glows ? glow : (part.isBack ? 0x808080 : 0xFFFFFF)
+        }
+        return Look(colours: colours, glow: glow, strokedParts: [.frontArm, .frontHand])
+    }
+
     static let orange: RGB = 0xF47E1B
-    static let swaps: [RGB: RGB] = [white: orange]
+    static let teal: RGB = 0x5FCDE4
+
+    static let playerOne = team(orange)
+    static let playerTwo = team(teal)
+    static let byPlayer = [playerOne, playerTwo]
+}
+
+enum BallLook {
+    /// The loose ball's colour, and what the sheet paints it.
+    static let colour = Look.orange
+    static let swaps: [RGB: RGB] = [0xFFFFFF: colour]
 }

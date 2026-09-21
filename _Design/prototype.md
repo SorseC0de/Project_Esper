@@ -59,7 +59,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   leaves it, direction automatic, double jump restored, and the stick doesn't steer for 6
   frames so the arc clears the wall. A jump press with a wall within 2 units of either side
   is a wall jump with no cling at all, and for 6 frames after letting go of a wall a press
-  still jumps off it. A cling can't start for 8 frames after leaving the ground.
+  still jumps off it. A cling can't start for 8 frames after leaving the ground, and the
+  walls above the court's top row can't be clung to or jumped off.
 - Catch is automatic: the ball within reach and either in front, or in the way of where
   the body is moving. A ball arriving from behind while standing still bounces off.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
@@ -80,10 +81,12 @@ holds the variants; A is always the baseline as tuned.
 
 `Art/PlayerPalette.swift` names the figure's eleven parts and the flat colour each is
 painted on the sheets. A `Look` maps parts to colours and the sprite library recolours
-each frame once as it's used. `Look.plain` is back limbs grey, the rest white, with a black line one pixel thick round
-the whole silhouette: it follows the outside edge only, so parts that touch share no line.
-The ball is painted white and plays orange, in the hands too; the library finds where the
-ball sits in each frame so the same soft additive halo follows it there. The ball pointer
+each frame once as it's used. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
+and the ball in hand are drawn in it, the outline around them is in it, and so are the halo
+on the ball and the fire off the head. Back limbs grey, the rest white, a black line one
+pixel thick round the whole silhouette following the outside edge only, and the front arm
+stroked on its own where it lies over the body. The loose ball is orange. The library finds
+where the ball and the head sit in each frame so the halo and the fire follow them. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off.
 
 ## Glow

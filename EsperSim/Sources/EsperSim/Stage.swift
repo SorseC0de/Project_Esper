@@ -202,12 +202,13 @@ public struct Stage: Equatable {
         return false
     }
 
-    /// The side with a wall pressed against the box, if either.
+    /// The side with a wall pressed against the box, if either. Only within the court's
+    /// rows: the walls up in the sky can't be clung to or jumped off.
     public func wall(beside box: Box) -> Facing? {
         let rows = rows(of: box)
         let rightColumn = column(at: box.max.x + Stage.edge)
         let leftColumn = column(at: box.min.x - Stage.edge)
-        for row in rows {
+        for row in rows where row < self.rows {
             if tile(column: rightColumn, row: row) == .solid { return .right }
             if tile(column: leftColumn, row: row) == .solid { return .left }
         }

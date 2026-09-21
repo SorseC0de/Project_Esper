@@ -10,6 +10,9 @@ final class InputHub {
     /// What the on-screen controls hold right now. The scene writes it.
     var touch = PlayerInput.idle
     private(set) var controllers: [GCController] = []
+    /// A pad's menu button went down since the last check.
+    private(set) var resetPressed = false
+    private var menuWasDown = false
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -31,13 +34,22 @@ final class InputHub {
 
     /// This frame's input for every player.
     func frames(players: Int) -> [PlayerInput] {
-        (0..<players).map { index in
+        let menuDown = controllers.contains { $0.extendedGamepad?.buttonMenu.isPressed ?? false }
+        if menuDown, !menuWasDown { resetPressed = true }
+        menuWasDown = menuDown
+        return (0..<players).map { index in
             let pad = index < controllers.count ? read(controllers[index].extendedGamepad!) : PlayerInput.idle
             return index == 0 ? merge(touch, pad) : pad
         }
     }
 
     var playerOneHasController: Bool { !controllers.isEmpty }
+
+    /// True once per menu press.
+    func consumeReset() -> Bool {
+        defer { resetPressed = false }
+        return resetPressed
+    }
 
     /// A: jump. B or the right bumper: shoot. X or the left bumper: throw. Y: taunt.
     /// The right stick aims a stance; failing that, the left stick does.

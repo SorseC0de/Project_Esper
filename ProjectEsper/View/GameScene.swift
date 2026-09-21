@@ -152,6 +152,7 @@ final class GameScene: SKScene {
         let halfHeight = size.height / pointsPerGamePixel / 2
         controls?.removeFromParent()
         let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight)
+        controls.onReset = { [weak self] in self?.reset() }
         cameraNode.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - 6)
@@ -168,6 +169,7 @@ final class GameScene: SKScene {
 
         hub.touch = controls?.input ?? .idle
         let inputs = hub.frames(players: match.players.count)
+        if hub.consumeReset() { reset() }
         var steps = 0
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
             match.advance(inputs: inputs)
@@ -179,6 +181,12 @@ final class GameScene: SKScene {
             accumulator = 0
         }
         render()
+    }
+
+    /// Everyone back to the start, scores cleared.
+    private func reset() {
+        match = Match()
+        rimFlash = rimFlash.map { _ in 0 }
     }
 
     private func show(_ events: [MatchEvent]) {

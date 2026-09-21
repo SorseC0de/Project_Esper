@@ -17,6 +17,9 @@ final class TouchControls: SKNode {
     private var buttons: [Button] = []
     private let stickBase = SKShapeNode(circleOfRadius: stickRadius)
     private let stickKnob = SKShapeNode(circleOfRadius: 10)
+    private let resetButton = SKShapeNode(rectOf: CGSize(width: 34, height: 12), cornerRadius: 3)
+    /// Called when the corner button is tapped.
+    var onReset: (() -> Void)?
     private var stickTouch: UITouch?
     private var stickCenter = CGPoint.zero
     private var buttonTouches: [UITouch: (index: Int, origin: CGPoint)] = [:]
@@ -50,6 +53,18 @@ final class TouchControls: SKNode {
             if down { input.aim = aim }
         }
         buttons = [jump, shoot, throwButton]
+
+        resetButton.position = CGPoint(x: halfWidth - 24, y: halfHeight - 12)
+        resetButton.fillColor = .init(white: 1, alpha: 0.1)
+        resetButton.strokeColor = .init(white: 1, alpha: 0.4)
+        resetButton.lineWidth = 1
+        let resetText = SKLabelNode(text: "RESET")
+        resetText.fontName = "Menlo-Bold"
+        resetText.fontSize = 6
+        resetText.verticalAlignmentMode = .center
+        resetText.fontColor = .init(white: 1, alpha: 0.8)
+        resetButton.addChild(resetText)
+        addChild(resetButton)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -74,6 +89,10 @@ final class TouchControls: SKNode {
     // MARK: Touches, in this node's space
 
     func began(_ touch: UITouch, at point: CGPoint) {
+        if resetButton.frame.insetBy(dx: -6, dy: -6).contains(point) {
+            onReset?()
+            return
+        }
         if point.x < 0 {
             guard stickTouch == nil else { return }
             stickTouch = touch

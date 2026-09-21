@@ -433,8 +433,9 @@ final class GameScene: SKScene {
         ballTrail.particleColor = colour
         ballTrail.particleBirthRate = ball.isLive && !ball.resting && ball.velocity.length > 1 ? 90 : 0
 
-        // Three dim chevrons stacked over a resting ball, lit one after another from the top, then a beat with none.
-        let step = (match.frame * 7 / 60) % 4
+        // Three dim chevrons stacked over a resting ball, lit one after another from the top, then
+        // a beat with none, four steps a second so each one reads as a step.
+        let step = (match.frame * 4 / 60) % 4
         let showChevrons = ball.isLive && ball.resting
         for (index, chevron) in chevrons.enumerated() {
             chevron.isHidden = !showChevrons

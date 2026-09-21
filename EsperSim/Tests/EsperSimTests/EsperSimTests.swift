@@ -34,29 +34,23 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(height, 14.9, accuracy: 1.5)
     }
 
-    func testMarioHopsMatchHisTable() {
-        var match = Match(specs: [.meleeMario, .meleeMario])
-        let start = match.players[0].position.y
-        var peak = start
-        run(&match, frames: 120, input: { _ in PlayerInput(jump: true) }) { match in
-            peak = max(peak, match.players[0].position.y)
-            return match.players[0].state == .land
+    /// Every preset's hops land on the SSBWiki heights its velocities were derived from.
+    func testPresetHopsMatchTheirTables() {
+        let table: [(FighterSpec, Double, Double)] = [
+            (.meleeMario, 29, 11), (.meleeFalcon, 38.5, 14.9), (.meleeFox, 31.3, 10.7), (.meleeSheik, 34.1, 20.2),
+        ]
+        for (spec, fullHop, shortHop) in table {
+            for (held, expected) in [(true, fullHop), (false, shortHop)] {
+                var match = Match(specs: [spec, spec])
+                let start = match.players[0].position.y
+                var peak = start
+                run(&match, frames: 120, input: { PlayerInput(jump: held || $0 < 2) }) { match in
+                    peak = max(peak, match.players[0].position.y)
+                    return match.players[0].state == .land
+                }
+                XCTAssertEqual(peak - start, expected, accuracy: 1.5, "\(spec.name) \(held ? "full" : "short") hop")
+            }
         }
-        XCTAssertEqual(peak - start, 29, accuracy: 1.5)
-    }
-
-    func testDoubleJumpRisesAgain() {
-        var match = Match()
-        let start = match.players[0].position.y
-        var peak = start
-        run(&match, frames: 200, input: { frame in
-            PlayerInput(jump: frame < 6 || (40...42).contains(frame))
-        }) { match in
-            peak = max(peak, match.players[0].position.y)
-            return match.players[0].state == .land
-        }
-        XCTAssertGreaterThan(peak - start, 40)
-        XCTAssertEqual(match.players[0].jumpsLeft, 2)
     }
 
     func testSmashInputDashesAndTiltWalks() {

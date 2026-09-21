@@ -112,6 +112,72 @@ public struct FighterSpec: Equatable {
         bodyWidth: 10,
         bodyHeight: 15
     )
+
+    /// Melee Fox. Full hop 31.3, short hop 10.7, double jump 40.2; 3-frame jumpsquat.
+    public static let meleeFox = FighterSpec(
+        name: "Fox",
+        walkMaxSpeed: 1.6,
+        walkAcceleration: 0.1,
+        dashThreshold: 0.8,
+        dashInitialVelocity: 1.9,
+        dashFrames: 11,
+        runSpeed: 2.2,
+        traction: 0.08,
+        pivotFrames: 15,
+        jumpSquatFrames: 3,
+        fullHopVelocity: 3.68,
+        shortHopVelocity: 2.1,
+        doubleJumpVelocity: 4.19,
+        jumps: 2,
+        gravity: 0.23,
+        fallSpeed: 2.8,
+        fastFallSpeed: 3.4,
+        airSpeedMax: 0.83,
+        airAccelerationBase: 0.02,
+        airAccelerationAdditional: 0.06,
+        airFriction: 0.02,
+        landingLagFrames: 4,
+        wallJumpHorizontal: 2.2,
+        wallJumpVertical: 3.2,
+        wallSlideSpeed: 0.5,
+        wallLandFrames: 12,
+        wallLandCooldownFrames: 30,
+        bodyWidth: 10,
+        bodyHeight: 15
+    )
+
+    /// Melee Sheik. Full hop 34.1, short hop 20.2, double jump 38; 3-frame jumpsquat.
+    public static let meleeSheik = FighterSpec(
+        name: "Sheik",
+        walkMaxSpeed: 1.2,
+        walkAcceleration: 0.1,
+        dashThreshold: 0.8,
+        dashInitialVelocity: 1.7,
+        dashFrames: 12,
+        runSpeed: 1.8,
+        traction: 0.08,
+        pivotFrames: 15,
+        jumpSquatFrames: 3,
+        fullHopVelocity: 2.91,
+        shortHopVelocity: 2.23,
+        doubleJumpVelocity: 3.08,
+        jumps: 2,
+        gravity: 0.13,
+        fallSpeed: 2.13,
+        fastFallSpeed: 3.0,
+        airSpeedMax: 0.8,
+        airAccelerationBase: 0.02,
+        airAccelerationAdditional: 0.04,
+        airFriction: 0.04,
+        landingLagFrames: 4,
+        wallJumpHorizontal: 1.8,
+        wallJumpVertical: 2.5,
+        wallSlideSpeed: 0.5,
+        wallLandFrames: 12,
+        wallLandCooldownFrames: 30,
+        bodyWidth: 10,
+        bodyHeight: 15
+    )
 }
 
 /// Everything about the ball, the hoops and the plays on them. Units and frames.

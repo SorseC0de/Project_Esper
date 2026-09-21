@@ -1,6 +1,26 @@
 import EsperSim
 import SpriteKit
 
+/// The bodies on the A/B/C toggle.
+enum Character: String, CaseIterable {
+    case falcon = "A", fox = "B", sheik = "C"
+
+    var spec: FighterSpec {
+        switch self {
+        case .falcon: .meleeFalcon
+        case .fox: .meleeFox
+        case .sheik: .meleeSheik
+        }
+    }
+
+    var next: Character {
+        let all = Character.allCases
+        return all[(all.firstIndex(of: self)! + 1) % all.count]
+    }
+
+    var label: String { "\(rawValue) \(spec.name.uppercased())" }
+}
+
 /// Runs the match at a fixed 60 steps a second and draws the last state. Nothing in here
 /// writes back into the match except the inputs it hands to `advance`.
 final class GameScene: SKScene {
@@ -8,7 +28,8 @@ final class GameScene: SKScene {
     private static let maxStepsPerFrame = 4
     private static let pixelsPerTile = CGFloat(Stage.tileSize * SpriteLibrary.pixelsPerUnit)
 
-    private var match = Match()
+    private var character = Character.falcon
+    private var match = Match(specs: [Character.falcon.spec, Character.falcon.spec])
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
@@ -153,6 +174,8 @@ final class GameScene: SKScene {
         controls?.removeFromParent()
         let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight)
         controls.onReset = { [weak self] in self?.reset() }
+        controls.onCycleCharacter = { [weak self] in self?.cycleCharacter() }
+        controls.showCharacter(character.label)
         cameraNode.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - 6)
@@ -170,6 +193,7 @@ final class GameScene: SKScene {
         hub.touch = controls?.input ?? .idle
         let inputs = hub.frames(players: match.players.count)
         if hub.consumeReset() { reset() }
+        if hub.consumeCycle() { cycleCharacter() }
         var steps = 0
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
             match.advance(inputs: inputs)
@@ -185,8 +209,15 @@ final class GameScene: SKScene {
 
     /// Everyone back to the start, scores cleared.
     private func reset() {
-        match = Match()
+        match = Match(specs: [character.spec, character.spec])
         rimFlash = rimFlash.map { _ in 0 }
+    }
+
+    /// Both players become the next body on the toggle, and the match restarts.
+    private func cycleCharacter() {
+        character = character.next
+        controls?.showCharacter(character.label)
+        reset()
     }
 
     private func show(_ events: [MatchEvent]) {

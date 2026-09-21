@@ -21,8 +21,8 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-Melee Captain Falcon from the SSBWiki table, in `FighterSpec.meleeFalcon`; Mario is kept
-beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
+Melee bodies from the SSBWiki table: Falcon, Fox and Sheik on the A/B/C toggle in the
+corner (the pad's options button cycles it too), Mario kept beside them in `FighterSpec`. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
 and are chosen to sit with the rest.
 
 ## Input grammar

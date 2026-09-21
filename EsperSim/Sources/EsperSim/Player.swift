@@ -109,10 +109,10 @@ public struct Player: Equatable {
         stateTimer = 0
     }
 
-    /// The run cycle's advance this frame: 30 frames a second at full run speed, scaling
-    /// with how fast the body actually moves, never under 10.
+    /// The run cycle's advance this frame: 24 frames a second at full run speed, scaling
+    /// with how fast the body actually moves, up to 26 in the dash and never under 10.
     private var runCycleStep: Double {
-        max(abs(velocity.x) / spec.runSpeed * 0.5, 10.0 / 60)
+        min(max(abs(velocity.x) / spec.runSpeed * 24, 10), 26) / 60
     }
 
     /// Whether the stick is pushed the way the body faces.

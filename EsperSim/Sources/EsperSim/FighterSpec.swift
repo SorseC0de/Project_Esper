@@ -204,14 +204,15 @@ public struct FighterSpec: Equatable {
 }
 
 extension FighterSpec {
-    /// The body the game is tuned on: Fox with a Falco-style dash, a 2.8 burst into a 3.2 run,
+    /// The body the game is tuned on: Fox with a Falco-style dash, the burst always 0.4 over
+    /// the 3.2 run,
     /// more traction, air control turned up so a jump starts at air speed and turns in about
     /// five frames, and a shoot stance that brakes hard in the air.
     public static let baseline: FighterSpec = {
         var spec = meleeFox
         spec.name = "Baseline"
-        spec.dashInitialVelocity = 2.8
         spec.runSpeed = 3.2
+        spec.dashInitialVelocity = spec.runSpeed + 0.4
         spec.traction = 0.35
         spec.airSpeedMax = 1.6
         spec.airAccelerationAdditional = 0.24

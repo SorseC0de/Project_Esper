@@ -173,11 +173,8 @@ final class GameScene: SKScene {
             fire.targetNode = glowers
             glowers.addChild(fire)
             headFires.append(fire)
-            let wing = Wing(colour: colour, texture: sprites.feather())
-            wing.zPosition = -3
-            glowers.addChild(wing)
-            wings.append(wing)
         }
+        // The wings are parked: `Wing.swift` stays, nothing is added to the scene.
 
         ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
         ballNode.colorBlendFactor = 1
@@ -263,7 +260,7 @@ final class GameScene: SKScene {
         fire.particleSpeed = 22
         fire.particleSpeedRange = 8
         fire.emissionAngle = .pi / 2
-        fire.emissionAngleRange = .pi / 6
+        fire.emissionAngleRange = .pi / 2.5
         fire.yAcceleration = 20
         fire.particleSize = CGSize(width: 3, height: 3)
         let steps = SKKeyframeSequence(keyframeValues: [1, 0.66, 0.33], times: [0, 0.45, 0.75])
@@ -428,7 +425,8 @@ final class GameScene: SKScene {
                 let player = match.players[index]
                 spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left)
             case .doubleJumped(let index):
-                wings[index].sweep()
+                let player = match.players[index]
+                spawnJumpPlatform(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow))
             case .shot(let index), .thrown(let index), .dunked(let index):
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
                 ballHold = BallLook.holdFrames
@@ -461,6 +459,28 @@ final class GameScene: SKScene {
         return SKColor(red: tr + (nr - tr) * toward, green: tg + (ng - tg) * toward, blue: tb + (nb - tb) * toward, alpha: 1)
     }
 
+    /// A short platform of loose digital squares under the feet where a double jump was
+    /// taken: they hang a moment, then drop away and cut out.
+    private func spawnJumpPlatform(at feet: CGPoint, colour: SKColor) {
+        let count = 9
+        for index in 0..<count {
+            let square = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
+            square.size = CGSize(width: 3, height: 3)
+            square.color = colour
+            square.colorBlendFactor = 1
+            square.blendMode = .add
+            square.zPosition = 3
+            let spread = CGFloat(index - count / 2) * 4
+            square.position = CGPoint(x: feet.x + spread, y: feet.y - 2 + CGFloat(index % 2))
+            glowers.addChild(square)
+            let hold = 0.12 + Double(abs(index - count / 2)) * 0.02
+            let drop = SKAction.moveBy(x: spread * 0.3, y: -10 - CGFloat(index % 3) * 4, duration: 0.3)
+            drop.timingMode = .easeIn
+            let shrink = SKAction.sequence([.wait(forDuration: 0.15), .scale(to: 0.66, duration: 0), .wait(forDuration: 0.1), .scale(to: 0.33, duration: 0)])
+            square.run(.sequence([.wait(forDuration: hold), .group([drop, shrink]), .removeFromParent()]))
+        }
+    }
+
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool) {
         glowers.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped))
     }
@@ -476,11 +496,6 @@ final class GameScene: SKScene {
             node.anchorPoint = sprites.anchor(for: frame.animation)
             node.position = SpriteLibrary.point(player.position)
             node.xScale = CGFloat(player.facing.sign)
-
-            // The wing hangs off the shoulder, behind, and flaps while the body runs.
-            let wing = wings[index]
-            wing.position = CGPoint(x: node.position.x - CGFloat(player.facing.sign) * 3, y: node.position.y + 17)
-            wing.step(running: player.state == .run || player.state == .dash, facing: CGFloat(player.facing.sign))
 
             let halo = handHalos[index]
             if player.hasBall, let inHand = sprites.landmark(.ball, in: frame, player: index) {
@@ -514,6 +529,8 @@ final class GameScene: SKScene {
                 headNode.position = shown
                 headFires[index].position = CGPoint(x: shown.x, y: shown.y + 4)
                 headFires[index].particleBirthRate = 24
+                // A slow sideways wind on the rising bits, so they wander rather than climb straight.
+                headFires[index].xAcceleration = CGFloat(sin(Double(match.frame) / 60 * 2 * .pi * 0.7 + Double(index))) * 40
             } else {
                 headNode.isHidden = true
                 headFires[index].particleBirthRate = 0

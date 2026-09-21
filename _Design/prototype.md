@@ -23,7 +23,8 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-`FighterSpec.baseline` is Melee Fox with a Falco-style dash, a 2.8 burst into a 3.2 run,
+`FighterSpec.baseline` is Melee Fox with a Falco-style dash, the burst always 0.4 over the
+3.2 run,
 traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air turned up: air speed 1.6, air acceleration 0.02 + 0.24, a jump with the stick held
 starts at air speed, and a double jump with the stick held sets the sideways speed, so it
@@ -96,11 +97,10 @@ into the world so it streams behind a moving head. The loose ball is purple, and
 of whoever let it go, then shifts back over 30. A flying ball leaves a soft additive trail
 in its colour. The library finds where the ball and the head sit in each frame so the halo
 and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted a pixel off the body. Three dim
-yellow chevrons stack over a resting ball and light one after another from the top. Each
-body has a wing behind the shoulder in the manner of Mithos's from Tales of Symphonia: five
-separate soft feather shapes in the team colour, hues nudged across the fan, additive. It
-flaps while the body runs, dissolves upward when it stops, and sweeps once on a double
-jump. In `Wing.swift`. The ball pointer
+yellow chevrons stack over a resting ball and light one after another from the top. A
+double jump leaves a short platform of loose digital squares under the feet where it was
+taken; they hang a moment, then drop away and cut out. The head bits wander sideways on a
+slow wind. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off.
 
 ## Court

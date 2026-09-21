@@ -2,7 +2,7 @@ import SpriteKit
 
 /// A row of lettered segments with a title on the left. One is lit.
 final class SegmentedPicker: SKNode {
-    static let segmentSize = CGSize(width: 14, height: 10)
+    static let segmentSize = CGSize(width: 18, height: 14)
 
     private var segments: [SKShapeNode] = []
     private(set) var selected: Int
@@ -16,14 +16,14 @@ final class SegmentedPicker: SKNode {
 
         let label = SKLabelNode(text: title)
         label.fontName = "Menlo-Bold"
-        label.fontSize = 6
+        label.fontSize = 8
         label.fontColor = .init(white: 1, alpha: 0.8)
         label.horizontalAlignmentMode = .left
         label.verticalAlignmentMode = .center
         label.position = CGPoint(x: 0, y: -SegmentedPicker.segmentSize.height / 2)
         addChild(label)
 
-        let start = CGFloat(title.count) * 4 + 8
+        let start = CGFloat(title.count) * 5 + 10
         for (index, option) in options.enumerated() {
             let segment = SKShapeNode(rectOf: SegmentedPicker.segmentSize, cornerRadius: 2)
             segment.position = CGPoint(x: start + (SegmentedPicker.segmentSize.width + 2) * CGFloat(index) + SegmentedPicker.segmentSize.width / 2,
@@ -32,7 +32,7 @@ final class SegmentedPicker: SKNode {
             segment.lineWidth = 1
             let text = SKLabelNode(text: option)
             text.fontName = "Menlo-Bold"
-            text.fontSize = 6
+            text.fontSize = 8
             text.fontColor = .init(white: 1, alpha: 0.9)
             text.verticalAlignmentMode = .center
             segment.addChild(text)
@@ -46,7 +46,7 @@ final class SegmentedPicker: SKNode {
 
     /// Selects whichever segment is under `point`, in this node's space. True if one was.
     func tap(at point: CGPoint) -> Bool {
-        for (index, segment) in segments.enumerated() where segment.frame.insetBy(dx: -2, dy: -3).contains(point) {
+        for (index, segment) in segments.enumerated() where segment.frame.insetBy(dx: -3, dy: -4).contains(point) {
             selected = index
             light()
             onSelect(index)

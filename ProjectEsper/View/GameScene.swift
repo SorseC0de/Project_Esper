@@ -14,8 +14,8 @@ final class GameScene: SKScene {
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
     private let world = SKNode()
-    /// Sits at the camera's position in the world, scale 1, so its children are laid out in
-    /// game pixels and stay put on screen.
+    /// Sits at the camera's position, scaled to cancel the camera, so its children are laid
+    /// out in screen points from the centre and a touch maps onto them with no arithmetic.
     private let hud = SKNode()
     private var controls: TouchControls?
     private var playerNodes: [SKSpriteNode] = []
@@ -27,7 +27,7 @@ final class GameScene: SKScene {
     private let scoreLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
     /// Debug: where the last touch landed in the HUD's space, and the numbers behind it.
-    private let touchMarker = SKShapeNode(circleOfRadius: 3)
+    private let touchMarker = SKShapeNode(circleOfRadius: 4)
     private var touchReport = ""
     private var displayScale: CGFloat = 1
     private var lastTime: TimeInterval?
@@ -36,7 +36,7 @@ final class GameScene: SKScene {
 
     override init() {
         super.init(size: CGSize(width: 640, height: 288))
-        scaleMode = .resizeFill
+        scaleMode = .fill
         backgroundColor = SKColor(red: 0.08, green: 0.09, blue: 0.14, alpha: 1)
     }
 
@@ -100,13 +100,13 @@ final class GameScene: SKScene {
         world.addChild(pointerNode)
 
         scoreLabel.fontName = "Menlo-Bold"
-        scoreLabel.fontSize = 12
+        scoreLabel.fontSize = 16
         scoreLabel.fontColor = .white
         scoreLabel.verticalAlignmentMode = .top
         hud.addChild(scoreLabel)
 
         debugLabel.fontName = "Menlo"
-        debugLabel.fontSize = 6
+        debugLabel.fontSize = 8
         debugLabel.fontColor = SKColor(white: 1, alpha: 0.6)
         debugLabel.horizontalAlignmentMode = .left
         debugLabel.verticalAlignmentMode = .top
@@ -162,9 +162,10 @@ final class GameScene: SKScene {
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraNode.position = CGPoint(x: stageWidth / 2, y: stageHeight / 2)
         hud.position = cameraNode.position
+        hud.setScale(cameraNode.xScale)
 
-        let halfWidth = size.width / pointsPerGamePixel / 2
-        let halfHeight = size.height / pointsPerGamePixel / 2
+        let halfWidth = size.width / 2
+        let halfHeight = size.height / 2
         controls?.removeFromParent()
         let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight)
         controls.onReset = { [weak self] in self?.reset() }
@@ -174,8 +175,8 @@ final class GameScene: SKScene {
         }
         hud.addChild(controls)
         self.controls = controls
-        scoreLabel.position = CGPoint(x: 0, y: halfHeight - 6)
-        debugLabel.position = CGPoint(x: -halfWidth + 6, y: controls.pickerBottom - 4)
+        scoreLabel.position = CGPoint(x: 0, y: halfHeight - 8)
+        debugLabel.position = CGPoint(x: -halfWidth + 8, y: controls.pickerBottom - 6)
     }
 
     // MARK: Stepping
@@ -289,10 +290,9 @@ final class GameScene: SKScene {
 
     // MARK: Touches, from the Metal view in points
 
-    /// A point in the view, in points, as a point in the HUD's space in game pixels.
+    /// A point in the view as a point in the HUD's space: the same points, from the centre, y up.
     private func hudPoint(_ point: CGPoint, viewSize: CGSize) -> CGPoint {
-        let scale = cameraNode.xScale
-        return CGPoint(x: (point.x - viewSize.width / 2) * scale, y: (viewSize.height / 2 - point.y) * scale)
+        CGPoint(x: point.x - viewSize.width / 2, y: viewSize.height / 2 - point.y)
     }
 
     func touchBegan(_ touch: UITouch, at point: CGPoint, viewSize: CGSize) {

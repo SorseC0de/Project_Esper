@@ -126,6 +126,9 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
               let sceneTexture, let sceneDepthStencil, let glowA, let glowB,
               let commands = queue.makeCommandBuffer() else { return }
 
+        if scene.size != view.bounds.size {
+            scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor)
+        }
         skRenderer.update(atTime: CACurrentMediaTime())
 
         let scenePass = MTLRenderPassDescriptor()

@@ -1,12 +1,12 @@
 import EsperSim
 import SpriteKit
 
-/// The on-screen controls, drawn in the camera's space in game pixels. The left half is a
+/// The on-screen controls, laid out in screen points from the centre. The left half is a
 /// floating stick: the thumb's first touch is the centre. The right half holds three
 /// buttons. Shoot and throw read the drag away from the touch-down point as the flick.
 final class TouchControls: SKNode {
-    static let stickRadius = 30.0
-    static let flickRadius = 25.0
+    static let stickRadius = 40.0
+    static let flickRadius = 32.0
 
     private struct Button {
         let node: SKShapeNode
@@ -16,8 +16,8 @@ final class TouchControls: SKNode {
 
     private var buttons: [Button] = []
     private let stickBase = SKShapeNode(circleOfRadius: stickRadius)
-    private let stickKnob = SKShapeNode(circleOfRadius: 10)
-    private let resetButton = SKShapeNode(rectOf: CGSize(width: 34, height: 12), cornerRadius: 3)
+    private let stickKnob = SKShapeNode(circleOfRadius: 14)
+    private let resetButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
     /// Called when the corner button is tapped.
     var onReset: (() -> Void)?
     private var pickers: [SegmentedPicker] = []
@@ -32,7 +32,7 @@ final class TouchControls: SKNode {
 
     /// `halfWidth` and `halfHeight` are what the camera shows, in game pixels.
     init(halfWidth: CGFloat, halfHeight: CGFloat) {
-        pickerOrigin = CGPoint(x: -halfWidth + 6, y: halfHeight - 6)
+        pickerOrigin = CGPoint(x: -halfWidth + 8, y: halfHeight - 8)
         super.init()
         zPosition = 100
 
@@ -46,26 +46,26 @@ final class TouchControls: SKNode {
         addChild(stickBase)
         addChild(stickKnob)
 
-        let jump = makeButton("JUMP", radius: 22, at: CGPoint(x: halfWidth - 38, y: -halfHeight + 40)) { input, down, _ in
+        let jump = makeButton("JUMP", radius: 30, at: CGPoint(x: halfWidth - 50, y: -halfHeight + 54)) { input, down, _ in
             input.jump = down
         }
-        let shoot = makeButton("SHOOT", radius: 18, at: CGPoint(x: halfWidth - 96, y: -halfHeight + 72)) { input, down, aim in
+        let shoot = makeButton("SHOOT", radius: 24, at: CGPoint(x: halfWidth - 128, y: -halfHeight + 96)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", radius: 18, at: CGPoint(x: halfWidth - 104, y: -halfHeight + 26)) { input, down, aim in
+        let throwButton = makeButton("THROW", radius: 24, at: CGPoint(x: halfWidth - 140, y: -halfHeight + 36)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }
         buttons = [jump, shoot, throwButton]
 
-        resetButton.position = CGPoint(x: halfWidth - 24, y: halfHeight - 12)
+        resetButton.position = CGPoint(x: halfWidth - 32, y: halfHeight - 16)
         resetButton.fillColor = .init(white: 1, alpha: 0.1)
         resetButton.strokeColor = .init(white: 1, alpha: 0.4)
         resetButton.lineWidth = 1
         let resetText = SKLabelNode(text: "RESET")
         resetText.fontName = "Menlo-Bold"
-        resetText.fontSize = 6
+        resetText.fontSize = 8
         resetText.verticalAlignmentMode = .center
         resetText.fontColor = .init(white: 1, alpha: 0.8)
         resetButton.addChild(resetText)
@@ -84,7 +84,7 @@ final class TouchControls: SKNode {
         node.lineWidth = 1
         let text = SKLabelNode(text: label)
         text.fontName = "Menlo-Bold"
-        text.fontSize = 7
+        text.fontSize = 9
         text.verticalAlignmentMode = .center
         text.fontColor = .init(white: 1, alpha: 0.8)
         node.addChild(text)
@@ -125,7 +125,7 @@ final class TouchControls: SKNode {
     // MARK: Touches, in this node's space
 
     func began(_ touch: UITouch, at point: CGPoint) {
-        if resetButton.frame.insetBy(dx: -6, dy: -6).contains(point) {
+        if resetButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             onReset?()
             return
         }
@@ -146,7 +146,7 @@ final class TouchControls: SKNode {
         // The nearest button whose halo the touch is in, so a thumb between two goes to the closer one.
         let reach = buttons.enumerated()
             .map { (index: $0.offset, distance: hypot(point.x - $0.element.node.position.x, point.y - $0.element.node.position.y)) }
-            .filter { $0.distance <= buttons[$0.index].radius + 6 }
+            .filter { $0.distance <= buttons[$0.index].radius + 8 }
             .min { $0.distance < $1.distance }
         if let reach {
             let button = buttons[reach.index]

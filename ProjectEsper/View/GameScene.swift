@@ -40,7 +40,7 @@ final class GameScene: SKScene {
     override init() {
         super.init(size: CGSize(width: 640, height: 288))
         scaleMode = .fill
-        backgroundColor = SKColor(red: 0.08, green: 0.09, blue: 0.14, alpha: 1)
+        backgroundColor = SKColor(red: 0.18, green: 0.12, blue: 0.24, alpha: 1)
     }
 
     required init?(coder: NSCoder) { fatalError() }

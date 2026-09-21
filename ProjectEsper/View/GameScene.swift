@@ -26,6 +26,10 @@ final class GameScene: SKScene {
     private var previewNodes: [SKShapeNode] = []
     private let scoreLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
+    /// Debug: where the last touch landed in the HUD's space, and the numbers behind it.
+    private let touchMarker = SKShapeNode(circleOfRadius: 3)
+    private var touchReport = ""
+    private var displayScale: CGFloat = 1
     private var lastTime: TimeInterval?
     private var accumulator = 0.0
     private var built = false
@@ -108,6 +112,12 @@ final class GameScene: SKScene {
         debugLabel.verticalAlignmentMode = .top
         debugLabel.numberOfLines = 0
         hud.addChild(debugLabel)
+
+        touchMarker.strokeColor = .red
+        touchMarker.lineWidth = 1
+        touchMarker.zPosition = 200
+        touchMarker.isHidden = true
+        hud.addChild(touchMarker)
     }
 
     /// The rim's net, as GMS2 built it: six columns, five rows, tapering to half width.
@@ -142,6 +152,7 @@ final class GameScene: SKScene {
 
     /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
     private func layout(displayScale screenScale: CGFloat) {
+        displayScale = screenScale
         let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
@@ -271,9 +282,9 @@ final class GameScene: SKScene {
 
         scoreLabel.text = "\(match.scores[0])  -  \(match.scores[1])"
         let p = match.players[0]
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@\n%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "")
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", touchReport)
     }
 
     // MARK: Touches, from the Metal view in points
@@ -285,7 +296,13 @@ final class GameScene: SKScene {
     }
 
     func touchBegan(_ touch: UITouch, at point: CGPoint, viewSize: CGSize) {
-        controls?.began(touch, at: hudPoint(point, viewSize: viewSize))
+        let hudPoint = hudPoint(point, viewSize: viewSize)
+        touchMarker.position = hudPoint
+        touchMarker.isHidden = false
+        touchReport = String(format: "touch %.0f,%.0f pt -> hud %.0f,%.0f | view %.0fx%.0f scene %.0fx%.0f scale %.2f cam %.3f",
+                             point.x, point.y, hudPoint.x, hudPoint.y, viewSize.width, viewSize.height,
+                             size.width, size.height, displayScale, cameraNode.xScale)
+        controls?.began(touch, at: hudPoint)
     }
 
     func touchMoved(_ touch: UITouch, to point: CGPoint, viewSize: CGSize) {

@@ -271,7 +271,8 @@ final class GameScene: SKScene {
         fire.particleAlphaSequence = fade
         fire.particleColor = colour
         fire.particleColorBlendFactor = 1
-        fire.particleBlendMode = .add
+        // Drawn over, not added: hard squares added on top of the head saturate to white.
+        fire.particleBlendMode = .alpha
         return fire
     }
 
@@ -468,7 +469,7 @@ final class GameScene: SKScene {
             square.size = CGSize(width: 3, height: 3)
             square.color = colour
             square.colorBlendFactor = 1
-            square.blendMode = .add
+            square.blendMode = .alpha
             square.zPosition = 3
             let spread = CGFloat(index - count / 2) * 4
             square.position = CGPoint(x: feet.x + spread, y: feet.y - 2 + CGFloat(index % 2))

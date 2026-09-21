@@ -196,14 +196,15 @@ public struct FighterSpec: Equatable {
 }
 
 extension FighterSpec {
-    /// The body the game is tuned on: Fox with a harder dash burst and Sonic's run (Brawl
-    /// Sonic over Brawl Falcon, 3.5 to 2.18, carried onto Melee Falcon's 2.3), more traction,
-    /// and air control turned up so a jump starts at air speed and turns in about five frames.
+    /// The body the game is tuned on: Fox with a harder dash burst and a run halfway between
+    /// Falcon's 2.3 and Sonic's 3.7 (Brawl Sonic over Brawl Falcon carried onto Melee), more
+    /// traction, and air control turned up so a jump starts at air speed and turns in about
+    /// five frames.
     public static let baseline: FighterSpec = {
         var spec = meleeFox
         spec.name = "Baseline"
         spec.dashInitialVelocity = 2.5
-        spec.runSpeed = 3.7
+        spec.runSpeed = 3.0
         spec.traction = 0.15
         spec.airSpeedMax = 1.4
         spec.airAccelerationAdditional = 0.24

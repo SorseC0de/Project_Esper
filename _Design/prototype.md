@@ -23,8 +23,8 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-`FighterSpec.baseline` is Melee Fox with a 2.5 dash burst, Sonic's run (Brawl Sonic over
-Brawl Falcon, 3.5 to 2.18, carried onto Melee Falcon's 2.3 gives 3.7), traction 0.15, and
+`FighterSpec.baseline` is Melee Fox with a 2.5 dash burst, a 3.0 run (halfway between
+Falcon's 2.3 and Sonic's 3.7, Brawl Sonic over Brawl Falcon carried onto Melee), traction 0.15, and
 the air turned up: air speed 1.4, air acceleration 0.02 + 0.24, a jump with the stick held
 starts at air speed, and a double jump with the stick held sets the sideways speed, so it
 turns around. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table

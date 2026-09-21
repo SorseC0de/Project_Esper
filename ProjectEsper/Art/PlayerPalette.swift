@@ -109,10 +109,20 @@ enum BallLook {
 }
 
 enum CourtLook {
+    /// The tiles are dark shades: a colour at this much of its brightness.
+    static let shade = 0.45
+
     /// The floor and walls with nobody holding the ball; they take the holder's colour.
-    static let neutral: RGB = BallLook.neutral
+    static let neutral: RGB = shaded(BallLook.neutral)
     /// The one-way ledge in the middle.
-    static let ledge: RGB = 0xF040E0
+    static let ledge: RGB = shaded(0xF040E0)
+
+    static func shaded(_ colour: RGB) -> RGB {
+        func channel(_ shift: RGB) -> RGB {
+            RGB((Double((colour >> shift) & 0xFF) * shade).rounded()) << shift
+        }
+        return channel(16) | channel(8) | channel(0)
+    }
     /// The chevrons over the rim the holder scores on.
     static let targetChevron: RGB = 0x50E080
     /// Frames the floor and walls take to shift between colours.

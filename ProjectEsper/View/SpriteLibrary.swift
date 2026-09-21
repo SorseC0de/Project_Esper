@@ -105,7 +105,7 @@ final class SpriteLibrary {
         _ = softGlow(diameter: 32)
         _ = softGlow(diameter: 8)
         _ = feather()
-        _ = flatSquare(size: 16, alpha: 0.6)
+        _ = flatSquare(size: 16, alpha: 1)
         _ = flatSquare(size: 4, alpha: 1)
         _ = symbol("chevron.down", pointSize: 14)
         _ = symbol("chevron.down", pointSize: 10)

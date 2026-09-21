@@ -9,7 +9,12 @@ final class Wing: SKNode {
     /// straight back, the top and bottom ones furthest back and up or down. Angles from
     /// straight back in radians, and where each feather's base sits, lowest feather first.
     private static let spread: [CGFloat] = [-0.7, -0.35, 0, 0.35, 0.7]
-    private static let bases: [CGPoint] = [
+    /// Where each feather's base sits while running: a low, wide V held well off the back.
+    private static let runBases: [CGPoint] = [
+        CGPoint(x: -18, y: -3), CGPoint(x: -14, y: -1), CGPoint(x: -11, y: 1), CGPoint(x: -14, y: 3), CGPoint(x: -18, y: 5),
+    ]
+    /// And for the double-jump sweep: taller and closer.
+    private static let sweepBases: [CGPoint] = [
         CGPoint(x: -12, y: -5), CGPoint(x: -8, y: -1), CGPoint(x: -5, y: 2), CGPoint(x: -8, y: 5), CGPoint(x: -12, y: 9),
     ]
     private static let flapsPerSecond: CGFloat = 2.5
@@ -62,7 +67,7 @@ final class Wing: SKNode {
             // Raised and wide, then swept down and out away from the body.
             let swing = 0.5 - eased * 1.5
             for (index, feather) in feathers.enumerated() {
-                let base = Wing.bases[index]
+                let base = Wing.sweepBases[index]
                 feather.zRotation = -.pi / 2 + Wing.spread[index] * (1.3 - eased * 0.5) + swing
                 feather.position = CGPoint(x: base.x * (1 + eased * 0.8), y: base.y - eased * 10)
                 feather.alpha = (1 - t) * 0.9
@@ -78,9 +83,9 @@ final class Wing: SKNode {
         }
         let flap = sin(phase)
         for (index, feather) in feathers.enumerated() {
-            let base = Wing.bases[index]
+            let base = Wing.runBases[index]
             let lift = running ? 0 : (1 - strength) * 6
-            feather.zRotation = -.pi / 2 + Wing.spread[index] * (0.9 + flap * 0.3) + flap * 0.3
+            feather.zRotation = -.pi / 2 + Wing.spread[index] * (0.6 + flap * 0.2) + flap * 0.25
             feather.position = CGPoint(x: base.x * (1 + flap * 0.15), y: base.y + lift)
             feather.alpha = strength * 0.7
             feather.setScale(1)

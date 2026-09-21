@@ -123,7 +123,7 @@ final class GameScene: SKScene {
             for column in 0..<stage.columns {
                 let tile = stage.tile(column: column, row: row)
                 guard tile != .empty else { continue }
-                let node = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 0.6))
+                let node = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
                 node.colorBlendFactor = 1
                 node.anchorPoint = .zero
                 node.position = CGPoint(x: CGFloat(column) * GameScene.pixelsPerTile, y: CGFloat(row) * GameScene.pixelsPerTile)
@@ -132,7 +132,7 @@ final class GameScene: SKScene {
                 if tile == .oneWay {
                     node.color = SKColor(rgb: CourtLook.ledge)
                 } else if !border, let hoop = stage.hoops.min(by: { $0.position.distance(to: Vec2(x: x, y: y)) < $1.position.distance(to: Vec2(x: x, y: y)) }) {
-                    node.color = SKColor(rgb: sprites.look(for: hoop.owner).glow)
+                    node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: hoop.owner).glow))
                 } else {
                     node.color = courtColour
                     courtTiles.append(node)
@@ -279,7 +279,7 @@ final class GameScene: SKScene {
 
     /// The floor and walls shift toward whoever holds the ball, and back to neutral.
     private func tickCourtColour() {
-        let wanted = match.ball.holder.map { SKColor(rgb: sprites.look(for: $0).glow) } ?? SKColor(rgb: CourtLook.neutral)
+        let wanted = match.ball.holder.map { SKColor(rgb: CourtLook.shaded(sprites.look(for: $0).glow)) } ?? SKColor(rgb: CourtLook.neutral)
         if wanted != courtTarget {
             courtTarget = wanted
             courtShift = CourtLook.shiftFrames

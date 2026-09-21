@@ -245,6 +245,34 @@ final class BallTests: XCTestCase {
         XCTAssertGreaterThan(match.ball.velocity.y, 0)
     }
 
+    func testJumpShotReleasedOnTheRiseShootsWithLift() {
+        var match = matchWithBallHeld()
+        for _ in 0..<BallRules.shotWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        }
+        match.advance(inputs: [PlayerInput(jump: true, shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertGreaterThan(match.players[0].velocity.y, 0)
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .shooting)
+        run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        let preset = sin(BallRules.shotAngleDefault) * BallRules.shotSpeed
+        XCTAssertGreaterThan(match.ball.velocity.y, preset)
+    }
+
+    func testJumpShotReleasedOnTheWayDownWithoutAFlickIsAFake() {
+        var match = matchWithBallHeld()
+        for _ in 0..<BallRules.shotWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        }
+        match.advance(inputs: [PlayerInput(jump: true, shoot: true), .idle])
+        run(&match, frames: 60, input: { _ in PlayerInput(shoot: true) }) { $0.players[0].velocity.y < 0 }
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .air)
+        XCTAssertTrue(match.players[0].hasBall)
+    }
+
     func testShotAngleClampsToRange() {
         var player = Match().players[0]
         player.shotAim = Vec2(x: 0, y: 1)
@@ -332,9 +360,10 @@ final class BallTests: XCTestCase {
     }
 
     @discardableResult
-    private func run(_ match: inout Match, frames: Int, input: (Int) -> PlayerInput) -> Int {
+    private func run(_ match: inout Match, frames: Int, input: (Int) -> PlayerInput, until stop: ((Match) -> Bool)? = nil) -> Int {
         for frame in 0..<frames {
             match.advance(inputs: [input(frame), .idle])
+            if let stop, stop(match) { return frame }
         }
         return frames
     }

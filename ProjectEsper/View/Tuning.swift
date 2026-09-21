@@ -1,9 +1,9 @@
 import EsperSim
 import Foundation
 
-/// Air models on the picker. A is the baseline as tuned. B is D with a hard brake in the
-/// shoot stance. C is direct. D and E keep the baseline's control and raise the cap. Only
-/// the air numbers change, so the ground is the same under each.
+/// Air models on the picker. A is the baseline as tuned. B brakes harder in the stance, C is
+/// direct, D keeps momentum through the stance, E raises the cap. Only the air numbers
+/// change, so the ground is the same under each.
 enum AirVariant: Int, CaseIterable {
     case a, b, c, d, e
 
@@ -15,19 +15,15 @@ enum AirVariant: Int, CaseIterable {
         case .a:
             break
         case .b:
-            // D's air, and the stance stops sideways drift in about five frames.
-            spec.airSpeedMax = 1.6
-            spec.jumpHorizontalVelocity = 1.6
-            spec.doubleJumpHorizontalVelocity = 1.6
+            // The stance stops sideways drift in about five frames.
             spec.stanceAirBrake = 0.3
         case .c:
             // Direct: the stick is the air speed, no momentum either way.
             spec.airAccelerationAdditional = 2
             spec.airFriction = 2
         case .d:
-            spec.airSpeedMax = 1.6
-            spec.jumpHorizontalVelocity = 1.6
-            spec.doubleJumpHorizontalVelocity = 1.6
+            // The stance barely brakes; drift carries into the shot.
+            spec.stanceAirBrake = 0.01
         case .e:
             spec.airSpeedMax = 1.8
             spec.jumpHorizontalVelocity = 1.8

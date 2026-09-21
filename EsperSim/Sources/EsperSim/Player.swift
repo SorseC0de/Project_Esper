@@ -43,6 +43,10 @@ public struct Player: Equatable {
     public var shotAim: Vec2 = .zero
     /// The stance was let go before its windup finished: it fires when the windup ends.
     public var quickShot = false
+    /// The stance was taken on the ground and jumped out of.
+    public var jumpShot = false
+    /// The shot was released on the way up out of a jump shot: it leaves with the body's lift.
+    public var shotLift = false
     /// The last cardinal recorded in the throwing stance; zero throws forward.
     public var throwDirection: Vec2 = .zero
     public var catchCooldown = 0
@@ -245,22 +249,22 @@ public struct Player: Equatable {
                 velocity.y = spec.fullHopVelocity
                 jumpsLeft = 0
                 grounded = false
+                jumpShot = true
                 events.append(.jumped(player: index))
             }
             if !input.shoot, !quickShot {
                 if stateTimer < BallRules.shotWindupFrames {
                     // Let go early: a quickshot, on the preset arc unless a flick came first.
                     quickShot = true
-                } else if shotAim != .zero {
-                    enter(.shooting)
+                } else if shotAim != .zero || (jumpShot && velocity.y > 0) {
+                    releaseShot()
                 } else {
                     // The pump fake.
                     enter(grounded ? .idle : .air)
                 }
             }
             if quickShot, stateTimer >= BallRules.shotWindupFrames {
-                if shotAim == .zero { shotAim = presetAim }
-                enter(.shooting)
+                releaseShot()
             }
 
         case .shooting:
@@ -273,7 +277,8 @@ public struct Player: Equatable {
             if stateTimer == BallRules.shotReleaseFrames {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames
-                action = .releaseShot(velocity: shotVelocity)
+                let lift = shotLift ? max(velocity.y, 0) : 0
+                action = .releaseShot(velocity: shotVelocity + Vec2(x: 0, y: lift))
                 events.append(.shot(player: index))
             } else if stateTimer >= BallRules.shotReleaseFrames + BallRules.shotRecoveryFrames {
                 enter(grounded ? .idle : .air)
@@ -376,7 +381,17 @@ public struct Player: Equatable {
     private mutating func enterShootStance() {
         shotAim = .zero
         quickShot = false
+        jumpShot = false
+        shotLift = false
         enter(.shootStance)
+    }
+
+    /// Off to the shot. Released on the way up out of a jump shot, it gets the preset arc if
+    /// nothing was flicked, and the body's lift.
+    private mutating func releaseShot() {
+        shotLift = jumpShot && velocity.y > 0
+        if shotAim == .zero { shotAim = presetAim }
+        enter(.shooting)
     }
 
     /// The preset arc, forward at the default angle.

@@ -23,9 +23,9 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-`FighterSpec.baseline` is Melee Fox with a Falco-style dash, a 3.0 burst into a 2.5 run,
-traction 0.15, and
-the air turned up: air speed 1.4, air acceleration 0.02 + 0.24, a jump with the stick held
+`FighterSpec.baseline` is Melee Fox with a Falco-style dash, a 2.8 burst into a 2.5 run,
+traction 0.15, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
+the air turned up: air speed 1.6, air acceleration 0.02 + 0.24, a jump with the stick held
 starts at air speed, and a double jump with the stick held sets the sideways speed, so it
 turns around. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
 and are chosen to sit with the rest.
@@ -42,7 +42,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap, or
   letting go before the 20-frame windup ends, is the quickshot: it fires on the preset 53°
   arc when the windup ends. Holding past the windup and releasing without a flick is the
-  pump fake. On the ground, jump during the stance is a jump shot.
+  pump fake. On the ground, jump during the stance is a jump shot: released on the way up
+  it fires on the preset arc if nothing was flicked and the ball leaves with the body's
+  lift. On the way down it's an ordinary air shot.
 - Shoot (without ball, in the air): swat. Reverses the ball if it's in front.
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
   gravity until the first bounce. The rims don't pull a thrown ball, so scoring off a throw
@@ -60,8 +62,8 @@ tuning picker, menu resets.
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
 holds the variants; A is always the baseline as tuned.
 
-- AIR: A baseline. B is D with the shoot stance braking sideways drift in about five
-  frames. C direct, the stick is the air speed. D the baseline with a 1.6 cap. E with 1.8.
+- AIR: A baseline. B the stance brakes harder, 0.3 a frame. C direct, the stick is the air
+  speed. D the stance barely brakes. E a 1.8 cap.
 
 ## Glow
 

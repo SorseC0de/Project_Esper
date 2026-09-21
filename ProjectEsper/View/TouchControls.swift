@@ -44,14 +44,14 @@ final class TouchControls: SKNode {
         addChild(stickBase)
         addChild(stickKnob)
 
-        let jump = makeButton("JUMP", radius: 22, at: CGPoint(x: halfWidth - 40, y: -halfHeight + 44)) { input, down, _ in
+        let jump = makeButton("JUMP", radius: 22, at: CGPoint(x: halfWidth - 38, y: -halfHeight + 40)) { input, down, _ in
             input.jump = down
         }
-        let shoot = makeButton("SHOOT", radius: 18, at: CGPoint(x: halfWidth - 92, y: -halfHeight + 66)) { input, down, aim in
+        let shoot = makeButton("SHOOT", radius: 18, at: CGPoint(x: halfWidth - 96, y: -halfHeight + 72)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", radius: 18, at: CGPoint(x: halfWidth - 108, y: -halfHeight + 22)) { input, down, aim in
+        let throwButton = makeButton("THROW", radius: 18, at: CGPoint(x: halfWidth - 104, y: -halfHeight + 26)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }
@@ -129,11 +129,16 @@ final class TouchControls: SKNode {
             input.stick = .zero
             return
         }
-        for (index, button) in buttons.enumerated() where hypot(point.x - button.node.position.x, point.y - button.node.position.y) <= button.radius + 8 {
-            buttonTouches[touch] = (index, point)
+        // The nearest button whose halo the touch is in, so a thumb between two goes to the closer one.
+        let reach = buttons.enumerated()
+            .map { (index: $0.offset, distance: hypot(point.x - $0.element.node.position.x, point.y - $0.element.node.position.y)) }
+            .filter { $0.distance <= buttons[$0.index].radius + 6 }
+            .min { $0.distance < $1.distance }
+        if let reach {
+            let button = buttons[reach.index]
+            buttonTouches[touch] = (reach.index, point)
             button.node.fillColor = .init(white: 1, alpha: 0.4)
             button.set(&input, true, .zero)
-            return
         }
     }
 

@@ -47,7 +47,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
   gravity until the first bounce. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
-- Wall: hold toward a wall in the air to cling, jump to leave. Direction is automatic.
+- Wall: hold toward a wall in the air to cling, jump to leave. Direction is automatic. A
+  cling can't start for 8 frames after leaving the ground, so a jump beside a wall isn't
+  caught by it on the way up.
 - Catch is automatic: facing the ball within reach.
 
 Pad: A jump, B or R1 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top

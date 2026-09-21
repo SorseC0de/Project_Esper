@@ -189,6 +189,7 @@ public struct Player: Equatable {
                 velocity.x = min(max(velocity.x + input.stick.x * spec.jumpHorizontalVelocity, -cap), cap)
                 jumpsLeft -= 1
                 grounded = false
+                wallLandCooldown = max(wallLandCooldown, spec.wallLandGroundLockoutFrames)
                 events.append(.jumped(player: index))
                 enter(.air)
             }
@@ -493,6 +494,7 @@ public struct Player: Equatable {
                 break
             }
         } else if state.isGroundState, state != .jumpSquat {
+            wallLandCooldown = max(wallLandCooldown, spec.wallLandGroundLockoutFrames)
             enter(.air)
         }
     }

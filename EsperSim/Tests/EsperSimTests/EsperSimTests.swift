@@ -145,6 +145,20 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.wallJumpHorizontal, accuracy: 0.001)
     }
 
+    func testJumpBesideAWallIsNotCaughtOnTheWayUp() {
+        var match = Match()
+        // Body against the left wall, stick into it, jump.
+        match.players[0].position = Vec2(x: 15, y: 10)
+        let lockout = match.players[0].spec.wallLandGroundLockoutFrames
+        run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0), jump: true) }) { $0.players[0].state == .air }
+        for _ in 0..<lockout - 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle])
+            XCTAssertEqual(match.players[0].state, .air)
+        }
+        let clung = run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
+        XCTAssertLessThan(clung, 60, "never clung once the lockout passed")
+    }
+
     func testJumpBufferedThroughLandingLag() {
         var match = Match()
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })

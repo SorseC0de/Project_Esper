@@ -43,6 +43,9 @@ public struct FighterSpec: Equatable {
     public var wallLandFrames: Int
     /// Frames after leaving a wall before another cling can start.
     public var wallLandCooldownFrames: Int
+    /// Frames after leaving the ground before a cling can start, so a jump beside a wall
+    /// isn't caught by it on the way up.
+    public var wallLandGroundLockoutFrames = 8
 
     /// Body box: full width and height, feet at the position.
     public var bodyWidth: Double

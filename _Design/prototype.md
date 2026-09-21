@@ -78,8 +78,8 @@ tuning picker, menu resets.
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
 holds the variants; A is always the baseline as tuned.
 
-- HEAD: how the detached head follows the body. Both close half the gap each frame. B
-  leads sideways instead of trailing, the offset reversed across only.
+- HEAD: how the detached head follows the body. Both close half the gap each frame. B,
+  the default, leads sideways instead of trailing, the offset reversed across only.
 
 ## Look
 
@@ -95,7 +95,7 @@ the body by a quarter of the gap each frame and bobbing a pixel, and its fire is
 into the world so it streams behind a moving head. The loose ball is purple, and for 45 frames after a shot, throw or dunk it's the colour
 of whoever let it go, then shifts back over 30. A flying ball leaves a soft additive trail
 in its colour. The library finds where the ball and the head sit in each frame so the halo
-and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted 3 pixels off the body. Three dim
+and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted a pixel off the body. Three dim
 yellow chevrons stack over a resting ball and light one after another from the top. Each
 body has a wing behind the shoulder in the manner of Mithos's from Tales of Symphonia: five
 separate soft feather shapes in the team colour, hues nudged across the fan, additive. It

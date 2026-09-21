@@ -14,10 +14,10 @@ final class GameScene: SKScene {
     private static let pixelsPerTile = CGFloat(Stage.tileSize * SpriteLibrary.pixelsPerUnit)
     private static let headScale: CGFloat = 1.25
     /// Pixels the head floats above its place on the body, so scaling it up doesn't sink it in.
-    private static let headLift: CGFloat = 3
+    private static let headLift: CGFloat = 1
 
     private var match = Match()
-    private var headVariant = HeadVariant.a
+    private var headVariant = HeadVariant.b
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()

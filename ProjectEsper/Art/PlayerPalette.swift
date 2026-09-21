@@ -88,9 +88,10 @@ struct Look: Hashable {
 
     static let orange: RGB = 0xF47E1B
     static let teal: RGB = 0x5FCDE4
-    /// The bodies: a light orange and a light teal, clearly toward the team colour.
-    static let lightOrange: RGB = 0xFFD8B0
-    static let lightTeal: RGB = 0xB8EEF5
+    /// The bodies: an orange and a teal light enough to read as the body, deep enough that
+    /// the glow doesn't wash them out.
+    static let lightOrange: RGB = 0xFFB877
+    static let lightTeal: RGB = 0x8EDCE8
 
     static let playerOne = team(orange, body: lightOrange)
     static let playerTwo = team(teal, body: lightTeal)

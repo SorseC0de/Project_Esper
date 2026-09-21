@@ -76,8 +76,8 @@ final class MovementTests: XCTestCase {
 
     func testWallLandThenWallJump() {
         var match = Match()
-        // Jump toward the left wall of the court (column 0 ends at x = 10) and hold into it.
-        match.players[0].position = Vec2(x: 30, y: 10)
+        // Jump toward the left backboard's inner face (x = 40, y 40 to 60) and hold into it.
+        match.players[0].position = Vec2(x: 60, y: 10)
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         let clung = run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
         XCTAssertLessThan(clung, 120, "never reached the wall")
@@ -88,6 +88,27 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].velocity.x, 1.5, accuracy: 0.001)
         XCTAssertEqual(match.players[0].velocity.y, 2.0, accuracy: 0.001)
         XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
+    }
+
+    func testJumpOnWallContactIsAWallJumpNotADoubleJump() {
+        var match = Match()
+        match.players[0].position = Vec2(x: 60, y: 10)
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        // Hold into the backboard and mash jump the whole way there.
+        let jumped = run(&match, frames: 120, input: { frame in
+            PlayerInput(stick: Vec2(x: -1, y: 0), jump: frame % 2 == 0)
+        }) { $0.events.contains(.wallJumped(player: 0, wall: .left)) }
+        XCTAssertLessThan(jumped, 120, "never wall jumped")
+        XCTAssertEqual(match.players[0].velocity.x, 1.5, accuracy: 0.001)
+    }
+
+    func testJumpBufferedThroughLandingLag() {
+        var match = Match()
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 120, input: { _ in .idle }) { $0.players[0].state == .land }
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        run(&match, frames: 5, input: { _ in .idle })
+        XCTAssertEqual(match.players[0].state, .jumpSquat)
     }
 
     func testLandingLagThenIdle() {
@@ -179,7 +200,7 @@ final class BallTests: XCTestCase {
 
     func testBallThroughTheRimScores() {
         var match = Match()
-        match.ball.position = match.stage.hoops[1].position + Vec2(x: 0, y: 30)
+        match.ball.position = match.stage.hoops[1].position + Vec2(x: 0, y: 20)
         match.ball.velocity = .zero
         for _ in 0..<120 where match.scores[0] == 0 {
             match.advance(inputs: [.idle, .idle])

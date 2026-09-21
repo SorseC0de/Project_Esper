@@ -48,6 +48,8 @@ public struct Player: Equatable {
     public var swatCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
+    /// Frames a jump press stays live waiting for something to spend it.
+    public var jumpBuffer = 0
     /// Frames since the stick was near centre on x, for telling a smash from a tilt.
     public var stickAwayFrames = 0
     /// Walk and run cycle position, in animation frames.
@@ -96,7 +98,8 @@ public struct Player: Equatable {
         if doubleJumpTimer > 0 { doubleJumpTimer -= 1 }
         stickAwayFrames = abs(input.stick.x) < 0.3 ? 0 : stickAwayFrames + 1
 
-        let jumpPressed = input.jump && !lastInput.jump
+        if input.jump && !lastInput.jump { jumpBuffer = 5 } else if jumpBuffer > 0 { jumpBuffer -= 1 }
+        let jumpPressed = jumpBuffer > 0
         let shootPressed = input.shoot && !lastInput.shoot
         let tauntPressed = input.taunt && !lastInput.taunt
         let smash = abs(input.stick.x) >= spec.dashThreshold && stickAwayFrames <= 3
@@ -166,6 +169,7 @@ public struct Player: Equatable {
             }
 
         case .jumpSquat:
+            jumpBuffer = 0
             if stateTimer >= spec.jumpSquatFrames {
                 velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
                 jumpsLeft -= 1
@@ -177,12 +181,13 @@ public struct Player: Equatable {
         case .air:
             airDrift(input)
             fall(input)
-            if jumpPressed, jumpsLeft > 0 {
-                doubleJump(input, events: &events)
-            } else if wallLandCooldown == 0, let wall = wallSide, stickFacing(input) == wall {
+            if wallLandCooldown == 0, let wall = wallSide, stickFacing(input) == wall {
                 facing = wall
                 velocity = .zero
                 enter(.wallLand)
+                if jumpPressed { wallJump(off: wall, events: &events) }
+            } else if jumpPressed, jumpsLeft > 0 {
+                doubleJump(input, events: &events)
             } else if hasBall, input.shoot {
                 shotAim = .zero
                 enter(.shootStance)
@@ -199,12 +204,7 @@ public struct Player: Equatable {
         case .wallLand:
             velocity = Vec2(x: 0, y: -spec.wallSlideSpeed)
             if let wall = wallSide, jumpPressed {
-                velocity = Vec2(x: spec.wallJumpHorizontal * -wall.sign, y: spec.wallJumpVertical)
-                facing = wall.flipped
-                fastFalling = false
-                wallLandCooldown = spec.wallLandCooldownFrames
-                events.append(.wallJumped(player: index, wall: wall))
-                enter(.air)
+                wallJump(off: wall, events: &events)
             } else if wallSide == nil || stateTimer >= spec.wallLandFrames {
                 wallLandCooldown = spec.wallLandCooldownFrames
                 enter(.air)
@@ -230,6 +230,7 @@ public struct Player: Equatable {
                 facing = direction
             }
             if grounded, jumpPressed {
+                jumpBuffer = 0
                 velocity.y = spec.fullHopVelocity
                 jumpsLeft = 0
                 grounded = false
@@ -360,7 +361,18 @@ public struct Player: Equatable {
         enter(.dash)
     }
 
+    private mutating func wallJump(off wall: Facing, events: inout [MatchEvent]) {
+        jumpBuffer = 0
+        velocity = Vec2(x: spec.wallJumpHorizontal * -wall.sign, y: spec.wallJumpVertical)
+        facing = wall.flipped
+        fastFalling = false
+        wallLandCooldown = spec.wallLandCooldownFrames
+        events.append(.wallJumped(player: index, wall: wall))
+        enter(.air)
+    }
+
     private mutating func doubleJump(_ input: PlayerInput, events: inout [MatchEvent]) {
+        jumpBuffer = 0
         velocity.y = spec.doubleJumpVelocity
         jumpsLeft -= 1
         fastFalling = false

@@ -35,6 +35,7 @@ final class GameScene: SKScene {
     required init?(coder: NSCoder) { fatalError() }
 
     override func didMove(to view: SKView) {
+        view.isMultipleTouchEnabled = true
         hub.activate()
         if !built {
             build()
@@ -135,14 +136,17 @@ final class GameScene: SKScene {
         return node
     }
 
-    /// One game pixel is a whole number of screen pixels, as many as fit the court's height.
+    /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
     private func layout(in view: SKView) {
         let screenScale = view.traitCollection.displayScale
+        let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile
-        let screenPixelsPerGamePixel = max(1, (screenScale * size.height / stageHeight).rounded(.down))
+        let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
+        let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
+        let screenPixelsPerGamePixel = max(1, min(fitHeight, fitWidth))
         let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
-        cameraNode.position = CGPoint(x: CGFloat(match.stage.columns) * GameScene.pixelsPerTile / 2, y: stageHeight / 2)
+        cameraNode.position = CGPoint(x: stageWidth / 2, y: stageHeight / 2)
 
         let halfWidth = size.width / pointsPerGamePixel / 2
         let halfHeight = size.height / pointsPerGamePixel / 2

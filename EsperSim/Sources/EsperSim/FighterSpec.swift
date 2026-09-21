@@ -91,7 +91,7 @@ public enum BallRules {
     public static let restSpeed = 0.2
 
     /// A shot leaves from this high above the feet and arcs at this speed.
-    public static let shotSpeed = 3.5
+    public static let shotSpeed = 2.5
     public static let shotReleaseHeight = 25.0
     public static let shotAngleMin = degrees(25)
     public static let shotAngleMax = degrees(80)
@@ -114,7 +114,7 @@ public enum BallRules {
     public static let throwWindupFrames = 25
     public static let throwRecoveryFrames = 15
     /// A throw stance this close to a rim becomes a dunk.
-    public static let dunkRadius = 24.0
+    public static let dunkRadius = 12.0
     public static let dunkFrames = 20
 
     /// The ball is caught within this of the chest, in front.
@@ -127,7 +127,7 @@ public enum BallRules {
 
     /// The rim pulls the ball in from this far, at strength over distance squared, and
     /// swallows it within the absorb radius.
-    public static let hoopPullRadius = 50.0
+    public static let hoopPullRadius = 25.0
     public static let hoopPullStrength = 20.0
     public static let hoopAbsorbRadius = 12.0
     public static let rimHalfWidth = 6.0

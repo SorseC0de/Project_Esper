@@ -15,7 +15,9 @@ neutral to get a shot off; catch it and the roles reverse.
 ## Units
 
 Melee units. 1 unit = 1.6 game pixels, so a 16px tile is 10 units and the 24px body is 15
-units tall. The camera draws each game pixel as a whole number of screen pixels.
+units tall, which is Melee Mario's height. The court is 20 by 9 tiles, about one Final
+Destination wide, and the camera fits all of it at a whole number of screen pixels per game
+pixel: 8 on an iPhone, so Mario stands a sixth of the screen tall, as Melee draws him.
 
 ## Movement
 

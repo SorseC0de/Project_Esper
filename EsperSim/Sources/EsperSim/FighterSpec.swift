@@ -266,8 +266,11 @@ public enum BallRules {
     public static let dunkRadius = 12.0
     public static let dunkFrames = 20
 
-    /// The ball is caught within this of the chest, in front.
+    /// The ball is caught within this of the chest, in front. Faster than the threshold it
+    /// bounces off instead, unless the body is in the catch stance: a shoot button held
+    /// with no ball.
     public static let catchRadius = 12.5
+    public static let catchSpeedThreshold = 5.0
     public static let chestHeight = 9.0
     /// The swat reaches this far and can't repeat for this long.
     public static let swatRadius = 20.0

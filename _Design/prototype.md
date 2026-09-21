@@ -63,7 +63,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   still jumps off it. A cling can't start for 8 frames after leaving the ground, and the
   walls above the court's top row can't be clung to or jumped off.
 - Catch is automatic: the ball within reach and either in front, or in the way of where
-  the body is moving. A ball arriving from behind while standing still bounces off.
+  the body is moving. A ball arriving from behind while standing still bounces off, and so
+  does one faster than 5 a frame (a throw is 7, a shot 4.5) unless the body is in the catch
+  stance: a shoot button held with no ball.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
   would carry it through the rim, a share a frame, never snapped.
 

@@ -436,6 +436,22 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity, Vec2(x: BallRules.throwSpeed, y: 0))
     }
 
+    func testFastBallBouncesOffUnlessInCatchStance() {
+        var match = Match()
+        let chest = match.players[0].chest
+        match.ball.respawn(at: chest + Vec2(x: 20, y: 0))
+        match.ball.velocity = Vec2(x: -BallRules.throwSpeed, y: 0)
+        run(&match, frames: 10, input: { _ in .idle }) { $0.ball.velocity.x > 0 || $0.ball.holder != nil }
+        XCTAssertNil(match.ball.holder)
+        XCTAssertGreaterThan(match.ball.velocity.x, 0, "a thrown ball should bounce off an idle body")
+
+        var ready = Match()
+        ready.ball.respawn(at: chest + Vec2(x: 20, y: 0))
+        ready.ball.velocity = Vec2(x: -BallRules.throwSpeed, y: 0)
+        run(&ready, frames: 10, input: { _ in PlayerInput(shoot: true) }) { $0.ball.holder != nil }
+        XCTAssertEqual(ready.ball.holder, 0)
+    }
+
     func testLooseBallInFrontIsCaught() {
         var match = Match()
         match.ball.position = match.players[0].chest + Vec2(x: 6, y: 0)

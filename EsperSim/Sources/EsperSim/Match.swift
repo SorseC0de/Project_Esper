@@ -85,8 +85,9 @@ public struct Match: Equatable {
 
     /// The nearest player who can reach the loose ball takes it.
     private mutating func tryCatch() {
+        let speed = ball.velocity.length
         let candidates = players.indices
-            .filter { players[$0].canCatch(ballAt: ball.position) }
+            .filter { players[$0].canCatch(ballAt: ball.position, speed: speed) }
             .sorted { players[$0].chest.distance(to: ball.position) < players[$1].chest.distance(to: ball.position) }
         guard let catcher = candidates.first else { return }
         players[catcher].catchBall()

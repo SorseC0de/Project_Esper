@@ -68,6 +68,8 @@ public struct Player: Equatable {
     /// the throw button before another throw stance.
     public var shootReady = true
     public var throwReady = true
+    /// A shoot button held with no ball: ready to catch a fast one.
+    public var catchStance = false
     public var swatCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
@@ -126,6 +128,7 @@ public struct Player: Equatable {
         if coyote > 0 { coyote -= 1 }
         if input.shootButtons == 0 { shootReady = true }
         if !input.throwBall { throwReady = true }
+        catchStance = !hasBall && input.shoot
         if swatCooldown > 0 { swatCooldown -= 1 }
         if doubleJumpTimer > 0 { doubleJumpTimer -= 1 }
         stickAwayFrames = abs(input.stick.x) < 0.3 ? 0 : stickAwayFrames + 1
@@ -608,9 +611,11 @@ public struct Player: Equatable {
     }
 
     /// Whether the ball at `ballPosition` is in reach and either in front or in the way of
-    /// where the body is moving. A ball arriving from behind while standing still bounces off.
-    public func canCatch(ballAt ballPosition: Vec2) -> Bool {
+    /// where the body is moving. A ball arriving from behind while standing still bounces
+    /// off, and so does one over the speed threshold unless the body is in the catch stance.
+    public func canCatch(ballAt ballPosition: Vec2, speed: Double = 0) -> Bool {
         guard !hasBall, catchCooldown == 0, state.canCatch else { return false }
+        guard speed <= BallRules.catchSpeedThreshold || catchStance else { return false }
         let offset = ballPosition - chest
         guard offset.length <= BallRules.catchRadius else { return false }
         let ahead = offset.x * facing.sign >= -1

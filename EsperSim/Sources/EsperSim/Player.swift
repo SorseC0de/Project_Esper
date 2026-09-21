@@ -109,6 +109,12 @@ public struct Player: Equatable {
         stateTimer = 0
     }
 
+    /// The run cycle's advance this frame: 30 frames a second at full run speed, scaling
+    /// with how fast the body actually moves, never under 10.
+    private var runCycleStep: Double {
+        max(abs(velocity.x) / spec.runSpeed * 0.5, 10.0 / 60)
+    }
+
     /// Whether the stick is pushed the way the body faces.
     private func stickForward(_ input: PlayerInput) -> Bool {
         input.stick.x != 0 && (input.stick.x > 0) == (facing == .right)
@@ -187,7 +193,7 @@ public struct Player: Equatable {
                     startDash(events: &events)
                 } else {
                     velocity.x = spec.dashInitialVelocity * facing.sign
-                    animationPhase += 0.25
+                    animationPhase += runCycleStep
                     if stateTimer >= spec.dashFrames {
                         enter(abs(input.stick.x) >= 0.5 && stickForward(input) ? .run : .idle)
                     }
@@ -199,7 +205,7 @@ public struct Player: Equatable {
                 if downHeldFrames >= spec.runBrakeHoldFrames {
                     // Held down: the run brakes, and at walking speed it becomes a walk.
                     velocity.x = approach(velocity.x, 0, spec.traction)
-                    animationPhase += abs(velocity.x) / spec.runSpeed * 0.25
+                    animationPhase += runCycleStep
                     if abs(velocity.x) <= spec.walkMaxSpeed {
                         enter(stickFacing(input) == nil ? .idle : .walk)
                     }
@@ -208,7 +214,7 @@ public struct Player: Equatable {
                         enter(.pivot)
                     } else {
                         velocity.x = spec.runSpeed * facing.sign
-                        animationPhase += 0.25
+                        animationPhase += runCycleStep
                     }
                 } else {
                     enter(.idle)

@@ -30,9 +30,16 @@ final class TouchControls: SKNode {
     /// Buttons that went down since the last sample, so a tap shorter than a frame still lands.
     private var latched = PlayerInput.idle
 
-    /// `halfWidth` and `halfHeight` are what the camera shows, in game pixels.
-    init(halfWidth: CGFloat, halfHeight: CGFloat) {
-        pickerOrigin = CGPoint(x: -halfWidth + 8, y: halfHeight - 8)
+    static let padding: CGFloat = 12
+
+    /// `halfWidth` and `halfHeight` are half the view in points; `insets` is the safe area.
+    /// Everything keeps `padding` inside the safe area.
+    init(halfWidth: CGFloat, halfHeight: CGFloat, insets: UIEdgeInsets) {
+        let left = -halfWidth + insets.left + TouchControls.padding
+        let right = halfWidth - insets.right - TouchControls.padding
+        let top = halfHeight - insets.top - TouchControls.padding
+        let bottom = -halfHeight + insets.bottom + TouchControls.padding
+        pickerOrigin = CGPoint(x: left, y: top)
         super.init()
         zPosition = 100
 
@@ -47,20 +54,20 @@ final class TouchControls: SKNode {
         addChild(stickKnob)
 
         // Shoot and jump side by side, throw below and between them.
-        let jump = makeButton("JUMP", radius: 30, at: CGPoint(x: halfWidth - 50, y: -halfHeight + 90)) { input, down, _ in
+        let jump = makeButton("JUMP", radius: 30, at: CGPoint(x: right - 38, y: bottom + 84)) { input, down, _ in
             input.jump = down
         }
-        let shoot = makeButton("SHOOT", radius: 30, at: CGPoint(x: halfWidth - 126, y: -halfHeight + 90)) { input, down, aim in
+        let shoot = makeButton("SHOOT", radius: 30, at: CGPoint(x: right - 114, y: bottom + 84)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", radius: 24, at: CGPoint(x: halfWidth - 88, y: -halfHeight + 32)) { input, down, aim in
+        let throwButton = makeButton("THROW", radius: 24, at: CGPoint(x: right - 76, y: bottom + 26)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }
         buttons = [jump, shoot, throwButton]
 
-        resetButton.position = CGPoint(x: halfWidth - 32, y: halfHeight - 16)
+        resetButton.position = CGPoint(x: right - 23, y: top - 8)
         resetButton.fillColor = .init(white: 1, alpha: 0.1)
         resetButton.strokeColor = .init(white: 1, alpha: 0.4)
         resetButton.lineWidth = 1

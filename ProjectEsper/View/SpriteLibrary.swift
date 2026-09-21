@@ -29,10 +29,7 @@ final class SpriteLibrary {
     func texture(_ name: String, _ frame: Int) -> SKTexture {
         let key = "\(name)_\(frame)"
         if let texture = cache[key] { return texture }
-        var texture = atlas.textureNamed(key)
-        if name == "ball" {
-            texture = recolour(texture, swaps: BallLook.swaps).texture
-        }
+        let texture = atlas.textureNamed(key)
         texture.filteringMode = .nearest
         cache[key] = texture
         return texture
@@ -86,12 +83,29 @@ final class SpriteLibrary {
 
     // MARK: Recolouring
 
-    private func recolour(_ texture: SKTexture, swaps: [RGB: RGB]) -> (texture: SKTexture, head: SKTexture?, centres: [BodyPart: CGPoint]) {
-        var look = Look(colours: [:], glow: 0, outline: 0, outlineWidth: 0)
-        for (source, target) in swaps {
-            if let part = BodyPart.owning(source) { look.colours[part] = target }
+    /// The head's centre in a player frame as an anchor on its canvas, for scaling the
+    /// head about itself.
+    func headAnchor(_ frame: AnimationFrame, player: Int) -> CGPoint? {
+        guard let head = landmark(.head, in: frame, player: player) else { return nil }
+        let size = frame.animation.pixelSize
+        return CGPoint(x: (head.x + size / 2) / size, y: (head.y + frame.animation.feetFromBottom) / size)
+    }
+
+    /// Builds every frame of every player up front and sends them to the GPU, so nothing
+    /// is made mid-draw.
+    func warmUp(players: Int, completion: @escaping () -> Void) {
+        for player in 0..<players {
+            for animation in Animation.allCases {
+                for frame in 0..<animation.frameCount {
+                    _ = texture(AnimationFrame(animation, frame), player: player)
+                }
+            }
         }
-        return recolour(texture, look: look, detachHead: false)
+        _ = texture("ball", 0)
+        _ = softGlow(diameter: 32)
+        _ = softGlow(diameter: 8)
+        _ = symbol("chevron.down", pointSize: 14)
+        SKTexture.preload(Array(cache.values), withCompletionHandler: completion)
     }
 
     private func makeCanvas(width: Int, height: Int) -> (CGContext, UnsafeMutablePointer<UInt8>)? {
@@ -168,35 +182,19 @@ final class SpriteLibrary {
             }
         }
 
-        // The outside line, grown a pixel at a time. Next to a glowing part it takes that
-        // part's colour, and a grown pixel passes its colour on.
+        // The outside line, grown a pixel at a time round the body. The glowing parts get
+        // none: a clear pixel next to nothing but the ball stays clear.
         if look.outlineWidth > 0 {
-            var lineColour = [RGB?](repeating: nil, count: count)
-            for pixel in 0..<count where parts[pixel]?.glows == true { lineColour[pixel] = look.glow }
+            var body = (0..<count).map { pixels[$0 * 4 + 3] != 0 && parts[$0]?.glows != true }
             for _ in 0..<look.outlineWidth {
-                let filled = (0..<count).map { pixels[$0 * 4 + 3] != 0 }
-                var grown: [(pixel: Int, colour: RGB)] = []
-                for pixel in 0..<count where !filled[pixel] {
-                    var touching: RGB?
-                    var touches = false
-                    let x = pixel % width, y = pixel / width
-                    for dy in -1...1 {
-                        for dx in -1...1 where dx != 0 || dy != 0 {
-                            let nx = x + dx, ny = y + dy
-                            guard nx >= 0, ny >= 0, nx < width, ny < height else { continue }
-                            let near = ny * width + nx
-                            if filled[near] {
-                                touches = true
-                                if let colour = lineColour[near] { touching = colour }
-                            }
-                        }
-                    }
-                    if touches { grown.append((pixel, touching ?? look.outline)) }
+                var grown: [Int] = []
+                for pixel in 0..<count where pixels[pixel * 4 + 3] == 0 && neighbours(pixel, { body[$0] }) {
+                    grown.append(pixel)
                 }
-                for (pixel, colour) in grown {
-                    paint(pixels, pixel * 4, colour)
+                for pixel in grown {
+                    paint(pixels, pixel * 4, look.outline)
                     pixels[pixel * 4 + 3] = 255
-                    if colour == look.glow { lineColour[pixel] = colour }
+                    body[pixel] = true
                 }
             }
         }
@@ -214,9 +212,11 @@ final class SpriteLibrary {
 
     // MARK: Generated textures
 
-    /// A soft round glow, bright in the middle and clear at the edge, for additive halos.
-    func softGlow(diameter: Int, colour: SKColor) -> SKTexture {
-        let key = "glow_\(diameter)_\(colour.description)"
+    /// A soft round white glow, bright in the middle and clear at the edge, for additive
+    /// halos and particles; the node colours it.
+    func softGlow(diameter: Int) -> SKTexture {
+        let colour = SKColor.white
+        let key = "glow_\(diameter)"
         if let texture = cache[key] { return texture }
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1

@@ -3,6 +3,7 @@ import SpriteKit
 
 extension CGPoint {
     static func + (a: CGPoint, b: CGPoint) -> CGPoint { CGPoint(x: a.x + b.x, y: a.y + b.y) }
+    static func - (a: CGPoint, b: CGPoint) -> CGPoint { CGPoint(x: a.x - b.x, y: a.y - b.y) }
 }
 
 /// Runs the match at a fixed 60 steps a second and draws the last state. Nothing in here
@@ -11,9 +12,10 @@ final class GameScene: SKScene {
     private static let stepSeconds = 1.0 / 60
     private static let maxStepsPerFrame = 4
     private static let pixelsPerTile = CGFloat(Stage.tileSize * SpriteLibrary.pixelsPerUnit)
+    private static let headScale: CGFloat = 1.5
 
     private var match = Match()
-    private var airVariant = AirVariant.a
+    private var headVariant = HeadVariant.a
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
@@ -23,23 +25,33 @@ final class GameScene: SKScene {
     private let hud = SKNode()
     private var controls: TouchControls?
     private var playerNodes: [SKSpriteNode] = []
-    /// Each head, drawn apart from its body and trailing it a little.
+    /// Each head, drawn apart from its body and following it loosely.
     private var headNodes: [SKSpriteNode] = []
     private var headShown: [CGPoint] = []
     /// The glow on the ball in each player's hands, and the fire off each head.
     private var handHalos: [SKSpriteNode] = []
     private var headFires: [SKEmitterNode] = []
-    private static let headLag: CGFloat = 0.25
     private var ballNode = SKSpriteNode()
-    private var pointerNode = SKSpriteNode()
+    private var ballHalo = SKSpriteNode()
+    private var ballTrail = SKEmitterNode()
+    /// The ball's colour: a team's for a while after it's let go, then back to neutral.
+    private var ballTeam = SKColor(rgb: BallLook.neutral)
+    private var ballHold = 0
+    private var ballShift = 0
+    private var chevrons: [SKSpriteNode] = []
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
     private var previewNodes: [SKShapeNode] = []
     private let scoreLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
+    private let fpsLabel = SKLabelNode()
     private var lastTime: TimeInterval?
     private var accumulator = 0.0
     private var built = false
+    private var ready = false
+    private(set) var safeInsets = UIEdgeInsets.zero
+    /// What the Metal view measured, shown in the corner.
+    var framesPerSecond = 0
 
     override init() {
         super.init(size: CGSize(width: 640, height: 288))
@@ -49,9 +61,10 @@ final class GameScene: SKScene {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// The Metal view calls this with its size in points whenever that changes.
-    func attach(size: CGSize, displayScale: CGFloat) {
+    /// The Metal view calls this with its size in points whenever that or the safe area changes.
+    func attach(size: CGSize, displayScale: CGFloat, insets: UIEdgeInsets) {
         self.size = size
+        safeInsets = insets
         hub.activate()
         if !built {
             build()
@@ -68,7 +81,9 @@ final class GameScene: SKScene {
         addChild(cameraNode)
         hud.zPosition = 100
         addChild(hud)
-        applyTuning()
+
+        // Every frame in both looks, made and uploaded before anything is drawn.
+        sprites.warmUp(players: match.players.count) { [weak self] in self?.ready = true }
 
         let stage = match.stage
         for row in 0..<stage.rows {
@@ -117,14 +132,25 @@ final class GameScene: SKScene {
         }
 
         ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
+        ballNode.colorBlendFactor = 1
         ballNode.zPosition = 25
         world.addChild(ballNode)
-        let halo = makeHalo(SKColor(rgb: BallLook.colour))
-        halo.zPosition = -1
-        ballNode.addChild(halo)
-        pointerNode = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 14))
-        pointerNode.zPosition = 25
-        world.addChild(pointerNode)
+        ballHalo = makeHalo(ballTeam)
+        ballHalo.zPosition = -1
+        ballNode.addChild(ballHalo)
+        ballTrail = makeTrail()
+        ballTrail.zPosition = 24
+        ballTrail.targetNode = world
+        world.addChild(ballTrail)
+
+        for _ in 0..<3 {
+            let chevron = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 14))
+            chevron.color = SKColor(rgb: BallLook.chevron)
+            chevron.colorBlendFactor = 1
+            chevron.zPosition = 25
+            world.addChild(chevron)
+            chevrons.append(chevron)
+        }
 
         scoreLabel.fontName = "Menlo-Bold"
         scoreLabel.fontSize = 16
@@ -140,12 +166,20 @@ final class GameScene: SKScene {
         debugLabel.numberOfLines = 0
         hud.addChild(debugLabel)
 
+        fpsLabel.fontName = "Menlo-Bold"
+        fpsLabel.fontSize = 10
+        fpsLabel.fontColor = SKColor(white: 1, alpha: 0.7)
+        fpsLabel.horizontalAlignmentMode = .left
+        fpsLabel.verticalAlignmentMode = .bottom
+        hud.addChild(fpsLabel)
     }
 
     /// A soft glow in the colour, added, which the glow pass then picks up.
     private func makeHalo(_ colour: SKColor) -> SKSpriteNode {
-        let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32, colour: colour))
+        let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
         halo.size = CGSize(width: 18, height: 18)
+        halo.color = colour
+        halo.colorBlendFactor = 1
         halo.alpha = 0.5
         halo.blendMode = .add
         return halo
@@ -154,7 +188,7 @@ final class GameScene: SKScene {
     /// Sparks rising off a head as if it were burning, in the colour.
     private func makeFire(_ colour: SKColor) -> SKEmitterNode {
         let fire = SKEmitterNode()
-        fire.particleTexture = sprites.softGlow(diameter: 8, colour: .white)
+        fire.particleTexture = sprites.softGlow(diameter: 8)
         fire.particleBirthRate = 24
         fire.particleLifetime = 0.45
         fire.particleLifetimeRange = 0.2
@@ -172,6 +206,27 @@ final class GameScene: SKScene {
         fire.particleColorBlendFactor = 1
         fire.particleBlendMode = .add
         return fire
+    }
+
+    /// The streak a flying ball leaves: soft blobs dropped where it was, thinning out, so
+    /// the trail runs like liquid light.
+    private func makeTrail() -> SKEmitterNode {
+        let trail = SKEmitterNode()
+        trail.particleTexture = sprites.softGlow(diameter: 32)
+        trail.particleBirthRate = 0
+        trail.particleLifetime = 0.35
+        trail.particleLifetimeRange = 0.1
+        trail.particlePositionRange = CGVector(dx: 2, dy: 2)
+        trail.particleSpeed = 0
+        trail.particleSize = CGSize(width: 12, height: 12)
+        trail.particleScale = 0.8
+        trail.particleScaleRange = 0.2
+        trail.particleScaleSpeed = -1.8
+        trail.particleAlpha = 0.6
+        trail.particleAlphaSpeed = -1.6
+        trail.particleColorBlendFactor = 1
+        trail.particleBlendMode = .add
+        return trail
     }
 
     /// The rim's net, as GMS2 built it: six columns, five rows, tapering to half width.
@@ -220,23 +275,23 @@ final class GameScene: SKScene {
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
         controls?.removeFromParent()
-        let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight)
+        let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight, insets: safeInsets)
         controls.onReset = { [weak self] in self?.reset() }
-        controls.addPicker(title: "AIR", options: AirVariant.allCases.map(\.label), selected: airVariant.rawValue) { [weak self] index in
-            self?.airVariant = AirVariant(rawValue: index)!
-            self?.applyTuning()
+        controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
+            self?.headVariant = HeadVariant(rawValue: index)!
         }
         hud.addChild(controls)
         self.controls = controls
-        scoreLabel.position = CGPoint(x: 0, y: halfHeight - 8)
-        debugLabel.position = CGPoint(x: -halfWidth + 8, y: controls.pickerBottom - 6)
+        scoreLabel.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 8)
+        debugLabel.position = CGPoint(x: -halfWidth + safeInsets.left + TouchControls.padding, y: controls.pickerBottom - 6)
+        fpsLabel.position = CGPoint(x: -halfWidth + safeInsets.left + TouchControls.padding, y: -halfHeight + safeInsets.bottom + TouchControls.padding)
     }
 
     // MARK: Stepping
 
     override func update(_ currentTime: TimeInterval) {
         defer { lastTime = currentTime }
-        guard let last = lastTime else { return }
+        guard ready, let last = lastTime else { return }
         accumulator += min(currentTime - last, 0.1)
         guard accumulator >= GameScene.stepSeconds else { return }
 
@@ -248,6 +303,7 @@ final class GameScene: SKScene {
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
             match.advance(inputs: inputs)
             show(match.events)
+            tickBallColour()
             accumulator -= GameScene.stepSeconds
             steps += 1
         }
@@ -261,14 +317,9 @@ final class GameScene: SKScene {
     private func reset() {
         match = Match()
         rimFlash = rimFlash.map { _ in 0 }
-        applyTuning()
-    }
-
-    /// The pickers' choices onto both players, live.
-    private func applyTuning() {
-        for index in match.players.indices {
-            match.players[index].spec = airVariant.apply(to: .baseline)
-        }
+        ballTeam = SKColor(rgb: BallLook.neutral)
+        ballHold = 0
+        ballShift = 0
     }
 
     private func show(_ events: [MatchEvent]) {
@@ -284,12 +335,36 @@ final class GameScene: SKScene {
             case .caught(let index):
                 let player = match.players[index]
                 spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left)
+            case .shot(let index), .thrown(let index), .dunked(let index):
+                ballTeam = SKColor(rgb: sprites.look(for: index).glow)
+                ballHold = BallLook.holdFrames
+                ballShift = BallLook.shiftFrames
             case .scored(_, let hoop):
                 rimFlash[hoop] = 8
             default:
                 break
             }
         }
+    }
+
+    /// The ball keeps the team colour for a while after it's let go, then shifts to neutral.
+    private func tickBallColour() {
+        if ballHold > 0 {
+            ballHold -= 1
+        } else if ballShift > 0 {
+            ballShift -= 1
+        }
+    }
+
+    private var ballColour: SKColor {
+        guard ballHold == 0 else { return ballTeam }
+        let neutral = SKColor(rgb: BallLook.neutral)
+        let toward = 1 - CGFloat(ballShift) / CGFloat(BallLook.shiftFrames)
+        var tr: CGFloat = 0, tg: CGFloat = 0, tb: CGFloat = 0, ta: CGFloat = 0
+        var nr: CGFloat = 0, ng: CGFloat = 0, nb: CGFloat = 0, na: CGFloat = 0
+        ballTeam.getRed(&tr, green: &tg, blue: &tb, alpha: &ta)
+        neutral.getRed(&nr, green: &ng, blue: &nb, alpha: &na)
+        return SKColor(red: tr + (nr - tr) * toward, green: tg + (ng - tg) * toward, blue: tb + (nb - tb) * toward, alpha: 1)
     }
 
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool) {
@@ -307,6 +382,7 @@ final class GameScene: SKScene {
             node.anchorPoint = sprites.anchor(for: frame.animation)
             node.position = SpriteLibrary.point(player.position)
             node.xScale = CGFloat(player.facing.sign)
+
             let halo = handHalos[index]
             if player.hasBall, let inHand = sprites.landmark(.ball, in: frame, player: index) {
                 halo.isHidden = false
@@ -314,22 +390,29 @@ final class GameScene: SKScene {
             } else {
                 halo.isHidden = true
             }
-            // The head trails its place on the body by a little and bobs, as if it only loosely belonged.
+
+            // The head follows its place on the body loosely and bobs, as if it only just belonged.
             let headNode = headNodes[index]
-            if let head = sprites.landmark(.head, in: frame, player: index), let headTexture = sprites.headTexture(frame, player: index) {
+            if let head = sprites.landmark(.head, in: frame, player: index),
+               let headTexture = sprites.headTexture(frame, player: index),
+               let anchor = sprites.headAnchor(frame, player: index) {
                 let target = CGPoint(x: node.position.x + head.x * CGFloat(player.facing.sign), y: node.position.y + head.y)
                 if headShown[index] == .zero { headShown[index] = target }
-                headShown[index] = CGPoint(x: headShown[index].x + (target.x - headShown[index].x) * GameScene.headLag,
-                                           y: headShown[index].y + (target.y - headShown[index].y) * GameScene.headLag)
+                let lag = headVariant.lag
+                headShown[index] = CGPoint(x: headShown[index].x + (target.x - headShown[index].x) * lag,
+                                           y: headShown[index].y + (target.y - headShown[index].y) * lag)
+                var offset = headShown[index] - target
+                if headVariant.reversed { offset = CGPoint(x: -offset.x, y: -offset.y) }
                 let bob = (sin(Double(match.frame) / 60 * 2 * .pi * 1.2) * 1).rounded()
-                let shown = CGPoint(x: headShown[index].x.rounded(), y: headShown[index].y.rounded() + bob)
+                let shown = CGPoint(x: (target.x + offset.x).rounded(), y: (target.y + offset.y).rounded() + bob)
                 headNode.isHidden = false
                 headNode.texture = headTexture
                 headNode.size = headTexture.size()
-                headNode.anchorPoint = node.anchorPoint
-                headNode.xScale = node.xScale
-                headNode.position = CGPoint(x: node.position.x + shown.x - target.x, y: node.position.y + shown.y - target.y)
-                headFires[index].position = CGPoint(x: shown.x, y: shown.y + 3)
+                headNode.anchorPoint = anchor
+                headNode.xScale = CGFloat(player.facing.sign) * GameScene.headScale
+                headNode.yScale = GameScene.headScale
+                headNode.position = shown
+                headFires[index].position = CGPoint(x: shown.x, y: shown.y + 4)
                 headFires[index].particleBirthRate = 24
             } else {
                 headNode.isHidden = true
@@ -337,12 +420,24 @@ final class GameScene: SKScene {
             }
         }
 
-        ballNode.isHidden = match.ball.holder != nil
-        ballNode.position = SpriteLibrary.point(match.ball.position)
-        // The chevron steps down three times and blinks off, seven steps a second, as the pixel one did.
+        let ball = match.ball
+        ballNode.isHidden = ball.holder != nil
+        ballNode.position = SpriteLibrary.point(ball.position)
+        let colour = ballColour
+        ballNode.color = colour
+        ballHalo.color = colour
+        ballTrail.position = ballNode.position
+        ballTrail.particleColor = colour
+        ballTrail.particleBirthRate = ball.isLive && !ball.resting && ball.velocity.length > 1 ? 90 : 0
+
+        // Three dim chevrons stacked over a resting ball, lit one after another from the top, then a beat with none.
         let step = (match.frame * 7 / 60) % 4
-        pointerNode.isHidden = !(match.ball.isLive && match.ball.resting) || step == 3
-        pointerNode.position = SpriteLibrary.point(match.ball.position) + CGPoint(x: 0, y: 30 - CGFloat(step) * 6)
+        let showChevrons = ball.isLive && ball.resting
+        for (index, chevron) in chevrons.enumerated() {
+            chevron.isHidden = !showChevrons
+            chevron.position = ballNode.position + CGPoint(x: 0, y: 32 - CGFloat(index) * 7)
+            chevron.alpha = step == index ? 1 : 0.3
+        }
 
         for index in rimNodes.indices {
             if rimFlash[index] > 0 { rimFlash[index] -= 1 }
@@ -364,6 +459,7 @@ final class GameScene: SKScene {
         }
 
         scoreLabel.text = "\(match.scores[0])  -  \(match.scores[1])"
+        fpsLabel.text = "\(framesPerSecond) fps"
         let p = match.players[0]
         debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,

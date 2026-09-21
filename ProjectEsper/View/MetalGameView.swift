@@ -71,6 +71,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let blur: MTLRenderPipelineState
     private let composite: MTLRenderPipelineState
     private let sampler: MTLSamplerState
+    private var framesDrawn = 0
+    private var fpsWindowStart = CACurrentMediaTime()
     private var sceneTexture: MTLTexture?
     /// SpriteKit draws with the stencil buffer, so its pass needs one.
     private var sceneDepthStencil: MTLTexture?
@@ -111,7 +113,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         sceneDepthStencil = makeTexture(width: Int(size.width), height: Int(size.height), pixelFormat: .depth32Float_stencil8)
         glowA = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
         glowB = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
-        scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor)
+        scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor, insets: view.safeAreaInsets)
     }
 
     private func makeTexture(width: Int, height: Int, pixelFormat: MTLPixelFormat = .bgra8Unorm) -> MTLTexture {
@@ -126,10 +128,17 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
               let sceneTexture, let sceneDepthStencil, let glowA, let glowB,
               let commands = queue.makeCommandBuffer() else { return }
 
-        if scene.size != view.bounds.size {
-            scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor)
+        if scene.size != view.bounds.size || scene.safeInsets != view.safeAreaInsets {
+            scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor, insets: view.safeAreaInsets)
         }
-        skRenderer.update(atTime: CACurrentMediaTime())
+        let now = CACurrentMediaTime()
+        framesDrawn += 1
+        if now - fpsWindowStart >= 1 {
+            scene.framesPerSecond = Int((Double(framesDrawn) / (now - fpsWindowStart)).rounded())
+            framesDrawn = 0
+            fpsWindowStart = now
+        }
+        skRenderer.update(atTime: now)
 
         let scenePass = MTLRenderPassDescriptor()
         scenePass.colorAttachments[0].texture = sceneTexture

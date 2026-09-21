@@ -1,36 +1,22 @@
 import EsperSim
 import Foundation
 
-/// Air models on the picker. A is the baseline as tuned. B brakes harder in the stance, C is
-/// direct, D keeps momentum through the stance, E raises the cap. Only the air numbers
-/// change, so the ground is the same under each.
-enum AirVariant: Int, CaseIterable {
-    case a, b, c, d, e
+/// How the head follows the body, on the picker. A trails tight; B is as loose as the
+/// first cut but leads instead of trailing, the lag reversed along each axis.
+enum HeadVariant: Int, CaseIterable {
+    case a, b
 
-    var label: String { ["A", "B", "C", "D", "E"][rawValue] }
+    var label: String { ["A", "B"][rawValue] }
 
-    func apply(to base: FighterSpec) -> FighterSpec {
-        var spec = base
+    /// The share of the gap closed each frame.
+    var lag: CGFloat {
         switch self {
-        case .a:
-            break
-        case .b:
-            // The stance stops sideways drift in about five frames.
-            spec.stanceAirBrake = 0.3
-        case .c:
-            // Direct: the stick is the air speed, no momentum either way.
-            spec.airAccelerationAdditional = 2
-            spec.airFriction = 2
-        case .d:
-            // The stance barely brakes; drift carries into the shot.
-            spec.stanceAirBrake = 0.01
-        case .e:
-            spec.airSpeedMax = 1.8
-            spec.jumpHorizontalVelocity = 1.8
-            spec.doubleJumpHorizontalVelocity = 1.8
+        case .a: 0.5
+        case .b: 0.25
         }
-        return spec
     }
+
+    var reversed: Bool { self == .b }
 }
 
 /// The glow, as GameMaker's Glow filter had it: what counts as bright, how soft the cut is,

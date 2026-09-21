@@ -87,7 +87,11 @@ struct Look: Hashable {
 }
 
 enum BallLook {
-    /// The loose ball's colour, and what the sheet paints it.
-    static let colour = Look.orange
-    static let swaps: [RGB: RGB] = [0xFFFFFF: colour]
+    /// The loose ball is purple, after a while in the colour of whoever last let it go.
+    static let neutral: RGB = 0xBF7BFF
+    /// Frames it keeps the team colour after a shot or a throw, and frames of the shift back.
+    static let holdFrames = 45
+    static let shiftFrames = 30
+    /// The chevrons over a resting ball.
+    static let chevron: RGB = 0xFBF236
 }

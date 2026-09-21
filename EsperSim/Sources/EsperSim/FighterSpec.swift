@@ -204,15 +204,15 @@ public struct FighterSpec: Equatable {
 }
 
 extension FighterSpec {
-    /// The body the game is tuned on: Fox with a Falco-style dash, a 2.8 burst into a 2.5 run,
+    /// The body the game is tuned on: Fox with a Falco-style dash, a 2.8 burst into a 3.2 run,
     /// more traction, air control turned up so a jump starts at air speed and turns in about
     /// five frames, and a shoot stance that brakes hard in the air.
     public static let baseline: FighterSpec = {
         var spec = meleeFox
         spec.name = "Baseline"
         spec.dashInitialVelocity = 2.8
-        spec.runSpeed = 2.5
-        spec.traction = 0.25
+        spec.runSpeed = 3.2
+        spec.traction = 0.35
         spec.airSpeedMax = 1.6
         spec.airAccelerationAdditional = 0.24
         spec.jumpHorizontalVelocity = 1.6
@@ -253,6 +253,10 @@ public enum BallRules {
 
     /// A throw goes straight at this speed, with no gravity until its first bounce.
     public static let throwSpeed = 7.0
+    /// An up throw is the floater: it drifts up this fast, gravity off, for this many
+    /// frames, then falls as a ball does.
+    public static let floaterSpeed = 1.5
+    public static let floaterFrames = 30
     public static let throwReleaseHeight = 12.0
     public static let throwWindupFrames = 12
     /// Frames from the release to the ball leaving the hand, then to acting again.

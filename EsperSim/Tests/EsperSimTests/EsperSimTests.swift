@@ -402,22 +402,38 @@ final class BallTests: XCTestCase {
     func testThrowGoesStraightInTheStickCardinal() {
         var match = matchWithBallHeld()
         for _ in 0..<BallRules.throwWindupFrames + 2 {
-            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
         }
         run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
         XCTAssertTrue(match.ball.straight)
         XCTAssertTrue(match.ball.thrown)
-        XCTAssertEqual(match.ball.velocity, Vec2(x: 0, y: BallRules.throwSpeed))
+        XCTAssertEqual(match.ball.velocity, Vec2(x: BallRules.throwSpeed, y: 0))
+    }
+
+    func testUpThrowIsAFloater() {
+        var match = matchWithBallHeld()
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        }
+        run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertTrue(match.ball.thrown)
+        XCTAssertEqual(match.ball.velocity.y, BallRules.floaterSpeed, accuracy: 0.001)
+        // Still drifting up at the same speed well into the float, then falling.
+        run(&match, frames: BallRules.floaterFrames - 5, input: { _ in .idle })
+        XCTAssertEqual(match.ball.velocity.y, BallRules.floaterSpeed, accuracy: 0.001)
+        run(&match, frames: 40, input: { _ in .idle })
+        XCTAssertLessThan(match.ball.velocity.y, 0)
     }
 
     func testTapThrowGoesWhenTheWindupEnds() {
         var match = matchWithBallHeld()
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
         run(&match, frames: BallRules.throwWindupFrames + BallRules.throwReleaseFrames + 1, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
-        XCTAssertEqual(match.ball.velocity, Vec2(x: 0, y: BallRules.throwSpeed))
+        XCTAssertEqual(match.ball.velocity, Vec2(x: BallRules.throwSpeed, y: 0))
     }
 
     func testLooseBallInFrontIsCaught() {

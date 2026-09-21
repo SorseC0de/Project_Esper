@@ -7,6 +7,8 @@ public struct Ball: Equatable {
     public var holder: Int?
     /// A thrown ball flies straight until it first hits something.
     public var straight = false
+    /// Frames of floater left: drifting up with gravity off.
+    public var floater = 0
     /// Released by a throw and not yet caught: the rims don't pull it, so scoring off a
     /// throw is the ball going through on its own.
     public var thrown = false
@@ -35,7 +37,9 @@ public struct Ball: Equatable {
             steer(toward: hoop)
         }
 
-        if !straight {
+        if floater > 0 {
+            floater -= 1
+        } else if !straight {
             velocity.y = max(velocity.y - BallRules.gravity, -BallRules.fallSpeed)
         }
 
@@ -85,12 +89,14 @@ public struct Ball: Equatable {
 
     private mutating func bounceX(events: inout [MatchEvent]) {
         straight = false
+        floater = 0
         velocity.x = abs(velocity.x) > 0.3 ? -velocity.x * BallRules.bounce : 0
         events.append(.ballBounced(position: position))
     }
 
     private mutating func bounceY(events: inout [MatchEvent]) {
         straight = false
+        floater = 0
         let rebound = -velocity.y * BallRules.bounce
         velocity.y = abs(rebound) > 0.6 ? rebound : 0
         events.append(.ballBounced(position: position))
@@ -126,9 +132,18 @@ public struct Ball: Equatable {
         previousY = position.y
         self.velocity = velocity
         self.straight = straight
+        floater = 0
         thrown = straight
         lastTouched = player
         resting = false
+    }
+
+    /// The floater: a soft drift up that ignores gravity for a while, carrying the
+    /// thrower's sideways speed, then a normal fall.
+    public mutating func releaseFloater(from position: Vec2, sideways: Double, by player: Int) {
+        release(from: position, velocity: Vec2(x: sideways, y: BallRules.floaterSpeed), by: player, straight: false)
+        thrown = true
+        floater = BallRules.floaterFrames
     }
 
     public mutating func respawn(at spawn: Vec2) {
@@ -137,6 +152,7 @@ public struct Ball: Equatable {
         velocity = .zero
         holder = nil
         straight = false
+        floater = 0
         thrown = false
         lastTouched = nil
         resting = false

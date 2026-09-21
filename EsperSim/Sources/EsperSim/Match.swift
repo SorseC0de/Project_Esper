@@ -63,7 +63,12 @@ public struct Match: Equatable {
                          velocity: velocity, by: index, straight: false)
         case .releaseThrow(let velocity):
             let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
-            ball.release(from: hand, velocity: velocity, by: index, straight: true)
+            if velocity.y > 0, velocity.x == 0 {
+                ball.releaseFloater(from: Vec2(x: player.position.x, y: player.position.y + BallRules.shotReleaseHeight),
+                                    sideways: player.velocity.x, by: index)
+            } else {
+                ball.release(from: hand, velocity: velocity, by: index, straight: true)
+            }
         case .dunk(let hoop):
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
         case .swat:

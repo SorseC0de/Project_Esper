@@ -105,9 +105,12 @@ is an SF Symbol chevron doing what the pixel one did: three steps down, then off
 
 ## Glow
 
-`GlowSettings` in `Tuning.swift`: luminance threshold, softness of the cut, blur passes at
-half size, intensity, tint. The passes are in `Glow.metal`. The threshold is on a slider
-across the top of the screen, printed with its value, to be felt out live.
+`GlowSettings` in `Tuning.swift`: luminance threshold 0.2 for the world and 0.8 for the
+bodies, softness of the cut, blur passes at half size, intensity, tint. The passes are in
+`Glow.metal`. The scene is drawn twice a frame, the second time with only the bodies
+showing, and that mask tells the bright pass which threshold applies. The world threshold
+is on a slider across the top of the screen. The corner counter shows the frame rate and
+the worst frame gap of the last second, which is what a hitch shows up as.
 
 ## Queued
 

@@ -8,6 +8,7 @@ struct GlowUniforms {
     float2 texelSize;
     float2 direction;
     float threshold;
+    float bodyThreshold;
     float softness;
     float intensity;
     float4 tint;
@@ -27,14 +28,18 @@ vertex FullScreen glowVertex(uint id [[vertex_id]]) {
     return out;
 }
 
-// What glows: everything above the luminance threshold, eased in over `softness`.
+// What glows: everything above the luminance threshold, eased in over `softness`. Where
+// the body mask is set the body's own, higher threshold applies instead.
 fragment float4 glowBright(FullScreen in [[stage_in]],
                            texture2d<float> scene [[texture(0)]],
+                           texture2d<float> bodies [[texture(1)]],
                            sampler linear [[sampler(0)]],
                            constant GlowUniforms &u [[buffer(0)]]) {
     float4 color = scene.sample(linear, in.uv);
+    float body = bodies.sample(linear, in.uv).a;
+    float threshold = mix(u.threshold, u.bodyThreshold, step(0.5, body));
     float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
-    float amount = smoothstep(u.threshold - u.softness, u.threshold + u.softness, luminance);
+    float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance);
     return float4(color.rgb * amount, 1);
 }
 

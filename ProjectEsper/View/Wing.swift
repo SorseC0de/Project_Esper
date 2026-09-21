@@ -5,8 +5,13 @@ import SpriteKit
 /// runs, dissolves when it stops, and sweeps once on a double jump.
 final class Wing: SKNode {
     private static let featherCount = 5
-    /// Fan angles from straight back, in radians, lowest feather first.
-    private static let spread: [CGFloat] = [-0.35, -0.05, 0.25, 0.55, 0.85]
+    /// The fan is a sideways V with its point at the shoulder: the middle feather goes
+    /// straight back, the top and bottom ones furthest back and up or down. Angles from
+    /// straight back in radians, and where each feather's base sits, lowest feather first.
+    private static let spread: [CGFloat] = [-0.7, -0.35, 0, 0.35, 0.7]
+    private static let bases: [CGPoint] = [
+        CGPoint(x: -12, y: -5), CGPoint(x: -8, y: -1), CGPoint(x: -5, y: 2), CGPoint(x: -8, y: 5), CGPoint(x: -12, y: 9),
+    ]
     private static let flapsPerSecond: CGFloat = 2.5
 
     private var feathers: [SKSpriteNode] = []
@@ -54,10 +59,12 @@ final class Wing: SKNode {
             flourish -= 1
             let t = 1 - CGFloat(flourish) / CGFloat(Wing.flourishFrames)
             let eased = t * t * (3 - 2 * t)
-            let swing = 0.7 - eased * 1.6
+            // Raised and wide, then swept down and out away from the body.
+            let swing = 0.5 - eased * 1.5
             for (index, feather) in feathers.enumerated() {
-                feather.zRotation = -.pi / 2 + Wing.spread[index] * (1.4 - eased * 0.6) + swing
-                feather.position = CGPoint(x: -4 - CGFloat(index) * 1.5, y: 2 + CGFloat(index) * 2)
+                let base = Wing.bases[index]
+                feather.zRotation = -.pi / 2 + Wing.spread[index] * (1.3 - eased * 0.5) + swing
+                feather.position = CGPoint(x: base.x * (1 + eased * 0.8), y: base.y - eased * 10)
                 feather.alpha = (1 - t) * 0.9
                 feather.setScale(1.3 - eased * 0.3)
             }
@@ -71,9 +78,10 @@ final class Wing: SKNode {
         }
         let flap = sin(phase)
         for (index, feather) in feathers.enumerated() {
+            let base = Wing.bases[index]
             let lift = running ? 0 : (1 - strength) * 6
-            feather.zRotation = -.pi / 2 + Wing.spread[index] * (0.8 + flap * 0.3) + flap * 0.35
-            feather.position = CGPoint(x: -4 - CGFloat(index) * 1.5, y: 2 + CGFloat(index) * 2 + lift)
+            feather.zRotation = -.pi / 2 + Wing.spread[index] * (0.9 + flap * 0.3) + flap * 0.3
+            feather.position = CGPoint(x: base.x * (1 + flap * 0.15), y: base.y + lift)
             feather.alpha = strength * 0.7
             feather.setScale(1)
         }

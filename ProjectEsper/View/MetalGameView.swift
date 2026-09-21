@@ -56,6 +56,7 @@ struct GlowUniforms {
     var texelSize: SIMD2<Float>
     var direction: SIMD2<Float>
     var threshold: Float
+    var bodyThreshold: Float
     var softness: Float
     var intensity: Float
     var tint: SIMD4<Float>
@@ -73,7 +74,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let sampler: MTLSamplerState
     private var framesDrawn = 0
     private var fpsWindowStart = CACurrentMediaTime()
+    private var lastDraw = CACurrentMediaTime()
+    private var worstGap = 0.0
     private var sceneTexture: MTLTexture?
+    /// The bodies alone, for the glow's per-object threshold.
+    private var bodyMask: MTLTexture?
     /// SpriteKit draws with the stencil buffer, so its pass needs one.
     private var sceneDepthStencil: MTLTexture?
     private var glowA: MTLTexture?
@@ -111,6 +116,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         guard size.width > 0, size.height > 0 else { return }
         sceneTexture = makeTexture(width: Int(size.width), height: Int(size.height))
         sceneDepthStencil = makeTexture(width: Int(size.width), height: Int(size.height), pixelFormat: .depth32Float_stencil8)
+        bodyMask = makeTexture(width: Int(size.width), height: Int(size.height))
         glowA = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
         glowB = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
         scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor, insets: view.safeAreaInsets)
@@ -125,7 +131,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
     func draw(in view: MTKView) {
         guard let drawable = view.currentDrawable, let screenPass = view.currentRenderPassDescriptor,
-              let sceneTexture, let sceneDepthStencil, let glowA, let glowB,
+              let sceneTexture, let sceneDepthStencil, let bodyMask, let glowA, let glowB,
               let commands = queue.makeCommandBuffer() else { return }
 
         if scene.size != view.bounds.size || scene.safeInsets != view.safeAreaInsets {
@@ -133,9 +139,13 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         }
         let now = CACurrentMediaTime()
         framesDrawn += 1
+        worstGap = max(worstGap, now - lastDraw)
+        lastDraw = now
         if now - fpsWindowStart >= 1 {
             scene.framesPerSecond = Int((Double(framesDrawn) / (now - fpsWindowStart)).rounded())
+            scene.worstFrameMilliseconds = Int((worstGap * 1000).rounded())
             framesDrawn = 0
+            worstGap = 0
             fpsWindowStart = now
         }
         skRenderer.update(atTime: now)
@@ -157,15 +167,33 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: sceneTexture.width, height: sceneTexture.height),
                           commandBuffer: commands, renderPassDescriptor: scenePass)
 
+        // The same scene again with only the bodies showing, as the glow's mask.
+        let maskPass = MTLRenderPassDescriptor()
+        maskPass.colorAttachments[0].texture = bodyMask
+        maskPass.colorAttachments[0].loadAction = .clear
+        maskPass.colorAttachments[0].storeAction = .store
+        maskPass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        maskPass.depthAttachment.texture = sceneDepthStencil
+        maskPass.depthAttachment.loadAction = .clear
+        maskPass.depthAttachment.storeAction = .dontCare
+        maskPass.stencilAttachment.texture = sceneDepthStencil
+        maskPass.stencilAttachment.loadAction = .clear
+        maskPass.stencilAttachment.storeAction = .dontCare
+        scene.showBodiesOnly(true)
+        skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: bodyMask.width, height: bodyMask.height),
+                          commandBuffer: commands, renderPassDescriptor: maskPass)
+        scene.showBodiesOnly(false)
+
         var uniforms = GlowUniforms(
             texelSize: SIMD2(1 / Float(glowA.width), 1 / Float(glowA.height)),
             direction: .zero,
             threshold: GlowSettings.threshold,
+            bodyThreshold: GlowSettings.bodyThreshold,
             softness: GlowSettings.softness,
             intensity: GlowSettings.intensity,
             tint: GlowSettings.tint)
 
-        pass(commands, pipeline: bright, into: glowA, sources: [sceneTexture], uniforms: uniforms)
+        pass(commands, pipeline: bright, into: glowA, sources: [sceneTexture, bodyMask], uniforms: uniforms)
         for _ in 0..<GlowSettings.blurPasses {
             uniforms.direction = SIMD2(1, 0)
             pass(commands, pipeline: blur, into: glowB, sources: [glowA], uniforms: uniforms)

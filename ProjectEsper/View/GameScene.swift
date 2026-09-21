@@ -22,6 +22,11 @@ final class GameScene: SKScene {
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
     private let world = SKNode()
+    /// The world in three layers so the glow can render the bodies on their own: the
+    /// court, the bodies, and everything that glows.
+    private let ground = SKNode()
+    private let bodies = SKNode()
+    private let glowers = SKNode()
     /// Sits at the camera's position, scaled to cancel the camera, so its children are laid
     /// out in screen points from the centre and a touch maps onto them with no arithmetic.
     private let hud = SKNode()
@@ -44,7 +49,7 @@ final class GameScene: SKScene {
     private var chevrons: [SKSpriteNode] = []
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
-    private var previewNodes: [SKShapeNode] = []
+    private var previewDots: [SKSpriteNode] = []
     private let scoreLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
     private let fpsLabel = SKLabelNode()
@@ -55,11 +60,22 @@ final class GameScene: SKScene {
     private(set) var safeInsets = UIEdgeInsets.zero
     /// What the Metal view measured, shown in the corner.
     var framesPerSecond = 0
+    var worstFrameMilliseconds = 0
+
+    /// Hides everything but the bodies, for the glow's mask pass.
+    func showBodiesOnly(_ only: Bool) {
+        ground.isHidden = only
+        glowers.isHidden = only
+        hud.isHidden = only
+        backgroundColor = only ? .clear : GameScene.background
+    }
+
+    private static let background = SKColor(red: 0.18, green: 0.12, blue: 0.24, alpha: 1)
 
     override init() {
         super.init(size: CGSize(width: 640, height: 288))
         scaleMode = .fill
-        backgroundColor = SKColor(red: 0.18, green: 0.12, blue: 0.24, alpha: 1)
+        backgroundColor = GameScene.background
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -80,6 +96,11 @@ final class GameScene: SKScene {
 
     private func build() {
         addChild(world)
+        world.addChild(ground)
+        bodies.zPosition = 20
+        world.addChild(bodies)
+        glowers.zPosition = 21
+        world.addChild(glowers)
         camera = cameraNode
         addChild(cameraNode)
         hud.zPosition = 100
@@ -96,7 +117,7 @@ final class GameScene: SKScene {
                 let node = SKSpriteNode(texture: sprites.texture(tile == .solid ? "solid" : "solid_oneway", 0))
                 node.anchorPoint = .zero
                 node.position = CGPoint(x: CGFloat(column) * GameScene.pixelsPerTile, y: CGFloat(row) * GameScene.pixelsPerTile)
-                world.addChild(node)
+                ground.addChild(node)
             }
         }
 
@@ -106,57 +127,66 @@ final class GameScene: SKScene {
             rim.zPosition = 5
             // The sheet draws the rim with its backboard on the right.
             rim.xScale = hoop.backboard == .left ? -1 : 1
-            world.addChild(rim)
+            ground.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            world.addChild(net(at: rim.position))
+            ground.addChild(net(at: rim.position))
         }
 
         for player in match.players {
             let node = SKSpriteNode(texture: sprites.texture(player.animationFrame, player: player.index))
-            node.zPosition = 20
-            world.addChild(node)
+            bodies.addChild(node)
             playerNodes.append(node)
             let head = SKSpriteNode(texture: sprites.headTexture(player.animationFrame, player: player.index))
-            head.zPosition = 21
-            world.addChild(head)
+            head.zPosition = 4
+            glowers.addChild(head)
             headNodes.append(head)
             headShown.append(.zero)
             let colour = SKColor(rgb: sprites.look(for: player.index).glow)
             let halo = makeHalo(colour)
-            halo.zPosition = 19
-            world.addChild(halo)
+            halo.zPosition = 2
+            glowers.addChild(halo)
             handHalos.append(halo)
             let fire = makeFire(colour)
-            fire.zPosition = 18
-            fire.targetNode = world
-            world.addChild(fire)
+            fire.zPosition = 1
+            fire.targetNode = glowers
+            glowers.addChild(fire)
             headFires.append(fire)
             let wing = Wing(colour: colour, texture: sprites.feather())
-            wing.zPosition = 17
-            world.addChild(wing)
+            wing.zPosition = -3
+            glowers.addChild(wing)
             wings.append(wing)
         }
 
         ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
         ballNode.colorBlendFactor = 1
-        ballNode.zPosition = 25
-        world.addChild(ballNode)
+        ballNode.zPosition = 6
+        glowers.addChild(ballNode)
         ballHalo = makeHalo(ballTeam)
         ballHalo.zPosition = -1
         ballNode.addChild(ballHalo)
         ballTrail = makeTrail()
-        ballTrail.zPosition = 24
-        ballTrail.targetNode = world
-        world.addChild(ballTrail)
+        ballTrail.zPosition = 5
+        ballTrail.targetNode = glowers
+        glowers.addChild(ballTrail)
 
         for _ in 0..<3 {
             let chevron = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 14))
             chevron.color = SKColor(rgb: BallLook.chevron)
             chevron.colorBlendFactor = 1
-            chevron.zPosition = 25
-            world.addChild(chevron)
+            chevron.zPosition = 6
+            glowers.addChild(chevron)
             chevrons.append(chevron)
+        }
+
+        // The aiming arc's dots, made once and moved.
+        for _ in 0..<30 {
+            let dot = SKSpriteNode(texture: sprites.softGlow(diameter: 8))
+            dot.size = CGSize(width: 3, height: 3)
+            dot.zPosition = 3
+            dot.isHidden = true
+            glowers.addChild(dot)
+            previewDots.append(dot)
         }
 
         scoreLabel.fontName = "Menlo-Bold"
@@ -380,7 +410,7 @@ final class GameScene: SKScene {
     }
 
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool) {
-        world.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped))
+        glowers.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped))
     }
 
     // MARK: Drawing
@@ -463,22 +493,20 @@ final class GameScene: SKScene {
             rimNodes[index].texture = sprites.texture("hoop_rim", rimFlash[index] > 0 ? 1 : 0)
         }
 
-        previewNodes.forEach { $0.removeFromParent() }
-        previewNodes = []
+        var shownDots = 0
         for player in match.players where player.state == .shootStance && player.shotAim != .zero {
-            for (step, point) in match.shotPreview(for: player.index).enumerated() {
-                let dot = SKShapeNode(circleOfRadius: 1)
-                dot.fillColor = SKColor(white: 1, alpha: step == 0 ? 0.9 : 0.35)
-                dot.strokeColor = .clear
+            for (step, point) in match.shotPreview(for: player.index).enumerated() where shownDots < previewDots.count {
+                let dot = previewDots[shownDots]
+                dot.isHidden = false
+                dot.alpha = step == 0 ? 0.9 : 0.35
                 dot.position = SpriteLibrary.point(point)
-                dot.zPosition = 15
-                world.addChild(dot)
-                previewNodes.append(dot)
+                shownDots += 1
             }
         }
+        for dot in previewDots[shownDots...] { dot.isHidden = true }
 
         scoreLabel.text = "\(match.scores[0])  -  \(match.scores[1])"
-        fpsLabel.text = "\(framesPerSecond) fps"
+        fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms"
         let p = match.players[0]
         debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,

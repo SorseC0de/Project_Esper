@@ -38,7 +38,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Stick: floating on the left half. A fast push past 0.8 is a dash; a tilt walks. A walk
   always faces the opponent whichever way it goes, so it can back off or dribble between
   the legs while staring them down. Only a dash turns the body.
-- Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. For 3 frames
+- Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. In the air
+  a stick against the way you're going turns you at once, Silksong's rule. For 3 frames
   after walking off an edge a press is still that jump. Down while falling is a fast fall,
   except while holding throw with the ball, where down is the aim.
 - Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap,
@@ -95,7 +96,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the throw button is the ordinary throw. Numbers in `WebRules`.
 - Super Soda (C). A fresh jump press in the air, held, is flight: the stick moves the body
   in any direction with gravity off, slowly with the ball and twice as fast without, for two seconds of budget per airtime, refilled on landing.
-  Let go or run out and it falls. No double jump. With or without the ball, and a shot or
+  Let go or run out and it falls. The body leans up to thirty degrees into its motion,
+  forward or back. No double jump. With or without the ball, and a shot or
   throw can be taken from flight. Numbers in `SodaRules`.
 - Flash Fizz (D). A shoot button with no ball warps the body to the ball and it arrives
   holding it, but only while the ball is still its colour, the 60 frames after it let the

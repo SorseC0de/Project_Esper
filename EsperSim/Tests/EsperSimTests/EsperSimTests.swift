@@ -238,6 +238,15 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.airSpeedMax, accuracy: 0.001)
     }
 
+    func testAirReversalIsImmediate() {
+        var match = Match()
+        run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
+        run(&match, frames: 5, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        XCTAssertGreaterThan(match.players[0].velocity.x, 0)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle])
+        XCTAssertEqual(match.players[0].velocity.x, -match.players[0].spec.airSpeedMax, accuracy: 0.001)
+    }
+
     func testDoubleJumpTurnsAround() {
         var match = Match()
         run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })

@@ -39,6 +39,9 @@ final class GameScene: SKScene {
     /// Each head, drawn apart from its body and following it loosely.
     private var headNodes: [SKSpriteNode] = []
     private var headShown: [CGPoint] = []
+    /// Each body's lean in flight, radians, eased toward where it's going.
+    private var bodyTilt: [CGFloat] = []
+    private static let flightTilt: CGFloat = .pi / 6
     /// The ball in each player's hands, its glow, and the fire off each head.
     private var handBalls: [SKSpriteNode] = []
     private var handHalos: [SKSpriteNode] = []
@@ -187,6 +190,7 @@ final class GameScene: SKScene {
             glowers.addChild(head)
             headNodes.append(head)
             headShown.append(.zero)
+            bodyTilt.append(0)
             let colour = SKColor(rgb: sprites.look(for: player.index).glow)
             let handBall = SKSpriteNode(texture: sprites.texture("ball", 0))
             handBall.color = colour
@@ -594,6 +598,20 @@ final class GameScene: SKScene {
             node.position = SpriteLibrary.point(player.position)
             node.xScale = CGFloat(player.facing.sign)
 
+            // In flight the body leans into its motion: forward tips it ahead, backward tips
+            // it back, up to thirty degrees, eased so it doesn't snap.
+            var wantedTilt: CGFloat = 0
+            if player.state == .flying {
+                let ahead = player.velocity.x * player.facing.sign / SodaRules.flightSpeedWithoutBall
+                wantedTilt = -CGFloat(min(max(ahead, -1), 1)) * GameScene.flightTilt * CGFloat(player.facing.sign)
+            }
+            bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
+            node.zRotation = bodyTilt[index]
+            let tilt = bodyTilt[index]
+            func leaned(_ offset: CGPoint) -> CGPoint {
+                CGPoint(x: offset.x * cos(tilt) - offset.y * sin(tilt), y: offset.x * sin(tilt) + offset.y * cos(tilt))
+            }
+
             // The ball in hand rides the frame's ball, and when that hangs off a ledge the
             // dribble reaches down to the real floor under it, over the same frames.
             let halo = handHalos[index]
@@ -604,7 +622,7 @@ final class GameScene: SKScene {
                 let drop = player.grounded ? match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit : 0
                 let phase = min(max(inHand.y / GameScene.dribbleHandHeight, 0), 1)
                 let y = inHand.y - CGFloat(drop) * (1 - phase)
-                let at = CGPoint(x: node.position.x + inHand.x * CGFloat(player.facing.sign), y: node.position.y + y.rounded())
+                let at = node.position + leaned(CGPoint(x: inHand.x * CGFloat(player.facing.sign), y: y.rounded()))
                 halo.isHidden = false
                 halo.position = at
                 handBall.isHidden = false
@@ -619,7 +637,7 @@ final class GameScene: SKScene {
             if let head = sprites.landmark(.head, in: frame, player: index),
                let headTexture = sprites.headTexture(frame, player: index),
                let anchor = sprites.headAnchor(frame, player: index) {
-                let target = CGPoint(x: node.position.x + head.x * CGFloat(player.facing.sign), y: node.position.y + head.y)
+                let target = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                 if headShown[index] == .zero { headShown[index] = target }
                 let lag = headVariant.lag
                 headShown[index] = CGPoint(x: headShown[index].x + (target.x - headShown[index].x) * lag,
@@ -635,6 +653,7 @@ final class GameScene: SKScene {
                 headNode.anchorPoint = anchor
                 headNode.xScale = CGFloat(player.facing.sign)
                 headNode.yScale = 1
+                headNode.zRotation = tilt
                 headNode.position = shown
                 headFires[index].position = CGPoint(x: shown.x, y: shown.y + 4)
                 headFires[index].particleBirthRate = 24

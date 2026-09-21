@@ -748,7 +748,8 @@ public struct Player: Equatable {
         events.append(.doubleJumped(player: index))
     }
 
-    /// Air control. Above the air speed cap the body only slows toward it.
+    /// Air control. Above the air speed cap the body only slows toward it. A stick against
+    /// the way it's going turns it at once, as Silksong does, rather than braking through.
     private mutating func airDrift(_ input: PlayerInput) {
         let x = input.stick.x
         if x == 0 {
@@ -756,8 +757,10 @@ public struct Player: Equatable {
             return
         }
         let target = spec.airSpeedMax * (x > 0 ? 1 : -1)
-        let sameWay = (velocity.x > 0) == (x > 0)
-        if sameWay, abs(velocity.x) > spec.airSpeedMax {
+        let sameWay = velocity.x == 0 || (velocity.x > 0) == (x > 0)
+        if !sameWay {
+            velocity.x = spec.airSpeedMax * x
+        } else if abs(velocity.x) > spec.airSpeedMax {
             velocity.x = approach(velocity.x, target, spec.airFriction)
         } else {
             velocity.x = approach(velocity.x, target, spec.airAccelerationBase + spec.airAccelerationAdditional * abs(x))

@@ -91,6 +91,9 @@ final class SpriteLibrary {
         return CGPoint(x: (head.x + size / 2) / size, y: (head.y + frame.animation.feetFromBottom) / size)
     }
 
+    /// Everything made so far.
+    var allTextures: [SKTexture] { Array(cache.values) }
+
     /// Builds every frame of every player up front and sends them to the GPU, so nothing
     /// is made mid-draw.
     func warmUp(players: Int, completion: @escaping () -> Void) {

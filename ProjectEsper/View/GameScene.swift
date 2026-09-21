@@ -72,6 +72,12 @@ final class GameScene: SKScene {
     private var accumulator = 0.0
     private var built = false
     private var ready = false
+    /// A texture reaches the GPU the first time it's drawn, and until then it draws as a
+    /// white square. So every texture is drawn once, tiny and all but invisible, for a few
+    /// frames before the game starts.
+    private let warmNode = SKNode()
+    private var warmFramesLeft = 3
+    private var preloaded = false
     private(set) var safeInsets = UIEdgeInsets.zero
     /// What the Metal view measured, shown in the corner.
     var framesPerSecond = 0
@@ -122,8 +128,16 @@ final class GameScene: SKScene {
         hud.zPosition = 100
         addChild(hud)
 
-        // Every frame in both looks, made and uploaded before anything is drawn.
-        sprites.warmUp(players: match.players.count) { [weak self] in self?.ready = true }
+        // Every frame in both looks, made before anything is drawn, then drawn once each.
+        sprites.warmUp(players: match.players.count) { [weak self] in self?.preloaded = true }
+        for texture in sprites.allTextures {
+            let sprite = SKSpriteNode(texture: texture)
+            sprite.size = CGSize(width: 1, height: 1)
+            sprite.alpha = 0.02
+            warmNode.addChild(sprite)
+        }
+        warmNode.zPosition = 90
+        hud.addChild(warmNode)
 
         // The floor and walls take the holder's colour, the backboard blocks keep their rim's
         // owner's, and the ledge is magenta.
@@ -410,7 +424,16 @@ final class GameScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         defer { lastTime = currentTime }
-        guard ready, let last = lastTime else { return }
+        if !ready {
+            // Hold until the textures have all been drawn once.
+            if preloaded, warmFramesLeft > 0 { warmFramesLeft -= 1 }
+            if preloaded, warmFramesLeft == 0 {
+                warmNode.removeFromParent()
+                ready = true
+            }
+            return
+        }
+        guard let last = lastTime else { return }
         accumulator += min(currentTime - last, 0.1)
         guard accumulator >= GameScene.stepSeconds else { return }
 

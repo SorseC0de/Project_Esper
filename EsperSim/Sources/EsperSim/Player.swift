@@ -60,6 +60,8 @@ public struct Player: Equatable {
     public var airControlLock = 0
     /// Frames left after walking off an edge in which a jump is still a ground jump.
     public var coyote = 0
+    /// Frames the stick has been held down.
+    public var downHeldFrames = 0
     /// Which shoot buttons took the stance; a different one pressed cancels it.
     public var stanceButtons: UInt8 = 0
     /// After a cancel, every shoot button has to come up before another shoot stance, and
@@ -127,6 +129,7 @@ public struct Player: Equatable {
         if swatCooldown > 0 { swatCooldown -= 1 }
         if doubleJumpTimer > 0 { doubleJumpTimer -= 1 }
         stickAwayFrames = abs(input.stick.x) < 0.3 ? 0 : stickAwayFrames + 1
+        downHeldFrames = input.stick.y < -0.65 ? downHeldFrames + 1 : 0
 
         if input.jump && !lastInput.jump { jumpBuffer = 5 } else if jumpBuffer > 0 { jumpBuffer -= 1 }
         let jumpPressed = jumpBuffer > 0
@@ -188,7 +191,14 @@ public struct Player: Equatable {
 
         case .run:
             if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
-                if let direction = stickFacing(input) {
+                if downHeldFrames >= spec.runBrakeHoldFrames {
+                    // Held down: the run brakes, and at walking speed it becomes a walk.
+                    velocity.x = approach(velocity.x, 0, spec.traction)
+                    animationPhase += abs(velocity.x) / spec.runSpeed * 0.25
+                    if abs(velocity.x) <= spec.walkMaxSpeed {
+                        enter(stickFacing(input) == nil ? .idle : .walk)
+                    }
+                } else if let direction = stickFacing(input) {
                     if direction != facing {
                         enter(.pivot)
                     } else {

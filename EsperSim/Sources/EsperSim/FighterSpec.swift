@@ -54,6 +54,8 @@ public struct FighterSpec: Equatable {
     public var wallJumpControlLockFrames = 6
     /// Frames after walking off an edge in which a jump press is still a ground jump.
     public var coyoteFrames = 3
+    /// Frames of holding down in a run before it brakes to walking speed.
+    public var runBrakeHoldFrames = 4
     /// Sideways speed lost per frame in an airborne stance.
     public var stanceAirBrake = 0.01
 

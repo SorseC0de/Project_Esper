@@ -86,6 +86,16 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].facing, .left)
     }
 
+    func testHoldingDownBrakesARunIntoAWalk() {
+        var match = Match()
+        run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        XCTAssertEqual(match.players[0].state, .run)
+        let walking = run(&match, frames: 40, input: { _ in PlayerInput(stick: Vec2(x: 0.7, y: -0.7)) }) { $0.players[0].state == .walk }
+        XCTAssertLessThan(walking, 40)
+        XCTAssertGreaterThan(match.players[0].velocity.x, 0)
+        XCTAssertLessThanOrEqual(match.players[0].velocity.x, match.players[0].spec.walkMaxSpeed + 0.001)
+    }
+
     func testTractionStopsTheBody() {
         var match = Match()
         run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })

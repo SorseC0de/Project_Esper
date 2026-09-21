@@ -45,6 +45,8 @@ public struct Player: Equatable {
     public var quickShot = false
     /// The stance was taken on the ground and jumped out of.
     public var jumpShot = false
+    /// The throw stance was let go before its windup finished: it throws when the windup ends.
+    public var quickThrow = false
     /// The shot was released on the way up out of a jump shot: it leaves with the body's lift.
     public var shotLift = false
     /// The last cardinal recorded in the throwing stance; zero throws forward.
@@ -212,6 +214,7 @@ public struct Player: Equatable {
                 enterShootStance()
             } else if hasBall, input.throwBall {
                 throwDirection = .zero
+                quickThrow = false
                 fastFalling = false
                 enter(.throwStance)
             } else if !hasBall, shootPressed, swatCooldown == 0 {
@@ -295,12 +298,16 @@ public struct Player: Equatable {
                 velocity = .zero
                 enter(.dunking)
                 action = .dunk(hoop: hoop)
-            } else if !input.throwBall {
+            } else if !input.throwBall, !quickThrow {
                 if stateTimer >= BallRules.throwWindupFrames {
                     enter(.throwing)
                 } else {
-                    enter(grounded ? .idle : .air)
+                    // Let go early: the throw goes when the windup ends, where the stick pointed.
+                    quickThrow = true
                 }
+            }
+            if quickThrow, stateTimer >= BallRules.throwWindupFrames {
+                enter(.throwing)
             }
 
         case .throwing:
@@ -369,6 +376,7 @@ public struct Player: Equatable {
             enterShootStance()
         } else if hasBall, input.throwBall {
             throwDirection = .zero
+            quickThrow = false
             enter(.throwStance)
         } else if hasBall, tauntPressed {
             enter(.taunt)
@@ -405,8 +413,10 @@ public struct Player: Equatable {
         enter(.dash)
     }
 
+    /// Off the wall, with the double jump back.
     private mutating func wallJump(off wall: Facing, events: inout [MatchEvent]) {
         jumpBuffer = 0
+        jumpsLeft = max(jumpsLeft, spec.jumps - 1)
         velocity = Vec2(x: spec.wallJumpHorizontal * -wall.sign, y: spec.wallJumpVertical)
         facing = wall.flipped
         fastFalling = false
@@ -521,12 +531,15 @@ public struct Player: Equatable {
         enter(.catching)
     }
 
-    /// Whether the ball at `ballPosition` is in reach and in front.
+    /// Whether the ball at `ballPosition` is in reach and either in front or in the way of
+    /// where the body is moving. A ball arriving from behind while standing still bounces off.
     public func canCatch(ballAt ballPosition: Vec2) -> Bool {
         guard !hasBall, catchCooldown == 0, state.canCatch else { return false }
-        guard chest.distance(to: ballPosition) <= BallRules.catchRadius else { return false }
-        let ahead = (ballPosition.x - position.x) * facing.sign
-        return ahead >= -1
+        let offset = ballPosition - chest
+        guard offset.length <= BallRules.catchRadius else { return false }
+        let ahead = offset.x * facing.sign >= -1
+        let movingInto = velocity.lengthSquared > 0.01 && offset.x * velocity.x + offset.y * velocity.y > 0
+        return ahead || movingInto
     }
 
     public func canSwat(ballAt ballPosition: Vec2) -> Bool {

@@ -31,18 +31,8 @@ public struct Ball: Equatable {
         previousY = position.y
         var scoredHoop: Int?
 
-        for (index, hoop) in stage.hoops.enumerated() where !thrown && position.y > hoop.position.y {
-            let distance = position.distance(to: hoop.position)
-            if distance < BallRules.hoopAbsorbRadius {
-                position.x = hoop.position.x
-                velocity.x *= 0.9
-                velocity.y = min(velocity.y, -1)
-                straight = false
-            } else if distance < BallRules.hoopPullRadius, distance > 0 {
-                let pull = (hoop.position - position) / distance * (BallRules.hoopPullStrength / (distance * distance))
-                velocity += pull
-            }
-            _ = index
+        for hoop in stage.hoops where !thrown && velocity.y < 0 && position.y > hoop.position.y {
+            steer(toward: hoop)
         }
 
         if !straight {
@@ -75,6 +65,22 @@ public struct Ball: Equatable {
         }
         resting = onFloor && velocity == .zero
         return scoredHoop
+    }
+
+    /// Bends a falling ball's path so it arrives over the rim: the sideways speed it would
+    /// need to reach the rim's centre in the time it will take to fall to the rim's height,
+    /// approached a share at a time.
+    private mutating func steer(toward hoop: Hoop) {
+        let across = hoop.position.x - position.x
+        let above = position.y - hoop.position.y
+        guard abs(across) <= BallRules.hoopReach, above <= BallRules.hoopReach else { return }
+        let down = -velocity.y
+        let g = BallRules.gravity
+        let frames = (-down + (down * down + 2 * g * above).squareRoot()) / g
+        guard frames > 0 else { return }
+        let needed = across / frames
+        let change = (needed - velocity.x) * BallRules.hoopSteerShare
+        velocity.x += min(max(change, -BallRules.hoopSteerMax), BallRules.hoopSteerMax)
     }
 
     private mutating func bounceX(events: inout [MatchEvent]) {

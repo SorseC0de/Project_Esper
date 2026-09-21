@@ -49,6 +49,8 @@ public struct Box: Equatable {
 /// The court: a grid of tiles, row 0 at the bottom, plus the rims and where everyone starts.
 public struct Stage: Equatable {
     public static let tileSize = 10.0
+    /// Rows of open sky above the grid before a ceiling, so a ball thrown straight up comes back.
+    public static let skyRows = 10
 
     public let columns: Int
     public let rows: Int
@@ -72,10 +74,12 @@ public struct Stage: Equatable {
     }
 
     /// Outside the grid: solid below and to the sides, and above the top the side walls
-    /// carry on up while everything between them is open sky.
+    /// carry on up through `skyRows` of open sky to a ceiling.
     public func tile(column: Int, row: Int) -> Tile {
         guard column >= 0, column < columns, row >= 0 else { return .solid }
-        guard row < rows else { return column == 0 || column == columns - 1 ? .solid : .empty }
+        guard row < rows else {
+            return column == 0 || column == columns - 1 || row >= rows + Stage.skyRows ? .solid : .empty
+        }
         return tiles[row * columns + column]
     }
 
@@ -213,14 +217,14 @@ public struct Stage: Equatable {
     // MARK: The court
 
     /// 34 by 16 tiles with no ceiling: floor and walls, a backboard block each side, two cells
-    /// in from the wall, with its rim on the inward face 60 units above the floor, and a
+    /// in from the wall, with its rim on the inward face 80 units above the floor, and a
     /// one-way ledge in the middle. Player 0 starts left and scores on the right rim.
     public static let court: Stage = {
         var stage = Stage(
             columns: 34, rows: 16,
             hoops: [
-                Hoop(position: Vec2(x: 58, y: 70), owner: 1, backboard: .left),
-                Hoop(position: Vec2(x: 282, y: 70), owner: 0, backboard: .right),
+                Hoop(position: Vec2(x: 58, y: 90), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: 282, y: 90), owner: 0, backboard: .right),
             ],
             playerSpawns: [Vec2(x: 130, y: 10), Vec2(x: 210, y: 10)],
             playerFacings: [.right, .left],
@@ -229,8 +233,8 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...33, rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...15)
         stage.fill(.solid, columns: 33...33, rows: 0...15)
-        stage.fill(.solid, columns: 3...4, rows: 6...7)
-        stage.fill(.solid, columns: 29...30, rows: 6...7)
+        stage.fill(.solid, columns: 3...4, rows: 8...9)
+        stage.fill(.solid, columns: 29...30, rows: 8...9)
         stage.fill(.oneWay, columns: 15...18, rows: 3...3)
         return stage
     }()

@@ -159,6 +159,20 @@ final class MovementTests: XCTestCase {
         XCTAssertLessThan(clung, 60, "never clung once the lockout passed")
     }
 
+    func testWallJumpGivesTheDoubleJumpBack() {
+        var match = Match()
+        match.players[0].position = Vec2(x: 30, y: 10)
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        // Spend the double jump, then reach the wall and jump off it.
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), jump: true), .idle])
+        XCTAssertEqual(match.players[0].jumpsLeft, 0)
+        run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), jump: true), .idle])
+        XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
+        XCTAssertEqual(match.players[0].jumpsLeft, 1)
+    }
+
     func testJumpBufferedThroughLandingLag() {
         var match = Match()
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
@@ -184,9 +198,10 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].facing, .left)
     }
 
-    func testNoCeilingButTheWallsGoUp() {
+    func testSkyThenACeilingAndTheWallsGoUp() {
         let stage = Stage.court
         XCTAssertEqual(stage.tile(column: 10, row: stage.rows + 5), .empty)
+        XCTAssertEqual(stage.tile(column: 10, row: stage.rows + Stage.skyRows), .solid)
         XCTAssertEqual(stage.tile(column: 0, row: stage.rows + 5), .solid)
         XCTAssertEqual(stage.tile(column: stage.columns - 1, row: stage.rows + 5), .solid)
         let box = Box(min: Vec2(x: 100, y: stage.height - 5), max: Vec2(x: 110, y: stage.height + 10))
@@ -302,6 +317,15 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity, Vec2(x: 0, y: BallRules.throwSpeed))
     }
 
+    func testTapThrowGoesWhenTheWindupEnds() {
+        var match = matchWithBallHeld()
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        run(&match, frames: BallRules.throwWindupFrames + BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertEqual(match.ball.velocity, Vec2(x: 0, y: BallRules.throwSpeed))
+    }
+
     func testLooseBallInFrontIsCaught() {
         var match = Match()
         match.ball.position = match.players[0].chest + Vec2(x: 6, y: 0)
@@ -312,12 +336,27 @@ final class BallTests: XCTestCase {
         XCTAssertTrue(match.events.contains(.caught(player: 0)))
     }
 
-    func testBallBehindIsNotCaught() {
+    func testBallBehindIsNotCaughtUnlessMovingIntoIt() {
         var match = Match()
         match.ball.position = match.players[0].chest + Vec2(x: -6, y: 0)
         match.ball.velocity = .zero
         match.advance(inputs: [.idle, .idle])
         XCTAssertNil(match.ball.holder)
+        // Backing into it, still facing away, picks it up.
+        match.players[0].velocity.x = -1
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -0.5, y: 0)), .idle])
+        XCTAssertEqual(match.ball.holder, 0)
+        XCTAssertEqual(match.players[0].facing, .right)
+    }
+
+    func testShotFallingBesideTheRimIsSteeredIn() {
+        var match = Match()
+        match.ball.position = match.stage.hoops[1].position + Vec2(x: -10, y: 20)
+        match.ball.velocity = Vec2(x: 0.3, y: 0)
+        for _ in 0..<120 where match.scores[0] == 0 {
+            match.advance(inputs: [.idle, .idle])
+        }
+        XCTAssertEqual(match.scores, [1, 0])
     }
 
     func testBallThroughTheRimScores() {
@@ -331,13 +370,13 @@ final class BallTests: XCTestCase {
         XCTAssertGreaterThan(match.ball.respawnTimer, 0)
     }
 
-    func testThrownBallIgnoresTheRimsPull() {
+    func testThrownBallIgnoresTheRimsSteering() {
         var match = Match()
         let rim = match.stage.hoops[1].position
-        // Just outside the absorb radius, inside the pull, moving up: a shot gets bent in, a throw doesn't.
+        // Falling beside the rim within reach: a shot gets steered across, a throw doesn't.
         for thrown in [false, true] {
-            match.ball.respawn(at: rim + Vec2(x: -15, y: 5))
-            match.ball.velocity = Vec2(x: 0, y: 1)
+            match.ball.respawn(at: rim + Vec2(x: -15, y: 10))
+            match.ball.velocity = Vec2(x: 0, y: -1)
             match.ball.thrown = thrown
             match.advance(inputs: [.idle, .idle])
             if thrown {

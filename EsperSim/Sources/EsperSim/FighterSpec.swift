@@ -206,7 +206,7 @@ extension FighterSpec {
         spec.name = "Baseline"
         spec.dashInitialVelocity = 2.8
         spec.runSpeed = 2.5
-        spec.traction = 0.15
+        spec.traction = 0.25
         spec.airSpeedMax = 1.6
         spec.airAccelerationAdditional = 0.24
         spec.jumpHorizontalVelocity = 1.6
@@ -248,7 +248,7 @@ public enum BallRules {
     /// A throw goes straight at this speed, with no gravity until its first bounce.
     public static let throwSpeed = 7.0
     public static let throwReleaseHeight = 12.0
-    public static let throwWindupFrames = 25
+    public static let throwWindupFrames = 12
     /// Frames from the release to the ball leaving the hand, then to acting again.
     public static let throwReleaseFrames = 3
     public static let throwRecoveryFrames = 15
@@ -264,11 +264,12 @@ public enum BallRules {
     public static let swatCooldownFrames = 80
     public static let swatFrames = 30
 
-    /// The rim pulls the ball in from this far, at strength over distance squared, and
-    /// swallows it within the absorb radius.
-    public static let hoopPullRadius = 25.0
-    public static let hoopPullStrength = 20.0
-    public static let hoopAbsorbRadius = 12.0
+    /// A ball falling toward a rim from within this reach, sideways and above, has its
+    /// sideways speed blended each frame toward what would carry it through the rim, by
+    /// this share, never by more than this much speed in one frame.
+    public static let hoopReach = 25.0
+    public static let hoopSteerShare = 0.15
+    public static let hoopSteerMax = 0.3
     public static let rimHalfWidth = 6.0
     /// Frames after a score before the ball comes back to centre.
     public static let respawnFrames = 90

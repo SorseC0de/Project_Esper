@@ -24,7 +24,7 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 ## Movement
 
 `FighterSpec.baseline` is Melee Fox with a Falco-style dash, a 2.8 burst into a 2.5 run,
-traction 0.15, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
+traction 0.25, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air turned up: air speed 1.6, air acceleration 0.02 + 0.24, a jump with the stick held
 starts at air speed, and a double jump with the stick held sets the sideways speed, so it
 turns around. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
@@ -49,10 +49,15 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
   gravity until the first bounce. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
-- Wall: hold toward a wall in the air to cling, jump to leave. Direction is automatic. A
-  cling can't start for 8 frames after leaving the ground, so a jump beside a wall isn't
-  caught by it on the way up.
-- Catch is automatic: facing the ball within reach.
+  A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
+  the stick pointed.
+- Wall: hold toward a wall in the air to cling, jump to leave. Direction is automatic, and
+  the wall jump gives the double jump back. A cling can't start for 8 frames after leaving
+  the ground, so a jump beside a wall isn't caught by it on the way up.
+- Catch is automatic: the ball within reach and either in front, or in the way of where
+  the body is moving. A ball arriving from behind while standing still bounces off.
+- Rims steer: a ball falling within reach has its sideways speed blended toward what
+  would carry it through the rim, a share a frame, never snapped.
 
 Pad: A jump, B or R1 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
 tuning picker, menu resets.

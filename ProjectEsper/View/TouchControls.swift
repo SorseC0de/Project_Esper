@@ -46,14 +46,15 @@ final class TouchControls: SKNode {
         addChild(stickBase)
         addChild(stickKnob)
 
-        let jump = makeButton("JUMP", radius: 30, at: CGPoint(x: halfWidth - 50, y: -halfHeight + 54)) { input, down, _ in
+        // Shoot and jump side by side, throw below and between them.
+        let jump = makeButton("JUMP", radius: 30, at: CGPoint(x: halfWidth - 50, y: -halfHeight + 90)) { input, down, _ in
             input.jump = down
         }
-        let shoot = makeButton("SHOOT", radius: 24, at: CGPoint(x: halfWidth - 128, y: -halfHeight + 96)) { input, down, aim in
+        let shoot = makeButton("SHOOT", radius: 30, at: CGPoint(x: halfWidth - 126, y: -halfHeight + 90)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", radius: 24, at: CGPoint(x: halfWidth - 140, y: -halfHeight + 36)) { input, down, aim in
+        let throwButton = makeButton("THROW", radius: 24, at: CGPoint(x: halfWidth - 88, y: -halfHeight + 32)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }

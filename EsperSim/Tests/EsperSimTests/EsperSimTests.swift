@@ -797,7 +797,7 @@ final class SodaAndFizzTests: XCTestCase {
         run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
         XCTAssertEqual(match.players[0].state, .flying)
         XCTAssertEqual(match.players[0].position.y, height, accuracy: 0.001)
-        XCTAssertEqual(match.players[0].velocity.x, SodaRules.flightSpeed, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, SodaRules.flightSpeedWithoutBall, accuracy: 0.001)
         // Let go and it falls.
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .air)

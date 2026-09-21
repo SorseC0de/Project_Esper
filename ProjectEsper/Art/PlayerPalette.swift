@@ -101,8 +101,9 @@ struct Look: Hashable {
 enum BallLook {
     /// The loose ball is purple, after a while in the colour of whoever last let it go.
     static let neutral: RGB = 0xBF7BFF
-    /// Frames it keeps the team colour after a shot or a throw, and frames of the shift back.
-    static let holdFrames = 45
+    /// Frames it keeps the team colour after a shot or a throw, the sim's owned window, and
+    /// frames of the shift back.
+    static let holdFrames = 60
     static let shiftFrames = 30
     /// The chevrons over a resting ball.
     static let chevron: RGB = 0xFBF236

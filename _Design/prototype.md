@@ -81,10 +81,11 @@ in hand: that's where tricking lives, throwing the ball away to use the power wh
 in the air, catching it, carrying on. On the POWER picker, A is none.
 
 - Web Water (B). Double jump is the web swing: air movement halts, a web goes to the top
-  of the court 35 units ahead, and the body swings under it on a pendulum arc past the
-  mirrored angle, so it dips, then lets go higher than it stopped with the arc's speed.
-  That least arc always happens; holding jump keeps swinging, up to twice the arc and never
-  over the anchor, and a full swing gives the double jump back. It spends the double jump
+  of the court 45 units ahead, and the body swings under it on a pendulum arc to the
+  mirrored angle, so it dips, then lets go higher than it stopped. That least arc always
+  happens; holding jump keeps swinging, up to 1.6 times the arc and never over the anchor,
+  and a full swing gives the double jump back. The exit keeps the arc's direction but is
+  capped to air speed across and a full hop up, so the stick can turn it. It spends the double jump
   and works with the ball. The wall cling never slides. The throw button without the ball
   is the web line, from the ground, the air or a wall: held, it aims along the stick with a
   faint line; let go, it fires, 120 units. It bends to a loose ball or the opponent within
@@ -92,12 +93,12 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   holding the ball loses it to the reel. The opponent without it is reeled to 12 units in
   front of the shooter and dropped. A wall or block reels the shooter to it. With the ball
   the throw button is the ordinary throw. Numbers in `WebRules`.
-- Super Soda (C). Holding jump in the air is flight: the stick moves the body slowly in any
-  direction with gravity off, for two seconds of budget per airtime, refilled on landing.
+- Super Soda (C). A fresh jump press in the air, held, is flight: the stick moves the body
+  in any direction with gravity off, slowly with the ball and twice as fast without, for two seconds of budget per airtime, refilled on landing.
   Let go or run out and it falls. No double jump. With or without the ball, and a shot or
   throw can be taken from flight. Numbers in `SodaRules`.
 - Flash Fizz (D). A shoot button with no ball warps the body to the ball and it arrives
-  holding it, but only while the ball is still its colour, the 45 frames after it let the
+  holding it, but only while the ball is still its colour, the 60 frames after it let the
   ball go: throw, warp, catch. One second between warps. A bright wide diamond blinks at
   where it left and where it landed. Otherwise shoot does what it does without the ball.
   Numbers in `FizzRules`.
@@ -122,7 +123,7 @@ darker version of it, a black line one pixel thick round the body following the 
 edge only, and the front arm stroked on its own where it lies over the body. The head is
 split out of every frame and drawn as its own sprite with no line, trailing its place on
 the body by a quarter of the gap each frame and bobbing a pixel, and its fire is released
-into the world so it streams behind a moving head. The loose ball is purple, and for 45 frames after a shot, throw or dunk it's the colour
+into the world so it streams behind a moving head. The loose ball is purple, and for 60 frames after a shot, throw or dunk it's the colour
 of whoever let it go, then shifts back over 30. A flying ball leaves a soft additive trail
 in its colour. The library finds where the ball and the head sit in each frame so the halo
 and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted a pixel off the body. Three dim

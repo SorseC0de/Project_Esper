@@ -296,7 +296,7 @@ public enum BallRules {
     /// Frames after a score before the ball comes back to centre.
     public static let respawnFrames = 90
     /// Frames after a shot, throw or dunk the ball still counts as the thrower's.
-    public static let ownedFrames = 45
+    public static let ownedFrames = 60
 }
 
 /// Web Water's numbers.
@@ -304,10 +304,10 @@ public enum WebRules {
     /// The swing's anchor sits this far ahead at the top of the court. The least arc runs
     /// past the mirrored angle by the overshoot, over this many frames; holding jump keeps
     /// it going up to twice that arc, never past this angle over the anchor.
-    public static let swingReach = 35.0
+    public static let swingReach = 45.0
     public static let swingFrames = 16
-    public static let swingOvershoot = 1.15
-    public static let swingMaxArcShare = 2.0
+    public static let swingOvershoot = 1.0
+    public static let swingMaxArcShare = 1.6
     public static let swingMaxAngle = 1.4
     /// The line reaches this far, bends to a ball or body within this angle of the aim,
     /// snaps to one within this of its tip, reels at this speed, can't repeat for this long,
@@ -325,8 +325,10 @@ public enum WebRules {
 }
 
 /// Super Soda's numbers: slow flight in any direction, gravity off, this long per airtime.
+/// Twice as fast without the ball.
 public enum SodaRules {
     public static let flightSpeed = 1.0
+    public static let flightSpeedWithoutBall = 2.0
     public static let flightFrames = 120
 }
 

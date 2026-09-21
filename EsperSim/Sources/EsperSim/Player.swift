@@ -529,16 +529,19 @@ public struct Player: Equatable {
             velocity = target - position
             let full = swept >= swingLeastArc * WebRules.swingMaxArcShare || abs(swingAngle) >= WebRules.swingMaxAngle
             if full || (swept >= swingLeastArc && !input.jump) {
-                // A full swing gives the double jump back.
+                // A full swing gives the double jump back. The exit keeps the arc's direction
+                // but not all its speed, so the stick can turn it.
                 if full { jumpsLeft = max(jumpsLeft, spec.jumps - 1) }
                 webAnchor = nil
+                velocity.x = min(max(velocity.x, -spec.airSpeedMax), spec.airSpeedMax)
+                velocity.y = min(velocity.y, spec.fullHopVelocity)
                 enter(.air)
             }
 
         case .flying:
             // Any direction, slowly, gravity off, while jump is held and the budget lasts.
             flightLeft -= 1
-            velocity = input.stick * SodaRules.flightSpeed
+            velocity = input.stick * (hasBall ? SodaRules.flightSpeed : SodaRules.flightSpeedWithoutBall)
             if hasBall, input.shoot, shootReady {
                 enterShootStance()
             } else if hasBall, input.throwBall, throwReady {

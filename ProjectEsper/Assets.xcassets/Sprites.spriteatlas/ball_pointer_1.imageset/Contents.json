@@ -1,0 +1,13 @@
+{
+  "images": [
+    {
+      "filename": "ball_pointer_1.png",
+      "idiom": "universal",
+      "scale": "1x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

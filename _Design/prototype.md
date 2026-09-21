@@ -58,7 +58,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
-  leaves it, direction automatic, the double jump not restored, and the stick doesn't steer
+  leaves it, direction automatic, the double jump restored, and the stick doesn't steer
   for 6 frames so the arc clears the wall. A jump press with a wall within 2 units of either side
   is a wall jump with no cling at all, and for 6 frames after letting go of a wall a press
   still jumps off it. A cling can't start for 8 frames after leaving the ground, and the

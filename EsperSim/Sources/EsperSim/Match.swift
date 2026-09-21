@@ -25,7 +25,8 @@ public struct Match: Equatable {
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
-            guard let action = players[index].step(input: input, stage: stage, events: &events) else { continue }
+            let opponentX = players.indices.first { $0 != index }.map { players[$0].position.x }
+            guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX, events: &events) else { continue }
             perform(action, by: index)
         }
 

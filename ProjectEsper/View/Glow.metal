@@ -1,0 +1,65 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// The glow, GameMaker's Glow filter by another route: the bright parts of the scene,
+// blurred at half size, added back on top.
+
+struct GlowUniforms {
+    float2 texelSize;
+    float2 direction;
+    float threshold;
+    float softness;
+    float intensity;
+    float4 tint;
+};
+
+struct FullScreen {
+    float4 position [[position]];
+    float2 uv;
+};
+
+// One triangle that covers the screen; uv has y down like the textures.
+vertex FullScreen glowVertex(uint id [[vertex_id]]) {
+    float2 corners[3] = { float2(-1, -1), float2(3, -1), float2(-1, 3) };
+    FullScreen out;
+    out.position = float4(corners[id], 0, 1);
+    out.uv = float2((corners[id].x + 1) / 2, 1 - (corners[id].y + 1) / 2);
+    return out;
+}
+
+// What glows: everything above the luminance threshold, eased in over `softness`.
+fragment float4 glowBright(FullScreen in [[stage_in]],
+                           texture2d<float> scene [[texture(0)]],
+                           sampler linear [[sampler(0)]],
+                           constant GlowUniforms &u [[buffer(0)]]) {
+    float4 color = scene.sample(linear, in.uv);
+    float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+    float amount = smoothstep(u.threshold - u.softness, u.threshold + u.softness, luminance);
+    return float4(color.rgb * amount, 1);
+}
+
+// A nine-tap Gaussian along `direction`; run once across and once down.
+fragment float4 glowBlur(FullScreen in [[stage_in]],
+                         texture2d<float> source [[texture(0)]],
+                         sampler linear [[sampler(0)]],
+                         constant GlowUniforms &u [[buffer(0)]]) {
+    const float weights[5] = { 0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216 };
+    float2 step = u.direction * u.texelSize;
+    float3 sum = source.sample(linear, in.uv).rgb * weights[0];
+    for (int i = 1; i < 5; i++) {
+        sum += source.sample(linear, in.uv + step * i).rgb * weights[i];
+        sum += source.sample(linear, in.uv - step * i).rgb * weights[i];
+    }
+    return float4(sum, 1);
+}
+
+// The scene with the glow added on top.
+fragment float4 glowComposite(FullScreen in [[stage_in]],
+                              texture2d<float> scene [[texture(0)]],
+                              texture2d<float> glow [[texture(1)]],
+                              sampler linear [[sampler(0)]],
+                              constant GlowUniforms &u [[buffer(0)]]) {
+    float4 color = scene.sample(linear, in.uv);
+    float3 bloom = glow.sample(linear, in.uv).rgb * u.tint.rgb * u.intensity;
+    return float4(color.rgb + bloom, 1);
+}

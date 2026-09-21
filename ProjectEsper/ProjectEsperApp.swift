@@ -13,10 +13,8 @@ struct ProjectEsperApp: App {
 }
 
 struct GameView: View {
-    @State private var scene = GameScene()
-
     var body: some View {
-        SpriteView(scene: scene, preferredFramesPerSecond: 60, options: [.ignoresSiblingOrder])
+        MetalGameView()
             .ignoresSafeArea()
             .persistentSystemOverlays(.hidden)
     }

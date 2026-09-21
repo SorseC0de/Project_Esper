@@ -92,7 +92,8 @@ public struct Player: Equatable {
 
     // MARK: Step
 
-    public mutating func step(input: PlayerInput, stage: Stage, events: inout [MatchEvent]) -> PlayerAction? {
+    /// `opponentX` is where the other body stands; a walk always faces it.
+    public mutating func step(input: PlayerInput, stage: Stage, opponentX: Double? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         stateTimer += 1
         if catchCooldown > 0 { catchCooldown -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
@@ -122,8 +123,11 @@ public struct Player: Equatable {
             }
 
         case .walk:
-            // Walking keeps the body facing where it was, so it can back up or dribble
-            // between the legs while staring the other way. Only a dash turns it.
+            // A walk faces the opponent whichever way it goes, so it can back off or dribble
+            // between the legs while staring them down. Only a dash turns the body.
+            if let opponentX, opponentX != position.x {
+                facing = opponentX > position.x ? .right : .left
+            }
             if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
                 if let direction = stickFacing(input) {
                     if smash {
@@ -132,7 +136,8 @@ public struct Player: Equatable {
                     } else {
                         let target = spec.walkMaxSpeed * input.stick.x
                         velocity.x = approach(velocity.x, target, spec.walkAcceleration)
-                        animationPhase += abs(velocity.x) / spec.walkMaxSpeed * 0.25
+                        // Never slower than 12 of the cycle's 15 frames a second, so the ball can't hang on a tween.
+                        animationPhase += max(abs(velocity.x) / spec.walkMaxSpeed, 0.8) * 0.25
                     }
                 } else {
                     enter(.idle)

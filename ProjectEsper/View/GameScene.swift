@@ -14,6 +14,9 @@ final class GameScene: SKScene {
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
     private let world = SKNode()
+    /// Sits at the camera's position in the world, scale 1, so its children are laid out in
+    /// game pixels and stay put on screen.
+    private let hud = SKNode()
     private var controls: TouchControls?
     private var playerNodes: [SKSpriteNode] = []
     private var ballNode = SKSpriteNode()
@@ -35,18 +38,15 @@ final class GameScene: SKScene {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override func didMove(to view: SKView) {
-        view.isMultipleTouchEnabled = true
+    /// The Metal view calls this with its size in points whenever that changes.
+    func attach(size: CGSize, displayScale: CGFloat) {
+        self.size = size
         hub.activate()
         if !built {
             build()
             built = true
         }
-        layout(in: view)
-    }
-
-    override func didChangeSize(_ oldSize: CGSize) {
-        if let view, built { layout(in: view) }
+        layout(displayScale: displayScale)
     }
 
     // MARK: Building
@@ -55,6 +55,8 @@ final class GameScene: SKScene {
         addChild(world)
         camera = cameraNode
         addChild(cameraNode)
+        hud.zPosition = 100
+        addChild(hud)
         applyTuning()
 
         let stage = match.stage
@@ -97,7 +99,7 @@ final class GameScene: SKScene {
         scoreLabel.fontSize = 12
         scoreLabel.fontColor = .white
         scoreLabel.verticalAlignmentMode = .top
-        cameraNode.addChild(scoreLabel)
+        hud.addChild(scoreLabel)
 
         debugLabel.fontName = "Menlo"
         debugLabel.fontSize = 6
@@ -105,7 +107,7 @@ final class GameScene: SKScene {
         debugLabel.horizontalAlignmentMode = .left
         debugLabel.verticalAlignmentMode = .top
         debugLabel.numberOfLines = 0
-        cameraNode.addChild(debugLabel)
+        hud.addChild(debugLabel)
     }
 
     /// The rim's net, as GMS2 built it: six columns, five rows, tapering to half width.
@@ -139,8 +141,7 @@ final class GameScene: SKScene {
     }
 
     /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
-    private func layout(in view: SKView) {
-        let screenScale = view.traitCollection.displayScale
+    private func layout(displayScale screenScale: CGFloat) {
         let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
@@ -149,6 +150,7 @@ final class GameScene: SKScene {
         let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraNode.position = CGPoint(x: stageWidth / 2, y: stageHeight / 2)
+        hud.position = cameraNode.position
 
         let halfWidth = size.width / pointsPerGamePixel / 2
         let halfHeight = size.height / pointsPerGamePixel / 2
@@ -159,7 +161,7 @@ final class GameScene: SKScene {
             self?.airVariant = AirVariant(rawValue: index)!
             self?.applyTuning()
         }
-        cameraNode.addChild(controls)
+        hud.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - 6)
         debugLabel.position = CGPoint(x: -halfWidth + 6, y: controls.pickerBottom - 4)
@@ -274,27 +276,23 @@ final class GameScene: SKScene {
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "")
     }
 
-    // MARK: Touches
+    // MARK: Touches, from the Metal view in points
 
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let controls else { return }
-        for touch in touches {
-            controls.began(touch, at: touch.location(in: controls))
-        }
+    /// A point in the view, in points, as a point in the HUD's space in game pixels.
+    private func hudPoint(_ point: CGPoint, viewSize: CGSize) -> CGPoint {
+        let scale = cameraNode.xScale
+        return CGPoint(x: (point.x - viewSize.width / 2) * scale, y: (viewSize.height / 2 - point.y) * scale)
     }
 
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let controls else { return }
-        for touch in touches {
-            controls.moved(touch, to: touch.location(in: controls))
-        }
+    func touchBegan(_ touch: UITouch, at point: CGPoint, viewSize: CGSize) {
+        controls?.began(touch, at: hudPoint(point, viewSize: viewSize))
     }
 
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        touches.forEach { controls?.ended($0) }
+    func touchMoved(_ touch: UITouch, to point: CGPoint, viewSize: CGSize) {
+        controls?.moved(touch, to: hudPoint(point, viewSize: viewSize))
     }
 
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        touches.forEach { controls?.ended($0) }
+    func touchEnded(_ touch: UITouch) {
+        controls?.ended(touch)
     }
 }

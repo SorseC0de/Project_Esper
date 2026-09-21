@@ -65,16 +65,24 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(walker.players[0].velocity.x, walker.players[0].spec.walkMaxSpeed * 0.5, accuracy: 0.001)
     }
 
-    func testWalkingBackwardKeepsFacing() {
+    func testWalkingFacesTheOpponentEitherWay() {
         var match = Match()
+        // Player 0 starts left of player 1. Walking away still faces them.
+        match.players[0].facing = .left
         run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: -0.5, y: 0)) })
         XCTAssertEqual(match.players[0].state, .walk)
         XCTAssertLessThan(match.players[0].velocity.x, 0)
         XCTAssertEqual(match.players[0].facing, .right)
-        // A smash the same way turns into a dash and turns the body.
+        // A smash away turns into a dash and turns the body away.
         run(&match, frames: 5, input: { _ in .idle })
         run(&match, frames: 3, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) })
         XCTAssertEqual(match.players[0].state, .dash)
+        XCTAssertEqual(match.players[0].facing, .left)
+        // Past the opponent, a walk faces back at them.
+        match.players[0].position.x = match.players[1].position.x + 30
+        match.players[0].velocity = .zero
+        match.players[0].enter(.idle)
+        run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 0.5, y: 0)) })
         XCTAssertEqual(match.players[0].facing, .left)
     }
 
@@ -180,7 +188,7 @@ final class BallTests: XCTestCase {
         XCTAssertGreaterThan(match.ball.velocity.y, 0)
         XCTAssertGreaterThan(match.ball.velocity.x, 0)
         // One frame of gravity has already come off it.
-        XCTAssertEqual(match.ball.velocity.length, BallRules.shotSpeed, accuracy: 0.1)
+        XCTAssertEqual(match.ball.velocity.length, BallRules.shotSpeed, accuracy: 0.2)
     }
 
     func testReleaseWithoutFlickIsAPumpFake() {

@@ -193,24 +193,25 @@ public struct FighterSpec: Equatable {
 }
 
 extension FighterSpec {
-    /// The body the game is tuned on: Fox with Falcon's run, and air control turned up so a
-    /// jump starts at air speed and turns around in about a dozen frames.
+    /// The body the game is tuned on: Fox with Falcon's run, more traction, and air control
+    /// turned up so a jump starts at air speed and turns around in about eight frames.
     public static let baseline: FighterSpec = {
         var spec = meleeFox
         spec.name = "Baseline"
         spec.runSpeed = 2.3
-        spec.airSpeedMax = 1.0
-        spec.airAccelerationAdditional = 0.12
-        spec.jumpHorizontalVelocity = 1.0
-        spec.doubleJumpHorizontalVelocity = 1.0
+        spec.traction = 0.15
+        spec.airSpeedMax = 1.2
+        spec.airAccelerationAdditional = 0.16
+        spec.jumpHorizontalVelocity = 1.2
+        spec.doubleJumpHorizontalVelocity = 1.2
         return spec
     }()
 }
 
 /// Everything about the ball, the hoops and the plays on them. Units and frames.
 public enum BallRules {
-    public static let gravity = 0.09
-    public static let fallSpeed = 5.0
+    public static let gravity = 0.15
+    public static let fallSpeed = 6.0
     public static let radius = 2.5
     /// Speed kept after hitting a wall, the floor, or a body.
     public static let bounce = 0.75
@@ -219,7 +220,7 @@ public enum BallRules {
     public static let restSpeed = 0.2
 
     /// A shot leaves from this high above the feet and arcs at this speed.
-    public static let shotSpeed = 2.5
+    public static let shotSpeed = 4.5
     public static let shotReleaseHeight = 25.0
     public static let shotAngleMin = degrees(25)
     public static let shotAngleMax = degrees(80)
@@ -237,7 +238,7 @@ public enum BallRules {
     public static let stanceFallSpeed = 0.5
 
     /// A throw goes straight at this speed, with no gravity until its first bounce.
-    public static let throwSpeed = 5.0
+    public static let throwSpeed = 7.0
     public static let throwReleaseHeight = 12.0
     public static let throwWindupFrames = 25
     /// Frames from the release to the ball leaving the hand, then to acting again.

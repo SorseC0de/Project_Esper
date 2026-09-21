@@ -209,15 +209,15 @@ public struct Stage: Equatable {
 
     // MARK: The court
 
-    /// 32 by 15 tiles: floor, walls and ceiling, a backboard block each side with its rim on
-    /// the inward face 60 units above the floor, and a one-way ledge in the middle. Player 0
+    /// 32 by 15 tiles: floor, walls and ceiling, a backboard block each side, two cells in from
+    /// the wall, with its rim on the inward face 60 units above the floor, and a one-way ledge in the middle. Player 0
     /// starts left and scores on the right rim.
     public static let court: Stage = {
         var stage = Stage(
             columns: 32, rows: 15,
             hoops: [
-                Hoop(position: Vec2(x: 48, y: 70), owner: 1, backboard: .left),
-                Hoop(position: Vec2(x: 272, y: 70), owner: 0, backboard: .right),
+                Hoop(position: Vec2(x: 58, y: 70), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: 262, y: 70), owner: 0, backboard: .right),
             ],
             playerSpawns: [Vec2(x: 120, y: 10), Vec2(x: 200, y: 10)],
             playerFacings: [.right, .left],
@@ -227,8 +227,8 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...31, rows: 14...14)
         stage.fill(.solid, columns: 0...0, rows: 0...14)
         stage.fill(.solid, columns: 31...31, rows: 0...14)
-        stage.fill(.solid, columns: 2...3, rows: 6...7)
-        stage.fill(.solid, columns: 28...29, rows: 6...7)
+        stage.fill(.solid, columns: 3...4, rows: 6...7)
+        stage.fill(.solid, columns: 27...28, rows: 6...7)
         stage.fill(.oneWay, columns: 14...17, rows: 3...3)
         return stage
     }()

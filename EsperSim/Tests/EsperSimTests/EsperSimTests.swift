@@ -25,13 +25,24 @@ final class MovementTests: XCTestCase {
 
     func testFullHopReachesMeleeHeight() {
         let height = peakHeight { _ in true }
-        XCTAssertEqual(height, 29, accuracy: 1.5)
+        XCTAssertEqual(height, 38.5, accuracy: 1.5)
     }
 
     func testShortHopReachesMeleeHeight() {
         // Let go during the jump squat.
         let height = peakHeight { $0 < 2 }
-        XCTAssertEqual(height, 11, accuracy: 1.5)
+        XCTAssertEqual(height, 14.9, accuracy: 1.5)
+    }
+
+    func testMarioHopsMatchHisTable() {
+        var match = Match(specs: [.meleeMario, .meleeMario])
+        let start = match.players[0].position.y
+        var peak = start
+        run(&match, frames: 120, input: { _ in PlayerInput(jump: true) }) { match in
+            peak = max(peak, match.players[0].position.y)
+            return match.players[0].state == .land
+        }
+        XCTAssertEqual(peak - start, 29, accuracy: 1.5)
     }
 
     func testDoubleJumpRisesAgain() {
@@ -52,26 +63,26 @@ final class MovementTests: XCTestCase {
         var match = Match()
         run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
         XCTAssertEqual(match.players[0].state, .run)
-        XCTAssertEqual(match.players[0].velocity.x, 1.5, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.runSpeed, accuracy: 0.001)
 
         var walker = Match()
         run(&walker, frames: 40, input: { _ in PlayerInput(stick: Vec2(x: 0.5, y: 0)) })
         XCTAssertEqual(walker.players[0].state, .walk)
-        XCTAssertEqual(walker.players[0].velocity.x, 0.55, accuracy: 0.001)
+        XCTAssertEqual(walker.players[0].velocity.x, walker.players[0].spec.walkMaxSpeed * 0.5, accuracy: 0.001)
     }
 
     func testTractionStopsTheBody() {
         var match = Match()
         run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
         let stopped = run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].velocity.x == 0 }
-        XCTAssertLessThan(stopped, 30)
+        XCTAssertLessThan(stopped, 40)
     }
 
     func testFastFallHitsTheCap() {
         var match = Match()
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.players[0].fastFalling }
-        XCTAssertEqual(match.players[0].velocity.y, -2.3, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.y, -match.players[0].spec.fastFallSpeed, accuracy: 0.001)
     }
 
     func testWallLandThenWallJump() {
@@ -85,8 +96,8 @@ final class MovementTests: XCTestCase {
         match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), jump: true), .idle])
         XCTAssertEqual(match.players[0].state, .air)
         XCTAssertEqual(match.players[0].facing, .right)
-        XCTAssertEqual(match.players[0].velocity.x, 1.5, accuracy: 0.001)
-        XCTAssertEqual(match.players[0].velocity.y, 2.0, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.wallJumpHorizontal, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.y, match.players[0].spec.wallJumpVertical, accuracy: 0.001)
         XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
     }
 
@@ -99,7 +110,7 @@ final class MovementTests: XCTestCase {
             PlayerInput(stick: Vec2(x: -1, y: 0), jump: frame % 2 == 0)
         }) { $0.events.contains(.wallJumped(player: 0, wall: .left)) }
         XCTAssertLessThan(jumped, 120, "never wall jumped")
-        XCTAssertEqual(match.players[0].velocity.x, 1.5, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.wallJumpHorizontal, accuracy: 0.001)
     }
 
     func testJumpBufferedThroughLandingLag() {

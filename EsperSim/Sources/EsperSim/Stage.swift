@@ -209,27 +209,27 @@ public struct Stage: Equatable {
 
     // MARK: The court
 
-    /// 26 by 12 tiles, about a Final Destination and a half wide: floor, walls and ceiling,
-    /// a backboard block each side with its rim on the inward face, and a one-way ledge in
-    /// the middle. Player 0 starts left and scores on the right rim.
+    /// 30 by 14 tiles, not quite two Final Destinations wide: floor, walls and ceiling, a
+    /// backboard block each side with its rim on the inward face, and a one-way ledge in the
+    /// middle. Player 0 starts left and scores on the right rim.
     public static let court: Stage = {
         var stage = Stage(
-            columns: 26, rows: 12,
+            columns: 30, rows: 14,
             hoops: [
                 Hoop(position: Vec2(x: 48, y: 50), owner: 1, backboard: .left),
-                Hoop(position: Vec2(x: 212, y: 50), owner: 0, backboard: .right),
+                Hoop(position: Vec2(x: 252, y: 50), owner: 0, backboard: .right),
             ],
-            playerSpawns: [Vec2(x: 90, y: 10), Vec2(x: 170, y: 10)],
+            playerSpawns: [Vec2(x: 110, y: 10), Vec2(x: 190, y: 10)],
             playerFacings: [.right, .left],
-            ballSpawn: Vec2(x: 130, y: 70)
+            ballSpawn: Vec2(x: 150, y: 70)
         )
-        stage.fill(.solid, columns: 0...25, rows: 0...0)
-        stage.fill(.solid, columns: 0...25, rows: 11...11)
-        stage.fill(.solid, columns: 0...0, rows: 0...11)
-        stage.fill(.solid, columns: 25...25, rows: 0...11)
+        stage.fill(.solid, columns: 0...29, rows: 0...0)
+        stage.fill(.solid, columns: 0...29, rows: 13...13)
+        stage.fill(.solid, columns: 0...0, rows: 0...13)
+        stage.fill(.solid, columns: 29...29, rows: 0...13)
         stage.fill(.solid, columns: 2...3, rows: 4...5)
-        stage.fill(.solid, columns: 22...23, rows: 4...5)
-        stage.fill(.oneWay, columns: 11...14, rows: 3...3)
+        stage.fill(.solid, columns: 26...27, rows: 4...5)
+        stage.fill(.oneWay, columns: 13...16, rows: 3...3)
         return stage
     }()
 }

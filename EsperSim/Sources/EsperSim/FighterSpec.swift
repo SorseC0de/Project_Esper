@@ -77,6 +77,41 @@ public struct FighterSpec: Equatable {
         bodyWidth: 10,
         bodyHeight: 15
     )
+
+    /// Melee Captain Falcon, same table. Jump velocities come from the listed heights: full
+    /// hop 38.5, short hop 14.9, double jump 28.6. The wall jump is his run speed out and
+    /// most of a full hop up, as Mario's was.
+    public static let meleeFalcon = FighterSpec(
+        name: "Falcon",
+        walkMaxSpeed: 0.85,
+        walkAcceleration: 0.1,
+        dashThreshold: 0.8,
+        dashInitialVelocity: 2.0,
+        dashFrames: 15,
+        runSpeed: 2.3,
+        traction: 0.08,
+        pivotFrames: 15,
+        jumpSquatFrames: 4,
+        fullHopVelocity: 3.1,
+        shortHopVelocity: 1.9,
+        doubleJumpVelocity: 2.66,
+        jumps: 2,
+        gravity: 0.13,
+        fallSpeed: 2.9,
+        fastFallSpeed: 3.5,
+        airSpeedMax: 1.12,
+        airAccelerationBase: 0.02,
+        airAccelerationAdditional: 0.04,
+        airFriction: 0.01,
+        landingLagFrames: 4,
+        wallJumpHorizontal: 2.3,
+        wallJumpVertical: 2.7,
+        wallSlideSpeed: 0.5,
+        wallLandFrames: 12,
+        wallLandCooldownFrames: 30,
+        bodyWidth: 10,
+        bodyHeight: 15
+    )
 }
 
 /// Everything about the ball, the hoops and the plays on them. Units and frames.

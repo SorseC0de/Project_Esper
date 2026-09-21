@@ -15,14 +15,15 @@ neutral to get a shot off; catch it and the roles reverse.
 ## Units
 
 Melee units. 1 unit = 1.6 game pixels, so a 16px tile is 10 units and the 24px body is 15
-units tall, which is Melee Mario's height. The court is 26 by 12 tiles, about a Final Destination and a half wide, and the camera fits all of it at a whole number of screen pixels per game
-pixel: 6 on an iPhone.
+units tall, which is Melee Mario's height. The court is 30 by 14 tiles, not quite two Final Destinations wide, and the camera fits
+all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 
 ## Movement
 
-Melee Mario from the SSBWiki table, in `FighterSpec.meleeMario`. Walk acceleration, dash
-length, pivot, and the wall numbers aren't on the table and are chosen to sit with the rest.
+Melee Captain Falcon from the SSBWiki table, in `FighterSpec.meleeFalcon`; Mario is kept
+beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
+and are chosen to sit with the rest.
 
 ## Input grammar
 

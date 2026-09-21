@@ -260,9 +260,11 @@ public enum BallRules {
     /// A throw goes straight at this speed, with no gravity until its first bounce.
     public static let throwSpeed = 7.0
     /// An up throw is the floater: it drifts up this fast, gravity off, for this many
-    /// frames, then falls as a ball does.
+    /// frames, then falls as a ball does. It keeps this share of the run it started from,
+    /// enough to drift with the thrower and not enough to arc.
     public static let floaterSpeed = 1.5
     public static let floaterFrames = 30
+    public static let floaterMomentumShare = 0.2
     public static let throwReleaseHeight = 12.0
     public static let throwWindupFrames = 12
     /// Frames from the release to the ball leaving the hand, then to acting again.

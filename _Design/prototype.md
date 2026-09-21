@@ -52,8 +52,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Shoot (without ball, in the air): swat. Reverses the ball if it's in front.
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
   gravity until the first bounce. Up is the floater: a soft drift up at 1.5 with gravity
-  off for 30 frames, carrying the sideways speed the thrower had when the stance began, then
-  a normal fall. The rims don't pull a thrown ball, so scoring off a throw
+  off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
+  began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed.

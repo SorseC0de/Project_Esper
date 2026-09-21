@@ -430,7 +430,7 @@ final class BallTests: XCTestCase {
                 match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
             }
             run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
-            XCTAssertEqual(match.ball.velocity.x, direction * match.players[0].spec.runSpeed, accuracy: 0.001)
+            XCTAssertEqual(match.ball.velocity.x, direction * match.players[0].spec.runSpeed * BallRules.floaterMomentumShare, accuracy: 0.001)
         }
     }
 

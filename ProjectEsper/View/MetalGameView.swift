@@ -172,7 +172,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         maskPass.colorAttachments[0].texture = bodyMask
         maskPass.colorAttachments[0].loadAction = .clear
         maskPass.colorAttachments[0].storeAction = .store
-        maskPass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        maskPass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         maskPass.depthAttachment.texture = sceneDepthStencil
         maskPass.depthAttachment.loadAction = .clear
         maskPass.depthAttachment.storeAction = .dontCare

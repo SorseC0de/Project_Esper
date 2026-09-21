@@ -69,12 +69,13 @@ final class GameScene: SKScene {
     var framesPerSecond = 0
     var worstFrameMilliseconds = 0
 
-    /// Hides everything but the bodies, for the glow's mask pass.
+    /// Hides everything but the bodies, on black, for the glow's mask pass. The background
+    /// stays opaque: a clear one turns the whole renderer transparent.
     func showBodiesOnly(_ only: Bool) {
         ground.isHidden = only
         glowers.isHidden = only
         hud.isHidden = only
-        backgroundColor = only ? .clear : GameScene.background
+        backgroundColor = only ? .black : GameScene.background
     }
 
     private static let background = SKColor(red: 0.18, green: 0.12, blue: 0.24, alpha: 1)

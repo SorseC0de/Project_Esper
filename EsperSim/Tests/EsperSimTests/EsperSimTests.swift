@@ -25,13 +25,13 @@ final class MovementTests: XCTestCase {
 
     func testFullHopReachesMeleeHeight() {
         let height = peakHeight { _ in true }
-        XCTAssertEqual(height, 38.5, accuracy: 1.5)
+        XCTAssertEqual(height, 31.3, accuracy: 1.5)
     }
 
     func testShortHopReachesMeleeHeight() {
         // Let go during the jump squat.
         let height = peakHeight { $0 < 2 }
-        XCTAssertEqual(height, 14.9, accuracy: 1.5)
+        XCTAssertEqual(height, 10.7, accuracy: 1.5)
     }
 
     /// Every preset's hops land on the SSBWiki heights its velocities were derived from.
@@ -81,8 +81,8 @@ final class MovementTests: XCTestCase {
 
     func testWallLandThenWallJump() {
         var match = Match()
-        // Jump toward the left backboard's inner face (x = 40, y 40 to 60) and hold into it.
-        match.players[0].position = Vec2(x: 60, y: 10)
+        // Jump toward the court's left wall (x = 10) and hold into it.
+        match.players[0].position = Vec2(x: 30, y: 10)
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         let clung = run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
         XCTAssertLessThan(clung, 120, "never reached the wall")
@@ -97,9 +97,9 @@ final class MovementTests: XCTestCase {
 
     func testJumpOnWallContactIsAWallJumpNotADoubleJump() {
         var match = Match()
-        match.players[0].position = Vec2(x: 60, y: 10)
+        match.players[0].position = Vec2(x: 30, y: 10)
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
-        // Hold into the backboard and mash jump the whole way there.
+        // Hold into the wall and mash jump the whole way there.
         let jumped = run(&match, frames: 120, input: { frame in
             PlayerInput(stick: Vec2(x: -1, y: 0), jump: frame % 2 == 0)
         }) { $0.events.contains(.wallJumped(player: 0, wall: .left)) }
@@ -114,6 +114,22 @@ final class MovementTests: XCTestCase {
         match.advance(inputs: [PlayerInput(jump: true), .idle])
         run(&match, frames: 5, input: { _ in .idle })
         XCTAssertEqual(match.players[0].state, .jumpSquat)
+    }
+
+    func testForwardJumpStartsAtAirSpeed() {
+        var match = Match()
+        let jumped = run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) }) { $0.players[0].state == .air }
+        XCTAssertLessThan(jumped, 10)
+        XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.airSpeedMax, accuracy: 0.001)
+    }
+
+    func testDoubleJumpTurnsAround() {
+        var match = Match()
+        run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
+        run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), jump: true), .idle])
+        XCTAssertEqual(match.players[0].velocity.x, -match.players[0].spec.doubleJumpHorizontalVelocity, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].facing, .left)
     }
 
     func testLandingLagThenIdle() {
@@ -165,6 +181,18 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.holder, 0)
     }
 
+    func testTapIsAQuickshotOnThePresetArc() {
+        var match = matchWithBallHeld()
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        run(&match, frames: BallRules.shotWindupFrames, input: { _ in .idle })
+        XCTAssertEqual(match.players[0].state, .shooting)
+        run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * BallRules.shotSpeed, accuracy: 0.001)
+        XCTAssertGreaterThan(match.ball.velocity.y, 0)
+    }
+
     func testShotAngleClampsToRange() {
         var player = Match().players[0]
         player.shotAim = Vec2(x: 0, y: 1)
@@ -178,10 +206,10 @@ final class BallTests: XCTestCase {
         for _ in 0..<BallRules.throwWindupFrames + 2 {
             match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
         }
-        match.advance(inputs: [.idle, .idle])
-        match.advance(inputs: [.idle, .idle])
+        run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
         XCTAssertTrue(match.ball.straight)
+        XCTAssertTrue(match.ball.thrown)
         XCTAssertEqual(match.ball.velocity, Vec2(x: 0, y: BallRules.throwSpeed))
     }
 
@@ -212,6 +240,23 @@ final class BallTests: XCTestCase {
         }
         XCTAssertEqual(match.scores, [1, 0])
         XCTAssertGreaterThan(match.ball.respawnTimer, 0)
+    }
+
+    func testThrownBallIgnoresTheRimsPull() {
+        var match = Match()
+        let rim = match.stage.hoops[1].position
+        // Just outside the absorb radius, inside the pull, moving up: a shot gets bent in, a throw doesn't.
+        for thrown in [false, true] {
+            match.ball.respawn(at: rim + Vec2(x: -15, y: 5))
+            match.ball.velocity = Vec2(x: 0, y: 1)
+            match.ball.thrown = thrown
+            match.advance(inputs: [.idle, .idle])
+            if thrown {
+                XCTAssertEqual(match.ball.velocity.x, 0)
+            } else {
+                XCTAssertGreaterThan(match.ball.velocity.x, 0)
+            }
+        }
     }
 
     func testSwatReversesTheBall() {

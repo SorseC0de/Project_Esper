@@ -22,6 +22,10 @@ public struct FighterSpec: Equatable {
     public var shortHopVelocity: Double
     public var doubleJumpVelocity: Double
     public var jumps: Int
+    /// A jump with the stick held starts at least this fast sideways.
+    public var jumpHorizontalVelocity: Double
+    /// A double jump with the stick held sets the sideways speed to this, which turns around.
+    public var doubleJumpHorizontalVelocity: Double
     public var gravity: Double
     public var fallSpeed: Double
     public var fastFallSpeed: Double
@@ -61,6 +65,8 @@ public struct FighterSpec: Equatable {
         shortHopVelocity: 1.4,
         doubleJumpVelocity: 2.2,
         jumps: 2,
+        jumpHorizontalVelocity: 0.86,
+        doubleJumpHorizontalVelocity: 0.86,
         gravity: 0.095,
         fallSpeed: 1.7,
         fastFallSpeed: 2.3,
@@ -96,6 +102,8 @@ public struct FighterSpec: Equatable {
         shortHopVelocity: 1.9,
         doubleJumpVelocity: 2.66,
         jumps: 2,
+        jumpHorizontalVelocity: 1.12,
+        doubleJumpHorizontalVelocity: 1.12,
         gravity: 0.13,
         fallSpeed: 2.9,
         fastFallSpeed: 3.5,
@@ -129,6 +137,8 @@ public struct FighterSpec: Equatable {
         shortHopVelocity: 2.1,
         doubleJumpVelocity: 4.19,
         jumps: 2,
+        jumpHorizontalVelocity: 0.83,
+        doubleJumpHorizontalVelocity: 0.83,
         gravity: 0.23,
         fallSpeed: 2.8,
         fastFallSpeed: 3.4,
@@ -162,6 +172,8 @@ public struct FighterSpec: Equatable {
         shortHopVelocity: 2.23,
         doubleJumpVelocity: 3.08,
         jumps: 2,
+        jumpHorizontalVelocity: 0.8,
+        doubleJumpHorizontalVelocity: 0.8,
         gravity: 0.13,
         fallSpeed: 2.13,
         fastFallSpeed: 3.0,
@@ -178,6 +190,21 @@ public struct FighterSpec: Equatable {
         bodyWidth: 10,
         bodyHeight: 15
     )
+}
+
+extension FighterSpec {
+    /// The body the game is tuned on: Fox with Falcon's run, and air control turned up so a
+    /// jump starts at air speed and turns around in about a dozen frames.
+    public static let baseline: FighterSpec = {
+        var spec = meleeFox
+        spec.name = "Baseline"
+        spec.runSpeed = 2.3
+        spec.airSpeedMax = 1.0
+        spec.airAccelerationAdditional = 0.12
+        spec.jumpHorizontalVelocity = 1.0
+        spec.doubleJumpHorizontalVelocity = 1.0
+        return spec
+    }()
 }
 
 /// Everything about the ball, the hoops and the plays on them. Units and frames.
@@ -213,6 +240,8 @@ public enum BallRules {
     public static let throwSpeed = 5.0
     public static let throwReleaseHeight = 12.0
     public static let throwWindupFrames = 25
+    /// Frames from the release to the ball leaving the hand, then to acting again.
+    public static let throwReleaseFrames = 3
     public static let throwRecoveryFrames = 15
     /// A throw stance this close to a rim becomes a dunk.
     public static let dunkRadius = 12.0

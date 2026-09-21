@@ -10,11 +10,9 @@ final class InputHub {
     /// What the on-screen controls hold right now. The scene writes it.
     var touch = PlayerInput.idle
     private(set) var controllers: [GCController] = []
-    /// A pad's menu button went down since the last check; the options button likewise.
+    /// A pad's menu button went down since the last check.
     private(set) var resetPressed = false
-    private(set) var cyclePressed = false
     private var menuWasDown = false
-    private var optionsWasDown = false
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -39,9 +37,6 @@ final class InputHub {
         let menuDown = controllers.contains { $0.extendedGamepad?.buttonMenu.isPressed ?? false }
         if menuDown, !menuWasDown { resetPressed = true }
         menuWasDown = menuDown
-        let optionsDown = controllers.contains { $0.extendedGamepad?.buttonOptions?.isPressed ?? false }
-        if optionsDown, !optionsWasDown { cyclePressed = true }
-        optionsWasDown = optionsDown
         return (0..<players).map { index in
             let pad = index < controllers.count ? read(controllers[index].extendedGamepad!) : PlayerInput.idle
             return index == 0 ? merge(touch, pad) : pad
@@ -54,12 +49,6 @@ final class InputHub {
     func consumeReset() -> Bool {
         defer { resetPressed = false }
         return resetPressed
-    }
-
-    /// True once per options press.
-    func consumeCycle() -> Bool {
-        defer { cyclePressed = false }
-        return cyclePressed
     }
 
     /// A: jump. B or the right bumper: shoot. X or the left bumper: throw. Y: taunt.

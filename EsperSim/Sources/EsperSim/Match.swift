@@ -10,7 +10,7 @@ public struct Match: Equatable {
     /// What happened on the last `advance`.
     public var events: [MatchEvent] = []
 
-    public init(stage: Stage = .court, specs: [FighterSpec] = [.meleeFalcon, .meleeFalcon]) {
+    public init(stage: Stage = .court, specs: [FighterSpec] = [.baseline, .baseline]) {
         self.stage = stage
         players = specs.indices.map { index in
             Player(spec: specs[index], index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
@@ -86,6 +86,7 @@ public struct Match: Equatable {
         players[catcher].catchBall()
         ball.holder = catcher
         ball.straight = false
+        ball.thrown = false
         ball.resting = false
         events.append(.caught(player: catcher))
     }

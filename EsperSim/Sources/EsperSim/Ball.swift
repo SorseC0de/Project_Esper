@@ -7,6 +7,9 @@ public struct Ball: Equatable {
     public var holder: Int?
     /// A thrown ball flies straight until it first hits something.
     public var straight = false
+    /// Released by a throw and not yet caught: the rims don't pull it, so scoring off a
+    /// throw is the ball going through on its own.
+    public var thrown = false
     /// Who released or swatted it last.
     public var lastTouched: Int?
     public var resting = false
@@ -28,7 +31,7 @@ public struct Ball: Equatable {
         previousY = position.y
         var scoredHoop: Int?
 
-        for (index, hoop) in stage.hoops.enumerated() where position.y > hoop.position.y {
+        for (index, hoop) in stage.hoops.enumerated() where !thrown && position.y > hoop.position.y {
             let distance = position.distance(to: hoop.position)
             if distance < BallRules.hoopAbsorbRadius {
                 position.x = hoop.position.x
@@ -117,6 +120,7 @@ public struct Ball: Equatable {
         previousY = position.y
         self.velocity = velocity
         self.straight = straight
+        thrown = straight
         lastTouched = player
         resting = false
     }
@@ -127,6 +131,7 @@ public struct Ball: Equatable {
         velocity = .zero
         holder = nil
         straight = false
+        thrown = false
         lastTouched = nil
         resting = false
         respawnTimer = 0

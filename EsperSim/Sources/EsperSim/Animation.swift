@@ -99,11 +99,12 @@ extension Player {
             // Both sheets smear the release on frame 6, where the ball leaves.
             return grounded ? AnimationFrame(.shoot, 4 + t * 24 / 60) : AnimationFrame(.shootAir, 3 + t * 36 / 60)
         case .throwStance:
-            return AnimationFrame(.throwForward, min(t * 12 / 60, 4))
+            // Frame 3 is the set pose with the ring on the ball; 4 is the release smear.
+            return AnimationFrame(.throwForward, min(t * 12 / 60, 3))
         case .throwing:
-            return AnimationFrame(.throwForward, 5 + t * 12 / 60)
+            return AnimationFrame(.throwForward, 3 + t * 24 / 60)
         case .dunking:
-            return AnimationFrame(.throwForward, 5)
+            return AnimationFrame(.throwForward, 4)
         case .catching:
             return AnimationFrame(grounded ? .catchGround : .catchAir, t * 12 / 60)
         case .swatting:

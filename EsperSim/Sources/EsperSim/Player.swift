@@ -41,6 +41,8 @@ public struct Player: Equatable {
     public var hasBall = false
     /// The last flick recorded in the shooting stance.
     public var shotAim: Vec2 = .zero
+    /// The stance was let go before its windup finished: it fires when the windup ends.
+    public var quickShot = false
     /// The last cardinal recorded in the throwing stance; zero throws forward.
     public var throwDirection: Vec2 = .zero
     public var catchCooldown = 0
@@ -172,6 +174,8 @@ public struct Player: Equatable {
             jumpBuffer = 0
             if stateTimer >= spec.jumpSquatFrames {
                 velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
+                let cap = max(abs(velocity.x), spec.airSpeedMax)
+                velocity.x = min(max(velocity.x + input.stick.x * spec.jumpHorizontalVelocity, -cap), cap)
                 jumpsLeft -= 1
                 grounded = false
                 events.append(.jumped(player: index))
@@ -189,8 +193,7 @@ public struct Player: Equatable {
             } else if jumpPressed, jumpsLeft > 0 {
                 doubleJump(input, events: &events)
             } else if hasBall, input.shoot {
-                shotAim = .zero
-                enter(.shootStance)
+                enterShootStance()
             } else if hasBall, input.throwBall {
                 throwDirection = .zero
                 enter(.throwStance)
@@ -236,12 +239,20 @@ public struct Player: Equatable {
                 grounded = false
                 events.append(.jumped(player: index))
             }
-            if !input.shoot {
-                if stateTimer >= BallRules.shotWindupFrames, shotAim != .zero {
+            if !input.shoot, !quickShot {
+                if stateTimer < BallRules.shotWindupFrames {
+                    // Let go early: a quickshot, on the preset arc unless a flick came first.
+                    quickShot = true
+                } else if shotAim != .zero {
                     enter(.shooting)
                 } else {
+                    // The pump fake.
                     enter(grounded ? .idle : .air)
                 }
+            }
+            if quickShot, stateTimer >= BallRules.shotWindupFrames {
+                if shotAim == .zero { shotAim = presetAim }
+                enter(.shooting)
             }
 
         case .shooting:
@@ -286,7 +297,7 @@ public struct Player: Equatable {
                 airDrift(.idle)
                 fall(.idle)
             }
-            if stateTimer == 1 {
+            if stateTimer == BallRules.throwReleaseFrames {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames
                 let direction = throwDirection == .zero ? Vec2(x: facing.sign, y: 0) : throwDirection
@@ -342,8 +353,7 @@ public struct Player: Equatable {
         if jumpPressed {
             enter(.jumpSquat)
         } else if hasBall, input.shoot {
-            shotAim = .zero
-            enter(.shootStance)
+            enterShootStance()
         } else if hasBall, input.throwBall {
             throwDirection = .zero
             enter(.throwStance)
@@ -353,6 +363,17 @@ public struct Player: Equatable {
             return false
         }
         return true
+    }
+
+    private mutating func enterShootStance() {
+        shotAim = .zero
+        quickShot = false
+        enter(.shootStance)
+    }
+
+    /// The preset arc, forward at the default angle.
+    private var presetAim: Vec2 {
+        Vec2(x: cos(BallRules.shotAngleDefault) * facing.sign, y: sin(BallRules.shotAngleDefault))
     }
 
     private mutating func startDash(events: inout [MatchEvent]) {
@@ -374,6 +395,9 @@ public struct Player: Equatable {
     private mutating func doubleJump(_ input: PlayerInput, events: inout [MatchEvent]) {
         jumpBuffer = 0
         velocity.y = spec.doubleJumpVelocity
+        if input.stick.x != 0 {
+            velocity.x = input.stick.x * spec.doubleJumpHorizontalVelocity
+        }
         jumpsLeft -= 1
         fastFalling = false
         doubleJumpTimer = 30

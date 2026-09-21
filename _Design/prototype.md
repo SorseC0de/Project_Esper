@@ -21,8 +21,10 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-Melee bodies from the SSBWiki table: Falcon, Fox and Sheik on the A/B/C toggle in the
-corner (the pad's options button cycles it too), Mario kept beside them in `FighterSpec`. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
+`FighterSpec.baseline` is Melee Fox with Falcon's run speed and the air turned up: air
+speed 1.0, air acceleration 0.02 + 0.12, a jump with the stick held starts at air speed,
+and a double jump with the stick held sets the sideways speed, so it turns around. Mario,
+Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
 and are chosen to sit with the rest.
 
 ## Input grammar
@@ -31,11 +33,14 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 
 - Stick: floating on the left half. A fast push past 0.8 is a dash; a tilt walks.
 - Jump: tap. Held through the 4-frame squat is a full hop, let go is a short hop.
-- Shoot (with ball): hold for the stance, flick for the angle, release to fire. Release
-  without a flick is the pump fake. On the ground, jump during the stance is a jump shot.
+- Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap, or
+  letting go before the 20-frame windup ends, is the quickshot: it fires on the preset 53°
+  arc when the windup ends. Holding past the windup and releasing without a flick is the
+  pump fake. On the ground, jump during the stance is a jump shot.
 - Shoot (without ball, in the air): swat. Reverses the ball if it's in front.
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
-  gravity until the first bounce. In the stance within 24 units of a rim it's a dunk.
+  gravity until the first bounce. The rims don't pull a thrown ball, so scoring off a throw
+  is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
 - Wall: hold toward a wall in the air to cling, jump to leave. Direction is automatic.
 - Catch is automatic: facing the ball within reach.
 

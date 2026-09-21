@@ -18,11 +18,8 @@ final class TouchControls: SKNode {
     private let stickBase = SKShapeNode(circleOfRadius: stickRadius)
     private let stickKnob = SKShapeNode(circleOfRadius: 10)
     private let resetButton = SKShapeNode(rectOf: CGSize(width: 34, height: 12), cornerRadius: 3)
-    private let characterButton = SKShapeNode(rectOf: CGSize(width: 50, height: 12), cornerRadius: 3)
-    private let characterLabel = SKLabelNode(text: "")
-    /// Called when the corner buttons are tapped.
+    /// Called when the corner button is tapped.
     var onReset: (() -> Void)?
-    var onCycleCharacter: (() -> Void)?
     private var stickTouch: UITouch?
     private var stickCenter = CGPoint.zero
     private var buttonTouches: [UITouch: (index: Int, origin: CGPoint)] = [:]
@@ -69,21 +66,6 @@ final class TouchControls: SKNode {
         resetButton.addChild(resetText)
         addChild(resetButton)
 
-        characterButton.position = CGPoint(x: halfWidth - 70, y: halfHeight - 12)
-        characterButton.fillColor = .init(white: 1, alpha: 0.1)
-        characterButton.strokeColor = .init(white: 1, alpha: 0.4)
-        characterButton.lineWidth = 1
-        characterLabel.fontName = "Menlo-Bold"
-        characterLabel.fontSize = 6
-        characterLabel.verticalAlignmentMode = .center
-        characterLabel.fontColor = .init(white: 1, alpha: 0.8)
-        characterButton.addChild(characterLabel)
-        addChild(characterButton)
-    }
-
-    /// The A/B/C button's text.
-    func showCharacter(_ text: String) {
-        characterLabel.text = text
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -110,10 +92,6 @@ final class TouchControls: SKNode {
     func began(_ touch: UITouch, at point: CGPoint) {
         if resetButton.frame.insetBy(dx: -6, dy: -6).contains(point) {
             onReset?()
-            return
-        }
-        if characterButton.frame.insetBy(dx: -6, dy: -6).contains(point) {
-            onCycleCharacter?()
             return
         }
         if point.x < 0 {

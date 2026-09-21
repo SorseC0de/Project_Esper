@@ -209,27 +209,27 @@ public struct Stage: Equatable {
 
     // MARK: The court
 
-    /// 30 by 14 tiles, not quite two Final Destinations wide: floor, walls and ceiling, a
-    /// backboard block each side with its rim on the inward face, and a one-way ledge in the
-    /// middle. Player 0 starts left and scores on the right rim.
+    /// 32 by 15 tiles: floor, walls and ceiling, a backboard block each side with its rim on
+    /// the inward face 60 units above the floor, and a one-way ledge in the middle. Player 0
+    /// starts left and scores on the right rim.
     public static let court: Stage = {
         var stage = Stage(
-            columns: 30, rows: 14,
+            columns: 32, rows: 15,
             hoops: [
-                Hoop(position: Vec2(x: 48, y: 50), owner: 1, backboard: .left),
-                Hoop(position: Vec2(x: 252, y: 50), owner: 0, backboard: .right),
+                Hoop(position: Vec2(x: 48, y: 70), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: 272, y: 70), owner: 0, backboard: .right),
             ],
-            playerSpawns: [Vec2(x: 110, y: 10), Vec2(x: 190, y: 10)],
+            playerSpawns: [Vec2(x: 120, y: 10), Vec2(x: 200, y: 10)],
             playerFacings: [.right, .left],
-            ballSpawn: Vec2(x: 150, y: 70)
+            ballSpawn: Vec2(x: 160, y: 80)
         )
-        stage.fill(.solid, columns: 0...29, rows: 0...0)
-        stage.fill(.solid, columns: 0...29, rows: 13...13)
-        stage.fill(.solid, columns: 0...0, rows: 0...13)
-        stage.fill(.solid, columns: 29...29, rows: 0...13)
-        stage.fill(.solid, columns: 2...3, rows: 4...5)
-        stage.fill(.solid, columns: 26...27, rows: 4...5)
-        stage.fill(.oneWay, columns: 13...16, rows: 3...3)
+        stage.fill(.solid, columns: 0...31, rows: 0...0)
+        stage.fill(.solid, columns: 0...31, rows: 14...14)
+        stage.fill(.solid, columns: 0...0, rows: 0...14)
+        stage.fill(.solid, columns: 31...31, rows: 0...14)
+        stage.fill(.solid, columns: 2...3, rows: 6...7)
+        stage.fill(.solid, columns: 28...29, rows: 6...7)
+        stage.fill(.oneWay, columns: 14...17, rows: 3...3)
         return stage
     }()
 }

@@ -58,6 +58,8 @@ public struct Player: Equatable {
     public var wallGrace = 0
     /// Frames left in which the stick doesn't steer, after a wall jump.
     public var airControlLock = 0
+    /// Frames left after walking off an edge in which a jump is still a ground jump.
+    public var coyote = 0
     /// Which shoot buttons took the stance; a different one pressed cancels it.
     public var stanceButtons: UInt8 = 0
     /// After a cancel, every shoot button has to come up before another shoot stance, and
@@ -119,6 +121,7 @@ public struct Player: Equatable {
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
         if wallGrace > 0 { wallGrace -= 1 }
         if airControlLock > 0 { airControlLock -= 1 }
+        if coyote > 0 { coyote -= 1 }
         if input.shootButtons == 0 { shootReady = true }
         if !input.throwBall { throwReady = true }
         if swatCooldown > 0 { swatCooldown -= 1 }
@@ -222,7 +225,15 @@ public struct Player: Equatable {
         case .air:
             airDrift(airControlLock > 0 ? .idle : input)
             fall(input)
-            if jumpPressed, wallLandCooldown == 0, let wall = wallSide ?? wall(within: spec.wallJumpReach, in: stage) {
+            if jumpPressed, coyote > 0 {
+                // Just off an edge: the jump the ground would have given.
+                jumpBuffer = 0
+                coyote = 0
+                velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
+                jumpsLeft = spec.jumps - 1
+                fastFalling = false
+                events.append(.jumped(player: index))
+            } else if jumpPressed, wallLandCooldown == 0, let wall = wallSide ?? wall(within: spec.wallJumpReach, in: stage) {
                 // Celeste's rule: a wall in reach is enough, no cling needed.
                 wallJump(off: wall, events: &events)
             } else if jumpPressed, wallGrace > 0, let wall = wallGraceSide {
@@ -575,6 +586,7 @@ public struct Player: Equatable {
             }
         } else if state.isGroundState, state != .jumpSquat {
             wallLandCooldown = max(wallLandCooldown, spec.wallLandGroundLockoutFrames)
+            coyote = spec.coyoteFrames
             enter(.air)
         }
     }

@@ -35,11 +35,16 @@ enum BodyPart: CaseIterable {
     }
 }
 
-/// What each part is drawn in. A swap table for the sprite library.
+/// What each part is drawn in, and the line around the whole figure. A swap table for
+/// the sprite library.
 struct Look: Hashable {
     var colours: [BodyPart: RGB]
+    /// Drawn around the figure's silhouette, this many pixels thick, or none. It follows
+    /// the outside edge only: parts that touch share no line.
+    var outline: RGB? = 0x000000
+    var outlineWidth = 1
 
-    /// Back limbs grey, everything else white.
+    /// Back limbs grey, everything else white, a black line round it all.
     static let plain: Look = {
         var colours: [BodyPart: RGB] = [:]
         for part in BodyPart.allCases {
@@ -61,6 +66,8 @@ struct Look: Hashable {
 }
 
 enum BallLook {
-    /// The sheet draws the ball white; it plays orange.
-    static let swaps: [RGB: RGB] = [0xFFFFFF: 0xF47E1B]
+    /// The sheets draw the ball white, in the player's hands too; it plays orange.
+    static let white: RGB = 0xFFFFFF
+    static let orange: RGB = 0xF47E1B
+    static let swaps: [RGB: RGB] = [white: orange]
 }

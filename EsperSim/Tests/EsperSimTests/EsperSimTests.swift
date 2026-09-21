@@ -198,6 +198,20 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].jumpsLeft, 1)
     }
 
+    func testCoyoteJumpOffTheLedge() {
+        var match = Match()
+        // Stand on the middle ledge's right end and walk off it.
+        match.players[0].position = Vec2(x: 185, y: 40)
+        match.players[0].grounded = true
+        let off = run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 0.5, y: 0)) }) { $0.players[0].state == .air }
+        XCTAssertLessThan(off, 60)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0.5, y: 0)), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0.5, y: 0), jump: true), .idle])
+        XCTAssertTrue(match.events.contains(.jumped(player: 0)))
+        XCTAssertEqual(match.players[0].jumpsLeft, 1)
+        XCTAssertEqual(match.players[0].velocity.y, match.players[0].spec.fullHopVelocity, accuracy: 0.001)
+    }
+
     func testJumpBufferedThroughLandingLag() {
         var match = Match()
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })

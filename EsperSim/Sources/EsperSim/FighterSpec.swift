@@ -52,6 +52,8 @@ public struct FighterSpec: Equatable {
     public var wallJumpGraceFrames = 6
     /// Frames after a wall jump in which the stick doesn't steer, so the arc leaves the wall.
     public var wallJumpControlLockFrames = 6
+    /// Frames after walking off an edge in which a jump press is still a ground jump.
+    public var coyoteFrames = 3
     /// Sideways speed lost per frame in an airborne stance.
     public var stanceAirBrake = 0.01
 

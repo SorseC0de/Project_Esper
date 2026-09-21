@@ -1,6 +1,10 @@
 import EsperSim
 import SpriteKit
 
+extension CGPoint {
+    static func + (a: CGPoint, b: CGPoint) -> CGPoint { CGPoint(x: a.x + b.x, y: a.y + b.y) }
+}
+
 /// Runs the match at a fixed 60 steps a second and draws the last state. Nothing in here
 /// writes back into the match except the inputs it hands to `advance`.
 final class GameScene: SKScene {
@@ -19,6 +23,8 @@ final class GameScene: SKScene {
     private let hud = SKNode()
     private var controls: TouchControls?
     private var playerNodes: [SKSpriteNode] = []
+    /// The glow on the ball in each player's hands.
+    private var handHalos: [SKSpriteNode] = []
     private var ballNode = SKSpriteNode()
     private var pointerNode = SKSpriteNode()
     private var rimNodes: [SKSpriteNode] = []
@@ -88,19 +94,19 @@ final class GameScene: SKScene {
             node.zPosition = 20
             world.addChild(node)
             playerNodes.append(node)
+            let halo = makeHalo()
+            halo.zPosition = 19
+            world.addChild(halo)
+            handHalos.append(halo)
         }
 
         ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
         ballNode.zPosition = 25
         world.addChild(ballNode)
-        // A soft orange halo added under the ball, which the glow pass then picks up.
-        let halo = SKShapeNode(circleOfRadius: 9)
-        halo.fillColor = SKColor(red: 1, green: 0.5, blue: 0.1, alpha: 0.35)
-        halo.strokeColor = .clear
-        halo.blendMode = .add
+        let halo = makeHalo()
         halo.zPosition = -1
         ballNode.addChild(halo)
-        pointerNode = SKSpriteNode(texture: sprites.texture("ball_pointer", 0))
+        pointerNode = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 14))
         pointerNode.zPosition = 25
         world.addChild(pointerNode)
 
@@ -118,6 +124,15 @@ final class GameScene: SKScene {
         debugLabel.numberOfLines = 0
         hud.addChild(debugLabel)
 
+    }
+
+    /// A soft orange glow, added, which the glow pass then picks up.
+    private func makeHalo() -> SKSpriteNode {
+        let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32, colour: SKColor(red: 1, green: 0.55, blue: 0.15, alpha: 1)))
+        halo.size = CGSize(width: 18, height: 18)
+        halo.alpha = 0.5
+        halo.blendMode = .add
+        return halo
     }
 
     /// The rim's net, as GMS2 built it: six columns, five rows, tapering to half width.
@@ -253,13 +268,21 @@ final class GameScene: SKScene {
             node.anchorPoint = sprites.anchor(for: frame.animation)
             node.position = SpriteLibrary.point(player.position)
             node.xScale = CGFloat(player.facing.sign)
+            let halo = handHalos[index]
+            if player.hasBall, let inHand = sprites.ballInHand(frame) {
+                halo.isHidden = false
+                halo.position = CGPoint(x: node.position.x + inHand.x * CGFloat(player.facing.sign), y: node.position.y + inHand.y)
+            } else {
+                halo.isHidden = true
+            }
         }
 
         ballNode.isHidden = match.ball.holder != nil
         ballNode.position = SpriteLibrary.point(match.ball.position)
-        pointerNode.isHidden = !(match.ball.isLive && match.ball.resting)
-        pointerNode.position = SpriteLibrary.point(match.ball.position + Vec2(x: 0, y: 16))
-        pointerNode.texture = sprites.texture("ball_pointer", (match.frame * 7 / 60) % 4)
+        // The chevron steps down three times and blinks off, seven steps a second, as the pixel one did.
+        let step = (match.frame * 7 / 60) % 4
+        pointerNode.isHidden = !(match.ball.isLive && match.ball.resting) || step == 3
+        pointerNode.position = SpriteLibrary.point(match.ball.position) + CGPoint(x: 0, y: 30 - CGFloat(step) * 6)
 
         for index in rimNodes.indices {
             if rimFlash[index] > 0 { rimFlash[index] -= 1 }

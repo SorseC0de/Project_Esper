@@ -37,8 +37,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Stick: floating on the left half. A fast push past 0.8 is a dash; a tilt walks. A walk
   always faces the opponent whichever way it goes, so it can back off or dribble between
   the legs while staring them down. Only a dash turns the body.
-- Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. Down while
-  falling is a fast fall, except while holding throw with the ball, where down is the aim.
+- Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. For 3 frames
+  after walking off an edge a press is still that jump. Down while falling is a fast fall,
+  except while holding throw with the ball, where down is the aim.
 - Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap, or
   letting go before the 20-frame windup ends, is the quickshot: it fires on the preset 53°
   arc when the windup ends. Holding past the windup and releasing without a flick is the
@@ -79,8 +80,11 @@ holds the variants; A is always the baseline as tuned.
 
 `Art/PlayerPalette.swift` names the figure's eleven parts and the flat colour each is
 painted on the sheets. A `Look` maps parts to colours and the sprite library recolours
-each frame once as it's used. `Look.plain` is back limbs grey, the rest white. The ball
-is painted white and plays orange, with an additive halo under it for the glow.
+each frame once as it's used. `Look.plain` is back limbs grey, the rest white, with a black line one pixel thick round
+the whole silhouette: it follows the outside edge only, so parts that touch share no line.
+The ball is painted white and plays orange, in the hands too; the library finds where the
+ball sits in each frame so the same soft additive halo follows it there. The ball pointer
+is an SF Symbol chevron doing what the pixel one did: three steps down, then off.
 
 ## Glow
 

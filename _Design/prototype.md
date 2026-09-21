@@ -137,8 +137,10 @@ digital dissolve rather than a flame.
 
 `GlowSettings` in `Tuning.swift`: luminance threshold 0.2 for the world and 0.8 for the
 bodies, softness of the cut, blur passes at half size, intensity, tint. The passes are in
-`Glow.metal`. The scene is drawn twice a frame, the second time with only the bodies
-showing, and that mask tells the bright pass which threshold applies. The world threshold
+`Glow.metal`. A second renderer draws a mirror scene holding only the two body sprites
+on black (`MaskScene`), and that mask tells the bright pass which threshold applies. The
+game scene is never drawn twice in a frame: SpriteKit reuses its per-frame buffers
+between two renders, which drew the bodies as white squares. The world threshold
 is on a slider across the top of the screen. The corner counter shows the frame rate and
 the worst frame gap of the last second, which is what a hitch shows up as.
 

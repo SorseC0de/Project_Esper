@@ -83,14 +83,15 @@ final class GameScene: SKScene {
     var framesPerSecond = 0
     var worstFrameMilliseconds = 0
 
-    /// Hides everything but the bodies, on black, for the glow's mask pass. The background
-    /// stays opaque: a clear one turns the whole renderer transparent.
-    func showBodiesOnly(_ only: Bool) {
-        ground.isHidden = only
-        glowers.isHidden = only
-        hud.isHidden = only
-        backgroundColor = only ? .black : GameScene.background
+    /// The bodies as drawn this frame, for the mask scene to copy.
+    var bodySnapshots: [BodySnapshot] {
+        playerNodes.compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
+        }
     }
+
+    var cameraPosition: CGPoint { cameraNode.position }
+    var cameraScale: CGFloat { cameraNode.xScale }
 
     private static let background = SKColor(red: 0.18, green: 0.12, blue: 0.24, alpha: 1)
 

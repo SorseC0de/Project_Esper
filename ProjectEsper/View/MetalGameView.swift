@@ -68,6 +68,9 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     private let skRenderer: SKRenderer
+    /// The bodies on black, by a renderer of their own.
+    private let maskScene = MaskScene()
+    private let maskRenderer: SKRenderer
     private let bright: MTLRenderPipelineState
     private let blur: MTLRenderPipelineState
     private let composite: MTLRenderPipelineState
@@ -90,6 +93,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         queue = device.makeCommandQueue()!
         skRenderer = SKRenderer(device: device)
         skRenderer.scene = scene
+        maskRenderer = SKRenderer(device: device)
+        maskRenderer.scene = maskScene
 
         let library = device.makeDefaultLibrary()!
         func pipeline(_ fragment: String) -> MTLRenderPipelineState {
@@ -167,7 +172,9 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: sceneTexture.width, height: sceneTexture.height),
                           commandBuffer: commands, renderPassDescriptor: scenePass)
 
-        // The same scene again with only the bodies showing, as the glow's mask.
+        // The bodies alone, mirrored into their own scene and drawn by their own renderer.
+        maskScene.mirror(scene.bodySnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
+        maskRenderer.update(atTime: now)
         let maskPass = MTLRenderPassDescriptor()
         maskPass.colorAttachments[0].texture = bodyMask
         maskPass.colorAttachments[0].loadAction = .clear
@@ -179,10 +186,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         maskPass.stencilAttachment.texture = sceneDepthStencil
         maskPass.stencilAttachment.loadAction = .clear
         maskPass.stencilAttachment.storeAction = .dontCare
-        scene.showBodiesOnly(true)
-        skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: bodyMask.width, height: bodyMask.height),
-                          commandBuffer: commands, renderPassDescriptor: maskPass)
-        scene.showBodiesOnly(false)
+        maskRenderer.render(withViewport: CGRect(x: 0, y: 0, width: bodyMask.width, height: bodyMask.height),
+                            commandBuffer: commands, renderPassDescriptor: maskPass)
 
         var uniforms = GlowUniforms(
             texelSize: SIMD2(1 / Float(glowA.width), 1 / Float(glowA.height)),

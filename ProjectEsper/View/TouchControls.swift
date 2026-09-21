@@ -20,6 +20,8 @@ final class TouchControls: SKNode {
     private let resetButton = SKShapeNode(rectOf: CGSize(width: 34, height: 12), cornerRadius: 3)
     /// Called when the corner button is tapped.
     var onReset: (() -> Void)?
+    private var pickers: [SegmentedPicker] = []
+    private let pickerOrigin: CGPoint
     private var stickTouch: UITouch?
     private var stickCenter = CGPoint.zero
     private var buttonTouches: [UITouch: (index: Int, origin: CGPoint)] = [:]
@@ -28,6 +30,7 @@ final class TouchControls: SKNode {
 
     /// `halfWidth` and `halfHeight` are what the camera shows, in game pixels.
     init(halfWidth: CGFloat, halfHeight: CGFloat) {
+        pickerOrigin = CGPoint(x: -halfWidth + 6, y: halfHeight - 6)
         super.init()
         zPosition = 100
 
@@ -87,11 +90,27 @@ final class TouchControls: SKNode {
         return Button(node: node, radius: radius, set: set)
     }
 
+    /// Adds a picker under the ones already in the top-left corner.
+    func addPicker(title: String, options: [String], selected: Int, onSelect: @escaping (Int) -> Void) {
+        let picker = SegmentedPicker(title: title, options: options, selected: selected, onSelect: onSelect)
+        picker.position = CGPoint(x: pickerOrigin.x, y: pickerBottom)
+        addChild(picker)
+        pickers.append(picker)
+    }
+
+    /// Where the next picker would go, so other corner text can sit under them.
+    var pickerBottom: CGFloat {
+        pickerOrigin.y - CGFloat(pickers.count) * (SegmentedPicker.segmentSize.height + 4)
+    }
+
     // MARK: Touches, in this node's space
 
     func began(_ touch: UITouch, at point: CGPoint) {
         if resetButton.frame.insetBy(dx: -6, dy: -6).contains(point) {
             onReset?()
+            return
+        }
+        for picker in pickers where picker.tap(at: convert(point, to: picker)) {
             return
         }
         if point.x < 0 {

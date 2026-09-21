@@ -9,6 +9,7 @@ final class GameScene: SKScene {
     private static let pixelsPerTile = CGFloat(Stage.tileSize * SpriteLibrary.pixelsPerUnit)
 
     private var match = Match()
+    private var airVariant = AirVariant.a
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
@@ -54,6 +55,7 @@ final class GameScene: SKScene {
         addChild(world)
         camera = cameraNode
         addChild(cameraNode)
+        applyTuning()
 
         let stage = match.stage
         for row in 0..<stage.rows {
@@ -153,10 +155,14 @@ final class GameScene: SKScene {
         controls?.removeFromParent()
         let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight)
         controls.onReset = { [weak self] in self?.reset() }
+        controls.addPicker(title: "AIR", options: AirVariant.allCases.map(\.label), selected: airVariant.rawValue) { [weak self] index in
+            self?.airVariant = AirVariant(rawValue: index)!
+            self?.applyTuning()
+        }
         cameraNode.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - 6)
-        debugLabel.position = CGPoint(x: -halfWidth + 6, y: halfHeight - 6)
+        debugLabel.position = CGPoint(x: -halfWidth + 6, y: controls.pickerBottom - 4)
     }
 
     // MARK: Stepping
@@ -187,6 +193,14 @@ final class GameScene: SKScene {
     private func reset() {
         match = Match()
         rimFlash = rimFlash.map { _ in 0 }
+        applyTuning()
+    }
+
+    /// The pickers' choices onto both players, live.
+    private func applyTuning() {
+        for index in match.players.indices {
+            match.players[index].spec = airVariant.apply(to: .baseline)
+        }
     }
 
     private func show(_ events: [MatchEvent]) {

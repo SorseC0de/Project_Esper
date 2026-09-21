@@ -112,16 +112,22 @@ public struct Player: Equatable {
             velocity.x = approach(velocity.x, 0, spec.traction)
             if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
                 if let direction = stickFacing(input) {
-                    facing = direction
-                    if smash { startDash(events: &events) } else { enter(.walk) }
+                    if smash {
+                        facing = direction
+                        startDash(events: &events)
+                    } else {
+                        enter(.walk)
+                    }
                 }
             }
 
         case .walk:
+            // Walking keeps the body facing where it was, so it can back up or dribble
+            // between the legs while staring the other way. Only a dash turns it.
             if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
                 if let direction = stickFacing(input) {
-                    facing = direction
                     if smash {
+                        facing = direction
                         startDash(events: &events)
                     } else {
                         let target = spec.walkMaxSpeed * input.stick.x
@@ -216,12 +222,7 @@ public struct Player: Equatable {
         case .land:
             velocity.x = approach(velocity.x, 0, spec.traction)
             if stateTimer >= spec.landingLagFrames {
-                if let direction = stickFacing(input) {
-                    facing = direction
-                    enter(.walk)
-                } else {
-                    enter(.idle)
-                }
+                enter(stickFacing(input) == nil ? .idle : .walk)
             }
 
         case .shootStance:

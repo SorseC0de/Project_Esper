@@ -31,7 +31,9 @@ and are chosen to sit with the rest.
 
 Tap is instant, hold is a stance, flick or release resolves it. Same on touch and pad.
 
-- Stick: floating on the left half. A fast push past 0.8 is a dash; a tilt walks.
+- Stick: floating on the left half. A fast push past 0.8 is a dash; a tilt walks. Walking
+  keeps the body facing where it was, so it can back up or dribble between the legs while
+  staring the other way. Only a dash turns it.
 - Jump: tap. Held through the 4-frame squat is a full hop, let go is a short hop.
 - Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap, or
   letting go before the 20-frame windup ends, is the quickshot: it fires on the preset 53°
@@ -45,6 +47,14 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Catch is automatic: facing the ball within reach.
 
 Pad: A jump, B or R1 shoot, X or L1 throw, Y taunt, right stick aims a stance.
+
+## Tuning pickers
+
+Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
+holds the variants; A is always the baseline as tuned.
+
+- AIR: A baseline. B faster and snappier. C near-instant turn, letting go stops the drift.
+  D momentum, Fox's own acceleration with a long carry. E direct, the stick is the air speed.
 
 ## Queued
 

@@ -65,6 +65,19 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(walker.players[0].velocity.x, walker.players[0].spec.walkMaxSpeed * 0.5, accuracy: 0.001)
     }
 
+    func testWalkingBackwardKeepsFacing() {
+        var match = Match()
+        run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: -0.5, y: 0)) })
+        XCTAssertEqual(match.players[0].state, .walk)
+        XCTAssertLessThan(match.players[0].velocity.x, 0)
+        XCTAssertEqual(match.players[0].facing, .right)
+        // A smash the same way turns into a dash and turns the body.
+        run(&match, frames: 5, input: { _ in .idle })
+        run(&match, frames: 3, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) })
+        XCTAssertEqual(match.players[0].state, .dash)
+        XCTAssertEqual(match.players[0].facing, .left)
+    }
+
     func testTractionStopsTheBody() {
         var match = Match()
         run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })

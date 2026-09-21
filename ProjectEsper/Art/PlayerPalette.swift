@@ -107,3 +107,14 @@ enum BallLook {
     /// The chevrons over a resting ball.
     static let chevron: RGB = 0xFBF236
 }
+
+enum CourtLook {
+    /// The floor and walls with nobody holding the ball; they take the holder's colour.
+    static let neutral: RGB = BallLook.neutral
+    /// The one-way ledge in the middle.
+    static let ledge: RGB = 0xF040E0
+    /// The chevrons over the rim the holder scores on.
+    static let targetChevron: RGB = 0x50E080
+    /// Frames the floor and walls take to shift between colours.
+    static let shiftFrames = 20
+}

@@ -105,7 +105,10 @@ final class SpriteLibrary {
         _ = softGlow(diameter: 32)
         _ = softGlow(diameter: 8)
         _ = feather()
+        _ = flatSquare(size: 16, alpha: 0.6)
+        _ = flatSquare(size: 4, alpha: 1)
         _ = symbol("chevron.down", pointSize: 14)
+        _ = symbol("chevron.down", pointSize: 10)
         SKTexture.preload(Array(cache.values), withCompletionHandler: completion)
     }
 
@@ -231,6 +234,23 @@ final class SpriteLibrary {
         }
         let texture = SKTexture(image: image)
         texture.filteringMode = .linear
+        cache[key] = texture
+        return texture
+    }
+
+    /// A flat white square, `size` pixels, at `alpha`, for tiles the node colours.
+    func flatSquare(size: Int, alpha: CGFloat) -> SKTexture {
+        let key = "square_\(size)_\(alpha)"
+        if let texture = cache[key] { return texture }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size), format: format)
+        let image = renderer.image { context in
+            SKColor(white: 1, alpha: alpha).setFill()
+            context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+        }
+        let texture = SKTexture(image: image)
+        texture.filteringMode = .nearest
         cache[key] = texture
         return texture
     }

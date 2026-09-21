@@ -47,6 +47,13 @@ final class GameScene: SKScene {
     private var ballHold = 0
     private var ballShift = 0
     private var chevrons: [SKSpriteNode] = []
+    /// Over the rim the holder scores on.
+    private var targetChevrons: [SKSpriteNode] = []
+    /// The floor and walls, coloured for whoever holds the ball.
+    private var courtTiles: [SKSpriteNode] = []
+    private var courtColour = SKColor(rgb: CourtLook.neutral)
+    private var courtTarget = SKColor(rgb: CourtLook.neutral)
+    private var courtShift = 0
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
     private var previewDots: [SKSpriteNode] = []
@@ -109,14 +116,27 @@ final class GameScene: SKScene {
         // Every frame in both looks, made and uploaded before anything is drawn.
         sprites.warmUp(players: match.players.count) { [weak self] in self?.ready = true }
 
+        // The floor and walls take the holder's colour, the backboard blocks keep their rim's
+        // owner's, and the ledge is magenta.
         let stage = match.stage
         for row in 0..<stage.rows {
             for column in 0..<stage.columns {
                 let tile = stage.tile(column: column, row: row)
                 guard tile != .empty else { continue }
-                let node = SKSpriteNode(texture: sprites.texture(tile == .solid ? "solid" : "solid_oneway", 0))
+                let node = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 0.6))
+                node.colorBlendFactor = 1
                 node.anchorPoint = .zero
                 node.position = CGPoint(x: CGFloat(column) * GameScene.pixelsPerTile, y: CGFloat(row) * GameScene.pixelsPerTile)
+                let x = (Double(column) + 0.5) * Stage.tileSize, y = (Double(row) + 0.5) * Stage.tileSize
+                let border = column == 0 || column == stage.columns - 1 || row == 0
+                if tile == .oneWay {
+                    node.color = SKColor(rgb: CourtLook.ledge)
+                } else if !border, let hoop = stage.hoops.min(by: { $0.position.distance(to: Vec2(x: x, y: y)) < $1.position.distance(to: Vec2(x: x, y: y)) }) {
+                    node.color = SKColor(rgb: sprites.look(for: hoop.owner).glow)
+                } else {
+                    node.color = courtColour
+                    courtTiles.append(node)
+                }
                 ground.addChild(node)
             }
         }
@@ -178,6 +198,14 @@ final class GameScene: SKScene {
             glowers.addChild(chevron)
             chevrons.append(chevron)
         }
+        for _ in 0..<3 {
+            let chevron = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 10))
+            chevron.color = SKColor(rgb: CourtLook.targetChevron)
+            chevron.colorBlendFactor = 1
+            chevron.zPosition = 6
+            glowers.addChild(chevron)
+            targetChevrons.append(chevron)
+        }
 
         // The aiming arc's dots, made once and moved.
         for _ in 0..<30 {
@@ -222,27 +250,49 @@ final class GameScene: SKScene {
         return halo
     }
 
-    /// Sparks rising off a head as if it were burning, in the colour.
+    /// Bits rising off a head: hard little squares in the colour that step down in size as
+    /// they go, more a digital dissolve than a flame.
     private func makeFire(_ colour: SKColor) -> SKEmitterNode {
         let fire = SKEmitterNode()
-        fire.particleTexture = sprites.softGlow(diameter: 8)
-        fire.particleBirthRate = 24
-        fire.particleLifetime = 0.45
+        fire.particleTexture = sprites.flatSquare(size: 4, alpha: 1)
+        fire.particleBirthRate = 20
+        fire.particleLifetime = 0.5
         fire.particleLifetimeRange = 0.2
         fire.particlePositionRange = CGVector(dx: 6, dy: 2)
-        fire.particleSpeed = 24
-        fire.particleSpeedRange = 10
+        fire.particleSpeed = 22
+        fire.particleSpeedRange = 8
         fire.emissionAngle = .pi / 2
-        fire.emissionAngleRange = .pi / 5
-        fire.yAcceleration = 30
-        fire.particleSize = CGSize(width: 4, height: 4)
-        fire.particleScaleSpeed = -1.5
-        fire.particleAlpha = 0.9
-        fire.particleAlphaSpeed = -1.6
+        fire.emissionAngleRange = .pi / 6
+        fire.yAcceleration = 20
+        fire.particleSize = CGSize(width: 3, height: 3)
+        let steps = SKKeyframeSequence(keyframeValues: [1, 0.66, 0.33], times: [0, 0.45, 0.75])
+        steps.interpolationMode = .step
+        fire.particleScaleSequence = steps
+        let fade = SKKeyframeSequence(keyframeValues: [0.9, 0.9, 0.5, 0], times: [0, 0.6, 0.85, 1])
+        fade.interpolationMode = .step
+        fire.particleAlphaSequence = fade
         fire.particleColor = colour
         fire.particleColorBlendFactor = 1
         fire.particleBlendMode = .add
         return fire
+    }
+
+    /// The floor and walls shift toward whoever holds the ball, and back to neutral.
+    private func tickCourtColour() {
+        let wanted = match.ball.holder.map { SKColor(rgb: sprites.look(for: $0).glow) } ?? SKColor(rgb: CourtLook.neutral)
+        if wanted != courtTarget {
+            courtTarget = wanted
+            courtShift = CourtLook.shiftFrames
+        }
+        guard courtShift > 0 else { return }
+        courtShift -= 1
+        let share = 1 / CGFloat(courtShift + 1)
+        var cr: CGFloat = 0, cg: CGFloat = 0, cb: CGFloat = 0, ca: CGFloat = 0
+        var tr: CGFloat = 0, tg: CGFloat = 0, tb: CGFloat = 0, ta: CGFloat = 0
+        courtColour.getRed(&cr, green: &cg, blue: &cb, alpha: &ca)
+        courtTarget.getRed(&tr, green: &tg, blue: &tb, alpha: &ta)
+        courtColour = SKColor(red: cr + (tr - cr) * share, green: cg + (tg - cg) * share, blue: cb + (tb - cb) * share, alpha: 1)
+        for tile in courtTiles { tile.color = courtColour }
     }
 
     /// The streak a flying ball leaves: soft blobs dropped where it was, thinning out, so
@@ -344,6 +394,7 @@ final class GameScene: SKScene {
             match.advance(inputs: inputs)
             show(match.events)
             tickBallColour()
+            tickCourtColour()
             accumulator -= GameScene.stepSeconds
             steps += 1
         }
@@ -486,6 +537,15 @@ final class GameScene: SKScene {
             chevron.isHidden = !showChevrons
             chevron.position = ballNode.position + CGPoint(x: 0, y: 32 - CGFloat(index) * 7)
             chevron.alpha = step == index ? 1 : 0.3
+        }
+        // The same, smaller and fainter and green, over the rim the holder scores on.
+        let targetHoop = ball.holder.flatMap { holder in match.stage.hoops.first { $0.owner == holder } }
+        for (index, chevron) in targetChevrons.enumerated() {
+            chevron.isHidden = targetHoop == nil
+            if let targetHoop {
+                chevron.position = SpriteLibrary.point(targetHoop.position) + CGPoint(x: 0, y: 30 - CGFloat(index) * 5)
+            }
+            chevron.alpha = step == index ? 0.6 : 0.2
         }
 
         for index in rimNodes.indices {

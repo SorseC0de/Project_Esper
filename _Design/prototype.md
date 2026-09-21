@@ -103,6 +103,14 @@ flaps while the body runs, dissolves upward when it stops, and sweeps once on a 
 jump. In `Wing.swift`. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off.
 
+## Court
+
+The tiles are flat colour. The floor and walls start purple and shift over 20 frames to
+the colour of whoever holds the ball, and back. The backboard blocks stay in their rim's
+owner's colour. The ledge is magenta. Three small faint green chevrons stack over the rim
+the holder scores on. The head particles are hard squares that step down in size, a
+digital dissolve rather than a flame.
+
 ## Glow
 
 `GlowSettings` in `Tuning.swift`: luminance threshold 0.2 for the world and 0.8 for the

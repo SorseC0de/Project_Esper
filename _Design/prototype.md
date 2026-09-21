@@ -108,6 +108,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   diamond blinks at where it left and where it landed. Otherwise shoot does what it does
   without the ball. Numbers in `FizzRules`; the dribble's ball position per frame comes from
   `BallLandmarks.swift`, which the importer generates from the sheets.
+- Platform Protein Shake (E). A fast fall makes a slab under the feet, three tiles wide
+  and a tile thick, that stands for a second: solid to everyone, so it blocks the ball and
+  the opponent, and a floor to land on, jumps refreshed. One at a time; the next comes only
+  after the last has gone. With or without the ball. The stage carries standing slabs as
+  `extras`, which every collision query sees. Numbers in `ShakeRules`.
 
 ## Tuning pickers
 
@@ -116,7 +121,8 @@ holds the variants; A is always the baseline as tuned.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
-- POWER: A none, B Web Water, C Super Soda, D Flash Fizz. The left bumper steps this one.
+- POWER: A none, B Web Water, C Super Soda, D Flash Fizz, E Platform Protein Shake. The
+  left bumper steps this one.
 
 ## Look
 

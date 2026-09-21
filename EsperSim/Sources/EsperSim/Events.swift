@@ -20,6 +20,7 @@ public enum MatchEvent: Equatable {
     case webLine(player: Int, hit: Bool)
     case flew(player: Int)
     case warped(player: Int, from: Vec2, to: Vec2)
+    case platformMade(player: Int)
 }
 
 /// What a player's step asks the match to do with the ball.
@@ -30,4 +31,5 @@ public enum PlayerAction: Equatable {
     case swat
     case webLine(direction: Vec2)
     case warpToBall
+    case makePlatform
 }

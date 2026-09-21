@@ -906,3 +906,74 @@ final class SodaAndFizzTests: XCTestCase {
         XCTAssertFalse(match.events.contains { if case .warped = $0 { return true } else { return false } })
     }
 }
+
+final class ShakeTests: XCTestCase {
+    private func shaken() -> Match {
+        var match = Match()
+        match.players[0].power = .platformShake
+        match.players[1].power = .platformShake
+        match.ball.respawn(at: Vec2(x: 300, y: 30))
+        return match
+    }
+
+    @discardableResult
+    private func run(_ match: inout Match, frames: Int, input: (Int) -> PlayerInput, until stop: ((Match) -> Bool)? = nil) -> Int {
+        for frame in 0..<frames {
+            match.advance(inputs: [input(frame), .idle])
+            if let stop, stop(match) { return frame }
+        }
+        return frames
+    }
+
+    /// A full hop, then a fast fall at the apex.
+    private func fastFallFromTheApex(_ match: inout Match) {
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].velocity.y <= 0 }
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])
+    }
+
+    func testFastFallMakesAPlatformYouLandOn() {
+        var match = shaken()
+        fastFallFromTheApex(&match)
+        XCTAssertEqual(match.platforms.count, 1)
+        XCTAssertTrue(match.events.contains(.platformMade(player: 0)))
+        let top = match.platforms[0].box.max.y
+        XCTAssertGreaterThan(top, 30)
+        run(&match, frames: 10, input: { _ in .idle }) { $0.players[0].grounded }
+        XCTAssertTrue(match.players[0].grounded)
+        XCTAssertEqual(match.players[0].position.y, top, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].jumpsLeft, match.players[0].spec.jumps)
+    }
+
+    func testPlatformDissipatesAndYouFall() {
+        var match = shaken()
+        fastFallFromTheApex(&match)
+        run(&match, frames: 10, input: { _ in .idle }) { $0.players[0].grounded }
+        let standing = match.players[0].position.y
+        run(&match, frames: ShakeRules.platformFrames + 2, input: { _ in .idle })
+        XCTAssertTrue(match.platforms.isEmpty)
+        run(&match, frames: 5, input: { _ in .idle })
+        XCTAssertLessThan(match.players[0].position.y, standing)
+    }
+
+    func testOnlyOnePlatformAtATime() {
+        var match = shaken()
+        fastFallFromTheApex(&match)
+        run(&match, frames: 10, input: { _ in .idle }) { $0.players[0].grounded }
+        // Jump off it and fast fall again while it stands.
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].velocity.y <= 0 }
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])
+        XCTAssertEqual(match.platforms.count, 1)
+    }
+
+    func testPlatformBlocksTheBall() {
+        var match = shaken()
+        fastFallFromTheApex(&match)
+        let box = match.platforms[0].box
+        match.ball.respawn(at: Vec2(x: box.center.x, y: box.max.y + 20))
+        match.ball.velocity = .zero
+        run(&match, frames: 30, input: { _ in .idle }) { $0.ball.velocity.y == 0 && $0.ball.position.y > box.max.y }
+        XCTAssertGreaterThanOrEqual(match.ball.position.y, box.max.y)
+    }
+}

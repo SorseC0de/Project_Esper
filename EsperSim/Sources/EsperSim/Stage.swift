@@ -59,6 +59,9 @@ public struct Stage: Equatable {
     public var playerSpawns: [Vec2]
     public var playerFacings: [Facing]
     public var ballSpawn: Vec2
+    /// Solid boxes that come and go, such as a made platform. Everything that asks the
+    /// stage about solids sees them.
+    public var extras: [Box] = []
 
     public var width: Double { Double(columns) * Stage.tileSize }
     public var height: Double { Double(rows) * Stage.tileSize }
@@ -112,14 +115,22 @@ public struct Stage: Equatable {
         row(at: box.min.y + Stage.edge)...row(at: box.max.y - Stage.edge)
     }
 
-    /// Any solid tile under the box. One-way platforms don't count.
+    /// Any solid tile or extra under the box. One-way platforms don't count.
     public func overlapsSolid(_ box: Box) -> Bool {
         for row in rows(of: box) {
             for column in columns(of: box) where tile(column: column, row: row) == .solid {
                 return true
             }
         }
-        return false
+        return extras.contains { $0.overlaps(box) }
+    }
+
+    private func spansY(_ extra: Box, _ box: Box) -> Bool {
+        extra.min.y < box.max.y - Stage.edge && extra.max.y > box.min.y + Stage.edge
+    }
+
+    private func spansX(_ extra: Box, _ box: Box) -> Bool {
+        extra.min.x < box.max.x - Stage.edge && extra.max.x > box.min.x + Stage.edge
     }
 
     /// Slides the box sideways by `dx`, stopping at the first solid. Returns how far it got
@@ -132,6 +143,8 @@ public struct Stage: Equatable {
         let from = column(at: direction == .right ? leading + Stage.edge : leading - Stage.edge)
         let to = column(at: direction == .right ? target - Stage.edge : target + Stage.edge)
         let span = from <= to ? Array(from...to) : Array((to...from).reversed())
+        var moved = dx
+        var blocked: Facing?
         for column in span {
             var hit = false
             for row in rows(of: box) where tile(column: column, row: row) == .solid {
@@ -140,10 +153,21 @@ public struct Stage: Equatable {
             }
             if hit {
                 let wall = direction == .right ? Double(column) * Stage.tileSize : Double(column + 1) * Stage.tileSize
-                return (wall - leading, direction)
+                moved = wall - leading
+                blocked = direction
+                break
             }
         }
-        return (dx, nil)
+        for extra in extras where spansY(extra, box) {
+            if direction == .right, extra.min.x >= leading - Stage.edge, extra.min.x - leading < moved {
+                moved = max(extra.min.x - leading, 0)
+                blocked = direction
+            } else if direction == .left, extra.max.x <= leading + Stage.edge, extra.max.x - leading > moved {
+                moved = min(extra.max.x - leading, 0)
+                blocked = direction
+            }
+        }
+        return (moved, blocked)
     }
 
     /// Drops or lifts the box by `dy`. Falling stops on solids and on the top of one-way
@@ -155,32 +179,50 @@ public struct Stage: Equatable {
             let target = feet + dy
             let from = row(at: feet - Stage.edge)
             let to = row(at: target + Stage.edge)
-            for row in stride(from: from, through: to, by: -1) {
+            var moved = dy
+            var landed = false
+            search: for row in stride(from: from, through: to, by: -1) {
                 let top = Double(row + 1) * Stage.tileSize
                 for column in columns(of: box) {
                     switch tile(column: column, row: row) {
                     case .solid:
-                        return (top - feet, true, false)
+                        moved = top - feet
+                        landed = true
+                        break search
                     case .oneWay where feet >= top - Stage.edge:
-                        return (top - feet, true, false)
+                        moved = top - feet
+                        landed = true
+                        break search
                     default:
                         continue
                     }
                 }
             }
-            return (dy, false, false)
+            for extra in extras where spansX(extra, box) && extra.max.y <= feet + Stage.edge && extra.max.y - feet > moved {
+                moved = min(extra.max.y - feet, 0)
+                landed = true
+            }
+            return (moved, landed, false)
         } else {
             let head = box.max.y
             let target = head + dy
             let from = row(at: head + Stage.edge)
             let to = row(at: target - Stage.edge)
-            for row in from...max(from, to) {
+            var moved = dy
+            var ceiling = false
+            search: for row in from...max(from, to) {
                 let bottom = Double(row) * Stage.tileSize
                 for column in columns(of: box) where tile(column: column, row: row) == .solid {
-                    return (bottom - head, false, true)
+                    moved = bottom - head
+                    ceiling = true
+                    break search
                 }
             }
-            return (dy, false, false)
+            for extra in extras where spansX(extra, box) && extra.min.y >= head - Stage.edge && extra.min.y - head < moved {
+                moved = max(extra.min.y - head, 0)
+                ceiling = true
+            }
+            return (moved, false, ceiling)
         }
     }
 
@@ -199,7 +241,7 @@ public struct Stage: Equatable {
                 continue
             }
         }
-        return false
+        return extras.contains { spansX($0, box) && abs($0.max.y - feet) < 0.01 }
     }
 
     /// The smallest nudge, up first, then sideways, then down, that gets the box clear of
@@ -217,17 +259,22 @@ public struct Stage: Equatable {
         return .zero
     }
 
-    /// How far down from `y` to the top of the first floor under `x`, solid or one-way.
+    /// How far down from `y` to the top of the first floor under `x`, solid, one-way or extra.
     public func drop(fromX x: Double, y: Double) -> Double {
+        var nearest = y
         let column = column(at: x)
         var row = row(at: y - Stage.edge)
         while row >= 0 {
             if tile(column: column, row: row) != .empty {
-                return y - Double(row + 1) * Stage.tileSize
+                nearest = y - Double(row + 1) * Stage.tileSize
+                break
             }
             row -= 1
         }
-        return y
+        for extra in extras where extra.min.x <= x && x < extra.max.x && extra.max.y <= y + Stage.edge {
+            nearest = min(nearest, y - extra.max.y)
+        }
+        return nearest
     }
 
     /// The side with a wall pressed against the box, if either. Only within the court's
@@ -239,6 +286,10 @@ public struct Stage: Equatable {
         for row in rows where row < self.rows {
             if tile(column: rightColumn, row: row) == .solid { return .right }
             if tile(column: leftColumn, row: row) == .solid { return .left }
+        }
+        for extra in extras where spansY(extra, box) {
+            if abs(extra.min.x - box.max.x) < 0.01 { return .right }
+            if abs(extra.max.x - box.min.x) < 0.01 { return .left }
         }
         return nil
     }

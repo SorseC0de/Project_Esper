@@ -55,6 +55,8 @@ final class GameScene: SKScene {
     /// Each player's webs: the swing's and the shot's.
     private var swingWebs: [SKShapeNode] = []
     private var shotWebs: [SKShapeNode] = []
+    /// Each player's made platform.
+    private var platformNodes: [SKSpriteNode] = []
     private var ballNode = SKSpriteNode()
     private var ballHalo = SKSpriteNode()
     private var ballTrail = SKEmitterNode()
@@ -224,6 +226,16 @@ final class GameScene: SKScene {
                 glowers.addChild(web)
                 self[keyPath: webs].append(web)
             }
+        }
+        for player in match.players {
+            let slab = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
+            slab.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: player.index).glow))
+            slab.colorBlendFactor = 1
+            slab.anchorPoint = CGPoint(x: 0, y: 0)
+            slab.zPosition = 1
+            slab.isHidden = true
+            ground.addChild(slab)
+            platformNodes.append(slab)
         }
         // The wings are parked: `Wing.swift` stays, nothing is added to the scene.
 
@@ -706,6 +718,19 @@ final class GameScene: SKScene {
                 shot.path = line(from: chest, to: end)
             } else {
                 shot.isHidden = true
+            }
+        }
+
+        // Made platforms, in their maker's dark shade, thinning out over their last quarter second.
+        for (index, slab) in platformNodes.enumerated() {
+            if let platform = match.platforms.first(where: { $0.owner == index }) {
+                slab.isHidden = false
+                slab.position = SpriteLibrary.point(platform.box.min)
+                slab.size = CGSize(width: (platform.box.width * SpriteLibrary.pixelsPerUnit).rounded(),
+                                   height: (platform.box.height * SpriteLibrary.pixelsPerUnit).rounded())
+                slab.alpha = min(CGFloat(platform.framesLeft) / 15, 1)
+            } else {
+                slab.isHidden = true
             }
         }
 

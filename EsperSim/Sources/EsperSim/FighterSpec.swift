@@ -338,3 +338,11 @@ public enum SodaRules {
 public enum FizzRules {
     public static let cooldownFrames = 60
 }
+
+/// Platform Protein Shake's numbers: a fast fall makes a slab under the feet this wide,
+/// this thick, for this long; one at a time.
+public enum ShakeRules {
+    public static let platformWidth = 30.0
+    public static let platformThickness = 10.0
+    public static let platformFrames = 60
+}

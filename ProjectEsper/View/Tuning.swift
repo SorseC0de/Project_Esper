@@ -16,9 +16,9 @@ enum HeadVariant: Int, CaseIterable {
 
 /// The powers on the picker. A is none.
 enum PowerVariant: Int, CaseIterable {
-    case none, webWater, superSoda, flashFizz
+    case none, webWater, superSoda, flashFizz, platformShake
 
-    var label: String { ["A", "B", "C", "D"][rawValue] }
+    var label: String { ["A", "B", "C", "D", "E"][rawValue] }
 
     var power: Power {
         switch self {
@@ -26,6 +26,7 @@ enum PowerVariant: Int, CaseIterable {
         case .webWater: .webWater
         case .superSoda: .superSoda
         case .flashFizz: .flashFizz
+        case .platformShake: .platformShake
         }
     }
 }

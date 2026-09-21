@@ -1,10 +1,18 @@
 import Foundation
 
+/// A slab a player made. Solid to everyone until it dissipates.
+public struct Platform: Equatable {
+    public var owner: Int
+    public var box: Box
+    public var framesLeft: Int
+}
+
 /// The whole game, one value. `advance` is the only way it changes.
 public struct Match: Equatable {
     public var stage: Stage
     public var players: [Player]
     public var ball: Ball
+    public var platforms: [Platform] = []
     public var scores: [Int]
     public var frame = 0
     /// What happened on the last `advance`.
@@ -22,6 +30,15 @@ public struct Match: Equatable {
     public mutating func advance(inputs: [PlayerInput]) {
         frame += 1
         events = []
+
+        // Platforms count down and go; the stage carries the ones standing.
+        platforms = platforms.compactMap { platform in
+            platform.framesLeft > 1 ? Platform(owner: platform.owner, box: platform.box, framesLeft: platform.framesLeft - 1) : nil
+        }
+        for index in players.indices {
+            players[index].hasPlatform = platforms.contains { $0.owner == index }
+        }
+        stage.extras = platforms.map(\.box)
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
@@ -80,6 +97,16 @@ public struct Match: Equatable {
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
         case .webLine(let direction):
             webLine(from: index, direction: direction)
+        case .makePlatform:
+            // A slab under the feet as they are after this frame's fall, rounded down so the
+            // body stands on it rather than in it; centred, a tile thick, for a second.
+            let top = player.position.y.rounded(.down)
+            let box = Box(min: Vec2(x: player.position.x - ShakeRules.platformWidth / 2, y: top - ShakeRules.platformThickness),
+                          max: Vec2(x: player.position.x + ShakeRules.platformWidth / 2, y: top))
+            platforms.append(Platform(owner: index, box: box, framesLeft: ShakeRules.platformFrames))
+            players[index].hasPlatform = true
+            stage.extras = platforms.map(\.box)
+            events.append(.platformMade(player: index))
         case .warpToBall:
             let from = player.position
             if let overhang = player.pendingWarp {

@@ -7,6 +7,7 @@ public enum Power: Equatable, Hashable {
     case webWater
     case superSoda
     case flashFizz
+    case platformShake
 }
 
 /// What a web line runs to.
@@ -122,6 +123,9 @@ public struct Player: Equatable {
     /// when it's to the ball in hand.
     public var warpCooldown = 0
     public var pendingWarp: Vec2?
+    /// Platform Protein Shake: a fast fall just began and wants a slab, if none stands.
+    public var wantsPlatform = false
+    public var hasPlatform = false
     public var swatCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
@@ -574,6 +578,10 @@ public struct Player: Equatable {
             }
         }
 
+        if action == nil, wantsPlatform {
+            action = .makePlatform
+        }
+        wantsPlatform = false
         move(in: stage)
         if state == .webSwing, let anchor = webAnchor {
             let target = anchor + Vec2(x: sin(swingAngle), y: -cos(swingAngle)) * swingLength
@@ -801,6 +809,7 @@ public struct Player: Equatable {
         if !fastFalling, !aimingThrow, velocity.y <= 0, input.stick.y < -0.65 {
             fastFalling = true
             velocity.y = -spec.fastFallSpeed
+            if power == .platformShake, !hasPlatform { wantsPlatform = true }
         }
         let floor = fastFalling ? -spec.fastFallSpeed : -spec.fallSpeed
         velocity.y = max(velocity.y - spec.gravity, floor)

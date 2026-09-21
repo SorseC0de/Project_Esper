@@ -299,14 +299,18 @@ public enum BallRules {
 
 /// Web Water's numbers.
 public enum WebRules {
-    /// The swing's anchor sits this far ahead at the top of the court, the arc takes this
-    /// long, and ends this much past the mirrored angle so the body comes out higher.
+    /// The swing's anchor sits this far ahead at the top of the court. The least arc runs
+    /// past the mirrored angle by the overshoot, over this many frames; holding jump keeps
+    /// it going up to twice that arc, never past this angle over the anchor.
     public static let swingReach = 35.0
     public static let swingFrames = 24
     public static let swingOvershoot = 1.15
-    /// The shot reaches this far, reels at this speed, can't repeat for this long, and a
-    /// miss shows for this many frames.
+    public static let swingMaxArcShare = 2.0
+    public static let swingMaxAngle = 1.4
+    /// The shot reaches this far, snaps to a ball or body within this of its tip, reels at
+    /// this speed, can't repeat for this long, and a miss shows for this many frames.
     public static let shotRange = 120.0
+    public static let snapRadius = 8.0
     public static let pullSpeed = 5.0
     public static let shotCooldownFrames = 30
     public static let missFrames = 8

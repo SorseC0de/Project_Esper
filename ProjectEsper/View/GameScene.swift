@@ -549,7 +549,8 @@ final class GameScene: SKScene {
             let handBall = handBalls[index]
             if player.hasBall, let inHand = sprites.landmark(.ball, in: frame, player: index) {
                 let ballX = player.position.x + Double(inHand.x) * player.facing.sign / SpriteLibrary.pixelsPerUnit
-                let drop = match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit
+                // Only a dribble reaches for the floor; in the air the ball stays where the frame put it.
+                let drop = player.grounded ? match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit : 0
                 let phase = min(max(inHand.y / GameScene.dribbleHandHeight, 0), 1)
                 let y = inHand.y - CGFloat(drop) * (1 - phase)
                 let at = CGPoint(x: node.position.x + inHand.x * CGFloat(player.facing.sign), y: node.position.y + y.rounded())
@@ -606,7 +607,13 @@ final class GameScene: SKScene {
                 swing.isHidden = true
             }
             let shot = shotWebs[index]
-            if let web = player.webLine {
+            if player.webAiming {
+                // A faint line the way the shot would go.
+                shot.isHidden = false
+                shot.alpha = 0.3
+                shot.path = line(from: chest, to: SpriteLibrary.point(player.chest + player.webAimDirection * WebRules.shotRange))
+            } else if let web = player.webLine {
+                shot.alpha = 1
                 let end: CGPoint
                 switch web.target {
                 case .point(let point): end = SpriteLibrary.point(point)

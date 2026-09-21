@@ -100,7 +100,11 @@ public struct Player: Equatable {
     public var webAnchor: Vec2?
     private var swingLength = 0.0
     private var swingStartAngle = 0.0
-    private var swingEndAngle = 0.0
+    private var swingAngle = 0.0
+    private var swingLeastArc = 0.0
+    /// Holding throw with no ball: aiming the shot along the stick, fired on release.
+    public var webAiming = false
+    public var webAimDirection = Vec2.zero
     /// A shot's web, for drawing.
     public var webLine: WebLine?
     public var webShotCooldown = 0
@@ -330,7 +334,8 @@ public struct Player: Equatable {
 
         case .wallLand:
             // Silksong's rule: the slide lasts as long as the stick is held into the wall.
-            velocity = Vec2(x: 0, y: -spec.wallSlideSpeed)
+            // Web Water doesn't slide at all.
+            velocity = Vec2(x: 0, y: power == .webWater ? 0 : -spec.wallSlideSpeed)
             if jumpPressed {
                 wallJump(off: facing, events: &events)
             } else if wallSide == nil || stickFacing(input) != facing {
@@ -487,13 +492,17 @@ public struct Player: Equatable {
             }
 
         case .webSwing:
-            // A pendulum under the anchor, from behind it to past the mirrored angle.
+            // A pendulum under the anchor: the least arc always, further while jump is held,
+            // up to twice the least arc and never over the anchor.
             guard let anchor = webAnchor else { enter(.air); break }
-            let t = Double(stateTimer) / Double(WebRules.swingFrames)
-            let angle = swingStartAngle + (swingEndAngle - swingStartAngle) * (1 - cos(.pi * t)) / 2
-            let target = anchor + Vec2(x: sin(angle), y: -cos(angle)) * swingLength
+            let pace = swingLeastArc / Double(WebRules.swingFrames) * facing.sign
+            let easeIn = min(Double(stateTimer) / 4, 1)
+            swingAngle += pace * easeIn
+            let swept = (swingAngle - swingStartAngle) * facing.sign
+            let target = anchor + Vec2(x: sin(swingAngle), y: -cos(swingAngle)) * swingLength
             velocity = target - position
-            if stateTimer >= WebRules.swingFrames {
+            let done = swept >= swingLeastArc * WebRules.swingMaxArcShare || abs(swingAngle) >= WebRules.swingMaxAngle
+            if done || (swept >= swingLeastArc && !input.jump) {
                 webAnchor = nil
                 enter(.air)
             }
@@ -510,9 +519,7 @@ public struct Player: Equatable {
 
         move(in: stage)
         if state == .webSwing, let anchor = webAnchor {
-            let t = Double(stateTimer) / Double(WebRules.swingFrames)
-            let angle = swingStartAngle + (swingEndAngle - swingStartAngle) * (1 - cos(.pi * t)) / 2
-            let target = anchor + Vec2(x: sin(angle), y: -cos(angle)) * swingLength
+            let target = anchor + Vec2(x: sin(swingAngle), y: -cos(swingAngle)) * swingLength
             if position.distance(to: target) > 1 {
                 webAnchor = nil
                 enter(.air)
@@ -544,14 +551,24 @@ public struct Player: Equatable {
         return true
     }
 
-    /// Web Water's shot, on the throw button with no ball: along the stick, or forward.
+    /// Web Water's shot, on the throw button with no ball: held, it aims along the stick;
+    /// let go, it fires that way, or forward if the stick never moved.
     private mutating func webShotIfAsked(_ input: PlayerInput, throwPressed: Bool) -> PlayerAction? {
-        guard power == .webWater, !hasBall, throwPressed, webShotCooldown == 0 else { return nil }
+        guard power == .webWater, !hasBall else { webAiming = false; return nil }
+        if throwPressed, webShotCooldown == 0, !webAiming {
+            webAiming = true
+            webAimDirection = Vec2(x: facing.sign, y: 0)
+        }
+        guard webAiming else { return nil }
+        if input.stick != .zero {
+            webAimDirection = input.stick.normalized
+            if input.stick.x != 0 { facing = input.stick.x > 0 ? .right : .left }
+        }
+        guard !input.throwBall else { return nil }
+        webAiming = false
         webShotCooldown = WebRules.shotCooldownFrames
         webShotPose = 8
-        let direction = input.stick == .zero ? Vec2(x: facing.sign, y: 0) : input.stick.normalized
-        if direction.x != 0 { facing = direction.x > 0 ? .right : .left }
-        return .webShot(direction: direction)
+        return .webShot(direction: webAimDirection)
     }
 
     private mutating func enterShootStance() {
@@ -587,7 +604,9 @@ public struct Player: Equatable {
         let offset = position - anchor
         swingLength = offset.length
         swingStartAngle = atan2(offset.x, -offset.y)
-        swingEndAngle = -swingStartAngle * WebRules.swingOvershoot
+        swingAngle = swingStartAngle
+        // Signed so the arc runs forward whichever way the body faces.
+        swingLeastArc = abs(swingStartAngle) * (1 + WebRules.swingOvershoot)
         webAnchor = anchor
         velocity = .zero
         events.append(.webSwung(player: index))

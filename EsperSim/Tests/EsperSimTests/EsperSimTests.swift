@@ -632,7 +632,7 @@ final class WebWaterTests: XCTestCase {
         XCTAssertNotNil(match.players[0].webAnchor)
         XCTAssertEqual(match.players[0].jumpsLeft, 0)
         var lowest = halt.y
-        run(&match, frames: WebRules.swingFrames + 1, input: { _ in .idle }) { match in
+        run(&match, frames: WebRules.swingFrames * 3, input: { _ in .idle }) { match in
             lowest = min(lowest, match.players[0].position.y)
             return match.players[0].state != .webSwing
         }
@@ -643,11 +643,39 @@ final class WebWaterTests: XCTestCase {
         XCTAssertGreaterThan(match.players[0].velocity.x, 0)
     }
 
+    func testHeldJumpLengthensTheSwing() {
+        func swing(holding: Bool) -> (frames: Int, x: Double) {
+            var match = webbed()
+            run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+            run(&match, frames: 10, input: { _ in .idle })
+            match.advance(inputs: [PlayerInput(jump: true), .idle])
+            let frames = run(&match, frames: 120, input: { _ in PlayerInput(jump: holding) }) { $0.players[0].state != .webSwing }
+            return (frames, match.players[0].position.x)
+        }
+        let short = swing(holding: false)
+        let long = swing(holding: true)
+        XCTAssertGreaterThan(long.frames, short.frames)
+        XCTAssertGreaterThan(long.x, short.x)
+    }
+
+    func testWebWaterClingsWithoutSliding() {
+        var match = webbed()
+        match.players[0].position = Vec2(x: 30, y: 10)
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
+        let height = match.players[0].position.y
+        run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) })
+        XCTAssertEqual(match.players[0].state, .wallLand)
+        XCTAssertEqual(match.players[0].position.y, height, accuracy: 0.001)
+    }
+
     func testWebShotReelsInALooseBall() {
         var match = webbed()
         match.ball.respawn(at: match.players[0].chest + Vec2(x: 60, y: 0))
         match.ball.velocity = .zero
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertTrue(match.players[0].webAiming)
+        match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.ball.tether, 0)
         XCTAssertTrue(match.events.contains(.webShot(player: 0, hit: true)))
         run(&match, frames: 30, input: { _ in .idle }) { $0.ball.holder != nil }
@@ -661,6 +689,7 @@ final class WebWaterTests: XCTestCase {
         match.ball.holder = 1
         match.players[1].position.x = match.players[0].position.x + 50
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        match.advance(inputs: [.idle, .idle])
         XCTAssertFalse(match.players[1].hasBall)
         XCTAssertEqual(match.ball.tether, 0)
         run(&match, frames: 30, input: { _ in .idle }) { $0.ball.holder != nil }
@@ -671,6 +700,7 @@ final class WebWaterTests: XCTestCase {
         var match = webbed()
         match.players[1].position.x = match.players[0].position.x + 60
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[1].state, .webbed)
         run(&match, frames: WebRules.pullMaxFrames + 2, input: { _ in .idle }) { $0.players[1].state != .webbed }
         XCTAssertNotEqual(match.players[1].state, .webbed)
@@ -682,6 +712,7 @@ final class WebWaterTests: XCTestCase {
         match.players[0].position = Vec2(x: 60, y: 10)
         match.players[0].facing = .left
         match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), throwBall: true), .idle])
+        match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .webPull)
         run(&match, frames: WebRules.pullMaxFrames + 2, input: { _ in .idle }) { $0.players[0].state != .webPull }
         XCTAssertLessThan(match.players[0].body.min.x, 16, "should end up against the left wall")
@@ -691,6 +722,7 @@ final class WebWaterTests: XCTestCase {
         var plain = Match()
         plain.ball.respawn(at: plain.players[0].chest + Vec2(x: 60, y: 0))
         plain.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        plain.advance(inputs: [.idle, .idle])
         XCTAssertNil(plain.ball.tether)
         XCTAssertFalse(plain.events.contains { if case .webShot = $0 { return true } else { return false } })
 

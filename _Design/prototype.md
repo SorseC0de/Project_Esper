@@ -82,10 +82,12 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 
 - Web Water (B). Double jump is the web swing: air movement halts, a web goes to the top
   of the court 35 units ahead, and the body swings under it on a pendulum arc past the
-  mirrored angle, so it dips, then lets go higher than it stopped with the arc's speed. It
-  spends the double jump and works with the ball. The throw button without the ball is the
-  web shot: a line along the stick from the chest, 120 units, and the first thing it meets
-  wins. A loose ball is reeled in and caught whatever its speed or facing. The opponent
+  mirrored angle, so it dips, then lets go higher than it stopped with the arc's speed.
+  That least arc always happens; holding jump keeps swinging, up to twice the arc and never
+  over the anchor. It spends the double jump and works with the ball. The wall cling never
+  slides. The throw button without the ball is the web shot: held, it aims along the stick
+  with a faint line; let go, it fires, 120 units, and the first thing within 8 units of its
+  tip wins. A loose ball is reeled in and caught whatever its speed or facing. The opponent
   holding the ball loses it to the reel. The opponent without it is reeled to 12 units in
   front of the shooter and dropped. A wall or block reels the shooter to it. With the ball
   the throw button is the ordinary throw. Numbers in `WebRules`.

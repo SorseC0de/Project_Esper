@@ -109,14 +109,14 @@ public struct Match: Equatable {
                 hit = true
                 break
             }
-            if ball.isLive, ball.position.distance(to: point) <= BallRules.radius + 2 {
+            if ball.isLive, ball.position.distance(to: point) <= BallRules.radius + WebRules.snapRadius {
                 ball.tether = index
                 ball.thrown = false
                 players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
                 hit = true
                 break
             }
-            if let opponent, players[opponent].body.overlaps(Box(center: point, width: 1, height: 1)) {
+            if let opponent, players[opponent].body.overlaps(Box(center: point, width: WebRules.snapRadius * 2, height: WebRules.snapRadius * 2)) {
                 if players[opponent].hasBall {
                     players[opponent].loseBall()
                     ball.holder = nil

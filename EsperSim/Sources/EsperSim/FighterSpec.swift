@@ -37,15 +37,21 @@ public struct FighterSpec: Equatable {
 
     public var wallJumpHorizontal: Double
     public var wallJumpVertical: Double
-    /// Speed of the slide down the wall while clinging.
+    /// Speed of the slide down the wall while clinging. The cling lasts as long as the
+    /// stick is held into the wall.
     public var wallSlideSpeed: Double
-    /// Frames the cling lasts before dropping off.
-    public var wallLandFrames: Int
-    /// Frames after leaving a wall before another cling can start.
+    /// Frames after a wall jump before a cling can start again.
     public var wallLandCooldownFrames: Int
     /// Frames after leaving the ground before a cling can start, so a jump beside a wall
     /// isn't caught by it on the way up.
     public var wallLandGroundLockoutFrames = 8
+    /// A jump press in the air with a wall this close on either side is a wall jump, cling
+    /// or not.
+    public var wallJumpReach = 2.0
+    /// Frames after letting go of a wall in which a jump press still jumps off it.
+    public var wallJumpGraceFrames = 6
+    /// Frames after a wall jump in which the stick doesn't steer, so the arc leaves the wall.
+    public var wallJumpControlLockFrames = 6
     /// Sideways speed lost per frame in an airborne stance.
     public var stanceAirBrake = 0.01
 
@@ -83,8 +89,7 @@ public struct FighterSpec: Equatable {
         wallJumpHorizontal: 1.5,
         wallJumpVertical: 2.0,
         wallSlideSpeed: 0.3,
-        wallLandFrames: 12,
-        wallLandCooldownFrames: 30,
+        wallLandCooldownFrames: 6,
         bodyWidth: 10,
         bodyHeight: 15
     )
@@ -120,8 +125,7 @@ public struct FighterSpec: Equatable {
         wallJumpHorizontal: 2.3,
         wallJumpVertical: 2.7,
         wallSlideSpeed: 0.5,
-        wallLandFrames: 12,
-        wallLandCooldownFrames: 30,
+        wallLandCooldownFrames: 6,
         bodyWidth: 10,
         bodyHeight: 15
     )
@@ -155,8 +159,7 @@ public struct FighterSpec: Equatable {
         wallJumpHorizontal: 2.2,
         wallJumpVertical: 3.2,
         wallSlideSpeed: 0.5,
-        wallLandFrames: 12,
-        wallLandCooldownFrames: 30,
+        wallLandCooldownFrames: 6,
         bodyWidth: 10,
         bodyHeight: 15
     )
@@ -190,8 +193,7 @@ public struct FighterSpec: Equatable {
         wallJumpHorizontal: 1.8,
         wallJumpVertical: 2.5,
         wallSlideSpeed: 0.5,
-        wallLandFrames: 12,
-        wallLandCooldownFrames: 30,
+        wallLandCooldownFrames: 6,
         bodyWidth: 10,
         bodyHeight: 15
     )

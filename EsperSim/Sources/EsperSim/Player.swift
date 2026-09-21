@@ -53,6 +53,17 @@ public struct Player: Equatable {
     public var throwDirection: Vec2 = .zero
     public var catchCooldown = 0
     public var wallLandCooldown = 0
+    /// The wall last clung to, and frames left in which a jump still goes off it.
+    public var wallGraceSide: Facing?
+    public var wallGrace = 0
+    /// Frames left in which the stick doesn't steer, after a wall jump.
+    public var airControlLock = 0
+    /// Which shoot buttons took the stance; a different one pressed cancels it.
+    public var stanceButtons: UInt8 = 0
+    /// After a cancel, every shoot button has to come up before another shoot stance, and
+    /// the throw button before another throw stance.
+    public var shootReady = true
+    public var throwReady = true
     public var swatCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
@@ -81,6 +92,9 @@ public struct Player: Equatable {
 
     public var inStance: Bool { state == .shootStance || state == .throwStance }
 
+    /// The first step in a state, after `enter` on the step before.
+    private var stanceTimerJustEntered: Bool { stateTimer == 1 }
+
     public mutating func enter(_ next: PlayerState) {
         previousState = state
         state = next
@@ -103,6 +117,10 @@ public struct Player: Equatable {
         stateTimer += 1
         if catchCooldown > 0 { catchCooldown -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
+        if wallGrace > 0 { wallGrace -= 1 }
+        if airControlLock > 0 { airControlLock -= 1 }
+        if input.shootButtons == 0 { shootReady = true }
+        if !input.throwBall { throwReady = true }
         if swatCooldown > 0 { swatCooldown -= 1 }
         if doubleJumpTimer > 0 { doubleJumpTimer -= 1 }
         stickAwayFrames = abs(input.stick.x) < 0.3 ? 0 : stickAwayFrames + 1
@@ -110,6 +128,7 @@ public struct Player: Equatable {
         if input.jump && !lastInput.jump { jumpBuffer = 5 } else if jumpBuffer > 0 { jumpBuffer -= 1 }
         let jumpPressed = jumpBuffer > 0
         let shootPressed = input.shoot && !lastInput.shoot
+        let throwPressed = input.throwBall && !lastInput.throwBall
         let tauntPressed = input.taunt && !lastInput.taunt
         let smash = abs(input.stick.x) >= spec.dashThreshold && stickAwayFrames <= 3
         var action: PlayerAction?
@@ -201,18 +220,22 @@ public struct Player: Equatable {
             }
 
         case .air:
-            airDrift(input)
+            airDrift(airControlLock > 0 ? .idle : input)
             fall(input)
-            if wallLandCooldown == 0, let wall = wallSide, stickFacing(input) == wall {
+            if jumpPressed, wallLandCooldown == 0, let wall = wallSide ?? wall(within: spec.wallJumpReach, in: stage) {
+                // Celeste's rule: a wall in reach is enough, no cling needed.
+                wallJump(off: wall, events: &events)
+            } else if jumpPressed, wallGrace > 0, let wall = wallGraceSide {
+                wallJump(off: wall, events: &events)
+            } else if wallLandCooldown == 0, let wall = wallSide, stickFacing(input) == wall {
                 facing = wall
                 velocity = .zero
                 enter(.wallLand)
-                if jumpPressed { wallJump(off: wall, events: &events) }
             } else if jumpPressed, jumpsLeft > 0 {
                 doubleJump(input, events: &events)
-            } else if hasBall, input.shoot {
+            } else if hasBall, input.shoot, shootReady {
                 enterShootStance()
-            } else if hasBall, input.throwBall {
+            } else if hasBall, input.throwBall, throwReady {
                 throwDirection = .zero
                 quickThrow = false
                 fastFalling = false
@@ -225,11 +248,13 @@ public struct Player: Equatable {
             }
 
         case .wallLand:
+            // Silksong's rule: the slide lasts as long as the stick is held into the wall.
             velocity = Vec2(x: 0, y: -spec.wallSlideSpeed)
-            if let wall = wallSide, jumpPressed {
-                wallJump(off: wall, events: &events)
-            } else if wallSide == nil || stateTimer >= spec.wallLandFrames {
-                wallLandCooldown = spec.wallLandCooldownFrames
+            if jumpPressed {
+                wallJump(off: facing, events: &events)
+            } else if wallSide == nil || stickFacing(input) != facing {
+                wallGraceSide = facing
+                wallGrace = spec.wallJumpGraceFrames
                 enter(.air)
             }
 
@@ -240,6 +265,13 @@ public struct Player: Equatable {
             }
 
         case .shootStance:
+            if stanceTimerJustEntered { stanceButtons = input.shootButtons }
+            if input.shootButtons & ~stanceButtons != 0 || throwPressed {
+                // A shoot button other than the one that took the stance, or the throw: the cancel.
+                cancelShot()
+                throwReady = !throwPressed
+                break
+            }
             stanceMovement(input)
             if input.aim.length >= BallRules.flickThreshold {
                 shotAim = input.aim
@@ -288,6 +320,13 @@ public struct Player: Equatable {
             }
 
         case .throwStance:
+            if shootPressed {
+                // The shoot button cancels the throw.
+                shootReady = false
+                throwReady = false
+                enter(grounded ? .idle : .air)
+                break
+            }
             stanceMovement(input)
             let aim = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
             if aim.length >= 0.5 {
@@ -372,9 +411,9 @@ public struct Player: Equatable {
     private mutating func groundActions(_ input: PlayerInput, jumpPressed: Bool, tauntPressed: Bool, events: inout [MatchEvent]) -> Bool {
         if jumpPressed {
             enter(.jumpSquat)
-        } else if hasBall, input.shoot {
+        } else if hasBall, input.shoot, shootReady {
             enterShootStance()
-        } else if hasBall, input.throwBall {
+        } else if hasBall, input.throwBall, throwReady {
             throwDirection = .zero
             quickThrow = false
             enter(.throwStance)
@@ -391,7 +430,14 @@ public struct Player: Equatable {
         quickShot = false
         jumpShot = false
         shotLift = false
+        stanceButtons = 0
         enter(.shootStance)
+    }
+
+    /// The stance dropped, ball kept, and no new stance until every shoot button is up.
+    private mutating func cancelShot() {
+        shootReady = false
+        enter(grounded ? .idle : .air)
     }
 
     /// Off to the shot. Released on the way up out of a jump shot, it gets the preset arc if
@@ -413,7 +459,8 @@ public struct Player: Equatable {
         enter(.dash)
     }
 
-    /// Off the wall, with the double jump back.
+    /// Off the wall, with the double jump back and the stick locked out for a moment so the
+    /// arc actually leaves.
     private mutating func wallJump(off wall: Facing, events: inout [MatchEvent]) {
         jumpBuffer = 0
         jumpsLeft = max(jumpsLeft, spec.jumps - 1)
@@ -421,8 +468,16 @@ public struct Player: Equatable {
         facing = wall.flipped
         fastFalling = false
         wallLandCooldown = spec.wallLandCooldownFrames
+        airControlLock = spec.wallJumpControlLockFrames
+        wallGrace = 0
         events.append(.wallJumped(player: index, wall: wall))
         enter(.air)
+    }
+
+    /// A wall within `reach` of either side of the body.
+    private func wall(within reach: Double, in stage: Stage) -> Facing? {
+        let wide = Box(min: Vec2(x: body.min.x - reach, y: body.min.y), max: Vec2(x: body.max.x + reach, y: body.max.y))
+        return stage.wall(beside: wide)
     }
 
     private mutating func doubleJump(_ input: PlayerInput, events: inout [MatchEvent]) {

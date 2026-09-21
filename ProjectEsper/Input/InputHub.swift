@@ -62,8 +62,9 @@ final class InputHub {
         return cyclePressed
     }
 
-    /// A: jump. B or the right bumper: shoot. X: throw. Y: taunt. The left bumper steps
-    /// the tuning picker, and the menu button resets.
+    /// A: jump. B, the right bumper and the right trigger: shoot, each its own button so a
+    /// second one cancels a shot. X: throw. Y: taunt. The left bumper steps the tuning
+    /// picker, and the menu button resets.
     /// The right stick aims a stance; failing that, the left stick does.
     private func read(_ pad: GCExtendedGamepad) -> PlayerInput {
         var stick = deadzoned(Vec2(x: Double(pad.leftThumbstick.xAxis.value), y: Double(pad.leftThumbstick.yAxis.value)))
@@ -73,7 +74,7 @@ final class InputHub {
         var input = PlayerInput(stick: stick)
         input.aim = rightStick.length >= BallRules.flickThreshold ? rightStick : stick
         input.jump = pad.buttonA.isPressed
-        input.shoot = pad.buttonB.isPressed || pad.rightShoulder.isPressed
+        input.shootButtons = (pad.buttonB.isPressed ? 1 : 0) | (pad.rightShoulder.isPressed ? 2 : 0) | (pad.rightTrigger.isPressed ? 4 : 0)
         input.throwBall = pad.buttonX.isPressed
         input.taunt = pad.buttonY.isPressed
         return input
@@ -83,7 +84,7 @@ final class InputHub {
         PlayerInput(stick: a.stick.lengthSquared >= b.stick.lengthSquared ? a.stick : b.stick,
                     aim: a.aim.lengthSquared >= b.aim.lengthSquared ? a.aim : b.aim,
                     jump: a.jump || b.jump,
-                    shoot: a.shoot || b.shoot,
+                    shootButtons: a.shootButtons | b.shootButtons,
                     throwBall: a.throwBall || b.throwBall,
                     taunt: a.taunt || b.taunt)
     }

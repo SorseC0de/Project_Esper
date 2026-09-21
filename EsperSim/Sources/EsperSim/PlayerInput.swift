@@ -10,21 +10,27 @@ public struct PlayerInput: Equatable, Hashable {
     /// or the left stick if neither. Length 0 to 1.
     public var aim: Vec2 = .zero
     public var jump = false
-    /// Shoots with the ball, swats without it.
-    public var shoot = false
+    /// Which shoot buttons are down, one bit each. Any of them shoots with the ball and
+    /// swats without it; a second one pressed during a stance cancels the shot.
+    public var shootButtons: UInt8 = 0
     public var throwBall = false
     public var taunt = false
 
     public static let idle = PlayerInput()
 
     public init(stick: Vec2 = .zero, aim: Vec2 = .zero, jump: Bool = false,
-                shoot: Bool = false, throwBall: Bool = false, taunt: Bool = false) {
+                shoot: Bool = false, shootButtons: UInt8? = nil, throwBall: Bool = false, taunt: Bool = false) {
         self.stick = stick
         self.aim = aim
         self.jump = jump
-        self.shoot = shoot
+        self.shootButtons = shootButtons ?? (shoot ? 1 : 0)
         self.throwBall = throwBall
         self.taunt = taunt
+    }
+
+    public var shoot: Bool {
+        get { shootButtons != 0 }
+        set { shootButtons = newValue ? 1 : 0 }
     }
 }
 

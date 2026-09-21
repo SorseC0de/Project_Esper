@@ -42,7 +42,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap, or
   letting go before the 20-frame windup ends, is the quickshot: it fires on the preset 53°
   arc when the windup ends. Holding past the windup and releasing without a flick is the
-  pump fake. On the ground, jump during the stance is a jump shot: released on the way up
+  pump fake, and so is a second shoot button or the throw button pressed during the
+  stance; after a cancel the buttons involved have to come up before another stance.
+  Shoot pressed during a throw stance cancels the throw the same way. On the ground, jump during the stance
+  is a jump shot: released on the way up
   it fires on the preset arc if nothing was flicked and the ball leaves with the body's
   lift. On the way down it's an ordinary air shot.
 - Shoot (without ball, in the air): swat. Reverses the ball if it's in front.
@@ -51,15 +54,17 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed.
-- Wall: hold toward a wall in the air to cling, jump to leave. Direction is automatic, and
-  the wall jump gives the double jump back. A cling can't start for 8 frames after leaving
-  the ground, so a jump beside a wall isn't caught by it on the way up.
+- Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
+  leaves it, direction automatic, double jump restored, and the stick doesn't steer for 6
+  frames so the arc clears the wall. A jump press with a wall within 2 units of either side
+  is a wall jump with no cling at all, and for 6 frames after letting go of a wall a press
+  still jumps off it. A cling can't start for 8 frames after leaving the ground.
 - Catch is automatic: the ball within reach and either in front, or in the way of where
   the body is moving. A ball arriving from behind while standing still bounces off.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
   would carry it through the rim, a share a frame, never snapped.
 
-Pad: A jump, B or R1 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
+Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
 tuning picker, menu resets.
 
 ## Tuning pickers

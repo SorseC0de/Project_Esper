@@ -133,6 +133,31 @@ final class MovementTests: XCTestCase {
         XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
     }
 
+    func testClingLastsWhileHeldAndGraceAfterLettingGo() {
+        var match = Match()
+        match.players[0].position = Vec2(x: 30, y: 10)
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
+        run(&match, frames: 40, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) })
+        XCTAssertEqual(match.players[0].state, .wallLand, "the cling should last as long as the stick is held")
+        // Let go, then jump inside the grace window.
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .air)
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
+    }
+
+    func testJumpNearAWallIsAWallJumpWithoutClinging() {
+        var match = Match()
+        match.players[0].position = Vec2(x: 30, y: 10)
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        // Drift to the wall without pressing into it, then press jump beside it.
+        let beside = run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].body.min.x <= 12 }
+        XCTAssertLessThan(beside, 120)
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
+    }
+
     func testJumpOnWallContactIsAWallJumpNotADoubleJump() {
         var match = Match()
         match.players[0].position = Vec2(x: 30, y: 10)
@@ -295,6 +320,43 @@ final class BallTests: XCTestCase {
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .air)
         XCTAssertTrue(match.players[0].hasBall)
+    }
+
+    func testASecondShootButtonCancelsTheShot() {
+        var match = matchWithBallHeld()
+        for _ in 0..<10 {
+            match.advance(inputs: [PlayerInput(shootButtons: 2), .idle])
+        }
+        XCTAssertEqual(match.players[0].state, .shootStance)
+        match.advance(inputs: [PlayerInput(shootButtons: 2 | 1), .idle])
+        XCTAssertEqual(match.players[0].state, .idle)
+        XCTAssertTrue(match.players[0].hasBall)
+        // Still holding both: no new stance until they're all up.
+        match.advance(inputs: [PlayerInput(shootButtons: 1), .idle])
+        XCTAssertEqual(match.players[0].state, .idle)
+        match.advance(inputs: [.idle, .idle])
+        match.advance(inputs: [PlayerInput(shootButtons: 1), .idle])
+        XCTAssertEqual(match.players[0].state, .shootStance)
+    }
+
+    func testThrowCancelsTheShotAndShootCancelsTheThrow() {
+        var match = matchWithBallHeld()
+        for _ in 0..<10 { match.advance(inputs: [PlayerInput(shoot: true), .idle]) }
+        XCTAssertEqual(match.players[0].state, .shootStance)
+        match.advance(inputs: [PlayerInput(shoot: true, throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .idle)
+        // Holding throw on after the cancel doesn't start a throw stance.
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .idle)
+        match.advance(inputs: [.idle, .idle])
+
+        for _ in 0..<5 { match.advance(inputs: [PlayerInput(throwBall: true), .idle]) }
+        XCTAssertEqual(match.players[0].state, .throwStance)
+        match.advance(inputs: [PlayerInput(shoot: true, throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .idle)
+        XCTAssertTrue(match.players[0].hasBall)
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .idle)
     }
 
     func testShotAngleClampsToRange() {

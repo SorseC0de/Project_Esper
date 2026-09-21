@@ -391,6 +391,31 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .idle)
     }
 
+    func testReleaseBetweenTheTapAndTheHoldIsAFake() {
+        var match = matchWithBallHeld()
+        for _ in 0..<BallRules.quickshotFrames + 4 {
+            match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        }
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .idle)
+        XCTAssertTrue(match.players[0].hasBall)
+    }
+
+    func testFloaterCarriesTheRunItStartedFrom() {
+        for direction in [1.0, -1.0] {
+            var match = Match()
+            match.players[0].position.x = 150
+            match.players[0].hasBall = true
+            match.ball.holder = 0
+            run(&match, frames: 25, input: { _ in PlayerInput(stick: Vec2(x: direction, y: 0)) })
+            for _ in 0..<BallRules.throwWindupFrames + 2 {
+                match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+            }
+            run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+            XCTAssertEqual(match.ball.velocity.x, direction * match.players[0].spec.runSpeed, accuracy: 0.001)
+        }
+    }
+
     func testShotAngleClampsToRange() {
         var player = Match().players[0]
         player.shotAim = Vec2(x: 0, y: 1)

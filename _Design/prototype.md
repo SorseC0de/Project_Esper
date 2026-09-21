@@ -40,10 +40,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. For 3 frames
   after walking off an edge a press is still that jump. Down while falling is a fast fall,
   except while holding throw with the ball, where down is the aim.
-- Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap, or
-  letting go before the 20-frame windup ends, is the quickshot: it fires on the preset 53°
-  arc when the windup ends. Holding past the windup and releasing without a flick is the
-  pump fake, and so is a second shoot button or the throw button pressed during the
+- Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap,
+  let go within 6 frames, is the quickshot: it fires on the preset 53° arc when the
+  20-frame windup ends. Let go after that but before the windup ends and it's a cancel.
+  Holding past the windup and releasing without a flick is the pump fake, and so is a second shoot button or the throw button pressed during the
   stance; after a cancel the buttons involved have to come up before another stance.
   Shoot pressed during a throw stance cancels the throw the same way. On the ground, jump during the stance
   is a jump shot: released on the way up
@@ -52,7 +52,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Shoot (without ball, in the air): swat. Reverses the ball if it's in front.
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
   gravity until the first bounce. Up is the floater: a soft drift up at 1.5 with gravity
-  off for 30 frames, carrying the thrower's sideways speed, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
+  off for 30 frames, carrying the sideways speed the thrower had when the stance began, then
+  a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed.
@@ -77,8 +78,8 @@ tuning picker, menu resets.
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
 holds the variants; A is always the baseline as tuned.
 
-- HEAD: how the detached head follows the body. A closes half the gap each frame. B closes
-  a quarter but leads instead of trailing, the lag reversed along each axis.
+- HEAD: how the detached head follows the body. Both close half the gap each frame. B
+  leads sideways instead of trailing, the offset reversed across only.
 
 ## Look
 
@@ -94,7 +95,7 @@ the body by a quarter of the gap each frame and bobbing a pixel, and its fire is
 into the world so it streams behind a moving head. The loose ball is purple, and for 45 frames after a shot, throw or dunk it's the colour
 of whoever let it go, then shifts back over 30. A flying ball leaves a soft additive trail
 in its colour. The library finds where the ball and the head sit in each frame so the halo
-and the fire follow them. The head is drawn at 1.5 times, about its own centre. Three dim
+and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted 3 pixels off the body. Three dim
 yellow chevrons stack over a resting ball and light one after another from the top. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off.
 

@@ -70,6 +70,8 @@ public struct Player: Equatable {
     public var throwReady = true
     /// A shoot button held with no ball: ready to catch a fast one.
     public var catchStance = false
+    /// The sideways speed when the throw stance began; the floater carries it.
+    public var throwStanceEntrySpeed = 0.0
     public var swatCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
@@ -263,6 +265,7 @@ public struct Player: Equatable {
                 throwDirection = .zero
                 quickThrow = false
                 fastFalling = false
+                throwStanceEntrySpeed = velocity.x
                 enter(.throwStance)
             } else if !hasBall, shootPressed, swatCooldown == 0 {
                 swatCooldown = BallRules.swatCooldownFrames
@@ -312,13 +315,16 @@ public struct Player: Equatable {
                 events.append(.jumped(player: index))
             }
             if !input.shoot, !quickShot {
-                if stateTimer < BallRules.shotWindupFrames {
-                    // Let go early: a quickshot, on the preset arc unless a flick came first.
+                if stateTimer <= BallRules.quickshotFrames {
+                    // A tap: the quickshot, on the preset arc when the windup ends.
                     quickShot = true
+                } else if stateTimer < BallRules.shotWindupFrames {
+                    // Let go before the hold: the pump fake.
+                    enter(grounded ? .idle : .air)
                 } else if shotAim != .zero || (jumpShot && velocity.y > 0) {
                     releaseShot()
                 } else {
-                    // The pump fake.
+                    // Held to the hold and let go with no flick: also the pump fake.
                     enter(grounded ? .idle : .air)
                 }
             }
@@ -440,6 +446,7 @@ public struct Player: Equatable {
         } else if hasBall, input.throwBall, throwReady {
             throwDirection = .zero
             quickThrow = false
+            throwStanceEntrySpeed = velocity.x
             enter(.throwStance)
         } else if hasBall, tauntPressed {
             enter(.taunt)

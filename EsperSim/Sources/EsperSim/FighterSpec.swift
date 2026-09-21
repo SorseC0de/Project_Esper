@@ -241,8 +241,11 @@ public enum BallRules {
     public static let shotAngleDefault = degrees(53)
     /// Aim length the flick has to reach to count.
     public static let flickThreshold = 0.5
-    /// Frames from taking the stance to being able to release.
+    /// Frames from taking the stance to being able to release. Let go within the quickshot
+    /// window and it fires on the preset arc when the windup ends; let go after the window
+    /// but before the windup ends and it's a cancel.
     public static let shotWindupFrames = 20
+    public static let quickshotFrames = 6
     /// Frames from the release to the ball leaving the hand, then to acting again.
     public static let shotReleaseFrames = 5
     public static let shotRecoveryFrames = 10

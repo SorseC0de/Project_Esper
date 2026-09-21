@@ -12,7 +12,9 @@ final class GameScene: SKScene {
     private static let stepSeconds = 1.0 / 60
     private static let maxStepsPerFrame = 4
     private static let pixelsPerTile = CGFloat(Stage.tileSize * SpriteLibrary.pixelsPerUnit)
-    private static let headScale: CGFloat = 1.5
+    private static let headScale: CGFloat = 1.25
+    /// Pixels the head floats above its place on the body, so scaling it up doesn't sink it in.
+    private static let headLift: CGFloat = 3
 
     private var match = Match()
     private var headVariant = HeadVariant.a
@@ -402,9 +404,9 @@ final class GameScene: SKScene {
                 headShown[index] = CGPoint(x: headShown[index].x + (target.x - headShown[index].x) * lag,
                                            y: headShown[index].y + (target.y - headShown[index].y) * lag)
                 var offset = headShown[index] - target
-                if headVariant.reversed { offset = CGPoint(x: -offset.x, y: -offset.y) }
+                if headVariant.reversedAcross { offset.x = -offset.x }
                 let bob = (sin(Double(match.frame) / 60 * 2 * .pi * 1.2) * 1).rounded()
-                let shown = CGPoint(x: (target.x + offset.x).rounded(), y: (target.y + offset.y).rounded() + bob)
+                let shown = CGPoint(x: (target.x + offset.x).rounded(), y: (target.y + offset.y).rounded() + bob + GameScene.headLift)
                 headNode.isHidden = false
                 headNode.texture = headTexture
                 headNode.size = headTexture.size()

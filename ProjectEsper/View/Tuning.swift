@@ -1,22 +1,17 @@
 import EsperSim
 import Foundation
 
-/// How the head follows the body, on the picker. A trails tight; B is as loose as the
-/// first cut but leads instead of trailing, the lag reversed along each axis.
+/// How the head follows the body, on the picker. Both close half the gap each frame; B
+/// leads sideways instead of trailing, the offset reversed across only.
 enum HeadVariant: Int, CaseIterable {
     case a, b
 
     var label: String { ["A", "B"][rawValue] }
 
     /// The share of the gap closed each frame.
-    var lag: CGFloat {
-        switch self {
-        case .a: 0.5
-        case .b: 0.25
-        }
-    }
+    var lag: CGFloat { 0.5 }
 
-    var reversed: Bool { self == .b }
+    var reversedAcross: Bool { self == .b }
 }
 
 /// The glow, as GameMaker's Glow filter had it: what counts as bright, how soft the cut is,

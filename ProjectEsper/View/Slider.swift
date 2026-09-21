@@ -9,12 +9,15 @@ final class Slider: SKNode {
     private let label = SKLabelNode()
     private let title: String
     private let range: ClosedRange<Float>
+    /// The value only ever lands on a multiple of this.
+    private let notch: Float
     private(set) var value: Float
     private let onChange: (Float) -> Void
 
-    init(title: String, range: ClosedRange<Float>, value: Float, onChange: @escaping (Float) -> Void) {
+    init(title: String, range: ClosedRange<Float>, notch: Float, value: Float, onChange: @escaping (Float) -> Void) {
         self.title = title
         self.range = range
+        self.notch = notch
         self.value = value
         self.onChange = onChange
         super.init()
@@ -40,10 +43,13 @@ final class Slider: SKNode {
         abs(point.x) <= Slider.size.width / 2 + 10 && abs(point.y) <= Slider.size.height
     }
 
-    /// Sets the value from where the finger is along the track.
+    /// Sets the value from where the finger is along the track, to the nearest notch.
     func drag(to point: CGPoint) {
         let share = min(max((point.x + Slider.size.width / 2) / Slider.size.width, 0), 1)
-        value = range.lowerBound + Float(share) * (range.upperBound - range.lowerBound)
+        let raw = range.lowerBound + Float(share) * (range.upperBound - range.lowerBound)
+        let notched = (raw / notch).rounded() * notch
+        guard notched != value else { return }
+        value = notched
         show()
         onChange(value)
     }
@@ -51,6 +57,6 @@ final class Slider: SKNode {
     private func show() {
         let share = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
         knob.position = CGPoint(x: -Slider.size.width / 2 + share * Slider.size.width, y: 0)
-        label.text = String(format: "%@ %.2f", title, value)
+        label.text = String(format: "%@ %.1f", title, value)
     }
 }

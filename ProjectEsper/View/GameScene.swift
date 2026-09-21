@@ -287,7 +287,7 @@ final class GameScene: SKScene {
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
             self?.headVariant = HeadVariant(rawValue: index)!
         }
-        controls.addSlider(title: "GLOW THRESHOLD", range: 0.2...1.0, value: GlowSettings.threshold) { value in
+        controls.addSlider(title: "GLOW THRESHOLD", range: 0.2...1.0, notch: 0.1, value: GlowSettings.threshold) { value in
             GlowSettings.threshold = value
         }
         hud.addChild(controls)

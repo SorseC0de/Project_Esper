@@ -480,11 +480,10 @@ public struct Player: Equatable {
         enter(.dash)
     }
 
-    /// Off the wall, with the double jump back and the stick locked out for a moment so the
-    /// arc actually leaves.
+    /// Off the wall, with the stick locked out for a moment so the arc actually leaves.
+    /// The double jump stays spent if it was.
     private mutating func wallJump(off wall: Facing, events: inout [MatchEvent]) {
         jumpBuffer = 0
-        jumpsLeft = max(jumpsLeft, spec.jumps - 1)
         velocity = Vec2(x: spec.wallJumpHorizontal * -wall.sign, y: spec.wallJumpVertical)
         facing = wall.flipped
         fastFalling = false

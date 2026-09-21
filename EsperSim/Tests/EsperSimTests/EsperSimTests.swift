@@ -194,7 +194,7 @@ final class MovementTests: XCTestCase {
         XCTAssertLessThan(clung, 60, "never clung once the lockout passed")
     }
 
-    func testWallJumpGivesTheDoubleJumpBack() {
+    func testWallJumpDoesNotGiveTheDoubleJumpBack() {
         var match = Match()
         match.players[0].position = Vec2(x: 30, y: 10)
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
@@ -205,7 +205,7 @@ final class MovementTests: XCTestCase {
         run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
         match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), jump: true), .idle])
         XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
-        XCTAssertEqual(match.players[0].jumpsLeft, 1)
+        XCTAssertEqual(match.players[0].jumpsLeft, 0)
     }
 
     func testCoyoteJumpOffTheLedge() {

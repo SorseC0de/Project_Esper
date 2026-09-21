@@ -23,8 +23,8 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-`FighterSpec.baseline` is Melee Fox with a Falco-style dash, a 2.8 burst into a 2.5 run,
-traction 0.25, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
+`FighterSpec.baseline` is Melee Fox with a Falco-style dash, a 2.8 burst into a 3.2 run,
+traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air turned up: air speed 1.6, air acceleration 0.02 + 0.24, a jump with the stick held
 starts at air speed, and a double jump with the stick held sets the sideways speed, so it
 turns around. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
@@ -51,13 +51,14 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   lift. On the way down it's an ordinary air shot.
 - Shoot (without ball, in the air): swat. Reverses the ball if it's in front.
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
-  gravity until the first bounce. The rims don't pull a thrown ball, so scoring off a throw
+  gravity until the first bounce. Up is the floater: a soft drift up at 1.5 with gravity
+  off for 30 frames, carrying the thrower's sideways speed, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
-  leaves it, direction automatic, double jump restored, and the stick doesn't steer for 6
-  frames so the arc clears the wall. A jump press with a wall within 2 units of either side
+  leaves it, direction automatic, the double jump not restored, and the stick doesn't steer
+  for 6 frames so the arc clears the wall. A jump press with a wall within 2 units of either side
   is a wall jump with no cling at all, and for 6 frames after letting go of a wall a press
   still jumps off it. A cling can't start for 8 frames after leaving the ground, and the
   walls above the court's top row can't be clung to or jumped off.
@@ -74,8 +75,8 @@ tuning picker, menu resets.
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
 holds the variants; A is always the baseline as tuned.
 
-- AIR: A baseline. B the stance brakes harder, 0.3 a frame. C direct, the stick is the air
-  speed. D the stance barely brakes. E a 1.8 cap.
+- HEAD: how the detached head follows the body. A closes half the gap each frame. B closes
+  a quarter but leads instead of trailing, the lag reversed along each axis.
 
 ## Look
 
@@ -88,8 +89,11 @@ a cool white for teal, a black line one pixel thick round the body following the
 edge only, and the front arm stroked on its own where it lies over the body. The head is
 split out of every frame and drawn as its own sprite with no line, trailing its place on
 the body by a quarter of the gap each frame and bobbing a pixel, and its fire is released
-into the world so it streams behind a moving head. The loose ball is orange. The library finds
-where the ball and the head sit in each frame so the halo and the fire follow them. The ball pointer
+into the world so it streams behind a moving head. The loose ball is purple, and for 45 frames after a shot, throw or dunk it's the colour
+of whoever let it go, then shifts back over 30. A flying ball leaves a soft additive trail
+in its colour. The library finds where the ball and the head sit in each frame so the halo
+and the fire follow them. The head is drawn at 1.5 times, about its own centre. Three dim
+yellow chevrons stack over a resting ball and light one after another from the top. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off.
 
 ## Glow

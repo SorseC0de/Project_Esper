@@ -409,10 +409,11 @@ final class GameScene: SKScene {
                 let shown = CGPoint(x: (target.x + offset.x).rounded(), y: (target.y + offset.y).rounded() + bob + GameScene.headLift)
                 headNode.isHidden = false
                 headNode.texture = headTexture
-                headNode.size = headTexture.size()
+                // Sized outright rather than scaled, and only ever flipped.
+                headNode.size = CGSize(width: headTexture.size().width * GameScene.headScale, height: headTexture.size().height * GameScene.headScale)
                 headNode.anchorPoint = anchor
-                headNode.xScale = CGFloat(player.facing.sign) * GameScene.headScale
-                headNode.yScale = GameScene.headScale
+                headNode.xScale = CGFloat(player.facing.sign)
+                headNode.yScale = 1
                 headNode.position = shown
                 headFires[index].position = CGPoint(x: shown.x, y: shown.y + 4)
                 headFires[index].particleBirthRate = 24

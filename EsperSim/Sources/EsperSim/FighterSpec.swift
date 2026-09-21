@@ -246,9 +246,12 @@ public enum BallRules {
     /// but before the windup ends and it's a cancel.
     public static let shotWindupFrames = 20
     public static let quickshotFrames = 6
-    /// Frames from the release to the ball leaving the hand, then to acting again.
+    /// Frames from the release to the ball leaving the hand, then to acting again on the
+    /// ground. In the air the body hangs, gravity off, for the hang frames instead, in the
+    /// pose with the leg kick.
     public static let shotReleaseFrames = 5
     public static let shotRecoveryFrames = 10
+    public static let shotHangFrames = 12
     /// Frames after any release before the same player can catch it back.
     public static let catchCooldownFrames = 15
     /// In the air the stance holds the fall to this.

@@ -342,6 +342,24 @@ final class BallTests: XCTestCase {
         XCTAssertGreaterThan(match.ball.velocity.y, preset)
     }
 
+    func testShooterHangsAfterAnAirShot() {
+        var match = matchWithBallHeld()
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        for _ in 0..<BallRules.shotWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        }
+        match.advance(inputs: [PlayerInput(aim: Vec2(x: 0.6, y: 0.8), shoot: true), .idle])
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .shooting)
+        run(&match, frames: BallRules.shotReleaseFrames + 1, input: { _ in .idle })
+        let heightAtRelease = match.players[0].position.y
+        run(&match, frames: BallRules.shotHangFrames - 3, input: { _ in .idle })
+        XCTAssertEqual(match.players[0].state, .shooting)
+        XCTAssertEqual(match.players[0].position.y, heightAtRelease, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].animationFrame.animation, .shootAir)
+        XCTAssertEqual(match.players[0].animationFrame.frame, Animation.shootAir.frameCount - 1)
+    }
+
     func testJumpShotReleasedOnTheWayDownWithoutAFlickIsAFake() {
         var match = matchWithBallHeld()
         for _ in 0..<BallRules.shotWindupFrames + 2 {

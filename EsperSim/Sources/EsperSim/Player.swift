@@ -335,6 +335,10 @@ public struct Player: Equatable {
         case .shooting:
             if grounded {
                 velocity.x = approach(velocity.x, 0, spec.traction)
+            } else if stateTimer > BallRules.shotReleaseFrames {
+                // Hanging after the release, in the pose.
+                velocity.x = approach(velocity.x, 0, spec.stanceAirBrake)
+                velocity.y = 0
             } else {
                 airDrift(.idle)
                 fall(.idle)
@@ -345,7 +349,8 @@ public struct Player: Equatable {
                 let lift = shotLift ? max(velocity.y, 0) : 0
                 action = .releaseShot(velocity: shotVelocity + Vec2(x: 0, y: lift))
                 events.append(.shot(player: index))
-            } else if stateTimer >= BallRules.shotReleaseFrames + BallRules.shotRecoveryFrames {
+            } else if stateTimer >= BallRules.shotReleaseFrames + (grounded ? BallRules.shotRecoveryFrames : BallRules.shotHangFrames) {
+                fastFalling = false
                 enter(grounded ? .idle : .air)
             }
 

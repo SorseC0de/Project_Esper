@@ -98,6 +98,11 @@ final class TouchControls: SKNode {
         pickers.append(picker)
     }
 
+    /// The top picker steps to its next option.
+    func cycleTopPicker() {
+        pickers.first?.selectNext()
+    }
+
     /// Where the next picker would go, so other corner text can sit under them.
     var pickerBottom: CGFloat {
         pickerOrigin.y - CGFloat(pickers.count) * (SegmentedPicker.segmentSize.height + 4)

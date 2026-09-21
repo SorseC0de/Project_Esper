@@ -46,7 +46,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Wall: hold toward a wall in the air to cling, jump to leave. Direction is automatic.
 - Catch is automatic: facing the ball within reach.
 
-Pad: A jump, B or R1 shoot, X or L1 throw, Y taunt, right stick aims a stance.
+Pad: A jump, B or R1 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
+tuning picker, menu resets.
 
 ## Tuning pickers
 

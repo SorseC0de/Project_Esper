@@ -55,6 +55,13 @@ final class SegmentedPicker: SKNode {
         return false
     }
 
+    /// Steps to the next segment, wrapping.
+    func selectNext() {
+        selected = (selected + 1) % segments.count
+        light()
+        onSelect(selected)
+    }
+
     private func light() {
         for (index, segment) in segments.enumerated() {
             segment.fillColor = .init(white: 1, alpha: index == selected ? 0.5 : 0.1)

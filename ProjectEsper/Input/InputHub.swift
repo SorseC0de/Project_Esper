@@ -10,9 +10,11 @@ final class InputHub {
     /// What the on-screen controls hold right now. The scene writes it.
     var touch = PlayerInput.idle
     private(set) var controllers: [GCController] = []
-    /// A pad's menu button went down since the last check.
+    /// A pad's menu button went down since the last check; the left bumper likewise.
     private(set) var resetPressed = false
+    private(set) var cyclePressed = false
     private var menuWasDown = false
+    private var bumperWasDown = false
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -37,6 +39,9 @@ final class InputHub {
         let menuDown = controllers.contains { $0.extendedGamepad?.buttonMenu.isPressed ?? false }
         if menuDown, !menuWasDown { resetPressed = true }
         menuWasDown = menuDown
+        let bumperDown = controllers.contains { $0.extendedGamepad?.leftShoulder.isPressed ?? false }
+        if bumperDown, !bumperWasDown { cyclePressed = true }
+        bumperWasDown = bumperDown
         return (0..<players).map { index in
             let pad = index < controllers.count ? read(controllers[index].extendedGamepad!) : PlayerInput.idle
             return index == 0 ? merge(touch, pad) : pad
@@ -51,7 +56,14 @@ final class InputHub {
         return resetPressed
     }
 
-    /// A: jump. B or the right bumper: shoot. X or the left bumper: throw. Y: taunt.
+    /// True once per left bumper press.
+    func consumeCycle() -> Bool {
+        defer { cyclePressed = false }
+        return cyclePressed
+    }
+
+    /// A: jump. B or the right bumper: shoot. X: throw. Y: taunt. The left bumper steps
+    /// the tuning picker, and the menu button resets.
     /// The right stick aims a stance; failing that, the left stick does.
     private func read(_ pad: GCExtendedGamepad) -> PlayerInput {
         var stick = deadzoned(Vec2(x: Double(pad.leftThumbstick.xAxis.value), y: Double(pad.leftThumbstick.yAxis.value)))
@@ -62,7 +74,7 @@ final class InputHub {
         input.aim = rightStick.length >= BallRules.flickThreshold ? rightStick : stick
         input.jump = pad.buttonA.isPressed
         input.shoot = pad.buttonB.isPressed || pad.rightShoulder.isPressed
-        input.throwBall = pad.buttonX.isPressed || pad.leftShoulder.isPressed
+        input.throwBall = pad.buttonX.isPressed
         input.taunt = pad.buttonY.isPressed
         return input
     }

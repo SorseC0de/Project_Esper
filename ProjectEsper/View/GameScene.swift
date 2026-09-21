@@ -176,6 +176,7 @@ final class GameScene: SKScene {
         hub.touch = controls?.input ?? .idle
         let inputs = hub.frames(players: match.players.count)
         if hub.consumeReset() { reset() }
+        if hub.consumeCycle() { controls?.cycleTopPicker() }
         var steps = 0
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
             match.advance(inputs: inputs)

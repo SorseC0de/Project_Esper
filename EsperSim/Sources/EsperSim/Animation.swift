@@ -93,9 +93,11 @@ extension Player {
         case .land:
             return AnimationFrame(.land, t * 24 / 60)
         case .shootStance:
-            return AnimationFrame(grounded ? .shoot : .shootAir, min(t * 12 / 60, 3))
+            // The ground sheet has one more windup frame before the set pose.
+            return grounded ? AnimationFrame(.shoot, min(t * 12 / 60, 4)) : AnimationFrame(.shootAir, min(t * 12 / 60, 3))
         case .shooting:
-            return AnimationFrame(grounded ? .shoot : .shootAir, 4 + t * 24 / 60)
+            // Both sheets smear the release on frame 6, where the ball leaves.
+            return grounded ? AnimationFrame(.shoot, 4 + t * 24 / 60) : AnimationFrame(.shootAir, 3 + t * 36 / 60)
         case .throwStance:
             return AnimationFrame(.throwForward, min(t * 12 / 60, 4))
         case .throwing:

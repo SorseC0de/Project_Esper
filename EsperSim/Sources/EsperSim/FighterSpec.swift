@@ -101,8 +101,8 @@ public enum BallRules {
     /// Frames from taking the stance to being able to release.
     public static let shotWindupFrames = 20
     /// Frames from the release to the ball leaving the hand, then to acting again.
-    public static let shotReleaseFrames = 10
-    public static let shotRecoveryFrames = 5
+    public static let shotReleaseFrames = 5
+    public static let shotRecoveryFrames = 10
     /// Frames after any release before the same player can catch it back.
     public static let catchCooldownFrames = 15
     /// In the air the stance holds the fall to this.

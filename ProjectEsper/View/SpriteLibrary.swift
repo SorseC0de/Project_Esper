@@ -104,6 +104,7 @@ final class SpriteLibrary {
         _ = texture("ball", 0)
         _ = softGlow(diameter: 32)
         _ = softGlow(diameter: 8)
+        _ = feather()
         _ = symbol("chevron.down", pointSize: 14)
         SKTexture.preload(Array(cache.values), withCompletionHandler: completion)
     }
@@ -227,6 +228,33 @@ final class SpriteLibrary {
             let centre = CGPoint(x: CGFloat(diameter) / 2, y: CGFloat(diameter) / 2)
             context.cgContext.drawRadialGradient(gradient, startCenter: centre, startRadius: 0, endCenter: centre,
                                                  endRadius: CGFloat(diameter) / 2, options: [])
+        }
+        let texture = SKTexture(image: image)
+        texture.filteringMode = .linear
+        cache[key] = texture
+        return texture
+    }
+
+    /// A soft white feather: a petal, bright down the middle and clear at the edges.
+    func feather() -> SKTexture {
+        let key = "feather"
+        if let texture = cache[key] { return texture }
+        let width = 12, height = 36
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format)
+        let image = renderer.image { context in
+            let cg = context.cgContext
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: width / 2, y: 0))
+            path.addQuadCurve(to: CGPoint(x: width / 2, y: height), control: CGPoint(x: width + 2, y: height / 2))
+            path.addQuadCurve(to: CGPoint(x: width / 2, y: 0), control: CGPoint(x: -2, y: height / 2))
+            cg.addPath(path)
+            cg.clip()
+            let colours = [SKColor.white.cgColor, SKColor.white.withAlphaComponent(0).cgColor] as CFArray
+            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colours, locations: [0, 1])!
+            let centre = CGPoint(x: CGFloat(width) / 2, y: CGFloat(height) / 2)
+            cg.drawRadialGradient(gradient, startCenter: centre, startRadius: 0, endCenter: centre, endRadius: CGFloat(height) / 2, options: [])
         }
         let texture = SKTexture(image: image)
         texture.filteringMode = .linear

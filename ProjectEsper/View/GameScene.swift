@@ -33,6 +33,7 @@ final class GameScene: SKScene {
     /// The glow on the ball in each player's hands, and the fire off each head.
     private var handHalos: [SKSpriteNode] = []
     private var headFires: [SKEmitterNode] = []
+    private var wings: [Wing] = []
     private var ballNode = SKSpriteNode()
     private var ballHalo = SKSpriteNode()
     private var ballTrail = SKEmitterNode()
@@ -131,6 +132,10 @@ final class GameScene: SKScene {
             fire.targetNode = world
             world.addChild(fire)
             headFires.append(fire)
+            let wing = Wing(colour: colour, texture: sprites.feather())
+            wing.zPosition = 17
+            world.addChild(wing)
+            wings.append(wing)
         }
 
         ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
@@ -337,6 +342,8 @@ final class GameScene: SKScene {
             case .caught(let index):
                 let player = match.players[index]
                 spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left)
+            case .doubleJumped(let index):
+                wings[index].sweep()
             case .shot(let index), .thrown(let index), .dunked(let index):
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
                 ballHold = BallLook.holdFrames
@@ -384,6 +391,11 @@ final class GameScene: SKScene {
             node.anchorPoint = sprites.anchor(for: frame.animation)
             node.position = SpriteLibrary.point(player.position)
             node.xScale = CGFloat(player.facing.sign)
+
+            // The wing hangs off the shoulder, behind, and flaps while the body runs.
+            let wing = wings[index]
+            wing.position = CGPoint(x: node.position.x - CGFloat(player.facing.sign) * 3, y: node.position.y + 17)
+            wing.step(running: player.state == .run || player.state == .dash, facing: CGFloat(player.facing.sign))
 
             let halo = handHalos[index]
             if player.hasBall, let inHand = sprites.landmark(.ball, in: frame, player: index) {

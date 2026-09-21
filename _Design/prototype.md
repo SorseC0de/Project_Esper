@@ -38,7 +38,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   always faces the opponent whichever way it goes, so it can back off or dribble between
   the legs while staring them down. Only a dash turns the body.
 - Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. Down while
-  falling is a fast fall, except with the ball, where down is the aim.
+  falling is a fast fall, except while holding throw with the ball, where down is the aim.
 - Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap, or
   letting go before the 20-frame windup ends, is the quickshot: it fires on the preset 53°
   arc when the windup ends. Holding past the windup and releasing without a flick is the

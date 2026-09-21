@@ -100,13 +100,21 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].velocity.y, -match.players[0].spec.fastFallSpeed, accuracy: 0.001)
     }
 
-    func testBallCarrierDoesNotFastFall() {
+    func testCarrierFastFallsUnlessHoldingThrow() {
         var match = Match()
         match.players[0].hasBall = true
         match.ball.holder = 0
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.players[0].fastFalling || $0.players[0].grounded }
-        XCTAssertFalse(match.players[0].fastFalling)
+        XCTAssertTrue(match.players[0].fastFalling)
+
+        var aiming = Match()
+        aiming.players[0].hasBall = true
+        aiming.ball.holder = 0
+        run(&aiming, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&aiming, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true) }) { $0.players[0].fastFalling || $0.players[0].grounded }
+        XCTAssertFalse(aiming.players[0].fastFalling)
+        XCTAssertEqual(aiming.players[0].state, .throwStance)
     }
 
     func testWallLandThenWallJump() {

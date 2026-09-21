@@ -427,8 +427,10 @@ public struct Player: Equatable {
         }
     }
 
+    /// Gravity, and the fast fall. With the ball, down is the aim for a throw or a shot, so
+    /// the carrier never fast falls.
     private mutating func fall(_ input: PlayerInput) {
-        if !fastFalling, velocity.y <= 0, input.stick.y < -0.65 {
+        if !fastFalling, !hasBall, velocity.y <= 0, input.stick.y < -0.65 {
             fastFalling = true
             velocity.y = -spec.fastFallSpeed
         }

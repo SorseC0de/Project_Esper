@@ -46,6 +46,8 @@ public struct FighterSpec: Equatable {
     /// Frames after leaving the ground before a cling can start, so a jump beside a wall
     /// isn't caught by it on the way up.
     public var wallLandGroundLockoutFrames = 8
+    /// Sideways speed lost per frame in an airborne stance.
+    public var stanceAirBrake = 0.01
 
     /// Body box: full width and height, feet at the position.
     public var bodyWidth: Double
@@ -196,15 +198,14 @@ public struct FighterSpec: Equatable {
 }
 
 extension FighterSpec {
-    /// The body the game is tuned on: Fox with a harder dash burst and a run halfway between
-    /// Falcon's 2.3 and Sonic's 3.7 (Brawl Sonic over Brawl Falcon carried onto Melee), more
-    /// traction, and air control turned up so a jump starts at air speed and turns in about
-    /// five frames.
+    /// The body the game is tuned on: Fox with a Falco-style dash, a 3.0 burst into a 2.5 run,
+    /// more traction, and air control turned up so a jump starts at air speed and turns in
+    /// about five frames.
     public static let baseline: FighterSpec = {
         var spec = meleeFox
         spec.name = "Baseline"
-        spec.dashInitialVelocity = 2.5
-        spec.runSpeed = 3.0
+        spec.dashInitialVelocity = 3.0
+        spec.runSpeed = 2.5
         spec.traction = 0.15
         spec.airSpeedMax = 1.4
         spec.airAccelerationAdditional = 0.24

@@ -446,7 +446,7 @@ public struct Player: Equatable {
         if grounded {
             velocity.x = approach(velocity.x, 0, spec.traction)
         } else {
-            velocity.x = approach(velocity.x, 0, spec.airFriction / 3)
+            velocity.x = approach(velocity.x, 0, spec.stanceAirBrake)
             if velocity.y <= 0 {
                 velocity.y = -BallRules.stanceFallSpeed
             } else {

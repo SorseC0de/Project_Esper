@@ -296,3 +296,22 @@ public enum BallRules {
     /// Frames after a score before the ball comes back to centre.
     public static let respawnFrames = 90
 }
+
+/// Web Water's numbers.
+public enum WebRules {
+    /// The swing's anchor sits this far ahead at the top of the court, the arc takes this
+    /// long, and ends this much past the mirrored angle so the body comes out higher.
+    public static let swingReach = 35.0
+    public static let swingFrames = 24
+    public static let swingOvershoot = 1.15
+    /// The shot reaches this far, reels at this speed, can't repeat for this long, and a
+    /// miss shows for this many frames.
+    public static let shotRange = 120.0
+    public static let pullSpeed = 5.0
+    public static let shotCooldownFrames = 30
+    public static let missFrames = 8
+    /// A pulled body is dropped this far in front of the shooter's chest, and any pull
+    /// gives up after this many frames.
+    public static let dropDistance = 12.0
+    public static let pullMaxFrames = 40
+}

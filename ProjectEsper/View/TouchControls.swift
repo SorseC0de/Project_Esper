@@ -132,9 +132,9 @@ final class TouchControls: SKNode {
         sliders.append(slider)
     }
 
-    /// The top picker steps to its next option.
+    /// The newest picker steps to its next option.
     func cycleTopPicker() {
-        pickers.first?.selectNext()
+        pickers.last?.selectNext()
     }
 
     /// Where the next picker would go, so other corner text can sit under them.

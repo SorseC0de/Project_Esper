@@ -16,6 +16,8 @@ public enum MatchEvent: Equatable {
     case scored(player: Int, hoop: Int)
     case ballBounced(position: Vec2)
     case ballRespawned
+    case webSwung(player: Int)
+    case webShot(player: Int, hit: Bool)
 }
 
 /// What a player's step asks the match to do with the ball.
@@ -24,4 +26,5 @@ public enum PlayerAction: Equatable {
     case releaseThrow(velocity: Vec2)
     case dunk(hoop: Int)
     case swat
+    case webShot(direction: Vec2)
 }

@@ -14,6 +14,20 @@ enum HeadVariant: Int, CaseIterable {
     var reversedAcross: Bool { self == .b }
 }
 
+/// The powers on the picker. A is none.
+enum PowerVariant: Int, CaseIterable {
+    case none, webWater
+
+    var label: String { ["A", "B"][rawValue] }
+
+    var power: Power {
+        switch self {
+        case .none: .none
+        case .webWater: .webWater
+        }
+    }
+}
+
 /// The glow, as GameMaker's Glow filter had it: what counts as bright, how soft the cut is,
 /// how far it spreads, how strong it comes back, and its colour.
 enum GlowSettings {

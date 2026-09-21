@@ -1,11 +1,33 @@
 import Foundation
 
+/// A power. Each one takes over parts of the controls, and less of it is available with
+/// the ball in hand.
+public enum Power: Equatable, Hashable {
+    case none
+    case webWater
+}
+
+/// What a web line runs to.
+public enum WebTarget: Equatable {
+    case point(Vec2)
+    case ball
+    case opponent
+}
+
+public struct WebLine: Equatable {
+    public var target: WebTarget
+    /// Frames left to show, for a line to nothing; a pull's line lasts as long as the pull.
+    public var frames: Int
+}
+
 public enum PlayerState: Equatable, Hashable {
     case idle, walk, dash, run, pivot
     case jumpSquat, air, wallLand, land
     case shootStance, shooting
     case throwStance, throwing, dunking
     case catching, swatting, taunt
+    /// Web Water: swinging under a web, reeling to a wall, and being reeled by the other.
+    case webSwing, webPull, webbed
 
     public var isGroundState: Bool {
         switch self {
@@ -17,7 +39,7 @@ public enum PlayerState: Equatable, Hashable {
     /// States a ball can be caught out of.
     public var canCatch: Bool {
         switch self {
-        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand: true
+        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull: true
         default: false
         }
     }
@@ -72,6 +94,20 @@ public struct Player: Equatable {
     public var catchStance = false
     /// The sideways speed when the throw stance began; the floater carries it.
     public var throwStanceEntrySpeed = 0.0
+
+    public var power = Power.none
+    /// The swing's web, while swinging: where it's anchored, and the arc.
+    public var webAnchor: Vec2?
+    private var swingLength = 0.0
+    private var swingStartAngle = 0.0
+    private var swingEndAngle = 0.0
+    /// A shot's web, for drawing.
+    public var webLine: WebLine?
+    public var webShotCooldown = 0
+    /// Where a reel is taking this body.
+    public var pullTarget: Vec2?
+    /// Frames the shot's pose shows.
+    public var webShotPose = 0
     public var swatCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
@@ -131,6 +167,11 @@ public struct Player: Equatable {
         stateTimer += 1
         if catchCooldown > 0 { catchCooldown -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
+        if webShotCooldown > 0 { webShotCooldown -= 1 }
+        if webShotPose > 0 { webShotPose -= 1 }
+        if let line = webLine, case .point = line.target, state != .webPull {
+            webLine = line.frames > 1 ? WebLine(target: line.target, frames: line.frames - 1) : nil
+        }
         if wallGrace > 0 { wallGrace -= 1 }
         if airControlLock > 0 { airControlLock -= 1 }
         if coyote > 0 { coyote -= 1 }
@@ -149,6 +190,9 @@ public struct Player: Equatable {
         let tauntPressed = input.taunt && !lastInput.taunt
         let smash = abs(input.stick.x) >= spec.dashThreshold && stickAwayFrames <= 3
         var action: PlayerAction?
+        if state == .idle || state == .walk || state == .run || state == .dash || state == .air || state == .land {
+            action = webShotIfAsked(input, throwPressed: throwPressed)
+        }
 
         switch state {
         case .idle:
@@ -264,7 +308,11 @@ public struct Player: Equatable {
                 velocity = .zero
                 enter(.wallLand)
             } else if jumpPressed, jumpsLeft > 0 {
-                doubleJump(input, events: &events)
+                if power == .webWater {
+                    startWebSwing(in: stage, events: &events)
+                } else {
+                    doubleJump(input, events: &events)
+                }
             } else if hasBall, input.shoot, shootReady {
                 enterShootStance()
             } else if hasBall, input.throwBall, throwReady {
@@ -437,9 +485,39 @@ public struct Player: Equatable {
             if stateTimer >= 44 {
                 enter(.idle)
             }
+
+        case .webSwing:
+            // A pendulum under the anchor, from behind it to past the mirrored angle.
+            guard let anchor = webAnchor else { enter(.air); break }
+            let t = Double(stateTimer) / Double(WebRules.swingFrames)
+            let angle = swingStartAngle + (swingEndAngle - swingStartAngle) * (1 - cos(.pi * t)) / 2
+            let target = anchor + Vec2(x: sin(angle), y: -cos(angle)) * swingLength
+            velocity = target - position
+            if stateTimer >= WebRules.swingFrames {
+                webAnchor = nil
+                enter(.air)
+            }
+
+        case .webPull, .webbed:
+            // Reeled straight at the target, dropped there or wherever it gets stuck.
+            guard let target = pullTarget else { enter(grounded ? .idle : .air); break }
+            let gap = target - position
+            velocity = gap.length <= WebRules.pullSpeed ? gap : gap.normalized * WebRules.pullSpeed
+            if gap.length <= 1 || stateTimer >= WebRules.pullMaxFrames {
+                endPull()
+            }
         }
 
         move(in: stage)
+        if state == .webSwing, let anchor = webAnchor {
+            let t = Double(stateTimer) / Double(WebRules.swingFrames)
+            let angle = swingStartAngle + (swingEndAngle - swingStartAngle) * (1 - cos(.pi * t)) / 2
+            let target = anchor + Vec2(x: sin(angle), y: -cos(angle)) * swingLength
+            if position.distance(to: target) > 1 {
+                webAnchor = nil
+                enter(.air)
+            }
+        }
         settle(input, events: &events)
         lastInput = input
         return action
@@ -466,6 +544,16 @@ public struct Player: Equatable {
         return true
     }
 
+    /// Web Water's shot, on the throw button with no ball: along the stick, or forward.
+    private mutating func webShotIfAsked(_ input: PlayerInput, throwPressed: Bool) -> PlayerAction? {
+        guard power == .webWater, !hasBall, throwPressed, webShotCooldown == 0 else { return nil }
+        webShotCooldown = WebRules.shotCooldownFrames
+        webShotPose = 8
+        let direction = input.stick == .zero ? Vec2(x: facing.sign, y: 0) : input.stick.normalized
+        if direction.x != 0 { facing = direction.x > 0 ? .right : .left }
+        return .webShot(direction: direction)
+    }
+
     private mutating func enterShootStance() {
         shotAim = .zero
         quickShot = false
@@ -487,6 +575,48 @@ public struct Player: Equatable {
         shotLift = jumpShot && velocity.y > 0
         if shotAim == .zero { shotAim = presetAim }
         enter(.shooting)
+    }
+
+    /// Web Water's swing: a web to the top of the court ahead, air movement halted, the
+    /// double jump spent.
+    private mutating func startWebSwing(in stage: Stage, events: inout [MatchEvent]) {
+        jumpBuffer = 0
+        jumpsLeft -= 1
+        fastFalling = false
+        let anchor = Vec2(x: position.x + WebRules.swingReach * facing.sign, y: stage.height)
+        let offset = position - anchor
+        swingLength = offset.length
+        swingStartAngle = atan2(offset.x, -offset.y)
+        swingEndAngle = -swingStartAngle * WebRules.swingOvershoot
+        webAnchor = anchor
+        velocity = .zero
+        events.append(.webSwung(player: index))
+        enter(.webSwing)
+    }
+
+    /// Reeled to `target`, by a wall of one's own or by the other's web.
+    public mutating func startPull(to target: Vec2, byOther: Bool) {
+        pullTarget = target
+        velocity = .zero
+        fastFalling = false
+        if state == .webSwing { webAnchor = nil }
+        enter(byOther ? .webbed : .webPull)
+    }
+
+    private mutating func endPull() {
+        pullTarget = nil
+        if state == .webPull { webLine = nil }
+        velocity = .zero
+        enter(grounded ? .idle : .air)
+    }
+
+    /// The ball taken off this body by a web.
+    public mutating func loseBall() {
+        hasBall = false
+        catchCooldown = BallRules.catchCooldownFrames
+        if inStance || state == .shooting || state == .throwing || state == .dunking {
+            enter(grounded ? .idle : .air)
+        }
     }
 
     /// The preset arc, forward at the default angle.
@@ -611,6 +741,10 @@ public struct Player: Equatable {
             case .air, .wallLand:
                 events.append(.landed(player: index))
                 enter(.land)
+            case .webSwing:
+                webAnchor = nil
+                events.append(.landed(player: index))
+                enter(.land)
             default:
                 break
             }
@@ -621,9 +755,11 @@ public struct Player: Equatable {
         }
     }
 
-    /// The match hands the ball over. Catching stops the body on the ground.
+    /// The match hands the ball over. Catching stops the body on the ground; caught
+    /// mid-swing, the swing carries on with it.
     public mutating func catchBall() {
         hasBall = true
+        if state == .webSwing { return }
         if grounded { velocity = .zero }
         enter(.catching)
     }

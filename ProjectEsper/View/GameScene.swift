@@ -21,6 +21,7 @@ final class GameScene: SKScene {
 
     private var match = Match()
     private var headVariant = HeadVariant.b
+    private var powerVariant = PowerVariant.none
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
@@ -43,6 +44,9 @@ final class GameScene: SKScene {
     private var handHalos: [SKSpriteNode] = []
     private var headFires: [SKEmitterNode] = []
     private var wings: [Wing] = []
+    /// Each player's webs: the swing's and the shot's.
+    private var swingWebs: [SKShapeNode] = []
+    private var shotWebs: [SKShapeNode] = []
     private var ballNode = SKSpriteNode()
     private var ballHalo = SKSpriteNode()
     private var ballTrail = SKEmitterNode()
@@ -184,6 +188,17 @@ final class GameScene: SKScene {
             fire.targetNode = glowers
             glowers.addChild(fire)
             headFires.append(fire)
+            for webs in [\GameScene.swingWebs, \GameScene.shotWebs] {
+                let web = SKShapeNode()
+                web.strokeColor = colour
+                web.lineWidth = 3
+                web.lineCap = .round
+                web.blendMode = .add
+                web.zPosition = 0
+                web.isHidden = true
+                glowers.addChild(web)
+                self[keyPath: webs].append(web)
+            }
         }
         // The wings are parked: `Wing.swift` stays, nothing is added to the scene.
 
@@ -377,6 +392,10 @@ final class GameScene: SKScene {
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
             self?.headVariant = HeadVariant(rawValue: index)!
         }
+        controls.addPicker(title: "POWER", options: PowerVariant.allCases.map(\.label), selected: powerVariant.rawValue) { [weak self] index in
+            self?.powerVariant = PowerVariant(rawValue: index)!
+            self?.applyPower()
+        }
         controls.addSlider(title: "GLOW THRESHOLD", range: 0.2...1.0, notch: 0.1, value: GlowSettings.threshold) { value in
             GlowSettings.threshold = value
         }
@@ -421,6 +440,14 @@ final class GameScene: SKScene {
         ballTeam = SKColor(rgb: BallLook.neutral)
         ballHold = 0
         ballShift = 0
+        applyPower()
+    }
+
+    /// The picker's power onto both players, live.
+    private func applyPower() {
+        for index in match.players.indices {
+            match.players[index].power = powerVariant.power
+        }
     }
 
     private func show(_ events: [MatchEvent]) {
@@ -493,6 +520,13 @@ final class GameScene: SKScene {
         }
     }
 
+    private func line(from a: CGPoint, to b: CGPoint) -> CGPath {
+        let path = CGMutablePath()
+        path.move(to: a)
+        path.addLine(to: b)
+        return path
+    }
+
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool) {
         glowers.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped))
     }
@@ -558,6 +592,31 @@ final class GameScene: SKScene {
             } else {
                 headNode.isHidden = true
                 headFires[index].particleBirthRate = 0
+            }
+        }
+
+        // The webs: a swing's from its anchor, a shot's to whatever it holds.
+        for (index, player) in match.players.enumerated() {
+            let chest = SpriteLibrary.point(player.chest)
+            let swing = swingWebs[index]
+            if let anchor = player.webAnchor {
+                swing.isHidden = false
+                swing.path = line(from: SpriteLibrary.point(anchor), to: chest)
+            } else {
+                swing.isHidden = true
+            }
+            let shot = shotWebs[index]
+            if let web = player.webLine {
+                let end: CGPoint
+                switch web.target {
+                case .point(let point): end = SpriteLibrary.point(point)
+                case .ball: end = SpriteLibrary.point(match.ball.position)
+                case .opponent: end = SpriteLibrary.point(match.players[1 - index].chest)
+                }
+                shot.isHidden = false
+                shot.path = line(from: chest, to: end)
+            } else {
+                shot.isHidden = true
             }
         }
 

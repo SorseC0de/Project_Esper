@@ -604,3 +604,100 @@ final class BallTests: XCTestCase {
         return frames
     }
 }
+
+final class WebWaterTests: XCTestCase {
+    private func webbed() -> Match {
+        var match = Match()
+        match.players[0].power = .webWater
+        match.players[1].power = .webWater
+        return match
+    }
+
+    @discardableResult
+    private func run(_ match: inout Match, frames: Int, input: (Int) -> PlayerInput, other: PlayerInput = .idle, until stop: ((Match) -> Bool)? = nil) -> Int {
+        for frame in 0..<frames {
+            match.advance(inputs: [input(frame), other])
+            if let stop, stop(match) { return frame }
+        }
+        return frames
+    }
+
+    func testDoubleJumpIsASwingThatComesOutHigherAndForward() {
+        var match = webbed()
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 10, input: { _ in .idle })
+        let halt = match.players[0].position
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertEqual(match.players[0].state, .webSwing)
+        XCTAssertNotNil(match.players[0].webAnchor)
+        XCTAssertEqual(match.players[0].jumpsLeft, 0)
+        var lowest = halt.y
+        run(&match, frames: WebRules.swingFrames + 1, input: { _ in .idle }) { match in
+            lowest = min(lowest, match.players[0].position.y)
+            return match.players[0].state != .webSwing
+        }
+        XCTAssertEqual(match.players[0].state, .air)
+        XCTAssertLessThan(lowest, halt.y, "the swing should dip under the anchor first")
+        XCTAssertGreaterThan(match.players[0].position.y, halt.y, "and come out higher than it halted")
+        XCTAssertGreaterThan(match.players[0].position.x, halt.x)
+        XCTAssertGreaterThan(match.players[0].velocity.x, 0)
+    }
+
+    func testWebShotReelsInALooseBall() {
+        var match = webbed()
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: 60, y: 0))
+        match.ball.velocity = .zero
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertEqual(match.ball.tether, 0)
+        XCTAssertTrue(match.events.contains(.webShot(player: 0, hit: true)))
+        run(&match, frames: 30, input: { _ in .idle }) { $0.ball.holder != nil }
+        XCTAssertEqual(match.ball.holder, 0)
+        XCTAssertNil(match.players[0].webLine)
+    }
+
+    func testWebShotTakesTheBallOffTheOpponent() {
+        var match = webbed()
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position.x = match.players[0].position.x + 50
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertFalse(match.players[1].hasBall)
+        XCTAssertEqual(match.ball.tether, 0)
+        run(&match, frames: 30, input: { _ in .idle }) { $0.ball.holder != nil }
+        XCTAssertEqual(match.ball.holder, 0)
+    }
+
+    func testWebShotDragsTheOpponentInFront() {
+        var match = webbed()
+        match.players[1].position.x = match.players[0].position.x + 60
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertEqual(match.players[1].state, .webbed)
+        run(&match, frames: WebRules.pullMaxFrames + 2, input: { _ in .idle }) { $0.players[1].state != .webbed }
+        XCTAssertNotEqual(match.players[1].state, .webbed)
+        XCTAssertEqual(match.players[1].position.x, match.players[0].position.x + WebRules.dropDistance, accuracy: 1.5)
+    }
+
+    func testWebShotAtAWallReelsTheShooterToIt() {
+        var match = webbed()
+        match.players[0].position = Vec2(x: 60, y: 10)
+        match.players[0].facing = .left
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .webPull)
+        run(&match, frames: WebRules.pullMaxFrames + 2, input: { _ in .idle }) { $0.players[0].state != .webPull }
+        XCTAssertLessThan(match.players[0].body.min.x, 16, "should end up against the left wall")
+    }
+
+    func testNoPowerNoWebAndTheBallStillThrows() {
+        var plain = Match()
+        plain.ball.respawn(at: plain.players[0].chest + Vec2(x: 60, y: 0))
+        plain.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertNil(plain.ball.tether)
+        XCTAssertFalse(plain.events.contains { if case .webShot = $0 { return true } else { return false } })
+
+        var match = webbed()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .throwStance)
+    }
+}

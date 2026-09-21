@@ -14,6 +14,8 @@ public struct Ball: Equatable {
     public var thrown = false
     /// Who released or swatted it last.
     public var lastTouched: Int?
+    /// Reeled in by a web: the player pulling it.
+    public var tether: Int?
     public var resting = false
     /// Counting down to the respawn after a score, 0 when live.
     public var respawnTimer = 0
@@ -154,6 +156,7 @@ public struct Ball: Equatable {
         straight = false
         floater = 0
         thrown = false
+        tether = nil
         lastTouched = nil
         resting = false
         respawnTimer = 0

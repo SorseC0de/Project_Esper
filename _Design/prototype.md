@@ -74,6 +74,22 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
 tuning picker, menu resets.
 
+## Powers
+
+Each power takes over parts of the controls, and less of it is available with the ball
+in hand: that's where tricking lives, throwing the ball away to use the power while it's
+in the air, catching it, carrying on. On the POWER picker, A is none.
+
+- Web Water (B). Double jump is the web swing: air movement halts, a web goes to the top
+  of the court 35 units ahead, and the body swings under it on a pendulum arc past the
+  mirrored angle, so it dips, then lets go higher than it stopped with the arc's speed. It
+  spends the double jump and works with the ball. The throw button without the ball is the
+  web shot: a line along the stick from the chest, 120 units, and the first thing it meets
+  wins. A loose ball is reeled in and caught whatever its speed or facing. The opponent
+  holding the ball loses it to the reel. The opponent without it is reeled to 12 units in
+  front of the shooter and dropped. A wall or block reels the shooter to it. With the ball
+  the throw button is the ordinary throw. Numbers in `WebRules`.
+
 ## Tuning pickers
 
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
@@ -81,6 +97,7 @@ holds the variants; A is always the baseline as tuned.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
+- POWER: A none, B Web Water. The left bumper steps this one.
 
 ## Look
 

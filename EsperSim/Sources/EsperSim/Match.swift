@@ -30,7 +30,13 @@ public struct Match: Equatable {
             perform(action, by: index)
         }
 
-        if ball.isLive {
+        for index in players.indices where players[index].webLine?.target == .opponent {
+            let other = players.indices.first { $0 != index }
+            if let other, players[other].state != .webbed { players[index].webLine = nil }
+        }
+        reelBall()
+
+        if ball.isLive, ball.tether == nil {
             let bodies = players.filter { $0.catchCooldown == 0 }.map(\.body)
             if let hoop = ball.step(stage: stage, bodies: bodies, events: &events) {
                 let owner = stage.hoops[hoop].owner
@@ -71,6 +77,8 @@ public struct Match: Equatable {
             }
         case .dunk(let hoop):
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
+        case .webShot(let direction):
+            webShot(from: index, direction: direction)
         case .swat:
             if ball.isLive, player.canSwat(ballAt: ball.position) {
                 ball.velocity = -ball.velocity
@@ -80,6 +88,87 @@ public struct Match: Equatable {
             } else {
                 events.append(.swatted(player: index, hit: false))
             }
+        }
+    }
+
+    /// Web Water's shot: the first thing along the line wins. A loose ball is reeled in; the
+    /// other with the ball loses it to the reel; the other without it is reeled to a spot in
+    /// front; a wall reels the shooter to it.
+    private mutating func webShot(from index: Int, direction: Vec2) {
+        let shooter = players[index]
+        let origin = shooter.chest
+        let opponent = players.indices.first { $0 != index }
+        var hit = false
+        var travelled = 0.0
+        while travelled <= WebRules.shotRange {
+            let point = origin + direction * travelled
+            if stage.overlapsSolid(Box(center: point, width: 1, height: 1)) {
+                let landing = origin + direction * max(travelled - 4, 0)
+                players[index].startPull(to: landing, byOther: false)
+                players[index].webLine = WebLine(target: .point(point), frames: WebRules.pullMaxFrames)
+                hit = true
+                break
+            }
+            if ball.isLive, ball.position.distance(to: point) <= BallRules.radius + 2 {
+                ball.tether = index
+                ball.thrown = false
+                players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
+                hit = true
+                break
+            }
+            if let opponent, players[opponent].body.overlaps(Box(center: point, width: 1, height: 1)) {
+                if players[opponent].hasBall {
+                    players[opponent].loseBall()
+                    ball.holder = nil
+                    ball.position = players[opponent].chest
+                    ball.velocity = .zero
+                    ball.tether = index
+                    players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
+                } else {
+                    let drop = Vec2(x: shooter.position.x + shooter.facing.sign * WebRules.dropDistance, y: shooter.position.y)
+                    players[opponent].startPull(to: drop, byOther: true)
+                    players[index].webLine = WebLine(target: .opponent, frames: WebRules.pullMaxFrames)
+                }
+                hit = true
+                break
+            }
+            travelled += 2
+        }
+        if !hit {
+            players[index].webLine = WebLine(target: .point(origin + direction * WebRules.shotRange), frames: WebRules.missFrames)
+        }
+        events.append(.webShot(player: index, hit: hit))
+    }
+
+    /// A tethered ball comes straight to its puller and is caught on arrival, whatever its
+    /// speed or the puller's facing.
+    private mutating func reelBall() {
+        guard let puller = ball.tether, ball.holder == nil else { return }
+        let target = players[puller].chest
+        let gap = target - ball.position
+        if gap.length <= BallRules.catchRadius, !players[puller].hasBall {
+            players[puller].catchBall()
+            ball.holder = puller
+            ball.straight = false
+            ball.thrown = false
+            ball.tether = nil
+            ball.resting = false
+            players[puller].webLine = nil
+            events.append(.caught(player: puller))
+        } else if players[puller].hasBall {
+            ball.tether = nil
+            players[puller].webLine = nil
+        } else {
+            ball.velocity = gap.normalized * WebRules.pullSpeed
+            ball.position += ball.velocity
+        }
+    }
+
+    /// The other side's web let go of whoever it had, if the puller's line is gone.
+    private mutating func releasePulls() {
+        for index in players.indices where players[index].state == .webbed {
+            let puller = players.indices.first { $0 != index }
+            if let puller, players[puller].webLine == nil { players[index].pullTarget = nil }
         }
     }
 

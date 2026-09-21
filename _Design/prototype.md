@@ -70,6 +70,13 @@ holds the variants; A is always the baseline as tuned.
 - AIR: A baseline. B the stance brakes harder, 0.3 a frame. C direct, the stick is the air
   speed. D the stance barely brakes. E a 1.8 cap.
 
+## Look
+
+`Art/PlayerPalette.swift` names the figure's eleven parts and the flat colour each is
+painted on the sheets. A `Look` maps parts to colours and the sprite library recolours
+each frame once as it's used. `Look.plain` is back limbs grey, the rest white. The ball
+is painted white and plays orange, with an additive halo under it for the glow.
+
 ## Glow
 
 `GlowSettings` in `Tuning.swift`: luminance threshold, softness of the cut, blur passes at

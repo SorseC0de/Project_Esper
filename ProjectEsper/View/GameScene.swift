@@ -26,10 +26,6 @@ final class GameScene: SKScene {
     private var previewNodes: [SKShapeNode] = []
     private let scoreLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
-    /// Debug: where the last touch landed in the HUD's space, and the numbers behind it.
-    private let touchMarker = SKShapeNode(circleOfRadius: 4)
-    private var touchReport = ""
-    private var displayScale: CGFloat = 1
     private var lastTime: TimeInterval?
     private var accumulator = 0.0
     private var built = false
@@ -79,6 +75,8 @@ final class GameScene: SKScene {
             let rim = SKSpriteNode(texture: sprites.texture("hoop_rim", 0))
             rim.position = SpriteLibrary.point(hoop.position)
             rim.zPosition = 5
+            // The sheet draws the rim with its backboard on the right.
+            rim.xScale = hoop.backboard == .left ? -1 : 1
             world.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
@@ -95,6 +93,13 @@ final class GameScene: SKScene {
         ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
         ballNode.zPosition = 25
         world.addChild(ballNode)
+        // A soft orange halo added under the ball, which the glow pass then picks up.
+        let halo = SKShapeNode(circleOfRadius: 9)
+        halo.fillColor = SKColor(red: 1, green: 0.5, blue: 0.1, alpha: 0.35)
+        halo.strokeColor = .clear
+        halo.blendMode = .add
+        halo.zPosition = -1
+        ballNode.addChild(halo)
         pointerNode = SKSpriteNode(texture: sprites.texture("ball_pointer", 0))
         pointerNode.zPosition = 25
         world.addChild(pointerNode)
@@ -113,11 +118,6 @@ final class GameScene: SKScene {
         debugLabel.numberOfLines = 0
         hud.addChild(debugLabel)
 
-        touchMarker.strokeColor = .red
-        touchMarker.lineWidth = 1
-        touchMarker.zPosition = 200
-        touchMarker.isHidden = true
-        hud.addChild(touchMarker)
     }
 
     /// The rim's net, as GMS2 built it: six columns, five rows, tapering to half width.
@@ -152,7 +152,6 @@ final class GameScene: SKScene {
 
     /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
     private func layout(displayScale screenScale: CGFloat) {
-        displayScale = screenScale
         let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
@@ -283,9 +282,9 @@ final class GameScene: SKScene {
 
         scoreLabel.text = "\(match.scores[0])  -  \(match.scores[1])"
         let p = match.players[0]
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@\n%@",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", touchReport)
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "")
     }
 
     // MARK: Touches, from the Metal view in points
@@ -296,13 +295,7 @@ final class GameScene: SKScene {
     }
 
     func touchBegan(_ touch: UITouch, at point: CGPoint, viewSize: CGSize) {
-        let hudPoint = hudPoint(point, viewSize: viewSize)
-        touchMarker.position = hudPoint
-        touchMarker.isHidden = false
-        touchReport = String(format: "touch %.0f,%.0f pt -> hud %.0f,%.0f | view %.0fx%.0f scene %.0fx%.0f scale %.2f cam %.3f",
-                             point.x, point.y, hudPoint.x, hudPoint.y, viewSize.width, viewSize.height,
-                             size.width, size.height, displayScale, cameraNode.xScale)
-        controls?.began(touch, at: hudPoint)
+        controls?.began(touch, at: hudPoint(point, viewSize: viewSize))
     }
 
     func touchMoved(_ touch: UITouch, to point: CGPoint, viewSize: CGSize) {

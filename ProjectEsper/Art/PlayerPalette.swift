@@ -65,21 +65,24 @@ struct Look: Hashable {
     /// Parts also outlined where they lie over the rest of the body, so they read on their own.
     var strokedParts: Set<BodyPart> = []
 
-    /// Back limbs grey, the rest white, the head and the ball in the team colour, a black
-    /// line round it all, and the front arm stroked on its own.
-    static func team(_ glow: RGB) -> Look {
+    /// Back limbs grey, the rest in the body white, the head and the ball in the team
+    /// colour, a black line round the body, and the front arm stroked on its own. The head
+    /// is drawn apart from the body, with no line.
+    static func team(_ glow: RGB, body: RGB) -> Look {
         var colours: [BodyPart: RGB] = [:]
         for part in BodyPart.allCases {
-            colours[part] = part.glows ? glow : (part.isBack ? 0x808080 : 0xFFFFFF)
+            colours[part] = part.glows ? glow : (part.isBack ? 0x808080 : body)
         }
         return Look(colours: colours, glow: glow, strokedParts: [.frontArm, .frontHand])
     }
 
     static let orange: RGB = 0xF47E1B
     static let teal: RGB = 0x5FCDE4
+    static let warmWhite: RGB = 0xFFF3E0
+    static let coolWhite: RGB = 0xE3F4FF
 
-    static let playerOne = team(orange)
-    static let playerTwo = team(teal)
+    static let playerOne = team(orange, body: warmWhite)
+    static let playerTwo = team(teal, body: coolWhite)
     static let byPlayer = [playerOne, playerTwo]
 }
 

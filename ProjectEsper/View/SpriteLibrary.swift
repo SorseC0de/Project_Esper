@@ -38,20 +38,30 @@ final class SpriteLibrary {
         return texture
     }
 
-    /// A player frame in that player's look.
+    /// A player frame in that player's look, without its head.
     func texture(_ frame: AnimationFrame, player: Int) -> SKTexture {
         let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)"
         if let texture = cache[key] { return texture }
         let look = look(for: player)
-        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look)
+        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look, detachHead: true)
         let texture = result.texture
         texture.filteringMode = .nearest
         cache[key] = texture
+        if let head = result.head {
+            head.filteringMode = .nearest
+            cache[key + "_head"] = head
+        }
         let size = frame.animation.pixelSize
         landmarks[key] = result.centres.mapValues { centre in
             CGPoint(x: centre.x - size / 2, y: size - centre.y - frame.animation.feetFromBottom)
         }
         return texture
+    }
+
+    /// The head alone from a player frame, on the same canvas as the body, if the frame has one.
+    func headTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
+        _ = texture(frame, player: player)
+        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)_head"]
     }
 
     /// Where a glowing part is drawn in a player frame, from the feet in art pixels, if it's there.
@@ -76,26 +86,31 @@ final class SpriteLibrary {
 
     // MARK: Recolouring
 
-    private func recolour(_ texture: SKTexture, swaps: [RGB: RGB]) -> (texture: SKTexture, centres: [BodyPart: CGPoint]) {
+    private func recolour(_ texture: SKTexture, swaps: [RGB: RGB]) -> (texture: SKTexture, head: SKTexture?, centres: [BodyPart: CGPoint]) {
         var look = Look(colours: [:], glow: 0, outline: 0, outlineWidth: 0)
         for (source, target) in swaps {
             if let part = BodyPart.owning(source) { look.colours[part] = target }
         }
-        return recolour(texture, look: look)
+        return recolour(texture, look: look, detachHead: false)
+    }
+
+    private func makeCanvas(width: Int, height: Int) -> (CGContext, UnsafeMutablePointer<UInt8>)? {
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let data = context.data else { return nil }
+        return (context, data.bindMemory(to: UInt8.self, capacity: width * height * 4))
     }
 
     /// A copy of the frame in the look: every part swapped to its colour, the stroked parts
     /// lined where they lie over the body, the silhouette lined round the outside, and the
-    /// centre of each glowing part found.
-    private func recolour(_ texture: SKTexture, look: Look) -> (texture: SKTexture, centres: [BodyPart: CGPoint]) {
+    /// centre of each glowing part found. With `detachHead`, the head comes back as its own
+    /// texture with no line, and the body is drawn and lined without it.
+    private func recolour(_ texture: SKTexture, look: Look, detachHead: Bool) -> (texture: SKTexture, head: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
-              let data = context.data else { return (texture, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, [:]) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
         let count = width * height
 
         // Which part each pixel came from, before anything changes.
@@ -116,6 +131,22 @@ final class SpriteLibrary {
             if let target = look.colours[part] {
                 paint(pixels, index, target)
             }
+        }
+
+        // The head onto its own canvas, and off this one.
+        var head: SKTexture?
+        if detachHead, sums[.head] != nil, let (headContext, headPixels) = makeCanvas(width: width, height: height) {
+            for pixel in 0..<count where parts[pixel] == .head {
+                let index = pixel * 4
+                paint(headPixels, index, look.colours[.head] ?? look.glow)
+                headPixels[index + 3] = 255
+                pixels[index] = 0
+                pixels[index + 1] = 0
+                pixels[index + 2] = 0
+                pixels[index + 3] = 0
+                parts[pixel] = nil
+            }
+            head = headContext.makeImage().map { SKTexture(cgImage: $0) }
         }
 
         func neighbours(_ pixel: Int, _ body: (Int) -> Bool) -> Bool {
@@ -170,9 +201,9 @@ final class SpriteLibrary {
             }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, [:]) }
+        guard let recoloured = context.makeImage() else { return (texture, nil, [:]) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), centres)
+        return (SKTexture(cgImage: recoloured), head, centres)
     }
 
     private func paint(_ pixels: UnsafeMutablePointer<UInt8>, _ index: Int, _ colour: RGB) {

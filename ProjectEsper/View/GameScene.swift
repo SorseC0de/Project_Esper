@@ -23,9 +23,13 @@ final class GameScene: SKScene {
     private let hud = SKNode()
     private var controls: TouchControls?
     private var playerNodes: [SKSpriteNode] = []
+    /// Each head, drawn apart from its body and trailing it a little.
+    private var headNodes: [SKSpriteNode] = []
+    private var headShown: [CGPoint] = []
     /// The glow on the ball in each player's hands, and the fire off each head.
     private var handHalos: [SKSpriteNode] = []
     private var headFires: [SKEmitterNode] = []
+    private static let headLag: CGFloat = 0.25
     private var ballNode = SKSpriteNode()
     private var pointerNode = SKSpriteNode()
     private var rimNodes: [SKSpriteNode] = []
@@ -95,6 +99,11 @@ final class GameScene: SKScene {
             node.zPosition = 20
             world.addChild(node)
             playerNodes.append(node)
+            let head = SKSpriteNode(texture: sprites.headTexture(player.animationFrame, player: player.index))
+            head.zPosition = 21
+            world.addChild(head)
+            headNodes.append(head)
+            headShown.append(.zero)
             let colour = SKColor(rgb: sprites.look(for: player.index).glow)
             let halo = makeHalo(colour)
             halo.zPosition = 19
@@ -102,6 +111,7 @@ final class GameScene: SKScene {
             handHalos.append(halo)
             let fire = makeFire(colour)
             fire.zPosition = 18
+            fire.targetNode = world
             world.addChild(fire)
             headFires.append(fire)
         }
@@ -304,8 +314,26 @@ final class GameScene: SKScene {
             } else {
                 halo.isHidden = true
             }
-            if let head = sprites.landmark(.head, in: frame, player: index) {
-                headFires[index].position = CGPoint(x: node.position.x + head.x * CGFloat(player.facing.sign), y: node.position.y + head.y + 3)
+            // The head trails its place on the body by a little and bobs, as if it only loosely belonged.
+            let headNode = headNodes[index]
+            if let head = sprites.landmark(.head, in: frame, player: index), let headTexture = sprites.headTexture(frame, player: index) {
+                let target = CGPoint(x: node.position.x + head.x * CGFloat(player.facing.sign), y: node.position.y + head.y)
+                if headShown[index] == .zero { headShown[index] = target }
+                headShown[index] = CGPoint(x: headShown[index].x + (target.x - headShown[index].x) * GameScene.headLag,
+                                           y: headShown[index].y + (target.y - headShown[index].y) * GameScene.headLag)
+                let bob = (sin(Double(match.frame) / 60 * 2 * .pi * 1.2) * 1).rounded()
+                let shown = CGPoint(x: headShown[index].x.rounded(), y: headShown[index].y.rounded() + bob)
+                headNode.isHidden = false
+                headNode.texture = headTexture
+                headNode.size = headTexture.size()
+                headNode.anchorPoint = node.anchorPoint
+                headNode.xScale = node.xScale
+                headNode.position = CGPoint(x: node.position.x + shown.x - target.x, y: node.position.y + shown.y - target.y)
+                headFires[index].position = CGPoint(x: shown.x, y: shown.y + 3)
+                headFires[index].particleBirthRate = 24
+            } else {
+                headNode.isHidden = true
+                headFires[index].particleBirthRate = 0
             }
         }
 

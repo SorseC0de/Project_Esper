@@ -175,7 +175,7 @@ final class GameScene: SKScene {
         accumulator += min(currentTime - last, 0.1)
         guard accumulator >= GameScene.stepSeconds else { return }
 
-        hub.touch = controls?.input ?? .idle
+        hub.touch = controls?.sample() ?? .idle
         let inputs = hub.frames(players: match.players.count)
         if hub.consumeReset() { reset() }
         if hub.consumeCycle() { controls?.cycleTopPicker() }

@@ -17,5 +17,6 @@ struct GameView: View {
         MetalGameView()
             .ignoresSafeArea()
             .persistentSystemOverlays(.hidden)
+            .defersSystemGestures(on: .all)
     }
 }

@@ -184,6 +184,15 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].facing, .left)
     }
 
+    func testNoCeilingButTheWallsGoUp() {
+        let stage = Stage.court
+        XCTAssertEqual(stage.tile(column: 10, row: stage.rows + 5), .empty)
+        XCTAssertEqual(stage.tile(column: 0, row: stage.rows + 5), .solid)
+        XCTAssertEqual(stage.tile(column: stage.columns - 1, row: stage.rows + 5), .solid)
+        let box = Box(min: Vec2(x: 100, y: stage.height - 5), max: Vec2(x: 110, y: stage.height + 10))
+        XCTAssertFalse(stage.sweepVertically(box, by: 20).ceiling)
+    }
+
     func testLandingLagThenIdle() {
         var match = Match()
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })

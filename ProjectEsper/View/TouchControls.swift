@@ -27,6 +27,8 @@ final class TouchControls: SKNode {
     private var buttonTouches: [UITouch: (index: Int, origin: CGPoint)] = [:]
 
     private(set) var input = PlayerInput.idle
+    /// Buttons that went down since the last sample, so a tap shorter than a frame still lands.
+    private var latched = PlayerInput.idle
 
     /// `halfWidth` and `halfHeight` are what the camera shows, in game pixels.
     init(halfWidth: CGFloat, halfHeight: CGFloat) {
@@ -90,6 +92,18 @@ final class TouchControls: SKNode {
         return Button(node: node, radius: radius, set: set)
     }
 
+    /// The controls as the sim should see them this frame: what's held, plus anything that
+    /// was tapped and let go since the last sample.
+    func sample() -> PlayerInput {
+        var frame = input
+        frame.jump = frame.jump || latched.jump
+        frame.shoot = frame.shoot || latched.shoot
+        frame.throwBall = frame.throwBall || latched.throwBall
+        if latched.aim != .zero, frame.aim == .zero { frame.aim = latched.aim }
+        latched = .idle
+        return frame
+    }
+
     /// Adds a picker under the ones already in the top-left corner.
     func addPicker(title: String, options: [String], selected: Int, onSelect: @escaping (Int) -> Void) {
         let picker = SegmentedPicker(title: title, options: options, selected: selected, onSelect: onSelect)
@@ -139,6 +153,7 @@ final class TouchControls: SKNode {
             buttonTouches[touch] = (reach.index, point)
             button.node.fillColor = .init(white: 1, alpha: 0.4)
             button.set(&input, true, .zero)
+            button.set(&latched, true, .zero)
         }
     }
 
@@ -155,6 +170,7 @@ final class TouchControls: SKNode {
             let aim = Vec2(x: (point.x - held.origin.x) / TouchControls.flickRadius,
                            y: (point.y - held.origin.y) / TouchControls.flickRadius).clamped(to: 1)
             buttons[held.index].set(&input, true, aim)
+            if aim.length >= BallRules.flickThreshold { latched.aim = aim }
         }
     }
 

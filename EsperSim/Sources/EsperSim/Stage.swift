@@ -71,8 +71,11 @@ public struct Stage: Equatable {
         self.ballSpawn = ballSpawn
     }
 
+    /// Outside the grid: solid below and to the sides, and above the top the side walls
+    /// carry on up while everything between them is open sky.
     public func tile(column: Int, row: Int) -> Tile {
-        guard column >= 0, column < columns, row >= 0, row < rows else { return .solid }
+        guard column >= 0, column < columns, row >= 0 else { return .solid }
+        guard row < rows else { return column == 0 || column == columns - 1 ? .solid : .empty }
         return tiles[row * columns + column]
     }
 
@@ -209,9 +212,9 @@ public struct Stage: Equatable {
 
     // MARK: The court
 
-    /// 34 by 16 tiles: floor, walls and ceiling, a backboard block each side, two cells in from
-    /// the wall, with its rim on the inward face 60 units above the floor, and a one-way ledge
-    /// in the middle. Player 0 starts left and scores on the right rim.
+    /// 34 by 16 tiles with no ceiling: floor and walls, a backboard block each side, two cells
+    /// in from the wall, with its rim on the inward face 60 units above the floor, and a
+    /// one-way ledge in the middle. Player 0 starts left and scores on the right rim.
     public static let court: Stage = {
         var stage = Stage(
             columns: 34, rows: 16,
@@ -224,7 +227,6 @@ public struct Stage: Equatable {
             ballSpawn: Vec2(x: 170, y: 80)
         )
         stage.fill(.solid, columns: 0...33, rows: 0...0)
-        stage.fill(.solid, columns: 0...33, rows: 15...15)
         stage.fill(.solid, columns: 0...0, rows: 0...15)
         stage.fill(.solid, columns: 33...33, rows: 0...15)
         stage.fill(.solid, columns: 3...4, rows: 6...7)

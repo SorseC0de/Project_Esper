@@ -23,10 +23,11 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-`FighterSpec.baseline` is Melee Fox with Falcon's run speed, traction 0.15, and the air
-turned up: air speed 1.2, air acceleration 0.02 + 0.16, a jump with the stick held starts
-at air speed, and a double jump with the stick held sets the sideways speed, so it turns
-around. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
+`FighterSpec.baseline` is Melee Fox with a 2.5 dash burst, Sonic's run (Brawl Sonic over
+Brawl Falcon, 3.5 to 2.18, carried onto Melee Falcon's 2.3 gives 3.7), traction 0.15, and
+the air turned up: air speed 1.4, air acceleration 0.02 + 0.24, a jump with the stick held
+starts at air speed, and a double jump with the stick held sets the sideways speed, so it
+turns around. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
 and are chosen to sit with the rest.
 
 ## Input grammar
@@ -56,8 +57,8 @@ tuning picker, menu resets.
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
 holds the variants; A is always the baseline as tuned.
 
-- AIR: A baseline. B turns in about five frames. C the same turn with a 1.4 cap. D a
-  three-frame turn and letting go stops the drift. E direct, the stick is the air speed.
+- AIR: A baseline. B a three-frame turn and letting go stops the drift. C direct, the stick
+  is the air speed. D the baseline with a 1.6 cap. E with a 1.8 cap.
 
 ## Glow
 

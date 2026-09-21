@@ -136,8 +136,8 @@ public struct Player: Equatable {
                     } else {
                         let target = spec.walkMaxSpeed * input.stick.x
                         velocity.x = approach(velocity.x, target, spec.walkAcceleration)
-                        // Never slower than 12 of the cycle's 15 frames a second, so the ball can't hang on a tween.
-                        animationPhase += max(abs(velocity.x) / spec.walkMaxSpeed, 0.8) * 0.25
+                        // The cycle runs 15 frames a second at full walk and never under 10, so the ball can't hang on a tween.
+                        animationPhase += max(abs(velocity.x) / spec.walkMaxSpeed * 0.25, 10.0 / 60)
                     }
                 } else {
                     enter(.idle)

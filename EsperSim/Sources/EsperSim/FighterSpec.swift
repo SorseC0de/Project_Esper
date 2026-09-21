@@ -56,6 +56,8 @@ public struct FighterSpec: Equatable {
     public var coyoteFrames = 3
     /// Frames of holding down in a run before it brakes to walking speed.
     public var runBrakeHoldFrames = 4
+    /// Frames into a walk in which the stick still turns the body, before it faces the opponent.
+    public var walkFaceLockoutFrames = 3
     /// Sideways speed lost per frame in an airborne stance.
     public var stanceAirBrake = 0.01
 

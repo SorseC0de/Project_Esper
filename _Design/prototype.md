@@ -36,10 +36,11 @@ and are chosen to sit with the rest.
 Tap is instant, hold is a stance, flick or release resolves it. Same on touch and pad.
 
 - Stick: floating on the left half. A fast push past 0.8 is a dash; a tilt walks. A walk
-  always faces the opponent whichever way it goes, so it can back off or dribble between
+  faces the opponent whichever way it goes after its first 3 frames, in which the stick
+  still turns the body, so it can back off or dribble between
   the legs while staring them down. Only a dash turns the body.
 - Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. In the air
-  a stick against the way you're going turns you at once, Silksong's rule. For 3 frames
+  a stick against the way you're going turns you at once, body and all, Silksong's rule. For 3 frames
   after walking off an edge a press is still that jump. Down while falling is a fast fall,
   except while holding throw with the ball, where down is the aim.
 - Shoot (with ball): hold for the stance, flick for the angle, release to fire. A tap,
@@ -97,13 +98,16 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 - Super Soda (C). A fresh jump press in the air, held, is flight: the stick moves the body
   in any direction with gravity off, slowly with the ball and twice as fast without, for two seconds of budget per airtime, refilled on landing.
   Let go or run out and it falls. The body leans up to thirty degrees into its motion,
-  forward or back, and held still it hovers round a two-pixel circle. No double jump. With or without the ball, and a shot or
+  forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and a shot or
   throw can be taken from flight. Numbers in `SodaRules`.
 - Flash Fizz (D). A shoot button with no ball warps the body to the ball and it arrives
   holding it, but only while the ball is still its colour, the 60 frames after it let the
-  ball go: throw, warp, catch. One second between warps. A bright wide diamond blinks at
-  where it left and where it landed. Otherwise shoot does what it does without the ball.
-  Numbers in `FizzRules`.
+  ball go: throw, warp, catch. It arrives nudged clear of anything solid. A dribble hanging
+  past a ledge by more than a tile counts as not having the ball, so the body can warp down
+  to it, keeping it, standing still on the block. One second between warps. A bright wide
+  diamond blinks at where it left and where it landed. Otherwise shoot does what it does
+  without the ball. Numbers in `FizzRules`; the dribble's ball position per frame comes from
+  `BallLandmarks.swift`, which the importer generates from the sheets.
 
 ## Tuning pickers
 

@@ -202,6 +202,21 @@ public struct Stage: Equatable {
         return false
     }
 
+    /// The smallest nudge, up first, then sideways, then down, that gets the box clear of
+    /// solids, up to `reach`. Zero if it's already clear or nothing within reach works.
+    public func pushOut(_ box: Box, reach: Double = 20) -> Vec2 {
+        guard overlapsSolid(box) else { return .zero }
+        var distance = 1.0
+        while distance <= reach {
+            for direction in [Vec2(x: 0, y: distance), Vec2(x: distance, y: 0), Vec2(x: -distance, y: 0), Vec2(x: 0, y: -distance)]
+            where !overlapsSolid(box.offset(by: direction)) {
+                return direction
+            }
+            distance += 1
+        }
+        return .zero
+    }
+
     /// How far down from `y` to the top of the first floor under `x`, solid or one-way.
     public func drop(fromX x: Double, y: Double) -> Double {
         let column = column(at: x)

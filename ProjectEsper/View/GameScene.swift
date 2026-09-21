@@ -45,7 +45,7 @@ final class GameScene: SKScene {
     private var hover: [CGFloat] = []
     private static let flightTilt: CGFloat = .pi / 6
     /// A still flight drifts round a small circle: this radius, this many seconds a lap.
-    private static let hoverRadius: CGFloat = 2
+    private static let hoverRadius: CGFloat = 3
     private static let hoverSeconds = 1.6
     /// The ball in each player's hands, its glow, and the fire off each head.
     private var handBalls: [SKSpriteNode] = []

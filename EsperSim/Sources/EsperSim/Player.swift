@@ -118,8 +118,10 @@ public struct Player: Equatable {
     public var webLinePose = 0
     /// Super Soda: frames of flight left this airtime.
     public var flightLeft = SodaRules.flightFrames
-    /// Flash Fizz: frames until the next warp.
+    /// Flash Fizz: frames until the next warp, and where a warp decided this step is going
+    /// when it's to the ball in hand.
     public var warpCooldown = 0
+    public var pendingWarp: Vec2?
     public var swatCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
@@ -176,7 +178,8 @@ public struct Player: Equatable {
 
     /// `opponentX` is where the other body stands; a walk always faces it. `ballOwner` is
     /// whose the loose ball still is, for Flash Fizz.
-    public mutating func step(input: PlayerInput, stage: Stage, opponentX: Double? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
+    public mutating func step(input given: PlayerInput, stage: Stage, opponentX: Double? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
+        var input = given
         stateTimer += 1
         if catchCooldown > 0 { catchCooldown -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
@@ -209,10 +212,13 @@ public struct Player: Equatable {
             action = webLineIfAsked(input, throwPressed: throwPressed)
         }
         if action == nil, free || ((state == .shooting || state == .throwing) && !hasBall) {
-            action = warpIfAsked(input, shootPressed: shootPressed, ballOwner: ballOwner)
+            action = warpIfAsked(input, shootPressed: shootPressed, ballOwner: ballOwner, stage: stage)
         }
-        // A warp on a shoot press takes the press; nothing else reads it this frame.
-        if action == .warpToBall { shootPressed = false }
+        // A warp on a shoot press takes the button; nothing else reads it this frame.
+        if action == .warpToBall {
+            shootPressed = false
+            input.shootButtons = 0
+        }
 
         switch state {
         case .idle:
@@ -230,8 +236,11 @@ public struct Player: Equatable {
 
         case .walk:
             // A walk faces the opponent whichever way it goes, so it can back off or dribble
-            // between the legs while staring them down. Only a dash turns the body.
-            if let opponentX, opponentX != position.x {
+            // between the legs while staring them down, after a few frames in which the stick
+            // can still turn the body. Only a dash turns it after that.
+            if stateTimer <= spec.walkFaceLockoutFrames, let direction = stickFacing(input) {
+                facing = direction
+            } else if let opponentX, opponentX != position.x {
                 facing = opponentX > position.x ? .right : .left
             }
             if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
@@ -308,6 +317,8 @@ public struct Player: Equatable {
             }
 
         case .air:
+            // The body turns with the stick in the air, at once.
+            if airControlLock == 0, let direction = stickFacing(input) { facing = direction }
             airDrift(airControlLock > 0 ? .idle : input)
             fall(input)
             if jumpPressed, coyote > 0 {
@@ -619,11 +630,25 @@ public struct Player: Equatable {
         return .webLine(direction: webAimDirection)
     }
 
-    /// Flash Fizz's warp, on a shoot button with no ball, when the ball is still yours.
-    private mutating func warpIfAsked(_ input: PlayerInput, shootPressed: Bool, ballOwner: Int?) -> PlayerAction? {
-        guard power == .flashFizz, !hasBall, shootPressed, warpCooldown == 0, ballOwner == index else { return nil }
+    /// Flash Fizz's warp, on a shoot button, when the loose ball is still yours, or when the
+    /// ball in hand is dribbling over a drop of more than a tile, which counts as not having it.
+    private mutating func warpIfAsked(_ input: PlayerInput, shootPressed: Bool, ballOwner: Int?, stage: Stage) -> PlayerAction? {
+        guard power == .flashFizz, shootPressed, warpCooldown == 0 else { return nil }
+        let overhang = overhangBall(in: stage)
+        guard (!hasBall && ballOwner == index) || overhang != nil else { return nil }
         warpCooldown = FizzRules.cooldownFrames
+        pendingWarp = overhang
         return .warpToBall
+    }
+
+    /// Where the dribbled ball is when it's hanging past a ledge by more than a tile: down
+    /// on the floor under it. Nil when it isn't.
+    public func overhangBall(in stage: Stage) -> Vec2? {
+        guard hasBall, grounded, state.isGroundState, let offset = BallLandmarks.offset(animationFrame) else { return nil }
+        let ballX = position.x + offset.x / 1.6 * facing.sign
+        let drop = stage.drop(fromX: ballX, y: position.y)
+        guard drop > Stage.tileSize else { return nil }
+        return Vec2(x: ballX, y: position.y - drop + BallRules.radius)
     }
 
     private mutating func enterShootStance() {
@@ -684,9 +709,11 @@ public struct Player: Equatable {
         enter(grounded ? .idle : .air)
     }
 
-    /// Flash Fizz: put down at the ball, still, in the air or on the floor as it lands.
-    public mutating func warp(to feet: Vec2) {
+    /// Flash Fizz: put down at the ball, nudged clear of anything solid, still, in the air
+    /// or on the floor as it lands.
+    public mutating func warp(to feet: Vec2, in stage: Stage) {
         position = feet
+        position += stage.pushOut(body)
         velocity = .zero
         fastFalling = false
         webAnchor = nil

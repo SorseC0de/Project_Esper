@@ -81,17 +81,25 @@ public struct Match: Equatable {
         case .webLine(let direction):
             webLine(from: index, direction: direction)
         case .warpToBall:
-            guard ball.isLive else { return }
             let from = player.position
+            if let overhang = player.pendingWarp {
+                // Down to the dribbled ball, keeping it.
+                players[index].pendingWarp = nil
+                let feet = Vec2(x: overhang.x, y: overhang.y - BallRules.radius)
+                players[index].warp(to: feet, in: stage)
+                events.append(.warped(player: index, from: from, to: players[index].position))
+                return
+            }
+            guard ball.isLive else { return }
             let feet = Vec2(x: ball.position.x, y: ball.position.y - BallRules.chestHeight)
-            players[index].warp(to: feet)
+            players[index].warp(to: feet, in: stage)
             players[index].catchBall()
             ball.holder = index
             ball.straight = false
             ball.thrown = false
             ball.tether = nil
             ball.resting = false
-            events.append(.warped(player: index, from: from, to: feet))
+            events.append(.warped(player: index, from: from, to: players[index].position))
             events.append(.caught(player: index))
         case .swat:
             if ball.isLive, player.canSwat(ballAt: ball.position) {

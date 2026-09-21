@@ -238,6 +238,25 @@ final class MovementTests: XCTestCase {
         XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.airSpeedMax, accuracy: 0.001)
     }
 
+    func testTheBodyTurnsWithTheStickInTheAir() {
+        var match = Match()
+        run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
+        XCTAssertEqual(match.players[0].facing, .right)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle])
+        XCTAssertEqual(match.players[0].facing, .left)
+    }
+
+    func testAWalkCanStillTurnForAFewFrames() {
+        var match = Match()
+        // Player 0 starts left of player 1, so a settled walk faces right.
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -0.5, y: 0)), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -0.5, y: 0)), .idle])
+        XCTAssertEqual(match.players[0].state, .walk)
+        XCTAssertEqual(match.players[0].facing, .left)
+        run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: -0.5, y: 0)) })
+        XCTAssertEqual(match.players[0].facing, .right)
+    }
+
     func testAirReversalIsImmediate() {
         var match = Match()
         run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
@@ -836,6 +855,47 @@ final class SodaAndFizzTests: XCTestCase {
         XCTAssertTrue(match.events.contains { if case .warped(player: 0, _, _) = $0 { return true } else { return false } })
         XCTAssertEqual(match.ball.holder, 0)
         XCTAssertEqual(match.players[0].position.x, ballWas.x, accuracy: 0.001)
+    }
+
+    func testWarpArrivesClearOfTheFloor() {
+        var match = with(.flashFizz)
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+        }
+        // Thrown into the floor, the ball bounces and settles; warp to it once it's resting.
+        run(&match, frames: 50, input: { _ in .idle }) { $0.ball.resting }
+        XCTAssertEqual(match.ball.owner, 0)
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(match.ball.holder, 0)
+        XCTAssertFalse(match.stage.overlapsSolid(match.players[0].body))
+        XCTAssertGreaterThanOrEqual(match.players[0].position.y, 10)
+    }
+
+    func testOverhangDribbleCanBeWarpedDownTo() {
+        var match = with(.flashFizz)
+        // On the right backboard block, feet at its left edge, facing left, dribbling.
+        match.players[0].position = Vec2(x: 290.5, y: 90)
+        match.players[0].facing = .left
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[1].position.x = 100
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertTrue(match.players[0].grounded)
+        // Some dribble frame puts the ball past the edge.
+        var found = false
+        for _ in 0..<60 where !found {
+            match.advance(inputs: [.idle, .idle])
+            if match.players[0].overhangBall(in: match.stage) != nil {
+                found = true
+                match.advance(inputs: [PlayerInput(shoot: true), .idle])
+            }
+        }
+        XCTAssertTrue(found, "no dribble frame overhung the block")
+        XCTAssertTrue(match.events.contains { if case .warped(player: 0, _, _) = $0 { return true } else { return false } })
+        XCTAssertTrue(match.players[0].hasBall)
+        XCTAssertEqual(match.players[0].position.y, 10, accuracy: 0.001)
     }
 
     func testNoWarpToABallThatIsNotYours() {

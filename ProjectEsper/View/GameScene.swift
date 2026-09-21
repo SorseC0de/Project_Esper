@@ -287,6 +287,9 @@ final class GameScene: SKScene {
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
             self?.headVariant = HeadVariant(rawValue: index)!
         }
+        controls.addSlider(title: "GLOW THRESHOLD", range: 0.2...1.0, value: GlowSettings.threshold) { value in
+            GlowSettings.threshold = value
+        }
         hud.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 8)

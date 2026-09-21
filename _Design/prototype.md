@@ -106,7 +106,8 @@ is an SF Symbol chevron doing what the pixel one did: three steps down, then off
 ## Glow
 
 `GlowSettings` in `Tuning.swift`: luminance threshold, softness of the cut, blur passes at
-half size, intensity, tint. The passes are in `Glow.metal`.
+half size, intensity, tint. The passes are in `Glow.metal`. The threshold is on a slider
+across the top of the screen, printed with its value, to be felt out live.
 
 ## Queued
 

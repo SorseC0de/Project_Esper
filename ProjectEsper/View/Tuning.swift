@@ -17,7 +17,8 @@ enum HeadVariant: Int, CaseIterable {
 /// The glow, as GameMaker's Glow filter had it: what counts as bright, how soft the cut is,
 /// how far it spreads, how strong it comes back, and its colour.
 enum GlowSettings {
-    static let threshold: Float = 0.5
+    /// Luminance above which a pixel glows. On a slider at the top of the screen.
+    nonisolated(unsafe) static var threshold: Float = 0.5
     static let softness: Float = 0.2
     /// Each pass blurs across and down at half size; more spreads further.
     static let blurPasses = 2

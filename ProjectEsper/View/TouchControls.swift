@@ -22,6 +22,9 @@ final class TouchControls: SKNode {
     var onReset: (() -> Void)?
     private var pickers: [SegmentedPicker] = []
     private let pickerOrigin: CGPoint
+    private var sliders: [Slider] = []
+    private var sliderTouches: [UITouch: Slider] = [:]
+    private let topCentre: CGPoint
     private var stickTouch: UITouch?
     private var stickCenter = CGPoint.zero
     private var buttonTouches: [UITouch: (index: Int, origin: CGPoint)] = [:]
@@ -40,6 +43,7 @@ final class TouchControls: SKNode {
         let top = halfHeight - insets.top - TouchControls.padding
         let bottom = -halfHeight + insets.bottom + TouchControls.padding
         pickerOrigin = CGPoint(x: left, y: top)
+        topCentre = CGPoint(x: 0, y: top)
         super.init()
         zPosition = 100
 
@@ -120,6 +124,14 @@ final class TouchControls: SKNode {
         pickers.append(picker)
     }
 
+    /// Adds a slider across the top, under the score, below any already there.
+    func addSlider(title: String, range: ClosedRange<Float>, value: Float, onChange: @escaping (Float) -> Void) {
+        let slider = Slider(title: title, range: range, value: value, onChange: onChange)
+        slider.position = CGPoint(x: topCentre.x, y: topCentre.y - 34 - CGFloat(sliders.count) * 26)
+        addChild(slider)
+        sliders.append(slider)
+    }
+
     /// The top picker steps to its next option.
     func cycleTopPicker() {
         pickers.first?.selectNext()
@@ -138,6 +150,11 @@ final class TouchControls: SKNode {
             return
         }
         for picker in pickers where picker.tap(at: convert(point, to: picker)) {
+            return
+        }
+        for slider in sliders where slider.covers(convert(point, to: slider)) {
+            sliderTouches[touch] = slider
+            slider.drag(to: convert(point, to: slider))
             return
         }
         if point.x < 0 {
@@ -166,6 +183,10 @@ final class TouchControls: SKNode {
     }
 
     func moved(_ touch: UITouch, to point: CGPoint) {
+        if let slider = sliderTouches[touch] {
+            slider.drag(to: convert(point, to: slider))
+            return
+        }
         if touch == stickTouch {
             let raw = Vec2(x: (point.x - stickCenter.x) / TouchControls.stickRadius,
                            y: (point.y - stickCenter.y) / TouchControls.stickRadius).clamped(to: 1)
@@ -183,6 +204,7 @@ final class TouchControls: SKNode {
     }
 
     func ended(_ touch: UITouch) {
+        if sliderTouches.removeValue(forKey: touch) != nil { return }
         if touch == stickTouch {
             stickTouch = nil
             input.stick = .zero

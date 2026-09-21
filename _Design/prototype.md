@@ -97,7 +97,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 - Super Soda (C). A fresh jump press in the air, held, is flight: the stick moves the body
   in any direction with gravity off, slowly with the ball and twice as fast without, for two seconds of budget per airtime, refilled on landing.
   Let go or run out and it falls. The body leans up to thirty degrees into its motion,
-  forward or back. No double jump. With or without the ball, and a shot or
+  forward or back, and held still it hovers round a two-pixel circle. No double jump. With or without the ball, and a shot or
   throw can be taken from flight. Numbers in `SodaRules`.
 - Flash Fizz (D). A shoot button with no ball warps the body to the ball and it arrives
   holding it, but only while the ball is still its colour, the 60 frames after it let the

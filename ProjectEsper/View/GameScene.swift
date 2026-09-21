@@ -39,9 +39,14 @@ final class GameScene: SKScene {
     /// Each head, drawn apart from its body and following it loosely.
     private var headNodes: [SKSpriteNode] = []
     private var headShown: [CGPoint] = []
-    /// Each body's lean in flight, radians, eased toward where it's going.
+    /// Each body's lean in flight, radians, eased toward where it's going, and how much of
+    /// the hover it's showing.
     private var bodyTilt: [CGFloat] = []
+    private var hover: [CGFloat] = []
     private static let flightTilt: CGFloat = .pi / 6
+    /// A still flight drifts round a small circle: this radius, this many seconds a lap.
+    private static let hoverRadius: CGFloat = 2
+    private static let hoverSeconds = 1.6
     /// The ball in each player's hands, its glow, and the fire off each head.
     private var handBalls: [SKSpriteNode] = []
     private var handHalos: [SKSpriteNode] = []
@@ -191,6 +196,7 @@ final class GameScene: SKScene {
             headNodes.append(head)
             headShown.append(.zero)
             bodyTilt.append(0)
+            hover.append(0)
             let colour = SKColor(rgb: sprites.look(for: player.index).glow)
             let handBall = SKSpriteNode(texture: sprites.texture("ball", 0))
             handBall.color = colour
@@ -595,7 +601,13 @@ final class GameScene: SKScene {
             node.texture = sprites.texture(frame, player: index)
             node.size = node.texture!.size()
             node.anchorPoint = sprites.anchor(for: frame.animation)
-            node.position = SpriteLibrary.point(player.position)
+            // A flight holding still hovers round a small circle, eased in and out.
+            let stillFlight = player.state == .flying && player.velocity.length < 0.2
+            hover[index] += ((stillFlight ? 1 : 0) - hover[index]) * 0.1
+            let lap = Double(match.frame) / 60 / GameScene.hoverSeconds * 2 * .pi
+            let drift = CGPoint(x: (cos(lap) * Double(GameScene.hoverRadius * hover[index])).rounded(),
+                                y: (sin(lap) * Double(GameScene.hoverRadius * hover[index])).rounded())
+            node.position = SpriteLibrary.point(player.position) + drift
             node.xScale = CGFloat(player.facing.sign)
 
             // In flight the body leans into its motion: forward tips it ahead, backward tips

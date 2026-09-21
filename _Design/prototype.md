@@ -87,8 +87,8 @@ holds the variants; A is always the baseline as tuned.
 painted on the sheets. A `Look` maps parts to colours and the sprite library recolours
 each frame once as it's used. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
 and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on
-the ball and the fire off the head. Back limbs grey, the rest a light orange or a light teal
-toward the team colour, a black line one pixel thick round the body following the outside
+the ball and the fire off the head. The body a light orange or a light teal toward the team colour, the back limbs a greyed,
+darker version of it, a black line one pixel thick round the body following the outside
 edge only, and the front arm stroked on its own where it lies over the body. The head is
 split out of every frame and drawn as its own sprite with no line, trailing its place on
 the body by a quarter of the gap each frame and bobbing a pixel, and its fire is released

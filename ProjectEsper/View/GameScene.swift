@@ -62,6 +62,10 @@ final class GameScene: SKScene {
     /// last frame, so the throw's release can be caught.
     private var chargeNodes: [SKSpriteNode] = []
     private var charging: [Bool] = []
+    /// A white copy of each body and head, added over them, flickering while the body is
+    /// stunned by the blade.
+    private var stunBodies: [SKSpriteNode] = []
+    private var stunHeads: [SKSpriteNode] = []
     private var headShown: [CGPoint] = []
     /// Each body's lean in flight, radians, eased toward where it's going, and how much of
     /// the hover it's showing.
@@ -238,6 +242,17 @@ final class GameScene: SKScene {
             glowers.addChild(charge)
             chargeNodes.append(charge)
             charging.append(false)
+            for flashes in [\GameScene.stunBodies, \GameScene.stunHeads] {
+                let flash = SKSpriteNode()
+                flash.color = .white
+                flash.colorBlendFactor = 1
+                flash.blendMode = .add
+                flash.alpha = 0.8
+                flash.zPosition = 9
+                flash.isHidden = true
+                glowers.addChild(flash)
+                self[keyPath: flashes].append(flash)
+            }
             headShown.append(.zero)
             bodyTilt.append(0)
             hover.append(0)
@@ -767,6 +782,20 @@ final class GameScene: SKScene {
             }
             bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
             node.zRotation = bodyTilt[index]
+
+            // Hit by the blade, the body and head flicker white, every other pair of frames.
+            let stunned = player.hitStun > 0 && (player.hitStun / 2) % 2 == 0
+            for (flash, source) in [(stunBodies[index], node), (stunHeads[index], headNodes[index])] {
+                flash.isHidden = !stunned || source.isHidden
+                guard stunned else { continue }
+                flash.texture = source.texture
+                flash.size = source.size
+                flash.anchorPoint = source.anchorPoint
+                flash.position = source.position
+                flash.xScale = source.xScale
+                flash.yScale = source.yScale
+                flash.zRotation = source.zRotation
+            }
 
             // The frame's energy rides exactly where the body is drawn.
             let energyNode = energyNodes[index]

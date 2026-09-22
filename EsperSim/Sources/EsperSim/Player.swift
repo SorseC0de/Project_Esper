@@ -150,6 +150,8 @@ public struct Player: Equatable {
     /// The slide's leg and the slash's blade each hit once.
     public var slideHit = false
     public var slashHit = false
+    /// Frames left in which no button does anything, after the blade hit; the stick still works.
+    public var hitStun = 0
     public var snatchCooldown = 0
     /// The corner being hung from, and frames after walking off an edge before a corner
     /// can be grabbed.
@@ -239,6 +241,14 @@ public struct Player: Equatable {
         catchStance = !hasBall && input.shoot
         if snatchCooldown > 0 { snatchCooldown -= 1 }
         if ledgeCooldown > 0 { ledgeCooldown -= 1 }
+        if hitStun > 0 {
+            hitStun -= 1
+            input.jump = false
+            input.shootButtons = 0
+            input.throwBall = false
+            input.taunt = false
+            jumpBuffer = 0
+        }
         if doubleJumpTimer > 0 { doubleJumpTimer -= 1 }
         stickAwayFrames = abs(input.stick.x) < 0.3 ? 0 : stickAwayFrames + 1
         downHeldFrames = input.stick.y < -0.65 ? downHeldFrames + 1 : 0
@@ -1164,9 +1174,9 @@ public struct Player: Equatable {
     /// either in front or in the way of where the body is moving, or in the second ring
     /// out in front, the spark's. A ball arriving from behind while standing still bounces
     /// off, and so does one over the speed threshold unless the body is in the catch stance.
-    public func canCatch(ballAt ballPosition: Vec2, speed: Double = 0) -> Bool {
+    public func canCatch(ballAt ballPosition: Vec2, speed: Double = 0, shotInFlight: Bool = false) -> Bool {
         guard !hasBall, catchCooldown == 0, state.canCatch else { return false }
-        guard speed <= BallRules.catchSpeedThreshold || catchStance else { return false }
+        guard (speed <= BallRules.catchSpeedThreshold && !shotInFlight) || catchStance else { return false }
         if ballPosition.distance(to: handCatchPoint) <= BallRules.handCatchRadius { return true }
         let offset = ballPosition - chest
         guard offset.length <= BallRules.catchRadius else { return false }

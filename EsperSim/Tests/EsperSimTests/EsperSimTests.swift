@@ -548,6 +548,41 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(ready.ball.holder, 0)
     }
 
+    /// Player 1 shoots a flat one from 120 out that comes down through player 0's chest,
+    /// on the left side of the court where nothing is in the way.
+    private func shotAtPlayerZero() -> Match {
+        var match = Match()
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position.x = 145
+        match.players[1].facing = .left
+        match.players[0].position.x = 25
+        for _ in 0..<BallRules.shotWindupFrames + 2 { match.advance(inputs: [.idle, PlayerInput(shoot: true)]) }
+        match.advance(inputs: [.idle, PlayerInput(aim: Vec2(x: -1, y: 0.3), shoot: true)])
+        match.advance(inputs: [.idle, .idle])
+        run(&match, frames: BallRules.shotReleaseFrames + 1, input: { _ in .idle })
+        return match
+    }
+
+    func testAShotInFlightGoesThroughABodyUnlessItIsCatching() {
+        var match = shotAtPlayerZero()
+        XCTAssertNil(match.ball.holder)
+        XCTAssertTrue(match.ball.shotInFlight)
+        var lowestOverBody = 100.0
+        let passed = run(&match, frames: 60, input: { _ in .idle }) { match in
+            if abs(match.ball.position.x - 25) < 5 { lowestOverBody = min(lowestOverBody, match.ball.position.y) }
+            return match.ball.position.x < 18
+        }
+        XCTAssertLessThan(passed, 60, "the shot should go straight through")
+        XCTAssertLessThan(lowestOverBody, 25 + 10, "it should have passed through the body, not over it")
+        XCTAssertNil(match.ball.holder)
+
+        // The same, holding the catch stance once the ball is loose: taken.
+        var ready = shotAtPlayerZero()
+        let caught = run(&ready, frames: 60, input: { _ in PlayerInput(shoot: true) }) { $0.ball.holder == 0 }
+        XCTAssertLessThan(caught, 60)
+    }
+
     func testLooseBallInFrontIsCaught() {
         var match = Match()
         match.ball.position = match.players[0].chest + Vec2(x: 6, y: 0)
@@ -1474,6 +1509,15 @@ final class FootsiesTests: XCTestCase {
 }
 
 final class OpponentTests: XCTestCase {
+    @discardableResult
+    private func run(_ match: inout Match, frames: Int, input: (Int) -> PlayerInput, until stop: ((Match) -> Bool)? = nil) -> Int {
+        for frame in 0..<frames {
+            match.advance(inputs: [input(frame), .idle])
+            if let stop, stop(match) { return frame }
+        }
+        return frames
+    }
+
     /// Runs the match with the human on `input` and the opponent deciding for itself.
     @discardableResult
     private func play(_ match: inout Match, _ opponent: inout Opponent, frames: Int, input: (Int) -> PlayerInput, until stop: ((Match) -> Bool)? = nil) -> Int {
@@ -1512,19 +1556,25 @@ final class OpponentTests: XCTestCase {
         XCTAssertLessThan(match.ball.position.x, 130, "the shot should be going at its own rim on the left")
     }
 
-    func testWithTheHumanClosingInItWaitsAndDartsWhenTheyCommit() {
+    func testItKeepsOutOfALiveSwingAndDartsPastASpentOne() {
         var match = Match()
         var brain = Opponent(index: 1)
         match.players[1].hasBall = true
         match.ball.holder = 1
-        // The human stands in the way, between it and its rim, close, doing nothing.
+        // The human stands in the way, between it and its rim, and swings.
         match.players[0].position.x = 180
-        play(&match, &brain, frames: 30, input: { _ in .idle })
+        match.players[1].position.x = 205
+        match.players[0].enter(.slashing)
+        // While the blade is live it never pushes toward them.
+        for _ in 0..<SlashRules.liveFrames.upperBound - 1 {
+            let theirs = brain.decide(match)
+            XCTAssertGreaterThanOrEqual(theirs.stick.x, 0, "pushed into a live blade")
+            match.advance(inputs: [.idle, theirs])
+        }
         XCTAssertTrue(match.players[1].hasBall)
-        XCTAssertGreaterThan(match.players[1].position.x, 160, "it shouldn't have barged into them")
-        // The human swings: it should get past inside a second or so.
-        let past = play(&match, &brain, frames: 120, input: { $0 < 2 ? PlayerInput(shoot: true) : .idle }) { $0.players[1].position.x < 170 }
-        XCTAssertLessThan(past, 120, "never darted past the swing")
+        // Spent: past them inside a second.
+        let past = play(&match, &brain, frames: 60, input: { _ in .idle }) { $0.players[1].position.x < 170 }
+        XCTAssertLessThan(past, 60, "never darted past the spent swing")
     }
 
     func testOnDefenceItGuardsTheRimAndSwingsInReach() {
@@ -1532,14 +1582,53 @@ final class OpponentTests: XCTestCase {
         var brain = Opponent(index: 1)
         match.players[0].hasBall = true
         match.ball.holder = 0
-        // It should head for the spot in front of the rim the human scores on, the right one.
-        play(&match, &brain, frames: 120, input: { _ in .idle })
+        // It heads first for the spot in front of the rim the human scores on, the right one.
+        play(&match, &brain, frames: 60, input: { _ in .idle })
         XCTAssertGreaterThan(match.players[1].position.x, 240)
         // The human walks up to it: a swing or a snatch comes.
         let swung = play(&match, &brain, frames: 400, input: { _ in PlayerInput(stick: Vec2(x: 0.6, y: 0)) }) {
             $0.events.contains(.slashed(player: 1)) || $0.players[1].state == .snatching
         }
         XCTAssertLessThan(swung, 400, "never went for the ball in reach")
+    }
+
+    func testStandingStillWithTheBallDrawsItIn() {
+        var match = Match()
+        var brain = Opponent(index: 1)
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        let came = play(&match, &brain, frames: 600, input: { _ in .idle }) {
+            $0.events.contains(.slashed(player: 1)) || $0.players[1].state == .snatching
+        }
+        XCTAssertLessThan(came, 600, "it should come and take a swing at a body standing about")
+    }
+
+    func testABallOnTheLedgeIsReachedWithAFullHop() {
+        var match = Match()
+        var brain = Opponent(index: 1)
+        match.players[0].position.x = 20
+        // The ball as it lies at the start: dropped from the spawn onto the ledge.
+        run(&match, frames: 150, input: { _ in .idle })
+        XCTAssertTrue(match.ball.resting)
+        XCTAssertGreaterThan(match.ball.position.y, 35)
+        let got = play(&match, &brain, frames: 400, input: { _ in .idle }) { $0.ball.holder == 1 }
+        XCTAssertLessThan(got, 400, "never got up to the ball")
+    }
+
+    func testAHitBodyCannotPressAnythingForAMoment() {
+        var match = Match()
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position.x = 142
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
+        XCTAssertEqual(match.players[1].hitStun, SlashRules.stunFrames)
+        // A jump press does nothing while stunned, and the stick still moves it.
+        match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: 1, y: 0), jump: true)])
+        XCTAssertNotEqual(match.players[1].state, .jumpSquat)
+        XCTAssertNotEqual(match.players[1].state, .idle)
+        run(&match, frames: SlashRules.stunFrames, input: { _ in .idle })
+        XCTAssertEqual(match.players[1].hitStun, 0)
     }
 
     func testWithTheBallLooseItGoesForIt() {

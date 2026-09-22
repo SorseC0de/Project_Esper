@@ -118,8 +118,12 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   snatch puts it, on the hand at full stretch: 16 art pixels, the spark's full size,
   round a point 18 ahead of and 19 above the feet, whichever way the body moves. A
   ball arriving from behind while standing still bounces off, and so does one faster
-  than 5 a frame (a throw is 7, a shot 4.5) unless the body is in the catch stance: a
-  shoot button held with no ball.
+  than 5 a frame (a throw is 7) unless the body is in the catch stance: a shoot button
+  held with no ball. A shot in flight, before its first bounce, is different: it goes
+  straight through a body, neither caught nor deflected, unless that body is in the
+  catch stance or reaching with a snatch; after its first bounce it's a loose ball again.
+- Hit by the blade, a body can't press anything for 15 frames, though the stick still
+  moves it, and its sprite flickers white.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
   would carry it through the rim, a share a frame, never snapped. Only a shot's or a
   floater's ball, and only until its first bounce off anything; a throw's never. Down
@@ -204,28 +208,34 @@ holds the variants; A is always the baseline as tuned.
 
 ## Opponent
 
-`Opponent.swift`. Powerless for now: it runs, walks, jumps, slides, slashes and snatches.
-It reads which of the three states the match is in and plays each differently.
+`Opponent.swift`. Powerless for now: it runs, walks, jumps, slides, slashes, snatches,
+throws and catches. It reads which of the three states the match is in and plays each
+differently, and it holds its jumps through the squat so its hops are full.
 
-- With the ball it doesn't just go and score. When the other is within 45 and hasn't
-  committed it picks, by chance, to stand, to walk back and forth dribbling, or to pump
-  fake, a stance held eight to sixteen frames and let go with down. While the other's
-  swing or reach is live it steps back out of reach and waits; the moment it's spent,
-  the recovery of a slash or a snatch, the roll, a landing, a catch, it darts past, a
-  dash with a full hop over them if they're in the way, the way Silksong's magma flies
-  wait for the swing. Crowded within 16 it darts or backs off. With the other far, or
-  the rim close, it goes to score: to within 80 units, then a stance with the flick that
-  lands nearest the rim, tried in five-degree steps through the shot's range, let go
-  after the windup, or at once if the other is closing.
-- Without the ball and the other holding it, it guards the rim they score on rather than
-  chasing them: it walks to a spot 25 units in front of that rim on their side and stands
-  there facing them, a step at them now and then. Within 22 it swings, mostly the slash,
-  the snatch when they're within 12, when they're winding up a shot or rushing it, and
-  otherwise by chance a few times a second; then it rests 45 frames, since a swing is a
-  window for them.
+- With the ball it works toward one of three shot spots, picked afresh each possession:
+  two on the floor in front of its rim, 45 and 70 out, and the end of the ledge nearest
+  the rim, which it climbs with a full hop and the double jump. At a floor spot it
+  shoots standing or, half the time, off a jump: the stance, a hop after the windup, let
+  go on the rise with the flick solved for the lift; the flick is the one that lands
+  nearest the rim, tried in five-degree steps. When the other is within 50 and in the
+  way and hasn't committed it picks, by chance, to stand, to walk back and forth
+  dribbling with the odd hop, to pump fake, to lob the ball straight up and run under
+  it, or to go over them on two jumps; after three such waits it stops waiting and goes
+  over, lobs, or switches spot. While the other's swing or reach is live it steps back
+  out of reach and waits; the moment it's spent, the recovery of a slash or a snatch,
+  the roll, a landing, a catch, it darts past, a dash with a full hop and the double
+  jump over them if they're in the way. Crowded within 16 it darts or backs off. Behind
+  the block it climbs out: to the wall, a hop, the wall jump, the double jump inward.
+- Without the ball and the other holding it, it guards the rim they score on: it walks
+  to a spot 25 in front of that rim on their side and stands facing them. It strikes,
+  a dash in and the swing when the blade will reach, a hop first if they're above, when
+  they wind up a shot within reach, when they're spent within 45, or by chance when
+  they stand about within 45; up close the swing is sometimes the snatch. After a swing
+  it rests 40 frames. When they stand still for a second far from the rim it walks up
+  to them and strikes.
 - With the ball loose it goes to where the ball will come down, running if it's far,
-  slides for it when it's a race, holds the catch stance when the ball is coming fast,
-  and jumps for one over its head.
+  slides for it when it's a race, holds the catch stance when the ball is coming, and
+  goes up for one over its head, both jumps if it's high.
 
 ## Look
 

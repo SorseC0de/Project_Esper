@@ -64,7 +64,8 @@ public struct Match: Equatable {
         reelBall()
 
         if ball.isLive, ball.tether == nil {
-            let bodies = players.filter { $0.catchCooldown == 0 }.map(\.body)
+            // A shot in flight goes through bodies; only a catch stance or a reach takes it.
+            let bodies = ball.shotInFlight ? [] : players.filter { $0.catchCooldown == 0 }.map(\.body)
             if let hoop = ball.step(stage: stage, bodies: bodies, events: &events) {
                 let owner = stage.hoops[hoop].owner
                 scores[owner] += 1
@@ -114,6 +115,7 @@ public struct Match: Equatable {
         case .releaseShot(let velocity):
             ball.release(from: player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight),
                          velocity: velocity, by: index, straight: false)
+            ball.shotInFlight = true
         case .releaseThrow(let velocity):
             let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
             if velocity.y > 0, velocity.x == 0 {
@@ -193,6 +195,7 @@ public struct Match: Equatable {
             if let other, players[other].hasBall, players[other].body.overlaps(blade) {
                 players[index].slashHit = true
                 pop(from: other, by: index)
+                players[other].hitStun = SlashRules.stunFrames
             } else if ball.isLive, ball.box.overlaps(blade) {
                 players[index].slashHit = true
                 ball.swat(toward: player.facing, by: index)
@@ -342,7 +345,7 @@ public struct Match: Equatable {
     private mutating func tryCatch() {
         let speed = ball.velocity.length
         let candidates = players.indices
-            .filter { players[$0].canCatch(ballAt: ball.position, speed: speed) }
+            .filter { players[$0].canCatch(ballAt: ball.position, speed: speed, shotInFlight: ball.shotInFlight) }
             .sorted { players[$0].chest.distance(to: ball.position) < players[$1].chest.distance(to: ball.position) }
         guard let catcher = candidates.first else { return }
         hand(ballTo: catcher)

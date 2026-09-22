@@ -413,6 +413,8 @@ public enum SlashRules {
     /// The sim frames on which some blade is live.
     public static let liveFrames = 3..<12
     public static let swatSpeed = 6.0
+    /// Frames the body hit by the blade can't press anything, though it can still move.
+    public static let stunFrames = 15
 }
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many

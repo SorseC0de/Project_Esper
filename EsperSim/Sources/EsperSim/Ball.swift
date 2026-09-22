@@ -15,6 +15,9 @@ public struct Ball: Equatable {
     /// anything. A thrown ball never steers, so scoring off a throw is the ball going
     /// through on its own.
     public var steers = false
+    /// A shot still in flight, before its first bounce: it goes through a body that isn't
+    /// in the catch stance, rather than into its hands or off it.
+    public var shotInFlight = false
     /// The hoop it last rose up through; its next fall through that hoop isn't a score.
     public var roseThrough: Int?
     /// Who released or swatted it last.
@@ -112,6 +115,7 @@ public struct Ball: Equatable {
         straight = false
         floater = 0
         steers = false
+        shotInFlight = false
         velocity.x = abs(velocity.x) > 0.3 ? -velocity.x * BallRules.bounce : 0
         events.append(.ballBounced(position: position))
     }
@@ -120,6 +124,7 @@ public struct Ball: Equatable {
         straight = false
         floater = 0
         steers = false
+        shotInFlight = false
         let rebound = -velocity.y * BallRules.bounce
         velocity.y = abs(rebound) > 0.6 ? rebound : 0
         events.append(.ballBounced(position: position))
@@ -158,6 +163,7 @@ public struct Ball: Equatable {
         floater = 0
         thrown = straight
         steers = !straight
+        shotInFlight = false
         roseThrough = nil
         lastTouched = player
         ownedFrames = BallRules.ownedFrames
@@ -183,6 +189,7 @@ public struct Ball: Equatable {
         floater = BallRules.popFloatFrames
         thrown = false
         steers = false
+        shotInFlight = false
         roseThrough = nil
         tether = nil
         lastTouched = nil
@@ -197,6 +204,7 @@ public struct Ball: Equatable {
         straight = false
         floater = 0
         steers = false
+        shotInFlight = false
         lastTouched = player
     }
 
@@ -209,6 +217,7 @@ public struct Ball: Equatable {
         floater = 0
         thrown = false
         steers = false
+        shotInFlight = false
         roseThrough = nil
         tether = nil
         lastTouched = nil

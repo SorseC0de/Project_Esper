@@ -522,6 +522,10 @@ final class GameScene: SKScene {
         controls.addSlider(title: "GLOW THRESHOLD", range: 0.2...1.0, notch: 0.1, value: GlowSettings.threshold) { value in
             GlowSettings.threshold = value
         }
+        if DunkTuning.enabled {
+            controls.addSlider(title: "DUNK X", range: -64...64, notch: 1, value: DunkTuning.x) { DunkTuning.x = $0 }
+            controls.addSlider(title: "DUNK Y", range: -64...0, notch: 1, value: DunkTuning.y) { DunkTuning.y = $0 }
+        }
         hud.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 8)
@@ -543,6 +547,11 @@ final class GameScene: SKScene {
             return
         }
         guard let last = lastTime else { return }
+        if DunkTuning.enabled {
+            holdDunkPose()
+            render()
+            return
+        }
         accumulator += min(currentTime - last, 0.1)
         guard accumulator >= GameScene.stepSeconds else { return }
 
@@ -564,6 +573,21 @@ final class GameScene: SKScene {
             accumulator = 0
         }
         render()
+    }
+
+    /// The dunk tuning pose: the match held still, player 1 hanging on the right rim at the
+    /// sliders' offset, facing the backboard, the ball out of the way.
+    private func holdDunkPose() {
+        let hoop = match.stage.hoops.first { $0.owner == 0 } ?? match.stage.hoops[0]
+        match.countdown = 0
+        match.players[0].position = hoop.position + Vec2(x: Double(DunkTuning.x) / SpriteLibrary.pixelsPerUnit * hoop.backboard.sign,
+                                                         y: Double(DunkTuning.y) / SpriteLibrary.pixelsPerUnit)
+        match.players[0].facing = hoop.backboard
+        match.players[0].hasBall = false
+        match.players[0].state = .dunking
+        match.players[0].stateTimer = BallRules.dunkFrames / 2 + 1
+        match.ball.respawn(at: Vec2(x: 170, y: 12.5))
+        debugLabel.text = String(format: "dunk offset %d, %d art px", Int(DunkTuning.x), Int(DunkTuning.y))
     }
 
     /// Everyone back to the start, scores cleared.
@@ -1016,7 +1040,7 @@ final class GameScene: SKScene {
             switch player.power {
             case .flashFizz: shoot = "FLASH"
             case .platformShake: shoot = "WALL"
-            default: shoot = defence ? "SLASH" : "CATCH"
+            default: shoot = "SLASH"
             }
         }
         let throwBall = player.hasBall ? "THROW" : (player.power == .webWater ? "WEB" : "SNATCH")

@@ -31,6 +31,16 @@ enum PowerVariant: Int, CaseIterable {
     }
 }
 
+/// Tuning the dunk's place on the rim: with this on, the match doesn't run; player 1 is
+/// held in the hang at the right rim, the feet this far from the rim's centre in art
+/// pixels, on the DUNK X and DUNK Y sliders. The numbers found go into
+/// `BallRules.dunkOffset`, mirrored across for the other rim.
+enum DunkTuning {
+    static let enabled = true
+    nonisolated(unsafe) static var x: Float = -3
+    nonisolated(unsafe) static var y: Float = -28
+}
+
 /// The glow, as GameMaker's Glow filter had it: what counts as bright, how soft the cut is,
 /// how far it spreads, how strong it comes back, and its colour.
 enum GlowSettings {

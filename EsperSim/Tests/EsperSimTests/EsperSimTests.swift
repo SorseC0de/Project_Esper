@@ -532,7 +532,7 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity, Vec2(x: BallRules.throwSpeed, y: 0))
     }
 
-    func testFastBallBouncesOffUnlessInCatchStance() {
+    func testFastBallBouncesOffUnlessSnatchedOrInTheCatchStance() {
         var match = Match()
         let chest = match.players[0].chest
         match.ball.respawn(at: chest + Vec2(x: 20, y: 0))
@@ -541,10 +541,21 @@ final class BallTests: XCTestCase {
         XCTAssertNil(match.ball.holder)
         XCTAssertGreaterThan(match.ball.velocity.x, 0, "a thrown ball should bounce off an idle body")
 
+        // The snatch, pressed as it comes, takes it.
+        var snatching = Match()
+        snatching.ball.respawn(at: chest + Vec2(x: 40, y: 0))
+        snatching.ball.velocity = Vec2(x: -BallRules.throwSpeed, y: 0)
+        run(&snatching, frames: 15, input: { _ in PlayerInput(throwBall: true) }) { $0.ball.holder != nil }
+        XCTAssertEqual(snatching.ball.holder, 0)
+
+        // Shoot held: the press is a slash, and once that's done the hold is the catch
+        // stance, which takes a fast ball arriving after it.
         var ready = Match()
-        ready.ball.respawn(at: chest + Vec2(x: 20, y: 0))
-        ready.ball.velocity = Vec2(x: -BallRules.throwSpeed, y: 0)
-        run(&ready, frames: 10, input: { _ in PlayerInput(shoot: true) }) { $0.ball.holder != nil }
+        ready.players[1].position.x = 20
+        ready.ball.respawn(at: chest + Vec2(x: 150, y: 0))
+        ready.ball.velocity = Vec2(x: -6, y: 0)
+        let caught = run(&ready, frames: 40, input: { _ in PlayerInput(shoot: true) }) { $0.ball.holder != nil }
+        XCTAssertGreaterThan(caught, SlashRules.frames)
         XCTAssertEqual(ready.ball.holder, 0)
     }
 
@@ -646,8 +657,12 @@ final class BallTests: XCTestCase {
         match.players[0].enter(.air)
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
-        // The dunk drops the ball through at once, and the beat starts.
+        // The dunk snaps the feet onto the rim, facing the backboard, drops the ball through
+        // at once, and the beat starts.
         XCTAssertEqual(match.players[0].state, .dunking)
+        XCTAssertEqual(match.players[0].facing, .right)
+        XCTAssertEqual(match.players[0].position.x, rim.x + BallRules.dunkOffset.x, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].position.y, rim.y + BallRules.dunkOffset.y, accuracy: 0.001)
         XCTAssertEqual(match.scores, [1, 0])
         XCTAssertEqual(match.restartIn, BallRules.dunkHangFrames)
         // Still hanging there, the point not yet restarted, for the beat.
@@ -1378,11 +1393,10 @@ final class FootsiesTests: XCTestCase {
         XCTAssertGreaterThan(snatching.players[0].velocity.x, 2)
     }
 
-    func testShootInNeutralIsNotASlash() {
+    func testShootInNeutralIsASlashToo() {
         var match = neutral()
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        XCTAssertEqual(match.players[0].state, .idle)
-        XCTAssertTrue(match.players[0].catchStance)
+        XCTAssertEqual(match.players[0].state, .slashing)
     }
 
     func testAirSlashFloatsThroughTheSwingThenRolls() {
@@ -1431,8 +1445,11 @@ final class FootsiesTests: XCTestCase {
         match.ball.velocity = Vec2(x: 0, y: -2)
         let swatted = run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.swatted(player: 0, hit: true)) }
         XCTAssertLessThan(swatted, SlashRules.frames)
+        // Spiked down and away, at about 45 degrees.
         XCTAssertGreaterThan(match.ball.velocity.x, 0)
-        XCTAssertGreaterThan(match.ball.velocity.y, 0)
+        XCTAssertLessThan(match.ball.velocity.y, 0)
+        let angle = atan2(match.ball.velocity.y, match.ball.velocity.x)
+        XCTAssertEqual(angle, SlashRules.spikeAngle, accuracy: SlashRules.spikeJitter + 0.05)
         XCTAssertGreaterThanOrEqual(match.ball.velocity.length, SlashRules.swatSpeed - 0.2)
     }
 

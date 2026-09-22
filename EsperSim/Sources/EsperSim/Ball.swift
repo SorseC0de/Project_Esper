@@ -197,10 +197,9 @@ public struct Ball: Equatable {
         resting = false
     }
 
-    /// Swatted: sent the way the swatter faces and a little up, at its own speed or the
-    /// swat speed, whichever is more.
-    public mutating func swat(toward facing: Facing, by player: Int) {
-        velocity = Vec2(x: facing.sign * 2, y: 1).normalized * max(velocity.length, SlashRules.swatSpeed)
+    /// Spiked: sent along `direction`, at its own speed or the swat speed, whichever is more.
+    public mutating func swat(along direction: Vec2, by player: Int) {
+        velocity = direction.normalized * max(velocity.length, SlashRules.swatSpeed)
         straight = false
         floater = 0
         steers = false

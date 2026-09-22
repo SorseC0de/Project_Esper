@@ -73,7 +73,8 @@ public struct Match: Equatable {
 
         if ball.isLive, ball.tether == nil {
             // A shot in flight goes through bodies; only a catch stance or a reach takes it.
-            let bodies = ball.shotInFlight ? [] : players.filter { $0.catchCooldown == 0 }.map(\.body)
+            // A dunker hanging under the rim doesn't get in the way of the ball dropping through.
+            let bodies = ball.shotInFlight ? [] : players.filter { $0.catchCooldown == 0 && $0.state != .dunking }.map(\.body)
             if let hoop = ball.step(stage: stage, bodies: bodies, events: &events) {
                 let owner = stage.hoops[hoop].owner
                 scores[owner] += 1
@@ -212,8 +213,11 @@ public struct Match: Equatable {
                 pop(from: other, by: index)
                 players[other].hitStun = SlashRules.stunFrames
             } else if ball.isLive, ball.box.overlaps(blade) {
+                // Down and away at about the spike angle, jittered a little by the frame.
                 players[index].slashHit = true
-                ball.swat(toward: player.facing, by: index)
+                let noise = Double((frame &* 1103515245 &+ 12345) & 0xFFFF) / 65535 * 2 - 1
+                let angle = SlashRules.spikeAngle + SlashRules.spikeJitter * noise
+                ball.swat(along: Vec2(x: cos(angle) * player.facing.sign, y: sin(angle)), by: index)
                 events.append(.swatted(player: index, hit: true))
             }
         }

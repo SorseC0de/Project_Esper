@@ -287,6 +287,10 @@ public enum BallRules {
     public static let dunkRadius = 25.0
     public static let dunkFrames = 20
     public static let dunkHangFrames = 45
+    /// Where the dunker's feet go on the rim, from the rim's centre, for a rim with its
+    /// backboard on the right; across is mirrored for the other. The hand on the ledge
+    /// sheet sits 28 art pixels up and 3 ahead of the feet.
+    public static let dunkOffset = Vec2(x: -3 / 1.6, y: -28 / 1.6)
 
     /// The ball is caught within this of the chest, in front. Faster than the threshold it
     /// bounces off instead, unless the body is in the catch stance: a shoot button held
@@ -396,27 +400,24 @@ public enum SlideRules {
     public static let legHeight = 6.0
 }
 
-/// The Esper Slash's numbers: shoot on defence, with the other holding the ball. On the
-/// ground it carries what run it had and is over when the swing is; in the air the body rises at
-/// least this fast and gravity is cut to this share, so it hangs through the swing, and
-/// the roll follows over this many frames. Both play at this many sheet frames a second.
-/// The blade is where the sheet draws the crescent, frame by frame: raised behind and
-/// above on sheet frame 1, overhead on 2, swung down in front on 3, in units from the
-/// feet facing right. It knocks the ball out of a holder's hands, body or ball, or swats
-/// a loose one away at no less than this speed.
+/// The Esper Slash's numbers: shoot without the ball, in neutral or on defence. On the
+/// ground it carries what run it had and is over when the swing is; in the air the body
+/// rises at least this fast and gravity is cut to this share, so it hangs through the
+/// swing, and the roll follows over this many frames. Both play at this many sheet
+/// frames a second. The blade is a square round the body, 56 art pixels a side, live over
+/// these frames. It knocks the ball out of a holder's hands, or spikes a loose one down
+/// and away at about this angle below the horizontal, jittered by up to this much, at no
+/// less than this speed.
 public enum SlashRules {
     public static let frames = 18
     public static let rollFrames = 18
     public static let sheetFramesPerSecond = 20
     public static let lift = 1.0
     public static let gravityShare = 0.2
-    public static let blades: [Int: Box] = [
-        1: Box(min: Vec2(x: -14, y: 8), max: Vec2(x: 0, y: 21)),
-        2: Box(min: Vec2(x: -13, y: 16), max: Vec2(x: 8, y: 21)),
-        3: Box(min: Vec2(x: 1, y: 0), max: Vec2(x: 18, y: 25)),
-    ]
-    /// The sim frames on which some blade is live.
+    public static let reach = 56 / 1.6 / 2
     public static let liveFrames = 3..<12
+    public static let spikeAngle = degrees(-45)
+    public static let spikeJitter = degrees(10)
     public static let swatSpeed = 6.0
     /// Frames the body hit by the blade can't press anything, though it can still move.
     public static let stunFrames = 15

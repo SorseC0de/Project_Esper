@@ -437,7 +437,7 @@ public struct Player: Equatable {
                 startSnatch()
             } else if !hasBall, shootPressed, power == .platformShake, platformCooldown == 0, platformArmed {
                 startWall()
-            } else if !hasBall, shootPressed, onDefence, power != .flashFizz, power != .platformShake {
+            } else if !hasBall, shootPressed, power != .flashFizz, power != .platformShake {
                 startSlash(events: &events)
             }
 
@@ -538,6 +538,10 @@ public struct Player: Equatable {
                 if throwDirection.x != 0 { facing = throwDirection.x > 0 ? .right : .left }
             }
             if let hoop = stage.hoops.indices.first(where: { stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius }) {
+                // Onto the rim: the feet at the dunk's place on it, facing the backboard.
+                let rim = stage.hoops[hoop]
+                position = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y)
+                facing = rim.backboard
                 velocity = .zero
                 enter(.dunking)
                 action = .dunk(hoop: hoop)
@@ -775,7 +779,7 @@ public struct Player: Equatable {
             startSnatch()
         } else if !hasBall, shootPressed, power == .platformShake, platformCooldown == 0, platformArmed {
             startWall()
-        } else if !hasBall, shootPressed, onDefence, power != .flashFizz, power != .platformShake {
+        } else if !hasBall, shootPressed, power != .flashFizz, power != .platformShake {
             startSlash(events: &events)
         } else {
             return false
@@ -863,12 +867,10 @@ public struct Player: Equatable {
         return Box(min: Vec2(x: min(front, tip), y: position.y), max: Vec2(x: max(front, tip), y: position.y + SlideRules.legHeight))
     }
 
-    /// The blade where this frame's sheet draws the crescent, until it has hit.
+    /// The blade: a square round the body over the slash's live frames, until it has hit.
     public var slashHitbox: Box? {
-        guard state == .slashing, !slashHit, let blade = SlashRules.blades[stateTimer * SlashRules.sheetFramesPerSecond / 60] else { return nil }
-        let left = facing == .right ? blade.min.x : -blade.max.x
-        let right = facing == .right ? blade.max.x : -blade.min.x
-        return Box(min: Vec2(x: position.x + left, y: position.y + blade.min.y), max: Vec2(x: position.x + right, y: position.y + blade.max.y))
+        guard state == .slashing, !slashHit, SlashRules.liveFrames.contains(stateTimer) else { return nil }
+        return Box(center: body.center, width: SlashRules.reach * 2, height: SlashRules.reach * 2)
     }
 
     /// The whole body and the hand's reach in front, while the snatch's hand is out.

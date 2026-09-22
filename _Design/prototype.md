@@ -72,15 +72,14 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   is a jump shot: released on the way up
   it fires on the preset arc if nothing was flicked and the ball leaves with the body's
   lift. On the way down it's an ordinary air shot.
-- Shoot (without ball, in neutral): held, the catch stance.
-- Shoot (without ball, on defence, the other holding the ball): the Esper Slash, the swat.
-  On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
-  air the body rises at least 1 a frame and
-  gravity is cut to a fifth, so it hangs through the swing. 18 frames at 20 a second. The
-  blade is where the sheet draws the crescent, frame by frame: raised behind and above on
-  sheet frame 1, overhead on 2, swung down in front on 3, out to 18 units ahead and 25
-  up. Touching the holder's body or ball with it knocks the ball out of their hands, and
-  it swats a loose ball the way the body faces and a little up at no less than 6. In the air it ends in the roll, the double
+- Shoot (without ball, in neutral or on defence): the Esper Slash, the swat. On the
+  ground it carries the run or dash it came from, bleeding 0.15 a frame; in the air the
+  body rises at least 1 a frame and gravity is cut to a fifth, so it hangs through the
+  swing. 18 frames at 20 a second. The blade is a square round the body, 56 art pixels a
+  side, live over frames 3 to 11. Touching the holder's body or ball with it knocks the
+  ball out of their hands, and it spikes a loose ball down and away at about 45° below
+  the horizontal, jittered up to 10° by the frame, at no less than 6. Shoot held past
+  the slash is the catch stance: a fast ball arriving while it's held is caught. In the air it ends in the roll, the double
   jump's somersault over 18 frames at the same pace with normal gravity and air drift, so
   the whole thing is a commitment; on the ground it's over when the swing is. Not in
   neutral.
@@ -106,8 +105,12 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the air the throw stance keeps its run,
   bleeding only 0.03 a frame, so a jump carries it to the rim. In the stance with the
-  chest within 25 units of a rim, wider than the basket, it's a dunk: the ball goes in
-  halfway through, and the dunker hangs on the rim 45 frames before the point restarts.
+  chest within 25 units of a rim, wider than the basket, it's a dunk: the feet snap to
+  the dunk's place on the rim, `BallRules.dunkOffset` from its centre, mirrored across
+  for the other rim, facing the backboard; the ball goes in at once, and the dunker
+  hangs there 45 frames before the point restarts. `DunkTuning` in `Tuning.swift`, when
+  on, holds the match with player 1 in that hang at the right rim and puts DUNK X and
+  DUNK Y sliders up, in art pixels, to find the place.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
@@ -121,10 +124,11 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   snatch puts it, on the hand at full stretch: 16 art pixels, the spark's full size,
   round a point 18 ahead of and 19 above the feet, whichever way the body moves. A
   ball arriving from behind while standing still bounces off, and so does one faster
-  than 5 a frame (a throw is 7) unless the body is in the catch stance: a shoot button
-  held with no ball. A shot in flight, before its first bounce, is different: it goes
-  straight through a body, neither caught nor deflected, unless that body is in the
-  catch stance or reaching with a snatch; after its first bounce it's a loose ball again.
+  than 5 a frame (a throw is 7) unless the body is in the catch stance, a shoot button
+  held with no ball past its slash, or reaching with a snatch. A shot in flight, before
+  its first bounce, is different: it goes straight through a body, neither caught nor
+  deflected, unless that body is in the catch stance or reaching with a snatch; after its
+  first bounce it's a loose ball again.
 - Hit by the blade, a body can't press anything for 15 frames, though the stick still
   moves it, and its sprite flickers white.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what

@@ -527,9 +527,19 @@ public struct Opponent: Equatable {
         let target = landing(of: ball, in: match.stage)
         let toBall = target - me.position.x
         let above = ball.position.y - me.position.y
-        let coming = ball.velocity.length > 2 && ball.position.distance(to: me.chest) < 50
-        if coming {
-            input.shoot = true
+        // A ball in flight about to be in reach: the snatch to take it, timed for the hand,
+        // or the slash to spike it, by chance.
+        if ball.velocity.length > 2 {
+            let soon = ballPosition(ball, after: 6)
+            let inHand = soon.distance(to: me.handCatchPoint) <= BallRules.handCatchRadius || soon.distance(to: me.chest) <= BallRules.catchRadius
+            let inBlade = abs(soon.x - me.body.center.x) <= SlashRules.reach && abs(soon.y - me.body.center.y) <= SlashRules.reach
+            if inHand, me.snatchCooldown == 0, chance(70) {
+                tapThrow(&input)
+                return
+            } else if inBlade, chance(50) {
+                tapShoot(&input)
+                return
+            }
         }
         if abs(toBall) > 30 {
             input.stick = Vec2(x: toBall > 0 ? 1 : -1, y: 0)
@@ -548,6 +558,17 @@ public struct Opponent: Equatable {
                 tapJump(&input)
             }
         }
+    }
+
+    /// Where the ball will be this many frames on, falling as it does.
+    private func ballPosition(_ ball: Ball, after frames: Int) -> Vec2 {
+        var position = ball.position
+        var velocity = ball.velocity
+        for _ in 0..<frames {
+            if ball.floater == 0 { velocity.y = max(velocity.y - BallRules.gravity, -BallRules.fallSpeed) }
+            position += velocity
+        }
+        return position
     }
 
     /// Where the loose ball comes down: its x when it next reaches the floor, off the walls

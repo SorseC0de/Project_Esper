@@ -179,8 +179,8 @@ way to white over the light half, so mid grey is the colour itself and white a p
 of it. The grayscale effect sheets go through the same ramp in a player's colour. A ball
 knocked loose or swatted throws one of two sparks, either each time, centred on the ball
 in the hitter's colour. A score brings lightning down on the rim in the scorer's colour,
-one of four bolts each time, leaning with the way the ball came in up to 20° off
-vertical, scaled from the rim so its top and sides are past the screen's edge wherever
+one of four bolts each time, favouring vertical: it leans half as far as the ball came
+in off vertical and never past 45°, so it never lies flat, scaled from the rim so its top and sides are past the screen's edge wherever
 the rim is; the sheet's two full-frame flash frames are matched by a flash over the whole
 screen in the same tone, so the sprite's edge never shows through them, and the crown
 erupts off the rim with it. Sparks and bolts play at 24 a second. A held throw shows the

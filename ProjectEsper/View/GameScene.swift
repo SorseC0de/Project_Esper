@@ -21,9 +21,10 @@ final class GameScene: SKScene {
     /// Where to put the catch spark's feet so its ring lands on the snatch's hand: the ring
     /// sits 7 art pixels ahead and 20 up on its own canvas, the hand 18 ahead and 19 up.
     private static let snatchSparkOffset = Vec2(x: 11, y: -1)
-    /// How far off vertical a score's lightning leans with the way the ball came in: the
-    /// cap of about 160 and -160 with straight down at 180.
-    private static let strikeMaxLean = degrees(20)
+    /// A score's lightning favours vertical: it leans this share of the way the ball came
+    /// in off vertical, and never past the cap, so it never lies flat.
+    private static let strikeLeanShare = 0.5
+    private static let strikeMaxLean = degrees(45)
 
     private var match = Match()
     private var headVariant = HeadVariant.b
@@ -630,15 +631,15 @@ final class GameScene: SKScene {
         glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position)))
     }
 
-    /// A score: lightning strikes the rim from the way the ball came in, leaning up to the
-    /// cap off vertical, one of the four bolts each time, scaled so its top and sides are
+    /// A score: lightning strikes the rim from the way the ball came in, leaning half as
+    /// far as the ball did and never past the cap, one of the four bolts each time, scaled so its top and sides are
     /// past the edge of the screen wherever the rim is. The sheet's two full-frame flash
     /// frames are matched by a flash over the whole screen in the same tone, so the
     /// sprite's own edge never shows through them. The crown erupts off the rim with it.
     private func strike(hoop: Int, by scorer: Int) {
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let velocity = match.ball.velocity
-        let lean = min(max(atan2(velocity.x, -velocity.y), -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
+        let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
         let bolt = EnergyEffect.strikes.randomElement()!
         let node = bolt.node(sprites, player: scorer, at: rim)
         node.zRotation = CGFloat(lean)

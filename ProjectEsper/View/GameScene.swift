@@ -762,10 +762,13 @@ final class GameScene: SKScene {
                 handBall.isHidden = true
             }
 
-            // A held throw charges: the swirl round the ball in hand, looping.
+            // A held throw charges: the swirl round the ball in hand, up to the loop's end,
+            // then round the loop for as long as the throw is held.
             let charge = chargeNodes[index]
             if player.state == .throwStance, !handBall.isHidden {
-                let frame = (player.stateTimer * Int(EnergyEffect.charge.fps) / 60) % EnergyEffect.charge.frameCount
+                let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
+                let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
+                let frame = played <= loopEnd ? played : loopStart + (played - loopStart) % (loopEnd - loopStart + 1)
                 charge.texture = sprites.effectTexture(EnergyEffect.charge.name, frame, player: index)
                 charge.size = charge.texture!.size()
                 charge.position = handBall.position

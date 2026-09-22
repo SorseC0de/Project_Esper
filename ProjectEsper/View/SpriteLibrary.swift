@@ -437,6 +437,9 @@ enum EnergyEffect: CaseIterable {
     /// The bolts' one colour on the sheets, (241, 246, 240), as a grey level: what their
     /// full-frame flash comes out as through the ramp.
     static let strikeLuminance = 0.958
+    /// The charge plays up to here, then loops from here while the throw is held.
+    static let chargeLoopEnd = 67
+    static let chargeLoopStart = 35
     /// The bolt sheets' frames that are a full-frame flash, and the one after, whose top
     /// 32 rows are solid across the sheet.
     static let strikeFlashFrames = 5..<7

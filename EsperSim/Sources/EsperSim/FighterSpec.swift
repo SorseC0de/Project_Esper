@@ -288,13 +288,12 @@ public enum BallRules {
     public static let dunkFrames = 20
     public static let dunkHangFrames = 45
     /// Where the dunker's feet go on the rim, from the rim's centre, for a rim with its
-    /// backboard on the right; across is mirrored for the other. The hand on the ledge
-    /// sheet sits 28 art pixels up and 3 ahead of the feet.
-    public static let dunkOffset = Vec2(x: -3 / 1.6, y: -28 / 1.6)
+    /// backboard on the right; across is mirrored for the other. 16 art pixels back and
+    /// 24 down, as the user placed it on the sliders.
+    public static let dunkOffset = Vec2(x: -16 / 1.6, y: -24 / 1.6)
 
     /// The ball is caught within this of the chest, in front. Faster than the threshold it
-    /// bounces off instead, unless the body is in the catch stance: a shoot button held
-    /// with no ball.
+    /// bounces off instead; that, and a shot in flight, take the snatch.
     public static let catchRadius = 12.5
     /// The second ring, the catch spark's where the snatch puts it, on the hand at full
     /// stretch: centred this far ahead of and above the feet and as big as the spark
@@ -303,6 +302,8 @@ public enum BallRules {
     public static let handCatchCentre = Vec2(x: 18 / 1.6, y: 19 / 1.6)
     public static let handCatchRadius = 16 / 1.6
     public static let catchSpeedThreshold = 5.0
+    /// Frames after bouncing off a body in which the rings don't take the ball.
+    public static let offBodyFrames = 10
     public static let chestHeight = 9.0
     /// A ball knocked out of a holder's hands pops straight up: the floater's drift for
     /// this many frames, then a normal fall, nobody's.

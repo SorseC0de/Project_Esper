@@ -15,8 +15,8 @@ import Foundation
 /// Without the ball and the other holding it, it guards the rim they score on and
 /// strikes when they wind up a shot, come into reach, or stand about: a dash in and the
 /// slash, the snatch up close. With the ball loose it goes to where the ball comes
-/// down, over its head with both jumps if it has to, and holds the catch stance for a
-/// ball in flight.
+/// down, over its head with both jumps if it has to, and times a snatch or a slash for
+/// a ball in flight. It leaves its own shot alone while it's in the air.
 public struct Opponent: Equatable {
     public let index: Int
     private var random: UInt32
@@ -524,6 +524,14 @@ public struct Opponent: Equatable {
         plan = .none
         if Opponent.committedStates.contains(me.state) { return }
         guard ball.isLive else { return }
+        // Its own shot, still on its way: let it go in, and wait under the rim for a miss.
+        if ball.shotInFlight, ball.lastTouched == index {
+            let hoop = hoop(scoredOnBy: index, in: match)
+            let spot = hoop.position.x - hoop.backboard.sign * 30
+            let toSpot = spot - me.position.x
+            if abs(toSpot) > 6 { input.stick = Vec2(x: toSpot > 0 ? 0.5 : -0.5, y: 0) }
+            return
+        }
         let target = landing(of: ball, in: match.stage)
         let toBall = target - me.position.x
         let above = ball.position.y - me.position.y

@@ -78,8 +78,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   swing. 18 frames at 20 a second. The blade is a square round the body, 56 art pixels a
   side, live over frames 3 to 11. Touching the holder's body or ball with it knocks the
   ball out of their hands, and it spikes a loose ball down and away at about 45° below
-  the horizontal, jittered up to 10° by the frame, at no less than 6. Shoot held past
-  the slash is the catch stance: a fast ball arriving while it's held is caught. In the air it ends in the roll, the double
+  the horizontal, jittered up to 10° by the frame, at no less than 6. In the air it ends in the roll, the double
   jump's somersault over 18 frames at the same pace with normal gravity and air drift, so
   the whole thing is a commitment; on the ground it's over when the swing is. Not in
   neutral.
@@ -110,7 +109,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   for the other rim, facing the backboard; the ball goes in at once, and the dunker
   hangs there 45 frames before the point restarts. `DunkTuning` in `Tuning.swift`, when
   on, holds the match with player 1 in that hang at the right rim and puts DUNK X and
-  DUNK Y sliders up, in art pixels, to find the place.
+  DUNK Y sliders up, in art pixels, to find the place; it found 16 back and 24 down.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
@@ -124,11 +123,13 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   snatch puts it, on the hand at full stretch: 16 art pixels, the spark's full size,
   round a point 18 ahead of and 19 above the feet, whichever way the body moves. A
   ball arriving from behind while standing still bounces off, and so does one faster
-  than 5 a frame (a throw is 7) unless the body is in the catch stance, a shoot button
-  held with no ball past its slash, or reaching with a snatch. A shot in flight, before
-  its first bounce, is different: it goes straight through a body, neither caught nor
-  deflected, unless that body is in the catch stance or reaching with a snatch; after its
-  first bounce it's a loose ball again.
+  than 5 a frame (a throw is 7) unless the body is reaching with a snatch, and for 10
+  frames after bouncing off a body the rings don't take it, so it isn't caught on the
+  rebound. A shot in
+  flight, before its first bounce, is different: it goes straight through a body,
+  neither caught nor deflected, unless that body is reaching with a snatch; after its
+  first bounce it's a loose ball again. The snatch is the catch: there is no catch
+  stance.
 - Hit by the blade, a body can't press anything for 15 frames, though the stick still
   moves it, and its sprite flickers white.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
@@ -174,8 +175,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 - Super Soda (C). A fresh jump press in the air, held, is flight: the stick moves the body
   in any direction with gravity off, slowly with the ball and twice as fast without, for two seconds of budget per airtime, refilled on landing.
   Let go or run out and it falls. The body leans up to thirty degrees into its motion,
-  forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and a shot or
-  throw can be taken from flight. Numbers in `SodaRules`.
+  forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and flight
+  cancels into a shot or a throw with the ball and a slash or a snatch without. Numbers in `SodaRules`.
 - Flash Fizz (D). Without the ball, in neutral or on defence, a shoot button is the
   flash: 30 units along the stick, or in place with the stick centred, in addition to the
   double jump, arriving nudged clear of anything solid. The flashes are tears in space,
@@ -241,8 +242,9 @@ differently, and it holds its jumps through the squat so its hops are full.
   it rests 40 frames. When they stand still for a second far from the rim it walks up
   to them and strikes.
 - With the ball loose it goes to where the ball will come down, running if it's far,
-  slides for it when it's a race, holds the catch stance when the ball is coming, and
-  goes up for one over its head, both jumps if it's high.
+  slides for it when it's a race, times a snatch or a slash for one in flight, leaves its
+  own shot alone while it's on its way and waits under the rim for the miss, and goes up
+  for one over its head, both jumps if it's high.
 
 ## Look
 

@@ -72,7 +72,7 @@ public struct Match: Equatable {
         reelBall()
 
         if ball.isLive, ball.tether == nil {
-            // A shot in flight goes through bodies; only a catch stance or a reach takes it.
+            // A shot in flight goes through bodies; only a snatch's reach takes it.
             // A dunker hanging under the rim doesn't get in the way of the ball dropping through.
             let bodies = ball.shotInFlight ? [] : players.filter { $0.catchCooldown == 0 && $0.state != .dunking }.map(\.body)
             if let hoop = ball.step(stage: stage, bodies: bodies, events: &events) {
@@ -362,6 +362,7 @@ public struct Match: Equatable {
 
     /// The nearest player who can reach the loose ball takes it.
     private mutating func tryCatch() {
+        guard ball.offBodyFrames == 0 else { return }
         let speed = ball.velocity.length
         let candidates = players.indices
             .filter { players[$0].canCatch(ballAt: ball.position, speed: speed, shotInFlight: ball.shotInFlight) }

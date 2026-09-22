@@ -532,7 +532,7 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity, Vec2(x: BallRules.throwSpeed, y: 0))
     }
 
-    func testFastBallBouncesOffUnlessSnatchedOrInTheCatchStance() {
+    func testFastBallBouncesOffUnlessSnatched() {
         var match = Match()
         let chest = match.players[0].chest
         match.ball.respawn(at: chest + Vec2(x: 20, y: 0))
@@ -548,15 +548,13 @@ final class BallTests: XCTestCase {
         run(&snatching, frames: 15, input: { _ in PlayerInput(throwBall: true) }) { $0.ball.holder != nil }
         XCTAssertEqual(snatching.ball.holder, 0)
 
-        // Shoot held: the press is a slash, and once that's done the hold is the catch
-        // stance, which takes a fast ball arriving after it.
-        var ready = Match()
-        ready.players[1].position.x = 20
-        ready.ball.respawn(at: chest + Vec2(x: 150, y: 0))
-        ready.ball.velocity = Vec2(x: -6, y: 0)
-        let caught = run(&ready, frames: 40, input: { _ in PlayerInput(shoot: true) }) { $0.ball.holder != nil }
-        XCTAssertGreaterThan(caught, SlashRules.frames)
-        XCTAssertEqual(ready.ball.holder, 0)
+        // Shoot held does nothing for it: the press is a slash, and after that it still bounces.
+        var holding = Match()
+        holding.players[1].position.x = 20
+        holding.ball.respawn(at: chest + Vec2(x: 150, y: 0))
+        holding.ball.velocity = Vec2(x: -6, y: 0)
+        run(&holding, frames: 40, input: { _ in PlayerInput(shoot: true) }) { $0.ball.holder != nil }
+        XCTAssertNil(holding.ball.holder)
     }
 
     /// Player 1 shoots a flat one from 120 out that comes down through player 0's chest,
@@ -575,7 +573,7 @@ final class BallTests: XCTestCase {
         return match
     }
 
-    func testAShotInFlightGoesThroughABodyUnlessItIsCatching() {
+    func testAShotInFlightGoesThroughABodyUnlessItIsSnatched() {
         var match = shotAtPlayerZero()
         XCTAssertNil(match.ball.holder)
         XCTAssertTrue(match.ball.shotInFlight)
@@ -588,10 +586,11 @@ final class BallTests: XCTestCase {
         XCTAssertLessThan(lowestOverBody, 25 + 10, "it should have passed through the body, not over it")
         XCTAssertNil(match.ball.holder)
 
-        // The same, holding the catch stance once the ball is loose: taken.
+        // The same, with a snatch pressed as it comes: taken.
         var ready = shotAtPlayerZero()
-        let caught = run(&ready, frames: 60, input: { _ in PlayerInput(shoot: true) }) { $0.ball.holder == 0 }
-        XCTAssertLessThan(caught, 60)
+        run(&ready, frames: 60, input: { _ in .idle }) { $0.ball.position.x - 25 < 45 }
+        let caught = run(&ready, frames: 20, input: { _ in PlayerInput(throwBall: true) }) { $0.ball.holder == 0 }
+        XCTAssertLessThan(caught, 20)
     }
 
     func testLooseBallInFrontIsCaught() {
@@ -1055,6 +1054,21 @@ final class SodaAndFizzTests: XCTestCase {
         // Let go and it falls.
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .air)
+    }
+
+    func testFlightCancelsIntoTheSlashAndTheSnatch() {
+        for (input, state) in [(PlayerInput(jump: true, shoot: true), PlayerState.slashing), (PlayerInput(jump: true, throwBall: true), PlayerState.snatching)] {
+            var match = with(.superSoda)
+            match.players[1].hasBall = true
+            match.ball.holder = 1
+            match.players[1].position.x = 300
+            run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+            run(&match, frames: 10, input: { _ in .idle })
+            run(&match, frames: 6, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .flying }
+            XCTAssertEqual(match.players[0].state, .flying)
+            match.advance(inputs: [input, .idle])
+            XCTAssertEqual(match.players[0].state, state)
+        }
     }
 
     func testFlightRunsOutAndRefillsOnLanding() {
@@ -1686,6 +1700,22 @@ final class OpponentTests: XCTestCase {
         XCTAssertNotEqual(match.players[1].state, .idle)
         run(&match, frames: SlashRules.stunFrames, input: { _ in .idle })
         XCTAssertEqual(match.players[1].hitStun, 0)
+    }
+
+    func testItLeavesItsOwnShotAloneUntilItLandsOrScores() {
+        var match = Match()
+        var brain = Opponent(index: 1)
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[0].position.x = 300
+        let shot = play(&match, &brain, frames: 900, input: { _ in .idle }) { $0.events.contains(.shot(player: 1)) }
+        XCTAssertLessThan(shot, 900)
+        var tookItBack = false
+        play(&match, &brain, frames: 300, input: { _ in .idle }) { match in
+            if match.ball.holder == 1, match.scores == [0, 0] { tookItBack = true }
+            return tookItBack || !match.ball.shotInFlight
+        }
+        XCTAssertFalse(tookItBack, "it caught its own shot on the way to the rim")
     }
 
     func testWithTheBallLooseItGoesForIt() {

@@ -36,7 +36,7 @@ enum PowerVariant: Int, CaseIterable {
 /// pixels, on the DUNK X and DUNK Y sliders. The numbers found go into
 /// `BallRules.dunkOffset`, mirrored across for the other rim.
 enum DunkTuning {
-    static let enabled = true
+    static let enabled = false
     nonisolated(unsafe) static var x: Float = -3
     nonisolated(unsafe) static var y: Float = -28
 }

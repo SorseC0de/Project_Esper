@@ -110,8 +110,6 @@ public struct Player: Equatable {
     /// the throw button before another throw stance.
     public var shootReady = true
     public var throwReady = true
-    /// A shoot button held with no ball: ready to catch a fast one.
-    public var catchStance = false
     /// The sideways speed when the throw stance began; the floater carries it.
     public var throwStanceEntrySpeed = 0.0
 
@@ -238,7 +236,6 @@ public struct Player: Equatable {
         if coyote > 0 { coyote -= 1 }
         if input.shootButtons == 0 { shootReady = true }
         if !input.throwBall { throwReady = true }
-        catchStance = !hasBall && input.shoot
         if snatchCooldown > 0 { snatchCooldown -= 1 }
         if ledgeCooldown > 0 { ledgeCooldown -= 1 }
         if hitStun > 0 {
@@ -726,6 +723,11 @@ public struct Player: Equatable {
                 quickThrow = false
                 throwStanceEntrySpeed = velocity.x
                 enter(.throwStance)
+            } else if !hasBall, throwPressed, snatchCooldown == 0 {
+                // Flight cancels into the snatch or the slash as the air does.
+                startSnatch()
+            } else if !hasBall, shootPressed {
+                startSlash(events: &events)
             } else if !input.jump || flightLeft <= 0 {
                 enter(.air)
             }
@@ -1177,10 +1179,11 @@ public struct Player: Equatable {
     /// Whether the ball at `ballPosition` is in reach: in the ring round the chest and
     /// either in front or in the way of where the body is moving, or in the second ring
     /// out in front, the spark's. A ball arriving from behind while standing still bounces
-    /// off, and so does one over the speed threshold unless the body is in the catch stance.
+    /// off, and so does one over the speed threshold, and a shot in flight goes through:
+    /// those take the snatch.
     public func canCatch(ballAt ballPosition: Vec2, speed: Double = 0, shotInFlight: Bool = false) -> Bool {
         guard !hasBall, catchCooldown == 0, state.canCatch else { return false }
-        guard (speed <= BallRules.catchSpeedThreshold && !shotInFlight) || catchStance else { return false }
+        guard speed <= BallRules.catchSpeedThreshold, !shotInFlight else { return false }
         if ballPosition.distance(to: handCatchPoint) <= BallRules.handCatchRadius { return true }
         let offset = ballPosition - chest
         guard offset.length <= BallRules.catchRadius else { return false }

@@ -437,8 +437,11 @@ enum EnergyEffect: CaseIterable {
     /// The bolts' one colour on the sheets, (241, 246, 240), as a grey level: what their
     /// full-frame flash comes out as through the ramp.
     static let strikeLuminance = 0.958
-    /// The bolt sheets' frames that are a full-frame flash.
+    /// The bolt sheets' frames that are a full-frame flash, and the one after, whose top
+    /// 32 rows are solid across the sheet.
     static let strikeFlashFrames = 5..<7
+    static let strikeHalfFlashFrame = 7
+    static let strikeHalfFlashRows = 32
 
     var name: String {
         switch self {

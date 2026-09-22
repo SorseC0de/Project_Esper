@@ -180,10 +180,12 @@ of it. The grayscale effect sheets go through the same ramp in a player's colour
 knocked loose or swatted throws one of two sparks, either each time, centred on the ball
 in the hitter's colour. A score brings lightning down on the rim in the scorer's colour,
 one of four bolts each time, favouring vertical: it leans half as far as the ball came
-in off vertical and never past 45°, so it never lies flat, scaled from the rim so its top and sides are past the screen's edge wherever
-the rim is; the sheet's two full-frame flash frames are matched by a flash over the whole
-screen in the same tone, so the sprite's edge never shows through them, and the crown
-erupts off the rim with it. Sparks and bolts play at 24 a second. A held throw shows the
+in off vertical and never past 45°, so it never lies flat, scaled from the rim so its top
+is just past the top of the screen at that lean; the sheet's two full-frame flash frames
+are matched by a flash over the whole screen in the same tone, and the half-frame flash
+after them by a band riding the bolt from that half's bottom edge out past the screen,
+so the sprite's edges never show through them, and the crown erupts off the rim with
+it. Sparks and bolts play at 24 a second. A held throw shows the
 charge, the 82-frame swirl at 30 a second looping round the ball in hand. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
 and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on
 the ball and the fire off the head. The body a light orange or a light teal toward the team colour, the back limbs a greyed,

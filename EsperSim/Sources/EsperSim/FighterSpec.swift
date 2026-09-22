@@ -315,6 +315,11 @@ public enum WebRules {
     public static let swingOvershoot = 1.0
     public static let swingMaxArcShare = 1.6
     public static let swingMaxAngle = 1.4
+    /// A swing can't start again for this long after one starts: the frames a full swing
+    /// takes, the least arc's frames times the max share plus the ease-in's frame and a
+    /// half. It neither spends nor needs the double jump, so a swing let go early doesn't
+    /// lock the next one out until landing.
+    public static let swingCooldownFrames = Int((Double(swingFrames) * swingMaxArcShare + 1.5).rounded(.up))
     /// The line reaches this far, bends to a ball or body within this angle of the aim,
     /// snaps to one within this of its tip, reels at this speed, can't repeat for this long,
     /// and a miss shows for this many frames, live the whole time.

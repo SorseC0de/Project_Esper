@@ -654,7 +654,6 @@ final class WebWaterTests: XCTestCase {
         match.advance(inputs: [PlayerInput(jump: true), .idle])
         XCTAssertEqual(match.players[0].state, .webSwing)
         XCTAssertNotNil(match.players[0].webAnchor)
-        XCTAssertEqual(match.players[0].jumpsLeft, 0)
         var lowest = halt.y
         run(&match, frames: WebRules.swingFrames * 3, input: { _ in .idle }) { match in
             lowest = min(lowest, match.players[0].position.y)
@@ -693,14 +692,40 @@ final class WebWaterTests: XCTestCase {
         XCTAssertEqual(match.players[0].position.y, height, accuracy: 0.001)
     }
 
-    func testFullSwingGivesTheDoubleJumpBack() {
+    /// High up, in the air, still, with nothing near.
+    private func aloft() -> Match {
         var match = webbed()
-        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
-        run(&match, frames: 10, input: { _ in .idle })
+        match.players[0].position = Vec2(x: 100, y: 100)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.ball.respawn(at: Vec2(x: 300, y: 30))
+        match.advance(inputs: [.idle, .idle])
+        return match
+    }
+
+    func testTheSwingIsACooldownNotTheDoubleJump() {
+        var match = aloft()
         match.advance(inputs: [PlayerInput(jump: true), .idle])
-        XCTAssertEqual(match.players[0].jumpsLeft, 0)
-        run(&match, frames: 120, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state != .webSwing }
-        XCTAssertEqual(match.players[0].jumpsLeft, 1)
+        XCTAssertEqual(match.players[0].state, .webSwing)
+        XCTAssertEqual(match.players[0].swingCooldown, WebRules.swingCooldownFrames)
+        // Let go at once: the least arc, then the air, with the cooldown still running.
+        let out = run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].state != .webSwing }
+        XCTAssertEqual(match.players[0].state, .air)
+        XCTAssertLessThan(out, WebRules.swingCooldownFrames)
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertEqual(match.players[0].state, .air, "no swing inside the cooldown")
+        run(&match, frames: WebRules.swingCooldownFrames, input: { _ in .idle }) { $0.players[0].swingCooldown == 0 }
+        XCTAssertFalse(match.players[0].grounded)
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertEqual(match.players[0].state, .webSwing, "the cooldown over, it swings again without landing")
+    }
+
+    func testAFullSwingFitsInsideTheCooldown() {
+        var match = aloft()
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        let full = run(&match, frames: 120, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state != .webSwing }
+        XCTAssertLessThanOrEqual(full + 1, WebRules.swingCooldownFrames)
+        XCTAssertGreaterThan(full + 4, WebRules.swingCooldownFrames, "the cooldown is a full swing's frames, not much more")
     }
 
     func testWebLineFiresFromAWall() {

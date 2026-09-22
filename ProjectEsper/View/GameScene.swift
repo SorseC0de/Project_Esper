@@ -25,6 +25,8 @@ final class GameScene: SKScene {
     /// in off vertical, and never past the cap, so it never lies flat.
     private static let strikeLeanShare = 0.5
     private static let strikeMaxLean = degrees(45)
+    /// The bolt's size over its sheet.
+    private static let strikeScale: CGFloat = 1.5
 
     private var match = Match()
     private var headVariant = HeadVariant.b
@@ -632,9 +634,8 @@ final class GameScene: SKScene {
     }
 
     /// A score: lightning strikes the rim from the way the ball came in, leaning half as
-    /// far as the ball did and never past the cap, one of the four bolts each time, scaled
-    /// so its top is just past the top of the screen at that lean. The sheet's two
-    /// full-frame flash frames are matched by a flash over the whole screen in the same
+    /// far as the ball did and never past the cap, one of the four bolts each time, at the
+    /// strike scale. The sheet's two full-frame flash frames are matched by a flash over the whole screen in the same
     /// tone, and the half-frame flash after them by a band riding the bolt from that
     /// half's bottom edge out past the screen, so the sprite's own edges never show
     /// through them. The crown erupts off the rim with it.
@@ -649,8 +650,7 @@ final class GameScene: SKScene {
         let visible = CGRect(x: cameraNode.position.x - size.width * cameraNode.xScale / 2,
                              y: cameraNode.position.y - size.height * cameraNode.yScale / 2,
                              width: size.width * cameraNode.xScale, height: size.height * cameraNode.yScale)
-        let reach = (visible.maxY - rim.y) / CGFloat(cos(lean)) * 1.1
-        node.setScale(reach / node.size.height)
+        node.setScale(GameScene.strikeScale)
         glowers.addChild(node)
 
         let tone = SKColor(rgb: sprites.look(for: scorer).energyTone(luminance: EnergyEffect.strikeLuminance))

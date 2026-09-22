@@ -119,6 +119,8 @@ public struct Player: Equatable {
     /// A shot's web, for drawing.
     public var webLine: WebLine?
     public var webLineCooldown = 0
+    /// Frames until the next swing can start.
+    public var swingCooldown = 0
     /// Where a reel is taking this body.
     public var pullTarget: Vec2?
     /// Frames the line's pose shows.
@@ -203,6 +205,7 @@ public struct Player: Equatable {
         if catchCooldown > 0 { catchCooldown -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
         if webLineCooldown > 0 { webLineCooldown -= 1 }
+        if swingCooldown > 0 { swingCooldown -= 1 }
         if warpCooldown > 0 { warpCooldown -= 1 }
         if webLinePose > 0 { webLinePose -= 1 }
         if let line = webLine, case .point = line.target, state != .webPull {
@@ -380,12 +383,10 @@ public struct Player: Equatable {
                 velocity = .zero
                 events.append(.flew(player: index))
                 enter(.flying)
-            } else if jumpPressed, jumpsLeft > 0, power != .superSoda {
-                if power == .webWater {
-                    startWebSwing(events: &events)
-                } else {
-                    doubleJump(input, events: &events)
-                }
+            } else if power == .webWater, jumpPressed, swingCooldown == 0 {
+                startWebSwing(events: &events)
+            } else if jumpPressed, jumpsLeft > 0, power != .superSoda, power != .webWater {
+                doubleJump(input, events: &events)
             } else if hasBall, input.shoot, shootReady {
                 enterShootStance()
             } else if hasBall, input.throwBall, throwReady {
@@ -647,9 +648,7 @@ public struct Player: Equatable {
             velocity = target - position
             let full = swept >= swingLeastArc * WebRules.swingMaxArcShare || abs(swingAngle) >= WebRules.swingMaxAngle
             if full || (swept >= swingLeastArc && !input.jump) {
-                // A full swing gives the double jump back. The exit keeps the arc's direction
-                // but not all its speed, so the stick can turn it.
-                if full { jumpsLeft = max(jumpsLeft, spec.jumps - 1) }
+                // The exit keeps the arc's direction but not all its speed, so the stick can turn it.
                 webAnchor = nil
                 velocity.x = min(max(velocity.x, -spec.airSpeedMax), spec.airSpeedMax)
                 velocity.y = min(velocity.y, spec.fullHopVelocity)
@@ -884,10 +883,10 @@ public struct Player: Equatable {
     }
 
     /// Web Water's swing: a web to a point ahead and above, the same wherever the body is,
-    /// air movement halted, the double jump spent.
+    /// air movement halted, and the next swing a full swing's frames away.
     private mutating func startWebSwing(events: inout [MatchEvent]) {
         jumpBuffer = 0
-        jumpsLeft -= 1
+        swingCooldown = WebRules.swingCooldownFrames
         fastFalling = false
         let anchor = position + Vec2(x: WebRules.swingReach * facing.sign, y: WebRules.swingHeight)
         let offset = position - anchor
@@ -1062,6 +1061,7 @@ public struct Player: Equatable {
             jumpsLeft = spec.jumps
             fastFalling = false
             flightLeft = SodaRules.flightFrames
+            swingCooldown = 0
             switch state {
             case .air, .wallLand, .rolling:
                 events.append(.landed(player: index))

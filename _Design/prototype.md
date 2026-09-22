@@ -128,10 +128,12 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   45 units ahead and 130 up, wherever the body is, so the swing is the same at any
   height, and the body swings under it on a pendulum arc to the
   mirrored angle, so it dips, then lets go higher than it stopped. That least arc always
-  happens; holding jump keeps swinging, up to 1.6 times the arc and never over the anchor,
-  and a full swing gives the double jump back. The exit keeps the arc's direction but is
-  capped to air speed across and a full hop up, so the stick can turn it. It spends the double jump
-  and works with the ball. The wall cling never slides. The throw button without the ball
+  happens; holding jump keeps swinging, up to 1.6 times the arc and never over the anchor.
+  The exit keeps the arc's direction but is
+  capped to air speed across and a full hop up, so the stick can turn it. The swing is on
+  a cooldown of a full swing's frames, 28, from the moment one starts, cleared on landing;
+  it neither spends nor needs the double jump, so a swing let go early doesn't lock the
+  next one out until landing. It works with the ball. The wall cling never slides. The throw button without the ball
   is the web line, from the ground, the air or a wall: held, it aims along the stick with a
   faint line; let go, it fires, 120 units. It bends to a loose ball or the opponent within
   15° of the aim, and the first thing within 8 units of its tip wins. A miss shows for 8
@@ -183,8 +185,8 @@ of it. The grayscale effect sheets go through the same ramp in a player's colour
 knocked loose or swatted throws one of two sparks, either each time, centred on the ball
 in the hitter's colour. A score brings lightning down on the rim in the scorer's colour,
 one of four bolts each time, favouring vertical: it leans half as far as the ball came
-in off vertical and never past 45°, so it never lies flat, scaled from the rim so its top
-is just past the top of the screen at that lean; the sheet's two full-frame flash frames
+in off vertical and never past 45°, so it never lies flat, at one and a half times its
+sheet; the sheet's two full-frame flash frames
 are matched by a flash over the whole screen in the same tone, and the half-frame flash
 after them by a band riding the bolt from that half's bottom edge out past the screen,
 so the sprite's edges never show through them, and the crown erupts off the rim with

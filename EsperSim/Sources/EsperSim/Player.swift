@@ -167,6 +167,11 @@ public struct Player: Equatable {
 
     public var chest: Vec2 { Vec2(x: position.x, y: position.y + BallRules.chestHeight) }
 
+    /// The centre of the second catch ring, the spark's, out in front.
+    public var handCatchPoint: Vec2 {
+        Vec2(x: position.x + BallRules.handCatchCentre.x * facing.sign, y: position.y + BallRules.handCatchCentre.y)
+    }
+
     public var inStance: Bool { state == .shootStance || state == .throwStance }
 
     /// The first step in a state, after `enter` on the step before.
@@ -1100,12 +1105,14 @@ public struct Player: Equatable {
         enter(.catching)
     }
 
-    /// Whether the ball at `ballPosition` is in reach and either in front or in the way of
-    /// where the body is moving. A ball arriving from behind while standing still bounces
+    /// Whether the ball at `ballPosition` is in reach: in the ring round the chest and
+    /// either in front or in the way of where the body is moving, or in the second ring
+    /// out in front, the spark's. A ball arriving from behind while standing still bounces
     /// off, and so does one over the speed threshold unless the body is in the catch stance.
     public func canCatch(ballAt ballPosition: Vec2, speed: Double = 0) -> Bool {
         guard !hasBall, catchCooldown == 0, state.canCatch else { return false }
         guard speed <= BallRules.catchSpeedThreshold || catchStance else { return false }
+        if ballPosition.distance(to: handCatchPoint) <= BallRules.handCatchRadius { return true }
         let offset = ballPosition - chest
         guard offset.length <= BallRules.catchRadius else { return false }
         let ahead = offset.x * facing.sign >= -1

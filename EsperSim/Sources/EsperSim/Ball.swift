@@ -9,9 +9,14 @@ public struct Ball: Equatable {
     public var straight = false
     /// Frames of floater left: drifting up with gravity off.
     public var floater = 0
-    /// Released by a throw and not yet caught: the rims don't pull it, so scoring off a
-    /// throw is the ball going through on its own.
+    /// Released by a throw and not yet caught.
     public var thrown = false
+    /// Whether the rims still steer it: a shot's or a floater's until its first bounce off
+    /// anything. A thrown ball never steers, so scoring off a throw is the ball going
+    /// through on its own.
+    public var steers = false
+    /// The hoop it last rose up through; its next fall through that hoop isn't a score.
+    public var roseThrough: Int?
     /// Who released or swatted it last.
     public var lastTouched: Int?
     /// Reeled in by a web: the player pulling it.
@@ -41,7 +46,7 @@ public struct Ball: Equatable {
         if ownedFrames > 0 { ownedFrames -= 1 }
         var scoredHoop: Int?
 
-        for hoop in stage.hoops where !thrown && velocity.y < 0 && position.y > hoop.position.y {
+        for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y {
             steer(toward: hoop)
         }
 
@@ -65,9 +70,17 @@ public struct Ball: Equatable {
             deflect(off: body, events: &events)
         }
 
-        for (index, hoop) in stage.hoops.enumerated()
-        where previousY >= hoop.position.y && position.y < hoop.position.y && abs(position.x - hoop.position.x) <= BallRules.rimHalfWidth {
-            scoredHoop = index
+        // Down through a rim scores, unless it rose up through that rim first.
+        for (index, hoop) in stage.hoops.enumerated() where abs(position.x - hoop.position.x) <= BallRules.rimHalfWidth {
+            if previousY >= hoop.position.y, position.y < hoop.position.y {
+                if roseThrough == index {
+                    roseThrough = nil
+                } else {
+                    scoredHoop = index
+                }
+            } else if previousY < hoop.position.y, position.y >= hoop.position.y {
+                roseThrough = index
+            }
         }
 
         let onFloor = stage.isGrounded(box)
@@ -98,6 +111,7 @@ public struct Ball: Equatable {
     private mutating func bounceX(events: inout [MatchEvent]) {
         straight = false
         floater = 0
+        steers = false
         velocity.x = abs(velocity.x) > 0.3 ? -velocity.x * BallRules.bounce : 0
         events.append(.ballBounced(position: position))
     }
@@ -105,6 +119,7 @@ public struct Ball: Equatable {
     private mutating func bounceY(events: inout [MatchEvent]) {
         straight = false
         floater = 0
+        steers = false
         let rebound = -velocity.y * BallRules.bounce
         velocity.y = abs(rebound) > 0.6 ? rebound : 0
         events.append(.ballBounced(position: position))
@@ -142,13 +157,15 @@ public struct Ball: Equatable {
         self.straight = straight
         floater = 0
         thrown = straight
+        steers = !straight
+        roseThrough = nil
         lastTouched = player
         ownedFrames = BallRules.ownedFrames
         resting = false
     }
 
     /// The floater: a soft drift up that ignores gravity for a while, carrying the
-    /// thrower's sideways speed, then a normal fall.
+    /// thrower's sideways speed, then a normal fall the rims steer.
     public mutating func releaseFloater(from position: Vec2, sideways: Double, by player: Int) {
         release(from: position, velocity: Vec2(x: sideways, y: BallRules.floaterSpeed), by: player, straight: false)
         thrown = true
@@ -165,6 +182,8 @@ public struct Ball: Equatable {
         straight = false
         floater = BallRules.popFloatFrames
         thrown = false
+        steers = false
+        roseThrough = nil
         tether = nil
         lastTouched = nil
         ownedFrames = 0
@@ -177,6 +196,7 @@ public struct Ball: Equatable {
         velocity = Vec2(x: facing.sign * 2, y: 1).normalized * max(velocity.length, SlashRules.swatSpeed)
         straight = false
         floater = 0
+        steers = false
         lastTouched = player
     }
 
@@ -188,6 +208,8 @@ public struct Ball: Equatable {
         straight = false
         floater = 0
         thrown = false
+        steers = false
+        roseThrough = nil
         tether = nil
         lastTouched = nil
         ownedFrames = 0

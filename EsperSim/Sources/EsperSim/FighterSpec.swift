@@ -287,6 +287,11 @@ public enum BallRules {
     /// bounces off instead, unless the body is in the catch stance: a shoot button held
     /// with no ball.
     public static let catchRadius = 12.5
+    /// The second ring, the catch spark's: centred this far ahead of and above the feet
+    /// and this big, in units, from the sheet's 7, 20 and 13 art pixels. A ball in it is
+    /// caught whichever way the body moves.
+    public static let handCatchCentre = Vec2(x: 7 / 1.6, y: 20 / 1.6)
+    public static let handCatchRadius = 13 / 1.6
     public static let catchSpeedThreshold = 5.0
     public static let chestHeight = 9.0
     /// A ball knocked out of a holder's hands pops straight up: the floater's drift for

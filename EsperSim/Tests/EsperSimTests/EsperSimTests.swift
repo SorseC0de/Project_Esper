@@ -592,21 +592,67 @@ final class BallTests: XCTestCase {
         XCTAssertGreaterThan(match.ball.respawnTimer, 0)
     }
 
-    func testThrownBallIgnoresTheRimsSteering() {
+    func testOnlyABallThatStillSteersIsPulledByTheRim() {
         var match = Match()
         let rim = match.stage.hoops[1].position
-        // Falling beside the rim within reach: a shot gets steered across, a throw doesn't.
-        for thrown in [false, true] {
+        // Falling beside the rim within reach: a steering ball is pulled across, another isn't.
+        for steers in [true, false] {
             match.ball.respawn(at: rim + Vec2(x: -15, y: 10))
             match.ball.velocity = Vec2(x: 0, y: -1)
-            match.ball.thrown = thrown
+            match.ball.steers = steers
             match.advance(inputs: [.idle, .idle])
-            if thrown {
-                XCTAssertEqual(match.ball.velocity.x, 0)
-            } else {
+            if steers {
                 XCTAssertGreaterThan(match.ball.velocity.x, 0)
+            } else {
+                XCTAssertEqual(match.ball.velocity.x, 0)
             }
         }
+    }
+
+    func testAShotSteersUntilItsFirstBounceAndAThrowNever() {
+        var match = matchWithBallHeld()
+        for _ in 0..<BallRules.shotWindupFrames + 2 { match.advance(inputs: [PlayerInput(shoot: true), .idle]) }
+        match.advance(inputs: [.idle, .idle])
+        run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertTrue(match.ball.steers)
+        run(&match, frames: 200, input: { _ in .idle }) { $0.events.contains { if case .ballBounced = $0 { return true } else { return false } } }
+        XCTAssertFalse(match.ball.steers)
+
+        var thrown = matchWithBallHeld()
+        for _ in 0..<BallRules.throwWindupFrames + 2 { thrown.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle]) }
+        run(&thrown, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+        XCTAssertNil(thrown.ball.holder)
+        XCTAssertFalse(thrown.ball.steers)
+    }
+
+    func testTheFloaterSteers() {
+        var match = matchWithBallHeld()
+        for _ in 0..<BallRules.throwWindupFrames + 2 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle]) }
+        run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertTrue(match.ball.thrown)
+        XCTAssertTrue(match.ball.steers)
+    }
+
+    func testRisingUpThroughTheRimThenFallingBackIsNotAScore() {
+        var match = Match()
+        // Straight up through the rim from under it, then down through it again.
+        match.ball.respawn(at: match.stage.hoops[1].position + Vec2(x: 0, y: -10))
+        match.ball.velocity = Vec2(x: 0, y: 4)
+        run(&match, frames: 120, input: { _ in .idle }) { $0.ball.position.y < $0.stage.hoops[1].position.y - 10 && $0.ball.velocity.y < 0 }
+        XCTAssertEqual(match.scores, [0, 0])
+        XCTAssertNil(match.ball.roseThrough)
+    }
+
+    func testABallInTheSparkRingIsCaught() {
+        var match = Match()
+        // Outside the chest ring, inside the spark's ring out front.
+        let at = match.players[0].handCatchPoint + Vec2(x: 6, y: 5)
+        XCTAssertGreaterThan(at.distance(to: match.players[0].chest), BallRules.catchRadius)
+        match.ball.respawn(at: at)
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.ball.holder, 0)
     }
 
     func testStepsAreDeterministic() {

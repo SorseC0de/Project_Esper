@@ -111,12 +111,16 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   is a wall jump with no cling at all, and for 6 frames after letting go of a wall a press
   still jumps off it. A cling can't start for 8 frames after leaving the ground, and the
   walls above the court's top row can't be clung to or jumped off.
-- Catch is automatic: the ball within reach and either in front, or in the way of where
-  the body is moving. A ball arriving from behind while standing still bounces off, and so
-  does one faster than 5 a frame (a throw is 7, a shot 4.5) unless the body is in the catch
-  stance: a shoot button held with no ball.
+- Catch is automatic, in two rings: the ball within 12.5 of the chest and either in front,
+  or in the way of where the body is moving; or within the catch spark's ring, 13 art
+  pixels round a point 7 ahead of and 20 above the feet, whichever way the body moves. A
+  ball arriving from behind while standing still bounces off, and so does one faster
+  than 5 a frame (a throw is 7, a shot 4.5) unless the body is in the catch stance: a
+  shoot button held with no ball.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
-  would carry it through the rim, a share a frame, never snapped.
+  would carry it through the rim, a share a frame, never snapped. Only a shot's or a
+  floater's ball, and only until its first bounce off anything; a throw's never. Down
+  through a rim scores unless the ball rose up through that rim first.
 
 Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
 tuning picker, menu resets.
@@ -193,8 +197,9 @@ knocked loose or swatted throws one of two sparks, either each time, centred on 
 in the hitter's colour. A score brings lightning down on the rim in the scorer's colour,
 one of four bolts each time, favouring vertical: it leans half as far as the ball came
 in off vertical and never past 45°, so it never lies flat, at the sheet's own width and
-stretched tall enough to run past the top of the screen at that lean, so the sheet's
-flash frames are pillars off the top, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. The jump spark and the dash's smoke, near-white on
+stretched tall enough to run past the top of the screen at that lean. On the sheet's two
+full-frame flash frames the whole screen flashes in the same tone and the floor and
+walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. The jump spark and the dash's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour. A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head

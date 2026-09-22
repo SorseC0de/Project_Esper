@@ -165,4 +165,6 @@ enum CourtLook {
     static let targetChevron: RGB = 0x50E080
     /// Frames the floor and walls take to shift between colours.
     static let shiftFrames = 20
+    /// On a score the floor and walls go white with the bolt's flash and fade back over this many frames.
+    static let strikeFadeFrames = 20
 }

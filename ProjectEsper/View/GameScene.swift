@@ -90,6 +90,9 @@ final class GameScene: SKScene {
     private var courtColour = SKColor(rgb: CourtLook.neutral)
     private var courtTarget = SKColor(rgb: CourtLook.neutral)
     private var courtShift = 0
+    /// A score's flash on the floor and walls: frames until it, then how white they are, fading.
+    private var courtWhiteIn = 0
+    private var courtWhite: CGFloat = 0
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
     private var previewDots: [SKSpriteNode] = []
@@ -371,22 +374,40 @@ final class GameScene: SKScene {
         return fire
     }
 
-    /// The floor and walls shift toward whoever holds the ball, and back to neutral.
+    /// The floor and walls shift toward whoever holds the ball, and back to neutral; on a
+    /// score they go white with the bolt's flash and fade back.
     private func tickCourtColour() {
         let wanted = match.ball.holder.map { SKColor(rgb: CourtLook.shaded(sprites.look(for: $0).glow)) } ?? SKColor(rgb: CourtLook.neutral)
         if wanted != courtTarget {
             courtTarget = wanted
             courtShift = CourtLook.shiftFrames
         }
-        guard courtShift > 0 else { return }
-        courtShift -= 1
-        let share = 1 / CGFloat(courtShift + 1)
-        var cr: CGFloat = 0, cg: CGFloat = 0, cb: CGFloat = 0, ca: CGFloat = 0
-        var tr: CGFloat = 0, tg: CGFloat = 0, tb: CGFloat = 0, ta: CGFloat = 0
-        courtColour.getRed(&cr, green: &cg, blue: &cb, alpha: &ca)
-        courtTarget.getRed(&tr, green: &tg, blue: &tb, alpha: &ta)
-        courtColour = SKColor(red: cr + (tr - cr) * share, green: cg + (tg - cg) * share, blue: cb + (tb - cb) * share, alpha: 1)
-        for tile in courtTiles { tile.color = courtColour }
+        var changed = false
+        if courtShift > 0 {
+            courtShift -= 1
+            let share = 1 / CGFloat(courtShift + 1)
+            var cr: CGFloat = 0, cg: CGFloat = 0, cb: CGFloat = 0, ca: CGFloat = 0
+            var tr: CGFloat = 0, tg: CGFloat = 0, tb: CGFloat = 0, ta: CGFloat = 0
+            courtColour.getRed(&cr, green: &cg, blue: &cb, alpha: &ca)
+            courtTarget.getRed(&tr, green: &tg, blue: &tb, alpha: &ta)
+            courtColour = SKColor(red: cr + (tr - cr) * share, green: cg + (tg - cg) * share, blue: cb + (tb - cb) * share, alpha: 1)
+            changed = true
+        }
+        if courtWhiteIn > 0 {
+            courtWhiteIn -= 1
+            if courtWhiteIn == 0 {
+                courtWhite = 1
+                changed = true
+            }
+        } else if courtWhite > 0 {
+            courtWhite = max(courtWhite - 1 / CGFloat(CourtLook.strikeFadeFrames), 0)
+            changed = true
+        }
+        guard changed else { return }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        courtColour.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let shown = SKColor(red: r + (1 - r) * courtWhite, green: g + (1 - g) * courtWhite, blue: b + (1 - b) * courtWhite, alpha: 1)
+        for tile in courtTiles { tile.color = shown }
     }
 
     /// The streak a flying ball leaves: soft blobs dropped where it was, thinning out, so
@@ -647,8 +668,9 @@ final class GameScene: SKScene {
     /// A score: lightning strikes the rim from the way the ball came in, leaning half as
     /// far as the ball did and never past the cap, one of the four bolts each time, at the
     /// sheet's own width and stretched tall enough to run past the top of the screen at
-    /// that lean, so the sheet's flash frames are pillars off the top. The crown erupts
-    /// off the rim with it.
+    /// that lean. On the sheet's two full-frame flash frames the whole screen flashes in
+    /// the same tone and the floor and walls go white, fading back. The crown erupts off
+    /// the rim with it.
     private func strike(hoop: Int, by scorer: Int) {
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let velocity = match.ball.velocity
@@ -660,6 +682,19 @@ final class GameScene: SKScene {
         let top = cameraNode.position.y + size.height * cameraNode.yScale / 2
         node.yScale = (top - rim.y) / CGFloat(cos(lean)) * 1.1 / node.size.height
         glowers.addChild(node)
+
+        let frame = 1 / bolt.fps
+        let flash = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
+        flash.color = SKColor(rgb: sprites.look(for: scorer).energyTone(luminance: EnergyEffect.strikeLuminance))
+        flash.colorBlendFactor = 1
+        flash.size = CGSize(width: size.width * cameraNode.xScale, height: size.height * cameraNode.yScale)
+        flash.position = cameraNode.position
+        flash.zPosition = 44
+        flash.isHidden = true
+        glowers.addChild(flash)
+        flash.run(.sequence([.wait(forDuration: Double(EnergyEffect.strikeFlashFrames.lowerBound) * frame), .unhide(),
+                             .wait(forDuration: Double(EnergyEffect.strikeFlashFrames.count) * frame), .removeFromParent()]))
+        courtWhiteIn = Int((Double(EnergyEffect.strikeFlashFrames.lowerBound) * frame * 60).rounded())
 
         let crown = EnergyEffect.spark3.node(sprites, player: scorer, at: rim)
         crown.zPosition = 46
@@ -916,11 +951,13 @@ final class GameScene: SKScene {
         }
         for player in match.players {
             outline(player.body, .white)
-            let reach = SKShapeNode(circleOfRadius: CGFloat(BallRules.catchRadius * SpriteLibrary.pixelsPerUnit))
-            reach.position = SpriteLibrary.point(player.chest)
-            reach.strokeColor = SKColor(white: 1, alpha: 0.3)
-            reach.lineWidth = 1
-            hitboxLayer.addChild(reach)
+            for (centre, radius) in [(player.chest, BallRules.catchRadius), (player.handCatchPoint, BallRules.handCatchRadius)] {
+                let reach = SKShapeNode(circleOfRadius: CGFloat(radius * SpriteLibrary.pixelsPerUnit))
+                reach.position = SpriteLibrary.point(centre)
+                reach.strokeColor = SKColor(white: 1, alpha: 0.3)
+                reach.lineWidth = 1
+                hitboxLayer.addChild(reach)
+            }
             if let leg = player.slideHitbox { outline(leg, .red) }
             if let blade = player.slashHitbox { outline(blade, .red) }
             if let hand = player.snatchHitbox { outline(hand, .green) }

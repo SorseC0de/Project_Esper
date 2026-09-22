@@ -12,7 +12,10 @@ neutral to get a shot off; catch it and the roles reverse.
   `MetalGameView` is the Metal layer: `SKRenderer` draws the scene into a texture and
   `Glow.metal` composites it with the glow. `InputHub` merges touch and controllers.
   `TouchControls` is the on-screen pad.
-- `Tools/import_sprites.py` — copies the GMS2 frames into the atlas. Run after art changes.
+- `Tools/import_sprites.py` — copies the GMS2 frames and slices the strips in
+  `_Graphic Assets` (square frames stacked one under another; a strip overrides the GMS2
+  sprite of the same name) into the atlas. Run after art changes. The ball's imageset
+  lives at the catalog's root, outside the atlas, and the importer leaves it alone.
 
 ## Units
 
@@ -36,9 +39,16 @@ and are chosen to sit with the rest.
 Tap is instant, hold is a stance, flick or release resolves it. Same on touch and pad.
 
 - Stick: floating on the left half. A fast push past 0.8 is a dash; a tilt walks. A walk
-  faces the opponent whichever way it goes after its first 3 frames, in which the stick
-  still turns the body, so it can back off or dribble between
-  the legs while staring them down. Only a dash turns the body.
+  with the ball faces the opponent whichever way it goes after its first 3 frames, in
+  which the stick still turns the body, so it can back off or dribble between the legs
+  while staring them down; only a dash turns the body after that. Without the ball the
+  stick turns the body throughout. Down without the ball is the crouch, and with the
+  stick across as well the crouch walk at 0.8, facing the stick.
+- Slide (without ball): down at full run, or shoot while crouched. The dash burst the way
+  the body faces, bleeding off 0.15 a frame over 20 frames, the leg out: a hitbox a tile
+  past the body's front edge and 6 units high that knocks the ball out of a grounded
+  holder's hands. It ends in a crouch if down is still held. A slide can catch a loose
+  ball on the way, which is what it's for.
 - Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. In the air
   a stick against the way you're going turns you at once, body and all, Silksong's rule. For 3 frames
   after walking off an edge a press is still that jump. Down while falling is a fast fall,
@@ -52,14 +62,37 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   is a jump shot: released on the way up
   it fires on the preset arc if nothing was flicked and the ball leaves with the body's
   lift. On the way down it's an ordinary air shot.
-- Shoot (without ball, in the air): swat. Reverses the ball if it's in front.
+- Shoot (without ball, in neutral): held, the catch stance.
+- Shoot (without ball, on defence, the other holding the ball): the Esper Slash, the swat.
+  On the ground it's a planted swing; in the air the body rises at least 1 a frame and
+  gravity is cut to a fifth, so it hangs through the swing. 24 frames, the blade live over
+  frames 8 to 15, 15 units ahead, 5 behind, 4 below the feet and 28 high: it knocks the
+  ball out of the holder's hands, and swats a loose ball the way the body faces and a
+  little up at no less than 6. It always ends in the roll, the double jump's somersault
+  over 18 frames with normal gravity and air drift, a short hop's worth from the ground,
+  so the whole thing is a commitment. Not in neutral.
+- Throw (without ball, in neutral or on defence): the snatch. 40 frames, the hand out over
+  frames 4 to 15, when the whole body plus a tile of reach in front takes any ball it
+  overlaps while the body faces it: a loose one at any speed, or the one in the other's
+  hands. The catch spark shows on the hand on frame 8. Then half a second before another.
+  Web Water keeps the web line on this button instead.
+- Ledge (without ball): automatic. Falling past the top corner of a block or the one-way
+  ledge, either side, with the corner within a tile of the body's side and within a tile
+  either way of hand height, 17.5 above the feet, the hand catches it: the body turns to
+  face it and hangs 10 frames, then climbs over 15 in three steps with the sheet, hanging,
+  astride the corner, standing a unit in from the edge. No way off it but up. For 20
+  frames after walking off an edge no corner is grabbed, so leaving a ledge doesn't grab
+  it back. Never a made platform.
+- Knocked loose (by a slide or a slash), the ball pops straight up: the floater's drift
+  for 10 frames, then a normal fall, nobody's, so Flash Fizz can't warp to it. The holder
+  can't catch it back for 15 frames.
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
   gravity until the first bounce. Up is the floater: a soft drift up at 1.5 with gravity
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
-  the stick pointed.
+  the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
   leaves it, direction automatic, the double jump restored, and the stick doesn't steer
   for 6 frames so the arc clears the wall. A jump press with a wall within 2 units of either side
@@ -144,7 +177,9 @@ double jump leaves a short platform of loose digital squares under the feet wher
 taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that one swinging wind bends as a whole, a scarf.
 The ball in hand is its own sprite on the frame's ball, and when that hangs off a ledge the
 dribble reaches down to the real floor under it over the same frames. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
-is an SF Symbol chevron doing what the pixel one did: three steps down, then off.
+is an SF Symbol chevron doing what the pixel one did: three steps down, then off. A slide
+leaves the dash's smoke; the snatch's catch spark sits on the hand at full stretch; a ball
+knocked loose bursts like a wall jump's spark, away from the hitter.
 
 ## Court
 

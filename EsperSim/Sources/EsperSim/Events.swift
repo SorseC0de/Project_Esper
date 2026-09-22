@@ -21,6 +21,13 @@ public enum MatchEvent: Equatable {
     case flew(player: Int)
     case warped(player: Int, from: Vec2, to: Vec2)
     case platformMade(player: Int)
+    case slid(player: Int)
+    case slashed(player: Int)
+    /// The snatch's hand is at full stretch.
+    case snatchReached(player: Int)
+    /// The ball knocked out of `player`'s hands by `by`.
+    case popped(player: Int, by: Int)
+    case ledgeGrabbed(player: Int)
 }
 
 /// What a player's step asks the match to do with the ball.
@@ -28,7 +35,6 @@ public enum PlayerAction: Equatable {
     case releaseShot(velocity: Vec2)
     case releaseThrow(velocity: Vec2)
     case dunk(hoop: Int)
-    case swat
     case webLine(direction: Vec2)
     case warpToBall
     case makePlatform

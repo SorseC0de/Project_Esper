@@ -294,6 +294,37 @@ public struct Stage: Equatable {
         return nil
     }
 
+    /// The top corner of a floor or ledge tile within `reach` of the box's `side`, with
+    /// its top in `top`, nothing beside it toward the box and nothing above either: what a
+    /// hand can hang from. The nearest, if any. A corner may sit up to two units back
+    /// inside the box's span. Only within the court's rows, and never a made platform.
+    public func ledge(beside box: Box, side: Facing, reach: Double, top: ClosedRange<Double>) -> Vec2? {
+        let near = side == .right ? box.max.x : box.min.x
+        let far = near + side.sign * reach
+        let back = near - side.sign * 2
+        let columns = side == .right ? column(at: back)...column(at: far) : column(at: far)...column(at: back)
+        let lowRow = Swift.max(row(at: top.lowerBound) - 1, 0)
+        let highRow = Swift.min(row(at: top.upperBound), rows - 1)
+        var best: Vec2?
+        var bestDistance = Double.infinity
+        for row in stride(from: lowRow, through: highRow, by: 1) {
+            let tileTop = Double(row + 1) * Stage.tileSize
+            guard top.contains(tileTop) else { continue }
+            for column in columns where tile(column: column, row: row) != .empty {
+                let toward = column - side.rawValue
+                guard tile(column: toward, row: row) == .empty,
+                      tile(column: column, row: row + 1) == .empty,
+                      tile(column: toward, row: row + 1) == .empty else { continue }
+                let face = side == .right ? Double(column) * Stage.tileSize : Double(column + 1) * Stage.tileSize
+                let ahead = (face - near) * side.sign
+                guard ahead >= -2, ahead <= reach, abs(ahead) < bestDistance else { continue }
+                bestDistance = abs(ahead)
+                best = Vec2(x: face, y: tileTop)
+            }
+        }
+        return best
+    }
+
     // MARK: The court
 
     /// 34 by 16 tiles with no ceiling: floor and walls, a backboard block each side, two cells

@@ -1,7 +1,8 @@
 import Foundation
 
 /// The player's sprites, as the importer names them. Frame counts and rates come from the
-/// GMS2 sprites; run `Tools/import_sprites.py` and check its table against this.
+/// GMS2 sprites and the strips in `_Graphic Assets`; run `Tools/import_sprites.py` and
+/// check its table against this.
 public enum Animation: String, CaseIterable {
     case idle = "player_idle"
     case dribbleIdle = "player_dribble_idle"
@@ -25,28 +26,36 @@ public enum Animation: String, CaseIterable {
     case skid = "player_skid"
     case skidBall = "player_skid_ball"
     case taunt = "player_taunt"
+    case crouch = "player_crouch"
+    case crouchWalk = "player_crouch_walk"
+    case slide = "player_slide"
+    case esperSlash = "player_esperslash"
+    case snatch = "player_snatch"
+    case snatchAir = "player_snatch_air"
+    case ledge = "player_ledge"
 
     public var frameCount: Int {
         switch self {
-        case .idle, .dribbleIdle: 10
-        case .walk, .dribbleWalk, .run, .dribbleRun: 8
+        case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir: 10
+        case .walk, .dribbleWalk, .run, .dribbleRun, .slide: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall: 3
         case .jumpSquat: 4
-        case .doubleJump, .wallLand, .wallLandBall: 6
+        case .doubleJump, .wallLand, .wallLandBall, .esperSlash: 6
         case .land: 9
         case .shoot: 10
         case .shootAir, .taunt: 11
         case .throwForward: 8
+        case .ledge: 5
         }
     }
 
     /// Pixels from the sprite's bottom edge up to the feet.
     public var feetFromBottom: Double {
-        self == .throwForward ? 16 : 8
+        pixelSize == 64 ? 16 : 8
     }
 
     public var pixelSize: Double {
-        self == .throwForward ? 64 : 48
+        self == .throwForward || self == .esperSlash ? 64 : 48
     }
 }
 
@@ -81,6 +90,12 @@ extension Player {
             return AnimationFrame(hasBall ? .dribbleWalk : .walk, Int(animationPhase) % 8)
         case .dash, .run:
             return AnimationFrame(hasBall ? .dribbleRun : .run, Int(animationPhase) % 8)
+        case .crouch:
+            return AnimationFrame(.crouch, (t * 15 / 60) % 10)
+        case .crouchWalk:
+            return AnimationFrame(.crouchWalk, Int(animationPhase) % 10)
+        case .slide:
+            return AnimationFrame(.slide, t * 24 / 60)
         case .pivot:
             return AnimationFrame(.pivot, t * 12 / 60)
         case .jumpSquat:
@@ -107,11 +122,21 @@ extension Player {
         case .throwing:
             return AnimationFrame(.throwForward, 3 + t * 24 / 60)
         case .dunking:
-            return AnimationFrame(.throwForward, 4)
+            // The ledge sheet's hang, for now: the arm up on the rim.
+            return AnimationFrame(.ledge, t < BallRules.dunkFrames / 2 ? 0 : 1)
         case .catching:
             return AnimationFrame(grounded ? .catchGround : .catchAir, t * 12 / 60)
-        case .swatting:
-            return AnimationFrame(.doubleJump, t * 12 / 60)
+        case .slashing:
+            return AnimationFrame(.esperSlash, t * 15 / 60)
+        case .rolling:
+            // The double jump's somersault, run through in the roll's frames.
+            return AnimationFrame(.doubleJump, t * 20 / 60)
+        case .snatching:
+            return AnimationFrame(grounded ? .snatch : .snatchAir, t * 15 / 60)
+        case .ledgeHang:
+            return AnimationFrame(.ledge, (t - 1) * 12 / 60)
+        case .ledgeClimb:
+            return AnimationFrame(.ledge, 2 + (t - 1) * 3 / LedgeRules.climbFrames)
         case .taunt:
             return AnimationFrame(.taunt, t * 15 / 60)
         case .webSwing, .webPull:

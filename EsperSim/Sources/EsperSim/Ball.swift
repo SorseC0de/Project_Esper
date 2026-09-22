@@ -155,6 +155,31 @@ public struct Ball: Equatable {
         floater = BallRules.floaterFrames
     }
 
+    /// Knocked out of a holder's hands: a short floater straight up, then a normal fall,
+    /// nobody's to warp to.
+    public mutating func pop(from position: Vec2) {
+        holder = nil
+        self.position = position
+        previousY = position.y
+        velocity = Vec2(x: 0, y: BallRules.floaterSpeed)
+        straight = false
+        floater = BallRules.popFloatFrames
+        thrown = false
+        tether = nil
+        lastTouched = nil
+        ownedFrames = 0
+        resting = false
+    }
+
+    /// Swatted: sent the way the swatter faces and a little up, at its own speed or the
+    /// swat speed, whichever is more.
+    public mutating func swat(toward facing: Facing, by player: Int) {
+        velocity = Vec2(x: facing.sign * 2, y: 1).normalized * max(velocity.length, SlashRules.swatSpeed)
+        straight = false
+        floater = 0
+        lastTouched = player
+    }
+
     public mutating func respawn(at spawn: Vec2) {
         position = spawn
         previousY = spawn.y

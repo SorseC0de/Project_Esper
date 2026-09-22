@@ -25,11 +25,11 @@ final class SpriteLibrary {
         cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
     }
 
-    /// A non-player frame.
+    /// A non-player frame, from the atlas or, like the ball, from the catalog's root.
     func texture(_ name: String, _ frame: Int) -> SKTexture {
         let key = "\(name)_\(frame)"
         if let texture = cache[key] { return texture }
-        let texture = atlas.textureNamed(key)
+        let texture = atlas.textureNames.contains(key) ? atlas.textureNamed(key) : SKTexture(imageNamed: key)
         texture.filteringMode = .nearest
         cache[key] = texture
         return texture

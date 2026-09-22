@@ -18,6 +18,9 @@ final class GameScene: SKScene {
     private static let dribbleHandHeight: CGFloat = 16
     /// Pixels the head floats above its place on the body, so scaling it up doesn't sink it in.
     private static let headLift: CGFloat = 1
+    /// Where to put the catch spark's feet so its ring lands on the snatch's hand: the ring
+    /// sits 7 art pixels ahead and 20 up on its own canvas, the hand 18 ahead and 19 up.
+    private static let snatchSparkOffset = Vec2(x: 11, y: -1)
 
     private var match = Match()
     private var headVariant = HeadVariant.b
@@ -501,8 +504,15 @@ final class GameScene: SKScene {
             switch event {
             case .jumped(let index):
                 spawn(.jumpSpark, at: match.players[index].position, flipped: match.players[index].facing == .left)
-            case .dashed(let index):
+            case .dashed(let index), .slid(let index):
                 spawn(.smoke, at: match.players[index].position, flipped: match.players[index].facing == .left)
+            case .snatchReached(let index):
+                let player = match.players[index]
+                let offset = Vec2(x: GameScene.snatchSparkOffset.x * player.facing.sign, y: GameScene.snatchSparkOffset.y) / SpriteLibrary.pixelsPerUnit
+                spawn(.catchSpark, at: player.position + offset, flipped: player.facing == .left)
+            case .popped(let victim, let popper):
+                // A burst off the ball as it leaves the hands, away from whoever knocked it.
+                spawn(.wallJumpSpark, at: match.players[victim].chest + Vec2(x: 0, y: 3), flipped: match.players[popper].facing == .right)
             case .wallJumped(let index, let wall):
                 let player = match.players[index]
                 spawn(.wallJumpSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .right)

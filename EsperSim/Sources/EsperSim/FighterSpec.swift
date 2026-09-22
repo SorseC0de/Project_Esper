@@ -56,8 +56,11 @@ public struct FighterSpec: Equatable {
     public var coyoteFrames = 3
     /// Frames of holding down in a run before it brakes to walking speed.
     public var runBrakeHoldFrames = 4
-    /// Frames into a walk in which the stick still turns the body, before it faces the opponent.
+    /// Frames into a walk with the ball in which the stick still turns the body, before it
+    /// faces the opponent. Without the ball a walk faces the stick.
     public var walkFaceLockoutFrames = 3
+    /// Speed of a crouch walk.
+    public var crouchWalkSpeed = 0.8
     /// Sideways speed lost per frame in an airborne stance.
     public var stanceAirBrake = 0.01
 
@@ -283,10 +286,9 @@ public enum BallRules {
     public static let catchRadius = 12.5
     public static let catchSpeedThreshold = 5.0
     public static let chestHeight = 9.0
-    /// The swat reaches this far and can't repeat for this long.
-    public static let swatRadius = 20.0
-    public static let swatCooldownFrames = 80
-    public static let swatFrames = 30
+    /// A ball knocked out of a holder's hands pops straight up: the floater's drift for
+    /// this many frames, then a normal fall, nobody's.
+    public static let popFloatFrames = 10
 
     /// A ball falling toward a rim from within this reach, sideways and above, has its
     /// sideways speed blended each frame toward what would carry it through the rim, by
@@ -345,4 +347,61 @@ public enum ShakeRules {
     public static let platformWidth = 30.0
     public static let platformThickness = 10.0
     public static let platformFrames = 60
+}
+
+/// The slide's numbers: down at full run without the ball, or shoot while crouched. It
+/// starts at the dash burst and bleeds this much a frame for this long. The extended leg
+/// reaches this far past the body's front edge and this high off the floor, and knocks
+/// the ball out of a grounded holder it meets.
+public enum SlideRules {
+    public static let frames = 20
+    public static let friction = 0.15
+    public static let legReach = 10.0
+    public static let legHeight = 6.0
+}
+
+/// The Esper Slash's numbers: shoot on defence, with the other holding the ball. On the
+/// ground it's a planted swing; in the air the body rises at least this fast and gravity
+/// is cut to this share, so it hangs through the swing. It always ends in the roll, a
+/// short hop's worth from the ground, played over this many frames. The blade is live
+/// over these frames and reaches this far ahead, this far behind, this far below the
+/// feet and this high. It knocks the ball out of a holder's hands or swats a loose one
+/// away at no less than this speed.
+public enum SlashRules {
+    public static let frames = 24
+    public static let rollFrames = 18
+    public static let lift = 1.0
+    public static let gravityShare = 0.2
+    public static let activeFrames = 8..<16
+    public static let reach = 15.0
+    public static let back = 5.0
+    public static let below = 4.0
+    public static let height = 28.0
+    public static let swatSpeed = 6.0
+}
+
+/// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many
+/// frames; the hand is out over these, and the whole body plus this much of reach in
+/// front takes any ball it overlaps while the body faces it, loose or in the other's
+/// hands. The spark shows on this frame. Then it can't repeat for this long.
+public enum SnatchRules {
+    public static let frames = 40
+    public static let activeFrames = 4..<16
+    public static let sparkFrame = 8
+    public static let reach = 10.0
+    public static let cooldownFrames = 30
+}
+
+/// The ledge's numbers: falling past a corner with no ball, the hand catches it when the
+/// corner is within this reach of the body's side and within this much either way of
+/// hand height, which is this far above the feet, 28 art pixels as the sheet draws it.
+/// The hang lasts this long and the climb this long, and for this long after walking off
+/// an edge the corner just left can't be grabbed again.
+public enum LedgeRules {
+    public static let hangDepth = 17.5
+    public static let grabReach = 10.0
+    public static let grabSlack = 10.0
+    public static let hangFrames = 10
+    public static let climbFrames = 15
+    public static let walkOffCooldownFrames = 20
 }

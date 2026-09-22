@@ -28,7 +28,12 @@ public enum PlayerState: Equatable, Hashable {
     case jumpSquat, air, wallLand, land
     case shootStance, shooting
     case throwStance, throwing, dunking
-    case catching, swatting, taunt
+    case catching, taunt
+    /// Without the ball: the crouch and crouch walk, the slide, the Esper Slash and the
+    /// roll that always follows it, the snatch, and hanging from and climbing a ledge.
+    case crouch, crouchWalk, slide
+    case slashing, rolling, snatching
+    case ledgeHang, ledgeClimb
     /// Web Water: swinging under a web, reeling to a wall, and being reeled by the other.
     case webSwing, webPull, webbed
     /// Super Soda: flying.
@@ -36,15 +41,16 @@ public enum PlayerState: Equatable, Hashable {
 
     public var isGroundState: Bool {
         switch self {
-        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .land: true
+        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .slide: true
         default: false
         }
     }
 
-    /// States a ball can be caught out of.
+    /// States a ball can be caught out of. The snatch takes the ball its own way.
     public var canCatch: Bool {
         switch self {
-        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull, .flying: true
+        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull, .flying,
+             .crouch, .crouchWalk, .slide: true
         default: false
         }
     }
@@ -126,7 +132,14 @@ public struct Player: Equatable {
     /// Platform Protein Shake: a fast fall just began and wants a slab, if none stands.
     public var wantsPlatform = false
     public var hasPlatform = false
-    public var swatCooldown = 0
+    /// The slide's leg and the slash's blade each hit once.
+    public var slideHit = false
+    public var slashHit = false
+    public var snatchCooldown = 0
+    /// The corner being hung from, and frames after walking off an edge before a corner
+    /// can be grabbed.
+    public var ledge: Vec2?
+    public var ledgeCooldown = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
     /// Frames a jump press stays live waiting for something to spend it.
@@ -180,9 +193,11 @@ public struct Player: Equatable {
 
     // MARK: Step
 
-    /// `opponentX` is where the other body stands; a walk always faces it. `ballOwner` is
-    /// whose the loose ball still is, for Flash Fizz.
-    public mutating func step(input given: PlayerInput, stage: Stage, opponentX: Double? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
+    /// `opponentX` is where the other body stands; a walk with the ball faces it. `ballOwner`
+    /// is whose the loose ball still is, for Flash Fizz, and `ballHolder` who has it in
+    /// hand: on defence, with the other holding it, shoot is the Esper Slash.
+    public mutating func step(input given: PlayerInput, stage: Stage, opponentX: Double? = nil, ballOwner: Int? = nil,
+                              ballHolder: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         var input = given
         stateTimer += 1
         if catchCooldown > 0 { catchCooldown -= 1 }
@@ -199,7 +214,8 @@ public struct Player: Equatable {
         if input.shootButtons == 0 { shootReady = true }
         if !input.throwBall { throwReady = true }
         catchStance = !hasBall && input.shoot
-        if swatCooldown > 0 { swatCooldown -= 1 }
+        if snatchCooldown > 0 { snatchCooldown -= 1 }
+        if ledgeCooldown > 0 { ledgeCooldown -= 1 }
         if doubleJumpTimer > 0 { doubleJumpTimer -= 1 }
         stickAwayFrames = abs(input.stick.x) < 0.3 ? 0 : stickAwayFrames + 1
         downHeldFrames = input.stick.y < -0.65 ? downHeldFrames + 1 : 0
@@ -210,8 +226,10 @@ public struct Player: Equatable {
         let throwPressed = input.throwBall && !lastInput.throwBall
         let tauntPressed = input.taunt && !lastInput.taunt
         let smash = abs(input.stick.x) >= spec.dashThreshold && stickAwayFrames <= 3
+        let onDefence = ballHolder != nil && ballHolder != index
         var action: PlayerAction?
-        let free = state == .idle || state == .walk || state == .run || state == .dash || state == .air || state == .land || state == .wallLand || state == .flying
+        let free = state == .idle || state == .walk || state == .run || state == .dash || state == .air || state == .land || state == .wallLand
+            || state == .flying || state == .crouch || state == .crouchWalk
         if free {
             action = webLineIfAsked(input, throwPressed: throwPressed)
         }
@@ -227,8 +245,11 @@ public struct Player: Equatable {
         switch state {
         case .idle:
             velocity.x = approach(velocity.x, 0, spec.traction)
-            if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
-                if let direction = stickFacing(input) {
+            if !groundActions(input, jumpPressed: jumpPressed, shootPressed: shootPressed, throwPressed: throwPressed,
+                              tauntPressed: tauntPressed, onDefence: onDefence, events: &events) {
+                if crouchAsked(input) {
+                    enter(.crouch)
+                } else if let direction = stickFacing(input) {
                     if smash {
                         facing = direction
                         startDash(events: &events)
@@ -239,16 +260,20 @@ public struct Player: Equatable {
             }
 
         case .walk:
-            // A walk faces the opponent whichever way it goes, so it can back off or dribble
-            // between the legs while staring them down, after a few frames in which the stick
-            // can still turn the body. Only a dash turns it after that.
-            if stateTimer <= spec.walkFaceLockoutFrames, let direction = stickFacing(input) {
+            // A walk with the ball faces the opponent whichever way it goes, so it can back off
+            // or dribble between the legs while staring them down, after a few frames in which
+            // the stick can still turn the body. Only a dash turns it after that. Without the
+            // ball the stick turns the body throughout.
+            if !hasBall || stateTimer <= spec.walkFaceLockoutFrames, let direction = stickFacing(input) {
                 facing = direction
-            } else if let opponentX, opponentX != position.x {
+            } else if hasBall, let opponentX, opponentX != position.x {
                 facing = opponentX > position.x ? .right : .left
             }
-            if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
-                if let direction = stickFacing(input) {
+            if !groundActions(input, jumpPressed: jumpPressed, shootPressed: shootPressed, throwPressed: throwPressed,
+                              tauntPressed: tauntPressed, onDefence: onDefence, events: &events) {
+                if crouchAsked(input) {
+                    enter(.crouch)
+                } else if let direction = stickFacing(input) {
                     if smash {
                         facing = direction
                         startDash(events: &events)
@@ -264,7 +289,8 @@ public struct Player: Equatable {
             }
 
         case .dash:
-            if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
+            if !groundActions(input, jumpPressed: jumpPressed, shootPressed: shootPressed, throwPressed: throwPressed,
+                              tauntPressed: tauntPressed, onDefence: onDefence, events: &events) {
                 if let direction = stickFacing(input), direction != facing, smash {
                     facing = direction
                     startDash(events: &events)
@@ -278,8 +304,12 @@ public struct Player: Equatable {
             }
 
         case .run:
-            if !groundActions(input, jumpPressed: jumpPressed, tauntPressed: tauntPressed, events: &events) {
-                if downHeldFrames >= spec.runBrakeHoldFrames {
+            if !groundActions(input, jumpPressed: jumpPressed, shootPressed: shootPressed, throwPressed: throwPressed,
+                              tauntPressed: tauntPressed, onDefence: onDefence, events: &events) {
+                if !hasBall, downHeldFrames >= 1 {
+                    // Down at full run without the ball: the slide.
+                    startSlide(events: &events)
+                } else if downHeldFrames >= spec.runBrakeHoldFrames {
                     // Held down: the run brakes, and at walking speed it becomes a walk.
                     velocity.x = approach(velocity.x, 0, spec.traction)
                     animationPhase += runCycleStep
@@ -364,11 +394,10 @@ public struct Player: Equatable {
                 fastFalling = false
                 throwStanceEntrySpeed = velocity.x
                 enter(.throwStance)
-            } else if !hasBall, shootPressed, swatCooldown == 0 {
-                swatCooldown = BallRules.swatCooldownFrames
-                velocity.x = 0
-                enter(.swatting)
-                action = .swat
+            } else if !hasBall, throwPressed, snatchCooldown == 0, power != .webWater {
+                startSnatch()
+            } else if !hasBall, shootPressed, onDefence {
+                startSlash(events: &events)
             }
 
         case .wallLand:
@@ -387,7 +416,7 @@ public struct Player: Equatable {
         case .land:
             velocity.x = approach(velocity.x, 0, spec.traction)
             if stateTimer >= spec.landingLagFrames {
-                enter(stickFacing(input) == nil ? .idle : .walk)
+                enter(crouchAsked(input) ? .crouch : (stickFacing(input) == nil ? .idle : .walk))
             }
 
         case .shootStance:
@@ -520,10 +549,84 @@ public struct Player: Equatable {
                 enter(grounded ? .idle : .air)
             }
 
-        case .swatting:
-            if !grounded { fall(.idle) }
-            if stateTimer >= BallRules.swatFrames {
+        case .crouch, .crouchWalk:
+            // Down with no ball. The crouch walk is slow, and the stick turns the body.
+            if let direction = stickFacing(input) { facing = direction }
+            if state == .crouchWalk {
+                velocity.x = approach(velocity.x, spec.crouchWalkSpeed * input.stick.x, spec.walkAcceleration)
+                animationPhase += max(abs(velocity.x) / spec.crouchWalkSpeed * 0.25, 10.0 / 60)
+            } else {
+                velocity.x = approach(velocity.x, 0, spec.traction)
+            }
+            if jumpPressed {
+                enter(.jumpSquat)
+            } else if throwPressed, snatchCooldown == 0, power != .webWater {
+                startSnatch()
+            } else if shootPressed {
+                // Shoot while crouched: the slide, in neutral or on defence alike.
+                startSlide(events: &events)
+            } else if !crouchAsked(input) {
+                enter(stickFacing(input) == nil ? .idle : .walk)
+            } else if (input.stick.x != 0) != (state == .crouchWalk) {
+                enter(input.stick.x != 0 ? .crouchWalk : .crouch)
+            }
+
+        case .slide:
+            // The leg out front, the body low, the burst bleeding off.
+            velocity.x = approach(velocity.x, 0, SlideRules.friction)
+            if stateTimer >= SlideRules.frames {
+                enter(crouchAsked(input) ? .crouch : .idle)
+            }
+
+        case .slashing:
+            // On the ground a planted swing; in the air gravity is cut, so the body hangs
+            // through it. Then the roll, whichever.
+            if grounded {
+                velocity.x = approach(velocity.x, 0, spec.traction)
+            } else {
+                velocity.x = approach(velocity.x, 0, spec.airFriction)
+                velocity.y = max(velocity.y - spec.gravity * SlashRules.gravityShare, -spec.fallSpeed)
+            }
+            if stateTimer >= SlashRules.frames {
+                startRoll()
+            }
+
+        case .rolling:
+            airDrift(input)
+            fall(.idle)
+            if stateTimer >= SlashRules.rollFrames {
+                enter(.air)
+            }
+
+        case .snatching:
+            if grounded {
+                velocity.x = approach(velocity.x, 0, spec.traction)
+            } else {
+                airDrift(input)
+                fall(.idle)
+            }
+            if stateTimer == SnatchRules.sparkFrame {
+                events.append(.snatchReached(player: index))
+            }
+            if stateTimer >= SnatchRules.frames {
+                snatchCooldown = SnatchRules.cooldownFrames
                 enter(grounded ? .idle : .air)
+            }
+
+        case .ledgeHang:
+            velocity = .zero
+            if stateTimer >= LedgeRules.hangFrames {
+                enter(.ledgeClimb)
+            }
+
+        case .ledgeClimb:
+            // Up in three steps with the sheet: hanging, astride the corner, standing on it.
+            velocity = .zero
+            guard let corner = ledge else { enter(.air); break }
+            position = ledgePositions(at: corner)[min((stateTimer - 1) * 3 / LedgeRules.climbFrames, 2)]
+            if stateTimer >= LedgeRules.climbFrames {
+                ledge = nil
+                enter(.idle)
             }
 
         case .taunt:
@@ -591,14 +694,17 @@ public struct Player: Equatable {
             }
         }
         settle(input, events: &events)
+        grabLedgeIfThere(in: stage, events: &events)
         lastInput = input
         return action
     }
 
     // MARK: Pieces of the step
 
-    /// Jumps, stances and the taunt, shared by every standing state. True when one fired.
-    private mutating func groundActions(_ input: PlayerInput, jumpPressed: Bool, tauntPressed: Bool, events: inout [MatchEvent]) -> Bool {
+    /// Jumps, stances and the taunt, shared by every standing state, and without the ball
+    /// the snatch and, on defence, the Esper Slash. True when one fired.
+    private mutating func groundActions(_ input: PlayerInput, jumpPressed: Bool, shootPressed: Bool, throwPressed: Bool,
+                                        tauntPressed: Bool, onDefence: Bool, events: inout [MatchEvent]) -> Bool {
         if jumpPressed {
             enter(.jumpSquat)
         } else if hasBall, input.shoot, shootReady {
@@ -610,10 +716,109 @@ public struct Player: Equatable {
             enter(.throwStance)
         } else if hasBall, tauntPressed {
             enter(.taunt)
+        } else if !hasBall, throwPressed, snatchCooldown == 0, power != .webWater {
+            startSnatch()
+        } else if !hasBall, shootPressed, onDefence {
+            startSlash(events: &events)
         } else {
             return false
         }
         return true
+    }
+
+    /// Down on the stick with no ball in hand.
+    private func crouchAsked(_ input: PlayerInput) -> Bool {
+        !hasBall && input.stick.y < -0.65
+    }
+
+    /// The slide: the dash burst the way the body faces, the leg out.
+    private mutating func startSlide(events: inout [MatchEvent]) {
+        slideHit = false
+        velocity.x = spec.dashInitialVelocity * facing.sign
+        events.append(.slid(player: index))
+        enter(.slide)
+    }
+
+    /// The Esper Slash. In the air the body rises at least the lift, so it floats.
+    private mutating func startSlash(events: inout [MatchEvent]) {
+        slashHit = false
+        fastFalling = false
+        if !grounded { velocity.y = max(velocity.y, SlashRules.lift) }
+        events.append(.slashed(player: index))
+        enter(.slashing)
+    }
+
+    /// The roll after the slash: from the ground it's a short hop's worth of air.
+    private mutating func startRoll() {
+        if grounded {
+            velocity.y = spec.shortHopVelocity
+            grounded = false
+        }
+        enter(.rolling)
+    }
+
+    private mutating func startSnatch() {
+        fastFalling = false
+        enter(.snatching)
+    }
+
+    /// Falling past a corner within a hand's reach with no ball: the hang, on either side,
+    /// the body turned to face it. Not into anything solid, and not for a while after
+    /// walking off an edge, so leaving a ledge doesn't grab it back.
+    private mutating func grabLedgeIfThere(in stage: Stage, events: inout [MatchEvent]) {
+        guard state == .air, !hasBall, velocity.y <= 0, ledgeCooldown == 0 else { return }
+        let hand = position.y + LedgeRules.hangDepth
+        for side in [facing, facing.flipped] {
+            guard let corner = stage.ledge(beside: body, side: side, reach: LedgeRules.grabReach,
+                                           top: (hand - LedgeRules.grabSlack)...(hand + LedgeRules.grabSlack)) else { continue }
+            let hang = Vec2(x: corner.x - side.sign * spec.bodyWidth / 2, y: corner.y - LedgeRules.hangDepth)
+            let hung = Box(min: Vec2(x: hang.x - spec.bodyWidth / 2, y: hang.y), max: Vec2(x: hang.x + spec.bodyWidth / 2, y: hang.y + spec.bodyHeight))
+            guard !stage.overlapsSolid(hung) else { continue }
+            facing = side
+            position = hang
+            velocity = .zero
+            fastFalling = false
+            ledge = corner
+            events.append(.ledgeGrabbed(player: index))
+            enter(.ledgeHang)
+            return
+        }
+    }
+
+    /// Where the feet go through a climb of `corner`, facing it: hanging beside it, astride
+    /// it, and standing a unit in from its edge.
+    private func ledgePositions(at corner: Vec2) -> [Vec2] {
+        let half = spec.bodyWidth / 2
+        return [Vec2(x: corner.x - facing.sign * half, y: corner.y - LedgeRules.hangDepth),
+                Vec2(x: corner.x, y: corner.y - LedgeRules.hangDepth / 2),
+                Vec2(x: corner.x + facing.sign * (half + 1), y: corner.y)]
+    }
+
+    // MARK: Hitboxes
+
+    /// The extended leg while sliding, until it has hit.
+    public var slideHitbox: Box? {
+        guard state == .slide, !slideHit else { return nil }
+        let front = position.x + facing.sign * spec.bodyWidth / 2
+        let tip = front + facing.sign * SlideRules.legReach
+        return Box(min: Vec2(x: min(front, tip), y: position.y), max: Vec2(x: max(front, tip), y: position.y + SlideRules.legHeight))
+    }
+
+    /// The blade over the slash's live frames, until it has hit.
+    public var slashHitbox: Box? {
+        guard state == .slashing, !slashHit, SlashRules.activeFrames.contains(stateTimer) else { return nil }
+        let back = position.x - facing.sign * SlashRules.back
+        let tip = position.x + facing.sign * SlashRules.reach
+        return Box(min: Vec2(x: min(back, tip), y: position.y - SlashRules.below), max: Vec2(x: max(back, tip), y: position.y + SlashRules.height))
+    }
+
+    /// The whole body and the hand's reach in front, while the snatch's hand is out.
+    public var snatchHitbox: Box? {
+        guard state == .snatching, SnatchRules.activeFrames.contains(stateTimer) else { return nil }
+        let box = body
+        return facing == .right
+            ? Box(min: box.min, max: Vec2(x: box.max.x + SnatchRules.reach, y: box.max.y))
+            : Box(min: Vec2(x: box.min.x - SnatchRules.reach, y: box.min.y), max: box.max)
     }
 
     /// Web Water's line, on the throw button with no ball: held, it aims along the stick;
@@ -862,7 +1067,7 @@ public struct Player: Equatable {
             fastFalling = false
             flightLeft = SodaRules.flightFrames
             switch state {
-            case .air, .wallLand:
+            case .air, .wallLand, .rolling:
                 events.append(.landed(player: index))
                 enter(.land)
             case .webSwing:
@@ -878,6 +1083,7 @@ public struct Player: Equatable {
         } else if state.isGroundState, state != .jumpSquat {
             wallLandCooldown = max(wallLandCooldown, spec.wallLandGroundLockoutFrames)
             coyote = spec.coyoteFrames
+            ledgeCooldown = LedgeRules.walkOffCooldownFrames
             enter(.air)
         }
     }
@@ -886,6 +1092,7 @@ public struct Player: Equatable {
     /// mid-swing, the swing carries on with it.
     public mutating func catchBall() {
         hasBall = true
+        if state == .snatching { snatchCooldown = SnatchRules.cooldownFrames }
         if state == .webSwing { return }
         if grounded { velocity = .zero }
         enter(.catching)
@@ -902,11 +1109,6 @@ public struct Player: Equatable {
         let ahead = offset.x * facing.sign >= -1
         let movingInto = velocity.lengthSquared > 0.01 && offset.x * velocity.x + offset.y * velocity.y > 0
         return ahead || movingInto
-    }
-
-    public func canSwat(ballAt ballPosition: Vec2) -> Bool {
-        guard chest.distance(to: ballPosition) <= BallRules.swatRadius else { return false }
-        return (ballPosition.x - position.x) * facing.sign >= 0
     }
 }
 

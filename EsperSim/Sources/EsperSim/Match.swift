@@ -44,8 +44,12 @@ public struct Match: Equatable {
             let input = index < inputs.count ? inputs[index] : .idle
             let opponentX = players.indices.first { $0 != index }.map { players[$0].position.x }
             let ballOwner = ball.isLive ? ball.owner : nil
-            guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX, ballOwner: ballOwner, events: &events) else { continue }
+            guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX, ballOwner: ballOwner,
+                                                   ballHolder: ball.holder, events: &events) else { continue }
             perform(action, by: index)
+        }
+        for index in players.indices {
+            resolveHits(by: index)
         }
 
         for index in players.indices where players[index].webLine?.target == .opponent {
@@ -120,24 +124,61 @@ public struct Match: Equatable {
             guard ball.isLive else { return }
             let feet = Vec2(x: ball.position.x, y: ball.position.y - BallRules.chestHeight)
             players[index].warp(to: feet, in: stage)
-            players[index].catchBall()
-            ball.holder = index
-            ball.straight = false
-            ball.thrown = false
-            ball.tether = nil
-            ball.resting = false
             events.append(.warped(player: index, from: from, to: players[index].position))
-            events.append(.caught(player: index))
-        case .swat:
-            if ball.isLive, player.canSwat(ballAt: ball.position) {
-                ball.velocity = -ball.velocity
-                ball.straight = false
-                ball.lastTouched = index
+            hand(ballTo: index)
+        }
+    }
+
+    /// The slide's leg and the slash's blade knock the ball out of the other's hands, the
+    /// blade swats a loose ball away, and the snatch takes any ball it reaches while the
+    /// body faces it, loose or in the other's hands.
+    private mutating func resolveHits(by index: Int) {
+        let player = players[index]
+        let other = players.indices.first { $0 != index }
+        if let leg = player.slideHitbox, let other, players[other].hasBall, players[other].grounded, players[other].body.overlaps(leg) {
+            players[index].slideHit = true
+            pop(from: other, by: index)
+        }
+        if let blade = player.slashHitbox {
+            if let other, players[other].hasBall, players[other].body.overlaps(blade) {
+                players[index].slashHit = true
+                pop(from: other, by: index)
+            } else if ball.isLive, ball.box.overlaps(blade) {
+                players[index].slashHit = true
+                ball.swat(toward: player.facing, by: index)
                 events.append(.swatted(player: index, hit: true))
-            } else {
-                events.append(.swatted(player: index, hit: false))
             }
         }
+        if let reach = player.snatchHitbox {
+            let held = ball.holder.flatMap { $0 == index ? nil : $0 }
+            let at = held.map { players[$0].chest + Vec2(x: 0, y: 3) } ?? ball.position
+            let facingIt = (at.x - player.position.x) * player.facing.sign >= -1
+            let inReach = Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2).overlaps(reach)
+            if facingIt, inReach, held != nil || ball.isLive {
+                if let held { players[held].loseBall() }
+                hand(ballTo: index)
+            }
+        }
+    }
+
+    /// The ball knocked out of `victim`'s hands: it pops straight up, nobody's.
+    private mutating func pop(from victim: Int, by popper: Int) {
+        let from = players[victim].chest + Vec2(x: 0, y: 3)
+        players[victim].loseBall()
+        ball.pop(from: from)
+        events.append(.popped(player: victim, by: popper))
+    }
+
+    /// The ball into a player's hands, whatever it was doing.
+    private mutating func hand(ballTo catcher: Int) {
+        players[catcher].catchBall()
+        ball.holder = catcher
+        ball.straight = false
+        ball.thrown = false
+        ball.tether = nil
+        ball.floater = 0
+        ball.resting = false
+        events.append(.caught(player: catcher))
     }
 
     /// Web Water's line: the first thing along it wins. A loose ball is reeled in; the other
@@ -211,14 +252,8 @@ public struct Match: Equatable {
         let target = players[puller].chest
         let gap = target - ball.position
         if gap.length <= BallRules.catchRadius, !players[puller].hasBall {
-            players[puller].catchBall()
-            ball.holder = puller
-            ball.straight = false
-            ball.thrown = false
-            ball.tether = nil
-            ball.resting = false
+            hand(ballTo: puller)
             players[puller].webLine = nil
-            events.append(.caught(player: puller))
         } else if players[puller].hasBall {
             ball.tether = nil
             players[puller].webLine = nil
@@ -243,12 +278,7 @@ public struct Match: Equatable {
             .filter { players[$0].canCatch(ballAt: ball.position, speed: speed) }
             .sorted { players[$0].chest.distance(to: ball.position) < players[$1].chest.distance(to: ball.position) }
         guard let catcher = candidates.first else { return }
-        players[catcher].catchBall()
-        ball.holder = catcher
-        ball.straight = false
-        ball.thrown = false
-        ball.resting = false
-        events.append(.caught(player: catcher))
+        hand(ballTo: catcher)
     }
 
     /// The arc a shot would take from where the player stands, for the aiming guide.

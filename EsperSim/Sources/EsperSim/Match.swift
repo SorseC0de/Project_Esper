@@ -19,6 +19,10 @@ public struct Match: Equatable {
     /// every point, and how long that is.
     public var countdown: Int
     public let countdownLength: Int
+    /// A point waiting to restart, after a dunk: frames left with the dunker on the rim,
+    /// and whose hands the ball then goes to.
+    public var restartIn = 0
+    public var restartBallTo = 0
     /// What happened on the last `advance`.
     public var events: [MatchEvent] = []
 
@@ -36,6 +40,10 @@ public struct Match: Equatable {
     public mutating func advance(inputs given: [PlayerInput]) {
         frame += 1
         events = []
+        if restartIn > 0 {
+            restartIn -= 1
+            if restartIn == 0 { restart(ballTo: restartBallTo) }
+        }
         let inputs = countdown > 0 ? [] : given
         if countdown > 0 { countdown -= 1 }
 
@@ -71,7 +79,14 @@ public struct Match: Equatable {
                 scores[owner] += 1
                 events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity))
                 if let other = players.indices.first(where: { $0 != owner }) {
-                    restart(ballTo: other)
+                    if players.contains(where: { $0.state == .dunking }) {
+                        // A dunk: the dunker hangs on the rim a beat, the ball dead, then the restart.
+                        restartIn = BallRules.dunkHangFrames
+                        restartBallTo = other
+                        ball.respawnTimer = BallRules.dunkHangFrames + 5
+                    } else {
+                        restart(ballTo: other)
+                    }
                 }
                 return
             }

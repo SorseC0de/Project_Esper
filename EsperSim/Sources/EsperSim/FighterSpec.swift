@@ -61,8 +61,10 @@ public struct FighterSpec: Equatable {
     public var walkFaceLockoutFrames = 3
     /// Speed of a crouch walk.
     public var crouchWalkSpeed = 0.8
-    /// Sideways speed lost per frame in an airborne stance.
+    /// Sideways speed lost per frame in an airborne shoot stance, and in a throw stance,
+    /// which keeps most of its run so a jump can carry it to the rim for the dunk.
     public var stanceAirBrake = 0.01
+    public var throwStanceAirBrake = 0.03
     /// Speed lost per frame on the ground through a snatch or a slash, so a run or a dash
     /// carries into them.
     public var attackBrake = 0.15
@@ -279,9 +281,12 @@ public enum BallRules {
     /// Frames from the release to the ball leaving the hand, then to acting again.
     public static let throwReleaseFrames = 3
     public static let throwRecoveryFrames = 15
-    /// A throw stance this close to a rim becomes a dunk.
-    public static let dunkRadius = 12.0
+    /// A throw stance with the chest this close to a rim becomes a dunk, wider than the
+    /// basket. The ball goes in halfway through the dunk's frames, and the dunker hangs
+    /// on the rim for this long after before the point restarts.
+    public static let dunkRadius = 25.0
     public static let dunkFrames = 20
+    public static let dunkHangFrames = 45
 
     /// The ball is caught within this of the chest, in front. Faster than the threshold it
     /// bounces off instead, unless the body is in the catch stance: a shoot button held

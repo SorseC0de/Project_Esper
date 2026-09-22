@@ -104,7 +104,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   gravity until the first bounce. Up is the floater: a soft drift up at 1.5 with gravity
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
-  is the ball going through on its own. In the stance within 12 units of a rim it's a dunk.
+  is the ball going through on its own. In the air the throw stance keeps its run,
+  bleeding only 0.03 a frame, so a jump carries it to the rim. In the stance with the
+  chest within 25 units of a rim, wider than the basket, it's a dunk: the ball goes in
+  halfway through, and the dunker hangs on the rim 45 frames before the point restarts.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump

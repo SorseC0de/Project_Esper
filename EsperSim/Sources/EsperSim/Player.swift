@@ -468,7 +468,7 @@ public struct Player: Equatable {
                 throwReady = !throwPressed
                 break
             }
-            stanceMovement(input)
+            stanceMovement(input, airBrake: spec.stanceAirBrake)
             if input.aim.length >= BallRules.flickThreshold {
                 shotAim = input.aim
                 if shotAim.x != 0 { facing = shotAim.x > 0 ? .right : .left }
@@ -531,7 +531,7 @@ public struct Player: Equatable {
                 enter(grounded ? .idle : .air)
                 break
             }
-            stanceMovement(input)
+            stanceMovement(input, airBrake: spec.throwStanceAirBrake)
             let aim = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
             if aim.length >= 0.5 {
                 throwDirection = abs(aim.x) >= abs(aim.y) ? Vec2(x: aim.x > 0 ? 1 : -1, y: 0) : Vec2(x: 0, y: aim.y > 0 ? 1 : -1)
@@ -571,12 +571,13 @@ public struct Player: Equatable {
             }
 
         case .dunking:
+            // Hanging on the rim through the dunk and the beat after, until the point restarts.
             velocity = .zero
             if stateTimer == BallRules.dunkFrames / 2 {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames
                 events.append(.dunked(player: index))
-            } else if stateTimer >= BallRules.dunkFrames {
+            } else if stateTimer >= BallRules.dunkFrames + BallRules.dunkHangFrames {
                 enter(grounded ? .idle : .air)
             }
 
@@ -1091,12 +1092,13 @@ public struct Player: Equatable {
         velocity.y = max(velocity.y - spec.gravity, floor)
     }
 
-    /// A stance comes to a stop on the ground and drifts down slowly in the air.
-    private mutating func stanceMovement(_ input: PlayerInput) {
+    /// A stance comes to a stop on the ground and drifts down slowly in the air, its
+    /// sideways speed bleeding off at `airBrake`.
+    private mutating func stanceMovement(_ input: PlayerInput, airBrake: Double) {
         if grounded {
             velocity.x = approach(velocity.x, 0, spec.traction)
         } else {
-            velocity.x = approach(velocity.x, 0, spec.stanceAirBrake)
+            velocity.x = approach(velocity.x, 0, airBrake)
             if velocity.y <= 0 {
                 velocity.y = -BallRules.stanceFallSpeed
             } else {

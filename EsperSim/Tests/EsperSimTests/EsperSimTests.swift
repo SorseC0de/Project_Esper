@@ -634,6 +634,46 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.countdown, 30)
     }
 
+    func testADunkHangsOnTheRimBeforeThePointRestarts() {
+        var match = Match(countdown: 30)
+        match.countdown = 0
+        // In the air just inside the dunk's reach of the right rim, holding the ball.
+        let rim = match.stage.hoops[1].position
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[0].position = rim + Vec2(x: -20, y: -BallRules.chestHeight)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        // The dunk drops the ball through at once, and the beat starts.
+        XCTAssertEqual(match.players[0].state, .dunking)
+        XCTAssertEqual(match.scores, [1, 0])
+        XCTAssertEqual(match.restartIn, BallRules.dunkHangFrames)
+        // Still hanging there, the point not yet restarted, for the beat.
+        run(&match, frames: BallRules.dunkHangFrames - 2, input: { _ in .idle })
+        XCTAssertEqual(match.players[0].state, .dunking)
+        XCTAssertEqual(match.countdown, 0)
+        run(&match, frames: 2, input: { _ in .idle })
+        XCTAssertEqual(match.countdown, 30 - 1)
+        XCTAssertEqual(match.ball.holder, 1)
+        XCTAssertEqual(match.players[0].position, match.stage.playerSpawns[0])
+    }
+
+    func testAThrowStanceInTheAirKeepsItsRun() {
+        var match = Match()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
+        XCTAssertEqual(match.players[0].state, .air)
+        let entry = match.players[0].velocity.x
+        run(&match, frames: 10, input: { _ in PlayerInput(throwBall: true) })
+        XCTAssertEqual(match.players[0].state, .throwStance)
+        XCTAssertGreaterThan(match.players[0].velocity.x, entry - 10 * match.players[0].spec.throwStanceAirBrake - 0.001)
+        XCTAssertGreaterThan(match.players[0].velocity.x, entry * 0.8)
+    }
+
     func testTheCountHoldsEveryoneStill() {
         var match = Match(countdown: 10)
         let start = match.players[0].position

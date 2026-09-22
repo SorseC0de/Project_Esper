@@ -741,6 +741,44 @@ final class WebWaterTests: XCTestCase {
         XCTAssertNil(match.players[0].webLine)
     }
 
+    func testAMissedLineStaysLiveWhileItShows() {
+        var match = webbed()
+        // Fired flat ahead at nothing, the other behind, then the ball drops through it a few frames later.
+        match.players[1].position.x = 30
+        match.ball.respawn(at: Vec2(x: 300, y: 30))
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle])
+        XCTAssertTrue(match.events.contains(.webLine(player: 0, hit: false)))
+        XCTAssertNil(match.ball.tether)
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: 60, y: 20))
+        match.ball.velocity = Vec2(x: 0, y: -4)
+        let snagged = run(&match, frames: WebRules.missFrames, input: { _ in .idle }) { $0.ball.tether == 0 }
+        XCTAssertLessThan(snagged, WebRules.missFrames, "the ball crossed the line while it showed and wasn't taken")
+    }
+
+    func testTheSwingIsTheSameAtAnyHeight() {
+        func swing(from height: Double) -> (dip: Double, travel: Double) {
+            var match = webbed()
+            match.players[0].position = Vec2(x: 100, y: height)
+            match.players[0].grounded = false
+            match.players[0].enter(.air)
+            match.advance(inputs: [.idle, .idle])
+            let start = match.players[0].position
+            match.advance(inputs: [PlayerInput(jump: true), .idle])
+            XCTAssertEqual(match.players[0].state, .webSwing)
+            var lowest = start.y
+            run(&match, frames: 120, input: { _ in .idle }) { match in
+                lowest = min(lowest, match.players[0].position.y)
+                return match.players[0].state != .webSwing
+            }
+            return (start.y - lowest, match.players[0].position.x - start.x)
+        }
+        let low = swing(from: 40)
+        let high = swing(from: 140)
+        XCTAssertEqual(low.dip, high.dip, accuracy: 0.5)
+        XCTAssertEqual(low.travel, high.travel, accuracy: 0.5)
+    }
+
     func testWebLineTakesTheBallOffTheOpponent() {
         var match = webbed()
         match.players[1].hasBall = true

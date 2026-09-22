@@ -56,6 +56,7 @@ public struct Match: Equatable {
             let other = players.indices.first { $0 != index }
             if let other, players[other].state != .webbed { players[index].webLine = nil }
         }
+        snagWithLingeringLines()
         reelBall()
 
         if ball.isLive, ball.tether == nil {
@@ -181,13 +182,11 @@ public struct Match: Equatable {
         events.append(.caught(player: catcher))
     }
 
-    /// Web Water's line: the first thing along it wins. A loose ball is reeled in; the other
-    /// with the ball loses it to the reel; the other without it is reeled to a spot in front;
-    /// a wall reels the shooter to it. The line bends toward a ball or body within the assist
-    /// angle of the aim first.
+    /// Web Water's line: the first thing along it wins. The line bends toward a ball or
+    /// body within the assist angle of the aim first, and a miss leaves it showing, live,
+    /// for a few frames.
     private mutating func webLine(from index: Int, direction aimed: Vec2) {
-        let shooter = players[index]
-        let origin = shooter.chest
+        let origin = players[index].chest
         let opponent = players.indices.first { $0 != index }
         var direction = aimed
         var bestTurn = WebRules.assistAngle
@@ -203,23 +202,33 @@ public struct Match: Equatable {
                 direction = toward.normalized
             }
         }
-        var hit = false
+        let hit = snag(by: index, from: origin, direction: direction, range: WebRules.lineRange, throughSolids: false)
+        if !hit {
+            players[index].webLine = WebLine(target: .point(origin + direction * WebRules.lineRange), frames: WebRules.missFrames)
+        }
+        events.append(.webLine(player: index, hit: hit))
+    }
+
+    /// Walks a line out from `origin` and takes the first thing on it. A wall reels the
+    /// shooter to it, unless the line is one that already ended and is only lingering; a
+    /// loose ball is tethered; the other holding the ball loses it to the tether; the other
+    /// without it is reeled to a spot in front of the shooter. True when something was taken.
+    private mutating func snag(by index: Int, from origin: Vec2, direction: Vec2, range: Double, throughSolids: Bool) -> Bool {
+        let opponent = players.indices.first { $0 != index }
         var travelled = 0.0
-        while travelled <= WebRules.lineRange {
+        while travelled <= range {
             let point = origin + direction * travelled
-            if stage.overlapsSolid(Box(center: point, width: 1, height: 1)) {
+            if !throughSolids, stage.overlapsSolid(Box(center: point, width: 1, height: 1)) {
                 let landing = origin + direction * max(travelled - 4, 0)
                 players[index].startPull(to: landing, byOther: false)
                 players[index].webLine = WebLine(target: .point(point), frames: WebRules.pullMaxFrames)
-                hit = true
-                break
+                return true
             }
             if ball.isLive, ball.position.distance(to: point) <= BallRules.radius + WebRules.snapRadius {
                 ball.tether = index
                 ball.thrown = false
                 players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
-                hit = true
-                break
+                return true
             }
             if let opponent, players[opponent].body.overlaps(Box(center: point, width: WebRules.snapRadius * 2, height: WebRules.snapRadius * 2)) {
                 if players[opponent].hasBall {
@@ -230,19 +239,28 @@ public struct Match: Equatable {
                     ball.tether = index
                     players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
                 } else {
+                    let shooter = players[index]
                     let drop = Vec2(x: shooter.position.x + shooter.facing.sign * WebRules.dropDistance, y: shooter.position.y)
                     players[opponent].startPull(to: drop, byOther: true)
                     players[index].webLine = WebLine(target: .opponent, frames: WebRules.pullMaxFrames)
                 }
-                hit = true
-                break
+                return true
             }
             travelled += 2
         }
-        if !hit {
-            players[index].webLine = WebLine(target: .point(origin + direction * WebRules.lineRange), frames: WebRules.missFrames)
+        return false
+    }
+
+    /// A line that hit nothing stays live for as long as it shows: the ball or the other
+    /// body crossing it in those frames is taken as if the line had just been fired.
+    private mutating func snagWithLingeringLines() {
+        for index in players.indices {
+            guard let line = players[index].webLine, case .point(let end) = line.target, players[index].state != .webPull else { continue }
+            let origin = players[index].chest
+            let toward = end - origin
+            guard toward.length > 1 else { continue }
+            _ = snag(by: index, from: origin, direction: toward.normalized, range: toward.length, throughSolids: true)
         }
-        events.append(.webLine(player: index, hit: hit))
     }
 
     /// A tethered ball comes straight to its puller and is caught on arrival, whatever its

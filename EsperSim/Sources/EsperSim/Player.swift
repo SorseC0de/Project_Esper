@@ -382,7 +382,7 @@ public struct Player: Equatable {
                 enter(.flying)
             } else if jumpPressed, jumpsLeft > 0, power != .superSoda {
                 if power == .webWater {
-                    startWebSwing(in: stage, events: &events)
+                    startWebSwing(events: &events)
                 } else {
                     doubleJump(input, events: &events)
                 }
@@ -883,13 +883,13 @@ public struct Player: Equatable {
         enter(.shooting)
     }
 
-    /// Web Water's swing: a web to the top of the court ahead, air movement halted, the
-    /// double jump spent.
-    private mutating func startWebSwing(in stage: Stage, events: inout [MatchEvent]) {
+    /// Web Water's swing: a web to a point ahead and above, the same wherever the body is,
+    /// air movement halted, the double jump spent.
+    private mutating func startWebSwing(events: inout [MatchEvent]) {
         jumpBuffer = 0
         jumpsLeft -= 1
         fastFalling = false
-        let anchor = Vec2(x: position.x + WebRules.swingReach * facing.sign, y: stage.height)
+        let anchor = position + Vec2(x: WebRules.swingReach * facing.sign, y: WebRules.swingHeight)
         let offset = position - anchor
         swingLength = offset.length
         swingStartAngle = atan2(offset.x, -offset.y)

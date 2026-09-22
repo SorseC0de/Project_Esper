@@ -124,8 +124,9 @@ Each power takes over parts of the controls, and less of it is available with th
 in hand: that's where tricking lives, throwing the ball away to use the power while it's
 in the air, catching it, carrying on. On the POWER picker, A is none.
 
-- Web Water (B). Double jump is the web swing: air movement halts, a web goes to the top
-  of the court 45 units ahead, and the body swings under it on a pendulum arc to the
+- Web Water (B). Double jump is the web swing: air movement halts, a web goes to a point
+  45 units ahead and 130 up, wherever the body is, so the swing is the same at any
+  height, and the body swings under it on a pendulum arc to the
   mirrored angle, so it dips, then lets go higher than it stopped. That least arc always
   happens; holding jump keeps swinging, up to 1.6 times the arc and never over the anchor,
   and a full swing gives the double jump back. The exit keeps the arc's direction but is
@@ -133,7 +134,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   and works with the ball. The wall cling never slides. The throw button without the ball
   is the web line, from the ground, the air or a wall: held, it aims along the stick with a
   faint line; let go, it fires, 120 units. It bends to a loose ball or the opponent within
-  15° of the aim, and the first thing within 8 units of its tip wins. A loose ball is reeled in and caught whatever its speed or facing. The opponent
+  15° of the aim, and the first thing within 8 units of its tip wins. A miss shows for 8
+  frames and is live the whole time: the ball or the opponent crossing it in those frames
+  is taken as if it had just been fired. A loose ball is reeled in and caught whatever its speed or facing. The opponent
   holding the ball loses it to the reel. The opponent without it is reeled to 12 units in
   front of the shooter and dropped. A wall or block reels the shooter to it. With the ball
   the throw button is the ordinary throw. Numbers in `WebRules`.

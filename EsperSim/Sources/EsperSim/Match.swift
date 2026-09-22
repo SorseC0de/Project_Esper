@@ -15,36 +15,40 @@ public struct Match: Equatable {
     public var platforms: [Platform] = []
     public var scores: [Int]
     public var frame = 0
+    /// The count before play: frames in which nobody moves or acts, at the start and after
+    /// every point, and how long that is.
+    public var countdown: Int
+    public let countdownLength: Int
     /// What happened on the last `advance`.
     public var events: [MatchEvent] = []
 
-    public init(stage: Stage = .court, specs: [FighterSpec] = [.baseline, .baseline]) {
+    public init(stage: Stage = .court, specs: [FighterSpec] = [.baseline, .baseline], countdown: Int = 0) {
         self.stage = stage
         players = specs.indices.map { index in
             Player(spec: specs[index], index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
         }
         ball = Ball(position: stage.ballSpawn)
         scores = Array(repeating: 0, count: specs.count)
+        countdownLength = countdown
+        self.countdown = countdown
     }
 
-    public mutating func advance(inputs: [PlayerInput]) {
+    public mutating func advance(inputs given: [PlayerInput]) {
         frame += 1
         events = []
+        let inputs = countdown > 0 ? [] : given
+        if countdown > 0 { countdown -= 1 }
 
         // Platforms count down and go; the stage carries the ones standing.
         platforms = platforms.compactMap { platform in
             platform.framesLeft > 1 ? Platform(owner: platform.owner, box: platform.box, framesLeft: platform.framesLeft - 1) : nil
-        }
-        for index in players.indices {
-            players[index].hasPlatform = platforms.contains { $0.owner == index }
         }
         stage.extras = platforms.map(\.box)
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
             let opponentX = players.indices.first { $0 != index }.map { players[$0].position.x }
-            let ballOwner = ball.isLive ? ball.owner : nil
-            guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX, ballOwner: ballOwner,
+            guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX,
                                                    ballHolder: ball.holder, events: &events) else { continue }
             perform(action, by: index)
         }
@@ -64,8 +68,11 @@ public struct Match: Equatable {
             if let hoop = ball.step(stage: stage, bodies: bodies, events: &events) {
                 let owner = stage.hoops[hoop].owner
                 scores[owner] += 1
-                ball.respawnTimer = BallRules.respawnFrames
-                events.append(.scored(player: owner, hoop: hoop))
+                events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity))
+                if let other = players.indices.first(where: { $0 != owner }) {
+                    restart(ballTo: other)
+                }
+                return
             }
             tryCatch()
         } else if ball.respawnTimer > 0 {
@@ -82,6 +89,23 @@ public struct Match: Equatable {
             ball.position = players[holder].chest + Vec2(x: 0, y: 3)
             ball.velocity = .zero
         }
+    }
+
+    /// After a point: everyone back to their spawn as they began, the ball in `holder`'s
+    /// hands, any slab gone, and the count again.
+    public mutating func restart(ballTo holder: Int) {
+        for index in players.indices {
+            let was = players[index]
+            players[index] = Player(spec: was.spec, index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
+            players[index].power = was.power
+        }
+        platforms = []
+        stage.extras = []
+        ball.respawn(at: stage.ballSpawn)
+        players[holder].hasBall = true
+        ball.holder = holder
+        ball.position = players[holder].chest + Vec2(x: 0, y: 3)
+        countdown = countdownLength
     }
 
     private mutating func perform(_ action: PlayerAction, by index: Int) {
@@ -108,10 +132,22 @@ public struct Match: Equatable {
             let top = player.position.y.rounded(.down)
             let box = Box(min: Vec2(x: player.position.x - ShakeRules.platformWidth / 2, y: top - ShakeRules.platformThickness),
                           max: Vec2(x: player.position.x + ShakeRules.platformWidth / 2, y: top))
-            platforms.append(Platform(owner: index, box: box, framesLeft: ShakeRules.platformFrames))
-            players[index].hasPlatform = true
-            stage.extras = platforms.map(\.box)
-            events.append(.platformMade(player: index))
+            make(box, by: index)
+        case .makeWall:
+            // A wall just in front of the body, from the feet up, rounded down to sit on
+            // whatever the feet are on.
+            let bottom = player.position.y.rounded(.down)
+            let near = player.position.x + player.facing.sign * (player.spec.bodyWidth / 2 + 2)
+            let far = near + player.facing.sign * ShakeRules.wallWidth
+            let box = Box(min: Vec2(x: min(near, far), y: bottom), max: Vec2(x: max(near, far), y: bottom + ShakeRules.wallHeight))
+            make(box, by: index)
+        case .flash(let direction):
+            // A short way along the stick, or in place, nudged clear of solids, and the
+            // tear left at the chest where it came out.
+            let from = player.position
+            players[index].warp(to: from + direction * FizzRules.flashDistance, in: stage)
+            players[index].tear = Tear(position: players[index].chest, framesLeft: FizzRules.tearFrames)
+            events.append(.flashed(player: index, from: from, to: players[index].position))
         case .warpToBall:
             let from = player.position
             if let overhang = player.pendingWarp {
@@ -130,12 +166,25 @@ public struct Match: Equatable {
         }
     }
 
+    /// A slab or a wall, solid for a second, and the maker disarmed and on the cooldown.
+    private mutating func make(_ box: Box, by index: Int) {
+        platforms.append(Platform(owner: index, box: box, framesLeft: ShakeRules.platformFrames))
+        players[index].platformArmed = false
+        players[index].platformCooldown = ShakeRules.cooldownFrames
+        stage.extras = platforms.map(\.box)
+        events.append(.platformMade(player: index))
+    }
+
     /// The slide's leg and the slash's blade knock the ball out of the other's hands, the
-    /// blade swats a loose ball away, and the snatch takes any ball it reaches while the
-    /// body faces it, loose or in the other's hands.
+    /// blade swats a loose ball away, the snatch takes any ball it reaches while the body
+    /// faces it, loose or in the other's hands, and a flash's tear pulls a loose ball in.
     private mutating func resolveHits(by index: Int) {
         let player = players[index]
         let other = players.indices.first { $0 != index }
+        if let tear = player.tear, ball.isLive, ball.position.distance(to: tear.position) <= FizzRules.tearRadius {
+            players[index].tear = nil
+            hand(ballTo: index)
+        }
         if let leg = player.slideHitbox, let other, players[other].hasBall, players[other].grounded, players[other].body.overlaps(leg) {
             players[index].slideHit = true
             pop(from: other, by: index)

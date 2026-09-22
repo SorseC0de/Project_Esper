@@ -287,11 +287,12 @@ public enum BallRules {
     /// bounces off instead, unless the body is in the catch stance: a shoot button held
     /// with no ball.
     public static let catchRadius = 12.5
-    /// The second ring, the catch spark's: centred this far ahead of and above the feet
-    /// and this big, in units, from the sheet's 7, 20 and 13 art pixels. A ball in it is
-    /// caught whichever way the body moves.
-    public static let handCatchCentre = Vec2(x: 7 / 1.6, y: 20 / 1.6)
-    public static let handCatchRadius = 13 / 1.6
+    /// The second ring, the catch spark's where the snatch puts it, on the hand at full
+    /// stretch: centred this far ahead of and above the feet and as big as the spark
+    /// grows, in units, from 18, 19 and 16 art pixels. A ball in it is caught whichever
+    /// way the body moves.
+    public static let handCatchCentre = Vec2(x: 18 / 1.6, y: 19 / 1.6)
+    public static let handCatchRadius = 16 / 1.6
     public static let catchSpeedThreshold = 5.0
     public static let chestHeight = 9.0
     /// A ball knocked out of a holder's hands pops straight up: the floater's drift for
@@ -351,17 +352,32 @@ public enum SodaRules {
     public static let flightFrames = 120
 }
 
-/// Flash Fizz's numbers: the warp to a ball that's still yours, this often.
+/// Flash Fizz's numbers. Without the ball, shoot is the flash: this far along the stick,
+/// or in place, this often. The tear it leaves at the exit lasts this long and pulls a
+/// loose ball within this reach into the hands. With the ball, shoot is the warp down to
+/// an overhung dribble.
 public enum FizzRules {
     public static let cooldownFrames = 60
+    public static let flashDistance = 30.0
+    public static let tearFrames = 12
+    public static let tearRadius = 12.0
 }
 
 /// Platform Protein Shake's numbers: a fast fall makes a slab under the feet this wide,
-/// this thick, for this long; one at a time.
+/// this thick, for this long. Without the ball, shoot makes a wall in front this thick
+/// and this tall on the snatch's reach, over this many frames, appearing on this one.
+/// Either can be made again only this long after the last, and only after a jump, a
+/// wall jump or a wall land since it, so holding down through a fall makes one, not a
+/// stream, and jump, slab, jump, slab still works.
 public enum ShakeRules {
     public static let platformWidth = 30.0
     public static let platformThickness = 10.0
     public static let platformFrames = 60
+    public static let cooldownFrames = 75
+    public static let wallWidth = 10.0
+    public static let wallHeight = 30.0
+    public static let wallFrames = 24
+    public static let wallAppearFrame = 8
 }
 
 /// The slide's numbers: down at full run without the ball, or shoot while crouched. It

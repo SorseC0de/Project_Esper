@@ -7,7 +7,9 @@ neutral to get a shot off; catch it and the roles reverse.
 
 - `EsperSim/` — the whole game as one value, `Match`, advanced one frame at a time by
   `advance(inputs:)`. Pure Swift, no SpriteKit. `swift test` runs its tests on the Mac.
-  This is the rollback boundary: nothing gameplay-relevant lives outside it.
+  This is the rollback boundary: nothing gameplay-relevant lives outside it. `Opponent`
+  is the computer's player, beside the sim rather than in it: it reads the match and
+  gives one frame of input like a pad, deterministic with its own random stream.
 - `ProjectEsper/` — the app. `GameScene` steps the sim at 60 and draws the last state.
   `MetalGameView` is the Metal layer: `SKRenderer` draws the scene into a texture and
   `Glow.metal` composites it with the glow. `InputHub` merges touch and controllers.
@@ -112,8 +114,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   still jumps off it. A cling can't start for 8 frames after leaving the ground, and the
   walls above the court's top row can't be clung to or jumped off.
 - Catch is automatic, in two rings: the ball within 12.5 of the chest and either in front,
-  or in the way of where the body is moving; or within the catch spark's ring, 13 art
-  pixels round a point 7 ahead of and 20 above the feet, whichever way the body moves. A
+  or in the way of where the body is moving; or within the catch spark's ring where the
+  snatch puts it, on the hand at full stretch: 16 art pixels, the spark's full size,
+  round a point 18 ahead of and 19 above the feet, whichever way the body moves. A
   ball arriving from behind while standing still bounces off, and so does one faster
   than 5 a frame (a throw is 7, a shot 4.5) unless the body is in the catch stance: a
   shoot button held with no ball.
@@ -124,6 +127,13 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 
 Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
 tuning picker, menu resets.
+
+The touch buttons say what they'd do right now: SHOOT, SLASH, CATCH, SLIDE, FLASH or
+WALL; THROW, SNATCH or WEB; JUMP, FLY or SWING.
+
+A match, and every point, starts with a three count in which nobody moves or acts. A
+point puts both back at their spawns as they began, the ball in the hands of whoever
+didn't score, and counts again.
 
 ## Powers
 
@@ -155,19 +165,28 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   Let go or run out and it falls. The body leans up to thirty degrees into its motion,
   forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and a shot or
   throw can be taken from flight. Numbers in `SodaRules`.
-- Flash Fizz (D). A shoot button with no ball warps the body to the ball and it arrives
-  holding it, but only while the ball is still its colour, the 60 frames after it let the
-  ball go: throw, warp, catch. It arrives nudged clear of anything solid. A dribble hanging
-  past a ledge by more than a tile counts as not having the ball, so the body can warp down
-  to it, keeping it, standing still on the block. One second between warps. A bright wide
-  diamond blinks at where it left and where it landed. Otherwise shoot does what it does
-  without the ball. Numbers in `FizzRules`; the dribble's ball position per frame comes from
-  `BallLandmarks.swift`, which the importer generates from the sheets.
+- Flash Fizz (D). Without the ball, in neutral or on defence, a shoot button is the
+  flash: 30 units along the stick, or in place with the stick centred, in addition to the
+  double jump, arriving nudged clear of anything solid. The flashes are tears in space,
+  and the exit tear lingers 12 frames and pulls any loose ball within 12 units into the
+  hands, the ball going through space the way the body did: throw, flash after it, and
+  it's yours again; or flash in place to take one that's near. There's no slash. With the
+  ball, a dribble hanging past a ledge by more than a tile counts as not having it, so
+  shoot warps the body down to it, keeping it, standing still on the block. One second
+  between flashes. A bright wide diamond blinks where it left, quick, and where it came
+  out, hanging on for the tear's frames. Numbers in `FizzRules`; the dribble's ball
+  position per frame comes from `BallLandmarks.swift`, which the importer generates from
+  the sheets.
 - Platform Protein Shake (E). A fast fall makes a slab under the feet, three tiles wide
   and a tile thick, that stands for a second: solid to everyone, so it blocks the ball and
-  the opponent, and a floor to land on, jumps refreshed. One at a time; the next comes only
-  after the last has gone. With or without the ball. The stage carries standing slabs as
-  `extras`, which every collision query sees. Numbers in `ShakeRules`.
+  the opponent, and a floor to land on, jumps refreshed. With or without the ball.
+  Without the ball, in neutral or on defence, a shoot button makes a wall instead, a
+  tile thick and three tall just in front of the feet, on the snatch's reach, appearing
+  at the hand's full stretch; there's no slash. Slab or wall, the next can come only 75
+  frames after the last, and only after a jump, a double jump, a wall jump or a wall land
+  since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
+  slab still works. The stage carries standing slabs as `extras`, which every collision
+  query sees. Numbers in `ShakeRules`.
 
 ## Tuning pickers
 
@@ -179,8 +198,34 @@ holds the variants; A is always the baseline as tuned.
 - POWER: A none, B Web Water, C Super Soda, D Flash Fizz, E Platform Protein Shake. The
   left bumper steps this one.
 - HITBOX, beside RESET: draws the sim's boxes over the world. Bodies white, the loose
-  ball purple, the catch reach a faint ring round each chest, the slide's leg and the
-  slash's blade red, the snatch's reach green.
+  ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
+  snatch's reach green, a flash's tear cyan.
+- AI, beside that: the computer plays the other side. Off, the second pad or nothing does.
+
+## Opponent
+
+`Opponent.swift`. Powerless for now: it runs, walks, jumps, slides, slashes and snatches.
+It reads which of the three states the match is in and plays each differently.
+
+- With the ball it doesn't just go and score. When the other is within 45 and hasn't
+  committed it picks, by chance, to stand, to walk back and forth dribbling, or to pump
+  fake, a stance held eight to sixteen frames and let go with down. While the other's
+  swing or reach is live it steps back out of reach and waits; the moment it's spent,
+  the recovery of a slash or a snatch, the roll, a landing, a catch, it darts past, a
+  dash with a full hop over them if they're in the way, the way Silksong's magma flies
+  wait for the swing. Crowded within 16 it darts or backs off. With the other far, or
+  the rim close, it goes to score: to within 80 units, then a stance with the flick that
+  lands nearest the rim, tried in five-degree steps through the shot's range, let go
+  after the windup, or at once if the other is closing.
+- Without the ball and the other holding it, it guards the rim they score on rather than
+  chasing them: it walks to a spot 25 units in front of that rim on their side and stands
+  there facing them, a step at them now and then. Within 22 it swings, mostly the slash,
+  the snatch when they're within 12, when they're winding up a shot or rushing it, and
+  otherwise by chance a few times a second; then it rests 45 frames, since a swing is a
+  window for them.
+- With the ball loose it goes to where the ball will come down, running if it's far,
+  slides for it when it's a race, holds the catch stance when the ball is coming fast,
+  and jumps for one over its head.
 
 ## Look
 

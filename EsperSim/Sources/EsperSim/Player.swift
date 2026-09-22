@@ -23,6 +23,13 @@ public struct WebLine: Equatable {
     public var frames: Int
 }
 
+/// Flash Fizz's tear in space, left where a flash came out: a loose ball within reach of
+/// it is pulled into the hands while it lasts.
+public struct Tear: Equatable {
+    public var position: Vec2
+    public var framesLeft: Int
+}
+
 public enum PlayerState: Equatable, Hashable {
     case idle, walk, dash, run, pivot
     case jumpSquat, air, wallLand, land
@@ -34,6 +41,8 @@ public enum PlayerState: Equatable, Hashable {
     case crouch, crouchWalk, slide
     case slashing, rolling, snatching
     case ledgeHang, ledgeClimb
+    /// Platform Protein Shake's wall, made on the snatch's reach.
+    case walling
     /// Web Water: swinging under a web, reeling to a wall, and being reeled by the other.
     case webSwing, webPull, webbed
     /// Super Soda: flying.
@@ -127,13 +136,17 @@ public struct Player: Equatable {
     public var webLinePose = 0
     /// Super Soda: frames of flight left this airtime.
     public var flightLeft = SodaRules.flightFrames
-    /// Flash Fizz: frames until the next warp, and where a warp decided this step is going
-    /// when it's to the ball in hand.
+    /// Flash Fizz: frames until the next flash; where a warp decided this step is going
+    /// when it's down to the ball in hand; and the tear the last flash left.
     public var warpCooldown = 0
     public var pendingWarp: Vec2?
-    /// Platform Protein Shake: a fast fall just began and wants a slab, if none stands.
+    public var tear: Tear?
+    /// Platform Protein Shake: a fast fall just began and wants a slab. A slab or a wall
+    /// can be made only once the cooldown has passed and after a jump, a wall jump or a
+    /// wall land since the last.
     public var wantsPlatform = false
-    public var hasPlatform = false
+    public var platformArmed = true
+    public var platformCooldown = 0
     /// The slide's leg and the slash's blade each hit once.
     public var slideHit = false
     public var slashHit = false
@@ -200,10 +213,10 @@ public struct Player: Equatable {
 
     // MARK: Step
 
-    /// `opponentX` is where the other body stands; a walk with the ball faces it. `ballOwner`
-    /// is whose the loose ball still is, for Flash Fizz, and `ballHolder` who has it in
-    /// hand: on defence, with the other holding it, shoot is the Esper Slash.
-    public mutating func step(input given: PlayerInput, stage: Stage, opponentX: Double? = nil, ballOwner: Int? = nil,
+    /// `opponentX` is where the other body stands; a walk with the ball faces it.
+    /// `ballHolder` is who has the ball in hand: on defence, with the other holding it,
+    /// shoot is the Esper Slash.
+    public mutating func step(input given: PlayerInput, stage: Stage, opponentX: Double? = nil,
                               ballHolder: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         var input = given
         stateTimer += 1
@@ -212,6 +225,8 @@ public struct Player: Equatable {
         if webLineCooldown > 0 { webLineCooldown -= 1 }
         if swingCooldown > 0 { swingCooldown -= 1 }
         if warpCooldown > 0 { warpCooldown -= 1 }
+        if let open = tear { tear = open.framesLeft > 1 ? Tear(position: open.position, framesLeft: open.framesLeft - 1) : nil }
+        if platformCooldown > 0 { platformCooldown -= 1 }
         if webLinePose > 0 { webLinePose -= 1 }
         if let line = webLine, case .point = line.target, state != .webPull {
             webLine = line.frames > 1 ? WebLine(target: line.target, frames: line.frames - 1) : nil
@@ -242,12 +257,17 @@ public struct Player: Equatable {
             action = webLineIfAsked(input, throwPressed: throwPressed)
         }
         if action == nil, free || ((state == .shooting || state == .throwing) && !hasBall) {
-            action = warpIfAsked(input, shootPressed: shootPressed, ballOwner: ballOwner, stage: stage)
+            action = flashIfAsked(input, shootPressed: shootPressed, stage: stage)
         }
-        // A warp on a shoot press takes the button; nothing else reads it this frame.
+        // A warp or a flash on a shoot press takes the button; nothing else reads it this frame.
         if action == .warpToBall {
             shootPressed = false
             input.shootButtons = 0
+        } else if case .flash(_)? = action {
+            // And the stick: the flash is the move this frame.
+            shootPressed = false
+            input.shootButtons = 0
+            input.stick = .zero
         }
 
         switch state {
@@ -352,6 +372,7 @@ public struct Player: Equatable {
                 let cap = max(abs(velocity.x), spec.airSpeedMax)
                 velocity.x = min(max(velocity.x + input.stick.x * spec.jumpHorizontalVelocity, -cap), cap)
                 jumpsLeft -= 1
+                platformArmed = true
                 grounded = false
                 wallLandCooldown = max(wallLandCooldown, spec.wallLandGroundLockoutFrames)
                 events.append(.jumped(player: index))
@@ -369,6 +390,7 @@ public struct Player: Equatable {
                 coyote = 0
                 velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
                 jumpsLeft = spec.jumps - 1
+                platformArmed = true
                 fastFalling = false
                 events.append(.jumped(player: index))
             } else if jumpPressed, wallLandCooldown == 0, let wall = wallSide ?? wall(within: spec.wallJumpReach, in: stage) {
@@ -379,6 +401,7 @@ public struct Player: Equatable {
             } else if wallLandCooldown == 0, let wall = wallSide, stickFacing(input) == wall {
                 facing = wall
                 velocity = .zero
+                platformArmed = true
                 enter(.wallLand)
             } else if power == .superSoda, jumpPressed, jumpsLeft > 0, flightLeft > 0 {
                 // A fresh press in the air starts flight; holding keeps it.
@@ -402,7 +425,9 @@ public struct Player: Equatable {
                 enter(.throwStance)
             } else if !hasBall, throwPressed, snatchCooldown == 0, power != .webWater {
                 startSnatch()
-            } else if !hasBall, shootPressed, onDefence {
+            } else if !hasBall, shootPressed, power == .platformShake, platformCooldown == 0, platformArmed {
+                startWall()
+            } else if !hasBall, shootPressed, onDefence, power != .flashFizz, power != .platformShake {
                 startSlash(events: &events)
             }
 
@@ -619,6 +644,21 @@ public struct Player: Equatable {
                 enter(grounded ? .idle : .air)
             }
 
+        case .walling:
+            // The snatch's reach, and the wall appears at the hand's full stretch.
+            if grounded {
+                velocity.x = approach(velocity.x, 0, spec.attackBrake)
+            } else {
+                airDrift(input)
+                fall(.idle)
+            }
+            if stateTimer == ShakeRules.wallAppearFrame {
+                action = .makeWall
+            }
+            if stateTimer >= ShakeRules.wallFrames {
+                enter(grounded ? .idle : .air)
+            }
+
         case .ledgeHang:
             velocity = .zero
             if stateTimer >= LedgeRules.hangFrames {
@@ -722,7 +762,9 @@ public struct Player: Equatable {
             enter(.taunt)
         } else if !hasBall, throwPressed, snatchCooldown == 0, power != .webWater {
             startSnatch()
-        } else if !hasBall, shootPressed, onDefence {
+        } else if !hasBall, shootPressed, power == .platformShake, platformCooldown == 0, platformArmed {
+            startWall()
+        } else if !hasBall, shootPressed, onDefence, power != .flashFizz, power != .platformShake {
             startSlash(events: &events)
         } else {
             return false
@@ -760,6 +802,12 @@ public struct Player: Equatable {
     private mutating func startSnatch() {
         fastFalling = false
         enter(.snatching)
+    }
+
+    /// Platform Protein Shake's wall, on the snatch's reach.
+    private mutating func startWall() {
+        fastFalling = false
+        enter(.walling)
     }
 
     /// Falling past a corner within a hand's reach with no ball: the hang, on either side,
@@ -843,15 +891,20 @@ public struct Player: Equatable {
         return .webLine(direction: webAimDirection)
     }
 
-    /// Flash Fizz's warp, on a shoot button, when the loose ball is still yours, or when the
-    /// ball in hand is dribbling over a drop of more than a tile, which counts as not having it.
-    private mutating func warpIfAsked(_ input: PlayerInput, shootPressed: Bool, ballOwner: Int?, stage: Stage) -> PlayerAction? {
+    /// Flash Fizz on a shoot button. With the ball, only when it's dribbling over a drop of
+    /// more than a tile, which counts as not having it: the warp down to it. Without the
+    /// ball, the flash: a short way along the stick, or in place, and the tear it leaves
+    /// pulls a loose ball in.
+    private mutating func flashIfAsked(_ input: PlayerInput, shootPressed: Bool, stage: Stage) -> PlayerAction? {
         guard power == .flashFizz, shootPressed, warpCooldown == 0 else { return nil }
-        let overhang = overhangBall(in: stage)
-        guard (!hasBall && ballOwner == index) || overhang != nil else { return nil }
+        if hasBall {
+            guard let overhang = overhangBall(in: stage) else { return nil }
+            warpCooldown = FizzRules.cooldownFrames
+            pendingWarp = overhang
+            return .warpToBall
+        }
         warpCooldown = FizzRules.cooldownFrames
-        pendingWarp = overhang
-        return .warpToBall
+        return .flash(direction: input.stick.length > 0.3 ? input.stick.normalized : .zero)
     }
 
     /// Where the dribbled ball is when it's hanging past a ledge by more than a tile: down
@@ -932,7 +985,7 @@ public struct Player: Equatable {
     /// or on the floor as it lands.
     public mutating func warp(to feet: Vec2, in stage: Stage) {
         position = feet
-        position += stage.pushOut(body)
+        position += stage.pushOut(body, reach: FizzRules.flashDistance + Stage.tileSize)
         velocity = .zero
         fastFalling = false
         webAnchor = nil
@@ -965,6 +1018,7 @@ public struct Player: Equatable {
     private mutating func wallJump(off wall: Facing, events: inout [MatchEvent]) {
         jumpBuffer = 0
         jumpsLeft = max(jumpsLeft, spec.jumps - 1)
+        platformArmed = true
         velocity = Vec2(x: spec.wallJumpHorizontal * -wall.sign, y: spec.wallJumpVertical)
         facing = wall.flipped
         fastFalling = false
@@ -983,6 +1037,7 @@ public struct Player: Equatable {
 
     private mutating func doubleJump(_ input: PlayerInput, events: inout [MatchEvent]) {
         jumpBuffer = 0
+        platformArmed = true
         velocity.y = spec.doubleJumpVelocity
         if input.stick.x != 0 {
             velocity.x = input.stick.x * spec.doubleJumpHorizontalVelocity
@@ -1020,7 +1075,7 @@ public struct Player: Equatable {
         if !fastFalling, !aimingThrow, velocity.y <= 0, input.stick.y < -0.65 {
             fastFalling = true
             velocity.y = -spec.fastFallSpeed
-            if power == .platformShake, !hasPlatform { wantsPlatform = true }
+            if power == .platformShake, platformArmed, platformCooldown == 0 { wantsPlatform = true }
         }
         let floor = fastFalling ? -spec.fastFallSpeed : -spec.fallSpeed
         velocity.y = max(velocity.y - spec.gravity, floor)

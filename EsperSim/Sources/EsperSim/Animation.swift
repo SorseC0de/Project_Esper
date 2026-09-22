@@ -141,7 +141,7 @@ extension Player {
         case .rolling:
             // The double jump's somersault, run through in the roll's frames.
             return AnimationFrame(.doubleJump, t * 20 / 60)
-        case .snatching:
+        case .snatching, .walling:
             return AnimationFrame(grounded ? .snatch : .snatchAir, t * 15 / 60)
         case .ledgeHang:
             return AnimationFrame(.ledge, (t - 1) * 12 / 60)

@@ -26,7 +26,13 @@ final class GameScene: SKScene {
     private static let strikeLeanShare = 0.5
     private static let strikeMaxLean = degrees(45)
 
-    private var match = Match()
+    /// The count before play, at the start and after every point.
+    private static let countdownFrames = 180
+
+    private var match = Match(countdown: GameScene.countdownFrames)
+    /// The computer on the other side, when the AI switch is on.
+    private var opponent = Opponent(index: 1)
+    private var aiOn = true
     private var headVariant = HeadVariant.b
     private var powerVariant = PowerVariant.none
     private let sprites = SpriteLibrary()
@@ -97,6 +103,7 @@ final class GameScene: SKScene {
     private var rimFlash: [Int] = []
     private var previewDots: [SKSpriteNode] = []
     private let scoreLabel = SKLabelNode()
+    private let countLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
     private let fpsLabel = SKLabelNode()
     private var lastTime: TimeInterval?
@@ -319,6 +326,13 @@ final class GameScene: SKScene {
         scoreLabel.verticalAlignmentMode = .top
         hud.addChild(scoreLabel)
 
+        countLabel.fontName = "Menlo-Bold"
+        countLabel.fontSize = 48
+        countLabel.fontColor = .white
+        countLabel.verticalAlignmentMode = .center
+        countLabel.zPosition = 5
+        hud.addChild(countLabel)
+
         debugLabel.fontName = "Menlo"
         debugLabel.fontSize = 8
         debugLabel.fontColor = SKColor(white: 1, alpha: 0.6)
@@ -481,6 +495,8 @@ final class GameScene: SKScene {
         controls.onReset = { [weak self] in self?.reset() }
         controls.showHitboxes = showHitboxes
         controls.onToggleHitboxes = { [weak self] on in self?.showHitboxes = on }
+        controls.aiOn = aiOn
+        controls.onToggleAI = { [weak self] on in self?.aiOn = on }
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
             self?.headVariant = HeadVariant(rawValue: index)!
         }
@@ -516,11 +532,12 @@ final class GameScene: SKScene {
         guard accumulator >= GameScene.stepSeconds else { return }
 
         hub.touch = controls?.sample() ?? .idle
-        let inputs = hub.frames(players: match.players.count)
+        var inputs = hub.frames(players: match.players.count)
         if hub.consumeReset() { reset() }
         if hub.consumeCycle() { controls?.cycleTopPicker() }
         var steps = 0
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
+            if aiOn, inputs.count > 1 { inputs[1] = opponent.decide(match) }
             match.advance(inputs: inputs)
             show(match.events)
             tickBallColour()
@@ -536,7 +553,8 @@ final class GameScene: SKScene {
 
     /// Everyone back to the start, scores cleared.
     private func reset() {
-        match = Match()
+        match = Match(countdown: GameScene.countdownFrames)
+        opponent = Opponent(index: 1)
         rimFlash = rimFlash.map { _ in 0 }
         ballTeam = SKColor(rgb: BallLook.neutral)
         ballHold = 0
@@ -581,13 +599,18 @@ final class GameScene: SKScene {
                 let colour = SKColor(rgb: sprites.look(for: index).glow)
                 spawnBlink(at: SpriteLibrary.point(from + Vec2(x: 0, y: BallRules.chestHeight)), colour: colour)
                 spawnBlink(at: SpriteLibrary.point(to + Vec2(x: 0, y: BallRules.chestHeight)), colour: colour)
+            case .flashed(let index, let from, let to):
+                // The exit is a tear that lingers, pulling the ball in, so its blink hangs on.
+                let colour = SKColor(rgb: sprites.look(for: index).glow)
+                spawnBlink(at: SpriteLibrary.point(from + Vec2(x: 0, y: BallRules.chestHeight)), colour: colour)
+                spawnBlink(at: SpriteLibrary.point(to + Vec2(x: 0, y: BallRules.chestHeight)), colour: colour, lingering: true)
             case .shot(let index), .thrown(let index), .dunked(let index):
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
                 ballHold = BallLook.holdFrames
                 ballShift = BallLook.shiftFrames
-            case .scored(let scorer, let hoop):
+            case .scored(let scorer, let hoop, let entry):
                 rimFlash[hoop] = 8
-                strike(hoop: hoop, by: scorer)
+                strike(hoop: hoop, by: scorer, entry: entry)
             default:
                 break
             }
@@ -636,8 +659,9 @@ final class GameScene: SKScene {
         }
     }
 
-    /// Flash Fizz's blink: a bright diamond, wide and low, that flares out and is gone.
-    private func spawnBlink(at point: CGPoint, colour: SKColor) {
+    /// Flash Fizz's blink: a bright diamond, wide and low, that flares out and is gone;
+    /// `lingering`, it holds for the tear's frames and fades three times as slowly.
+    private func spawnBlink(at point: CGPoint, colour: SKColor, lingering: Bool = false) {
         let path = CGMutablePath()
         path.move(to: CGPoint(x: -14, y: 0))
         path.addLine(to: CGPoint(x: 0, y: 4))
@@ -655,7 +679,12 @@ final class GameScene: SKScene {
             glowers.addChild(blink)
             let flare = SKAction.scale(to: scale, duration: 0.12)
             flare.timingMode = .easeOut
-            blink.run(.sequence([.group([flare, .fadeOut(withDuration: 0.2)]), .removeFromParent()]))
+            if lingering {
+                let hold = Double(FizzRules.tearFrames) / 60
+                blink.run(.sequence([flare, .wait(forDuration: hold), .fadeOut(withDuration: 0.6), .removeFromParent()]))
+            } else {
+                blink.run(.sequence([.group([flare, .fadeOut(withDuration: 0.2)]), .removeFromParent()]))
+            }
         }
     }
 
@@ -671,9 +700,8 @@ final class GameScene: SKScene {
     /// that lean. On the sheet's two full-frame flash frames the whole screen flashes in
     /// the same tone and the floor and walls go white, fading back. The crown erupts off
     /// the rim with it.
-    private func strike(hoop: Int, by scorer: Int) {
+    private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
-        let velocity = match.ball.velocity
         let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
         let bolt = EnergyEffect.strikes.randomElement()!
         let node = bolt.node(sprites, player: scorer, at: rim)
@@ -929,11 +957,41 @@ final class GameScene: SKScene {
 
         drawHitboxes()
         scoreLabel.text = "\(match.scores[0])  -  \(match.scores[1])"
+        countLabel.text = match.countdown > 0 ? "\((match.countdown + 59) / 60)" : ""
         fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms"
         let p = match.players[0]
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "")
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "",
+                                 aiOn ? "  ai \(String(describing: opponent.current))" : "")
+        let labels = buttonLabels(for: p)
+        controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
+    }
+
+    /// What each button would do for this player right now.
+    private func buttonLabels(for player: Player) -> (jump: String, shoot: String, throwBall: String) {
+        let defence = match.ball.holder != nil && match.ball.holder != player.index
+        let airborne = !player.grounded && !player.state.isGroundState
+        let jump: String
+        switch player.power {
+        case .superSoda where airborne: jump = "FLY"
+        case .webWater where airborne: jump = "SWING"
+        default: jump = "JUMP"
+        }
+        let shoot: String
+        if player.hasBall {
+            shoot = "SHOOT"
+        } else if player.state == .crouch || player.state == .crouchWalk {
+            shoot = "SLIDE"
+        } else {
+            switch player.power {
+            case .flashFizz: shoot = "FLASH"
+            case .platformShake: shoot = "WALL"
+            default: shoot = defence ? "SLASH" : "CATCH"
+            }
+        }
+        let throwBall = player.hasBall ? "THROW" : (player.power == .webWater ? "WEB" : "SNATCH")
+        return (jump, shoot, throwBall)
     }
 
     /// The sim's boxes, rebuilt each frame while the toggle is on: bodies white, the loose
@@ -961,6 +1019,13 @@ final class GameScene: SKScene {
             if let leg = player.slideHitbox { outline(leg, .red) }
             if let blade = player.slashHitbox { outline(blade, .red) }
             if let hand = player.snatchHitbox { outline(hand, .green) }
+            if let tear = player.tear {
+                let ring = SKShapeNode(circleOfRadius: CGFloat(FizzRules.tearRadius * SpriteLibrary.pixelsPerUnit))
+                ring.position = SpriteLibrary.point(tear.position)
+                ring.strokeColor = .cyan
+                ring.lineWidth = 1
+                hitboxLayer.addChild(ring)
+            }
         }
         if match.ball.holder == nil {
             outline(match.ball.box, SKColor(rgb: BallLook.neutral))

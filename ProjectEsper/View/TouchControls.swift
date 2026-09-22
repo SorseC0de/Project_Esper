@@ -10,6 +10,7 @@ final class TouchControls: SKNode {
 
     private struct Button {
         let node: SKShapeNode
+        let label: SKLabelNode
         let radius: CGFloat
         let set: (inout PlayerInput, Bool, Vec2) -> Void
     }
@@ -19,11 +20,15 @@ final class TouchControls: SKNode {
     private let stickKnob = SKShapeNode(circleOfRadius: 14)
     private let resetButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
     private let hitboxButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
+    private let aiButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
     /// Called when the corner button is tapped.
     var onReset: (() -> Void)?
     /// The HITBOX toggle beside it: whether the sim's boxes are drawn, and who to tell.
     var showHitboxes = false { didSet { hitboxButton.fillColor = .init(white: 1, alpha: showHitboxes ? 0.4 : 0.1) } }
     var onToggleHitboxes: ((Bool) -> Void)?
+    /// The AI switch beside that: whether the computer plays the other side.
+    var aiOn = true { didSet { aiButton.fillColor = .init(white: 1, alpha: aiOn ? 0.4 : 0.1) } }
+    var onToggleAI: ((Bool) -> Void)?
     private var pickers: [SegmentedPicker] = []
     private let pickerOrigin: CGPoint
     private var sliders: [Slider] = []
@@ -98,6 +103,25 @@ final class TouchControls: SKNode {
         hitboxText.fontColor = .init(white: 1, alpha: 0.8)
         hitboxButton.addChild(hitboxText)
         addChild(hitboxButton)
+
+        aiButton.position = CGPoint(x: right - 127, y: top - 8)
+        aiButton.fillColor = .init(white: 1, alpha: 0.4)
+        aiButton.strokeColor = .init(white: 1, alpha: 0.4)
+        aiButton.lineWidth = 1
+        let aiText = SKLabelNode(text: "AI")
+        aiText.fontName = "Menlo-Bold"
+        aiText.fontSize = 8
+        aiText.verticalAlignmentMode = .center
+        aiText.fontColor = .init(white: 1, alpha: 0.8)
+        aiButton.addChild(aiText)
+        addChild(aiButton)
+    }
+
+    /// The buttons' names, for what they'd do right now.
+    func setLabels(jump: String, shoot: String, throwBall: String) {
+        for (button, text) in zip(buttons, [jump, shoot, throwBall]) where button.label.text != text {
+            button.label.text = text
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -116,7 +140,7 @@ final class TouchControls: SKNode {
         text.fontColor = .init(white: 1, alpha: 0.8)
         node.addChild(text)
         addChild(node)
-        return Button(node: node, radius: radius, set: set)
+        return Button(node: node, label: text, radius: radius, set: set)
     }
 
     /// The controls as the sim should see them this frame: what's held, plus anything that
@@ -167,6 +191,11 @@ final class TouchControls: SKNode {
         if hitboxButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             showHitboxes.toggle()
             onToggleHitboxes?(showHitboxes)
+            return
+        }
+        if aiButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
+            aiOn.toggle()
+            onToggleAI?(aiOn)
             return
         }
         for picker in pickers where picker.tap(at: convert(point, to: picker)) {

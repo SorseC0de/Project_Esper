@@ -13,13 +13,16 @@ public enum MatchEvent: Equatable {
     case thrown(player: Int)
     case dunked(player: Int)
     case swatted(player: Int, hit: Bool)
-    case scored(player: Int, hoop: Int)
+    /// `entry` is the ball's velocity as it went through.
+    case scored(player: Int, hoop: Int, entry: Vec2)
     case ballBounced(position: Vec2)
     case ballRespawned
     case webSwung(player: Int)
     case webLine(player: Int, hit: Bool)
     case flew(player: Int)
     case warped(player: Int, from: Vec2, to: Vec2)
+    /// Flash Fizz's flash without the ball: the tear left at `to` pulls a loose ball in.
+    case flashed(player: Int, from: Vec2, to: Vec2)
     case platformMade(player: Int)
     case slid(player: Int)
     case slashed(player: Int)
@@ -37,5 +40,7 @@ public enum PlayerAction: Equatable {
     case dunk(hoop: Int)
     case webLine(direction: Vec2)
     case warpToBall
+    case flash(direction: Vec2)
     case makePlatform
+    case makeWall
 }

@@ -188,7 +188,8 @@ in the hitter's colour. A score brings lightning down on the rim in the scorer's
 one of four bolts each time, favouring vertical: it leans half as far as the ball came
 in off vertical and never past 45°, so it never lies flat, at the sheet's own width and
 stretched tall enough to run past the top of the screen at that lean, so the sheet's
-flash frames are pillars off the top, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. A held throw shows the
+flash frames are pillars off the top, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. The jump spark and the dash's smoke, near-white on
+their sheets, go through the ramp too, in the player's colour. A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
 and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on

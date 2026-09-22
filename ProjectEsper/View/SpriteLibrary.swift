@@ -109,6 +109,10 @@ final class SpriteLibrary {
         (0..<effect.frameCount).map { effectTexture(effect.name, $0, player: player) }
     }
 
+    func effectFrames(_ effect: Effect, player: Int) -> [SKTexture] {
+        (0..<effect.frameCount).map { effectTexture(effect.name, $0, player: player) }
+    }
+
     /// Where a glowing part is drawn in a player frame, from the feet in art pixels, if it's there.
     func landmark(_ part: BodyPart, in frame: AnimationFrame, player: Int) -> CGPoint? {
         _ = texture(frame, player: player)
@@ -152,6 +156,9 @@ final class SpriteLibrary {
                 }
             }
             for effect in EnergyEffect.allCases {
+                _ = effectFrames(effect, player: player)
+            }
+            for effect in Effect.inEnergyColour {
                 _ = effectFrames(effect, player: player)
             }
         }
@@ -490,8 +497,11 @@ enum EnergyEffect: CaseIterable {
 }
 
 /// One-shot sprites: sparks, smoke, the swish. Each plays through and removes itself.
+/// The jump spark and the smoke are drawn in the player's energy colour.
 enum Effect {
     case smoke, jumpSpark, catchSpark, wallJumpSpark
+
+    static let inEnergyColour: [Effect] = [.smoke, .jumpSpark]
 
     var name: String {
         switch self {
@@ -521,8 +531,9 @@ enum Effect {
         self == .wallJumpSpark ? CGPoint(x: 0.5, y: 0.5) : CGPoint(x: 0.5, y: 8.0 / 48.0)
     }
 
-    func node(_ sprites: SpriteLibrary, at point: CGPoint, flipped: Bool) -> SKSpriteNode {
-        let frames = sprites.frames(name, count: frameCount)
+    /// With a `player`, the frames come in that player's energy colour.
+    func node(_ sprites: SpriteLibrary, at point: CGPoint, flipped: Bool, player: Int? = nil) -> SKSpriteNode {
+        let frames = player.map { sprites.effectFrames(self, player: $0) } ?? sprites.frames(name, count: frameCount)
         let node = SKSpriteNode(texture: frames[0])
         node.anchorPoint = anchor
         node.position = point

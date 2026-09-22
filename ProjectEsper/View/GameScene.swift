@@ -526,9 +526,9 @@ final class GameScene: SKScene {
         for event in events {
             switch event {
             case .jumped(let index):
-                spawn(.jumpSpark, at: match.players[index].position, flipped: match.players[index].facing == .left)
+                spawn(.jumpSpark, at: match.players[index].position, flipped: match.players[index].facing == .left, player: index)
             case .dashed(let index), .slid(let index):
-                spawn(.smoke, at: match.players[index].position, flipped: match.players[index].facing == .left)
+                spawn(.smoke, at: match.players[index].position, flipped: match.players[index].facing == .left, player: index)
             case .snatchReached(let index):
                 let player = match.players[index]
                 let offset = Vec2(x: GameScene.snatchSparkOffset.x * player.facing.sign, y: GameScene.snatchSparkOffset.y) / SpriteLibrary.pixelsPerUnit
@@ -540,7 +540,8 @@ final class GameScene: SKScene {
                 spawnHitSpark(player: index, at: match.ball.position)
             case .wallJumped(let index, let wall):
                 let player = match.players[index]
-                spawn(.wallJumpSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .right)
+                // The sheet's spark flies left, away from a wall on the right.
+                spawn(.wallJumpSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .left)
             case .caught(let index):
                 let player = match.players[index]
                 spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left)
@@ -664,8 +665,8 @@ final class GameScene: SKScene {
         return path
     }
 
-    private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool) {
-        glowers.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped))
+    private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool, player: Int? = nil) {
+        glowers.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped, player: player))
     }
 
     // MARK: Drawing

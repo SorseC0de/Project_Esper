@@ -580,7 +580,7 @@ public struct Player: Equatable {
 
         case .slashing:
             // On the ground a planted swing; in the air gravity is cut, so the body hangs
-            // through it. Then the roll, whichever.
+            // through it, and the roll follows.
             if grounded {
                 velocity.x = approach(velocity.x, 0, spec.traction)
             } else {
@@ -588,7 +588,7 @@ public struct Player: Equatable {
                 velocity.y = max(velocity.y - spec.gravity * SlashRules.gravityShare, -spec.fallSpeed)
             }
             if stateTimer >= SlashRules.frames {
-                startRoll()
+                endSlash()
             }
 
         case .rolling:
@@ -748,13 +748,9 @@ public struct Player: Equatable {
         enter(.slashing)
     }
 
-    /// The roll after the slash: from the ground it's a short hop's worth of air.
-    private mutating func startRoll() {
-        if grounded {
-            velocity.y = spec.shortHopVelocity
-            grounded = false
-        }
-        enter(.rolling)
+    /// After the swing: on the ground it's over; in the air, the roll.
+    private mutating func endSlash() {
+        enter(grounded ? .idle : .rolling)
     }
 
     private mutating func startSnatch() {

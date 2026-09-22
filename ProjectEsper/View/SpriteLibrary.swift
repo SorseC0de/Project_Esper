@@ -76,6 +76,39 @@ final class SpriteLibrary {
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)_energy"]
     }
 
+    /// An effect frame in a player's energy colour: the sheet's greys through the look's
+    /// tone ramp, its alpha kept.
+    func effectTexture(_ name: String, _ frame: Int, player: Int) -> SKTexture {
+        let key = "p\(player)_fx_\(name)_\(frame)"
+        if let texture = cache[key] { return texture }
+        let look = look(for: player)
+        let source = texture(name, frame)
+        let image = source.cgImage()
+        let width = image.width, height = image.height
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        for pixel in 0..<(width * height) {
+            let index = pixel * 4
+            let alpha = Int(pixels[index + 3])
+            guard alpha > 0 else { continue }
+            // The canvas is premultiplied: the grey level is the colour over the alpha.
+            let grey = (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / Double(alpha)
+            let tone = look.energyTone(luminance: min(grey, 1))
+            pixels[index] = UInt8(Int((tone >> 16) & 0xFF) * alpha / 255)
+            pixels[index + 1] = UInt8(Int((tone >> 8) & 0xFF) * alpha / 255)
+            pixels[index + 2] = UInt8(Int(tone & 0xFF) * alpha / 255)
+        }
+        guard let toned = context.makeImage() else { return source }
+        let result = SKTexture(cgImage: toned)
+        result.filteringMode = .nearest
+        cache[key] = result
+        return result
+    }
+
+    func effectFrames(_ effect: EnergyEffect, player: Int) -> [SKTexture] {
+        (0..<effect.frameCount).map { effectTexture(effect.name, $0, player: player) }
+    }
+
     /// Where a glowing part is drawn in a player frame, from the feet in art pixels, if it's there.
     func landmark(_ part: BodyPart, in frame: AnimationFrame, player: Int) -> CGPoint? {
         _ = texture(frame, player: player)
@@ -117,6 +150,9 @@ final class SpriteLibrary {
                 for frame in 0..<animation.frameCount {
                     _ = texture(AnimationFrame(animation, frame), player: player)
                 }
+            }
+            for effect in EnergyEffect.allCases {
+                _ = effectFrames(effect, player: player)
             }
         }
         _ = texture("ball", 0)
@@ -162,9 +198,11 @@ final class SpriteLibrary {
         }
         markEnergy(&parts, holdsBall: holdsBall, width: width, height: height)
 
+        // Each part to its colour; the energy to the tone of its own brightness.
         var sums: [BodyPart: (x: CGFloat, y: CGFloat, n: Int)] = [:]
         for pixel in 0..<count {
             guard let part = parts[pixel] else { continue }
+            let index = pixel * 4
             if part.glows {
                 var sum = sums[part] ?? (0, 0, 0)
                 sum.x += CGFloat(pixel % width) + 0.5
@@ -172,8 +210,11 @@ final class SpriteLibrary {
                 sum.n += 1
                 sums[part] = sum
             }
-            if let target = look.colours[part] {
-                paint(pixels, pixel * 4, target)
+            if part.isEnergy {
+                let grey = (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / 255
+                paint(pixels, index, look.energyTone(luminance: grey))
+            } else if let target = look.colours[part] {
+                paint(pixels, index, target)
             }
         }
 
@@ -191,7 +232,9 @@ final class SpriteLibrary {
                     paint(headPixels, index, look.colours[.head] ?? look.glow)
                     headPixels[index + 3] = 255
                 } else if part.isEnergy, let (_, energyPixels) = energyCanvas {
-                    paint(energyPixels, index, look.colours[part] ?? look.glow)
+                    energyPixels[index] = pixels[index]
+                    energyPixels[index + 1] = pixels[index + 1]
+                    energyPixels[index + 2] = pixels[index + 2]
                     energyPixels[index + 3] = 255
                 }
                 pixels[index] = 0
@@ -379,6 +422,68 @@ extension SKColor {
     convenience init(rgb: RGB) {
         self.init(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255,
                   blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
+    }
+}
+
+/// The grayscale effect sheets, drawn in a player's energy colour through the look's tone
+/// ramp: the sparks off a hit ball, the crown and the lightning on a score, and the charge
+/// round a held throw.
+enum EnergyEffect: CaseIterable {
+    case spark, spark2, spark3, lightning1, lightning2, lightning3, lightning4, charge
+
+    /// The two sparks a hit ball throws, one or the other each time, and the four bolts.
+    static let hitSparks: [EnergyEffect] = [.spark, .spark2]
+    static let strikes: [EnergyEffect] = [.lightning1, .lightning2, .lightning3, .lightning4]
+    /// The bolts' one colour on the sheets, (241, 246, 240), as a grey level: what their
+    /// full-frame flash comes out as through the ramp.
+    static let strikeLuminance = 0.958
+    /// The bolt sheets' frames that are a full-frame flash.
+    static let strikeFlashFrames = 5..<7
+
+    var name: String {
+        switch self {
+        case .spark: "esper_spark"
+        case .spark2: "esper_spark2"
+        case .spark3: "esper_spark3"
+        case .lightning1: "lightning1"
+        case .lightning2: "lightning2"
+        case .lightning3: "lightning3"
+        case .lightning4: "lightning4"
+        case .charge: "esper_charge"
+        }
+    }
+
+    var frameCount: Int {
+        switch self {
+        case .spark: 9
+        case .spark2: 10
+        case .spark3: 7
+        case .lightning1, .lightning2, .lightning3, .lightning4: 25
+        case .charge: 82
+        }
+    }
+
+    var fps: Double { self == .charge ? 30 : 24 }
+
+    /// The sparks and the charge are centred; the crown rises from its base, 10 pixels up
+    /// its 128; a bolt strikes at its bottom edge.
+    var anchor: CGPoint {
+        switch self {
+        case .spark3: CGPoint(x: 0.5, y: 10.0 / 128)
+        case .lightning1, .lightning2, .lightning3, .lightning4: CGPoint(x: 0.5, y: 0)
+        default: CGPoint(x: 0.5, y: 0.5)
+        }
+    }
+
+    /// A one-shot node in the player's colour that plays through and removes itself.
+    func node(_ sprites: SpriteLibrary, player: Int, at point: CGPoint) -> SKSpriteNode {
+        let frames = sprites.effectFrames(self, player: player)
+        let node = SKSpriteNode(texture: frames[0])
+        node.anchorPoint = anchor
+        node.position = point
+        node.zPosition = 30
+        node.run(.sequence([.animate(with: frames, timePerFrame: 1 / fps), .removeFromParent()]))
+        return node
     }
 }
 

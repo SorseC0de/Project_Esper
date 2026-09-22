@@ -21,6 +21,9 @@ final class GameScene: SKScene {
     /// Where to put the catch spark's feet so its ring lands on the snatch's hand: the ring
     /// sits 7 art pixels ahead and 20 up on its own canvas, the hand 18 ahead and 19 up.
     private static let snatchSparkOffset = Vec2(x: 11, y: -1)
+    /// How far off vertical a score's lightning leans with the way the ball came in: the
+    /// cap of about 160 and -160 with straight down at 180.
+    private static let strikeMaxLean = degrees(20)
 
     private var match = Match()
     private var headVariant = HeadVariant.b
@@ -44,6 +47,8 @@ final class GameScene: SKScene {
     /// Each body's energy, the slash's blade and the sheets' puffs and streaks, drawn over
     /// the body among the glowers so it blooms.
     private var energyNodes: [SKSpriteNode] = []
+    /// The charge round each player's ball while a throw is held.
+    private var chargeNodes: [SKSpriteNode] = []
     private var headShown: [CGPoint] = []
     /// Each body's lean in flight, radians, eased toward where it's going, and how much of
     /// the hover it's showing.
@@ -207,6 +212,11 @@ final class GameScene: SKScene {
             energy.isHidden = true
             glowers.addChild(energy)
             energyNodes.append(energy)
+            let charge = SKSpriteNode()
+            charge.zPosition = 5
+            charge.isHidden = true
+            glowers.addChild(charge)
+            chargeNodes.append(charge)
             headShown.append(.zero)
             bodyTilt.append(0)
             hover.append(0)
@@ -519,8 +529,10 @@ final class GameScene: SKScene {
                 let offset = Vec2(x: GameScene.snatchSparkOffset.x * player.facing.sign, y: GameScene.snatchSparkOffset.y) / SpriteLibrary.pixelsPerUnit
                 spawn(.catchSpark, at: player.position + offset, flipped: player.facing == .left)
             case .popped(let victim, let popper):
-                // A burst off the ball as it leaves the hands, away from whoever knocked it.
-                spawn(.wallJumpSpark, at: match.players[victim].chest + Vec2(x: 0, y: 3), flipped: match.players[popper].facing == .right)
+                // A spark off the ball as it leaves the hands, in the colour of whoever knocked it.
+                spawnHitSpark(player: popper, at: match.players[victim].chest + Vec2(x: 0, y: 3))
+            case .swatted(let index, hit: true):
+                spawnHitSpark(player: index, at: match.ball.position)
             case .wallJumped(let index, let wall):
                 let player = match.players[index]
                 spawn(.wallJumpSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .right)
@@ -538,8 +550,9 @@ final class GameScene: SKScene {
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
                 ballHold = BallLook.holdFrames
                 ballShift = BallLook.shiftFrames
-            case .scored(_, let hoop):
+            case .scored(let scorer, let hoop):
                 rimFlash[hoop] = 8
+                strike(hoop: hoop, by: scorer)
             default:
                 break
             }
@@ -609,6 +622,50 @@ final class GameScene: SKScene {
             flare.timingMode = .easeOut
             blink.run(.sequence([.group([flare, .fadeOut(withDuration: 0.2)]), .removeFromParent()]))
         }
+    }
+
+    /// One of the two sparks, either each time, on the ball in the hitter's colour.
+    private func spawnHitSpark(player: Int, at position: Vec2) {
+        let spark = EnergyEffect.hitSparks.randomElement()!
+        glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position)))
+    }
+
+    /// A score: lightning strikes the rim from the way the ball came in, leaning up to the
+    /// cap off vertical, one of the four bolts each time, scaled so its top and sides are
+    /// past the edge of the screen wherever the rim is. The sheet's two full-frame flash
+    /// frames are matched by a flash over the whole screen in the same tone, so the
+    /// sprite's own edge never shows through them. The crown erupts off the rim with it.
+    private func strike(hoop: Int, by scorer: Int) {
+        let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
+        let velocity = match.ball.velocity
+        let lean = min(max(atan2(velocity.x, -velocity.y), -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
+        let bolt = EnergyEffect.strikes.randomElement()!
+        let node = bolt.node(sprites, player: scorer, at: rim)
+        node.zRotation = CGFloat(lean)
+        node.zPosition = 45
+        let visible = CGRect(x: cameraNode.position.x - size.width * cameraNode.xScale / 2,
+                             y: cameraNode.position.y - size.height * cameraNode.yScale / 2,
+                             width: size.width * cameraNode.xScale, height: size.height * cameraNode.yScale)
+        let corners = [visible.origin, CGPoint(x: visible.maxX, y: visible.minY), CGPoint(x: visible.minX, y: visible.maxY), CGPoint(x: visible.maxX, y: visible.maxY)]
+        let farthest = corners.map { hypot($0.x - rim.x, $0.y - rim.y) }.max() ?? 0
+        node.setScale(farthest * 2.4 / node.size.width)
+        glowers.addChild(node)
+
+        let flash = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
+        flash.color = SKColor(rgb: sprites.look(for: scorer).energyTone(luminance: EnergyEffect.strikeLuminance))
+        flash.colorBlendFactor = 1
+        flash.size = visible.size
+        flash.position = CGPoint(x: visible.midX, y: visible.midY)
+        flash.zPosition = 44
+        flash.isHidden = true
+        glowers.addChild(flash)
+        let frame = 1 / bolt.fps
+        flash.run(.sequence([.wait(forDuration: Double(EnergyEffect.strikeFlashFrames.lowerBound) * frame), .unhide(),
+                             .wait(forDuration: Double(EnergyEffect.strikeFlashFrames.count) * frame), .removeFromParent()]))
+
+        let crown = EnergyEffect.spark3.node(sprites, player: scorer, at: rim)
+        crown.zPosition = 46
+        glowers.addChild(crown)
     }
 
     private func line(from a: CGPoint, to b: CGPoint) -> CGPath {
@@ -686,6 +743,18 @@ final class GameScene: SKScene {
             } else {
                 halo.isHidden = true
                 handBall.isHidden = true
+            }
+
+            // A held throw charges: the swirl round the ball in hand, looping.
+            let charge = chargeNodes[index]
+            if player.state == .throwStance, !handBall.isHidden {
+                let frame = (player.stateTimer * Int(EnergyEffect.charge.fps) / 60) % EnergyEffect.charge.frameCount
+                charge.texture = sprites.effectTexture(EnergyEffect.charge.name, frame, player: index)
+                charge.size = charge.texture!.size()
+                charge.position = handBall.position
+                charge.isHidden = false
+            } else {
+                charge.isHidden = true
             }
 
             // The head follows its place on the body loosely and bobs, as if it only just belonged.

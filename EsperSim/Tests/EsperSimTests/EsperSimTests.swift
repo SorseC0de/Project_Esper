@@ -1087,7 +1087,7 @@ final class FootsiesTests: XCTestCase {
 
     // MARK: Esper Slash
 
-    func testShootOnDefenceIsTheEsperSlashThenTheRoll() {
+    func testShootOnDefenceIsTheEsperSlashAndOnTheGroundItEndsThere() {
         var match = defending()
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .slashing)
@@ -1095,12 +1095,8 @@ final class FootsiesTests: XCTestCase {
         XCTAssertTrue(match.players[0].grounded, "from the ground the swing is planted")
         let swung = run(&match, frames: SlashRules.frames + 2, input: { _ in .idle }) { $0.players[0].state != .slashing }
         XCTAssertEqual(swung + 1, SlashRules.frames)
-        XCTAssertEqual(match.players[0].state, .rolling)
-        XCTAssertFalse(match.players[0].grounded)
-        XCTAssertGreaterThan(match.players[0].velocity.y, 0, "the roll hops")
-        let rolled = run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].state == .land }
-        XCTAssertLessThan(rolled, 60)
-        XCTAssertGreaterThan(rolled, 10, "the roll is a commitment")
+        XCTAssertEqual(match.players[0].state, .idle)
+        XCTAssertTrue(match.players[0].grounded)
     }
 
     func testShootInNeutralIsNotASlash() {
@@ -1110,7 +1106,7 @@ final class FootsiesTests: XCTestCase {
         XCTAssertTrue(match.players[0].catchStance)
     }
 
-    func testAirSlashFloatsThroughTheSwing() {
+    func testAirSlashFloatsThroughTheSwingThenRolls() {
         var match = defending()
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].velocity.y <= 0 }
@@ -1120,6 +1116,11 @@ final class FootsiesTests: XCTestCase {
         run(&match, frames: SlashRules.frames - 1, input: { _ in .idle })
         XCTAssertEqual(match.players[0].state, .slashing)
         XCTAssertGreaterThan(match.players[0].position.y, apex, "with gravity cut it should still be up there")
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .rolling)
+        let rolled = run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].state == .land }
+        XCTAssertLessThan(rolled, 60)
+        XCTAssertGreaterThan(rolled, 5, "the roll is a commitment")
     }
 
     func testSlashKnocksTheBallOutOfTheHoldersHands() {

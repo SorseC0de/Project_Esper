@@ -137,7 +137,7 @@ extension Player {
         case .catching:
             return AnimationFrame(grounded ? .catchGround : .catchAir, t * 12 / 60)
         case .slashing:
-            return AnimationFrame(.esperSlash, t * 15 / 60)
+            return AnimationFrame(.esperSlash, t * 20 / 60)
         case .rolling:
             // The double jump's somersault, run through in the roll's frames.
             return AnimationFrame(.doubleJump, t * 20 / 60)

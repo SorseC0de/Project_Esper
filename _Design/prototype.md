@@ -20,7 +20,10 @@ neutral to get a shot off; catch it and the roles reverse.
   importer's `BALL_SHEETS`), and there only where it's the biggest blob of white in the
   frame and at least 12 pixels; every other white pixel is energy, the skid's puffs, a
   release's streaks, the slide's speed lines. The importer and the sprite library apply
-  the same rule.
+  the same rule. The effect sheets there (`esper_spark`, `esper_spark2`, `esper_spark3`,
+  `lightning1` to `4`, `esper_charge`) are grayscale strips toned per player in the app;
+  the charge is a 512-pixel soft render with the swirl in its middle 150, boxed down by 4
+  on import. Palette PNGs are read too.
 
 ## Units
 
@@ -70,12 +73,13 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Shoot (without ball, in neutral): held, the catch stance.
 - Shoot (without ball, on defence, the other holding the ball): the Esper Slash, the swat.
   On the ground it's a planted swing; in the air the body rises at least 1 a frame and
-  gravity is cut to a fifth, so it hangs through the swing. 24 frames, the blade live over
-  frames 8 to 15, 15 units ahead, 5 behind, 4 below the feet and 28 high: it knocks the
-  ball out of the holder's hands, and swats a loose ball the way the body faces and a
-  little up at no less than 6. It always ends in the roll, the double jump's somersault
-  over 18 frames with normal gravity and air drift, a short hop's worth from the ground,
-  so the whole thing is a commitment. Not in neutral.
+  gravity is cut to a fifth, so it hangs through the swing. 18 frames at 20 a second, the
+  blade live over frames 6 to 11, 15 units ahead, 5 behind, 4 below the feet and 28 high:
+  it knocks the ball out of the holder's hands, and swats a loose ball the way the body
+  faces and a little up at no less than 6. In the air it ends in the roll, the double
+  jump's somersault over 18 frames at the same pace with normal gravity and air drift, so
+  the whole thing is a commitment; on the ground it's over when the swing is. Not in
+  neutral.
 - Throw (without ball, in neutral or on defence): the snatch. 40 frames, the hand out over
   frames 4 to 15, when the whole body plus a tile of reach in front takes any ball it
   overlaps while the body faces it: a loose one at any speed, or the one in the other's
@@ -165,13 +169,22 @@ holds the variants; A is always the baseline as tuned.
 ## Look
 
 `Art/PlayerPalette.swift` names the figure's eleven parts and the flat colour each is
-painted on the sheets, plus the Esper Slash's blade in three pinks and the energy, the
-sheets' white that isn't the ball. A `Look` maps parts to colours and the sprite library
+painted on the sheets, plus the Esper Slash's blade in pinks and the energy, the sheets'
+white that isn't the ball. A `Look` maps parts to colours and the sprite library
 recolours each frame once as it's used. The blade and the energy are split out of every
 frame like the head and drawn on their own sprite over the body, among the glowers, so
-they bloom at the world threshold: the blade's edge, the puffs and the streaks in the
-team colour outright, the blade's fill three tenths of the way to white, its core seven
-tenths. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
+they bloom at the world threshold, toned by their own brightness through the look's
+ramp: black up to the team colour over the dark half, the colour up to six tenths of the
+way to white over the light half, so mid grey is the colour itself and white a pale tint
+of it. The grayscale effect sheets go through the same ramp in a player's colour. A ball
+knocked loose or swatted throws one of two sparks, either each time, centred on the ball
+in the hitter's colour. A score brings lightning down on the rim in the scorer's colour,
+one of four bolts each time, leaning with the way the ball came in up to 20° off
+vertical, scaled from the rim so its top and sides are past the screen's edge wherever
+the rim is; the sheet's two full-frame flash frames are matched by a flash over the whole
+screen in the same tone, so the sprite's edge never shows through them, and the crown
+erupts off the rim with it. Sparks and bolts play at 24 a second. A held throw shows the
+charge, the 82-frame swirl at 30 a second looping round the ball in hand. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
 and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on
 the ball and the fire off the head. The body a light orange or a light teal toward the team colour, the back limbs a greyed,
 darker version of it, a black line one pixel thick round the body following the outside

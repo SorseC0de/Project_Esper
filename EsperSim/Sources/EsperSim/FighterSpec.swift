@@ -361,18 +361,18 @@ public enum SlideRules {
 }
 
 /// The Esper Slash's numbers: shoot on defence, with the other holding the ball. On the
-/// ground it's a planted swing; in the air the body rises at least this fast and gravity
-/// is cut to this share, so it hangs through the swing. It always ends in the roll, a
-/// short hop's worth from the ground, played over this many frames. The blade is live
+/// ground it's a planted swing, over when the swing is; in the air the body rises at
+/// least this fast and gravity is cut to this share, so it hangs through the swing, and
+/// the roll follows over this many frames. Both play at 20 a second. The blade is live
 /// over these frames and reaches this far ahead, this far behind, this far below the
 /// feet and this high. It knocks the ball out of a holder's hands or swats a loose one
 /// away at no less than this speed.
 public enum SlashRules {
-    public static let frames = 24
+    public static let frames = 18
     public static let rollFrames = 18
     public static let lift = 1.0
     public static let gravityShare = 0.2
-    public static let activeFrames = 8..<16
+    public static let activeFrames = 6..<12
     public static let reach = 15.0
     public static let back = 5.0
     public static let below = 4.0

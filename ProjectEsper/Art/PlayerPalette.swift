@@ -4,16 +4,17 @@ import Foundation
 typealias RGB = UInt32
 
 /// The figure's parts, one flat colour each on the sheets, plus the ball in its hands,
-/// the Esper Slash's blade in three pinks, and the energy: the sheets' white where it
-/// isn't the ball, the skid's puffs and a release's streaks, told apart by size rather
-/// than colour. Two of the parts are drawn in two close shades across the sheets, so a
-/// part can own more than one source colour.
+/// the Esper Slash's blade in pinks, and the energy: the sheets' white where it isn't
+/// the ball, the skid's puffs and a release's streaks, told apart by size rather than
+/// colour. The blade and the energy are toned by their brightness rather than painted
+/// flat. Two of the parts are drawn in two close shades across the sheets, so a part can
+/// own more than one source colour.
 enum BodyPart: CaseIterable {
     case backHand, backArm, backLeg, backThigh
     case pelvis, torso, head
     case frontThigh, frontLeg, frontArm, frontHand
     case ball
-    case slashEdge, slashFill, slashCore
+    case slash
     case energy
 
     /// What the sheets paint this part with, as the artist named the colours.
@@ -31,9 +32,7 @@ enum BodyPart: CaseIterable {
         case .frontArm: [0x6ABE30]                        // lime
         case .frontHand: [0x99E550]                       // yellow-green
         case .ball: [0xFFFFFF]                            // white
-        case .slashEdge: [0xF065C4]                       // magenta
-        case .slashFill: [0xF9ABFF, 0xFBC2FF, 0xEEA6F5, 0xF098F5] // pink
-        case .slashCore: [0xFDD9FF, 0xEDCEF0]             // pale pink
+        case .slash: [0xF065C4, 0xF9ABFF, 0xFBC2FF, 0xEEA6F5, 0xF098F5, 0xFDD9FF, 0xEDCEF0] // pinks, edge to core
         case .energy: []
         }
     }
@@ -49,13 +48,8 @@ enum BodyPart: CaseIterable {
     var glows: Bool { self == .head || self == .ball }
 
     /// The parts that are light rather than body: drawn on their own above the body so
-    /// they bloom, with no line.
-    var isEnergy: Bool {
-        switch self {
-        case .slashEdge, .slashFill, .slashCore, .energy: true
-        default: false
-        }
-    }
+    /// they bloom, with no line, in the team colour's tones by their brightness.
+    var isEnergy: Bool { self == .slash || self == .energy }
 
     /// The part a source colour belongs to, within two steps per channel.
     static func owning(_ colour: RGB) -> BodyPart? {
@@ -85,19 +79,22 @@ struct Look: Hashable {
     /// The body in its colour and the back limbs in a greyed, darker version of it, the head
     /// and the ball in the team colour, a black line round the body, and the front arm
     /// stroked on its own. The head is drawn apart from the body, with no line, and so is
-    /// the energy: the slash's edge and the sheets' puffs and streaks in the team colour
-    /// outright, the slash's fill lightened, its core nearly white.
+    /// the energy, toned by `energyTone`.
     static func team(_ glow: RGB, body: RGB) -> Look {
         var colours: [BodyPart: RGB] = [:]
         let back = greyedDarker(body)
         for part in BodyPart.allCases {
-            switch part {
-            case .slashFill: colours[part] = lightened(glow, 0.3)
-            case .slashCore: colours[part] = lightened(glow, 0.7)
-            default: colours[part] = part.glows || part.isEnergy ? glow : (part.isBack ? back : body)
-            }
+            colours[part] = part.glows || part.isEnergy ? glow : (part.isBack ? back : body)
         }
         return Look(colours: colours, glow: glow, strokedParts: [.frontArm, .frontHand])
+    }
+
+    /// A grey level as a tone of the team colour, for everything that's energy: the
+    /// blade, the puffs and streaks, the effect sheets. Black up to the colour over the
+    /// dark half, the colour up to six tenths of the way to white over the light half, so
+    /// mid grey is the colour itself and white a pale tint of it.
+    func energyTone(luminance: Double) -> RGB {
+        luminance <= 0.5 ? Look.scaled(glow, luminance * 2) : Look.lightened(glow, (luminance * 2 - 1) * 0.6)
     }
 
     /// The colour moved this share of the way to white.
@@ -105,6 +102,14 @@ struct Look: Hashable {
         func channel(_ shift: RGB) -> RGB {
             let value = Double((colour >> shift) & 0xFF)
             return RGB((value + (255 - value) * share).rounded()) << shift
+        }
+        return channel(16) | channel(8) | channel(0)
+    }
+
+    /// The colour at this share of its brightness.
+    static func scaled(_ colour: RGB, _ share: Double) -> RGB {
+        func channel(_ shift: RGB) -> RGB {
+            RGB((Double((colour >> shift) & 0xFF) * share).rounded()) << shift
         }
         return channel(16) | channel(8) | channel(0)
     }

@@ -3,7 +3,9 @@
 
 Two sources. GMS2 keeps each frame as its own PNG beside the sprite's .yy, in the order
 the .yy lists. Newer sheets come as vertical strips in `_Graphic Assets`, one square
-frame under another, and a strip overrides the GMS2 sprite of the same name. Both go
+frame under another, and a strip overrides the GMS2 sprite of the same name; the effect
+sheets (esper_spark, lightning, esper_charge) are strips too, grayscale, toned per player
+in the app. A strip in REDUCE was rendered big and is boxed down by its factor. Both go
 into Assets.xcassets/Sprites.spriteatlas as one imageset per frame, named
 <sprite>_<frame> with the spr_ prefix dropped, and the tool prints the table the sim's
 Animation enum has to agree with. It also writes BallLandmarks.swift into the sim: where
@@ -31,6 +33,9 @@ LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources",
 FEET_FROM_BOTTOM_BY_SIZE = {48: 8, 64: 16}
 STRIP_FPS = 15
 BALL_MIN_PIXELS = 12
+# Strips rendered at a multiple of their playing size, boxed down by this factor. The
+# charge is a 512px soft render whose swirl fills the middle 150.
+REDUCE = {"esper_charge": 4}
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt"}
@@ -47,20 +52,27 @@ def load_yy(path):
 
 
 def read_png(path):
-    """Pixels of an 8-bit PNG as rows of bytes, with the colour type and bytes per pixel."""
+    """Pixels of a PNG as rows of bytes, with the colour type and bytes per pixel. An
+    indexed PNG comes back expanded to RGBA (colour type 6), whatever its bit depth."""
     data = open(path, "rb").read()
-    pos, idat, width, height, ctype = 8, b"", 0, 0, 0
+    pos, idat, width, height, ctype, depth = 8, b"", 0, 0, 0, 8
+    palette, transparency = b"", b""
     while pos < len(data):
         length = struct.unpack(">I", data[pos:pos + 4])[0]
         kind, chunk = data[pos + 4:pos + 8], data[pos + 8:pos + 8 + length]
         pos += 12 + length
         if kind == b"IHDR":
-            width, height, _, ctype = struct.unpack(">IIBB", chunk[:10])
+            width, height, depth, ctype = struct.unpack(">IIBB", chunk[:10])
         elif kind == b"IDAT":
             idat += chunk
+        elif kind == b"PLTE":
+            palette = chunk
+        elif kind == b"tRNS":
+            transparency = chunk
     raw = zlib.decompress(idat)
-    bpp = {6: 4, 2: 3, 0: 1, 4: 2}[ctype]
-    stride = width * bpp
+    channels = {6: 4, 2: 3, 0: 1, 4: 2, 3: 1}[ctype]
+    bpp = max(channels * depth // 8, 1)
+    stride = (width * channels * depth + 7) // 8
     rows, prev, p = [], bytearray(stride), 0
     for _ in range(height):
         filt, line = raw[p], bytearray(raw[p + 1:p + 1 + stride])
@@ -77,7 +89,22 @@ def read_png(path):
                 line[i] = (line[i] + (a if pa <= pb and pa <= pc else (b if pb <= pc else c))) & 255
         rows.append(bytes(line))
         prev = line
-    return width, height, ctype, bpp, rows
+    if ctype != 3:
+        return width, height, ctype, bpp, rows
+    # Indexed: look each index up, with tRNS giving the alphas it lists.
+    expanded = []
+    for line in rows:
+        out = bytearray(width * 4)
+        for x in range(width):
+            if depth == 8:
+                index = line[x]
+            else:
+                per_byte = 8 // depth
+                index = (line[x // per_byte] >> (8 - depth * (x % per_byte + 1))) & ((1 << depth) - 1)
+            out[x * 4:x * 4 + 3] = palette[index * 3:index * 3 + 3]
+            out[x * 4 + 3] = transparency[index] if index < len(transparency) else 255
+        expanded.append(bytes(out))
+    return width, height, 6, 4, expanded
 
 
 def write_png(path, width, height, ctype, rows):
@@ -92,6 +119,29 @@ def write_png(path, width, height, ctype, rows):
         out.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, ctype, 0, 0, 0)))
         out.write(chunk(b"IDAT", zlib.compress(raw, 9)))
         out.write(chunk(b"IEND", b""))
+
+
+def box_down(width, height, bpp, rows, factor):
+    """RGBA rows averaged over factor-by-factor boxes, the colour weighted by alpha."""
+    out_width, out_height = width // factor, height // factor
+    out = []
+    for oy in range(out_height):
+        line = bytearray(out_width * 4)
+        source = rows[oy * factor:(oy + 1) * factor]
+        for ox in range(out_width):
+            r = g = b = a = 0
+            for row in source:
+                for x in range(ox * factor, (ox + 1) * factor):
+                    px = row[x * bpp:x * bpp + bpp]
+                    alpha = px[3] if bpp == 4 else 255
+                    r += px[0] * alpha
+                    g += px[1] * alpha
+                    b += px[2] * alpha
+                    a += alpha
+            if a:
+                line[ox * 4:ox * 4 + 4] = bytes((r // a, g // a, b // a, a // (factor * factor)))
+        out.append(bytes(line))
+    return out_width, out_height, out
 
 
 def ball_centre(width, height, bpp, rows, feet_from_bottom):
@@ -187,6 +237,9 @@ def main():
     for strip in sorted(glob.glob(os.path.join(STRIPS, "*.png"))):
         short = os.path.splitext(os.path.basename(strip))[0]
         width, height, ctype, bpp, rows = read_png(strip)
+        if short in REDUCE:
+            width, height, rows = box_down(width, height, bpp, rows, REDUCE[short])
+            ctype, bpp = 6, 4
         size = width
         count = height // size
         feet = FEET_FROM_BOTTOM_BY_SIZE.get(size, 8)

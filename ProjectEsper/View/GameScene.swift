@@ -50,8 +50,10 @@ final class GameScene: SKScene {
     /// Each body's energy, the slash's blade and the sheets' puffs and streaks, drawn over
     /// the body among the glowers so it blooms.
     private var energyNodes: [SKSpriteNode] = []
-    /// The charge round each player's ball while a throw is held.
+    /// The charge round each player's ball while a throw is held, and whether it showed
+    /// last frame, so the throw's release can be caught.
     private var chargeNodes: [SKSpriteNode] = []
+    private var charging: [Bool] = []
     private var headShown: [CGPoint] = []
     /// Each body's lean in flight, radians, eased toward where it's going, and how much of
     /// the hover it's showing.
@@ -218,8 +220,10 @@ final class GameScene: SKScene {
             let charge = SKSpriteNode()
             charge.zPosition = 5
             charge.isHidden = true
+            charge.setScale(EnergyEffect.chargeScale)
             glowers.addChild(charge)
             chargeNodes.append(charge)
+            charging.append(false)
             headShown.append(.zero)
             bodyTilt.append(0)
             hover.append(0)
@@ -763,9 +767,11 @@ final class GameScene: SKScene {
             }
 
             // A held throw charges: the swirl round the ball in hand, up to the loop's end,
-            // then round the loop for as long as the throw is held.
+            // then round the loop for as long as the throw is held. Let go into the throw,
+            // the rest of the sheet plays out where the ball was.
             let charge = chargeNodes[index]
-            if player.state == .throwStance, !handBall.isHidden {
+            let chargingNow = player.state == .throwStance && !handBall.isHidden
+            if chargingNow {
                 let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
                 let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
                 let frame = played <= loopEnd ? played : loopStart + (played - loopStart) % (loopEnd - loopStart + 1)
@@ -775,7 +781,15 @@ final class GameScene: SKScene {
                 charge.isHidden = false
             } else {
                 charge.isHidden = true
+                if charging[index], player.state == .throwing || player.state == .dunking {
+                    let tail = EnergyEffect.charge.node(sprites, player: index, at: charge.position,
+                                                        frames: (EnergyEffect.chargeLoopEnd + 1)..<EnergyEffect.charge.frameCount,
+                                                        scale: EnergyEffect.chargeScale)
+                    tail.zPosition = 5
+                    glowers.addChild(tail)
+                }
             }
+            charging[index] = chargingNow
 
             // The head follows its place on the body loosely and bobs, as if it only just belonged.
             let headNode = headNodes[index]

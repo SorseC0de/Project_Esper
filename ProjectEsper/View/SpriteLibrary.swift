@@ -437,9 +437,11 @@ enum EnergyEffect: CaseIterable {
     /// The bolts' one colour on the sheets, (241, 246, 240), as a grey level: what their
     /// full-frame flash comes out as through the ramp.
     static let strikeLuminance = 0.958
-    /// The charge plays up to here, then loops from here while the throw is held.
+    /// The charge plays up to here, then loops from here while the throw is held; the
+    /// frames after play out where the throw was let go. Drawn at this size over its sheet.
     static let chargeLoopEnd = 67
     static let chargeLoopStart = 35
+    static let chargeScale: CGFloat = 0.75
     /// The bolt sheets' frames that are a full-frame flash, and the one after, whose top
     /// 32 rows are solid across the sheet.
     static let strikeFlashFrames = 5..<7
@@ -481,13 +483,15 @@ enum EnergyEffect: CaseIterable {
         }
     }
 
-    /// A one-shot node in the player's colour that plays through and removes itself.
-    func node(_ sprites: SpriteLibrary, player: Int, at point: CGPoint) -> SKSpriteNode {
-        let frames = sprites.effectFrames(self, player: player)
+    /// A one-shot node in the player's colour that plays through, or through `range` of
+    /// its frames, and removes itself.
+    func node(_ sprites: SpriteLibrary, player: Int, at point: CGPoint, frames range: Range<Int>? = nil, scale: CGFloat = 1) -> SKSpriteNode {
+        let frames = Array(sprites.effectFrames(self, player: player)[range ?? 0..<frameCount])
         let node = SKSpriteNode(texture: frames[0])
         node.anchorPoint = anchor
         node.position = point
         node.zPosition = 30
+        node.setScale(scale)
         node.run(.sequence([.animate(with: frames, timePerFrame: 1 / fps), .removeFromParent()]))
         return node
     }

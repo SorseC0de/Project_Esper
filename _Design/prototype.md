@@ -191,8 +191,9 @@ are matched by a flash over the whole screen in the same tone, and the half-fram
 after them by a band riding the bolt from that half's bottom edge out past the screen,
 so the sprite's edges never show through them, and the crown erupts off the rim with
 it. Sparks and bolts play at 24 a second. A held throw shows the
-charge, the swirl round the ball in hand at 30 a second: up to frame 67, then frames 35
-to 67 round again for as long as the throw is held. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
+charge, the swirl round the ball in hand at 30 a second and three quarters of its sheet's
+size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
+and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
 and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on
 the ball and the fire off the head. The body a light orange or a light teal toward the team colour, the back limbs a greyed,
 darker version of it, a black line one pixel thick round the body following the outside

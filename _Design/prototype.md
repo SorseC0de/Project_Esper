@@ -15,7 +15,10 @@ neutral to get a shot off; catch it and the roles reverse.
 - `Tools/import_sprites.py` — copies the GMS2 frames and slices the strips in
   `_Graphic Assets` (square frames stacked one under another; a strip overrides the GMS2
   sprite of the same name) into the atlas. Run after art changes. The ball's imageset
-  lives at the catalog's root, outside the atlas, and the importer leaves it alone.
+  lives at the catalog's root, outside the atlas, and the importer leaves it alone. The
+  sheets' white is the ball only where it's the biggest blob of white in the frame and at
+  least 12 pixels; every other white pixel is energy, the skid's puffs and a release's
+  streaks. The importer and the sprite library apply the same rule.
 
 ## Units
 
@@ -160,8 +163,13 @@ holds the variants; A is always the baseline as tuned.
 ## Look
 
 `Art/PlayerPalette.swift` names the figure's eleven parts and the flat colour each is
-painted on the sheets. A `Look` maps parts to colours and the sprite library recolours
-each frame once as it's used. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
+painted on the sheets, plus the Esper Slash's blade in three pinks and the energy, the
+sheets' white that isn't the ball. A `Look` maps parts to colours and the sprite library
+recolours each frame once as it's used. The blade and the energy are split out of every
+frame like the head and drawn on their own sprite over the body, among the glowers, so
+they bloom at the world threshold: the blade's edge, the puffs and the streaks in the
+team colour outright, the blade's fill three tenths of the way to white, its core seven
+tenths. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
 and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on
 the ball and the fire off the head. The body a light orange or a light teal toward the team colour, the back limbs a greyed,
 darker version of it, a black line one pixel thick round the body following the outside

@@ -7,6 +7,9 @@ import SpriteKit
 /// and kept, and the library remembers where the ball and the head sit in each frame.
 final class SpriteLibrary {
     static let pixelsPerUnit = 1.6
+    /// The sheets' white is the ball where it's the biggest blob of white in the frame and
+    /// at least this many pixels; the rest of the white is energy. The importer agrees.
+    static let ballMinPixels = 12
 
     private let atlas = SKTextureAtlas(named: "Sprites")
     private var cache: [String: SKTexture] = [:]
@@ -35,18 +38,22 @@ final class SpriteLibrary {
         return texture
     }
 
-    /// A player frame in that player's look, without its head.
+    /// A player frame in that player's look, without its head or its energy.
     func texture(_ frame: AnimationFrame, player: Int) -> SKTexture {
         let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)"
         if let texture = cache[key] { return texture }
         let look = look(for: player)
-        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look, detachHead: true)
+        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look, detach: true)
         let texture = result.texture
         texture.filteringMode = .nearest
         cache[key] = texture
         if let head = result.head {
             head.filteringMode = .nearest
             cache[key + "_head"] = head
+        }
+        if let energy = result.energy {
+            energy.filteringMode = .nearest
+            cache[key + "_energy"] = energy
         }
         let size = frame.animation.pixelSize
         landmarks[key] = result.centres.mapValues { centre in
@@ -59,6 +66,13 @@ final class SpriteLibrary {
     func headTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
         _ = texture(frame, player: player)
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)_head"]
+    }
+
+    /// The energy alone from a player frame, on the same canvas as the body: the slash's
+    /// blade, the skid's puffs, a release's streaks. Nil when the frame has none.
+    func energyTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
+        _ = texture(frame, player: player)
+        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)_energy"]
     }
 
     /// Where a glowing part is drawn in a player frame, from the feet in art pixels, if it's there.
@@ -128,23 +142,27 @@ final class SpriteLibrary {
 
     /// A copy of the frame in the look: every part swapped to its colour, the stroked parts
     /// lined where they lie over the body, the silhouette lined round the outside, and the
-    /// centre of each glowing part found. With `detachHead`, the head comes back as its own
-    /// texture with no line, and the body is drawn and lined without it.
-    private func recolour(_ texture: SKTexture, look: Look, detachHead: Bool) -> (texture: SKTexture, head: SKTexture?, centres: [BodyPart: CGPoint]) {
+    /// centre of each glowing part found. With `detach`, the head and the energy come back
+    /// as their own textures with no line, and the body is drawn and lined without them.
+    private func recolour(_ texture: SKTexture, look: Look, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, [:]) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
 
         // Which part each pixel came from, before anything changes.
         var parts = [BodyPart?](repeating: nil, count: count)
-        var sums: [BodyPart: (x: CGFloat, y: CGFloat, n: Int)] = [:]
         for pixel in 0..<count where pixels[pixel * 4 + 3] == 255 {
             let index = pixel * 4
             let colour = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
-            guard let part = BodyPart.owning(colour) else { continue }
-            parts[pixel] = part
+            parts[pixel] = BodyPart.owning(colour)
+        }
+        markEnergy(&parts, width: width, height: height)
+
+        var sums: [BodyPart: (x: CGFloat, y: CGFloat, n: Int)] = [:]
+        for pixel in 0..<count {
+            guard let part = parts[pixel] else { continue }
             if part.glows {
                 var sum = sums[part] ?? (0, 0, 0)
                 sum.x += CGFloat(pixel % width) + 0.5
@@ -153,20 +171,26 @@ final class SpriteLibrary {
                 sums[part] = sum
             }
             if let target = look.colours[part] {
-                paint(pixels, index, target)
+                paint(pixels, pixel * 4, target)
             }
         }
 
-        // The head onto its own canvas, and off this one; the ball off this one too, since
-        // it's drawn as its own sprite wherever the frame puts it.
+        // The head and the energy onto their own canvases, and off this one; the ball off
+        // this one too, since it's drawn as its own sprite wherever the frame puts it.
         var head: SKTexture?
-        if detachHead {
+        var energy: SKTexture?
+        if detach {
             let headCanvas = sums[.head] != nil ? makeCanvas(width: width, height: height) : nil
-            for pixel in 0..<count where parts[pixel] == .head || parts[pixel] == .ball {
+            let energyCanvas = parts.contains { $0?.isEnergy == true } ? makeCanvas(width: width, height: height) : nil
+            for pixel in 0..<count {
+                guard let part = parts[pixel], part == .head || part == .ball || part.isEnergy else { continue }
                 let index = pixel * 4
-                if parts[pixel] == .head, let (_, headPixels) = headCanvas {
+                if part == .head, let (_, headPixels) = headCanvas {
                     paint(headPixels, index, look.colours[.head] ?? look.glow)
                     headPixels[index + 3] = 255
+                } else if part.isEnergy, let (_, energyPixels) = energyCanvas {
+                    paint(energyPixels, index, look.colours[part] ?? look.glow)
+                    energyPixels[index + 3] = 255
                 }
                 pixels[index] = 0
                 pixels[index + 1] = 0
@@ -175,6 +199,7 @@ final class SpriteLibrary {
                 parts[pixel] = nil
             }
             head = headCanvas?.0.makeImage().map { SKTexture(cgImage: $0) }
+            energy = energyCanvas?.0.makeImage().map { SKTexture(cgImage: $0) }
         }
 
         func neighbours(_ pixel: Int, _ body: (Int) -> Bool) -> Bool {
@@ -213,9 +238,43 @@ final class SpriteLibrary {
             }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, [:]) }
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, [:]) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, centres)
+        return (SKTexture(cgImage: recoloured), head, energy, centres)
+    }
+
+    /// The sheets' white is the ball only where it's the biggest 8-connected blob of white
+    /// in the frame and big enough to be one; every other white pixel becomes energy: the
+    /// skid's puffs, a release's streaks.
+    private func markEnergy(_ parts: inout [BodyPart?], width: Int, height: Int) {
+        var label = [Int](repeating: 0, count: parts.count)
+        var sizes = [0]
+        for start in parts.indices where parts[start] == .ball && label[start] == 0 {
+            let id = sizes.count
+            sizes.append(0)
+            label[start] = id
+            var stack = [start]
+            while let pixel = stack.popLast() {
+                sizes[id] += 1
+                let x = pixel % width, y = pixel / width
+                for dy in -1...1 {
+                    for dx in -1...1 where dx != 0 || dy != 0 {
+                        let nx = x + dx, ny = y + dy
+                        guard nx >= 0, ny >= 0, nx < width, ny < height else { continue }
+                        let neighbour = ny * width + nx
+                        if parts[neighbour] == .ball, label[neighbour] == 0 {
+                            label[neighbour] = id
+                            stack.append(neighbour)
+                        }
+                    }
+                }
+            }
+        }
+        guard sizes.count > 1, let biggest = sizes.indices.dropFirst().max(by: { sizes[$0] < sizes[$1] }) else { return }
+        let ball = sizes[biggest] >= SpriteLibrary.ballMinPixels ? biggest : 0
+        for pixel in parts.indices where parts[pixel] == .ball && label[pixel] != ball {
+            parts[pixel] = .energy
+        }
     }
 
     private func paint(_ pixels: UnsafeMutablePointer<UInt8>, _ index: Int, _ colour: RGB) {

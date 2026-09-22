@@ -41,6 +41,9 @@ final class GameScene: SKScene {
     private var playerNodes: [SKSpriteNode] = []
     /// Each head, drawn apart from its body and following it loosely.
     private var headNodes: [SKSpriteNode] = []
+    /// Each body's energy, the slash's blade and the sheets' puffs and streaks, drawn over
+    /// the body among the glowers so it blooms.
+    private var energyNodes: [SKSpriteNode] = []
     private var headShown: [CGPoint] = []
     /// Each body's lean in flight, radians, eased toward where it's going, and how much of
     /// the hover it's showing.
@@ -199,6 +202,11 @@ final class GameScene: SKScene {
             head.zPosition = 4
             glowers.addChild(head)
             headNodes.append(head)
+            let energy = SKSpriteNode()
+            energy.zPosition = 3
+            energy.isHidden = true
+            glowers.addChild(energy)
+            energyNodes.append(energy)
             headShown.append(.zero)
             bodyTilt.append(0)
             hover.append(0)
@@ -641,6 +649,20 @@ final class GameScene: SKScene {
             }
             bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
             node.zRotation = bodyTilt[index]
+
+            // The frame's energy rides exactly where the body is drawn.
+            let energyNode = energyNodes[index]
+            if let energy = sprites.energyTexture(frame, player: index) {
+                energyNode.isHidden = false
+                energyNode.texture = energy
+                energyNode.size = node.size
+                energyNode.anchorPoint = node.anchorPoint
+                energyNode.position = node.position
+                energyNode.xScale = node.xScale
+                energyNode.zRotation = node.zRotation
+            } else {
+                energyNode.isHidden = true
+            }
             let tilt = bodyTilt[index]
             func leaned(_ offset: CGPoint) -> CGPoint {
                 CGPoint(x: offset.x * cos(tilt) - offset.y * sin(tilt), y: offset.x * sin(tilt) + offset.y * cos(tilt))

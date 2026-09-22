@@ -9,7 +9,10 @@ into Assets.xcassets/Sprites.spriteatlas as one imageset per frame, named
 Animation enum has to agree with. It also writes BallLandmarks.swift into the sim: where
 the ball (the sheets' pure white) sits in each player frame, so the rules can know where
 a dribble is. The ball itself lives at the catalog's root, outside the atlas, and is left
-alone. Run it again whenever the art changes.
+alone. The sheets' white is the ball only where it's the biggest blob of white in the
+frame and at least BALL_MIN_PIXELS; the rest of the white is energy, the skid's puffs and
+a release's streaks, which the app draws in the team colour. SpriteLibrary applies the
+same rule. Run it again whenever the art changes.
 """
 import glob
 import json
@@ -26,6 +29,7 @@ ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xc
 LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources", "EsperSim", "BallLandmarks.swift")
 FEET_FROM_BOTTOM_BY_SIZE = {48: 8, 64: 16}
 STRIP_FPS = 15
+BALL_MIN_PIXELS = 12
 
 SKIP = {"Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",
@@ -87,20 +91,40 @@ def write_png(path, width, height, ctype, rows):
 
 
 def ball_centre(width, height, bpp, rows, feet_from_bottom):
-    """The white pixels' centre in art pixels from the feet, or None."""
-    sx = sy = n = 0
+    """The ball's centre in art pixels from the feet, or None: the biggest 8-connected blob
+    of white, if it's at least BALL_MIN_PIXELS."""
+    white = []
     for y, row in enumerate(rows):
         for x in range(width):
             px = row[x * bpp:x * bpp + bpp]
             if bpp == 4 and px[3] < 128:
                 continue
             if px[0] == 255 and px[1] == 255 and px[2] == 255:
-                sx += x + 0.5
-                sy += y + 0.5
-                n += 1
-    if n == 0:
+                white.append((x, y))
+    remaining, blobs = set(white), []
+    for start in white:
+        if start not in remaining:
+            continue
+        remaining.discard(start)
+        stack, blob = [start], []
+        while stack:
+            x, y = stack.pop()
+            blob.append((x, y))
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    neighbour = (x + dx, y + dy)
+                    if neighbour in remaining:
+                        remaining.discard(neighbour)
+                        stack.append(neighbour)
+        blobs.append(blob)
+    if not blobs:
         return None
-    return (sx / n - width / 2, height - sy / n - feet_from_bottom)
+    ball = max(blobs, key=len)
+    if len(ball) < BALL_MIN_PIXELS:
+        return None
+    sx = sum(x + 0.5 for x, _ in ball) / len(ball)
+    sy = sum(y + 0.5 for _, y in ball) / len(ball)
+    return (sx - width / 2, height - sy - feet_from_bottom)
 
 
 def write_imageset(short, index, png_source=None, png_writer=None):

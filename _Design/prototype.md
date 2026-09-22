@@ -72,11 +72,13 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   lift. On the way down it's an ordinary air shot.
 - Shoot (without ball, in neutral): held, the catch stance.
 - Shoot (without ball, on defence, the other holding the ball): the Esper Slash, the swat.
-  On the ground it's a planted swing; in the air the body rises at least 1 a frame and
-  gravity is cut to a fifth, so it hangs through the swing. 18 frames at 20 a second, the
-  blade live over frames 6 to 11, 15 units ahead, 5 behind, 4 below the feet and 28 high:
-  it knocks the ball out of the holder's hands, and swats a loose ball the way the body
-  faces and a little up at no less than 6. In the air it ends in the roll, the double
+  On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
+  air the body rises at least 1 a frame and
+  gravity is cut to a fifth, so it hangs through the swing. 18 frames at 20 a second. The
+  blade is where the sheet draws the crescent, frame by frame: raised behind and above on
+  sheet frame 1, overhead on 2, swung down in front on 3, out to 18 units ahead and 25
+  up. Touching the holder's body or ball with it knocks the ball out of their hands, and
+  it swats a loose ball the way the body faces and a little up at no less than 6. In the air it ends in the roll, the double
   jump's somersault over 18 frames at the same pace with normal gravity and air drift, so
   the whole thing is a commitment; on the ground it's over when the swing is. Not in
   neutral.
@@ -84,7 +86,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   frames 4 to 15, when the whole body plus a tile of reach in front takes any ball it
   overlaps while the body faces it: a loose one at any speed, or the one in the other's
   hands. The catch spark shows on the hand on frame 8. Then half a second before another.
-  Web Water keeps the web line on this button instead.
+  On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
+  air it drifts. Web Water keeps the web line on this button instead.
 - Ledge (without ball): automatic. Falling past the top corner of a block or the one-way
   ledge, either side, with the corner within a tile of the body's side and within a tile
   either way of hand height, 17.5 above the feet, the hand catches it: the body turns to
@@ -171,6 +174,9 @@ holds the variants; A is always the baseline as tuned.
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER: A none, B Web Water, C Super Soda, D Flash Fizz, E Platform Protein Shake. The
   left bumper steps this one.
+- HITBOX, beside RESET: draws the sim's boxes over the world. Bodies white, the loose
+  ball purple, the catch reach a faint ring round each chest, the slide's leg and the
+  slash's blade red, the snatch's reach green.
 
 ## Look
 

@@ -18,8 +18,12 @@ final class TouchControls: SKNode {
     private let stickBase = SKShapeNode(circleOfRadius: stickRadius)
     private let stickKnob = SKShapeNode(circleOfRadius: 14)
     private let resetButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
+    private let hitboxButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
     /// Called when the corner button is tapped.
     var onReset: (() -> Void)?
+    /// The HITBOX toggle beside it: whether the sim's boxes are drawn, and who to tell.
+    var showHitboxes = false { didSet { hitboxButton.fillColor = .init(white: 1, alpha: showHitboxes ? 0.4 : 0.1) } }
+    var onToggleHitboxes: ((Bool) -> Void)?
     private var pickers: [SegmentedPicker] = []
     private let pickerOrigin: CGPoint
     private var sliders: [Slider] = []
@@ -83,6 +87,17 @@ final class TouchControls: SKNode {
         resetButton.addChild(resetText)
         addChild(resetButton)
 
+        hitboxButton.position = CGPoint(x: right - 75, y: top - 8)
+        hitboxButton.fillColor = .init(white: 1, alpha: 0.1)
+        hitboxButton.strokeColor = .init(white: 1, alpha: 0.4)
+        hitboxButton.lineWidth = 1
+        let hitboxText = SKLabelNode(text: "HITBOX")
+        hitboxText.fontName = "Menlo-Bold"
+        hitboxText.fontSize = 8
+        hitboxText.verticalAlignmentMode = .center
+        hitboxText.fontColor = .init(white: 1, alpha: 0.8)
+        hitboxButton.addChild(hitboxText)
+        addChild(hitboxButton)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -147,6 +162,11 @@ final class TouchControls: SKNode {
     func began(_ touch: UITouch, at point: CGPoint) {
         if resetButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             onReset?()
+            return
+        }
+        if hitboxButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
+            showHitboxes.toggle()
+            onToggleHitboxes?(showHitboxes)
             return
         }
         for picker in pickers where picker.tap(at: convert(point, to: picker)) {

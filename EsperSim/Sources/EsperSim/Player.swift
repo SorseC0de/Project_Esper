@@ -580,10 +580,10 @@ public struct Player: Equatable {
             }
 
         case .slashing:
-            // On the ground a planted swing; in the air gravity is cut, so the body hangs
-            // through it, and the roll follows.
+            // On the ground the swing carries the run it came from, bleeding it off; in the
+            // air gravity is cut, so the body hangs through it, and the roll follows.
             if grounded {
-                velocity.x = approach(velocity.x, 0, spec.traction)
+                velocity.x = approach(velocity.x, 0, spec.attackBrake)
             } else {
                 velocity.x = approach(velocity.x, 0, spec.airFriction)
                 velocity.y = max(velocity.y - spec.gravity * SlashRules.gravityShare, -spec.fallSpeed)
@@ -601,7 +601,7 @@ public struct Player: Equatable {
 
         case .snatching:
             if grounded {
-                velocity.x = approach(velocity.x, 0, spec.traction)
+                velocity.x = approach(velocity.x, 0, spec.attackBrake)
             } else {
                 airDrift(input)
                 fall(.idle)
@@ -799,12 +799,12 @@ public struct Player: Equatable {
         return Box(min: Vec2(x: min(front, tip), y: position.y), max: Vec2(x: max(front, tip), y: position.y + SlideRules.legHeight))
     }
 
-    /// The blade over the slash's live frames, until it has hit.
+    /// The blade where this frame's sheet draws the crescent, until it has hit.
     public var slashHitbox: Box? {
-        guard state == .slashing, !slashHit, SlashRules.activeFrames.contains(stateTimer) else { return nil }
-        let back = position.x - facing.sign * SlashRules.back
-        let tip = position.x + facing.sign * SlashRules.reach
-        return Box(min: Vec2(x: min(back, tip), y: position.y - SlashRules.below), max: Vec2(x: max(back, tip), y: position.y + SlashRules.height))
+        guard state == .slashing, !slashHit, let blade = SlashRules.blades[stateTimer * SlashRules.sheetFramesPerSecond / 60] else { return nil }
+        let left = facing == .right ? blade.min.x : -blade.max.x
+        let right = facing == .right ? blade.max.x : -blade.min.x
+        return Box(min: Vec2(x: position.x + left, y: position.y + blade.min.y), max: Vec2(x: position.x + right, y: position.y + blade.max.y))
     }
 
     /// The whole body and the hand's reach in front, while the snatch's hand is out.

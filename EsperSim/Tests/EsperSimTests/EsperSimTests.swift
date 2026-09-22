@@ -1176,6 +1176,23 @@ final class FootsiesTests: XCTestCase {
         XCTAssertTrue(match.players[0].grounded)
     }
 
+    func testARunCarriesIntoASlashAndASnatch() {
+        var slashing = defending()
+        run(&slashing, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        XCTAssertEqual(slashing.players[0].state, .run)
+        slashing.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(slashing.players[0].state, .slashing)
+        run(&slashing, frames: 6, input: { _ in .idle })
+        XCTAssertGreaterThan(slashing.players[0].velocity.x, 2, "the run should still be carrying it")
+
+        var snatching = neutral()
+        run(&snatching, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        snatching.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertEqual(snatching.players[0].state, .snatching)
+        run(&snatching, frames: 6, input: { _ in .idle })
+        XCTAssertGreaterThan(snatching.players[0].velocity.x, 2)
+    }
+
     func testShootInNeutralIsNotASlash() {
         var match = neutral()
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
@@ -1201,24 +1218,34 @@ final class FootsiesTests: XCTestCase {
     }
 
     func testSlashKnocksTheBallOutOfTheHoldersHands() {
-        var match = defending(otherAt: 142)
+        var match = defending(otherAt: 140)
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         let hit = run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
-        XCTAssertEqual(hit + 1, SlashRules.activeFrames.lowerBound)
+        XCTAssertTrue(SlashRules.liveFrames.contains(hit + 1))
         XCTAssertFalse(match.players[1].hasBall)
         XCTAssertEqual(match.ball.velocity, Vec2(x: 0, y: BallRules.floaterSpeed))
+    }
+
+    func testSlashPopsTheBallOffAHolderTheBladeOnlyTouchesTheBodyOf() {
+        // The other stands at the tip of the forward swing: its box reaches the near edge
+        // of their body and not the ball at their centre.
+        var match = defending(otherAt: 152)
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        let hit = run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
+        XCTAssertTrue(SlashRules.liveFrames.contains(hit + 1))
+        XCTAssertFalse(match.players[1].hasBall)
     }
 
     func testSlashSwatsALooseBallAway() {
         var match = defending()
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        run(&match, frames: SlashRules.activeFrames.lowerBound - 2, input: { _ in .idle })
-        // The other lets go; a ball coming at the chest meets the blade.
+        match.advance(inputs: [.idle, .idle])
+        // The other lets go; a ball dropping in front meets the forward swing.
         match.players[1].hasBall = false
-        match.ball.respawn(at: match.players[0].chest + Vec2(x: 16, y: 0))
-        match.ball.velocity = Vec2(x: -3, y: 0)
-        let swatted = run(&match, frames: 6, input: { _ in .idle }) { $0.events.contains(.swatted(player: 0, hit: true)) }
-        XCTAssertLessThan(swatted, 6)
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: 12, y: 21))
+        match.ball.velocity = Vec2(x: 0, y: -2)
+        let swatted = run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.swatted(player: 0, hit: true)) }
+        XCTAssertLessThan(swatted, SlashRules.frames)
         XCTAssertGreaterThan(match.ball.velocity.x, 0)
         XCTAssertGreaterThan(match.ball.velocity.y, 0)
         XCTAssertGreaterThanOrEqual(match.ball.velocity.length, SlashRules.swatSpeed - 0.2)

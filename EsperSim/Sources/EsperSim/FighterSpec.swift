@@ -63,6 +63,9 @@ public struct FighterSpec: Equatable {
     public var crouchWalkSpeed = 0.8
     /// Sideways speed lost per frame in an airborne stance.
     public var stanceAirBrake = 0.01
+    /// Speed lost per frame on the ground through a snatch or a slash, so a run or a dash
+    /// carries into them.
+    public var attackBrake = 0.15
 
     /// Body box: full width and height, feet at the position.
     public var bodyWidth: Double
@@ -368,22 +371,26 @@ public enum SlideRules {
 }
 
 /// The Esper Slash's numbers: shoot on defence, with the other holding the ball. On the
-/// ground it's a planted swing, over when the swing is; in the air the body rises at
+/// ground it carries what run it had and is over when the swing is; in the air the body rises at
 /// least this fast and gravity is cut to this share, so it hangs through the swing, and
-/// the roll follows over this many frames. Both play at 20 a second. The blade is live
-/// over these frames and reaches this far ahead, this far behind, this far below the
-/// feet and this high. It knocks the ball out of a holder's hands or swats a loose one
-/// away at no less than this speed.
+/// the roll follows over this many frames. Both play at this many sheet frames a second.
+/// The blade is where the sheet draws the crescent, frame by frame: raised behind and
+/// above on sheet frame 1, overhead on 2, swung down in front on 3, in units from the
+/// feet facing right. It knocks the ball out of a holder's hands, body or ball, or swats
+/// a loose one away at no less than this speed.
 public enum SlashRules {
     public static let frames = 18
     public static let rollFrames = 18
+    public static let sheetFramesPerSecond = 20
     public static let lift = 1.0
     public static let gravityShare = 0.2
-    public static let activeFrames = 6..<12
-    public static let reach = 15.0
-    public static let back = 5.0
-    public static let below = 4.0
-    public static let height = 28.0
+    public static let blades: [Int: Box] = [
+        1: Box(min: Vec2(x: -14, y: 8), max: Vec2(x: 0, y: 21)),
+        2: Box(min: Vec2(x: -13, y: 16), max: Vec2(x: 8, y: 21)),
+        3: Box(min: Vec2(x: 1, y: 0), max: Vec2(x: 18, y: 25)),
+    ]
+    /// The sim frames on which some blade is live.
+    public static let liveFrames = 3..<12
     public static let swatSpeed = 6.0
 }
 

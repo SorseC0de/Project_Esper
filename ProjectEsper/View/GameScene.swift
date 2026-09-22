@@ -38,6 +38,10 @@ final class GameScene: SKScene {
     private let ground = SKNode()
     private let bodies = SKNode()
     private let glowers = SKNode()
+    /// The sim's boxes drawn over the world while the HITBOX toggle is on: bodies, the
+    /// loose ball, the catch reach round each chest, and any live leg, blade or reach.
+    private let hitboxLayer = SKNode()
+    private var showHitboxes = false
     /// Sits at the camera's position, scaled to cancel the camera, so its children are laid
     /// out in screen points from the centre and a touch maps onto them with no arithmetic.
     private let hud = SKNode()
@@ -148,6 +152,8 @@ final class GameScene: SKScene {
         world.addChild(bodies)
         glowers.zPosition = 21
         world.addChild(glowers)
+        hitboxLayer.zPosition = 30
+        world.addChild(hitboxLayer)
         camera = cameraNode
         addChild(cameraNode)
         hud.zPosition = 100
@@ -452,6 +458,8 @@ final class GameScene: SKScene {
         controls?.removeFromParent()
         let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight, insets: safeInsets)
         controls.onReset = { [weak self] in self?.reset() }
+        controls.showHitboxes = showHitboxes
+        controls.onToggleHitboxes = { [weak self] on in self?.showHitboxes = on }
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
             self?.headVariant = HeadVariant(rawValue: index)!
         }
@@ -884,12 +892,42 @@ final class GameScene: SKScene {
         }
         for dot in previewDots[shownDots...] { dot.isHidden = true }
 
+        drawHitboxes()
         scoreLabel.text = "\(match.scores[0])  -  \(match.scores[1])"
         fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms"
         let p = match.players[0]
         debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "")
+    }
+
+    /// The sim's boxes, rebuilt each frame while the toggle is on: bodies white, the loose
+    /// ball purple, the catch reach a faint ring, the slide's leg and the slash's blade
+    /// red, the snatch's reach green.
+    private func drawHitboxes() {
+        hitboxLayer.removeAllChildren()
+        guard showHitboxes else { return }
+        func outline(_ box: Box, _ colour: SKColor) {
+            let low = SpriteLibrary.point(box.min), high = SpriteLibrary.point(box.max)
+            let node = SKShapeNode(rect: CGRect(x: low.x, y: low.y, width: high.x - low.x, height: high.y - low.y))
+            node.strokeColor = colour
+            node.lineWidth = 1
+            hitboxLayer.addChild(node)
+        }
+        for player in match.players {
+            outline(player.body, .white)
+            let reach = SKShapeNode(circleOfRadius: CGFloat(BallRules.catchRadius * SpriteLibrary.pixelsPerUnit))
+            reach.position = SpriteLibrary.point(player.chest)
+            reach.strokeColor = SKColor(white: 1, alpha: 0.3)
+            reach.lineWidth = 1
+            hitboxLayer.addChild(reach)
+            if let leg = player.slideHitbox { outline(leg, .red) }
+            if let blade = player.slashHitbox { outline(blade, .red) }
+            if let hand = player.snatchHitbox { outline(hand, .green) }
+        }
+        if match.ball.holder == nil {
+            outline(match.ball.box, SKColor(rgb: BallLook.neutral))
+        }
     }
 
     // MARK: Touches, from the Metal view in points

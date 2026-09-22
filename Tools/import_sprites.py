@@ -9,10 +9,11 @@ into Assets.xcassets/Sprites.spriteatlas as one imageset per frame, named
 Animation enum has to agree with. It also writes BallLandmarks.swift into the sim: where
 the ball (the sheets' pure white) sits in each player frame, so the rules can know where
 a dribble is. The ball itself lives at the catalog's root, outside the atlas, and is left
-alone. The sheets' white is the ball only where it's the biggest blob of white in the
-frame and at least BALL_MIN_PIXELS; the rest of the white is energy, the skid's puffs and
-a release's streaks, which the app draws in the team colour. SpriteLibrary applies the
-same rule. Run it again whenever the art changes.
+alone. The sheets' white is the ball only on the sheets in BALL_SHEETS, and there only
+where it's the biggest blob of white in the frame and at least BALL_MIN_PIXELS; the rest
+of the white is energy, the skid's puffs, a release's streaks, the slide's speed lines,
+which the app draws in the team colour. The sim's Animation.holdsBall and SpriteLibrary
+apply the same rule. Run it again whenever the art changes.
 """
 import glob
 import json
@@ -30,6 +31,9 @@ LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources",
 FEET_FROM_BOTTOM_BY_SIZE = {48: 8, 64: 16}
 STRIP_FPS = 15
 BALL_MIN_PIXELS = 12
+BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball",
+               "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
+               "player_catch", "player_catch_air", "player_skid_ball", "player_taunt"}
 
 SKIP = {"Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",
@@ -171,7 +175,7 @@ def main():
         for index, frame in enumerate(frames):
             source = os.path.join(folder, frame + ".png")
             write_imageset(short, index, png_source=source)
-            if short.startswith("player_"):
+            if short in BALL_SHEETS:
                 width, height, _, bpp, rows = read_png(source)
                 centre = ball_centre(width, height, bpp, rows, FEET_FROM_BOTTOM_BY_SIZE.get(height, 8))
                 if centre:
@@ -190,17 +194,17 @@ def main():
         for index in range(count):
             frame_rows = rows[index * size:(index + 1) * size]
             write_imageset(short, index, png_writer=lambda path, r=frame_rows: write_png(path, size, size, ctype, r))
-            if short.startswith("player_"):
+            if short in BALL_SHEETS:
                 centre = ball_centre(size, size, bpp, frame_rows, feet)
                 if centre:
                     landmarks.append((f"{short}_{index}", centre))
         table[short] = (size, size, count, size // 2, size - feet, STRIP_FPS)
         print(f"strip  {short}: {count} frames of {size}px")
 
-    print(f"\n{'sprite':26s} size    frames origin   fps")
+    print(f"\n{'sprite':26s} size    frames origin   fps  ball")
     for short in sorted(table):
         width, height, count, ox, oy, fps = table[short]
-        print(f"{short:26s} {width}x{height:<4d} {count:3d}   ({ox},{oy})  {fps:g}")
+        print(f"{short:26s} {width}x{height:<4d} {count:3d}   ({ox},{oy})  {fps:<4g} {'ball' if short in BALL_SHEETS else ''}")
     print(f"\n{sum(row[2] for row in table.values())} frames into {ATLAS}")
 
     landmarks.sort()

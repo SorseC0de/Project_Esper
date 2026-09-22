@@ -49,6 +49,16 @@ public enum Animation: String, CaseIterable {
         }
     }
 
+    /// Whether the sheet draws the ball in hand. Only these are searched for it; on the
+    /// rest every white pixel is energy. The importer's `BALL_SHEETS` has to agree.
+    public var holdsBall: Bool {
+        switch self {
+        case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .wallLandBall, .shoot, .shootAir, .throwForward,
+             .catchGround, .catchAir, .skidBall, .taunt: true
+        default: false
+        }
+    }
+
     /// Pixels from the sprite's bottom edge up to the feet.
     public var feetFromBottom: Double {
         pixelSize == 64 ? 16 : 8

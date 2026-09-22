@@ -43,7 +43,8 @@ final class SpriteLibrary {
         let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)"
         if let texture = cache[key] { return texture }
         let look = look(for: player)
-        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look, detach: true)
+        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look,
+                              holdsBall: frame.animation.holdsBall, detach: true)
         let texture = result.texture
         texture.filteringMode = .nearest
         cache[key] = texture
@@ -142,9 +143,10 @@ final class SpriteLibrary {
 
     /// A copy of the frame in the look: every part swapped to its colour, the stroked parts
     /// lined where they lie over the body, the silhouette lined round the outside, and the
-    /// centre of each glowing part found. With `detach`, the head and the energy come back
-    /// as their own textures with no line, and the body is drawn and lined without them.
-    private func recolour(_ texture: SKTexture, look: Look, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, centres: [BodyPart: CGPoint]) {
+    /// centre of each glowing part found. The ball is looked for only where the sheet
+    /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
+    /// with no line, and the body is drawn and lined without them.
+    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, [:]) }
@@ -158,7 +160,7 @@ final class SpriteLibrary {
             let colour = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
             parts[pixel] = BodyPart.owning(colour)
         }
-        markEnergy(&parts, width: width, height: height)
+        markEnergy(&parts, holdsBall: holdsBall, width: width, height: height)
 
         var sums: [BodyPart: (x: CGFloat, y: CGFloat, n: Int)] = [:]
         for pixel in 0..<count {
@@ -243,10 +245,15 @@ final class SpriteLibrary {
         return (SKTexture(cgImage: recoloured), head, energy, centres)
     }
 
-    /// The sheets' white is the ball only where it's the biggest 8-connected blob of white
-    /// in the frame and big enough to be one; every other white pixel becomes energy: the
-    /// skid's puffs, a release's streaks.
-    private func markEnergy(_ parts: inout [BodyPart?], width: Int, height: Int) {
+    /// The sheets' white is the ball only on a sheet that holds it, and there only where
+    /// it's the biggest 8-connected blob of white in the frame and big enough to be one;
+    /// every other white pixel becomes energy: the skid's puffs, a release's streaks, the
+    /// slide's speed lines.
+    private func markEnergy(_ parts: inout [BodyPart?], holdsBall: Bool, width: Int, height: Int) {
+        guard holdsBall else {
+            for pixel in parts.indices where parts[pixel] == .ball { parts[pixel] = .energy }
+            return
+        }
         var label = [Int](repeating: 0, count: parts.count)
         var sizes = [0]
         for start in parts.indices where parts[start] == .ball && label[start] == 0 {

@@ -16,9 +16,11 @@ neutral to get a shot off; catch it and the roles reverse.
   `_Graphic Assets` (square frames stacked one under another; a strip overrides the GMS2
   sprite of the same name) into the atlas. Run after art changes. The ball's imageset
   lives at the catalog's root, outside the atlas, and the importer leaves it alone. The
-  sheets' white is the ball only where it's the biggest blob of white in the frame and at
-  least 12 pixels; every other white pixel is energy, the skid's puffs and a release's
-  streaks. The importer and the sprite library apply the same rule.
+  sheets' white is the ball only on a sheet that holds it (`Animation.holdsBall`, the
+  importer's `BALL_SHEETS`), and there only where it's the biggest blob of white in the
+  frame and at least 12 pixels; every other white pixel is energy, the skid's puffs, a
+  release's streaks, the slide's speed lines. The importer and the sprite library apply
+  the same rule.
 
 ## Units
 

@@ -315,7 +315,7 @@ public enum WebRules {
     public static let swingOvershoot = 1.0
     public static let swingMaxArcShare = 1.6
     public static let swingMaxAngle = 1.4
-    /// A swing can't start again for this long after one starts: the frames a full swing
+    /// A swing can't start again for this long after one ends: the frames a full swing
     /// takes, the least arc's frames times the max share plus the ease-in's frame and a
     /// half. It neither spends nor needs the double jump, so a swing let go early doesn't
     /// lock the next one out until landing.

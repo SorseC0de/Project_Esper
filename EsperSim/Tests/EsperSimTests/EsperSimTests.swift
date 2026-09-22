@@ -707,17 +707,31 @@ final class WebWaterTests: XCTestCase {
         var match = aloft()
         match.advance(inputs: [PlayerInput(jump: true), .idle])
         XCTAssertEqual(match.players[0].state, .webSwing)
-        XCTAssertEqual(match.players[0].swingCooldown, WebRules.swingCooldownFrames)
-        // Let go at once: the least arc, then the air, with the cooldown still running.
-        let out = run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].state != .webSwing }
+        // Let go at once: the least arc, then the air, and the cooldown starts as it ends.
+        run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].state != .webSwing }
         XCTAssertEqual(match.players[0].state, .air)
-        XCTAssertLessThan(out, WebRules.swingCooldownFrames)
+        XCTAssertEqual(match.players[0].swingCooldown, WebRules.swingCooldownFrames)
         match.advance(inputs: [PlayerInput(jump: true), .idle])
         XCTAssertEqual(match.players[0].state, .air, "no swing inside the cooldown")
+        run(&match, frames: 10, input: { _ in .idle })
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertEqual(match.players[0].state, .air, "still none, halfway through it")
         run(&match, frames: WebRules.swingCooldownFrames, input: { _ in .idle }) { $0.players[0].swingCooldown == 0 }
         XCTAssertFalse(match.players[0].grounded)
         match.advance(inputs: [PlayerInput(jump: true), .idle])
         XCTAssertEqual(match.players[0].state, .webSwing, "the cooldown over, it swings again without landing")
+    }
+
+    func testAFullSwingCannotChainStraightIntoAnother() {
+        var match = aloft()
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        run(&match, frames: 120, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state != .webSwing }
+        XCTAssertEqual(match.players[0].state, .air)
+        // A fresh press straight after the full swing.
+        match.advance(inputs: [.idle, .idle])
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertEqual(match.players[0].state, .air)
+        XCTAssertGreaterThan(match.players[0].swingCooldown, 0)
     }
 
     func testAFullSwingFitsInsideTheCooldown() {

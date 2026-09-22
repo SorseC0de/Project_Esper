@@ -25,8 +25,6 @@ final class GameScene: SKScene {
     /// in off vertical, and never past the cap, so it never lies flat.
     private static let strikeLeanShare = 0.5
     private static let strikeMaxLean = degrees(45)
-    /// The bolt's size over its sheet.
-    private static let strikeScale: CGFloat = 1.5
 
     private var match = Match()
     private var headVariant = HeadVariant.b
@@ -639,10 +637,9 @@ final class GameScene: SKScene {
 
     /// A score: lightning strikes the rim from the way the ball came in, leaning half as
     /// far as the ball did and never past the cap, one of the four bolts each time, at the
-    /// strike scale. The sheet's two full-frame flash frames are matched by a flash over the whole screen in the same
-    /// tone, and the half-frame flash after them by a band riding the bolt from that
-    /// half's bottom edge out past the screen, so the sprite's own edges never show
-    /// through them. The crown erupts off the rim with it.
+    /// sheet's own width and stretched tall enough to run past the top of the screen at
+    /// that lean, so the sheet's flash frames are pillars off the top. The crown erupts
+    /// off the rim with it.
     private func strike(hoop: Int, by scorer: Int) {
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let velocity = match.ball.velocity
@@ -651,38 +648,9 @@ final class GameScene: SKScene {
         let node = bolt.node(sprites, player: scorer, at: rim)
         node.zRotation = CGFloat(lean)
         node.zPosition = 45
-        let visible = CGRect(x: cameraNode.position.x - size.width * cameraNode.xScale / 2,
-                             y: cameraNode.position.y - size.height * cameraNode.yScale / 2,
-                             width: size.width * cameraNode.xScale, height: size.height * cameraNode.yScale)
-        node.setScale(GameScene.strikeScale)
+        let top = cameraNode.position.y + size.height * cameraNode.yScale / 2
+        node.yScale = (top - rim.y) / CGFloat(cos(lean)) * 1.1 / node.size.height
         glowers.addChild(node)
-
-        let tone = SKColor(rgb: sprites.look(for: scorer).energyTone(luminance: EnergyEffect.strikeLuminance))
-        let frame = 1 / bolt.fps
-        let flash = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
-        flash.color = tone
-        flash.colorBlendFactor = 1
-        flash.size = visible.size
-        flash.position = CGPoint(x: visible.midX, y: visible.midY)
-        flash.zPosition = 44
-        flash.isHidden = true
-        glowers.addChild(flash)
-        flash.run(.sequence([.wait(forDuration: Double(EnergyEffect.strikeFlashFrames.lowerBound) * frame), .unhide(),
-                             .wait(forDuration: Double(EnergyEffect.strikeFlashFrames.count) * frame), .removeFromParent()]))
-        // The band is the bolt's child, so it takes its scale and lean: its bottom edge sits
-        // where the sheet's solid half ends, in the sheet's own pixels, and it runs on far
-        // past the screen from there.
-        let band = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
-        band.color = tone
-        band.colorBlendFactor = 1
-        band.anchorPoint = CGPoint(x: 0.5, y: 0)
-        band.position = CGPoint(x: 0, y: CGFloat(EnergyEffect.strikeHalfFlashRows))
-        band.size = CGSize(width: 4096, height: 4096)
-        band.zPosition = -1
-        band.isHidden = true
-        node.addChild(band)
-        band.run(.sequence([.wait(forDuration: Double(EnergyEffect.strikeHalfFlashFrame) * frame), .unhide(),
-                            .wait(forDuration: frame), .hide()]))
 
         let crown = EnergyEffect.spark3.node(sprites, player: scorer, at: rim)
         crown.zPosition = 46

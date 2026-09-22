@@ -131,9 +131,10 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   happens; holding jump keeps swinging, up to 1.6 times the arc and never over the anchor.
   The exit keeps the arc's direction but is
   capped to air speed across and a full hop up, so the stick can turn it. The swing is on
-  a cooldown of a full swing's frames, 28, from the moment one starts, cleared on landing;
-  it neither spends nor needs the double jump, so a swing let go early doesn't lock the
-  next one out until landing. It works with the ball. The wall cling never slides. The throw button without the ball
+  a cooldown of a full swing's frames, 28, from the moment one ends, however it ends,
+  cleared on landing; it neither spends nor needs the double jump, so a swing let go early
+  doesn't lock the next one out until landing, and no swing chains straight into another.
+  It works with the ball. The wall cling never slides. The throw button without the ball
   is the web line, from the ground, the air or a wall: held, it aims along the stick with a
   faint line; let go, it fires, 120 units. It bends to a loose ball or the opponent within
   15° of the aim, and the first thing within 8 units of its tip wins. A miss shows for 8
@@ -179,20 +180,16 @@ white that isn't the ball. A `Look` maps parts to colours and the sprite library
 recolours each frame once as it's used. The blade and the energy are split out of every
 frame like the head and drawn on their own sprite over the body, among the glowers, so
 they bloom at the world threshold, toned by their own brightness through the look's
-ramp: black up to the team colour over the dark half, the colour up to six tenths of the
-way to white over the light half, so mid grey is the colour itself and white a pale tint
-of it. The grayscale effect sheets go through the same ramp in a player's colour. A ball
+ramp: black up to the team colour over the dark half, the colour up to a quarter of the
+way to white over the light half, so mid grey is the colour itself and white a light tint
+that still reads as it. The grayscale effect sheets go through the same ramp in a player's colour. A ball
 knocked loose or swatted throws one of two sparks, either each time, centred on the ball
 in the hitter's colour. A score brings lightning down on the rim in the scorer's colour,
 one of four bolts each time, favouring vertical: it leans half as far as the ball came
-in off vertical and never past 45°, so it never lies flat, at one and a half times its
-sheet; the sheet's two full-frame flash frames
-are matched by a flash over the whole screen in the same tone, and the half-frame flash
-after them by a band riding the bolt from that half's bottom edge out past the screen,
-so the sprite's edges never show through them, and the crown erupts off the rim with
-it. Sparks and bolts play at 24 a second. A held throw shows the
-charge, the swirl round the ball in hand at 30 a second and three quarters of its sheet's
-size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
+in off vertical and never past 45°, so it never lies flat, at the sheet's own width and
+stretched tall enough to run past the top of the screen at that lean, so the sheet's
+flash frames are pillars off the top, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. A held throw shows the
+charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
 and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on
 the ball and the fire off the head. The body a light orange or a light teal toward the team colour, the back limbs a greyed,

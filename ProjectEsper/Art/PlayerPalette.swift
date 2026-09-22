@@ -91,10 +91,10 @@ struct Look: Hashable {
 
     /// A grey level as a tone of the team colour, for everything that's energy: the
     /// blade, the puffs and streaks, the effect sheets. Black up to the colour over the
-    /// dark half, the colour up to six tenths of the way to white over the light half, so
-    /// mid grey is the colour itself and white a pale tint of it.
+    /// dark half, the colour up to a quarter of the way to white over the light half, so
+    /// mid grey is the colour itself and white a light tint that still reads as it.
     func energyTone(luminance: Double) -> RGB {
-        luminance <= 0.5 ? Look.scaled(glow, luminance * 2) : Look.lightened(glow, (luminance * 2 - 1) * 0.6)
+        luminance <= 0.5 ? Look.scaled(glow, luminance * 2) : Look.lightened(glow, (luminance * 2 - 1) * 0.25)
     }
 
     /// The colour moved this share of the way to white.

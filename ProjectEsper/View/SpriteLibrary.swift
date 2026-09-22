@@ -434,19 +434,11 @@ enum EnergyEffect: CaseIterable {
     /// The two sparks a hit ball throws, one or the other each time, and the four bolts.
     static let hitSparks: [EnergyEffect] = [.spark, .spark2]
     static let strikes: [EnergyEffect] = [.lightning1, .lightning2, .lightning3, .lightning4]
-    /// The bolts' one colour on the sheets, (241, 246, 240), as a grey level: what their
-    /// full-frame flash comes out as through the ramp.
-    static let strikeLuminance = 0.958
     /// The charge plays up to here, then loops from here while the throw is held; the
     /// frames after play out where the throw was let go. Drawn at this size over its sheet.
     static let chargeLoopEnd = 67
     static let chargeLoopStart = 35
-    static let chargeScale: CGFloat = 0.75
-    /// The bolt sheets' frames that are a full-frame flash, and the one after, whose top
-    /// 32 rows are solid across the sheet.
-    static let strikeFlashFrames = 5..<7
-    static let strikeHalfFlashFrame = 7
-    static let strikeHalfFlashRows = 32
+    static let chargeScale: CGFloat = 0.5
 
     var name: String {
         switch self {

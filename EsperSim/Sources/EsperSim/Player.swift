@@ -649,7 +649,7 @@ public struct Player: Equatable {
             let full = swept >= swingLeastArc * WebRules.swingMaxArcShare || abs(swingAngle) >= WebRules.swingMaxAngle
             if full || (swept >= swingLeastArc && !input.jump) {
                 // The exit keeps the arc's direction but not all its speed, so the stick can turn it.
-                webAnchor = nil
+                endSwing()
                 velocity.x = min(max(velocity.x, -spec.airSpeedMax), spec.airSpeedMax)
                 velocity.y = min(velocity.y, spec.fullHopVelocity)
                 enter(.air)
@@ -688,7 +688,7 @@ public struct Player: Equatable {
         if state == .webSwing, let anchor = webAnchor {
             let target = anchor + Vec2(x: sin(swingAngle), y: -cos(swingAngle)) * swingLength
             if position.distance(to: target) > 1 {
-                webAnchor = nil
+                endSwing()
                 enter(.air)
             }
         }
@@ -883,10 +883,9 @@ public struct Player: Equatable {
     }
 
     /// Web Water's swing: a web to a point ahead and above, the same wherever the body is,
-    /// air movement halted, and the next swing a full swing's frames away.
+    /// air movement halted.
     private mutating func startWebSwing(events: inout [MatchEvent]) {
         jumpBuffer = 0
-        swingCooldown = WebRules.swingCooldownFrames
         fastFalling = false
         let anchor = position + Vec2(x: WebRules.swingReach * facing.sign, y: WebRules.swingHeight)
         let offset = position - anchor
@@ -901,12 +900,19 @@ public struct Player: Equatable {
         enter(.webSwing)
     }
 
+    /// The web let go, however the swing ended, and the next swing a full swing's frames
+    /// away.
+    private mutating func endSwing() {
+        webAnchor = nil
+        swingCooldown = WebRules.swingCooldownFrames
+    }
+
     /// Reeled to `target`, by a wall of one's own or by the other's web.
     public mutating func startPull(to target: Vec2, byOther: Bool) {
         pullTarget = target
         velocity = .zero
         fastFalling = false
-        if state == .webSwing { webAnchor = nil }
+        if state == .webSwing { endSwing() }
         enter(byOther ? .webbed : .webPull)
     }
 

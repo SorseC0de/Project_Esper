@@ -95,21 +95,6 @@ class Screen: SKNode {
     func moved() {}
 }
 
-/// The title: the name and the two ways in, one of them not open yet.
-final class TitleScreen: Screen {
-    init(halfWidth: CGFloat, halfHeight: CGFloat, onBestOfSeven: @escaping () -> Void) {
-        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        veil()
-        let title = TitleText.node("PROJECT ESPER", size: 56)
-        title.position = CGPoint(x: 0, y: halfHeight * 0.35)
-        addChild(title)
-        addButton("BEST OF 7", at: CGPoint(x: 0, y: -halfHeight * 0.1), action: onBestOfSeven)
-        addButton("MULTIPLAYER", at: CGPoint(x: 0, y: -halfHeight * 0.4), enabled: false) {}
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-}
-
 /// Three bottles of Greateraid to choose from, large, their bottoms off the screen, each
 /// leaning a little, its name across it; what the raised one does is lettered in the
 /// middle of the screen. A tap on a bottle raises it, a tap on the raised one drinks it;
@@ -136,20 +121,20 @@ final class PickScreen: Screen {
         sub.position = CGPoint(x: 0, y: halfHeight - 72)
         addChild(sub)
 
-        let spacing = min(halfWidth * 0.62, 260)
+        let spacing = min(halfWidth * 0.55, 200)
         for (index, offer) in offers.enumerated() {
             let x = (CGFloat(index) - 1) * spacing
             let bottle = PickScreen.bottle(for: offer, colour: colour)
             // Leaning between 5 and 30 degrees, either way; the bottom clipped by the screen's edge.
             let lean = CGFloat(5 + Int.random(in: 0...25)) * .pi / 180 * (Bool.random() ? 1 : -1)
             bottle.zRotation = lean
-            bottle.position = CGPoint(x: x, y: -halfHeight - 30)
+            bottle.position = CGPoint(x: x, y: -halfHeight - 24)
             addChild(bottle)
-            let name = TitleText.node(offer.name.uppercased(), size: offer.name.count > 14 ? 13 : 16)
-            name.position = CGPoint(x: x, y: -halfHeight + 118)
+            let name = TitleText.node(offer.name.uppercased(), size: offer.name.count > 14 ? 11 : 13)
+            name.position = CGPoint(x: x, y: -halfHeight + 84)
             name.zPosition = 2
             addChild(name)
-            let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight * 1.2)
+            let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight)
             addChoice(bottle, hit: hit) { [weak self] in
                 guard let self else { return }
                 self.onDrink(offer)
@@ -179,17 +164,17 @@ final class PickScreen: Screen {
     /// A bottle: a rounded body, shoulders, a neck and a cap, in the drink's colour with a
     /// black line, tall enough that its bottom runs off the screen.
     static func bottle(for drink: Greateraid, colour: SKColor) -> SKNode {
-        let width: CGFloat = 96, height: CGFloat = 250
+        let width: CGFloat = 70, height: CGFloat = 180
         let path = CGMutablePath()
         let bodyTop = height * 0.6
         let neckWidth = width * 0.38
         path.move(to: CGPoint(x: -width / 2, y: 0))
         path.addLine(to: CGPoint(x: -width / 2, y: bodyTop))
-        path.addQuadCurve(to: CGPoint(x: -neckWidth / 2, y: bodyTop + 36), control: CGPoint(x: -width / 2, y: bodyTop + 30))
-        path.addLine(to: CGPoint(x: -neckWidth / 2, y: height - 16))
-        path.addLine(to: CGPoint(x: neckWidth / 2, y: height - 16))
-        path.addLine(to: CGPoint(x: neckWidth / 2, y: bodyTop + 36))
-        path.addQuadCurve(to: CGPoint(x: width / 2, y: bodyTop), control: CGPoint(x: width / 2, y: bodyTop + 30))
+        path.addQuadCurve(to: CGPoint(x: -neckWidth / 2, y: bodyTop + 26), control: CGPoint(x: -width / 2, y: bodyTop + 22))
+        path.addLine(to: CGPoint(x: -neckWidth / 2, y: height - 12))
+        path.addLine(to: CGPoint(x: neckWidth / 2, y: height - 12))
+        path.addLine(to: CGPoint(x: neckWidth / 2, y: bodyTop + 26))
+        path.addQuadCurve(to: CGPoint(x: width / 2, y: bodyTop), control: CGPoint(x: width / 2, y: bodyTop + 22))
         path.addLine(to: CGPoint(x: width / 2, y: 0))
         path.closeSubpath()
         let fill: SKColor
@@ -202,12 +187,12 @@ final class PickScreen: Screen {
         bottle.fillColor = fill
         bottle.strokeColor = .black
         bottle.lineWidth = 3
-        let cap = SKShapeNode(rect: CGRect(x: -neckWidth / 2 - 4, y: height - 18, width: neckWidth + 8, height: 18), cornerRadius: 3)
+        let cap = SKShapeNode(rect: CGRect(x: -neckWidth / 2 - 3, y: height - 14, width: neckWidth + 6, height: 14), cornerRadius: 3)
         cap.fillColor = colour
         cap.strokeColor = .black
         cap.lineWidth = 3
         bottle.addChild(cap)
-        let label = SKShapeNode(rect: CGRect(x: -width / 2 + 10, y: height * 0.18, width: width - 20, height: height * 0.3), cornerRadius: 6)
+        let label = SKShapeNode(rect: CGRect(x: -width / 2 + 8, y: height * 0.18, width: width - 16, height: height * 0.3), cornerRadius: 5)
         label.fillColor = SKColor(white: 1, alpha: 0.85)
         label.strokeColor = .black
         label.lineWidth = 2

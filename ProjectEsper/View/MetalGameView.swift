@@ -5,8 +5,12 @@ import SwiftUI
 /// The Metal layer: SpriteKit draws the scene into a texture through `SKRenderer`, and the
 /// glow pass composites it onto the screen. Effects that need their own pass go here.
 struct MetalGameView: UIViewRepresentable {
+    let flow: FlowState
+
     func makeUIView(context: Context) -> GameMetalView {
-        GameMetalView(scene: GameScene())
+        let scene = GameScene()
+        scene.flowState = flow
+        return GameMetalView(scene: scene)
     }
 
     func updateUIView(_ uiView: GameMetalView, context: Context) {}

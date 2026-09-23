@@ -13,10 +13,19 @@ struct ProjectEsperApp: App {
 }
 
 struct GameView: View {
+    @StateObject private var flow = FlowState()
+
     var body: some View {
-        MetalGameView()
-            .ignoresSafeArea()
-            .persistentSystemOverlays(.hidden)
-            .defersSystemGestures(on: .all)
+        ZStack {
+            MetalGameView(flow: flow)
+                .ignoresSafeArea()
+                .persistentSystemOverlays(.hidden)
+                .defersSystemGestures(on: .all)
+            if flow.showsTitle {
+                TitleOverlay(flow: flow)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.25), value: flow.showsTitle)
     }
 }

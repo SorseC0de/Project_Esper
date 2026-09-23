@@ -202,15 +202,19 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 
 ## The game loop
 
-A best of seven, first to four points, in `Series`. The title screen offers BEST OF 7
-and, greyed for now, MULTIPLAYER. A round starts with both bodies struck in at their
+A best of seven, first to four points, in `Series`. The title screen, drawn by the
+SwiftUI layer over the Metal view on a dark ultra-thin material with the court showing
+through, offers BEST OF 7 and, greyed for now, MULTIPLAYER; jump on the pad starts too.
+A round starts with both bodies struck in at their
 spawns by a bolt and the crown in their colours, then the three count in title lettering
 and BALL OUT!!! as it hits zero, when both can act. A point is a round: BUCKET!! goes up
 with the strike, and whoever was scored on drinks. The computer drinks at once, one of
 its three at random on the series' dice; the human gets the pick screen once the strike
 has played, and the round counts again after the drink. Five circles across the top,
 dark purple, fill in the round winner's colour as they go, with a sixth and seventh
-added if the series gets there. Four points brings the win screen: NEW MATCH, a fresh
+added if the series gets there, and under them each side's drinks with their levels, in
+its colour. What the computer drank goes up as a banner after BUCKET!!. Four points
+brings the win screen: NEW MATCH, a fresh
 best of seven with the drinks gone, or TITLE. RESET starts the round again with the
 drinks kept. A pick timer of twenty seconds for networked play is a number in `Series`,
 not enforced yet.

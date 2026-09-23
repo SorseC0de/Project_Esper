@@ -49,12 +49,17 @@ final class GameScene: SKScene {
     /// value, to catch it reaching zero.
     private var roundIntro = 0
     private var lastCount = 0
-    /// Title lettering over the court: the count, BALL OUT, BUCKET; and the round circles.
+    /// Title lettering over the court: the count, BALL OUT, BUCKET, what the computer
+    /// drank, one after another; the round circles; and each side's drinks under them.
     private let banner = SKSpriteNode()
     private var bannerFrames = 0
+    private var bannerQueue: [(text: String, size: CGFloat)] = []
     private static let bannerHold = 45
     private let circles = SKNode()
+    private var drinkLabels: [SKLabelNode] = []
     private var menuLast = PlayerInput.idle
+    /// The SwiftUI layer, which shows the title over the Metal view.
+    var flowState: FlowState?
     private var headVariant = HeadVariant.b
     private var powerVariant = PowerVariant.none
     private let sprites = SpriteLibrary()
@@ -368,7 +373,20 @@ final class GameScene: SKScene {
         hud.addChild(banner)
         circles.zPosition = 5
         hud.addChild(circles)
-        drawCircles()
+        for index in 0..<2 {
+            let label = SKLabelNode()
+            label.fontName = "Menlo-Bold"
+            label.fontSize = 8
+            label.fontColor = SKColor(rgb: sprites.look(for: index).glow)
+            label.horizontalAlignmentMode = index == 0 ? .right : .left
+            label.verticalAlignmentMode = .top
+            label.numberOfLines = 0
+            label.zPosition = 5
+            hud.addChild(label)
+            drinkLabels.append(label)
+        }
+        drawSeries()
+        flowState?.startSeries = { [weak self] in self?.startSeries() }
 
         debugLabel.fontName = "Menlo"
         debugLabel.fontSize = 8
@@ -552,6 +570,9 @@ final class GameScene: SKScene {
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 8)
         circles.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 16)
+        for (index, label) in drinkLabels.enumerated() {
+            label.position = CGPoint(x: index == 0 ? -12 : 12, y: circles.position.y - 12)
+        }
         presentScreen()
         debugLabel.position = CGPoint(x: -halfWidth + safeInsets.left + TouchControls.padding, y: controls.pickerBottom - 6)
         fpsLabel.position = CGPoint(x: -halfWidth + safeInsets.left + TouchControls.padding, y: -halfHeight + safeInsets.bottom + TouchControls.padding)
@@ -590,12 +611,15 @@ final class GameScene: SKScene {
         hub.touch = flow == .playing ? controls?.sample() ?? .idle : .idle
         var inputs = hub.frames(players: match.players.count)
         if flow != .playing {
-            // A screen is up: the stick moves its cursor and jump picks; the sim waits.
+            // A screen is up: the stick moves its cursor and jump picks; the sim waits. On
+            // the title, which the SwiftUI layer draws, jump starts the series.
             let pad = inputs.first ?? .idle
             if let screen {
                 if pad.stick.x >= 0.5, menuLast.stick.x < 0.5 { screen.move(1) }
                 if pad.stick.x <= -0.5, menuLast.stick.x > -0.5 { screen.move(-1) }
                 if pad.jump, !menuLast.jump { screen.fire() }
+            } else if flow == .title, pad.jump, !menuLast.jump {
+                startSeries()
             }
             menuLast = pad
             accumulator = 0
@@ -665,7 +689,7 @@ final class GameScene: SKScene {
         ballHold = 0
         ballShift = 0
         lastCount = match.countdown
-        drawCircles()
+        drawSeries()
         bringPlayersIn()
     }
 
@@ -701,15 +725,18 @@ final class GameScene: SKScene {
     private func pointScored(by scorer: Int) {
         guard flow == .playing else { return }
         series.record(pointFor: scorer)
-        drawCircles()
+        drawSeries()
         if series.winner != nil {
             pendingFlow = .won
             flowDelay = 60
         } else if scorer == 0 {
             let offers = series.offers(for: 1)
-            series.drink(offers[series.dice.roll(offers.count)], by: 1)
+            let drink = offers[series.dice.roll(offers.count)]
+            series.drink(drink, by: 1)
             applyDrinks()
+            drawSeries()
             bringPlayersIn()
+            bannerQueue.append(("TEAL DRINKS \(drink.name.uppercased())", 26))
         } else {
             pendingFlow = .picking
             flowDelay = 45
@@ -719,6 +746,7 @@ final class GameScene: SKScene {
     private func enter(_ next: Flow) {
         flow = next
         if next == .picking { pickOffers = series.offers(for: 0) }
+        flowState?.showsTitle = next == .title
         presentScreen()
     }
 
@@ -729,13 +757,15 @@ final class GameScene: SKScene {
         let halfWidth = size.width / 2, halfHeight = size.height / 2
         switch flow {
         case .title:
-            screen = TitleScreen(halfWidth: halfWidth, halfHeight: halfHeight) { [weak self] in self?.startSeries() }
+            // The SwiftUI layer draws the title.
+            break
         case .picking:
             screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: pickOffers, drinks: series.drinks[0],
                                 colour: SKColor(rgb: sprites.look(for: 0).glow)) { [weak self] drink in
                 guard let self else { return }
                 self.series.drink(drink, by: 0)
                 self.applyDrinks()
+                self.drawSeries()
                 self.match.countdown = self.match.countdownLength
                 self.lastCount = self.match.countdown
                 self.bringPlayersIn()
@@ -754,8 +784,20 @@ final class GameScene: SKScene {
     }
 
     /// The rounds across the top: five circles in dark purple, filled in the round
-    /// winner's colour as they go, a sixth and seventh added if the series gets there.
-    private func drawCircles() {
+    /// winner's colour as they go, a sixth and seventh added if the series gets there;
+    /// and under them each side's drinks, with their levels.
+    private func drawSeries() {
+        for (index, label) in drinkLabels.enumerated() where index < series.drinks.count {
+            let drinks = series.drinks[index]
+            var lines: [String] = []
+            for booster in Greateraid.boosters where drinks.level(of: booster) > 0 {
+                lines.append(drinks.level(of: booster) > 1 ? "\(booster.name) ×2" : booster.name)
+            }
+            if let biomorph = drinks.biomorph {
+                lines.append(drinks.biomorphLevel > 1 ? "\(biomorph.name) L2" : biomorph.name)
+            }
+            label.text = lines.joined(separator: "\n")
+        }
         circles.removeAllChildren()
         let count = series.circles
         let spacing: CGFloat = 18
@@ -773,6 +815,25 @@ final class GameScene: SKScene {
         TitleText.set(banner, to: text, size: size)
         banner.isHidden = false
         bannerFrames = GameScene.bannerHold
+    }
+
+    /// The next queued banner, once the one up has had its frames.
+    private func tickBanner() {
+        guard bannerFrames > 0 else {
+            if !bannerQueue.isEmpty, banner.isHidden {
+                let next = bannerQueue.removeFirst()
+                showBanner(next.text, size: next.size)
+            }
+            return
+        }
+        bannerFrames -= 1
+        if bannerFrames == 0 {
+            banner.isHidden = true
+            if !bannerQueue.isEmpty {
+                let next = bannerQueue.removeFirst()
+                showBanner(next.text, size: next.size)
+            }
+        }
     }
 
     /// The picker's power onto both players, live.
@@ -1192,9 +1253,8 @@ final class GameScene: SKScene {
             bannerFrames = 0
         } else if lastCount > 0 {
             showBanner("BALL OUT!!!", size: 48)
-        } else if bannerFrames > 0 {
-            bannerFrames -= 1
-            if bannerFrames == 0 { banner.isHidden = true }
+        } else {
+            tickBanner()
         }
         lastCount = match.countdown
         if roundIntro > 0 {

@@ -13,10 +13,20 @@ enum TitleText {
     private static let drop: CGFloat = 0.12
     private static let steps = 16
     nonisolated(unsafe) private static var cache: [String: SKTexture] = [:]
+    nonisolated(unsafe) private static var images: [String: UIImage] = [:]
 
     static func texture(_ text: String, size: CGFloat) -> SKTexture {
         let key = "\(size)|\(text)"
         if let texture = cache[key] { return texture }
+        let texture = SKTexture(image: image(text, size: size))
+        cache[key] = texture
+        return texture
+    }
+
+    /// The lettering as an image, for the SwiftUI layer.
+    static func image(_ text: String, size: CGFloat) -> UIImage {
+        let key = "\(size)|\(text)"
+        if let image = images[key] { return image }
         let font = UIFont(name: face, size: size) ?? UIFont.boldSystemFont(ofSize: size)
         let measured = (text as NSString).size(withAttributes: [.font: font])
         let ring = size * stroke
@@ -49,9 +59,8 @@ enum TitleText {
             draw(lightBlue, offset: .zero)
             cg.restoreGState()
         }
-        let texture = SKTexture(image: image)
-        cache[key] = texture
-        return texture
+        images[key] = image
+        return image
     }
 
     /// A sprite of the lettering, sized in points.

@@ -30,6 +30,9 @@ final class GameCenter: NSObject, ObservableObject {
 
     @Published private(set) var state = State.signedOut
     private(set) var match: GKMatch?
+    /// Looks in on a match still connecting, since the connection callback doesn't
+    /// always come: the count of players still to arrive is read every half second.
+    private var connectTimer: Timer?
     /// Bytes from the other phone, on the main thread.
     var onData: ((Data) -> Void)?
     /// The match is on: both phones connected.
@@ -105,6 +108,8 @@ final class GameCenter: NSObject, ObservableObject {
 
     /// Off the match, and back to ready.
     func leave() {
+        connectTimer?.invalidate()
+        connectTimer = nil
         match?.delegate = nil
         match?.disconnect()
         match = nil
@@ -127,8 +132,27 @@ final class GameCenter: NSObject, ObservableObject {
     private func take(_ found: GKMatch) {
         match = found
         found.delegate = self
-        state = found.expectedPlayerCount == 0 ? .connected : .connecting
-        if state == .connected { onConnected?() }
+        state = .connecting
+        connectTimer?.invalidate()
+        connectTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async { self?.settleIfEveryoneIsHere() }
+        }
+        settleIfEveryoneIsHere()
+    }
+
+    /// Connected once nobody is still expected, or once the other side's bytes arrive,
+    /// whichever GameKit shows first; either way only once.
+    private func settleIfEveryoneIsHere(dataArrived: Bool = false) {
+        guard let match, state == .connecting else { return }
+        guard match.expectedPlayerCount == 0 || (dataArrived && !match.players.isEmpty) else {
+            // A knock, so the other side settles on our bytes if its count never reaches nought.
+            try? match.sendData(toAllPlayers: Data([0]), with: .unreliable)
+            return
+        }
+        connectTimer?.invalidate()
+        connectTimer = nil
+        state = .connected
+        onConnected?()
     }
 }
 
@@ -159,6 +183,7 @@ extension GameCenter: GKMatchDelegate {
     nonisolated func match(_ match: GKMatch, didReceive data: Data, fromRemotePlayer player: GKPlayer) {
         DispatchQueue.main.async {
             guard match === self.match else { return }
+            self.settleIfEveryoneIsHere(dataArrived: true)
             self.onData?(data)
         }
     }
@@ -168,10 +193,7 @@ extension GameCenter: GKMatchDelegate {
             guard match === self.match else { return }
             switch state {
             case .connected:
-                if match.expectedPlayerCount == 0, self.state != .connected {
-                    self.state = .connected
-                    self.onConnected?()
-                }
+                self.settleIfEveryoneIsHere()
             case .disconnected:
                 self.onDisconnect?("DISCONNECTED")
             default:

@@ -148,7 +148,8 @@ public struct Player: Equatable {
     /// The slide's leg and the slash's blade each hit once.
     public var slideHit = false
     public var slashHit = false
-    /// Frames left in which no button does anything, after the blade hit; the stick still works.
+    /// Frames left in which no button does anything and nothing is caught, after the ball
+    /// was knocked or taken out of the hands; the stick still works.
     public var hitStun = 0
     public var snatchCooldown = 0
     /// The corner being hung from, and frames after walking off an edge before a corner
@@ -214,10 +215,10 @@ public struct Player: Equatable {
     // MARK: Step
 
     /// `opponentX` is where the other body stands; a walk with the ball faces it.
-    /// `ballHolder` is who has the ball in hand: on defence, with the other holding it,
-    /// shoot is the Esper Slash.
+    /// `ballHolder` is who has the ball in hand, and `ballOwner` whose the loose ball still
+    /// is, for Flash Fizz's warp to it.
     public mutating func step(input given: PlayerInput, stage: Stage, opponentX: Double? = nil,
-                              ballHolder: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
+                              ballHolder: Int? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         var input = given
         stateTimer += 1
         if catchCooldown > 0 { catchCooldown -= 1 }
@@ -264,7 +265,7 @@ public struct Player: Equatable {
             action = webLineIfAsked(input, throwPressed: throwPressed)
         }
         if action == nil, free || ((state == .shooting || state == .throwing) && !hasBall) {
-            action = flashIfAsked(input, shootPressed: shootPressed, stage: stage)
+            action = flashIfAsked(input, shootPressed: shootPressed, ballOwner: ballOwner, stage: stage)
         }
         // A warp or a flash on a shoot press takes the button; nothing else reads it this frame.
         if action == .warpToBall {
@@ -908,9 +909,10 @@ public struct Player: Equatable {
 
     /// Flash Fizz on a shoot button. With the ball, only when it's dribbling over a drop of
     /// more than a tile, which counts as not having it: the warp down to it. Without the
-    /// ball, the flash: a short way along the stick, or in place, and the tear it leaves
-    /// pulls a loose ball in.
-    private mutating func flashIfAsked(_ input: PlayerInput, shootPressed: Bool, stage: Stage) -> PlayerAction? {
+    /// ball and the loose ball still yours, the warp to it, arriving holding it. Otherwise
+    /// the flash: a short way along the stick, or in place, and the tear it leaves pulls a
+    /// loose ball in.
+    private mutating func flashIfAsked(_ input: PlayerInput, shootPressed: Bool, ballOwner: Int?, stage: Stage) -> PlayerAction? {
         guard power == .flashFizz, shootPressed, warpCooldown == 0 else { return nil }
         if hasBall {
             guard let overhang = overhangBall(in: stage) else { return nil }
@@ -919,6 +921,10 @@ public struct Player: Equatable {
             return .warpToBall
         }
         warpCooldown = FizzRules.cooldownFrames
+        if ballOwner == index {
+            pendingWarp = nil
+            return .warpToBall
+        }
         return .flash(direction: input.stick.length > 0.3 ? input.stick.normalized : .zero)
     }
 
@@ -1182,7 +1188,7 @@ public struct Player: Equatable {
     /// off, and so does one over the speed threshold, and a shot in flight goes through:
     /// those take the snatch.
     public func canCatch(ballAt ballPosition: Vec2, speed: Double = 0, shotInFlight: Bool = false) -> Bool {
-        guard !hasBall, catchCooldown == 0, state.canCatch else { return false }
+        guard !hasBall, catchCooldown == 0, hitStun == 0, state.canCatch else { return false }
         guard speed <= BallRules.catchSpeedThreshold, !shotInFlight else { return false }
         if ballPosition.distance(to: handCatchPoint) <= BallRules.handCatchRadius { return true }
         let offset = ballPosition - chest

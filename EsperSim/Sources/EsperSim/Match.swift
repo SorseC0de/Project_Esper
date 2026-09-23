@@ -57,7 +57,8 @@ public struct Match: Equatable {
             let input = index < inputs.count ? inputs[index] : .idle
             let opponentX = players.indices.first { $0 != index }.map { players[$0].position.x }
             guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX,
-                                                   ballHolder: ball.holder, events: &events) else { continue }
+                                                   ballHolder: ball.holder, ballOwner: ball.isLive ? ball.owner : nil,
+                                                   events: &events) else { continue }
             perform(action, by: index)
         }
         for index in players.indices {
@@ -72,9 +73,10 @@ public struct Match: Equatable {
         reelBall()
 
         if ball.isLive, ball.tether == nil {
-            // A shot in flight goes through bodies; only a snatch's reach takes it.
-            // A dunker hanging under the rim doesn't get in the way of the ball dropping through.
-            let bodies = ball.shotInFlight ? [] : players.filter { $0.catchCooldown == 0 && $0.state != .dunking }.map(\.body)
+            // A shot in flight goes through bodies; only a snatch's reach takes it. A dunker
+            // hanging under the rim, and a body stunned with the ball just knocked out of
+            // its hands, don't get in the ball's way either.
+            let bodies = ball.shotInFlight ? [] : players.filter { $0.catchCooldown == 0 && $0.state != .dunking && $0.hitStun == 0 }.map(\.body)
             if let hoop = ball.step(stage: stage, bodies: bodies, events: &events) {
                 let owner = stage.hoops[hoop].owner
                 scores[owner] += 1
@@ -211,7 +213,6 @@ public struct Match: Equatable {
             if let other, players[other].hasBall, players[other].body.overlaps(blade) {
                 players[index].slashHit = true
                 pop(from: other, by: index)
-                players[other].hitStun = SlashRules.stunFrames
             } else if ball.isLive, ball.box.overlaps(blade) {
                 // Down and away at about the spike angle, jittered a little by the frame.
                 players[index].slashHit = true
@@ -227,16 +228,21 @@ public struct Match: Equatable {
             let facingIt = (at.x - player.position.x) * player.facing.sign >= -1
             let inReach = Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2).overlaps(reach)
             if facingIt, inReach, held != nil || ball.isLive {
-                if let held { players[held].loseBall() }
+                if let held {
+                    players[held].loseBall()
+                    players[held].hitStun = BallRules.hitStunFrames
+                }
                 hand(ballTo: index)
             }
         }
     }
 
-    /// The ball knocked out of `victim`'s hands: it pops straight up, nobody's.
+    /// The ball knocked out of `victim`'s hands: it pops straight up, nobody's, and the
+    /// victim is stunned, so the popper has first go at it.
     private mutating func pop(from victim: Int, by popper: Int) {
         let from = players[victim].chest + Vec2(x: 0, y: 3)
         players[victim].loseBall()
+        players[victim].hitStun = BallRules.hitStunFrames
         ball.pop(from: from)
         events.append(.popped(player: victim, by: popper))
     }

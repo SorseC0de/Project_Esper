@@ -130,8 +130,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   neither caught nor deflected, unless that body is reaching with a snatch; after its
   first bounce it's a loose ball again. The snatch is the catch: there is no catch
   stance.
-- Hit by the blade, a body can't press anything for 15 frames, though the stick still
-  moves it, and its sprite flickers white.
+- Knocked loose by the blade or the slide's leg, or robbed by a snatch, a body can't
+  press anything or catch anything for 45 frames, longer than the pop's round trip,
+  though the stick still moves it, its body doesn't deflect the ball, and its sprite
+  flickers white: the taker has first go at the ball.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
   would carry it through the rim, a share a frame, never snapped. Only a shot's or a
   floater's ball, and only until its first bounce off anything; a throw's never. Down
@@ -177,7 +179,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   Let go or run out and it falls. The body leans up to thirty degrees into its motion,
   forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and flight
   cancels into a shot or a throw with the ball and a slash or a snatch without. Numbers in `SodaRules`.
-- Flash Fizz (D). Without the ball, in neutral or on defence, a shoot button is the
+- Flash Fizz (D). Without the ball, a shoot button warps the body to the ball while the
+  ball is still its colour, the 60 frames after it let it go, and it arrives holding it:
+  throw, warp, catch. Otherwise the shoot button is the
   flash: 30 units along the stick, or in place with the stick centred, in addition to the
   double jump, arriving nudged clear of anything solid. The flashes are tears in space,
   and the exit tear lingers 12 frames and pulls any loose ball within 12 units into the

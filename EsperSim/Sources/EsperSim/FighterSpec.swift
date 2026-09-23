@@ -304,6 +304,11 @@ public enum BallRules {
     public static let catchSpeedThreshold = 5.0
     /// Frames after bouncing off a body in which the rings don't take the ball.
     public static let offBodyFrames = 10
+    /// Knocked loose by a blade or a leg, or robbed by a snatch, the body can't press
+    /// anything or catch anything for this long, though the stick still moves it: the
+    /// taker's advantage for the ball. Longer than the pop's round trip, which is 32
+    /// frames up and back to chest height, so the ball comes down while they're still out.
+    public static let hitStunFrames = 45
     public static let chestHeight = 9.0
     /// A ball knocked out of a holder's hands pops straight up: the floater's drift for
     /// this many frames, then a normal fall, nobody's.
@@ -362,10 +367,11 @@ public enum SodaRules {
     public static let flightFrames = 120
 }
 
-/// Flash Fizz's numbers. Without the ball, shoot is the flash: this far along the stick,
-/// or in place, this often. The tear it leaves at the exit lasts this long and pulls a
-/// loose ball within this reach into the hands. With the ball, shoot is the warp down to
-/// an overhung dribble.
+/// Flash Fizz's numbers. Without the ball, shoot is the warp to the ball while it's still
+/// yours, the owned frames after you let it go, arriving holding it; otherwise the
+/// flash: this far along the stick, or in place, this often. The tear the flash leaves
+/// at the exit lasts this long and pulls a loose ball within this reach into the hands.
+/// With the ball, shoot is the warp down to an overhung dribble.
 public enum FizzRules {
     public static let cooldownFrames = 60
     public static let flashDistance = 30.0
@@ -420,8 +426,6 @@ public enum SlashRules {
     public static let spikeAngle = degrees(-45)
     public static let spikeJitter = degrees(10)
     public static let swatSpeed = 6.0
-    /// Frames the body hit by the blade can't press anything, though it can still move.
-    public static let stunFrames = 15
 }
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many

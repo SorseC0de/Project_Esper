@@ -1081,6 +1081,22 @@ final class SodaAndFizzTests: XCTestCase {
         XCTAssertEqual(match.players[0].flightLeft, SodaRules.flightFrames)
     }
 
+    func testWarpToYourOwnBallAndCatchIt() {
+        var match = with(.flashFizz)
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
+        }
+        run(&match, frames: BallRules.throwReleaseFrames + 8, input: { _ in .idle })
+        XCTAssertEqual(match.ball.owner, 0)
+        let ballWas = match.ball.position
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), shoot: true), .idle])
+        XCTAssertTrue(match.events.contains { if case .warped(player: 0, _, _) = $0 { return true } else { return false } })
+        XCTAssertEqual(match.ball.holder, 0)
+        XCTAssertEqual(match.players[0].position.x, ballWas.x, accuracy: 0.001)
+    }
+
     func testAFlashAlongTheStickTearsANearbyBallIntoTheHands() {
         var match = with(.flashFizz)
         match.players[1].position.x = 300
@@ -1693,13 +1709,42 @@ final class OpponentTests: XCTestCase {
         match.players[1].position.x = 142
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
-        XCTAssertEqual(match.players[1].hitStun, SlashRules.stunFrames)
+        XCTAssertEqual(match.players[1].hitStun, BallRules.hitStunFrames)
         // A jump press does nothing while stunned, and the stick still moves it.
         match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: 1, y: 0), jump: true)])
         XCTAssertNotEqual(match.players[1].state, .jumpSquat)
         XCTAssertNotEqual(match.players[1].state, .idle)
-        run(&match, frames: SlashRules.stunFrames, input: { _ in .idle })
+        run(&match, frames: BallRules.hitStunFrames, input: { _ in .idle })
         XCTAssertEqual(match.players[1].hitStun, 0)
+    }
+
+    func testTheBallKnockedLooseGoesToTheSlasherNotBackToTheStunnedHolder() {
+        var match = Match()
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position.x = 142
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
+        // It pops up and comes down through the holder's own rings, and they can't take it.
+        var holderTookIt = false
+        let taken = run(&match, frames: 60, input: { _ in .idle }) { match in
+            if match.ball.holder == 1 { holderTookIt = true }
+            return match.ball.holder != nil
+        }
+        XCTAssertFalse(holderTookIt)
+        XCTAssertLessThan(taken, 60)
+        XCTAssertEqual(match.ball.holder, 0)
+    }
+
+    func testASnatchedBodyIsStunnedToo() {
+        var match = Match()
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position.x = 140
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        run(&match, frames: SnatchRules.activeFrames.upperBound, input: { _ in .idle }) { $0.ball.holder == 0 }
+        XCTAssertEqual(match.ball.holder, 0)
+        XCTAssertEqual(match.players[1].hitStun, BallRules.hitStunFrames)
     }
 
     func testItLeavesItsOwnShotAloneUntilItLandsOrScores() {

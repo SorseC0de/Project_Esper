@@ -15,7 +15,8 @@ neutral to get a shot off; catch it and the roles reverse.
   `Glow.metal` composites it with the glow. The HUD is a second scene, `HudScene`, shown
   by a transparent SpriteKit view (`HudView`) laid over the Metal view, so nothing in it
   glows; it takes the touches and hands them to the game scene. `InputHub` merges touch
-  and controllers. `TouchControls` is the on-screen pad.
+  and controllers. `TouchControls` is the on-screen pad. `Net/GameCenter` is Game
+  Center: signing in, the matchmaker, and the bytes between the two phones.
 - `Tools/import_sprites.py` — copies the GMS2 frames and slices the strips in
   `_Graphic Assets` (square frames stacked one under another; a strip overrides the GMS2
   sprite of the same name) into the atlas. Run after art changes. The ball's imageset
@@ -378,7 +379,48 @@ ultra-thin material as the title, a SwiftUI layer between the two views (`FlowSt
 The corner counter shows the frame rate and the worst frame gap of the last second,
 which is what a hitch shows up as.
 
+## Multiplayer
+
+Two phones over Game Center, the match run in lockstep with rollback. The sim is the
+same `Match` on both; only inputs cross. `RollbackSession` in the sim package runs it:
+each frame runs as soon as the local input is known, the other side's predicted as held
+where it hasn't arrived, and when it arrives different the sim rolls back to that frame
+(`Match` is a value, so a snapshot is a copy) and runs forward again. The local input
+is held `NetRules.inputDelay` frames (2) before it's simulated, so the other side's
+usually has time to arrive; the sim runs at most `predictionWindow` frames (8) past
+the last remote input it holds, then waits; and the side ahead of the other by more
+than the other is of it holds back half the gap, checked every 10 frames, the frame
+counts and each side's lead going in every packet. A frame's local input is fixed the
+first time the frame is reached, since it may already have gone over the wire; a tick
+that can't run drops its sample. Every packet carries every input the other side hasn't
+acknowledged, and the newest eight regardless, so a lost packet costs nothing: they go
+unreliably at 60 a second, five bytes an input (the stick and the aim in 127 steps a
+side, the buttons in one byte), which both sides simulate quantized. Hello, picks, the
+rematch and bye go reliably. Each packet also carries a checksum of the sender's state
+before its last confirmed frame; a disagreement lights DESYNC in the corner readout,
+which also shows the lead and the rollback counts. Offline runs through the same session
+with the other side's input handed in each tick, so there is one path and every frame
+confirms at once.
+
+Events come back in two kinds: those of frames run for the first time, or run again
+with something new, are the effects, shown at once and never taken back; a point comes
+only from a frame both sides' inputs have confirmed, so BUCKET, the strike and the round
+never happen on a prediction. After a confirmed point both phones stop the sim on the
+same frame, 60 past it, and change screens together: the scored-on side picks, the
+other watches WAIT with the same clock, and the pick crosses as an index into the offers
+both rolled off the shared dice. The pick is applied once every frame before the stop is
+confirmed, as a change outside the inputs (`RollbackSession.mutate`), then both resume.
+Twenty seconds to pick, or the raised bottle drinks itself. The seed is the two phones'
+randoms together, exchanged in hello; the side whose Game Center player ID sorts first
+plays the left. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
+or a bye puts the title up with why under MULTIPLAYER. No computer, no reset, no
+tuning pickers online; HITBOX stays. Two phones on different iOS versions could in
+principle round trig differently; the checksum would say.
+
+Game Center needs the app's App ID to carry the Game Center capability
+(`ProjectEsper.entitlements`, automatic signing adds it) and, for the matchmaker to
+answer, the app record in App Store Connect with Game Center turned on.
+
 ## Queued
 
-- Rollback netcode over GameKit, then an AI for solo play.
 - Power-ups, including throw-button overrides.

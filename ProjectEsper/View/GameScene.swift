@@ -29,10 +29,33 @@ final class GameScene: SKScene {
     /// The count before play, at the start and after every point.
     private static let countdownFrames = 180
 
-    private var match = Match(countdown: GameScene.countdownFrames)
-    /// The computer on the other side, when the AI switch is on.
+    /// The match runs inside a rollback session offline as well as online, so there is
+    /// one path: offline the other side's input is handed in each tick and every frame
+    /// confirms at once; online the other phone's inputs arrive by frame and the sim
+    /// rolls back when a prediction was wrong.
+    private var session = RollbackSession(match: Match(countdown: GameScene.countdownFrames), localIndex: 0)
+    private var match: Match { session.match }
+    /// The computer on the other side, when the AI switch is on; never online.
     private var opponent = Opponent(index: 1)
     private var aiOn = true
+
+    /// A networked series: this phone's side, the two randoms that seed the series, the
+    /// pick waiting to be applied, and the rematch randoms after a win.
+    private struct Online {
+        var localIndex: Int
+        var random: UInt32
+        var theirRandom: UInt32?
+        var started = false
+        var helloAgainIn = 0
+        var pendingPick: (round: Int, choice: Int)?
+        var rematchRandom: UInt32?
+        var theirRematch: UInt32?
+    }
+    private var online: Online?
+    private var localIndex: Int { online?.localIndex ?? 0 }
+    /// Who drinks this round, and the frames left to choose online.
+    private var picker = 1
+    private var pickFramesLeft = 0
 
     /// The game loop round the sim: the title, a best of seven, a drink between rounds
     /// for whoever was scored on, and the win.
@@ -42,9 +65,11 @@ final class GameScene: SKScene {
     private var screen: Screen?
     /// The bottles on offer while picking, kept so a re-laid-out screen shows the same.
     private var pickOffers: [Greateraid] = []
-    /// A flow change held back for the strike to play.
+    /// A flow change held back for the strike to play, until the sim reaches this frame;
+    /// online both phones stop the sim on that frame and change together.
     private var pendingFlow: Flow?
-    private var flowDelay = 0
+    private var pendingFlowFrame = 0
+    private static let flowDelayFrames = 60
     /// Frames the bodies stay hidden while the bolts bring them in, and the count's last
     /// value, to catch it reaching zero.
     private var roundIntro = 0
@@ -394,6 +419,9 @@ final class GameScene: SKScene {
         }
         drawSeries()
         flowState?.startSeries = { [weak self] in self?.startSeries() }
+        flowState?.net.onConnected = { [weak self] in self?.startOnline() }
+        flowState?.net.onData = { [weak self] data in self?.handle(data) }
+        flowState?.net.onDisconnect = { [weak self] why in self?.endOnline(why) }
 
         debugLabel.fontName = "Menlo"
         debugLabel.fontSize = 8
@@ -580,6 +608,7 @@ final class GameScene: SKScene {
                 ySlider.set(Float(DunkArt.offsets[DunkTuning.frame].y))
             }
         }
+        controls.setOnline(online != nil)
         hud.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 8)
@@ -612,16 +641,14 @@ final class GameScene: SKScene {
         accumulator += min(currentTime - last, 0.1)
         guard accumulator >= GameScene.stepSeconds else { return }
 
-        if flowDelay > 0 {
-            flowDelay -= 1
-            if flowDelay == 0, let next = pendingFlow {
-                pendingFlow = nil
-                enter(next)
-            }
+        if let next = pendingFlow, match.frame >= pendingFlowFrame {
+            pendingFlow = nil
+            enter(next)
         }
         if roundIntro > 0 { roundIntro -= 1 }
         hub.touch = flow == .playing ? controls?.sample() ?? .idle : .idle
-        var inputs = hub.frames(players: match.players.count)
+        let inputs = hub.frames(players: match.players.count)
+        tickOnline()
         if flow != .playing {
             // A screen is up: the stick moves its cursor and jump picks; the sim waits. On
             // the title, which the SwiftUI layer draws, jump starts the series.
@@ -630,23 +657,37 @@ final class GameScene: SKScene {
                 if pad.stick.x >= 0.5, menuLast.stick.x < 0.5 { screen.move(1) }
                 if pad.stick.x <= -0.5, menuLast.stick.x > -0.5 { screen.move(-1) }
                 if pad.jump, !menuLast.jump { screen.fire() }
-            } else if flow == .title, pad.jump, !menuLast.jump {
+            } else if flow == .title, pad.jump, !menuLast.jump, online == nil {
                 startSeries()
             }
             menuLast = pad
             accumulator = 0
+            // Online the session ticks in place while a screen is up, so the last inputs
+            // cross and the other side's arrive.
+            if online?.started == true {
+                _ = session.tick(local: .idle)
+                send(.inputs(session.outgoing()), reliable: false)
+            }
             tickBallColour()
             tickCourtColour()
             render()
             return
         }
-        if hub.consumeReset() { reset() }
+        if online == nil, hub.consumeReset() { reset() }
         if hub.consumeCycle() { controls?.cycleTopPicker() }
         var steps = 0
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
-            if aiOn, inputs.count > 1 { inputs[1] = opponent.decide(match) }
-            match.advance(inputs: inputs)
-            show(match.events)
+            let tick: SessionTick
+            if online != nil {
+                tick = session.tick(local: inputs[0])
+                send(.inputs(session.outgoing()), reliable: false)
+            } else {
+                var remote = inputs.count > 1 ? inputs[1] : .idle
+                if aiOn { remote = opponent.decide(match) }
+                tick = session.tick(local: inputs[0], remote: remote)
+            }
+            show(tick.shown)
+            confirm(tick.confirmed)
             tickBallColour()
             tickCourtColour()
             accumulator -= GameScene.stepSeconds
@@ -662,32 +703,41 @@ final class GameScene: SKScene {
     /// sliders' offset, facing the backboard, the ball out of the way.
     private func holdDunkPose() {
         let hoop = match.stage.hoops.first { $0.owner == 0 } ?? match.stage.hoops[0]
-        match.countdown = 0
         flowState?.showsTitle = false
         screen?.removeFromParent()
         screen = nil
         controls?.isHidden = false
-        match.players[0].position = hoop.position + Vec2(x: BallRules.dunkOffset.x * hoop.backboard.sign, y: BallRules.dunkOffset.y)
-        match.players[0].facing = hoop.backboard
-        match.players[0].hasBall = DunkTuning.frame < 3
-        match.players[0].state = .dunking
-        match.players[0].stateTimer = Animation.dunkStart(of: DunkTuning.frame)
-        match.ball.holder = match.players[0].hasBall ? 0 : nil
-        if match.ball.holder == nil { match.ball.respawn(at: Vec2(x: 170, y: 12.5)) }
+        session.mutate { match in
+            match.countdown = 0
+            match.players[0].position = hoop.position + Vec2(x: BallRules.dunkOffset.x * hoop.backboard.sign, y: BallRules.dunkOffset.y)
+            match.players[0].facing = hoop.backboard
+            match.players[0].hasBall = DunkTuning.frame < 3
+            match.players[0].state = .dunking
+            match.players[0].stateTimer = Animation.dunkStart(of: DunkTuning.frame)
+            match.ball.holder = match.players[0].hasBall ? 0 : nil
+            if match.ball.holder == nil { match.ball.respawn(at: Vec2(x: 170, y: 12.5)) }
+        }
         let table = DunkArt.offsets.map { "(\(Int($0.x)), \(Int($0.y)))" }.joined(separator: " ")
         debugLabel.text = "dunk frame \(DunkTuning.frame)  offsets \(table)"
     }
 
-    /// The round again from the start, drinks kept.
+    /// The round again from the start, drinks kept. Offline only.
     private func reset() {
+        guard online == nil else { return }
         startRound()
     }
 
     // MARK: The game loop
 
-    /// A new best of seven: the drinks gone, the dice rolled on, the first round.
+    /// A new best of seven against the computer: the drinks gone, the dice rolled on,
+    /// the first round.
     private func startSeries() {
-        series = Series(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
+        guard online == nil else { return }
+        startSeries(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
+    }
+
+    private func startSeries(seed: UInt32) {
+        series = Series(seed: seed)
         startRound()
         enter(.playing)
     }
@@ -695,11 +745,13 @@ final class GameScene: SKScene {
     /// A round: bodies with their drinks in them at their spawns, the count, and the
     /// bolts that bring them in.
     private func startRound() {
-        match = Match(specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames)
-        for index in match.players.indices {
-            match.players[index].power = series.drinks[index].power
-            match.players[index].powerLevel = series.drinks[index].powerLevel
+        var fresh = Match(specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames)
+        for index in fresh.players.indices {
+            fresh.players[index].power = series.drinks[index].power
+            fresh.players[index].powerLevel = series.drinks[index].powerLevel
         }
+        session = RollbackSession(match: fresh, localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
+        controls?.setOnline(online != nil)
         opponent = Opponent(index: 1)
         rimFlash = rimFlash.map { _ in 0 }
         ballTeam = SKColor(rgb: BallLook.neutral)
@@ -712,10 +764,13 @@ final class GameScene: SKScene {
 
     /// The drinks onto the bodies as they stand, for the round about to count.
     private func applyDrinks() {
-        for index in match.players.indices {
-            match.players[index].spec = series.drinks[index].spec()
-            match.players[index].power = series.drinks[index].power
-            match.players[index].powerLevel = series.drinks[index].powerLevel
+        let drinks = series.drinks
+        session.mutate { match in
+            for index in match.players.indices {
+                match.players[index].spec = drinks[index].spec()
+                match.players[index].power = drinks[index].power
+                match.players[index].powerLevel = drinks[index].powerLevel
+            }
         }
     }
 
@@ -736,35 +791,106 @@ final class GameScene: SKScene {
         }
     }
 
-    /// A point: the round to the scorer. The winner's screen after the strike; otherwise
-    /// whoever was scored on drinks, the computer at once and the human on the pick
-    /// screen once the strike has played.
-    private func pointScored(by scorer: Int) {
+    /// A point, confirmed on both sides: the round to the scorer. The winner's screen
+    /// after the strike; otherwise whoever was scored on drinks, the computer at once
+    /// and a person on the pick screen once the strike has played. Online the sim stops
+    /// on the same frame on both phones for the screen.
+    private func pointScored(by scorer: Int, at frame: Int) {
         guard flow == .playing else { return }
         series.record(pointFor: scorer)
         drawSeries()
         if series.winner != nil {
             pendingFlow = .won
-            flowDelay = 60
-        } else if scorer == 0 {
+            pendingFlowFrame = frame + GameScene.flowDelayFrames
+        } else if online == nil, scorer == 0 {
             let offers = series.offers(for: 1)
             let drink = offers[series.dice.roll(offers.count)]
             series.drink(drink, by: 1)
             applyDrinks()
             drawSeries()
             bringPlayersIn()
-            bannerQueue.append(("TEAL DRINKS \(drink.name.uppercased())", 26))
+            bannerQueue.append(("\(sideName(1)) DRINKS \(drink.name.uppercased())", 26))
         } else {
+            picker = 1 - scorer
             pendingFlow = .picking
-            flowDelay = 45
+            pendingFlowFrame = frame + GameScene.flowDelayFrames
         }
+        if online != nil, pendingFlow != nil { session.stopAt = pendingFlowFrame }
     }
 
     private func enter(_ next: Flow) {
         flow = next
-        if next == .picking { pickOffers = series.offers(for: 0) }
+        if next == .picking {
+            // Both phones roll the same offers off the shared dice.
+            pickOffers = series.offers(for: picker)
+            pickFramesLeft = Series.pickSeconds * 60
+        }
         flowState?.showsTitle = next == .title
         presentScreen()
+    }
+
+    private func sideName(_ index: Int) -> String {
+        index == 0 ? "ORANGE" : "TEAL"
+    }
+
+    /// The pick, ours: applied at once offline, sent and then applied once the sim has
+    /// settled online.
+    private func choose(_ drink: Greateraid) {
+        guard let choice = pickOffers.firstIndex(of: drink) else { return }
+        if online != nil {
+            guard online?.pendingPick == nil else { return }
+            online?.pendingPick = (series.rounds.count, choice)
+            send(.pick(round: series.rounds.count, choice: choice), reliable: true)
+        } else {
+            applyPick(choice: choice)
+        }
+    }
+
+    /// The round's drink onto the body, the count again, and play on.
+    private func applyPick(choice: Int) {
+        guard flow == .picking, pickOffers.indices.contains(choice) else { return }
+        let drink = pickOffers[choice]
+        series.drink(drink, by: picker)
+        applyDrinks()
+        drawSeries()
+        session.mutate { $0.countdown = $0.countdownLength }
+        session.stopAt = nil
+        lastCount = match.countdown
+        bringPlayersIn()
+        if picker != localIndex {
+            bannerQueue.append(("\(sideName(picker)) DRINKS \(drink.name.uppercased())", 26))
+        }
+        enter(.playing)
+    }
+
+    /// NEW MATCH offline; REMATCH online, which starts once both sides have pressed it.
+    private func playAgain() {
+        guard online != nil else {
+            startSeries()
+            return
+        }
+        guard online?.rematchRandom == nil else { return }
+        let random = UInt32.random(in: .min ... .max)
+        online?.rematchRandom = random
+        send(.rematch(random: random), reliable: true)
+        (screen as? WinScreen)?.showWaiting()
+        startRematchIfBothIn()
+    }
+
+    private func startRematchIfBothIn() {
+        guard let mine = online?.rematchRandom, let theirs = online?.theirRematch else { return }
+        online?.rematchRandom = nil
+        online?.theirRematch = nil
+        startSeries(seed: mine ^ theirs)
+    }
+
+    private func leaveToTitle() {
+        if online != nil {
+            send(.bye, reliable: true)
+            endOnline(nil)
+        } else {
+            enter(.title)
+        }
     }
 
     /// The screen for the flow, built for the view's size.
@@ -777,22 +903,21 @@ final class GameScene: SKScene {
             // The SwiftUI layer draws the title.
             break
         case .picking:
-            screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: pickOffers, drinks: series.drinks[0],
-                                colour: SKColor(rgb: sprites.look(for: 0).glow)) { [weak self] drink in
-                guard let self else { return }
-                self.series.drink(drink, by: 0)
-                self.applyDrinks()
-                self.drawSeries()
-                self.match.countdown = self.match.countdownLength
-                self.lastCount = self.match.countdown
-                self.bringPlayersIn()
-                self.enter(.playing)
+            if picker == localIndex {
+                screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: pickOffers, drinks: series.drinks[picker],
+                                    colour: SKColor(rgb: sprites.look(for: picker).glow), timed: online != nil) { [weak self] drink in
+                    self?.choose(drink)
+                }
+            } else {
+                screen = WaitScreen(halfWidth: halfWidth, halfHeight: halfHeight, who: sideName(picker))
             }
         case .won:
             let winner = series.winner ?? 0
-            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: winner == 0 ? "ORANGE" : "TEAL",
-                               onNewMatch: { [weak self] in self?.startSeries() },
-                               onTitle: { [weak self] in self?.enter(.title) })
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(winner),
+                               again: online == nil ? "NEW MATCH" : "REMATCH",
+                               onAgain: { [weak self] in self?.playAgain() },
+                               onTitle: { [weak self] in self?.leaveToTitle() })
+            if online?.rematchRandom != nil { (screen as? WinScreen)?.showWaiting() }
         case .playing:
             break
         }
@@ -859,10 +984,121 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The picker's power onto both players, live.
+    /// The picker's power onto both players, live. Offline only.
     private func applyPower() {
-        for index in match.players.indices {
-            match.players[index].power = powerVariant.power
+        guard online == nil else { return }
+        let power = powerVariant.power
+        session.mutate { match in
+            for index in match.players.indices {
+                match.players[index].power = power
+            }
+        }
+    }
+
+    // MARK: Online
+
+    /// Both phones are connected: this side's place by Game Center's ordering, and hello
+    /// goes out until theirs is in.
+    private func startOnline() {
+        guard let net = flowState?.net else { return }
+        online = Online(localIndex: net.localIsFirst ? 0 : 1, random: UInt32.random(in: .min ... .max))
+        // Whatever was on, off: the title holds until the series starts.
+        pendingFlow = nil
+        session.stopAt = nil
+        enter(.title)
+    }
+
+    /// Every frame online: the hello until the other's random is in, then the series;
+    /// a pick waiting for the sim to settle; the pick clock.
+    private func tickOnline() {
+        guard online != nil else { return }
+        if online?.started != true {
+            online?.helloAgainIn -= 1
+            if let online, online.helloAgainIn <= 0 {
+                send(.hello(random: online.random, version: NetRules.protocolVersion), reliable: true)
+                self.online?.helloAgainIn = 60
+            }
+            if let online, let theirs = online.theirRandom {
+                self.online?.started = true
+                startSeries(seed: online.random ^ theirs)
+            }
+            return
+        }
+        guard flow == .picking else { return }
+        if let pending = online?.pendingPick {
+            if pending.round == series.rounds.count, session.settled {
+                online?.pendingPick = nil
+                applyPick(choice: pending.choice)
+            }
+            return
+        }
+        pickFramesLeft -= 1
+        let seconds = (pickFramesLeft + 59) / 60
+        if picker == localIndex {
+            (screen as? PickScreen)?.showSeconds(seconds)
+            if pickFramesLeft <= 0 { screen?.fire() }
+        } else {
+            (screen as? WaitScreen)?.showSeconds(seconds)
+        }
+    }
+
+    private func send(_ message: NetMessage, reliable: Bool) {
+        flowState?.net.send(message.data, reliable: reliable)
+    }
+
+    private func handle(_ data: Data) {
+        guard online != nil, let message = NetMessage(data: data) else { return }
+        switch message {
+        case .hello(let random, let version):
+            guard version == NetRules.protocolVersion else {
+                endOnline("VERSIONS DIFFER")
+                return
+            }
+            if online?.theirRandom == nil {
+                online?.theirRandom = random
+                if let mine = online?.random { send(.hello(random: mine, version: NetRules.protocolVersion), reliable: true) }
+            }
+        case .inputs(let packet):
+            guard online?.started == true else { return }
+            session.receive(packet)
+        case .pick(let round, let choice):
+            guard picker != localIndex || flow != .picking else { return }
+            online?.pendingPick = (round, choice)
+        case .rematch(let random):
+            online?.theirRematch = random
+            startRematchIfBothIn()
+        case .bye:
+            endOnline("THEY LEFT")
+        }
+    }
+
+    /// The networked series is over, with why if the other side ended it; back to the title.
+    private func endOnline(_ why: String?) {
+        guard online != nil else { return }
+        online = nil
+        session.stopAt = nil
+        pendingFlow = nil
+        flowState?.net.leave()
+        if let why { flowState?.net.fail(why) }
+        controls?.setOnline(false)
+        enter(.title)
+    }
+
+    /// The events of frames just run, first time or run again with something new: the
+    /// effects. A point isn't among them; that waits for both sides' inputs.
+    private func show(_ frames: [FrameEvents]) {
+        for frameEvents in frames { show(frameEvents.events) }
+    }
+
+    /// The events of frames both sides' inputs have confirmed: the point.
+    private func confirm(_ frames: [FrameEvents]) {
+        for frameEvents in frames {
+            for case .scored(let scorer, let hoop, let entry) in frameEvents.events {
+                rimFlash[hoop] = 8
+                strike(hoop: hoop, by: scorer, entry: entry)
+                showBanner("BUCKET!!", size: 48)
+                pointScored(by: scorer, at: frameEvents.frame)
+            }
         }
     }
 
@@ -905,11 +1141,6 @@ final class GameScene: SKScene {
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
                 ballHold = BallLook.holdFrames
                 ballShift = BallLook.shiftFrames
-            case .scored(let scorer, let hoop, let entry):
-                rimFlash[hoop] = 8
-                strike(hoop: hoop, by: scorer, entry: entry)
-                showBanner("BUCKET!!", size: 48)
-                pointScored(by: scorer)
             default:
                 break
             }
@@ -1300,18 +1531,22 @@ final class GameScene: SKScene {
             for node in playerNodes { node.isHidden = false }
         }
         fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms"
-        let p = match.players[0]
+        let p = match.players[localIndex]
+        let side: String
+        if online != nil {
+            side = "  net lead \(session.frame - session.remoteFrame) rollbacks \(session.rollbacks)/\(session.framesRerun)\(session.desynced ? "  DESYNC" : "")"
+        } else {
+            side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
+        }
         debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "",
-                                 aiOn ? "  ai \(String(describing: opponent.current))" : "")
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
     }
 
     /// What each button would do for this player right now.
     private func buttonLabels(for player: Player) -> (jump: String, shoot: String, throwBall: String) {
-        let defence = match.ball.holder != nil && match.ball.holder != player.index
         let airborne = !player.grounded && !player.state.isGroundState
         let jump: String
         switch player.power {

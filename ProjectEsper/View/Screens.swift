@@ -96,9 +96,12 @@ final class PickScreen: Screen {
     private let offers: [Greateraid]
     private let drinks: Drinks
     private let blurb = SKSpriteNode()
+    private let clock = SKSpriteNode()
     private let onDrink: (Greateraid) -> Void
 
-    init(halfWidth: CGFloat, halfHeight: CGFloat, offers: [Greateraid], drinks: Drinks, colour: SKColor, onDrink: @escaping (Greateraid) -> Void) {
+    /// `timed` shows the seconds left, for a networked pick.
+    init(halfWidth: CGFloat, halfHeight: CGFloat, offers: [Greateraid], drinks: Drinks, colour: SKColor, timed: Bool = false,
+         onDrink: @escaping (Greateraid) -> Void) {
         self.offers = offers
         self.drinks = drinks
         self.onDrink = onDrink
@@ -112,6 +115,11 @@ final class PickScreen: Screen {
         sub.fontColor = SKColor(white: 1, alpha: 0.7)
         sub.position = CGPoint(x: 0, y: halfHeight - 72)
         addChild(sub)
+        if timed {
+            clock.position = CGPoint(x: halfWidth - 60, y: halfHeight - 50)
+            addChild(clock)
+            showSeconds(Series.pickSeconds)
+        }
 
         let spacing = min(halfWidth * 0.55, 200)
         for (index, offer) in offers.enumerated() {
@@ -141,6 +149,12 @@ final class PickScreen: Screen {
 
     override var tapFiresAtOnce: Bool { false }
 
+    /// The seconds left on the pick.
+    func showSeconds(_ seconds: Int) {
+        guard clock.parent != nil else { return }
+        TitleText.set(clock, to: "\(max(seconds, 0))", size: 32)
+    }
+
     override func moved() {
         guard choices.indices.contains(cursor) else { return }
         let offer = offers[cursor]
@@ -167,16 +181,52 @@ final class PickScreen: Screen {
     }
 }
 
-/// Who won, and the two ways on.
+/// The other side is drinking: nothing to pick, only the clock to watch.
+final class WaitScreen: Screen {
+    private let clock = SKSpriteNode()
+
+    init(halfWidth: CGFloat, halfHeight: CGFloat, who: String) {
+        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
+        let header = TitleText.node("GREATERAID", size: 40)
+        header.position = CGPoint(x: 0, y: halfHeight - 44)
+        addChild(header)
+        let sub = TitleText.node("\(who) IS DRINKING", size: 26)
+        sub.position = CGPoint(x: 0, y: 10)
+        addChild(sub)
+        clock.position = CGPoint(x: 0, y: -50)
+        addChild(clock)
+        showSeconds(Series.pickSeconds)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func showSeconds(_ seconds: Int) {
+        TitleText.set(clock, to: "\(max(seconds, 0))", size: 32)
+    }
+}
+
+/// Who won, and the two ways on. `again` is NEW MATCH offline and REMATCH online, where
+/// it waits for the other side to press theirs.
 final class WinScreen: Screen {
-    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, onNewMatch: @escaping () -> Void, onTitle: @escaping () -> Void) {
+    private let waiting = SKSpriteNode()
+
+    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, again: String, onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight)
         let title = TitleText.node("\(winner) WINS", size: 56)
         title.position = CGPoint(x: 0, y: halfHeight * 0.35)
         addChild(title)
-        addButton("NEW MATCH", at: CGPoint(x: 0, y: -halfHeight * 0.1), action: onNewMatch)
+        addButton(again, at: CGPoint(x: 0, y: -halfHeight * 0.1), action: onAgain)
         addButton("TITLE", at: CGPoint(x: 0, y: -halfHeight * 0.4), action: onTitle)
+        waiting.position = CGPoint(x: 0, y: -halfHeight * 0.25)
+        waiting.isHidden = true
+        addChild(waiting)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// The rematch is asked for; now the other side has to.
+    func showWaiting() {
+        TitleText.set(waiting, to: "WAITING FOR THEM", size: 14)
+        waiting.isHidden = false
+    }
 }

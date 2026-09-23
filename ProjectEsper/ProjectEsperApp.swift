@@ -32,7 +32,7 @@ struct GameView: View {
             HudView(scene: flow.scene)
                 .ignoresSafeArea()
             if flow.showsTitle {
-                TitleOverlay(flow: flow)
+                TitleOverlay(flow: flow, net: flow.net)
                     .transition(.opacity)
             }
         }

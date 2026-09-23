@@ -117,6 +117,14 @@ final class TouchControls: SKNode {
         addChild(aiButton)
     }
 
+    /// Online there's no reset, no computer and no tuning: only the pad and HITBOX.
+    func setOnline(_ online: Bool) {
+        resetButton.isHidden = online
+        aiButton.isHidden = online
+        for picker in pickers { picker.isHidden = online }
+        for slider in sliders { slider.isHidden = online }
+    }
+
     /// The buttons' names, for what they'd do right now.
     func setLabels(jump: String, shoot: String, throwBall: String) {
         for (button, text) in zip(buttons, [jump, shoot, throwBall]) where button.label.text != text {
@@ -186,7 +194,7 @@ final class TouchControls: SKNode {
     // MARK: Touches, in this node's space
 
     func began(_ touch: UITouch, at point: CGPoint) {
-        if resetButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
+        if !resetButton.isHidden, resetButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             onReset?()
             return
         }
@@ -195,15 +203,15 @@ final class TouchControls: SKNode {
             onToggleHitboxes?(showHitboxes)
             return
         }
-        if aiButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
+        if !aiButton.isHidden, aiButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             aiOn.toggle()
             onToggleAI?(aiOn)
             return
         }
-        for picker in pickers where picker.tap(at: convert(point, to: picker)) {
+        for picker in pickers where !picker.isHidden && picker.tap(at: convert(point, to: picker)) {
             return
         }
-        for slider in sliders where slider.covers(convert(point, to: slider)) {
+        for slider in sliders where !slider.isHidden && slider.covers(convert(point, to: slider)) {
             sliderTouches[touch] = slider
             slider.drag(to: convert(point, to: slider))
             return

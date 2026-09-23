@@ -76,7 +76,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   ground it carries the run or dash it came from, bleeding 0.15 a frame; in the air the
   body rises at least 1 a frame and gravity is cut to a fifth, so it hangs through the
   swing. 18 frames at 20 a second. The blade is a square round the body, 56 art pixels a
-  side, live over frames 3 to 11. Touching the holder's body or ball with it knocks the
+  side, its centre 4 art pixels in front of the body's, live over frames 3 to 11. Touching the holder's body or ball with it knocks the
   ball out of their hands, and it spikes a loose ball down and away at about 45° below
   the horizontal, jittered up to 10° by the frame, at no less than 6. In the air it ends in the roll, the double
   jump's somersault over 18 frames at the same pace with normal gravity and air drift, so
@@ -266,8 +266,10 @@ holds the variants; A is always the baseline as tuned.
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER: A none, B Web Water, C Super Soda, D Flash Fizz, E Platform Protein Shake. The
   left bumper steps this one.
-- DUNK: A draws the dunk's frames nudged into place by `DunkArt.offsets`, B draws them
-  raw at the body's place on the rim. The left bumper steps this one now, being newest.
+- DUNK: A glides the body to the rim and draws the dunk's frames nudged into place by
+  `DunkArt.offsets`; B glides and draws them raw; C neither, the body staying where the
+  stance became a dunk (`BallRules.dunkGlides` off) with the frames raw. The left bumper
+  steps this one now, being newest.
 - HITBOX, beside RESET: draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green, a flash's tear cyan.

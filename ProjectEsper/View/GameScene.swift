@@ -562,6 +562,7 @@ final class GameScene: SKScene {
         }
         controls.addPicker(title: "DUNK", options: DunkVariant.allCases.map(\.label), selected: dunkVariant.rawValue) { [weak self] index in
             self?.dunkVariant = DunkVariant(rawValue: index)!
+            BallRules.dunkGlides = self?.dunkVariant.glides ?? true
         }
         controls.addSlider(title: "GLOW THRESHOLD", range: 0.2...1.0, notch: 0.1, value: GlowSettings.threshold) { value in
             GlowSettings.threshold = value

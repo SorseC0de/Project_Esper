@@ -309,6 +309,9 @@ public enum BallRules {
     /// backboard on the right; across is mirrored for the other. 16 art pixels back and
     /// 24 down, as the user placed it on the sliders.
     public static let dunkOffset = Vec2(x: -16 / 1.6, y: -24 / 1.6)
+    /// Tuning only: off, the body stays where the stance became a dunk instead of gliding
+    /// to the rim. The DUNK picker sets it.
+    nonisolated(unsafe) public static var dunkGlides = true
 
     /// The ball is caught within this of the chest, in front. Faster than the threshold it
     /// goes through instead, as a shot in flight does; those take the snatch. Bodies never
@@ -434,8 +437,8 @@ public enum SlideRules {
 /// ground it carries what run it had and is over when the swing is; in the air the body
 /// rises at least this fast and gravity is cut to this share, so it hangs through the
 /// swing, and the roll follows over this many frames. Both play at this many sheet
-/// frames a second. The blade is a square round the body, 56 art pixels a side, live over
-/// these frames. It knocks the ball out of a holder's hands, or spikes a loose one down
+/// frames a second. The blade is a square round the body, 56 art pixels a side, its centre
+/// this far in front of the body's, live over these frames. It knocks the ball out of a holder's hands, or spikes a loose one down
 /// and away at about this angle below the horizontal, jittered by up to this much, at no
 /// less than this speed.
 public enum SlashRules {
@@ -445,6 +448,7 @@ public enum SlashRules {
     public static let lift = 1.0
     public static let gravityShare = 0.2
     public static let reach = 56 / 1.6 / 2
+    public static let forward = 4 / 1.6
     public static let liveFrames = 3..<12
     public static let spikeAngle = degrees(-45)
     public static let spikeJitter = degrees(10)

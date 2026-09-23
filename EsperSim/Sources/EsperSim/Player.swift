@@ -191,6 +191,11 @@ public struct Player: Equatable {
         Vec2(x: position.x + BallRules.handCatchCentre.x * facing.sign, y: position.y + BallRules.handCatchCentre.y)
     }
 
+    /// The centre of the slash's blade: the body's, a little in front.
+    public var bladeCentre: Vec2 {
+        Vec2(x: body.center.x + SlashRules.forward * facing.sign, y: body.center.y)
+    }
+
     public var inStance: Bool { state == .shootStance || state == .throwStance }
 
     /// The first step in a state, after `enter` on the step before.
@@ -586,7 +591,9 @@ public struct Player: Equatable {
             let place = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y)
             let slam = BallRules.dunkFrames / 2
             let share = min(Double(stateTimer) / Double(slam), 1)
-            position = dunkFrom + (place - dunkFrom) * share
+            if BallRules.dunkGlides {
+                position = dunkFrom + (place - dunkFrom) * share
+            }
             if stateTimer == BallRules.dunkFrames / 2 {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames
@@ -886,7 +893,7 @@ public struct Player: Equatable {
     /// The blade: a square round the body over the slash's live frames, until it has hit.
     public var slashHitbox: Box? {
         guard state == .slashing, !slashHit, SlashRules.liveFrames.contains(stateTimer) else { return nil }
-        return Box(center: body.center, width: SlashRules.reach * 2, height: SlashRules.reach * 2)
+        return Box(center: bladeCentre, width: SlashRules.reach * 2, height: SlashRules.reach * 2)
     }
 
     /// The whole body and the hand's reach in front, while the snatch's hand is out.

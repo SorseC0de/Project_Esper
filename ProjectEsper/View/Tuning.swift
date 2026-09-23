@@ -31,13 +31,15 @@ enum PowerVariant: Int, CaseIterable {
     }
 }
 
-/// The dunk's frames on the picker: A drawn with `DunkArt.offsets` nudging each frame
-/// into place, B raw, every frame at the body's place on the rim as the sheet has it.
+/// The dunk on the picker: A glides the body to the rim and draws each frame nudged by
+/// `DunkArt.offsets`; B glides and draws the frames raw, as the sheet has them; C neither,
+/// the body stays where the stance became a dunk and the frames are raw.
 enum DunkVariant: Int, CaseIterable {
-    case corrected, raw
+    case corrected, raw, still
 
-    var label: String { ["A", "B"][rawValue] }
+    var label: String { ["A", "B", "C"][rawValue] }
     var nudges: Bool { self == .corrected }
+    var glides: Bool { self != .still }
 }
 
 /// How each frame of the dunk sequence is drawn: nudged from the body's place on the rim

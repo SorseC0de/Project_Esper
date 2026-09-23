@@ -540,7 +540,7 @@ public struct Opponent: Equatable {
         if ball.velocity.length > 2 {
             let soon = ballPosition(ball, after: 6)
             let inHand = soon.distance(to: me.handCatchPoint) <= BallRules.handCatchRadius || soon.distance(to: me.chest) <= BallRules.catchRadius
-            let inBlade = abs(soon.x - me.body.center.x) <= SlashRules.reach && abs(soon.y - me.body.center.y) <= SlashRules.reach
+            let inBlade = abs(soon.x - me.bladeCentre.x) <= SlashRules.reach && abs(soon.y - me.bladeCentre.y) <= SlashRules.reach
             if inHand, me.snatchCooldown == 0, chance(70) {
                 tapThrow(&input)
                 return

@@ -1096,14 +1096,16 @@ final class GameScene: SKScene {
                 CGPoint(x: offset.x * cos(tilt) - offset.y * sin(tilt), y: offset.x * sin(tilt) + offset.y * cos(tilt))
             }
 
-            // The ball in hand rides the frame's ball, and when that hangs off a ledge the
-            // dribble reaches down to the real floor under it, over the same frames.
+            // The ball in hand rides the frame's ball, and when a dribble's ball hangs off a
+            // ledge it reaches down to the real floor under it, over the same frames. Only
+            // the dribble sheets do that: a stance or a throw keeps the ball where the frame
+            // put it, so nothing sags off the edge of a slab.
             let halo = handHalos[index]
             let handBall = handBalls[index]
             if player.hasBall, let inHand = sprites.landmark(.ball, in: frame, player: index) {
                 let ballX = player.position.x + Double(inHand.x) * player.facing.sign / SpriteLibrary.pixelsPerUnit
-                // Only a dribble reaches for the floor; in the air the ball stays where the frame put it.
-                let drop = player.grounded ? match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit : 0
+                let dribbling = [Animation.dribbleIdle, .dribbleWalk, .dribbleRun].contains(frame.animation)
+                let drop = player.grounded && dribbling ? match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit : 0
                 let phase = min(max(inHand.y / GameScene.dribbleHandHeight, 0), 1)
                 let y = inHand.y - CGFloat(drop) * (1 - phase)
                 let at = node.position + leaned(CGPoint(x: inHand.x * CGFloat(player.facing.sign), y: y.rounded()))

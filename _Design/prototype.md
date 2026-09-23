@@ -112,7 +112,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   through the 45 frames before the point restarts. Each frame of it is drawn nudged by
   `DunkArt.offsets`, in art pixels, found with `DunkTuning` on: the match held, player 1
   on the right rim on the frame the DUNK FRAME slider picks, DUNK X and DUNK Y nudging
-  that frame, the table in the corner readout.
+  that frame, the table in the corner readout. As placed: (-6, 10), (-4, 12), (-2, 16),
+  (4, 2), (-3, 3), (-2, 2), (-2, 2).
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
@@ -229,7 +230,8 @@ walked round a ring, a black drop to the south-east, drawn into a texture per st
 ## Greateraid
 
 The drinks between rounds, in `Greateraid.swift`. Three bottles an offer, the user's
-vector bottle from the catalog, large with
+vector bottle from the catalog, blue for a booster and its three blues swapped for
+golds for a biomorph or Bio-Boba, large with
 their bottoms off the screen, each leaning five to thirty degrees, its name across it,
 what the raised one does lettered in the middle; a tap raises a bottle and a second
 tap drinks it, or the stick and jump on the pad. Boosters raise a stat and stack to two
@@ -334,8 +336,9 @@ and the fire follow them. The head is drawn at 1.25 times about its own centre a
 yellow chevrons stack over a resting ball and light one after another from the top. A
 double jump leaves a short platform of loose digital squares under the feet where it was
 taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that one swinging wind bends as a whole, a scarf.
-The ball in hand is its own sprite on the frame's ball, and when that hangs off a ledge the
-dribble reaches down to the real floor under it over the same frames. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
+The ball in hand is its own sprite on the frame's ball, and when a dribble's ball hangs
+off a ledge it reaches down to the real floor under it over the same frames; only the
+dribble sheets do that, so a stance's ball never sags off the edge of a slab. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off. A slide
 leaves the dash's smoke; the snatch's catch spark sits on the hand at full stretch; a ball
 knocked loose bursts like a wall jump's spark, away from the hitter.

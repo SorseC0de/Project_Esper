@@ -162,10 +162,11 @@ final class PickScreen: Screen {
     }
 
     /// The bottle, the user's vector from the catalog, 180 points tall and anchored at its
-    /// bottom so that runs off the screen. Every drink wears the same one for now.
+    /// bottom so that runs off the screen: blue for a booster, gold for a biomorph or
+    /// Bio-Boba.
     static func bottle(for drink: Greateraid, colour: SKColor) -> SKNode {
         let height: CGFloat = 180
-        let texture = SKTexture(imageNamed: "Greateraid")
+        let texture = SKTexture(imageNamed: drink.kind == .booster ? "Greateraid" : "Greateraid-Gold")
         let aspect = texture.size().width / max(texture.size().height, 1)
         let bottle = SKSpriteNode(texture: texture)
         bottle.size = CGSize(width: height * aspect, height: height)

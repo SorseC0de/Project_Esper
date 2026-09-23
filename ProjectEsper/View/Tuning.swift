@@ -33,16 +33,20 @@ enum PowerVariant: Int, CaseIterable {
 
 /// How each frame of the dunk sequence is drawn: nudged from the body's place on the rim
 /// by this many art pixels, across (mirrored for the other rim) and up. Found on the
-/// sliders with `DunkTuning` on, then written here.
+/// sliders with `DunkTuning` on, as the user placed them: the throw stance, then the
+/// six sheet frames.
 enum DunkArt {
-    nonisolated(unsafe) static var offsets: [CGPoint] = Array(repeating: .zero, count: Animation.dunkSequence.count)
+    nonisolated(unsafe) static var offsets: [CGPoint] = [
+        CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -2, y: 16), CGPoint(x: 4, y: 2),
+        CGPoint(x: -3, y: 3), CGPoint(x: -2, y: 2), CGPoint(x: -2, y: 2),
+    ]
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the
 /// right rim in the dunk, on the sequence frame the DUNK FRAME slider picks, and the
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
-    static let enabled = true
+    static let enabled = false
     nonisolated(unsafe) static var frame = 0
 }
 

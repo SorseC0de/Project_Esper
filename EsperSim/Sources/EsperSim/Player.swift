@@ -721,7 +721,7 @@ public struct Player: Equatable {
             let easeIn = min(Double(stateTimer) / 4, 1)
             swingAngle += pace * easeIn
             let swept = (swingAngle - swingStartAngle) * facing.sign
-            let target = anchor + Vec2(x: sin(swingAngle), y: -cos(swingAngle)) * swingLength
+            let target = anchor + Vec2(x: Trig.sin(swingAngle), y: -Trig.cos(swingAngle)) * swingLength
             velocity = target - position
             let full = swept >= swingLeastArc * WebRules.swingMaxArcShare || abs(swingAngle) >= WebRules.swingMaxAngle
             if full || (swept >= swingLeastArc && !input.jump) {
@@ -768,7 +768,7 @@ public struct Player: Equatable {
         wantsPlatform = false
         move(in: stage)
         if state == .webSwing, let anchor = webAnchor {
-            let target = anchor + Vec2(x: sin(swingAngle), y: -cos(swingAngle)) * swingLength
+            let target = anchor + Vec2(x: Trig.sin(swingAngle), y: -Trig.cos(swingAngle)) * swingLength
             if position.distance(to: target) > 1 {
                 endSwing()
                 enter(.air)
@@ -996,7 +996,7 @@ public struct Player: Equatable {
         let anchor = position + Vec2(x: WebRules.swingReach * facing.sign, y: WebRules.swingHeight)
         let offset = position - anchor
         swingLength = offset.length
-        swingStartAngle = atan2(offset.x, -offset.y)
+        swingStartAngle = Trig.atan2(offset.x, -offset.y)
         swingAngle = swingStartAngle
         // Signed so the arc runs forward whichever way the body faces.
         swingLeastArc = abs(swingStartAngle) * (1 + WebRules.swingOvershoot)
@@ -1052,7 +1052,7 @@ public struct Player: Equatable {
 
     /// The preset arc, forward at the default angle.
     private var presetAim: Vec2 {
-        Vec2(x: cos(BallRules.shotAngleDefault) * facing.sign, y: sin(BallRules.shotAngleDefault))
+        Vec2(x: Trig.cos(BallRules.shotAngleDefault) * facing.sign, y: Trig.sin(BallRules.shotAngleDefault))
     }
 
     private mutating func startDash(events: inout [MatchEvent]) {
@@ -1148,9 +1148,9 @@ public struct Player: Equatable {
     /// range, sent the way the body faces.
     public var shotVelocity: Vec2 {
         let forward = shotAim.x * facing.sign
-        var angle = atan2(shotAim.y, abs(forward))
+        var angle = Trig.atan2(shotAim.y, abs(forward))
         angle = min(max(angle, BallRules.shotAngleMin), BallRules.shotAngleMax)
-        return Vec2(x: cos(angle) * facing.sign, y: sin(angle)) * spec.shotSpeed
+        return Vec2(x: Trig.cos(angle) * facing.sign, y: Trig.sin(angle)) * spec.shotSpeed
     }
 
     private mutating func move(in stage: Stage) {
@@ -1228,7 +1228,7 @@ public struct Player: Equatable {
 
 extension Double {
     func rounded(toPlaces places: Int) -> Double {
-        let scale = pow(10.0, Double(places))
+        let scale = Trig.powerOfTen(places)
         return (self * scale).rounded() / scale
     }
 }

@@ -195,7 +195,7 @@ public struct Opponent: Equatable {
                     if stanceFrames > BallRules.shotWindupFrames { fullHop(&input) }
                 } else {
                     let aim = shotAim(match, from: me.position, lift: max(me.velocity.y, 0), to: hoop) ?? shotAim(match, from: me.position, lift: 0, to: hoop)
-                    input.aim = aim ?? Vec2(x: cos(BallRules.shotAngleDefault) * inward, y: sin(BallRules.shotAngleDefault))
+                    input.aim = aim ?? Vec2(x: Trig.cos(BallRules.shotAngleDefault) * inward, y: Trig.sin(BallRules.shotAngleDefault))
                     input.shoot = me.velocity.y > 2.4
                 }
                 return
@@ -422,7 +422,7 @@ public struct Opponent: Equatable {
         var angle = BallRules.shotAngleMin
         while angle <= BallRules.shotAngleMax + 0.001 {
             var position = feet + Vec2(x: 0, y: BallRules.shotReleaseHeight)
-            var velocity = Vec2(x: cos(angle) * sign, y: sin(angle)) * match.players[index].spec.shotSpeed + Vec2(x: 0, y: lift)
+            var velocity = Vec2(x: Trig.cos(angle) * sign, y: Trig.sin(angle)) * match.players[index].spec.shotSpeed + Vec2(x: 0, y: lift)
             var error: Double?
             for _ in 0..<200 {
                 let before = position
@@ -442,7 +442,7 @@ public struct Opponent: Equatable {
             angle += degrees(5)
         }
         guard let best else { return nil }
-        return Vec2(x: cos(best.angle) * sign, y: sin(best.angle))
+        return Vec2(x: Trig.cos(best.angle) * sign, y: Trig.sin(best.angle))
     }
 
     // MARK: The other with the ball

@@ -227,7 +227,7 @@ public struct Match: Equatable {
                 players[index].slashHit = true
                 let noise = Double((frame &* 1103515245 &+ 12345) & 0xFFFF) / 65535 * 2 - 1
                 let angle = SlashRules.spikeAngle + SlashRules.spikeJitter * noise
-                ball.swat(along: Vec2(x: cos(angle) * player.facing.sign, y: sin(angle)), by: index)
+                ball.swat(along: Vec2(x: Trig.cos(angle) * player.facing.sign, y: Trig.sin(angle)), by: index)
                 events.append(.swatted(player: index, hit: true))
             }
         }
@@ -281,7 +281,7 @@ public struct Match: Equatable {
         for candidate in candidates {
             let toward = candidate - origin
             guard toward.length <= WebRules.lineRange, toward.length > 1 else { continue }
-            let turn = abs(atan2(toward.x * aimed.y - toward.y * aimed.x, toward.x * aimed.x + toward.y * aimed.y))
+            let turn = abs(Trig.atan2(toward.x * aimed.y - toward.y * aimed.x, toward.x * aimed.x + toward.y * aimed.y))
             if turn < bestTurn {
                 bestTurn = turn
                 direction = toward.normalized

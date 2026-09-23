@@ -15,7 +15,7 @@ public struct Vec2: Equatable, Hashable {
     public var length: Double { (x * x + y * y).squareRoot() }
     public var lengthSquared: Double { x * x + y * y }
     /// Radians, counter-clockwise from +x.
-    public var angle: Double { atan2(y, x) }
+    public var angle: Double { Trig.atan2(y, x) }
 
     public var normalized: Vec2 {
         let l = length

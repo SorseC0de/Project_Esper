@@ -10,7 +10,7 @@ class Screen: SKNode {
         let hit: CGRect
         let enabled: Bool
         /// Where the arrow sits to point at this choice, and which way it turns from
-        /// pointing right.
+        /// pointing down, as the drawing does.
         let arrowAt: CGPoint
         let arrowTurn: CGFloat
         let action: () -> Void
@@ -20,13 +20,14 @@ class Screen: SKNode {
     private(set) var cursor = 0
     let halfWidth: CGFloat
     let halfHeight: CGFloat
-    /// CardCourt's swing arrow, white, pointing at the cursor's choice.
+    /// CardCourt's selection arrow, the one that hangs over a man, in its own greys,
+    /// pointing at the cursor's choice. It points down as drawn.
     private let arrow: SKSpriteNode = {
-        let image = UIImage(named: "MenuArrow")?.withTintColor(.white, renderingMode: .alwaysOriginal)
-        let node = SKSpriteNode(texture: image.map { SKTexture(image: $0) })
-        let height: CGFloat = 22
-        let aspect = (image?.size.width ?? 1) / max(image?.size.height ?? 1, 1)
-        node.size = CGSize(width: height * aspect, height: height)
+        let texture = SKTexture(imageNamed: "MenuArrow")
+        texture.filteringMode = .nearest
+        let node = SKSpriteNode(texture: texture)
+        let width: CGFloat = 20
+        node.size = CGSize(width: width, height: width * 104 / 144)
         node.zPosition = 3
         node.isHidden = true
         return node
@@ -51,15 +52,15 @@ class Screen: SKNode {
         addChild(label)
         let hit = CGRect(x: point.x - label.size.width / 2 - 12, y: point.y - label.size.height / 2 - 8,
                          width: label.size.width + 24, height: label.size.height + 16)
-        // The arrow sits to the left of a lettered button, pointing at it.
-        let arrowAt = CGPoint(x: hit.minX - 22, y: point.y)
-        choices.append(Choice(node: label, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: 0, action: action))
+        // The arrow sits to the left of a lettered button, turned to point at it.
+        let arrowAt = CGPoint(x: hit.minX - 16, y: point.y)
+        choices.append(Choice(node: label, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: .pi / 2, action: action))
         if choices.count == 1 { cursor = 0 }
         showCursor()
         return label
     }
 
-    /// `arrowAt` is where the arrow sits for this choice, turned `arrowTurn` from pointing right.
+    /// `arrowAt` is where the arrow sits for this choice, turned `arrowTurn` from pointing down.
     func addChoice(_ node: SKNode, hit: CGRect, enabled: Bool = true, arrowAt: CGPoint, arrowTurn: CGFloat, action: @escaping () -> Void) {
         choices.append(Choice(node: node, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: arrowTurn, action: action))
         showCursor()
@@ -162,7 +163,7 @@ final class PickScreen: Screen {
             addChild(name)
             let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight)
             // The arrow hangs over the name, pointing down at the bottle.
-            addChoice(bottle, hit: hit, arrowAt: CGPoint(x: x, y: -halfHeight + 84 + 28), arrowTurn: -.pi / 2) { [weak self] in
+            addChoice(bottle, hit: hit, arrowAt: CGPoint(x: x, y: -halfHeight + 84 + 24), arrowTurn: 0) { [weak self] in
                 guard let self else { return }
                 self.onDrink(offer)
             }

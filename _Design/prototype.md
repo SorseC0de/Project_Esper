@@ -376,6 +376,10 @@ the glow: it's drawn by its own SpriteKit view over the Metal view, transparent,
 bottles and the two-tone lettering keep their colours. Only the round circles glow, kept
 in the game scene under the camera. The pick and win screens sit on the same dark
 ultra-thin material as the title, a SwiftUI layer between the two views (`FlowState.veiled`).
+The count's banner stays in the world under the material, so it shows through a screen;
+the mask marks it in pure green and the bright pass leaves green alone. On a screen the
+stick moves the cursor any of the four ways, and CardCourt's swing arrow (`MenuArrow`,
+white) points at the raised choice.
 The corner counter shows the frame rate and the worst frame gap of the last second,
 which is what a hitch shows up as.
 
@@ -412,7 +416,9 @@ both rolled off the shared dice. The pick is applied once every frame before the
 confirmed, as a change outside the inputs (`RollbackSession.mutate`), then both resume.
 Twenty seconds to pick, or the raised bottle drinks itself. The seed is the two phones'
 randoms together, exchanged in hello; the side whose Game Center player ID sorts first
-plays the left. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
+plays the left. MULTIPLAYER automatches for two through `GKMatchmaker` directly, as
+CardCourt does, with CANCEL under it while it looks; Apple's matchmaker sheet failed
+at once on the same phones. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
 or a bye puts the title up with why under MULTIPLAYER. No computer, no reset, no
 tuning pickers online; HITBOX stays. The sim calls nothing in the system's maths library: `Trig` is its own sine,
 cosine and arctangent in plain arithmetic, so two phones on different iOS versions

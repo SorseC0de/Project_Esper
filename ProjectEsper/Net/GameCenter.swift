@@ -66,22 +66,45 @@ final class GameCenter: NSObject, ObservableObject {
         }
     }
 
-    /// Apple's matchmaker: invite a friend or automatch, for two.
+    /// Automatch for two, asked of Game Center directly, as CardCourt does; the
+    /// matchmaker sheet failed at once on the same phones.
     func findMatch() {
         guard GKLocalPlayer.local.isAuthenticated else {
             signIn()
             return
         }
-        guard match == nil else { return }
+        guard match == nil, state != .finding else { return }
+        if GKLocalPlayer.local.isMultiplayerGamingRestricted {
+            state = .failed("Multiplayer is off in Screen Time")
+            return
+        }
+        state = .finding
         let request = GKMatchRequest()
         request.minPlayers = 2
         request.maxPlayers = 2
-        request.defaultNumberOfPlayers = 2
-        request.inviteMessage = "Project Esper: best of seven?"
-        guard let controller = GKMatchmakerViewController(matchRequest: request) else { return }
-        controller.matchmakerDelegate = self
-        state = .finding
-        present(controller)
+        Task { @MainActor in
+            do {
+                let found = try await GKMatchmaker.shared().findMatch(for: request)
+                guard self.state == .finding else {
+                    found.disconnect()
+                    return
+                }
+                self.take(found)
+            } catch {
+                if (error as NSError).code == GKError.Code.cancelled.rawValue {
+                    self.state = .ready
+                } else {
+                    self.state = .failed(self.short(error))
+                }
+            }
+        }
+    }
+
+    /// Out of the queue.
+    func cancelFinding() {
+        guard state == .finding else { return }
+        GKMatchmaker.shared().cancel()
+        state = .ready
     }
 
     func send(_ data: Data, reliable: Bool) {

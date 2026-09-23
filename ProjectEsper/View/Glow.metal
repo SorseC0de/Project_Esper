@@ -36,11 +36,14 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
                            sampler linear [[sampler(0)]],
                            constant GlowUniforms &u [[buffer(0)]]) {
     float4 color = scene.sample(linear, in.uv);
-    // The mask is the bodies on black, so anything with light in it is body.
-    float body = dot(bodies.sample(linear, in.uv).rgb, float3(0.2126, 0.7152, 0.0722));
+    // The mask is the bodies on black, so anything with light in it is body; pure green
+    // marks what must not glow at all.
+    float3 mask = bodies.sample(linear, in.uv).rgb;
+    float body = dot(mask, float3(0.2126, 0.7152, 0.0722));
+    float flat = step(0.5, mask.g) * step(mask.r, 0.05) * step(mask.b, 0.05);
     float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body));
     float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
-    float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance);
+    float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance) * (1 - flat);
     return float4(color.rgb * amount, 1);
 }
 

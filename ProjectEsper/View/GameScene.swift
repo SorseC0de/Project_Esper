@@ -189,6 +189,16 @@ final class GameScene: SKScene {
         }
     }
 
+    /// What's drawn in the world but must not glow, for the mask to mark: the banner.
+    var flatSnapshots: [BodySnapshot] {
+        guard !banner.isHidden, let texture = banner.texture else { return [] }
+        let scale = glowHud.xScale
+        return [BodySnapshot(texture: texture,
+                             position: CGPoint(x: glowHud.position.x + banner.position.x * scale, y: glowHud.position.y + banner.position.y * scale),
+                             anchor: banner.anchorPoint, xScale: 1,
+                             size: CGSize(width: banner.size.width * scale, height: banner.size.height * scale))]
+    }
+
     var cameraPosition: CGPoint { cameraNode.position }
     var cameraScale: CGFloat { cameraNode.xScale }
 
@@ -400,9 +410,11 @@ final class GameScene: SKScene {
         scoreLabel.isHidden = true
         hud.addChild(scoreLabel)
 
+        // The banner is in the world, under the material, so the count shows through a
+        // screen; the mask keeps it out of the glow.
         banner.zPosition = 5
         banner.isHidden = true
-        hud.addChild(banner)
+        glowHud.addChild(banner)
         circles.zPosition = 5
         glowHud.addChild(circles)
         for index in 0..<2 {
@@ -656,6 +668,8 @@ final class GameScene: SKScene {
             if let screen {
                 if pad.stick.x >= 0.5, menuLast.stick.x < 0.5 { screen.move(1) }
                 if pad.stick.x <= -0.5, menuLast.stick.x > -0.5 { screen.move(-1) }
+                if pad.stick.y <= -0.5, menuLast.stick.y > -0.5 { screen.move(1) }
+                if pad.stick.y >= 0.5, menuLast.stick.y < 0.5 { screen.move(-1) }
                 if pad.jump, !menuLast.jump { screen.fire() }
             } else if flow == .title, pad.jump, !menuLast.jump, online == nil {
                 startSeries()

@@ -31,17 +31,6 @@ enum PowerVariant: Int, CaseIterable {
     }
 }
 
-/// The dunk on the picker: A glides the body to the rim and draws each frame nudged by
-/// `DunkArt.offsets`; B glides and draws the frames raw, as the sheet has them; C neither,
-/// the body stays where the stance became a dunk and the frames are raw.
-enum DunkVariant: Int, CaseIterable {
-    case corrected, raw, still
-
-    var label: String { ["A", "B", "C"][rawValue] }
-    var nudges: Bool { self == .corrected }
-    var glides: Bool { self != .still }
-}
-
 /// How each frame of the dunk sequence is drawn: nudged from the body's place on the rim
 /// by this many art pixels, across (mirrored for the other rim) and up. Found on the
 /// sliders with `DunkTuning` on, as the user placed them: the throw stance, then the
@@ -65,8 +54,7 @@ enum DunkTuning {
 /// how far it spreads, how strong it comes back, and its colour.
 enum GlowSettings {
     /// Luminance above which a pixel glows, and the higher bar the bodies have to clear.
-    /// The first is on a slider at the top of the screen.
-    nonisolated(unsafe) static var threshold: Float = 0.2
+    static let threshold: Float = 0.2
     static let bodyThreshold: Float = 0.8
     static let softness: Float = 0.2
     /// Each pass blurs across and down at half size; more spreads further.

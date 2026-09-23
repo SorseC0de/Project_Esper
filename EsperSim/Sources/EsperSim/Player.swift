@@ -591,9 +591,7 @@ public struct Player: Equatable {
             let place = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y)
             let slam = BallRules.dunkFrames / 2
             let share = min(Double(stateTimer) / Double(slam), 1)
-            if BallRules.dunkGlides {
-                position = dunkFrom + (place - dunkFrom) * share
-            }
+            position = dunkFrom + (place - dunkFrom) * share
             if stateTimer == BallRules.dunkFrames / 2 {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames

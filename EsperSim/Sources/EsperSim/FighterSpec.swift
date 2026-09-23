@@ -309,9 +309,6 @@ public enum BallRules {
     /// backboard on the right; across is mirrored for the other. 16 art pixels back and
     /// 24 down, as the user placed it on the sliders.
     public static let dunkOffset = Vec2(x: -16 / 1.6, y: -24 / 1.6)
-    /// Tuning only: off, the body stays where the stance became a dunk instead of gliding
-    /// to the rim. The DUNK picker sets it.
-    nonisolated(unsafe) public static var dunkGlides = true
 
     /// The ball is caught within this of the chest, in front. Faster than the threshold it
     /// goes through instead, as a shot in flight does; those take the snatch. Bodies never

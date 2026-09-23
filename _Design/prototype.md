@@ -217,8 +217,8 @@ with the strike, and whoever was scored on drinks. The computer drinks at once, 
 its three at random on the series' dice; the human gets the pick screen once the strike
 has played, and the round counts again after the drink. Five circles across the top,
 dark purple, fill in the round winner's colour as they go, with a sixth and seventh
-added if the series gets there, and under them each side's drinks with their levels, in
-its colour. What the computer drank goes up as a banner after BUCKET!!. Four points
+added if the series gets there, and to either side of them each side's drinks with their
+levels, in its colour. What the computer drank goes up as a banner after BUCKET!!. Four points
 brings the win screen: NEW MATCH, a fresh
 best of seven with the drinks gone, or TITLE. RESET starts the round again with the
 drinks kept. A pick timer of twenty seconds for networked play is a number in `Series`,
@@ -266,10 +266,6 @@ holds the variants; A is always the baseline as tuned.
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER: A none, B Web Water, C Super Soda, D Flash Fizz, E Platform Protein Shake. The
   left bumper steps this one.
-- DUNK: A glides the body to the rim and draws the dunk's frames nudged into place by
-  `DunkArt.offsets`; B glides and draws them raw; C neither, the body staying where the
-  stance became a dunk (`BallRules.dunkGlides` off) with the frames raw. The left bumper
-  steps this one now, being newest.
 - HITBOX, beside RESET: draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green, a flash's tear cyan.
@@ -365,9 +361,9 @@ bodies, softness of the cut, blur passes at half size, intensity, tint. The pass
 `Glow.metal`. A second renderer draws a mirror scene holding only the two body sprites
 on black (`MaskScene`), and that mask tells the bright pass which threshold applies. The
 game scene is never drawn twice in a frame: SpriteKit reuses its per-frame buffers
-between two renders, which drew the bodies as white squares. The world threshold
-is on a slider across the top of the screen. The corner counter shows the frame rate and
-the worst frame gap of the last second, which is what a hitch shows up as.
+between two renders, which drew the bodies as white squares. The corner counter shows
+the frame rate and the worst frame gap of the last second, which is what a hitch shows
+up as.
 
 ## Queued
 

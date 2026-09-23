@@ -50,7 +50,7 @@ final class GameScene: SKScene {
     private var roundIntro = 0
     private var lastCount = 0
     /// Title lettering over the court: the count, BALL OUT, BUCKET, what the computer
-    /// drank, one after another; the round circles; and each side's drinks under them.
+    /// drank, one after another; the round circles; and each side's drinks beside them.
     private let banner = SKSpriteNode()
     private var bannerFrames = 0
     private var bannerQueue: [(text: String, size: CGFloat)] = []
@@ -62,7 +62,6 @@ final class GameScene: SKScene {
     var flowState: FlowState?
     private var headVariant = HeadVariant.b
     private var powerVariant = PowerVariant.none
-    private var dunkVariant = DunkVariant.corrected
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
@@ -560,13 +559,6 @@ final class GameScene: SKScene {
             self?.powerVariant = PowerVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addPicker(title: "DUNK", options: DunkVariant.allCases.map(\.label), selected: dunkVariant.rawValue) { [weak self] index in
-            self?.dunkVariant = DunkVariant(rawValue: index)!
-            BallRules.dunkGlides = self?.dunkVariant.glides ?? true
-        }
-        controls.addSlider(title: "GLOW THRESHOLD", range: 0.2...1.0, notch: 0.1, value: GlowSettings.threshold) { value in
-            GlowSettings.threshold = value
-        }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
@@ -585,9 +577,7 @@ final class GameScene: SKScene {
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 8)
         circles.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 16)
-        for (index, label) in drinkLabels.enumerated() {
-            label.position = CGPoint(x: index == 0 ? -12 : 12, y: circles.position.y - 12)
-        }
+        drawSeries()
         presentScreen()
         debugLabel.position = CGPoint(x: -halfWidth + safeInsets.left + TouchControls.padding, y: controls.pickerBottom - 6)
         fpsLabel.position = CGPoint(x: -halfWidth + safeInsets.left + TouchControls.padding, y: -halfHeight + safeInsets.bottom + TouchControls.padding)
@@ -805,7 +795,7 @@ final class GameScene: SKScene {
 
     /// The rounds across the top: five circles in dark purple, filled in the round
     /// winner's colour as they go, a sixth and seventh added if the series gets there;
-    /// and under them each side's drinks, with their levels.
+    /// and to either side of them each side's drinks, with their levels.
     private func drawSeries() {
         for (index, label) in drinkLabels.enumerated() where index < series.drinks.count {
             let drinks = series.drinks[index]
@@ -821,8 +811,13 @@ final class GameScene: SKScene {
         circles.removeAllChildren()
         let count = series.circles
         let spacing: CGFloat = 18
+        let radius: CGFloat = 6
+        let halfRow = CGFloat(count - 1) / 2 * spacing + radius
+        for (index, label) in drinkLabels.enumerated() {
+            label.position = CGPoint(x: (halfRow + 8) * (index == 0 ? -1 : 1), y: circles.position.y + radius)
+        }
         for index in 0..<count {
-            let circle = SKShapeNode(circleOfRadius: 6)
+            let circle = SKShapeNode(circleOfRadius: radius)
             circle.position = CGPoint(x: (CGFloat(index) - CGFloat(count - 1) / 2) * spacing, y: 0)
             circle.fillColor = index < series.rounds.count ? SKColor(rgb: sprites.look(for: series.rounds[index]).glow) : SKColor(rgb: 0x3A2A48)
             circle.strokeColor = SKColor(white: 0, alpha: 0.6)
@@ -1052,7 +1047,7 @@ final class GameScene: SKScene {
             let drift = CGPoint(x: (cos(lap) * Double(GameScene.hoverRadius * hover[index])).rounded(),
                                 y: (sin(lap) * Double(GameScene.hoverRadius * hover[index])).rounded())
             node.position = SpriteLibrary.point(player.position) + drift
-            if player.state == .dunking, dunkVariant.nudges {
+            if player.state == .dunking {
                 // Each frame of the dunk sits where its art was placed on the rim.
                 let nudge = DunkArt.offsets[Animation.dunkEntry(at: player.stateTimer).index]
                 node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y)

@@ -5,18 +5,16 @@ import SwiftUI
 /// The Metal layer: SpriteKit draws the scene into a texture through `SKRenderer`, and the
 /// glow pass composites it onto the screen. Effects that need their own pass go here.
 struct MetalGameView: UIViewRepresentable {
-    let flow: FlowState
+    let scene: GameScene
 
     func makeUIView(context: Context) -> GameMetalView {
-        let scene = GameScene()
-        scene.flowState = flow
-        return GameMetalView(scene: scene)
+        GameMetalView(scene: scene)
     }
 
     func updateUIView(_ uiView: GameMetalView, context: Context) {}
 }
 
-/// The view itself. Touches go straight to the scene's controls.
+/// The view itself. Touches land on the HUD's view over it, never here.
 final class GameMetalView: MTKView {
     let scene: GameScene
     private let renderer: GlowRenderer
@@ -28,31 +26,11 @@ final class GameMetalView: MTKView {
         super.init(frame: .zero, device: device)
         colorPixelFormat = .bgra8Unorm
         preferredFramesPerSecond = 60
-        isMultipleTouchEnabled = true
+        isUserInteractionEnabled = false
         delegate = renderer
     }
 
     required init(coder: NSCoder) { fatalError() }
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches {
-            scene.touchBegan(touch, at: touch.location(in: self), viewSize: bounds.size)
-        }
-    }
-
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches {
-            scene.touchMoved(touch, to: touch.location(in: self), viewSize: bounds.size)
-        }
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        touches.forEach(scene.touchEnded)
-    }
-
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        touches.forEach(scene.touchEnded)
-    }
 }
 
 /// Matches `GlowUniforms` in Glow.metal.

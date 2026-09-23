@@ -1,8 +1,9 @@
 import EsperSim
 import SpriteKit
 
-/// A screen laid over the game in HUD points: title lettering and a few choices a tap or
-/// the pad picks from. The pad's cursor is the raised choice.
+/// A screen laid over the game in HUD points, on the SwiftUI layer's dark material: title
+/// lettering and a few choices a tap or the pad picks from. The pad's cursor is the raised
+/// choice.
 class Screen: SKNode {
     struct Choice {
         let node: SKNode
@@ -24,14 +25,6 @@ class Screen: SKNode {
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    /// A dark veil over the world, so the lettering reads.
-    func veil(alpha: CGFloat = 0.55) {
-        let veil = SKSpriteNode(color: SKColor(red: 0.1, green: 0.06, blue: 0.14, alpha: alpha),
-                                size: CGSize(width: halfWidth * 2 + 4, height: halfHeight * 2 + 4))
-        veil.zPosition = -1
-        addChild(veil)
-    }
 
     /// A lettered button. Disabled ones are dimmed and never fire.
     @discardableResult
@@ -110,7 +103,6 @@ final class PickScreen: Screen {
         self.drinks = drinks
         self.onDrink = onDrink
         super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        veil(alpha: 0.7)
         let header = TitleText.node("GREATERAID", size: 40)
         header.position = CGPoint(x: 0, y: halfHeight - 44)
         addChild(header)
@@ -179,7 +171,6 @@ final class PickScreen: Screen {
 final class WinScreen: Screen {
     init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, onNewMatch: @escaping () -> Void, onTitle: @escaping () -> Void) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        veil()
         let title = TitleText.node("\(winner) WINS", size: 56)
         title.position = CGPoint(x: 0, y: halfHeight * 0.35)
         addChild(title)

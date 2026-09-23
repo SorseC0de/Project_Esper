@@ -12,8 +12,10 @@ neutral to get a shot off; catch it and the roles reverse.
   gives one frame of input like a pad, deterministic with its own random stream.
 - `ProjectEsper/` — the app. `GameScene` steps the sim at 60 and draws the last state.
   `MetalGameView` is the Metal layer: `SKRenderer` draws the scene into a texture and
-  `Glow.metal` composites it with the glow. `InputHub` merges touch and controllers.
-  `TouchControls` is the on-screen pad.
+  `Glow.metal` composites it with the glow. The HUD is a second scene, `HudScene`, shown
+  by a transparent SpriteKit view (`HudView`) laid over the Metal view, so nothing in it
+  glows; it takes the touches and hands them to the game scene. `InputHub` merges touch
+  and controllers. `TouchControls` is the on-screen pad.
 - `Tools/import_sprites.py` — copies the GMS2 frames and slices the strips in
   `_Graphic Assets` (square frames stacked one under another; a strip overrides the GMS2
   sprite of the same name) into the atlas. Run after art changes. The ball's imageset
@@ -368,9 +370,13 @@ bodies, softness of the cut, blur passes at half size, intensity, tint. The pass
 `Glow.metal`. A second renderer draws a mirror scene holding only the two body sprites
 on black (`MaskScene`), and that mask tells the bright pass which threshold applies. The
 game scene is never drawn twice in a frame: SpriteKit reuses its per-frame buffers
-between two renders, which drew the bodies as white squares. The corner counter shows
-the frame rate and the worst frame gap of the last second, which is what a hitch shows
-up as.
+between two renders, which drew the bodies as white squares. The HUD never goes through
+the glow: it's drawn by its own SpriteKit view over the Metal view, transparent, so the
+bottles and the two-tone lettering keep their colours. Only the round circles glow, kept
+in the game scene under the camera. The pick and win screens sit on the same dark
+ultra-thin material as the title, a SwiftUI layer between the two views (`FlowState.veiled`).
+The corner counter shows the frame rate and the worst frame gap of the last second,
+which is what a hitch shows up as.
 
 ## Queued
 

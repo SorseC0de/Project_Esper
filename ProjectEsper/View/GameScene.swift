@@ -58,8 +58,9 @@ final class GameScene: SKScene {
     private let circles = SKNode()
     private var drinkLabels: [SKLabelNode] = []
     private var menuLast = PlayerInput.idle
-    /// The SwiftUI layer, which shows the title over the Metal view.
-    var flowState: FlowState?
+    /// The SwiftUI layer, which shows the title over the Metal view and the material
+    /// under a screen.
+    weak var flowState: FlowState?
     private var headVariant = HeadVariant.b
     private var powerVariant = PowerVariant.none
     private let sprites = SpriteLibrary()
@@ -75,9 +76,14 @@ final class GameScene: SKScene {
     /// loose ball, the catch reach round each chest, and any live leg, blade or reach.
     private let hitboxLayer = SKNode()
     private var showHitboxes = false
-    /// Sits at the camera's position, scaled to cancel the camera, so its children are laid
-    /// out in screen points from the centre and a touch maps onto them with no arithmetic.
-    private let hud = SKNode()
+    /// The HUD lives in its own scene, drawn over the Metal view by a plain SpriteKit view
+    /// so none of it glows; its children are laid out in screen points from the centre
+    /// and a touch maps onto them with no arithmetic. What should glow, the round circles
+    /// and the warm-up, sits in `glowHud` here, at the camera's position and scaled to
+    /// cancel it, in the same points.
+    let hudScene = HudScene()
+    private var hud: SKNode { hudScene.hud }
+    private let glowHud = SKNode()
     private var controls: TouchControls?
     private var playerNodes: [SKSpriteNode] = []
     /// Each head, drawn apart from its body and following it loosely.
@@ -174,6 +180,7 @@ final class GameScene: SKScene {
     /// The Metal view calls this with its size in points whenever that or the safe area changes.
     func attach(size: CGSize, displayScale: CGFloat, insets: UIEdgeInsets) {
         self.size = size
+        hudScene.size = size
         safeInsets = insets
         hub.activate()
         if !built {
@@ -196,8 +203,8 @@ final class GameScene: SKScene {
         world.addChild(hitboxLayer)
         camera = cameraNode
         addChild(cameraNode)
-        hud.zPosition = 100
-        addChild(hud)
+        glowHud.zPosition = 100
+        addChild(glowHud)
 
         // Every frame in both looks, made before anything is drawn, then drawn once each.
         sprites.warmUp(players: match.players.count) { [weak self] in self?.preloaded = true }
@@ -208,7 +215,7 @@ final class GameScene: SKScene {
             warmNode.addChild(sprite)
         }
         warmNode.zPosition = 90
-        hud.addChild(warmNode)
+        glowHud.addChild(warmNode)
 
         // The floor and walls take the holder's colour, the backboard blocks keep their rim's
         // owner's, and the ledge is magenta.
@@ -372,7 +379,7 @@ final class GameScene: SKScene {
         banner.isHidden = true
         hud.addChild(banner)
         circles.zPosition = 5
-        hud.addChild(circles)
+        glowHud.addChild(circles)
         for index in 0..<2 {
             let label = SKLabelNode()
             label.fontName = "Menlo-Bold"
@@ -540,8 +547,8 @@ final class GameScene: SKScene {
         let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraNode.position = CGPoint(x: stageWidth / 2, y: stageHeight / 2)
-        hud.position = cameraNode.position
-        hud.setScale(cameraNode.xScale)
+        glowHud.position = cameraNode.position
+        glowHud.setScale(cameraNode.xScale)
 
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
@@ -791,6 +798,7 @@ final class GameScene: SKScene {
         }
         if let screen { hud.addChild(screen) }
         controls?.isHidden = flow != .playing
+        flowState?.veiled = screen != nil
     }
 
     /// The rounds across the top: five circles in dark purple, filled in the round
@@ -1372,7 +1380,7 @@ final class GameScene: SKScene {
         }
     }
 
-    // MARK: Touches, from the Metal view in points
+    // MARK: Touches, from the HUD's view in points
 
     /// A point in the view as a point in the HUD's space: the same points, from the centre, y up.
     private func hudPoint(_ point: CGPoint, viewSize: CGSize) -> CGPoint {

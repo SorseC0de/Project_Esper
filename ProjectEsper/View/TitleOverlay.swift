@@ -1,10 +1,17 @@
 import SwiftUI
 
-/// What the scene tells the SwiftUI layer: whether the title is up, and what to do when
-/// its button is pressed.
+/// The game and what its scene tells the SwiftUI layer: whether the title is up, whether
+/// a screen wants the dark material under it, and what to do when the title's button is
+/// pressed.
 final class FlowState: ObservableObject {
+    let scene = GameScene()
     @Published var showsTitle = true
+    @Published var veiled = false
     var startSeries: (() -> Void)?
+
+    init() {
+        scene.flowState = self
+    }
 }
 
 /// The title screen, over the Metal view on a dark ultra-thin material so the court shows

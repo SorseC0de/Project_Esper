@@ -293,7 +293,8 @@ public enum BallRules {
     public static let dunkOffset = Vec2(x: -16 / 1.6, y: -24 / 1.6)
 
     /// The ball is caught within this of the chest, in front. Faster than the threshold it
-    /// bounces off instead; that, and a shot in flight, take the snatch.
+    /// goes through instead, as a shot in flight does; those take the snatch. Bodies never
+    /// deflect the ball.
     public static let catchRadius = 12.5
     /// The second ring, the catch spark's where the snatch puts it, on the hand at full
     /// stretch: centred this far ahead of and above the feet and as big as the spark
@@ -302,13 +303,11 @@ public enum BallRules {
     public static let handCatchCentre = Vec2(x: 18 / 1.6, y: 19 / 1.6)
     public static let handCatchRadius = 16 / 1.6
     public static let catchSpeedThreshold = 5.0
-    /// Frames after bouncing off a body in which the rings don't take the ball.
-    public static let offBodyFrames = 10
     /// Knocked loose by a blade or a leg, or robbed by a snatch, the body can't press
     /// anything or catch anything for this long, though the stick still moves it: the
     /// taker's advantage for the ball. Longer than the pop's round trip, which is 32
     /// frames up and back to chest height, so the ball comes down while they're still out.
-    public static let hitStunFrames = 45
+    public static let hitStunFrames = 60
     public static let chestHeight = 9.0
     /// A ball knocked out of a holder's hands pops straight up: the floater's drift for
     /// this many frames, then a normal fall, nobody's.

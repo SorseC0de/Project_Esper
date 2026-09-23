@@ -532,14 +532,15 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity, Vec2(x: BallRules.throwSpeed, y: 0))
     }
 
-    func testFastBallBouncesOffUnlessSnatched() {
+    func testFastBallGoesThroughUnlessSnatched() {
         var match = Match()
         let chest = match.players[0].chest
         match.ball.respawn(at: chest + Vec2(x: 20, y: 0))
         match.ball.velocity = Vec2(x: -BallRules.throwSpeed, y: 0)
-        run(&match, frames: 10, input: { _ in .idle }) { $0.ball.velocity.x > 0 || $0.ball.holder != nil }
+        let through = run(&match, frames: 10, input: { _ in .idle }) { $0.ball.position.x < chest.x - 10 || $0.ball.holder != nil }
+        XCTAssertLessThan(through, 10)
         XCTAssertNil(match.ball.holder)
-        XCTAssertGreaterThan(match.ball.velocity.x, 0, "a thrown ball should bounce off an idle body")
+        XCTAssertLessThan(match.ball.velocity.x, 0, "a thrown ball should go straight through an idle body")
 
         // The snatch, pressed as it comes, takes it.
         var snatching = Match()
@@ -548,7 +549,7 @@ final class BallTests: XCTestCase {
         run(&snatching, frames: 15, input: { _ in PlayerInput(throwBall: true) }) { $0.ball.holder != nil }
         XCTAssertEqual(snatching.ball.holder, 0)
 
-        // Shoot held does nothing for it: the press is a slash, and after that it still bounces.
+        // Shoot held does nothing for it: the press is a slash, and after that it still goes through.
         var holding = Match()
         holding.players[1].position.x = 20
         holding.ball.respawn(at: chest + Vec2(x: 150, y: 0))

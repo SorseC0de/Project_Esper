@@ -121,19 +121,15 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Catch is automatic, in two rings: the ball within 12.5 of the chest and either in front,
   or in the way of where the body is moving; or within the catch spark's ring where the
   snatch puts it, on the hand at full stretch: 16 art pixels, the spark's full size,
-  round a point 18 ahead of and 19 above the feet, whichever way the body moves. A
-  ball arriving from behind while standing still bounces off, and so does one faster
-  than 5 a frame (a throw is 7) unless the body is reaching with a snatch, and for 10
-  frames after bouncing off a body the rings don't take it, so it isn't caught on the
-  rebound. A shot in
-  flight, before its first bounce, is different: it goes straight through a body,
-  neither caught nor deflected, unless that body is reaching with a snatch; after its
-  first bounce it's a loose ball again. The snatch is the catch: there is no catch
-  stance.
+  round a point 18 ahead of and 19 above the feet, whichever way the body moves. Bodies
+  never deflect the ball: a ball arriving from behind while standing still goes straight
+  through, and so does one faster than 5 a frame (a throw is 7) or a shot in flight
+  before its first bounce, unless the body is reaching with a snatch or swinging the
+  blade. The snatch is the catch: there is no catch stance.
 - Knocked loose by the blade or the slide's leg, or robbed by a snatch, a body can't
-  press anything or catch anything for 45 frames, longer than the pop's round trip,
-  though the stick still moves it, its body doesn't deflect the ball, and its sprite
-  flickers white: the taker has first go at the ball.
+  press anything or catch anything for 60 frames, longer than the pop's round trip,
+  though the stick still moves it, and its sprite flickers white: the taker has first
+  go at the ball.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
   would carry it through the rim, a share a frame, never snapped. Only a shot's or a
   floater's ball, and only until its first bounce off anything; a throw's never. Down

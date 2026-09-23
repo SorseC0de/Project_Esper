@@ -15,12 +15,9 @@ public struct Ball: Equatable {
     /// anything. A thrown ball never steers, so scoring off a throw is the ball going
     /// through on its own.
     public var steers = false
-    /// A shot still in flight, before its first bounce: it goes through a body rather than
-    /// into its hands or off it; only a snatch takes it.
+    /// A shot still in flight, before its first bounce: the rings don't take it; only a
+    /// snatch does. Bodies never deflect the ball; it goes through anyone not catching it.
     public var shotInFlight = false
-    /// Frames since it bounced off a body in which the rings don't take it, so a ball that
-    /// was too fast to catch isn't caught on the rebound.
-    public var offBodyFrames = 0
     /// The hoop it last rose up through; its next fall through that hoop isn't a score.
     public var roseThrough: Int?
     /// Who released or swatted it last.
@@ -47,10 +44,9 @@ public struct Ball: Equatable {
     public var isLive: Bool { holder == nil && respawnTimer == 0 }
 
     /// Moves the loose ball one frame. Returns the hoop it fell through, if any.
-    public mutating func step(stage: Stage, bodies: [Box], events: inout [MatchEvent]) -> Int? {
+    public mutating func step(stage: Stage, events: inout [MatchEvent]) -> Int? {
         previousY = position.y
         if ownedFrames > 0 { ownedFrames -= 1 }
-        if offBodyFrames > 0 { offBodyFrames -= 1 }
         var scoredHoop: Int?
 
         for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y {
@@ -72,9 +68,6 @@ public struct Ball: Equatable {
         position.y += sweptY.moved
         if sweptY.landed || sweptY.ceiling {
             bounceY(events: &events)
-        }
-        for body in bodies {
-            deflect(off: body, events: &events)
         }
 
         // Down through a rim scores, unless it rose up through that rim first.
@@ -132,37 +125,6 @@ public struct Ball: Equatable {
         let rebound = -velocity.y * BallRules.bounce
         velocity.y = abs(rebound) > 0.6 ? rebound : 0
         events.append(.ballBounced(position: position))
-    }
-
-    /// Pushes out of a body along the shallow axis and reflects that part of the velocity.
-    /// A reflection, not the push alone, keeps the rings off it for a moment.
-    private mutating func deflect(off body: Box, events: inout [MatchEvent]) {
-        let mine = box
-        guard mine.overlaps(body) else { return }
-        let pushLeft = mine.max.x - body.min.x
-        let pushRight = body.max.x - mine.min.x
-        let pushDown = mine.max.y - body.min.y
-        let pushUp = body.max.y - mine.min.y
-        let smallest = min(pushLeft, pushRight, pushDown, pushUp)
-        var bounced = false
-        if smallest == pushLeft {
-            position.x -= pushLeft
-            bounced = velocity.x > 0
-            if bounced { bounceX(events: &events) }
-        } else if smallest == pushRight {
-            position.x += pushRight
-            bounced = velocity.x < 0
-            if bounced { bounceX(events: &events) }
-        } else if smallest == pushDown {
-            position.y -= pushDown
-            bounced = velocity.y > 0
-            if bounced { bounceY(events: &events) }
-        } else {
-            position.y += pushUp
-            bounced = velocity.y < 0
-            if bounced { bounceY(events: &events) }
-        }
-        if bounced { offBodyFrames = BallRules.offBodyFrames }
     }
 
     public mutating func release(from position: Vec2, velocity: Vec2, by player: Int, straight: Bool) {

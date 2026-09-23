@@ -334,7 +334,7 @@ final class BallTests: XCTestCase {
         XCTAssertGreaterThan(match.ball.velocity.y, 0)
         XCTAssertGreaterThan(match.ball.velocity.x, 0)
         // One frame of gravity has already come off it.
-        XCTAssertEqual(match.ball.velocity.length, BallRules.shotSpeed, accuracy: 0.2)
+        XCTAssertEqual(match.ball.velocity.length, FighterSpec.baseline.shotSpeed, accuracy: 0.2)
     }
 
     func testReleaseWithoutFlickFollowsThroughOnThePresetArc() {
@@ -346,7 +346,7 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .shooting)
         run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
-        XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * BallRules.shotSpeed, accuracy: 0.001)
+        XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * FighterSpec.baseline.shotSpeed, accuracy: 0.001)
     }
 
     func testDownOnTheGroundCancelsTheShot() {
@@ -367,7 +367,7 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .shooting)
         run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
-        XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * BallRules.shotSpeed, accuracy: 0.001)
+        XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * FighterSpec.baseline.shotSpeed, accuracy: 0.001)
         XCTAssertGreaterThan(match.ball.velocity.y, 0)
     }
 
@@ -383,7 +383,7 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .shooting)
         run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
-        let preset = sin(BallRules.shotAngleDefault) * BallRules.shotSpeed
+        let preset = sin(BallRules.shotAngleDefault) * FighterSpec.baseline.shotSpeed
         XCTAssertGreaterThan(match.ball.velocity.y, preset)
     }
 
@@ -783,11 +783,23 @@ final class BallTests: XCTestCase {
 }
 
 final class WebWaterTests: XCTestCase {
+    /// Both on Web Water at level two, the line included.
     private func webbed() -> Match {
         var match = Match()
-        match.players[0].power = .webWater
-        match.players[1].power = .webWater
+        for index in match.players.indices {
+            match.players[index].power = .webWater
+            match.players[index].powerLevel = 2
+        }
         return match
+    }
+
+    func testTheWebLineWaitsForLevelTwo() {
+        var match = webbed()
+        match.players[0].powerLevel = 1
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: 60, y: 0))
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertFalse(match.players[0].webAiming)
+        XCTAssertEqual(match.players[0].state, .snatching)
     }
 
     @discardableResult
@@ -1024,11 +1036,58 @@ final class WebWaterTests: XCTestCase {
 
 
 final class SodaAndFizzTests: XCTestCase {
-    private func with(_ power: Power) -> Match {
+    /// Both on the power, at level two unless said otherwise.
+    private func with(_ power: Power, level: Int = 2) -> Match {
         var match = Match()
-        match.players[0].power = power
-        match.players[1].power = power
+        for index in match.players.indices {
+            match.players[index].power = power
+            match.players[index].powerLevel = level
+        }
         return match
+    }
+
+    func testLevelTwoSodaFliesFasterAndLonger() {
+        XCTAssertEqual(SodaRules.flightSpeed(level: 2, withBall: true), SodaRules.flightSpeed(level: 1, withBall: false))
+        XCTAssertGreaterThan(SodaRules.flightSpeed(level: 2, withBall: false), SodaRules.flightSpeed(level: 1, withBall: false))
+        XCTAssertGreaterThan(SodaRules.flightFrames(level: 2), SodaRules.flightFrames(level: 1))
+        var match = with(.superSoda, level: 2)
+        match.ball.respawn(at: Vec2(x: 300, y: 30))
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 10, input: { _ in .idle })
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .flying }
+        run(&match, frames: 5, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
+        XCTAssertEqual(match.players[0].velocity.x, SodaRules.flightSpeed(level: 2, withBall: false), accuracy: 0.001)
+    }
+
+    func testFlightNeedsNoSecondJump() {
+        var match = Match(specs: [.starting, .starting])
+        match.players[0].power = .superSoda
+        match.ball.respawn(at: Vec2(x: 300, y: 30))
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&match, frames: 10, input: { _ in .idle })
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .flying }
+        XCTAssertEqual(match.players[0].state, .flying)
+    }
+
+    func testLevelOneFizzFlashesWithoutATearAndLevelTwoTearsBothEnds() {
+        var one = with(.flashFizz, level: 1)
+        one.players[1].position.x = 300
+        one.ball.respawn(at: Vec2(x: 300, y: 30))
+        one.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        XCTAssertEqual(one.players[0].position.x, 130 + FizzRules.flashDistance(level: 1), accuracy: 0.001)
+        XCTAssertNil(one.players[0].tear)
+
+        // Level two: further, and the other holding the ball where it came out loses it to
+        // the tear on the spot.
+        var two = with(.flashFizz, level: 2)
+        two.players[1].hasBall = true
+        two.ball.holder = 1
+        two.players[1].position.x = 130 + FizzRules.flashDistance(level: 2) + 8
+        two.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        XCTAssertEqual(two.players[0].position.x, 130 + FizzRules.flashDistance(level: 2), accuracy: 0.001)
+        XCTAssertTrue(two.events.contains(.popped(player: 1, by: 0)))
+        XCTAssertFalse(two.players[1].hasBall)
+        XCTAssertEqual(two.ball.holder, 0)
     }
 
     @discardableResult
@@ -1041,7 +1100,7 @@ final class SodaAndFizzTests: XCTestCase {
     }
 
     func testHeldJumpInTheAirIsFlightThatIgnoresGravity() {
-        var match = with(.superSoda)
+        var match = with(.superSoda, level: 1)
         match.ball.respawn(at: Vec2(x: 300, y: 30))
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 10, input: { _ in .idle })
@@ -1051,7 +1110,7 @@ final class SodaAndFizzTests: XCTestCase {
         run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
         XCTAssertEqual(match.players[0].state, .flying)
         XCTAssertEqual(match.players[0].position.y, height, accuracy: 0.001)
-        XCTAssertEqual(match.players[0].velocity.x, SodaRules.flightSpeedWithoutBall, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, SodaRules.flightSpeed(level: 1, withBall: false), accuracy: 0.001)
         // Let go and it falls.
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .air)
@@ -1073,13 +1132,14 @@ final class SodaAndFizzTests: XCTestCase {
     }
 
     func testFlightRunsOutAndRefillsOnLanding() {
-        var match = with(.superSoda)
+        var match = with(.superSoda, level: 1)
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 10, input: { _ in .idle })
-        let ended = run(&match, frames: SodaRules.flightFrames + 20, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .air && $0.players[0].flightLeft <= 0 }
-        XCTAssertLessThan(ended, SodaRules.flightFrames + 20)
+        let budget = SodaRules.flightFrames(level: 1)
+        let ended = run(&match, frames: budget + 20, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .air && $0.players[0].flightLeft <= 0 }
+        XCTAssertLessThan(ended, budget + 20)
         run(&match, frames: 200, input: { _ in .idle }) { $0.players[0].grounded }
-        XCTAssertEqual(match.players[0].flightLeft, SodaRules.flightFrames)
+        XCTAssertEqual(match.players[0].flightLeft, budget)
     }
 
     func testWarpToYourOwnBallAndCatchIt() {
@@ -1102,10 +1162,10 @@ final class SodaAndFizzTests: XCTestCase {
         var match = with(.flashFizz)
         match.players[1].position.x = 300
         // A ball out of every ring's reach, but within the tear's once the flash lands.
-        match.ball.respawn(at: match.players[0].position + Vec2(x: 34, y: 15))
+        match.ball.respawn(at: match.players[0].position + Vec2(x: FizzRules.flashDistance(level: 2) + 4, y: 15))
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
         XCTAssertTrue(match.events.contains { if case .flashed(player: 0, _, _) = $0 { return true } else { return false } })
-        XCTAssertEqual(match.players[0].position.x, 130 + FizzRules.flashDistance, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].position.x, 130 + FizzRules.flashDistance(level: 2), accuracy: 0.001)
         XCTAssertEqual(match.ball.holder, 0)
     }
 
@@ -1174,12 +1234,22 @@ final class SodaAndFizzTests: XCTestCase {
 }
 
 final class ShakeTests: XCTestCase {
+    /// Both on the shake at level two, the wall included.
     private func shaken() -> Match {
         var match = Match()
-        match.players[0].power = .platformShake
-        match.players[1].power = .platformShake
+        for index in match.players.indices {
+            match.players[index].power = .platformShake
+            match.players[index].powerLevel = 2
+        }
         match.ball.respawn(at: Vec2(x: 300, y: 30))
         return match
+    }
+
+    func testTheWallWaitsForLevelTwo() {
+        var match = shaken()
+        match.players[0].powerLevel = 1
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .slashing)
     }
 
     @discardableResult
@@ -1540,6 +1610,7 @@ final class FootsiesTests: XCTestCase {
     func testWebWaterKeepsTheLineOnThrow() {
         var match = neutral()
         match.players[0].power = .webWater
+        match.players[0].powerLevel = 2
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         XCTAssertNotEqual(match.players[0].state, .snatching)
         XCTAssertTrue(match.players[0].webAiming)
@@ -1771,5 +1842,89 @@ final class OpponentTests: XCTestCase {
         match.ball.respawn(at: Vec2(x: 280, y: 30))
         let got = play(&match, &brain, frames: 300, input: { _ in .idle }) { $0.ball.holder == 1 }
         XCTAssertLessThan(got, 300, "never picked the ball up")
+    }
+}
+
+final class GreateraidTests: XCTestCase {
+    func testOneHorchataAndOneJuiceIsTheBaseline() {
+        var drinks = Drinks.none
+        drinks.drink(.hastyHorchata)
+        drinks.drink(.jumperJuice)
+        let spec = drinks.spec()
+        XCTAssertEqual(spec.runSpeed, FighterSpec.baseline.runSpeed, accuracy: 0.001)
+        XCTAssertEqual(spec.dashInitialVelocity, FighterSpec.baseline.dashInitialVelocity, accuracy: 0.001)
+        XCTAssertEqual(spec.airSpeedMax, FighterSpec.baseline.airSpeedMax, accuracy: 0.001)
+        XCTAssertEqual(spec.jumps, FighterSpec.baseline.jumps)
+        XCTAssertEqual(FighterSpec.starting.runSpeed, FighterSpec.baseline.runSpeed - 0.5, accuracy: 0.001)
+        XCTAssertEqual(FighterSpec.starting.jumps, 1)
+    }
+
+    func testTheStartingBodyHasNoSecondJump() {
+        var match = Match(specs: [.starting, .starting])
+        for _ in 0..<6 { match.advance(inputs: [PlayerInput(jump: true), .idle]) }
+        XCTAssertEqual(match.players[0].state, .air)
+        XCTAssertEqual(match.players[0].jumpsLeft, 0)
+        match.advance(inputs: [.idle, .idle])
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertFalse(match.events.contains(.doubleJumped(player: 0)))
+    }
+
+    func testBoostersStackToTwoAndThenStopBeingOffered() {
+        var drinks = Drinks.none
+        drinks.drink(.cannonCola)
+        drinks.drink(.cannonCola)
+        drinks.drink(.cannonCola)
+        XCTAssertEqual(drinks.level(of: .cannonCola), 2)
+        XCTAssertEqual(drinks.spec().shotSpeed, FighterSpec.starting.shotSpeed + 1, accuracy: 0.001)
+        var dice = Dice(seed: 3)
+        for _ in 0..<50 {
+            let offer = drinks.offers(&dice)
+            XCTAssertEqual(offer.count, 3)
+            XCTAssertFalse(offer.contains(.cannonCola))
+            XCTAssertEqual(Set(offer).count, 3, "an offer never repeats a bottle")
+        }
+    }
+
+    func testBiomorphsAreRarerAndOneAtATimeThenBioBoba() {
+        var drinks = Drinks.none
+        var dice = Dice(seed: 9)
+        var biomorphs = 0, boosters = 0
+        for _ in 0..<300 {
+            for drink in drinks.offers(&dice) {
+                if drink.kind == .biomorph { biomorphs += 1 } else { boosters += 1 }
+            }
+        }
+        XCTAssertGreaterThan(boosters, biomorphs * 2)
+        XCTAssertGreaterThan(biomorphs, 0)
+        drinks.drink(.superSoda)
+        XCTAssertEqual(drinks.power, .superSoda)
+        XCTAssertEqual(drinks.powerLevel, 1)
+        for _ in 0..<50 {
+            let offer = drinks.offers(&dice)
+            XCTAssertFalse(offer.contains { $0.kind == .biomorph }, "with a biomorph in hand no other is offered")
+        }
+        var sawBoba = false
+        for _ in 0..<50 where drinks.offers(&dice).contains(.bioBoba) { sawBoba = true }
+        XCTAssertTrue(sawBoba)
+        drinks.drink(.bioBoba)
+        XCTAssertEqual(drinks.powerLevel, 2)
+        for _ in 0..<50 {
+            XCTAssertFalse(drinks.offers(&dice).contains(.bioBoba), "at level two Bio-Boba is done")
+        }
+    }
+
+    func testASeriesIsFirstToFourAndGrowsItsCircles() {
+        var series = Series()
+        XCTAssertEqual(series.circles, 5)
+        for winner in [0, 1, 0, 1, 0] { series.record(pointFor: winner) }
+        XCTAssertNil(series.winner)
+        XCTAssertEqual(series.circles, 6)
+        series.record(pointFor: 1)
+        XCTAssertEqual(series.circles, 7)
+        series.record(pointFor: 0)
+        XCTAssertEqual(series.winner, 0)
+        let fresh = series.fresh()
+        XCTAssertEqual(fresh.wins, [0, 0])
+        XCTAssertEqual(fresh.drinks, [.none, .none])
     }
 }

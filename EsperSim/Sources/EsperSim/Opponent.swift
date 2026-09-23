@@ -422,7 +422,7 @@ public struct Opponent: Equatable {
         var angle = BallRules.shotAngleMin
         while angle <= BallRules.shotAngleMax + 0.001 {
             var position = feet + Vec2(x: 0, y: BallRules.shotReleaseHeight)
-            var velocity = Vec2(x: cos(angle) * sign, y: sin(angle)) * BallRules.shotSpeed + Vec2(x: 0, y: lift)
+            var velocity = Vec2(x: cos(angle) * sign, y: sin(angle)) * match.players[index].spec.shotSpeed + Vec2(x: 0, y: lift)
             var error: Double?
             for _ in 0..<200 {
                 let before = position

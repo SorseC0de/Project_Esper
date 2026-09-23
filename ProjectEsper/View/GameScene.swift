@@ -33,6 +33,28 @@ final class GameScene: SKScene {
     /// The computer on the other side, when the AI switch is on.
     private var opponent = Opponent(index: 1)
     private var aiOn = true
+
+    /// The game loop round the sim: the title, a best of seven, a drink between rounds
+    /// for whoever was scored on, and the win.
+    private enum Flow { case title, playing, picking, won }
+    private var flow = Flow.title
+    private var series = Series(seed: 1)
+    private var screen: Screen?
+    /// The bottles on offer while picking, kept so a re-laid-out screen shows the same.
+    private var pickOffers: [Greateraid] = []
+    /// A flow change held back for the strike to play.
+    private var pendingFlow: Flow?
+    private var flowDelay = 0
+    /// Frames the bodies stay hidden while the bolts bring them in, and the count's last
+    /// value, to catch it reaching zero.
+    private var roundIntro = 0
+    private var lastCount = 0
+    /// Title lettering over the court: the count, BALL OUT, BUCKET; and the round circles.
+    private let banner = SKSpriteNode()
+    private var bannerFrames = 0
+    private static let bannerHold = 45
+    private let circles = SKNode()
+    private var menuLast = PlayerInput.idle
     private var headVariant = HeadVariant.b
     private var powerVariant = PowerVariant.none
     private let sprites = SpriteLibrary()
@@ -107,7 +129,6 @@ final class GameScene: SKScene {
     private var rimFlash: [Int] = []
     private var previewDots: [SKSpriteNode] = []
     private let scoreLabel = SKLabelNode()
-    private let countLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
     private let fpsLabel = SKLabelNode()
     private var lastTime: TimeInterval?
@@ -127,7 +148,7 @@ final class GameScene: SKScene {
 
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
-        playerNodes.compactMap { node in
+        playerNodes.filter { !$0.isHidden }.compactMap { node in
             node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
         }
     }
@@ -339,14 +360,15 @@ final class GameScene: SKScene {
         scoreLabel.fontSize = 16
         scoreLabel.fontColor = .white
         scoreLabel.verticalAlignmentMode = .top
+        scoreLabel.isHidden = true
         hud.addChild(scoreLabel)
 
-        countLabel.fontName = "Menlo-Bold"
-        countLabel.fontSize = 48
-        countLabel.fontColor = .white
-        countLabel.verticalAlignmentMode = .center
-        countLabel.zPosition = 5
-        hud.addChild(countLabel)
+        banner.zPosition = 5
+        banner.isHidden = true
+        hud.addChild(banner)
+        circles.zPosition = 5
+        hud.addChild(circles)
+        drawCircles()
 
         debugLabel.fontName = "Menlo"
         debugLabel.fontSize = 8
@@ -529,6 +551,8 @@ final class GameScene: SKScene {
         hud.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 8)
+        circles.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 16)
+        presentScreen()
         debugLabel.position = CGPoint(x: -halfWidth + safeInsets.left + TouchControls.padding, y: controls.pickerBottom - 6)
         fpsLabel.position = CGPoint(x: -halfWidth + safeInsets.left + TouchControls.padding, y: -halfHeight + safeInsets.bottom + TouchControls.padding)
     }
@@ -555,8 +579,31 @@ final class GameScene: SKScene {
         accumulator += min(currentTime - last, 0.1)
         guard accumulator >= GameScene.stepSeconds else { return }
 
-        hub.touch = controls?.sample() ?? .idle
+        if flowDelay > 0 {
+            flowDelay -= 1
+            if flowDelay == 0, let next = pendingFlow {
+                pendingFlow = nil
+                enter(next)
+            }
+        }
+        if roundIntro > 0 { roundIntro -= 1 }
+        hub.touch = flow == .playing ? controls?.sample() ?? .idle : .idle
         var inputs = hub.frames(players: match.players.count)
+        if flow != .playing {
+            // A screen is up: the stick moves its cursor and jump picks; the sim waits.
+            let pad = inputs.first ?? .idle
+            if let screen {
+                if pad.stick.x >= 0.5, menuLast.stick.x < 0.5 { screen.move(1) }
+                if pad.stick.x <= -0.5, menuLast.stick.x > -0.5 { screen.move(-1) }
+                if pad.jump, !menuLast.jump { screen.fire() }
+            }
+            menuLast = pad
+            accumulator = 0
+            tickBallColour()
+            tickCourtColour()
+            render()
+            return
+        }
         if hub.consumeReset() { reset() }
         if hub.consumeCycle() { controls?.cycleTopPicker() }
         var steps = 0
@@ -590,15 +637,142 @@ final class GameScene: SKScene {
         debugLabel.text = String(format: "dunk offset %d, %d art px", Int(DunkTuning.x), Int(DunkTuning.y))
     }
 
-    /// Everyone back to the start, scores cleared.
+    /// The round again from the start, drinks kept.
     private func reset() {
-        match = Match(countdown: GameScene.countdownFrames)
+        startRound()
+    }
+
+    // MARK: The game loop
+
+    /// A new best of seven: the drinks gone, the dice rolled on, the first round.
+    private func startSeries() {
+        series = Series(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
+        startRound()
+        enter(.playing)
+    }
+
+    /// A round: bodies with their drinks in them at their spawns, the count, and the
+    /// bolts that bring them in.
+    private func startRound() {
+        match = Match(specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames)
+        for index in match.players.indices {
+            match.players[index].power = series.drinks[index].power
+            match.players[index].powerLevel = series.drinks[index].powerLevel
+        }
         opponent = Opponent(index: 1)
         rimFlash = rimFlash.map { _ in 0 }
         ballTeam = SKColor(rgb: BallLook.neutral)
         ballHold = 0
         ballShift = 0
-        applyPower()
+        lastCount = match.countdown
+        drawCircles()
+        bringPlayersIn()
+    }
+
+    /// The drinks onto the bodies as they stand, for the round about to count.
+    private func applyDrinks() {
+        for index in match.players.indices {
+            match.players[index].spec = series.drinks[index].spec()
+            match.players[index].power = series.drinks[index].power
+            match.players[index].powerLevel = series.drinks[index].powerLevel
+        }
+    }
+
+    /// Both bodies struck in at their spawns by a bolt and the crown in their colours,
+    /// hidden until the flash.
+    private func bringPlayersIn() {
+        roundIntro = 12
+        let top = cameraNode.position.y + size.height * cameraNode.yScale / 2
+        for player in match.players {
+            let point = SpriteLibrary.point(player.position)
+            let bolt = EnergyEffect.strikes.randomElement()!.node(sprites, player: player.index, at: point)
+            bolt.zPosition = 45
+            bolt.yScale = max((top - point.y) * 1.1, 64) / bolt.size.height
+            glowers.addChild(bolt)
+            let crown = EnergyEffect.spark3.node(sprites, player: player.index, at: point)
+            crown.zPosition = 46
+            glowers.addChild(crown)
+        }
+    }
+
+    /// A point: the round to the scorer. The winner's screen after the strike; otherwise
+    /// whoever was scored on drinks, the computer at once and the human on the pick
+    /// screen once the strike has played.
+    private func pointScored(by scorer: Int) {
+        guard flow == .playing else { return }
+        series.record(pointFor: scorer)
+        drawCircles()
+        if series.winner != nil {
+            pendingFlow = .won
+            flowDelay = 60
+        } else if scorer == 0 {
+            let offers = series.offers(for: 1)
+            series.drink(offers[series.dice.roll(offers.count)], by: 1)
+            applyDrinks()
+            bringPlayersIn()
+        } else {
+            pendingFlow = .picking
+            flowDelay = 45
+        }
+    }
+
+    private func enter(_ next: Flow) {
+        flow = next
+        if next == .picking { pickOffers = series.offers(for: 0) }
+        presentScreen()
+    }
+
+    /// The screen for the flow, built for the view's size.
+    private func presentScreen() {
+        screen?.removeFromParent()
+        screen = nil
+        let halfWidth = size.width / 2, halfHeight = size.height / 2
+        switch flow {
+        case .title:
+            screen = TitleScreen(halfWidth: halfWidth, halfHeight: halfHeight) { [weak self] in self?.startSeries() }
+        case .picking:
+            screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: pickOffers, drinks: series.drinks[0],
+                                colour: SKColor(rgb: sprites.look(for: 0).glow)) { [weak self] drink in
+                guard let self else { return }
+                self.series.drink(drink, by: 0)
+                self.applyDrinks()
+                self.match.countdown = self.match.countdownLength
+                self.lastCount = self.match.countdown
+                self.bringPlayersIn()
+                self.enter(.playing)
+            }
+        case .won:
+            let winner = series.winner ?? 0
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: winner == 0 ? "ORANGE" : "TEAL",
+                               onNewMatch: { [weak self] in self?.startSeries() },
+                               onTitle: { [weak self] in self?.enter(.title) })
+        case .playing:
+            break
+        }
+        if let screen { hud.addChild(screen) }
+        controls?.isHidden = flow != .playing
+    }
+
+    /// The rounds across the top: five circles in dark purple, filled in the round
+    /// winner's colour as they go, a sixth and seventh added if the series gets there.
+    private func drawCircles() {
+        circles.removeAllChildren()
+        let count = series.circles
+        let spacing: CGFloat = 18
+        for index in 0..<count {
+            let circle = SKShapeNode(circleOfRadius: 6)
+            circle.position = CGPoint(x: (CGFloat(index) - CGFloat(count - 1) / 2) * spacing, y: 0)
+            circle.fillColor = index < series.rounds.count ? SKColor(rgb: sprites.look(for: series.rounds[index]).glow) : SKColor(rgb: 0x3A2A48)
+            circle.strokeColor = SKColor(white: 0, alpha: 0.6)
+            circle.lineWidth = 1
+            circles.addChild(circle)
+        }
+    }
+
+    private func showBanner(_ text: String, size: CGFloat) {
+        TitleText.set(banner, to: text, size: size)
+        banner.isHidden = false
+        bannerFrames = GameScene.bannerHold
     }
 
     /// The picker's power onto both players, live.
@@ -650,6 +824,8 @@ final class GameScene: SKScene {
             case .scored(let scorer, let hoop, let entry):
                 rimFlash[hoop] = 8
                 strike(hoop: hoop, by: scorer, entry: entry)
+                showBanner("BUCKET!!", size: 48)
+                pointScored(by: scorer)
             default:
                 break
             }
@@ -801,7 +977,7 @@ final class GameScene: SKScene {
             // it back, up to thirty degrees, eased so it doesn't snap.
             var wantedTilt: CGFloat = 0
             if player.state == .flying {
-                let ahead = player.velocity.x * player.facing.sign / SodaRules.flightSpeedWithoutBall
+                let ahead = player.velocity.x * player.facing.sign / SodaRules.flightSpeed(level: player.powerLevel, withBall: false)
                 wantedTilt = -CGFloat(min(max(ahead, -1), 1)) * GameScene.flightTilt * CGFloat(player.facing.sign)
             }
             bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
@@ -1009,8 +1185,30 @@ final class GameScene: SKScene {
         for dot in previewDots[shownDots...] { dot.isHidden = true }
 
         drawHitboxes()
-        scoreLabel.text = "\(match.scores[0])  -  \(match.scores[1])"
-        countLabel.text = match.countdown > 0 ? "\((match.countdown + 59) / 60)" : ""
+        // The count in title lettering, BALL OUT as it ends, and any other banner for its frames.
+        if match.countdown > 0 {
+            TitleText.set(banner, to: "\((match.countdown + 59) / 60)", size: 80)
+            banner.isHidden = false
+            bannerFrames = 0
+        } else if lastCount > 0 {
+            showBanner("BALL OUT!!!", size: 48)
+        } else if bannerFrames > 0 {
+            bannerFrames -= 1
+            if bannerFrames == 0 { banner.isHidden = true }
+        }
+        lastCount = match.countdown
+        if roundIntro > 0 {
+            for index in match.players.indices {
+                playerNodes[index].isHidden = true
+                headNodes[index].isHidden = true
+                energyNodes[index].isHidden = true
+                handBalls[index].isHidden = true
+                handHalos[index].isHidden = true
+                headFires[index].particleBirthRate = 0
+            }
+        } else {
+            for node in playerNodes { node.isHidden = false }
+        }
         fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms"
         let p = match.players[0]
         debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
@@ -1093,6 +1291,10 @@ final class GameScene: SKScene {
     }
 
     func touchBegan(_ touch: UITouch, at point: CGPoint, viewSize: CGSize) {
+        if flow != .playing, let screen {
+            _ = screen.tap(at: hudPoint(point, viewSize: viewSize))
+            return
+        }
         controls?.began(touch, at: hudPoint(point, viewSize: viewSize))
     }
 

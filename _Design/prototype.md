@@ -200,6 +200,52 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   slab still works. The stage carries standing slabs as `extras`, which every collision
   query sees. Numbers in `ShakeRules`.
 
+## The game loop
+
+A best of seven, first to four points, in `Series`. The title screen offers BEST OF 7
+and, greyed for now, MULTIPLAYER. A round starts with both bodies struck in at their
+spawns by a bolt and the crown in their colours, then the three count in title lettering
+and BALL OUT!!! as it hits zero, when both can act. A point is a round: BUCKET!! goes up
+with the strike, and whoever was scored on drinks. The computer drinks at once, one of
+its three at random on the series' dice; the human gets the pick screen once the strike
+has played, and the round counts again after the drink. Five circles across the top,
+dark purple, fill in the round winner's colour as they go, with a sixth and seventh
+added if the series gets there. Four points brings the win screen: NEW MATCH, a fresh
+best of seven with the drinks gone, or TITLE. RESET starts the round again with the
+drinks kept. A pick timer of twenty seconds for networked play is a number in `Series`,
+not enforced yet.
+
+Title lettering is `TitleText`: CardCourt's TwoXMark by another route, Avenir Next
+Condensed Heavy, white over light blue split at the capitals' middle, a black outline
+walked round a ring, a black drop to the south-east, drawn into a texture per string.
+
+## Greateraid
+
+The drinks between rounds, in `Greateraid.swift`. Three bottles an offer, large with
+their bottoms off the screen, each leaning five to thirty degrees, its name across it,
+what the raised one does lettered in the middle; a tap raises a bottle and a second
+tap drinks it, or the stick and jump on the pad. Boosters raise a stat and stack to two
+drinks, after which that bottle stops being offered; they're weighted three to one over
+Biomorphs, which are the powers, one at a time. With a biomorph in hand Bio-Boba stands
+in for the biomorphs until it's been drunk, which takes the power to level two. Drinks
+stack through the series and go with it.
+
+- Hasty Horchata: run, dash and air speed up by half a unit a drink. The body a match
+  starts on is the baseline with half a unit less of each and no second jump, so one
+  Hasty Horchata and one Jumper Juice bring it back to the baseline the game was tuned
+  on.
+- Jumper Juice: the second jump; then both jumps a tenth higher.
+- Lunge Lemonade: four more frames of dash a drink.
+- Cannon Cola: half a unit more shot speed a drink, so further out.
+- Slide Cider: three hundredths less slide friction a drink, so further.
+- Web Water: the swing; level two adds the web line.
+- Super Soda: flight; level two flies at twice the speed, with the ball as fast as level
+  one without, and lasts 150 frames rather than 120. Flight needs no second jump.
+- Flash Fizz: the flash, 30 units, and the warp to your own ball; level two goes 45 and
+  makes the flashes tears, pulling a loose ball into the hands from where you came out
+  and knocking the ball out of the other's hands within reach of either end.
+- Platform Protein Shake: the slab; level two adds the wall.
+
 ## Tuning pickers
 
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`

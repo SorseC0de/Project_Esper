@@ -68,6 +68,10 @@ public struct FighterSpec: Equatable {
     /// Speed lost per frame on the ground through a snatch or a slash, so a run or a dash
     /// carries into them.
     public var attackBrake = 0.15
+    /// A shot leaves at this speed, and a slide bleeds this much a frame; Cannon Cola and
+    /// Slide Cider move them.
+    public var shotSpeed = 4.5
+    public var slideFriction = 0.15
 
     /// Body box: full width and height, feet at the position.
     public var bodyWidth: Double
@@ -214,6 +218,21 @@ public struct FighterSpec: Equatable {
 }
 
 extension FighterSpec {
+    /// The body a match starts on: the baseline with half a unit less run, dash and air
+    /// speed and no second jump. One Hasty Horchata and one Jumper Juice bring it back
+    /// to the baseline.
+    public static let starting: FighterSpec = {
+        var spec = baseline
+        spec.name = "Starting"
+        spec.runSpeed = baseline.runSpeed - 0.5
+        spec.dashInitialVelocity = spec.runSpeed + 0.4
+        spec.airSpeedMax = baseline.airSpeedMax - 0.5
+        spec.jumpHorizontalVelocity = baseline.jumpHorizontalVelocity - 0.5
+        spec.doubleJumpHorizontalVelocity = baseline.doubleJumpHorizontalVelocity - 0.5
+        spec.jumps = 1
+        return spec
+    }()
+
     /// The body the game is tuned on: Fox with a Falco-style dash, the burst always 0.4 over
     /// the 3.2 run,
     /// more traction, air control turned up so a jump starts at air speed and turns in about
@@ -244,8 +263,7 @@ public enum BallRules {
     public static let rollingFriction = 0.9
     public static let restSpeed = 0.2
 
-    /// A shot leaves from this high above the feet and arcs at this speed.
-    public static let shotSpeed = 4.5
+    /// A shot leaves from this high above the feet, at the body's shot speed.
     public static let shotReleaseHeight = 25.0
     public static let shotAngleMin = degrees(25)
     public static let shotAngleMax = degrees(80)
@@ -358,22 +376,29 @@ public enum WebRules {
     public static let pullMaxFrames = 40
 }
 
-/// Super Soda's numbers: slow flight in any direction, gravity off, this long per airtime.
-/// Twice as fast without the ball.
+/// Super Soda's numbers: slow flight in any direction, gravity off, for a budget per
+/// airtime. Twice as fast without the ball. Level two is faster, with the ball as fast as
+/// level one without, and lasts longer.
 public enum SodaRules {
-    public static let flightSpeed = 1.0
-    public static let flightSpeedWithoutBall = 2.0
-    public static let flightFrames = 120
+    public static func flightSpeed(level: Int, withBall: Bool) -> Double {
+        level >= 2 ? (withBall ? 2.0 : 3.0) : (withBall ? 1.0 : 2.0)
+    }
+
+    public static func flightFrames(level: Int) -> Int {
+        level >= 2 ? 150 : 120
+    }
 }
 
 /// Flash Fizz's numbers. Without the ball, shoot is the warp to the ball while it's still
 /// yours, the owned frames after you let it go, arriving holding it; otherwise the
-/// flash: this far along the stick, or in place, this often. The tear the flash leaves
-/// at the exit lasts this long and pulls a loose ball within this reach into the hands.
-/// With the ball, shoot is the warp down to an overhung dribble.
+/// flash: this far along the stick, further at level two, or in place, this often. At
+/// level two the flashes are tears: the ball within this reach of where it came out is
+/// pulled into the hands for this long after, and the other holding the ball within
+/// reach of where it left or came out loses it. With the ball, shoot is the warp down
+/// to an overhung dribble.
 public enum FizzRules {
     public static let cooldownFrames = 60
-    public static let flashDistance = 30.0
+    public static func flashDistance(level: Int) -> Double { level >= 2 ? 45 : 30 }
     public static let tearFrames = 12
     public static let tearRadius = 12.0
 }
@@ -396,12 +421,11 @@ public enum ShakeRules {
 }
 
 /// The slide's numbers: down at full run without the ball, or shoot while crouched. It
-/// starts at the dash burst and bleeds this much a frame for this long. The extended leg
-/// reaches this far past the body's front edge and this high off the floor, and knocks
-/// the ball out of a grounded holder it meets.
+/// starts at the dash burst and bleeds the body's slide friction a frame for this long.
+/// The extended leg reaches this far past the body's front edge and this high off the
+/// floor, and knocks the ball out of a grounded holder it meets.
 public enum SlideRules {
     public static let frames = 20
-    public static let friction = 0.15
     public static let legReach = 10.0
     public static let legHeight = 6.0
 }

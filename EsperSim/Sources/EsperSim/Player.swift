@@ -114,6 +114,8 @@ public struct Player: Equatable {
     public var throwStanceEntrySpeed = 0.0
 
     public var power = Power.none
+    /// One, or two after Bio-Boba.
+    public var powerLevel = 1
     /// The swing's web, while swinging: where it's anchored, and the arc.
     public var webAnchor: Vec2?
     private var swingLength = 0.0
@@ -133,7 +135,7 @@ public struct Player: Equatable {
     /// Frames the line's pose shows.
     public var webLinePose = 0
     /// Super Soda: frames of flight left this airtime.
-    public var flightLeft = SodaRules.flightFrames
+    public var flightLeft = SodaRules.flightFrames(level: 1)
     /// Flash Fizz: frames until the next flash; where a warp decided this step is going
     /// when it's down to the ball in hand; and the tear the last flash left.
     public var warpCooldown = 0
@@ -411,7 +413,7 @@ public struct Player: Equatable {
                 velocity = .zero
                 platformArmed = true
                 enter(.wallLand)
-            } else if power == .superSoda, jumpPressed, jumpsLeft > 0, flightLeft > 0 {
+            } else if power == .superSoda, jumpPressed, flightLeft > 0 {
                 // A fresh press in the air starts flight; holding keeps it.
                 jumpBuffer = 0
                 jumpsLeft = 0
@@ -431,11 +433,11 @@ public struct Player: Equatable {
                 fastFalling = false
                 throwStanceEntrySpeed = velocity.x
                 enter(.throwStance)
-            } else if !hasBall, throwPressed, snatchCooldown == 0, power != .webWater {
+            } else if !hasBall, throwPressed, snatchCooldown == 0, !(power == .webWater && powerLevel >= 2) {
                 startSnatch()
-            } else if !hasBall, shootPressed, power == .platformShake, platformCooldown == 0, platformArmed {
+            } else if !hasBall, shootPressed, power == .platformShake, powerLevel >= 2, platformCooldown == 0, platformArmed {
                 startWall()
-            } else if !hasBall, shootPressed, power != .flashFizz, power != .platformShake {
+            } else if !hasBall, shootPressed, power != .flashFizz, !(power == .platformShake && powerLevel >= 2) {
                 startSlash(events: &events)
             }
 
@@ -604,7 +606,7 @@ public struct Player: Equatable {
             }
             if jumpPressed {
                 enter(.jumpSquat)
-            } else if throwPressed, snatchCooldown == 0, power != .webWater {
+            } else if throwPressed, snatchCooldown == 0, !(power == .webWater && powerLevel >= 2) {
                 startSnatch()
             } else if shootPressed {
                 // Shoot while crouched: the slide, in neutral or on defence alike.
@@ -617,7 +619,7 @@ public struct Player: Equatable {
 
         case .slide:
             // The leg out front, the body low, the burst bleeding off.
-            velocity.x = approach(velocity.x, 0, SlideRules.friction)
+            velocity.x = approach(velocity.x, 0, spec.slideFriction)
             if stateTimer >= SlideRules.frames {
                 enter(crouchAsked(input) ? .crouch : .idle)
             }
@@ -716,7 +718,7 @@ public struct Player: Equatable {
         case .flying:
             // Any direction, slowly, gravity off, while jump is held and the budget lasts.
             flightLeft -= 1
-            velocity = input.stick * (hasBall ? SodaRules.flightSpeed : SodaRules.flightSpeedWithoutBall)
+            velocity = input.stick * SodaRules.flightSpeed(level: powerLevel, withBall: hasBall)
             if hasBall, input.shoot, shootReady {
                 enterShootStance()
             } else if hasBall, input.throwBall, throwReady {
@@ -778,11 +780,11 @@ public struct Player: Equatable {
             enter(.throwStance)
         } else if hasBall, tauntPressed {
             enter(.taunt)
-        } else if !hasBall, throwPressed, snatchCooldown == 0, power != .webWater {
+        } else if !hasBall, throwPressed, snatchCooldown == 0, !(power == .webWater && powerLevel >= 2) {
             startSnatch()
-        } else if !hasBall, shootPressed, power == .platformShake, platformCooldown == 0, platformArmed {
+        } else if !hasBall, shootPressed, power == .platformShake, powerLevel >= 2, platformCooldown == 0, platformArmed {
             startWall()
-        } else if !hasBall, shootPressed, power != .flashFizz, power != .platformShake {
+        } else if !hasBall, shootPressed, power != .flashFizz, !(power == .platformShake && powerLevel >= 2) {
             startSlash(events: &events)
         } else {
             return false
@@ -888,7 +890,7 @@ public struct Player: Equatable {
     /// Web Water's line, on the throw button with no ball: held, it aims along the stick;
     /// let go, it fires that way, or forward if the stick never moved.
     private mutating func webLineIfAsked(_ input: PlayerInput, throwPressed: Bool) -> PlayerAction? {
-        guard power == .webWater, !hasBall else { webAiming = false; return nil }
+        guard power == .webWater, powerLevel >= 2, !hasBall else { webAiming = false; return nil }
         if throwPressed, webLineCooldown == 0, !webAiming {
             webAiming = true
             webAimDirection = Vec2(x: facing.sign, y: 0)
@@ -1006,7 +1008,7 @@ public struct Player: Equatable {
     /// or on the floor as it lands.
     public mutating func warp(to feet: Vec2, in stage: Stage) {
         position = feet
-        position += stage.pushOut(body, reach: FizzRules.flashDistance + Stage.tileSize)
+        position += stage.pushOut(body, reach: FizzRules.flashDistance(level: 2) + Stage.tileSize)
         velocity = .zero
         fastFalling = false
         webAnchor = nil
@@ -1123,7 +1125,7 @@ public struct Player: Equatable {
         let forward = shotAim.x * facing.sign
         var angle = atan2(shotAim.y, abs(forward))
         angle = min(max(angle, BallRules.shotAngleMin), BallRules.shotAngleMax)
-        return Vec2(x: cos(angle) * facing.sign, y: sin(angle)) * BallRules.shotSpeed
+        return Vec2(x: cos(angle) * facing.sign, y: sin(angle)) * spec.shotSpeed
     }
 
     private mutating func move(in stage: Stage) {
@@ -1148,7 +1150,7 @@ public struct Player: Equatable {
         if grounded {
             jumpsLeft = spec.jumps
             fastFalling = false
-            flightLeft = SodaRules.flightFrames
+            flightLeft = SodaRules.flightFrames(level: powerLevel)
             swingCooldown = 0
             switch state {
             case .air, .wallLand, .rolling:

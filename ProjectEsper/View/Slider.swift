@@ -38,6 +38,12 @@ final class Slider: SKNode {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// The value put on it from outside, without telling the owner.
+    func set(_ newValue: Float) {
+        value = min(max(newValue, range.lowerBound), range.upperBound)
+        show()
+    }
+
     /// Whether `point`, in this node's space, is on the slider, with room around it.
     func covers(_ point: CGPoint) -> Bool {
         abs(point.x) <= Slider.size.width / 2 + 10 && abs(point.y) <= Slider.size.height

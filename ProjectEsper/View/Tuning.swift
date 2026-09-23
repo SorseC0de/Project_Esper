@@ -31,14 +31,19 @@ enum PowerVariant: Int, CaseIterable {
     }
 }
 
-/// Tuning the dunk's place on the rim: with this on, the match doesn't run; player 1 is
-/// held in the hang at the right rim, the feet this far from the rim's centre in art
-/// pixels, on the DUNK X and DUNK Y sliders. The numbers found go into
-/// `BallRules.dunkOffset`, mirrored across for the other rim.
+/// How each frame of the dunk sequence is drawn: nudged from the body's place on the rim
+/// by this many art pixels, across (mirrored for the other rim) and up. Found on the
+/// sliders with `DunkTuning` on, then written here.
+enum DunkArt {
+    nonisolated(unsafe) static var offsets: [CGPoint] = Array(repeating: .zero, count: Animation.dunkSequence.count)
+}
+
+/// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the
+/// right rim in the dunk, on the sequence frame the DUNK FRAME slider picks, and the
+/// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
-    static let enabled = false
-    nonisolated(unsafe) static var x: Float = -3
-    nonisolated(unsafe) static var y: Float = -28
+    static let enabled = true
+    nonisolated(unsafe) static var frame = 0
 }
 
 /// The glow, as GameMaker's Glow filter had it: what counts as bright, how soft the cut is,

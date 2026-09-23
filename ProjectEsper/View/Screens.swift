@@ -161,42 +161,15 @@ final class PickScreen: Screen {
         TitleText.set(blurb, to: text, size: text.count > 50 ? 16 : 20)
     }
 
-    /// A bottle: a rounded body, shoulders, a neck and a cap, in the drink's colour with a
-    /// black line, tall enough that its bottom runs off the screen.
+    /// The bottle, the user's vector from the catalog, 180 points tall and anchored at its
+    /// bottom so that runs off the screen. Every drink wears the same one for now.
     static func bottle(for drink: Greateraid, colour: SKColor) -> SKNode {
-        let width: CGFloat = 70, height: CGFloat = 180
-        let path = CGMutablePath()
-        let bodyTop = height * 0.6
-        let neckWidth = width * 0.38
-        path.move(to: CGPoint(x: -width / 2, y: 0))
-        path.addLine(to: CGPoint(x: -width / 2, y: bodyTop))
-        path.addQuadCurve(to: CGPoint(x: -neckWidth / 2, y: bodyTop + 26), control: CGPoint(x: -width / 2, y: bodyTop + 22))
-        path.addLine(to: CGPoint(x: -neckWidth / 2, y: height - 12))
-        path.addLine(to: CGPoint(x: neckWidth / 2, y: height - 12))
-        path.addLine(to: CGPoint(x: neckWidth / 2, y: bodyTop + 26))
-        path.addQuadCurve(to: CGPoint(x: width / 2, y: bodyTop), control: CGPoint(x: width / 2, y: bodyTop + 22))
-        path.addLine(to: CGPoint(x: width / 2, y: 0))
-        path.closeSubpath()
-        let fill: SKColor
-        switch drink.kind {
-        case .booster: fill = SKColor(rgb: 0xFFB040)
-        case .biomorph: fill = SKColor(rgb: 0xBF7BFF)
-        case .bioBoba: fill = SKColor(rgb: 0xF040E0)
-        }
-        let bottle = SKShapeNode(path: path)
-        bottle.fillColor = fill
-        bottle.strokeColor = .black
-        bottle.lineWidth = 3
-        let cap = SKShapeNode(rect: CGRect(x: -neckWidth / 2 - 3, y: height - 14, width: neckWidth + 6, height: 14), cornerRadius: 3)
-        cap.fillColor = colour
-        cap.strokeColor = .black
-        cap.lineWidth = 3
-        bottle.addChild(cap)
-        let label = SKShapeNode(rect: CGRect(x: -width / 2 + 8, y: height * 0.18, width: width - 16, height: height * 0.3), cornerRadius: 5)
-        label.fillColor = SKColor(white: 1, alpha: 0.85)
-        label.strokeColor = .black
-        label.lineWidth = 2
-        bottle.addChild(label)
+        let height: CGFloat = 180
+        let texture = SKTexture(imageNamed: "Greateraid")
+        let aspect = texture.size().width / max(texture.size().height, 1)
+        let bottle = SKSpriteNode(texture: texture)
+        bottle.size = CGSize(width: height * aspect, height: height)
+        bottle.anchorPoint = CGPoint(x: 0.5, y: 0)
         return bottle
     }
 }

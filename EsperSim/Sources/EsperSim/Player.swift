@@ -158,6 +158,8 @@ public struct Player: Equatable {
     /// can be grabbed.
     public var ledge: Vec2?
     public var ledgeCooldown = 0
+    /// The rim being dunked on.
+    public var dunkHoop = 0
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
     /// Frames a jump press stays live waiting for something to spend it.
@@ -543,8 +545,8 @@ public struct Player: Equatable {
                 position = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y)
                 facing = rim.backboard
                 velocity = .zero
+                dunkHoop = hoop
                 enter(.dunking)
-                action = .dunk(hoop: hoop)
             } else if !input.throwBall, !quickThrow {
                 if stateTimer >= BallRules.throwWindupFrames {
                     enter(.throwing)
@@ -575,12 +577,14 @@ public struct Player: Equatable {
             }
 
         case .dunking:
-            // Hanging on the rim through the dunk and the beat after, until the point restarts.
+            // Hanging on the rim through the dunk and the beat after, until the point
+            // restarts; the ball leaves the hand at the slam.
             velocity = .zero
             if stateTimer == BallRules.dunkFrames / 2 {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames
                 events.append(.dunked(player: index))
+                action = .dunk(hoop: dunkHoop)
             } else if stateTimer >= BallRules.dunkFrames + BallRules.dunkHangFrames {
                 enter(grounded ? .idle : .air)
             }

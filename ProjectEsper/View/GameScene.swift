@@ -563,8 +563,18 @@ final class GameScene: SKScene {
             GlowSettings.threshold = value
         }
         if DunkTuning.enabled {
-            controls.addSlider(title: "DUNK X", range: -64...64, notch: 1, value: DunkTuning.x) { DunkTuning.x = $0 }
-            controls.addSlider(title: "DUNK Y", range: -64...0, notch: 1, value: DunkTuning.y) { DunkTuning.y = $0 }
+            let last = Float(Animation.dunkSequence.count - 1)
+            let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
+                DunkArt.offsets[DunkTuning.frame].x = CGFloat($0)
+            }
+            let ySlider = controls.addSlider(title: "DUNK Y", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].y)) {
+                DunkArt.offsets[DunkTuning.frame].y = CGFloat($0)
+            }
+            controls.addSlider(title: "DUNK FRAME", range: 0...last, notch: 1, value: Float(DunkTuning.frame)) { value in
+                DunkTuning.frame = Int(value)
+                xSlider.set(Float(DunkArt.offsets[DunkTuning.frame].x))
+                ySlider.set(Float(DunkArt.offsets[DunkTuning.frame].y))
+            }
         }
         hud.addChild(controls)
         self.controls = controls
@@ -651,14 +661,19 @@ final class GameScene: SKScene {
     private func holdDunkPose() {
         let hoop = match.stage.hoops.first { $0.owner == 0 } ?? match.stage.hoops[0]
         match.countdown = 0
-        match.players[0].position = hoop.position + Vec2(x: Double(DunkTuning.x) / SpriteLibrary.pixelsPerUnit * hoop.backboard.sign,
-                                                         y: Double(DunkTuning.y) / SpriteLibrary.pixelsPerUnit)
+        flowState?.showsTitle = false
+        screen?.removeFromParent()
+        screen = nil
+        controls?.isHidden = false
+        match.players[0].position = hoop.position + Vec2(x: BallRules.dunkOffset.x * hoop.backboard.sign, y: BallRules.dunkOffset.y)
         match.players[0].facing = hoop.backboard
-        match.players[0].hasBall = false
+        match.players[0].hasBall = DunkTuning.frame < 3
         match.players[0].state = .dunking
-        match.players[0].stateTimer = BallRules.dunkFrames / 2 + 1
-        match.ball.respawn(at: Vec2(x: 170, y: 12.5))
-        debugLabel.text = String(format: "dunk offset %d, %d art px", Int(DunkTuning.x), Int(DunkTuning.y))
+        match.players[0].stateTimer = Animation.dunkStart(of: DunkTuning.frame)
+        match.ball.holder = match.players[0].hasBall ? 0 : nil
+        if match.ball.holder == nil { match.ball.respawn(at: Vec2(x: 170, y: 12.5)) }
+        let table = DunkArt.offsets.map { "(\(Int($0.x)), \(Int($0.y)))" }.joined(separator: " ")
+        debugLabel.text = "dunk frame \(DunkTuning.frame)  offsets \(table)"
     }
 
     /// The round again from the start, drinks kept.
@@ -1032,6 +1047,11 @@ final class GameScene: SKScene {
             let drift = CGPoint(x: (cos(lap) * Double(GameScene.hoverRadius * hover[index])).rounded(),
                                 y: (sin(lap) * Double(GameScene.hoverRadius * hover[index])).rounded())
             node.position = SpriteLibrary.point(player.position) + drift
+            if player.state == .dunking {
+                // Each frame of the dunk sits where its art was placed on the rim.
+                let nudge = DunkArt.offsets[Animation.dunkEntry(at: player.stateTimer).index]
+                node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y)
+            }
             node.xScale = CGFloat(player.facing.sign)
 
             // In flight the body leans into its motion: forward tips it ahead, backward tips

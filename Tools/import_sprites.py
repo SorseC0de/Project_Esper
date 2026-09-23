@@ -38,7 +38,7 @@ BALL_MIN_PIXELS = 12
 REDUCE = {"esper_charge": 4}
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
-               "player_catch", "player_catch_air", "player_skid_ball", "player_taunt"}
+               "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk"}
 
 SKIP = {"Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",
@@ -235,7 +235,8 @@ def main():
                         sequence["xorigin"], sequence["yorigin"], sequence["playbackSpeed"])
 
     for strip in sorted(glob.glob(os.path.join(STRIPS, "*.png"))):
-        short = os.path.splitext(os.path.basename(strip))[0]
+        # Exports arrive in whatever case the tool gave them; the atlas is lower case.
+        short = os.path.splitext(os.path.basename(strip))[0].lower()
         width, height, ctype, bpp, rows = read_png(strip)
         if short in REDUCE:
             width, height, rows = box_down(width, height, bpp, rows, REDUCE[short])

@@ -33,6 +33,7 @@ public enum Animation: String, CaseIterable {
     case snatch = "player_snatch"
     case snatchAir = "player_snatch_air"
     case ledge = "player_ledge"
+    case dunk = "player_dunk"
 
     public var frameCount: Int {
         switch self {
@@ -40,7 +41,7 @@ public enum Animation: String, CaseIterable {
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall: 3
         case .jumpSquat: 4
-        case .doubleJump, .wallLand, .wallLandBall, .esperSlash: 6
+        case .doubleJump, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
         case .land: 9
         case .shoot: 10
         case .shootAir, .taunt: 11
@@ -66,6 +67,36 @@ public enum Animation: String, CaseIterable {
 
     public var pixelSize: Double {
         self == .throwForward || self == .esperSlash ? 64 : 48
+    }
+}
+
+extension Animation {
+    /// The dunk, frame by frame from the throw stance it starts in: each entry a frame and
+    /// how many sim frames it holds; the last holds through the hang. The ball leaves the
+    /// hand at the slam, the third dunk frame, which starts at the dunk's release frame.
+    public static let dunkSequence: [(frame: AnimationFrame, frames: Int)] = [
+        (AnimationFrame(.throwForward, 3), 4),
+        (AnimationFrame(.dunk, 0), 3),
+        (AnimationFrame(.dunk, 1), 3),
+        (AnimationFrame(.dunk, 2), 5),
+        (AnimationFrame(.dunk, 3), 5),
+        (AnimationFrame(.dunk, 4), 5),
+        (AnimationFrame(.dunk, 5), 1),
+    ]
+
+    /// Which entry of the dunk sequence shows `frames` in: its index and its frame.
+    public static func dunkEntry(at frames: Int) -> (index: Int, frame: AnimationFrame) {
+        var left = frames
+        for (index, entry) in dunkSequence.enumerated() {
+            if left < entry.frames || index == dunkSequence.count - 1 { return (index, entry.frame) }
+            left -= entry.frames
+        }
+        return (dunkSequence.count - 1, dunkSequence[dunkSequence.count - 1].frame)
+    }
+
+    /// The sim frame the dunk sequence's entry starts on.
+    public static func dunkStart(of index: Int) -> Int {
+        dunkSequence.prefix(index).reduce(0) { $0 + $1.frames }
     }
 }
 
@@ -132,8 +163,7 @@ extension Player {
         case .throwing:
             return AnimationFrame(.throwForward, 3 + t * 24 / 60)
         case .dunking:
-            // The ledge sheet's hang, for now: the arm up on the rim.
-            return AnimationFrame(.ledge, t < BallRules.dunkFrames / 2 ? 0 : 1)
+            return Animation.dunkEntry(at: t).frame
         case .catching:
             return AnimationFrame(grounded ? .catchGround : .catchAir, t * 12 / 60)
         case .slashing:

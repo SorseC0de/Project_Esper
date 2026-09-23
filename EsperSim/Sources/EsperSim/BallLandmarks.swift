@@ -39,6 +39,8 @@ public enum BallLandmarks {
         "player_dribble_walk_5": Vec2(x: -5.64, y: 6.28),
         "player_dribble_walk_6": Vec2(x: -0.56, y: 2.26),
         "player_dribble_walk_7": Vec2(x: 7.85, y: 9.21),
+        "player_dunk_0": Vec2(x: -15.00, y: 33.00),
+        "player_dunk_1": Vec2(x: 8.68, y: 30.14),
         "player_shoot_0": Vec2(x: 7.40, y: 15.30),
         "player_shoot_1": Vec2(x: 5.45, y: 10.17),
         "player_shoot_2": Vec2(x: 9.53, y: 19.50),

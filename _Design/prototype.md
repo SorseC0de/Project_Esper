@@ -105,11 +105,14 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   is the ball going through on its own. In the air the throw stance keeps its run,
   bleeding only 0.03 a frame, so a jump carries it to the rim. In the stance with the
   chest within 25 units of a rim, wider than the basket, it's a dunk: the feet snap to
-  the dunk's place on the rim, `BallRules.dunkOffset` from its centre, mirrored across
-  for the other rim, facing the backboard; the ball goes in at once, and the dunker
-  hangs there 45 frames before the point restarts. `DunkTuning` in `Tuning.swift`, when
-  on, holds the match with player 1 in that hang at the right rim and puts DUNK X and
-  DUNK Y sliders up, in art pixels, to find the place; it found 16 back and 24 down.
+  the dunk's place on the rim, `BallRules.dunkOffset` from its centre, 16 art pixels
+  back and 24 down, mirrored across for the other rim, facing the backboard. The dunk
+  sheet plays from the throw stance's frame: the wind-up, the swing, the slam on the
+  release frame, when the ball leaves the hand and drops through, then the hang, held
+  through the 45 frames before the point restarts. Each frame of it is drawn nudged by
+  `DunkArt.offsets`, in art pixels, found with `DunkTuning` on: the match held, player 1
+  on the right rim on the frame the DUNK FRAME slider picks, DUNK X and DUNK Y nudging
+  that frame, the table in the corner readout.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
@@ -225,7 +228,8 @@ walked round a ring, a black drop to the south-east, drawn into a texture per st
 
 ## Greateraid
 
-The drinks between rounds, in `Greateraid.swift`. Three bottles an offer, large with
+The drinks between rounds, in `Greateraid.swift`. Three bottles an offer, the user's
+vector bottle from the catalog, large with
 their bottoms off the screen, each leaning five to thirty degrees, its name across it,
 what the raised one does lettered in the middle; a tap raises a bottle and a second
 tap drinks it, or the stick and jump on the pad. Boosters raise a stat and stack to two

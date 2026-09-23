@@ -164,11 +164,13 @@ final class TouchControls: SKNode {
     }
 
     /// Adds a slider across the top, under the score, below any already there.
-    func addSlider(title: String, range: ClosedRange<Float>, notch: Float, value: Float, onChange: @escaping (Float) -> Void) {
+    @discardableResult
+    func addSlider(title: String, range: ClosedRange<Float>, notch: Float, value: Float, onChange: @escaping (Float) -> Void) -> Slider {
         let slider = Slider(title: title, range: range, notch: notch, value: value, onChange: onChange)
         slider.position = CGPoint(x: topCentre.x, y: topCentre.y - 34 - CGFloat(sliders.count) * 26)
         addChild(slider)
         sliders.append(slider)
+        return slider
     }
 
     /// The newest picker steps to its next option.

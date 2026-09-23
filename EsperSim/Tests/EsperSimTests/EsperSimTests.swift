@@ -657,13 +657,19 @@ final class BallTests: XCTestCase {
         match.players[0].enter(.air)
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
-        // The dunk snaps the feet onto the rim, facing the backboard, drops the ball through
-        // at once, and the beat starts.
+        // The dunk snaps the feet onto the rim, facing the backboard, from the throw stance's
+        // frame, the ball still in hand until the slam.
         XCTAssertEqual(match.players[0].state, .dunking)
         XCTAssertEqual(match.players[0].facing, .right)
         XCTAssertEqual(match.players[0].position.x, rim.x + BallRules.dunkOffset.x, accuracy: 0.001)
         XCTAssertEqual(match.players[0].position.y, rim.y + BallRules.dunkOffset.y, accuracy: 0.001)
-        XCTAssertEqual(match.scores, [1, 0])
+        XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.throwForward, 3))
+        XCTAssertTrue(match.players[0].hasBall)
+        XCTAssertEqual(match.scores, [0, 0])
+        let scored = run(&match, frames: BallRules.dunkFrames, input: { _ in .idle }) { $0.scores[0] == 1 }
+        XCTAssertLessThan(scored, BallRules.dunkFrames)
+        XCTAssertGreaterThanOrEqual(scored + 1, BallRules.dunkFrames / 2)
+        XCTAssertEqual(match.players[0].animationFrame.animation, .dunk)
         XCTAssertEqual(match.restartIn, BallRules.dunkHangFrames)
         // Still hanging there, the point not yet restarted, for the beat.
         run(&match, frames: BallRules.dunkHangFrames - 2, input: { _ in .idle })
@@ -1657,13 +1663,16 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.players[0].position.y, 10, accuracy: 0.001)
     }
 
-    func testDunkShowsTheLedgeSheetForNow() {
+    func testTheDunkRunsItsSheetFromTheStanceAndHoldsTheHang() {
         var player = Match().players[0]
         player.enter(.dunking)
         player.stateTimer = 1
-        XCTAssertEqual(player.animationFrame, AnimationFrame(.ledge, 0))
+        XCTAssertEqual(player.animationFrame, AnimationFrame(.throwForward, 3))
         player.stateTimer = BallRules.dunkFrames / 2
-        XCTAssertEqual(player.animationFrame, AnimationFrame(.ledge, 1))
+        XCTAssertEqual(player.animationFrame, AnimationFrame(.dunk, 2), "the slam on the release frame")
+        player.stateTimer = BallRules.dunkFrames + BallRules.dunkHangFrames - 1
+        XCTAssertEqual(player.animationFrame, AnimationFrame(.dunk, 5))
+        XCTAssertEqual(Animation.dunkStart(of: 3), BallRules.dunkFrames / 2)
     }
 }
 

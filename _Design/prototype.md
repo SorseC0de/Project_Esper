@@ -416,9 +416,9 @@ both rolled off the shared dice. The pick is applied once every frame before the
 confirmed, as a change outside the inputs (`RollbackSession.mutate`), then both resume.
 Twenty seconds to pick, or the raised bottle drinks itself. The seed is the two phones'
 randoms together, exchanged in hello; the side whose Game Center player ID sorts first
-plays the left. MULTIPLAYER automatches for two through `GKMatchmaker` directly, as
-CardCourt does, with CANCEL under it while it looks; Apple's matchmaker sheet failed
-at once on the same phones. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
+plays the left. MULTIPLAYER opens Apple's matchmaker sheet for two, invites or
+automatch; it fails at once until the app's record in App Store Connect has Game
+Center on. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
 or a bye puts the title up with why under MULTIPLAYER. No computer, no reset, no
 tuning pickers online; HITBOX stays. The sim calls nothing in the system's maths library: `Trig` is its own sine,
 cosine and arctangent in plain arithmetic, so two phones on different iOS versions

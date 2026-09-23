@@ -59,14 +59,6 @@ struct TitleOverlay: View {
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.7))
                     }
-                    if net.state == .finding {
-                        Button {
-                            net.cancelFinding()
-                        } label: {
-                            Image(uiImage: TitleText.image("CANCEL", size: 16))
-                        }
-                        .buttonStyle(.plain)
-                    }
                 }
             }
         }

@@ -414,8 +414,9 @@ Twenty seconds to pick, or the raised bottle drinks itself. The seed is the two 
 randoms together, exchanged in hello; the side whose Game Center player ID sorts first
 plays the left. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
 or a bye puts the title up with why under MULTIPLAYER. No computer, no reset, no
-tuning pickers online; HITBOX stays. Two phones on different iOS versions could in
-principle round trig differently; the checksum would say.
+tuning pickers online; HITBOX stays. The sim calls nothing in the system's maths library: `Trig` is its own sine,
+cosine and arctangent in plain arithmetic, so two phones on different iOS versions
+get the same bits; the checksum would say otherwise.
 
 Game Center needs the app's App ID to carry the Game Center capability
 (`ProjectEsper.entitlements`, automatic signing adds it) and, for the matchmaker to

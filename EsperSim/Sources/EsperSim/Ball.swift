@@ -26,6 +26,10 @@ public struct Ball: Equatable {
     public var tether: Int?
     /// Frames the ball still counts as `lastTouched`'s, after a release.
     public var ownedFrames = 0
+    /// How many times faster than an ordinary ball a shot runs its arc, Cannon Cola's
+    /// doing: the velocity is this much more and gravity this much squared, so the path is
+    /// the same. It's an ordinary ball again from its first bounce.
+    public var pace = 1.0
 
     /// Whose the ball still is, if anyone's.
     public var owner: Int? { ownedFrames > 0 ? lastTouched : nil }
@@ -56,7 +60,7 @@ public struct Ball: Equatable {
         if floater > 0 {
             floater -= 1
         } else if !straight {
-            velocity.y = max(velocity.y - BallRules.gravity, -BallRules.fallSpeed)
+            velocity.y = max(velocity.y - BallRules.gravity * pace * pace, -BallRules.fallSpeed * pace)
         }
 
         let sweptX = stage.sweepHorizontally(box, by: velocity.x)
@@ -100,15 +104,24 @@ public struct Ball: Equatable {
         let above = position.y - hoop.position.y
         guard abs(across) <= BallRules.hoopReach, above <= BallRules.hoopReach else { return }
         let down = -velocity.y
-        let g = BallRules.gravity
+        let g = BallRules.gravity * pace * pace
         let frames = (-down + (down * down + 2 * g * above).squareRoot()) / g
         guard frames > 0 else { return }
         let needed = across / frames
         let change = (needed - velocity.x) * BallRules.hoopSteerShare
-        velocity.x += min(max(change, -BallRules.hoopSteerMax), BallRules.hoopSteerMax)
+        let most = BallRules.hoopSteerMax * pace
+        velocity.x += min(max(change, -most), most)
+    }
+
+    /// The first bounce ends a paced shot: an ordinary ball's speed from here.
+    private mutating func settlePace() {
+        guard pace != 1 else { return }
+        velocity = velocity / pace
+        pace = 1
     }
 
     private mutating func bounceX(events: inout [MatchEvent]) {
+        settlePace()
         straight = false
         floater = 0
         steers = false
@@ -118,6 +131,7 @@ public struct Ball: Equatable {
     }
 
     private mutating func bounceY(events: inout [MatchEvent]) {
+        settlePace()
         straight = false
         floater = 0
         steers = false
@@ -127,11 +141,12 @@ public struct Ball: Equatable {
         events.append(.ballBounced(position: position))
     }
 
-    public mutating func release(from position: Vec2, velocity: Vec2, by player: Int, straight: Bool) {
+    public mutating func release(from position: Vec2, velocity: Vec2, by player: Int, straight: Bool, pace: Double = 1) {
         holder = nil
         self.position = position
         previousY = position.y
         self.velocity = velocity
+        self.pace = pace
         self.straight = straight
         floater = 0
         thrown = straight
@@ -158,6 +173,7 @@ public struct Ball: Equatable {
         self.position = position
         previousY = position.y
         velocity = Vec2(x: 0, y: BallRules.floaterSpeed)
+        pace = 1
         straight = false
         floater = BallRules.popFloatFrames
         thrown = false
@@ -172,6 +188,7 @@ public struct Ball: Equatable {
 
     /// Spiked: sent along `direction`, at its own speed or the swat speed, whichever is more.
     public mutating func swat(along direction: Vec2, by player: Int) {
+        settlePace()
         velocity = direction.normalized * max(velocity.length, SlashRules.swatSpeed)
         straight = false
         floater = 0
@@ -184,6 +201,7 @@ public struct Ball: Equatable {
         position = spawn
         previousY = spawn.y
         velocity = .zero
+        pace = 1
         holder = nil
         straight = false
         floater = 0

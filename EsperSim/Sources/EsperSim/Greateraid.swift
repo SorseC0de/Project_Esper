@@ -68,7 +68,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .hastyHorchata: ("Run, dash and air speed up.", "And up again.")
         case .jumperJuice: ("A second jump.", "Both jumps higher.")
         case .lungeLemonade: ("A longer dash.", "Longer still.")
-        case .cannonCola: ("A faster shot, from further out.", "Faster still.")
+        case .cannonCola: ("A faster shot.", "Faster still.")
         case .slideCider: ("A longer slide.", "Longer still.")
         case .webWater: ("Double jump is a web swing.", "Throw fires a web line.")
         case .superSoda: ("Hold jump in the air to fly.", "Faster, and for longer.")
@@ -148,8 +148,8 @@ public struct Drinks: Equatable {
     /// The body's numbers with these drinks in it, from the starting body: Hasty Horchata
     /// adds half a unit of run, dash and air speed a drink; Jumper Juice gives the second
     /// jump, then both jumps a tenth higher; Lunge Lemonade four frames of dash a drink;
-    /// Cannon Cola half a unit of shot speed a drink; Slide Cider three hundredths less
-    /// slide friction a drink.
+    /// Cannon Cola a quarter more shot pace a drink, the same arc run faster; Slide Cider
+    /// four frames of slide a drink.
     public func spec(from base: FighterSpec = .starting) -> FighterSpec {
         var spec = base
         let hasty = Double(level(of: .hastyHorchata))
@@ -166,8 +166,8 @@ public struct Drinks: Equatable {
             spec.doubleJumpVelocity *= 1.1
         }
         spec.dashFrames += 4 * level(of: .lungeLemonade)
-        spec.shotSpeed += 0.5 * Double(level(of: .cannonCola))
-        spec.slideFriction -= 0.03 * Double(level(of: .slideCider))
+        spec.shotPace += 0.25 * Double(level(of: .cannonCola))
+        spec.slideFrames += 4 * level(of: .slideCider)
         return spec
     }
 }

@@ -128,8 +128,9 @@ public struct Match: Equatable {
         let player = players[index]
         switch action {
         case .releaseShot(let velocity):
+            // Cannon Cola's pace: the same arc run through that many times faster.
             ball.release(from: player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight),
-                         velocity: velocity, by: index, straight: false)
+                         velocity: velocity * player.spec.shotPace, by: index, straight: false, pace: player.spec.shotPace)
             ball.shotInFlight = true
         case .releaseThrow(let velocity):
             let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
@@ -161,8 +162,8 @@ public struct Match: Equatable {
         case .flash(let direction):
             // A short way along the stick, or in place, nudged clear of solids. At level two
             // the flashes are tears: the ball is pulled into the hands from where it came
-            // out for a while after, and the other holding the ball within reach of either
-            // end loses it.
+            // out for a while after, and the other holding the ball with their body within
+            // reach of either end loses it.
             let from = player.position
             players[index].warp(to: from + direction * FizzRules.flashDistance(level: player.powerLevel), in: stage)
             let to = players[index].position
@@ -170,9 +171,9 @@ public struct Match: Equatable {
             guard player.powerLevel >= 2 else { break }
             players[index].tear = Tear(position: players[index].chest, framesLeft: FizzRules.tearFrames)
             if let other = players.indices.first(where: { $0 != index }), players[other].hasBall {
-                let ball = players[other].chest + Vec2(x: 0, y: 3)
+                let body = players[other].body
                 let ends = [from + Vec2(x: 0, y: BallRules.chestHeight), to + Vec2(x: 0, y: BallRules.chestHeight)]
-                if ends.contains(where: { $0.distance(to: ball) <= FizzRules.tearRadius }) {
+                if ends.contains(where: { body.distance(to: $0) <= FizzRules.tearRadius }) {
                     pop(from: other, by: index)
                 }
             }
@@ -311,6 +312,7 @@ public struct Match: Equatable {
             if ball.isLive, ball.position.distance(to: point) <= BallRules.radius + WebRules.snapRadius {
                 ball.tether = index
                 ball.thrown = false
+                ball.pace = 1
                 players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
                 return true
             }

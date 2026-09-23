@@ -68,10 +68,14 @@ public struct FighterSpec: Equatable {
     /// Speed lost per frame on the ground through a snatch or a slash, so a run or a dash
     /// carries into them.
     public var attackBrake = 0.15
-    /// A shot leaves at this speed, and a slide bleeds this much a frame; Cannon Cola and
-    /// Slide Cider move them.
+    /// A shot leaves at this speed, and runs its arc this many times faster than an
+    /// ordinary ball; Cannon Cola raises the pace, never the speed, so the arc is the same.
     public var shotSpeed = 4.5
-    public var slideFriction = 0.15
+    public var shotPace = 1.0
+    /// A slide lasts this many frames and bleeds only this much a frame, so it carries
+    /// the burst it started with; Slide Cider adds frames.
+    public var slideFrames = 20
+    public var slideFriction = 0.02
 
     /// Body box: full width and height, feet at the position.
     public var bodyWidth: Double
@@ -422,11 +426,11 @@ public enum ShakeRules {
 }
 
 /// The slide's numbers: down at full run without the ball, or shoot while crouched. It
-/// starts at the dash burst and bleeds the body's slide friction a frame for this long.
-/// The extended leg reaches this far past the body's front edge and this high off the
-/// floor, and knocks the ball out of a grounded holder it meets.
+/// starts at the dash burst and carries it for the body's slide frames, bleeding only
+/// its slide friction, then stands up into the run's skid. The extended leg reaches this
+/// far past the body's front edge and this high off the floor, and knocks the ball out
+/// of a grounded holder it meets.
 public enum SlideRules {
-    public static let frames = 20
     public static let legReach = 10.0
     public static let legHeight = 6.0
 }
@@ -448,7 +452,7 @@ public enum SlashRules {
     public static let gravityShare = 0.2
     public static let reach = 56 / 1.6 / 2
     public static let forward = 4 / 1.6
-    public static let liveSheetFrames = 1..<4
+    public static let liveSheetFrames = 1..<6
     public static var liveFrames: Range<Int> { simFrames(liveSheetFrames, at: sheetFramesPerSecond) }
     public static let spikeAngle = degrees(-45)
     public static let spikeJitter = degrees(10)

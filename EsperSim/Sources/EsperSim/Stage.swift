@@ -43,6 +43,13 @@ public struct Box: Equatable {
         min.x < o.max.x && max.x > o.min.x && min.y < o.max.y && max.y > o.min.y
     }
 
+    /// How far the point is from the box's nearest edge; zero inside it.
+    public func distance(to point: Vec2) -> Double {
+        let across = Swift.max(min.x - point.x, 0, point.x - max.x)
+        let up = Swift.max(min.y - point.y, 0, point.y - max.y)
+        return (across * across + up * up).squareRoot()
+    }
+
     public func offset(by d: Vec2) -> Box { Box(min: min + d, max: max + d) }
 }
 

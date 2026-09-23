@@ -634,9 +634,10 @@ public struct Player: Equatable {
             }
 
         case .slide:
-            // The leg out front, the body low, the burst bleeding off.
+            // The leg out front, the body low, the burst carried nearly whole; then up into
+            // the skid, or a crouch if down is still held.
             velocity.x = approach(velocity.x, 0, spec.slideFriction)
-            if stateTimer >= SlideRules.frames {
+            if stateTimer >= spec.slideFrames {
                 enter(crouchAsked(input) ? .crouch : .idle)
             }
 

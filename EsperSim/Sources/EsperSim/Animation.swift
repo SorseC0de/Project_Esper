@@ -120,7 +120,7 @@ extension Player {
         }
         switch state {
         case .idle:
-            if previousState == .run || previousState == .dash, t < 15 {
+            if previousState == .run || previousState == .dash || previousState == .slide, t < 15 {
                 return AnimationFrame(hasBall ? .skidBall : .skid, t / 5)
             }
             if previousState == .land, t + spec.landingLagFrames < 22 {

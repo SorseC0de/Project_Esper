@@ -55,10 +55,11 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   stick turns the body throughout. Down without the ball is the crouch, and with the
   stick across as well the crouch walk at 0.8, facing the stick.
 - Slide (without ball): down at full run, or shoot while crouched. The dash burst the way
-  the body faces, bleeding off 0.15 a frame over 20 frames, the leg out: a hitbox a tile
-  past the body's front edge and 6 units high that knocks the ball out of a grounded
-  holder's hands. It ends in a crouch if down is still held. A slide can catch a loose
-  ball on the way, which is what it's for.
+  the body faces, carried for 20 frames bleeding only 0.02 a frame, the leg out: a hitbox
+  a tile past the body's front edge and 6 units high that knocks the ball out of a
+  grounded holder's hands. It ends in a crouch if down is still held, or stands up into
+  the run's skid to stop. A slide can catch a loose ball on the way, which is what it's
+  for. Numbers on the body (`slideFrames`, `slideFriction`) and in `SlideRules`.
 - Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. In the air
   a stick against the way you're going turns you at once, body and all, Silksong's rule. For 3 frames
   after walking off an edge a press is still that jump. Down while falling is a fast fall,
@@ -190,7 +191,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   double jump, arriving nudged clear of anything solid. The flashes are tears in space,
   and the exit tear lingers 12 frames and pulls any loose ball within 12 units into the
   hands, the ball going through space the way the body did: throw, flash after it, and
-  it's yours again; or flash in place to take one that's near. There's no slash. With the
+  it's yours again; or flash in place to take one that's near. At level two the other
+  holding the ball with their body within 12 units of either end loses it, popped. There's no slash. With the
   ball, a dribble hanging past a ledge by more than a tile counts as not having it, so
   shoot warps the body down to it, keeping it, standing still on the block. One second
   between flashes. A bright wide diamond blinks where it left, quick, and where it came
@@ -250,8 +252,10 @@ stack through the series and go with it.
   on.
 - Jumper Juice: the second jump; then both jumps a tenth higher.
 - Lunge Lemonade: four more frames of dash a drink.
-- Cannon Cola: half a unit more shot speed a drink, so further out.
-- Slide Cider: three hundredths less slide friction a drink, so further.
+- Cannon Cola: a quarter more shot pace a drink. The shot runs the same arc to the same
+  spot, only faster, velocity up by the pace and gravity by its square; it's an ordinary
+  ball again from its first bounce.
+- Slide Cider: four frames of slide a drink, so further.
 - Web Water: the swing; level two adds the web line.
 - Super Soda: flight; level two flies at twice the speed, with the ball as fast as level
   one without, and lasts 150 frames rather than 120. Flight needs no second jump.

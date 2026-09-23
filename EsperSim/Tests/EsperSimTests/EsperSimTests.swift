@@ -1430,11 +1430,12 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .slide)
         XCTAssertTrue(match.events.contains(.slid(player: 0)))
         XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.dashInitialVelocity, accuracy: 0.001)
-        // Held down through it, it ends in a crouch with the burst bled off.
-        let ended = run(&match, frames: SlideRules.frames + 2, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.players[0].state != .slide }
-        XCTAssertLessThanOrEqual(ended, SlideRules.frames)
+        // Held down through it, it ends in a crouch still carrying most of the burst.
+        let frames = match.players[0].spec.slideFrames
+        let ended = run(&match, frames: frames + 2, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.players[0].state != .slide }
+        XCTAssertLessThanOrEqual(ended, frames)
         XCTAssertEqual(match.players[0].state, .crouch)
-        XCTAssertLessThan(match.players[0].velocity.x, 1)
+        XCTAssertGreaterThan(match.players[0].velocity.x, match.players[0].spec.dashInitialVelocity - 0.5)
     }
 
     func testShootWhileCrouchedIsASlide() {
@@ -1451,8 +1452,9 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .run)
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0.7, y: -0.7)), .idle])
         XCTAssertEqual(match.players[0].state, .slide)
-        let hit = run(&match, frames: SlideRules.frames, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.events.contains(.popped(player: 1, by: 0)) }
-        XCTAssertLessThan(hit, SlideRules.frames, "the leg never reached them")
+        let frames = match.players[0].spec.slideFrames
+        let hit = run(&match, frames: frames, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.events.contains(.popped(player: 1, by: 0)) }
+        XCTAssertLessThan(hit, frames, "the leg never reached them")
         XCTAssertFalse(match.players[1].hasBall)
         // Popped straight up, nobody's, and the slider's hand ring is right there to take it.
         XCTAssertNil(match.ball.owner)
@@ -1897,13 +1899,60 @@ final class GreateraidTests: XCTestCase {
         XCTAssertFalse(match.events.contains(.doubleJumped(player: 0)))
     }
 
+    func testCannonColaRunsTheSameArcFaster() {
+        func flight(pace: Double) -> (landing: Vec2, frames: Int) {
+            var match = Match()
+            match.players[0].spec.shotPace = pace
+            match.players[0].hasBall = true
+            match.ball.holder = 0
+            for _ in 0..<BallRules.shotWindupFrames + 2 {
+                match.advance(inputs: [PlayerInput(shoot: true), .idle])
+            }
+            match.advance(inputs: [PlayerInput(aim: Vec2(x: 0.5, y: 0.8), shoot: true), .idle])
+            var frames = 0
+            var landing = Vec2.zero
+            while frames < 300 {
+                match.advance(inputs: [.idle, .idle])
+                frames += 1
+                if let bounce = match.events.compactMap({ event -> Vec2? in
+                    if case .ballBounced(let position) = event { return position } else { return nil }
+                }).first {
+                    landing = bounce
+                    break
+                }
+            }
+            return (landing, frames)
+        }
+        let plain = flight(pace: 1)
+        let cola = flight(pace: 1.5)
+        XCTAssertEqual(cola.landing.x, plain.landing.x, accuracy: 3, "the same arc, so the same landing")
+        XCTAssertEqual(cola.landing.y, plain.landing.y, accuracy: 3)
+        XCTAssertLessThan(cola.frames, plain.frames * 3 / 4, "run through faster")
+    }
+
+    func testTearsPopAHolderWhoseBodyIsInReach() {
+        var match = Match()
+        for index in match.players.indices {
+            match.players[index].power = .flashFizz
+            match.players[index].powerLevel = 2
+        }
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        // The body's near edge just inside the tear's reach of the exit, the ball's centre outside it.
+        let exit = 130 + FizzRules.flashDistance(level: 2)
+        match.players[1].position.x = exit + FizzRules.tearRadius + match.players[1].spec.bodyWidth / 2 - 1
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        XCTAssertTrue(match.events.contains(.popped(player: 1, by: 0)))
+    }
+
     func testBoostersStackToTwoAndThenStopBeingOffered() {
         var drinks = Drinks.none
         drinks.drink(.cannonCola)
         drinks.drink(.cannonCola)
         drinks.drink(.cannonCola)
         XCTAssertEqual(drinks.level(of: .cannonCola), 2)
-        XCTAssertEqual(drinks.spec().shotSpeed, FighterSpec.starting.shotSpeed + 1, accuracy: 0.001)
+        XCTAssertEqual(drinks.spec().shotPace, 1.5, accuracy: 0.001)
+        XCTAssertEqual(drinks.spec().shotSpeed, FighterSpec.starting.shotSpeed, accuracy: 0.001)
         var dice = Dice(seed: 3)
         for _ in 0..<50 {
             let offer = drinks.offers(&dice)

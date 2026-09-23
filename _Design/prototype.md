@@ -104,9 +104,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the air the throw stance keeps its run,
   bleeding only 0.03 a frame, so a jump carries it to the rim. In the stance with the
-  chest within 25 units of a rim, wider than the basket, it's a dunk: the feet snap to
-  the dunk's place on the rim, `BallRules.dunkOffset` from its centre, 16 art pixels
-  back and 24 down, mirrored across for the other rim, facing the backboard. The dunk
+  chest within 25 units of a rim, wider than the basket, it's a dunk: the body turns to
+  the backboard and glides to the dunk's place on the rim, `BallRules.dunkOffset` from
+  its centre, 16 art pixels back and 24 down, mirrored across for the other rim, over the
+  wind-up, there by the slam, so it never jumps into place. The dunk
   sheet plays from the throw stance's frame: the wind-up, the swing, the slam on the
   release frame, when the ball leaves the hand and drops through, then the hang, held
   through the 45 frames before the point restarts. Each frame of it is drawn nudged by

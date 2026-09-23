@@ -657,18 +657,23 @@ final class BallTests: XCTestCase {
         match.players[0].enter(.air)
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
-        // The dunk snaps the feet onto the rim, facing the backboard, from the throw stance's
-        // frame, the ball still in hand until the slam.
+        // The dunk turns the body to the backboard and glides it to its place on the rim
+        // through the wind-up, from the throw stance's frame, the ball in hand until the slam.
         XCTAssertEqual(match.players[0].state, .dunking)
         XCTAssertEqual(match.players[0].facing, .right)
-        XCTAssertEqual(match.players[0].position.x, rim.x + BallRules.dunkOffset.x, accuracy: 0.001)
-        XCTAssertEqual(match.players[0].position.y, rim.y + BallRules.dunkOffset.y, accuracy: 0.001)
+        let began = match.players[0].position
         XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.throwForward, 3))
         XCTAssertTrue(match.players[0].hasBall)
         XCTAssertEqual(match.scores, [0, 0])
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertGreaterThan(match.players[0].position.distance(to: began), 0)
+        XCTAssertLessThan(match.players[0].position.distance(to: began), 6, "it should glide, not jump")
         let scored = run(&match, frames: BallRules.dunkFrames, input: { _ in .idle }) { $0.scores[0] == 1 }
         XCTAssertLessThan(scored, BallRules.dunkFrames)
-        XCTAssertGreaterThanOrEqual(scored + 1, BallRules.dunkFrames / 2)
+        // One frame already went to the glide check above.
+        XCTAssertGreaterThanOrEqual(scored + 2, BallRules.dunkFrames / 2)
+        XCTAssertEqual(match.players[0].position.x, rim.x + BallRules.dunkOffset.x, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].position.y, rim.y + BallRules.dunkOffset.y, accuracy: 0.001)
         XCTAssertEqual(match.players[0].animationFrame.animation, .dunk)
         XCTAssertEqual(match.restartIn, BallRules.dunkHangFrames)
         // Still hanging there, the point not yet restarted, for the beat.

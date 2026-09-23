@@ -158,8 +158,9 @@ public struct Player: Equatable {
     /// can be grabbed.
     public var ledge: Vec2?
     public var ledgeCooldown = 0
-    /// The rim being dunked on.
+    /// The rim being dunked on, and where the body was when the dunk began, to glide from.
     public var dunkHoop = 0
+    public var dunkFrom = Vec2.zero
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
     /// Frames a jump press stays live waiting for something to spend it.
@@ -541,11 +542,12 @@ public struct Player: Equatable {
             }
             if let hoop = stage.hoops.indices.first(where: { stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius }) {
                 // Onto the rim: the feet at the dunk's place on it, facing the backboard.
-                let rim = stage.hoops[hoop]
-                position = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y)
-                facing = rim.backboard
+                // Turned to the backboard; the body glides to its place on the rim through
+                // the wind-up, so it never jumps there.
+                facing = stage.hoops[hoop].backboard
                 velocity = .zero
                 dunkHoop = hoop
+                dunkFrom = position
                 enter(.dunking)
             } else if !input.throwBall, !quickThrow {
                 if stateTimer >= BallRules.throwWindupFrames {
@@ -577,9 +579,14 @@ public struct Player: Equatable {
             }
 
         case .dunking:
-            // Hanging on the rim through the dunk and the beat after, until the point
-            // restarts; the ball leaves the hand at the slam.
+            // To the rim over the wind-up, there by the slam, then hanging through the dunk
+            // and the beat after, until the point restarts; the ball leaves the hand at the slam.
             velocity = .zero
+            let rim = stage.hoops[dunkHoop]
+            let place = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y)
+            let slam = BallRules.dunkFrames / 2
+            let share = min(Double(stateTimer) / Double(slam), 1)
+            position = dunkFrom + (place - dunkFrom) * share
             if stateTimer == BallRules.dunkFrames / 2 {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames

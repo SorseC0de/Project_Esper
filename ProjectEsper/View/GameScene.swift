@@ -62,6 +62,7 @@ final class GameScene: SKScene {
     var flowState: FlowState?
     private var headVariant = HeadVariant.b
     private var powerVariant = PowerVariant.none
+    private var dunkVariant = DunkVariant.corrected
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
@@ -559,6 +560,9 @@ final class GameScene: SKScene {
             self?.powerVariant = PowerVariant(rawValue: index)!
             self?.applyPower()
         }
+        controls.addPicker(title: "DUNK", options: DunkVariant.allCases.map(\.label), selected: dunkVariant.rawValue) { [weak self] index in
+            self?.dunkVariant = DunkVariant(rawValue: index)!
+        }
         controls.addSlider(title: "GLOW THRESHOLD", range: 0.2...1.0, notch: 0.1, value: GlowSettings.threshold) { value in
             GlowSettings.threshold = value
         }
@@ -1047,7 +1051,7 @@ final class GameScene: SKScene {
             let drift = CGPoint(x: (cos(lap) * Double(GameScene.hoverRadius * hover[index])).rounded(),
                                 y: (sin(lap) * Double(GameScene.hoverRadius * hover[index])).rounded())
             node.position = SpriteLibrary.point(player.position) + drift
-            if player.state == .dunking {
+            if player.state == .dunking, dunkVariant.nudges {
                 // Each frame of the dunk sits where its art was placed on the rim.
                 let nudge = DunkArt.offsets[Animation.dunkEntry(at: player.stateTimer).index]
                 node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y)

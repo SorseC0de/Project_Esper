@@ -31,6 +31,15 @@ enum PowerVariant: Int, CaseIterable {
     }
 }
 
+/// The dunk's frames on the picker: A drawn with `DunkArt.offsets` nudging each frame
+/// into place, B raw, every frame at the body's place on the rim as the sheet has it.
+enum DunkVariant: Int, CaseIterable {
+    case corrected, raw
+
+    var label: String { ["A", "B"][rawValue] }
+    var nudges: Bool { self == .corrected }
+}
+
 /// How each frame of the dunk sequence is drawn: nudged from the body's place on the rim
 /// by this many art pixels, across (mirrored for the other rim) and up. Found on the
 /// sliders with `DunkTuning` on, as the user placed them: the throw stance, then the

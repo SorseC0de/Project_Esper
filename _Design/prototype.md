@@ -266,6 +266,8 @@ holds the variants; A is always the baseline as tuned.
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER: A none, B Web Water, C Super Soda, D Flash Fizz, E Platform Protein Shake. The
   left bumper steps this one.
+- DUNK: A draws the dunk's frames nudged into place by `DunkArt.offsets`, B draws them
+  raw at the body's place on the rim. The left bumper steps this one now, being newest.
 - HITBOX, beside RESET: draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green, a flash's tear cyan.

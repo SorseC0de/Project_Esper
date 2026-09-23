@@ -1351,7 +1351,14 @@ final class GameScene: SKScene {
             }
             if let leg = player.slideHitbox { outline(leg, .red) }
             if let blade = player.slashHitbox { outline(blade, .red) }
-            if let hand = player.snatchHitbox { outline(hand, .green) }
+            if let hand = player.snatchHitbox {
+                outline(hand, .green)
+                let ring = SKShapeNode(circleOfRadius: CGFloat(BallRules.handCatchRadius * SpriteLibrary.pixelsPerUnit))
+                ring.position = SpriteLibrary.point(player.handCatchPoint)
+                ring.strokeColor = .green
+                ring.lineWidth = 1
+                hitboxLayer.addChild(ring)
+            }
             if let tear = player.tear {
                 let ring = SKShapeNode(circleOfRadius: CGFloat(FizzRules.tearRadius * SpriteLibrary.pixelsPerUnit))
                 ring.position = SpriteLibrary.point(tear.position)

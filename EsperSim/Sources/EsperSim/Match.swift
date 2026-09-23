@@ -230,12 +230,11 @@ public struct Match: Equatable {
                 events.append(.swatted(player: index, hit: true))
             }
         }
-        if let reach = player.snatchHitbox {
+        if player.snatchHitbox != nil {
             let held = ball.holder.flatMap { $0 == index ? nil : $0 }
             let at = held.map { players[$0].chest + Vec2(x: 0, y: 3) } ?? ball.position
             let facingIt = (at.x - player.position.x) * player.facing.sign >= -1
-            let inReach = Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2).overlaps(reach)
-            if facingIt, inReach, held != nil || ball.isLive {
+            if facingIt, player.snatchReaches(ballAt: at), held != nil || ball.isLive {
                 if let held {
                     players[held].loseBall()
                     players[held].hitStun = BallRules.hitStunFrames

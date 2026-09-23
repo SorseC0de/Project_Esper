@@ -894,6 +894,14 @@ public struct Player: Equatable {
         return Box(center: bladeCentre, width: SlashRules.reach * 2, height: SlashRules.reach * 2)
     }
 
+    /// Whether the snatch's hand takes a ball centred here: the ball on the body and the
+    /// reach in front, or on the hand's catch ring.
+    public func snatchReaches(ballAt at: Vec2) -> Bool {
+        guard let reach = snatchHitbox else { return false }
+        let ball = Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2)
+        return ball.overlaps(reach) || at.distance(to: handCatchPoint) <= BallRules.handCatchRadius + BallRules.radius
+    }
+
     /// The whole body and the hand's reach in front, while the snatch's hand is out.
     public var snatchHitbox: Box? {
         guard state == .snatching, SnatchRules.activeFrames.contains(stateTimer) else { return nil }

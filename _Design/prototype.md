@@ -83,9 +83,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   the whole thing is a commitment; on the ground it's over when the swing is. Not in
   neutral.
 - Throw (without ball, in neutral or on defence): the snatch. 40 frames, the hand out over
-  frames 4 to 15, when the whole body plus a tile of reach in front takes any ball it
-  overlaps while the body faces it: a loose one at any speed, or the one in the other's
-  hands. The catch spark shows on the hand on frame 8. Then half a second before another.
+  frames 4 to 15, when the whole body plus a tile of reach in front, or the hand's catch
+  ring at the spark's spot, takes any ball it touches while the body faces it: a loose
+  one at any speed, or the one in the other's hands. The catch spark shows on the hand on
+  frame 8. Then half a second before another.
   On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
   air it drifts. Web Water keeps the web line on this button instead.
 - Ledge (without ball): automatic. Falling past the top corner of a block or the one-way
@@ -268,7 +269,7 @@ holds the variants; A is always the baseline as tuned.
   left bumper steps this one.
 - HITBOX, beside RESET: draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
-  snatch's reach green, a flash's tear cyan.
+  snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
 - AI, beside that: the computer plays the other side. Off, the second pad or nothing does.
 
 ## Opponent

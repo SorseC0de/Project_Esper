@@ -454,8 +454,9 @@ public enum SlashRules {
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many
 /// frames; the hand is out over these, and the whole body plus this much of reach in
-/// front takes any ball it overlaps while the body faces it, loose or in the other's
-/// hands. The spark shows on this frame. Then it can't repeat for this long.
+/// front, or the hand's catch ring, takes any ball it touches while the body faces it,
+/// loose or in the other's hands. The spark shows on this frame. Then it can't repeat
+/// for this long.
 public enum SnatchRules {
     public static let frames = 40
     public static let activeFrames = 4..<16

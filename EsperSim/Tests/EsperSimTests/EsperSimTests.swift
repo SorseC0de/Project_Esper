@@ -1589,6 +1589,19 @@ final class FootsiesTests: XCTestCase {
         XCTAssertNil(match.ball.holder)
     }
 
+    func testSnatchTakesABallOnTheHandsRingBeyondItsBox() {
+        var match = neutral()
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        run(&match, frames: 4, input: { _ in .idle })
+        let player = match.players[0]
+        let beyondBox = player.spec.bodyWidth / 2 + SnatchRules.reach + BallRules.radius + 1
+        let spot = player.position + Vec2(x: beyondBox, y: BallRules.handCatchCentre.y)
+        XCTAssertFalse(Box(center: spot, width: BallRules.radius * 2, height: BallRules.radius * 2).overlaps(player.snatchHitbox!))
+        match.ball.respawn(at: spot)
+        run(&match, frames: 4, input: { _ in .idle }) { $0.ball.holder == 0 }
+        XCTAssertEqual(match.ball.holder, 0)
+    }
+
     func testSnatchTakesTheBallFromTheHoldersHands() {
         var match = defending(otherAt: 140)
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])

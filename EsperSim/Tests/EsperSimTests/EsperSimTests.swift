@@ -544,9 +544,9 @@ final class BallTests: XCTestCase {
 
         // The snatch, pressed as it comes, takes it.
         var snatching = Match()
-        snatching.ball.respawn(at: chest + Vec2(x: 40, y: 0))
+        snatching.ball.respawn(at: chest + Vec2(x: BallRules.throwSpeed * Double(SnatchRules.activeFrames.lowerBound + 3), y: 0))
         snatching.ball.velocity = Vec2(x: -BallRules.throwSpeed, y: 0)
-        run(&snatching, frames: 15, input: { _ in PlayerInput(throwBall: true) }) { $0.ball.holder != nil }
+        run(&snatching, frames: SnatchRules.activeFrames.upperBound, input: { _ in PlayerInput(throwBall: true) }) { $0.ball.holder != nil }
         XCTAssertEqual(snatching.ball.holder, 0)
 
         // Shoot held does nothing for it: the press is a slash, and after that it still goes through.
@@ -1572,10 +1572,11 @@ final class FootsiesTests: XCTestCase {
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         XCTAssertEqual(match.players[0].state, .snatching)
         // Too fast to catch by hand, straight at the chest, arriving while the hand is out.
-        match.ball.respawn(at: match.players[0].chest + Vec2(x: 36, y: 0))
+        let arrival = SnatchRules.activeFrames.lowerBound + 2
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: BallRules.throwSpeed * Double(arrival), y: 0))
         match.ball.velocity = Vec2(x: -BallRules.throwSpeed, y: 0)
-        let taken = run(&match, frames: 10, input: { _ in .idle }) { $0.ball.holder == 0 }
-        XCTAssertLessThan(taken, 10)
+        let taken = run(&match, frames: SnatchRules.activeFrames.upperBound, input: { _ in .idle }) { $0.ball.holder == 0 }
+        XCTAssertLessThan(taken, SnatchRules.activeFrames.upperBound)
         XCTAssertEqual(match.players[0].state, .catching)
         XCTAssertEqual(match.players[0].snatchCooldown, SnatchRules.cooldownFrames)
     }
@@ -1592,7 +1593,7 @@ final class FootsiesTests: XCTestCase {
     func testSnatchTakesABallOnTheHandsRingBeyondItsBox() {
         var match = neutral()
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
-        run(&match, frames: 4, input: { _ in .idle })
+        run(&match, frames: SnatchRules.activeFrames.lowerBound, input: { _ in .idle })
         let player = match.players[0]
         let beyondBox = player.spec.bodyWidth / 2 + SnatchRules.reach + BallRules.radius + 1
         let spot = player.position + Vec2(x: beyondBox, y: BallRules.handCatchCentre.y)

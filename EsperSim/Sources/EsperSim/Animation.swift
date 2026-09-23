@@ -159,9 +159,9 @@ extension Player {
             return grounded ? AnimationFrame(.shoot, 4 + t * 24 / 60) : AnimationFrame(.shootAir, 3 + t * 36 / 60)
         case .throwStance:
             // Frame 3 is the set pose with the ring on the ball; 4 is the release smear.
-            return AnimationFrame(.throwForward, min(t * 12 / 60, 3))
+            return AnimationFrame(.throwForward, min(t * BallRules.throwSheetFramesPerSecond / 60, 3))
         case .throwing:
-            return AnimationFrame(.throwForward, 3 + t * 24 / 60)
+            return AnimationFrame(.throwForward, 3 + t * BallRules.throwSheetFramesPerSecond / 60)
         case .dunking:
             return Animation.dunkEntry(at: t).frame
         case .catching:
@@ -170,9 +170,9 @@ extension Player {
             return AnimationFrame(.esperSlash, t * SlashRules.sheetFramesPerSecond / 60)
         case .rolling:
             // The double jump's somersault, run through in the roll's frames.
-            return AnimationFrame(.doubleJump, t * 20 / 60)
+            return AnimationFrame(.doubleJump, t * SlashRules.sheetFramesPerSecond / 60)
         case .snatching, .walling:
-            return AnimationFrame(grounded ? .snatch : .snatchAir, t * 15 / 60)
+            return AnimationFrame(grounded ? .snatch : .snatchAir, t * SnatchRules.sheetFramesPerSecond / 60)
         case .ledgeHang:
             return AnimationFrame(.ledge, (t - 1) * 12 / 60)
         case .ledgeClimb:

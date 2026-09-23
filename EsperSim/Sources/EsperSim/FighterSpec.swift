@@ -296,6 +296,7 @@ public enum BallRules {
     public static let floaterMomentumShare = 0.2
     public static let throwReleaseHeight = 12.0
     public static let throwWindupFrames = 12
+    public static let throwSheetFramesPerSecond = 15
     /// Frames from the release to the ball leaving the hand, then to acting again.
     public static let throwReleaseFrames = 3
     public static let throwRecoveryFrames = 15
@@ -435,18 +436,20 @@ public enum SlideRules {
 /// rises at least this fast and gravity is cut to this share, so it hangs through the
 /// swing, and the roll follows over this many frames. Both play at this many sheet
 /// frames a second. The blade is a square round the body, 56 art pixels a side, its centre
-/// this far in front of the body's, live over these frames. It knocks the ball out of a holder's hands, or spikes a loose one down
+/// this far in front of the body's, live over these sheet frames. It knocks the ball out of a holder's hands, or spikes a loose one down
 /// and away at about this angle below the horizontal, jittered by up to this much, at no
 /// less than this speed.
 public enum SlashRules {
-    public static let frames = 18
-    public static let rollFrames = 18
-    public static let sheetFramesPerSecond = 20
+    public static let sheetFramesPerSecond = 15
+    public static let sheetFrames = 6
+    public static var frames: Int { simFrames(sheetFrames, at: sheetFramesPerSecond) }
+    public static var rollFrames: Int { frames }
     public static let lift = 1.0
     public static let gravityShare = 0.2
     public static let reach = 56 / 1.6 / 2
     public static let forward = 4 / 1.6
-    public static let liveFrames = 3..<12
+    public static let liveSheetFrames = 1..<4
+    public static var liveFrames: Range<Int> { simFrames(liveSheetFrames, at: sheetFramesPerSecond) }
     public static let spikeAngle = degrees(-45)
     public static let spikeJitter = degrees(10)
     public static let swatSpeed = 6.0
@@ -455,12 +458,16 @@ public enum SlashRules {
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many
 /// frames; the hand is out over these, and the whole body plus this much of reach in
 /// front, or the hand's catch ring, takes any ball it touches while the body faces it,
-/// loose or in the other's hands. The spark shows on this frame. Then it can't repeat
-/// for this long.
+/// loose or in the other's hands. The spark shows on this sheet frame. Then it can't
+/// repeat for this long.
 public enum SnatchRules {
-    public static let frames = 40
-    public static let activeFrames = 4..<16
-    public static let sparkFrame = 8
+    public static let sheetFramesPerSecond = 15
+    public static let sheetFrames = 10
+    public static var frames: Int { simFrames(sheetFrames, at: sheetFramesPerSecond) }
+    public static let activeSheetFrames = 2..<4
+    public static var activeFrames: Range<Int> { simFrames(activeSheetFrames, at: sheetFramesPerSecond) }
+    public static let sparkSheetFrame = 2
+    public static var sparkFrame: Int { simFrames(sparkSheetFrame, at: sheetFramesPerSecond) }
     public static let reach = 10.0
     public static let cooldownFrames = 30
 }
@@ -477,4 +484,14 @@ public enum LedgeRules {
     public static let hangFrames = 10
     public static let climbFrames = 15
     public static let walkOffCooldownFrames = 20
+}
+
+/// Sim frames, at sixty a second, for this many sheet frames at the sheet's rate.
+func simFrames(_ sheetFrames: Int, at sheetFramesPerSecond: Int) -> Int {
+    sheetFrames * 60 / sheetFramesPerSecond
+}
+
+/// The sim frames a range of sheet frames covers, at the sheet's rate.
+func simFrames(_ sheetFrames: Range<Int>, at sheetFramesPerSecond: Int) -> Range<Int> {
+    simFrames(sheetFrames.lowerBound, at: sheetFramesPerSecond)..<simFrames(sheetFrames.upperBound, at: sheetFramesPerSecond)
 }

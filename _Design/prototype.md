@@ -75,18 +75,20 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Shoot (without ball, in neutral or on defence): the Esper Slash, the swat. On the
   ground it carries the run or dash it came from, bleeding 0.15 a frame; in the air the
   body rises at least 1 a frame and gravity is cut to a fifth, so it hangs through the
-  swing. 18 frames at 20 a second. The blade is a square round the body, 56 art pixels a
-  side, its centre 4 art pixels in front of the body's, live over frames 3 to 11. Touching the holder's body or ball with it knocks the
+  swing. The sheet's six frames at 15 a second, 24 sim frames, and the roll the same. The
+  blade is a square round the body, 56 art pixels a side, its centre 4 art pixels in
+  front of the body's, live over sheet frames 1 to 3 (`SlashRules.liveSheetFrames`). Touching the holder's body or ball with it knocks the
   ball out of their hands, and it spikes a loose ball down and away at about 45° below
   the horizontal, jittered up to 10° by the frame, at no less than 6. In the air it ends in the roll, the double
   jump's somersault over 18 frames at the same pace with normal gravity and air drift, so
   the whole thing is a commitment; on the ground it's over when the swing is. Not in
   neutral.
-- Throw (without ball, in neutral or on defence): the snatch. 40 frames, the hand out over
-  frames 4 to 15, when the whole body plus a tile of reach in front, or the hand's catch
-  ring at the spark's spot, takes any ball it touches while the body faces it: a loose
-  one at any speed, or the one in the other's hands. The catch spark shows on the hand on
-  frame 8. Then half a second before another.
+- Throw (without ball, in neutral or on defence): the snatch. The sheet's ten frames at
+  15 a second, 40 sim frames, the hand out over sheet frames 2 and 3
+  (`SnatchRules.activeSheetFrames`), when the whole body plus a tile of reach in front, or
+  the hand's catch ring at the spark's spot, takes any ball it touches while the body
+  faces it: a loose one at any speed, or the one in the other's hands. The catch spark
+  shows on the hand on sheet frame 2. Then half a second before another.
   On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
   air it drifts. Web Water keeps the web line on this button instead.
 - Ledge (without ball): automatic. Falling past the top corner of a block or the one-way

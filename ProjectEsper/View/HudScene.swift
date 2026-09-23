@@ -53,7 +53,9 @@ struct HudView: UIViewRepresentable {
         let view = HudSKView(frame: .zero)
         view.allowsTransparency = true
         view.backgroundColor = .clear
+        #if os(iOS)
         view.isMultipleTouchEnabled = true
+        #endif
         view.preferredFramesPerSecond = 60
         view.ignoresSiblingOrder = true
         view.game = scene

@@ -32,13 +32,24 @@ final class InputHub {
 
     private func refresh() {
         controllers = GCController.controllers().filter { $0.extendedGamepad != nil }
+        #if os(tvOS)
+        // On the TV a menu button nobody handles sends the app home, so it's claimed
+        // here: it resets, as it does on a phone.
+        for controller in controllers {
+            controller.extendedGamepad?.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
+                if pressed { MainActor.assumeIsolated { self?.resetPressed = true } }
+            }
+        }
+        #endif
     }
 
     /// This frame's input for every player.
     func frames(players: Int) -> [PlayerInput] {
+        #if !os(tvOS)
         let menuDown = controllers.contains { $0.extendedGamepad?.buttonMenu.isPressed ?? false }
         if menuDown, !menuWasDown { resetPressed = true }
         menuWasDown = menuDown
+        #endif
         let bumperDown = controllers.contains { $0.extendedGamepad?.leftShoulder.isPressed ?? false }
         if bumperDown, !bumperWasDown { cyclePressed = true }
         bumperWasDown = bumperDown

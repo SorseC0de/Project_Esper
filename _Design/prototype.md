@@ -16,7 +16,13 @@ neutral to get a shot off; catch it and the roles reverse.
   by a transparent SpriteKit view (`HudView`) laid over the Metal view, so nothing in it
   glows; it takes the touches and hands them to the game scene. `InputHub` merges touch
   and controllers. `TouchControls` is the on-screen pad. `Net/GameCenter` is Game
-  Center: signing in, the matchmaker, and the bytes between the two phones.
+  Center: signing in, the matchmaker, and the bytes between the two phones. Two
+  targets build the same sources and catalog: `ProjectEsper` for iPhone and iPad, and
+  `ProjectEsperTV` for Apple TV, same bundle ID so the two play each other. On the TV
+  there's no pad on screen, a controller is required, and its menu button is claimed as
+  reset so it doesn't send the app home; the few phone-only calls sit behind
+  `#if os(iOS)`. The TV's icon is the empty `App Icon & Top Shelf Image` brand assets,
+  waiting for art.
 - `Tools/import_sprites.py` — copies the GMS2 frames and slices the strips in
   `_Graphic Assets` (square frames stacked one under another; a strip overrides the GMS2
   sprite of the same name) into the atlas. Run after art changes. The ball's imageset

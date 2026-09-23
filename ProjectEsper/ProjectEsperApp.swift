@@ -7,7 +7,7 @@ struct ProjectEsperApp: App {
         WindowGroup {
             GameView()
                 .preferredColorScheme(.dark)
-                .statusBarHidden()
+                .phoneChrome()
         }
     }
 }
@@ -36,9 +36,22 @@ struct GameView: View {
                     .transition(.opacity)
             }
         }
-        .persistentSystemOverlays(.hidden)
-        .defersSystemGestures(on: .all)
         .animation(.easeOut(duration: 0.25), value: flow.showsTitle)
         .animation(.easeOut(duration: 0.25), value: flow.veiled)
+    }
+}
+
+extension View {
+    /// The phone's chrome out of the way: no status bar, no home indicator, and the
+    /// edge swipes held off. Nothing to do on the TV.
+    @ViewBuilder
+    func phoneChrome() -> some View {
+        #if os(iOS)
+        self.statusBarHidden()
+            .persistentSystemOverlays(.hidden)
+            .defersSystemGestures(on: .all)
+        #else
+        self
+        #endif
     }
 }

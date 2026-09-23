@@ -8,10 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		E5FE000000000000000000A2 /* EsperSim in Frameworks */ = {isa = PBXBuildFile; productRef = E5FE000000000000000000A3 /* EsperSim */; };
+		E5FE00000000000000000118 /* EsperSim in Frameworks */ = {isa = PBXBuildFile; productRef = E5FE00000000000000000116 /* EsperSim */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		E5FE000000000000000000A1 /* ProjectEsper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ProjectEsper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E5FE00000000000000000117 /* ProjectEsperTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ProjectEsperTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -31,6 +33,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E5FE00000000000000000114 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E5FE00000000000000000118 /* EsperSim in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -46,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				E5FE000000000000000000A1 /* ProjectEsper.app */,
+				E5FE00000000000000000117 /* ProjectEsperTV.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,6 +87,29 @@
 			productReference = E5FE000000000000000000A1 /* ProjectEsper.app */;
 			productType = "com.apple.product-type.application";
 		};
+		E5FE00000000000000000111 /* ProjectEsperTV */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E5FE00000000000000000112 /* Build configuration list for PBXNativeTarget "ProjectEsperTV" */;
+			buildPhases = (
+				E5FE00000000000000000113 /* Sources */,
+				E5FE00000000000000000114 /* Frameworks */,
+				E5FE00000000000000000115 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E5FE000000000000000000B1 /* ProjectEsper */,
+			);
+			name = ProjectEsperTV;
+			packageProductDependencies = (
+				E5FE00000000000000000116 /* EsperSim */,
+			);
+			productName = ProjectEsperTV;
+			productReference = E5FE00000000000000000117 /* ProjectEsperTV.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -87,6 +121,9 @@
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
 					E5FE000000000000000000E1 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					E5FE00000000000000000111 = {
 						CreatedOnToolsVersion = 26.6;
 					};
 				};
@@ -109,6 +146,7 @@
 			projectRoot = "";
 			targets = (
 				E5FE000000000000000000E1 /* ProjectEsper */,
+				E5FE00000000000000000111 /* ProjectEsperTV */,
 			);
 		};
 /* End PBXProject section */
@@ -121,10 +159,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E5FE00000000000000000115 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		E5FE000000000000000000C2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E5FE00000000000000000113 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -275,6 +327,70 @@
 			};
 			name = Release;
 		};
+		E5FE00000000000000000119 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ProjectEsper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4KKY6YAP78;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Project Esper";
+				INFOPLIST_KEY_GCRequiresControllerUserInteraction = YES;
+				INFOPLIST_KEY_GCSupportsControllerUserInteraction = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sorsec0de.projectesper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Debug;
+		};
+		E5FE0000000000000000011A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ProjectEsper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4KKY6YAP78;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Project Esper";
+				INFOPLIST_KEY_GCRequiresControllerUserInteraction = YES;
+				INFOPLIST_KEY_GCSupportsControllerUserInteraction = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sorsec0de.projectesper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -296,6 +412,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		E5FE00000000000000000112 /* Build configuration list for PBXNativeTarget "ProjectEsperTV" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E5FE00000000000000000119 /* Debug */,
+				E5FE0000000000000000011A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -307,6 +432,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		E5FE000000000000000000A3 /* EsperSim */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EsperSim;
+		};
+		E5FE00000000000000000116 /* EsperSim */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = EsperSim;
 		};

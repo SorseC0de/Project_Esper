@@ -28,6 +28,12 @@ final class GameScene: SKScene {
 
     /// The count before play, at the start and after every point.
     private static let countdownFrames = 180
+    /// The on-screen pad is for a phone; the TV has a controller and nothing to touch.
+    #if os(tvOS)
+    private static let touchControlsShown = false
+    #else
+    private static let touchControlsShown = true
+    #endif
 
     /// The match runs inside a rollback session offline as well as online, so there is
     /// one path: offline the other side's input is handed in each tick and every frame
@@ -621,6 +627,7 @@ final class GameScene: SKScene {
             }
         }
         controls.setOnline(online != nil)
+        controls.isHidden = !GameScene.touchControlsShown
         hud.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - safeInsets.top - 8)
@@ -720,7 +727,7 @@ final class GameScene: SKScene {
         flowState?.showsTitle = false
         screen?.removeFromParent()
         screen = nil
-        controls?.isHidden = false
+        controls?.isHidden = !GameScene.touchControlsShown
         session.mutate { match in
             match.countdown = 0
             match.players[0].position = hoop.position + Vec2(x: BallRules.dunkOffset.x * hoop.backboard.sign, y: BallRules.dunkOffset.y)
@@ -936,7 +943,7 @@ final class GameScene: SKScene {
             break
         }
         if let screen { hud.addChild(screen) }
-        controls?.isHidden = flow != .playing
+        controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
         flowState?.veiled = screen != nil
     }
 

@@ -734,16 +734,10 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addSlider(title: "BASKET Y", range: 60...200, notch: 5, value: Float(Stage.fieldRimHeight)) { [weak self] value in
-            // Offline only: the rims and the goalposts move together.
+        controls.addSlider(title: "HOOP X", range: 20...120, notch: 1, value: Float(Stage.fieldRimInset)) { [weak self] value in
+            // Offline only: the rims in from each wall, the goalposts staying where they are.
             guard let self, self.online == nil else { return }
-            GoalpostTuning.postRimHeight = Double(value)
-            self.moveRims(to: Double(value))
-        }
-        controls.addSlider(title: "HOOP Y", range: 60...200, notch: 1, value: Float(Stage.fieldRimHeight)) { [weak self] value in
-            // Offline only: the rims alone, the goalposts staying where they are.
-            guard let self, self.online == nil else { return }
-            self.moveRims(to: Double(value))
+            self.moveRims(inset: Double(value))
         }
         controls.addSlider(title: "POST THICKNESS", range: 1...10, notch: 0.5, value: GoalpostTuning.thickness) { [weak self] value in
             GoalpostTuning.thickness = value
@@ -1759,14 +1753,16 @@ final class GameScene: SKScene {
     private let goalposts = SKNode()
     private var netNodes: [SKShapeNode] = []
 
-    /// The sim's rims to this height, in the match and the next, and everything drawn to them.
-    private func moveRims(to height: Double) {
-        Stage.fieldRimHeight = height
+    /// The sim's rims this far in from each wall, in the match and the next, and the rims drawn there.
+    private func moveRims(inset: Double) {
+        Stage.fieldRimInset = inset
         session.mutate { match in
-            for index in match.stage.hoops.indices { match.stage.hoops[index].position.y = height }
+            let width = match.stage.width
+            for index in match.stage.hoops.indices {
+                match.stage.hoops[index].position.x = match.stage.hoops[index].backboard == .left ? inset : width - inset
+            }
         }
         placeRims()
-        buildGoalposts()
     }
 
     /// The rims and their nets moved to where the stage has them now.
@@ -1784,7 +1780,8 @@ final class GameScene: SKScene {
     private func buildGoalposts() {
         goalposts.removeAllChildren()
         for hoop in match.stage.hoops {
-            FieldArt.goalpost(at: SpriteLibrary.point(Vec2(x: hoop.position.x, y: GoalpostTuning.postRimHeight)), backboard: hoop.backboard, into: goalposts,
+            let postX = hoop.backboard == .left ? Stage.fieldPostInset : match.stage.width - Stage.fieldPostInset
+            FieldArt.goalpost(at: SpriteLibrary.point(Vec2(x: postX, y: GoalpostTuning.postRimHeight)), backboard: hoop.backboard, into: goalposts,
                               crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
                               angle: GoalpostTuning.crossbarAngle * .pi / 180,
                               thickness: CGFloat(GoalpostTuning.thickness), outline: GoalpostTuning.outline)
@@ -2450,10 +2447,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nbasket y %.0f  hoop y %.0f  post thickness %.1f",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nhoop x %.0f  post thickness %.1f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 GoalpostTuning.postRimHeight, Stage.fieldRimHeight, GoalpostTuning.thickness)
+                                 Stage.fieldRimInset, GoalpostTuning.thickness)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

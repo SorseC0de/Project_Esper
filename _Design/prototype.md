@@ -360,11 +360,12 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
-- BASKET Y, HOOP Y and POST THICKNESS, sliders under the score: the rims and goalposts
-  together, the rims alone, offline (both phones keep 120 online), and the goalposts'
-  gold width, until they're settled.
+- HOOP X and POST THICKNESS, sliders under the score: the rims in from each wall, the
+  goalposts staying 60 in, offline (both phones keep 60 online), and the goalposts' gold
+  width, 5 for now, until they're settled. The rims sit at 105, the goalposts drawn for
+  one at 120.
   The crossbar sits 20 below the rim, tilted 20° with the end toward the field up, and
-  the uprights stand 100 over it; the posts and the light panels have a 2 black outline.
+  the uprights stand 100 over it; the posts and the light panels have a 1 black outline.
 - HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
@@ -464,7 +465,7 @@ its length.
 `Stage.footballField`, the stage in play for tuning (`Stage.current`); the court comes back
 with stage selection. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
 invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
-at 120, four tiles higher than the court's, 60 in from each wall, floating between the
+at 105, 60 in from each wall, floating between the
 goalposts' uprights; a standing shot can't reach them, a jump shot can. Each player starts
 under the rim they guard, and the coin flip, off the series' dice so both phones agree,
 puts the ball in one pair of hands. A ball that leaves the world comes back at centre.

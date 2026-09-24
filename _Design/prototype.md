@@ -349,6 +349,9 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, every one at level two. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
+- ZEUS CHARGE, a slider under the score: the share of its sheet Zeus Juice's charge
+  swirl is drawn at, offline, with the pixels it comes to in the corner readout, until
+  the number is settled.
 - HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.

@@ -664,6 +664,9 @@ final class GameScene: SKScene {
             self?.powerVariant = PowerVariant(rawValue: index)!
             self?.applyPower()
         }
+        controls.addSlider(title: "ZEUS CHARGE", range: 0.02...1.0, notch: 0.01, value: ZeusTuning.chargeScale) { value in
+            ZeusTuning.chargeScale = value
+        }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
@@ -1775,7 +1778,7 @@ final class GameScene: SKScene {
                     charge.texture = sprites.effectTexture(EnergyEffect.lightningCharge.name, frame, player: index)
                     charge.size = charge.texture!.size()
                     charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-                    charge.setScale(0.07)
+                    charge.setScale(CGFloat(ZeusTuning.chargeScale))
                 default:
                     let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
                     let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
@@ -1986,9 +1989,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@  zeus charge %.2f (%.0f px)",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
+                                 ZeusTuning.chargeScale, ZeusTuning.chargeScale * 240)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

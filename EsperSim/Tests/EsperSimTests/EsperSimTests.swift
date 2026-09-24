@@ -610,11 +610,9 @@ final class BallTests: XCTestCase {
         match.ball.velocity = .zero
         match.advance(inputs: [.idle, .idle])
         XCTAssertNil(match.ball.holder)
-        // Backing into it, still facing away, picks it up.
-        match.players[0].velocity.x = -1
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: -0.5, y: 0)), .idle])
+        // Walking into it picks it up once the walk has some speed.
+        for _ in 0..<4 { match.advance(inputs: [PlayerInput(stick: Vec2(x: -0.5, y: 0)), .idle]) }
         XCTAssertEqual(match.ball.holder, 0)
-        XCTAssertEqual(match.players[0].facing, .right)
     }
 
     func testShotFallingBesideTheRimIsSteeredIn() {

@@ -281,9 +281,10 @@ final class GameScene: SKScene {
         // The floor and walls take the holder's colour, the backboard blocks keep their rim's
         // owner's, and the ledge is magenta.
         let stage = match.stage
-        for row in 0..<stage.rows {
+        for row in 0..<(stage.rows + Stage.skyRows) {
             for column in 0..<stage.columns {
-                let tile = stage.tile(column: column, row: row)
+                // The side walls run on up through the sky, so a tall screen never sees their top.
+                let tile = row < stage.rows ? stage.tile(column: column, row: row) : ((column == 0 || column == stage.columns - 1) ? Tile.solid : Tile.empty)
                 guard tile != .empty else { continue }
                 let node = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
                 node.colorBlendFactor = 1
@@ -828,6 +829,12 @@ final class GameScene: SKScene {
             fresh.players[index].power = series.drinks[index].power
             fresh.players[index].powerLevel = series.drinks[index].powerLevel
         }
+        if online == nil, powerVariant != .none {
+            for index in fresh.players.indices {
+                fresh.players[index].power = powerVariant.power
+                fresh.players[index].powerLevel = 2
+            }
+        }
         session = RollbackSession(match: fresh, localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
         controls?.setOnline(online != nil)
         opponent = Opponent(index: 1)
@@ -840,14 +847,16 @@ final class GameScene: SKScene {
         bringPlayersIn()
     }
 
-    /// The drinks onto the bodies as they stand, for the round about to count.
+    /// The drinks onto the bodies as they stand, for the round about to count. The POWER
+    /// picker's choice, offline, stands over the drinks.
     private func applyDrinks() {
         let drinks = series.drinks
+        let picked = online == nil && powerVariant != .none ? powerVariant.power : nil
         session.mutate { match in
             for index in match.players.indices {
                 match.players[index].spec = drinks[index].spec()
-                match.players[index].power = drinks[index].power
-                match.players[index].powerLevel = drinks[index].powerLevel
+                match.players[index].power = picked ?? drinks[index].power
+                match.players[index].powerLevel = picked == nil ? drinks[index].powerLevel : 2
             }
         }
     }
@@ -1188,7 +1197,7 @@ final class GameScene: SKScene {
                 let player = match.players[index]
                 switch player.power {
                 case .blazingBoba: spawn(.fireJump, at: player.position, flipped: player.facing == .left)
-                case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 1.0 / 3))
+                case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 0.42))
                 default: spawn(.jumpSpark, at: player.position, flipped: player.facing == .left, player: index)
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
@@ -1243,7 +1252,7 @@ final class GameScene: SKScene {
                 spawnHitSpark(player: by, at: match.players[victim].chest)
                 spawnHitSpark(player: by, at: match.players[by].handCatchPoint)
             case .quaked(let index):
-                shake = 8
+                shake = match.players[index].powerLevel >= 2 ? 18 : 14
                 spawnRocks(at: SpriteLibrary.point(match.players[index].position), whole: match.players[index].powerLevel >= 2)
             case .boltLanded(let at):
                 let owner = match.ball.lastTouched ?? 0
@@ -1445,9 +1454,11 @@ final class GameScene: SKScene {
         let node = bolt.node(sprites, player: index, at: point)
         node.zPosition = 45
         let top = cameraBase.y + size.height * cameraNode.yScale / 2
+        // A sixth of the sheet's width: a bolt, not a scoring strike.
+        node.xScale = 1.0 / 6
         node.yScale = (top - point.y) * 1.1 / node.size.height
         glowers.addChild(node)
-        spawnHitSpark(player: index, at: Vec2(x: Double(point.x) / SpriteLibrary.pixelsPerUnit, y: Double(point.y) / SpriteLibrary.pixelsPerUnit))
+        spawnHitSpark(player: index, at: Vec2(x: Double(point.x) / SpriteLibrary.pixelsPerUnit, y: Double(point.y) / SpriteLibrary.pixelsPerUnit), scale: 0.5)
     }
 
     /// Pulsepistol Punch's pulse: a bar from the hand to the edge of the screen, eight
@@ -1481,20 +1492,26 @@ final class GameScene: SKScene {
             capeTrails[index] = []
             return
         }
-        let shoulder = CGPoint(x: body.x - CGFloat(player.facing.sign) * 3, y: body.y + 22)
+        let back = -CGFloat(player.facing.sign)
+        let shoulder = CGPoint(x: body.x + back * 3, y: body.y + 22)
         var trail = capeTrails[index]
         trail.insert(shoulder, at: 0)
         if trail.count > GameScene.capeSegments * 2 { trail.removeLast(trail.count - GameScene.capeSegments * 2) }
         capeTrails[index] = trail
+        var previous = shoulder
         for (step, segment) in segments.enumerated() {
             let at = min(step * 2, trail.count - 1)
-            let next = min(at + 2, trail.count - 1)
-            let here = trail[at], ahead = trail[next]
-            // A little sag and a wave down the length, so it flows rather than hangs.
-            let wave = CGFloat(sin(Double(match.frame) / 4 + Double(step) * 0.9)) * CGFloat(1 + step / 2)
+            // Each segment hangs behind the shoulder and follows where the body has been,
+            // with a wave running down the length so it flows even hovering still.
+            let hang = CGPoint(x: shoulder.x + back * CGFloat(step) * 4, y: shoulder.y - CGFloat(step) * 0.8)
+            let followed = CGPoint(x: (trail[at].x - shoulder.x) * 0.6, y: (trail[at].y - shoulder.y) * 0.6)
+            let phase = Double(match.frame) / 5 - Double(step) * 0.8
+            let wave = CGPoint(x: CGFloat(cos(phase)) * CGFloat(step) * 0.4, y: CGFloat(sin(phase)) * (1 + CGFloat(step) * 0.5))
+            let here = CGPoint(x: hang.x + followed.x + wave.x, y: hang.y + followed.y + wave.y)
             segment.isHidden = false
-            segment.position = CGPoint(x: here.x, y: here.y - CGFloat(step) * 0.6 + wave)
-            segment.zRotation = here == ahead ? 0 : atan2(here.y - ahead.y, here.x - ahead.x)
+            segment.position = here
+            segment.zRotation = atan2(here.y - previous.y, here.x - previous.x)
+            previous = here
         }
     }
 
@@ -1541,15 +1558,29 @@ final class GameScene: SKScene {
             seen.insert(clone.id)
             let node = cloneNodes[clone.id] ?? {
                 let owner = match.players[clone.owner]
-                let node = SKSpriteNode(texture: sprites.texture(owner.animationFrame, player: clone.owner))
+                let frame = owner.animationFrame
+                let node = SKSpriteNode(texture: sprites.texture(frame, player: clone.owner))
                 node.size = node.texture!.size()
-                node.anchorPoint = sprites.anchor(for: owner.animationFrame.animation)
+                node.anchorPoint = sprites.anchor(for: frame.animation)
                 node.xScale = CGFloat(owner.facing.sign)
                 node.color = GameScene.ice
                 node.colorBlendFactor = 0.75
                 node.alpha = 0.8
                 node.position = SpriteLibrary.point(Vec2(x: clone.box.center.x, y: clone.box.min.y))
                 node.zPosition = 6
+                // Its head, where the body's sat that frame; the body's space is already flipped.
+                if let head = sprites.landmark(.head, in: frame, player: clone.owner),
+                   let headTexture = sprites.headTexture(frame, player: clone.owner),
+                   let anchor = sprites.headAnchor(frame, player: clone.owner) {
+                    let headNode = SKSpriteNode(texture: headTexture)
+                    headNode.size = CGSize(width: headTexture.size().width * GameScene.headScale, height: headTexture.size().height * GameScene.headScale)
+                    headNode.anchorPoint = anchor
+                    headNode.color = GameScene.ice
+                    headNode.colorBlendFactor = 0.75
+                    headNode.position = CGPoint(x: head.x, y: head.y + GameScene.headLift)
+                    headNode.zPosition = 1
+                    node.addChild(headNode)
+                }
                 glowers.addChild(node)
                 cloneNodes[clone.id] = node
                 return node
@@ -1844,8 +1875,8 @@ final class GameScene: SKScene {
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.
         if shake > 0 {
             shake -= 1
-            let wobble = CGFloat(shake % 2 == 0 ? 1 : -1) * CGFloat(min(shake, 2))
-            cameraNode.position = CGPoint(x: cameraBase.x + wobble, y: cameraBase.y + wobble / 2)
+            let wobble = CGFloat(shake % 2 == 0 ? 1 : -1) * CGFloat(min(shake, 4))
+            cameraNode.position = CGPoint(x: cameraBase.x + wobble, y: cameraBase.y + wobble * 0.75)
         } else {
             cameraNode.position = cameraBase
         }

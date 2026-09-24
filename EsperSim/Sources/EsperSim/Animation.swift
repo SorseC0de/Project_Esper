@@ -118,6 +118,10 @@ extension Player {
     /// the sim, so the drawing can never change the game.
     public var animationFrame: AnimationFrame {
         let t = stateTimer
+        if boltPose > 0, state != .webSwing, state != .webPull, state != .webbed {
+            // Zeus Juice's bolt: the throw from its set pose through the release.
+            return AnimationFrame(.throwForward, 3 + (ZeusRules.boltPoseFrames - boltPose) * 15 / 60)
+        }
         if webLinePose > 0, state != .webSwing, state != .webPull, state != .webbed {
             return AnimationFrame(.throwForward, 4)
         }
@@ -133,7 +137,7 @@ extension Player {
         case .walk:
             return AnimationFrame(holding ? .dribbleWalk : .walk, Int(animationPhase) % 8)
         case .dash, .run:
-            if gunRunTimer > 0 { return AnimationFrame(.gunRunShoot, Int(animationPhase) % 8) }
+            if gunRunTimer > 0 { return AnimationFrame(.gunRunShoot, (PulseRules.runShotFrames - gunRunTimer) * 15 / 60) }
             return AnimationFrame(holding ? .dribbleRun : .run, Int(animationPhase) % 8)
         case .crouch:
             return AnimationFrame(.crouch, (t * 15 / 60) % 10)

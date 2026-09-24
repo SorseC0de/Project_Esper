@@ -38,6 +38,8 @@ public struct Fireball: Equatable {
 /// grounded on the same floor is hit, the ball hopping up by this much and the other
 /// stripped; at level two the whole screen is the floor.
 public enum QuakeRules {
+    /// The fast fall is this much faster than anyone else's.
+    public static let fastFallMultiplier = 1.6
     public static let ballHop = 3.0
     public static let knock = Vec2(x: 0, y: 2)
     /// Bodies within this of each other's height stand on the same floor.
@@ -54,6 +56,8 @@ public enum ZeusRules {
     public static let boltTilt = degrees(30)
     public static let boltFrames = 60
     public static let boltCooldownFrames = 24
+    /// The throw sheet's frames 3 to 6 at 15 a second after a bolt.
+    public static let boltPoseFrames = 16
     public static let boltKnock = Vec2(x: 3, y: 1.5)
     public static let ballPop = Vec2(x: 2, y: 2)
     public static let strikeHalfWidth = 2.5
@@ -96,8 +100,10 @@ public enum PulseRules {
     public static let handHeight = 11.0
     public static let ballPush = Vec2(x: 5, y: 1)
     public static let bodyPush = Vec2(x: 3, y: 1.5)
-    /// The gun sheet's ten frames at 15 a second, the pulse on its third sheet frame.
+    /// The gun sheet's ten frames at 15 a second, the pulse on its third sheet frame; on
+    /// the run, the running sheet's eight frames at the same rate.
     public static let shotFrames = 40
     public static let fireFrame = 8
+    public static let runShotFrames = 32
     public static let cooldownFrames = 20
 }

@@ -45,6 +45,8 @@ final class InputHub {
             controller.extendedGamepad?.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
                 if pressed { MainActor.assumeIsolated { self?.resetPressed = true } }
             }
+            // B is a shoot button here; unclaimed, the TV reads it as back and leaves the app.
+            controller.extendedGamepad?.buttonB.pressedChangedHandler = { _, _, _ in }
         }
         #endif
     }

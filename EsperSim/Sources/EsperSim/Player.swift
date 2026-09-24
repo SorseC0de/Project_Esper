@@ -194,6 +194,8 @@ public struct Player: Equatable {
     /// Frames left of the running shot's pose, and whether the standing shot pulls.
     public var gunRunTimer = 0
     public var gunPull = false
+    /// Frames left of the throw's pose after a bolt.
+    public var boltPose = 0
     /// Frames of running at full speed or sliding, for the flames left every few.
     private var flameTimer = 0
     /// Something a piece of the step asked the match to do, if nothing else took the turn.
@@ -269,6 +271,7 @@ public struct Player: Equatable {
         if strikeCooldown > 0 { strikeCooldown -= 1 }
         if pulseCooldown > 0 { pulseCooldown -= 1 }
         if gunRunTimer > 0 { gunRunTimer -= 1 }
+        if boltPose > 0 { boltPose -= 1 }
         if catchCooldown > 0 { catchCooldown -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
         if webLineCooldown > 0 { webLineCooldown -= 1 }
@@ -921,8 +924,8 @@ public struct Player: Equatable {
     /// Zeus Juice's bolt: straight ahead, tilted by the stick up to the limit.
     private mutating func fireBolt(_ input: PlayerInput) {
         boltCooldown = ZeusRules.boltCooldownFrames
-        // Thrown: the throw's release pose for a few frames.
-        webLinePose = 8
+        // Thrown: the throw's sheet from the set pose through the release.
+        boltPose = ZeusRules.boltPoseFrames
         let tilt = min(max(input.stick.y, -1), 1) * ZeusRules.boltTilt
         wanted = .fireBolt(direction: Vec2(x: Trig.cos(tilt) * facing.sign, y: Trig.sin(tilt)))
     }
@@ -932,7 +935,7 @@ public struct Player: Equatable {
     private mutating func startGunShot(pull: Bool) {
         pulseCooldown = PulseRules.cooldownFrames
         if powerLevel >= 2, state == .run || state == .dash {
-            gunRunTimer = 8
+            gunRunTimer = PulseRules.runShotFrames
             wanted = .pulse(pull: pull)
         } else {
             gunPull = pull
@@ -1304,12 +1307,14 @@ public struct Player: Equatable {
     /// down is the throw's aim.
     private mutating func fall(_ input: PlayerInput) {
         let aimingThrow = hasBall && input.throwBall
+        // Quake-Up Coffee drops faster than anyone.
+        let fastFall = spec.fastFallSpeed * (power == .quakeUp ? QuakeRules.fastFallMultiplier : 1)
         if !fastFalling, !aimingThrow, velocity.y <= 0, input.stick.y < -0.65 {
             fastFalling = true
-            velocity.y = -spec.fastFallSpeed
+            velocity.y = -fastFall
             if power == .platformShake, platformArmed, platformCooldown == 0 { wantsPlatform = true }
         }
-        let floor = fastFalling ? -spec.fastFallSpeed : -spec.fallSpeed
+        let floor = fastFalling ? -fastFall : -spec.fallSpeed
         velocity.y = max(velocity.y - spec.gravity, floor)
     }
 

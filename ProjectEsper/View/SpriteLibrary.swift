@@ -553,21 +553,24 @@ enum Effect {
         }
     }
 
-    /// Feet-anchored like the player sprites, except the wall spark and the flash, which
-    /// are centred, and the fire sheets, painted at the bottom of their frames.
+    /// Feet-anchored like the player sprites, except the wall spark, the flash and the
+    /// fire's charge, which are centred, and the rest of the fire sheets, painted at the
+    /// bottom of their frames.
     var anchor: CGPoint {
         switch self {
-        case .wallJumpSpark, .flashSpark: CGPoint(x: 0.5, y: 0.5)
-        case .fireJump, .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireCharge, .fireExplosion: CGPoint(x: 0.5, y: 0)
+        case .wallJumpSpark, .flashSpark, .fireCharge: CGPoint(x: 0.5, y: 0.5)
+        case .fireJump, .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion: CGPoint(x: 0.5, y: 0)
         default: CGPoint(x: 0.5, y: 8.0 / 48.0)
         }
     }
 
-    /// The fire sheets are painted three times their playing size; the flash's reduced
-    /// sheet twice.
+    /// The fire sheets are painted three times their playing size, the jump spark half
+    /// again as much and the charge a little less; the flash's reduced sheet twice.
     var scale: CGFloat {
         switch self {
-        case .fireJump, .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireCharge, .fireExplosion: 1.0 / 3
+        case .fireJump: 2.0 / 3
+        case .fireCharge: 0.27
+        case .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion: 1.0 / 3
         case .flashSpark: 0.5
         default: 1
         }

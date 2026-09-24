@@ -246,7 +246,8 @@ extension FighterSpec {
         spec.name = "Baseline"
         spec.runSpeed = 3.2
         spec.dashInitialVelocity = spec.runSpeed + 0.4
-        spec.traction = 0.35
+        // Near-instant: a full run is gone in a couple of frames.
+        spec.traction = 1.5
         spec.airSpeedMax = 1.6
         spec.airAccelerationAdditional = 0.24
         spec.jumpHorizontalVelocity = 1.6
@@ -394,7 +395,7 @@ public enum SmoothieRules {
         level >= 2 ? 180 : 120
     }
 
-    public static func glideSpeed(withBall: Bool) -> Double { withBall ? 3.0 : 4.0 }
+    public static func glideSpeed(withBall: Bool) -> Double { withBall ? 2.5 : 3.5 }
     public static let glideSink = 0.8
     public static let diveSpeed = 3.0
 }

@@ -224,11 +224,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   slab still works. The stage carries standing slabs as `extras`, which every collision
   query sees. Numbers in `ShakeRules`.
   Super Smoothie's flight is on a cape of energy, and at level two the stick forward
-  is the glide: 4 forward (3 with the ball), sinking 0.8 a frame unless up is held,
+  is the glide: 3.5 forward (2.5 with the ball), sinking 0.8 a frame unless up is held,
   which rises at the flight speed, and diving at 3 on down; the stick backward is the
   drift at the flight speed, and centred it levitates. Level one is the plain flight.
   Numbers in `SmoothieRules`.
-- Quake-Up Coffee (G). A fast fall's landing shakes the floor: the ball on it hops up
+- Quake-Up Coffee (G). Its fast fall is 1.6 times anyone's, and the landing shakes the floor: the ball on it hops up
   3 and the other standing on the same floor, within a unit of the same height, is
   stripped; level two makes the whole screen the floor. Numbers in `QuakeRules`.
 - Zeus Juice (H). Shoot without the ball throws a bolt straight ahead at 6, tilted by

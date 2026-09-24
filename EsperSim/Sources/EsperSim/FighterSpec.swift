@@ -244,6 +244,7 @@ extension FighterSpec {
         spec.dashInitialVelocity = spec.runSpeed + 0.4
         // Half Fox's 11 frames, rounded up: the dash covers half the ground.
         spec.dashFrames = 6
+        spec.pivotFrames = 5
         // Near-instant: a full run is gone in a couple of frames.
         spec.traction = 1.5
         spec.airSpeedMax = 1.6

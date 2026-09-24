@@ -249,6 +249,19 @@ final class PowerTests: XCTestCase {
         XCTAssertTrue(match.bolts.isEmpty)
     }
 
+    func testABoltGoesTheWayTheBodyFacesOnTheRelease() {
+        var match = with(.zeusJuice)
+        match.players[0].position.y = 60
+        match.players[0].grounded = false
+        match.players[0].state = .air
+        match.players[1].position.x = 300
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        // Turned in the air before the release.
+        run(&match, frames: ZeusRules.boltReleaseFrame + 1, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { !$0.bolts.isEmpty }
+        XCTAssertEqual(match.players[0].facing, .left)
+        XCTAssertLessThan(match.bolts.first?.velocity.x ?? 0, 0, "thrown the way it faces as it lets go")
+    }
+
     func testABoltPopsTheBallBackTowardTheThrower() {
         var match = with(.zeusJuice)
         match.advance(inputs: [PlayerInput(shoot: true), .idle])

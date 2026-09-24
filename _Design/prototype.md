@@ -52,7 +52,7 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 ## Movement
 
 Defending, without the ball while the other has it, a body walks, runs, dashes and
-drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, the burst always 0.4 over the
+drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, a 5-frame pivot, the burst always 0.4 over the
 3.2 run,
 traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air turned up: air speed 1.6, air acceleration 0.02 + 0.24, a jump with the stick held
@@ -249,14 +249,14 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   stripped; level two makes the whole screen the floor. Numbers in `QuakeRules`.
 - Zeus Juice (H). Shoot without the ball throws a bolt straight ahead at 6, tilted by
   the stick up to 30°, for 60 frames, one every 24: a body it meets is stripped and
-  knocked on, and the ball it meets pops back toward the thrower. There's no slash.
+  knocked as the slash knocks, and the ball it meets pops back toward the thrower. There's no slash.
   Level two's throw calls a strike down from the top of the screen, five units wide,
   from the top of the screen onto the ball in hand, where the stance's sheet draws it, as the charge starts or onto the
   snatch's hand at full stretch,
   stopping on the first thing it meets on the way down, a solid, the other body,
   stripped, or the loose ball, popped, once every 40 frames. The bolt throw plays the
   whole throw sheet, ground or air, with the sheet's ball drawn as energy, and the bolt
-  leaves on its release frame, sixteen frames in.
+  leaves on its release frame, sixteen frames in, the way the body faces then.
   Numbers in `ZeusRules`.
 - Frost Tea (I). The snatch freezes what it reaches, a body or the loose ball, for 60
   frames: held exactly where it is, nothing running, nothing caught, no hitbox live, though

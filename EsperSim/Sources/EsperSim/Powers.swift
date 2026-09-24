@@ -63,7 +63,8 @@ public enum ZeusRules {
     /// release frame, the fifth.
     public static let boltPoseFrames = 32
     public static let boltReleaseFrame = 16
-    public static let boltKnock = Vec2(x: 3, y: 1.5)
+    /// A bolt knocks a body as the slash does.
+    public static var boltKnock: Vec2 { SlashRules.knock }
     public static let ballPop = Vec2(x: 2, y: 2)
     public static let strikeHalfWidth = 2.5
     public static let strikeCooldownFrames = 40

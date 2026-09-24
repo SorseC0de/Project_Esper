@@ -195,11 +195,10 @@ public struct Player: Equatable {
     /// Frames left of the running shot's pose, and whether the standing shot pulls.
     public var gunRunTimer = 0
     public var gunPull = false
-    /// Frames left of the throw's pose after a bolt, and the bolt's way, sent on the release.
+    /// Frames left of the throw's pose after a bolt; its way is set on the release.
     public var boltPose = 0
     /// Frames left of the throw's hold frame after a fireball summon; only for show.
     public var summonPose = 0
-    private var boltDirection = Vec2.zero
     /// Smash's rising aerial: shoot or throw pressed with or during the jump squat comes
     /// out of it as the slash or the snatch on the jump's first frame, with its ascent.
     public enum Aerial: Equatable { case slash, snatch }
@@ -303,7 +302,9 @@ public struct Player: Equatable {
         if boltPose > 0 {
             boltPose -= 1
             if ZeusRules.boltPoseFrames - boltPose == ZeusRules.boltReleaseFrame, wanted == nil {
-                wanted = .fireBolt(direction: boltDirection)
+                // The way the body faces now, and the stick's tilt now, on the release.
+                let tilt = min(max(input.stick.y, -1), 1) * ZeusRules.boltTilt
+                wanted = .fireBolt(direction: Vec2(x: Trig.cos(tilt) * facing.sign, y: Trig.sin(tilt)))
             }
         }
         if catchCooldown > 0 { catchCooldown -= 1 }
@@ -992,10 +993,9 @@ public struct Player: Equatable {
     /// Zeus Juice's bolt: straight ahead, tilted by the stick up to the limit.
     private mutating func fireBolt(_ input: PlayerInput) {
         boltCooldown = ZeusRules.boltCooldownFrames
-        // Thrown: the whole throw sheet plays, and the bolt leaves on its release frame.
+        // Thrown: the whole throw sheet plays, and the bolt leaves on its release frame the
+        // way the body faces then.
         boltPose = ZeusRules.boltPoseFrames
-        let tilt = min(max(input.stick.y, -1), 1) * ZeusRules.boltTilt
-        boltDirection = Vec2(x: Trig.cos(tilt) * facing.sign, y: Trig.sin(tilt))
     }
 
     /// Pulsepistol Punch's shot: on the run at level two it fires in stride; otherwise the

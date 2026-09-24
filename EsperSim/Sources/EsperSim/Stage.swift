@@ -364,9 +364,9 @@ public struct Stage: Equatable {
     /// higher than the court's, six tiles in from each wall. Each player starts under the
     /// rim they guard, and the ball starts in someone's hands by the coin flip. Helmets
     /// sweep it and a portal hangs over it.
-    /// The field's rims: their height, and how far in from each wall, on the HOOP X slider
-    /// offline until it's settled; both phones keep the default online.
-    public static let fieldRimHeight = 105.0
+    /// The field's rims: their height and how far in from each wall, on the HOOP Y and HOOP X
+    /// sliders offline until they're settled; both phones keep the defaults online.
+    nonisolated(unsafe) public static var fieldRimHeight = 105.0
     nonisolated(unsafe) public static var fieldRimInset = 60.0
     /// The goalposts stand this far in from each wall, apart from the rims.
     public static let fieldPostInset = 60.0

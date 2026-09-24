@@ -360,8 +360,9 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
-- HOOP X and POST THICKNESS, sliders under the score: the rims in from each wall, the
-  goalposts staying 60 in, offline (both phones keep 60 online), and the goalposts' gold
+- HOOP X, HOOP Y and POST THICKNESS, sliders under the score: the rims in from each wall
+  and their height, the goalposts staying where they are, offline (both phones keep 60
+  and 105 online), and the goalposts' gold
   width, 5 for now, until they're settled. The rims sit at 105, the goalposts drawn for
   one at 120.
   The crossbar sits 20 below the rim, tilted 20° with the end toward the field up, and
@@ -495,8 +496,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   toward the rim the holder attacks; the floodlights' blooms take the same colour, purple
   when nobody has it, and so do the panels the lamps sit on, trapezoids wider at the top;
   the yard numbers at one and a half times; the turf's five-yard stripes,
-  leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded blue base
-  behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
+  leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded blue base,
+  the pole's width and five more, behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
 - The camera scrolls sideways only: level, gliding after the local player a share of the
   way each frame and leading them by where they're heading, stopped at the field's ends.
   The view takes in the stage's height and the turf below the floor. When the ball is off

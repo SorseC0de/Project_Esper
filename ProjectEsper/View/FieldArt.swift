@@ -207,7 +207,8 @@ enum FieldArt {
         let baseX = rim.x + back * 26
         let crossbarY = rim.y - crossbarBelowRim
         let halfSpan: CGFloat = 24
-        let base = SKShapeNode(rectOf: CGSize(width: 8, height: 40), cornerRadius: 3)
+        // The pad is the pole's width and five more.
+        let base = SKShapeNode(rectOf: CGSize(width: thickness + 5, height: 40), cornerRadius: 3)
         base.fillColor = pad
         base.strokeColor = .black
         base.lineWidth = outline

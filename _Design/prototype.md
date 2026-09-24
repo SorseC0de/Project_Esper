@@ -204,9 +204,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and flight
   cancels into a shot or a throw with the ball and a slash or a snatch without. Numbers in `LeviRules`.
 - Flash Fizz (D). Without the ball, a shoot button warps the body to the ball while the
-  ball is still its colour, the 60 frames after it let it go, and it arrives holding it:
+  ball is still its colour, from letting it go until its first bounce, and it arrives holding it:
   throw, warp, catch. Otherwise the shoot button is the
-  flash: 30 units along the stick, or in place with the stick centred, in addition to the
+  flash: 45 units along the stick, 90 at level two, or in place with the stick centred, in addition to the
   double jump, arriving nudged clear of anything solid. The flashes are tears in space,
   and the exit tear lingers 12 frames and pulls any loose ball within 12 units into the
   hands, the ball going through space the way the body did: throw, flash after it, and
@@ -328,7 +328,7 @@ placeholder for one not written yet.
 - Super Smoothie: flight; level two flies faster, with the ball as fast as level one
   without, lasts 180 frames rather than 120, and glides forward. Flight needs no second
   jump.
-- Flash Fizz: the flash, 30 units, and the warp to your own ball; level two goes 45 and
+- Flash Fizz: the flash, 45 units, and the warp to your own ball; level two goes 90 and
   makes the flashes tears, pulling a loose ball into the hands from where you came out
   and knocking the ball out of the other's hands within reach of either end.
 - Platform Protein Shake: the slab; level two adds the wall.
@@ -414,7 +414,7 @@ darker version of it, a black line one pixel thick round the body following the 
 edge only, and the front arm stroked on its own where it lies over the body. The head is
 split out of every frame and drawn as its own sprite with no line, trailing its place on
 the body by a quarter of the gap each frame and bobbing a pixel, and its fire is released
-into the world so it streams behind a moving head. The loose ball is purple, and for 60 frames after a shot, throw or dunk it's the colour
+into the world so it streams behind a moving head. The loose ball is purple, and from a shot, throw or dunk until its first bounce it's the colour
 of whoever let it go, then shifts back over 30. A flying ball leaves a soft additive trail
 in its colour. The library finds where the ball and the head sit in each frame so the halo
 and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted a pixel off the body. Three dim
@@ -433,8 +433,8 @@ knocked loose bursts like a wall jump's spark, away from the hitter.
 The powers' effects: Blazing Boba's jump, dash, wall spark, skid, charge, trail and
 burst are the painted `fire_*` sheets drawn as they are at a third, standing on the
 bottom of their frames; Zeus Juice's bolts are thrown from the throw's release pose; Zeus Juice's jump spark and
-charge are grey sheets toned per player; Flash Fizz's flash is `flashspark`, its 256x144 frames boxed down by four and drawn at
-half, at both ends, in place of the diamonds; Frost Tea's sparks are snowflakes off the
+charge are grey sheets toned per player; Flash Fizz's flash is `flashspark`, its 256x144 frames boxed down by four, drawn added
+so it glows, at both ends, in place of the diamonds; Frost Tea's sparks are snowflakes off the
 vector, a sphere of them for the snatch; Quake-Up's quake shakes the camera a pixel or
 two for eight frames and throws rock squares up; bolts are the SF bolt in the energy
 colour with fading afterimages; the strike reuses a scoring bolt down to the point;

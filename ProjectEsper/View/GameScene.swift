@@ -1201,7 +1201,7 @@ final class GameScene: SKScene {
                 switch player.power {
                 case .blazingBoba:
                     // Four pixels down from the feet, and over the body.
-                    let spark = Effect.fireJump.node(sprites, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: -2.5)), flipped: player.facing == .left)
+                    let spark = Effect.fireJump.node(sprites, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: -3.75)), flipped: player.facing == .left)
                     spark.zPosition = 40
                     glowers.addChild(spark)
                 case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 0.42))
@@ -1254,7 +1254,9 @@ final class GameScene: SKScene {
             case .warped(_, let from, let to), .flashed(_, let from, let to):
                 // The flash's spark at both ends, the sheet at half size.
                 for end in [from, to] {
-                    glowers.addChild(Effect.flashSpark.node(sprites, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), flipped: false))
+                    let flash = Effect.flashSpark.node(sprites, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), flipped: false)
+                    flash.blendMode = .add
+                    glowers.addChild(flash)
                 }
             case .struck(let victim, let striker):
                 spawnHitSpark(player: striker, at: match.players[victim].chest)
@@ -1291,7 +1293,7 @@ final class GameScene: SKScene {
                 if showHitboxes { spawnPulse(by: index, pull: pull) }
             case .shot(let index), .thrown(let index), .dunked(let index):
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
-                ballHold = BallLook.holdFrames
+                ballHold = 1
                 ballShift = BallLook.shiftFrames
             default:
                 break
@@ -1299,10 +1301,14 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The ball keeps the team colour for a while after it's let go, then shifts to neutral.
+    /// The ball keeps the team colour while it's still the thrower's, until its first
+    /// bounce, then shifts to neutral.
     private func tickBallColour() {
-        if ballHold > 0 {
-            ballHold -= 1
+        if match.ball.owner != nil {
+            ballHold = 1
+        } else if ballHold > 0 {
+            ballHold = 0
+            ballShift = BallLook.shiftFrames
         } else if ballShift > 0 {
             ballShift -= 1
         }

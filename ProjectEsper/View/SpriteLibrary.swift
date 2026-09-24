@@ -571,7 +571,7 @@ enum Effect {
         case .fireJump: 2.0 / 3
         case .fireCharge: 0.27
         case .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion: 1.0 / 3
-        case .flashSpark: 0.5
+        case .flashSpark: 1
         default: 1
         }
     }

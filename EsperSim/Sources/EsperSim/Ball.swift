@@ -24,15 +24,16 @@ public struct Ball: Equatable {
     public var lastTouched: Int?
     /// Reeled in by a web: the player pulling it.
     public var tether: Int?
-    /// Frames the ball still counts as `lastTouched`'s, after a release.
-    public var ownedFrames = 0
+    /// Whether the ball still counts as `lastTouched`'s: from a release until its first
+    /// bounce off anything.
+    public var owned = false
     /// How many times faster than an ordinary ball a shot runs its arc, Cannon Cola's
     /// doing: the velocity is this much more and gravity this much squared, so the path is
     /// the same. It's an ordinary ball again from its first bounce.
     public var pace = 1.0
 
     /// Whose the ball still is, if anyone's.
-    public var owner: Int? { ownedFrames > 0 ? lastTouched : nil }
+    public var owner: Int? { owned ? lastTouched : nil }
     /// Frost Tea: held exactly where it is for this many frames more.
     public var frozen = 0
     /// Blazing Boba: alight from a shot or a throw until the first bounce; nobody but the
@@ -55,7 +56,6 @@ public struct Ball: Equatable {
     /// Moves the loose ball one frame. Returns the hoop it fell through, if any.
     public mutating func step(stage: Stage, events: inout [MatchEvent]) -> Int? {
         previousY = position.y
-        if ownedFrames > 0 { ownedFrames -= 1 }
         var scoredHoop: Int?
 
         for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y {
@@ -121,6 +121,7 @@ public struct Ball: Equatable {
     /// The first bounce ends a paced shot: an ordinary ball's speed from here.
     private mutating func settlePace() {
         burning = false
+        owned = false
         guard pace != 1 else { return }
         velocity = velocity / pace
         pace = 1
@@ -160,7 +161,7 @@ public struct Ball: Equatable {
         shotInFlight = false
         roseThrough = nil
         lastTouched = player
-        ownedFrames = BallRules.ownedFrames
+        owned = true
         resting = false
     }
 
@@ -189,7 +190,7 @@ public struct Ball: Equatable {
         roseThrough = nil
         tether = nil
         lastTouched = nil
-        ownedFrames = 0
+        owned = false
         resting = false
     }
 
@@ -220,7 +221,7 @@ public struct Ball: Equatable {
         roseThrough = nil
         tether = nil
         lastTouched = nil
-        ownedFrames = 0
+        owned = false
         resting = false
         respawnTimer = 0
     }

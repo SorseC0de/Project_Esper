@@ -346,8 +346,6 @@ public enum BallRules {
     public static let rimHalfWidth = 6.0
     /// Frames after a score before the ball comes back to centre.
     public static let respawnFrames = 90
-    /// Frames after a shot, throw or dunk the ball still counts as the thrower's.
-    public static let ownedFrames = 60
 }
 
 /// Web Water's numbers.
@@ -409,7 +407,7 @@ public enum SmoothieRules {
 /// to an overhung dribble.
 public enum FizzRules {
     public static let cooldownFrames = 60
-    public static func flashDistance(level: Int) -> Double { level >= 2 ? 45 : 30 }
+    public static func flashDistance(level: Int) -> Double { level >= 2 ? 90 : 45 }
     public static let tearFrames = 12
     public static let tearRadius = 12.0
 }

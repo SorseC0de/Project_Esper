@@ -7,6 +7,11 @@ import SwiftUI
 /// scene lays the HUD out in it exactly as it laid it out under the camera.
 final class HudScene: SKScene {
     let hud = SKNode()
+    /// Points in the HUD are the phone's; on a bigger screen the whole HUD is scaled up
+    /// by this, so the pad, the lettering and the bottles keep their size to the eye.
+    static func scale(forHeight height: CGFloat) -> CGFloat {
+        max(1, height / 430)
+    }
 
     override init() {
         super.init(size: CGSize(width: 640, height: 288))

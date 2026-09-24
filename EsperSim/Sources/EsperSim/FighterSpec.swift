@@ -76,6 +76,8 @@ public struct FighterSpec: Equatable {
     /// the burst it started with; Slide Cider adds frames.
     public var slideFrames = 20
     public var slideFriction = 0.02
+    /// A third jump's speed, when there is one: Jumper Juice's second drink.
+    public var thirdJumpVelocity = 0.0
 
     /// Body box: full width and height, feet at the position.
     public var bodyWidth: Double
@@ -223,8 +225,7 @@ public struct FighterSpec: Equatable {
 
 extension FighterSpec {
     /// The body a match starts on: the baseline with half a unit less run, dash and air
-    /// speed and no second jump. One Hasty Horchata and one Jumper Juice bring it back
-    /// to the baseline.
+    /// speed, the double jump kept. One Hasty Horchata brings the speeds back.
     public static let starting: FighterSpec = {
         var spec = baseline
         spec.name = "Starting"
@@ -233,7 +234,6 @@ extension FighterSpec {
         spec.airSpeedMax = baseline.airSpeedMax - 0.5
         spec.jumpHorizontalVelocity = baseline.jumpHorizontalVelocity - 0.5
         spec.doubleJumpHorizontalVelocity = baseline.doubleJumpHorizontalVelocity - 0.5
-        spec.jumps = 1
         return spec
     }()
 
@@ -308,7 +308,7 @@ public enum BallRules {
     /// basket. The ball goes in halfway through the dunk's frames, and the dunker hangs
     /// on the rim for this long after before the point restarts.
     public static let dunkRadius = 25.0
-    public static let dunkFrames = 20
+    public static let dunkFrames = 40
     public static let dunkHangFrames = 45
     /// Where the dunker's feet go on the rim, from the rim's centre, for a rim with its
     /// backboard on the right; across is mirrored for the other. 16 art pixels back and
@@ -381,10 +381,10 @@ public enum WebRules {
     public static let pullMaxFrames = 40
 }
 
-/// Super Soda's numbers: slow flight in any direction, gravity off, for a budget per
+/// Levi-Tea's numbers: slow flight in any direction, gravity off, for a budget per
 /// airtime. Twice as fast without the ball. Level two is faster, with the ball as fast as
 /// level one without, and lasts longer.
-public enum SodaRules {
+public enum LeviRules {
     public static func flightSpeed(level: Int, withBall: Bool) -> Double {
         level >= 2 ? (withBall ? 2.0 : 3.0) : (withBall ? 1.0 : 2.0)
     }
@@ -440,7 +440,8 @@ public enum SlideRules {
 /// rises at least this fast and gravity is cut to this share, so it hangs through the
 /// swing, and the roll follows over this many frames. Both play at this many sheet
 /// frames a second. The blade is a square round the body, 56 art pixels a side, its centre
-/// this far in front of the body's, live over these sheet frames. It knocks the ball out of a holder's hands, or spikes a loose one down
+/// this far in front of the body's, live over these sheet frames. A body it meets, ball
+/// or no ball, is stripped and knocked this far along the swing. It knocks the ball out of a holder's hands, or spikes a loose one down
 /// and away at about this angle below the horizontal, jittered by up to this much, at no
 /// less than this speed.
 public enum SlashRules {
@@ -457,13 +458,15 @@ public enum SlashRules {
     public static let spikeAngle = degrees(-45)
     public static let spikeJitter = degrees(10)
     public static let swatSpeed = 6.0
+    public static let knock = Vec2(x: 2.5, y: 1.5)
 }
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many
 /// frames; the hand is out over these, and the whole body plus this much of reach in
 /// front, or the hand's catch ring, takes any ball it touches while the body faces it,
-/// loose or in the other's hands. The spark shows on this sheet frame. Then it can't
-/// repeat for this long.
+/// loose or in the other's hands. The spark shows on this sheet frame. It can repeat
+/// as soon as it's over, as the slash can. Meeting a live blade, it's the parry: the
+/// slasher is the one stripped and knocked back.
 public enum SnatchRules {
     public static let sheetFramesPerSecond = 15
     public static let sheetFrames = 10
@@ -473,7 +476,8 @@ public enum SnatchRules {
     public static let sparkSheetFrame = 2
     public static var sparkFrame: Int { simFrames(sparkSheetFrame, at: sheetFramesPerSecond) }
     public static let reach = 10.0
-    public static let cooldownFrames = 30
+    public static let cooldownFrames = 0
+    public static let parryKnock = Vec2(x: 3, y: 1.5)
 }
 
 /// The ledge's numbers: falling past a corner with no ball, the hand catches it when the

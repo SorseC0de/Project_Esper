@@ -123,6 +123,7 @@ final class PickScreen: Screen {
     private let offers: [Greateraid]
     private let drinks: Drinks
     private let blurb = SKSpriteNode()
+    private let comment = SKSpriteNode()
     private let clock = SKSpriteNode()
     private let onDrink: (Greateraid) -> Void
 
@@ -161,6 +162,12 @@ final class PickScreen: Screen {
             name.position = CGPoint(x: x, y: -halfHeight + 84)
             name.zPosition = 2
             addChild(name)
+            if drinks.isSecondSip(offer) {
+                let sip = TitleText.node("(Second Sip)", size: 10, italic: true)
+                sip.position = CGPoint(x: x, y: -halfHeight + 68)
+                sip.zPosition = 2
+                addChild(sip)
+            }
             let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight)
             // The arrow hangs over the name, pointing down at the bottle.
             addChoice(bottle, hit: hit, arrowAt: CGPoint(x: x, y: -halfHeight + 84 + 24), arrowTurn: 0) { [weak self] in
@@ -168,7 +175,9 @@ final class PickScreen: Screen {
                 self.onDrink(offer)
             }
         }
-        blurb.position = CGPoint(x: 0, y: 20)
+        comment.position = CGPoint(x: 0, y: 44)
+        addChild(comment)
+        blurb.position = CGPoint(x: 0, y: 14)
         addChild(blurb)
         moved()
     }
@@ -186,13 +195,9 @@ final class PickScreen: Screen {
     override func moved() {
         guard choices.indices.contains(cursor) else { return }
         let offer = offers[cursor]
-        let text: String
-        switch offer.kind {
-        case .booster: text = drinks.level(of: offer) == 0 ? offer.blurbs.first : offer.blurbs.second
-        case .biomorph: text = offer.blurbs.first
-        case .bioBoba: text = drinks.biomorph.map { "\($0.name) to level two: \($0.blurbs.second)" } ?? offer.blurbs.first
-        }
-        TitleText.set(blurb, to: text, size: text.count > 50 ? 16 : 20)
+        let text = drinks.level(of: offer) == 0 ? offer.blurbs.first : offer.blurbs.second
+        TitleText.set(blurb, to: text, size: text.count > 70 ? 13 : (text.count > 50 ? 16 : 20))
+        TitleText.set(comment, to: "\u{201C}\(offer.comment)\u{201D}", size: 15, italic: true)
     }
 
     /// The bottle, the user's vector from the catalog, 180 points tall and anchored at its

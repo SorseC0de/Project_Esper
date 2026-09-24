@@ -15,7 +15,12 @@ neutral to get a shot off; catch it and the roles reverse.
   `Glow.metal` composites it with the glow. The HUD is a second scene, `HudScene`, shown
   by a transparent SpriteKit view (`HudView`) laid over the Metal view, so nothing in it
   glows; it takes the touches and hands them to the game scene. `InputHub` merges touch
-  and controllers. `TouchControls` is the on-screen pad. `Net/GameCenter` is Game
+  and controllers. `TouchControls` is the on-screen pad. Who drives whom: on a phone touch is player 0,
+  one controller is player 1, two controllers are players 0 and 1 in order; on the TV
+  the controllers are players 0 and 1. A pad on player 1 sits the computer out, so a
+  second person just picks up a pad. The HUD is laid out in the phone's points and
+  scaled up by `HudScene.scale(forHeight:)` on a bigger screen, the lettering rendered
+  at that scale so it stays crisp. `Net/GameCenter` is Game
   Center: signing in, the matchmaker, and the bytes between the two phones. Two
   targets build the same sources and catalog: `ProjectEsper` for iPhone and iPad, and
   `ProjectEsperTV` for Apple TV, same bundle ID so the two play each other. On the TV
@@ -123,7 +128,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   wind-up, there by the slam, so it never jumps into place. The dunk
   sheet plays from the throw stance's frame: the wind-up, the swing, the slam on the
   release frame, when the ball leaves the hand and drops through, then the hang, held
-  through the 45 frames before the point restarts. Each frame of it is drawn nudged by
+  through the 45 frames, each frame held twice as long as first cut (40 frames to the slam) before the point restarts. Each frame of it is drawn nudged by
   `DunkArt.offsets`, in art pixels, found with `DunkTuning` on: the match held, player 1
   on the right rim on the frame the DUNK FRAME slider picks, DUNK X and DUNK Y nudging
   that frame, the table in the corner readout. As placed: (-6, 10), (-4, 12), (-2, 16),
@@ -188,11 +193,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   holding the ball loses it to the reel. The opponent without it is reeled to 12 units in
   front of the shooter and dropped. A wall or block reels the shooter to it. With the ball
   the throw button is the ordinary throw. Numbers in `WebRules`.
-- Super Soda (C). A fresh jump press in the air, held, is flight: the stick moves the body
+- Levi-Tea (C). A fresh jump press in the air, held, is flight: the stick moves the body
   in any direction with gravity off, slowly with the ball and twice as fast without, for two seconds of budget per airtime, refilled on landing.
   Let go or run out and it falls. The body leans up to thirty degrees into its motion,
   forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and flight
-  cancels into a shot or a throw with the ball and a slash or a snatch without. Numbers in `SodaRules`.
+  cancels into a shot or a throw with the ball and a slash or a snatch without. Numbers in `LeviRules`.
 - Flash Fizz (D). Without the ball, a shoot button warps the body to the ball while the
   ball is still its colour, the 60 frames after it let it go, and it arrives holding it:
   throw, warp, catch. Otherwise the shoot button is the
@@ -218,6 +223,49 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
   slab still works. The stage carries standing slabs as `extras`, which every collision
   query sees. Numbers in `ShakeRules`.
+- Super Smoothie (D). Jump held on the way down with the jumps spent is the glide,
+  Meta Knight's: the body levels off at its speed or 2, whichever is more, on a cape of
+  energy, and the stick pitches it between 60° down and 40° up (60° at level two), a
+  climb bleeding speed and a dive gaining it, up to 4 (5 at level two); let go of jump,
+  stall under 0.7, land or hit a wall and it's the air. Shots, throws, the snatch and
+  the slash cancel out of it. Numbers in `GlideRules`.
+- Quake-Up Coffee (G). A fast fall's landing shakes the floor: the ball on it hops up
+  3 and the other standing on the same floor, within a unit of the same height, is
+  stripped; level two makes the whole screen the floor. Numbers in `QuakeRules`.
+- Zeus Juice (H). Shoot without the ball throws a bolt straight ahead at 6, tilted by
+  the stick up to 30°, for 60 frames, one every 24: a body it meets is stripped and
+  knocked on, and the ball it meets pops back toward the thrower. There's no slash.
+  Level two's throw calls a strike down from the top of the screen, five units wide,
+  onto the ball in hand as the charge starts or onto the snatch's hand at full stretch,
+  stripping the other body in it or popping a loose ball, once every 40 frames.
+  Numbers in `ZeusRules`.
+- Frost Tea (I). The snatch freezes what it reaches, a body or the loose ball, for 60
+  frames: held exactly where it is, nothing running, nothing caught, no hitbox live;
+  a frozen body is stripped as well. The slide has no friction and no end, until jump,
+  throw, shoot, the stick against it, or down let go cancel it. Level two: a double
+  jump or a slide leaves an ice clone, the body's box, that freezes whatever touches it
+  and shatters, or shatters after 60 frames. Numbers in `FrostRules`.
+- Blazing Boba (J). A run at full speed or a slide leaves a flame every 4 frames, six
+  wide and four tall at the feet, for 45 frames; the other body in one is stripped and
+  the flame is spent. Shots and throws set the ball alight until its first bounce, and
+  nobody but the thrower can catch or snatch it; the slash still can. Level two: shoot
+  held through a slash makes a fireball in hand, shot or thrown like the ball, that
+  bursts on the first thing it meets and strips and knocks whatever's within 15 of the
+  burst. Numbers in `BlazeRules`.
+- Pulsepistol Punch (K). Shoot without the ball is the pulse: a pillar five units tall
+  at the hand, the width of the screen the way the body faces, that knocks the ball and
+  the other body away without stunning, a held ball popping free; standing it's the
+  gun sheet, ten frames with the pulse on the third, one every 20. Level two fires in
+  stride on the run, and throw is the pull, the same pulse bringing everything toward
+  the body. Numbers in `PulseRules`.
+
+Hits share the strip: the victim is stunned 60 frames and any ball they hold pops
+free; the slash, the parry, the bolt, the burst and the pulse knock the body away as
+well (`Player.knock`), and the pulse doesn't stun. The slash strips a body with or
+without the ball, knocking it 2.5 along the swing and 1.5 up. The snatch has no
+cooldown, as the slash has none, and meeting a live blade it's the parry: the slasher
+is the one stripped and knocked back, the blade spent, resolved before the blades so it
+always wins.
 
 ## The game loop
 
@@ -246,32 +294,41 @@ walked round a ring, a black drop to the south-east, drawn into a texture per st
 
 The drinks between rounds, in `Greateraid.swift`. Three bottles an offer, the user's
 vector bottle from the catalog, blue for a booster and its three blues swapped for
-golds for a biomorph or Bio-Boba, large with
-their bottoms off the screen, each leaning five to thirty degrees, its name across it,
-what the raised one does lettered in the middle; a tap raises a bottle and a second
-tap drinks it, or the stick and jump on the pad. Boosters raise a stat and stack to two
-drinks, after which that bottle stops being offered; they're weighted three to one over
-Biomorphs, which are the powers, one at a time. With a biomorph in hand Bio-Boba stands
-in for the biomorphs until it's been drunk, which takes the power to level two. Drinks
-stack through the series and go with it.
+golds for a biomorph, large with their bottoms off the screen, each leaning five to
+thirty degrees, its name across it, the bottle's line in italics and quotes and what
+the raised one does lettered in the middle; a tap raises a bottle and a second tap
+drinks it, or the stick and jump on the pad. Boosters raise a stat and stack to two
+drinks, after which that bottle stops being offered; as a group they're weighted three
+to one over Biomorphs, which are the powers, one at a time. With a biomorph in hand only
+that one comes round again, lettered "(Second Sip)" under its name, and drinking it
+takes the power to level two. Drinks stack through the series and go with it. Every
+bottle carries its comment (`Greateraid.comment`), the user's line; "..." is the
+placeholder for one not written yet.
 
 - Hasty Horchata: run, dash and air speed up by half a unit a drink. The body a match
-  starts on is the baseline with half a unit less of each and no second jump, so one
-  Hasty Horchata and one Jumper Juice bring it back to the baseline the game was tuned
-  on.
-- Jumper Juice: the second jump; then both jumps a tenth higher.
+  starts on is the baseline with half a unit less of each, the double jump kept, so one
+  Hasty Horchata brings it back to the baseline the game was tuned on.
+- Jumper Juice: both jumps a tenth higher; then a third jump at half the first's
+  height, speed the first's over root two. The double jump itself is 130% of the full
+  hop's height, Fox's numbers.
 - Lunge Lemonade: four more frames of dash a drink.
 - Cannon Cola: a quarter more shot pace a drink. The shot runs the same arc to the same
   spot, only faster, velocity up by the pace and gravity by its square; it's an ordinary
   ball again from its first bounce.
-- Slide Cider: four frames of slide a drink, so further.
+- Slide Cider: eight frames of slide a drink, so further.
 - Web Water: the swing; level two adds the web line.
-- Super Soda: flight; level two flies at twice the speed, with the ball as fast as level
+- Levi-Tea: flight; level two flies at twice the speed, with the ball as fast as level
   one without, and lasts 150 frames rather than 120. Flight needs no second jump.
+- Super Smoothie: the glide; level two climbs steeper and runs faster.
 - Flash Fizz: the flash, 30 units, and the warp to your own ball; level two goes 45 and
   makes the flashes tears, pulling a loose ball into the hands from where you came out
   and knocking the ball out of the other's hands within reach of either end.
 - Platform Protein Shake: the slab; level two adds the wall.
+- Quake-Up Coffee: the quake on the same floor; level two the whole screen.
+- Zeus Juice: the bolt; level two adds the strike on throw.
+- Frost Tea: the freezing snatch and the endless slide; level two adds the ice clones.
+- Blazing Boba: the flames and the burning ball; level two adds the fireball.
+- Pulsepistol Punch: the pulse; level two shoots on the run and adds the pull.
 
 ## Tuning pickers
 
@@ -280,8 +337,9 @@ holds the variants; A is always the baseline as tuned.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
-- POWER: A none, B Web Water, C Super Soda, D Flash Fizz, E Platform Protein Shake. The
-  left bumper steps this one.
+- POWER: A none, B Web Water, C Levi-Tea, D Super Smoothie, E Flash Fizz, F Platform
+  Protein Shake, G Quake-Up Coffee, H Zeus Juice, I Frost Tea, J Blazing Boba, K
+  Pulsepistol Punch. The left bumper steps this one.
 - HITBOX, beside RESET: draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
@@ -359,6 +417,18 @@ dribble sheets do that, so a stance's ball never sags off the edge of a slab. Th
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off. A slide
 leaves the dash's smoke; the snatch's catch spark sits on the hand at full stretch; a ball
 knocked loose bursts like a wall jump's spark, away from the hitter.
+
+The powers' effects: Blazing Boba's jump, dash, wall spark, skid, charge, trail and
+burst are the painted `fire_*` sheets drawn as they are; Zeus Juice's jump spark and
+charge are grey sheets toned per player; Flash Fizz's flash is `flashspark` at half
+size at both ends, in place of the diamonds; Frost Tea's sparks are snowflakes off the
+vector, a sphere of them for the snatch; Quake-Up's quake shakes the camera a pixel or
+two for eight frames and throws rock squares up; bolts are the SF bolt in the energy
+colour with fading afterimages; the strike reuses a scoring bolt down to the point;
+the pulse is a bar from the hand to the edge; ice clones are the body's frame in ice;
+flames loop `fire_trail`; fireballs are the ball in fire; frozen bodies and balls go
+ice; the cape is seven short rectangles chained along the glide's trail with a wave down
+its length.
 
 ## Court
 

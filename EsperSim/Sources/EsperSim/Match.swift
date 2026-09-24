@@ -13,6 +13,13 @@ public struct Match: Equatable {
     public var players: [Player]
     public var ball: Ball
     public var platforms: [Platform] = []
+    /// What the powers leave in the world.
+    public var bolts: [Bolt] = []
+    public var clones: [IceClone] = []
+    public var flames: [Flame] = []
+    public var fireballs: [Fireball] = []
+    /// The next id for anything the powers leave, so the screen can follow each one.
+    public var nextId = 1
     public var scores: [Int]
     public var frame = 0
     /// The count before play: frames in which nobody moves or acts, at the start and after
@@ -61,9 +68,14 @@ public struct Match: Equatable {
                                                    events: &events) else { continue }
             perform(action, by: index)
         }
+        resolveParries()
         for index in players.indices {
             resolveHits(by: index)
         }
+        stepBolts()
+        stepClones()
+        stepFlames()
+        stepFireballs()
 
         for index in players.indices where players[index].webLine?.target == .opponent {
             let other = players.indices.first { $0 != index }
@@ -72,7 +84,10 @@ public struct Match: Equatable {
         snagWithLingeringLines()
         reelBall()
 
-        if ball.isLive, ball.tether == nil {
+        if ball.frozen > 0 {
+            // Frost Tea: the ball hangs where it is.
+            ball.frozen -= 1
+        } else if ball.isLive, ball.tether == nil {
             if let hoop = ball.step(stage: stage, events: &events) {
                 let owner = stage.hoops[hoop].owner
                 scores[owner] += 1
@@ -117,6 +132,10 @@ public struct Match: Equatable {
         }
         platforms = []
         stage.extras = []
+        bolts = []
+        clones = []
+        flames = []
+        fireballs = []
         ball.respawn(at: stage.ballSpawn)
         players[holder].hasBall = true
         ball.holder = holder
@@ -132,6 +151,7 @@ public struct Match: Equatable {
             ball.release(from: player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight),
                          velocity: velocity * player.spec.shotPace, by: index, straight: false, pace: player.spec.shotPace)
             ball.shotInFlight = true
+            ball.burning = player.power == .blazingBoba
         case .releaseThrow(let velocity):
             let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
             if velocity.y > 0, velocity.x == 0 {
@@ -140,6 +160,28 @@ public struct Match: Equatable {
             } else {
                 ball.release(from: hand, velocity: velocity, by: index, straight: true)
             }
+            ball.burning = player.power == .blazingBoba
+        case .releaseFireball(let velocity):
+            let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
+            fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity, framesLeft: BlazeRules.fireballFrames))
+        case .quake:
+            quake(by: index)
+        case .fireBolt(let direction):
+            bolts.append(Bolt(id: stamp(), owner: index, position: player.chest + direction * 6, velocity: direction * ZeusRules.boltSpeed,
+                              framesLeft: ZeusRules.boltFrames))
+            events.append(.boltFired(player: index))
+        case .strikeBolt(let x, let bottom):
+            strike(x: x, bottom: bottom, by: index)
+        case .leaveClone:
+            clones.append(IceClone(id: stamp(), owner: index, box: player.body, framesLeft: FrostRules.cloneFrames))
+            events.append(.cloneMade(player: index, at: player.position))
+        case .leaveFlame:
+            let box = Box(min: Vec2(x: player.position.x - BlazeRules.flameWidth / 2, y: player.position.y),
+                          max: Vec2(x: player.position.x + BlazeRules.flameWidth / 2, y: player.position.y + BlazeRules.flameHeight))
+            flames.append(Flame(id: stamp(), owner: index, box: box, framesLeft: BlazeRules.flameFrames))
+            events.append(.flameLeft(player: index, at: player.position))
+        case .pulse(let pull):
+            pulse(by: index, pull: pull)
         case .dunk(let hoop):
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
         case .webLine(let direction):
@@ -195,6 +237,11 @@ public struct Match: Equatable {
         }
     }
 
+    private mutating func stamp() -> Int {
+        defer { nextId += 1 }
+        return nextId
+    }
+
     /// A slab or a wall, solid for a second, and the maker disarmed and on the cooldown.
     private mutating func make(_ box: Box, by index: Int) {
         platforms.append(Platform(owner: index, box: box, framesLeft: ShakeRules.platformFrames))
@@ -219,9 +266,10 @@ public struct Match: Equatable {
             pop(from: other, by: index)
         }
         if let blade = player.slashHitbox {
-            if let other, players[other].hasBall, players[other].body.overlaps(blade) {
+            if let other, players[other].body.overlaps(blade), players[other].frozen == 0 {
+                // The body, ball or no ball: stripped and knocked along the swing.
                 players[index].slashHit = true
-                pop(from: other, by: index)
+                strip(other, by: index, knock: Vec2(x: SlashRules.knock.x * player.facing.sign, y: SlashRules.knock.y))
             } else if ball.isLive, ball.box.overlaps(blade) {
                 // Down and away at about the spike angle, jittered a little by the frame.
                 players[index].slashHit = true
@@ -231,17 +279,43 @@ public struct Match: Equatable {
                 events.append(.swatted(player: index, hit: true))
             }
         }
-        if player.snatchHitbox != nil {
+        if let reach = player.snatchHitbox {
             let held = ball.holder.flatMap { $0 == index ? nil : $0 }
             let at = held.map { players[$0].chest + Vec2(x: 0, y: 3) } ?? ball.position
             let facingIt = (at.x - player.position.x) * player.facing.sign >= -1
-            if facingIt, player.snatchReaches(ballAt: at), held != nil || ball.isLive {
+            // A burning ball is the thrower's alone.
+            let allowed = !ball.burning || ball.lastTouched == index || held != nil
+            if player.power == .frostTea, let other, players[other].frozen == 0, players[other].body.overlaps(reach),
+               (players[other].body.center.x - player.position.x) * player.facing.sign >= -1 {
+                // Frost Tea: the body it reaches is frozen where it stands, and stripped.
+                strip(other, by: index, knock: nil)
+                freeze(other)
+            } else if facingIt, allowed, ball.frozen == 0, player.snatchReaches(ballAt: at), held != nil || ball.isLive {
                 if let held {
                     players[held].loseBall()
                     players[held].hitStun = BallRules.hitStunFrames
+                    if player.power == .frostTea { freeze(held) }
                 }
-                hand(ballTo: index)
+                if held == nil, player.power == .frostTea, ball.frozen == 0 {
+                    ball.frozen = FrostRules.freezeFrames
+                    events.append(.ballFrozen)
+                } else {
+                    hand(ballTo: index)
+                }
             }
+        }
+    }
+
+    /// A snatch's reach meeting a live blade: the slasher is the one stripped and knocked
+    /// back, and the blade is spent. Before the blades are resolved, so it wins.
+    private mutating func resolveParries() {
+        for index in players.indices {
+            guard let reach = players[index].snatchHitbox, let other = players.indices.first(where: { $0 != index }),
+                  let blade = players[other].slashHitbox, blade.overlaps(reach) else { continue }
+            players[other].slashHit = true
+            let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
+            strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y))
+            events.append(.parried(player: other, by: index))
         }
     }
 
@@ -253,6 +327,186 @@ public struct Match: Equatable {
         players[victim].hitStun = BallRules.hitStunFrames
         ball.pop(from: from)
         events.append(.popped(player: victim, by: popper))
+    }
+
+    /// The strip: the victim stunned, any ball they hold popped free, and knocked away if
+    /// `knock` is given. Without stunning, only the ball pops and the knock lands.
+    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true) {
+        if players[victim].hasBall {
+            pop(from: victim, by: striker)
+        } else {
+            events.append(.struck(player: victim, by: striker))
+        }
+        if stun { players[victim].hitStun = BallRules.hitStunFrames } else { players[victim].hitStun = 0 }
+        if let knock { players[victim].knock(knock) }
+    }
+
+    private mutating func freeze(_ index: Int) {
+        guard players[index].frozen == 0 else { return }
+        players[index].frozen = FrostRules.freezeFrames
+        events.append(.frozen(player: index))
+    }
+
+    // MARK: The powers' pieces
+
+    /// Quake-Up Coffee: the floor shaken. At level one whatever stands on the same floor;
+    /// at level two whatever stands on any.
+    private mutating func quake(by index: Int) {
+        let me = players[index]
+        events.append(.quaked(player: index))
+        let whole = me.powerLevel >= 2
+        if ball.isLive, ball.frozen == 0, stage.isGrounded(ball.box),
+           whole || abs(ball.position.y - BallRules.radius - me.position.y) <= QuakeRules.sameFloorSlack {
+            ball.velocity.y = QuakeRules.ballHop
+            ball.steers = false
+            ball.resting = false
+        }
+        if let other = players.indices.first(where: { $0 != index }), players[other].grounded, players[other].frozen == 0,
+           whole || abs(players[other].position.y - me.position.y) <= QuakeRules.sameFloorSlack {
+            strip(other, by: index, knock: QuakeRules.knock)
+        }
+    }
+
+    /// Zeus Juice's strike: a column from the top of the screen down to `bottom` at `x`,
+    /// stripping the other body in it and popping a loose ball in it up.
+    private mutating func strike(x: Double, bottom: Double, by index: Int) {
+        let top = Double(stage.rows + Stage.skyRows) * Stage.tileSize
+        let column = Box(min: Vec2(x: x - ZeusRules.strikeHalfWidth, y: bottom), max: Vec2(x: x + ZeusRules.strikeHalfWidth, y: top))
+        events.append(.boltStruck(player: index, x: x, bottom: bottom))
+        if let other = players.indices.first(where: { $0 != index }), players[other].frozen == 0, players[other].body.overlaps(column) {
+            strip(other, by: index, knock: Vec2(x: 0, y: 1))
+        } else if ball.isLive, ball.frozen == 0, ball.box.overlaps(column) {
+            ball.pop(from: ball.position)
+        }
+    }
+
+    /// Pulsepistol Punch's pulse: a pillar the width of the screen the way the body
+    /// faces, at the hand, that pushes the ball and the other body away, or pulls them in.
+    private mutating func pulse(by index: Int, pull: Bool) {
+        let me = players[index]
+        let sign = me.facing.sign
+        let y = me.position.y + PulseRules.handHeight
+        let edge = sign > 0 ? Double(stage.columns) * Stage.tileSize : 0
+        let pillar = Box(min: Vec2(x: min(me.position.x, edge), y: y - PulseRules.halfHeight),
+                         max: Vec2(x: max(me.position.x, edge), y: y + PulseRules.halfHeight))
+        let way = pull ? -sign : sign
+        events.append(.pulsed(player: index, pull: pull))
+        if let other = players.indices.first(where: { $0 != index }), players[other].frozen == 0, players[other].body.overlaps(pillar) {
+            strip(other, by: index, knock: Vec2(x: PulseRules.bodyPush.x * way, y: PulseRules.bodyPush.y), stun: false)
+            if !players[other].hasBall, ball.isLive == false, ball.holder == nil {
+                // The ball just popped: it goes the pulse's way too.
+                ball.velocity = Vec2(x: PulseRules.ballPush.x * way, y: PulseRules.ballPush.y)
+            }
+        }
+        if ball.isLive, ball.frozen == 0, ball.box.overlaps(pillar) {
+            ball.velocity = Vec2(x: PulseRules.ballPush.x * way, y: PulseRules.ballPush.y)
+            ball.straight = false
+            ball.floater = 0
+            ball.steers = false
+            ball.shotInFlight = false
+            ball.resting = false
+            ball.lastTouched = index
+        }
+    }
+
+    /// Zeus Juice's bolts fly straight until they meet a wall, a body or the ball.
+    private mutating func stepBolts() {
+        var kept: [Bolt] = []
+        for var bolt in bolts {
+            bolt.position += bolt.velocity
+            bolt.framesLeft -= 1
+            let box = Box(center: bolt.position, width: 4, height: 4)
+            if bolt.framesLeft <= 0 || stage.overlapsSolid(box) {
+                events.append(.boltLanded(at: bolt.position))
+                continue
+            }
+            if let other = players.indices.first(where: { $0 != bolt.owner }), players[other].frozen == 0, players[other].body.overlaps(box) {
+                let sign = bolt.velocity.x >= 0 ? 1.0 : -1.0
+                strip(other, by: bolt.owner, knock: Vec2(x: ZeusRules.boltKnock.x * sign, y: ZeusRules.boltKnock.y))
+                events.append(.boltLanded(at: bolt.position))
+                continue
+            }
+            if ball.isLive, ball.frozen == 0, ball.box.overlaps(box) {
+                // Back toward the thrower, a little.
+                let sign = bolt.velocity.x >= 0 ? 1.0 : -1.0
+                ball.pop(from: ball.position)
+                ball.velocity = Vec2(x: -ZeusRules.ballPop.x * sign, y: ZeusRules.ballPop.y)
+                ball.lastTouched = bolt.owner
+                events.append(.boltLanded(at: bolt.position))
+                continue
+            }
+            kept.append(bolt)
+        }
+        bolts = kept
+    }
+
+    /// Frost Tea's clones freeze the other body or the ball on touch and shatter, or
+    /// shatter on their own when their frames run out.
+    private mutating func stepClones() {
+        var kept: [IceClone] = []
+        for var clone in clones {
+            clone.framesLeft -= 1
+            var shattered = clone.framesLeft <= 0
+            if let other = players.indices.first(where: { $0 != clone.owner }), players[other].frozen == 0, players[other].body.overlaps(clone.box) {
+                freeze(other)
+                shattered = true
+            } else if ball.isLive, ball.frozen == 0, ball.box.overlaps(clone.box) {
+                ball.frozen = FrostRules.freezeFrames
+                events.append(.ballFrozen)
+                shattered = true
+            }
+            if shattered {
+                events.append(.cloneShattered(at: clone.box.center))
+            } else {
+                kept.append(clone)
+            }
+        }
+        clones = kept
+    }
+
+    /// Blazing Boba's flames strip the other body that steps in one, once each.
+    private mutating func stepFlames() {
+        var kept: [Flame] = []
+        for var flame in flames {
+            flame.framesLeft -= 1
+            guard flame.framesLeft > 0 else { continue }
+            if let other = players.indices.first(where: { $0 != flame.owner }), players[other].frozen == 0,
+               players[other].hitStun == 0, players[other].body.overlaps(flame.box) {
+                strip(other, by: flame.owner, knock: BlazeRules.flameKnock)
+                continue
+            }
+            kept.append(flame)
+        }
+        flames = kept
+    }
+
+    /// Blazing Boba's fireballs fly like a thrown ball and burst on the first thing they
+    /// meet, stripping and knocking whatever's within reach.
+    private mutating func stepFireballs() {
+        var kept: [Fireball] = []
+        for var fireball in fireballs {
+            fireball.velocity.y = max(fireball.velocity.y - BallRules.gravity, -BallRules.fallSpeed)
+            fireball.position += fireball.velocity
+            fireball.framesLeft -= 1
+            let box = Box(center: fireball.position, width: BallRules.radius * 2, height: BallRules.radius * 2)
+            let other = players.indices.first { $0 != fireball.owner }
+            let hitBody = other.map { players[$0].frozen == 0 && players[$0].body.overlaps(box) } ?? false
+            if fireball.framesLeft <= 0 || stage.overlapsSolid(box) || hitBody {
+                events.append(.fireballBurst(at: fireball.position))
+                if let other, players[other].body.distance(to: fireball.position) <= BlazeRules.burstReach, players[other].frozen == 0 {
+                    let sign = players[other].position.x >= fireball.position.x ? 1.0 : -1.0
+                    strip(other, by: fireball.owner, knock: Vec2(x: BlazeRules.burstKnock.x * sign, y: BlazeRules.burstKnock.y))
+                }
+                if ball.isLive, ball.frozen == 0, ball.position.distance(to: fireball.position) <= BlazeRules.burstReach {
+                    let sign = ball.position.x >= fireball.position.x ? 1.0 : -1.0
+                    ball.pop(from: ball.position)
+                    ball.velocity = Vec2(x: BlazeRules.burstKnock.x * sign, y: BlazeRules.burstKnock.y)
+                }
+                continue
+            }
+            kept.append(fireball)
+        }
+        fireballs = kept
     }
 
     /// The ball into a player's hands, whatever it was doing.
@@ -379,6 +633,7 @@ public struct Match: Equatable {
     private mutating func tryCatch() {
         let speed = ball.velocity.length
         let candidates = players.indices
+            .filter { !ball.burning || ball.lastTouched == $0 }
             .filter { players[$0].canCatch(ballAt: ball.position, speed: speed, shotInFlight: ball.shotInFlight) }
             .sorted { players[$0].chest.distance(to: ball.position) < players[$1].chest.distance(to: ball.position) }
         guard let catcher = candidates.first else { return }

@@ -7,6 +7,10 @@ import UIKit
 /// texture, at the screen's scale.
 enum TitleText {
     static let face = "AvenirNextCondensed-Heavy"
+    static let italicFace = "AvenirNextCondensed-HeavyItalic"
+    /// Times the screen's scale the lettering is rendered at, so a HUD scaled up for a
+    /// big screen stays crisp. The scene sets it from its HUD scale.
+    nonisolated(unsafe) static var renderScale: CGFloat = 1
     static let lightBlue = UIColor(red: 0x89 / 255, green: 0xD7 / 255, blue: 0xED / 255, alpha: 1)
     /// The outline and the drop, as shares of the text size, and the steps round the ring.
     private static let stroke: CGFloat = 0.09
@@ -15,26 +19,26 @@ enum TitleText {
     nonisolated(unsafe) private static var cache: [String: SKTexture] = [:]
     nonisolated(unsafe) private static var images: [String: UIImage] = [:]
 
-    static func texture(_ text: String, size: CGFloat) -> SKTexture {
-        let key = "\(size)|\(text)"
+    static func texture(_ text: String, size: CGFloat, italic: Bool = false) -> SKTexture {
+        let key = "\(size)|\(italic)|\(renderScale)|\(text)"
         if let texture = cache[key] { return texture }
-        let texture = SKTexture(image: image(text, size: size))
+        let texture = SKTexture(image: image(text, size: size, italic: italic))
         cache[key] = texture
         return texture
     }
 
     /// The lettering as an image, for the SwiftUI layer.
-    static func image(_ text: String, size: CGFloat) -> UIImage {
-        let key = "\(size)|\(text)"
+    static func image(_ text: String, size: CGFloat, italic: Bool = false) -> UIImage {
+        let key = "\(size)|\(italic)|\(renderScale)|\(text)"
         if let image = images[key] { return image }
-        let font = UIFont(name: face, size: size) ?? UIFont.boldSystemFont(ofSize: size)
+        let font = UIFont(name: italic ? italicFace : face, size: size) ?? UIFont.boldSystemFont(ofSize: size)
         let measured = (text as NSString).size(withAttributes: [.font: font])
         let ring = size * stroke
         let shadow = size * drop
         let pad = ring + shadow + 2
         let canvas = CGSize(width: ceil(measured.width + pad * 2), height: ceil(measured.height + pad * 2))
         let format = UIGraphicsImageRendererFormat()
-        format.scale = UIScreen.main.scale
+        format.scale = UIScreen.main.scale * renderScale
         let image = UIGraphicsImageRenderer(size: canvas, format: format).image { context in
             let origin = CGPoint(x: pad, y: pad)
             func draw(_ colour: UIColor, offset: CGPoint) {
@@ -64,17 +68,17 @@ enum TitleText {
     }
 
     /// A sprite of the lettering, sized in points.
-    static func node(_ text: String, size: CGFloat) -> SKSpriteNode {
-        let texture = texture(text, size: size)
+    static func node(_ text: String, size: CGFloat, italic: Bool = false) -> SKSpriteNode {
+        let texture = texture(text, size: size, italic: italic)
         let node = SKSpriteNode(texture: texture)
-        node.size = CGSize(width: texture.size().width, height: texture.size().height)
+        node.size = CGSize(width: texture.size().width / renderScale, height: texture.size().height / renderScale)
         return node
     }
 
     /// Swaps a sprite's lettering, keeping its place.
-    static func set(_ node: SKSpriteNode, to text: String, size: CGFloat) {
-        let texture = texture(text, size: size)
+    static func set(_ node: SKSpriteNode, to text: String, size: CGFloat, italic: Bool = false) {
+        let texture = texture(text, size: size, italic: italic)
         node.texture = texture
-        node.size = CGSize(width: texture.size().width, height: texture.size().height)
+        node.size = CGSize(width: texture.size().width / renderScale, height: texture.size().height / renderScale)
     }
 }

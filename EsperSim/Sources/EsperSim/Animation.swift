@@ -34,11 +34,14 @@ public enum Animation: String, CaseIterable {
     case snatchAir = "player_snatch_air"
     case ledge = "player_ledge"
     case dunk = "player_dunk"
+    case gunShoot = "player_gun_shoot"
+    case gunRun = "player_gun_run"
+    case gunRunShoot = "player_gun_run_shoot"
 
     public var frameCount: Int {
         switch self {
-        case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir: 10
-        case .walk, .dribbleWalk, .run, .dribbleRun, .slide: 8
+        case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot: 10
+        case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall: 3
         case .jumpSquat: 4
         case .doubleJump, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
@@ -75,12 +78,12 @@ extension Animation {
     /// how many sim frames it holds; the last holds through the hang. The ball leaves the
     /// hand at the slam, the third dunk frame, which starts at the dunk's release frame.
     public static let dunkSequence: [(frame: AnimationFrame, frames: Int)] = [
-        (AnimationFrame(.throwForward, 3), 4),
-        (AnimationFrame(.dunk, 0), 3),
-        (AnimationFrame(.dunk, 1), 3),
-        (AnimationFrame(.dunk, 2), 5),
-        (AnimationFrame(.dunk, 3), 5),
-        (AnimationFrame(.dunk, 4), 5),
+        (AnimationFrame(.throwForward, 3), 8),
+        (AnimationFrame(.dunk, 0), 6),
+        (AnimationFrame(.dunk, 1), 6),
+        (AnimationFrame(.dunk, 2), 10),
+        (AnimationFrame(.dunk, 3), 10),
+        (AnimationFrame(.dunk, 4), 10),
         (AnimationFrame(.dunk, 5), 1),
     ]
 
@@ -126,11 +129,12 @@ extension Player {
             if previousState == .land, t + spec.landingLagFrames < 22 {
                 return AnimationFrame(.land, (t + spec.landingLagFrames) * 24 / 60)
             }
-            return AnimationFrame(hasBall ? .dribbleIdle : .idle, (t * 12 / 60) % 10)
+            return AnimationFrame(holding ? .dribbleIdle : .idle, (t * 12 / 60) % 10)
         case .walk:
-            return AnimationFrame(hasBall ? .dribbleWalk : .walk, Int(animationPhase) % 8)
+            return AnimationFrame(holding ? .dribbleWalk : .walk, Int(animationPhase) % 8)
         case .dash, .run:
-            return AnimationFrame(hasBall ? .dribbleRun : .run, Int(animationPhase) % 8)
+            if gunRunTimer > 0 { return AnimationFrame(.gunRunShoot, Int(animationPhase) % 8) }
+            return AnimationFrame(holding ? .dribbleRun : .run, Int(animationPhase) % 8)
         case .crouch:
             return AnimationFrame(.crouch, (t * 15 / 60) % 10)
         case .crouchWalk:
@@ -185,6 +189,10 @@ extension Player {
             return AnimationFrame(hasBall ? .airBall : .air, 2)
         case .flying:
             return AnimationFrame(hasBall ? .airBall : .air, 1)
+        case .gliding:
+            return AnimationFrame(holding ? .airBall : .air, 1)
+        case .gunShoot:
+            return AnimationFrame(.gunShoot, t * 15 / 60)
         }
     }
 }

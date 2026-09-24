@@ -436,7 +436,7 @@ extension SKColor {
 /// ramp: the sparks off a hit ball, the crown and the lightning on a score, and the charge
 /// round a held throw.
 enum EnergyEffect: CaseIterable {
-    case spark, spark2, spark3, lightning1, lightning2, lightning3, lightning4, charge
+    case spark, spark2, spark3, lightning1, lightning2, lightning3, lightning4, charge, lightningJump, lightningCharge
 
     /// The two sparks a hit ball throws, one or the other each time, and the four bolts.
     static let hitSparks: [EnergyEffect] = [.spark, .spark2]
@@ -461,6 +461,8 @@ enum EnergyEffect: CaseIterable {
         case .lightning3: "lightning3"
         case .lightning4: "lightning4"
         case .charge: "esper_charge"
+        case .lightningJump: "lightning_jump"
+        case .lightningCharge: "lightning_charge"
         }
     }
 
@@ -471,17 +473,20 @@ enum EnergyEffect: CaseIterable {
         case .spark3: 7
         case .lightning1, .lightning2, .lightning3, .lightning4: 25
         case .charge: 82
+        case .lightningJump, .lightningCharge: 8
         }
     }
 
     var fps: Double { self == .charge ? 30 : 24 }
 
-    /// The sparks and the charge are centred; the crown rises from its base, 10 pixels up
-    /// its 128; a bolt strikes at its bottom edge.
+    /// The sparks and the charges are centred; the crown rises from its base, 10 pixels
+    /// up its 128; a bolt strikes at its bottom edge; Zeus Juice's jump spark stands on
+    /// its feet, a quarter up its 128.
     var anchor: CGPoint {
         switch self {
         case .spark3: CGPoint(x: 0.5, y: 10.0 / 128)
         case .lightning1, .lightning2, .lightning3, .lightning4: CGPoint(x: 0.5, y: 0)
+        case .lightningJump: CGPoint(x: 0.5, y: 0.25)
         default: CGPoint(x: 0.5, y: 0.5)
         }
     }
@@ -500,10 +505,13 @@ enum EnergyEffect: CaseIterable {
     }
 }
 
-/// One-shot sprites: sparks, smoke, the swish. Each plays through and removes itself.
-/// The jump spark and the smoke are drawn in the player's energy colour.
+/// One-shot sprites: sparks, smoke, the swish, and Blazing Boba's fire and Flash Fizz's
+/// flash, painted as they are. Each plays through and removes itself. The jump spark and
+/// the smoke are drawn in the player's energy colour.
 enum Effect {
     case smoke, jumpSpark, catchSpark, wallJumpSpark
+    case fireJump, fireDash, fireWallSpark, fireSkid, fireTrail, fireCharge, fireExplosion
+    case flashSpark
 
     static let inEnergyColour: [Effect] = [.smoke, .jumpSpark]
 
@@ -513,6 +521,14 @@ enum Effect {
         case .jumpSpark: "jumpspark"
         case .catchSpark: "catchspark"
         case .wallJumpSpark: "walljumpspark"
+        case .fireJump: "fire_jump"
+        case .fireDash: "fire_dash"
+        case .fireWallSpark: "fire_wallspark"
+        case .fireSkid: "fire_skid"
+        case .fireTrail: "fire_trail"
+        case .fireCharge: "fire_charge"
+        case .fireExplosion: "fire_explosion"
+        case .flashSpark: "flashspark"
         }
     }
 
@@ -520,19 +536,31 @@ enum Effect {
         switch self {
         case .smoke: 6
         case .jumpSpark, .catchSpark, .wallJumpSpark: 5
+        case .fireJump, .fireSkid: 22
+        case .fireDash: 13
+        case .fireWallSpark, .fireTrail: 11
+        case .fireCharge: 12
+        case .fireExplosion: 16
+        case .flashSpark: 6
         }
     }
 
     var fps: Double {
         switch self {
         case .catchSpark: 15
+        case .fireJump, .fireDash, .fireWallSpark, .fireSkid, .fireTrail, .fireCharge, .fireExplosion, .flashSpark: 24
         default: 12
         }
     }
 
-    /// Feet-anchored like the player sprites, except the wall spark which is centred.
+    /// Feet-anchored like the player sprites, a quarter up a 64 sheet, except the wall
+    /// sparks, the charge, the burst and the flash, which are centred.
     var anchor: CGPoint {
-        self == .wallJumpSpark ? CGPoint(x: 0.5, y: 0.5) : CGPoint(x: 0.5, y: 8.0 / 48.0)
+        switch self {
+        case .wallJumpSpark, .fireWallSpark, .fireCharge, .fireExplosion, .flashSpark: CGPoint(x: 0.5, y: 0.5)
+        case .fireJump, .fireDash, .fireSkid, .fireTrail: CGPoint(x: 0.5, y: 16.0 / 64.0)
+        default: CGPoint(x: 0.5, y: 8.0 / 48.0)
+        }
     }
 
     /// With a `player`, the frames come in that player's energy colour.

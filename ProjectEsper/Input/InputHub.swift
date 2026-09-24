@@ -2,9 +2,10 @@ import EsperSim
 import Foundation
 import GameController
 
-/// Where each player's input comes from. Player 0 is the touch controls and the first
-/// controller together; player 1 is the second controller. Everything is read as held
-/// state each frame, so nothing queues and nothing is lost between frames.
+/// Where each player's input comes from. On a phone the touch controls are player 0; one
+/// controller is player 1, and with two the first is player 0 and the second player 1.
+/// On the TV the first controller is player 0 and the second player 1. Everything is
+/// read as held state each frame, so nothing queues and nothing is lost between frames.
 @MainActor
 final class InputHub {
     /// What the on-screen controls hold right now. The scene writes it.
@@ -54,12 +55,27 @@ final class InputHub {
         if bumperDown, !bumperWasDown { cyclePressed = true }
         bumperWasDown = bumperDown
         return (0..<players).map { index in
-            let pad = index < controllers.count ? read(controllers[index].extendedGamepad!) : PlayerInput.idle
+            let pad = controller(for: index).map { read($0.extendedGamepad!) } ?? PlayerInput.idle
             return index == 0 ? merge(touch, pad) : pad
         }
     }
 
-    var playerOneHasController: Bool { !controllers.isEmpty }
+    /// The controller that drives this player, by the rule above.
+    private func controller(for index: Int) -> GCController? {
+        #if os(tvOS)
+        return index < controllers.count ? controllers[index] : nil
+        #else
+        switch (controllers.count, index) {
+        case (1, 1): return controllers[0]
+        case (1, 0): return nil
+        default: return index < controllers.count ? controllers[index] : nil
+        }
+        #endif
+    }
+
+    var playerOneHasController: Bool { controller(for: 0) != nil }
+    /// A second person is on a pad: the computer sits out.
+    var playerTwoHasController: Bool { controller(for: 1) != nil }
 
     /// True once per menu press.
     func consumeReset() -> Bool {

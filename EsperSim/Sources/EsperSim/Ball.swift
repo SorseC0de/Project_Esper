@@ -33,6 +33,11 @@ public struct Ball: Equatable {
 
     /// Whose the ball still is, if anyone's.
     public var owner: Int? { ownedFrames > 0 ? lastTouched : nil }
+    /// Frost Tea: held exactly where it is for this many frames more.
+    public var frozen = 0
+    /// Blazing Boba: alight from a shot or a throw until the first bounce; nobody but the
+    /// thrower can catch or snatch it.
+    public var burning = false
     public var resting = false
     /// Counting down to the respawn after a score, 0 when live.
     public var respawnTimer = 0
@@ -115,6 +120,7 @@ public struct Ball: Equatable {
 
     /// The first bounce ends a paced shot: an ordinary ball's speed from here.
     private mutating func settlePace() {
+        burning = false
         guard pace != 1 else { return }
         velocity = velocity / pace
         pace = 1
@@ -174,6 +180,7 @@ public struct Ball: Equatable {
         previousY = position.y
         velocity = Vec2(x: 0, y: BallRules.floaterSpeed)
         pace = 1
+        burning = false
         straight = false
         floater = BallRules.popFloatFrames
         thrown = false
@@ -202,6 +209,8 @@ public struct Ball: Equatable {
         previousY = spawn.y
         velocity = .zero
         pace = 1
+        burning = false
+        frozen = 0
         holder = nil
         straight = false
         floater = 0

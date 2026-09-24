@@ -27,7 +27,7 @@ import sys
 import zlib
 
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
-STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets")
+STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")
 LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources", "EsperSim", "BallLandmarks.swift")
 FEET_FROM_BOTTOM_BY_SIZE = {48: 8, 64: 16}
@@ -36,6 +36,8 @@ BALL_MIN_PIXELS = 12
 # Strips rendered at a multiple of their playing size, boxed down by this factor. The
 # charge is a 512px soft render whose swirl fills the middle 150.
 REDUCE = {"esper_charge": 4}
+# Strips whose frames aren't square: their frame height.
+FRAME_HEIGHT = {"flashspark": 216}
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk"}
@@ -242,18 +244,19 @@ def main():
             width, height, rows = box_down(width, height, bpp, rows, REDUCE[short])
             ctype, bpp = 6, 4
         size = width
-        count = height // size
+        tall = FRAME_HEIGHT.get(short, size)
+        count = height // tall
         feet = FEET_FROM_BOTTOM_BY_SIZE.get(size, 8)
         landmarks = [mark for mark in landmarks if not mark[0].startswith(short + "_")]
         for index in range(count):
-            frame_rows = rows[index * size:(index + 1) * size]
-            write_imageset(short, index, png_writer=lambda path, r=frame_rows: write_png(path, size, size, ctype, r))
+            frame_rows = rows[index * tall:(index + 1) * tall]
+            write_imageset(short, index, png_writer=lambda path, r=frame_rows: write_png(path, size, tall, ctype, r))
             if short in BALL_SHEETS:
-                centre = ball_centre(size, size, bpp, frame_rows, feet)
+                centre = ball_centre(size, tall, bpp, frame_rows, feet)
                 if centre:
                     landmarks.append((f"{short}_{index}", centre))
-        table[short] = (size, size, count, size // 2, size - feet, STRIP_FPS)
-        print(f"strip  {short}: {count} frames of {size}px")
+        table[short] = (size, tall, count, size // 2, tall - feet, STRIP_FPS)
+        print(f"strip  {short}: {count} frames of {size}x{tall}px")
 
     print(f"\n{'sprite':26s} size    frames origin   fps  ball")
     for short in sorted(table):

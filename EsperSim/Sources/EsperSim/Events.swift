@@ -31,6 +31,24 @@ public enum MatchEvent: Equatable {
     /// The ball knocked out of `player`'s hands by `by`.
     case popped(player: Int, by: Int)
     case ledgeGrabbed(player: Int)
+    /// A body struck without the ball: stunned, and knocked if `knocked`.
+    case struck(player: Int, by: Int)
+    /// A snatch met a live blade: the slasher is the one stripped.
+    case parried(player: Int, by: Int)
+    case quaked(player: Int)
+    case boltFired(player: Int)
+    case boltLanded(at: Vec2)
+    /// A strike from the top of the screen down to `bottom`, at `x`.
+    case boltStruck(player: Int, x: Double, bottom: Double)
+    case frozen(player: Int)
+    case ballFrozen
+    case cloneMade(player: Int, at: Vec2)
+    case cloneShattered(at: Vec2)
+    case flameLeft(player: Int, at: Vec2)
+    case fireballMade(player: Int)
+    case fireballBurst(at: Vec2)
+    case pulsed(player: Int, pull: Bool)
+    case glided(player: Int)
 }
 
 /// What a player's step asks the match to do with the ball.
@@ -43,4 +61,11 @@ public enum PlayerAction: Equatable {
     case flash(direction: Vec2)
     case makePlatform
     case makeWall
+    case quake
+    case fireBolt(direction: Vec2)
+    case strikeBolt(x: Double, bottom: Double)
+    case leaveClone
+    case leaveFlame
+    case releaseFireball(velocity: Vec2)
+    case pulse(pull: Bool)
 }

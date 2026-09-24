@@ -47,6 +47,12 @@ enum DunkArt {
     ]
 }
 
+/// Whether the head's fire and the double jump's platform are drawn with `esper_spark`,
+/// scaled down to the squares' size, rather than the hard squares.
+enum ParticleLook {
+    static let sprites = true
+}
+
 /// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel
 /// sheet round the ball in hand. On the ZEUS CHARGE slider, offline, until it's settled.
 enum ZeusTuning {

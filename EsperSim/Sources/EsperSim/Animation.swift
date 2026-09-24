@@ -35,12 +35,15 @@ public enum Animation: String, CaseIterable {
     case ledge = "player_ledge"
     case dunk = "player_dunk"
     case gunShoot = "player_gun_shoot"
+    case gunShootAir = "player_gun_shoot_air"
     case gunRun = "player_gun_run"
     case gunRunShoot = "player_gun_run_shoot"
+    case hurt = "player_hurt"
 
     public var frameCount: Int {
         switch self {
-        case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot: 10
+        case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir: 10
+        case .hurt: 4
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall: 3
         case .jumpSquat: 4
@@ -118,6 +121,10 @@ extension Player {
     /// the sim, so the drawing can never change the game.
     public var animationFrame: AnimationFrame {
         let t = stateTimer
+        if hitStun > 0, state == .air || state == .idle || state == .land || state == .walk {
+            // Stunned: the hurt sheet, its frames in order and the last held.
+            return AnimationFrame(.hurt, (BallRules.hitStunFrames - hitStun) * 15 / 60)
+        }
         if boltPose > 0, state != .webSwing, state != .webPull, state != .webbed {
             // Zeus Juice's bolt: the throw from its set pose through the release.
             return AnimationFrame(.throwForward, 3 + (ZeusRules.boltPoseFrames - boltPose) * 15 / 60)
@@ -180,7 +187,7 @@ extension Player {
             // The double jump's somersault, run through in the roll's frames.
             return AnimationFrame(.doubleJump, t * SlashRules.sheetFramesPerSecond / 60)
         case .snatching, .walling:
-            return AnimationFrame(grounded ? .snatch : .snatchAir, t * SnatchRules.sheetFramesPerSecond / 60)
+            return AnimationFrame(grounded ? .snatch : .snatchAir, SnatchRules.sheetFrame(at: t))
         case .ledgeHang:
             return AnimationFrame(.ledge, (t - 1) * 12 / 60)
         case .ledgeClimb:
@@ -194,7 +201,7 @@ extension Player {
         case .flying:
             return AnimationFrame(hasBall ? .airBall : .air, 1)
         case .gunShoot:
-            return AnimationFrame(.gunShoot, t * 15 / 60)
+            return AnimationFrame(grounded ? .gunShoot : .gunShootAir, t * 15 / 60)
         }
     }
 }

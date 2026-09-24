@@ -125,6 +125,8 @@ final class GameScene: SKScene {
     /// The charge round each player's ball while a throw is held, and whether it showed
     /// last frame, so the throw's release can be caught.
     private var chargeNodes: [SKSpriteNode] = []
+    /// Blazing Boba's second charge sheet, small on the ball itself.
+    private var chargeOverlays: [SKSpriteNode] = []
     private var charging: [Bool] = []
     /// A white copy of each body and head, added over them, flickering while the body is
     /// stunned by the blade.
@@ -339,13 +341,19 @@ final class GameScene: SKScene {
             charge.setScale(EnergyEffect.chargeScale)
             glowers.addChild(charge)
             chargeNodes.append(charge)
+            let overlay = SKSpriteNode()
+            overlay.zPosition = 6
+            overlay.isHidden = true
+            glowers.addChild(overlay)
+            chargeOverlays.append(overlay)
             charging.append(false)
             for flashes in [\GameScene.stunBodies, \GameScene.stunHeads] {
+                // Stunned, the body flickers to a dark shade of its energy.
                 let flash = SKSpriteNode()
-                flash.color = .white
+                flash.color = SKColor(rgb: sprites.look(for: player.index).energyTone(luminance: 0.15))
                 flash.colorBlendFactor = 1
-                flash.blendMode = .add
-                flash.alpha = 0.8
+                flash.blendMode = .alpha
+                flash.alpha = 0.85
                 flash.zPosition = 9
                 flash.isHidden = true
                 glowers.addChild(flash)
@@ -517,7 +525,8 @@ final class GameScene: SKScene {
     /// they go, more a digital dissolve than a flame.
     private func makeFire(_ colour: SKColor) -> SKEmitterNode {
         let fire = SKEmitterNode()
-        fire.particleTexture = sprites.flatSquare(size: 4, alpha: 1)
+        // The hard square, or a frame of the spark scaled down to the square's size.
+        fire.particleTexture = ParticleLook.sprites ? sprites.texture(EnergyEffect.spark.name, 4) : sprites.flatSquare(size: 4, alpha: 1)
         fire.particleBirthRate = 40
         fire.particleLifetime = 0.6
         fire.particleLifetimeRange = 0.1
@@ -528,6 +537,7 @@ final class GameScene: SKScene {
         fire.emissionAngleRange = .pi / 14
         fire.yAcceleration = 10
         fire.particleSize = CGSize(width: 3, height: 3)
+        if ParticleLook.sprites { fire.particleRotationRange = .pi * 2 }
         let steps = SKKeyframeSequence(keyframeValues: [1, 0.66, 0.33], times: [0, 0.45, 0.75])
         steps.interpolationMode = .step
         fire.particleScaleSequence = steps
@@ -1210,7 +1220,9 @@ final class GameScene: SKScene {
                     spark.zPosition = 40
                     glowers.addChild(spark)
                 case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 0.42))
-                default: spawn(.jumpSpark, at: player.position, flipped: player.facing == .left, player: index)
+                default:
+                    let drop = Effect.jumpSpark.bottomAligned ? -3.75 : 0
+                    spawn(.jumpSpark, at: player.position + Vec2(x: 0, y: drop), flipped: player.facing == .left, player: index)
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
             case .dashed(let index), .slid(let index):
@@ -1289,6 +1301,9 @@ final class GameScene: SKScene {
                 let swirl = Effect.fireCharge.node(sprites, at: SpriteLibrary.point(hand), flipped: player.facing == .left)
                 swirl.zPosition = 40
                 glowers.addChild(swirl)
+                let summon = Effect.fireballSummon.node(sprites, at: SpriteLibrary.point(hand), flipped: player.facing == .left)
+                summon.zPosition = 41
+                glowers.addChild(summon)
             case .fireballBurst(let at):
                 let burst = Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at + Vec2(x: 0, y: -4)), flipped: false)
                 glowers.addChild(burst)
@@ -1334,7 +1349,7 @@ final class GameScene: SKScene {
     private func spawnJumpPlatform(at feet: CGPoint, colour: SKColor) {
         let count = 9
         for index in 0..<count {
-            let square = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
+            let square = SKSpriteNode(texture: ParticleLook.sprites ? sprites.texture(EnergyEffect.spark.name, 3 + index % 3) : sprites.flatSquare(size: 4, alpha: 1))
             square.size = CGSize(width: 3, height: 3)
             square.color = colour
             square.colorBlendFactor = 1
@@ -1794,8 +1809,22 @@ final class GameScene: SKScene {
                 }
                 charge.position = handBall.position
                 charge.isHidden = false
+                let overlay = chargeOverlays[index]
+                if player.power == .blazingBoba {
+                    let frame = player.stateTimer * Int(Effect.fireCharge2.fps) / 60 % Effect.fireCharge2.frameCount
+                    overlay.setScale(1)
+                    overlay.texture = sprites.texture(Effect.fireCharge2.name, frame)
+                    overlay.size = overlay.texture!.size()
+                    overlay.anchorPoint = Effect.fireCharge2.anchor
+                    overlay.setScale(Effect.fireCharge2.scale)
+                    overlay.position = handBall.position
+                    overlay.isHidden = false
+                } else {
+                    overlay.isHidden = true
+                }
             } else {
                 charge.isHidden = true
+                chargeOverlays[index].isHidden = true
                 if charging[index], player.power != .blazingBoba, player.power != .zeusJuice,
                    player.state == .throwing || player.state == .dunking {
                     let tail = EnergyEffect.charge.node(sprites, player: index, at: charge.position,

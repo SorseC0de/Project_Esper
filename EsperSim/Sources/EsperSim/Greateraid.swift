@@ -134,7 +134,7 @@ public struct Drinks: Equatable {
 
     /// Whether the offer of `drink` is the second sip of the biomorph in hand.
     public func isSecondSip(_ drink: Greateraid) -> Bool {
-        drink.kind == .biomorph && biomorph == drink
+        (drink.kind == .biomorph && biomorph == drink) || (drink.kind == .booster && level(of: drink) == 1)
     }
 
     public var power: Power { biomorph?.power ?? .none }

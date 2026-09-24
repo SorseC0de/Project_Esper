@@ -284,7 +284,15 @@ public struct Match: Equatable {
         }
         if let reach = player.snatchHitbox {
             let held = ball.holder.flatMap { $0 == index ? nil : $0 }
-            let at = held.map { players[$0].chest + Vec2(x: 0, y: 3) } ?? ball.position
+            // A held ball is where the holder's sheet draws it this frame, so the hand can
+            // take it off the dribble; failing a landmark, the chest.
+            let at = held.map { holder -> Vec2 in
+                let body = players[holder]
+                if let offset = BallLandmarks.offset(body.animationFrame) {
+                    return body.position + Vec2(x: offset.x / 1.6 * body.facing.sign, y: offset.y / 1.6)
+                }
+                return body.chest + Vec2(x: 0, y: 3)
+            } ?? ball.position
             let facingIt = (at.x - player.position.x) * player.facing.sign >= -1
             // A burning ball is the thrower's alone.
             let allowed = !ball.burning || ball.lastTouched == index || held != nil
@@ -293,7 +301,8 @@ public struct Match: Equatable {
                 // Frost Tea: the body it reaches is frozen where it stands, and stripped.
                 strip(other, by: index, knock: nil)
                 freeze(other)
-            } else if facingIt, allowed, player.snatchReaches(ballAt: at), held != nil || ball.isLive {
+            } else if facingIt, allowed, player.snatchReaches(ballAt: at) || (held.map { players[$0].body.overlaps(reach) } ?? false),
+                      held != nil || ball.isLive {
                 if let held {
                     players[held].loseBall()
                     players[held].hitStun = BallRules.hitStunFrames

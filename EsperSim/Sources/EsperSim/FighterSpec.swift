@@ -470,11 +470,27 @@ public enum SlashRules {
 public enum SnatchRules {
     public static let sheetFramesPerSecond = 15
     public static let sheetFrames = 10
-    public static var frames: Int { simFrames(sheetFrames, at: sheetFramesPerSecond) }
+    /// The third sheet frame, the hand at full stretch, holds twice as long as the rest.
+    public static let heldSheetFrame = 2
+    public static let heldTimes = 2
+    /// The sim frame a sheet frame starts on, with the held one's extra length in.
+    public static func simStart(ofSheetFrame frame: Int) -> Int {
+        let each = simFrames(1, at: sheetFramesPerSecond)
+        return frame * each + (frame > heldSheetFrame ? each * (heldTimes - 1) : 0)
+    }
+    /// The sheet frame showing on a sim frame.
+    public static func sheetFrame(at simFrame: Int) -> Int {
+        let each = simFrames(1, at: sheetFramesPerSecond)
+        let heldEnd = simStart(ofSheetFrame: heldSheetFrame + 1)
+        if simFrame < simStart(ofSheetFrame: heldSheetFrame) { return simFrame / each }
+        if simFrame < heldEnd { return heldSheetFrame }
+        return heldSheetFrame + 1 + (simFrame - heldEnd) / each
+    }
+    public static var frames: Int { simStart(ofSheetFrame: sheetFrames) }
     public static let activeSheetFrames = 2..<4
-    public static var activeFrames: Range<Int> { simFrames(activeSheetFrames, at: sheetFramesPerSecond) }
+    public static var activeFrames: Range<Int> { simStart(ofSheetFrame: activeSheetFrames.lowerBound)..<simStart(ofSheetFrame: activeSheetFrames.upperBound) }
     public static let sparkSheetFrame = 2
-    public static var sparkFrame: Int { simFrames(sparkSheetFrame, at: sheetFramesPerSecond) }
+    public static var sparkFrame: Int { simStart(ofSheetFrame: sparkSheetFrame) }
     public static let reach = 10.0
     public static let cooldownFrames = 0
     public static let parryKnock = Vec2(x: 3, y: 1.5)

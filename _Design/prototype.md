@@ -103,10 +103,11 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   neutral.
 - Throw (without ball, in neutral or on defence): the snatch. The sheet's ten frames at
   15 a second, 40 sim frames, the hand out over sheet frames 2 and 3
-  (`SnatchRules.activeSheetFrames`), when the whole body plus a tile of reach in front, or
-  the hand's catch ring at the spark's spot, takes any ball it touches while the body
-  faces it: a loose one at any speed, or the one in the other's hands. The catch spark
-  shows on the hand on sheet frame 2. Then half a second before another.
+  (`SnatchRules.activeSheetFrames`), the third sheet frame held twice as long, when the
+  whole body plus a tile of reach in front, or the hand's catch ring at the spark's
+  spot, takes any ball it touches while the body faces it: a loose one at any speed, or
+  the one in the other's hands, where the sheet draws it that frame, or the holder's
+  body itself. The catch spark shows on the hand on sheet frame 2.
   On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
   air it drifts. Web Water keeps the web line on this button instead.
 - Ledge (without ball): automatic. Falling past the top corner of a block or the one-way
@@ -411,7 +412,7 @@ one of four bolts each time, favouring vertical: it leans half as far as the bal
 in off vertical and never past 45°, so it never lies flat, at the sheet's own width and
 stretched tall enough to run past the top of the screen at that lean. On the sheet's two
 full-frame flash frames the whole screen flashes in the same tone and the floor and
-walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. The jump spark and the dash's smoke, near-white on
+walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Stunned, the body and head flicker a dark shade of the energy colour and the hurt sheet plays. `ParticleLook.sprites` draws the head's fire and the double jump's platform with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour. A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head

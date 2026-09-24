@@ -467,30 +467,12 @@ enum EnergyEffect: CaseIterable {
         }
     }
 
-    var frameCount: Int {
-        switch self {
-        case .spark: 9
-        case .spark2: 10
-        case .spark3: 7
-        case .lightning1, .lightning2, .lightning3, .lightning4: 25
-        case .charge: 82
-        case .lightningJump, .lightningCharge: 8
-        }
-    }
+    /// Frames and the anchor come from the importer's measurements of the sheet.
+    var frameCount: Int { EffectSheets.frames[name] ?? 1 }
 
     var fps: Double { self == .charge ? 30 : 24 }
 
-    /// The sparks and the charges are centred; the crown rises from its base, 10 pixels
-    /// up its 128; a bolt strikes at its bottom edge; Zeus Juice's jump spark stands on
-    /// its feet, a quarter up its 128.
-    var anchor: CGPoint {
-        switch self {
-        case .spark3: CGPoint(x: 0.5, y: 10.0 / 128)
-        case .lightning1, .lightning2, .lightning3, .lightning4: CGPoint(x: 0.5, y: 0)
-        case .lightningJump: CGPoint(x: 0.5, y: 0.25)
-        default: CGPoint(x: 0.5, y: 0.5)
-        }
-    }
+    var anchor: CGPoint { CGPoint(x: 0.5, y: EffectSheets.anchorY[name] ?? 0.5) }
 
     /// A one-shot node in the player's colour that plays through, or through `range` of
     /// its frames, and removes itself.
@@ -511,7 +493,7 @@ enum EnergyEffect: CaseIterable {
 /// the smoke are drawn in the player's energy colour.
 enum Effect {
     case smoke, jumpSpark, catchSpark, wallJumpSpark
-    case fireJump, fireDash, fireWallSpark, fireSkid, fireTrail, fireCharge, fireExplosion
+    case fireJump, fireDash, fireWallSpark, fireSkid, fireTrail, fireCharge, fireCharge2, fireExplosion, fireballSummon
     case flashSpark
 
     static let inEnergyColour: [Effect] = [.smoke, .jumpSpark]
@@ -528,42 +510,40 @@ enum Effect {
         case .fireSkid: "fire_skid"
         case .fireTrail: "fire_trail"
         case .fireCharge: "fire_charge"
+        case .fireCharge2: "fire_charge2"
         case .fireExplosion: "fire_explosion"
+        case .fireballSummon: "fireball_summon"
         case .flashSpark: "flashspark"
         }
     }
 
+    /// The GMS2 sheets keep their counts; a strip's come from the importer's measurements.
     var frameCount: Int {
+        if let measured = EffectSheets.frames[name] { return measured }
         switch self {
-        case .smoke: 6
-        case .jumpSpark, .catchSpark, .wallJumpSpark: 5
-        case .fireJump, .fireSkid: 22
-        case .fireDash: 13
-        case .fireWallSpark, .fireTrail: 11
-        case .fireCharge: 12
-        case .fireExplosion: 16
-        case .flashSpark: 9
+        case .smoke: return 6
+        default: return 5
         }
     }
 
     var fps: Double {
         switch self {
         case .catchSpark: 15
-        case .fireJump, .fireDash, .fireWallSpark, .fireSkid, .fireTrail, .fireCharge, .fireExplosion, .flashSpark: 24
-        default: 12
+        case .smoke, .wallJumpSpark: 12
+        default: 24
         }
     }
 
-    /// Feet-anchored like the player sprites, except the wall spark, the flash and the
-    /// fire's charge, which are centred, and the rest of the fire sheets, painted at the
-    /// bottom of their frames.
+    /// A strip's anchor is where the importer found its art: on the bottom edge, on the
+    /// feet line, or centred. The GMS2 sheets are feet-anchored, except the wall spark.
     var anchor: CGPoint {
-        switch self {
-        case .wallJumpSpark, .flashSpark, .fireCharge: CGPoint(x: 0.5, y: 0.5)
-        case .fireJump, .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion: CGPoint(x: 0.5, y: 0)
-        default: CGPoint(x: 0.5, y: 8.0 / 48.0)
-        }
+        if let measured = EffectSheets.anchorY[name] { return CGPoint(x: 0.5, y: measured) }
+        return self == .wallJumpSpark ? CGPoint(x: 0.5, y: 0.5) : CGPoint(x: 0.5, y: 8.0 / 48.0)
     }
+
+    /// Whether the art sits on the bottom edge of its cell: a jump spark drawn there goes
+    /// six pixels under the feet.
+    var bottomAligned: Bool { (EffectSheets.anchorY[name] ?? 0.5) == 0 }
 
     /// The fire sheets are painted three times their playing size, the jump spark half
     /// again as much and the charge a little less; the flash's reduced sheet twice.
@@ -571,8 +551,8 @@ enum Effect {
         switch self {
         case .fireJump: 2.0 / 3
         case .fireCharge: 0.8
-        case .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion: 1.0 / 3
-        case .flashSpark: 1
+        case .fireCharge2: 0.25
+        case .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion, .fireballSummon: 1.0 / 3
         default: 1
         }
     }

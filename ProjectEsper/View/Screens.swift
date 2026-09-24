@@ -134,14 +134,14 @@ final class PickScreen: Screen {
         self.drinks = drinks
         self.onDrink = onDrink
         super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        let header = TitleText.node("GREATERAID", size: 40)
+        let header = TitleText.node("GREATERAID", size: 60)
         header.position = CGPoint(x: 0, y: halfHeight - 44)
         addChild(header)
         let sub = SKLabelNode(text: "You were scored on. Drink up.")
         sub.fontName = "Menlo-Bold"
         sub.fontSize = 11
         sub.fontColor = SKColor(white: 1, alpha: 0.7)
-        sub.position = CGPoint(x: 0, y: halfHeight - 72)
+        sub.position = CGPoint(x: 0, y: halfHeight - 82)
         addChild(sub)
         if timed {
             clock.position = CGPoint(x: halfWidth - 60, y: halfHeight - 50)
@@ -154,16 +154,16 @@ final class PickScreen: Screen {
             let x = (CGFloat(index) - 1) * spacing
             let bottle = PickScreen.bottle(for: offer, colour: colour)
             // Leaning between 5 and 30 degrees, either way; the bottom clipped by the screen's edge.
-            let lean = CGFloat(5 + Int.random(in: 0...25)) * .pi / 180 * (Bool.random() ? 1 : -1)
+            let lean = CGFloat(5 + Int.random(in: 0...15)) * .pi / 180 * (Bool.random() ? 1 : -1)
             bottle.zRotation = lean
             bottle.position = CGPoint(x: x, y: -halfHeight - 24)
             addChild(bottle)
-            let name = TitleText.node(offer.name.uppercased(), size: offer.name.count > 14 ? 11 : 13)
+            let name = TitleText.node(offer.name.uppercased(), size: offer.name.count > 14 ? 21 : 23)
             name.position = CGPoint(x: x, y: -halfHeight + 84)
             name.zPosition = 2
             addChild(name)
             if drinks.isSecondSip(offer) {
-                let sip = TitleText.node("(Second Sip)", size: 10, italic: true)
+                let sip = TitleText.node("(Second Sip)", size: 20, italic: true)
                 sip.position = CGPoint(x: x, y: -halfHeight + 68)
                 sip.zPosition = 2
                 addChild(sip)
@@ -196,8 +196,8 @@ final class PickScreen: Screen {
         guard choices.indices.contains(cursor) else { return }
         let offer = offers[cursor]
         let text = drinks.level(of: offer) == 0 ? offer.blurbs.first : offer.blurbs.second
-        TitleText.set(blurb, to: text, size: text.count > 70 ? 13 : (text.count > 50 ? 16 : 20))
-        TitleText.set(comment, to: "\u{201C}\(offer.comment)\u{201D}", size: 15, italic: true)
+        TitleText.set(blurb, to: text, size: text.count > 70 ? 23 : (text.count > 50 ? 26 : 30))
+        TitleText.set(comment, to: "\u{201C}\(offer.comment)\u{201D}", size: 25, italic: true)
     }
 
     /// The bottle, the user's vector from the catalog, 180 points tall and anchored at its

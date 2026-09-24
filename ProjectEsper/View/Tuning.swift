@@ -90,6 +90,9 @@ enum GoalpostTuning {
     /// round it and round the light panels.
     nonisolated(unsafe) static var thickness: Float = 3
     static let outline: CGFloat = 2
+    /// The height, in units, the goalposts are drawn for, apart from the rims: BASKET Y moves
+    /// both, HOOP Y only the rims.
+    nonisolated(unsafe) static var postRimHeight: Double = Stage.fieldRimHeight
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the

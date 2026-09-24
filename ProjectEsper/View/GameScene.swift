@@ -735,14 +735,15 @@ final class GameScene: SKScene {
             self?.applyPower()
         }
         controls.addSlider(title: "BASKET Y", range: 60...200, notch: 5, value: Float(Stage.fieldRimHeight)) { [weak self] value in
-            // Offline only: the sim's rims move, in the match and for the next one.
+            // Offline only: the rims and the goalposts move together.
             guard let self, self.online == nil else { return }
-            Stage.fieldRimHeight = Double(value)
-            self.session.mutate { match in
-                for index in match.stage.hoops.indices { match.stage.hoops[index].position.y = Double(value) }
-            }
-            self.placeRims()
-            self.buildGoalposts()
+            GoalpostTuning.postRimHeight = Double(value)
+            self.moveRims(to: Double(value))
+        }
+        controls.addSlider(title: "HOOP Y", range: 60...200, notch: 1, value: Float(Stage.fieldRimHeight)) { [weak self] value in
+            // Offline only: the rims alone, the goalposts staying where they are.
+            guard let self, self.online == nil else { return }
+            self.moveRims(to: Double(value))
         }
         controls.addSlider(title: "POST THICKNESS", range: 1...10, notch: 0.5, value: GoalpostTuning.thickness) { [weak self] value in
             GoalpostTuning.thickness = value
@@ -1758,6 +1759,16 @@ final class GameScene: SKScene {
     private let goalposts = SKNode()
     private var netNodes: [SKShapeNode] = []
 
+    /// The sim's rims to this height, in the match and the next, and everything drawn to them.
+    private func moveRims(to height: Double) {
+        Stage.fieldRimHeight = height
+        session.mutate { match in
+            for index in match.stage.hoops.indices { match.stage.hoops[index].position.y = height }
+        }
+        placeRims()
+        buildGoalposts()
+    }
+
     /// The rims and their nets moved to where the stage has them now.
     private func placeRims() {
         for (index, hoop) in match.stage.hoops.enumerated() where index < rimNodes.count {
@@ -1773,7 +1784,7 @@ final class GameScene: SKScene {
     private func buildGoalposts() {
         goalposts.removeAllChildren()
         for hoop in match.stage.hoops {
-            FieldArt.goalpost(at: SpriteLibrary.point(hoop.position), backboard: hoop.backboard, into: goalposts,
+            FieldArt.goalpost(at: SpriteLibrary.point(Vec2(x: hoop.position.x, y: GoalpostTuning.postRimHeight)), backboard: hoop.backboard, into: goalposts,
                               crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
                               angle: GoalpostTuning.crossbarAngle * .pi / 180,
                               thickness: CGFloat(GoalpostTuning.thickness), outline: GoalpostTuning.outline)
@@ -2439,10 +2450,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nbasket y %.0f  post thickness %.1f",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nbasket y %.0f  hoop y %.0f  post thickness %.1f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 Stage.fieldRimHeight, GoalpostTuning.thickness)
+                                 GoalpostTuning.postRimHeight, Stage.fieldRimHeight, GoalpostTuning.thickness)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

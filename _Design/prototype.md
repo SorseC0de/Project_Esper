@@ -471,8 +471,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   way they go, drawn at 1.1 times the box; a burst of `flashspark2` in their colour
   where one spawns and where one goes, as when two meet. While someone has the
   ball a clock runs, and every two and a half seconds of it a helmet comes from the end the
-  defender guards at one of four heights (30, 50, 70, 90; the lowest clears a standing
-  body) and crosses at 2 a frame to
+  defender guards at one of four heights (20, 50, 70, 90; the lowest pushes a standing
+  body and clears a crouch or a slide, and the computer crouches or slides under it) and crosses at 2 a frame to
   the far wall, where it goes. They keep going when the ball is loose; only the clock
   stops. A body standing on one rides it; one in its way is pushed ahead of it, and once
   that would put them in a wall it passes through them. It pushes the loose ball the same

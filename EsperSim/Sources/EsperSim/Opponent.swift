@@ -109,18 +109,29 @@ public struct Opponent: Equatable {
 
     // MARK: Helmets
 
-    /// A helmet coming at it at its height, close: a full hop and the double jump to get on
-    /// top and ride it, the stick into it so it lands there. True while it's doing that.
+    /// A helmet coming at it at its height, close. Low enough to go under crouched, and
+    /// with nothing in hand on the floor, it crouches, or slides from a run, until it's
+    /// past; otherwise a full hop and the double jump to get on top and ride it, the stick
+    /// into it so it lands there. True while it's doing either.
     private mutating func clearHelmet(_ match: Match, me: Player, into input: inout PlayerInput) -> Bool {
-        guard !Opponent.committedStates.contains(me.state) else { return false }
-        let body = me.body
+        guard !Opponent.committedStates.contains(me.state) || me.state == .slide else { return false }
+        let feet = me.position.y
+        let standingTop = feet + me.spec.bodyHeight
+        let crouchedTop = feet + me.spec.bodyHeight / 2
+        let halfWidth = me.spec.bodyWidth / 2
         let coming = match.helmets.first { helmet in
             let ahead = (me.position.x - helmet.box.center.x) * (helmet.speed > 0 ? 1 : -1)
-            let gap = ahead - helmet.box.width / 2 - body.width / 2
-            let level = helmet.box.min.y < body.max.y + 4 && helmet.box.max.y > body.min.y
-            return ahead > 0 && gap < 70 && gap > -4 && level
+            let gap = ahead - helmet.box.width / 2 - halfWidth
+            let level = helmet.box.min.y < standingTop + 4 && helmet.box.max.y > feet
+            return ahead > -helmet.box.width && gap < 70 && level
         }
         guard let helmet = coming else { return false }
+        if me.grounded, !me.holding, helmet.box.min.y > crouchedTop + 1 {
+            // Under it: down, and from a run that's the slide.
+            input.stick = Vec2(x: 0, y: -1)
+            return true
+        }
+        guard me.state != .slide else { return true }
         input.stick = Vec2(x: helmet.box.center.x > me.position.x ? 1 : -1, y: 0)
         if me.grounded {
             fullHop(&input)

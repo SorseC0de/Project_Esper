@@ -76,9 +76,32 @@ final class StageTests: XCTestCase {
         XCTAssertFalse(match.stage.overlapsSolid(match.players[0].body))
     }
 
-    func testTheLowestHelmetClearsAStandingBody() {
-        let match = field()
-        XCTAssertGreaterThan(FieldRules.helmetHeights[0], match.players[0].body.max.y)
+    func testTheLowestHelmetPushesAStandingBodyAndClearsACrouch() {
+        var match = field()
+        let lowest = FieldRules.helmetHeights[0]
+        XCTAssertLessThan(lowest, match.players[0].standingHeightTop - match.players[0].position.y + 10)
+        match.players[0].state = .crouch
+        XCTAssertGreaterThan(lowest, match.players[0].body.max.y)
+    }
+
+    func testTheComputerGoesUnderTheLowestHelmet() {
+        var match = field()
+        var brain = Opponent(index: 1)
+        match.players[0].hasBall = false
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        match.ball.respawn(at: Vec2(x: 400, y: 20))
+        match.helmetClock = -10_000
+        match.players[1].position = Vec2(x: 900, y: 10)
+        let bottom = FieldRules.helmetHeights[0]
+        match.helmets = [Helmet(id: 5, box: Box(min: Vec2(x: 780, y: bottom), max: Vec2(x: 820, y: bottom + 40)), speed: 2, owner: 0, variant: 0)]
+        var passed = false
+        for _ in 0..<150 where !passed {
+            match.advance(inputs: [.idle, brain.decide(match)])
+            if let helmet = match.helmets.first, helmet.box.min.x > match.players[1].position.x + 10 { passed = true }
+        }
+        XCTAssertTrue(passed, "the helmet went over it")
+        XCTAssertLessThan(match.players[1].position.x, 900, "not carried along ahead of it")
     }
 
     func testACrouchStaysDownWhileThereIsNoRoomToStand() {

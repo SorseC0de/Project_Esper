@@ -43,8 +43,8 @@ public enum FieldRules {
     public static let helmetSize = 40.0
     public static let helmetSpawnFrames = 150
     public static let helmetSpeed = 2.0
-    /// The lowest clears a standing body.
-    public static let helmetHeights: [Double] = [30, 50, 70, 90]
+    /// The lowest pushes a standing body and clears a crouched or sliding one.
+    public static let helmetHeights: [Double] = [20, 50, 70, 90]
     public static let helmetVariants = 3
     public static let portalFrames = 300
     public static let portalHeight = 90.0

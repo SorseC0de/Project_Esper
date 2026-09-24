@@ -246,7 +246,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the stick up to 30°, for 60 frames, one every 24: a body it meets is stripped and
   knocked on, and the ball it meets pops back toward the thrower. There's no slash.
   Level two's throw calls a strike down from the top of the screen, five units wide,
-  from the top of the screen onto the ball in hand as the charge starts or onto the
+  from the top of the screen onto the ball in hand, where the stance's sheet draws it, as the charge starts or onto the
   snatch's hand at full stretch,
   stripping the other body in it or popping a loose ball, once every 40 frames.
   Numbers in `ZeusRules`.
@@ -460,7 +460,10 @@ magenta. Three small faint green chevrons stack over the rim
 the holder scores on. The head particles are `esper_particle` frames at a hard square's size, stepping down as
 they go; Blazing Boba's head burns `fire_particle`, Frost Tea's sheds snowflakes among the energy,
 Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
-`ParticleLook`: energy 4, snowflake 6, fire 12, lightning 12. Frost Tea's jump spark is
+`ParticleLook`: energy 4, snowflake 6, fire 12, lightning 6. Hits spark with
+`esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and
+`lightning_spark2`. The flash is `flashspark2` at half size in the energy colour at both
+ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.
 
 ## Glow

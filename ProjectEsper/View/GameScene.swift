@@ -535,7 +535,7 @@ final class GameScene: SKScene {
     private func makeFire(_ colour: SKColor) -> SKEmitterNode {
         let fire = SKEmitterNode()
         // The hard square, or a frame of the spark scaled down to the square's size.
-        fire.particleTexture = ParticleLook.sprites ? sprites.texture("esper_particle", 4) : sprites.flatSquare(size: 4, alpha: 1)
+        fire.particleTexture = ParticleLook.sprites ? sprites.texture("esper_particle", (EffectSheets.frames["esper_particle"] ?? 1) / 3) : sprites.flatSquare(size: 4, alpha: 1)
         fire.particleBirthRate = 40
         fire.particleLifetime = 0.6
         fire.particleLifetimeRange = 0.1
@@ -1235,13 +1235,17 @@ final class GameScene: SKScene {
                     let spark = SKSpriteNode(texture: frames[0])
                     spark.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["ice_jumpspark"] ?? 0)
                     spark.position = SpriteLibrary.point(player.position + Vec2(x: 0, y: (EffectSheets.anchorY["ice_jumpspark"] ?? 0) == 0 ? -3.75 : 0))
-                    spark.xScale = player.facing == .left ? -1 : 1
+                    spark.xScale = player.facing == .left ? -0.5 : 0.5
+                    spark.yScale = 0.5
                     spark.zPosition = 30
                     spark.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 24), .removeFromParent()]))
                     glowers.addChild(spark)
                 default:
                     let drop = Effect.jumpSpark.bottomAligned ? -3.75 : 0
-                    spawn(.jumpSpark, at: player.position + Vec2(x: 0, y: drop), flipped: player.facing == .left, player: index)
+                    let spark = Effect.jumpSpark.node(sprites, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: drop)), flipped: player.facing == .left, player: index)
+                    spark.xScale *= 0.75
+                    spark.yScale *= 0.75
+                    glowers.addChild(spark)
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
             case .dashed(let index), .slid(let index):
@@ -1288,11 +1292,11 @@ final class GameScene: SKScene {
             case .doubleJumped(let index):
                 let player = match.players[index]
                 spawnJumpPlatform(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow))
-            case .warped(_, let from, let to), .flashed(_, let from, let to):
+            case .warped(let flasher, let from, let to), .flashed(let flasher, let from, let to):
                 // The flash's spark at both ends, the sheet at half size.
-                // The first sheet where the body left, the second where it came out.
-                for (end, sheet) in [(from, Effect.flashSpark), (to, Effect.flashSpark2.available ? Effect.flashSpark2 : Effect.flashSpark)] {
-                    let flash = sheet.node(sprites, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), flipped: false)
+                // The flash sheet at both ends, in the energy colour, at half size.
+                for end in [from, to] {
+                    let flash = EnergyEffect.flashSpark2.node(sprites, player: flasher, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), scale: 0.5)
                     flash.blendMode = .add
                     glowers.addChild(flash)
                 }
@@ -1370,7 +1374,7 @@ final class GameScene: SKScene {
     private func spawnJumpPlatform(at feet: CGPoint, colour: SKColor) {
         let count = 9
         for index in 0..<count {
-            let square = SKSpriteNode(texture: ParticleLook.sprites ? sprites.texture("esper_particle", 3 + index % 3) : sprites.flatSquare(size: 4, alpha: 1))
+            let square = SKSpriteNode(texture: ParticleLook.sprites ? sprites.texture("esper_particle", (EffectSheets.frames["esper_particle"] ?? 1) / 3 + index % 3) : sprites.flatSquare(size: 4, alpha: 1))
             square.size = CGSize(width: 3, height: 3)
             square.color = colour
             square.colorBlendFactor = 1
@@ -1418,7 +1422,9 @@ final class GameScene: SKScene {
 
     /// One of the two sparks, either each time, on the ball in the hitter's colour.
     private func spawnHitSpark(player: Int, at position: Vec2, scale: CGFloat = 1) {
-        let spark = EnergyEffect.hitSparks.randomElement()!
+        // Zeus Juice's hits spark in lightning; everyone else's in energy.
+        let zeus = match.players.indices.contains(player) && match.players[player].power == .zeusJuice
+        let spark = (zeus ? EnergyEffect.lightningSparks : EnergyEffect.hitSparks).randomElement()!
         glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale))
     }
 
@@ -1482,7 +1488,7 @@ final class GameScene: SKScene {
             if let tint { emitter.particleColor = tint }
             emitter.particleColorBlendFactor = blend
         }
-        let energy = ParticleLook.sprites ? sprites.texture("esper_particle", 4) : sprites.flatSquare(size: 4, alpha: 1)
+        let energy = ParticleLook.sprites ? sprites.texture("esper_particle", (EffectSheets.frames["esper_particle"] ?? 1) / 3) : sprites.flatSquare(size: 4, alpha: 1)
         dress(fire, energy, size: ParticleLook.energySize, tint: colour, blend: 1)
         mixing[index] = false
         switch power {

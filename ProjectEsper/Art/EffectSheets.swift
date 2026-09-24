@@ -8,8 +8,8 @@ enum EffectSheets {
     static let frames: [String: Int] = [
         "esper_charge": 82,
         "esper_particle": 22,
-        "esper_spark": 9,
-        "esper_spark2": 10,
+        "esper_spark": 10,
+        "esper_spark2": 22,
         "esper_spark3": 7,
         "fire_charge": 12,
         "fire_charge2": 14,
@@ -33,12 +33,14 @@ enum EffectSheets {
         "lightning_jump": 8,
         "lightning_particle": 20,
         "lightning_particle2": 13,
+        "lightning_spark": 9,
+        "lightning_spark2": 10,
     ]
 
     static let anchorY: [String: CGFloat] = [
         "esper_charge": 0.5000,
         "esper_particle": 0.5000,
-        "esper_spark": 0.0000,
+        "esper_spark": 0.5000,
         "esper_spark2": 0.5000,
         "esper_spark3": 0.0625,
         "fire_charge": 0.5000,
@@ -63,6 +65,8 @@ enum EffectSheets {
         "lightning_jump": 0.0625,
         "lightning_particle": 0.5000,
         "lightning_particle2": 0.5000,
+        "lightning_spark": 0.0000,
+        "lightning_spark2": 0.5000,
     ]
 
     static let toned: Set<String> = [
@@ -78,5 +82,7 @@ enum EffectSheets {
         "lightning_jump",
         "lightning_particle",
         "lightning_particle2",
+        "lightning_spark",
+        "lightning_spark2",
     ]
 }

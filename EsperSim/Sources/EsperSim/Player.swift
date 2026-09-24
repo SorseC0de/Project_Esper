@@ -620,7 +620,10 @@ public struct Player: Equatable {
             if stanceTimerJustEntered, hasBall, power == .zeusJuice, powerLevel >= 2, strikeCooldown == 0 {
                 // Zeus Juice: the charge calls a strike down onto the ball in hand.
                 strikeCooldown = ZeusRules.strikeCooldownFrames
-                wanted = .strikeBolt(x: chest.x, bottom: chest.y + 3)
+                // Onto the ball where the stance's sheet draws it, a little behind the chest.
+                let ball = BallLandmarks.offset(animationFrame).map { position + Vec2(x: $0.x / 1.6 * facing.sign, y: $0.y / 1.6) }
+                    ?? Vec2(x: chest.x - facing.sign * 5, y: chest.y + 3)
+                wanted = .strikeBolt(x: ball.x, bottom: ball.y)
             }
             if hasBall, let hoop = stage.hoops.indices.first(where: { stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius }) {
                 // Onto the rim: the feet at the dunk's place on it, facing the backboard.

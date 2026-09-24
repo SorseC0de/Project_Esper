@@ -55,7 +55,7 @@ enum ParticleLook {
     static let energySize: CGFloat = 4
     static let snowflakeSize: CGFloat = 6
     static let fireSize: CGFloat = 12
-    static let lightningSize: CGFloat = 12
+    static let lightningSize: CGFloat = 6
 }
 
 /// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel

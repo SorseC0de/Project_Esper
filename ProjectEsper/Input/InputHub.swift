@@ -27,6 +27,15 @@ final class InputHub {
 
     static let stickDeadzone = 0.2
 
+    /// Running on a Mac, or in the simulator, where a keyboard's Esc should close the app.
+    static var onDesk: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return ProcessInfo.processInfo.isiOSAppOnMac || ProcessInfo.processInfo.isMacCatalystApp
+        #endif
+    }
+
     func activate() {
         guard observers.isEmpty else { return }
         let center = NotificationCenter.default
@@ -77,10 +86,12 @@ final class InputHub {
         }
     }
 
-    /// The keyboard as a pad: WASD the stick, space jump, J shoot, K throw.
+    /// The keyboard as a pad: WASD the stick, space jump, J shoot, K throw. Esc quits,
+    /// on a Mac or the simulator only.
     private func keyboard() -> PlayerInput {
         guard let keys = GCKeyboard.coalesced?.keyboardInput else { return .idle }
         func down(_ code: GCKeyCode) -> Bool { keys.button(forKeyCode: code)?.isPressed ?? false }
+        if down(.escape), InputHub.onDesk { exit(0) }
         let x = (down(.keyD) ? 1.0 : 0) - (down(.keyA) ? 1.0 : 0)
         let y = (down(.keyW) ? 1.0 : 0) - (down(.keyS) ? 1.0 : 0)
         let stick = Vec2(x: x, y: y).clamped(to: 1)

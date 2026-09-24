@@ -59,8 +59,10 @@ public enum ZeusRules {
     public static let boltTilt = degrees(30)
     public static let boltFrames = 60
     public static let boltCooldownFrames = 24
-    /// The throw sheet's frames 3 to 6 at 15 a second after a bolt.
-    public static let boltPoseFrames = 16
+    /// The whole throw sheet, eight frames at 15 a second, and the bolt leaves on its
+    /// release frame, the fifth.
+    public static let boltPoseFrames = 32
+    public static let boltReleaseFrame = 16
     public static let boltKnock = Vec2(x: 3, y: 1.5)
     public static let ballPop = Vec2(x: 2, y: 2)
     public static let strikeHalfWidth = 2.5

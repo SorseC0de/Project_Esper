@@ -219,8 +219,10 @@ final class PowerTests: XCTestCase {
         match.players[1].hasBall = true
         match.ball.holder = 1
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        XCTAssertTrue(match.events.contains(.boltFired(player: 0)))
         XCTAssertNotEqual(match.players[0].state, .slashing, "Zeus Juice's shoot is the bolt, not the slash")
+        // The throw sheet plays, and the bolt leaves on its release frame.
+        let fired = run(&match, frames: ZeusRules.boltReleaseFrame + 1, input: { _ in .idle }) { $0.events.contains(.boltFired(player: 0)) }
+        XCTAssertEqual(fired + 1, ZeusRules.boltReleaseFrame)
         let hit = run(&match, frames: 30, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
         XCTAssertLessThan(hit, 30)
         XCTAssertTrue(match.bolts.isEmpty)
@@ -228,8 +230,9 @@ final class PowerTests: XCTestCase {
 
     func testABoltPopsTheBallBackTowardTheThrower() {
         var match = with(.zeusJuice)
-        match.ball.respawn(at: Vec2(x: match.players[0].chest.x + 30, y: match.players[0].chest.y))
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        run(&match, frames: ZeusRules.boltReleaseFrame + 1, input: { _ in .idle }) { !$0.bolts.isEmpty }
+        match.ball.respawn(at: match.bolts[0].position + Vec2(x: 20, y: 0))
         let hit = run(&match, frames: 30, input: { _ in .idle }) { $0.events.contains { if case .boltLanded = $0 { return true } else { return false } } }
         XCTAssertLessThan(hit, 30)
         XCTAssertLessThan(match.ball.velocity.x, 0, "back toward the thrower")

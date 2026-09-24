@@ -19,7 +19,7 @@ neutral to get a shot off; catch it and the roles reverse.
   one controller is player 1, two controllers are players 0 and 1 in order; on the TV
   the controllers are players 0 and 1. A pad on player 1 sits the computer out, so a
   second person just picks up a pad. A keyboard on an iPad or a Mac is player 0 as well: WASD, space to jump, J to shoot,
-  K to throw, shift as the left bumper. The HUD is laid out in the phone's points and
+  K to throw, shift as the left bumper, Esc quits on a Mac or in the simulator. The HUD is laid out in the phone's points and
   scaled up by `HudScene.scale(forHeight:)` on a bigger screen, the lettering rendered
   at that scale so it stays crisp. `Net/GameCenter` is Game
   Center: signing in, the matchmaker, and the bytes between the two phones. Two
@@ -120,7 +120,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Knocked loose (by a slide or a slash), the ball pops straight up: the floater's drift
   for 10 frames, then a normal fall, nobody's, so Flash Fizz can't warp to it. The holder
   can't catch it back for 15 frames.
-- Throw: hold for the stance, stick picks a cardinal, release throws straight with no
+- Throw: the `player_throw` sheet, `player_throw_air` off the ground, frames 4 to 7
+  spread over the recovery. Hold for the stance, stick picks a cardinal, release throws straight with no
   gravity until the first bounce. Sideways or down it's a projectile: the other body it
   meets is stripped and knocked as by the slash, and it bounces back toward the thrower,
   theirs to catch at any speed, so a throw holds off a defender coming in; a snatch with
@@ -248,7 +249,10 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   Level two's throw calls a strike down from the top of the screen, five units wide,
   from the top of the screen onto the ball in hand, where the stance's sheet draws it, as the charge starts or onto the
   snatch's hand at full stretch,
-  stripping the other body in it or popping a loose ball, once every 40 frames.
+  stopping on the first thing it meets on the way down, a solid, the other body,
+  stripped, or the loose ball, popped, once every 40 frames. The bolt throw plays the
+  whole throw sheet, ground or air, with the sheet's ball drawn as energy, and the bolt
+  leaves on its release frame, sixteen frames in.
   Numbers in `ZeusRules`.
 - Frost Tea (I). The snatch freezes what it reaches, a body or the loose ball, for 60
   frames: held exactly where it is, nothing running, nothing caught, no hitbox live, though
@@ -463,9 +467,10 @@ swinging wind; a single-frame one (a snowflake, or the squares with
 `ParticleLook.sprites` off) steps down in size instead. The double jump's platform plays
 the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, Frost Tea's sheds snowflakes among the energy,
 Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
-`ParticleLook`: energy 4, snowflake 6, fire 12, lightning 6. Hits spark with
+`ParticleLook`: energy 10, snowflake 6, fire 12, lightning 8. Hits spark with
 `esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and
-`lightning_spark2`. The flash is `flashspark2` at half size in the energy colour at both
+`lightning_spark2`, at half size, centred. The wall jump spark is `fire_wallspark` as a
+silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark2` at half size in the energy colour at both
 ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.
 

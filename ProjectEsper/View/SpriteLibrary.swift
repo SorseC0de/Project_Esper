@@ -39,12 +39,14 @@ final class SpriteLibrary {
     }
 
     /// A player frame in that player's look, without its head or its energy.
-    func texture(_ frame: AnimationFrame, player: Int) -> SKTexture {
-        let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)"
+    /// With `ballAsEnergy`, a sheet that draws the ball has its whites taken as energy,
+    /// ball and all, for a throw made with nothing in hand.
+    func texture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture {
+        let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "")
         if let texture = cache[key] { return texture }
         let look = look(for: player)
         let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look,
-                              holdsBall: frame.animation.holdsBall, detach: true)
+                              holdsBall: frame.animation.holdsBall && !ballAsEnergy, detach: true)
         let texture = result.texture
         texture.filteringMode = .nearest
         cache[key] = texture
@@ -71,9 +73,35 @@ final class SpriteLibrary {
 
     /// The energy alone from a player frame, on the same canvas as the body: the slash's
     /// blade, the skid's puffs, a release's streaks. Nil when the frame has none.
-    func energyTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
-        _ = texture(frame, player: player)
-        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)_energy"]
+    func energyTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
+        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_energy"]
+    }
+
+    /// A strip's frame as a silhouette in the player's energy: every painted pixel white,
+    /// its alpha kept, then toned as white energy is.
+    func silhouetteTexture(_ name: String, _ frame: Int, player: Int) -> SKTexture {
+        let key = "p\(player)_sil_\(name)_\(frame)"
+        if let texture = cache[key] { return texture }
+        let source = texture(name, frame)
+        let image = source.cgImage()
+        let width = image.width, height = image.height
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let tone = look(for: player).energyTone(luminance: 1)
+        for pixel in 0..<(width * height) {
+            let index = pixel * 4
+            let alpha = Int(pixels[index + 3])
+            guard alpha > 0 else { continue }
+            pixels[index] = UInt8(Int((tone >> 16) & 0xFF) * alpha / 255)
+            pixels[index + 1] = UInt8(Int((tone >> 8) & 0xFF) * alpha / 255)
+            pixels[index + 2] = UInt8(Int(tone & 0xFF) * alpha / 255)
+        }
+        guard let toned = context.makeImage() else { return source }
+        let result = SKTexture(cgImage: toned)
+        result.filteringMode = .nearest
+        cache[key] = result
+        return result
     }
 
     /// An effect frame in a player's energy colour: the sheet's greys through the look's

@@ -20,7 +20,8 @@ public enum Animation: String, CaseIterable {
     case wallLandBall = "player_wall_land_ball"
     case shoot = "player_shoot"
     case shootAir = "player_shoot_air"
-    case throwForward = "player_throw_forward"
+    case throwForward = "player_throw"
+    case throwAir = "player_throw_air"
     case catchGround = "player_catch"
     case catchAir = "player_catch_air"
     case skid = "player_skid"
@@ -51,7 +52,7 @@ public enum Animation: String, CaseIterable {
         case .land: 9
         case .shoot: 10
         case .shootAir, .taunt: 11
-        case .throwForward: 8
+        case .throwForward, .throwAir: 8
         case .ledge: 5
         }
     }
@@ -72,7 +73,7 @@ public enum Animation: String, CaseIterable {
     }
 
     public var pixelSize: Double {
-        self == .throwForward || self == .esperSlash ? 64 : 48
+        self == .throwForward || self == .throwAir || self == .esperSlash ? 64 : 48
     }
 }
 
@@ -126,8 +127,8 @@ extension Player {
             return AnimationFrame(.hurt, (BallRules.hitStunFrames - hitStun) * 10 / 60)
         }
         if boltPose > 0, state != .webSwing, state != .webPull, state != .webbed {
-            // Zeus Juice's bolt: the throw from its set pose through the release.
-            return AnimationFrame(.throwForward, 3 + (ZeusRules.boltPoseFrames - boltPose) * 15 / 60)
+            // Zeus Juice's bolt: the whole throw sheet at 15 a second, ground or air.
+            return AnimationFrame(grounded ? .throwForward : .throwAir, (ZeusRules.boltPoseFrames - boltPose) * 15 / 60)
         }
         if webLinePose > 0, state != .webSwing, state != .webPull, state != .webbed {
             return AnimationFrame(.throwForward, 4)
@@ -174,9 +175,10 @@ extension Player {
             return grounded ? AnimationFrame(.shoot, 4 + t * 24 / 60) : AnimationFrame(.shootAir, 3 + t * 36 / 60)
         case .throwStance:
             // Frame 3 is the set pose with the ring on the ball; 4 is the release smear.
-            return AnimationFrame(.throwForward, min(t * BallRules.throwSheetFramesPerSecond / 60, 3))
+            return AnimationFrame(grounded ? .throwForward : .throwAir, min(t * BallRules.throwSheetFramesPerSecond / 60, 3))
         case .throwing:
-            return AnimationFrame(.throwForward, 3 + t * BallRules.throwSheetFramesPerSecond / 60)
+            // Frames 4 to 7 spread over the recovery, so every one shows, the smear on the release.
+            return AnimationFrame(grounded ? .throwForward : .throwAir, 4 + t * 4 / BallRules.throwRecoveryFrames)
         case .dunking:
             return Animation.dunkEntry(at: t).frame
         case .catching:

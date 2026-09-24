@@ -398,17 +398,31 @@ public struct Match: Equatable {
         }
     }
 
-    /// Zeus Juice's strike: a column from the top of the screen down to `bottom` at `x`,
-    /// stripping the other body in it and popping a loose ball in it up.
+    /// Zeus Juice's strike: down from the top of the screen at `x` toward `bottom`, and it
+    /// stops on the first thing it meets: a solid, the other body, stripped, or the loose
+    /// ball, popped up.
     private mutating func strike(x: Double, bottom: Double, by index: Int) {
-        let top = Double(stage.rows + Stage.skyRows) * Stage.tileSize
-        let column = Box(min: Vec2(x: x - ZeusRules.strikeHalfWidth, y: bottom), max: Vec2(x: x + ZeusRules.strikeHalfWidth, y: top))
-        events.append(.boltStruck(player: index, x: x, bottom: bottom))
-        if let other = players.indices.first(where: { $0 != index }), players[other].frozen == 0, players[other].body.overlaps(column) {
-            strip(other, by: index, knock: Vec2(x: 0, y: 1))
-        } else if ball.isLive, ball.frozen == 0, ball.box.overlaps(column) {
-            ball.pop(from: ball.position)
+        let other = players.indices.first { $0 != index }
+        var y = Double(stage.rows + Stage.skyRows) * Stage.tileSize - 1
+        while y > bottom {
+            let bit = Box(min: Vec2(x: x - ZeusRules.strikeHalfWidth, y: y - 2), max: Vec2(x: x + ZeusRules.strikeHalfWidth, y: y))
+            if let other, players[other].frozen == 0, players[other].body.overlaps(bit) {
+                events.append(.boltStruck(player: index, x: x, bottom: players[other].body.max.y))
+                strip(other, by: index, knock: Vec2(x: 0, y: 1))
+                return
+            }
+            if ball.isLive, ball.frozen == 0, ball.box.overlaps(bit) {
+                events.append(.boltStruck(player: index, x: x, bottom: ball.box.max.y))
+                ball.pop(from: ball.position)
+                return
+            }
+            if stage.overlapsSolid(bit) {
+                events.append(.boltStruck(player: index, x: x, bottom: y))
+                return
+            }
+            y -= 2
         }
+        events.append(.boltStruck(player: index, x: x, bottom: bottom))
     }
 
     /// Pulsepistol Punch's pulse: a pillar the width of the screen the way the body

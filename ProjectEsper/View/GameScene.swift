@@ -162,13 +162,13 @@ final class GameScene: SKScene {
     /// A still flight drifts round a small circle: this radius, this many seconds a lap.
     private static let hoverRadius: CGFloat = 3
     private static let hoverSeconds = 1.6
-    /// The ball in each player's hands, its glow, and the fire off each head.
+    /// The ball in each player's hands, its glow, and the esper energy off each head.
     private var handBalls: [SKSpriteNode] = []
     private var handHalos: [SKSpriteNode] = []
-    private var headFires: [SKEmitterNode] = []
+    private var headEspers: [SKEmitterNode] = []
     /// A second stream off each head, for a power that mixes two particles: Frost Tea's
     /// snowflakes among the energy, Zeus Juice's second bolt.
-    private var headMixes: [SKEmitterNode] = []
+    private var headEsperMixes: [SKEmitterNode] = []
     private var wings: [Wing] = []
     /// Each player's webs: the swing's and the shot's.
     private var swingWebs: [SKShapeNode] = []
@@ -393,17 +393,17 @@ final class GameScene: SKScene {
             halo.zPosition = 2
             glowers.addChild(halo)
             handHalos.append(halo)
-            let fire = makeFire(colour)
-            fire.particleBirthRate = 0
-            fire.targetNode = glowers
-            glowers.addChild(fire)
-            headFires.append(fire)
-            let mix = makeFire(colour)
+            let esper = makeEsper(colour)
+            esper.particleBirthRate = 0
+            esper.targetNode = glowers
+            glowers.addChild(esper)
+            headEspers.append(esper)
+            let mix = makeEsper(colour)
             mix.zPosition = 1
             mix.targetNode = glowers
             mix.particleBirthRate = 0
             glowers.addChild(mix)
-            headMixes.append(mix)
+            headEsperMixes.append(mix)
             for webs in [\GameScene.swingWebs, \GameScene.shotWebs] {
                 let web = SKShapeNode()
                 web.strokeColor = colour
@@ -530,34 +530,34 @@ final class GameScene: SKScene {
         return halo
     }
 
-    /// Bits rising off a head: hard little squares in the colour that step down in size as
-    /// they go, more a digital dissolve than a flame.
-    private func makeFire(_ colour: SKColor) -> SKEmitterNode {
-        let fire = SKEmitterNode()
+    /// Esper energy rising off a head: fire-like but of no element; bits in the colour
+    /// that step down in size as they go, a digital dissolve.
+    private func makeEsper(_ colour: SKColor) -> SKEmitterNode {
+        let esper = SKEmitterNode()
         // The hard square, or a frame of the spark scaled down to the square's size.
-        fire.particleTexture = ParticleLook.sprites ? sprites.texture("esper_particle", (EffectSheets.frames["esper_particle"] ?? 1) / 3) : sprites.flatSquare(size: 4, alpha: 1)
-        fire.particleBirthRate = 40
-        fire.particleLifetime = 0.6
-        fire.particleLifetimeRange = 0.1
-        fire.particlePositionRange = CGVector(dx: 2, dy: 1)
-        fire.particleSpeed = 24
-        fire.particleSpeedRange = 4
-        fire.emissionAngle = .pi / 2
-        fire.emissionAngleRange = .pi / 14
-        fire.yAcceleration = 10
-        fire.particleSize = CGSize(width: ParticleLook.energySize, height: ParticleLook.energySize)
-        if ParticleLook.sprites { fire.particleRotationRange = .pi * 2 }
+        esper.particleTexture = ParticleLook.sprites ? sprites.texture("esper_particle", (EffectSheets.frames["esper_particle"] ?? 1) / 3) : sprites.flatSquare(size: 4, alpha: 1)
+        esper.particleBirthRate = 40
+        esper.particleLifetime = 0.6
+        esper.particleLifetimeRange = 0.1
+        esper.particlePositionRange = CGVector(dx: 2, dy: 1)
+        esper.particleSpeed = 24
+        esper.particleSpeedRange = 4
+        esper.emissionAngle = .pi / 2
+        esper.emissionAngleRange = .pi / 14
+        esper.yAcceleration = 10
+        esper.particleSize = CGSize(width: ParticleLook.energySize, height: ParticleLook.energySize)
+        if ParticleLook.sprites { esper.particleRotationRange = .pi * 2 }
         let steps = SKKeyframeSequence(keyframeValues: [1, 0.66, 0.33], times: [0, 0.45, 0.75])
         steps.interpolationMode = .step
-        fire.particleScaleSequence = steps
+        esper.particleScaleSequence = steps
         let fade = SKKeyframeSequence(keyframeValues: [0.9, 0.9, 0.5, 0], times: [0, 0.6, 0.85, 1])
         fade.interpolationMode = .step
-        fire.particleAlphaSequence = fade
-        fire.particleColor = colour
-        fire.particleColorBlendFactor = 1
+        esper.particleAlphaSequence = fade
+        esper.particleColor = colour
+        esper.particleColorBlendFactor = 1
         // Drawn over, not added: hard squares added on top of the head saturate to white.
-        fire.particleBlendMode = .alpha
-        return fire
+        esper.particleBlendMode = .alpha
+        return esper
     }
 
     /// The floor and walls shift toward whoever holds the ball, or whose it still is in
@@ -1279,11 +1279,21 @@ final class GameScene: SKScene {
             case .wallJumped(let index, let wall):
                 let player = match.players[index]
                 // The sheet's spark flies left, away from a wall on the right.
+                // Blazing Boba's is the fire skid sheet; everyone else's the fire wall spark as
+                // a silhouette in their energy. Both painted the other way round from the old spark.
+                let at = SpriteLibrary.point(player.position + Vec2(x: wall.sign * 4, y: 5))
                 if player.power == .blazingBoba {
-                    // Painted the other way round from the GMS2 spark.
-                    spawn(.fireWallSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .right)
+                    spawn(.fireSkid, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .right)
                 } else {
-                    spawn(.wallJumpSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .left)
+                    let frames = (0..<Effect.fireWallSpark.frameCount).map { sprites.silhouetteTexture(Effect.fireWallSpark.name, $0, player: index) }
+                    let spark = SKSpriteNode(texture: frames[0])
+                    spark.anchorPoint = Effect.fireWallSpark.anchor
+                    spark.position = at
+                    spark.xScale = (wall == .right ? -1 : 1) * Effect.fireWallSpark.scale
+                    spark.yScale = Effect.fireWallSpark.scale
+                    spark.zPosition = 30
+                    spark.run(.sequence([.animate(with: frames, timePerFrame: 1 / Effect.fireWallSpark.fps), .removeFromParent()]))
+                    glowers.addChild(spark)
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: 0, y: 5)), count: 4, spread: 10) }
             case .caught(let index):
@@ -1429,7 +1439,7 @@ final class GameScene: SKScene {
         // Zeus Juice's hits spark in lightning; everyone else's in energy.
         let zeus = match.players.indices.contains(player) && match.players[player].power == .zeusJuice
         let spark = (zeus ? EnergyEffect.lightningSparks : EnergyEffect.hitSparks).randomElement()!
-        glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale))
+        glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale * (zeus ? 0.5 : 1)))
     }
 
     /// A score: lightning strikes the rim from the way the ball came in, leaning half as
@@ -1833,7 +1843,9 @@ final class GameScene: SKScene {
         for (index, player) in match.players.enumerated() {
             let node = playerNodes[index]
             let frame = player.animationFrame
-            node.texture = sprites.texture(frame, player: index)
+            // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
+            let wholeSheet = player.boltPose > 0 && !player.hasBall
+            node.texture = sprites.texture(frame, player: index, ballAsEnergy: wholeSheet)
             node.size = node.texture!.size()
             node.anchorPoint = sprites.anchor(for: frame.animation)
             // A flight holding still hovers round a small circle, eased in and out.
@@ -1881,7 +1893,7 @@ final class GameScene: SKScene {
 
             // The frame's energy rides exactly where the body is drawn.
             let energyNode = energyNodes[index]
-            if let energy = sprites.energyTexture(frame, player: index) {
+            if let energy = sprites.energyTexture(frame, player: index, ballAsEnergy: wholeSheet) {
                 energyNode.isHidden = false
                 energyNode.texture = energy
                 energyNode.size = node.size
@@ -2010,8 +2022,8 @@ final class GameScene: SKScene {
                 emitHeadParticles(index, power: player.power, at: CGPoint(x: shown.x, y: shown.y + 4))
             } else {
                 headNode.isHidden = true
-                headFires[index].particleBirthRate = 0
-                headMixes[index].particleBirthRate = 0
+                headEspers[index].particleBirthRate = 0
+                headEsperMixes[index].particleBirthRate = 0
             }
 
             drawCape(index, player: player, behind: node.position)
@@ -2154,8 +2166,8 @@ final class GameScene: SKScene {
                 energyNodes[index].isHidden = true
                 handBalls[index].isHidden = true
                 handHalos[index].isHidden = true
-                headFires[index].particleBirthRate = 0
-                headMixes[index].particleBirthRate = 0
+                headEspers[index].particleBirthRate = 0
+                headEsperMixes[index].particleBirthRate = 0
             }
         } else {
             for node in playerNodes { node.isHidden = false }

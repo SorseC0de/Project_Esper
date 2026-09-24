@@ -295,8 +295,10 @@ final class GameScene: SKScene {
             let handles = FieldArt.build(for: stage, into: ground, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
                                          glow: sprites.softGlow(diameter: 64))
             // The rail and the floodlights wear the possession's colour like the court's walls.
-            handles.rail.color = courtColour
-            courtTiles.append(handles.rail)
+            for rail in handles.rails {
+                rail.color = courtColour
+                courtTiles.append(rail)
+            }
             fieldBlooms = handles.blooms
             lightPanels = handles.panels
             for panel in lightPanels { panel.fillColor = courtColour }
@@ -304,18 +306,21 @@ final class GameScene: SKScene {
             for number in yardNumbers { number.setScale(HelmetTuning.numberScale) }
             for bloom in fieldBlooms { bloom.color = courtColour }
             // Chevrons along the rail, pointing at the rim the holder attacks.
-            var x: CGFloat = 8
-            while x < CGFloat(stage.columns) * GameScene.pixelsPerTile {
-                let chevron = SKSpriteNode(texture: sprites.symbol("chevron.right", pointSize: 9))
-                chevron.color = SKColor(white: 1, alpha: 1)
-                chevron.colorBlendFactor = 1
-                chevron.alpha = 0.55
-                chevron.position = CGPoint(x: x, y: FieldArt.railY + FieldArt.railHeight / 2)
-                chevron.zPosition = -16
-                chevron.isHidden = true
-                ground.addChild(chevron)
-                railChevrons.append(chevron)
-                x += 14
+            for line in FieldArt.railLines {
+                var x: CGFloat = 8
+                while x < CGFloat(stage.columns) * GameScene.pixelsPerTile {
+                    let chevron = SKSpriteNode(texture: sprites.symbol("chevron.right", pointSize: 9))
+                    chevron.color = SKColor(white: 1, alpha: 1)
+                    chevron.colorBlendFactor = 1
+                    chevron.alpha = 0.55
+                    chevron.position = CGPoint(x: x, y: line + FieldArt.railHeight / 2)
+                    chevron.zPosition = -16
+                    chevron.isHidden = true
+                    ground.addChild(chevron)
+                    railChevrons.append(chevron)
+                    railChevronHomes.append(x)
+                    x += 14
+                }
             }
             ground.addChild(goalposts)
             buildGoalposts()
@@ -727,12 +732,8 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addSlider(title: "CROSSBAR Y", range: -40...80, notch: 1, value: GoalpostTuning.crossbarBelowRim) { [weak self] value in
-            GoalpostTuning.crossbarBelowRim = value
-            self?.buildGoalposts()
-        }
-        controls.addSlider(title: "PRONGS", range: 20...300, notch: 5, value: GoalpostTuning.prongHeight) { [weak self] value in
-            GoalpostTuning.prongHeight = value
+        controls.addSlider(title: "CROSSBAR ANGLE", range: -45...45, notch: 1, value: GoalpostTuning.crossbarAngle) { [weak self] value in
+            GoalpostTuning.crossbarAngle = value
             self?.buildGoalposts()
         }
         if DunkTuning.enabled {
@@ -1749,11 +1750,13 @@ final class GameScene: SKScene {
         goalposts.removeAllChildren()
         for hoop in match.stage.hoops {
             FieldArt.goalpost(at: SpriteLibrary.point(hoop.position), backboard: hoop.backboard, into: goalposts,
-                              crossbarBelowRim: CGFloat(GoalpostTuning.crossbarBelowRim), prongHeight: CGFloat(GoalpostTuning.prongHeight))
+                              crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
+                              angle: CGFloat(GoalpostTuning.crossbarAngle) * .pi / 180)
         }
     }
     private var yardNumbers: [SKNode] = []
     private var railChevrons: [SKSpriteNode] = []
+    private var railChevronHomes: [CGFloat] = []
     private var portalNode: SKShapeNode?
     private var portalId = 0
 
@@ -1794,7 +1797,7 @@ final class GameScene: SKScene {
             let right = attacking.position.x > match.stage.width / 2
             chevron.zRotation = right ? 0 : .pi
             let drift = CGFloat(match.frame % 28) / 2 * (right ? 1 : -1)
-            chevron.position.x = 8 + CGFloat(index) * 14 + drift
+            chevron.position.x = railChevronHomes[index] + drift
         }
         if let portal = match.portal {
             if portalNode == nil || portalId != portal.id {
@@ -2411,10 +2414,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\ncrossbar %.0f below rim  prongs %.0f",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\ncrossbar angle %.0f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 GoalpostTuning.crossbarBelowRim, GoalpostTuning.prongHeight)
+                                 GoalpostTuning.crossbarAngle)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

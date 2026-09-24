@@ -30,7 +30,8 @@ enum FieldArt {
     /// colour like the court's walls; the floodlights' blooms, likewise; and each yard
     /// number with its arrow, for the size slider.
     struct Handles {
-        var rail: SKSpriteNode
+        /// The two rails under the stands, one over the other.
+        var rails: [SKSpriteNode]
         var blooms: [SKSpriteNode] = []
         /// The panels the lamps sit on, which also wear the possession's colour.
         var panels: [SKShapeNode] = []
@@ -38,6 +39,9 @@ enum FieldArt {
     }
 
     static let railHeight: CGFloat = 12
+    static let railGap: CGFloat = 4
+    /// The bottoms of the two rails.
+    static var railLines: [CGFloat] { [railY, railY - railHeight - railGap] }
 
     static func build(for stage: Stage, into parent: SKNode, flat: (CGFloat) -> SKTexture, glow: SKTexture) -> Handles {
         let width = CGFloat(stage.columns) * 16
@@ -84,8 +88,9 @@ enum FieldArt {
                   CGPoint(x: topRight, y: standsTop), CGPoint(x: topLeft, y: standsTop)], standLine, z: -18)
             x += standSpacing
         }
-        // The rail: a band in the possession's colour, the scene fills it with chevrons.
-        var handles = Handles(rail: rect(-200, railY, width + 400, railHeight, .black, z: -17))
+        // The rails: two bands in the possession's colour, a small gap between; the scene
+        // fills them with chevrons.
+        var handles = Handles(rails: railLines.map { rect(-200, $0, width + 400, railHeight, .black, z: -17) })
         // A dark shadow where the stands meet the turf.
         rect(-200, turfTop - 4, width + 400, 6, SKColor(white: 0, alpha: 0.6), z: -12)
 
@@ -194,7 +199,7 @@ enum FieldArt {
 
     /// A goalpost at a rim: the padded base behind it on the floor, the gold pole bending
     /// forward to the crossbar under the rim, and the two uprights rising from its ends.
-    static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode, crossbarBelowRim: CGFloat, prongHeight: CGFloat) {
+    static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode, crossbarBelowRim: CGFloat, prongHeight: CGFloat, angle: CGFloat) {
         let back = CGFloat(backboard.sign)
         let floor: CGFloat = 16
         let baseX = rim.x + back * 26
@@ -210,11 +215,15 @@ enum FieldArt {
         path.move(to: CGPoint(x: baseX, y: floor + 40))
         path.addLine(to: CGPoint(x: baseX, y: crossbarY - 30))
         path.addQuadCurve(to: CGPoint(x: rim.x, y: crossbarY), control: CGPoint(x: baseX, y: crossbarY))
-        path.move(to: CGPoint(x: rim.x - halfSpan, y: crossbarY))
-        path.addLine(to: CGPoint(x: rim.x + halfSpan, y: crossbarY))
-        for side in [-halfSpan, halfSpan] {
-            path.move(to: CGPoint(x: rim.x + side, y: crossbarY))
-            path.addLine(to: CGPoint(x: rim.x + side, y: crossbarY + prongHeight))
+        // The crossbar tilts about its middle, the end toward the field rising; each upright
+        // stands on its end of it.
+        let rise = tan(angle) * halfSpan * -back
+        let ends = [(x: rim.x - halfSpan, y: crossbarY - rise), (x: rim.x + halfSpan, y: crossbarY + rise)]
+        path.move(to: CGPoint(x: ends[0].x, y: ends[0].y))
+        path.addLine(to: CGPoint(x: ends[1].x, y: ends[1].y))
+        for end in ends {
+            path.move(to: CGPoint(x: end.x, y: end.y))
+            path.addLine(to: CGPoint(x: end.x, y: end.y + prongHeight))
         }
         let post = SKShapeNode(path: path)
         post.strokeColor = gold

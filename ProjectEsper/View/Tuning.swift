@@ -79,11 +79,13 @@ enum HelmetTuning {
     static let numberScale: CGFloat = 1.5
 }
 
-/// The goalposts, on the CROSSBAR Y and PRONGS sliders until they're settled: the
-/// crossbar's height against the rim, and the uprights' length above it, in art pixels.
+/// The goalposts: the crossbar's height below the rim and the uprights' length above it,
+/// in art pixels, and the crossbar's tilt in degrees, on the CROSSBAR ANGLE slider until
+/// it's settled; the far end rises, and its upright with it.
 enum GoalpostTuning {
-    nonisolated(unsafe) static var crossbarBelowRim: Float = 14
-    nonisolated(unsafe) static var prongHeight: Float = 130
+    static let crossbarBelowRim: CGFloat = 20
+    static let prongHeight: CGFloat = 100
+    nonisolated(unsafe) static var crossbarAngle: Float = 15
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the

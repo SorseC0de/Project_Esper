@@ -34,6 +34,11 @@ public struct Opponent: Equatable {
     /// The jump's button held through the squat, so the hop is full.
     private var wantsFullHop = false
     private var humanStill = 0
+    /// How long the other charged the throw they last let go: a long charge is telegraphed.
+    /// Whether it will go for the throw in the air is decided once per throw.
+    private var humanThrowCharge = 0
+    private var lastThrowCharge = 0
+    private var throwRead: Bool?
     /// Last frame's output, to make a press an edge.
     private var pressed = PlayerInput.idle
 
@@ -79,6 +84,13 @@ public struct Opponent: Equatable {
             return .idle
         }
         humanStill = abs(human.velocity.x) < 0.2 && (human.state == .idle || human.state == .crouch) ? humanStill + 1 : 0
+        if human.state == .throwStance {
+            humanThrowCharge = human.stateTimer
+        } else if human.state == .throwing {
+            lastThrowCharge = humanThrowCharge
+        } else {
+            humanThrowCharge = 0
+        }
         if me.state == .jumpSquat {
             // Through the squat the button stays down for a full hop, or up for a short one.
             input.jump = wantsFullHop
@@ -496,6 +508,14 @@ public struct Opponent: Equatable {
             input.stick = Vec2(x: gap > 0 ? -1 : 1, y: 0)
             return
         }
+        // A throw charged at it for more than a few frames is telegraphed: it squares up
+        // to them and stands ready, and the snatch comes as the ball does.
+        if human.state == .throwStance, humanThrowCharge > 6, abs(gap) < 100, level, (gap > 0) == (human.facing == .left) {
+            plan = .none
+            planFrames = 0
+            if me.facing != (gap > 0 ? .right : .left) { input.stick = Vec2(x: gap > 0 ? 0.5 : -0.5, y: 0) }
+            return
+        }
         let winding = human.state == .shootStance || (human.state == .throwStance && abs(gap) < 30)
         let humanOpen = Opponent.open(human)
         if winding || plan == .strike || (humanOpen && abs(gap) < 45) || (rest == 0 && abs(gap) < 45 && humanStill > 20 && chance(4)) {
@@ -587,6 +607,25 @@ public struct Opponent: Equatable {
             tapThrow(&input)
             return
         }
+        // A throw coming at it: it stands its ground, facing it, and the snatch goes out so
+        // the hand is live as the ball arrives. Charged more than a few frames it was
+        // telegraphed and the snatch comes every time; a quick throw gets by seven in ten.
+        if ball.strikes, ball.velocity.x != 0, abs(ball.position.y - me.chest.y) < 14,
+           (ball.position.x < me.position.x) == (ball.velocity.x > 0) {
+            if throwRead == nil { throwRead = lastThrowCharge > 6 || chance(30) }
+            let toward: Facing = ball.position.x < me.position.x ? .left : .right
+            if me.facing != toward, me.grounded {
+                input.stick = Vec2(x: toward.sign * 0.5, y: 0)
+                return
+            }
+            let reach = abs(ball.position.x - me.handCatchPoint.x) - BallRules.handCatchRadius - BallRules.radius
+            let framesAway = reach / abs(ball.velocity.x)
+            if throwRead == true, me.snatchCooldown == 0, framesAway <= Double(SnatchRules.activeFrames.lowerBound + 1) {
+                tapThrow(&input)
+            }
+            return
+        }
+        throwRead = nil
         let target = landing(of: ball, in: match.stage)
         let toBall = target - me.position.x
         let above = ball.position.y - me.position.y

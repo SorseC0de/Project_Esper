@@ -105,6 +105,7 @@ public struct Match: Equatable {
                 }
                 return
             }
+            strikeWithThrow()
             tryCatch()
         } else if ball.respawnTimer > 0 {
             ball.velocity.y = max(ball.velocity.y - BallRules.gravity, -BallRules.fallSpeed)
@@ -160,6 +161,7 @@ public struct Match: Equatable {
                                     sideways: player.throwStanceEntrySpeed * BallRules.floaterMomentumShare, by: index)
             } else {
                 ball.release(from: hand, velocity: velocity, by: index, straight: true)
+                ball.strikes = true
             }
             ball.burning = player.power == .blazingBoba
         case .releaseFireball(let velocity, let straight):
@@ -648,11 +650,29 @@ public struct Match: Equatable {
     }
 
     /// The nearest player who can reach the loose ball takes it.
+    /// A thrown ball, sideways or down, that meets the other body: they're stripped and
+    /// knocked as by the slash, and it bounces back toward the thrower, theirs to catch.
+    /// A snatch with the hand out takes it instead, before this.
+    private mutating func strikeWithThrow() {
+        guard ball.strikes, ball.isLive, let thrower = ball.lastTouched,
+              let other = players.indices.first(where: { $0 != thrower }) else { return }
+        let victim = players[other]
+        guard victim.frozen == 0, victim.snatchHitbox == nil, victim.body.overlaps(ball.box) else { return }
+        let back = ball.velocity.x >= 0 ? -1.0 : 1.0
+        strip(other, by: thrower, knock: Vec2(x: SlashRules.knock.x * -back, y: SlashRules.knock.y))
+        ball.velocity = Vec2(x: max(abs(ball.velocity.x), 2) * BallRules.bounce * back, y: 2)
+        ball.straight = false
+        ball.strikes = false
+        ball.returning = true
+        ball.lastTouched = thrower
+        ball.owned = true
+    }
+
     private mutating func tryCatch() {
         let speed = ball.velocity.length
         let candidates = players.indices
             .filter { !ball.burning || ball.lastTouched == $0 }
-            .filter { players[$0].canCatch(ballAt: ball.position, speed: speed, shotInFlight: ball.shotInFlight) }
+            .filter { players[$0].canCatch(ballAt: ball.position, speed: ball.returning && ball.lastTouched == $0 ? 0 : speed, shotInFlight: ball.shotInFlight) }
             .sorted { players[$0].chest.distance(to: ball.position) < players[$1].chest.distance(to: ball.position) }
         guard let catcher = candidates.first else { return }
         hand(ballTo: catcher)

@@ -65,6 +65,64 @@ final class PowerTests: XCTestCase {
         XCTAssertFalse(snatch.players[0].grounded)
     }
 
+    // MARK: The throw as a projectile
+
+    func testAThrowStripsTheBodyItMeetsAndComesBackToBeCaught() {
+        var match = Match()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[1].position.x = match.players[0].position.x + 40
+        match.players[1].facing = .left
+        // A quick throw forward.
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        run(&match, frames: BallRules.throwWindupFrames + BallRules.throwReleaseFrames + 2, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertTrue(match.ball.strikes)
+        let hit = run(&match, frames: 30, input: { _ in .idle }) { $0.events.contains(.struck(player: 1, by: 0)) }
+        XCTAssertLessThan(hit, 30)
+        XCTAssertGreaterThan(match.players[1].hitStun, 0)
+        XCTAssertGreaterThan(match.players[1].velocity.x, 0, "knocked on")
+        XCTAssertTrue(match.ball.returning)
+        XCTAssertLessThan(match.ball.velocity.x, 0, "back toward the thrower")
+        let caught = run(&match, frames: 60, input: { _ in .idle }) { $0.ball.holder == 0 }
+        XCTAssertLessThan(caught, 60, "the thrower catches it at any speed")
+    }
+
+    func testASnatchTakesAThrownBallInsteadOfBeingStruck() {
+        var match = Match()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[1].position.x = match.players[0].position.x + 40
+        match.players[1].facing = .left
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        // The hand goes out as the throw comes, so it's live when the ball arrives.
+        run(&match, frames: BallRules.throwWindupFrames + BallRules.throwReleaseFrames - 7, input: { _ in .idle })
+        match.advance(inputs: [.idle, PlayerInput(throwBall: true)])
+        let taken = run(&match, frames: 40, input: { _ in .idle }) { $0.ball.holder == 1 }
+        XCTAssertLessThan(taken, 30)
+        XCTAssertEqual(match.players[1].hitStun, 0)
+    }
+
+    func testTheComputerSnatchesATelegraphedThrowEveryTime() {
+        for seed in 1...6 {
+            var match = Match()
+            var brain = Opponent(index: 1, seed: UInt32(seed))
+            match.players[0].hasBall = true
+            match.ball.holder = 0
+            match.players[1].position.x = match.players[0].position.x + 60
+            match.players[1].facing = .left
+            // Charged well past a few frames, long enough to turn out of a run, then let go.
+            for _ in 0..<32 { match.advance(inputs: [PlayerInput(throwBall: true), brain.decide(match)]) }
+            XCTAssertEqual(match.players[1].facing, .left, "seed \(seed): squared up to the charge")
+            var frames = 0
+            while frames < 60, match.ball.holder != 1, match.players[1].hitStun == 0 {
+                match.advance(inputs: [.idle, brain.decide(match)])
+                frames += 1
+            }
+            XCTAssertEqual(match.ball.holder, 1, "seed \(seed): a telegraphed throw is snatched")
+        }
+    }
+
     // MARK: Quake-Up Coffee
 
     func testQuakeStripsWhoeverStandsOnTheFloorAndHopsTheBall() {

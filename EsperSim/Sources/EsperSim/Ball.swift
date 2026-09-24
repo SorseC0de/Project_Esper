@@ -11,6 +11,11 @@ public struct Ball: Equatable {
     public var floater = 0
     /// Released by a throw and not yet caught.
     public var thrown = false
+    /// A throw sideways or down is a projectile: the other body it meets is stripped and
+    /// knocked as by the slash, and it comes back off them, `returning`, for the thrower
+    /// to catch at any speed.
+    public var strikes = false
+    public var returning = false
     /// Whether the rims still steer it: a shot's or a floater's until its first bounce off
     /// anything. A thrown ball never steers, so scoring off a throw is the ball going
     /// through on its own.
@@ -122,6 +127,8 @@ public struct Ball: Equatable {
     private mutating func settlePace() {
         burning = false
         owned = false
+        strikes = false
+        returning = false
         guard pace != 1 else { return }
         velocity = velocity / pace
         pace = 1
@@ -155,6 +162,8 @@ public struct Ball: Equatable {
         self.velocity = velocity
         self.pace = pace
         self.straight = straight
+        strikes = false
+        returning = false
         floater = 0
         thrown = straight
         steers = !straight
@@ -182,6 +191,8 @@ public struct Ball: Equatable {
         velocity = Vec2(x: 0, y: BallRules.floaterSpeed)
         pace = 1
         burning = false
+        strikes = false
+        returning = false
         straight = false
         floater = BallRules.popFloatFrames
         thrown = false
@@ -211,6 +222,8 @@ public struct Ball: Equatable {
         velocity = .zero
         pace = 1
         burning = false
+        strikes = false
+        returning = false
         frozen = 0
         holder = nil
         straight = false

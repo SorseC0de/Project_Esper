@@ -120,7 +120,11 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   for 10 frames, then a normal fall, nobody's, so Flash Fizz can't warp to it. The holder
   can't catch it back for 15 frames.
 - Throw: hold for the stance, stick picks a cardinal, release throws straight with no
-  gravity until the first bounce. Up is the floater: a soft drift up at 1.5 with gravity
+  gravity until the first bounce. Sideways or down it's a projectile: the other body it
+  meets is stripped and knocked as by the slash, and it bounces back toward the thrower,
+  theirs to catch at any speed, so a throw holds off a defender coming in; a snatch with
+  the hand out takes it instead. The computer reads a throw charged more than six
+  frames and snatches it every time; a quick throw gets by it seven times in ten. Up is the floater: a soft drift up at 1.5 with gravity
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the air the throw stance keeps its run,

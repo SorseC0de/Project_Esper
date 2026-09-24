@@ -186,6 +186,17 @@ final class PowerTests: XCTestCase {
         XCTAssertEqual(abs(match.players[1].velocity.x), abs(match.players[0].velocity.x) * DefenceRules.speedShare, accuracy: 0.001)
     }
 
+    func testASnatchTakesTheBallFromABodyItOverlapsFacingAway() {
+        var match = Match()
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position.x = match.players[0].position.x - 3
+        match.players[0].facing = .right
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        let taken = run(&match, frames: SnatchRules.frames, input: { _ in .idle }) { $0.ball.holder == 0 }
+        XCTAssertLessThan(taken, SnatchRules.frames, "the body is part of the reach")
+    }
+
     // MARK: Quake-Up Coffee
 
     func testQuakeStripsWhoeverStandsOnTheFloorAndHopsTheBall() {
@@ -285,6 +296,8 @@ final class PowerTests: XCTestCase {
         run(&match, frames: 20, input: { _ in .idle }) { $0.events.contains(.ballFrozen) }
         XCTAssertEqual(match.ball.frozen, FrostRules.freezeFrames - 1)
         XCTAssertNil(match.ball.holder)
+        // The freezer stepped away, so its own hands don't take it back.
+        match.players[0].position.x -= 60
         let spot = match.ball.position
         run(&match, frames: 30, input: { _ in .idle })
         XCTAssertEqual(match.ball.position, spot)

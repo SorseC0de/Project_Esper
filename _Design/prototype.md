@@ -110,7 +110,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   whole body plus a tile of reach in front, or the hand's catch ring at the spark's
   spot, takes any ball it touches while the body faces it: a loose one at any speed, or
   the one in the other's hands, where the sheet draws it that frame, or the holder's
-  body itself. The catch spark shows on the hand on sheet frame 2.
+  body itself, whichever way the snatcher faces while their bodies overlap. The last two
+  sheet frames are left off. The catch spark shows on the hand on sheet frame 2.
   On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
   air it drifts. Web Water keeps the web line on this button instead.
 - Ledge (without ball): automatic. Falling past the top corner of a block or the one-way
@@ -504,8 +505,10 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   160 pixels up, half its size by then.
 - The backboard: behind each rim a 3 by 4 cluster of `flashspark2` in the guarding side's
   energy, each on its own frame so the board shimmers, on a grid sheared to the
-  crossbar's lean; placed, sized and sheared by the BOARD X, Y, SIZE and SKEW sliders
-  until they're settled.
+  crossbar's lean, 10 behind the rim and 24 over it at 0.4, sheared 20°, at two thirds;
+  solid to the ball, a 4 by 20 unit box (`FieldRules.backboardOffset`, `ballBlockers`).
+  Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
+  in the maker's energy.
 - The camera scrolls sideways only: level, gliding after the local player a share of the
   way each frame and leading them by where they're heading, stopped at the field's ends.
   The view takes in the stage's height and the turf below the floor. When the ball is off

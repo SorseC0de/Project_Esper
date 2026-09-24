@@ -59,6 +59,10 @@ public enum FieldRules {
     public static func yard(in stage: Stage) -> Double { (stage.width - 2 * Stage.tileSize) / 100 }
     public static let warpYards = 10.0
     public static let warpLift = Vec2(x: 2, y: 3.5)
+    /// The backboard's box: its centre behind and above the rim, and its size, in units;
+    /// the drawing's 10 and 24 art pixels.
+    public static let backboardOffset = Vec2(x: 6.25, y: 15)
+    public static let backboardSize = Vec2(x: 4, y: 20)
 }
 
 extension Match {

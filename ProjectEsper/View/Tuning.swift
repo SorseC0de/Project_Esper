@@ -80,12 +80,13 @@ enum HelmetTuning {
 }
 
 /// The backboard, a cluster of flashes behind each rim: its place against the rim, in art
-/// pixels, its size and its shear in degrees, on the BOARD sliders until they're settled.
+/// pixels, its size, its shear in degrees and its opacity. The sim's box matches it.
 enum BackboardTuning {
-    nonisolated(unsafe) static var x: Float = 6
-    nonisolated(unsafe) static var y: Float = 14
-    nonisolated(unsafe) static var size: Float = 0.5
-    nonisolated(unsafe) static var skew: Float = 20
+    static let x: CGFloat = 10
+    static let y: CGFloat = 24
+    static let size: CGFloat = 0.4
+    static let skew: CGFloat = 20
+    static let alpha: CGFloat = 0.66
     static let columns = 3
     static let rows = 4
     static let spacing: CGFloat = 9

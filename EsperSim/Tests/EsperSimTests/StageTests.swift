@@ -155,6 +155,19 @@ final class StageTests: XCTestCase {
         XCTAssertTrue(rode, "up and riding it rather than pushed along")
     }
 
+    func testTheBallBouncesOffABackboard() {
+        var match = field()
+        match.players[0].hasBall = false
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        match.helmetClock = -10_000
+        let board = match.stage.ballBlockers[1]
+        match.ball.release(from: Vec2(x: board.min.x - 20, y: board.center.y), velocity: Vec2(x: 4, y: 0), by: 0, straight: true)
+        for _ in 0..<10 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertLessThan(match.ball.velocity.x, 0, "off the board and back")
+        XCTAssertLessThanOrEqual(match.ball.box.max.x, board.min.x + 0.01)
+    }
+
     func testOpposingHelmetsTakeEachOtherOut() {
         var match = field()
         match.helmets = [

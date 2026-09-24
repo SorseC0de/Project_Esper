@@ -495,7 +495,9 @@ public enum SnatchRules {
         if simFrame < heldEnd { return heldSheetFrame }
         return heldSheetFrame + 1 + (simFrame - heldEnd) / each
     }
-    public static var frames: Int { simStart(ofSheetFrame: sheetFrames) }
+    /// The last two sheet frames are left off, for the held frame's extra length.
+    public static let playedSheetFrames = sheetFrames - 2
+    public static var frames: Int { simStart(ofSheetFrame: playedSheetFrames) }
     public static let activeSheetFrames = 2..<4
     public static var activeFrames: Range<Int> { simStart(ofSheetFrame: activeSheetFrames.lowerBound)..<simStart(ofSheetFrame: activeSheetFrames.upperBound) }
     public static let sparkSheetFrame = 2

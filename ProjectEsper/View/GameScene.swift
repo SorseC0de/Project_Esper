@@ -175,7 +175,6 @@ final class GameScene: SKScene {
     private var swingWebs: [SKShapeNode] = []
     private var shotWebs: [SKShapeNode] = []
     /// Each player's made platform.
-    private var platformNodes: [SKSpriteNode] = []
     private var ballNode = SKSpriteNode()
     private var ballHalo = SKSpriteNode()
     private var ballTrail = SKEmitterNode()
@@ -469,16 +468,6 @@ final class GameScene: SKScene {
                 self[keyPath: webs].append(web)
             }
         }
-        for player in match.players {
-            let slab = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
-            slab.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: player.index).glow))
-            slab.colorBlendFactor = 1
-            slab.anchorPoint = CGPoint(x: 0, y: 0)
-            slab.zPosition = 1
-            slab.isHidden = true
-            ground.addChild(slab)
-            platformNodes.append(slab)
-        }
         // The wings are parked: `Wing.swift` stays, nothing is added to the scene.
 
         ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
@@ -748,22 +737,6 @@ final class GameScene: SKScene {
         controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
-        }
-        controls.addSlider(title: "BOARD X", range: -30...30, notch: 1, value: BackboardTuning.x) { [weak self] value in
-            BackboardTuning.x = value
-            self?.buildBackboards()
-        }
-        controls.addSlider(title: "BOARD Y", range: -30...60, notch: 1, value: BackboardTuning.y) { [weak self] value in
-            BackboardTuning.y = value
-            self?.buildBackboards()
-        }
-        controls.addSlider(title: "BOARD SIZE", range: 0.1...1.5, notch: 0.05, value: BackboardTuning.size) { [weak self] value in
-            BackboardTuning.size = value
-            self?.buildBackboards()
-        }
-        controls.addSlider(title: "BOARD SKEW", range: -60...60, notch: 1, value: BackboardTuning.skew) { [weak self] value in
-            BackboardTuning.skew = value
-            self?.buildBackboards()
         }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
@@ -1785,23 +1758,64 @@ final class GameScene: SKScene {
             let frames = sprites.effectFrames(EnergyEffect.flashSpark2, player: owner)
             let back = CGFloat(hoop.backboard.sign)
             let rim = SpriteLibrary.point(hoop.position)
-            let centre = CGPoint(x: rim.x + back * CGFloat(BackboardTuning.x), y: rim.y + CGFloat(BackboardTuning.y))
-            let shear = tan(CGFloat(BackboardTuning.skew) * .pi / 180) * -back
-            for column in 0..<BackboardTuning.columns {
-                for row in 0..<BackboardTuning.rows {
-                    let across = (CGFloat(column) - CGFloat(BackboardTuning.columns - 1) / 2) * BackboardTuning.spacing * CGFloat(BackboardTuning.size) * 2
-                    let up = (CGFloat(row) - CGFloat(BackboardTuning.rows - 1) / 2) * BackboardTuning.spacing * CGFloat(BackboardTuning.size) * 2
-                    let spark = SKSpriteNode(texture: frames[0])
-                    spark.setScale(CGFloat(BackboardTuning.size))
-                    spark.position = CGPoint(x: centre.x + across, y: centre.y + up + across * shear)
-                    spark.zPosition = 4
-                    // Each starts on its own frame, so the board shimmers rather than blinks.
-                    let start = (column * 7 + row * 5) % max(frameCount, 1)
-                    let looped: [SKTexture] = Array(frames[start...]) + Array(frames[..<start])
-                    spark.run(SKAction.repeatForever(SKAction.animate(with: looped, timePerFrame: 1.0 / 24)))
-                    backboards.addChild(spark)
-                }
+            let centre = CGPoint(x: rim.x + back * BackboardTuning.x, y: rim.y + BackboardTuning.y)
+            let shear = tan(BackboardTuning.skew * .pi / 180) * -back
+            let step = BackboardTuning.spacing * BackboardTuning.size * 2
+            let cluster = flashCluster(frames: frames, frameCount: frameCount, columns: BackboardTuning.columns, rows: BackboardTuning.rows,
+                                       step: step, scale: BackboardTuning.size, shear: shear)
+            cluster.position = centre
+            cluster.alpha = BackboardTuning.alpha
+            backboards.addChild(cluster)
+        }
+    }
+
+    /// A grid of `flashspark2` round its middle, each spark on its own frame so the whole
+    /// shimmers rather than blinks, sheared up by `shear` a pixel across.
+    private func flashCluster(frames: [SKTexture], frameCount: Int, columns: Int, rows: Int, step: CGFloat, scale: CGFloat, shear: CGFloat) -> SKNode {
+        let cluster = SKNode()
+        for column in 0..<columns {
+            for row in 0..<rows {
+                let across = (CGFloat(column) - CGFloat(columns - 1) / 2) * step
+                let up = (CGFloat(row) - CGFloat(rows - 1) / 2) * step
+                let spark = SKSpriteNode(texture: frames[0])
+                spark.setScale(scale)
+                spark.position = CGPoint(x: across, y: up + across * shear)
+                spark.zPosition = 4
+                let start = (column * 7 + row * 5) % max(frameCount, 1)
+                let looped: [SKTexture] = Array(frames[start...]) + Array(frames[..<start])
+                spark.run(SKAction.repeatForever(SKAction.animate(with: looped, timePerFrame: 1.0 / 24)))
+                cluster.addChild(spark)
             }
+        }
+        return cluster
+    }
+
+    /// Made slabs and walls as flash clusters in their maker's energy, by where they stand.
+    private var platformClusters: [String: SKNode] = [:]
+    private func drawPlatforms() {
+        var seen = Set<String>()
+        let frameCount = EffectSheets.frames[EnergyEffect.flashSpark2.name] ?? 1
+        for platform in match.platforms {
+            let key = "\(platform.owner)|\(platform.box.min.x)|\(platform.box.min.y)"
+            seen.insert(key)
+            let cluster = platformClusters[key] ?? {
+                let width = CGFloat(platform.box.width * SpriteLibrary.pixelsPerUnit)
+                let height = CGFloat(platform.box.height * SpriteLibrary.pixelsPerUnit)
+                let step = BackboardTuning.spacing * BackboardTuning.size * 2
+                let cluster = flashCluster(frames: sprites.effectFrames(EnergyEffect.flashSpark2, player: platform.owner), frameCount: frameCount,
+                                           columns: max(Int((width / step).rounded()), 1), rows: max(Int((height / step).rounded()), 1),
+                                           step: step, scale: BackboardTuning.size, shear: 0)
+                cluster.position = SpriteLibrary.point(platform.box.center)
+                glowers.addChild(cluster)
+                platformClusters[key] = cluster
+                return cluster
+            }()
+            // Thinning out over its last quarter second.
+            cluster.alpha = BackboardTuning.alpha * min(CGFloat(platform.framesLeft) / 15, 1)
+        }
+        for (key, cluster) in platformClusters where !seen.contains(key) {
+            cluster.removeFromParent()
+            platformClusters[key] = nil
         }
     }
     /// The goalposts' shadows, one flat group at two thirds so overlaps don't darken, and
@@ -2425,18 +2439,7 @@ final class GameScene: SKScene {
             }
         }
 
-        // Made platforms, in their maker's dark shade, thinning out over their last quarter second.
-        for (index, slab) in platformNodes.enumerated() {
-            if let platform = match.platforms.first(where: { $0.owner == index }) {
-                slab.isHidden = false
-                slab.position = SpriteLibrary.point(platform.box.min)
-                slab.size = CGSize(width: (platform.box.width * SpriteLibrary.pixelsPerUnit).rounded(),
-                                   height: (platform.box.height * SpriteLibrary.pixelsPerUnit).rounded())
-                slab.alpha = min(CGFloat(platform.framesLeft) / 15, 1)
-            } else {
-                slab.isHidden = true
-            }
-        }
+        drawPlatforms()
 
         let ball = match.ball
         ballNode.isHidden = ball.holder != nil
@@ -2543,10 +2546,9 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nboard x %.0f y %.0f size %.2f skew %.0f",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 BackboardTuning.x, BackboardTuning.y, BackboardTuning.size, BackboardTuning.skew)
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

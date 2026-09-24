@@ -113,7 +113,10 @@ public struct Match: Equatable {
             ball.frozen -= 1
             if ball.isLive { tryCatch() }
         } else if ball.isLive, ball.tether == nil {
-            if let hoop = ball.step(stage: stage, events: &events) {
+            // The ball sees the stage's ball-only solids as well.
+            var ballStage = stage
+            ballStage.extras += stage.ballBlockers
+            if let hoop = ball.step(stage: ballStage, events: &events) {
                 let owner = stage.hoops[hoop].owner
                 scores[owner] += 1
                 events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity))
@@ -324,11 +327,13 @@ public struct Match: Equatable {
                 }
                 return body.chest + Vec2(x: 0, y: 3)
             } ?? ball.position
-            let facingIt = (at.x - player.position.x) * player.facing.sign >= -1
+            // In front, or a holder the body itself overlaps: the body is part of the reach.
+            let onTheBody = held.map { player.body.overlaps(players[$0].body) } ?? false
+            let facingIt = (at.x - player.position.x) * player.facing.sign >= -1 || onTheBody
             // A burning ball is the thrower's alone.
             let allowed = !ball.burning || ball.lastTouched == index || held != nil
             if player.power == .frostTea, let other, players[other].frozen == 0, players[other].body.overlaps(reach),
-               (players[other].body.center.x - player.position.x) * player.facing.sign >= -1 {
+               (players[other].body.center.x - player.position.x) * player.facing.sign >= -1 || players[other].body.overlaps(player.body) {
                 // Frost Tea: the body it reaches is frozen where it stands, and stripped.
                 strip(other, by: index, knock: nil)
                 freeze(other)

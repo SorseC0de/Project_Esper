@@ -71,6 +71,8 @@ public struct Stage: Equatable {
     public var extras: [Box] = []
     /// What the stage has beyond its tiles.
     public var features = StageFeatures()
+    /// Boxes solid to the ball alone, such as the field's backboards.
+    public var ballBlockers: [Box] = []
 
     public var width: Double { Double(columns) * Stage.tileSize }
     public var height: Double { Double(rows) * Stage.tileSize }
@@ -388,6 +390,12 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
         stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
         stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true)
+        // The backboards: behind each rim and above it, solid to the ball.
+        stage.ballBlockers = stage.hoops.map { hoop in
+            let back = hoop.backboard.sign
+            let centre = hoop.position + Vec2(x: back * FieldRules.backboardOffset.x, y: FieldRules.backboardOffset.y)
+            return Box(center: centre, width: FieldRules.backboardSize.x, height: FieldRules.backboardSize.y)
+        }
         return stage
     }
 

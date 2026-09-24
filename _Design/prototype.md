@@ -51,7 +51,8 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-`FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, the burst always 0.4 over the
+Defending, without the ball while the other has it, a body walks, runs, dashes and
+drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, the burst always 0.4 over the
 3.2 run,
 traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air turned up: air speed 1.6, air acceleration 0.02 + 0.24, a jump with the stick held
@@ -474,7 +475,7 @@ twice its size on a wall. Blazing Boba's hits spark with `fire_spark`, `fire_spa
 `fire_spark3`, painted, at half size, centred. The flash sheet is drawn over, not added, so its tone shows,
 and with the hitboxes on its tear's reach rings both ends. Head particles each start on
 a random frame of their sheet, so a stream never plays in step. The wall jump spark is `fire_wallspark` as a
-silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark2` at 0.625 in the energy colour at both
+silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark2` at 0.66 in the energy colour at both
 ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.
 

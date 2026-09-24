@@ -217,6 +217,14 @@ public struct Player: Equatable {
         jumpsLeft = spec.jumps
     }
 
+    /// Defending, the body moves this much faster than the one with the ball; the match
+    /// sets it each frame from who holds the ball.
+    public var speedShare = 1.0
+    var runSpeed: Double { spec.runSpeed * speedShare }
+    var walkMaxSpeed: Double { spec.walkMaxSpeed * speedShare }
+    var dashInitialVelocity: Double { runSpeed + (spec.dashInitialVelocity - spec.runSpeed) }
+    var airSpeedMax: Double { spec.airSpeedMax * speedShare }
+
     public var body: Box {
         Box(min: Vec2(x: position.x - spec.bodyWidth / 2, y: position.y),
             max: Vec2(x: position.x + spec.bodyWidth / 2, y: position.y + spec.bodyHeight))
@@ -248,7 +256,7 @@ public struct Player: Equatable {
     /// The run cycle's advance this frame: 24 frames a second at full run speed, scaling
     /// with how fast the body actually moves, up to 26 in the dash and never under 10.
     private var runCycleStep: Double {
-        min(max(abs(velocity.x) / spec.runSpeed * 24, 10), 26) / 60
+        min(max(abs(velocity.x) / runSpeed * 24, 10), 26) / 60
     }
 
     /// Whether the stick is pushed the way the body faces.
@@ -382,10 +390,10 @@ public struct Player: Equatable {
                         facing = direction
                         startDash(events: &events)
                     } else {
-                        let target = spec.walkMaxSpeed * input.stick.x
+                        let target = walkMaxSpeed * input.stick.x
                         velocity.x = approach(velocity.x, target, spec.walkAcceleration)
                         // The cycle runs 15 frames a second at full walk and never under 10, so the ball can't hang on a tween.
-                        animationPhase += max(abs(velocity.x) / spec.walkMaxSpeed * 0.25, 10.0 / 60)
+                        animationPhase += max(abs(velocity.x) / walkMaxSpeed * 0.25, 10.0 / 60)
                     }
                 } else {
                     enter(.idle)
@@ -399,7 +407,7 @@ public struct Player: Equatable {
                     facing = direction
                     startDash(events: &events)
                 } else {
-                    velocity.x = spec.dashInitialVelocity * facing.sign
+                    velocity.x = dashInitialVelocity * facing.sign
                     animationPhase += runCycleStep
                     if stateTimer >= spec.dashFrames {
                         enter(abs(input.stick.x) >= 0.5 && stickForward(input) ? .run : .idle)
@@ -417,14 +425,14 @@ public struct Player: Equatable {
                     // Held down: the run brakes, and at walking speed it becomes a walk.
                     velocity.x = approach(velocity.x, 0, spec.traction)
                     animationPhase += runCycleStep
-                    if abs(velocity.x) <= spec.walkMaxSpeed {
+                    if abs(velocity.x) <= walkMaxSpeed {
                         enter(stickFacing(input) == nil ? .idle : .walk)
                     }
                 } else if let direction = stickFacing(input) {
                     if direction != facing {
                         enter(.pivot)
                     } else {
-                        velocity.x = spec.runSpeed * facing.sign
+                        velocity.x = runSpeed * facing.sign
                         animationPhase += runCycleStep
                     }
                 } else {
@@ -447,7 +455,7 @@ public struct Player: Equatable {
             if !holding, throwPressed, throwIsSnatch { pendingAerial = .snatch }
             if stateTimer >= spec.jumpSquatFrames {
                 velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
-                let cap = max(abs(velocity.x), spec.airSpeedMax)
+                let cap = max(abs(velocity.x), airSpeedMax)
                 velocity.x = min(max(velocity.x + input.stick.x * spec.jumpHorizontalVelocity, -cap), cap)
                 jumpsLeft -= 1
                 platformArmed = true
@@ -847,7 +855,7 @@ public struct Player: Equatable {
             if full || (swept >= swingLeastArc && !input.jump) {
                 // The exit keeps the arc's direction but not all its speed, so the stick can turn it.
                 endSwing()
-                velocity.x = min(max(velocity.x, -spec.airSpeedMax), spec.airSpeedMax)
+                velocity.x = min(max(velocity.x, -airSpeedMax), airSpeedMax)
                 velocity.y = min(velocity.y, spec.fullHopVelocity)
                 enter(.air)
             }
@@ -927,7 +935,7 @@ public struct Player: Equatable {
         settle(input, events: &events)
         grabLedgeIfThere(in: stage, events: &events)
         // Blazing Boba: a flame every few frames of a full run or a slide.
-        if power == .blazingBoba, grounded, state == .slide || (state == .run && abs(velocity.x) >= spec.runSpeed - 0.01) {
+        if power == .blazingBoba, grounded, state == .slide || (state == .run && abs(velocity.x) >= runSpeed - 0.01) {
             flameTimer += 1
             if flameTimer % BlazeRules.flameEveryFrames == 0, wanted == nil { wanted = .leaveFlame }
         } else {
@@ -1056,7 +1064,7 @@ public struct Player: Equatable {
     /// two leaves an ice clone where it began.
     private mutating func startSlide(events: inout [MatchEvent]) {
         slideHit = false
-        velocity.x = spec.dashInitialVelocity * facing.sign
+        velocity.x = dashInitialVelocity * facing.sign
         events.append(.slid(player: index))
         if power == .frostTea, powerLevel >= 2 { wanted = .leaveClone }
         enter(.slide)
@@ -1293,7 +1301,7 @@ public struct Player: Equatable {
     }
 
     private mutating func startDash(events: inout [MatchEvent]) {
-        velocity.x = spec.dashInitialVelocity * facing.sign
+        velocity.x = dashInitialVelocity * facing.sign
         events.append(.dashed(player: index))
         enter(.dash)
     }
@@ -1343,11 +1351,11 @@ public struct Player: Equatable {
             velocity.x = approach(velocity.x, 0, spec.airFriction)
             return
         }
-        let target = spec.airSpeedMax * (x > 0 ? 1 : -1)
+        let target = airSpeedMax * (x > 0 ? 1 : -1)
         let sameWay = velocity.x == 0 || (velocity.x > 0) == (x > 0)
         if !sameWay {
-            velocity.x = spec.airSpeedMax * x
-        } else if abs(velocity.x) > spec.airSpeedMax {
+            velocity.x = airSpeedMax * x
+        } else if abs(velocity.x) > airSpeedMax {
             velocity.x = approach(velocity.x, target, spec.airFriction)
         } else {
             velocity.x = approach(velocity.x, target, spec.airAccelerationBase + spec.airAccelerationAdditional * abs(x))

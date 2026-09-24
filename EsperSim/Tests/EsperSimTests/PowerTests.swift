@@ -176,6 +176,16 @@ final class PowerTests: XCTestCase {
         XCTAssertEqual(match.players[0].state == .walling || match.platforms.contains { $0.framesLeft > ShakeRules.platformFrames - ShakeRules.wallFrames - 2 }, true, "a second wall with no landing between")
     }
 
+    func testTheDefenderRunsATenthFaster() {
+        var match = Match()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[1].position.x = 300
+        match.players[1].facing = .left
+        for _ in 0..<40 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), PlayerInput(stick: Vec2(x: -1, y: 0))]) }
+        XCTAssertEqual(abs(match.players[1].velocity.x), abs(match.players[0].velocity.x) * DefenceRules.speedShare, accuracy: 0.001)
+    }
+
     // MARK: Quake-Up Coffee
 
     func testQuakeStripsWhoeverStandsOnTheFloorAndHopsTheBall() {

@@ -62,6 +62,7 @@ public struct Match: Equatable {
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
+            players[index].speedShare = ball.holder != nil && ball.holder != index ? DefenceRules.speedShare : 1
             let opponentX = players.indices.first { $0 != index }.map { players[$0].position.x }
             guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX,
                                                    ballHolder: ball.holder, ballOwner: ball.isLive ? ball.owner : nil,

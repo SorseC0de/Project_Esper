@@ -255,6 +255,11 @@ extension FighterSpec {
     }()
 }
 
+/// The defender, without the ball while the other has it, moves this much faster.
+public enum DefenceRules {
+    public static let speedShare = 1.1
+}
+
 /// Everything about the ball, the hoops and the plays on them. Units and frames.
 public enum BallRules {
     public static let gravity = 0.15

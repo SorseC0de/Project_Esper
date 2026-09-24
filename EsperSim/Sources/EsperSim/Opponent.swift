@@ -306,7 +306,9 @@ public struct Opponent: Equatable {
             } else if atSpot {
                 plan = .shoot
                 planFrames = 90
-                jumpShot = spot != .ledge && chance(50)
+                // A rim too high for a shot off the floor always takes the jump shot.
+                let outOfReach = hoop.position.y - target.y > 90
+                jumpShot = outOfReach || (spot != .ledge && chance(50))
                 dances = 0
             } else if blocked, !committed {
                 dances += 1

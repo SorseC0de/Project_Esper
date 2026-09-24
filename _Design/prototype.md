@@ -466,7 +466,9 @@ its length.
 with stage selection. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
 invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
 at 105, 60 in from each wall, floating between the
-goalposts' uprights; a standing shot can't reach them, a jump shot can. Each player starts
+goalposts' uprights; by design a standing shot can't reach them, so scoring takes a
+jump shot, or a jump off a helmet to dunk or shoot. The computer always takes the jump
+shot at a rim that high. Each player starts
 under the rim they guard, and the coin flip, off the series' dice so both phones agree,
 puts the ball in one pair of hands. A ball that leaves the world comes back at centre.
 

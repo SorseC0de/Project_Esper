@@ -114,7 +114,8 @@ enum FieldArt {
                                          CGPoint(x: bank + 124, y: lightsBottom + 44), CGPoint(x: bank - 4, y: lightsBottom + 44)])
             panelPath.closeSubpath()
             let panel = SKShapeNode(path: panelPath)
-            panel.strokeColor = .clear
+            panel.strokeColor = .black
+            panel.lineWidth = GoalpostTuning.outline
             panel.zPosition = -14
             parent.addChild(panel)
             handles.panels.append(panel)
@@ -199,7 +200,8 @@ enum FieldArt {
 
     /// A goalpost at a rim: the padded base behind it on the floor, the gold pole bending
     /// forward to the crossbar under the rim, and the two uprights rising from its ends.
-    static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode, crossbarBelowRim: CGFloat, prongHeight: CGFloat, angle: CGFloat) {
+    static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode, crossbarBelowRim: CGFloat, prongHeight: CGFloat,
+                         angle: CGFloat, thickness: CGFloat, outline: CGFloat) {
         let back = CGFloat(backboard.sign)
         let floor: CGFloat = 16
         let baseX = rim.x + back * 26
@@ -207,7 +209,8 @@ enum FieldArt {
         let halfSpan: CGFloat = 24
         let base = SKShapeNode(rectOf: CGSize(width: 8, height: 40), cornerRadius: 3)
         base.fillColor = pad
-        base.strokeColor = .clear
+        base.strokeColor = .black
+        base.lineWidth = outline
         base.position = CGPoint(x: baseX, y: floor + 20)
         base.zPosition = -5
         parent.addChild(base)
@@ -225,12 +228,15 @@ enum FieldArt {
             path.move(to: CGPoint(x: end.x, y: end.y))
             path.addLine(to: CGPoint(x: end.x, y: end.y + prongHeight))
         }
-        let post = SKShapeNode(path: path)
-        post.strokeColor = gold
-        post.lineWidth = 3
-        post.lineCap = .round
-        post.lineJoin = .round
-        post.zPosition = -4
-        parent.addChild(post)
+        // The gold over a black line as wide as it plus the outline each side.
+        for (colour, width, z) in [(SKColor.black, thickness + outline * 2, CGFloat(-4.5)), (gold, thickness, CGFloat(-4))] {
+            let post = SKShapeNode(path: path)
+            post.strokeColor = colour
+            post.lineWidth = width
+            post.lineCap = .round
+            post.lineJoin = .round
+            post.zPosition = z
+            parent.addChild(post)
+        }
     }
 }

@@ -85,7 +85,11 @@ enum HelmetTuning {
 enum GoalpostTuning {
     static let crossbarBelowRim: CGFloat = 20
     static let prongHeight: CGFloat = 100
-    nonisolated(unsafe) static var crossbarAngle: Float = 15
+    static let crossbarAngle: CGFloat = 20
+    /// The gold's width, on the POST THICKNESS slider until it's settled, and the black line
+    /// round it and round the light panels.
+    nonisolated(unsafe) static var thickness: Float = 3
+    static let outline: CGFloat = 2
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the

@@ -358,7 +358,9 @@ final class GameScene: SKScene {
             ground.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            ground.addChild(net(at: rim.position))
+            let hanging = net(at: rim.position)
+            ground.addChild(hanging)
+            netNodes.append(hanging)
         }
 
         for player in match.players {
@@ -732,8 +734,18 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addSlider(title: "CROSSBAR ANGLE", range: -45...45, notch: 1, value: GoalpostTuning.crossbarAngle) { [weak self] value in
-            GoalpostTuning.crossbarAngle = value
+        controls.addSlider(title: "BASKET Y", range: 60...200, notch: 5, value: Float(Stage.fieldRimHeight)) { [weak self] value in
+            // Offline only: the sim's rims move, in the match and for the next one.
+            guard let self, self.online == nil else { return }
+            Stage.fieldRimHeight = Double(value)
+            self.session.mutate { match in
+                for index in match.stage.hoops.indices { match.stage.hoops[index].position.y = Double(value) }
+            }
+            self.placeRims()
+            self.buildGoalposts()
+        }
+        controls.addSlider(title: "POST THICKNESS", range: 1...10, notch: 0.5, value: GoalpostTuning.thickness) { [weak self] value in
+            GoalpostTuning.thickness = value
             self?.buildGoalposts()
         }
         if DunkTuning.enabled {
@@ -1744,6 +1756,18 @@ final class GameScene: SKScene {
     private var fieldBlooms: [SKSpriteNode] = []
     private var lightPanels: [SKShapeNode] = []
     private let goalposts = SKNode()
+    private var netNodes: [SKShapeNode] = []
+
+    /// The rims and their nets moved to where the stage has them now.
+    private func placeRims() {
+        for (index, hoop) in match.stage.hoops.enumerated() where index < rimNodes.count {
+            rimNodes[index].position = SpriteLibrary.point(hoop.position)
+            netNodes[index].removeFromParent()
+            let hanging = net(at: rimNodes[index].position)
+            ground.addChild(hanging)
+            netNodes[index] = hanging
+        }
+    }
 
     /// The goalposts drawn afresh at the sliders' numbers.
     private func buildGoalposts() {
@@ -1751,7 +1775,8 @@ final class GameScene: SKScene {
         for hoop in match.stage.hoops {
             FieldArt.goalpost(at: SpriteLibrary.point(hoop.position), backboard: hoop.backboard, into: goalposts,
                               crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
-                              angle: CGFloat(GoalpostTuning.crossbarAngle) * .pi / 180)
+                              angle: GoalpostTuning.crossbarAngle * .pi / 180,
+                              thickness: CGFloat(GoalpostTuning.thickness), outline: GoalpostTuning.outline)
         }
     }
     private var yardNumbers: [SKNode] = []
@@ -2414,10 +2439,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\ncrossbar angle %.0f",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nbasket y %.0f  post thickness %.1f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 GoalpostTuning.crossbarAngle)
+                                 Stage.fieldRimHeight, GoalpostTuning.thickness)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

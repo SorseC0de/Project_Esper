@@ -360,9 +360,10 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
-- CROSSBAR ANGLE, a slider under the score: the goalposts' crossbar tilt, the end toward
-  the field rising with its upright, until it's settled. The crossbar sits 20 below the
-  rim and the uprights stand 100 over it.
+- BASKET Y and POST THICKNESS, sliders under the score: the field's rims' height, offline
+  (both phones keep 120 online), and the goalposts' gold width, until they're settled.
+  The crossbar sits 20 below the rim, tilted 20° with the end toward the field up, and
+  the uprights stand 100 over it; the posts and the light panels have a 2 black outline.
 - HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.

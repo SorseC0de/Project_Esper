@@ -364,15 +364,19 @@ public struct Stage: Equatable {
     /// higher than the court's, six tiles in from each wall. Each player starts under the
     /// rim they guard, and the ball starts in someone's hands by the coin flip. Helmets
     /// sweep it and a portal hangs over it.
-    public static let footballField: Stage = {
+    /// The field's rims' height, on the BASKET Y slider offline until it's settled; both
+    /// phones keep the default online.
+    nonisolated(unsafe) public static var fieldRimHeight = 120.0
+
+    public static var footballField: Stage {
         let columns = 340, rows = 20
         let width = Double(columns) * Stage.tileSize
         let inset = 60.0
         var stage = Stage(
             columns: columns, rows: rows,
             hoops: [
-                Hoop(position: Vec2(x: inset, y: 120), owner: 1, backboard: .left),
-                Hoop(position: Vec2(x: width - inset, y: 120), owner: 0, backboard: .right),
+                Hoop(position: Vec2(x: inset, y: fieldRimHeight), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: width - inset, y: fieldRimHeight), owner: 0, backboard: .right),
             ],
             playerSpawns: [Vec2(x: inset, y: 10), Vec2(x: width - inset, y: 10)],
             playerFacings: [.right, .left],
@@ -383,8 +387,8 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
         stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true)
         return stage
-    }()
+    }
 
     /// The stage being tuned; the court comes back with stage selection.
-    public static let current = footballField
+    public static var current: Stage { footballField }
 }

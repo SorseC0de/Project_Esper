@@ -48,6 +48,23 @@ final class PowerTests: XCTestCase {
         XCTAssertEqual(match.players[0].hitStun, 0)
     }
 
+    func testJumpAndShootTogetherIsARisingSlash() {
+        var match = with(.none)
+        match.advance(inputs: [PlayerInput(jump: true, shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .jumpSquat)
+        let out = run(&match, frames: 6, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .slashing }
+        XCTAssertLessThan(out, 6, "straight out of the squat into the slash")
+        XCTAssertTrue(match.events.contains(.jumped(player: 0)))
+        XCTAssertGreaterThan(match.players[0].velocity.y, 3, "with the jump's ascent")
+        // Throw pressed during the squat is the snatch.
+        var snatch = with(.none)
+        snatch.advance(inputs: [PlayerInput(jump: true), .idle])
+        snatch.advance(inputs: [PlayerInput(jump: true, throwBall: true), .idle])
+        let hand = run(&snatch, frames: 6, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .snatching }
+        XCTAssertLessThan(hand, 6)
+        XCTAssertFalse(snatch.players[0].grounded)
+    }
+
     // MARK: Quake-Up Coffee
 
     func testQuakeStripsWhoeverStandsOnTheFloorAndHopsTheBall() {

@@ -196,6 +196,10 @@ public struct Player: Equatable {
     public var gunPull = false
     /// Frames left of the throw's pose after a bolt.
     public var boltPose = 0
+    /// Smash's rising aerial: shoot or throw pressed with or during the jump squat comes
+    /// out of it as the slash or the snatch on the jump's first frame, with its ascent.
+    public enum Aerial: Equatable { case slash, snatch }
+    public var pendingAerial: Aerial?
     /// Frames of running at full speed or sliding, for the flames left every few.
     private var flameTimer = 0
     /// Something a piece of the step asked the match to do, if nothing else took the turn.
@@ -426,6 +430,8 @@ public struct Player: Equatable {
 
         case .jumpSquat:
             jumpBuffer = 0
+            if !holding, shootPressed, slashAllowed { pendingAerial = .slash }
+            if !holding, throwPressed, throwIsSnatch { pendingAerial = .snatch }
             if stateTimer >= spec.jumpSquatFrames {
                 velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
                 let cap = max(abs(velocity.x), spec.airSpeedMax)
@@ -436,6 +442,14 @@ public struct Player: Equatable {
                 wallLandCooldown = max(wallLandCooldown, spec.wallLandGroundLockoutFrames)
                 events.append(.jumped(player: index))
                 enter(.air)
+                if let aerial = pendingAerial {
+                    // The rising aerial: out of the squat straight into the move, still rising.
+                    pendingAerial = nil
+                    switch aerial {
+                    case .slash: startSlash(events: &events)
+                    case .snatch: startSnatch()
+                    }
+                }
             }
 
         case .air:
@@ -964,6 +978,9 @@ public struct Player: Equatable {
     private mutating func groundActions(_ input: PlayerInput, jumpPressed: Bool, shootPressed: Bool, throwPressed: Bool,
                                         tauntPressed: Bool, onDefence: Bool, events: inout [MatchEvent]) -> Bool {
         if jumpPressed {
+            pendingAerial = nil
+            if !holding, shootPressed, slashAllowed { pendingAerial = .slash }
+            if !holding, throwPressed, throwIsSnatch { pendingAerial = .snatch }
             enter(.jumpSquat)
         } else if holding, input.shoot, shootReady {
             enterShootStance()

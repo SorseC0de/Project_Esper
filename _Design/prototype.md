@@ -75,7 +75,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   grounded holder's hands. It ends in a crouch if down is still held, or stands up into
   the run's skid to stop. A slide can catch a loose ball on the way, which is what it's
   for. Numbers on the body (`slideFrames`, `slideFriction`) and in `SlideRules`.
-- Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. In the air
+- Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. Shoot or
+  throw pressed with the jump or during the squat is Smash's rising aerial: out of the
+  squat straight into the slash or the snatch on the jump's first frame, still rising. In the air
   a stick against the way you're going turns you at once, body and all, Silksong's rule. For 3 frames
   after walking off an edge a press is still that jump. Down while falling is a fast fall,
   except while holding throw with the ball, where down is the aim.

@@ -292,7 +292,8 @@ final class GameScene: SKScene {
         let stage = match.stage
         if stage.features.helmets {
             // The field: scenery in place of tiles, the floor invisible through the turf.
-            FieldArt.build(for: stage, into: ground) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
+            FieldArt.build(for: stage, into: ground, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
+                           glow: sprites.softGlow(diameter: 64))
             for hoop in stage.hoops {
                 FieldArt.goalpost(at: SpriteLibrary.point(hoop.position), backboard: hoop.backboard, into: ground)
             }
@@ -702,8 +703,8 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addSlider(title: "ZEUS CHARGE", range: 0.02...1.0, notch: 0.01, value: ZeusTuning.chargeScale) { value in
-            ZeusTuning.chargeScale = value
+        controls.addSlider(title: "HELMET", range: 0.5...2.0, notch: 0.05, value: HelmetTuning.scale) { value in
+            HelmetTuning.scale = value
         }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
@@ -1698,19 +1699,22 @@ final class GameScene: SKScene {
         for helmet in match.helmets {
             seen.insert(helmet.id)
             let node = helmetNodes[helmet.id] ?? {
-                let side = CGFloat(FieldRules.helmetSize * SpriteLibrary.pixelsPerUnit)
-                let image = UIImage(named: "FootballHelmet\(helmet.variant + 1)")
+                // The vector as a template, filled in the defender's energy colour.
+                let colour = SKColor(rgb: sprites.look(for: helmet.owner).glow)
+                let image = UIImage(named: "FootballHelmet\(helmet.variant + 1)")?.withTintColor(colour, renderingMode: .alwaysOriginal)
                 let node = SKSpriteNode(texture: image.map { SKTexture(image: $0) })
-                node.size = CGSize(width: side, height: side)
-                node.color = SKColor(rgb: sprites.look(for: helmet.owner).glow)
-                node.colorBlendFactor = 1
-                node.zRotation = .pi / 12 * (helmet.speed > 0 ? 1 : -1)
-                node.xScale = helmet.speed > 0 ? 1 : -1
                 node.zPosition = 6
                 glowers.addChild(node)
                 helmetNodes[helmet.id] = node
                 return node
             }()
+            // Facing the way it goes, tipped back, at the slider's scale over its box.
+            let side = CGFloat(FieldRules.helmetSize * SpriteLibrary.pixelsPerUnit) * CGFloat(HelmetTuning.scale)
+            let forward: CGFloat = helmet.speed > 0 ? 1 : -1
+            node.setScale(1)
+            node.size = CGSize(width: side, height: side)
+            node.xScale = -forward
+            node.zRotation = HelmetTuning.tilt * forward
             node.position = SpriteLibrary.point(helmet.box.center)
         }
         for (id, node) in helmetNodes where !seen.contains(id) {
@@ -2332,13 +2336,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        let chargeNode = chargeNodes[localIndex]
-        let chargeDrawn = chargeNode.isHidden ? "hidden" : String(format: "%.0fx%.0f px \"%@\"", chargeNode.frame.width, chargeNode.frame.height,
-                                                                   chargeNode.texture?.description.components(separatedBy: "'").dropFirst().first ?? "?")
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nzeus charge slider %.2f  charge node %@",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nhelmet %.2f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 ZeusTuning.chargeScale, chargeDrawn)
+                                 HelmetTuning.scale)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

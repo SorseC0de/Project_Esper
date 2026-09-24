@@ -359,13 +359,13 @@ public struct Stage: Equatable {
         return stage
     }()
 
-    /// The football field: five courts long and 20 rows high, flat and empty but for the
+    /// The football field: ten courts long and 20 rows high, flat and empty but for the
     /// floor and the end walls. The rims float between the goalposts' uprights, four tiles
     /// higher than the court's, six tiles in from each wall. Each player starts under the
     /// rim they guard, and the ball starts in someone's hands by the coin flip. Helmets
     /// sweep it and a portal hangs over it.
     public static let footballField: Stage = {
-        let columns = 170, rows = 20
+        let columns = 340, rows = 20
         let width = Double(columns) * Stage.tileSize
         let inset = 60.0
         var stage = Stage(

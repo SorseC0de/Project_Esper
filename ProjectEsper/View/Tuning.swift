@@ -66,9 +66,16 @@ enum ParticleLook {
 }
 
 /// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel
-/// sheet round the ball in hand. On the ZEUS CHARGE slider, offline, until it's settled.
+/// sheet round the ball in hand.
 enum ZeusTuning {
     nonisolated(unsafe) static var chargeScale: Float = 0.17
+}
+
+/// The helmets' drawing against their five-tile box, on the HELMET slider until it's settled.
+enum HelmetTuning {
+    nonisolated(unsafe) static var scale: Float = 1
+    /// Tipped back this far, radians, from the vector's own slight lift.
+    static let tilt: CGFloat = .pi / 6
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the

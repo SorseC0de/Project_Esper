@@ -9,7 +9,7 @@ final class StageTests: XCTestCase {
         let match = field()
         for player in match.players { XCTAssertFalse(match.stage.overlapsSolid(player.body)) }
         XCTAssertFalse(match.stage.overlapsSolid(Box(center: match.stage.ballSpawn, width: 5, height: 5)))
-        XCTAssertEqual(match.stage.columns, 170)
+        XCTAssertEqual(match.stage.columns, 340)
         XCTAssertEqual(match.stage.rows, 20)
     }
 
@@ -52,6 +52,7 @@ final class StageTests: XCTestCase {
         match.ball.respawn(at: Vec2(x: 900, y: 150))
         let box = Box(min: Vec2(x: 500, y: 10), max: Vec2(x: 550, y: 60))
         match.helmets = [Helmet(id: 99, box: box, speed: 1, owner: 1, variant: 0)]
+        match.helmetClock = -10_000
         match.players[0].position = Vec2(x: 555, y: 10)
         match.players[1].position = Vec2(x: 525, y: 60)
         match.advance(inputs: [.idle, .idle])
@@ -73,6 +74,24 @@ final class StageTests: XCTestCase {
         for _ in 0..<30 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(match.helmets.isEmpty, "gone at the wall")
         XCTAssertFalse(match.stage.overlapsSolid(match.players[0].body))
+    }
+
+    func testACrouchFitsUnderTheLowestHelmetAndStaysDownUnderIt() {
+        var match = field()
+        match.players[0].hasBall = false
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        match.ball.respawn(at: Vec2(x: 900, y: 150))
+        let bottom = FieldRules.helmetHeights[0]
+        match.players[0].position = Vec2(x: 700, y: 10)
+        run: for _ in 0..<3 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle]) }
+        XCTAssertEqual(match.players[0].state, .crouch)
+        XCTAssertLessThan(match.players[0].body.max.y, bottom, "crouched, under it")
+        XCTAssertGreaterThan(match.players[0].standingHeightTop, bottom, "standing, into it")
+        match.helmets = [Helmet(id: 5, box: Box(min: Vec2(x: 680, y: bottom), max: Vec2(x: 730, y: bottom + 50)), speed: 0, owner: 1, variant: 0)]
+        match.helmetClock = -10_000
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .crouch, "no room to stand")
     }
 
     func testOpposingHelmetsTakeEachOtherOut() {

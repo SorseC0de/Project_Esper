@@ -9,24 +9,24 @@ enum FieldArt {
     static let sky = SKColor(red: 0.04, green: 0.08, blue: 0.16, alpha: 1)
     static let stands = SKColor(red: 0.09, green: 0.21, blue: 0.29, alpha: 1)
     static let standLine = SKColor(red: 0.20, green: 0.45, blue: 0.54, alpha: 1)
-    static let turfLight = SKColor(red: 0.47, green: 0.63, blue: 0.27, alpha: 1)
-    static let turfDark = SKColor(red: 0.36, green: 0.53, blue: 0.20, alpha: 1)
+    static let turfLight = SKColor(red: 0.16, green: 0.30, blue: 0.11, alpha: 1)
+    static let turfDark = SKColor(red: 0.11, green: 0.23, blue: 0.08, alpha: 1)
     static let chalk = SKColor(white: 0.97, alpha: 1)
     static let gold = SKColor(red: 0.93, green: 0.70, blue: 0.29, alpha: 1)
-    static let pad = SKColor(red: 0.13, green: 0.29, blue: 0.56, alpha: 1)
+    static let pad = SKColor(red: 0.06, green: 0.13, blue: 0.31, alpha: 1)
 
     /// Art pixels, the floor's top at 16: the turf from `turfBottom` to `turfTop`, the
     /// floor line through its middle, the stands above to `standsTop`, and the lights over them.
-    static let turfBottom: CGFloat = -64
-    static let turfTop: CGFloat = 96
-    static let standsTop: CGFloat = 232
-    static let railY: CGFloat = 176
-    static let lightsBottom: CGFloat = 250
+    static let turfBottom: CGFloat = -24
+    static let turfTop: CGFloat = 56
+    static let standsTop: CGFloat = 192
+    static let railY: CGFloat = 136
+    static let lightsBottom: CGFloat = 210
     /// How far down the camera looks below the floor, in art pixels, so the turf shows round
     /// the players.
-    static let viewBelowFloor: CGFloat = 64
+    static let viewBelowFloor: CGFloat = 32
 
-    static func build(for stage: Stage, into parent: SKNode, flat: (CGFloat) -> SKTexture) {
+    static func build(for stage: Stage, into parent: SKNode, flat: (CGFloat) -> SKTexture, glow: SKTexture) {
         let width = CGFloat(stage.columns) * 16
         let top = CGFloat(stage.rows + Stage.skyRows) * 16
         let centre = width / 2
@@ -82,12 +82,16 @@ enum FieldArt {
         // Floodlight banks: a grid of soft lamps on a dark panel, a glow behind.
         var bank: CGFloat = 60
         while bank < width {
-            let glow = SKSpriteNode(color: SKColor(red: 0.45, green: 0.75, blue: 1, alpha: 0.25), size: CGSize(width: 150, height: 90))
-            glow.anchorPoint = .zero
-            glow.position = CGPoint(x: bank - 15, y: lightsBottom - 20)
-            glow.blendMode = .add
-            glow.zPosition = -15
-            parent.addChild(glow)
+            // A wide soft bloom round the bank, spilling down onto the stands.
+            let bloom = SKSpriteNode(texture: glow)
+            bloom.size = CGSize(width: 300, height: 200)
+            bloom.position = CGPoint(x: bank + 60, y: lightsBottom + 12)
+            bloom.color = SKColor(red: 0.45, green: 0.75, blue: 1, alpha: 1)
+            bloom.colorBlendFactor = 1
+            bloom.alpha = 0.45
+            bloom.blendMode = .add
+            bloom.zPosition = -15
+            parent.addChild(bloom)
             rect(bank, lightsBottom, 120, 44, SKColor(red: 0.08, green: 0.12, blue: 0.22, alpha: 1), z: -14)
             for row in 0..<4 {
                 for column in 0..<9 {
@@ -124,12 +128,16 @@ enum FieldArt {
                   CGPoint(x: lean(at + thick * 0.6, at: turfTop, from: bottom, to: turfTop, share: 0.12), y: turfTop),
                   CGPoint(x: lean(at - thick * 0.6, at: turfTop, from: bottom, to: turfTop, share: 0.12), y: turfTop)], chalk, z: -8)
         }
-        // Hashes each yard, a row near the bottom and one near the top.
+        // Hashes each yard: a row along the bottom, and its mirror along the top, smaller
+        // for being further off, each on the yard line's lean at its height.
+        let bottomEdge = turfBottom + 4
         for step in 1..<100 where step % 5 != 0 {
             let at = inner + CGFloat(step) * yard
-            for (y, height) in [(turfBottom + 8, CGFloat(6)), (turfTop - 18, CGFloat(4))] {
-                let top = lean(at, at: y + height, from: turfBottom + 4, to: turfTop, share: 0.12)
-                quad([CGPoint(x: at - 0.6, y: y), CGPoint(x: at + 0.6, y: y), CGPoint(x: top + 0.5, y: y + height), CGPoint(x: top - 0.5, y: y + height)], chalk, z: -8)
+            for (low, height, half) in [(bottomEdge + 4, CGFloat(5), CGFloat(0.6)), (turfTop - 4 - 3, CGFloat(3), CGFloat(0.4))] {
+                let foot = lean(at, at: low, from: bottomEdge, to: turfTop, share: 0.12)
+                let head = lean(at, at: low + height, from: bottomEdge, to: turfTop, share: 0.12)
+                quad([CGPoint(x: foot - half, y: low), CGPoint(x: foot + half, y: low),
+                      CGPoint(x: head + half * 0.8, y: low + height), CGPoint(x: head - half * 0.8, y: low + height)], chalk, z: -8)
             }
         }
         // Numbers every ten yards, with the arrow toward the nearer goal.
@@ -138,17 +146,17 @@ enum FieldArt {
             let number = ten <= 5 ? ten * 10 : (10 - ten) * 10
             let label = SKLabelNode(text: "\(number)")
             label.fontName = "Georgia-Bold"
-            label.fontSize = 22
+            label.fontSize = 14
             label.fontColor = chalk
             label.verticalAlignmentMode = .center
-            label.position = CGPoint(x: at, y: turfBottom + 30)
+            label.position = CGPoint(x: at, y: turfBottom + 18)
             label.yScale = 0.8
             label.zPosition = -7
             parent.addChild(label)
             if number != 50 {
                 let pointsLeft = ten < 5
-                let tip = at + (pointsLeft ? -22 : 22), back = at + (pointsLeft ? -15 : 15)
-                quad([CGPoint(x: tip, y: turfBottom + 30), CGPoint(x: back, y: turfBottom + 33), CGPoint(x: back, y: turfBottom + 27)], chalk, z: -7)
+                let tip = at + (pointsLeft ? -15 : 15), back = at + (pointsLeft ? -10 : 10)
+                quad([CGPoint(x: tip, y: turfBottom + 18), CGPoint(x: back, y: turfBottom + 20), CGPoint(x: back, y: turfBottom + 16)], chalk, z: -7)
             }
         }
     }

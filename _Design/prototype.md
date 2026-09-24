@@ -70,6 +70,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   while staring them down; only a dash turns the body after that. Without the ball the
   stick turns the body throughout. Down without the ball is the crouch, and with the
   stick across as well the crouch walk at 0.8, facing the stick.
+- Crouched or sliding, the body is half as tall, and it stays down while there's no room
+  to stand.
 - Slide (without ball): down at full run, or shoot while crouched. The dash burst the way
   the body faces, carried for 20 frames bleeding only 0.02 a frame, the leg out: a hitbox
   a tile past the body's front edge and 6 units high that knocks the ball out of a
@@ -358,9 +360,7 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
-- ZEUS CHARGE, a slider under the score: the share of its sheet Zeus Juice's charge
-  swirl is drawn at, offline, with the pixels it comes to in the corner readout, until
-  the number is settled.
+- HELMET, a slider under the score: the football helmets' drawing against their box.
 - HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
@@ -458,7 +458,7 @@ its length.
 ## Football Field
 
 `Stage.footballField`, the stage in play for tuning (`Stage.current`); the court comes back
-with stage selection. 170 by 20 tiles, five courts long, flat and empty: the floor is an
+with stage selection. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
 invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
 at 120, four tiles higher than the court's, 60 in from each wall, floating between the
 goalposts' uprights; a standing shot can't reach them, a jump shot can. Each player starts
@@ -466,9 +466,11 @@ under the rim they guard, and the coin flip, off the series' dice so both phones
 puts the ball in one pair of hands. A ball that leaves the world comes back at centre.
 
 - Helmets (`FieldRules`): 5 by 5 tiles, solid, in the defender's energy colour, one of the
-  three helmet vectors tipped back 15°, facing the way they go. While someone has the
-  ball a clock runs, and every five seconds of it a helmet comes from the end the
-  defender guards at one of four heights (10, 50, 90, 130) and crosses at 1 a frame to
+  three helmet vectors as a template filled in that colour, tipped back 30°, facing the
+  way they go, drawn at the HELMET slider's scale over the box. While someone has the
+  ball a clock runs, and every two and a half seconds of it a helmet comes from the end the
+  defender guards at one of four heights (20, 50, 80, 110; the lowest clears a crouch or
+  a slide but not a standing body) and crosses at 2 a frame to
   the far wall, where it goes. They keep going when the ball is loose; only the clock
   stops. A body standing on one rides it; one in its way is pushed ahead of it, and once
   that would put them in a wall it passes through them. It pushes the loose ball the same

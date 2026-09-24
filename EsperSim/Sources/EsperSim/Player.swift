@@ -225,10 +225,22 @@ public struct Player: Equatable {
     var dashInitialVelocity: Double { runSpeed + (spec.dashInitialVelocity - spec.runSpeed) }
     var airSpeedMax: Double { spec.airSpeedMax * speedShare }
 
+    /// Crouched or sliding, the body is half as tall, so it fits under what a standing
+    /// body can't.
     public var body: Box {
+        let low = state == .crouch || state == .crouchWalk || state == .slide
+        return Box(min: Vec2(x: position.x - spec.bodyWidth / 2, y: position.y),
+                   max: Vec2(x: position.x + spec.bodyWidth / 2, y: position.y + spec.bodyHeight * (low ? 0.5 : 1)))
+    }
+
+    /// The body standing where it is, for whether there's room to get up.
+    private var standingBody: Box {
         Box(min: Vec2(x: position.x - spec.bodyWidth / 2, y: position.y),
             max: Vec2(x: position.x + spec.bodyWidth / 2, y: position.y + spec.bodyHeight))
     }
+
+    private func roomToStand(in stage: Stage) -> Bool { !stage.overlapsSolid(standingBody) }
+    public var standingHeightTop: Double { standingBody.max.y }
 
     public var chest: Vec2 { Vec2(x: position.x, y: position.y + BallRules.chestHeight) }
 
@@ -729,7 +741,7 @@ public struct Player: Equatable {
             } else if shootPressed {
                 // Shoot while crouched: the slide, in neutral or on defence alike.
                 startSlide(events: &events)
-            } else if !crouchAsked(input) {
+            } else if !crouchAsked(input), roomToStand(in: stage) {
                 enter(stickFacing(input) == nil ? .idle : .walk)
             } else if (input.stick.x != 0) != (state == .crouchWalk) {
                 enter(input.stick.x != 0 ? .crouchWalk : .crouch)
@@ -748,12 +760,12 @@ public struct Player: Equatable {
                 } else if shootPressed, slashAllowed {
                     startSlash(events: &events)
                 } else if !crouchAsked(input) || (input.stick.x != 0 && !stickForward(input)) {
-                    enter(.idle)
+                    enter(roomToStand(in: stage) ? .idle : .crouch)
                 }
             } else {
                 velocity.x = approach(velocity.x, 0, spec.slideFriction)
                 if stateTimer >= spec.slideFrames {
-                    enter(crouchAsked(input) ? .crouch : .idle)
+                    enter(crouchAsked(input) || !roomToStand(in: stage) ? .crouch : .idle)
                 }
             }
 

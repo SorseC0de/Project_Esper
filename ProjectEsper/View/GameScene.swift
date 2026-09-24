@@ -738,6 +738,10 @@ final class GameScene: SKScene {
         }
         if online == nil, hub.consumeReset() { reset() }
         if hub.consumeCycle() { controls?.cycleTopPicker() }
+        if online == nil, hub.consumeAIToggle() {
+            aiOn.toggle()
+            controls?.aiOn = aiOn
+        }
         var steps = 0
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
             let tick: SessionTick

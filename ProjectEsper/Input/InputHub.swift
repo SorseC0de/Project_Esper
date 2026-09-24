@@ -11,11 +11,14 @@ final class InputHub {
     /// What the on-screen controls hold right now. The scene writes it.
     var touch = PlayerInput.idle
     private(set) var controllers: [GCController] = []
-    /// A pad's menu button went down since the last check; the left bumper likewise.
+    /// A pad's menu button went down since the last check; the left bumper likewise,
+    /// and the right stick's click, which switches the computer on and off.
     private(set) var resetPressed = false
     private(set) var cyclePressed = false
+    private(set) var aiTogglePressed = false
     private var menuWasDown = false
     private var bumperWasDown = false
+    private var stickClickWasDown = false
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -54,6 +57,9 @@ final class InputHub {
         let bumperDown = controllers.contains { $0.extendedGamepad?.leftShoulder.isPressed ?? false }
         if bumperDown, !bumperWasDown { cyclePressed = true }
         bumperWasDown = bumperDown
+        let stickClickDown = controllers.contains { $0.extendedGamepad?.rightThumbstickButton?.isPressed ?? false }
+        if stickClickDown, !stickClickWasDown { aiTogglePressed = true }
+        stickClickWasDown = stickClickDown
         return (0..<players).map { index in
             let pad = controller(for: index).map { read($0.extendedGamepad!) } ?? PlayerInput.idle
             return index == 0 ? merge(touch, pad) : pad
@@ -89,9 +95,15 @@ final class InputHub {
         return cyclePressed
     }
 
+    /// True once per right stick click.
+    func consumeAIToggle() -> Bool {
+        defer { aiTogglePressed = false }
+        return aiTogglePressed
+    }
+
     /// A: jump. B, the right bumper and the right trigger: shoot, each its own button so a
     /// second one cancels a shot. X: throw. Y: taunt. The left bumper steps the tuning
-    /// picker, and the menu button resets.
+    /// picker, the menu button resets, and clicking the right stick switches the computer.
     /// The right stick aims a stance; failing that, the left stick does.
     private func read(_ pad: GCExtendedGamepad) -> PlayerInput {
         var stick = deadzoned(Vec2(x: Double(pad.leftThumbstick.xAxis.value), y: Double(pad.leftThumbstick.yAxis.value)))

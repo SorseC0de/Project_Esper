@@ -344,6 +344,7 @@ holds the variants; A is always the baseline as tuned.
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
 - AI, beside that: the computer plays the other side. Off, the second pad or nothing does.
+  Clicking a pad's right stick (R3) switches it too, which is the only way on the TV.
 
 ## Opponent
 

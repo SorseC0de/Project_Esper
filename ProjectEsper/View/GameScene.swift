@@ -166,6 +166,9 @@ final class GameScene: SKScene {
     private var handBalls: [SKSpriteNode] = []
     private var handHalos: [SKSpriteNode] = []
     private var headFires: [SKEmitterNode] = []
+    /// A second stream off each head, for a power that mixes two particles: Frost Tea's
+    /// snowflakes among the energy, Zeus Juice's second bolt.
+    private var headMixes: [SKEmitterNode] = []
     private var wings: [Wing] = []
     /// Each player's webs: the swing's and the shot's.
     private var swingWebs: [SKShapeNode] = []
@@ -395,6 +398,12 @@ final class GameScene: SKScene {
             fire.targetNode = glowers
             glowers.addChild(fire)
             headFires.append(fire)
+            let mix = makeFire(colour)
+            mix.zPosition = 1
+            mix.targetNode = glowers
+            mix.particleBirthRate = 0
+            glowers.addChild(mix)
+            headMixes.append(mix)
             for webs in [\GameScene.swingWebs, \GameScene.shotWebs] {
                 let web = SKShapeNode()
                 web.strokeColor = colour
@@ -536,7 +545,7 @@ final class GameScene: SKScene {
         fire.emissionAngle = .pi / 2
         fire.emissionAngleRange = .pi / 14
         fire.yAcceleration = 10
-        fire.particleSize = CGSize(width: 3, height: 3)
+        fire.particleSize = CGSize(width: ParticleLook.energySize, height: ParticleLook.energySize)
         if ParticleLook.sprites { fire.particleRotationRange = .pi * 2 }
         let steps = SKKeyframeSequence(keyframeValues: [1, 0.66, 0.33], times: [0, 0.45, 0.75])
         steps.interpolationMode = .step
@@ -1220,6 +1229,16 @@ final class GameScene: SKScene {
                     spark.zPosition = 40
                     glowers.addChild(spark)
                 case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 0.42))
+                case .frostTea where EffectSheets.frames["ice_jumpspark"] != nil:
+                    // The ice jump spark in the snowflake's blues, under the feet like the others.
+                    let frames = (0..<(EffectSheets.frames["ice_jumpspark"] ?? 1)).map { sprites.iceTexture("ice_jumpspark", $0) }
+                    let spark = SKSpriteNode(texture: frames[0])
+                    spark.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["ice_jumpspark"] ?? 0)
+                    spark.position = SpriteLibrary.point(player.position + Vec2(x: 0, y: (EffectSheets.anchorY["ice_jumpspark"] ?? 0) == 0 ? -3.75 : 0))
+                    spark.xScale = player.facing == .left ? -1 : 1
+                    spark.zPosition = 30
+                    spark.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 24), .removeFromParent()]))
+                    glowers.addChild(spark)
                 default:
                     let drop = Effect.jumpSpark.bottomAligned ? -3.75 : 0
                     spawn(.jumpSpark, at: player.position + Vec2(x: 0, y: drop), flipped: player.facing == .left, player: index)
@@ -1455,22 +1474,36 @@ final class GameScene: SKScene {
     private func setHeadParticles(_ index: Int, power: Power) {
         guard headParticlePower[index] != power else { return }
         headParticlePower[index] = power
-        let fire = headFires[index]
+        let fire = headFires[index], mix = headMixes[index]
         let colour = SKColor(rgb: sprites.look(for: index).glow)
+        func dress(_ emitter: SKEmitterNode, _ texture: SKTexture, size: CGFloat, tint: SKColor?, blend: CGFloat) {
+            emitter.particleTexture = texture
+            emitter.particleSize = CGSize(width: size, height: size)
+            if let tint { emitter.particleColor = tint }
+            emitter.particleColorBlendFactor = blend
+        }
+        let energy = ParticleLook.sprites ? sprites.texture("esper_particle", 4) : sprites.flatSquare(size: 4, alpha: 1)
+        dress(fire, energy, size: ParticleLook.energySize, tint: colour, blend: 1)
+        mixing[index] = false
         switch power {
-        case .blazingBoba where Effect.fireParticleAvailable:
-            fire.particleTexture = sprites.texture("fire_particle", 0)
-            fire.particleColorBlendFactor = 0
+        case .blazingBoba where EffectSheets.frames["fire_particle"] != nil:
+            dress(fire, sprites.texture("fire_particle", (EffectSheets.frames["fire_particle"] ?? 1) / 3), size: ParticleLook.fireSize, tint: nil, blend: 0)
         case .frostTea:
-            fire.particleTexture = SKTexture(imageNamed: "Snowflake")
-            fire.particleColor = GameScene.ice
-            fire.particleColorBlendFactor = 0.6
+            // Snowflakes among the energy.
+            dress(mix, SKTexture(imageNamed: "Snowflake"), size: ParticleLook.snowflakeSize, tint: GameScene.ice, blend: 0.6)
+            mixing[index] = true
+        case .zeusJuice where EffectSheets.frames["lightning_particle"] != nil:
+            // The two bolts, half each, toned in the energy colour.
+            dress(fire, sprites.effectTexture("lightning_particle", (EffectSheets.frames["lightning_particle"] ?? 1) / 3, player: index), size: ParticleLook.lightningSize, tint: nil, blend: 0)
+            if EffectSheets.frames["lightning_particle2"] != nil {
+                dress(mix, sprites.effectTexture("lightning_particle2", (EffectSheets.frames["lightning_particle2"] ?? 1) / 3, player: index), size: ParticleLook.lightningSize, tint: nil, blend: 0)
+                mixing[index] = true
+            }
         default:
-            fire.particleTexture = ParticleLook.sprites ? sprites.texture("esper_particle", 4) : sprites.flatSquare(size: 4, alpha: 1)
-            fire.particleColor = colour
-            fire.particleColorBlendFactor = 1
+            break
         }
     }
+    private var mixing: [Int: Bool] = [:]
 
     /// Frost Tea's snowflakes: the vector, small, thrown out from a point and fading.
     private func spawnSnowflakes(at point: CGPoint, count: Int, spread: CGFloat) {
@@ -1884,15 +1917,21 @@ final class GameScene: SKScene {
                 headNode.yScale = 1
                 headNode.zRotation = tilt
                 headNode.position = shown
-                headFires[index].position = CGPoint(x: shown.x, y: shown.y + 4)
-                headFires[index].particleBirthRate = 24
                 setHeadParticles(index, power: player.power)
+                // A mixed stream splits the rate between its two emitters.
+                let mixed = mixing[index] == true
                 // One sideways wind on all the bits at once, swinging back and forth, so the
                 // column bends as a whole like a scarf rather than scattering.
-                headFires[index].xAcceleration = CGFloat(sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(index) * 2)) * 140
+                let wind = CGFloat(sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(index) * 2)) * 140
+                for (emitter, rate) in [(headFires[index], mixed ? 12.0 : 24.0), (headMixes[index], mixed ? 12.0 : 0)] {
+                    emitter.position = CGPoint(x: shown.x, y: shown.y + 4)
+                    emitter.particleBirthRate = CGFloat(rate)
+                    emitter.xAcceleration = wind
+                }
             } else {
                 headNode.isHidden = true
                 headFires[index].particleBirthRate = 0
+                headMixes[index].particleBirthRate = 0
             }
 
             drawCape(index, player: player, behind: node.position)
@@ -2036,6 +2075,7 @@ final class GameScene: SKScene {
                 handBalls[index].isHidden = true
                 handHalos[index].isHidden = true
                 headFires[index].particleBirthRate = 0
+                headMixes[index].particleBirthRate = 0
             }
         } else {
             for node in playerNodes { node.isHidden = false }

@@ -155,7 +155,9 @@ public struct Match: Equatable {
             ball.shotInFlight = true
             ball.burning = player.power == .blazingBoba
         case .releaseThrow(let velocity):
-            let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
+            // The hand, pushed out of any wall the body is pressed against.
+            let reach = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
+            let hand = reach + stage.pushOut(Box(center: reach, width: BallRules.radius * 2, height: BallRules.radius * 2), reach: 12)
             if velocity.y > 0, velocity.x == 0 {
                 ball.releaseFloater(from: Vec2(x: player.position.x, y: player.position.y + BallRules.shotReleaseHeight),
                                     sideways: player.throwStanceEntrySpeed * BallRules.floaterMomentumShare, by: index)
@@ -203,7 +205,7 @@ public struct Match: Equatable {
             let near = player.position.x + player.facing.sign * (player.spec.bodyWidth / 2 + 2)
             let far = near + player.facing.sign * ShakeRules.wallWidth
             let box = Box(min: Vec2(x: min(near, far), y: bottom), max: Vec2(x: max(near, far), y: bottom + ShakeRules.wallHeight))
-            make(box, by: index)
+            make(box, by: index, wall: true)
         case .flash(let direction):
             // Five tiles along the stick, or in place, nudged clear of solids. The flashes
             // are tears: the ball is pulled into the hands from where it came out for a
@@ -244,11 +246,16 @@ public struct Match: Equatable {
         return nextId
     }
 
-    /// A slab or a wall, solid for a second, and the maker disarmed and on the cooldown.
-    private mutating func make(_ box: Box, by index: Int) {
+    /// A slab or a wall, solid for a second. A slab disarms its maker until the next jump
+    /// and starts the slab's cooldown; a wall starts only its own cooldown.
+    private mutating func make(_ box: Box, by index: Int, wall: Bool = false) {
         platforms.append(Platform(owner: index, box: box, framesLeft: ShakeRules.platformFrames))
-        players[index].platformArmed = false
-        players[index].platformCooldown = ShakeRules.cooldownFrames
+        if wall {
+            players[index].wallCooldown = ShakeRules.cooldownFrames
+        } else {
+            players[index].platformArmed = false
+            players[index].platformCooldown = ShakeRules.cooldownFrames
+        }
         stage.extras = platforms.map(\.box)
         events.append(.platformMade(player: index))
     }
@@ -668,8 +675,12 @@ public struct Match: Equatable {
         guard victim.frozen == 0, victim.snatchHitbox == nil, victim.body.overlaps(ball.box) else { return }
         let back = ball.velocity.x >= 0 ? -1.0 : 1.0
         strip(other, by: thrower, knock: Vec2(x: SlashRules.knock.x * -back, y: SlashRules.knock.y))
-        ball.velocity = Vec2(x: max(abs(ball.velocity.x), 2) * BallRules.bounce * back, y: 2)
-        ball.straight = false
+        // Straight back at the thrower's chest, so it arrives wherever they were; it's
+        // theirs to catch until it first hits something.
+        let speed = max(abs(ball.velocity.x), 2) * BallRules.bounce
+        let toward = players[thrower].chest - ball.position
+        ball.velocity = toward.length > 1 ? toward.normalized * speed : Vec2(x: speed * back, y: 0)
+        ball.straight = true
         ball.strikes = false
         ball.returning = true
         ball.lastTouched = thrower
@@ -677,6 +688,13 @@ public struct Match: Equatable {
     }
 
     private mutating func tryCatch() {
+        // A throw coming back off the other is the thrower's at any speed, facing or not,
+        // in any state but a stun or a freeze.
+        if ball.returning, let thrower = ball.lastTouched, !players[thrower].holding, players[thrower].hitStun == 0,
+           players[thrower].frozen == 0, players[thrower].chest.distance(to: ball.position) <= BallRules.catchRadius + BallRules.radius {
+            hand(ballTo: thrower)
+            return
+        }
         let speed = ball.velocity.length
         let candidates = players.indices
             .filter { !ball.burning || ball.lastTouched == $0 }

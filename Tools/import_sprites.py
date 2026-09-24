@@ -41,7 +41,8 @@ REDUCE = {"esper_charge": 4, "flashspark": 4}
 # flash's 256x144 frames come down to 64x36.
 FRAME_HEIGHT = {"flashspark": 36}
 # Where the measurement reads a sheet's art wrong, the artist's word: 0 bottom edge, 0.5 centred.
-ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.5, "flashspark2": 0.5}
+ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.5, "flashspark2": 0.5,
+                   "lightning_particle": 0.5, "lightning_particle2": 0.5, "ice_jumpspark": 0.0}
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk"}

@@ -105,6 +105,33 @@ final class SpriteLibrary {
         return result
     }
 
+    /// A grey frame toned in the snowflake's two blues, dark to light, for Frost Tea.
+    func iceTexture(_ name: String, _ frame: Int) -> SKTexture {
+        let key = "ice_\(name)_\(frame)"
+        if let texture = cache[key] { return texture }
+        let source = texture(name, frame)
+        let image = source.cgImage()
+        let width = image.width, height = image.height
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let dark = (0x8F, 0xCE, 0xFA), light = (0xB5, 0xE6, 0xF8)
+        for pixel in 0..<(width * height) {
+            let index = pixel * 4
+            let alpha = Int(pixels[index + 3])
+            guard alpha > 0 else { continue }
+            let grey = min(Double(pixels[index]) / Double(alpha), 1)
+            func mix(_ a: Int, _ b: Int) -> UInt8 { UInt8(Int(Double(a) + Double(b - a) * grey) * alpha / 255) }
+            pixels[index] = mix(dark.0, light.0)
+            pixels[index + 1] = mix(dark.1, light.1)
+            pixels[index + 2] = mix(dark.2, light.2)
+        }
+        guard let toned = context.makeImage() else { return source }
+        let result = SKTexture(cgImage: toned)
+        result.filteringMode = .nearest
+        cache[key] = result
+        return result
+    }
+
     func effectFrames(_ effect: EnergyEffect, player: Int) -> [SKTexture] {
         (0..<effect.frameCount).map { effectTexture(effect.name, $0, player: player) }
     }

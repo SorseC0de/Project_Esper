@@ -121,9 +121,9 @@ extension Player {
     /// the sim, so the drawing can never change the game.
     public var animationFrame: AnimationFrame {
         let t = stateTimer
-        if hitStun > 0, state == .air || state == .idle || state == .land || state == .walk {
-            // Stunned: the hurt sheet, its frames in order and the last held.
-            return AnimationFrame(.hurt, (BallRules.hitStunFrames - hitStun) * 15 / 60)
+        if hitStun > 0, ![.dunking, .ledgeHang, .ledgeClimb, .webbed].contains(state) {
+            // Stunned: the hurt sheet at 10 a second, its frames in order and the last held.
+            return AnimationFrame(.hurt, (BallRules.hitStunFrames - hitStun) * 10 / 60)
         }
         if boltPose > 0, state != .webSwing, state != .webPull, state != .webbed {
             // Zeus Juice's bolt: the throw from its set pose through the release.

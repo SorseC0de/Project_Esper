@@ -1390,7 +1390,8 @@ final class ShakeTests: XCTestCase {
         XCTAssertEqual(wall.width, ShakeRules.wallWidth, accuracy: 0.001)
         XCTAssertEqual(wall.min.y, 10, accuracy: 0.001)
         XCTAssertEqual(wall.height, ShakeRules.wallHeight, accuracy: 0.001)
-        XCTAssertEqual(match.players[0].platformCooldown, ShakeRules.cooldownFrames)
+        XCTAssertEqual(match.players[0].wallCooldown, ShakeRules.cooldownFrames)
+        XCTAssertEqual(match.players[0].platformCooldown, 0, "a wall leaves the slab alone")
         // Walking into it stops at it.
         run(&match, frames: 40, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
         XCTAssertLessThanOrEqual(match.players[0].body.max.x, wall.min.x + 0.001)

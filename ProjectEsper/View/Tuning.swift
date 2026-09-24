@@ -51,6 +51,11 @@ enum DunkArt {
 /// scaled down to the squares' size, rather than the hard squares.
 enum ParticleLook {
     static let sprites = true
+    /// Each head particle's size, in art pixels square.
+    static let energySize: CGFloat = 4
+    static let snowflakeSize: CGFloat = 6
+    static let fireSize: CGFloat = 12
+    static let lightningSize: CGFloat = 12
 }
 
 /// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel

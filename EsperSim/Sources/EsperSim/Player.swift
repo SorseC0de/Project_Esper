@@ -155,6 +155,8 @@ public struct Player: Equatable {
     /// wall land since the last.
     public var wantsPlatform = false
     public var platformArmed = true
+    /// Frames until the next wall; walls need no arming.
+    public var wallCooldown = 0
     public var platformCooldown = 0
     /// The slide's leg and the slash's blade each hit once.
     public var slideHit = false
@@ -285,6 +287,7 @@ public struct Player: Equatable {
         }
         if let open = tear { tear = open.framesLeft > 1 ? Tear(position: open.position, framesLeft: open.framesLeft - 1) : nil }
         if platformCooldown > 0 { platformCooldown -= 1 }
+        if wallCooldown > 0 { wallCooldown -= 1 }
         if webLinePose > 0 { webLinePose -= 1 }
         if let line = webLine, case .point = line.target, state != .webPull {
             webLine = line.frames > 1 ? WebLine(target: line.target, frames: line.frames - 1) : nil
@@ -505,7 +508,7 @@ public struct Player: Equatable {
                 startSnatch()
             } else if !holding, throwPressed, power == .pulsepistol, powerLevel >= 2, pulseCooldown == 0 {
                 startGunShot(pull: true)
-            } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, platformCooldown == 0, platformArmed {
+            } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, wallCooldown == 0 {
                 startWall()
             } else if !holding, shootPressed, power == .zeusJuice, boltCooldown == 0 {
                 fireBolt(input)
@@ -1017,7 +1020,7 @@ public struct Player: Equatable {
             startSnatch()
         } else if !holding, throwPressed, power == .pulsepistol, powerLevel >= 2, pulseCooldown == 0 {
             startGunShot(pull: true)
-        } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, platformCooldown == 0, platformArmed {
+        } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, wallCooldown == 0 {
             startWall()
         } else if !holding, shootPressed, power == .zeusJuice, boltCooldown == 0 {
             fireBolt(input)

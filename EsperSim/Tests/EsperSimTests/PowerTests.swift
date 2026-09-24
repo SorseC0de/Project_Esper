@@ -123,6 +123,59 @@ final class PowerTests: XCTestCase {
         }
     }
 
+    func testADownThrowAgainstAWallComesOutOfIt() {
+        var match = Match()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        // Pressed against the left wall in the air, facing it.
+        match.players[0].position = Vec2(x: 15, y: 40)
+        match.players[0].facing = .left
+        match.players[0].grounded = false
+        match.players[0].state = .air
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+        }
+        run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertFalse(match.stage.overlapsSolid(match.ball.box), "never released inside the wall")
+        run(&match, frames: 40, input: { _ in .idle })
+        XCTAssertFalse(match.stage.overlapsSolid(match.ball.box))
+    }
+
+    func testAThrowComingBackFromFarIsStillTheThrowersToCatch() {
+        var match = Match()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[1].position.x = match.players[0].position.x + 150
+        match.players[1].facing = .left
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        run(&match, frames: BallRules.throwWindupFrames + BallRules.throwReleaseFrames + 2, input: { _ in .idle })
+        run(&match, frames: 40, input: { _ in .idle }) { $0.ball.returning }
+        XCTAssertTrue(match.ball.returning)
+        let caught = run(&match, frames: 90, input: { _ in .idle }) { $0.ball.holder == 0 }
+        XCTAssertLessThan(caught, 90, "back into the thrower's hands from across the court")
+    }
+
+    func testWallsComeOnTheirCooldownWithoutLanding() {
+        var match = with(.platformShake, level: 2)
+        match.players[0].position.y = 90
+        match.players[0].grounded = false
+        match.players[0].state = .air
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        run(&match, frames: 2, input: { _ in .idle })
+        XCTAssertEqual(match.platforms.count, 0)
+        run(&match, frames: ShakeRules.wallFrames, input: { _ in .idle })
+        let first = match.platforms.count
+        XCTAssertEqual(first, 1)
+        run(&match, frames: ShakeRules.cooldownFrames, input: { _ in .idle })
+        match.players[0].position.y = max(match.players[0].position.y, 60)
+        match.players[0].velocity = .zero
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        run(&match, frames: ShakeRules.wallFrames, input: { _ in .idle })
+        XCTAssertTrue(match.events.contains(.platformMade(player: 0)) || match.platforms.count >= 1)
+        XCTAssertEqual(match.players[0].state == .walling || match.platforms.contains { $0.framesLeft > ShakeRules.platformFrames - ShakeRules.wallFrames - 2 }, true, "a second wall with no landing between")
+    }
+
     // MARK: Quake-Up Coffee
 
     func testQuakeStripsWhoeverStandsOnTheFloorAndHopsTheBall() {

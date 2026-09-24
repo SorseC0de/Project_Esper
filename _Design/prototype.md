@@ -125,7 +125,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   meets is stripped and knocked as by the slash, and it bounces back toward the thrower,
   theirs to catch at any speed, so a throw holds off a defender coming in; a snatch with
   the hand out takes it instead. The computer reads a throw charged more than six
-  frames and snatches it every time; a quick throw gets by it seven times in ten. Up is the floater: a soft drift up at 1.5 with gravity
+  frames and snatches it every time; a quick throw gets by it seven times in ten. Off
+  the other it flies straight back at the thrower's chest and is theirs, at any speed and
+  facing either way, until it first hits something. A release never starts inside a
+  wall: the hand is pushed out of one the body is pressed against. Up is the floater: a soft drift up at 1.5 with gravity
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the air the throw stance keeps its run,
@@ -226,9 +229,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the opponent, and a floor to land on, jumps refreshed. With or without the ball.
   Without the ball, in neutral or on defence, a shoot button makes a wall instead, a
   tile thick and three tall just in front of the feet, on the snatch's reach, appearing
-  at the hand's full stretch; there's no slash. Slab or wall, the next can come only 75
-  frames after the last, and only after a jump, a double jump, a wall jump or a wall land
-  since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
+  at the hand's full stretch; there's no slash. A wall can come 75 frames after the last wall, on its
+  own cooldown and with no arming. A slab can come only 75 frames after the last slab,
+  and only after a jump, a double jump, a wall jump or a wall land since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
   slab still works. The stage carries standing slabs as `extras`, which every collision
   query sees. Numbers in `ShakeRules`.
   Super Smoothie's flight is on a cape of energy, and at level two the stick forward
@@ -408,7 +411,7 @@ one of four bolts each time, favouring vertical: it leans half as far as the bal
 in off vertical and never past 45°, so it never lies flat, at the sheet's own width and
 stretched tall enough to run past the top of the screen at that lean. On the sheet's two
 full-frame flash frames the whole screen flashes in the same tone and the floor and
-walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Stunned, the body and head flicker a dark shade of the energy colour and the hurt sheet plays. `ParticleLook.sprites` draws the head's fire and the double jump's platform with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
+walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Stunned, the body and head flicker a dark shade of the energy colour and the hurt sheet plays at 10 a second, its last frame held. `ParticleLook.sprites` draws the head's fire and the double jump's platform with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour. A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
@@ -455,7 +458,10 @@ ball, and back. The backboard blocks wear the colour of the player who scores th
 score on the other side's basket. The ledge is
 magenta. Three small faint green chevrons stack over the rim
 the holder scores on. The head particles are `esper_particle` frames at a hard square's size, stepping down as
-they go; Blazing Boba's head burns `fire_particle`, Frost Tea's sheds snowflakes.
+they go; Blazing Boba's head burns `fire_particle`, Frost Tea's sheds snowflakes among the energy,
+Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
+`ParticleLook`: energy 4, snowflake 6, fire 12, lightning 12. Frost Tea's jump spark is
+`ice_jumpspark` toned in the snowflake's two blues.
 
 ## Glow
 

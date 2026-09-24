@@ -86,9 +86,8 @@ enum GoalpostTuning {
     static let crossbarBelowRim: CGFloat = 20
     static let prongHeight: CGFloat = 100
     static let crossbarAngle: CGFloat = 20
-    /// The gold's width, on the POST THICKNESS slider until it's settled, and the black line
-    /// round it and round the light panels.
-    nonisolated(unsafe) static var thickness: Float = 5
+    /// The gold's width, and the black line round it and round the light panels.
+    static let thickness: CGFloat = 8
     static let outline: CGFloat = 1
     /// The height, in units, the goalposts are drawn for, apart from the rims.
     static let postRimHeight = 120.0

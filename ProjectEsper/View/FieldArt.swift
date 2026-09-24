@@ -215,10 +215,13 @@ enum FieldArt {
         base.position = CGPoint(x: baseX, y: floor + 20)
         base.zPosition = -5
         parent.addChild(base)
+        // The back rod, from the pad bending forward to the crossbar's middle.
+        let rod = CGMutablePath()
+        rod.move(to: CGPoint(x: baseX, y: floor + 40))
+        rod.addLine(to: CGPoint(x: baseX, y: crossbarY - 30))
+        rod.addQuadCurve(to: CGPoint(x: rim.x, y: crossbarY), control: CGPoint(x: baseX, y: crossbarY))
+        // The crossbar and its uprights, outlined on their own over the rod.
         let path = CGMutablePath()
-        path.move(to: CGPoint(x: baseX, y: floor + 40))
-        path.addLine(to: CGPoint(x: baseX, y: crossbarY - 30))
-        path.addQuadCurve(to: CGPoint(x: rim.x, y: crossbarY), control: CGPoint(x: baseX, y: crossbarY))
         // The crossbar tilts about its middle, the end toward the field rising; each upright
         // stands on its end of it.
         let rise = tan(angle) * halfSpan * -back
@@ -229,15 +232,17 @@ enum FieldArt {
             path.move(to: CGPoint(x: end.x, y: end.y))
             path.addLine(to: CGPoint(x: end.x, y: end.y + prongHeight))
         }
-        // The gold over a black line as wide as it plus the outline each side.
-        for (colour, width, z) in [(SKColor.black, thickness + outline * 2, CGFloat(-4.5)), (gold, thickness, CGFloat(-4))] {
-            let post = SKShapeNode(path: path)
-            post.strokeColor = colour
-            post.lineWidth = width
-            post.lineCap = .round
-            post.lineJoin = .round
-            post.zPosition = z
-            parent.addChild(post)
+        // Each part the gold over a black line as wide as it plus the outline each side.
+        for (part, z) in [(rod as CGPath, CGFloat(-4.6)), (path as CGPath, CGFloat(-4.4))] {
+            for (colour, width, lift) in [(SKColor.black, thickness + outline * 2, CGFloat(0)), (gold, thickness, CGFloat(0.05))] {
+                let post = SKShapeNode(path: part)
+                post.strokeColor = colour
+                post.lineWidth = width
+                post.lineCap = .round
+                post.lineJoin = .round
+                post.zPosition = z + lift
+                parent.addChild(post)
+            }
         }
     }
 }

@@ -360,13 +360,11 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
-- HOOP X, HOOP Y and POST THICKNESS, sliders under the score: the rims in from each wall
-  and their height, the goalposts staying where they are, offline (both phones keep 60
-  and 105 online), and the goalposts' gold
-  width, 5 for now, until they're settled. The rims sit at 105, the goalposts drawn for
-  one at 120.
-  The crossbar sits 20 below the rim, tilted 20° with the end toward the field up, and
-  the uprights stand 100 over it; the posts and the light panels have a 1 black outline.
+- The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
+  60 in and drawn for a rim at 120, the gold 8 wide; the crossbar sits 20 below that,
+  tilted 20° with the end toward the field up, the uprights 100 over it; the back rod
+  and the crossbar with its uprights each have their own 1 black outline, as do the
+  light panels.
 - HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
@@ -466,7 +464,7 @@ its length.
 `Stage.footballField`, the stage in play for tuning (`Stage.current`); the court comes back
 with stage selection. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
 invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
-at 105, 60 in from each wall, floating between the
+at 107, 66 in from each wall, floating between the
 goalposts' uprights; by design a standing shot can't reach them, so scoring takes a
 jump shot, or a jump off a helmet to dunk or shoot. The computer always takes the jump
 shot at a rim that high. Each player starts

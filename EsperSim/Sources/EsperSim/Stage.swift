@@ -364,10 +364,9 @@ public struct Stage: Equatable {
     /// higher than the court's, six tiles in from each wall. Each player starts under the
     /// rim they guard, and the ball starts in someone's hands by the coin flip. Helmets
     /// sweep it and a portal hangs over it.
-    /// The field's rims: their height and how far in from each wall, on the HOOP Y and HOOP X
-    /// sliders offline until they're settled; both phones keep the defaults online.
-    nonisolated(unsafe) public static var fieldRimHeight = 105.0
-    nonisolated(unsafe) public static var fieldRimInset = 60.0
+    /// The field's rims: their height and how far in from each wall.
+    public static let fieldRimHeight = 107.0
+    public static let fieldRimInset = 66.0
     /// The goalposts stand this far in from each wall, apart from the rims.
     public static let fieldPostInset = 60.0
 
@@ -381,7 +380,7 @@ public struct Stage: Equatable {
                 Hoop(position: Vec2(x: inset, y: fieldRimHeight), owner: 1, backboard: .left),
                 Hoop(position: Vec2(x: width - inset, y: fieldRimHeight), owner: 0, backboard: .right),
             ],
-            playerSpawns: [Vec2(x: fieldPostInset, y: 10), Vec2(x: width - fieldPostInset, y: 10)],
+            playerSpawns: [Vec2(x: inset, y: 10), Vec2(x: width - inset, y: 10)],
             playerFacings: [.right, .left],
             ballSpawn: Vec2(x: width / 2, y: 80)
         )

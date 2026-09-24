@@ -734,21 +734,6 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addSlider(title: "HOOP X", range: 20...120, notch: 1, value: Float(Stage.fieldRimInset)) { [weak self] value in
-            // Offline only: the rims in from each wall, the goalposts staying where they are.
-            guard let self, self.online == nil else { return }
-            Stage.fieldRimInset = Double(value)
-            self.moveRims()
-        }
-        controls.addSlider(title: "HOOP Y", range: 60...200, notch: 1, value: Float(Stage.fieldRimHeight)) { [weak self] value in
-            guard let self, self.online == nil else { return }
-            Stage.fieldRimHeight = Double(value)
-            self.moveRims()
-        }
-        controls.addSlider(title: "POST THICKNESS", range: 1...10, notch: 0.5, value: GoalpostTuning.thickness) { [weak self] value in
-            GoalpostTuning.thickness = value
-            self?.buildGoalposts()
-        }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
@@ -1759,30 +1744,7 @@ final class GameScene: SKScene {
     private let goalposts = SKNode()
     private var netNodes: [SKShapeNode] = []
 
-    /// The sim's rims to the sliders' place, in the match and the next, and the rims drawn there.
-    private func moveRims() {
-        let inset = Stage.fieldRimInset, height = Stage.fieldRimHeight
-        session.mutate { match in
-            let width = match.stage.width
-            for index in match.stage.hoops.indices {
-                match.stage.hoops[index].position = Vec2(x: match.stage.hoops[index].backboard == .left ? inset : width - inset, y: height)
-            }
-        }
-        placeRims()
-    }
-
-    /// The rims and their nets moved to where the stage has them now.
-    private func placeRims() {
-        for (index, hoop) in match.stage.hoops.enumerated() where index < rimNodes.count {
-            rimNodes[index].position = SpriteLibrary.point(hoop.position)
-            netNodes[index].removeFromParent()
-            let hanging = net(at: rimNodes[index].position)
-            ground.addChild(hanging)
-            netNodes[index] = hanging
-        }
-    }
-
-    /// The goalposts drawn afresh at the sliders' numbers.
+    /// The goalposts drawn at their rims.
     private func buildGoalposts() {
         goalposts.removeAllChildren()
         for hoop in match.stage.hoops {
@@ -1790,7 +1752,7 @@ final class GameScene: SKScene {
             FieldArt.goalpost(at: SpriteLibrary.point(Vec2(x: postX, y: GoalpostTuning.postRimHeight)), backboard: hoop.backboard, into: goalposts,
                               crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
                               angle: GoalpostTuning.crossbarAngle * .pi / 180,
-                              thickness: CGFloat(GoalpostTuning.thickness), outline: GoalpostTuning.outline,
+                              thickness: GoalpostTuning.thickness, outline: GoalpostTuning.outline,
                               // The rim's defender's colour, as the court's backboard blocks wear it.
                               padColour: SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow)))
         }
@@ -2455,10 +2417,9 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nhoop x %.0f  hoop y %.0f  post thickness %.1f",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 Stage.fieldRimInset, Stage.fieldRimHeight, GoalpostTuning.thickness)
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

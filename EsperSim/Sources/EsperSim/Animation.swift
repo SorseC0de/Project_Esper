@@ -130,6 +130,10 @@ extension Player {
             // Zeus Juice's bolt: the whole throw sheet at 15 a second, ground or air.
             return AnimationFrame(grounded ? .throwForward : .throwAir, (ZeusRules.boltPoseFrames - boltPose) * 15 / 60)
         }
+        if summonPose > 0, hasFireball, [.idle, .walk, .air, .land].contains(state) {
+            // The fireball gathers in the throw's hold frame.
+            return AnimationFrame(grounded ? .throwForward : .throwAir, 3)
+        }
         if webLinePose > 0, state != .webSwing, state != .webPull, state != .webbed {
             return AnimationFrame(.throwForward, 4)
         }

@@ -510,7 +510,8 @@ public struct Opponent: Equatable {
         }
         // A throw charged at it for more than a few frames is telegraphed: it squares up
         // to them and stands ready, and the snatch comes as the ball does.
-        if human.state == .throwStance, humanThrowCharge > 6, abs(gap) < 100, level, (gap > 0) == (human.facing == .left) {
+        let charged = human.state == .throwStance ? humanThrowCharge : (human.state == .throwing ? lastThrowCharge : 0)
+        if human.state == .throwStance || human.state == .throwing, charged > 6, abs(gap) < 100, level, (gap > 0) == (human.facing == .left) {
             plan = .none
             planFrames = 0
             if me.facing != (gap > 0 ? .right : .left) { input.stick = Vec2(x: gap > 0 ? 0.5 : -0.5, y: 0) }

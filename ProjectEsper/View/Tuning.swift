@@ -14,6 +14,13 @@ enum HeadVariant: Int, CaseIterable {
     var reversedAcross: Bool { self == .b }
 }
 
+/// The power level the POWER picker's choice is played at.
+enum PowerLevelVariant: Int, CaseIterable {
+    case one, two
+    var label: String { ["1", "2"][rawValue] }
+    var level: Int { rawValue + 1 }
+}
+
 /// The powers on the picker. A is none.
 enum PowerVariant: Int, CaseIterable {
     case none, webWater, superSmoothie, flashFizz, platformShake, quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol

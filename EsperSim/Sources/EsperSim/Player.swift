@@ -197,6 +197,8 @@ public struct Player: Equatable {
     public var gunPull = false
     /// Frames left of the throw's pose after a bolt, and the bolt's way, sent on the release.
     public var boltPose = 0
+    /// Frames left of the throw's hold frame after a fireball summon; only for show.
+    public var summonPose = 0
     private var boltDirection = Vec2.zero
     /// Smash's rising aerial: shoot or throw pressed with or during the jump squat comes
     /// out of it as the slash or the snatch on the jump's first frame, with its ascent.
@@ -277,6 +279,7 @@ public struct Player: Equatable {
         if strikeCooldown > 0 { strikeCooldown -= 1 }
         if pulseCooldown > 0 { pulseCooldown -= 1 }
         if gunRunTimer > 0 { gunRunTimer -= 1 }
+        if summonPose > 0 { summonPose -= 1 }
         if boltPose > 0 {
             boltPose -= 1
             if ZeusRules.boltPoseFrames - boltPose == ZeusRules.boltReleaseFrame, wanted == nil {
@@ -959,6 +962,7 @@ public struct Player: Equatable {
 
     private mutating func summonFireball(events: inout [MatchEvent]) {
         hasFireball = true
+        summonPose = BlazeRules.summonPoseFrames
         // Both have to come up before either can take a stance with it.
         shootReady = false
         throwReady = false

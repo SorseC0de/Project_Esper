@@ -94,6 +94,7 @@ final class GameScene: SKScene {
     weak var flowState: FlowState?
     private var headVariant = HeadVariant.b
     private var powerVariant = PowerVariant.none
+    private var powerLevelVariant = PowerLevelVariant.two
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
@@ -685,6 +686,10 @@ final class GameScene: SKScene {
             self?.powerVariant = PowerVariant(rawValue: index)!
             self?.applyPower()
         }
+        controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in
+            self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
+            self?.applyPower()
+        }
         controls.addSlider(title: "ZEUS CHARGE", range: 0.02...1.0, notch: 0.01, value: ZeusTuning.chargeScale) { value in
             ZeusTuning.chargeScale = value
         }
@@ -859,7 +864,7 @@ final class GameScene: SKScene {
         if online == nil, powerVariant != .none {
             for index in fresh.players.indices {
                 fresh.players[index].power = powerVariant.power
-                fresh.players[index].powerLevel = 2
+                fresh.players[index].powerLevel = powerLevelVariant.level
             }
         }
         session = RollbackSession(match: fresh, localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
@@ -883,7 +888,7 @@ final class GameScene: SKScene {
             for index in match.players.indices {
                 match.players[index].spec = drinks[index].spec()
                 match.players[index].power = picked ?? drinks[index].power
-                match.players[index].powerLevel = picked == nil ? drinks[index].powerLevel : 2
+                match.players[index].powerLevel = picked == nil ? drinks[index].powerLevel : powerLevelVariant.level
             }
         }
     }
@@ -1102,10 +1107,11 @@ final class GameScene: SKScene {
     private func applyPower() {
         guard online == nil else { return }
         let power = powerVariant.power
+        let level = powerLevelVariant.level
         session.mutate { match in
             for index in match.players.indices {
                 match.players[index].power = power
-                match.players[index].powerLevel = 2
+                match.players[index].powerLevel = level
             }
         }
     }
@@ -1305,10 +1311,21 @@ final class GameScene: SKScene {
             case .warped(let flasher, let from, let to), .flashed(let flasher, let from, let to):
                 // The flash's spark at both ends, the sheet at half size.
                 // The flash sheet at both ends, in the energy colour, at half size.
+                // Drawn over rather than added, or the white saturates past the tone.
                 for end in [from, to] {
-                    let flash = EnergyEffect.flashSpark2.node(sprites, player: flasher, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), scale: 0.5)
-                    flash.blendMode = .add
+                    let point = SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight))
+                    let flash = EnergyEffect.flashSpark2.node(sprites, player: flasher, at: point, scale: 0.5)
                     glowers.addChild(flash)
+                    if showHitboxes {
+                        // The tear's reach at each end, where a held ball is popped.
+                        let ring = SKShapeNode(circleOfRadius: CGFloat(FizzRules.tearRadius * SpriteLibrary.pixelsPerUnit))
+                        ring.position = point
+                        ring.strokeColor = .cyan
+                        ring.lineWidth = 1
+                        ring.zPosition = 60
+                        glowers.addChild(ring)
+                        ring.run(.sequence([.wait(forDuration: Double(FizzRules.tearFrames) / 60), .removeFromParent()]))
+                    }
                 }
             case .struck(let victim, let striker):
                 spawnHitSpark(player: striker, at: match.players[victim].chest)
@@ -1320,7 +1337,9 @@ final class GameScene: SKScene {
                 spawnRocks(at: SpriteLibrary.point(match.players[index].position), whole: match.players[index].powerLevel >= 2)
             case .boltLanded(let at):
                 let owner = match.ball.lastTouched ?? 0
-                spawnHitSpark(player: owner, at: at, scale: 1.0 / 3)
+                // Twice the size on a wall.
+                let onWall = match.stage.overlapsSolid(Box(center: at, width: 6, height: 6))
+                spawnHitSpark(player: owner, at: at, scale: onWall ? 2.0 / 3 : 1.0 / 3)
             case .boltStruck(let index, let x, let bottom):
                 strikeColumn(at: SpriteLibrary.point(Vec2(x: x, y: bottom)), by: index)
             case .frozen(let index):
@@ -1332,7 +1351,10 @@ final class GameScene: SKScene {
             case .fireballMade(let index):
                 // The fire swirling into the hand.
                 let player = match.players[index]
-                let hand = Vec2(x: player.position.x + player.facing.sign * 4, y: player.position.y + BallRules.throwReleaseHeight)
+                // Where the throw's hold frame draws the ball.
+                let pose = AnimationFrame(player.grounded ? .throwForward : .throwAir, 3)
+                let hand = BallLandmarks.offset(pose).map { player.position + Vec2(x: $0.x / 1.6 * player.facing.sign, y: $0.y / 1.6) }
+                    ?? Vec2(x: player.position.x + player.facing.sign * 4, y: player.position.y + BallRules.throwReleaseHeight)
                 let swirl = Effect.fireCharge.node(sprites, at: SpriteLibrary.point(hand), flipped: player.facing == .left)
                 swirl.zPosition = 40
                 glowers.addChild(swirl)
@@ -1341,6 +1363,11 @@ final class GameScene: SKScene {
                 glowers.addChild(summon)
             case .fireballBurst(let at):
                 let burst = Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at + Vec2(x: 0, y: -4)), flipped: false)
+                // Twice the size on a wall.
+                if match.stage.overlapsSolid(Box(center: at, width: 8, height: 8)) {
+                    burst.xScale *= 2
+                    burst.yScale *= 2
+                }
                 glowers.addChild(burst)
             case .pulsed(let index, let pull):
                 // Kinetic and unseen: the bar shows only with the hitboxes on.
@@ -1437,7 +1464,20 @@ final class GameScene: SKScene {
     /// One of the two sparks, either each time, on the ball in the hitter's colour.
     private func spawnHitSpark(player: Int, at position: Vec2, scale: CGFloat = 1) {
         // Zeus Juice's hits spark in lightning; everyone else's in energy.
-        let zeus = match.players.indices.contains(player) && match.players[player].power == .zeusJuice
+        let power = match.players.indices.contains(player) ? match.players[player].power : .none
+        if power == .blazingBoba, let name = ["fire_spark", "fire_spark2", "fire_spark3"].filter({ EffectSheets.frames[$0] != nil }).randomElement() {
+            // Blazing Boba's hits spark in fire, painted as it is.
+            let frames = (0..<(EffectSheets.frames[name] ?? 1)).map { sprites.texture(name, $0) }
+            let node = SKSpriteNode(texture: frames[0])
+            node.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY[name] ?? 0.5)
+            node.position = SpriteLibrary.point(position)
+            node.setScale(scale)
+            node.zPosition = 30
+            node.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 24), .removeFromParent()]))
+            glowers.addChild(node)
+            return
+        }
+        let zeus = power == .zeusJuice
         let spark = (zeus ? EnergyEffect.lightningSparks : EnergyEffect.hitSparks).randomElement()!
         glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale * (zeus ? 0.5 : 1)))
     }
@@ -1506,6 +1546,8 @@ final class GameScene: SKScene {
         var age: Double
         var life: Double
         var frames: [SKTexture]
+        /// The sheet frame it started on, so a stream's particles don't play in step.
+        var startFrame: Int
     }
 
     private var headParticles: [HeadParticle] = []
@@ -1571,7 +1613,8 @@ final class GameScene: SKScene {
                 // A sheet plays through once over the life; a single frame lives 0.6 s.
                 let life = stream.frames.count > 1 ? Double(stream.frames.count) / 24 : 0.6 + Double.random(in: -0.05...0.05)
                 headParticles.append(HeadParticle(node: node, owner: index, velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
-                                                  age: 0, life: life, frames: stream.frames))
+                                                  age: 0, life: life, frames: stream.frames,
+                                                  startFrame: Int.random(in: 0..<stream.frames.count)))
             }
         }
         headCredit[index] = credit
@@ -1594,7 +1637,7 @@ final class GameScene: SKScene {
                                              y: particle.node.position.y + particle.velocity.dy * step)
             let share = particle.age / particle.life
             if particle.frames.count > 1 {
-                particle.node.texture = particle.frames[min(Int(particle.age * 24), particle.frames.count - 1)]
+                particle.node.texture = particle.frames[(particle.startFrame + Int(particle.age * 24)) % particle.frames.count]
             } else {
                 // A single frame steps down in size and fades, the digital dissolve.
                 particle.node.setScale(share < 0.45 ? 1 : (share < 0.75 ? 0.66 : 0.33))

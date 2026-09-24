@@ -51,7 +51,7 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 
 ## Movement
 
-`FighterSpec.baseline` is Melee Fox with a Falco-style dash, the burst always 0.4 over the
+`FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, the burst always 0.4 over the
 3.2 run,
 traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air turned up: air speed 1.6, air acceleration 0.02 + 0.24, a jump with the stick held
@@ -353,9 +353,9 @@ holds the variants; A is always the baseline as tuned.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
-- POWER: A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
+- POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
-  Punch, every one at level two. The left bumper steps this one; the local side's power
+  Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
 - ZEUS CHARGE, a slider under the score: the share of its sheet Zeus Juice's charge
   swirl is drawn at, offline, with the pixels it comes to in the corner readout, until
@@ -469,7 +469,11 @@ the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, 
 Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
 `ParticleLook`: energy 10, snowflake 6, fire 12, lightning 8. Hits spark with
 `esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and
-`lightning_spark2`, at half size, centred. The wall jump spark is `fire_wallspark` as a
+`lightning_spark2`, at half size, centred, twice that on a wall; a fireball's burst is
+twice its size on a wall. Blazing Boba's hits spark with `fire_spark`, `fire_spark2` or
+`fire_spark3`, painted. The flash sheet is drawn over, not added, so its tone shows,
+and with the hitboxes on its tear's reach rings both ends. Head particles each start on
+a random frame of their sheet, so a stream never plays in step. The wall jump spark is `fire_wallspark` as a
 silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark2` at half size in the energy colour at both
 ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.

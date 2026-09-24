@@ -91,6 +91,8 @@ public enum BlazeRules {
     public static let flameFrames = 45
     public static let flameKnock = Vec2(x: 0, y: 2)
     public static let fireballGravityShare = 0.5
+    /// Frames the throw's hold frame shows after a summon, while the fire gathers.
+    public static let summonPoseFrames = 30
     public static let fireballFrames = 150
     public static let burstReach = 15.0
     public static let burstKnock = Vec2(x: 3, y: 2.5)

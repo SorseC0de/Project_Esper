@@ -50,7 +50,7 @@ enum DunkArt {
 /// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel
 /// sheet round the ball in hand. On the ZEUS CHARGE slider, offline, until it's settled.
 enum ZeusTuning {
-    nonisolated(unsafe) static var chargeScale: Float = 0.07
+    nonisolated(unsafe) static var chargeScale: Float = 0.17
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the

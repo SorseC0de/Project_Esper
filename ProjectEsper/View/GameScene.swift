@@ -1765,6 +1765,9 @@ final class GameScene: SKScene {
             let charge = chargeNodes[index]
             let chargingNow = player.state == .throwStance && !handBall.isHidden
             if chargingNow {
+                // A sprite's size is set in its parent's units, so it's divided by whatever
+                // scale the node has on: back to 1 first, or the scale below does nothing.
+                charge.setScale(1)
                 switch player.power {
                 case .blazingBoba:
                     // Fire round the ball, the sheet looped, as painted.

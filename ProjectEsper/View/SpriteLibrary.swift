@@ -449,7 +449,8 @@ enum EnergyEffect: CaseIterable {
     /// frames after play out where the throw was let go. Drawn at this size over its sheet.
     static let chargeLoopEnd = 67
     static let chargeLoopStart = 35
-    static let chargeScale: CGFloat = 0.5
+    /// The swirl at its sheet's own 128 pixels, as the user tuned it on screen.
+    static let chargeScale: CGFloat = 1
 
     var name: String {
         switch self {
@@ -569,7 +570,7 @@ enum Effect {
     var scale: CGFloat {
         switch self {
         case .fireJump: 2.0 / 3
-        case .fireCharge: 0.27
+        case .fireCharge: 0.8
         case .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion: 1.0 / 3
         case .flashSpark: 1
         default: 1

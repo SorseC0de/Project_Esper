@@ -1790,7 +1790,9 @@ final class GameScene: SKScene {
             FieldArt.goalpost(at: SpriteLibrary.point(Vec2(x: postX, y: GoalpostTuning.postRimHeight)), backboard: hoop.backboard, into: goalposts,
                               crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
                               angle: GoalpostTuning.crossbarAngle * .pi / 180,
-                              thickness: CGFloat(GoalpostTuning.thickness), outline: GoalpostTuning.outline)
+                              thickness: CGFloat(GoalpostTuning.thickness), outline: GoalpostTuning.outline,
+                              // The rim's defender's colour, as the court's backboard blocks wear it.
+                              padColour: SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow)))
         }
     }
     private var yardNumbers: [SKNode] = []

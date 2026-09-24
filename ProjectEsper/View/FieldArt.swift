@@ -201,7 +201,7 @@ enum FieldArt {
     /// A goalpost at a rim: the padded base behind it on the floor, the gold pole bending
     /// forward to the crossbar under the rim, and the two uprights rising from its ends.
     static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode, crossbarBelowRim: CGFloat, prongHeight: CGFloat,
-                         angle: CGFloat, thickness: CGFloat, outline: CGFloat) {
+                         angle: CGFloat, thickness: CGFloat, outline: CGFloat, padColour: SKColor) {
         let back = CGFloat(backboard.sign)
         let floor: CGFloat = 16
         let baseX = rim.x + back * 26
@@ -209,7 +209,7 @@ enum FieldArt {
         let halfSpan: CGFloat = 24
         // The pad is the pole's width and five more.
         let base = SKShapeNode(rectOf: CGSize(width: thickness + 5, height: 40), cornerRadius: 3)
-        base.fillColor = pad
+        base.fillColor = padColour
         base.strokeColor = .black
         base.lineWidth = outline
         base.position = CGPoint(x: baseX, y: floor + 20)

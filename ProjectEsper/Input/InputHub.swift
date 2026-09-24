@@ -4,8 +4,10 @@ import GameController
 
 /// Where each player's input comes from. On a phone the touch controls are player 0; one
 /// controller is player 1, and with two the first is player 0 and the second player 1.
-/// On the TV the first controller is player 0 and the second player 1. Everything is
-/// read as held state each frame, so nothing queues and nothing is lost between frames.
+/// On the TV the first controller is player 0 and the second player 1. A keyboard, on an
+/// iPad or a Mac, is player 0 too: WASD moves, space jumps, J shoots, K throws, shift
+/// steps the picker like the left bumper. Everything is read as held state each frame,
+/// so nothing queues and nothing is lost between frames.
 @MainActor
 final class InputHub {
     /// What the on-screen controls hold right now. The scene writes it.
@@ -58,7 +60,9 @@ final class InputHub {
         if menuDown, !menuWasDown { resetPressed = true }
         menuWasDown = menuDown
         #endif
-        let bumperDown = controllers.contains { $0.extendedGamepad?.leftShoulder.isPressed ?? false }
+        let keys = GCKeyboard.coalesced?.keyboardInput
+        let shiftDown = keys.map { $0.button(forKeyCode: .leftShift)?.isPressed ?? false || $0.button(forKeyCode: .rightShift)?.isPressed ?? false } ?? false
+        let bumperDown = shiftDown || controllers.contains { $0.extendedGamepad?.leftShoulder.isPressed ?? false }
         if bumperDown, !bumperWasDown { cyclePressed = true }
         bumperWasDown = bumperDown
         let stickClickDown = controllers.contains { $0.extendedGamepad?.rightThumbstickButton?.isPressed ?? false }
@@ -69,8 +73,23 @@ final class InputHub {
         leftClickWasDown = leftClickDown
         return (0..<players).map { index in
             let pad = controller(for: index).map { read($0.extendedGamepad!) } ?? PlayerInput.idle
-            return index == 0 ? merge(touch, pad) : pad
+            return index == 0 ? merge(merge(touch, keyboard()), pad) : pad
         }
+    }
+
+    /// The keyboard as a pad: WASD the stick, space jump, J shoot, K throw.
+    private func keyboard() -> PlayerInput {
+        guard let keys = GCKeyboard.coalesced?.keyboardInput else { return .idle }
+        func down(_ code: GCKeyCode) -> Bool { keys.button(forKeyCode: code)?.isPressed ?? false }
+        let x = (down(.keyD) ? 1.0 : 0) - (down(.keyA) ? 1.0 : 0)
+        let y = (down(.keyW) ? 1.0 : 0) - (down(.keyS) ? 1.0 : 0)
+        let stick = Vec2(x: x, y: y).clamped(to: 1)
+        var input = PlayerInput(stick: stick)
+        input.aim = stick
+        input.jump = down(.spacebar)
+        input.shoot = down(.keyJ)
+        input.throwBall = down(.keyK)
+        return input
     }
 
     /// The controller that drives this player, by the rule above.

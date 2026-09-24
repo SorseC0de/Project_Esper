@@ -18,7 +18,8 @@ neutral to get a shot off; catch it and the roles reverse.
   and controllers. `TouchControls` is the on-screen pad. Who drives whom: on a phone touch is player 0,
   one controller is player 1, two controllers are players 0 and 1 in order; on the TV
   the controllers are players 0 and 1. A pad on player 1 sits the computer out, so a
-  second person just picks up a pad. The HUD is laid out in the phone's points and
+  second person just picks up a pad. A keyboard on an iPad or a Mac is player 0 as well: WASD, space to jump, J to shoot,
+  K to throw, shift as the left bumper. The HUD is laid out in the phone's points and
   scaled up by `HudScene.scale(forHeight:)` on a bigger screen, the lettering rendered
   at that scale so it stays crisp. `Net/GameCenter` is Game
   Center: signing in, the matchmaker, and the bytes between the two phones. Two

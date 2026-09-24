@@ -541,10 +541,12 @@ final class GameScene: SKScene {
         return fire
     }
 
-    /// The floor and walls shift toward whoever holds the ball, and back to neutral; on a
-    /// score they go white with the bolt's flash and fade back.
+    /// The floor and walls shift toward whoever holds the ball, or whose it still is in
+    /// the air until its first bounce, and back to neutral; on a score they go white with
+    /// the bolt's flash and fade back.
     private func tickCourtColour() {
-        let wanted = match.ball.holder.map { SKColor(rgb: CourtLook.shaded(sprites.look(for: $0).glow)) } ?? SKColor(rgb: CourtLook.neutral)
+        let owner = match.ball.holder ?? match.ball.owner
+        let wanted = owner.map { SKColor(rgb: CourtLook.shaded(sprites.look(for: $0).glow)) } ?? SKColor(rgb: CourtLook.neutral)
         if wanted != courtTarget {
             courtTarget = wanted
             courtShift = CourtLook.shiftFrames
@@ -1273,8 +1275,7 @@ final class GameScene: SKScene {
                 let owner = match.ball.lastTouched ?? 0
                 spawnHitSpark(player: owner, at: at, scale: 1.0 / 3)
             case .boltStruck(let index, let x, let bottom):
-                // Onto the ball in hand it's a short bolt; onto the snatch's hand, from the top.
-                strikeColumn(at: SpriteLibrary.point(Vec2(x: x, y: bottom)), by: index, tall: !match.players[index].hasBall)
+                strikeColumn(at: SpriteLibrary.point(Vec2(x: x, y: bottom)), by: index)
             case .frozen(let index):
                 spawnSnowflakes(at: SpriteLibrary.point(match.players[index].chest), count: 10, spread: 14)
             case .ballFrozen:
@@ -1476,11 +1477,11 @@ final class GameScene: SKScene {
 
     /// Zeus Juice's strike: a bolt down from the top of the screen to the point, in the
     /// player's colour, and a spark where it lands.
-    private func strikeColumn(at point: CGPoint, by index: Int, tall: Bool) {
+    private func strikeColumn(at point: CGPoint, by index: Int) {
         let bolt = EnergyEffect.strikes.randomElement()!
         let node = bolt.node(sprites, player: index, at: point)
         node.zPosition = 45
-        let top = tall ? cameraBase.y + size.height * cameraNode.yScale / 2 : point.y + 48
+        let top = cameraBase.y + size.height * cameraNode.yScale / 2
         // A sixth of the sheet's width: a bolt, not a scoring strike.
         node.xScale = 1.0 / 6
         node.yScale = (top - point.y) * 1.1 / node.size.height

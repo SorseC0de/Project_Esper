@@ -240,8 +240,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the stick up to 30°, for 60 frames, one every 24: a body it meets is stripped and
   knocked on, and the ball it meets pops back toward the thrower. There's no slash.
   Level two's throw calls a strike down from the top of the screen, five units wide,
-  a short bolt onto the ball in hand as the charge starts or one from the top of the
-  screen onto the snatch's hand at full stretch,
+  from the top of the screen onto the ball in hand as the charge starts or onto the
+  snatch's hand at full stretch,
   stripping the other body in it or popping a loose ball, once every 40 frames.
   Numbers in `ZeusRules`.
 - Frost Tea (I). The snatch freezes what it reaches, a body or the loose ball, for 60

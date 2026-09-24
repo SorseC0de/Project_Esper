@@ -1403,12 +1403,13 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .idle)
     }
 
-    func testDownWithTheBallStaysStanding() {
+    func testDownWithTheBallNeverCrouches() {
         var match = Match()
         match.players[0].hasBall = true
         match.ball.holder = 0
         run(&match, frames: 5, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) })
-        XCTAssertEqual(match.players[0].state, .idle)
+        XCTAssertEqual(match.players[0].state, .taunt, "the sauce, standing")
+        XCTAssertTrue(match.players[0].state.isGroundState || match.players[0].state == .taunt)
     }
 
     func testAWalkWithoutTheBallFacesTheStick() {
@@ -1512,16 +1513,26 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .slashing)
     }
 
-    func testAirSlashFloatsThroughTheSwingThenRolls() {
+    func testAirSlashHangsALittleThroughTheSwingThenRolls() {
         var match = defending()
-        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
-        run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].velocity.y <= 0 }
-        let apex = match.players[0].position.y
+        // Up high, so the swing has room to run out before the floor.
+        match.players[0].position.y = 80
+        match.players[0].grounded = false
+        match.players[0].state = .air
+        run(&match, frames: 2, input: { _ in .idle })
+        let start = match.players[0].position.y
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .slashing)
         run(&match, frames: SlashRules.frames - 1, input: { _ in .idle })
         XCTAssertEqual(match.players[0].state, .slashing)
-        XCTAssertGreaterThan(match.players[0].position.y, apex, "with gravity cut it should still be up there")
+        // A plain fall over the same frames would drop further: the swing hangs a little.
+        var plain = defending()
+        plain.players[0].position.y = 80
+        plain.players[0].grounded = false
+        plain.players[0].state = .air
+        run(&plain, frames: 2 + SlashRules.frames, input: { _ in .idle })
+        XCTAssertGreaterThan(match.players[0].position.y, plain.players[0].position.y)
+        XCTAssertLessThan(match.players[0].position.y, start, "but it falls")
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .rolling)
         let rolled = run(&match, frames: 60, input: { _ in .idle }) { $0.players[0].state == .land }
@@ -1767,9 +1778,10 @@ final class OpponentTests: XCTestCase {
         var brain = Opponent(index: 1)
         match.players[0].hasBall = true
         match.ball.holder = 0
-        // It heads first for the spot in front of the rim the human scores on, the right one.
+        // It heads first toward the rim the human scores on, the right one: the guard
+        // spot in front of it, or hanging back a little further off it.
         play(&match, &brain, frames: 60, input: { _ in .idle })
-        XCTAssertGreaterThan(match.players[1].position.x, 240)
+        XCTAssertGreaterThan(match.players[1].position.x, 200)
         // The human walks up to it: a swing or a snatch comes.
         let swung = play(&match, &brain, frames: 400, input: { _ in PlayerInput(stick: Vec2(x: 0.6, y: 0)) }) {
             $0.events.contains(.slashed(player: 1)) || $0.players[1].state == .snatching
@@ -1909,6 +1921,19 @@ final class GreateraidTests: XCTestCase {
         XCTAssertEqual(jumps, 2, "two jumps in the air after the first")
         XCTAssertEqual(thirdVelocity, drinks.spec().thirdJumpVelocity, accuracy: 0.001)
         XCTAssertEqual(match.players[0].jumpsLeft, 0)
+    }
+
+    func testDownWithTheBallIsTheSauceAndAnythingCancelsIt() {
+        var match = Match()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])
+        XCTAssertEqual(match.players[0].state, .taunt)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])
+        XCTAssertEqual(match.players[0].state, .taunt, "held down keeps it")
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertEqual(match.players[0].state, .jumpSquat, "a jump cancels it")
+        XCTAssertTrue(match.players[0].hasBall)
     }
 
     func testCannonColaRunsTheSameArcFaster() {

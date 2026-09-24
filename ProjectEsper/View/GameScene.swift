@@ -1199,7 +1199,11 @@ final class GameScene: SKScene {
             case .jumped(let index):
                 let player = match.players[index]
                 switch player.power {
-                case .blazingBoba: spawn(.fireJump, at: player.position, flipped: player.facing == .left)
+                case .blazingBoba:
+                    // Four pixels down from the feet, and over the body.
+                    let spark = Effect.fireJump.node(sprites, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: -2.5)), flipped: player.facing == .left)
+                    spark.zPosition = 40
+                    glowers.addChild(spark)
                 case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 0.42))
                 default: spawn(.jumpSpark, at: player.position, flipped: player.facing == .left, player: index)
                 }
@@ -1264,13 +1268,21 @@ final class GameScene: SKScene {
                 let owner = match.ball.lastTouched ?? 0
                 spawnHitSpark(player: owner, at: at, scale: 1.0 / 3)
             case .boltStruck(let index, let x, let bottom):
-                strikeColumn(at: SpriteLibrary.point(Vec2(x: x, y: bottom)), by: index)
+                // Onto the ball in hand it's a short bolt; onto the snatch's hand, from the top.
+                strikeColumn(at: SpriteLibrary.point(Vec2(x: x, y: bottom)), by: index, tall: !match.players[index].hasBall)
             case .frozen(let index):
                 spawnSnowflakes(at: SpriteLibrary.point(match.players[index].chest), count: 10, spread: 14)
             case .ballFrozen:
                 spawnSnowflakes(at: SpriteLibrary.point(match.ball.position), count: 8, spread: 10)
             case .cloneShattered(let at):
                 spawnSnowflakes(at: SpriteLibrary.point(at), count: 12, spread: 16)
+            case .fireballMade(let index):
+                // The fire swirling into the hand.
+                let player = match.players[index]
+                let hand = Vec2(x: player.position.x + player.facing.sign * 4, y: player.position.y + BallRules.throwReleaseHeight)
+                let swirl = Effect.fireCharge.node(sprites, at: SpriteLibrary.point(hand), flipped: player.facing == .left)
+                swirl.zPosition = 40
+                glowers.addChild(swirl)
             case .fireballBurst(let at):
                 let burst = Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at + Vec2(x: 0, y: -4)), flipped: false)
                 glowers.addChild(burst)
@@ -1455,16 +1467,16 @@ final class GameScene: SKScene {
 
     /// Zeus Juice's strike: a bolt down from the top of the screen to the point, in the
     /// player's colour, and a spark where it lands.
-    private func strikeColumn(at point: CGPoint, by index: Int) {
+    private func strikeColumn(at point: CGPoint, by index: Int, tall: Bool) {
         let bolt = EnergyEffect.strikes.randomElement()!
         let node = bolt.node(sprites, player: index, at: point)
         node.zPosition = 45
-        let top = cameraBase.y + size.height * cameraNode.yScale / 2
+        let top = tall ? cameraBase.y + size.height * cameraNode.yScale / 2 : point.y + 48
         // A sixth of the sheet's width: a bolt, not a scoring strike.
         node.xScale = 1.0 / 6
         node.yScale = (top - point.y) * 1.1 / node.size.height
         glowers.addChild(node)
-        spawnHitSpark(player: index, at: Vec2(x: Double(point.x) / SpriteLibrary.pixelsPerUnit, y: Double(point.y) / SpriteLibrary.pixelsPerUnit), scale: 0.5)
+        spawnHitSpark(player: index, at: Vec2(x: Double(point.x) / SpriteLibrary.pixelsPerUnit, y: Double(point.y) / SpriteLibrary.pixelsPerUnit), scale: 0.25)
     }
 
     /// Pulsepistol Punch's pulse: a bar from the hand to the edge of the screen, eight
@@ -1821,7 +1833,8 @@ final class GameScene: SKScene {
             }
             // Blazing Boba's skid: the fire sheet as the run stops.
             if player.power == .blazingBoba, player.state == .idle, lastStates[index] == .run || lastStates[index] == .dash {
-                spawn(.fireSkid, at: player.position, flipped: player.facing == .left)
+                // The sheet skids the other way from the run sheets.
+                spawn(.fireSkid, at: player.position, flipped: player.facing == .right)
             }
             lastStates[index] = player.state
         }

@@ -162,9 +162,9 @@ public struct Match: Equatable {
                 ball.release(from: hand, velocity: velocity, by: index, straight: true)
             }
             ball.burning = player.power == .blazingBoba
-        case .releaseFireball(let velocity):
+        case .releaseFireball(let velocity, let straight):
             let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
-            fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity, framesLeft: BlazeRules.fireballFrames))
+            fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity, framesLeft: BlazeRules.fireballFrames, straight: straight))
         case .quake:
             quake(by: index)
         case .fireBolt(let direction):
@@ -499,7 +499,10 @@ public struct Match: Equatable {
     private mutating func stepFireballs() {
         var kept: [Fireball] = []
         for var fireball in fireballs {
-            fireball.velocity.y = max(fireball.velocity.y - BallRules.gravity, -BallRules.fallSpeed)
+            if !fireball.straight {
+                let gravity = BallRules.gravity * BlazeRules.fireballGravityShare
+                fireball.velocity.y = max(fireball.velocity.y - gravity, -BallRules.fallSpeed * BlazeRules.fireballGravityShare)
+            }
             fireball.position += fireball.velocity
             fireball.framesLeft -= 1
             let box = Box(center: fireball.position, width: BallRules.radius * 2, height: BallRules.radius * 2)
@@ -660,9 +663,11 @@ public struct Match: Equatable {
         let player = players[index]
         var position = player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight)
         var velocity = player.shotVelocity
+        // A fireball falls under a share of the ball's gravity.
+        let share = player.hasFireball ? BlazeRules.fireballGravityShare : 1
         var path: [Vec2] = []
         for step in 0..<(points * stride) {
-            velocity.y = max(velocity.y - BallRules.gravity, -BallRules.fallSpeed)
+            velocity.y = max(velocity.y - BallRules.gravity * share, -BallRules.fallSpeed * share)
             position += velocity
             if stage.overlapsSolid(Box(center: position, width: BallRules.radius * 2, height: BallRules.radius * 2)) { break }
             if step % stride == 0 { path.append(position) }

@@ -455,8 +455,8 @@ public enum SlashRules {
     public static let sheetFrames = 6
     public static var frames: Int { simFrames(sheetFrames, at: sheetFramesPerSecond) }
     public static var rollFrames: Int { frames }
-    public static let lift = 1.0
-    public static let gravityShare = 0.2
+    public static let lift = 0.5
+    public static let gravityShare = 0.7
     public static let reach = 56 / 1.6 / 2
     public static let forward = 4 / 1.6
     public static let liveSheetFrames = 1..<6

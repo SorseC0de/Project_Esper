@@ -92,8 +92,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   lift. On the way down it's an ordinary air shot.
 - Shoot (without ball, in neutral or on defence): the Esper Slash, the swat. On the
   ground it carries the run or dash it came from, bleeding 0.15 a frame; in the air the
-  body rises at least 1 a frame and gravity is cut to a fifth, so it hangs through the
-  swing. The sheet's six frames at 15 a second, 24 sim frames, and the roll the same. The
+  body rises at least 0.5 a frame and gravity is cut to seven tenths, a little hang
+  through the swing. The sheet's six frames at 15 a second, 24 sim frames, and the roll the same. The
   blade is a square round the body, 56 art pixels a side, its centre 4 art pixels in
   front of the body's, live over sheet frames 1 to 3 (`SlashRules.liveSheetFrames`). Touching the holder's body or ball with it knocks the
   ball out of their hands, and it spikes a loose ball down and away at about 45° below
@@ -162,7 +162,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   through a rim scores unless the ball rose up through that rim first.
 
 Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
-tuning picker, menu resets.
+tuning picker, menu resets, R3 switches the computer, L3 the hitboxes. Down on the stick
+with the ball, standing or walking, is the sauce too: the taunt sheet for show, and any
+action or the stick cancels it.
 
 The touch buttons say what they'd do right now: SHOOT, SLASH, CATCH, SLIDE, FLASH or
 WALL; THROW, SNATCH or WEB; JUMP, FLY or SWING.
@@ -238,7 +240,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the stick up to 30°, for 60 frames, one every 24: a body it meets is stripped and
   knocked on, and the ball it meets pops back toward the thrower. There's no slash.
   Level two's throw calls a strike down from the top of the screen, five units wide,
-  onto the ball in hand as the charge starts or onto the snatch's hand at full stretch,
+  a short bolt onto the ball in hand as the charge starts or one from the top of the
+  screen onto the snatch's hand at full stretch,
   stripping the other body in it or popping a loose ball, once every 40 frames.
   Numbers in `ZeusRules`.
 - Frost Tea (I). The snatch freezes what it reaches, a body or the loose ball, for 60
@@ -252,9 +255,10 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   wide and four tall at the feet, for 45 frames; the other body in one is stripped and
   the flame is spent. Shots and throws set the ball alight until its first bounce, and
   nobody but the thrower can catch or snatch it; the slash still can. Level two: shoot
-  held through a slash makes a fireball in hand, shot or thrown like the ball, that
-  bursts on the first thing it meets and strips and knocks whatever's within 15 of the
-  burst. Numbers in `BlazeRules`.
+  and throw together with nothing in hand makes a fireball in hand, fire swirling into
+  it; shot it arcs under half the ball's gravity with the aiming dots, thrown it flies
+  dead straight, and it bursts on the first thing it meets and strips and knocks
+  whatever's within 15 of the burst. Numbers in `BlazeRules`.
 - Pulsepistol Punch (K). Shoot without the ball is the pulse: a pillar ten units tall
   at the hand, the width of the screen the way the body faces, that knocks the ball and
   the other body away without stunning, a held ball popping free; standing it's the
@@ -516,4 +520,7 @@ answer, the app record in App Store Connect with Game Center turned on.
 
 ## Queued
 
+- A "score" mode with three-point lines: a dim glowing arc in the background on each
+  side, its peak touching the edge of the middle platform; a shot begun from behind
+  the arc counts three. Not built; the note is the whole of it so far.
 - Power-ups, including throw-button overrides.

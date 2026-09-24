@@ -44,8 +44,11 @@ public struct Opponent: Equatable {
         /// backing off, going to the spot, shooting from it, the lob up and over, over
         /// them on two jumps, and climbing out from behind the block.
         case hold, shuffle, fake, dart, retreat, travel, shoot, lob, over, climb
-        /// Without it: the guard spot, walking up to press, the dash in and swing.
-        case guardSpot, pressure, strike
+        /// Without it: the guard spot, walking up to press, the dash in and swing, and
+        /// hanging back a little off the rim.
+        case guardSpot, pressure, strike, hover
+        /// With it near the rim: up and onto it.
+        case dunk
     }
 
     /// Where it likes to shoot from: two distances on the floor in front of the rim, and
@@ -233,9 +236,14 @@ public struct Opponent: Equatable {
         let atSpot = abs(target.x - me.position.x) < 6 && abs(target.y - me.position.y) < 4 && me.grounded
         let blocked = (gap > 0) == (target.x - me.position.x > 0) && abs(gap) < abs(target.x - me.position.x) + 10 && near
 
+        // Near enough the rim and level with its floor: the dunk, up and onto it.
+        let rimClose = abs(toHoop) < 55 && me.position.y < hoop.position.y && hoop.position.y - me.position.y < 60
         if behind {
             plan = .climb
             planFrames = 1
+        } else if plan == .none, rimClose, !(dangerous && inReach), chance(70) {
+            plan = .dunk
+            planFrames = 60
         } else if plan == .none {
             if open {
                 plan = .dart
@@ -305,9 +313,13 @@ public struct Opponent: Equatable {
             plan = .dart
             planFrames = 40
         }
-        // They crowd it: away, or straight past.
-        if abs(gap) < 16, level, !committed, ![.dart, .retreat, .over, .lob].contains(plan) {
-            plan = chance(50) ? .dart : .retreat
+        // They crowd it: away, straight past, or the floater up and over them.
+        if abs(gap) < 16, level, !committed, ![.dart, .retreat, .over, .lob, .dunk].contains(plan) {
+            switch roll(10) {
+            case 0...3: plan = .dart
+            case 4...6: plan = .retreat
+            default: plan = .lob
+            }
             planFrames = 30
         }
 
@@ -354,6 +366,17 @@ public struct Opponent: Equatable {
             }
         case .climb:
             climbOut(me: me, hoop: hoop, into: &input)
+        case .dunk:
+            // In under the rim, a full hop when it's close, and the throw held in the air
+            // so the stance carries it onto the rim.
+            input.stick = Vec2(x: toHoop > 0 ? 1 : -1, y: 0)
+            if me.grounded, abs(toHoop) < 34 {
+                fullHop(&input)
+            } else if !me.grounded {
+                if me.velocity.y < 0.5, me.jumpsLeft > 0, hoop.position.y - me.chest.y > 20 { tapJump(&input) }
+                if hoop.position.distance(to: me.chest) < 45 { input.throwBall = true }
+            }
+            if planFrames == 0 { plan = .none }
         default:
             plan = .none
         }
@@ -459,6 +482,16 @@ public struct Opponent: Equatable {
         if Opponent.committedStates.contains(me.state) { return }
         if planFrames > 0 { planFrames -= 1 } else if plan != .none { plan = .none }
 
+        // Their swing just started within reach: the hand out to parry it, mostly.
+        if human.state == .slashing, human.stateTimer < SlashRules.liveFrames.lowerBound, abs(gap) <= 30, level, me.snatchCooldown == 0 {
+            if chance(70) {
+                tapThrow(&input)
+                rest = 30
+                return
+            }
+            input.stick = Vec2(x: gap > 0 ? -1 : 1, y: 0)
+            return
+        }
         let winding = human.state == .shootStance || (human.state == .throwStance && abs(gap) < 30)
         let humanOpen = Opponent.open(human)
         if winding || plan == .strike || (humanOpen && abs(gap) < 45) || (rest == 0 && abs(gap) < 45 && humanStill > 20 && chance(4)) {
@@ -501,9 +534,22 @@ public struct Opponent: Equatable {
             }
             return
         }
-        // Between them and the rim, facing them: walk there, run if it's far, and a step
-        // at them now and then.
-        plan = .guardSpot
+        // Mostly between them and the rim; now and then up to them, or hanging back a
+        // way off the rim, so it isn't always in the same place.
+        if plan == .none {
+            switch roll(10) {
+            case 0...5: plan = .guardSpot
+            case 6...7: plan = .pressure
+            default: plan = .hover
+            }
+            planFrames = 60 + Int(roll(90))
+        }
+        if plan == .hover {
+            let hoverX = hoop.position.x + side * (55 + Double(roll(2)) * 10)
+            let toHover = hoverX - me.position.x
+            if abs(toHover) > 8 { input.stick = Vec2(x: toHover > 0 ? 0.5 : -0.5, y: 0) }
+            return
+        }
         if abs(toGuard) > 6 {
             let speed = abs(toGuard) > 50 ? 1.0 : 0.5
             input.stick = Vec2(x: toGuard > 0 ? speed : -speed, y: 0)
@@ -530,6 +576,11 @@ public struct Opponent: Equatable {
             let spot = hoop.position.x - hoop.backboard.sign * 30
             let toSpot = spot - me.position.x
             if abs(toSpot) > 6 { input.stick = Vec2(x: toSpot > 0 ? 0.5 : -0.5, y: 0) }
+            return
+        }
+        if human.state == .slashing, human.stateTimer < SlashRules.liveFrames.lowerBound,
+           abs(human.position.x - me.position.x) <= 30, abs(human.position.y - me.position.y) < 20, me.snatchCooldown == 0, chance(70) {
+            tapThrow(&input)
             return
         }
         let target = landing(of: ball, in: match.stage)

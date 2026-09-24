@@ -496,6 +496,8 @@ public struct Player: Equatable {
                 fastFalling = false
                 throwStanceEntrySpeed = velocity.x
                 enter(.throwStance)
+            } else if !holding, fireballAsked(input, shootPressed: shootPressed, throwPressed: throwPressed) {
+                summonFireball(events: &events)
             } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
                 startSnatch()
             } else if !holding, throwPressed, power == .pulsepistol, powerLevel >= 2, pulseCooldown == 0 {
@@ -585,7 +587,7 @@ public struct Player: Equatable {
                 let lift = shotLift ? max(velocity.y, 0) : 0
                 if hasFireball {
                     hasFireball = false
-                    action = .releaseFireball(velocity: shotVelocity + Vec2(x: 0, y: lift))
+                    action = .releaseFireball(velocity: shotVelocity + Vec2(x: 0, y: lift), straight: false)
                 } else {
                     hasBall = false
                     catchCooldown = BallRules.catchCooldownFrames
@@ -648,7 +650,7 @@ public struct Player: Equatable {
                 let direction = throwDirection == .zero ? Vec2(x: facing.sign, y: 0) : throwDirection
                 if hasFireball {
                     hasFireball = false
-                    action = .releaseFireball(velocity: direction * BallRules.throwSpeed)
+                    action = .releaseFireball(velocity: direction * BallRules.throwSpeed, straight: true)
                 } else {
                     hasBall = false
                     catchCooldown = BallRules.catchCooldownFrames
@@ -741,13 +743,6 @@ public struct Player: Equatable {
                 velocity.y = max(velocity.y - spec.gravity * SlashRules.gravityShare, -spec.fallSpeed)
             }
             if stateTimer >= SlashRules.frames {
-                // Blazing Boba at level two: shoot still held through the swing makes the fireball.
-                if power == .blazingBoba, powerLevel >= 2, input.shoot, !holding {
-                    hasFireball = true
-                    // Shoot has to come up before it can take a stance with it.
-                    shootReady = false
-                    events.append(.fireballMade(player: index))
-                }
                 endSlash()
             }
 
@@ -810,8 +805,15 @@ public struct Player: Equatable {
             }
 
         case .taunt:
+            // The sauce is only for show: anything cancels it, the stick walks out of it.
             velocity.x = 0
-            if stateTimer >= 44 {
+            if groundActions(input, jumpPressed: jumpPressed, shootPressed: shootPressed, throwPressed: throwPressed,
+                             tauntPressed: false, onDefence: onDefence, events: &events) {
+                break
+            }
+            if stickFacing(input) != nil, input.stick.y >= -0.65 {
+                enter(.walk)
+            } else if stateTimer >= 44 {
                 enter(.idle)
             }
 
@@ -935,6 +937,21 @@ public struct Player: Equatable {
         !(power == .webWater && powerLevel >= 2) && !(power == .pulsepistol && powerLevel >= 2)
     }
 
+    /// Blazing Boba at level two: shoot and throw together, one pressed with the other
+    /// down, with nothing in hand.
+    private func fireballAsked(_ input: PlayerInput, shootPressed: Bool, throwPressed: Bool) -> Bool {
+        power == .blazingBoba && powerLevel >= 2 && !holding
+            && ((shootPressed && input.throwBall) || (throwPressed && input.shoot))
+    }
+
+    private mutating func summonFireball(events: inout [MatchEvent]) {
+        hasFireball = true
+        // Both have to come up before either can take a stance with it.
+        shootReady = false
+        throwReady = false
+        events.append(.fireballMade(player: index))
+    }
+
     /// Zeus Juice's bolt: straight ahead, tilted by the stick up to the limit.
     private mutating func fireBolt(_ input: PlayerInput) {
         boltCooldown = ZeusRules.boltCooldownFrames
@@ -982,6 +999,8 @@ public struct Player: Equatable {
             if !holding, shootPressed, slashAllowed { pendingAerial = .slash }
             if !holding, throwPressed, throwIsSnatch { pendingAerial = .snatch }
             enter(.jumpSquat)
+        } else if !holding, fireballAsked(input, shootPressed: shootPressed, throwPressed: throwPressed) {
+            summonFireball(events: &events)
         } else if holding, input.shoot, shootReady {
             enterShootStance()
         } else if holding, input.throwBall, throwReady {
@@ -989,7 +1008,9 @@ public struct Player: Equatable {
             quickThrow = false
             throwStanceEntrySpeed = velocity.x
             enter(.throwStance)
-        } else if hasBall, tauntPressed {
+        } else if hasBall, tauntPressed || (input.stick.y < -0.65 && lastInput.stick.y >= -0.65 && (state == .idle || state == .walk)) {
+            // The sauce: the taunt sheet, on the button or on down with the ball standing
+            // or walking, for show. A run holding down brakes instead.
             enter(.taunt)
         } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
             startSnatch()

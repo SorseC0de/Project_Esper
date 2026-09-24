@@ -32,6 +32,9 @@ public struct Fireball: Equatable {
     public var position: Vec2
     public var velocity: Vec2
     public var framesLeft: Int
+    /// Thrown, it flies dead straight, as a thrown ball does; shot, it arcs, floatier
+    /// than the ball.
+    public var straight: Bool
 }
 
 /// Quake-Up Coffee: a fast fall's landing shakes the floor. At level one whatever is
@@ -76,17 +79,17 @@ public enum FrostRules {
 /// Blazing Boba: a run at full speed or a slide leaves a flame every few frames, this big
 /// at the feet, for this long; the other side touching one is stripped. A shot or a throw
 /// sets the ball alight until its first bounce, and nobody but the thrower can catch or
-/// snatch it. Level two: shoot held this long with nothing in hand makes a fireball in
-/// hand, shot or thrown like the ball, that bursts on whatever it meets, stripping and
-/// knocking everything within this reach.
+/// snatch it. Level two: shoot and throw together with nothing in hand makes a fireball
+/// in hand, shot or thrown like the ball but under this share of its gravity, that
+/// bursts on whatever it meets, stripping and knocking everything within this reach.
 public enum BlazeRules {
     public static let flameEveryFrames = 4
     public static let flameWidth = 6.0
     public static let flameHeight = 4.0
     public static let flameFrames = 45
     public static let flameKnock = Vec2(x: 0, y: 2)
-    public static let fireballHoldFrames = 15
-    public static let fireballFrames = 120
+    public static let fireballGravityShare = 0.5
+    public static let fireballFrames = 150
     public static let burstReach = 15.0
     public static let burstKnock = Vec2(x: 3, y: 2.5)
 }

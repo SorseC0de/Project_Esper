@@ -229,13 +229,18 @@ final class PowerTests: XCTestCase {
         XCTAssertNil(match.ball.holder)
     }
 
-    func testLevelTwoHoldsShootThroughASlashForAFireballThatBursts() {
+    func testLevelTwoShootAndThrowTogetherMakeAFireballThatBursts() {
         var match = with(.blazingBoba, level: 2)
         match.players[1].position.x = 60
-        run(&match, frames: SlashRules.frames + 2, input: { _ in PlayerInput(shoot: true) })
-        XCTAssertTrue(match.players[0].hasFireball)
-        XCTAssertTrue(match.events.contains(.fireballMade(player: 0)) || match.players[0].hasFireball)
-        // Thrown: it flies and bursts on the wall.
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .slashing, "shoot alone is still the slash")
+        var summon = with(.blazingBoba, level: 2)
+        summon.players[1].position.x = 60
+        summon.advance(inputs: [PlayerInput(shoot: true, throwBall: true), .idle])
+        XCTAssertTrue(summon.players[0].hasFireball)
+        XCTAssertTrue(summon.events.contains(.fireballMade(player: 0)))
+        match = summon
+        // Thrown: it flies dead straight and bursts on the wall.
         run(&match, frames: 2, input: { _ in .idle })
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         run(&match, frames: BallRules.throwWindupFrames + 2, input: { _ in PlayerInput(throwBall: true) })
@@ -243,6 +248,10 @@ final class PowerTests: XCTestCase {
         let thrown = run(&match, frames: 10, input: { _ in .idle }) { !$0.fireballs.isEmpty }
         XCTAssertLessThan(thrown, 10)
         XCTAssertFalse(match.players[0].hasFireball)
+        XCTAssertTrue(match.fireballs[0].straight)
+        let height = match.fireballs[0].position.y
+        run(&match, frames: 5, input: { _ in .idle })
+        if let flying = match.fireballs.first { XCTAssertEqual(flying.position.y, height, accuracy: 0.001, "a thrown fireball flies level") }
         let burst = run(&match, frames: 120, input: { _ in .idle }) { $0.events.contains { if case .fireballBurst = $0 { return true } else { return false } } }
         XCTAssertLessThan(burst, 120)
     }

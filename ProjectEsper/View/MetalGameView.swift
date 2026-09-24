@@ -53,6 +53,19 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     /// The bodies on black, by a renderer of their own.
     private let maskScene = MaskScene()
     private let maskRenderer: SKRenderer
+    /// The ball cam: its own scene and renderer, drawn every few frames into a small
+    /// texture that's laid over the screen as a trapezoid.
+    private let ballCamScene = BallCamScene()
+    private let ballCamRenderer: SKRenderer
+    private let ballCamPipeline: MTLRenderPipelineState
+    private let nearest: MTLSamplerState
+    private var ballCamTexture: MTLTexture?
+    private var ballCamDepthStencil: MTLTexture?
+    private var ballCamFrames = 0
+    /// Drawn one frame in this many, to keep its cost down.
+    private static let ballCamEvery = 3
+    /// Texture pixels per art pixel it shows.
+    private static let ballCamResolution = 2
     private let bright: MTLRenderPipelineState
     private let blur: MTLRenderPipelineState
     private let composite: MTLRenderPipelineState
@@ -77,6 +90,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         skRenderer.scene = scene
         maskRenderer = SKRenderer(device: device)
         maskRenderer.scene = maskScene
+        ballCamRenderer = SKRenderer(device: device)
+        ballCamRenderer.scene = ballCamScene
 
         let library = device.makeDefaultLibrary()!
         func pipeline(_ fragment: String) -> MTLRenderPipelineState {
@@ -86,6 +101,17 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
             return try! device.makeRenderPipelineState(descriptor: descriptor)
         }
+        let camDescriptor = MTLRenderPipelineDescriptor()
+        camDescriptor.vertexFunction = library.makeFunction(name: "ballCamVertex")
+        camDescriptor.fragmentFunction = library.makeFunction(name: "ballCamFragment")
+        camDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        ballCamPipeline = try! device.makeRenderPipelineState(descriptor: camDescriptor)
+        let nearestDescriptor = MTLSamplerDescriptor()
+        nearestDescriptor.minFilter = .nearest
+        nearestDescriptor.magFilter = .nearest
+        nearestDescriptor.sAddressMode = .clampToEdge
+        nearestDescriptor.tAddressMode = .clampToEdge
+        nearest = device.makeSamplerState(descriptor: nearestDescriptor)!
         bright = pipeline("glowBright")
         blur = pipeline("glowBlur")
         composite = pipeline("glowComposite")
@@ -187,7 +213,9 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             uniforms.direction = SIMD2(0, 1)
             pass(commands, pipeline: blur, into: glowA, sources: [glowB], uniforms: uniforms)
         }
-        pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA], uniforms: uniforms)
+        let camReady = drawBallCam(commands, at: now)
+        pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA], uniforms: uniforms,
+             then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)
 
         commands.present(drawable)
         commands.commit()
@@ -202,8 +230,69 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         pass(commands, pipeline: pipeline, descriptor: descriptor, sources: sources, uniforms: uniforms)
     }
 
+    /// Every few frames, the ball cam's scene on the ball into its texture. True once there's
+    /// a picture to lay down.
+    private func drawBallCam(_ commands: MTLCommandBuffer, at now: CFTimeInterval) -> Bool {
+        guard scene.ballCamEnabled else { return false }
+        if ballCamTexture == nil {
+            let resolution = GlowRenderer.ballCamResolution
+            let width = Int(BallCamScene.view.width) * resolution, height = Int(BallCamScene.view.height) * resolution
+            ballCamTexture = makeTexture(width: width, height: height)
+            ballCamDepthStencil = makeTexture(width: width, height: height, pixelFormat: .depth32Float_stencil8)
+            scene.fillBallCam(ballCamScene)
+            ballCamFrames = 0
+        }
+        guard let target = ballCamTexture, let depth = ballCamDepthStencil else { return false }
+        if ballCamFrames % GlowRenderer.ballCamEvery == 0 {
+            ballCamScene.mirror(scene.ballCamSnapshots, centre: scene.ballCamCentre)
+            ballCamRenderer.update(atTime: now)
+            let camPass = MTLRenderPassDescriptor()
+            camPass.colorAttachments[0].texture = target
+            camPass.colorAttachments[0].loadAction = .clear
+            camPass.colorAttachments[0].storeAction = .store
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 1
+            FieldArt.sky.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            camPass.colorAttachments[0].clearColor = MTLClearColor(red: red, green: green, blue: blue, alpha: 1)
+            camPass.depthAttachment.texture = depth
+            camPass.depthAttachment.loadAction = .clear
+            camPass.depthAttachment.storeAction = .dontCare
+            camPass.stencilAttachment.texture = depth
+            camPass.stencilAttachment.loadAction = .clear
+            camPass.stencilAttachment.storeAction = .dontCare
+            ballCamRenderer.render(withViewport: CGRect(x: 0, y: 0, width: target.width, height: target.height),
+                                   commandBuffer: commands, renderPassDescriptor: camPass)
+        }
+        ballCamFrames += 1
+        return true
+    }
+
+    /// The ball cam's texture on a trapezoid, a quarter of the screen across at the top and a
+    /// little less at the bottom, over the upper screen at the cam's place across.
+    private func layBallCam(_ encoder: MTLRenderCommandEncoder, aspect screenAspect: Float) {
+        guard let texture = ballCamTexture else { return }
+        assert(MemoryLayout<SIMD3<Float>>.stride == 16)
+        let camAspect = Float(BallCamScene.view.width / BallCamScene.view.height)
+        let topWidth: Float = 0.5, bottomWidth: Float = 0.42
+        let height = (topWidth + bottomWidth) / 2 * screenAspect / camAspect
+        let centreX = Float(scene.ballCamScreenX) * 2 - 1
+        let top: Float = 0.9, bottom = top - height
+        // Laid out as Metal's float2 then float3: the float3 sits at 16, 32 bytes a corner.
+        struct Corner { var position: SIMD2<Float>; var pad: SIMD2<Float> = .zero; var uvq: SIMD3<Float> }
+        var corners: [Corner] = [
+            Corner(position: SIMD2(centreX - topWidth / 2, top), uvq: SIMD3(0, 0, 1) * topWidth),
+            Corner(position: SIMD2(centreX + topWidth / 2, top), uvq: SIMD3(1, 0, 1) * topWidth),
+            Corner(position: SIMD2(centreX - bottomWidth / 2, bottom), uvq: SIMD3(0, 1, 1) * bottomWidth),
+            Corner(position: SIMD2(centreX + bottomWidth / 2, bottom), uvq: SIMD3(1, 1, 1) * bottomWidth),
+        ]
+        encoder.setRenderPipelineState(ballCamPipeline)
+        encoder.setVertexBytes(&corners, length: MemoryLayout<Corner>.stride * corners.count, index: 0)
+        encoder.setFragmentTexture(texture, index: 0)
+        encoder.setFragmentSamplerState(nearest, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+    }
+
     private func pass(_ commands: MTLCommandBuffer, pipeline: MTLRenderPipelineState, descriptor: MTLRenderPassDescriptor,
-                      sources: [MTLTexture], uniforms: GlowUniforms) {
+                      sources: [MTLTexture], uniforms: GlowUniforms, then extra: ((MTLRenderCommandEncoder) -> Void)? = nil) {
         guard let encoder = commands.makeRenderCommandEncoder(descriptor: descriptor) else { return }
         encoder.setRenderPipelineState(pipeline)
         for (index, texture) in sources.enumerated() {
@@ -213,6 +302,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         var uniforms = uniforms
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<GlowUniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        extra?(encoder)
         encoder.endEncoding()
     }
 }

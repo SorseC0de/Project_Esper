@@ -473,8 +473,9 @@ under the rim they guard, and the coin flip, off the series' dice so both phones
 puts the ball in one pair of hands. A ball that leaves the world comes back at centre.
 
 - Helmets (`FieldRules`): 4 by 4 tiles, solid, in the defender's energy colour, one of the
-  three helmet vectors filled in that colour, tipped back 30°, facing the
-  way they go, drawn at 1.1 times the box; a burst of `flashspark2` in their colour
+  three helmet vectors filled in that colour, facing the
+  way they go, drawn at 1.1 times the box, tipped back 40°, bobbing round a two-pixel
+  circle each on its own phase; a burst of `flashspark2` in their colour
   where one spawns and where one goes, as when two meet. While someone has the
   ball a clock runs, and every two and a half seconds of it a helmet comes from the end the
   defender guards at one of four heights (20, 50, 70, 90; the lowest pushes a standing
@@ -497,6 +498,12 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   the yard numbers at one and a half times; the turf's five-yard stripes,
   leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded base in the
   colour of the side that guards it, as the court's blocks are, the pole's width and five more, behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
+- The ball cam (`StageFeatures.ballCam`, the view's alone): a close view of the ball,
+  128 by 80 art pixels round it, hanging over the upper screen as a trapezoid wider at the
+  top with a thin black edge, easing across after the local player. It has its own scene,
+  with its own copy of the scenery built once, and its own renderer, drawn one frame in
+  three into a small texture the Metal pass lays down after the glow; the game scene is
+  never drawn twice in a frame.
 - Shadows (`StageFeatures.shadows`, the view's alone): each body's current frame and its
   head, and the goalposts, cast in a dark greyed purple at two thirds, mirrored under the
   feet or the floor line and sheared by the turf's own lean where they stand, so they

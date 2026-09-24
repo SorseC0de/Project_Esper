@@ -26,13 +26,16 @@ public struct StageFeatures: Equatable {
     public var portals = false
     /// The ball starts in a player's hands, by the coin flip, rather than loose at centre.
     public var startsHeld = false
-    /// Bodies and scenery cast shadows on the floor; only the view reads it.
+    /// Bodies and scenery cast shadows on the floor, and a ball cam hangs over the player;
+    /// only the view reads these.
     public var shadows = false
-    public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, shadows: Bool = false) {
+    public var ballCam = false
+    public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, shadows: Bool = false, ballCam: Bool = false) {
         self.helmets = helmets
         self.portals = portals
         self.startsHeld = startsHeld
         self.shadows = shadows
+        self.ballCam = ballCam
     }
 }
 

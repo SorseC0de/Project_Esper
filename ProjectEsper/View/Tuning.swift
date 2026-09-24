@@ -75,7 +75,9 @@ enum ZeusTuning {
 enum HelmetTuning {
     static let scale: CGFloat = 1.1
     /// Tipped back this far, radians, from the vector's own slight lift.
-    static let tilt: CGFloat = .pi / 6
+    static let tilt: CGFloat = .pi / 6 + .pi / 18
+    /// Each helmet bobs round a circle this many art pixels across, as a hover does.
+    static let orbit: CGFloat = 2
     static let numberScale: CGFloat = 1.5
 }
 

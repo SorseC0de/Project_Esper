@@ -389,7 +389,7 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...(columns - 1), rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
         stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
-        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true)
+        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true, ballCam: true)
         // The backboards: behind each rim and above it, solid to the ball.
         stage.ballBlockers = stage.hoops.map { hoop in
             let back = hoop.backboard.sign

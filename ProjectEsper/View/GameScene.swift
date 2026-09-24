@@ -233,6 +233,60 @@ final class GameScene: SKScene {
                              size: CGSize(width: banner.size.width * scale, height: banner.size.height * scale))]
     }
 
+    // MARK: Ball cam
+
+    var ballCamEnabled: Bool { match.stage.features.ballCam && playing }
+    private var playing: Bool { built && !playerNodes.isEmpty }
+
+    /// Where the ball is, in art pixels, held or loose.
+    var ballCamCentre: CGPoint {
+        let ball = match.ball
+        let at = ball.holder.map { match.players[$0].chest + Vec2(x: 0, y: 3) } ?? ball.position
+        return SpriteLibrary.point(at)
+    }
+
+    /// The cam's middle across the screen, 0 to 1, easing after the local player.
+    private(set) var ballCamScreenX: CGFloat = 0.5
+    private func easeBallCam() {
+        guard match.players.indices.contains(localIndex), size.width > 0 else { return }
+        let feet = SpriteLibrary.point(match.players[localIndex].position)
+        let onScreen = (feet.x - cameraNode.position.x) / (size.width * cameraNode.xScale) + 0.5
+        let wanted = min(max(onScreen, 0.2), 0.8)
+        ballCamScreenX += (wanted - ballCamScreenX) * 0.1
+    }
+
+    /// The moving things the ball cam copies: bodies, heads, the ball, helmets.
+    var ballCamSnapshots: [SpriteSnapshot] {
+        var nodes: [SKSpriteNode] = playerNodes + headNodes + handBalls + [ballNode]
+        nodes += helmetNodes.values
+        return nodes.filter { !$0.isHidden && $0.texture != nil && $0.parent != nil }.map { node in
+            SpriteSnapshot(texture: node.texture!, position: node.position, anchor: node.anchorPoint,
+                           size: CGSize(width: node.size.width / abs(node.xScale == 0 ? 1 : node.xScale), height: node.size.height / abs(node.yScale == 0 ? 1 : node.yScale)),
+                           xScale: node.xScale, yScale: node.yScale, zRotation: node.zRotation,
+                           colour: node.color, colourBlend: node.colorBlendFactor, alpha: node.alpha, zPosition: node.zPosition)
+        }
+    }
+
+    /// The field's scenery and goalposts into the ball cam's own scene, once.
+    func fillBallCam(_ camScene: BallCamScene) {
+        guard !camScene.built, match.stage.features.ballCam else { return }
+        camScene.built = true
+        _ = FieldArt.build(for: match.stage, into: camScene.scenery, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
+                           glow: sprites.softGlow(diameter: 64))
+        for hoop in match.stage.hoops {
+            let postX = hoop.backboard == .left ? Stage.fieldPostInset : match.stage.width - Stage.fieldPostInset
+            FieldArt.goalpost(at: SpriteLibrary.point(Vec2(x: postX, y: GoalpostTuning.postRimHeight)), backboard: hoop.backboard, into: camScene.scenery,
+                              crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
+                              angle: GoalpostTuning.crossbarAngle * .pi / 180, thickness: GoalpostTuning.thickness, outline: GoalpostTuning.outline,
+                              padColour: SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow)))
+            let rim = SKSpriteNode(texture: sprites.texture("hoop_rim", 0))
+            rim.position = SpriteLibrary.point(hoop.position)
+            rim.xScale = hoop.backboard == .left ? -1 : 1
+            rim.zPosition = 5
+            camScene.scenery.addChild(rim)
+        }
+    }
+
     var cameraPosition: CGPoint { cameraNode.position }
     var cameraScale: CGFloat { cameraNode.xScale }
 
@@ -1918,7 +1972,10 @@ final class GameScene: SKScene {
             node.size = CGSize(width: side, height: side)
             node.xScale = -forward
             node.zRotation = -HelmetTuning.tilt * forward
+            // A slow circle, each on its own phase, like a hover; the drawing only.
+            let phase = Double(match.frame) / 60 * 2 * .pi * 0.6 + Double(helmet.id) * 1.7
             node.position = SpriteLibrary.point(helmet.box.center)
+                + CGPoint(x: cos(phase) * HelmetTuning.orbit, y: sin(phase) * HelmetTuning.orbit)
         }
         for (id, node) in helmetNodes where !seen.contains(id) {
             node.removeFromParent()
@@ -2452,6 +2509,7 @@ final class GameScene: SKScene {
         if match.stage.features.helmets {
             cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase
         }
+        if match.stage.features.ballCam { easeBallCam() }
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.
         if shake > 0 {
             shake -= 1

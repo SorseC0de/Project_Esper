@@ -457,8 +457,11 @@ floor and walls start purple and shift over 20 frames to the colour of whoever h
 ball, and back. The backboard blocks wear the colour of the player who scores there's opponent, since you
 score on the other side's basket. The ledge is
 magenta. Three small faint green chevrons stack over the rim
-the holder scores on. The head particles are `esper_particle` frames at a hard square's size, stepping down as
-they go; Blazing Boba's head burns `fire_particle`, Frost Tea's sheds snowflakes among the energy,
+the holder scores on. The head particles are sprites of their own, not an emitter, so each plays its sheet
+through at 24 a second over its life (`esper_particle` by default), rising on one
+swinging wind; a single-frame one (a snowflake, or the squares with
+`ParticleLook.sprites` off) steps down in size instead. The double jump's platform plays
+the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, Frost Tea's sheds snowflakes among the energy,
 Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
 `ParticleLook`: energy 4, snowflake 6, fire 12, lightning 6. Hits spark with
 `esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and

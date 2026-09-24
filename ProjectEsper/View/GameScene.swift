@@ -394,7 +394,7 @@ final class GameScene: SKScene {
             glowers.addChild(halo)
             handHalos.append(halo)
             let fire = makeFire(colour)
-            fire.zPosition = 1
+            fire.particleBirthRate = 0
             fire.targetNode = glowers
             glowers.addChild(fire)
             headFires.append(fire)
@@ -1386,7 +1386,11 @@ final class GameScene: SKScene {
             let hold = 0.12 + Double(abs(index - count / 2)) * 0.02
             let drop = SKAction.moveBy(x: spread * 0.3, y: -10 - CGFloat(index % 3) * 4, duration: 0.3)
             drop.timingMode = .easeIn
-            let shrink = SKAction.sequence([.wait(forDuration: 0.15), .scale(to: 0.66, duration: 0), .wait(forDuration: 0.1), .scale(to: 0.33, duration: 0)])
+            // The particle sheet played through as it drops, or the squares' step down.
+            let frames = sheetFrames("esper_particle")
+            let shrink = ParticleLook.sprites && frames.count > 1
+                ? SKAction.animate(with: frames, timePerFrame: 0.3 / Double(frames.count))
+                : SKAction.sequence([.wait(forDuration: 0.15), .scale(to: 0.66, duration: 0), .wait(forDuration: 0.1), .scale(to: 0.33, duration: 0)])
             square.run(.sequence([.wait(forDuration: hold), .group([drop, shrink]), .removeFromParent()]))
         }
     }
@@ -1474,42 +1478,121 @@ final class GameScene: SKScene {
         glowers.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped, player: player))
     }
 
-    /// The head's particles by power: Blazing Boba's are the fire sheet's frame, painted;
-    /// Frost Tea's have snowflakes mixed in; the rest are the energy particle.
-    private var headParticlePower: [Int: Power] = [:]
-    private func setHeadParticles(_ index: Int, power: Power) {
-        guard headParticlePower[index] != power else { return }
-        headParticlePower[index] = power
-        let fire = headFires[index], mix = headMixes[index]
+    /// The head's particles, sprites of their own rather than an emitter, since an emitter
+    /// can't play a sheet: each one plays its sheet through at 24 a second over its life,
+    /// rising and bending with one wind. A stream is a sheet, its size and its colour;
+    /// a power may mix two streams, half the rate each.
+    private struct HeadStream {
+        var frames: [SKTexture]
+        var size: CGFloat
+        var tint: SKColor?
+        var rate: Double
+    }
+
+    private struct HeadParticle {
+        var node: SKSpriteNode
+        var owner: Int
+        var velocity: CGVector
+        var age: Double
+        var life: Double
+        var frames: [SKTexture]
+    }
+
+    private var headParticles: [HeadParticle] = []
+    private var headCredit: [Int: [Double]] = [:]
+    private var headStreamsCache: [Int: (power: Power, streams: [HeadStream])] = [:]
+
+    private func sheetFrames(_ name: String, toned player: Int? = nil) -> [SKTexture] {
+        let count = EffectSheets.frames[name] ?? 1
+        return (0..<count).map { frame in player.map { sprites.effectTexture(name, frame, player: $0) } ?? sprites.texture(name, frame) }
+    }
+
+    private func headStreams(_ index: Int, power: Power) -> [HeadStream] {
+        if let cached = headStreamsCache[index], cached.power == power { return cached.streams }
         let colour = SKColor(rgb: sprites.look(for: index).glow)
-        func dress(_ emitter: SKEmitterNode, _ texture: SKTexture, size: CGFloat, tint: SKColor?, blend: CGFloat) {
-            emitter.particleTexture = texture
-            emitter.particleSize = CGSize(width: size, height: size)
-            if let tint { emitter.particleColor = tint }
-            emitter.particleColorBlendFactor = blend
-        }
-        let energy = ParticleLook.sprites ? sprites.texture("esper_particle", (EffectSheets.frames["esper_particle"] ?? 1) / 3) : sprites.flatSquare(size: 4, alpha: 1)
-        dress(fire, energy, size: ParticleLook.energySize, tint: colour, blend: 1)
-        mixing[index] = false
+        let energy = HeadStream(frames: ParticleLook.sprites ? sheetFrames("esper_particle") : [sprites.flatSquare(size: 4, alpha: 1)],
+                                size: ParticleLook.energySize, tint: colour, rate: 24)
+        var streams = [energy]
         switch power {
         case .blazingBoba where EffectSheets.frames["fire_particle"] != nil:
-            dress(fire, sprites.texture("fire_particle", (EffectSheets.frames["fire_particle"] ?? 1) / 3), size: ParticleLook.fireSize, tint: nil, blend: 0)
+            streams = [HeadStream(frames: sheetFrames("fire_particle"), size: ParticleLook.fireSize, tint: nil, rate: 24)]
         case .frostTea:
             // Snowflakes among the energy.
-            dress(mix, SKTexture(imageNamed: "Snowflake"), size: ParticleLook.snowflakeSize, tint: GameScene.ice, blend: 0.6)
-            mixing[index] = true
+            streams = [HeadStream(frames: energy.frames, size: energy.size, tint: colour, rate: 12),
+                       HeadStream(frames: [SKTexture(imageNamed: "Snowflake")], size: ParticleLook.snowflakeSize, tint: GameScene.ice, rate: 12)]
         case .zeusJuice where EffectSheets.frames["lightning_particle"] != nil:
             // The two bolts, half each, toned in the energy colour.
-            dress(fire, sprites.effectTexture("lightning_particle", (EffectSheets.frames["lightning_particle"] ?? 1) / 3, player: index), size: ParticleLook.lightningSize, tint: nil, blend: 0)
+            streams = [HeadStream(frames: sheetFrames("lightning_particle", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 12)]
             if EffectSheets.frames["lightning_particle2"] != nil {
-                dress(mix, sprites.effectTexture("lightning_particle2", (EffectSheets.frames["lightning_particle2"] ?? 1) / 3, player: index), size: ParticleLook.lightningSize, tint: nil, blend: 0)
-                mixing[index] = true
+                streams.append(HeadStream(frames: sheetFrames("lightning_particle2", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 12))
+            } else {
+                streams[0].rate = 24
             }
         default:
             break
         }
+        headStreamsCache[index] = (power, streams)
+        return streams
     }
-    private var mixing: [Int: Bool] = [:]
+
+    /// New particles off a head at `point` this frame, by its streams' rates.
+    private func emitHeadParticles(_ index: Int, power: Power, at point: CGPoint) {
+        let streams = headStreams(index, power: power)
+        var credit = headCredit[index] ?? []
+        while credit.count < streams.count { credit.append(0) }
+        for (slot, stream) in streams.enumerated() {
+            credit[slot] += stream.rate / 60
+            while credit[slot] >= 1 {
+                credit[slot] -= 1
+                let node = SKSpriteNode(texture: stream.frames[0])
+                node.size = CGSize(width: stream.size, height: stream.size)
+                if let tint = stream.tint {
+                    node.color = tint
+                    node.colorBlendFactor = 1
+                }
+                // Drawn over, not added: added on top of the head they saturate to white.
+                node.blendMode = .alpha
+                node.zPosition = 1
+                node.position = CGPoint(x: point.x + CGFloat.random(in: -1...1), y: point.y + CGFloat.random(in: -0.5...0.5))
+                if stream.frames.count == 1 { node.zRotation = CGFloat.random(in: 0...(2 * .pi)) }
+                glowers.addChild(node)
+                let angle = Double.pi / 2 + Double.random(in: -Double.pi / 28...Double.pi / 28)
+                let speed = 24 + Double.random(in: -2...2)
+                // A sheet plays through once over the life; a single frame lives 0.6 s.
+                let life = stream.frames.count > 1 ? Double(stream.frames.count) / 24 : 0.6 + Double.random(in: -0.05...0.05)
+                headParticles.append(HeadParticle(node: node, owner: index, velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
+                                                  age: 0, life: life, frames: stream.frames))
+            }
+        }
+        headCredit[index] = credit
+    }
+
+    /// Every head particle a frame on: the sheet's frame for its age, the rise, the wind.
+    private func stepHeadParticles() {
+        let step = 1.0 / 60
+        headParticles = headParticles.compactMap { particle in
+            var particle = particle
+            particle.age += step
+            guard particle.age < particle.life else {
+                particle.node.removeFromParent()
+                return nil
+            }
+            let wind = sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(particle.owner) * 2) * 140
+            particle.velocity.dx += wind * step
+            particle.velocity.dy += 10 * step
+            particle.node.position = CGPoint(x: particle.node.position.x + particle.velocity.dx * step,
+                                             y: particle.node.position.y + particle.velocity.dy * step)
+            let share = particle.age / particle.life
+            if particle.frames.count > 1 {
+                particle.node.texture = particle.frames[min(Int(particle.age * 24), particle.frames.count - 1)]
+            } else {
+                // A single frame steps down in size and fades, the digital dissolve.
+                particle.node.setScale(share < 0.45 ? 1 : (share < 0.75 ? 0.66 : 0.33))
+            }
+            particle.node.alpha = share < 0.85 ? 0.9 : 0.9 * (1 - share) / 0.15
+            return particle
+        }
+    }
 
     /// Frost Tea's snowflakes: the vector, small, thrown out from a point and fading.
     private func spawnSnowflakes(at point: CGPoint, count: Int, spread: CGFloat) {
@@ -1746,6 +1829,7 @@ final class GameScene: SKScene {
     // MARK: Drawing
 
     private func render() {
+        stepHeadParticles()
         for (index, player) in match.players.enumerated() {
             let node = playerNodes[index]
             let frame = player.animationFrame
@@ -1923,17 +2007,7 @@ final class GameScene: SKScene {
                 headNode.yScale = 1
                 headNode.zRotation = tilt
                 headNode.position = shown
-                setHeadParticles(index, power: player.power)
-                // A mixed stream splits the rate between its two emitters.
-                let mixed = mixing[index] == true
-                // One sideways wind on all the bits at once, swinging back and forth, so the
-                // column bends as a whole like a scarf rather than scattering.
-                let wind = CGFloat(sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(index) * 2)) * 140
-                for (emitter, rate) in [(headFires[index], mixed ? 12.0 : 24.0), (headMixes[index], mixed ? 12.0 : 0)] {
-                    emitter.position = CGPoint(x: shown.x, y: shown.y + 4)
-                    emitter.particleBirthRate = CGFloat(rate)
-                    emitter.xAcceleration = wind
-                }
+                emitHeadParticles(index, power: player.power, at: CGPoint(x: shown.x, y: shown.y + 4))
             } else {
                 headNode.isHidden = true
                 headFires[index].particleBirthRate = 0

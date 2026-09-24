@@ -47,8 +47,7 @@ public enum FieldRules {
     public static let helmetHeights: [Double] = [30, 50, 70, 90]
     public static let helmetVariants = 3
     public static let portalFrames = 300
-    /// Offline, the PORTAL slider sets it; both phones keep the default online.
-    nonisolated(unsafe) public static var portalHeight = 150.0
+    public static let portalHeight = 90.0
     public static let portalHalfWidth = 5.0
     public static let portalHalfHeight = 15.0
     /// Kept this far from either end, clear of the goalposts.
@@ -90,7 +89,11 @@ extension Match {
             }
             // Gone at the far wall.
             let far = helmet.speed > 0 ? helmet.box.max.x >= stage.width - Stage.tileSize : helmet.box.min.x <= Stage.tileSize
-            if !far { kept.append(helmet) }
+            if far {
+                events.append(.helmetRemoved(at: helmet.box.center, owner: helmet.owner))
+            } else {
+                kept.append(helmet)
+            }
         }
         // Two going opposite ways that meet take each other out.
         var gone = Set<Int>()
@@ -119,7 +122,7 @@ extension Match {
         let box = Box(min: Vec2(x: x, y: bottom), max: Vec2(x: x + size, y: bottom + size))
         helmets.append(Helmet(id: stampId(), box: box, speed: FieldRules.helmetSpeed * (fromRight ? -1 : 1),
                               owner: defender, variant: fieldDice.roll(FieldRules.helmetVariants)))
-        events.append(.helmetSpawned(owner: defender))
+        events.append(.helmetSpawned(at: box.center, owner: defender))
     }
 
     private func stands(_ player: Player, on box: Box) -> Bool {

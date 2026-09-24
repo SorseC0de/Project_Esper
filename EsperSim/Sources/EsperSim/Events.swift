@@ -17,7 +17,9 @@ public enum MatchEvent: Equatable {
     case scored(player: Int, hoop: Int, entry: Vec2)
     case ballBounced(position: Vec2)
     case ballRespawned
-    case helmetSpawned(owner: Int)
+    case helmetSpawned(at: Vec2, owner: Int)
+    /// Gone at the far wall.
+    case helmetRemoved(at: Vec2, owner: Int)
     case helmetsCollided(at: Vec2, owner: Int)
     case portalOpened(at: Vec2)
     case portalClosed(at: Vec2)

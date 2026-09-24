@@ -71,13 +71,19 @@ enum ZeusTuning {
     nonisolated(unsafe) static var chargeScale: Float = 0.17
 }
 
-/// The helmets' drawing against their five-tile box, on the HELMET slider until it's settled.
+/// The helmets' drawing against their box, and the yard numbers' size, as tuned.
 enum HelmetTuning {
-    nonisolated(unsafe) static var scale: Float = 1
+    static let scale: CGFloat = 1.1
     /// Tipped back this far, radians, from the vector's own slight lift.
     static let tilt: CGFloat = .pi / 6
-    /// The yard numbers' size.
-    nonisolated(unsafe) static var numberScale: Float = 1
+    static let numberScale: CGFloat = 1.5
+}
+
+/// The goalposts, on the CROSSBAR Y and PRONGS sliders until they're settled: the
+/// crossbar's height against the rim, and the uprights' length above it, in art pixels.
+enum GoalpostTuning {
+    nonisolated(unsafe) static var crossbarBelowRim: Float = 14
+    nonisolated(unsafe) static var prongHeight: Float = 130
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the

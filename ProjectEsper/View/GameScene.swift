@@ -298,7 +298,10 @@ final class GameScene: SKScene {
             handles.rail.color = courtColour
             courtTiles.append(handles.rail)
             fieldBlooms = handles.blooms
+            lightPanels = handles.panels
+            for panel in lightPanels { panel.fillColor = courtColour }
             yardNumbers = handles.numbers
+            for number in yardNumbers { number.setScale(HelmetTuning.numberScale) }
             for bloom in fieldBlooms { bloom.color = courtColour }
             // Chevrons along the rail, pointing at the rim the holder attacks.
             var x: CGFloat = 8
@@ -314,9 +317,8 @@ final class GameScene: SKScene {
                 railChevrons.append(chevron)
                 x += 14
             }
-            for hoop in stage.hoops {
-                FieldArt.goalpost(at: SpriteLibrary.point(hoop.position), backboard: hoop.backboard, into: ground)
-            }
+            ground.addChild(goalposts)
+            buildGoalposts()
         }
         for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.helmets {
             for column in 0..<stage.columns {
@@ -626,6 +628,7 @@ final class GameScene: SKScene {
         let shown = SKColor(red: r + (1 - r) * courtWhite, green: g + (1 - g) * courtWhite, blue: b + (1 - b) * courtWhite, alpha: 1)
         for tile in courtTiles { tile.color = shown }
         for bloom in fieldBlooms { bloom.color = shown }
+        for panel in lightPanels { panel.fillColor = shown }
     }
 
     /// The streak a flying ball leaves: soft blobs dropped where it was, thinning out, so
@@ -724,17 +727,13 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addSlider(title: "HELMET", range: 0.5...2.0, notch: 0.05, value: HelmetTuning.scale) { value in
-            HelmetTuning.scale = value
+        controls.addSlider(title: "CROSSBAR Y", range: -40...80, notch: 1, value: GoalpostTuning.crossbarBelowRim) { [weak self] value in
+            GoalpostTuning.crossbarBelowRim = value
+            self?.buildGoalposts()
         }
-        controls.addSlider(title: "PORTAL Y", range: 40...200, notch: 5, value: Float(FieldRules.portalHeight)) { [weak self] value in
-            // Offline only: the sim's rule, and the portal up now moved to it.
-            guard let self, self.online == nil else { return }
-            FieldRules.portalHeight = Double(value)
-            self.session.mutate { match in match.portal?.centre.y = Double(value) }
-        }
-        controls.addSlider(title: "YARD NUMBERS", range: 0.5...3.0, notch: 0.05, value: HelmetTuning.numberScale) { value in
-            HelmetTuning.numberScale = value
+        controls.addSlider(title: "PRONGS", range: 20...300, notch: 5, value: GoalpostTuning.prongHeight) { [weak self] value in
+            GoalpostTuning.prongHeight = value
+            self?.buildGoalposts()
         }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
@@ -1393,7 +1392,7 @@ final class GameScene: SKScene {
                 spawnSnowflakes(at: SpriteLibrary.point(match.ball.position), count: 8, spread: 10)
             case .cloneShattered(let at):
                 spawnSnowflakes(at: SpriteLibrary.point(at), count: 12, spread: 16)
-            case .helmetsCollided(let at, let owner):
+            case .helmetsCollided(let at, let owner), .helmetSpawned(let at, let owner), .helmetRemoved(let at, let owner):
                 // A burst of flashes in the helmet's colour.
                 for step in 0..<6 {
                     let angle = CGFloat(step) / 6 * 2 * .pi
@@ -1742,6 +1741,17 @@ final class GameScene: SKScene {
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
     private var fieldBlooms: [SKSpriteNode] = []
+    private var lightPanels: [SKShapeNode] = []
+    private let goalposts = SKNode()
+
+    /// The goalposts drawn afresh at the sliders' numbers.
+    private func buildGoalposts() {
+        goalposts.removeAllChildren()
+        for hoop in match.stage.hoops {
+            FieldArt.goalpost(at: SpriteLibrary.point(hoop.position), backboard: hoop.backboard, into: goalposts,
+                              crossbarBelowRim: CGFloat(GoalpostTuning.crossbarBelowRim), prongHeight: CGFloat(GoalpostTuning.prongHeight))
+        }
+    }
     private var yardNumbers: [SKNode] = []
     private var railChevrons: [SKSpriteNode] = []
     private var portalNode: SKShapeNode?
@@ -1763,7 +1773,7 @@ final class GameScene: SKScene {
                 return node
             }()
             // Facing the way it goes, tipped back, at the slider's scale over its box.
-            let side = CGFloat(FieldRules.helmetSize * SpriteLibrary.pixelsPerUnit) * CGFloat(HelmetTuning.scale)
+            let side = CGFloat(FieldRules.helmetSize * SpriteLibrary.pixelsPerUnit) * HelmetTuning.scale
             let forward: CGFloat = helmet.speed > 0 ? 1 : -1
             node.setScale(1)
             node.size = CGSize(width: side, height: side)
@@ -1786,7 +1796,6 @@ final class GameScene: SKScene {
             let drift = CGFloat(match.frame % 28) / 2 * (right ? 1 : -1)
             chevron.position.x = 8 + CGFloat(index) * 14 + drift
         }
-        for number in yardNumbers { number.setScale(CGFloat(HelmetTuning.numberScale)) }
         if let portal = match.portal {
             if portalNode == nil || portalId != portal.id {
                 portalNode?.removeFromParent()
@@ -2402,10 +2411,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nhelmet %.2f  portal y %.0f  yard numbers %.2f",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\ncrossbar %.0f below rim  prongs %.0f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 HelmetTuning.scale, FieldRules.portalHeight, HelmetTuning.numberScale)
+                                 GoalpostTuning.crossbarBelowRim, GoalpostTuning.prongHeight)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

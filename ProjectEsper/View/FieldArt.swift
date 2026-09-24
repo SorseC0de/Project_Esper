@@ -32,6 +32,8 @@ enum FieldArt {
     struct Handles {
         var rail: SKSpriteNode
         var blooms: [SKSpriteNode] = []
+        /// The panels the lamps sit on, which also wear the possession's colour.
+        var panels: [SKShapeNode] = []
         var numbers: [SKNode] = []
     }
 
@@ -101,7 +103,16 @@ enum FieldArt {
             bloom.zPosition = -15
             parent.addChild(bloom)
             handles.blooms.append(bloom)
-            rect(bank, lightsBottom, 120, 44, SKColor(red: 0.08, green: 0.12, blue: 0.22, alpha: 1), z: -14)
+            // The panel, a trapezoid wider at the top.
+            let panelPath = CGMutablePath()
+            panelPath.addLines(between: [CGPoint(x: bank + 4, y: lightsBottom), CGPoint(x: bank + 116, y: lightsBottom),
+                                         CGPoint(x: bank + 124, y: lightsBottom + 44), CGPoint(x: bank - 4, y: lightsBottom + 44)])
+            panelPath.closeSubpath()
+            let panel = SKShapeNode(path: panelPath)
+            panel.strokeColor = .clear
+            panel.zPosition = -14
+            parent.addChild(panel)
+            handles.panels.append(panel)
             for row in 0..<4 {
                 for column in 0..<9 {
                     let lamp = SKShapeNode(circleOfRadius: 4)
@@ -183,11 +194,11 @@ enum FieldArt {
 
     /// A goalpost at a rim: the padded base behind it on the floor, the gold pole bending
     /// forward to the crossbar under the rim, and the two uprights rising from its ends.
-    static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode) {
+    static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode, crossbarBelowRim: CGFloat, prongHeight: CGFloat) {
         let back = CGFloat(backboard.sign)
         let floor: CGFloat = 16
         let baseX = rim.x + back * 26
-        let crossbarY = rim.y - 14
+        let crossbarY = rim.y - crossbarBelowRim
         let halfSpan: CGFloat = 24
         let base = SKShapeNode(rectOf: CGSize(width: 8, height: 40), cornerRadius: 3)
         base.fillColor = pad
@@ -203,7 +214,7 @@ enum FieldArt {
         path.addLine(to: CGPoint(x: rim.x + halfSpan, y: crossbarY))
         for side in [-halfSpan, halfSpan] {
             path.move(to: CGPoint(x: rim.x + side, y: crossbarY))
-            path.addLine(to: CGPoint(x: rim.x + side, y: crossbarY + 130))
+            path.addLine(to: CGPoint(x: rim.x + side, y: crossbarY + prongHeight))
         }
         let post = SKShapeNode(path: path)
         post.strokeColor = gold

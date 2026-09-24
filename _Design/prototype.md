@@ -360,8 +360,8 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
-- HELMET, a slider under the score: the football helmets' drawing against their box.
-  PORTAL Y under it moves the portal, offline; YARD NUMBERS sizes the yard numbers.
+- CROSSBAR Y and PRONGS, sliders under the score: the goalposts' crossbar below the rim
+  and the uprights' length, in art pixels, until they're settled.
 - HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
@@ -468,7 +468,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 
 - Helmets (`FieldRules`): 4 by 4 tiles, solid, in the defender's energy colour, one of the
   three helmet vectors filled in that colour, tipped back 30°, facing the
-  way they go, drawn at the HELMET slider's scale over the box. While someone has the
+  way they go, drawn at 1.1 times the box; a burst of `flashspark2` in their colour
+  where one spawns and where one goes, as when two meet. While someone has the
   ball a clock runs, and every two and a half seconds of it a helmet comes from the end the
   defender guards at one of four heights (30, 50, 70, 90; the lowest clears a standing
   body) and crosses at 2 a frame to
@@ -478,7 +479,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   way, and a pushed ball is an ordinary ball again, falling. The computer, meeting one at
   its height, hops and double jumps onto it and rides it. Two going opposite ways that meet take each other out in a burst of `flashspark2`
   in their colours.
-- The portal: a vertical loop at 150 (the PORTAL Y slider, offline), above double-jump height, at a random x kept 200
+- The portal: a vertical loop at 90, above double-jump height, at a random x kept 200
   from either end; one at a time, five seconds each, the next as soon as it goes. A shot
   or throw still its thrower's through it comes out ten yards, a hundredth of the field
   each, toward the thrower's rim, with a lift of 2 forward and 3.5 up.
@@ -486,7 +487,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   the stands with fanning lines and a rail twelve pixels tall that wears the possession's
   colour like the court's walls and, with the ball in hand, fills with chevrons drifting
   toward the rim the holder attacks; the floodlights' blooms take the same colour, purple
-  when nobody has it; the turf's five-yard stripes,
+  when nobody has it, and so do the panels the lamps sit on, trapezoids wider at the top;
+  the yard numbers at one and a half times; the turf's five-yard stripes,
   leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded blue base
   behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
 - The camera scrolls sideways only: level, gliding after the local player a share of the

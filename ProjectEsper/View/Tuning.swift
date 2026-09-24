@@ -79,6 +79,18 @@ enum HelmetTuning {
     static let numberScale: CGFloat = 1.5
 }
 
+/// The backboard, a cluster of flashes behind each rim: its place against the rim, in art
+/// pixels, its size and its shear in degrees, on the BOARD sliders until they're settled.
+enum BackboardTuning {
+    nonisolated(unsafe) static var x: Float = 6
+    nonisolated(unsafe) static var y: Float = 14
+    nonisolated(unsafe) static var size: Float = 0.5
+    nonisolated(unsafe) static var skew: Float = 20
+    static let columns = 3
+    static let rows = 4
+    static let spacing: CGFloat = 9
+}
+
 /// The goalposts: the crossbar's height below the rim and the uprights' length above it,
 /// in art pixels, and the crossbar's tilt in degrees, on the CROSSBAR ANGLE slider until
 /// it's settled; the far end rises, and its upright with it.

@@ -15,6 +15,10 @@ enum FieldArt {
     /// Shadows: a dark, greyed purple at two thirds.
     static let shadow = SKColor(red: 0.17, green: 0.13, blue: 0.21, alpha: 1)
     static let shadowAlpha: CGFloat = 0.66
+    /// A shadow thins out and shrinks as its body rises: gone by this many art pixels up,
+    /// and down to this share of its size there.
+    static let shadowFadeHeight: CGFloat = 160
+    static let shadowSmallest: CGFloat = 0.5
     /// The turf's lean: yard lines tip this share of their distance to the middle across
     /// the turf's height.
     static let turfLean: CGFloat = 0.12

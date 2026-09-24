@@ -500,6 +500,12 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   head, and the goalposts, cast in a dark greyed purple at two thirds, mirrored under the
   feet or the floor line and sheared by the turf's own lean where they stand, so they
   tip away from the field's middle as the yard lines tip toward it.
+  A body's shadow stays on the ground under it: rising, it thins out and shrinks, gone at
+  160 pixels up, half its size by then.
+- The backboard: behind each rim a 3 by 4 cluster of `flashspark2` in the guarding side's
+  energy, each on its own frame so the board shimmers, on a grid sheared to the
+  crossbar's lean; placed, sized and sheared by the BOARD X, Y, SIZE and SKEW sliders
+  until they're settled.
 - The camera scrolls sideways only: level, gliding after the local player a share of the
   way each frame and leading them by where they're heading, stopped at the field's ends.
   The view takes in the stage's height and the turf below the floor. When the ball is off

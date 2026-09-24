@@ -328,6 +328,8 @@ final class GameScene: SKScene {
             ground.addChild(goalpostShadows)
             ground.addChild(goalposts)
             buildGoalposts()
+            glowers.addChild(backboards)
+            buildBackboards()
         }
         for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.helmets {
             for column in 0..<stage.columns {
@@ -746,6 +748,22 @@ final class GameScene: SKScene {
         controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
+        }
+        controls.addSlider(title: "BOARD X", range: -30...30, notch: 1, value: BackboardTuning.x) { [weak self] value in
+            BackboardTuning.x = value
+            self?.buildBackboards()
+        }
+        controls.addSlider(title: "BOARD Y", range: -30...60, notch: 1, value: BackboardTuning.y) { [weak self] value in
+            BackboardTuning.y = value
+            self?.buildBackboards()
+        }
+        controls.addSlider(title: "BOARD SIZE", range: 0.1...1.5, notch: 0.05, value: BackboardTuning.size) { [weak self] value in
+            BackboardTuning.size = value
+            self?.buildBackboards()
+        }
+        controls.addSlider(title: "BOARD SKEW", range: -60...60, notch: 1, value: BackboardTuning.skew) { [weak self] value in
+            BackboardTuning.skew = value
+            self?.buildBackboards()
         }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
@@ -1755,6 +1773,37 @@ final class GameScene: SKScene {
     private var fieldBlooms: [SKSpriteNode] = []
     private var lightPanels: [SKShapeNode] = []
     private let goalposts = SKNode()
+    private let backboards = SKNode()
+
+    /// Behind each rim a cluster of `flashspark2` in the guarding side's energy, each on its
+    /// own frame, laid out on a grid sheared to the crossbar's lean.
+    private func buildBackboards() {
+        backboards.removeAllChildren()
+        let frameCount = EffectSheets.frames[EnergyEffect.flashSpark2.name] ?? 1
+        for hoop in match.stage.hoops {
+            let owner = 1 - hoop.owner
+            let frames = sprites.effectFrames(EnergyEffect.flashSpark2, player: owner)
+            let back = CGFloat(hoop.backboard.sign)
+            let rim = SpriteLibrary.point(hoop.position)
+            let centre = CGPoint(x: rim.x + back * CGFloat(BackboardTuning.x), y: rim.y + CGFloat(BackboardTuning.y))
+            let shear = tan(CGFloat(BackboardTuning.skew) * .pi / 180) * -back
+            for column in 0..<BackboardTuning.columns {
+                for row in 0..<BackboardTuning.rows {
+                    let across = (CGFloat(column) - CGFloat(BackboardTuning.columns - 1) / 2) * BackboardTuning.spacing * CGFloat(BackboardTuning.size) * 2
+                    let up = (CGFloat(row) - CGFloat(BackboardTuning.rows - 1) / 2) * BackboardTuning.spacing * CGFloat(BackboardTuning.size) * 2
+                    let spark = SKSpriteNode(texture: frames[0])
+                    spark.setScale(CGFloat(BackboardTuning.size))
+                    spark.position = CGPoint(x: centre.x + across, y: centre.y + up + across * shear)
+                    spark.zPosition = 4
+                    // Each starts on its own frame, so the board shimmers rather than blinks.
+                    let start = (column * 7 + row * 5) % max(frameCount, 1)
+                    let looped: [SKTexture] = Array(frames[start...]) + Array(frames[..<start])
+                    spark.run(SKAction.repeatForever(SKAction.animate(with: looped, timePerFrame: 1.0 / 24)))
+                    backboards.addChild(spark)
+                }
+            }
+        }
+    }
     /// The goalposts' shadows, one flat group at two thirds so overlaps don't darken, and
     /// each player's body and head shadow.
     private let goalpostShadows = SKEffectNode()
@@ -1775,15 +1824,21 @@ final class GameScene: SKScene {
 
     /// A sprite's shadow: the same frame in the shadow colour, mirrored under its anchor and
     /// sheared with the turf, `height` pixels of it above the anchor at `x`.
-    private func castShadow(_ shadow: SKSpriteNode, of source: SKSpriteNode, anchorY: CGFloat, facing: CGFloat) {
+    /// `ground` is the floor under the body and `rise` how far up off it the feet are: the
+    /// shadow stays on the ground, thinner and smaller the higher the body.
+    private func castShadow(_ shadow: SKSpriteNode, of source: SKSpriteNode, anchorY: CGFloat, facing: CGFloat, ground: CGFloat, rise: CGFloat) {
         guard let texture = source.texture else { shadow.isHidden = true; return }
-        shadow.isHidden = source.isHidden
+        let height = max(rise, 0)
+        let share = min(height / FieldArt.shadowFadeHeight, 1)
+        let scale = 1 - (1 - FieldArt.shadowSmallest) * share
+        shadow.isHidden = source.isHidden || share >= 1
+        shadow.alpha = FieldArt.shadowAlpha * (1 - share)
         shadow.texture = texture
         shadow.setScale(1)
         shadow.size = source.size
         shadow.anchorPoint = source.anchorPoint
-        shadow.xScale = facing
-        shadow.yScale = -1
+        shadow.xScale = facing * scale
+        shadow.yScale = -scale
         shadow.zRotation = -source.zRotation
         let centre = CGFloat(match.stage.columns) * GameScene.pixelsPerTile / 2
         let slope = FieldArt.slope(at: source.position.x, centre: centre)
@@ -1794,8 +1849,9 @@ final class GameScene: SKScene {
                                                  sourcePositions: [SIMD2(0, 0), SIMD2(1, 0), SIMD2(0, 1), SIMD2(1, 1)],
                                                  destinationPositions: [SIMD2(Float(shear * rowBottom), 0), SIMD2(Float(1 + shear * rowBottom), 0),
                                                                         SIMD2(Float(shear * rowTop), 1), SIMD2(Float(1 + shear * rowTop), 1)])
-        let height = source.position.y - anchorY
-        shadow.position = CGPoint(x: source.position.x - slope * height, y: anchorY - height)
+        // Its place below the feet, mirrored and shrunk, set down on the ground.
+        let above = (source.position.y - anchorY) * scale
+        shadow.position = CGPoint(x: source.position.x - slope * above, y: ground - above)
     }
     private var netNodes: [SKShapeNode] = []
 
@@ -2312,8 +2368,9 @@ final class GameScene: SKScene {
             if match.stage.features.shadows {
                 // The body and head cast down from the feet, flipped and sheared with the turf.
                 let feet = SpriteLibrary.point(player.position).y
-                castShadow(shadowBodies[index], of: node, anchorY: feet, facing: node.xScale)
-                castShadow(shadowHeads[index], of: headNode, anchorY: feet, facing: headNode.xScale)
+                let drop = CGFloat(match.stage.drop(fromX: player.position.x, y: player.position.y) * SpriteLibrary.pixelsPerUnit)
+                castShadow(shadowBodies[index], of: node, anchorY: feet, facing: node.xScale, ground: feet - drop, rise: drop)
+                castShadow(shadowHeads[index], of: headNode, anchorY: feet, facing: headNode.xScale, ground: feet - drop, rise: drop)
             }
             drawCape(index, player: player, behind: node.position)
             if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {
@@ -2486,9 +2543,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nboard x %.0f y %.0f size %.2f skew %.0f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
+                                 BackboardTuning.x, BackboardTuning.y, BackboardTuning.size, BackboardTuning.skew)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

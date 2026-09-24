@@ -34,20 +34,21 @@ public struct StageFeatures: Equatable {
 }
 
 /// The field's numbers. Helmets are five tiles square, spawn every five seconds of
-/// possession, halved to two and a half, from the defender's end at one of four heights, and cross to the
+/// possession, halved to two and a half, from the defender's end at one of four heights, four
+/// tiles square, and cross to the
 /// other end. The portal is a vertical loop above double-jump height, one at a time, five
 /// seconds each, the next as soon as it goes; a shot or throw through it comes out ten
 /// yards toward the shooter's rim with a lift.
 public enum FieldRules {
-    public static let helmetSize = 50.0
+    public static let helmetSize = 40.0
     public static let helmetSpawnFrames = 150
     public static let helmetSpeed = 2.0
-    /// The lowest leaves room to crouch or slide under it: over a crouched body, under a
-    /// standing one.
-    public static let helmetHeights: [Double] = [20, 50, 80, 110]
+    /// The lowest clears a standing body.
+    public static let helmetHeights: [Double] = [30, 50, 70, 90]
     public static let helmetVariants = 3
     public static let portalFrames = 300
-    public static let portalHeight = 150.0
+    /// Offline, the PORTAL slider sets it; both phones keep the default online.
+    nonisolated(unsafe) public static var portalHeight = 150.0
     public static let portalHalfWidth = 5.0
     public static let portalHalfHeight = 15.0
     /// Kept this far from either end, clear of the goalposts.
@@ -159,6 +160,9 @@ extension Match {
         if (ball.velocity.x > 0) != (helmet.speed > 0) || abs(ball.velocity.x) < abs(helmet.speed) {
             ball.velocity.x = helmet.speed
         }
+        // Pushed, it's an ordinary ball: it falls.
+        ball.straight = false
+        ball.floater = 0
         ball.resting = false
     }
 

@@ -361,6 +361,7 @@ holds the variants; A is always the baseline as tuned.
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
 - HELMET, a slider under the score: the football helmets' drawing against their box.
+  PORTAL Y under it moves the portal, offline; YARD NUMBERS sizes the yard numbers.
 - HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
@@ -465,23 +466,27 @@ goalposts' uprights; a standing shot can't reach them, a jump shot can. Each pla
 under the rim they guard, and the coin flip, off the series' dice so both phones agree,
 puts the ball in one pair of hands. A ball that leaves the world comes back at centre.
 
-- Helmets (`FieldRules`): 5 by 5 tiles, solid, in the defender's energy colour, one of the
-  three helmet vectors as a template filled in that colour, tipped back 30°, facing the
+- Helmets (`FieldRules`): 4 by 4 tiles, solid, in the defender's energy colour, one of the
+  three helmet vectors filled in that colour, tipped back 30°, facing the
   way they go, drawn at the HELMET slider's scale over the box. While someone has the
   ball a clock runs, and every two and a half seconds of it a helmet comes from the end the
-  defender guards at one of four heights (20, 50, 80, 110; the lowest clears a crouch or
-  a slide but not a standing body) and crosses at 2 a frame to
+  defender guards at one of four heights (30, 50, 70, 90; the lowest clears a standing
+  body) and crosses at 2 a frame to
   the far wall, where it goes. They keep going when the ball is loose; only the clock
   stops. A body standing on one rides it; one in its way is pushed ahead of it, and once
   that would put them in a wall it passes through them. It pushes the loose ball the same
-  way. Two going opposite ways that meet take each other out in a burst of `flashspark2`
+  way, and a pushed ball is an ordinary ball again, falling. The computer, meeting one at
+  its height, hops and double jumps onto it and rides it. Two going opposite ways that meet take each other out in a burst of `flashspark2`
   in their colours.
-- The portal: a vertical loop at 150, above double-jump height, at a random x kept 200
+- The portal: a vertical loop at 150 (the PORTAL Y slider, offline), above double-jump height, at a random x kept 200
   from either end; one at a time, five seconds each, the next as soon as it goes. A shot
   or throw still its thrower's through it comes out ten yards, a hundredth of the field
   each, toward the thrower's rim, with a lift of 2 forward and 3.5 up.
 - The scenery (`FieldArt`) is flat shapes drawn once: a night sky with floodlight banks,
-  the stands with fanning lines and a rail of white squares, the turf's five-yard stripes,
+  the stands with fanning lines and a rail twelve pixels tall that wears the possession's
+  colour like the court's walls and, with the ball in hand, fills with chevrons drifting
+  toward the rim the holder attacks; the floodlights' blooms take the same colour, purple
+  when nobody has it; the turf's five-yard stripes,
   leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded blue base
   behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
 - The camera scrolls sideways only: level, gliding after the local player a share of the

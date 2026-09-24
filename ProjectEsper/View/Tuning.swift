@@ -76,6 +76,8 @@ enum HelmetTuning {
     nonisolated(unsafe) static var scale: Float = 1
     /// Tipped back this far, radians, from the vector's own slight lift.
     static let tilt: CGFloat = .pi / 6
+    /// The yard numbers' size.
+    nonisolated(unsafe) static var numberScale: Float = 1
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the

@@ -50,11 +50,11 @@ final class StageTests: XCTestCase {
         match.players[1].hasBall = false
         match.ball.holder = nil
         match.ball.respawn(at: Vec2(x: 900, y: 150))
-        let box = Box(min: Vec2(x: 500, y: 10), max: Vec2(x: 550, y: 60))
+        let box = Box(min: Vec2(x: 500, y: 10), max: Vec2(x: 540, y: 50))
         match.helmets = [Helmet(id: 99, box: box, speed: 1, owner: 1, variant: 0)]
         match.helmetClock = -10_000
-        match.players[0].position = Vec2(x: 555, y: 10)
-        match.players[1].position = Vec2(x: 525, y: 60)
+        match.players[0].position = Vec2(x: 545, y: 10)
+        match.players[1].position = Vec2(x: 520, y: 50)
         match.advance(inputs: [.idle, .idle])
         XCTAssertGreaterThanOrEqual(match.players[0].body.min.x, match.helmets[0].box.max.x - 0.001, "pushed ahead")
         let riderX = match.players[1].position.x
@@ -76,22 +76,60 @@ final class StageTests: XCTestCase {
         XCTAssertFalse(match.stage.overlapsSolid(match.players[0].body))
     }
 
-    func testACrouchFitsUnderTheLowestHelmetAndStaysDownUnderIt() {
+    func testTheLowestHelmetClearsAStandingBody() {
+        let match = field()
+        XCTAssertGreaterThan(FieldRules.helmetHeights[0], match.players[0].body.max.y)
+    }
+
+    func testACrouchStaysDownWhileThereIsNoRoomToStand() {
         var match = field()
         match.players[0].hasBall = false
         match.players[1].hasBall = false
         match.ball.holder = nil
         match.ball.respawn(at: Vec2(x: 900, y: 150))
-        let bottom = FieldRules.helmetHeights[0]
         match.players[0].position = Vec2(x: 700, y: 10)
-        run: for _ in 0..<3 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle]) }
+        for _ in 0..<3 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle]) }
         XCTAssertEqual(match.players[0].state, .crouch)
-        XCTAssertLessThan(match.players[0].body.max.y, bottom, "crouched, under it")
-        XCTAssertGreaterThan(match.players[0].standingHeightTop, bottom, "standing, into it")
-        match.helmets = [Helmet(id: 5, box: Box(min: Vec2(x: 680, y: bottom), max: Vec2(x: 730, y: bottom + 50)), speed: 0, owner: 1, variant: 0)]
+        // A block low enough to fit a crouch and not a standing body.
+        let bottom = (match.players[0].body.max.y + match.players[0].standingHeightTop) / 2
+        match.helmets = [Helmet(id: 5, box: Box(min: Vec2(x: 680, y: bottom), max: Vec2(x: 720, y: bottom + 40)), speed: 0, owner: 1, variant: 0)]
         match.helmetClock = -10_000
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .crouch, "no room to stand")
+    }
+
+    func testAPushedBallFalls() {
+        var match = field()
+        match.players[0].hasBall = false
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        match.helmetClock = -10_000
+        match.ball.release(from: Vec2(x: 705, y: 60), velocity: Vec2(x: -2, y: 0), by: 0, straight: true)
+        match.helmets = [Helmet(id: 5, box: Box(min: Vec2(x: 660, y: 40), max: Vec2(x: 700, y: 80)), speed: 2, owner: 1, variant: 0)]
+        let height = match.ball.position.y
+        for _ in 0..<20 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertLessThan(match.ball.position.y, height - 5, "gravity takes it once pushed")
+    }
+
+    func testTheComputerGetsOnTopOfAHelmetComingAtIt() {
+        var match = field()
+        var brain = Opponent(index: 1)
+        match.players[0].hasBall = false
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        // The ball behind the helmet, so its way there runs into it.
+        match.ball.respawn(at: Vec2(x: 400, y: 20))
+        match.helmetClock = -10_000
+        match.players[1].position = Vec2(x: 900, y: 10)
+        // One at its height: none spawn this low, but one met in the air is the same.
+        let bottom = 10.0
+        match.helmets = [Helmet(id: 5, box: Box(min: Vec2(x: 780, y: bottom), max: Vec2(x: 820, y: bottom + 40)), speed: 2, owner: 0, variant: 0)]
+        var rode = false
+        for _ in 0..<120 where !rode {
+            match.advance(inputs: [.idle, brain.decide(match)])
+            if let helmet = match.helmets.first, match.players[1].grounded, abs(match.players[1].position.y - helmet.box.max.y) < 0.01 { rode = true }
+        }
+        XCTAssertTrue(rode, "up and riding it rather than pushed along")
     }
 
     func testOpposingHelmetsTakeEachOtherOut() {

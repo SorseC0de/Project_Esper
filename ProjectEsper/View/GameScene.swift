@@ -292,8 +292,28 @@ final class GameScene: SKScene {
         let stage = match.stage
         if stage.features.helmets {
             // The field: scenery in place of tiles, the floor invisible through the turf.
-            FieldArt.build(for: stage, into: ground, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
-                           glow: sprites.softGlow(diameter: 64))
+            let handles = FieldArt.build(for: stage, into: ground, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
+                                         glow: sprites.softGlow(diameter: 64))
+            // The rail and the floodlights wear the possession's colour like the court's walls.
+            handles.rail.color = courtColour
+            courtTiles.append(handles.rail)
+            fieldBlooms = handles.blooms
+            yardNumbers = handles.numbers
+            for bloom in fieldBlooms { bloom.color = courtColour }
+            // Chevrons along the rail, pointing at the rim the holder attacks.
+            var x: CGFloat = 8
+            while x < CGFloat(stage.columns) * GameScene.pixelsPerTile {
+                let chevron = SKSpriteNode(texture: sprites.symbol("chevron.right", pointSize: 9))
+                chevron.color = SKColor(white: 1, alpha: 1)
+                chevron.colorBlendFactor = 1
+                chevron.alpha = 0.55
+                chevron.position = CGPoint(x: x, y: FieldArt.railY + FieldArt.railHeight / 2)
+                chevron.zPosition = -16
+                chevron.isHidden = true
+                ground.addChild(chevron)
+                railChevrons.append(chevron)
+                x += 14
+            }
             for hoop in stage.hoops {
                 FieldArt.goalpost(at: SpriteLibrary.point(hoop.position), backboard: hoop.backboard, into: ground)
             }
@@ -605,6 +625,7 @@ final class GameScene: SKScene {
         courtColour.getRed(&r, green: &g, blue: &b, alpha: &a)
         let shown = SKColor(red: r + (1 - r) * courtWhite, green: g + (1 - g) * courtWhite, blue: b + (1 - b) * courtWhite, alpha: 1)
         for tile in courtTiles { tile.color = shown }
+        for bloom in fieldBlooms { bloom.color = shown }
     }
 
     /// The streak a flying ball leaves: soft blobs dropped where it was, thinning out, so
@@ -705,6 +726,15 @@ final class GameScene: SKScene {
         }
         controls.addSlider(title: "HELMET", range: 0.5...2.0, notch: 0.05, value: HelmetTuning.scale) { value in
             HelmetTuning.scale = value
+        }
+        controls.addSlider(title: "PORTAL Y", range: 40...200, notch: 5, value: Float(FieldRules.portalHeight)) { [weak self] value in
+            // Offline only: the sim's rule, and the portal up now moved to it.
+            guard let self, self.online == nil else { return }
+            FieldRules.portalHeight = Double(value)
+            self.session.mutate { match in match.portal?.centre.y = Double(value) }
+        }
+        controls.addSlider(title: "YARD NUMBERS", range: 0.5...3.0, notch: 0.05, value: HelmetTuning.numberScale) { value in
+            HelmetTuning.numberScale = value
         }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
@@ -1674,6 +1704,28 @@ final class GameScene: SKScene {
         }
     }
 
+    /// A helmet vector filled in a colour: drawn, then painted over with the colour through
+    /// its own alpha, since a vector's black won't take a tint.
+    private var helmetTextures: [String: SKTexture] = [:]
+    private func helmetTexture(variant: Int, colour: SKColor) -> SKTexture? {
+        let key = "\(variant)|\(colour)"
+        if let cached = helmetTextures[key] { return cached }
+        guard let image = UIImage(named: "FootballHelmet\(variant + 1)") else { return nil }
+        let side: CGFloat = 256
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let filled = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
+            let rect = CGRect(x: 0, y: 0, width: side, height: side)
+            image.draw(in: rect)
+            context.cgContext.setBlendMode(.sourceIn)
+            colour.setFill()
+            context.cgContext.fill(rect)
+        }
+        let texture = SKTexture(image: filled)
+        helmetTextures[key] = texture
+        return texture
+    }
+
     /// Where the field's camera wants to be: the local player, led by where they're heading,
     /// kept inside the field's ends.
     private func cameraTargetX() -> CGFloat {
@@ -1689,6 +1741,9 @@ final class GameScene: SKScene {
     private static let cameraLeadFrames: CGFloat = 20
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
+    private var fieldBlooms: [SKSpriteNode] = []
+    private var yardNumbers: [SKNode] = []
+    private var railChevrons: [SKSpriteNode] = []
     private var portalNode: SKShapeNode?
     private var portalId = 0
 
@@ -1701,8 +1756,7 @@ final class GameScene: SKScene {
             let node = helmetNodes[helmet.id] ?? {
                 // The vector as a template, filled in the defender's energy colour.
                 let colour = SKColor(rgb: sprites.look(for: helmet.owner).glow)
-                let image = UIImage(named: "FootballHelmet\(helmet.variant + 1)")?.withTintColor(colour, renderingMode: .alwaysOriginal)
-                let node = SKSpriteNode(texture: image.map { SKTexture(image: $0) })
+                let node = SKSpriteNode(texture: helmetTexture(variant: helmet.variant, colour: colour))
                 node.zPosition = 6
                 glowers.addChild(node)
                 helmetNodes[helmet.id] = node
@@ -1714,13 +1768,25 @@ final class GameScene: SKScene {
             node.setScale(1)
             node.size = CGSize(width: side, height: side)
             node.xScale = -forward
-            node.zRotation = HelmetTuning.tilt * forward
+            node.zRotation = -HelmetTuning.tilt * forward
             node.position = SpriteLibrary.point(helmet.box.center)
         }
         for (id, node) in helmetNodes where !seen.contains(id) {
             node.removeFromParent()
             helmetNodes[id] = nil
         }
+        // The rail's chevrons: shown with the ball in hand, pointing and drifting toward the
+        // rim the holder attacks.
+        let attacking = match.ball.holder.flatMap { holder in match.stage.hoops.first { $0.owner == holder } }
+        for (index, chevron) in railChevrons.enumerated() {
+            chevron.isHidden = attacking == nil
+            guard let attacking else { continue }
+            let right = attacking.position.x > match.stage.width / 2
+            chevron.zRotation = right ? 0 : .pi
+            let drift = CGFloat(match.frame % 28) / 2 * (right ? 1 : -1)
+            chevron.position.x = 8 + CGFloat(index) * 14 + drift
+        }
+        for number in yardNumbers { number.setScale(CGFloat(HelmetTuning.numberScale)) }
         if let portal = match.portal {
             if portalNode == nil || portalId != portal.id {
                 portalNode?.removeFromParent()
@@ -2336,10 +2402,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nhelmet %.2f",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nhelmet %.2f  portal y %.0f  yard numbers %.2f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 HelmetTuning.scale)
+                                 HelmetTuning.scale, FieldRules.portalHeight, HelmetTuning.numberScale)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

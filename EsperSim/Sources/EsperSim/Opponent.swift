@@ -94,6 +94,8 @@ public struct Opponent: Equatable {
         if me.state == .jumpSquat {
             // Through the squat the button stays down for a full hop, or up for a short one.
             input.jump = wantsFullHop
+        } else if clearHelmet(match, me: me, into: &input) {
+            // A helmet bearing down: up and onto it, whatever else it was doing.
         } else if me.hasBall {
             offence(match, me: me, human: human, into: &input)
         } else if human.hasBall {
@@ -103,6 +105,29 @@ public struct Opponent: Equatable {
         }
         pressed = input
         return input
+    }
+
+    // MARK: Helmets
+
+    /// A helmet coming at it at its height, close: a full hop and the double jump to get on
+    /// top and ride it, the stick into it so it lands there. True while it's doing that.
+    private mutating func clearHelmet(_ match: Match, me: Player, into input: inout PlayerInput) -> Bool {
+        guard !Opponent.committedStates.contains(me.state) else { return false }
+        let body = me.body
+        let coming = match.helmets.first { helmet in
+            let ahead = (me.position.x - helmet.box.center.x) * (helmet.speed > 0 ? 1 : -1)
+            let gap = ahead - helmet.box.width / 2 - body.width / 2
+            let level = helmet.box.min.y < body.max.y + 4 && helmet.box.max.y > body.min.y
+            return ahead > 0 && gap < 70 && gap > -4 && level
+        }
+        guard let helmet = coming else { return false }
+        input.stick = Vec2(x: helmet.box.center.x > me.position.x ? 1 : -1, y: 0)
+        if me.grounded {
+            fullHop(&input)
+        } else if me.velocity.y < 0.5, me.jumpsLeft > 0, me.position.y < helmet.box.max.y + 2 {
+            tapJump(&input)
+        }
+        return true
     }
 
     // MARK: Chance and presses

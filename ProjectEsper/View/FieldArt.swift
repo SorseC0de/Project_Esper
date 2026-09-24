@@ -26,11 +26,23 @@ enum FieldArt {
     /// the players.
     static let viewBelowFloor: CGFloat = 32
 
-    static func build(for stage: Stage, into parent: SKNode, flat: (CGFloat) -> SKTexture, glow: SKTexture) {
+    /// What the scene keeps hold of: the rail under the stands, which wears the possession's
+    /// colour like the court's walls; the floodlights' blooms, likewise; and each yard
+    /// number with its arrow, for the size slider.
+    struct Handles {
+        var rail: SKSpriteNode
+        var blooms: [SKSpriteNode] = []
+        var numbers: [SKNode] = []
+    }
+
+    static let railHeight: CGFloat = 12
+
+    static func build(for stage: Stage, into parent: SKNode, flat: (CGFloat) -> SKTexture, glow: SKTexture) -> Handles {
         let width = CGFloat(stage.columns) * 16
         let top = CGFloat(stage.rows + Stage.skyRows) * 16
         let centre = width / 2
-        func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ colour: SKColor, z: CGFloat = -10) {
+        @discardableResult
+        func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ colour: SKColor, z: CGFloat = -10) -> SKSpriteNode {
             let node = SKSpriteNode(texture: flat(4))
             node.anchorPoint = .zero
             node.position = CGPoint(x: x, y: y)
@@ -39,6 +51,7 @@ enum FieldArt {
             node.colorBlendFactor = 1
             node.zPosition = z
             parent.addChild(node)
+            return node
         }
         func quad(_ points: [CGPoint], _ colour: SKColor, z: CGFloat) {
             let path = CGMutablePath()
@@ -69,13 +82,8 @@ enum FieldArt {
                   CGPoint(x: topRight, y: standsTop), CGPoint(x: topLeft, y: standsTop)], standLine, z: -18)
             x += standSpacing
         }
-        // The rail: a black band with white squares along it.
-        rect(-200, railY, width + 400, 6, .black, z: -17)
-        var square: CGFloat = 20
-        while square < width {
-            rect(square, railY + 1, 6, 4, chalk, z: -16)
-            square += 64
-        }
+        // The rail: a band in the possession's colour, the scene fills it with chevrons.
+        var handles = Handles(rail: rect(-200, railY, width + 400, railHeight, .black, z: -17))
         // A dark shadow where the stands meet the turf.
         rect(-200, turfTop - 4, width + 400, 6, SKColor(white: 0, alpha: 0.6), z: -12)
 
@@ -92,6 +100,7 @@ enum FieldArt {
             bloom.blendMode = .add
             bloom.zPosition = -15
             parent.addChild(bloom)
+            handles.blooms.append(bloom)
             rect(bank, lightsBottom, 120, 44, SKColor(red: 0.08, green: 0.12, blue: 0.22, alpha: 1), z: -14)
             for row in 0..<4 {
                 for column in 0..<9 {
@@ -144,21 +153,32 @@ enum FieldArt {
         for ten in 1...9 {
             let at = inner + CGFloat(ten) * 10 * yard
             let number = ten <= 5 ? ten * 10 : (10 - ten) * 10
+            // The number and its arrow on one node, so the slider scales them about their middle.
+            let group = SKNode()
+            group.position = CGPoint(x: at, y: turfBottom + 18)
+            group.zPosition = -7
+            parent.addChild(group)
             let label = SKLabelNode(text: "\(number)")
             label.fontName = "Georgia-Bold"
             label.fontSize = 14
             label.fontColor = chalk
             label.verticalAlignmentMode = .center
-            label.position = CGPoint(x: at, y: turfBottom + 18)
             label.yScale = 0.8
-            label.zPosition = -7
-            parent.addChild(label)
+            group.addChild(label)
             if number != 50 {
                 let pointsLeft = ten < 5
-                let tip = at + (pointsLeft ? -15 : 15), back = at + (pointsLeft ? -10 : 10)
-                quad([CGPoint(x: tip, y: turfBottom + 18), CGPoint(x: back, y: turfBottom + 20), CGPoint(x: back, y: turfBottom + 16)], chalk, z: -7)
+                let tip: CGFloat = pointsLeft ? -15 : 15, back: CGFloat = pointsLeft ? -10 : 10
+                let path = CGMutablePath()
+                path.addLines(between: [CGPoint(x: tip, y: 0), CGPoint(x: back, y: 2), CGPoint(x: back, y: -2)])
+                path.closeSubpath()
+                let arrow = SKShapeNode(path: path)
+                arrow.fillColor = chalk
+                arrow.strokeColor = .clear
+                group.addChild(arrow)
             }
+            handles.numbers.append(group)
         }
+        return handles
     }
 
     /// A goalpost at a rim: the padded base behind it on the floor, the gold pole bending

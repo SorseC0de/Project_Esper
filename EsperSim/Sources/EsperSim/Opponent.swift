@@ -426,8 +426,12 @@ public struct Opponent: Equatable {
         if me.grounded {
             input.stick = Vec2(x: wallward, y: 0)
             fullHop(&input)
-        } else if me.wallSide != nil || me.state == .wallLand {
+        } else if me.state == .wallLand {
+            input.stick = Vec2(x: wallward, y: 0)
             tapJump(&input)
+        } else if me.wallSide != nil, me.wallLandCooldown == 0 {
+            // Into the wall for the cling; the jump comes out of that.
+            input.stick = Vec2(x: wallward, y: 0)
         } else if me.velocity.y < 0.5, me.jumpsLeft > 0 {
             input.stick = Vec2(x: -wallward, y: 0)
             tapJump(&input)

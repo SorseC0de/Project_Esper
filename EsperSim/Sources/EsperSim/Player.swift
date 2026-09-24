@@ -105,9 +105,6 @@ public struct Player: Equatable {
     public var throwDirection: Vec2 = .zero
     public var catchCooldown = 0
     public var wallLandCooldown = 0
-    /// The wall last clung to, and frames left in which a jump still goes off it.
-    public var wallGraceSide: Facing?
-    public var wallGrace = 0
     /// Frames left in which the stick doesn't steer, after a wall jump.
     public var airControlLock = 0
     /// Frames left after walking off an edge in which a jump is still a ground jump.
@@ -287,7 +284,6 @@ public struct Player: Equatable {
         if let line = webLine, case .point = line.target, state != .webPull {
             webLine = line.frames > 1 ? WebLine(target: line.target, frames: line.frames - 1) : nil
         }
-        if wallGrace > 0 { wallGrace -= 1 }
         if airControlLock > 0 { airControlLock -= 1 }
         if coyote > 0 { coyote -= 1 }
         if input.shootButtons == 0 { shootReady = true }
@@ -466,11 +462,6 @@ public struct Player: Equatable {
                 platformArmed = true
                 fastFalling = false
                 events.append(.jumped(player: index))
-            } else if jumpPressed, wallLandCooldown == 0, let wall = wallSide ?? wall(within: spec.wallJumpReach, in: stage) {
-                // Celeste's rule: a wall in reach is enough, no cling needed.
-                wallJump(off: wall, events: &events)
-            } else if jumpPressed, wallGrace > 0, let wall = wallGraceSide {
-                wallJump(off: wall, events: &events)
             } else if wallLandCooldown == 0, let wall = wallSide, stickFacing(input) == wall {
                 facing = wall
                 velocity = .zero
@@ -520,8 +511,6 @@ public struct Player: Equatable {
                 wallJump(off: facing, events: &events)
             } else if wallSide == nil || (stickFacing(input) != facing && !webAiming) {
                 // Aiming a web line holds the cling whatever the stick does.
-                wallGraceSide = facing
-                wallGrace = spec.wallJumpGraceFrames
                 enter(.air)
             }
 
@@ -1295,7 +1284,6 @@ public struct Player: Equatable {
         fastFalling = false
         wallLandCooldown = spec.wallLandCooldownFrames
         airControlLock = spec.wallJumpControlLockFrames
-        wallGrace = 0
         events.append(.wallJumped(player: index, wall: wall))
         enter(.air)
     }

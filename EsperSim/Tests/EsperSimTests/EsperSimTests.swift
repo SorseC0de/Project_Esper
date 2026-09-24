@@ -147,29 +147,42 @@ final class MovementTests: XCTestCase {
         XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
     }
 
-    func testClingLastsWhileHeldAndGraceAfterLettingGo() {
+    func testClingLastsWhileHeldAndNoJumpAfterLettingGo() {
         var match = Match()
         match.players[0].position = Vec2(x: 30, y: 10)
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
         run(&match, frames: 40, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) })
         XCTAssertEqual(match.players[0].state, .wallLand, "the cling should last as long as the stick is held")
-        // Let go, then jump inside the grace window.
+        // Let go: the wall jump is gone with the cling.
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .air)
         match.advance(inputs: [PlayerInput(jump: true), .idle])
-        XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
+        XCTAssertFalse(match.events.contains(.wallJumped(player: 0, wall: .left)))
     }
 
-    func testJumpNearAWallIsAWallJumpWithoutClinging() {
+    func testJumpNearAWallWithoutClingingIsNotAWallJump() {
         var match = Match()
-        match.players[0].position = Vec2(x: 30, y: 10)
-        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
-        // Drift to the wall without pressing into it, then press jump beside it.
+        // Up above the backboard block, so the jump off the wall has clear air.
+        match.players[0].position = Vec2(x: 30, y: 110)
+        match.players[0].grounded = false
+        match.players[0].state = .air
+        run(&match, frames: 10, input: { _ in .idle })
+        // Drift to the wall, then let the stick go and press jump beside it.
         let beside = run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].body.min.x <= 12 }
         XCTAssertLessThan(beside, 120)
+        match.advance(inputs: [.idle, .idle])
         match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertFalse(match.events.contains(.wallJumped(player: 0, wall: .left)), "a wall jump comes only out of the cling")
+        // Held into it, the cling, and then the jump.
+        run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
+        XCTAssertEqual(match.players[0].state, .wallLand)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), jump: true), .idle])
         XCTAssertTrue(match.events.contains(.wallJumped(player: 0, wall: .left)))
+        // And the stick doesn't steer for the lockout.
+        let held = match.players[0].velocity.x
+        run(&match, frames: match.players[0].spec.wallJumpControlLockFrames - 2, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) })
+        XCTAssertGreaterThan(match.players[0].velocity.x, held - 0.5, "steering back in should do nothing yet")
     }
 
     func testJumpOnWallContactIsAWallJumpNotADoubleJump() {

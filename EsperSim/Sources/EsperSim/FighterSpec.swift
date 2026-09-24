@@ -45,13 +45,9 @@ public struct FighterSpec: Equatable {
     /// Frames after leaving the ground before a cling can start, so a jump beside a wall
     /// isn't caught by it on the way up.
     public var wallLandGroundLockoutFrames = 8
-    /// A jump press in the air with a wall this close on either side is a wall jump, cling
-    /// or not.
-    public var wallJumpReach = 2.0
-    /// Frames after letting go of a wall in which a jump press still jumps off it.
-    public var wallJumpGraceFrames = 6
-    /// Frames after a wall jump in which the stick doesn't steer, so the arc leaves the wall.
-    public var wallJumpControlLockFrames = 6
+    /// A wall jump comes only out of the cling: the wall land state. Frames after one in
+    /// which the stick doesn't steer, so the arc leaves the wall.
+    public var wallJumpControlLockFrames = 12
     /// Frames after walking off an edge in which a jump press is still a ground jump.
     public var coyoteFrames = 3
     /// Frames of holding down in a run before it brakes to walking speed.

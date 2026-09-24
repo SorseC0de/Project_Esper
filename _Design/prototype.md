@@ -140,10 +140,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
   leaves it, direction automatic, the double jump restored, and the stick doesn't steer
-  for 6 frames so the arc clears the wall. A jump press with a wall within 2 units of either side
-  is a wall jump with no cling at all, and for 6 frames after letting go of a wall a press
-  still jumps off it. A cling can't start for 8 frames after leaving the ground, and the
-  walls above the court's top row can't be clung to or jumped off.
+  for 12 frames so the arc clears the wall. A wall jump comes only out of the cling: no
+  jump off a wall merely in reach, none after letting go. A cling can't start for 8
+  frames after leaving the ground, and the walls above the court's top row can't be
+  clung to or jumped off.
 - Catch is automatic, in two rings: the ball within 12.5 of the chest and either in front,
   or in the way of where the body is moving; or within the catch spark's ring where the
   snatch puts it, on the hand at full stretch: 16 art pixels, the spark's full size,

@@ -20,13 +20,13 @@ public struct Dice: Equatable {
 /// round again as a second sip that raises it to level two.
 public enum Greateraid: CaseIterable, Equatable, Hashable {
     case hastyHorchata, jumperJuice, lungeLemonade, cannonCola, slideCider
-    case webWater, leviTea, superSmoothie, flashFizz, platformShake
+    case webWater, superSmoothie, flashFizz, platformShake
     case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol
 
     public enum Kind: Equatable { case booster, biomorph }
 
     public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .lungeLemonade, .cannonCola, .slideCider]
-    public static let biomorphs: [Greateraid] = [.webWater, .leviTea, .superSmoothie, .flashFizz, .platformShake,
+    public static let biomorphs: [Greateraid] = [.webWater, .superSmoothie, .flashFizz, .platformShake,
                                                  .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol]
 
     public var kind: Kind {
@@ -41,7 +41,6 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .cannonCola: "Cannon Cola"
         case .slideCider: "Slide Cider"
         case .webWater: "Web Water"
-        case .leviTea: "Levi-Tea"
         case .superSmoothie: "Super Smoothie"
         case .flashFizz: "Flash Fizz"
         case .platformShake: "Platform Protein Shake"
@@ -57,7 +56,6 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
     public var power: Power? {
         switch self {
         case .webWater: .webWater
-        case .leviTea: .leviTea
         case .superSmoothie: .superSmoothie
         case .flashFizz: .flashFizz
         case .platformShake: .platformShake
@@ -79,8 +77,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .cannonCola: "Best served as a shooter"
         case .slideCider: "DMs not included"
         case .webWater: "I thought this was alkaline not radioactive"
-        case .leviTea: "So THIS is what was in that Special Stuff MJ drank"
-        case .superSmoothie: "..."
+        case .superSmoothie: "So THIS is what was in that Special Stuff MJ drank"
         case .flashFizz: "Now you see me, now I dunk"
         case .platformShake: "From staring up to the basket to stairing up to the basket"
         case .quakeUp: "Suddenly everyone around you seems so grounded"
@@ -100,8 +97,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .cannonCola: ("A faster shot.", "Faster still.")
         case .slideCider: ("A longer slide.", "Longer still.")
         case .webWater: ("Double jump is a web swing.", "Throw fires a web line.")
-        case .leviTea: ("Hold jump in the air to fly.", "Faster, and for longer.")
-        case .superSmoothie: ("Hold jump after your jumps to glide on a cape of energy.", "Steeper climbs, faster dives.")
+        case .superSmoothie: ("Hold jump in the air to fly, on a cape of energy.", "Forward is a fast glide, and the flight lasts longer.")
         case .flashFizz: ("Shoot flashes you a short way, or to your ball while it's still yours.", "Flashes tear the ball into your hands and out of theirs, further.")
         case .platformShake: ("A fast fall makes a slab.", "Shoot makes a wall.")
         case .quakeUp: ("A fast fall's landing shakes the floor: the ball hops and whoever stands on it is stripped.", "The whole screen is the floor.")

@@ -1058,21 +1058,22 @@ final class SodaAndFizzTests: XCTestCase {
     }
 
     func testLevelTwoSodaFliesFasterAndLonger() {
-        XCTAssertEqual(LeviRules.flightSpeed(level: 2, withBall: true), LeviRules.flightSpeed(level: 1, withBall: false))
-        XCTAssertGreaterThan(LeviRules.flightSpeed(level: 2, withBall: false), LeviRules.flightSpeed(level: 1, withBall: false))
-        XCTAssertGreaterThan(LeviRules.flightFrames(level: 2), LeviRules.flightFrames(level: 1))
-        var match = with(.leviTea, level: 2)
+        XCTAssertEqual(SmoothieRules.flightSpeed(level: 2, withBall: true), SmoothieRules.flightSpeed(level: 1, withBall: false))
+        XCTAssertGreaterThan(SmoothieRules.flightSpeed(level: 2, withBall: false), SmoothieRules.flightSpeed(level: 1, withBall: false))
+        XCTAssertGreaterThan(SmoothieRules.flightFrames(level: 2), SmoothieRules.flightFrames(level: 1))
+        var match = with(.superSmoothie, level: 2)
         match.ball.respawn(at: Vec2(x: 300, y: 30))
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 10, input: { _ in .idle })
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .flying }
-        run(&match, frames: 5, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
-        XCTAssertEqual(match.players[0].velocity.x, LeviRules.flightSpeed(level: 2, withBall: false), accuracy: 0.001)
+        // Backward is the drift at the flight speed; forward is the glide, faster.
+        run(&match, frames: 5, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0), jump: true) })
+        XCTAssertEqual(match.players[0].velocity.x, -SmoothieRules.flightSpeed(level: 2, withBall: false), accuracy: 0.001)
     }
 
     func testFlightNeedsNoSecondJump() {
         var match = Match(specs: [.starting, .starting])
-        match.players[0].power = .leviTea
+        match.players[0].power = .superSmoothie
         match.ball.respawn(at: Vec2(x: 300, y: 30))
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 10, input: { _ in .idle })
@@ -1111,7 +1112,7 @@ final class SodaAndFizzTests: XCTestCase {
     }
 
     func testHeldJumpInTheAirIsFlightThatIgnoresGravity() {
-        var match = with(.leviTea, level: 1)
+        var match = with(.superSmoothie, level: 1)
         match.ball.respawn(at: Vec2(x: 300, y: 30))
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 10, input: { _ in .idle })
@@ -1121,7 +1122,7 @@ final class SodaAndFizzTests: XCTestCase {
         run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
         XCTAssertEqual(match.players[0].state, .flying)
         XCTAssertEqual(match.players[0].position.y, height, accuracy: 0.001)
-        XCTAssertEqual(match.players[0].velocity.x, LeviRules.flightSpeed(level: 1, withBall: false), accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, SmoothieRules.flightSpeed(level: 1, withBall: false), accuracy: 0.001)
         // Let go and it falls.
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.players[0].state, .air)
@@ -1129,7 +1130,7 @@ final class SodaAndFizzTests: XCTestCase {
 
     func testFlightCancelsIntoTheSlashAndTheSnatch() {
         for (input, state) in [(PlayerInput(jump: true, shoot: true), PlayerState.slashing), (PlayerInput(jump: true, throwBall: true), PlayerState.snatching)] {
-            var match = with(.leviTea)
+            var match = with(.superSmoothie)
             match.players[1].hasBall = true
             match.ball.holder = 1
             match.players[1].position.x = 300
@@ -1143,10 +1144,10 @@ final class SodaAndFizzTests: XCTestCase {
     }
 
     func testFlightRunsOutAndRefillsOnLanding() {
-        var match = with(.leviTea, level: 1)
+        var match = with(.superSmoothie, level: 1)
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 10, input: { _ in .idle })
-        let budget = LeviRules.flightFrames(level: 1)
+        let budget = SmoothieRules.flightFrames(level: 1)
         let ended = run(&match, frames: budget + 20, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .air && $0.players[0].flightLeft <= 0 }
         XCTAssertLessThan(ended, budget + 20)
         run(&match, frames: 200, input: { _ in .idle }) { $0.players[0].grounded }
@@ -1986,18 +1987,18 @@ final class GreateraidTests: XCTestCase {
         }
         XCTAssertGreaterThan(boosters, biomorphs * 2)
         XCTAssertGreaterThan(biomorphs, 0)
-        drinks.drink(.leviTea)
-        XCTAssertEqual(drinks.power, .leviTea)
+        drinks.drink(.superSmoothie)
+        XCTAssertEqual(drinks.power, .superSmoothie)
         XCTAssertEqual(drinks.powerLevel, 1)
         for _ in 0..<50 {
             let offer = drinks.offers(&dice)
-            XCTAssertFalse(offer.contains { $0.kind == .biomorph && $0 != .leviTea }, "with a biomorph in hand no other is offered")
+            XCTAssertFalse(offer.contains { $0.kind == .biomorph && $0 != .superSmoothie }, "with a biomorph in hand no other is offered")
         }
         var sawSecondSip = false
-        for _ in 0..<50 where drinks.offers(&dice).contains(.leviTea) { sawSecondSip = true }
+        for _ in 0..<50 where drinks.offers(&dice).contains(.superSmoothie) { sawSecondSip = true }
         XCTAssertTrue(sawSecondSip, "the biomorph in hand comes round as its second sip")
-        XCTAssertTrue(drinks.isSecondSip(.leviTea))
-        drinks.drink(.leviTea)
+        XCTAssertTrue(drinks.isSecondSip(.superSmoothie))
+        drinks.drink(.superSmoothie)
         XCTAssertEqual(drinks.powerLevel, 2)
         for _ in 0..<50 {
             XCTAssertFalse(drinks.offers(&dice).contains { $0.kind == .biomorph }, "at level two no biomorph is offered")

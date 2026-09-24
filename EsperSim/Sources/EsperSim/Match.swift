@@ -85,8 +85,9 @@ public struct Match: Equatable {
         reelBall()
 
         if ball.frozen > 0 {
-            // Frost Tea: the ball hangs where it is.
+            // Frost Tea: the ball hangs where it is, but a hand can still take it.
             ball.frozen -= 1
+            if ball.isLive { tryCatch() }
         } else if ball.isLive, ball.tether == nil {
             if let hoop = ball.step(stage: stage, events: &events) {
                 let owner = stage.hoops[hoop].owner
@@ -290,15 +291,19 @@ public struct Match: Equatable {
                 // Frost Tea: the body it reaches is frozen where it stands, and stripped.
                 strip(other, by: index, knock: nil)
                 freeze(other)
-            } else if facingIt, allowed, ball.frozen == 0, player.snatchReaches(ballAt: at), held != nil || ball.isLive {
+            } else if facingIt, allowed, player.snatchReaches(ballAt: at), held != nil || ball.isLive {
                 if let held {
                     players[held].loseBall()
                     players[held].hitStun = BallRules.hitStunFrames
                     if player.power == .frostTea { freeze(held) }
                 }
-                if held == nil, player.power == .frostTea, ball.frozen == 0 {
-                    ball.frozen = FrostRules.freezeFrames
-                    events.append(.ballFrozen)
+                if held == nil, player.power == .frostTea {
+                    // Frost Tea's snatch freezes a loose ball rather than taking it; a
+                    // hand, anyone's, can still pick the frozen ball up.
+                    if ball.frozen == 0 {
+                        ball.frozen = FrostRules.freezeFrames
+                        events.append(.ballFrozen)
+                    }
                 } else {
                     hand(ballTo: index)
                 }
@@ -332,12 +337,21 @@ public struct Match: Equatable {
     /// The strip: the victim stunned, any ball they hold popped free, and knocked away if
     /// `knock` is given. Without stunning, only the ball pops and the knock lands.
     private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true) {
-        if players[victim].hasBall {
+        if !stun {
+            // A push, not a hit: no stun and no spark, the ball let go of if held.
+            let held = players[victim].hasBall
+            if held {
+                let from = players[victim].chest + Vec2(x: 0, y: 3)
+                players[victim].loseBall()
+                ball.pop(from: from)
+            }
+            events.append(.pushed(player: victim, by: striker, ball: held))
+        } else if players[victim].hasBall {
             pop(from: victim, by: striker)
         } else {
             events.append(.struck(player: victim, by: striker))
         }
-        if stun { players[victim].hitStun = BallRules.hitStunFrames } else { players[victim].hitStun = 0 }
+        if stun { players[victim].hitStun = BallRules.hitStunFrames }
         if let knock { players[victim].knock(knock) }
     }
 
@@ -517,6 +531,7 @@ public struct Match: Equatable {
         ball.thrown = false
         ball.tether = nil
         ball.floater = 0
+        ball.frozen = 0
         ball.resting = false
         events.append(.caught(player: catcher))
     }

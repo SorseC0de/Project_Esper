@@ -541,7 +541,7 @@ enum Effect {
         case .fireWallSpark, .fireTrail: 11
         case .fireCharge: 12
         case .fireExplosion: 16
-        case .flashSpark: 6
+        case .flashSpark: 9
         }
     }
 
@@ -553,13 +553,23 @@ enum Effect {
         }
     }
 
-    /// Feet-anchored like the player sprites, a quarter up a 64 sheet, except the wall
-    /// sparks, the charge, the burst and the flash, which are centred.
+    /// Feet-anchored like the player sprites, except the wall spark and the flash, which
+    /// are centred, and the fire sheets, painted at the bottom of their frames.
     var anchor: CGPoint {
         switch self {
-        case .wallJumpSpark, .fireWallSpark, .fireCharge, .fireExplosion, .flashSpark: CGPoint(x: 0.5, y: 0.5)
-        case .fireJump, .fireDash, .fireSkid, .fireTrail: CGPoint(x: 0.5, y: 16.0 / 64.0)
+        case .wallJumpSpark, .flashSpark: CGPoint(x: 0.5, y: 0.5)
+        case .fireJump, .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireCharge, .fireExplosion: CGPoint(x: 0.5, y: 0)
         default: CGPoint(x: 0.5, y: 8.0 / 48.0)
+        }
+    }
+
+    /// The fire sheets are painted three times their playing size; the flash's reduced
+    /// sheet twice.
+    var scale: CGFloat {
+        switch self {
+        case .fireJump, .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireCharge, .fireExplosion: 1.0 / 3
+        case .flashSpark: 0.5
+        default: 1
         }
     }
 
@@ -569,7 +579,8 @@ enum Effect {
         let node = SKSpriteNode(texture: frames[0])
         node.anchorPoint = anchor
         node.position = point
-        node.xScale = flipped ? -1 : 1
+        node.xScale = (flipped ? -1 : 1) * scale
+        node.yScale = scale
         node.zPosition = 30
         node.run(.sequence([.animate(with: frames, timePerFrame: 1 / fps), .removeFromParent()]))
         return node

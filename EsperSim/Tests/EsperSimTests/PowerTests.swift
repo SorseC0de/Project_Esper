@@ -147,6 +147,12 @@ final class PowerTests: XCTestCase {
         let spot = match.ball.position
         run(&match, frames: 30, input: { _ in .idle })
         XCTAssertEqual(match.ball.position, spot)
+        // Frozen, it can still be picked up: the other walks into it.
+        match.players[1].position = Vec2(x: spot.x - 2, y: spot.y - BallRules.chestHeight)
+        match.players[1].facing = .right
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.ball.holder, 1)
+        XCTAssertEqual(match.ball.frozen, 0)
     }
 
     func testFrostSlideRunsUntilCancelled() {
@@ -251,19 +257,31 @@ final class PowerTests: XCTestCase {
 
     // MARK: Super Smoothie
 
-    func testTheGlideStartsWithJumpHeldAfterTheJumpsAndEndsWhenLetGo() {
-        var match = with(.superSmoothie)
+    func testLevelTwoFlightForwardIsTheGlideThatSinksUnlessUpIsHeld() {
+        var match = with(.superSmoothie, level: 2)
         run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
         run(&match, frames: 6, input: { _ in .idle })
         match.advance(inputs: [PlayerInput(jump: true), .idle])
-        XCTAssertEqual(match.players[0].jumpsLeft, 0)
-        let glided = run(&match, frames: 60, input: { _ in PlayerInput(jump: true) }) { $0.players[0].state == .gliding }
-        XCTAssertLessThan(glided, 60)
-        let height = match.players[0].position.y
-        run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 0, y: 1), jump: true) })
-        XCTAssertGreaterThan(match.players[0].position.y, height - 5, "pitched up, it holds its height")
-        XCTAssertGreaterThan(match.players[0].velocity.x, 0, "and keeps going forward")
-        match.advance(inputs: [.idle, .idle])
-        XCTAssertEqual(match.players[0].state, .air)
+        run(&match, frames: 2, input: { _ in PlayerInput(jump: true) })
+        XCTAssertEqual(match.players[0].state, .flying)
+        // Forward: fast, and sinking.
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
+        XCTAssertEqual(match.players[0].velocity.x, SmoothieRules.glideSpeed(withBall: false), accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.y, -SmoothieRules.glideSink, accuracy: 0.001)
+        // Forward and up: rising at the flight speed.
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 1), jump: true), .idle])
+        XCTAssertGreaterThan(match.players[0].velocity.y, 0)
+        // Backward: the drift, at the flight speed.
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), jump: true), .idle])
+        XCTAssertEqual(match.players[0].velocity.x, -SmoothieRules.flightSpeed(level: 2, withBall: false), accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.y, 0, accuracy: 0.001)
+        // Level one forward is plain flight, no sink.
+        var one = with(.superSmoothie, level: 1)
+        run(&one, frames: 6, input: { _ in PlayerInput(jump: true) })
+        run(&one, frames: 6, input: { _ in .idle })
+        one.advance(inputs: [PlayerInput(jump: true), .idle])
+        run(&one, frames: 2, input: { _ in PlayerInput(jump: true) })
+        one.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
+        XCTAssertEqual(one.players[0].velocity.y, 0, accuracy: 0.001)
     }
 }

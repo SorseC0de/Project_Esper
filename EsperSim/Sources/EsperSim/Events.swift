@@ -48,7 +48,8 @@ public enum MatchEvent: Equatable {
     case fireballMade(player: Int)
     case fireballBurst(at: Vec2)
     case pulsed(player: Int, pull: Bool)
-    case glided(player: Int)
+    /// Pushed or pulled by a pulse, not stunned: `ball` when the ball left the hands with it.
+    case pushed(player: Int, by: Int, ball: Bool)
 }
 
 /// What a player's step asks the match to do with the ball.

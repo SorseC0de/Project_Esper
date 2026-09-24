@@ -193,7 +193,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   holding the ball loses it to the reel. The opponent without it is reeled to 12 units in
   front of the shooter and dropped. A wall or block reels the shooter to it. With the ball
   the throw button is the ordinary throw. Numbers in `WebRules`.
-- Levi-Tea (C). A fresh jump press in the air, held, is flight: the stick moves the body
+- Super Smoothie (C). A fresh jump press in the air, held, is flight: the stick moves the body
   in any direction with gravity off, slowly with the ball and twice as fast without, for two seconds of budget per airtime, refilled on landing.
   Let go or run out and it falls. The body leans up to thirty degrees into its motion,
   forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and flight
@@ -223,12 +223,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
   slab still works. The stage carries standing slabs as `extras`, which every collision
   query sees. Numbers in `ShakeRules`.
-- Super Smoothie (D). Jump held on the way down with the jumps spent is the glide,
-  Meta Knight's: the body levels off at its speed or 2, whichever is more, on a cape of
-  energy, and the stick pitches it between 60° down and 40° up (60° at level two), a
-  climb bleeding speed and a dive gaining it, up to 4 (5 at level two); let go of jump,
-  stall under 0.7, land or hit a wall and it's the air. Shots, throws, the snatch and
-  the slash cancel out of it. Numbers in `GlideRules`.
+  Super Smoothie's flight is on a cape of energy, and at level two the stick forward
+  is the glide: 4 forward (3 with the ball), sinking 0.8 a frame unless up is held,
+  which rises at the flight speed, and diving at 3 on down; the stick backward is the
+  drift at the flight speed, and centred it levitates. Level one is the plain flight.
+  Numbers in `SmoothieRules`.
 - Quake-Up Coffee (G). A fast fall's landing shakes the floor: the ball on it hops up
   3 and the other standing on the same floor, within a unit of the same height, is
   stripped; level two makes the whole screen the floor. Numbers in `QuakeRules`.
@@ -240,7 +239,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   stripping the other body in it or popping a loose ball, once every 40 frames.
   Numbers in `ZeusRules`.
 - Frost Tea (I). The snatch freezes what it reaches, a body or the loose ball, for 60
-  frames: held exactly where it is, nothing running, nothing caught, no hitbox live;
+  frames: held exactly where it is, nothing running, nothing caught, no hitbox live, though
+  a frozen ball can still be picked up or snatched;
   a frozen body is stripped as well. The slide has no friction and no end, until jump,
   throw, shoot, the stick against it, or down let go cancel it. Level two: a double
   jump or a slide leaves an ice clone, the body's box, that freezes whatever touches it
@@ -252,10 +252,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   held through a slash makes a fireball in hand, shot or thrown like the ball, that
   bursts on the first thing it meets and strips and knocks whatever's within 15 of the
   burst. Numbers in `BlazeRules`.
-- Pulsepistol Punch (K). Shoot without the ball is the pulse: a pillar five units tall
+- Pulsepistol Punch (K). Shoot without the ball is the pulse: a pillar ten units tall
   at the hand, the width of the screen the way the body faces, that knocks the ball and
   the other body away without stunning, a held ball popping free; standing it's the
-  gun sheet, ten frames with the pulse on the third, one every 20. Level two fires in
+  gun sheet, its ten frames at 15 a second with the pulse on the third, one every 20,
+  and nothing to see unless the hitboxes are on: a kinetic pulse, no spark. Level two fires in
   stride on the run, and throw is the pull, the same pulse bringing everything toward
   the body. Numbers in `PulseRules`.
 
@@ -317,9 +318,9 @@ placeholder for one not written yet.
   ball again from its first bounce.
 - Slide Cider: eight frames of slide a drink, so further.
 - Web Water: the swing; level two adds the web line.
-- Levi-Tea: flight; level two flies at twice the speed, with the ball as fast as level
-  one without, and lasts 150 frames rather than 120. Flight needs no second jump.
-- Super Smoothie: the glide; level two climbs steeper and runs faster.
+- Super Smoothie: flight; level two flies faster, with the ball as fast as level one
+  without, lasts 180 frames rather than 120, and glides forward. Flight needs no second
+  jump.
 - Flash Fizz: the flash, 30 units, and the warp to your own ball; level two goes 45 and
   makes the flashes tears, pulling a loose ball into the hands from where you came out
   and knocking the ball out of the other's hands within reach of either end.
@@ -337,10 +338,11 @@ holds the variants; A is always the baseline as tuned.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
-- POWER: A none, B Web Water, C Levi-Tea, D Super Smoothie, E Flash Fizz, F Platform
-  Protein Shake, G Quake-Up Coffee, H Zeus Juice, I Frost Tea, J Blazing Boba, K
-  Pulsepistol Punch. The left bumper steps this one.
-- HITBOX, beside RESET: draws the sim's boxes over the world. Bodies white, the loose
+- POWER: A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
+  Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
+  Punch, every one at level two. The left bumper steps this one; the local side's power
+  and level are lettered under the pickers.
+- HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
 - AI, beside that: the computer plays the other side. Off, the second pad or nothing does.
@@ -420,9 +422,10 @@ leaves the dash's smoke; the snatch's catch spark sits on the hand at full stret
 knocked loose bursts like a wall jump's spark, away from the hitter.
 
 The powers' effects: Blazing Boba's jump, dash, wall spark, skid, charge, trail and
-burst are the painted `fire_*` sheets drawn as they are; Zeus Juice's jump spark and
-charge are grey sheets toned per player; Flash Fizz's flash is `flashspark` at half
-size at both ends, in place of the diamonds; Frost Tea's sparks are snowflakes off the
+burst are the painted `fire_*` sheets drawn as they are at a third, standing on the
+bottom of their frames; Zeus Juice's bolts are thrown from the throw's release pose; Zeus Juice's jump spark and
+charge are grey sheets toned per player; Flash Fizz's flash is `flashspark`, its 256x144 frames boxed down by four and drawn at
+half, at both ends, in place of the diamonds; Frost Tea's sparks are snowflakes off the
 vector, a sphere of them for the snatch; Quake-Up's quake shakes the camera a pixel or
 two for eight frames and throws rock squares up; bolts are the SF bolt in the energy
 colour with fading afterimages; the strike reuses a scoring bolt down to the point;

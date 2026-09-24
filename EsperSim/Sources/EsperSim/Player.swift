@@ -5,7 +5,6 @@ import Foundation
 public enum Power: Equatable, Hashable {
     case none
     case webWater
-    case leviTea
     case superSmoothie
     case flashFizz
     case platformShake
@@ -56,8 +55,8 @@ public enum PlayerState: Equatable, Hashable {
     case walling
     /// Web Water: swinging under a web, reeling to a wall, and being reeled by the other.
     case webSwing, webPull, webbed
-    /// Levi-Tea: flying. Super Smoothie: gliding. Pulsepistol Punch: the shot, standing.
-    case flying, gliding, gunShoot
+    /// Super Smoothie: flying. Pulsepistol Punch: the shot, standing.
+    case flying, gunShoot
 
     public var isGroundState: Bool {
         switch self {
@@ -69,7 +68,7 @@ public enum PlayerState: Equatable, Hashable {
     /// States a ball can be caught out of. The snatch takes the ball its own way.
     public var canCatch: Bool {
         switch self {
-        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull, .flying, .gliding,
+        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull, .flying,
              .crouch, .crouchWalk, .slide: true
         default: false
         }
@@ -145,8 +144,8 @@ public struct Player: Equatable {
     public var pullTarget: Vec2?
     /// Frames the line's pose shows.
     public var webLinePose = 0
-    /// Levi-Tea: frames of flight left this airtime.
-    public var flightLeft = LeviRules.flightFrames(level: 1)
+    /// Super Smoothie: frames of flight left this airtime.
+    public var flightLeft = SmoothieRules.flightFrames(level: 1)
     /// Flash Fizz: frames until the next flash; where a warp decided this step is going
     /// when it's down to the ball in hand; and the tear the last flash left.
     public var warpCooldown = 0
@@ -195,9 +194,6 @@ public struct Player: Equatable {
     /// Frames left of the running shot's pose, and whether the standing shot pulls.
     public var gunRunTimer = 0
     public var gunPull = false
-    /// The glide's heading, radians above level, and its speed along it.
-    public var glideAngle = 0.0
-    public var glideSpeed = 0.0
     /// Frames of running at full speed or sliding, for the flames left every few.
     private var flameTimer = 0
     /// Something a piece of the step asked the match to do, if nothing else took the turn.
@@ -463,7 +459,7 @@ public struct Player: Equatable {
                 velocity = .zero
                 platformArmed = true
                 enter(.wallLand)
-            } else if power == .leviTea, jumpPressed, flightLeft > 0 {
+            } else if power == .superSmoothie, jumpPressed, flightLeft > 0 {
                 // A fresh press in the air starts flight; holding keeps it.
                 jumpBuffer = 0
                 jumpsLeft = 0
@@ -473,11 +469,8 @@ public struct Player: Equatable {
                 enter(.flying)
             } else if power == .webWater, jumpPressed, swingCooldown == 0 {
                 startWebSwing(events: &events)
-            } else if jumpPressed, jumpsLeft > 0, power != .leviTea, power != .webWater {
+            } else if jumpPressed, jumpsLeft > 0, power != .superSmoothie, power != .webWater {
                 doubleJump(input, events: &events)
-            } else if power == .superSmoothie, input.jump, jumpsLeft == 0, velocity.y <= 0 {
-                // The jumps spent and jump still held on the way down: the glide.
-                startGlide(events: &events)
             } else if holding, input.shoot, shootReady {
                 enterShootStance()
             } else if holding, input.throwBall, throwReady {
@@ -825,9 +818,24 @@ public struct Player: Equatable {
             }
 
         case .flying:
-            // Any direction, slowly, gravity off, while jump is held and the budget lasts.
+            // Any direction, slowly, gravity off, while jump is held and the budget lasts;
+            // at level two the stick forward is the glide: fast, sinking unless up is held,
+            // diving on down. The body keeps facing the way it did.
             flightLeft -= 1
-            velocity = input.stick * LeviRules.flightSpeed(level: powerLevel, withBall: hasBall)
+            let forward = input.stick.x * facing.sign
+            if powerLevel >= 2, forward > 0.3 {
+                let vertical: Double
+                if input.stick.y > 0.3 {
+                    vertical = input.stick.y * SmoothieRules.flightSpeed(level: powerLevel, withBall: hasBall)
+                } else if input.stick.y < -0.3 {
+                    vertical = -SmoothieRules.diveSpeed
+                } else {
+                    vertical = -SmoothieRules.glideSink
+                }
+                velocity = Vec2(x: facing.sign * forward * SmoothieRules.glideSpeed(withBall: hasBall), y: vertical)
+            } else {
+                velocity = input.stick * SmoothieRules.flightSpeed(level: powerLevel, withBall: hasBall)
+            }
             if holding, input.shoot, shootReady {
                 enterShootStance()
             } else if holding, input.throwBall, throwReady {
@@ -841,28 +849,6 @@ public struct Player: Equatable {
             } else if !holding, shootPressed {
                 startSlash(events: &events)
             } else if !input.jump || flightLeft <= 0 {
-                enter(.air)
-            }
-
-        case .gliding:
-            // Along the heading; the stick pitches it, a climb costs speed and a dive pays
-            // it; let go of jump, stall, or hit something, and it's the air again.
-            glideAngle = min(max(glideAngle + input.stick.y * GlideRules.pitchRate, GlideRules.pitchDownMax), GlideRules.pitchUpMax(level: powerLevel))
-            glideSpeed -= Trig.sin(glideAngle) * GlideRules.gravityShare + GlideRules.drag
-            glideSpeed = min(max(glideSpeed, 0), GlideRules.maxSpeed(level: powerLevel))
-            velocity = Vec2(x: Trig.cos(glideAngle) * glideSpeed * facing.sign, y: Trig.sin(glideAngle) * glideSpeed)
-            if holding, input.shoot, shootReady {
-                enterShootStance()
-            } else if holding, input.throwBall, throwReady {
-                throwDirection = .zero
-                quickThrow = false
-                throwStanceEntrySpeed = velocity.x
-                enter(.throwStance)
-            } else if !holding, throwPressed, snatchCooldown == 0 {
-                startSnatch()
-            } else if !holding, shootPressed, slashAllowed {
-                startSlash(events: &events)
-            } else if !input.jump || glideSpeed < GlideRules.stallSpeed {
                 enter(.air)
             }
 
@@ -895,7 +881,6 @@ public struct Player: Equatable {
             action = .makePlatform
         }
         wantsPlatform = false
-        let before = velocity
         move(in: stage)
         if state == .webSwing, let anchor = webAnchor {
             let target = anchor + Vec2(x: Trig.sin(swingAngle), y: -Trig.cos(swingAngle)) * swingLength
@@ -903,10 +888,6 @@ public struct Player: Equatable {
                 endSwing()
                 enter(.air)
             }
-        }
-        if state == .gliding, before.x != 0, velocity.x == 0 {
-            // Into a wall: the glide is over.
-            enter(.air)
         }
         settle(input, events: &events)
         grabLedgeIfThere(in: stage, events: &events)
@@ -940,6 +921,8 @@ public struct Player: Equatable {
     /// Zeus Juice's bolt: straight ahead, tilted by the stick up to the limit.
     private mutating func fireBolt(_ input: PlayerInput) {
         boltCooldown = ZeusRules.boltCooldownFrames
+        // Thrown: the throw's release pose for a few frames.
+        webLinePose = 8
         let tilt = min(max(input.stick.y, -1), 1) * ZeusRules.boltTilt
         wanted = .fireBolt(direction: Vec2(x: Trig.cos(tilt) * facing.sign, y: Trig.sin(tilt)))
     }
@@ -956,15 +939,6 @@ public struct Player: Equatable {
             fastFalling = false
             enter(.gunShoot)
         }
-    }
-
-    /// Super Smoothie's glide, from whatever the body was doing in the air.
-    private mutating func startGlide(events: inout [MatchEvent]) {
-        glideAngle = 0
-        glideSpeed = max(abs(velocity.x), GlideRules.startSpeed)
-        fastFalling = false
-        events.append(.glided(player: index))
-        enter(.gliding)
     }
 
     /// Hit: whatever the body was doing is over and it's sent this way through the air.
@@ -1389,7 +1363,7 @@ public struct Player: Equatable {
             }
             jumpsLeft = spec.jumps
             fastFalling = false
-            flightLeft = LeviRules.flightFrames(level: powerLevel)
+            flightLeft = SmoothieRules.flightFrames(level: powerLevel)
             swingCooldown = 0
             switch state {
             case .air, .wallLand, .rolling:
@@ -1399,7 +1373,7 @@ public struct Player: Equatable {
                 webAnchor = nil
                 events.append(.landed(player: index))
                 enter(.land)
-            case .flying, .gliding:
+            case .flying:
                 events.append(.landed(player: index))
                 enter(.land)
             default:

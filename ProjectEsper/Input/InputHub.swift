@@ -16,9 +16,11 @@ final class InputHub {
     private(set) var resetPressed = false
     private(set) var cyclePressed = false
     private(set) var aiTogglePressed = false
+    private(set) var hitboxTogglePressed = false
     private var menuWasDown = false
     private var bumperWasDown = false
     private var stickClickWasDown = false
+    private var leftClickWasDown = false
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -60,6 +62,9 @@ final class InputHub {
         let stickClickDown = controllers.contains { $0.extendedGamepad?.rightThumbstickButton?.isPressed ?? false }
         if stickClickDown, !stickClickWasDown { aiTogglePressed = true }
         stickClickWasDown = stickClickDown
+        let leftClickDown = controllers.contains { $0.extendedGamepad?.leftThumbstickButton?.isPressed ?? false }
+        if leftClickDown, !leftClickWasDown { hitboxTogglePressed = true }
+        leftClickWasDown = leftClickDown
         return (0..<players).map { index in
             let pad = controller(for: index).map { read($0.extendedGamepad!) } ?? PlayerInput.idle
             return index == 0 ? merge(touch, pad) : pad
@@ -99,6 +104,12 @@ final class InputHub {
     func consumeAIToggle() -> Bool {
         defer { aiTogglePressed = false }
         return aiTogglePressed
+    }
+
+    /// True once per left stick click.
+    func consumeHitboxToggle() -> Bool {
+        defer { hitboxTogglePressed = false }
+        return hitboxTogglePressed
     }
 
     /// A: jump. B, the right bumper and the right trigger: shoot, each its own button so a

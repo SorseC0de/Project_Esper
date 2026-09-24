@@ -381,17 +381,22 @@ public enum WebRules {
     public static let pullMaxFrames = 40
 }
 
-/// Levi-Tea's numbers: slow flight in any direction, gravity off, for a budget per
-/// airtime. Twice as fast without the ball. Level two is faster, with the ball as fast as
-/// level one without, and lasts longer.
-public enum LeviRules {
+/// Super Smoothie's numbers: slow flight in any direction, gravity off, for a budget per
+/// airtime, twice as fast without the ball, on a cape of energy. Level two is faster, with
+/// the ball as fast as level one without, lasts longer, and the stick forward is the
+/// glide: this fast, sinking this much a frame unless up is held, diving this fast on down.
+public enum SmoothieRules {
     public static func flightSpeed(level: Int, withBall: Bool) -> Double {
         level >= 2 ? (withBall ? 2.0 : 3.0) : (withBall ? 1.0 : 2.0)
     }
 
     public static func flightFrames(level: Int) -> Int {
-        level >= 2 ? 150 : 120
+        level >= 2 ? 180 : 120
     }
+
+    public static func glideSpeed(withBall: Bool) -> Double { withBall ? 3.0 : 4.0 }
+    public static let glideSink = 0.8
+    public static let diveSpeed = 3.0
 }
 
 /// Flash Fizz's numbers. Without the ball, shoot is the warp to the ball while it's still

@@ -35,9 +35,10 @@ STRIP_FPS = 15
 BALL_MIN_PIXELS = 12
 # Strips rendered at a multiple of their playing size, boxed down by this factor. The
 # charge is a 512px soft render whose swirl fills the middle 150.
-REDUCE = {"esper_charge": 4}
-# Strips whose frames aren't square: their frame height.
-FRAME_HEIGHT = {"flashspark": 216}
+REDUCE = {"esper_charge": 4, "flashspark": 4}
+# Strips whose frames aren't square: their frame height, after any reduction. The
+# flash's 256x144 frames come down to 64x36.
+FRAME_HEIGHT = {"flashspark": 36}
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk"}

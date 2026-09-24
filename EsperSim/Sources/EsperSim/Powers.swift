@@ -89,29 +89,15 @@ public enum BlazeRules {
 
 /// Pulsepistol Punch: shoot without the ball fires a pulse the width of the screen the way
 /// the body faces, this tall at the hand, that knocks the ball and the other body away
-/// without stunning, a held ball popping free. Level two runs while shooting, and throw
+/// without stunning and without a spark, a held ball popping free. Level two runs while shooting, and throw
 /// is the pull, the same pulse bringing everything toward the body.
 public enum PulseRules {
-    public static let halfHeight = 2.5
+    public static let halfHeight = 5.0
     public static let handHeight = 11.0
     public static let ballPush = Vec2(x: 5, y: 1)
     public static let bodyPush = Vec2(x: 3, y: 1.5)
-    public static let shotFrames = 10
-    public static let fireFrame = 3
+    /// The gun sheet's ten frames at 15 a second, the pulse on its third sheet frame.
+    public static let shotFrames = 40
+    public static let fireFrame = 8
     public static let cooldownFrames = 20
-}
-
-/// Super Smoothie: the glide. Falling with jump held after the jumps are spent, the body
-/// levels off and glides; the stick pitches it up or down between these angles, a climb
-/// bleeding speed and a dive gaining it, and it ends when jump is let go, the speed
-/// falls under the stall, or something is hit. Level two climbs steeper and runs faster.
-public enum GlideRules {
-    public static let startSpeed = 2.0
-    public static let stallSpeed = 0.7
-    public static func maxSpeed(level: Int) -> Double { level >= 2 ? 5.0 : 4.0 }
-    public static func pitchUpMax(level: Int) -> Double { level >= 2 ? degrees(60) : degrees(40) }
-    public static let pitchDownMax = degrees(-60)
-    public static let pitchRate = 0.035
-    public static let gravityShare = 0.06
-    public static let drag = 0.004
 }

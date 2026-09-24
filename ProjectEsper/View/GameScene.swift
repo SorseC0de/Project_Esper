@@ -190,6 +190,8 @@ final class GameScene: SKScene {
     private var previewDots: [SKSpriteNode] = []
     private let scoreLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
+    /// The local side's power and level, lettered top-left under the pickers.
+    private let powerLabel = SKSpriteNode()
     private let fpsLabel = SKLabelNode()
     private var lastTime: TimeInterval?
     private var accumulator = 0.0
@@ -476,6 +478,10 @@ final class GameScene: SKScene {
         flowState?.net.onData = { [weak self] data in self?.handle(data) }
         flowState?.net.onDisconnect = { [weak self] why in self?.endOnline(why) }
 
+        powerLabel.anchorPoint = CGPoint(x: 0, y: 1)
+        powerLabel.zPosition = 5
+        hud.addChild(powerLabel)
+
         debugLabel.fontName = "Menlo"
         debugLabel.fontSize = 8
         debugLabel.fontColor = SKColor(white: 1, alpha: 0.6)
@@ -676,7 +682,8 @@ final class GameScene: SKScene {
         circles.position = CGPoint(x: 0, y: halfHeight - insets.top - 16)
         drawSeries()
         presentScreen()
-        debugLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 6)
+        powerLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 4)
+        debugLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 26)
         fpsLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)
     }
 
@@ -741,6 +748,10 @@ final class GameScene: SKScene {
         if online == nil, hub.consumeAIToggle() {
             aiOn.toggle()
             controls?.aiOn = aiOn
+        }
+        if hub.consumeHitboxToggle() {
+            showHitboxes.toggle()
+            controls?.showHitboxes = showHitboxes
         }
         var steps = 0
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
@@ -1058,6 +1069,7 @@ final class GameScene: SKScene {
         session.mutate { match in
             for index in match.players.indices {
                 match.players[index].power = power
+                match.players[index].powerLevel = 2
             }
         }
     }
@@ -1176,7 +1188,7 @@ final class GameScene: SKScene {
                 let player = match.players[index]
                 switch player.power {
                 case .blazingBoba: spawn(.fireJump, at: player.position, flipped: player.facing == .left)
-                case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position)))
+                case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 1.0 / 3))
                 default: spawn(.jumpSpark, at: player.position, flipped: player.facing == .left, player: index)
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
@@ -1223,9 +1235,7 @@ final class GameScene: SKScene {
             case .warped(_, let from, let to), .flashed(_, let from, let to):
                 // The flash's spark at both ends, the sheet at half size.
                 for end in [from, to] {
-                    let node = Effect.flashSpark.node(sprites, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), flipped: false)
-                    node.setScale(0.5)
-                    glowers.addChild(node)
+                    glowers.addChild(Effect.flashSpark.node(sprites, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), flipped: false))
                 }
             case .struck(let victim, let striker):
                 spawnHitSpark(player: striker, at: match.players[victim].chest)
@@ -1237,7 +1247,7 @@ final class GameScene: SKScene {
                 spawnRocks(at: SpriteLibrary.point(match.players[index].position), whole: match.players[index].powerLevel >= 2)
             case .boltLanded(let at):
                 let owner = match.ball.lastTouched ?? 0
-                spawnHitSpark(player: owner, at: at)
+                spawnHitSpark(player: owner, at: at, scale: 1.0 / 3)
             case .boltStruck(let index, let x, let bottom):
                 strikeColumn(at: SpriteLibrary.point(Vec2(x: x, y: bottom)), by: index)
             case .frozen(let index):
@@ -1247,11 +1257,11 @@ final class GameScene: SKScene {
             case .cloneShattered(let at):
                 spawnSnowflakes(at: SpriteLibrary.point(at), count: 12, spread: 16)
             case .fireballBurst(let at):
-                let burst = Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at), flipped: false)
-                burst.setScale(1.5)
+                let burst = Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at + Vec2(x: 0, y: -4)), flipped: false)
                 glowers.addChild(burst)
             case .pulsed(let index, let pull):
-                spawnPulse(by: index, pull: pull)
+                // Kinetic and unseen: the bar shows only with the hitboxes on.
+                if showHitboxes { spawnPulse(by: index, pull: pull) }
             case .shot(let index), .thrown(let index), .dunked(let index):
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
                 ballHold = BallLook.holdFrames
@@ -1334,9 +1344,9 @@ final class GameScene: SKScene {
     }
 
     /// One of the two sparks, either each time, on the ball in the hitter's colour.
-    private func spawnHitSpark(player: Int, at position: Vec2) {
+    private func spawnHitSpark(player: Int, at position: Vec2, scale: CGFloat = 1) {
         let spark = EnergyEffect.hitSparks.randomElement()!
-        glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position)))
+        glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale))
     }
 
     /// A score: lightning strikes the rim from the way the ball came in, leaning half as
@@ -1466,12 +1476,12 @@ final class GameScene: SKScene {
     /// little behind the one before, so it flows.
     private func drawCape(_ index: Int, player: Player, behind body: CGPoint) {
         let segments = capes[index]
-        guard player.power == .superSmoothie, player.state == .gliding else {
+        guard player.power == .superSmoothie, player.state == .flying else {
             for segment in segments { segment.isHidden = true }
             capeTrails[index] = []
             return
         }
-        let shoulder = CGPoint(x: body.x - CGFloat(player.facing.sign) * 3, y: body.y + 14)
+        let shoulder = CGPoint(x: body.x - CGFloat(player.facing.sign) * 3, y: body.y + 22)
         var trail = capeTrails[index]
         trail.insert(shoulder, at: 0)
         if trail.count > GameScene.capeSegments * 2 { trail.removeLast(trail.count - GameScene.capeSegments * 2) }
@@ -1558,6 +1568,7 @@ final class GameScene: SKScene {
                 let frames = sprites.frames(Effect.fireTrail.name, count: Effect.fireTrail.frameCount)
                 let node = SKSpriteNode(texture: frames[0])
                 node.anchorPoint = Effect.fireTrail.anchor
+                node.setScale(Effect.fireTrail.scale)
                 node.position = SpriteLibrary.point(Vec2(x: flame.box.center.x, y: flame.box.min.y))
                 node.zPosition = 4
                 node.run(.repeatForever(.animate(with: frames, timePerFrame: 1 / Effect.fireTrail.fps)))
@@ -1623,14 +1634,11 @@ final class GameScene: SKScene {
             headNodes[index].colorBlendFactor = player.frozen > 0 ? 0.6 : 0
 
             // In flight the body leans into its motion: forward tips it ahead, backward tips
-            // it back, up to thirty degrees, eased so it doesn't snap. A glide leans along
-            // its heading.
+            // it back, up to thirty degrees, eased so it doesn't snap.
             var wantedTilt: CGFloat = 0
             if player.state == .flying {
-                let ahead = player.velocity.x * player.facing.sign / LeviRules.flightSpeed(level: player.powerLevel, withBall: false)
+                let ahead = player.velocity.x * player.facing.sign / SmoothieRules.flightSpeed(level: player.powerLevel, withBall: false)
                 wantedTilt = -CGFloat(min(max(ahead, -1), 1)) * GameScene.flightTilt * CGFloat(player.facing.sign)
-            } else if player.state == .gliding {
-                wantedTilt = CGFloat(player.glideAngle) * CGFloat(player.facing.sign)
             }
             bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
             node.zRotation = bodyTilt[index]
@@ -1705,27 +1713,28 @@ final class GameScene: SKScene {
                     let frame = player.stateTimer * Int(Effect.fireCharge.fps) / 60 % Effect.fireCharge.frameCount
                     charge.texture = sprites.texture(Effect.fireCharge.name, frame)
                     charge.size = charge.texture!.size()
-                    charge.setScale(1)
+                    charge.anchorPoint = Effect.fireCharge.anchor
+                    charge.setScale(Effect.fireCharge.scale)
                 case .zeusJuice:
                     let frame = player.stateTimer * Int(EnergyEffect.lightningCharge.fps) / 60 % EnergyEffect.lightningCharge.frameCount
                     charge.texture = sprites.effectTexture(EnergyEffect.lightningCharge.name, frame, player: index)
                     charge.size = charge.texture!.size()
-                    charge.setScale(0.4)
+                    charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+                    charge.setScale(0.07)
                 default:
                     let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
                     let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
                     let frame = played <= loopEnd ? played : loopStart + (played - loopStart) % (loopEnd - loopStart + 1)
                     charge.texture = sprites.effectTexture(EnergyEffect.charge.name, frame, player: index)
                     charge.size = charge.texture!.size()
+                    charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                     charge.setScale(EnergyEffect.chargeScale)
                 }
                 charge.position = handBall.position
                 charge.isHidden = false
             } else {
                 charge.isHidden = true
-                if charging[index], player.power == .none || player.power == .leviTea || player.power == .webWater
-                    || player.power == .flashFizz || player.power == .platformShake || player.power == .superSmoothie
-                    || player.power == .quakeUp || player.power == .frostTea || player.power == .pulsepistol,
+                if charging[index], player.power != .blazingBoba, player.power != .zeusJuice,
                    player.state == .throwing || player.state == .dunking {
                     let tail = EnergyEffect.charge.node(sprites, player: index, at: charge.position,
                                                         frames: (EnergyEffect.chargeLoopEnd + 1)..<EnergyEffect.charge.frameCount,
@@ -1770,6 +1779,9 @@ final class GameScene: SKScene {
             }
 
             drawCape(index, player: player, behind: node.position)
+            if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {
+                spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: -player.facing.sign * 4, y: 2)), count: 2, spread: 6)
+            }
             // Blazing Boba's skid: the fire sheet as the run stops.
             if player.power == .blazingBoba, player.state == .idle, lastStates[index] == .run || lastStates[index] == .dash {
                 spawn(.fireSkid, at: player.position, flipped: player.facing == .left)
@@ -1915,6 +1927,8 @@ final class GameScene: SKScene {
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
+        let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"
+        TitleText.set(powerLabel, to: p.power == .none ? powerName : "\(powerName) L\(p.powerLevel)", size: 12)
     }
 
     /// What each button would do for this player right now.
@@ -1922,9 +1936,8 @@ final class GameScene: SKScene {
         let airborne = !player.grounded && !player.state.isGroundState
         let jump: String
         switch player.power {
-        case .leviTea where airborne: jump = "FLY"
+        case .superSmoothie where airborne: jump = "FLY"
         case .webWater where airborne: jump = "SWING"
-        case .superSmoothie where airborne && player.jumpsLeft == 0: jump = "GLIDE"
         default: jump = "JUMP"
         }
         let shoot: String

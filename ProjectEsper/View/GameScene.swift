@@ -146,6 +146,9 @@ final class GameScene: SKScene {
     private static let capeSegments = 7
     /// Each body's state last frame, to catch the skid's start.
     private var lastStates: [PlayerState] = []
+    /// Effects that ride a body while they play, at an offset from its feet: the snatch's
+    /// spark, so it stays on the hand however the body moves.
+    private var riders: [(node: SKSpriteNode, player: Int, offset: Vec2)] = []
     /// Frames of screenshake left, and where the camera sits unshaken.
     private var shake = 0
     private var cameraBase = CGPoint.zero
@@ -1219,7 +1222,10 @@ final class GameScene: SKScene {
                 case .zeusJuice where player.powerLevel >= 2:
                     spawnHitSpark(player: index, at: player.handCatchPoint)
                 default:
-                    spawn(.catchSpark, at: player.position + offset, flipped: player.facing == .left)
+                    // On the hand, and riding the body from there.
+                    let spark = Effect.catchSpark.node(sprites, at: SpriteLibrary.point(player.position + offset), flipped: player.facing == .left)
+                    glowers.addChild(spark)
+                    riders.append((spark, index, offset))
                 }
             case .popped(let victim, let popper):
                 // A spark off the ball as it leaves the hands, in the colour of whoever knocked it.
@@ -1820,6 +1826,14 @@ final class GameScene: SKScene {
             lastStates[index] = player.state
         }
         drawPowersLeavings()
+        // Riders follow their body, the offset turned with it.
+        riders.removeAll { $0.node.parent == nil }
+        for rider in riders {
+            let player = match.players[rider.player]
+            let offset = Vec2(x: abs(rider.offset.x) * player.facing.sign, y: rider.offset.y)
+            rider.node.position = SpriteLibrary.point(player.position + offset)
+            rider.node.xScale = player.facing == .left ? -1 : 1
+        }
 
         // The webs: a swing's from its anchor, a shot's to whatever it holds.
         for (index, player) in match.players.enumerated() {

@@ -30,6 +30,20 @@ final class HudScene: SKScene {
 final class HudSKView: SKView {
     weak var game: GameScene?
 
+    /// Keys are read through GameController; taking the presses here keeps a Mac from
+    /// beeping at every one it thinks nobody handled.
+    override var canBecomeFirstResponder: Bool { true }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        becomeFirstResponder()
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {}
+    override func pressesChanged(_ presses: Set<UIPress>, with event: UIPressesEvent?) {}
+    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {}
+    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {}
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
             game?.touchBegan(touch, at: touch.location(in: self), viewSize: bounds.size)

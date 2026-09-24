@@ -421,7 +421,9 @@ The ball in hand is its own sprite on the frame's ball, and when a dribble's bal
 off a ledge it reaches down to the real floor under it over the same frames; only the
 dribble sheets do that, so a stance's ball never sags off the edge of a slab. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off. A slide
-leaves the dash's smoke; the snatch's catch spark sits on the hand at full stretch; a ball
+leaves the dash's smoke; the snatch's catch spark sits on the hand at full stretch and
+rides the body through the rest of the swing, so it's on the hand however far the run
+carries it; a ball
 knocked loose bursts like a wall jump's spark, away from the hitter.
 
 The powers' effects: Blazing Boba's jump, dash, wall spark, skid, charge, trail and

@@ -1314,7 +1314,7 @@ final class GameScene: SKScene {
                 // Drawn over rather than added, or the white saturates past the tone.
                 for end in [from, to] {
                     let point = SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight))
-                    let flash = EnergyEffect.flashSpark2.node(sprites, player: flasher, at: point, scale: 0.5)
+                    let flash = EnergyEffect.flashSpark2.node(sprites, player: flasher, at: point, scale: 0.625)
                     glowers.addChild(flash)
                     if showHitboxes {
                         // The tear's reach at each end, where a held ball is popped.
@@ -1471,7 +1471,8 @@ final class GameScene: SKScene {
             let node = SKSpriteNode(texture: frames[0])
             node.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY[name] ?? 0.5)
             node.position = SpriteLibrary.point(position)
-            node.setScale(scale)
+            // Painted at twice their playing size.
+            node.setScale(scale * 0.5)
             node.zPosition = 30
             node.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 24), .removeFromParent()]))
             glowers.addChild(node)

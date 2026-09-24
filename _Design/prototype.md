@@ -218,8 +218,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   place of the double jump: five tiles along the stick, or in place, arriving nudged
   clear of anything solid, one a cooldown, two at level two. The flashes are tears in
   space at either level: the exit tear lingers 12 frames and pulls any loose ball
-  within 12 units into the hands, and the other holding the ball with their body within
-  12 units of either end loses it, popped. With the ball, a dribble hanging past a ledge
+  within 15 units into the hands, and the other holding the ball with their body within
+  15 units of either end loses it, popped. With the ball, a dribble hanging past a ledge
   by more than a tile counts as not having it, so shoot warps the body down to it,
   keeping it. One second between flashes. The flash sheet plays where the body left and
   the second flash sheet where it came out. Numbers in `FizzRules`; the dribble's ball
@@ -266,7 +266,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the flame is spent. Shots and throws set the ball alight until its first bounce, and
   nobody but the thrower can catch or snatch it; the slash still can. Level two: shoot
   and throw together with nothing in hand makes a fireball in hand, fire swirling into
-  it; shot it arcs under half the ball's gravity with the aiming dots, thrown it flies
+  it; it leaves at one and a half times the ball's speed; shot it arcs under half the ball's gravity with the aiming dots, thrown it flies
   dead straight, and it bursts on the first thing it meets and strips and knocks
   whatever's within 15 of the burst. Numbers in `BlazeRules`.
 - Pulsepistol Punch (K). Shoot without the ball is the pulse: a pillar ten units tall
@@ -471,10 +471,10 @@ Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
 `esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and
 `lightning_spark2`, at half size, centred, twice that on a wall; a fireball's burst is
 twice its size on a wall. Blazing Boba's hits spark with `fire_spark`, `fire_spark2` or
-`fire_spark3`, painted. The flash sheet is drawn over, not added, so its tone shows,
+`fire_spark3`, painted, at half size, centred. The flash sheet is drawn over, not added, so its tone shows,
 and with the hitboxes on its tear's reach rings both ends. Head particles each start on
 a random frame of their sheet, so a stream never plays in step. The wall jump spark is `fire_wallspark` as a
-silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark2` at half size in the energy colour at both
+silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark2` at 0.625 in the energy colour at both
 ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.
 

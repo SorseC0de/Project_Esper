@@ -409,7 +409,7 @@ public enum FizzRules {
     public static let flashDistance = 80.0
     public static func flashCharges(level: Int) -> Int { level >= 2 ? 2 : 1 }
     public static let tearFrames = 12
-    public static let tearRadius = 12.0
+    public static let tearRadius = 15.0
 }
 
 /// Platform Protein Shake's numbers: a fast fall makes a slab under the feet this wide,

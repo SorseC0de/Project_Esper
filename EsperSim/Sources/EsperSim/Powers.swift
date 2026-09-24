@@ -94,6 +94,8 @@ public enum BlazeRules {
     /// Frames the throw's hold frame shows after a summon, while the fire gathers.
     public static let summonPoseFrames = 30
     public static let fireballFrames = 150
+    /// A fireball leaves at this many times the ball's speed, shot or thrown.
+    public static let fireballSpeedShare = 1.5
     public static let burstReach = 15.0
     public static let burstKnock = Vec2(x: 3, y: 2.5)
 }

@@ -168,7 +168,8 @@ public struct Match: Equatable {
             ball.burning = player.power == .blazingBoba
         case .releaseFireball(let velocity, let straight):
             let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
-            fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity, framesLeft: BlazeRules.fireballFrames, straight: straight))
+            fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity * BlazeRules.fireballSpeedShare,
+                                      framesLeft: BlazeRules.fireballFrames, straight: straight))
         case .quake:
             quake(by: index)
         case .fireBolt(let direction):

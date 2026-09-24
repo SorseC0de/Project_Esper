@@ -496,6 +496,10 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   the yard numbers at one and a half times; the turf's five-yard stripes,
   leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded base in the
   colour of the side that guards it, as the court's blocks are, the pole's width and five more, behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
+- Shadows (`StageFeatures.shadows`, the view's alone): each body's current frame and its
+  head, and the goalposts, cast in a dark greyed purple at two thirds, mirrored under the
+  feet or the floor line and sheared by the turf's own lean where they stand, so they
+  tip away from the field's middle as the yard lines tip toward it.
 - The camera scrolls sideways only: level, gliding after the local player a share of the
   way each frame and leading them by where they're heading, stopped at the field's ends.
   The view takes in the stage's height and the turf below the floor. When the ball is off

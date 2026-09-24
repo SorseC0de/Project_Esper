@@ -322,6 +322,10 @@ final class GameScene: SKScene {
                     x += 14
                 }
             }
+            goalpostShadows.shouldRasterize = true
+            goalpostShadows.alpha = FieldArt.shadowAlpha
+            goalpostShadows.zPosition = -6
+            ground.addChild(goalpostShadows)
             ground.addChild(goalposts)
             buildGoalposts()
         }
@@ -367,6 +371,15 @@ final class GameScene: SKScene {
             let node = SKSpriteNode(texture: sprites.texture(player.animationFrame, player: player.index))
             bodies.addChild(node)
             playerNodes.append(node)
+            for shadows in [\GameScene.shadowBodies, \GameScene.shadowHeads] {
+                let shadow = SKSpriteNode()
+                shadow.shader = shadowShader
+                shadow.alpha = FieldArt.shadowAlpha
+                shadow.zPosition = -6
+                shadow.isHidden = true
+                ground.addChild(shadow)
+                self[keyPath: shadows].append(shadow)
+            }
             let head = SKSpriteNode(texture: sprites.headTexture(player.animationFrame, player: player.index))
             head.zPosition = 4
             glowers.addChild(head)
@@ -1742,11 +1755,61 @@ final class GameScene: SKScene {
     private var fieldBlooms: [SKSpriteNode] = []
     private var lightPanels: [SKShapeNode] = []
     private let goalposts = SKNode()
+    /// The goalposts' shadows, one flat group at two thirds so overlaps don't darken, and
+    /// each player's body and head shadow.
+    private let goalpostShadows = SKEffectNode()
+    private var shadowBodies: [SKSpriteNode] = []
+    private var shadowHeads: [SKSpriteNode] = []
+    private lazy var shadowShader: SKShader = {
+        let shader = SKShader(source: """
+        void main() {
+            float alpha = texture2D(u_texture, v_tex_coord).a;
+            gl_FragColor = vec4(u_shade.rgb * alpha, alpha) * v_color_mix.a;
+        }
+        """)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        FieldArt.shadow.getRed(&r, green: &g, blue: &b, alpha: &a)
+        shader.uniforms = [SKUniform(name: "u_shade", vectorFloat4: SIMD4<Float>(Float(r), Float(g), Float(b), 1))]
+        return shader
+    }()
+
+    /// A sprite's shadow: the same frame in the shadow colour, mirrored under its anchor and
+    /// sheared with the turf, `height` pixels of it above the anchor at `x`.
+    private func castShadow(_ shadow: SKSpriteNode, of source: SKSpriteNode, anchorY: CGFloat, facing: CGFloat) {
+        guard let texture = source.texture else { shadow.isHidden = true; return }
+        shadow.isHidden = source.isHidden
+        shadow.texture = texture
+        shadow.setScale(1)
+        shadow.size = source.size
+        shadow.anchorPoint = source.anchorPoint
+        shadow.xScale = facing
+        shadow.yScale = -1
+        shadow.zRotation = -source.zRotation
+        let centre = CGFloat(match.stage.columns) * GameScene.pixelsPerTile / 2
+        let slope = FieldArt.slope(at: source.position.x, centre: centre)
+        // Local shift across per unit up the sprite, turned into its own normalised units.
+        let shear = -slope * source.size.height / source.size.width / facing
+        let rowTop = 1 - source.anchorPoint.y, rowBottom = -source.anchorPoint.y
+        shadow.warpGeometry = SKWarpGeometryGrid(columns: 1, rows: 1,
+                                                 sourcePositions: [SIMD2(0, 0), SIMD2(1, 0), SIMD2(0, 1), SIMD2(1, 1)],
+                                                 destinationPositions: [SIMD2(Float(shear * rowBottom), 0), SIMD2(Float(1 + shear * rowBottom), 0),
+                                                                        SIMD2(Float(shear * rowTop), 1), SIMD2(Float(1 + shear * rowTop), 1)])
+        let height = source.position.y - anchorY
+        shadow.position = CGPoint(x: source.position.x - slope * height, y: anchorY - height)
+    }
     private var netNodes: [SKShapeNode] = []
 
     /// The goalposts drawn at their rims.
     private func buildGoalposts() {
         goalposts.removeAllChildren()
+        goalpostShadows.removeAllChildren()
+        for hoop in match.stage.hoops where match.stage.features.shadows {
+            let postX = hoop.backboard == .left ? Stage.fieldPostInset : match.stage.width - Stage.fieldPostInset
+            FieldArt.goalpost(at: SpriteLibrary.point(Vec2(x: postX, y: GoalpostTuning.postRimHeight)), backboard: hoop.backboard, into: goalpostShadows,
+                              crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
+                              angle: GoalpostTuning.crossbarAngle * .pi / 180, thickness: GoalpostTuning.thickness, outline: 0,
+                              padColour: FieldArt.shadow, shadowOf: CGFloat(match.stage.columns) * GameScene.pixelsPerTile / 2)
+        }
         for hoop in match.stage.hoops {
             let postX = hoop.backboard == .left ? Stage.fieldPostInset : match.stage.width - Stage.fieldPostInset
             FieldArt.goalpost(at: SpriteLibrary.point(Vec2(x: postX, y: GoalpostTuning.postRimHeight)), backboard: hoop.backboard, into: goalposts,
@@ -2246,6 +2309,12 @@ final class GameScene: SKScene {
                 headEsperMixes[index].particleBirthRate = 0
             }
 
+            if match.stage.features.shadows {
+                // The body and head cast down from the feet, flipped and sheared with the turf.
+                let feet = SpriteLibrary.point(player.position).y
+                castShadow(shadowBodies[index], of: node, anchorY: feet, facing: node.xScale)
+                castShadow(shadowHeads[index], of: headNode, anchorY: feet, facing: headNode.xScale)
+            }
             drawCape(index, player: player, behind: node.position)
             if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {
                 spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: -player.facing.sign * 4, y: 2)), count: 2, spread: 6)

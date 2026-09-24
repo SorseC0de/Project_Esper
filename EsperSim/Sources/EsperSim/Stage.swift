@@ -387,7 +387,7 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...(columns - 1), rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
         stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
-        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true)
+        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true)
         return stage
     }
 

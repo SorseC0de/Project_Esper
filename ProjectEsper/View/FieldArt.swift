@@ -12,6 +12,26 @@ enum FieldArt {
     static let turfLight = SKColor(red: 0.16, green: 0.30, blue: 0.11, alpha: 1)
     static let turfDark = SKColor(red: 0.11, green: 0.23, blue: 0.08, alpha: 1)
     static let chalk = SKColor(white: 0.97, alpha: 1)
+    /// Shadows: a dark, greyed purple at two thirds.
+    static let shadow = SKColor(red: 0.17, green: 0.13, blue: 0.21, alpha: 1)
+    static let shadowAlpha: CGFloat = 0.66
+    /// The turf's lean: yard lines tip this share of their distance to the middle across
+    /// the turf's height.
+    static let turfLean: CGFloat = 0.12
+    /// The floor line the feet stand on, in art pixels.
+    static let floorLine: CGFloat = 16
+
+    /// Sideways shift per pixel of height at `x`, the yard lines' slope there: positive up
+    /// toward the middle. A shadow cast down takes it the other way.
+    static func slope(at x: CGFloat, centre: CGFloat) -> CGFloat {
+        (centre - x) * turfLean / (turfTop - (turfBottom + 4))
+    }
+
+    /// A point mirrored under the floor line and sheared with the turf, as its shadow falls.
+    static func shadowPoint(_ point: CGPoint, centre: CGFloat) -> CGPoint {
+        let height = point.y - floorLine
+        return CGPoint(x: point.x - slope(at: point.x, centre: centre) * height, y: floorLine - height)
+    }
     static let gold = SKColor(red: 0.93, green: 0.70, blue: 0.29, alpha: 1)
     static let pad = SKColor(red: 0.06, green: 0.13, blue: 0.31, alpha: 1)
 
@@ -200,41 +220,51 @@ enum FieldArt {
 
     /// A goalpost at a rim: the padded base behind it on the floor, the gold pole bending
     /// forward to the crossbar under the rim, and the two uprights rising from its ends.
+    /// With `shadowOf`, the field's middle, it draws the goalpost's shadow instead: every
+    /// point mirrored under the floor and sheared with the turf, all in the shadow colour.
     static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode, crossbarBelowRim: CGFloat, prongHeight: CGFloat,
-                         angle: CGFloat, thickness: CGFloat, outline: CGFloat, padColour: SKColor) {
+                         angle: CGFloat, thickness: CGFloat, outline: CGFloat, padColour: SKColor, shadowOf centre: CGFloat? = nil) {
+        let cast: (CGPoint) -> CGPoint = { point in centre.map { shadowPoint(point, centre: $0) } ?? point }
         let back = CGFloat(backboard.sign)
         let floor: CGFloat = 16
         let baseX = rim.x + back * 26
         let crossbarY = rim.y - crossbarBelowRim
         let halfSpan: CGFloat = 24
         // The pad is the pole's width and five more.
-        let base = SKShapeNode(rectOf: CGSize(width: thickness + 5, height: 40), cornerRadius: 3)
-        base.fillColor = padColour
-        base.strokeColor = .black
+        let padHalf = (thickness + 5) / 2
+        let padPath = CGMutablePath()
+        padPath.addLines(between: [CGPoint(x: baseX - padHalf, y: floor), CGPoint(x: baseX + padHalf, y: floor),
+                                   CGPoint(x: baseX + padHalf, y: floor + 40), CGPoint(x: baseX - padHalf, y: floor + 40)].map(cast))
+        padPath.closeSubpath()
+        let base = SKShapeNode(path: padPath)
+        base.fillColor = centre == nil ? padColour : shadow
+        base.strokeColor = centre == nil ? .black : .clear
         base.lineWidth = outline
-        base.position = CGPoint(x: baseX, y: floor + 20)
         base.zPosition = -5
         parent.addChild(base)
         // The back rod, from the pad bending forward to the crossbar's middle.
         let rod = CGMutablePath()
-        rod.move(to: CGPoint(x: baseX, y: floor + 40))
-        rod.addLine(to: CGPoint(x: baseX, y: crossbarY - 30))
-        rod.addQuadCurve(to: CGPoint(x: rim.x, y: crossbarY), control: CGPoint(x: baseX, y: crossbarY))
+        rod.move(to: cast(CGPoint(x: baseX, y: floor + 40)))
+        rod.addLine(to: cast(CGPoint(x: baseX, y: crossbarY - 30)))
+        rod.addQuadCurve(to: cast(CGPoint(x: rim.x, y: crossbarY)), control: cast(CGPoint(x: baseX, y: crossbarY)))
         // The crossbar and its uprights, outlined on their own over the rod.
         let path = CGMutablePath()
         // The crossbar tilts about its middle, the end toward the field rising; each upright
         // stands on its end of it.
         let rise = tan(angle) * halfSpan * -back
         let ends = [(x: rim.x - halfSpan, y: crossbarY - rise), (x: rim.x + halfSpan, y: crossbarY + rise)]
-        path.move(to: CGPoint(x: ends[0].x, y: ends[0].y))
-        path.addLine(to: CGPoint(x: ends[1].x, y: ends[1].y))
+        path.move(to: cast(CGPoint(x: ends[0].x, y: ends[0].y)))
+        path.addLine(to: cast(CGPoint(x: ends[1].x, y: ends[1].y)))
         for end in ends {
-            path.move(to: CGPoint(x: end.x, y: end.y))
-            path.addLine(to: CGPoint(x: end.x, y: end.y + prongHeight))
+            path.move(to: cast(CGPoint(x: end.x, y: end.y)))
+            path.addLine(to: cast(CGPoint(x: end.x, y: end.y + prongHeight)))
         }
         // Each part the gold over a black line as wide as it plus the outline each side.
+        let layers: [(SKColor, CGFloat, CGFloat)] = centre == nil
+            ? [(SKColor.black, thickness + outline * 2, 0), (gold, thickness, 0.05)]
+            : [(shadow, thickness, 0)]
         for (part, z) in [(rod as CGPath, CGFloat(-4.6)), (path as CGPath, CGFloat(-4.4))] {
-            for (colour, width, lift) in [(SKColor.black, thickness + outline * 2, CGFloat(0)), (gold, thickness, CGFloat(0.05))] {
+            for (colour, width, lift) in layers {
                 let post = SKShapeNode(path: part)
                 post.strokeColor = colour
                 post.lineWidth = width

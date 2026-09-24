@@ -209,18 +209,16 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   forward or back, and held still it hovers round a three-pixel circle. No double jump. With or without the ball, and flight
   cancels into a shot or a throw with the ball and a slash or a snatch without. Numbers in `LeviRules`.
 - Flash Fizz (D). Without the ball, a shoot button warps the body to the ball while the
-  ball is still its colour, from letting it go until its first bounce, and it arrives holding it:
-  throw, warp, catch. Otherwise the shoot button is the
-  flash: 45 units along the stick, 90 at level two, or in place with the stick centred, in addition to the
-  double jump, arriving nudged clear of anything solid. The flashes are tears in space,
-  and the exit tear lingers 12 frames and pulls any loose ball within 12 units into the
-  hands, the ball going through space the way the body did: throw, flash after it, and
-  it's yours again; or flash in place to take one that's near. At level two the other
-  holding the ball with their body within 12 units of either end loses it, popped. There's no slash. With the
-  ball, a dribble hanging past a ledge by more than a tile counts as not having it, so
-  shoot warps the body down to it, keeping it, standing still on the block. One second
-  between flashes. A bright wide diamond blinks where it left, quick, and where it came
-  out, hanging on for the tear's frames. Numbers in `FizzRules`; the dribble's ball
+  ball is still its colour, until its first bounce, and it arrives holding it: throw,
+  warp, catch. Otherwise shoot is the slash as ever. The flash is on jump in the air, in
+  place of the double jump: five tiles along the stick, or in place, arriving nudged
+  clear of anything solid, one a cooldown, two at level two. The flashes are tears in
+  space at either level: the exit tear lingers 12 frames and pulls any loose ball
+  within 12 units into the hands, and the other holding the ball with their body within
+  12 units of either end loses it, popped. With the ball, a dribble hanging past a ledge
+  by more than a tile counts as not having it, so shoot warps the body down to it,
+  keeping it. One second between flashes. The flash sheet plays where the body left and
+  the second flash sheet where it came out. Numbers in `FizzRules`; the dribble's ball
   position per frame comes from `BallLandmarks.swift`, which the importer generates from
   the sheets.
 - Platform Protein Shake (E). A fast fall makes a slab under the feet, three tiles wide
@@ -333,9 +331,7 @@ placeholder for one not written yet.
 - Super Smoothie: flight; level two flies faster, with the ball as fast as level one
   without, lasts 180 frames rather than 120, and glides forward. Flight needs no second
   jump.
-- Flash Fizz: the flash, 45 units, and the warp to your own ball; level two goes 90 and
-  makes the flashes tears, pulling a loose ball into the hands from where you came out
-  and knocking the ball out of the other's hands within reach of either end.
+- Flash Fizz: the flash on jump, five tiles, tearing; level two gives two a cooldown.
 - Platform Protein Shake: the slab; level two adds the wall.
 - Quake-Up Coffee: the quake on the same floor; level two the whole screen.
 - Zeus Juice: the bolt; level two adds the strike on throw.
@@ -458,8 +454,8 @@ floor and walls start purple and shift over 20 frames to the colour of whoever h
 ball, and back. The backboard blocks wear the colour of the player who scores there's opponent, since you
 score on the other side's basket. The ledge is
 magenta. Three small faint green chevrons stack over the rim
-the holder scores on. The head particles are hard squares that step down in size, a
-digital dissolve rather than a flame.
+the holder scores on. The head particles are `esper_particle` frames at a hard square's size, stepping down as
+they go; Blazing Boba's head burns `fire_particle`, Frost Tea's sheds snowflakes.
 
 ## Glow
 

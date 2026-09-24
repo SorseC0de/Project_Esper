@@ -205,15 +205,14 @@ public struct Match: Equatable {
             let box = Box(min: Vec2(x: min(near, far), y: bottom), max: Vec2(x: max(near, far), y: bottom + ShakeRules.wallHeight))
             make(box, by: index)
         case .flash(let direction):
-            // A short way along the stick, or in place, nudged clear of solids. At level two
-            // the flashes are tears: the ball is pulled into the hands from where it came
-            // out for a while after, and the other holding the ball with their body within
-            // reach of either end loses it.
+            // Five tiles along the stick, or in place, nudged clear of solids. The flashes
+            // are tears: the ball is pulled into the hands from where it came out for a
+            // while after, and the other holding the ball with their body within reach of
+            // either end loses it.
             let from = player.position
-            players[index].warp(to: from + direction * FizzRules.flashDistance(level: player.powerLevel), in: stage)
+            players[index].warp(to: from + direction * FizzRules.flashDistance, in: stage)
             let to = players[index].position
             events.append(.flashed(player: index, from: from, to: to))
-            guard player.powerLevel >= 2 else { break }
             players[index].tear = Tear(position: players[index].chest, framesLeft: FizzRules.tearFrames)
             if let other = players.indices.first(where: { $0 != index }), players[other].hasBall {
                 let body = players[other].body

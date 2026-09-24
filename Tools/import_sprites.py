@@ -40,6 +40,8 @@ REDUCE = {"esper_charge": 4, "flashspark": 4}
 # Strips whose frames aren't square: their frame height, after any reduction. The
 # flash's 256x144 frames come down to 64x36.
 FRAME_HEIGHT = {"flashspark": 36}
+# Where the measurement reads a sheet's art wrong, the artist's word: 0 bottom edge, 0.5 centred.
+ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.5, "flashspark2": 0.5}
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk"}
@@ -211,7 +213,9 @@ def sheet_facts(short, width, height, bpp, rows):
     # touches the edge in one frame still reads as centred.
     typical = sorted(bottoms)[len(bottoms) // 2] if bottoms else 0
     feet = FEET_FROM_BOTTOM_BY_SIZE.get(width, 8)
-    if typical <= 1:
+    if short in ANCHOR_OVERRIDE:
+        anchor = ANCHOR_OVERRIDE[short]
+    elif typical <= 1:
         anchor = 0.0
     elif abs(typical - feet) <= 1:
         anchor = feet / cell

@@ -16,7 +16,7 @@ public enum Power: Equatable, Hashable {
 
     /// Powers whose shoot button, without the ball, is something other than the slash.
     public var takesShoot: Bool {
-        self == .flashFizz || self == .zeusJuice || self == .pulsepistol
+        self == .zeusJuice || self == .pulsepistol
     }
 }
 
@@ -146,6 +146,8 @@ public struct Player: Equatable {
     /// Flash Fizz: frames until the next flash; where a warp decided this step is going
     /// when it's down to the ball in hand; and the tear the last flash left.
     public var warpCooldown = 0
+    /// Flashes left before the cooldown; nil is a full set for the level.
+    public var flashCharges: Int?
     public var pendingWarp: Vec2?
     public var tear: Tear?
     /// Platform Protein Shake: a fast fall just began and wants a slab. A slab or a wall
@@ -277,7 +279,10 @@ public struct Player: Equatable {
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
         if webLineCooldown > 0 { webLineCooldown -= 1 }
         if swingCooldown > 0 { swingCooldown -= 1 }
-        if warpCooldown > 0 { warpCooldown -= 1 }
+        if warpCooldown > 0 {
+            warpCooldown -= 1
+            if warpCooldown == 0 { flashCharges = nil }
+        }
         if let open = tear { tear = open.framesLeft > 1 ? Tear(position: open.position, framesLeft: open.framesLeft - 1) : nil }
         if platformCooldown > 0 { platformCooldown -= 1 }
         if webLinePose > 0 { webLinePose -= 1 }
@@ -477,7 +482,14 @@ public struct Player: Equatable {
                 enter(.flying)
             } else if power == .webWater, jumpPressed, swingCooldown == 0 {
                 startWebSwing(events: &events)
-            } else if jumpPressed, jumpsLeft > 0, power != .superSmoothie, power != .webWater {
+            } else if power == .flashFizz, jumpPressed, (flashCharges ?? FizzRules.flashCharges(level: powerLevel)) > 0 {
+                // Flash Fizz's flash is the double jump: five tiles along the stick, or in place.
+                jumpBuffer = 0
+                let left = (flashCharges ?? FizzRules.flashCharges(level: powerLevel)) - 1
+                flashCharges = left
+                if left == 0 { warpCooldown = FizzRules.cooldownFrames }
+                wanted = .flash(direction: input.stick.length > 0.3 ? input.stick.normalized : .zero)
+            } else if jumpPressed, jumpsLeft > 0, power != .superSmoothie, power != .webWater, power != .flashFizz {
                 doubleJump(input, events: &events)
             } else if holding, input.shoot, shootReady {
                 enterShootStance()
@@ -1146,11 +1158,10 @@ public struct Player: Equatable {
         return .webLine(direction: webAimDirection)
     }
 
-    /// Flash Fizz on a shoot button. With the ball, only when it's dribbling over a drop of
-    /// more than a tile, which counts as not having it: the warp down to it. Without the
-    /// ball and the loose ball still yours, the warp to it, arriving holding it. Otherwise
-    /// the flash: a short way along the stick, or in place, and the tear it leaves pulls a
-    /// loose ball in.
+    /// Flash Fizz on a shoot button: the warp to the ball. With the ball, only when it's
+    /// dribbling over a drop of more than a tile, which counts as not having it: the warp
+    /// down to it. Without the ball and the loose ball still yours, the warp to it,
+    /// arriving holding it. Otherwise the button is the slash; the flash is on jump.
     private mutating func flashIfAsked(_ input: PlayerInput, shootPressed: Bool, ballOwner: Int?, stage: Stage) -> PlayerAction? {
         guard power == .flashFizz, shootPressed, warpCooldown == 0 else { return nil }
         if hasBall {
@@ -1159,12 +1170,10 @@ public struct Player: Equatable {
             pendingWarp = overhang
             return .warpToBall
         }
+        guard ballOwner == index else { return nil }
         warpCooldown = FizzRules.cooldownFrames
-        if ballOwner == index {
-            pendingWarp = nil
-            return .warpToBall
-        }
-        return .flash(direction: input.stick.length > 0.3 ? input.stick.normalized : .zero)
+        pendingWarp = nil
+        return .warpToBall
     }
 
     /// Where the dribbled ball is when it's hanging past a ledge by more than a tile: down
@@ -1245,7 +1254,7 @@ public struct Player: Equatable {
     /// or on the floor as it lands.
     public mutating func warp(to feet: Vec2, in stage: Stage) {
         position = feet
-        position += stage.pushOut(body, reach: FizzRules.flashDistance(level: 2) + Stage.tileSize)
+        position += stage.pushOut(body, reach: FizzRules.flashDistance + Stage.tileSize)
         velocity = .zero
         fastFalling = false
         webAnchor = nil

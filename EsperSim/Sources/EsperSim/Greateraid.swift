@@ -98,7 +98,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .slideCider: ("A longer slide.", "Longer still.")
         case .webWater: ("Double jump is a web swing.", "Throw fires a web line.")
         case .superSmoothie: ("Hold jump in the air to fly, on a cape of energy.", "Forward is a fast glide, and the flight lasts longer.")
-        case .flashFizz: ("Shoot flashes you a short way, or to your ball while it's still yours.", "Flashes tear the ball into your hands and out of theirs, further.")
+        case .flashFizz: ("Jump in the air flashes you five tiles, a tear that pulls the ball in; shoot warps to your ball.", "Two flashes a cooldown.")
         case .platformShake: ("A fast fall makes a slab.", "Shoot makes a wall.")
         case .quakeUp: ("A fast fall's landing shakes the floor: the ball hops and whoever stands on it is stripped.", "The whole screen is the floor.")
         case .zeusJuice: ("Shoot throws a bolt that strips whoever it hits and pops the ball back to you.", "Throw calls a strike down on the ball in hand, or on your snatch.")

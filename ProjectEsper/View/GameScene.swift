@@ -526,7 +526,7 @@ final class GameScene: SKScene {
     private func makeFire(_ colour: SKColor) -> SKEmitterNode {
         let fire = SKEmitterNode()
         // The hard square, or a frame of the spark scaled down to the square's size.
-        fire.particleTexture = ParticleLook.sprites ? sprites.texture(EnergyEffect.spark.name, 4) : sprites.flatSquare(size: 4, alpha: 1)
+        fire.particleTexture = ParticleLook.sprites ? sprites.texture("esper_particle", 4) : sprites.flatSquare(size: 4, alpha: 1)
         fire.particleBirthRate = 40
         fire.particleLifetime = 0.6
         fire.particleLifetimeRange = 0.1
@@ -1257,7 +1257,8 @@ final class GameScene: SKScene {
                 let player = match.players[index]
                 // The sheet's spark flies left, away from a wall on the right.
                 if player.power == .blazingBoba {
-                    spawn(.fireWallSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .left)
+                    // Painted the other way round from the GMS2 spark.
+                    spawn(.fireWallSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .right)
                 } else {
                     spawn(.wallJumpSpark, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .left)
                 }
@@ -1270,8 +1271,9 @@ final class GameScene: SKScene {
                 spawnJumpPlatform(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow))
             case .warped(_, let from, let to), .flashed(_, let from, let to):
                 // The flash's spark at both ends, the sheet at half size.
-                for end in [from, to] {
-                    let flash = Effect.flashSpark.node(sprites, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), flipped: false)
+                // The first sheet where the body left, the second where it came out.
+                for (end, sheet) in [(from, Effect.flashSpark), (to, Effect.flashSpark2.available ? Effect.flashSpark2 : Effect.flashSpark)] {
+                    let flash = sheet.node(sprites, at: SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight)), flipped: false)
                     flash.blendMode = .add
                     glowers.addChild(flash)
                 }
@@ -1349,7 +1351,7 @@ final class GameScene: SKScene {
     private func spawnJumpPlatform(at feet: CGPoint, colour: SKColor) {
         let count = 9
         for index in 0..<count {
-            let square = SKSpriteNode(texture: ParticleLook.sprites ? sprites.texture(EnergyEffect.spark.name, 3 + index % 3) : sprites.flatSquare(size: 4, alpha: 1))
+            let square = SKSpriteNode(texture: ParticleLook.sprites ? sprites.texture("esper_particle", 3 + index % 3) : sprites.flatSquare(size: 4, alpha: 1))
             square.size = CGSize(width: 3, height: 3)
             square.color = colour
             square.colorBlendFactor = 1
@@ -1445,6 +1447,29 @@ final class GameScene: SKScene {
 
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool, player: Int? = nil) {
         glowers.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped, player: player))
+    }
+
+    /// The head's particles by power: Blazing Boba's are the fire sheet's frame, painted;
+    /// Frost Tea's have snowflakes mixed in; the rest are the energy particle.
+    private var headParticlePower: [Int: Power] = [:]
+    private func setHeadParticles(_ index: Int, power: Power) {
+        guard headParticlePower[index] != power else { return }
+        headParticlePower[index] = power
+        let fire = headFires[index]
+        let colour = SKColor(rgb: sprites.look(for: index).glow)
+        switch power {
+        case .blazingBoba where Effect.fireParticleAvailable:
+            fire.particleTexture = sprites.texture("fire_particle", 0)
+            fire.particleColorBlendFactor = 0
+        case .frostTea:
+            fire.particleTexture = SKTexture(imageNamed: "Snowflake")
+            fire.particleColor = GameScene.ice
+            fire.particleColorBlendFactor = 0.6
+        default:
+            fire.particleTexture = ParticleLook.sprites ? sprites.texture("esper_particle", 4) : sprites.flatSquare(size: 4, alpha: 1)
+            fire.particleColor = colour
+            fire.particleColorBlendFactor = 1
+        }
     }
 
     /// Frost Tea's snowflakes: the vector, small, thrown out from a point and fading.
@@ -1861,6 +1886,7 @@ final class GameScene: SKScene {
                 headNode.position = shown
                 headFires[index].position = CGPoint(x: shown.x, y: shown.y + 4)
                 headFires[index].particleBirthRate = 24
+                setHeadParticles(index, power: player.power)
                 // One sideways wind on all the bits at once, swinging back and forth, so the
                 // column bends as a whole like a scarf rather than scattering.
                 headFires[index].xAcceleration = CGFloat(sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(index) * 2)) * 140
@@ -2042,6 +2068,7 @@ final class GameScene: SKScene {
         switch player.power {
         case .superSmoothie where airborne: jump = "FLY"
         case .webWater where airborne: jump = "SWING"
+        case .flashFizz where airborne: jump = "FLASH"
         default: jump = "JUMP"
         }
         let shoot: String
@@ -2051,7 +2078,7 @@ final class GameScene: SKScene {
             shoot = "SLIDE"
         } else {
             switch player.power {
-            case .flashFizz: shoot = "FLASH"
+            case .flashFizz where match.ball.owner == player.index: shoot = "WARP"
             case .platformShake where player.powerLevel >= 2: shoot = "WALL"
             case .zeusJuice: shoot = "BOLT"
             case .pulsepistol: shoot = "PULSE"

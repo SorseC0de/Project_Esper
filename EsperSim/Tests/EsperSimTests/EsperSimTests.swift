@@ -1092,25 +1092,54 @@ final class SodaAndFizzTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .flying)
     }
 
-    func testLevelOneFizzFlashesWithoutATearAndLevelTwoTearsBothEnds() {
+    /// Player 0 hanging in the air a little way up, where a jump press is the flash.
+    private func airborne(_ match: inout Match, y: Double = 40) {
+        match.players[0].position.y = y
+        match.players[0].grounded = false
+        match.players[0].state = .air
+        match.players[0].jumpsLeft = 1
+        match.advance(inputs: [.idle, .idle])
+    }
+
+    func testTheFlashIsJumpInTheAirAndTearsAtEitherLevel() {
         var one = with(.flashFizz, level: 1)
         one.players[1].position.x = 300
         one.ball.respawn(at: Vec2(x: 300, y: 30))
-        one.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
-        XCTAssertEqual(one.players[0].position.x, 130 + FizzRules.flashDistance(level: 1), accuracy: 0.001)
-        XCTAssertNil(one.players[0].tear)
+        airborne(&one)
+        one.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
+        XCTAssertEqual(one.players[0].position.x, 130 + FizzRules.flashDistance, accuracy: 1)
+        XCTAssertNotNil(one.players[0].tear, "the tear is there from level one")
+        XCTAssertFalse(one.events.contains(.doubleJumped(player: 0)), "in place of the double jump")
 
-        // Level two: further, and the other holding the ball where it came out loses it to
-        // the tear on the spot.
+        // The other holding the ball where it came out loses it to the tear on the spot.
         var two = with(.flashFizz, level: 2)
         two.players[1].hasBall = true
         two.ball.holder = 1
-        two.players[1].position.x = 130 + FizzRules.flashDistance(level: 2) + 8
-        two.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
-        XCTAssertEqual(two.players[0].position.x, 130 + FizzRules.flashDistance(level: 2), accuracy: 0.001)
+        two.players[1].position.x = 130 + FizzRules.flashDistance + 8
+        airborne(&two, y: 12)
+        two.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
+        XCTAssertEqual(two.players[0].position.x, 130 + FizzRules.flashDistance, accuracy: 1)
         XCTAssertTrue(two.events.contains(.popped(player: 1, by: 0)))
         XCTAssertFalse(two.players[1].hasBall)
         XCTAssertEqual(two.ball.holder, 0)
+    }
+
+    func testLevelTwoGetsTwoFlashesACooldown() {
+        var one = with(.flashFizz, level: 1)
+        one.players[1].position.x = 300
+        airborne(&one, y: 60)
+        one.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
+        one.advance(inputs: [.idle, .idle])
+        one.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
+        XCTAssertEqual(one.events.filter { if case .flashed = $0 { return true } else { return false } }.count, 0, "one a cooldown at level one")
+        var two = with(.flashFizz, level: 2)
+        two.players[1].position.x = 300
+        airborne(&two, y: 60)
+        two.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
+        two.advance(inputs: [.idle, .idle])
+        two.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
+        XCTAssertEqual(two.events.filter { if case .flashed = $0 { return true } else { return false } }.count, 1, "two a cooldown at level two")
+        XCTAssertGreaterThan(two.players[0].warpCooldown, 0)
     }
 
     @discardableResult
@@ -1185,10 +1214,11 @@ final class SodaAndFizzTests: XCTestCase {
         var match = with(.flashFizz)
         match.players[1].position.x = 300
         // A ball out of every ring's reach, but within the tear's once the flash lands.
-        match.ball.respawn(at: match.players[0].position + Vec2(x: FizzRules.flashDistance(level: 2) + 4, y: 15))
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        match.ball.respawn(at: match.players[0].position + Vec2(x: FizzRules.flashDistance + 4, y: 15))
+        airborne(&match, y: 12)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
         XCTAssertTrue(match.events.contains { if case .flashed(player: 0, _, _) = $0 { return true } else { return false } })
-        XCTAssertEqual(match.players[0].position.x, 130 + FizzRules.flashDistance(level: 2), accuracy: 0.001)
+        XCTAssertEqual(match.players[0].position.x, 130 + FizzRules.flashDistance, accuracy: 1)
         XCTAssertEqual(match.ball.holder, 0)
     }
 
@@ -1197,9 +1227,9 @@ final class SodaAndFizzTests: XCTestCase {
         match.players[1].position.x = 300
         // Behind, where the rings don't catch it standing still.
         match.ball.respawn(at: match.players[0].chest + Vec2(x: -10, y: 5))
-        match.advance(inputs: [.idle, .idle])
+        airborne(&match, y: 12)
         XCTAssertNil(match.ball.holder)
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
         XCTAssertEqual(match.players[0].position.x, 130, accuracy: 0.001)
         XCTAssertEqual(match.ball.holder, 0)
     }
@@ -1207,15 +1237,17 @@ final class SodaAndFizzTests: XCTestCase {
     func testAFlashPastTheBallLeavesIt() {
         var match = with(.flashFizz)
         match.players[1].position.x = 300
-        match.ball.respawn(at: match.players[0].chest + Vec2(x: 70, y: 0))
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        match.ball.respawn(at: match.players[0].chest + Vec2(x: 120, y: 0))
+        airborne(&match, y: 12)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
         XCTAssertNil(match.ball.holder)
         XCTAssertNotNil(match.players[0].tear)
     }
 
     func testAFlashIntoTheFloorArrivesClearOfIt() {
         var match = with(.flashFizz)
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
+        airborne(&match, y: 30)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), jump: true), .idle])
         XCTAssertFalse(match.stage.overlapsSolid(match.players[0].body))
         XCTAssertGreaterThanOrEqual(match.players[0].position.y, 10)
     }
@@ -1245,14 +1277,14 @@ final class SodaAndFizzTests: XCTestCase {
         XCTAssertEqual(match.players[0].position.y, 10, accuracy: 0.001)
     }
 
-    func testFlashFizzHasNoSlashOnDefence() {
+    func testFlashFizzKeepsTheSlashOnShoot() {
         var match = with(.flashFizz)
         match.players[1].hasBall = true
         match.ball.holder = 1
         match.players[1].position.x = 300
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        XCTAssertNotEqual(match.players[0].state, .slashing)
-        XCTAssertTrue(match.events.contains { if case .flashed = $0 { return true } else { return false } })
+        XCTAssertEqual(match.players[0].state, .slashing)
+        XCTAssertFalse(match.events.contains { if case .flashed = $0 { return true } else { return false } })
     }
 }
 
@@ -1989,9 +2021,14 @@ final class GreateraidTests: XCTestCase {
         match.players[1].hasBall = true
         match.ball.holder = 1
         // The body's near edge just inside the tear's reach of the exit, the ball's centre outside it.
-        let exit = 130 + FizzRules.flashDistance(level: 2)
+        let exit = 130 + FizzRules.flashDistance
         match.players[1].position.x = exit + FizzRules.tearRadius + match.players[1].spec.bodyWidth / 2 - 1
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        match.players[0].position.y = 12
+        match.players[0].grounded = false
+        match.players[0].state = .air
+        match.players[0].jumpsLeft = 1
+        match.advance(inputs: [.idle, .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
         XCTAssertTrue(match.events.contains(.popped(player: 1, by: 0)))
     }
 

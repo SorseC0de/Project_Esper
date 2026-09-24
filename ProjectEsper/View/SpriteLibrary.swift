@@ -494,7 +494,7 @@ enum EnergyEffect: CaseIterable {
 enum Effect {
     case smoke, jumpSpark, catchSpark, wallJumpSpark
     case fireJump, fireDash, fireWallSpark, fireSkid, fireTrail, fireCharge, fireCharge2, fireExplosion, fireballSummon
-    case flashSpark
+    case flashSpark, flashSpark2
 
     static let inEnergyColour: [Effect] = [.smoke, .jumpSpark]
 
@@ -514,8 +514,13 @@ enum Effect {
         case .fireExplosion: "fire_explosion"
         case .fireballSummon: "fireball_summon"
         case .flashSpark: "flashspark"
+        case .flashSpark2: "flashspark2"
         }
     }
+
+    /// Whether the sheet has been imported: a sheet named before it lands falls back.
+    var available: Bool { EffectSheets.frames[name] != nil }
+    static var fireParticleAvailable: Bool { EffectSheets.frames["fire_particle"] != nil }
 
     /// The GMS2 sheets keep their counts; a strip's come from the importer's measurements.
     var frameCount: Int {
@@ -551,8 +556,9 @@ enum Effect {
         switch self {
         case .fireJump: 2.0 / 3
         case .fireCharge: 0.8
-        case .fireCharge2: 0.25
-        case .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion, .fireballSummon: 1.0 / 3
+        case .fireCharge2: 0.5
+        case .fireballSummon: 2.0 / 3
+        case .fireDash, .fireSkid, .fireTrail, .fireWallSpark, .fireExplosion: 1.0 / 3
         default: 1
         }
     }

@@ -403,7 +403,9 @@ public enum SmoothieRules {
 /// to an overhung dribble.
 public enum FizzRules {
     public static let cooldownFrames = 60
-    public static func flashDistance(level: Int) -> Double { level >= 2 ? 90 : 45 }
+    /// Five tiles at either level; level two gets two flashes a cooldown.
+    public static let flashDistance = 80.0
+    public static func flashCharges(level: Int) -> Int { level >= 2 ? 2 : 1 }
     public static let tearFrames = 12
     public static let tearRadius = 12.0
 }

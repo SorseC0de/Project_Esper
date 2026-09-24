@@ -455,6 +455,39 @@ flames loop `fire_trail`; fireballs are the ball in fire; frozen bodies and ball
 ice; the cape is seven short rectangles chained along the glide's trail with a wave down
 its length.
 
+## Football Field
+
+`Stage.footballField`, the stage in play for tuning (`Stage.current`); the court comes back
+with stage selection. 170 by 20 tiles, five courts long, flat and empty: the floor is an
+invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
+at 120, four tiles higher than the court's, 60 in from each wall, floating between the
+goalposts' uprights; a standing shot can't reach them, a jump shot can. Each player starts
+under the rim they guard, and the coin flip, off the series' dice so both phones agree,
+puts the ball in one pair of hands. A ball that leaves the world comes back at centre.
+
+- Helmets (`FieldRules`): 5 by 5 tiles, solid, in the defender's energy colour, one of the
+  three helmet vectors tipped back 15°, facing the way they go. While someone has the
+  ball a clock runs, and every five seconds of it a helmet comes from the end the
+  defender guards at one of four heights (10, 50, 90, 130) and crosses at 1 a frame to
+  the far wall, where it goes. They keep going when the ball is loose; only the clock
+  stops. A body standing on one rides it; one in its way is pushed ahead of it, and once
+  that would put them in a wall it passes through them. It pushes the loose ball the same
+  way. Two going opposite ways that meet take each other out in a burst of `flashspark2`
+  in their colours.
+- The portal: a vertical loop at 150, above double-jump height, at a random x kept 200
+  from either end; one at a time, five seconds each, the next as soon as it goes. A shot
+  or throw still its thrower's through it comes out ten yards, a hundredth of the field
+  each, toward the thrower's rim, with a lift of 2 forward and 3.5 up.
+- The scenery (`FieldArt`) is flat shapes drawn once: a night sky with floodlight banks,
+  the stands with fanning lines and a rail of white squares, the turf's five-yard stripes,
+  leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded blue base
+  behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
+- The camera scrolls sideways only: level, gliding after the local player a share of the
+  way each frame and leading them by where they're heading, stopped at the field's ends.
+  The view takes in the stage's height and the turf below the floor. When the ball is off
+  the screen sideways, its chevrons sit at that edge at its height, pointing at it. All of
+  it is the view; the sim never sees the camera, so it's safe online.
+
 ## Court
 
 The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The

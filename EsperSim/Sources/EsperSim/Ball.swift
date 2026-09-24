@@ -47,7 +47,7 @@ public struct Ball: Equatable {
     public var resting = false
     /// Counting down to the respawn after a score, 0 when live.
     public var respawnTimer = 0
-    private var previousY: Double
+    var previousY: Double
 
     public init(position: Vec2) {
         self.position = position

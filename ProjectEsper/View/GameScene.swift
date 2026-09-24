@@ -39,7 +39,7 @@ final class GameScene: SKScene {
     /// one path: offline the other side's input is handed in each tick and every frame
     /// confirms at once; online the other phone's inputs arrive by frame and the sim
     /// rolls back when a prediction was wrong.
-    private var session = RollbackSession(match: Match(countdown: GameScene.countdownFrames), localIndex: 0)
+    private var session = RollbackSession(match: Match(stage: .current, countdown: GameScene.countdownFrames), localIndex: 0)
     private var match: Match { session.match }
     /// The computer on the other side, when the AI switch is on; never online.
     private var opponent = Opponent(index: 1)
@@ -290,7 +290,14 @@ final class GameScene: SKScene {
         // The floor and walls take the holder's colour, the backboard blocks keep their rim's
         // owner's, and the ledge is magenta.
         let stage = match.stage
-        for row in 0..<(stage.rows + Stage.skyRows) {
+        if stage.features.helmets {
+            // The field: scenery in place of tiles, the floor invisible through the turf.
+            FieldArt.build(for: stage, into: ground) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
+            for hoop in stage.hoops {
+                FieldArt.goalpost(at: SpriteLibrary.point(hoop.position), backboard: hoop.backboard, into: ground)
+            }
+        }
+        for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.helmets {
             for column in 0..<stage.columns {
                 // The side walls run on up through the sky, so a tall screen never sees their top.
                 let tile = row < stage.rows ? stage.tile(column: column, row: row) : ((column == 0 || column == stage.columns - 1) ? Tile.solid : Tile.empty)
@@ -653,13 +660,18 @@ final class GameScene: SKScene {
     /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
     private func layout(displayScale screenScale: CGFloat) {
         let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
-        let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile
+        let scrolls = match.stage.features.helmets
+        // The field scrolls sideways, so only its height is fitted, the turf below the floor
+        // counted in so the players stand in the middle of it.
+        let below = scrolls ? FieldArt.viewBelowFloor : 0
+        let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
-        let screenPixelsPerGamePixel = max(1, min(fitHeight, fitWidth))
+        let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
         let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
-        cameraNode.position = CGPoint(x: stageWidth / 2, y: stageHeight / 2)
+        cameraNode.position = CGPoint(x: scrolls ? cameraBase.x : stageWidth / 2, y: stageHeight / 2 - below)
+        if scrolls, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
         cameraBase = cameraNode.position
         // The HUD is laid out in the phone's points and scaled up for a bigger screen.
         hudScale = HudScene.scale(forHeight: size.height)
@@ -856,7 +868,9 @@ final class GameScene: SKScene {
     /// A round: bodies with their drinks in them at their spawns, the count, and the
     /// bolts that bring them in.
     private func startRound() {
-        var fresh = Match(specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames)
+        // The field's dice and coin flip come off the series' dice, the same on both phones.
+        let fieldSeed = UInt32(series.dice.roll(1 << 16)) &+ 1
+        var fresh = Match(stage: .current, specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed)
         for index in fresh.players.indices {
             fresh.players[index].power = series.drinks[index].power
             fresh.players[index].powerLevel = series.drinks[index].powerLevel
@@ -1348,6 +1362,17 @@ final class GameScene: SKScene {
                 spawnSnowflakes(at: SpriteLibrary.point(match.ball.position), count: 8, spread: 10)
             case .cloneShattered(let at):
                 spawnSnowflakes(at: SpriteLibrary.point(at), count: 12, spread: 16)
+            case .helmetsCollided(let at, let owner):
+                // A burst of flashes in the helmet's colour.
+                for step in 0..<6 {
+                    let angle = CGFloat(step) / 6 * 2 * .pi
+                    let point = SpriteLibrary.point(at) + CGPoint(x: cos(angle) * 18, y: sin(angle) * 18)
+                    glowers.addChild(EnergyEffect.flashSpark2.node(sprites, player: owner, at: point, scale: 0.66))
+                }
+            case .portalWarped(let from, let to):
+                for end in [from, to] {
+                    glowers.addChild(EnergyEffect.flashSpark2.node(sprites, player: match.ball.lastTouched ?? 0, at: SpriteLibrary.point(end), scale: 0.5))
+                }
             case .fireballMade(let index):
                 // The fire swirling into the hand.
                 let player = match.players[index]
@@ -1645,6 +1670,72 @@ final class GameScene: SKScene {
             }
             particle.node.alpha = share < 0.85 ? 0.9 : 0.9 * (1 - share) / 0.15
             return particle
+        }
+    }
+
+    /// Where the field's camera wants to be: the local player, led by where they're heading,
+    /// kept inside the field's ends.
+    private func cameraTargetX() -> CGFloat {
+        guard match.players.indices.contains(localIndex) else { return cameraBase.x }
+        let player = match.players[localIndex]
+        let lead = CGFloat(player.velocity.x) * GameScene.cameraLeadFrames * CGFloat(SpriteLibrary.pixelsPerUnit)
+        let wanted = SpriteLibrary.point(player.position).x + lead
+        let halfView = size.width * cameraNode.xScale / 2
+        let width = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
+        return min(max(wanted, halfView), max(width - halfView, halfView))
+    }
+    private static let cameraEase: CGFloat = 0.08
+    private static let cameraLeadFrames: CGFloat = 20
+
+    private var helmetNodes: [Int: SKSpriteNode] = [:]
+    private var portalNode: SKShapeNode?
+    private var portalId = 0
+
+    /// Helmets in their defender's colour, facing the way they travel and tipped back 15
+    /// degrees, and the portal's loop.
+    private func drawField() {
+        var seen = Set<Int>()
+        for helmet in match.helmets {
+            seen.insert(helmet.id)
+            let node = helmetNodes[helmet.id] ?? {
+                let side = CGFloat(FieldRules.helmetSize * SpriteLibrary.pixelsPerUnit)
+                let image = UIImage(named: "FootballHelmet\(helmet.variant + 1)")
+                let node = SKSpriteNode(texture: image.map { SKTexture(image: $0) })
+                node.size = CGSize(width: side, height: side)
+                node.color = SKColor(rgb: sprites.look(for: helmet.owner).glow)
+                node.colorBlendFactor = 1
+                node.zRotation = .pi / 12 * (helmet.speed > 0 ? 1 : -1)
+                node.xScale = helmet.speed > 0 ? 1 : -1
+                node.zPosition = 6
+                glowers.addChild(node)
+                helmetNodes[helmet.id] = node
+                return node
+            }()
+            node.position = SpriteLibrary.point(helmet.box.center)
+        }
+        for (id, node) in helmetNodes where !seen.contains(id) {
+            node.removeFromParent()
+            helmetNodes[id] = nil
+        }
+        if let portal = match.portal {
+            if portalNode == nil || portalId != portal.id {
+                portalNode?.removeFromParent()
+                let loop = SKShapeNode(ellipseOf: CGSize(width: FieldRules.portalHalfWidth * 2 * SpriteLibrary.pixelsPerUnit,
+                                                        height: FieldRules.portalHalfHeight * 2 * SpriteLibrary.pixelsPerUnit))
+                loop.strokeColor = SKColor(rgb: BallLook.neutral)
+                loop.lineWidth = 2
+                loop.glowWidth = 2
+                loop.zPosition = 5
+                glowers.addChild(loop)
+                portalNode = loop
+                portalId = portal.id
+            }
+            portalNode?.position = SpriteLibrary.point(portal.centre)
+            // Fading out over its last half second.
+            portalNode?.alpha = min(CGFloat(portal.framesLeft) / 30, 1) * (0.75 + 0.25 * CGFloat(sin(Double(match.frame) / 6)))
+        } else {
+            portalNode?.removeFromParent()
+            portalNode = nil
         }
     }
 
@@ -2082,6 +2173,7 @@ final class GameScene: SKScene {
             lastStates[index] = player.state
         }
         drawPowersLeavings()
+        drawField()
         // Riders follow their body, the offset turned with it.
         riders.removeAll { $0.node.parent == nil }
         for rider in riders {
@@ -2142,6 +2234,10 @@ final class GameScene: SKScene {
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
         ballNode.color = colour
         ballHalo.color = colour
+        // The field's camera: level, gliding after the local player and leading them.
+        if match.stage.features.helmets {
+            cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase
+        }
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.
         if shake > 0 {
             shake -= 1
@@ -2159,7 +2255,19 @@ final class GameScene: SKScene {
         // a beat with none, four steps a second so each one reads as a step.
         let step = (match.frame * 4 / 60) % 4
         let showChevrons = ball.isLive && ball.resting
+        // Off the screen sideways, the chevrons sit at its edge at the ball's height, pointing at it.
+        let halfView = size.width * cameraNode.xScale / 2
+        let ballAt = SpriteLibrary.point(ball.position)
+        let offSide: CGFloat? = ballAt.x > cameraNode.position.x + halfView ? 1 : (ballAt.x < cameraNode.position.x - halfView ? -1 : nil)
         for (index, chevron) in chevrons.enumerated() {
+            if let side = offSide {
+                chevron.isHidden = false
+                chevron.zRotation = side > 0 ? .pi / 2 : -.pi / 2
+                chevron.position = CGPoint(x: cameraNode.position.x + side * (halfView - 10 - CGFloat(index) * 7), y: ballAt.y)
+                chevron.alpha = step == index ? 1 : 0.3
+                continue
+            }
+            chevron.zRotation = 0
             chevron.isHidden = !showChevrons
             chevron.position = ballNode.position + CGPoint(x: 0, y: 32 - CGFloat(index) * 7)
             chevron.alpha = step == index ? 1 : 0.3

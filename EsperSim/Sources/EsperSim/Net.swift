@@ -197,6 +197,11 @@ extension Match {
         mix(ball.velocity.x)
         mix(ball.velocity.y)
         for score in scores { mix(UInt32(truncatingIfNeeded: score)) }
+        for helmet in helmets {
+            mix(helmet.box.min.x)
+            mix(helmet.box.min.y)
+        }
+        if let portal { mix(portal.centre.x) }
         return hash
     }
 }

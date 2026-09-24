@@ -20,6 +20,13 @@ public struct Match: Equatable {
     public var fireballs: [Fireball] = []
     /// The next id for anything the powers leave, so the screen can follow each one.
     public var nextId = 1
+    /// The football field's helmets and portal, the clock to the next helmet, and the
+    /// dice they roll on; a warp can't repeat for a few frames.
+    public var helmets: [Helmet] = []
+    public var portal: Portal?
+    public var helmetClock = 0
+    public var portalCooldown = 0
+    public var fieldDice: Dice
     public var scores: [Int]
     public var frame = 0
     /// The count before play: frames in which nobody moves or acts, at the start and after
@@ -33,7 +40,9 @@ public struct Match: Equatable {
     /// What happened on the last `advance`.
     public var events: [MatchEvent] = []
 
-    public init(stage: Stage = .court, specs: [FighterSpec] = [.baseline, .baseline], countdown: Int = 0) {
+    /// `seed` drives the field's dice and, on a stage that starts held, the coin flip for
+    /// who has the ball; both sides of a network match pass the same one.
+    public init(stage: Stage = .court, specs: [FighterSpec] = [.baseline, .baseline], countdown: Int = 0, seed: UInt32 = 1) {
         self.stage = stage
         players = specs.indices.map { index in
             Player(spec: specs[index], index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
@@ -42,6 +51,18 @@ public struct Match: Equatable {
         scores = Array(repeating: 0, count: specs.count)
         countdownLength = countdown
         self.countdown = countdown
+        fieldDice = Dice(seed: seed)
+        if stage.features.startsHeld, !players.isEmpty {
+            let holder = fieldDice.roll(players.count)
+            players[holder].hasBall = true
+            ball.holder = holder
+            ball.position = players[holder].chest + Vec2(x: 0, y: 3)
+        }
+    }
+
+    mutating func stampId() -> Int {
+        defer { nextId += 1 }
+        return nextId
     }
 
     public mutating func advance(inputs given: [PlayerInput]) {
@@ -59,6 +80,8 @@ public struct Match: Equatable {
             platform.framesLeft > 1 ? Platform(owner: platform.owner, box: platform.box, framesLeft: platform.framesLeft - 1) : nil
         }
         stage.extras = platforms.map(\.box)
+        if portalCooldown > 0 { portalCooldown -= 1 }
+        stepField()
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
@@ -108,6 +131,7 @@ public struct Match: Equatable {
             }
             strikeWithThrow()
             tryCatch()
+            keepBallInWorld()
         } else if ball.respawnTimer > 0 {
             ball.velocity.y = max(ball.velocity.y - BallRules.gravity, -BallRules.fallSpeed)
             ball.position += ball.velocity
@@ -139,6 +163,8 @@ public struct Match: Equatable {
         clones = []
         flames = []
         fireballs = []
+        helmets = []
+        helmetClock = 0
         ball.respawn(at: stage.ballSpawn)
         players[holder].hasBall = true
         ball.holder = holder
@@ -243,10 +269,7 @@ public struct Match: Equatable {
         }
     }
 
-    private mutating func stamp() -> Int {
-        defer { nextId += 1 }
-        return nextId
-    }
+    private mutating func stamp() -> Int { stampId() }
 
     /// A slab or a wall, solid for a second. A slab disarms its maker until the next jump
     /// and starts the slab's cooldown; a wall starts only its own cooldown.

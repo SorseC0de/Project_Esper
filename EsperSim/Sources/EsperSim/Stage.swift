@@ -69,6 +69,8 @@ public struct Stage: Equatable {
     /// Solid boxes that come and go, such as a made platform. Everything that asks the
     /// stage about solids sees them.
     public var extras: [Box] = []
+    /// What the stage has beyond its tiles.
+    public var features = StageFeatures()
 
     public var width: Double { Double(columns) * Stage.tileSize }
     public var height: Double { Double(rows) * Stage.tileSize }
@@ -356,4 +358,33 @@ public struct Stage: Equatable {
         stage.fill(.oneWay, columns: 15...18, rows: 3...3)
         return stage
     }()
+
+    /// The football field: five courts long and 20 rows high, flat and empty but for the
+    /// floor and the end walls. The rims float between the goalposts' uprights, four tiles
+    /// higher than the court's, six tiles in from each wall. Each player starts under the
+    /// rim they guard, and the ball starts in someone's hands by the coin flip. Helmets
+    /// sweep it and a portal hangs over it.
+    public static let footballField: Stage = {
+        let columns = 170, rows = 20
+        let width = Double(columns) * Stage.tileSize
+        let inset = 60.0
+        var stage = Stage(
+            columns: columns, rows: rows,
+            hoops: [
+                Hoop(position: Vec2(x: inset, y: 120), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: width - inset, y: 120), owner: 0, backboard: .right),
+            ],
+            playerSpawns: [Vec2(x: inset, y: 10), Vec2(x: width - inset, y: 10)],
+            playerFacings: [.right, .left],
+            ballSpawn: Vec2(x: width / 2, y: 80)
+        )
+        stage.fill(.solid, columns: 0...(columns - 1), rows: 0...0)
+        stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
+        stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
+        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true)
+        return stage
+    }()
+
+    /// The stage being tuned; the court comes back with stage selection.
+    public static let current = footballField
 }

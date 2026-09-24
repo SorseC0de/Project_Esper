@@ -1989,10 +1989,13 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@  zeus charge %.2f (%.0f px)",
+        let chargeNode = chargeNodes[localIndex]
+        let chargeDrawn = chargeNode.isHidden ? "hidden" : String(format: "%.0fx%.0f px \"%@\"", chargeNode.frame.width, chargeNode.frame.height,
+                                                                   chargeNode.texture?.description.components(separatedBy: "'").dropFirst().first ?? "?")
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nzeus charge slider %.2f  charge node %@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 ZeusTuning.chargeScale, ZeusTuning.chargeScale * 240)
+                                 ZeusTuning.chargeScale, chargeDrawn)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

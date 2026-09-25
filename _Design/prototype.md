@@ -362,8 +362,8 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
-- NEAR LANE Y and FAR LANE Y, sliders under the score: each lane of traffic drawn that
-  many pixels up, until they're settled; the near lane's solid boxes stay on the floor.
+- HELICOPTER, HOOP X and HOOP Y, sliders under the score: the helicopter's size, and the
+  rim ahead of it and under it, offline (both phones keep 0 and 32 online), until settled.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
   60 in and drawn for a rim at 120, the gold 8 wide; the crossbar sits 20 below that,
   tilted 20° with the end toward the field up, the uprights 100 over it; the back rod
@@ -471,8 +471,9 @@ strip through its middle. Each player starts where the court has them, the ball 
 centre.
 
 - The traffic (`Highway.swift`): two lanes, each in four slots: the near lane on the floor,
-  which plays, and the far one 12.5 up over the lane line, drawn behind and darker, only
-  scenery. Each slot is each wide enough for the longest
+  which plays, and the far one up over the lane line, drawn behind and darker, only
+  scenery. The near lane stands 17.5 down into the road, its boxes with it; the far lane
+  7.5 up. Each slot is each wide enough for the longest
   vehicle, a car standing in each; the near lane's are solid and rideable and face right,
   the far lane's face left. Which of the 23 vehicles stands where
   comes off the match's dice, so both phones agree with nothing sent. Each has its own

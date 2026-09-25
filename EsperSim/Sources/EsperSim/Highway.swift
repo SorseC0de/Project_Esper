@@ -153,14 +153,20 @@ public struct Helicopter: Equatable {
 public enum HighwayRules {
     /// Each level is cut into this many slots, each wide enough for the longest vehicle.
     public static let slots = 4
-    /// The far lane's cars stand this far up from the floor, over the lane line, the other
-    /// way round from the near lane's; drawn behind, not solid, never hit.
-    public static let farLaneLift = 12.5
+    /// The near lane's cars stand this far down into the road from the floor, so their
+    /// wheels are in the near half of it and their roofs lower; their boxes go with them.
+    /// The far lane's stand this far up, over the lane line, the other way round from the
+    /// near lane's; drawn behind, not solid, never hit.
+    public static let nearLaneDrop = 17.5
+    public static let farLaneLift = 7.5
     public static let hitsToWreck = 3
     public static let hitGuardFrames = 20
     /// The helicopter flies at this height, the rim hanging this far under it, at this speed.
     public static let helicopterHeight = 140.0
-    public static let rimBelowHelicopter = 32.0
+    /// The rim against the helicopter: this far ahead of it the way it flies, and this far
+    /// under it; on the HOOP X and HOOP Y sliders offline until they're settled.
+    nonisolated(unsafe) public static var rimAhead = 0.0
+    nonisolated(unsafe) public static var rimBelowHelicopter = 32.0
     public static let helicopterSpeed = 1.0
     /// Where the rim waits while its helicopter isn't out: far over the sky, out of play.
     public static let parked = Vec2(x: -1000, y: 5000)
@@ -183,7 +189,7 @@ extension Match {
         let vehicle = Vehicle.allCases[fieldDice.roll(Vehicle.allCases.count)]
         let size = vehicle.size
         let centre = slotCentre(slot)
-        let floor = level == 0 ? Stage.tileSize : Stage.tileSize + HighwayRules.farLaneLift
+        let floor = level == 0 ? Stage.tileSize - HighwayRules.nearLaneDrop : Stage.tileSize + HighwayRules.farLaneLift
         let box = Box(min: Vec2(x: centre - size.x / 2, y: floor), max: Vec2(x: centre + size.x / 2, y: floor + size.y))
         return Car(id: stampId(), vehicle: vehicle, slot: slot, level: level, box: box, facesLeft: level == 1)
     }
@@ -227,7 +233,7 @@ extension Match {
         let gone = flying.speed > 0 ? flying.x > stage.width + 40 : flying.x < -40
         for index in stage.hoops.indices {
             stage.hoops[index].position = index == flying.hoop && !gone
-                ? Vec2(x: flying.x, y: HighwayRules.helicopterHeight - HighwayRules.rimBelowHelicopter)
+                ? Vec2(x: flying.x + HighwayRules.rimAhead * (flying.speed > 0 ? 1 : -1), y: HighwayRules.helicopterHeight - HighwayRules.rimBelowHelicopter)
                 : HighwayRules.parked
         }
         helicopter = gone ? nil : flying

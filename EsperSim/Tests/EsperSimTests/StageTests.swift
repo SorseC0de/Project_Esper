@@ -262,7 +262,7 @@ final class HighwayTests: XCTestCase {
         XCTAssertTrue(a.cars.filter { $0.level == 0 }.allSatisfy { !$0.facesLeft })
         XCTAssertEqual(a.cars.map(\.vehicle), b.cars.map(\.vehicle), "the same seed, the same traffic")
         for car in a.cars where car.level == 0 {
-            XCTAssertEqual(car.box.min.y, Stage.tileSize, accuracy: 0.001, "on the road")
+            XCTAssertEqual(car.box.min.y, Stage.tileSize - HighwayRules.nearLaneDrop, accuracy: 0.001, "down in the near half of the road")
             for box in car.boxes { XCTAssertTrue(a.stage.extras.contains(box), "solid, tile by tile") }
             XCTAssertEqual(car.boxes.count, Int(car.vehicle.lengthTiles))
         }

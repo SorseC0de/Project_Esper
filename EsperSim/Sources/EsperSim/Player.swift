@@ -89,6 +89,8 @@ public struct Player: Equatable {
     public var stateTimer = 0
     public var grounded = true
     public var wallSide: Facing?
+    /// The wall beside, if the board can ride it: not a car.
+    public var ridableWallSide: Facing?
     public var jumpsLeft: Int
     public var fastFalling = false
     public var hasBall = false
@@ -573,7 +575,7 @@ public struct Player: Equatable {
             let wall = surfWall!
             surfAngle += (wall.sign * Double.pi / 2 - surfAngle) * 0.3
             velocity = Vec2(x: wall.sign * 0.5, y: runSpeed)
-            if stickFacing(input) != wall || wallSide != wall || stateTimer > 1 && position.y <= lastWallRideY {
+            if stickFacing(input) != wall || ridableWallSide != wall || stateTimer > 1 && position.y <= lastWallRideY {
                 leapOffWall(wall)
             }
             lastWallRideY = position.y
@@ -605,7 +607,7 @@ public struct Player: Equatable {
                 let turns = (surfAngle / (2 * Double.pi)).rounded()
                 surfAngle += (turns * 2 * Double.pi - surfAngle) * SurfRules.uprightShare
             }
-            if powerLevel >= 2, surfPath == 0, let wall = wallSide, stickFacing(input) == wall, wallLandCooldown == 0 {
+            if powerLevel >= 2, surfPath == 0, let wall = ridableWallSide, stickFacing(input) == wall, wallLandCooldown == 0 {
                 // Onto a wall anywhere up it, held into it: the ride, as a wall land would be.
                 startWallRide(wall)
             } else if surfWall == nil, jumpPressed, jumpsLeft > 0 {
@@ -1081,7 +1083,7 @@ public struct Player: Equatable {
         wantsPlatform = false
         move(in: stage)
         // Surf Soda: running into a wall with the stick held toward it takes the board up it.
-        if power == .surfSoda, powerLevel >= 2, grounded, state == .run || state == .dash || state == .walk, let wall = wallSide, stickFacing(input) == wall {
+        if power == .surfSoda, powerLevel >= 2, grounded, state == .run || state == .dash || state == .walk, let wall = ridableWallSide, stickFacing(input) == wall {
             startWallRide(wall)
         }
         // Surf Soda on the ground: up into the wheelie at a run, back down to upright else.
@@ -1659,6 +1661,7 @@ public struct Player: Equatable {
             position.y = position.y.rounded(toPlaces: 6)
         }
         wallSide = stage.wall(beside: body)
+        ridableWallSide = stage.wall(beside: body, riding: true)
         grounded = velocity.y <= 0 && stage.isGrounded(body)
     }
 

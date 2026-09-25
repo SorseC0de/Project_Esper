@@ -282,7 +282,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   stride on the run, and throw is the pull, the same pulse bringing everything toward
   the body. Numbers in `PulseRules`.
 
-- Surf Soda (K; the debug pick for now, while its movement is found). Running, the body
+- Surf Soda (K). Running, the body
   rides a board, the skid sheet's first frame still, leaning back 45° in a wheelie on the
   board's tail so the board stands up ahead as a shield, easing there and, stopping, back
   down to upright before the board goes; floating three pixels and bobbing two, leaving a trail of `bubbles`, some flipped. In the air the board is always out,
@@ -302,6 +302,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   first jump leans back a quarter turn over
   its crescent, the double jump a whole backflip. Running into a wall with the stick held
   toward it (level two), or meeting one anywhere up it in the air held into it, the board
+  (never a car's side: `Stage.unridable`)
   turns back against it and rides up at the run speed; letting go,
   stalling or meeting the ceiling flips it off, pushed away, carrying on round the way
   the ride turned it to the next upright. In the air with the stick let go it rights
@@ -404,7 +405,7 @@ holds the variants; A is always the baseline as tuned.
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
-  Punch, K Surf Soda, at the level LEVEL picks. The left bumper always steps POWER; the local side's power
+  Punch, K Surf Soda, at the level LEVEL picks; A by default. The left bumper always steps POWER; the local side's power
   and level are lettered under the pickers.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
   60 in and drawn for a rim at 120, the gold 8 wide; the crossbar sits 20 below that,
@@ -616,7 +617,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   feet or the floor line and sheared by the turf's own lean where they stand, so they
   tip away from the field's middle as the yard lines tip toward it.
   A body's shadow stays on the ground under it: rising, it thins out and shrinks, gone at
-  160 pixels up, half its size by then.
+  160 pixels up, half its size by then. It stays upright whatever the body's lean.
 - The backboard: behind each rim a 3 by 4 cluster of `flashspark2` in the guarding side's
   energy, each on its own frame so the board shimmers, on a grid sheared to the
   crossbar's lean, 10 behind the rim and 24 over it at 0.4, sheared 20°, at two thirds;

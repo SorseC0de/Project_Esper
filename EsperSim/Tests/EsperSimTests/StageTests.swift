@@ -408,4 +408,16 @@ final class HighwayTests: XCTestCase {
         }
         XCTAssertEqual(a, b)
     }
+
+    func testTheBoardPassesOverAnUnridableWall() {
+        var stage = Stage.court
+        let car = Box(min: Vec2(x: 100, y: 10), max: Vec2(x: 140, y: 30))
+        stage.extras = [car]
+        let body = Box(min: Vec2(x: 90, y: 10), max: Vec2(x: 100, y: 25))
+        XCTAssertEqual(stage.wall(beside: body), .right)
+        XCTAssertEqual(stage.wall(beside: body, riding: true), .right)
+        stage.unridable = [car]
+        XCTAssertEqual(stage.wall(beside: body), .right, "still a wall to everything else")
+        XCTAssertNil(stage.wall(beside: body, riding: true))
+    }
 }

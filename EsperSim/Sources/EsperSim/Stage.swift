@@ -96,6 +96,8 @@ public struct Stage: Equatable {
     /// Solid boxes that come and go, such as a made platform. Everything that asks the
     /// stage about solids sees them.
     public var extras: [Box] = []
+    /// Extras Surf Soda's board can't ride up: the cars.
+    public var unridable: [Box] = []
     /// What the stage has beyond its tiles.
     public var features = StageFeatures()
     /// Boxes solid to the ball alone, such as the field's backboards.
@@ -352,7 +354,8 @@ public struct Stage: Equatable {
 
     /// The side with a wall pressed against the box, if either. Only within the court's
     /// rows: the walls up in the sky can't be clung to or jumped off.
-    public func wall(beside box: Box) -> Facing? {
+    /// `riding`: the board's question, which passes over the unridable extras.
+    public func wall(beside box: Box, riding: Bool = false) -> Facing? {
         let rows = rows(of: box)
         let rightColumn = column(at: box.max.x + Stage.edge)
         let leftColumn = column(at: box.min.x - Stage.edge)
@@ -360,7 +363,7 @@ public struct Stage: Equatable {
             if tile(column: rightColumn, row: row) == .solid { return .right }
             if tile(column: leftColumn, row: row) == .solid { return .left }
         }
-        for extra in extras where spansY(extra, box) {
+        for extra in extras where spansY(extra, box) && !(riding && unridable.contains(extra)) {
             if abs(extra.min.x - box.max.x) < 0.01 { return .right }
             if abs(extra.max.x - box.min.x) < 0.01 { return .left }
         }

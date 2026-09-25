@@ -108,8 +108,7 @@ final class GameScene: SKScene {
     /// under a screen.
     weak var flowState: FlowState?
     private var headVariant = HeadVariant.b
-    /// Surf Soda for now, while its movement is being found.
-    private var powerVariant = PowerVariant.surfSoda
+    private var powerVariant = PowerVariant.none
     private var powerLevelVariant = PowerLevelVariant.two
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
@@ -2706,7 +2705,8 @@ final class GameScene: SKScene {
         shadow.anchorPoint = source.anchorPoint
         shadow.xScale = facing * scale
         shadow.yScale = -scale
-        shadow.zRotation = -source.zRotation
+        // Upright whatever the body's lean.
+        shadow.zRotation = 0
         let centre = CGFloat(match.stage.columns) * GameScene.pixelsPerTile / 2
         let slope = FieldArt.slope(at: source.position.x, centre: centre)
         // Local shift across per unit up the sprite, turned into its own normalised units.

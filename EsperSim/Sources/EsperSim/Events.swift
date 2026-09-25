@@ -63,6 +63,7 @@ public enum MatchEvent: Equatable {
     case cloneShattered(at: Vec2)
     case flameLeft(player: Int, at: Vec2)
     case fireballMade(player: Int)
+    case fireballThrown(player: Int)
     case fireballBurst(at: Vec2)
     case pulsed(player: Int, pull: Bool)
     /// Pushed or pulled by a pulse, not stunned: `ball` when the ball left the hands with it.

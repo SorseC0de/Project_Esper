@@ -1702,7 +1702,7 @@ final class GameScene: SKScene {
         for event in events {
             switch event {
             case .jumped, .doubleJumped, .wallJumped: sounds.play(.jump)
-            case .shot, .thrown: sounds.play(.playerShoot)
+            case .shot, .thrown, .fireballThrown, .boltFired: sounds.play(.playerShoot)
             case .slashed: sounds.play(.esperSlash)
             case .slashClanked: sounds.play(.slashWallClank)
             case .snatchReached: sounds.play(.playerSnatch)
@@ -1717,14 +1717,34 @@ final class GameScene: SKScene {
     private static let bounceSoundFloor = 0.6
     private static let bounceSoundFull = 4.0
 
-    /// A footfall on the walk and run sheets' frames 0 and 4, on the ground.
-    private var lastStepFrames: [AnimationFrame?] = [nil, nil]
-    private func playStep(_ index: Int, frame: AnimationFrame, grounded: Bool) {
-        guard lastStepFrames.indices.contains(index), lastStepFrames[index] != frame else { return }
-        lastStepFrames[index] = frame
+    /// The sounds a body's sheet makes as it reaches a frame, on the ground: a footfall on
+    /// the walk and run sheets' frames 0 and 4, and the ball's bounce on each frame of a
+    /// sheet with the ball in hand where it's lowest, as the landmarks draw it.
+    private var lastSoundFrames: [AnimationFrame?] = [nil, nil]
+    private func playFrameSounds(_ index: Int, frame: AnimationFrame, grounded: Bool) {
+        guard lastSoundFrames.indices.contains(index), lastSoundFrames[index] != frame else { return }
+        lastSoundFrames[index] = frame
+        guard grounded else { return }
         let walking: Set<Animation> = [.walk, .dribbleWalk, .run, .dribbleRun, .gunRun, .gunRunShoot]
-        guard grounded, walking.contains(frame.animation), frame.frame % 4 == 0 else { return }
-        SoundBoard.shared.play(.step, volume: 0.5)
+        if walking.contains(frame.animation), frame.frame % 4 == 0 { SoundBoard.shared.play(.step) }
+        if GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) { SoundBoard.shared.play(.ballBounce) }
+    }
+
+    /// The frames of a sheet where the ball in hand is at its lowest, under five art pixels
+    /// off the floor and no higher than the frames either side: where it meets the floor.
+    private static var bounceFramesCache: [Animation: Set<Int>] = [:]
+    private static func dribbleBounceFrames(of animation: Animation) -> Set<Int> {
+        if let cached = bounceFramesCache[animation] { return cached }
+        let count = animation.frameCount
+        let heights = (0..<count).map { BallLandmarks.offset(AnimationFrame(animation, $0))?.y }
+        var frames = Set<Int>()
+        for index in 0..<count {
+            guard let height = heights[index], height < 5 else { continue }
+            let neighbours = [heights[(index + count - 1) % count], heights[(index + 1) % count]].compactMap { $0 }
+            if neighbours.allSatisfy({ height <= $0 }) { frames.insert(index) }
+        }
+        bounceFramesCache[animation] = frames
+        return frames
     }
 
     /// The events of frames both sides' inputs have confirmed: the point.
@@ -3111,7 +3131,7 @@ final class GameScene: SKScene {
         for (index, player) in match.players.enumerated() {
             let node = playerNodes[index]
             let frame = player.animationFrame
-            playStep(index, frame: frame, grounded: player.grounded)
+            playFrameSounds(index, frame: frame, grounded: player.grounded)
             // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
             node.texture = sprites.texture(frame, player: index, ballAsEnergy: wholeSheet)

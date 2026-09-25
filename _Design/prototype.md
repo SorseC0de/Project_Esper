@@ -662,13 +662,16 @@ through one engine, ambient, so the silent switch mutes it. Sounds come off the 
 shown, once, like the effects.
 
 - jump: the jump, the double jump, the wall jump.
-- player_shoot: the shot and the throw.
+- player_shoot: the shot, the throw, the fireball's throw and Zeus Juice's bolt.
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`).
 - player_snatch: the snatch at full stretch.
 - player_hit: struck, popped, parried.
-- ball_bounce: every bounce faster than 0.6 across the surface, at full volume from 4.
-- step: the walk and run sheets' frames 0 and 4, on the ground, at half volume.
+- ball_bounce: every bounce faster than 0.6 across the surface, at full volume from 4;
+  and in hand, on the ground, on each frame of a sheet where the landmarks put the ball
+  lowest, under five art pixels: the dribbles and the taunt (idle 3 and 8, walk 2 and 6,
+  run 4, taunt 2 and 7).
+- step: the walk and run sheets' frames 0 and 4, on the ground.
 - menu_cursor: a cursor moving, a colour circle. menu_select: a choice or a stage picked,
   BEST OF 7, MULTIPLAYER. menu_back: RESUME, start to unpause, TITLE and TITLE SCREEN.
 

@@ -211,6 +211,7 @@ public struct Match: Equatable {
             let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
             fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity * BlazeRules.fireballSpeedShare,
                                       framesLeft: BlazeRules.fireballFrames, straight: straight))
+            events.append(.fireballThrown(player: index))
         case .quake:
             quake(by: index)
         case .fireBolt(let direction):

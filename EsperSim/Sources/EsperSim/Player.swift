@@ -211,12 +211,28 @@ public struct Player: Equatable {
     public var surfFlipRate = 0.0
 
     /// Whether Surf Soda's board is under the feet: running, or up on a surf jump.
+    /// On the ground the board stays out while the body is still coming down off the
+    /// wheelie; never on the rim.
     public var boardOut: Bool {
-        power == .surfSoda && (surfing || state == .air || (grounded && (state == .run || state == .dash)))
+        guard power == .surfSoda, state != .dunking else { return false }
+        return surfing || state == .air || (grounded && (state == .run || state == .dash || abs(surfAngle) > 0.02))
     }
 
-    /// The board: its middle and its turn, under the feet as the body turns about its middle.
+    /// Riding the ground the body turns about the board's tail, where it meets the floor;
+    /// in the air, about the body's middle.
+    public var riding: Bool { grounded && !surfing }
+
+    /// The board's tail on the floor, behind the feet.
+    public var boardTail: Vec2 {
+        Vec2(x: position.x - facing.sign * SurfRules.boardLength / 2, y: position.y - SurfRules.boardThickness / 2)
+    }
+
+    /// The board: its middle and its turn, under the feet, turning with the body.
     public var board: (centre: Vec2, angle: Double) {
+        if riding {
+            let half = facing.sign * SurfRules.boardLength / 2
+            return (boardTail + Vec2(x: Trig.cos(surfAngle) * half, y: Trig.sin(surfAngle) * half), surfAngle)
+        }
         let middle = Vec2(x: position.x, y: position.y + spec.bodyHeight / 2)
         let down = spec.bodyHeight / 2 + SurfRules.boardThickness / 2
         return (middle + Vec2(x: Trig.sin(surfAngle) * down, y: -Trig.cos(surfAngle) * down), surfAngle)
@@ -299,12 +315,19 @@ public struct Player: Equatable {
         previousState = state
         state = next
         stateTimer = 0
+        // Onto the rim the body goes upright and the board drops away.
+        if next == .dunking {
+            surfing = false
+            surfWall = nil
+            surfFlip = 0
+            surfAngle = 0
+        }
         // The crescent is only the air's; anything else ends it and sets the body upright.
         if next != .air, next != .land {
             surfPath = 0
             if surfing, next.isGroundState || [.wallLand, .ledgeHang, .webbed, .webPull].contains(next) {
                 surfing = false
-                surfAngle = 0
+                surfAngle = surfAngle - (surfAngle / (2 * Double.pi)).rounded() * 2 * Double.pi
                 surfWall = nil
                 surfFlip = 0
             }
@@ -572,11 +595,12 @@ public struct Player: Equatable {
                 floatDown(input)
             } else {
                 floatDown(input)
-                surfAngle -= input.stick.x * SurfRules.spinRate
+                // Spinning it by hand is level two's.
+                if powerLevel >= 2 { surfAngle -= input.stick.x * SurfRules.spinRate }
             }
             let drop = stage.drop(fromX: position.x, y: position.y)
             // Upright again near the ground, or whenever the stick isn't spinning it.
-            if surfPath == 0, surfFlip == 0, drop < SurfRules.uprightHeight || stickFacing(input) == nil {
+            if surfPath == 0, surfFlip == 0, drop < SurfRules.uprightHeight || stickFacing(input) == nil || powerLevel < 2 {
                 // The nearest upright, not always back the way it came.
                 let turns = (surfAngle / (2 * Double.pi)).rounded()
                 surfAngle += (turns * 2 * Double.pi - surfAngle) * SurfRules.uprightShare
@@ -1054,8 +1078,14 @@ public struct Player: Equatable {
         wantsPlatform = false
         move(in: stage)
         // Surf Soda: running into a wall with the stick held toward it takes the board up it.
-        if power == .surfSoda, grounded, state == .run || state == .dash || state == .walk, let wall = wallSide, stickFacing(input) == wall {
+        if power == .surfSoda, powerLevel >= 2, grounded, state == .run || state == .dash || state == .walk, let wall = wallSide, stickFacing(input) == wall {
             startWallRide(wall)
+        }
+        // Surf Soda on the ground: up into the wheelie at a run, back down to upright else.
+        if power == .surfSoda, grounded, !surfing, surfWall == nil {
+            let target = state == .run || state == .dash ? facing.sign * SurfRules.wheelie : 0
+            surfAngle += (target - surfAngle) * SurfRules.wheelieShare
+            if target == 0, abs(surfAngle) < 0.02 { surfAngle = 0 }
         }
         if state == .webSwing, let anchor = webAnchor {
             let target = anchor + Vec2(x: Trig.sin(swingAngle), y: -Trig.cos(swingAngle)) * swingLength
@@ -1644,7 +1674,7 @@ public struct Player: Equatable {
                     // Down off the board, upright, in a burst of bubbles.
                     surfing = false
                     surfPath = 0
-                    surfAngle = 0
+                    surfAngle = surfAngle - (surfAngle / (2 * Double.pi)).rounded() * 2 * Double.pi
                     surfWall = nil
                     surfFlip = 0
                     events.append(.surfLanded(player: index))

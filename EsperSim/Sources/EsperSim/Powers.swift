@@ -65,6 +65,11 @@ public enum SurfRules {
     /// off it with this push, in a backflip over this many frames.
     public static let wallLeap = Vec2(x: 2.5, y: 2.5)
     public static let flipFrames = 30
+    /// Riding the ground the body leans back this far, a wheelie on the board's tail, so
+    /// the board stands up ahead as a shield; it eases there and back this share a frame,
+    /// and the board goes once it's upright again.
+    public static let wheelie = Double.pi / 4
+    public static let wheelieShare = 0.2
 }
 
 /// Slopes: a body's feet ride one up or down this far a frame at most, a block's height;

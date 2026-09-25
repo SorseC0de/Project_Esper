@@ -1917,13 +1917,76 @@ final class GameScene: SKScene {
 
     private var boards: [Int: SKSpriteNode] = [:]
     private var surfTrailFrames: [Int: Int] = [:]
+    private var boardWasOut: [Int: Bool] = [:]
+
+    /// The board as a white silhouette, its tail's shadow a shade off white, toned in the
+    /// player's energy as every white sheet is.
+    private func boardTexture(for index: Int) -> SKTexture? {
+        guard let image = UIImage(named: "Surfboard") else { return nil }
+        let width = 400, height = 46
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let drawn = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { _ in
+            image.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        guard let cg = drawn.cgImage, let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let data = context.data else { return SKTexture(image: drawn) }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        let look = sprites.look(for: index)
+        let white = look.energyTone(luminance: 1), shadow = look.energyTone(luminance: 240.0 / 255)
+        for pixel in 0..<(width * height) {
+            let at = pixel * 4
+            let alpha = Int(pixels[at + 3])
+            guard alpha > 0 else { continue }
+            // The tail's shadow is the drawing's darker blue, #147A99; the rest is its #0C91C4.
+            let red = Int(pixels[at]) * 255 / alpha, green = Int(pixels[at + 1]) * 255 / alpha
+            let tone = abs(red - 0x14) + abs(green - 0x7A) < abs(red - 0x0C) + abs(green - 0x91) ? shadow : white
+            pixels[at] = UInt8(Int((tone >> 16) & 0xFF) * alpha / 255)
+            pixels[at + 1] = UInt8(Int((tone >> 8) & 0xFF) * alpha / 255)
+            pixels[at + 2] = UInt8(Int(tone & 0xFF) * alpha / 255)
+        }
+        guard let toned = context.makeImage() else { return SKTexture(image: drawn) }
+        return SKTexture(cgImage: toned)
+    }
+
+    /// A line of bubbles along where the board lies, as it comes and goes.
+    private func bubbleLine(along centre: CGPoint, angle: CGFloat, length: CGFloat) {
+        for step in 0..<6 {
+            let along = (CGFloat(step) / 5 - 0.5) * length
+            spawnBubbles(at: centre + CGPoint(x: cos(angle) * along, y: sin(angle) * along), count: 1, spread: 3)
+        }
+    }
+
+    /// The board left behind on a dunk: it falls flat to the floor under it and goes there
+    /// in a line of bubbles.
+    private func dropBoard(_ board: SKSpriteNode, player: Player) {
+        guard let texture = board.texture else { return }
+        let falling = SKSpriteNode(texture: texture)
+        falling.size = CGSize(width: board.size.width / abs(board.xScale == 0 ? 1 : board.xScale), height: board.size.height)
+        falling.position = board.position
+        falling.zRotation = board.zRotation
+        falling.xScale = board.xScale
+        falling.zPosition = board.zPosition
+        bodies.addChild(falling)
+        let feet = board.position.y
+        let floor = feet - CGFloat(match.stage.drop(fromX: player.position.x, y: Double(feet) / SpriteLibrary.pixelsPerUnit) * SpriteLibrary.pixelsPerUnit)
+        let fall = SKAction.group([.moveTo(y: floor + 2, duration: 0.35), .rotate(toAngle: 0, duration: 0.35)])
+        fall.timingMode = .easeIn
+        falling.run(.sequence([fall, .run { [weak self, weak falling] in
+            guard let self, let falling else { return }
+            self.bubbleLine(along: falling.position, angle: 0, length: falling.size.width)
+        }, .removeFromParent()]))
+    }
 
     /// The board under a Surf Soda body and the ride on it: riding the ground, the body and
     /// board float a little and bob two pixels, leaving a trail of bubbles; up on a surf
     /// jump, body, head and board turn together about the body's middle.
     private func placeSurf(_ index: Int, player: Player, body: SKSpriteNode, head: SKSpriteNode) {
         let board = boards[index] ?? {
-            let node = SKSpriteNode(texture: UIImage(named: "Surfboard").map { SKTexture(image: $0) })
+            let node = SKSpriteNode(texture: boardTexture(for: index))
             let length = CGFloat(SurfRules.boardLength * SpriteLibrary.pixelsPerUnit)
             node.size = CGSize(width: length, height: length * 92 / 800)
             node.zPosition = -0.5
@@ -1931,16 +1994,31 @@ final class GameScene: SKScene {
             boards[index] = node
             return node
         }()
-        guard player.boardOut else { board.isHidden = true; return }
+        let out = player.boardOut
+        if out != (boardWasOut[index] ?? false) {
+            boardWasOut[index] = out
+            if !out, player.state == .dunking {
+                // Onto the rim: the board drops away to the floor and pops there.
+                dropBoard(board, player: player)
+            } else if !board.isHidden || out {
+                // In or out in a line of bubbles along it.
+                bubbleLine(along: out ? SpriteLibrary.point(player.board.centre) : board.position, angle: out ? CGFloat(player.surfAngle) : board.zRotation, length: board.size.width)
+            }
+        }
+        guard out else { board.isHidden = true; return }
         board.isHidden = false
-        let riding = player.grounded
+        let riding = player.riding
         // Floating, and bobbing on the ground.
         let bob: CGFloat = riding ? 3 + round(sin(Double(match.frame) / 60 * 2 * .pi * 1.5)) : 0
-        let middle = SpriteLibrary.point(Vec2(x: player.position.x, y: player.position.y + player.spec.bodyHeight / 2)) + CGPoint(x: 0, y: bob)
+        // Riding, the body turns about the board's tail on the floor, a wheelie; in the air,
+        // about its own middle.
+        let pivot = (riding ? SpriteLibrary.point(player.boardTail)
+                            : SpriteLibrary.point(Vec2(x: player.position.x, y: player.position.y + player.spec.bodyHeight / 2)))
+            + CGPoint(x: 0, y: bob)
         let angle = CGFloat(player.surfAngle)
         func turned(_ point: CGPoint) -> CGPoint {
-            let offset = point - middle
-            return middle + CGPoint(x: offset.x * cos(angle) - offset.y * sin(angle), y: offset.x * sin(angle) + offset.y * cos(angle))
+            let offset = point - pivot
+            return pivot + CGPoint(x: offset.x * cos(angle) - offset.y * sin(angle), y: offset.x * sin(angle) + offset.y * cos(angle))
         }
         body.position = turned(body.position + CGPoint(x: 0, y: bob))
         body.zRotation += angle

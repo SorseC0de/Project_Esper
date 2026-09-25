@@ -213,7 +213,7 @@ final class PowerTests: XCTestCase {
     }
 
     func testPastTheTopTheStickSpinsAndTheLandingIsUpright() {
-        var match = with(.surfSoda)
+        var match = with(.surfSoda, level: 2)
         match.players[1].position.x = 300
         match.players[0].position.x = 60
         for _ in 0..<(match.players[0].spec.jumpSquatFrames + 1) { match.advance(inputs: [PlayerInput(jump: true), .idle]) }
@@ -228,12 +228,18 @@ final class PowerTests: XCTestCase {
         XCTAssertGreaterThan(match.players[0].surfAngle, spun, "let go, it rights itself")
         let landed = run(&match, frames: 120, input: { _ in .idle }) { $0.events.contains(.surfLanded(player: 0)) }
         XCTAssertLessThan(landed, 120)
-        XCTAssertEqual(match.players[0].surfAngle, 0)
+        XCTAssertLessThan(abs(match.players[0].surfAngle), 0.5, "upright, or close enough to ease the rest")
         XCTAssertFalse(match.players[0].surfing)
     }
 
     func testRunningIntoAWallRidesUpItAndLettingGoFlipsOff() {
-        var match = with(.surfSoda)
+        var one = with(.surfSoda, level: 1)
+        one.players[1].position.x = 60
+        one.players[0].position.x = 280
+        one.advance(inputs: [.idle, .idle])
+        run(&one, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        XCTAssertNil(one.players[0].surfWall, "the wall ride is level two's")
+        var match = with(.surfSoda, level: 2)
         match.players[1].position.x = 60
         match.players[0].position.x = 280
         // A smash from neutral, so it runs.
@@ -274,6 +280,21 @@ final class PowerTests: XCTestCase {
         XCTAssertLessThan(off, 60)
         XCTAssertTrue(match.players[0].surfing)
         XCTAssertTrue(match.players[0].boardOut)
+    }
+
+    func testRunningItRidesAWheelieAndComesBackDownWhenItStops() {
+        var match = with(.surfSoda)
+        match.players[1].position.x = 300
+        match.players[0].position.x = 60
+        match.advance(inputs: [.idle, .idle])
+        run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        XCTAssertEqual(match.players[0].surfAngle, SurfRules.wheelie, accuracy: 0.05, "up on the tail")
+        XCTAssertGreaterThan(match.players[0].board.centre.y, match.players[0].position.y, "the board stands up ahead")
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertTrue(match.players[0].boardOut, "still coming down")
+        run(&match, frames: 40, input: { _ in .idle })
+        XCTAssertEqual(match.players[0].surfAngle, 0)
+        XCTAssertFalse(match.players[0].boardOut, "upright, and gone")
     }
 
     func testTheBoardStopsTheOthersBolt() {

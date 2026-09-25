@@ -283,21 +283,25 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the body. Numbers in `PulseRules`.
 
 - Surf Soda (K; the debug pick for now, while its movement is found). Running, the body
-  rides a board, the skid sheet's first frame still, floating three pixels and bobbing
-  two, leaving a trail of `bubbles`, some flipped. In the air the board is always out,
+  rides a board, the skid sheet's first frame still, leaning back 45° in a wheelie on the
+  board's tail so the board stands up ahead as a shield, easing there and, stopping, back
+  down to upright before the board goes; floating three pixels and bobbing two, leaving a trail of `bubbles`, some flipped. In the air the board is always out,
   off an edge too, floating as off a jump; a jump throws a cloud of bubbles in place of
   the spark, and a landing's bubbles spread wide along the ground at their own sizes. Both jumps are a fixed crescent, a quarter circle 40
   up and 30 forward the way it faces over 30 frames, whatever the stick says; from the
-  top the stick spins the body about its middle at 0.25 a frame instead of drifting it,
+  top the stick spins the body about its middle at 0.25 a frame instead of drifting it
+  (level two; at level one it always rights itself),
   and within 30 of the ground it eases toward the nearest upright, landing in a burst of
   bubbles. The board, 20 by 3 under the feet and turning with the body, stops the
   other's bolts and fireballs and turns back their thrown ball: a shield to spin into
-  place. On the board the body is a tenth faster, on top of the defender's tenth, and
+  place. The board is a white silhouette, its tail's shadow at 240, toned in the energy
+  colour; it comes and goes in a line of bubbles, and onto the rim the body goes upright
+  and the board drops away to the floor. On the board the body is a tenth faster, on top of the defender's tenth, and
   past the crescent's top it floats down at half gravity and six tenths of the fall speed
   unless the fast fall cuts through, shedding bubbles along the board's underside. The
   first jump leans back a quarter turn over
   its crescent, the double jump a whole backflip. Running into a wall with the stick held
-  toward it, the board turns back against it and rides up at the run speed; letting go,
+  toward it (level two), the board turns back against it and rides up at the run speed; letting go,
   stalling or meeting the ceiling flips it off, pushed away, carrying on round the way
   the ride turned it to the next upright. In the air with the stick let go it rights
   itself. Its head's

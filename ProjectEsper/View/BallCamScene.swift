@@ -27,11 +27,11 @@ final class BallCamScene: SKScene {
     static let view = CGSize(width: 128, height: 80)
     /// Where it hangs on the screen, in the screen's -1 to 1 across and up: the trapezoid's
     /// widths at the top and bottom and its top edge. Its height follows from the view's
-    /// shape. Laid down at two thirds.
+    /// shape. Laid down at a third.
     static let topWidth: CGFloat = 0.5
     static let bottomWidth: CGFloat = 0.42
     static let top: CGFloat = 0.9
-    static let opacity: CGFloat = 0.66
+    static let opacity: CGFloat = 0.33
 
     /// The trapezoid's corners for a screen of this aspect, top left, top right, bottom
     /// left, bottom right, with the cam's middle at `centre` across.

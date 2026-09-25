@@ -249,6 +249,21 @@ final class PowerTests: XCTestCase {
         XCTAssertTrue(match.bolts.isEmpty)
     }
 
+    func testABoltThrowOnTheGroundBrakesAsTheSlashDoes() {
+        var match = with(.zeusJuice)
+        match.players[1].position.x = 300
+        for _ in 0..<30 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
+        let speed = match.players[0].velocity.x
+        XCTAssertGreaterThan(speed, 2)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle])
+        XCTAssertEqual(match.players[0].velocity.x, speed - match.players[0].spec.attackBrake, accuracy: 0.001, "the slash's brake from the frame after the press")
+        // Held into the stick all the way, it never runs again until the throw's done.
+        for _ in 0..<(ZeusRules.boltPoseFrames - 2) { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
+        XCTAssertNotEqual(match.players[0].state, .run)
+        XCTAssertLessThan(match.players[0].velocity.x, speed)
+    }
+
     func testABoltGoesTheWayTheBodyFacesOnTheRelease() {
         var match = with(.zeusJuice)
         match.players[0].position.y = 60

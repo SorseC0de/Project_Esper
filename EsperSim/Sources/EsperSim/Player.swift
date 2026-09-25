@@ -366,6 +366,11 @@ public struct Player: Equatable {
             input.shootButtons = 0
             input.stick = .zero
         }
+        // Zeus Juice's bolt throw on the ground is committed as the slash is: the stick
+        // doesn't walk, and the run it came from bleeds off at the slash's brake.
+        let throwingBolt = boltPose > 0 && grounded && state.isGroundState
+        let boltCarry = velocity.x
+        if throwingBolt { input.stick.x = 0 }
 
         switch state {
         case .idle:
@@ -933,6 +938,9 @@ public struct Player: Equatable {
             }
         }
 
+        if throwingBolt, state.isGroundState {
+            velocity.x = approach(boltCarry, 0, spec.attackBrake)
+        }
         if action == nil, wantsPlatform {
             action = .makePlatform
         }

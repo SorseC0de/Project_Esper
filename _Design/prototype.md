@@ -249,7 +249,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   stripped; level two makes the whole screen the floor. Numbers in `QuakeRules`.
 - Zeus Juice (H). Shoot without the ball throws a bolt straight ahead at 6, tilted by
   the stick up to 30°, for 60 frames, one every 24: a body it meets is stripped and
-  knocked as the slash knocks, and the ball it meets pops back toward the thrower. There's no slash.
+  knocked as the slash knocks; thrown on the ground it's committed as the slash is, the
+  stick not walking and the run bleeding off at the slash's brake, and the ball it meets pops back toward the thrower. There's no slash.
   Level two's throw calls a strike down from the top of the screen, five units wide,
   from the top of the screen onto the ball in hand, where the stance's sheet draws it, as the charge starts or onto the
   snatch's hand at full stretch,
@@ -421,7 +422,7 @@ one of four bolts each time, favouring vertical: it leans half as far as the bal
 in off vertical and never past 45°, so it never lies flat, at the sheet's own width and
 stretched tall enough to run past the top of the screen at that lean. On the sheet's two
 full-frame flash frames the whole screen flashes in the same tone and the floor and
-walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Stunned, the body and head flicker a dark shade of the energy colour and the hurt sheet plays at 10 a second, its last frame held. `ParticleLook.sprites` draws the head's fire and the double jump's platform with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
+walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Stunned, the body and head flicker a dark shade of the energy colour. `ParticleLook.sprites` draws the head's fire and the double jump's platform with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour. A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
@@ -496,14 +497,15 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 - The scenery (`FieldArt`) is flat shapes drawn once: a night sky with floodlight banks,
   the stands with fanning lines and two rails twelve pixels tall, four apart, that wears the possession's
   colour like the court's walls and, with the ball in hand, fills with chevrons drifting
-  toward the rim the holder attacks; the floodlights' blooms take the same colour, purple
+  toward the rim the holder attacks, and with it loose runs "⬩ GET THE BALL! ⬩", one
+  rail's lettering one way and the other's the other; the floodlights' blooms take the same colour, purple
   when nobody has it, and so do the panels the lamps sit on, trapezoids wider at the top;
   the yard numbers at one and a half times; the turf's five-yard stripes,
   leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded base in the
   colour of the side that guards it, as the court's blocks are, the pole's width and five more, behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
 - The ball cam (`StageFeatures.ballCam`, the view's alone): a close view of the ball,
-  128 by 80 art pixels round it, hanging over the upper screen as a trapezoid wider at the
-  top at two thirds, lined with `flashspark2` in the local player's energy, each on its own
+  128 by 80 art pixels round it, only in play, hanging over the upper screen as a
+  trapezoid wider at the top at a third, lined with `flashspark2` in the local player's energy, each on its own
   frame, easing across after the local player. It has its own scene,
   with its own copy of the scenery built once, and its own renderer, drawn one frame in
   three into a small texture with its own glow, laid down after the screen's; the game

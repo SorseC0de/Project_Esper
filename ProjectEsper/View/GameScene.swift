@@ -235,7 +235,8 @@ final class GameScene: SKScene {
 
     // MARK: Ball cam
 
-    var ballCamEnabled: Bool { match.stage.features.ballCam && playing }
+    /// Only in play: not on the title, the drink pick or the win.
+    var ballCamEnabled: Bool { match.stage.features.ballCam && playing && flow == .playing }
     private var playing: Bool { built && !playerNodes.isEmpty }
 
     /// Where the ball is, in art pixels, held or loose.
@@ -426,7 +427,17 @@ final class GameScene: SKScene {
             for number in yardNumbers { number.setScale(HelmetTuning.numberScale) }
             for bloom in fieldBlooms { bloom.color = courtColour }
             // Chevrons along the rail, pointing at the rim the holder attacks.
-            for line in FieldArt.railLines {
+            for (rail, line) in FieldArt.railLines.enumerated() {
+                var callX: CGFloat = 0
+                while callX < CGFloat(stage.columns) * GameScene.pixelsPerTile + GameScene.railCallSpacing {
+                    let call = TitleText.node(GameScene.railCall, size: 7)
+                    call.position = CGPoint(x: callX, y: line + FieldArt.railHeight / 2)
+                    call.zPosition = -16
+                    call.isHidden = true
+                    ground.addChild(call)
+                    railCalls.append((call, rail, callX))
+                    callX += GameScene.railCallSpacing
+                }
                 var x: CGFloat = 8
                 while x < CGFloat(stage.columns) * GameScene.pixelsPerTile {
                     let chevron = SKSpriteNode(texture: sprites.symbol("chevron.right", pointSize: 9))
@@ -1106,6 +1117,8 @@ final class GameScene: SKScene {
     }
 
     private func enter(_ next: Flow) {
+        // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
+        ballCamFrame.isHidden = next != .playing
         flow = next
         if next == .picking {
             // Both phones roll the same offers off the shared dice.
@@ -2013,6 +2026,11 @@ final class GameScene: SKScene {
     }
     private var yardNumbers: [SKNode] = []
     private var railChevrons: [SKSpriteNode] = []
+    /// With nobody holding it, the rails call for the ball instead, the lettering running
+    /// one way on one rail and the other way on the other.
+    private var railCalls: [(node: SKSpriteNode, rail: Int, home: CGFloat)] = []
+    private static let railCall = "\u{2B29} GET THE BALL!  \u{2B29}"
+    private static let railCallSpacing: CGFloat = 150
     private var railChevronHomes: [CGFloat] = []
     private var portalNode: SKNode?
     private var riftPlates: [(node: SKSpriteNode, salt: Int, outer: Bool)] = []
@@ -2102,6 +2120,15 @@ final class GameScene: SKScene {
         // The rail's chevrons: shown with the ball in hand, pointing and drifting toward the
         // rim the holder attacks.
         let attacking = match.ball.holder.flatMap { holder in match.stage.hoops.first { $0.owner == holder } }
+        // Loose: the call, drifting one way on the top rail and the other on the bottom.
+        let loose = attacking == nil && match.ball.holder == nil
+        let callShift = CGFloat(match.frame % Int(GameScene.railCallSpacing * 2)) / 2
+        for call in railCalls {
+            call.node.isHidden = !loose
+            guard loose else { continue }
+            let way: CGFloat = call.rail == 0 ? 1 : -1
+            call.node.position.x = call.home + way * callShift - (way < 0 ? 0 : GameScene.railCallSpacing)
+        }
         for (index, chevron) in railChevrons.enumerated() {
             chevron.isHidden = attacking == nil
             guard let attacking else { continue }

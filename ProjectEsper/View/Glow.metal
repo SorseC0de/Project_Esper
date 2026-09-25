@@ -75,7 +75,7 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
 
 // The ball cam: its texture on a trapezoid over the screen, wider at the top. Each corner
 // carries its uv times the row's width, so the divide after interpolation keeps the
-// picture straight across the slant. It's laid down at two thirds; flashes line its edges.
+// picture straight across the slant. It's laid down at a third; flashes line its edges.
 struct BallCamCorner {
     float2 position;
     float3 uvq;
@@ -101,5 +101,5 @@ fragment float4 ballCamFragment(BallCamOut in [[stage_in]],
                                 constant GlowUniforms &u [[buffer(0)]]) {
     float2 uv = in.uvq.xy / in.uvq.z;
     float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
-    return float4(cam.sample(nearest, uv).rgb + bloom, 0.66);
+    return float4(cam.sample(nearest, uv).rgb + bloom, 0.33);
 }

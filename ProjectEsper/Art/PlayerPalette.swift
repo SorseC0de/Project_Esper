@@ -135,6 +135,58 @@ struct Look: Hashable {
     static let byPlayer = [playerOne, playerTwo]
 }
 
+/// The energy colours a player can pick on the title, each paired with its opposite: when
+/// two sides pick the same, the one that gives way takes the opposite.
+enum EnergyColour: String, CaseIterable {
+    case orange, teal, red, lime, pink, blue
+
+    var glow: RGB {
+        switch self {
+        case .orange: Look.orange
+        case .teal: Look.teal
+        case .red: 0xFF454D
+        case .lime: 0xA2CF22
+        case .pink: 0xFF3676
+        case .blue: 0x1539FF
+        }
+    }
+
+    /// The body: orange and teal as tuned; the others their glow lifted two fifths of the
+    /// way to white, about where the first two sit.
+    var body: RGB {
+        switch self {
+        case .orange: Look.lightOrange
+        case .teal: Look.lightTeal
+        default: Look.lightened(glow, 0.4)
+        }
+    }
+
+    var opposite: EnergyColour {
+        switch self {
+        case .orange: .teal
+        case .teal: .orange
+        case .red: .lime
+        case .lime: .red
+        case .pink: .blue
+        case .blue: .pink
+        }
+    }
+
+    var look: Look { Look.team(glow, body: body) }
+
+    /// Both sides' colours: each keeps its own unless they match, and then the second gives
+    /// way to the opposite.
+    static func pair(first: EnergyColour, second: EnergyColour) -> [EnergyColour] {
+        [first, second == first ? first.opposite : second]
+    }
+
+    /// What this phone picked, kept between launches.
+    static let storageKey = "esper.energyColour"
+    static var saved: EnergyColour {
+        UserDefaults.standard.string(forKey: storageKey).flatMap(EnergyColour.init(rawValue:)) ?? .orange
+    }
+}
+
 enum BallLook {
     /// The loose ball is purple, after a while in the colour of whoever last let it go.
     static let neutral: RGB = 0xBF7BFF

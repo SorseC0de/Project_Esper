@@ -23,6 +23,8 @@ final class FlowState: ObservableObject {
 struct TitleOverlay: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
+    /// This phone's energy colour, kept between launches.
+    @AppStorage(EnergyColour.storageKey) private var colour = EnergyColour.orange.rawValue
 
     private var busy: Bool {
         switch net.state {
@@ -36,6 +38,12 @@ struct TitleOverlay: View {
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
+                // The energy colours in the upper right corner.
+                .overlay(alignment: .topTrailing) {
+                    colourPicker
+                        .padding(.top, 20)
+                        .padding(.trailing, 24)
+                }
             VStack(spacing: 32) {
                 Image(uiImage: TitleText.image("PROJECT ESPER", size: 56))
                 Button {
@@ -64,5 +72,29 @@ struct TitleOverlay: View {
         }
         .environment(\.colorScheme, .dark)
         .onAppear { net.signIn() }
+    }
+
+    /// The energy colours as a row of circles, the picked one ringed.
+    private var colourPicker: some View {
+        HStack(spacing: 10) {
+            ForEach(EnergyColour.allCases, id: \.self) { choice in
+                Button {
+                    colour = choice.rawValue
+                    flow.scene.applySavedColours()
+                } label: {
+                    Circle()
+                        .fill(Color(rgb: choice.glow))
+                        .frame(width: 22, height: 22)
+                        .overlay(Circle().stroke(.white, lineWidth: choice.rawValue == colour ? 3 : 0).padding(-4))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+private extension Color {
+    init(rgb: RGB) {
+        self.init(red: Double((rgb >> 16) & 0xFF) / 255, green: Double((rgb >> 8) & 0xFF) / 255, blue: Double(rgb & 0xFF) / 255)
     }
 }

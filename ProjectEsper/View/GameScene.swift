@@ -56,6 +56,7 @@ final class GameScene: SKScene {
         var pendingPick: (round: Int, choice: Int)?
         var rematchRandom: UInt32?
         var theirRematch: UInt32?
+        var theirColour: EnergyColour?
     }
     private var online: Online?
     private var localIndex: Int { online?.localIndex ?? 0 }
@@ -387,6 +388,10 @@ final class GameScene: SKScene {
     private func build() {
         // The vehicles' shapes as last set in the bounds gallery, offline.
         BoundsGallery.loadSaved()
+        // The colours as last picked, before anything is drawn in them.
+        for (index, colour) in EnergyColour.pair(first: EnergyColour.saved, second: .teal).enumerated() {
+            sprites.setLook(colour.look, for: index)
+        }
         addChild(world)
         world.addChild(ground)
         bodies.zPosition = 20
@@ -484,6 +489,7 @@ final class GameScene: SKScene {
                 } else if !border, let hoop = stage.hoops.min(by: { $0.position.distance(to: Vec2(x: x, y: y)) < $1.position.distance(to: Vec2(x: x, y: y)) }) {
                     // You score on your opponent's basket, so the block wears the other colour.
                     node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow))
+                    blockTiles.append((node, 1 - hoop.owner))
                 } else {
                     node.color = courtColour
                     courtTiles.append(node)
@@ -668,6 +674,7 @@ final class GameScene: SKScene {
             label.fontName = "Menlo-Bold"
             label.fontSize = 8
             label.fontColor = SKColor(rgb: sprites.look(for: index).glow)
+            sideLabels.append(label)
             label.horizontalAlignmentMode = index == 0 ? .right : .left
             label.verticalAlignmentMode = .top
             label.numberOfLines = 0
@@ -1035,6 +1042,7 @@ final class GameScene: SKScene {
     /// the first round.
     private func startSeries() {
         guard online == nil else { return }
+        applySavedColours()
         startSeries(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
     }
 
@@ -1331,11 +1339,14 @@ final class GameScene: SKScene {
         if online?.started != true {
             online?.helloAgainIn -= 1
             if let online, online.helloAgainIn <= 0 {
-                send(.hello(random: online.random, version: NetRules.protocolVersion), reliable: true)
+                sendHello(online.random)
                 self.online?.helloAgainIn = 60
             }
             if let online, let theirs = online.theirRandom {
                 self.online?.started = true
+                // The host, player one, keeps their colour; the other gives way if they match.
+                let mine = EnergyColour.saved, other = online.theirColour ?? .teal
+                applyColours(online.localIndex == 0 ? EnergyColour.pair(first: mine, second: other) : EnergyColour.pair(first: other, second: mine))
                 startSeries(seed: online.random ^ theirs)
             }
             return
@@ -1358,6 +1369,43 @@ final class GameScene: SKScene {
         }
     }
 
+    private func sendHello(_ random: UInt32) {
+        let colour = UInt8(EnergyColour.allCases.firstIndex(of: EnergyColour.saved) ?? 0)
+        send(.hello(random: random, version: NetRules.protocolVersion, colour: colour), reliable: true)
+    }
+
+    // MARK: Colours
+
+    /// The block tiles by the side whose colour they wear, and the side labels, recoloured
+    /// when the colours change.
+    private var blockTiles: [(node: SKSpriteNode, side: Int)] = []
+    private var sideLabels: [SKLabelNode] = []
+
+    /// Offline: this phone's pick for player one, the computer or the second pad in teal,
+    /// or the opposite if that's the pick.
+    func applySavedColours() {
+        applyColours(EnergyColour.pair(first: EnergyColour.saved, second: .teal))
+    }
+
+    /// Both sides' colours onto everything drawn in them.
+    func applyColours(_ colours: [EnergyColour]) {
+        for (index, colour) in colours.enumerated() { sprites.setLook(colour.look, for: index) }
+        headStreamsCache = [:]
+        for (index, flashes) in zip(stunBodies.indices, zip(stunBodies, stunHeads)) {
+            let dark = SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
+            flashes.0.color = dark
+            flashes.1.color = dark
+        }
+        for (index, segments) in capes.enumerated() {
+            for segment in segments { segment.color = SKColor(rgb: sprites.look(for: index).glow) }
+        }
+        for (index, web) in swingWebs.enumerated() { web.strokeColor = SKColor(rgb: sprites.look(for: index).glow) }
+        for (index, web) in shotWebs.enumerated() { web.strokeColor = SKColor(rgb: sprites.look(for: index).glow) }
+        for tile in blockTiles { tile.node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: tile.side).glow)) }
+        for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
+        drawSeries()
+    }
+
     private func send(_ message: NetMessage, reliable: Bool) {
         flowState?.net.send(message.data, reliable: reliable)
     }
@@ -1365,14 +1413,15 @@ final class GameScene: SKScene {
     private func handle(_ data: Data) {
         guard online != nil, let message = NetMessage(data: data) else { return }
         switch message {
-        case .hello(let random, let version):
+        case .hello(let random, let version, let colour):
             guard version == NetRules.protocolVersion else {
                 endOnline("VERSIONS DIFFER")
                 return
             }
             if online?.theirRandom == nil {
                 online?.theirRandom = random
-                if let mine = online?.random { send(.hello(random: mine, version: NetRules.protocolVersion), reliable: true) }
+                online?.theirColour = EnergyColour.allCases.indices.contains(Int(colour)) ? EnergyColour.allCases[Int(colour)] : .teal
+                if let mine = online?.random { sendHello(mine) }
             }
         case .inputs(let packet):
             guard online?.started == true else { return }
@@ -1392,6 +1441,7 @@ final class GameScene: SKScene {
     private func endOnline(_ why: String?) {
         guard online != nil else { return }
         online = nil
+        applySavedColours()
         session.stopAt = nil
         pendingFlow = nil
         flowState?.net.leave()

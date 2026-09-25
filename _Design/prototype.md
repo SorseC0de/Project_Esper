@@ -400,6 +400,16 @@ holds the variants; A is always the baseline as tuned.
 - AI, beside that: the computer plays the other side. Off, the second pad or nothing does.
   Clicking a pad's right stick (R3) switches it too, which is the only way on the TV.
 
+## Energy colours
+
+Six to pick from on the title, circles in its upper right corner, the pick kept between
+launches (`EnergyColour`, `esper.energyColour`): orange, the default, teal, red #FF454D,
+lime #A2CF22, pink #FF3676 and blue #1539FF. Each has an opposite: orange and teal, red
+and lime, pink and blue. Offline this phone's pick is player one and the other side teal,
+or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
+host, player one, keeps theirs, and the other takes the opposite if they match. Any two
+different colours can meet. Purple is left out, as it's the loose ball's.
+
 ## Opponent
 
 `Opponent.swift`. Powerless for now: it runs, walks, jumps, slides, slashes, snatches,

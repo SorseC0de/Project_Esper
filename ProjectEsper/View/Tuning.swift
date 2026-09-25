@@ -71,6 +71,17 @@ enum ZeusTuning {
     nonisolated(unsafe) static var chargeScale: Float = 0.17
 }
 
+/// Gemini's rift, as the portal, with Project Stars' own numbers: the small pair's size
+/// against the big, the length trade's period, the jumps' reach in art pixels and rate a
+/// second, and how faint a plate can roll.
+enum RiftLook {
+    static let innerScale: CGFloat = 0.5
+    static let tradePeriod = 1.5
+    static let jumpReach: CGFloat = 1.5
+    static let jumpRate = 12.0
+    static let faintest = 0.01
+}
+
 /// The helmets' drawing against their box, and the yard numbers' size, as tuned.
 enum HelmetTuning {
     static let scale: CGFloat = 1.1

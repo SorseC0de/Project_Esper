@@ -2014,7 +2014,58 @@ final class GameScene: SKScene {
     private var yardNumbers: [SKNode] = []
     private var railChevrons: [SKSpriteNode] = []
     private var railChevronHomes: [CGFloat] = []
-    private var portalNode: SKShapeNode?
+    private var portalNode: SKNode?
+    private var riftPlates: [(node: SKSpriteNode, salt: Int, outer: Bool)] = []
+
+    /// The portal is Gemini's rift from Project Stars, without its lean: both drawings as
+    /// a tall pair, and the same pair again half as wide, turned end over end, the two
+    /// pairs trading length back and forth. Each plate jumps to a new place and opacity
+    /// twelve times a second, held, never eased, so it reads as a picture failing.
+    private func makeRift() -> SKNode {
+        let rift = SKNode()
+        rift.zPosition = 5
+        riftPlates = []
+        let plates: [(name: String, outer: Bool, salt: Int)] = [
+            ("gemini_rift_v1", true, 3), ("gemini_rift_v2", true, 11), ("gemini_rift_v1", false, 21), ("gemini_rift_v2", false, 31),
+        ]
+        for plate in plates {
+            let frames = (0..<(EffectSheets.frames[plate.name] ?? 1)).map { sprites.texture(plate.name, $0) }
+            let node = SKSpriteNode(texture: frames[0])
+            node.zRotation = plate.outer ? 0 : .pi
+            node.run(.repeatForever(.animate(with: frames, timePerFrame: 1.0 / 24)))
+            rift.addChild(node)
+            riftPlates.append((node, plate.salt, plate.outer))
+        }
+        return rift
+    }
+
+    /// Stars' `jitter`: a value from -1 to 1 for a step, different for each salt.
+    private func riftJitter(_ step: Double, salt: Int) -> Double {
+        let frequency = 12.9898 + Double(salt) * 4.1357
+        let hashed = sin(step * frequency + Double(salt) * 78.233) * 43758.5453
+        return (hashed - hashed.rounded(.down)) * 2 - 1
+    }
+
+    private func stepRift(fading: CGFloat) {
+        let now = Double(match.frame) / 60
+        let trade = (1 - cos(now / RiftLook.tradePeriod * 2 * .pi)) / 2
+        let outerLength = RiftLook.innerScale + (1 - RiftLook.innerScale) * (1 - trade)
+        let innerLength = RiftLook.innerScale + (1 - RiftLook.innerScale) * trade
+        let step = (now * RiftLook.jumpRate).rounded(.down)
+        let side = CGFloat(FieldRules.portalHalfHeight * 2 * SpriteLibrary.pixelsPerUnit)
+        for plate in riftPlates {
+            let width = plate.outer ? 1 : RiftLook.innerScale
+            let length = plate.outer ? outerLength : innerLength
+            plate.node.setScale(1)
+            plate.node.size = CGSize(width: side, height: side)
+            plate.node.xScale = 0.375 * width
+            plate.node.yScale = 1.25 * length
+            plate.node.position = CGPoint(x: RiftLook.jumpReach * riftJitter(step, salt: plate.salt),
+                                          y: RiftLook.jumpReach * riftJitter(step, salt: plate.salt + 1))
+            let roll = (riftJitter(step, salt: plate.salt + 2) + 1) / 2
+            plate.node.alpha = CGFloat(RiftLook.faintest + (1 - RiftLook.faintest) * roll) * fading
+        }
+    }
     private var portalId = 0
 
     /// Helmets in their defender's colour, facing the way they travel and tipped back 15
@@ -2062,19 +2113,12 @@ final class GameScene: SKScene {
         if let portal = match.portal {
             if portalNode == nil || portalId != portal.id {
                 portalNode?.removeFromParent()
-                let loop = SKShapeNode(ellipseOf: CGSize(width: FieldRules.portalHalfWidth * 2 * SpriteLibrary.pixelsPerUnit,
-                                                        height: FieldRules.portalHalfHeight * 2 * SpriteLibrary.pixelsPerUnit))
-                loop.strokeColor = SKColor(rgb: BallLook.neutral)
-                loop.lineWidth = 2
-                loop.glowWidth = 2
-                loop.zPosition = 5
-                glowers.addChild(loop)
-                portalNode = loop
+                portalNode = makeRift()
+                glowers.addChild(portalNode!)
                 portalId = portal.id
             }
             portalNode?.position = SpriteLibrary.point(portal.centre)
-            // Fading out over its last half second.
-            portalNode?.alpha = min(CGFloat(portal.framesLeft) / 30, 1) * (0.75 + 0.25 * CGFloat(sin(Double(match.frame) / 6)))
+            stepRift(fading: min(CGFloat(portal.framesLeft) / 30, 1))
         } else {
             portalNode?.removeFromParent()
             portalNode = nil

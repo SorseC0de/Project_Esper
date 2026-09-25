@@ -486,7 +486,10 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   way, and a pushed ball is an ordinary ball again, falling. The computer, meeting one at
   its height, hops and double jumps onto it and rides it. Two going opposite ways that meet take each other out in a burst of `flashspark2`
   in their colours.
-- The portal: a vertical loop at 90, above double-jump height, at a random x kept 200
+- The portal: Gemini's rift from Project Stars (`gemini_rift_v1` and `v2`, boxed down by
+  four), drawn as there without the lean: the two drawings as a tall pair and again half
+  as wide turned end over end, the pairs trading length every 1.5 seconds, each plate
+  jumping 1.5 pixels and to a new opacity twelve times a second, held. At 90, above double-jump height, at a random x kept 200
   from either end; one at a time, five seconds each, the next as soon as it goes. A shot
   or throw still its thrower's through it comes out ten yards, a hundredth of the field
   each, toward the thrower's rim, with a lift of 2 forward and 3.5 up.
@@ -507,7 +510,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   scene is never drawn twice in a frame. It copies every sprite of the bodies and effects
   layers and the shadows, but only those within its window round the ball and a margin:
   the rest cost one position check each, so a busy field costs it little. Emitters and
-  shapes (the portal, webs, the pulse) aren't copied.
+  shapes (webs, the pulse) aren't copied; the portal is sprites, so it is.
 - Shadows (`StageFeatures.shadows`, the view's alone): each body's current frame and its
   head, and the goalposts, cast in a dark greyed purple at two thirds, mirrored under the
   feet or the floor line and sheared by the turf's own lean where they stand, so they

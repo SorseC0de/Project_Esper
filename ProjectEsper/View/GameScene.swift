@@ -877,8 +877,11 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
-            index == 1 ? self?.openBoundsGallery() : self?.closeBoundsGallery()
+        // The bounds gallery only means anything on the highway.
+        if match.stage.features.traffic {
+            controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
+                index == 1 ? self?.openBoundsGallery() : self?.closeBoundsGallery()
+            }
         }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)

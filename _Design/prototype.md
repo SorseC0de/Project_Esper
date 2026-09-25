@@ -463,7 +463,8 @@ its length.
 
 ## Highway Traffic
 
-`Stage.highway`, the stage in play for tuning (`Stage.current`). The court's 34 by 16,
+`Stage.highway`, built and tested but held back until stage selection; the court is in
+play (`Stage.current`). The court's 34 by 16,
 flat: a dark blue night, and a road where the field's grass is, the floor an invisible
 strip through its middle. Each player starts where the court has them, the ball loose at
 centre.
@@ -506,8 +507,7 @@ centre.
 
 ## Football Field
 
-`Stage.footballField`, the stage in play for tuning (`Stage.current`); the court comes back
-with stage selection. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
+`Stage.footballField`, built and tested but held back until stage selection. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
 invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
 at 107, 66 in from each wall, floating between the
 goalposts' uprights; by design a standing shot can't reach them, so scoring takes a
@@ -666,6 +666,9 @@ Game Center needs the app's App ID to carry the Game Center capability
 answer, the app record in App Store Connect with Game Center turned on.
 
 ## Queued
+
+- Revisit the football field's helmets now that slopes exist: they may want a shaped
+  outline like the cars' rather than a square.
 
 - A "score" mode with three-point lines: a dim glowing arc in the background on each
   side, its peak touching the edge of the middle platform; a shot begun from behind

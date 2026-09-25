@@ -483,6 +483,7 @@ public struct Stage: Equatable {
         return stage
     }
 
-    /// The stage being tuned; the others come back with stage selection.
-    public static var current: Stage { highway }
+    /// The stage in play. The court, for now: the football field and the highway are built
+    /// and tested but held back until stage selection.
+    public static var current: Stage { court }
 }

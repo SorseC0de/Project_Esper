@@ -1302,23 +1302,40 @@ final class GameScene: SKScene {
         }
     }
 
-    /// Both bodies struck in at their spawns by a bolt and the crown in their colours,
-    /// hidden until the flash.
+    /// Both bodies ported in at their spawns in a flash cluster in their colours, hidden
+    /// until it's up.
     private func bringPlayersIn() {
         roundIntro = 12
         SoundBoard.shared.play(.portIn)
         lastCountSounded = 0
+        for player in match.players { portIn(player) }
+    }
+
+    /// The port-in: a cluster of `flashspark2` over the body in its energy, the backboards'
+    /// grid unskewed, held while the body is hidden and then faded out.
+    private func portIn(_ player: Player) {
+        let frameCount = EffectSheets.frames[EnergyEffect.flashSpark2.name] ?? 1
+        let frames = sprites.effectFrames(EnergyEffect.flashSpark2, player: player.index)
+        let step = BackboardTuning.spacing * BackboardTuning.size * 2
+        let cluster = flashCluster(frames: frames, frameCount: frameCount, columns: BackboardTuning.columns, rows: BackboardTuning.rows,
+                                   step: step, scale: BackboardTuning.size, shear: 0)
+        cluster.position = SpriteLibrary.point(player.chest)
+        cluster.zPosition = 45
+        cluster.run(.sequence([.wait(forDuration: Double(roundIntro) / 60), .fadeOut(withDuration: 0.3), .removeFromParent()]))
+        glowers.addChild(cluster)
+    }
+
+    /// The old entry, a bolt from the top of the screen and the crown, kept for a power to come.
+    private func boltEntry(_ player: Player) {
         let top = cameraNode.position.y + size.height * cameraNode.yScale / 2
-        for player in match.players {
-            let point = SpriteLibrary.point(player.position)
-            let bolt = EnergyEffect.strikes.randomElement()!.node(sprites, player: player.index, at: point)
-            bolt.zPosition = 45
-            bolt.yScale = max((top - point.y) * 1.1, 64) / bolt.size.height
-            glowers.addChild(bolt)
-            let crown = EnergyEffect.spark3.node(sprites, player: player.index, at: point)
-            crown.zPosition = 46
-            glowers.addChild(crown)
-        }
+        let point = SpriteLibrary.point(player.position)
+        let bolt = EnergyEffect.strikes.randomElement()!.node(sprites, player: player.index, at: point)
+        bolt.zPosition = 45
+        bolt.yScale = max((top - point.y) * 1.1, 64) / bolt.size.height
+        glowers.addChild(bolt)
+        let crown = EnergyEffect.spark3.node(sprites, player: player.index, at: point)
+        crown.zPosition = 46
+        glowers.addChild(crown)
     }
 
     /// A point, confirmed on both sides: the round to the scorer. The winner's screen

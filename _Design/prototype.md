@@ -325,8 +325,10 @@ always wins.
 A best of seven, first to four points, in `Series`. The title screen, drawn by the
 SwiftUI layer over the Metal view on a dark ultra-thin material with the court showing
 through, offers BEST OF 7 and, greyed for now, MULTIPLAYER; jump on the pad starts too.
-A round starts with both bodies struck in at their
-spawns by a bolt and the crown in their colours, then the three count in title lettering
+A round starts with both bodies ported in at their
+spawns: a cluster of `flashspark2` over each in its energy, the backboards' 3 by 4 grid
+at 0.4 unskewed, held the 12 frames the body is hidden and faded over 0.3 seconds (the
+old bolt and crown are kept, `boltEntry`, for a power to come); then the three count in title lettering
 and BALL OUT!!! as it hits zero, when both can act. A point is a round: BUCKET!! goes up
 with the strike, and whoever was scored on drinks. The computer drinks at once, one of
 its three at random on the series' dice; the human gets the pick screen once the strike
@@ -678,7 +680,7 @@ shown, once, like the effects.
   run 4, taunt 2 and 7).
 - step: the walk and run sheets' frames 0 and 4, on the ground.
 - 3, 2, 1: each number of the count as it goes up, in play.
-- port_in: the bolts that strike the bodies in at a round's start.
+- port_in: the port-in at a round's start.
 - basket: a point, with the strike on the rim.
 - lightning1, 2, 3, one at random: with every lightning spark, Zeus Juice's hits.
 - menu_cursor: a cursor moving, a colour circle. menu_select: a choice or a stage picked,

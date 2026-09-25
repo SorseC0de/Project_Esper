@@ -119,7 +119,8 @@ public enum Vehicle: Int, CaseIterable, Equatable {
 public struct Car: Equatable {
     public var id: Int
     public var vehicle: Vehicle
-    /// Which slot along the road it stands in, and on which level: 0 the road, 1 the deck.
+    /// Which slot along the road it stands in, and in which lane: 0 the near lane, which
+    /// plays, 1 the far one above the lane line, which is only scenery.
     public var slot: Int
     public var level = 0
     /// The whole of it, and the one-tile boxes that follow its outline, which are what's
@@ -152,10 +153,9 @@ public struct Helicopter: Equatable {
 public enum HighwayRules {
     /// Each level is cut into this many slots, each wide enough for the longest vehicle.
     public static let slots = 4
-    /// The upper deck: an invisible one-way floor this many tiles up, a second row of
-    /// traffic on it facing the other way from the road's.
-    public static let deckRow = 4
-    public static var deckTop: Double { Double(deckRow + 1) * Stage.tileSize }
+    /// The far lane's cars stand this far up from the floor, over the lane line, the other
+    /// way round from the near lane's; drawn behind, not solid, never hit.
+    public static let farLaneLift = 12.5
     public static let hitsToWreck = 3
     public static let hitGuardFrames = 20
     /// The helicopter flies at this height, the rim hanging this far under it, at this speed.
@@ -178,12 +178,12 @@ extension Match {
         return Stage.tileSize + inner * (Double(slot) + 0.5) / Double(HighwayRules.slots)
     }
 
-    /// The road's row faces right and the deck's left.
+    /// The near lane faces right and the far one left.
     private mutating func makeCar(in slot: Int, level: Int) -> Car {
         let vehicle = Vehicle.allCases[fieldDice.roll(Vehicle.allCases.count)]
         let size = vehicle.size
         let centre = slotCentre(slot)
-        let floor = level == 0 ? Stage.tileSize : HighwayRules.deckTop
+        let floor = level == 0 ? Stage.tileSize : Stage.tileSize + HighwayRules.farLaneLift
         let box = Box(min: Vec2(x: centre - size.x / 2, y: floor), max: Vec2(x: centre + size.x / 2, y: floor + size.y))
         return Car(id: stampId(), vehicle: vehicle, slot: slot, level: level, box: box, facesLeft: level == 1)
     }
@@ -206,7 +206,7 @@ extension Match {
 
     /// The first car a box touches, if any.
     func car(touching box: Box) -> Int? {
-        cars.firstIndex { car in car.box.overlaps(box) && car.boxes.contains { $0.overlaps(box) } }
+        cars.firstIndex { car in car.level == 0 && car.box.overlaps(box) && car.boxes.contains { $0.overlaps(box) } }
     }
 
     /// The traffic and the helicopter a frame on.
@@ -235,6 +235,6 @@ extension Match {
 
     /// The boxes solid to bodies: made slabs, helmets and cars.
     mutating func refreshExtras() {
-        stage.extras = platforms.map(\.box) + helmets.map(\.box) + cars.flatMap(\.boxes)
+        stage.extras = platforms.map(\.box) + helmets.map(\.box) + cars.filter { $0.level == 0 }.flatMap(\.boxes)
     }
 }

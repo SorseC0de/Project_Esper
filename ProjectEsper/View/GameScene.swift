@@ -1904,6 +1904,7 @@ final class GameScene: SKScene {
     private var carDip: [Int: Int] = [:]
     private static let carFlashFrames = 12
     private static let carDipFrames = 14
+    private static let farLaneShade: CGFloat = 0.35
     private var helicopterNode: SKNode?
     private var helicopterId = 0
 
@@ -1920,7 +1921,9 @@ final class GameScene: SKScene {
                 let body = SKSpriteNode(texture: HighwayArt.texture("vehicle_\(art)_body", art: art))
                 body.size = size
                 body.anchorPoint = CGPoint(x: 0.5, y: 0)
-                body.zPosition = 3
+                // The far lane behind everything that plays, and darker for being further off.
+                let far = car.level == 1
+                body.zPosition = far ? -7 : 3
                 ground.addChild(body)
                 var wheels: SKSpriteNode?
                 if let texture = HighwayArt.texture("vehicle_\(art)_wheels", art: art) {
@@ -1928,7 +1931,11 @@ final class GameScene: SKScene {
                     node.size = size
                     node.anchorPoint = CGPoint(x: 0.5, y: 0)
                     // The wheels over the body, so the body's shiver never covers them.
-                    node.zPosition = 3.1
+                    node.zPosition = far ? -6.9 : 3.1
+                    if far {
+                        node.color = .black
+                        node.colorBlendFactor = GameScene.farLaneShade
+                    }
                     ground.addChild(node)
                     wheels = node
                 }
@@ -1957,7 +1964,8 @@ final class GameScene: SKScene {
                 nodes.body.colorBlendFactor = on ? 0.85 : 0
                 carFlash[car.id] = left - 1
             } else {
-                nodes.body.colorBlendFactor = 0
+                nodes.body.color = .black
+                nodes.body.colorBlendFactor = car.level == 1 ? GameScene.farLaneShade : 0
             }
         }
         for (id, nodes) in carNodes where !seen.contains(id) {

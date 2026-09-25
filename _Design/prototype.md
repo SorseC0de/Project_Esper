@@ -468,10 +468,11 @@ flat: a dark blue night, and a road where the field's grass is, the floor an inv
 strip through its middle. Each player starts where the court has them, the ball loose at
 centre.
 
-- The traffic (`Highway.swift`): two levels, the road and an invisible one-way deck 50
-  up, jumped up through and stood on, each in four slots, each wide enough for the longest
-  vehicle, a car standing in each, solid, rideable, the road's row facing right and the
-  deck's left. Which of the 23 vehicles stands where
+- The traffic (`Highway.swift`): two lanes, each in four slots: the near lane on the floor,
+  which plays, and the far one 12.5 up over the lane line, drawn behind and darker, only
+  scenery. Each slot is each wide enough for the longest
+  vehicle, a car standing in each; the near lane's are solid and rideable and face right,
+  the far lane's face left. Which of the 23 vehicles stands where
   comes off the match's dice, so both phones agree with nothing sent. Each has its own
   length in tiles and its height the drawing's own; it's solid tile by tile, a box a tile
   wide to each tile of its outline (`Vehicle.outline`, measured off the art), so a

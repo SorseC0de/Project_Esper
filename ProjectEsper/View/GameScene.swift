@@ -2122,7 +2122,7 @@ final class GameScene: SKScene {
         // The rail's chevrons: shown with the ball in hand, pointing and drifting toward the
         // rim the holder attacks.
         let attacking = match.ball.holder.flatMap { holder in match.stage.hoops.first { $0.owner == holder } }
-        // The down marker: where a loose ball has come to rest, on the top edge of the grass.
+        // The down marker: where a loose ball last came to rest, on the top edge of the grass.
         if match.stage.features.ballCam {
             if downMarker == nil, let image = UIImage(named: "FootballMarker") {
                 let marker = SKSpriteNode(texture: SKTexture(image: image))
@@ -2132,9 +2132,14 @@ final class GameScene: SKScene {
                 ground.addChild(marker)
                 downMarker = marker
             }
+            // It stays at the last spot a loose ball rested, until the next, or the point ends.
             let resting = match.ball.holder == nil && match.ball.isLive && match.ball.resting
-            downMarker?.isHidden = !resting
-            if resting { downMarker?.position = CGPoint(x: SpriteLibrary.point(match.ball.position).x, y: FieldArt.turfTop) }
+            if resting {
+                downMarker?.isHidden = false
+                downMarker?.position = CGPoint(x: SpriteLibrary.point(match.ball.position).x, y: FieldArt.turfTop)
+            } else if match.countdown > 0 {
+                downMarker?.isHidden = true
+            }
         }
         // Loose: the call, drifting one way on the top rail and the other on the bottom.
         let loose = attacking == nil && match.ball.holder == nil

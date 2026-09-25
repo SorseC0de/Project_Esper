@@ -203,8 +203,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   cleared on landing; it neither spends nor needs the double jump, so a swing let go early
   doesn't lock the next one out until landing, and no swing chains straight into another.
   It works with the ball. The wall cling never slides. The throw button without the ball
-  is the web line, from the ground, the air or a wall: held, it aims along the stick with a
-  faint line; let go, it fires, 120 units. It bends to a loose ball or the opponent within
+  is the web line, from the ground, the air or a wall: held, it aims along the stick with
+  twelve dots out to its reach, like the shot's; let go, it fires, 120 units, a miss drawn
+  going out to its tip over four frames and back over four. It bends to a loose ball or the opponent within
   15° of the aim, and the first thing within 8 units of its tip wins. A miss shows for 8
   frames and is live the whole time: the ball or the opponent crossing it in those frames
   is taken as if it had just been fired. A loose ball is reeled in and caught whatever its speed or facing. The opponent
@@ -385,7 +386,8 @@ placeholder for one not written yet.
   spot, only faster, velocity up by the pace and gravity by its square; it's an ordinary
   ball again from its first bounce.
 - Slide Cider: eight frames of slide a drink, so further.
-- Web Water: the swing; level two adds the web line.
+- Web Water: the swing; level two adds the web line. The swing's line is drawn on past its anchor off
+  the top of the screen, the view's alone.
 - Super Smoothie: flight; level two flies faster, with the ball as fast as level one
   without, lasts 180 frames rather than 120, and glides forward. Flight needs no second
   jump.

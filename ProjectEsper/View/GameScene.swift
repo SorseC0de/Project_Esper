@@ -212,6 +212,7 @@ final class GameScene: SKScene {
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
     private var previewDots: [SKSpriteNode] = []
+    private static let webAimDots = 12
     private let scoreLabel = SKLabelNode()
     private let debugLabel = SKLabelNode()
     /// The local side's power and level, lettered top-left under the pickers.
@@ -3352,21 +3353,28 @@ final class GameScene: SKScene {
             let swing = swingWebs[index]
             if let anchor = player.webAnchor {
                 swing.isHidden = false
-                swing.path = line(from: SpriteLibrary.point(anchor), to: chest)
+                // Drawn on past the anchor off the top of the screen, as if hung from the sky.
+                let hung = SpriteLibrary.point(anchor)
+                let top = cameraNode.position.y + size.height * cameraNode.yScale / 2 + 16
+                let rise = hung.y - chest.y
+                let reach = rise > 0 ? max((top - chest.y) / rise, 1) : 1
+                swing.path = line(from: CGPoint(x: chest.x + (hung.x - chest.x) * reach, y: chest.y + rise * reach), to: chest)
             } else {
                 swing.isHidden = true
             }
             let shot = shotWebs[index]
-            if player.webAiming {
-                // A faint line the way the shot would go.
-                shot.isHidden = false
-                shot.alpha = 0.3
-                shot.path = line(from: chest, to: SpriteLibrary.point(player.chest + player.webAimDirection * WebRules.lineRange))
-            } else if let web = player.webLine {
-                shot.alpha = 1
-                let end: CGPoint
+            if let web = player.webLine {
+                var end: CGPoint
                 switch web.target {
-                case .point(let point): end = SpriteLibrary.point(point)
+                case .point(let point):
+                    end = SpriteLibrary.point(point)
+                    // A miss goes out to its tip over the first half of its frames and back over the rest.
+                    if web.frames <= WebRules.missFrames {
+                        let half = CGFloat(WebRules.missFrames) / 2
+                        let out = CGFloat(WebRules.missFrames - web.frames)
+                        let share = out < half ? (out + 1) / half : CGFloat(web.frames) / half
+                        end = CGPoint(x: chest.x + (end.x - chest.x) * share, y: chest.y + (end.y - chest.y) * share)
+                    }
                 case .ball: end = SpriteLibrary.point(match.ball.position)
                 case .opponent: end = SpriteLibrary.point(match.players[1 - index].chest)
                 }
@@ -3455,6 +3463,17 @@ final class GameScene: SKScene {
                 dot.isHidden = false
                 dot.alpha = step == 0 ? 0.9 : 0.35
                 dot.position = SpriteLibrary.point(point)
+                shownDots += 1
+            }
+        }
+        // Web Water's aim, held: dots out along it to the line's reach, like the shot's.
+        for player in match.players where player.webAiming {
+            let spacing = WebRules.lineRange / Double(GameScene.webAimDots)
+            for step in 1...GameScene.webAimDots where shownDots < previewDots.count {
+                let dot = previewDots[shownDots]
+                dot.isHidden = false
+                dot.alpha = step == 1 ? 0.9 : 0.35
+                dot.position = SpriteLibrary.point(player.chest + player.webAimDirection * (spacing * Double(step)))
                 shownDots += 1
             }
         }

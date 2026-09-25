@@ -144,10 +144,10 @@ enum EnergyColour: String, CaseIterable {
         switch self {
         case .orange: Look.orange
         case .teal: Look.teal
-        case .red: 0xFF454D
-        case .lime: 0xA2CF22
-        case .pink: 0xFF3676
-        case .blue: 0x1539FF
+        case .red: 0xFF282B
+        case .lime: 0xA6E51C
+        case .pink: 0xF21188
+        case .blue: 0x1937FF
         }
     }
 

@@ -2026,6 +2026,8 @@ final class GameScene: SKScene {
     }
     private var yardNumbers: [SKNode] = []
     private var railChevrons: [SKSpriteNode] = []
+    /// The down marker, stood on the top of the grass under a loose ball at rest.
+    private var downMarker: SKSpriteNode?
     /// With nobody holding it, the rails call for the ball instead, the lettering running
     /// one way on one rail and the other way on the other.
     private var railCalls: [(node: SKSpriteNode, rail: Int, home: CGFloat)] = []
@@ -2120,6 +2122,20 @@ final class GameScene: SKScene {
         // The rail's chevrons: shown with the ball in hand, pointing and drifting toward the
         // rim the holder attacks.
         let attacking = match.ball.holder.flatMap { holder in match.stage.hoops.first { $0.owner == holder } }
+        // The down marker: where a loose ball has come to rest, on the top edge of the grass.
+        if match.stage.features.ballCam {
+            if downMarker == nil, let image = UIImage(named: "FootballMarker") {
+                let marker = SKSpriteNode(texture: SKTexture(image: image))
+                marker.size = CGSize(width: FieldArt.markerHeight * 121 / 512, height: FieldArt.markerHeight)
+                marker.anchorPoint = CGPoint(x: 0.5, y: 0)
+                marker.zPosition = -12
+                ground.addChild(marker)
+                downMarker = marker
+            }
+            let resting = match.ball.holder == nil && match.ball.isLive && match.ball.resting
+            downMarker?.isHidden = !resting
+            if resting { downMarker?.position = CGPoint(x: SpriteLibrary.point(match.ball.position).x, y: FieldArt.turfTop) }
+        }
         // Loose: the call, drifting one way on the top rail and the other on the bottom.
         let loose = attacking == nil && match.ball.holder == nil
         let callShift = CGFloat(match.frame % Int(GameScene.railCallSpacing * 2)) / 2

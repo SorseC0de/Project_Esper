@@ -24,6 +24,9 @@ enum FieldArt {
     static let turfLean: CGFloat = 0.12
     /// The floor line the feet stand on, in art pixels.
     static let floorLine: CGFloat = 16
+    /// The down marker's height, standing on the top of the grass, in art pixels; its
+    /// width follows the vector's 121 by 512.
+    static let markerHeight: CGFloat = 48
 
     /// Sideways shift per pixel of height at `x`, the yard lines' slope there: positive up
     /// toward the middle. A shadow cast down takes it the other way.

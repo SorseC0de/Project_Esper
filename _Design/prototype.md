@@ -500,7 +500,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   toward the rim the holder attacks, and with it loose runs "⬩ GET THE BALL! ⬩", one
   rail's lettering one way and the other's the other; the floodlights' blooms take the same colour, purple
   when nobody has it, and so do the panels the lamps sit on, trapezoids wider at the top;
-  the yard numbers at one and a half times; the turf's five-yard stripes,
+  the yard numbers at one and a half times; the down marker (`football_marker`, 48 tall) stood on the top
+  edge of the grass under a loose ball while it's at rest; the turf's five-yard stripes,
   leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded base in the
   colour of the side that guards it, as the court's blocks are, the pole's width and five more, behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
 - The ball cam (`StageFeatures.ballCam`, the view's alone): a close view of the ball,

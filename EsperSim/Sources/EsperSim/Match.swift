@@ -314,6 +314,11 @@ public struct Match: Equatable {
             pop(from: other, by: index)
         }
         if let blade = player.slashHitbox {
+            // Clear of the floor the body stands on, the blade in a wall clanks, once a swing.
+            if player.stateTimer == SlashRules.liveFrames.lowerBound {
+                let clear = Box(min: Vec2(x: blade.min.x, y: max(blade.min.y, player.position.y + 1)), max: blade.max)
+                if stage.overlapsSolid(clear) { events.append(.slashClanked(player: index)) }
+            }
             // A car in the blade takes a hit too; its guard keeps one swing to one.
             if let car = car(touching: blade) { hitCar(car, fire: false) }
             if let other, players[other].body.overlaps(blade), players[other].frozen == 0 {

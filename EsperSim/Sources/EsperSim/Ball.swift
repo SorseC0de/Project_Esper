@@ -169,8 +169,9 @@ public struct Ball: Equatable {
         floater = 0
         steers = false
         shotInFlight = false
+        let speed = abs(velocity.x)
         velocity.x = abs(velocity.x) > 0.3 ? -velocity.x * BallRules.bounce : 0
-        events.append(.ballBounced(position: position))
+        events.append(.ballBounced(position: position, speed: speed))
     }
 
     private mutating func bounceY(events: inout [MatchEvent]) {
@@ -179,9 +180,10 @@ public struct Ball: Equatable {
         floater = 0
         steers = false
         shotInFlight = false
+        let speed = abs(velocity.y)
         let rebound = -velocity.y * BallRules.bounce
         velocity.y = abs(rebound) > 0.6 ? rebound : 0
-        events.append(.ballBounced(position: position))
+        events.append(.ballBounced(position: position, speed: speed))
     }
 
     public mutating func release(from position: Vec2, velocity: Vec2, by player: Int, straight: Bool, pace: Double = 1) {

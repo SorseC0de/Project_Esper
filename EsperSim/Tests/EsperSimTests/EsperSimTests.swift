@@ -1605,6 +1605,17 @@ final class FootsiesTests: XCTestCase {
         XCTAssertFalse(match.players[1].hasBall)
     }
 
+    func testTheSlashClanksOnAWallAndNotInTheOpen() {
+        var open = defending()
+        open.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(run(&open, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.slashClanked(player: 0)) }, SlashRules.frames)
+        var walled = defending(otherAt: 60)
+        walled.players[0].position.x = 322
+        walled.players[0].facing = .right
+        walled.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertLessThan(run(&walled, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.slashClanked(player: 0)) }, SlashRules.frames)
+    }
+
     func testSlashSwatsALooseBallAway() {
         var match = defending()
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
@@ -1998,7 +2009,7 @@ final class GreateraidTests: XCTestCase {
                 match.advance(inputs: [.idle, .idle])
                 frames += 1
                 if let bounce = match.events.compactMap({ event -> Vec2? in
-                    if case .ballBounced(let position) = event { return position } else { return nil }
+                    if case .ballBounced(let position, _) = event { return position } else { return nil }
                 }).first {
                     landing = bounce
                     break

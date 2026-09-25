@@ -13,6 +13,7 @@ class Screen: SKNode {
         /// pointing down, as the drawing does.
         let arrowAt: CGPoint
         let arrowTurn: CGFloat
+        let sound: SoundBoard.Effect
         let action: () -> Void
     }
 
@@ -45,7 +46,8 @@ class Screen: SKNode {
 
     /// A lettered button. Disabled ones are dimmed and never fire.
     @discardableResult
-    func addButton(_ text: String, size: CGFloat = 26, at point: CGPoint, enabled: Bool = true, action: @escaping () -> Void) -> SKNode {
+    func addButton(_ text: String, size: CGFloat = 26, at point: CGPoint, enabled: Bool = true, sound: SoundBoard.Effect = .menuSelect,
+                   action: @escaping () -> Void) -> SKNode {
         let label = TitleText.node(text, size: size)
         label.position = point
         label.alpha = enabled ? 1 : 0.35
@@ -54,7 +56,7 @@ class Screen: SKNode {
                          width: label.size.width + 24, height: label.size.height + 16)
         // The arrow sits to the left of a lettered button, turned to point at it.
         let arrowAt = CGPoint(x: hit.minX - 16, y: point.y)
-        choices.append(Choice(node: label, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: .pi / 2, action: action))
+        choices.append(Choice(node: label, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: .pi / 2, sound: sound, action: action))
         if choices.count == 1 { cursor = 0 }
         showCursor()
         return label
@@ -62,7 +64,7 @@ class Screen: SKNode {
 
     /// `arrowAt` is where the arrow sits for this choice, turned `arrowTurn` from pointing down.
     func addChoice(_ node: SKNode, hit: CGRect, enabled: Bool = true, arrowAt: CGPoint, arrowTurn: CGFloat, action: @escaping () -> Void) {
-        choices.append(Choice(node: node, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: arrowTurn, action: action))
+        choices.append(Choice(node: node, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: arrowTurn, sound: .menuSelect, action: action))
         showCursor()
     }
 
@@ -91,6 +93,7 @@ class Screen: SKNode {
         } else {
             cursor = index
             showCursor()
+            SoundBoard.shared.play(.menuCursor)
             moved()
         }
         return true
@@ -110,11 +113,13 @@ class Screen: SKNode {
         guard !choices.isEmpty else { return }
         cursor = (cursor + delta + choices.count) % choices.count
         showCursor()
+        SoundBoard.shared.play(.menuCursor)
         moved()
     }
 
     func fire() {
         guard choices.indices.contains(cursor), choices[cursor].enabled else { return }
+        SoundBoard.shared.play(choices[cursor].sound)
         choices[cursor].action()
     }
 
@@ -256,7 +261,7 @@ final class WinScreen: Screen {
         title.position = CGPoint(x: 0, y: halfHeight * 0.35)
         addChild(title)
         addButton(again, at: CGPoint(x: 0, y: -halfHeight * 0.1), action: onAgain)
-        addButton("TITLE", at: CGPoint(x: 0, y: -halfHeight * 0.4), action: onTitle)
+        addButton("TITLE", at: CGPoint(x: 0, y: -halfHeight * 0.4), sound: .menuBack, action: onTitle)
         waiting.position = CGPoint(x: 0, y: -halfHeight * 0.25)
         waiting.isHidden = true
         addChild(waiting)
@@ -335,12 +340,14 @@ final class StageSelectScreen: Screen {
     func move(voter: Int, by delta: Int) {
         guard picks[voter] == nil, flipLit == nil, let at = cursors[voter] else { return }
         cursors[voter] = (at + delta + tiles.count) % tiles.count
+        SoundBoard.shared.play(.menuCursor)
         refresh()
     }
 
     func lock(voter: Int) {
         guard picks[voter] == nil, flipLit == nil, let at = cursors[voter] else { return }
         picks[voter] = at
+        SoundBoard.shared.play(.menuSelect)
         refresh()
         onPick(voter, at)
     }
@@ -375,6 +382,7 @@ final class StageSelectScreen: Screen {
             lock(voter: voter)
         } else if picks[voter] == nil {
             cursors[voter] = index
+            SoundBoard.shared.play(.menuCursor)
             refresh()
         }
         return true
@@ -414,8 +422,8 @@ final class PauseScreen: Screen {
         title.position = CGPoint(x: 0, y: halfHeight * 0.45)
         addChild(title)
         addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.05), action: onRestart)
-        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.25), action: onTitle)
-        addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.55), action: onResume)
+        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.25), sound: .menuBack, action: onTitle)
+        addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.55), sound: .menuBack, action: onResume)
         // On RESUME, so a press of jump straight after pausing plays on.
         place(cursor: 2)
     }

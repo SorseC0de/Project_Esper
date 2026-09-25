@@ -1027,6 +1027,7 @@ final class GameScene: SKScene {
                 menuLast = inputs.first ?? .idle
                 enter(.paused)
             } else if flow == .paused {
+                SoundBoard.shared.play(.menuBack)
                 enter(.playing)
             }
         }
@@ -1042,6 +1043,7 @@ final class GameScene: SKScene {
                 if pad.stick.y >= 0.5, menuLast.stick.y < 0.5 { screen.move(-1) }
                 if pad.jump, !menuLast.jump { screen.fire() }
             } else if flow == .title, pad.jump, !menuLast.jump, online == nil {
+                SoundBoard.shared.play(.menuSelect)
                 startSeries()
             }
             menuLast = pad
@@ -1692,6 +1694,39 @@ final class GameScene: SKScene {
         for frameEvents in frames { show(frameEvents.events) }
     }
 
+    // MARK: Sound
+
+    /// The sounds for a frame's events, shown once like the effects.
+    private func playSounds(_ events: [MatchEvent]) {
+        let sounds = SoundBoard.shared
+        for event in events {
+            switch event {
+            case .jumped, .doubleJumped, .wallJumped: sounds.play(.jump)
+            case .shot, .thrown: sounds.play(.playerShoot)
+            case .slashed: sounds.play(.esperSlash)
+            case .slashClanked: sounds.play(.slashWallClank)
+            case .snatchReached: sounds.play(.playerSnatch)
+            case .struck, .popped, .parried: sounds.play(.playerHit)
+            // Quiet for a soft bounce, silent once it's only settling.
+            case .ballBounced(_, let speed) where speed > GameScene.bounceSoundFloor:
+                sounds.play(.ballBounce, volume: Float(min(speed / GameScene.bounceSoundFull, 1)))
+            default: break
+            }
+        }
+    }
+    private static let bounceSoundFloor = 0.6
+    private static let bounceSoundFull = 4.0
+
+    /// A footfall on the walk and run sheets' frames 0 and 4, on the ground.
+    private var lastStepFrames: [AnimationFrame?] = [nil, nil]
+    private func playStep(_ index: Int, frame: AnimationFrame, grounded: Bool) {
+        guard lastStepFrames.indices.contains(index), lastStepFrames[index] != frame else { return }
+        lastStepFrames[index] = frame
+        let walking: Set<Animation> = [.walk, .dribbleWalk, .run, .dribbleRun, .gunRun, .gunRunShoot]
+        guard grounded, walking.contains(frame.animation), frame.frame % 4 == 0 else { return }
+        SoundBoard.shared.play(.step, volume: 0.5)
+    }
+
     /// The events of frames both sides' inputs have confirmed: the point.
     private func confirm(_ frames: [FrameEvents]) {
         for frameEvents in frames {
@@ -1705,6 +1740,7 @@ final class GameScene: SKScene {
     }
 
     private func show(_ events: [MatchEvent]) {
+        playSounds(events)
         for event in events {
             switch event {
             case .jumped(let index):
@@ -3075,6 +3111,7 @@ final class GameScene: SKScene {
         for (index, player) in match.players.enumerated() {
             let node = playerNodes[index]
             let frame = player.animationFrame
+            playStep(index, frame: frame, grounded: player.grounded)
             // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
             node.texture = sprites.texture(frame, player: index, ballAsEnergy: wholeSheet)

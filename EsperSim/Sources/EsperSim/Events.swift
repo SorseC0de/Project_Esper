@@ -15,7 +15,8 @@ public enum MatchEvent: Equatable {
     case swatted(player: Int, hit: Bool)
     /// `entry` is the ball's velocity as it went through.
     case scored(player: Int, hoop: Int, entry: Vec2)
-    case ballBounced(position: Vec2)
+    /// `speed`: how fast it met the surface, across it.
+    case ballBounced(position: Vec2, speed: Double)
     case ballRespawned
     case helmetSpawned(at: Vec2, owner: Int)
     /// Gone at the far wall.
@@ -40,6 +41,8 @@ public enum MatchEvent: Equatable {
     case platformMade(player: Int)
     case slid(player: Int)
     case slashed(player: Int)
+    /// The blade met a wall on its first live frame.
+    case slashClanked(player: Int)
     /// The snatch's hand is at full stretch.
     case snatchReached(player: Int)
     /// The ball knocked out of `player`'s hands by `by`.

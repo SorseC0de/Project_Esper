@@ -653,6 +653,25 @@ silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `fl
 ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.
 
+## Sound
+
+The user's effects in `_Sound FX`, brought into `ProjectEsper/Sounds` as 16-bit PCM by
+`Tools/import_sounds.py` (run it after adding or changing one; the originals are only
+read). `SoundBoard` reads each into memory once and plays it on a ring of twelve voices
+through one engine, ambient, so the silent switch mutes it. Sounds come off the events
+shown, once, like the effects.
+
+- jump: the jump, the double jump, the wall jump.
+- player_shoot: the shot and the throw.
+- esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
+  clear of the floor the body stands on (`slashClanked`).
+- player_snatch: the snatch at full stretch.
+- player_hit: struck, popped, parried.
+- ball_bounce: every bounce faster than 0.6 across the surface, at full volume from 4.
+- step: the walk and run sheets' frames 0 and 4, on the ground, at half volume.
+- menu_cursor: a cursor moving, a colour circle. menu_select: a choice or a stage picked,
+  BEST OF 7, MULTIPLAYER. menu_back: RESUME, start to unpause, TITLE and TITLE SCREEN.
+
 ## Glow
 
 `GlowSettings` in `Tuning.swift`: luminance threshold 0.2 for the world and 0.8 for the

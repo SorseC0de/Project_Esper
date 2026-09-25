@@ -1554,7 +1554,7 @@ final class GameScene: SKScene {
             case .landed(let index):
                 // Landing on a car dips it on its springs.
                 let feet = match.players[index].position
-                if let car = match.cars.first(where: { abs($0.box.max.y - feet.y) < 0.5 && feet.x >= $0.box.min.x && feet.x <= $0.box.max.x }) {
+                if let car = match.cars.first(where: { car in car.boxes.contains { abs($0.max.y - feet.y) < 0.5 && feet.x >= $0.min.x - 5 && feet.x <= $0.max.x + 5 } }) {
                     carDip[car.id] = GameScene.carDipFrames
                 }
             case .fireballMade(let index):
@@ -1927,12 +1927,13 @@ final class GameScene: SKScene {
                     let node = SKSpriteNode(texture: texture)
                     node.size = size
                     node.anchorPoint = CGPoint(x: 0.5, y: 0)
-                    node.zPosition = 2.9
+                    // The wheels over the body, so the body's shiver never covers them.
+                    node.zPosition = 3.1
                     ground.addChild(node)
                     wheels = node
                 }
-                // Facing the other way, half the time, by its id.
-                if car.id % 2 == 1 {
+                // The drawings face right; the sim says which way this one faces.
+                if car.facesLeft {
                     body.xScale = -1
                     wheels?.xScale = -1
                 }
@@ -1987,14 +1988,15 @@ final class GameScene: SKScene {
     private func makeHelicopter(for flying: Helicopter) -> SKNode {
         let node = SKNode()
         node.zPosition = 6
-        node.xScale = flying.speed > 0 ? -1 : 1
+        node.xScale = flying.speed > 0 ? 1 : -1
         let hoop = match.stage.hoops[flying.hoop]
         let look = sprites.look(for: 1 - hoop.owner)
         let width: CGFloat = 96
         let rows = HighwayArt.artRows["helicopter"]!
         let height = width * (rows.bottom - rows.top)
-        let tones: [SKColor?] = [nil, SKColor(rgb: look.energyTone(luminance: 0.75)),
-                                 SKColor(rgb: look.energyTone(luminance: 0.55)), SKColor(rgb: look.energyTone(luminance: 0.4))]
+        // Dark tones of the energy, so the glow doesn't wash them out.
+        let tones: [SKColor?] = [nil, SKColor(rgb: look.energyTone(luminance: 0.42)),
+                                 SKColor(rgb: look.energyTone(luminance: 0.3)), SKColor(rgb: look.energyTone(luminance: 0.2))]
         // A point on the drawing's 800 square, in the node's own space.
         func place(_ share: CGPoint) -> CGPoint {
             CGPoint(x: (share.x - 0.5) * width, y: (1 - (share.y - rows.top) / (rows.bottom - rows.top) - 0.5) * height)

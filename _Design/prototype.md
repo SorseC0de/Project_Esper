@@ -471,7 +471,9 @@ centre.
 - The traffic (`Highway.swift`): the road in four slots, each wide enough for the longest
   vehicle, a car standing in each, solid, rideable. Which of the 23 vehicles stands where
   comes off the match's dice, so both phones agree with nothing sent. Each has its own
-  length in tiles, and its height is the drawing's own. Anything that would stun a player
+  length in tiles and its height the drawing's own; it's solid tile by tile, a box a tile
+  wide to each tile of its outline (`Vehicle.outline`, measured off the art), so a
+  sedan's hood and roof are each their own height. Anything that would stun a player
   hits one: the slash, a bolt, a strike, a fireball's burst, a thrown ball, a flame; one
   swing counts once. Three hits wreck it, the fuel truck one of fire, in a fire burst, and
   a new one off the dice takes its slot.
@@ -479,12 +481,12 @@ centre.
   (a wheel is a tyre's circle through its hub's bolts), and the helicopter into its hull,
   top rotor and tail rotor, each plain and its three reds, as imagesets in the catalog's
   Traffic folder. The racer and both motorcycles have no wheels to split and idle whole.
-  A body shivers a pixel over wheels that stay put, each on its own beat, dips three
+  A body shivers a pixel under wheels drawn over it that stay put, each on its own beat, dips three
   pixels on its springs when someone lands on it, and flashes black when hit.
 - The rim: one at a time, carried under a helicopter flying from one wall to the other at
-  1 a frame, 120 up, the rim 32 under it; the next carries the other side's rim, and the
+  1 a frame, 140 up, the rim 32 under it; the next carries the other side's rim, and the
   one not out waits far over the sky. The helicopter's reds are the rim's guarding side's
-  energy; its tail rotor spins and its top rotor flips end over end every other frame.
+  energy in dark tones, so the glow leaves them their colour; its tail rotor spins and its top rotor flips end over end every other frame.
 
 ## Football Field
 

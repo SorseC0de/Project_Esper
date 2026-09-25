@@ -258,7 +258,8 @@ final class HighwayTests: XCTestCase {
         XCTAssertEqual(a.cars.map(\.vehicle), b.cars.map(\.vehicle), "the same seed, the same traffic")
         for car in a.cars {
             XCTAssertEqual(car.box.min.y, Stage.tileSize, accuracy: 0.001, "on the road")
-            XCTAssertTrue(a.stage.extras.contains(car.box), "solid")
+            for box in car.boxes { XCTAssertTrue(a.stage.extras.contains(box), "solid, tile by tile") }
+            XCTAssertEqual(car.boxes.count, Int(car.vehicle.lengthTiles))
         }
         var kinds = Set<Vehicle>()
         for seed in 1...40 { kinds.formUnion(road(seed: UInt32(seed)).cars.map(\.vehicle)) }
@@ -280,7 +281,7 @@ final class HighwayTests: XCTestCase {
     func testTheFuelTruckGoesUpOnOneHitOfFire() {
         var match = road()
         let box = match.cars[1].box
-        match.cars[1] = Car(id: 77, vehicle: .fuelTruck, slot: 1, box: box)
+        match.cars[1] = Car(id: 77, vehicle: .fuelTruck, slot: 1, box: box, facesLeft: false)
         match.hitCar(1, fire: false)
         XCTAssertEqual(match.cars[1].id, 77, "a plain hit only counts")
         match.cars[1].guardFrames = 0

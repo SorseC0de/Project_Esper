@@ -31,7 +31,8 @@ enum HighwayArt {
         rect(-400, FieldArt.turfBottom, width + 800, 3, kerb, z: -9)
         var dash: CGFloat = 0
         while dash < width {
-            rect(dash, FieldArt.turfBottom + 10, 20, 2, paint, z: -8)
+            // Through the road's middle, which is the floor line.
+            rect(dash, (FieldArt.turfBottom + FieldArt.turfTop) / 2 - 1, 20, 2, paint, z: -8)
             dash += 40
         }
     }

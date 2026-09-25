@@ -83,6 +83,37 @@ public enum Vehicle: Int, CaseIterable, Equatable {
 
     /// One hit of fire wrecks it.
     public var burnsAtOnce: Bool { self == .fuelTruck }
+
+    /// Its outline, tile by tile from the drawing's left: each tile's height as a share of
+    /// the whole, measured off the art at the top that four in five of its pixel columns
+    /// reach, so an aerial or a stack doesn't count. One solid box a tile.
+    public var outline: [Double] {
+        switch self {
+        case .ambulance: [0.84, 0.93, 0.98, 0.93, 0.81, 0.49]
+        case .bus: [0.90, 1.00, 1.00, 0.97, 0.97, 0.97, 0.97, 0.88]
+        case .cab: [0.49, 0.80, 0.84, 0.58, 0.49]
+        case .car: [0.70, 1.00, 1.00, 0.68, 0.50]
+        case .batmobile: [0.42, 0.81, 0.92, 0.59, 0.44]
+        case .droptop: [0.54, 0.76, 0.76, 0.71, 0.54]
+        case .police: [0.48, 0.89, 0.89, 0.59, 0.43]
+        case .racer: [0.53, 0.78, 0.79, 0.73, 0.55]
+        case .supercar: [0.79, 0.97, 0.91, 0.73, 0.45]
+        case .fuelTruck: [0.84, 0.93, 1.00, 0.98, 0.93, 0.82, 0.99, 0.63]
+        case .hearse: [0.90, 1.00, 1.00, 1.00, 0.87, 0.52]
+        case .limousine: [0.59, 0.71, 1.00, 1.00, 0.99, 0.71, 0.62]
+        case .moped: [0.74, 0.61, 0.58]
+        case .motorcycle: [0.52, 0.71, 0.49]
+        case .motorcycle2: [0.54, 0.69, 0.50]
+        case .truck: [0.21, 0.34, 0.25, 0.63, 0.83, 0.73, 0.60]
+        case .truck2: [1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 0.95, 0.86]
+        case .fireTruck: [0.79, 0.82, 0.86, 0.89, 0.91, 0.95, 0.97, 0.65]
+        case .foodTruck: [0.52, 0.84, 0.84, 0.52, 0.52, 0.29]
+        case .van: [0.98, 1.00, 1.00, 1.00, 0.57]
+        case .van2: [0.85, 0.97, 0.97, 0.84, 0.48]
+        case .van3: [0.88, 0.91, 1.00, 0.76, 0.42]
+        case .vespa: [0.52, 0.19, 0.33]
+        }
+    }
 }
 
 public struct Car: Equatable {
@@ -90,7 +121,18 @@ public struct Car: Equatable {
     public var vehicle: Vehicle
     /// Which slot along the road it stands in.
     public var slot: Int
+    /// The whole of it, and the one-tile boxes that follow its outline, which are what's
+    /// solid and what takes hits. Facing left, the drawing and the outline are mirrored.
     public var box: Box
+    public var facesLeft: Bool
+    public var boxes: [Box] {
+        let tile = Stage.tileSize
+        let heights = facesLeft ? Array(vehicle.outline.reversed()) : vehicle.outline
+        return heights.enumerated().map { column, share in
+            let left = box.min.x + Double(column) * tile
+            return Box(min: Vec2(x: left, y: box.min.y), max: Vec2(x: left + tile, y: box.min.y + max(share, 0.1) * box.height))
+        }
+    }
     public var hits = 0
     /// Frames before the same car can take another hit, so one swing counts once.
     public var guardFrames = 0
@@ -112,7 +154,7 @@ public enum HighwayRules {
     public static let hitsToWreck = 3
     public static let hitGuardFrames = 20
     /// The helicopter flies at this height, the rim hanging this far under it, at this speed.
-    public static let helicopterHeight = 120.0
+    public static let helicopterHeight = 140.0
     public static let rimBelowHelicopter = 32.0
     public static let helicopterSpeed = 1.0
     /// Where the rim waits while its helicopter isn't out: far over the sky, out of play.
@@ -136,7 +178,7 @@ extension Match {
         let size = vehicle.size
         let centre = slotCentre(slot)
         let box = Box(min: Vec2(x: centre - size.x / 2, y: Stage.tileSize), max: Vec2(x: centre + size.x / 2, y: Stage.tileSize + size.y))
-        return Car(id: stampId(), vehicle: vehicle, slot: slot, box: box)
+        return Car(id: stampId(), vehicle: vehicle, slot: slot, box: box, facesLeft: slot % 2 == 1)
     }
 
     /// A hit on a car, from anything that would stun a player; `fire` for fire's own.
@@ -157,7 +199,7 @@ extension Match {
 
     /// The first car a box touches, if any.
     func car(touching box: Box) -> Int? {
-        cars.firstIndex { $0.box.overlaps(box) }
+        cars.firstIndex { car in car.box.overlaps(box) && car.boxes.contains { $0.overlaps(box) } }
     }
 
     /// The traffic and the helicopter a frame on.
@@ -186,6 +228,6 @@ extension Match {
 
     /// The boxes solid to bodies: made slabs, helmets and cars.
     mutating func refreshExtras() {
-        stage.extras = platforms.map(\.box) + helmets.map(\.box) + cars.map(\.box)
+        stage.extras = platforms.map(\.box) + helmets.map(\.box) + cars.flatMap(\.boxes)
     }
 }

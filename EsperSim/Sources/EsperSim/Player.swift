@@ -13,6 +13,7 @@ public enum Power: Equatable, Hashable {
     case frostTea
     case blazingBoba
     case pulsepistol
+    case surfSoda
 
     /// Powers whose shoot button, without the ball, is something other than the slash.
     public var takesShoot: Bool {
@@ -195,6 +196,35 @@ public struct Player: Equatable {
     /// Frames left of the running shot's pose, and whether the standing shot pulls.
     public var gunRunTimer = 0
     public var gunPull = false
+    /// Surf Soda: frames into the crescent, the way it runs, whether the board is out in the
+    /// air, and the body's turn about its middle.
+    public var surfPath = 0
+    public var surfDirection = 1.0
+    public var surfing = false
+    public var surfAngle = 0.0
+
+    /// Whether Surf Soda's board is under the feet: running, or up on a surf jump.
+    public var boardOut: Bool {
+        power == .surfSoda && (surfing || (grounded && (state == .run || state == .dash)))
+    }
+
+    /// The board: its middle and its turn, under the feet as the body turns about its middle.
+    public var board: (centre: Vec2, angle: Double) {
+        let middle = Vec2(x: position.x, y: position.y + spec.bodyHeight / 2)
+        let down = spec.bodyHeight / 2 + SurfRules.boardThickness / 2
+        return (middle + Vec2(x: Trig.sin(surfAngle) * down, y: -Trig.cos(surfAngle) * down), surfAngle)
+    }
+
+    /// Whether a round thing of this radius at `point` touches the board.
+    public func boardBlocks(_ point: Vec2, radius: Double) -> Bool {
+        guard boardOut else { return false }
+        let (centre, angle) = board
+        let offset = point - centre
+        let along = offset.x * Trig.cos(angle) + offset.y * Trig.sin(angle)
+        let across = -offset.x * Trig.sin(angle) + offset.y * Trig.cos(angle)
+        return abs(along) <= SurfRules.boardLength / 2 + radius && abs(across) <= SurfRules.boardThickness / 2 + radius
+    }
+
     /// Frames left of the throw's pose after a bolt; its way is set on the release.
     public var boltPose = 0
     /// Frames left of the throw's hold frame after a fireball summon; only for show.
@@ -262,6 +292,14 @@ public struct Player: Equatable {
         previousState = state
         state = next
         stateTimer = 0
+        // The crescent is only the air's; anything else ends it and sets the body upright.
+        if next != .air, next != .land {
+            surfPath = 0
+            if surfing, next.isGroundState || [.wallLand, .ledgeHang, .webbed, .webPull].contains(next) {
+                surfing = false
+                surfAngle = 0
+            }
+        }
     }
 
     /// The run cycle's advance this frame: 24 frames a second at full run speed, scaling
@@ -471,7 +509,13 @@ public struct Player: Equatable {
             jumpBuffer = 0
             if !holding, shootPressed, slashAllowed { pendingAerial = .slash }
             if !holding, throwPressed, throwIsSnatch { pendingAerial = .snatch }
-            if stateTimer >= spec.jumpSquatFrames {
+            if stateTimer >= spec.jumpSquatFrames, power == .surfSoda {
+                // Surf Soda: off on the crescent, the board under the feet.
+                jumpsLeft -= 1
+                startSurfJump(events: &events)
+                grounded = false
+                enter(.air)
+            } else if stateTimer >= spec.jumpSquatFrames {
                 velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
                 let cap = max(abs(velocity.x), airSpeedMax)
                 velocity.x = min(max(velocity.x + input.stick.x * spec.jumpHorizontalVelocity, -cap), cap)
@@ -489,6 +533,42 @@ public struct Player: Equatable {
                     case .snatch: startSnatch()
                     }
                 }
+            }
+
+        case .air where surfPath > 0 || surfing:
+            // Surf Soda: the crescent, fixed; past its top the stick spins the body instead
+            // of drifting it, and it eases upright near the ground.
+            if surfPath > 0 {
+                surfPath += 1
+                let step = Double.pi / 2 / Double(SurfRules.pathFrames)
+                let angle = Double(surfPath) * step
+                velocity = Vec2(x: surfDirection * SurfRules.reach * Trig.sin(angle) * step, y: SurfRules.rise * Trig.cos(angle) * step)
+                if surfPath >= SurfRules.pathFrames { surfPath = 0 }
+            } else {
+                fall(.idle)
+                surfAngle -= input.stick.x * SurfRules.spinRate
+            }
+            let drop = stage.drop(fromX: position.x, y: position.y)
+            if surfPath == 0, drop < SurfRules.uprightHeight {
+                // The nearest upright, not always back the way it came.
+                let turns = (surfAngle / (2 * Double.pi)).rounded()
+                surfAngle += (turns * 2 * Double.pi - surfAngle) * SurfRules.uprightShare
+            }
+            if jumpPressed, jumpsLeft > 0 {
+                jumpsLeft -= 1
+                startSurfJump(events: &events)
+                events.append(.doubleJumped(player: index))
+            } else if holding, input.shoot, shootReady {
+                enterShootStance()
+            } else if holding, input.throwBall, throwReady {
+                throwDirection = .zero
+                quickThrow = false
+                throwStanceEntrySpeed = velocity.x
+                enter(.throwStance)
+            } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
+                startSnatch()
+            } else if !holding, shootPressed, slashAllowed {
+                startSlash(events: &events)
             }
 
         case .air:
@@ -1347,6 +1427,19 @@ public struct Player: Equatable {
         return stage.wall(beside: wide)
     }
 
+    /// Surf Soda's jump: the crescent from here, forward the way the body faces.
+    private mutating func startSurfJump(events: inout [MatchEvent]) {
+        jumpBuffer = 0
+        surfPath = 1
+        surfing = true
+        surfDirection = facing.sign
+        fastFalling = false
+        platformArmed = true
+        let step = Double.pi / 2 / Double(SurfRules.pathFrames)
+        velocity = Vec2(x: 0, y: SurfRules.rise * step)
+        events.append(.jumped(player: index))
+    }
+
     private mutating func doubleJump(_ input: PlayerInput, events: inout [MatchEvent]) {
         jumpBuffer = 0
         platformArmed = true
@@ -1471,6 +1564,13 @@ public struct Player: Equatable {
             swingCooldown = 0
             switch state {
             case .air, .wallLand, .rolling:
+                if surfing {
+                    // Down off the board, upright, in a burst of bubbles.
+                    surfing = false
+                    surfPath = 0
+                    surfAngle = 0
+                    events.append(.surfLanded(player: index))
+                }
                 events.append(.landed(player: index))
                 enter(.land)
             case .webSwing:

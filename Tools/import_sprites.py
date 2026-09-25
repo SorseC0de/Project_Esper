@@ -45,7 +45,7 @@ ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.
                    "lightning_particle": 0.5, "lightning_particle2": 0.5, "ice_jumpspark": 0.0,
                    "lightning_spark": 0.5, "lightning_spark2": 0.5, "fire_explosion": 0.5,
                    "fire_spark": 0.5, "fire_spark2": 0.5, "fire_spark3": 0.5,
-                   "gemini_rift_v1": 0.5, "gemini_rift_v2": 0.5}
+                   "gemini_rift_v1": 0.5, "gemini_rift_v2": 0.5, "bubble_particle": 0.5, "bubbles": 0.0}
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk",

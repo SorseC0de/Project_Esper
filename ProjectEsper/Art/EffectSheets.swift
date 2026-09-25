@@ -6,11 +6,15 @@ import CoreGraphics
 /// Tools/import_sprites.py; don't edit.
 enum EffectSheets {
     static let frames: [String: Int] = [
+        "bubble_particle": 12,
+        "bubbles": 40,
+        "charge": 12,
         "esper_charge": 82,
         "esper_particle": 22,
         "esper_spark": 10,
         "esper_spark2": 22,
         "esper_spark3": 7,
+        "explosion": 30,
         "fire_charge": 12,
         "fire_charge2": 14,
         "fire_dash": 13,
@@ -43,11 +47,15 @@ enum EffectSheets {
     ]
 
     static let anchorY: [String: CGFloat] = [
+        "bubble_particle": 0.5000,
+        "bubbles": 0.0000,
+        "charge": 0.5000,
         "esper_charge": 0.5000,
         "esper_particle": 0.5000,
         "esper_spark": 0.5000,
         "esper_spark2": 0.5000,
         "esper_spark3": 0.0625,
+        "explosion": 0.5000,
         "fire_charge": 0.5000,
         "fire_charge2": 0.5000,
         "fire_dash": 0.0000,
@@ -80,6 +88,9 @@ enum EffectSheets {
     ]
 
     static let toned: Set<String> = [
+        "bubble_particle",
+        "bubbles",
+        "charge",
         "esper_charge",
         "esper_particle",
         "esper_spark",

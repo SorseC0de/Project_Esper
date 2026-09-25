@@ -28,6 +28,9 @@ public enum MatchEvent: Equatable {
     case carWrecked(id: Int, at: Vec2)
     case carArrived(id: Int)
     case helicopterArrived(hoop: Int)
+    case surfLanded(player: Int)
+    /// Something the other threw or fired stopped on Surf Soda's board.
+    case boardBlocked(player: Int, at: Vec2)
     case webSwung(player: Int)
     case webLine(player: Int, hit: Bool)
     case flew(player: Int)

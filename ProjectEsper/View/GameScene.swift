@@ -93,7 +93,8 @@ final class GameScene: SKScene {
     /// under a screen.
     weak var flowState: FlowState?
     private var headVariant = HeadVariant.b
-    private var powerVariant = PowerVariant.none
+    /// Surf Soda for now, while its movement is being found.
+    private var powerVariant = PowerVariant.surfSoda
     private var powerLevelVariant = PowerLevelVariant.two
     private let sprites = SpriteLibrary()
     private let hub = InputHub()
@@ -1553,6 +1554,10 @@ final class GameScene: SKScene {
                 for end in [from, to] {
                     glowers.addChild(EnergyEffect.flashSpark2.node(sprites, player: match.ball.lastTouched ?? 0, at: SpriteLibrary.point(end), scale: 0.5))
                 }
+            case .surfLanded(let index):
+                spawnBubbles(at: SpriteLibrary.point(match.players[index].position), count: 10, spread: 14)
+            case .boardBlocked(_, let at):
+                spawnBubbles(at: SpriteLibrary.point(at), count: 6, spread: 8)
             case .carHit(let id):
                 carFlash[id] = GameScene.carFlashFrames
             case .carWrecked(_, let at):
@@ -1790,6 +1795,8 @@ final class GameScene: SKScene {
             // Snowflakes among the energy.
             streams = [HeadStream(frames: energy.frames, size: energy.size, tint: colour, rate: 12),
                        HeadStream(frames: [SKTexture(imageNamed: "Snowflake")], size: ParticleLook.snowflakeSize, tint: GameScene.ice, rate: 12)]
+        case .surfSoda where EffectSheets.frames["bubble_particle"] != nil:
+            streams = [HeadStream(frames: sheetFrames("bubble_particle"), size: ParticleLook.bubbleSize, tint: ParticleLook.soda, rate: 24)]
         case .zeusJuice where EffectSheets.frames["lightning_particle"] != nil:
             // The two bolts, half each, toned in the energy colour.
             streams = [HeadStream(frames: sheetFrames("lightning_particle", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 12)]
@@ -1902,6 +1909,82 @@ final class GameScene: SKScene {
     private static let cameraLeadFrames: CGFloat = 20
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
+
+    // MARK: Surf Soda
+
+    private var boards: [Int: SKSpriteNode] = [:]
+    private var surfTrailFrames: [Int: Int] = [:]
+
+    /// The board under a Surf Soda body and the ride on it: riding the ground, the body and
+    /// board float a little and bob two pixels, leaving a trail of bubbles; up on a surf
+    /// jump, body, head and board turn together about the body's middle.
+    private func placeSurf(_ index: Int, player: Player, body: SKSpriteNode, head: SKSpriteNode) {
+        let board = boards[index] ?? {
+            let node = SKSpriteNode(texture: UIImage(named: "Surfboard").map { SKTexture(image: $0) })
+            let length = CGFloat(SurfRules.boardLength * SpriteLibrary.pixelsPerUnit)
+            node.size = CGSize(width: length, height: length * 92 / 800)
+            node.zPosition = -0.5
+            bodies.addChild(node)
+            boards[index] = node
+            return node
+        }()
+        guard player.boardOut else { board.isHidden = true; return }
+        board.isHidden = false
+        let riding = player.grounded
+        // Floating, and bobbing on the ground.
+        let bob: CGFloat = riding ? 3 + round(sin(Double(match.frame) / 60 * 2 * .pi * 1.5)) : 0
+        let middle = SpriteLibrary.point(Vec2(x: player.position.x, y: player.position.y + player.spec.bodyHeight / 2)) + CGPoint(x: 0, y: bob)
+        let angle = CGFloat(player.surfAngle)
+        func turned(_ point: CGPoint) -> CGPoint {
+            let offset = point - middle
+            return middle + CGPoint(x: offset.x * cos(angle) - offset.y * sin(angle), y: offset.x * sin(angle) + offset.y * cos(angle))
+        }
+        body.position = turned(body.position + CGPoint(x: 0, y: bob))
+        body.zRotation += angle
+        if !head.isHidden {
+            head.position = turned(head.position + CGPoint(x: 0, y: bob))
+            head.zRotation += angle
+        }
+        board.position = SpriteLibrary.point(player.board.centre) + CGPoint(x: 0, y: bob)
+        board.zRotation = angle
+        board.xScale = CGFloat(player.facing.sign)
+        // The trail on the ground.
+        if riding {
+            let frames = (surfTrailFrames[index] ?? 0) + 1
+            surfTrailFrames[index] = frames
+            if frames % 6 == 0, EffectSheets.frames["bubbles"] != nil {
+                let sheet = (0..<(EffectSheets.frames["bubbles"] ?? 1)).map { sprites.texture("bubbles", $0) }
+                let trail = SKSpriteNode(texture: sheet[0])
+                trail.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["bubbles"] ?? 0)
+                trail.position = SpriteLibrary.point(player.position) + CGPoint(x: -CGFloat(player.facing.sign) * 8, y: 0)
+                trail.setScale(0.25)
+                trail.color = ParticleLook.soda
+                trail.colorBlendFactor = 1
+                trail.zPosition = 4
+                trail.run(.sequence([.animate(with: sheet, timePerFrame: 1.0 / 24), .removeFromParent()]))
+                glowers.addChild(trail)
+            }
+        }
+    }
+
+    /// A burst of soda bubbles from a point, each playing the bubble sheet as it drifts off.
+    private func spawnBubbles(at point: CGPoint, count: Int, spread: CGFloat) {
+        guard EffectSheets.frames["bubble_particle"] != nil else { return }
+        let sheet = (0..<(EffectSheets.frames["bubble_particle"] ?? 1)).map { sprites.texture("bubble_particle", $0) }
+        for step in 0..<count {
+            let bubble = SKSpriteNode(texture: sheet[step % sheet.count])
+            bubble.size = CGSize(width: ParticleLook.bubbleSize * 0.6, height: ParticleLook.bubbleSize * 0.6)
+            bubble.color = ParticleLook.soda
+            bubble.colorBlendFactor = 1
+            bubble.position = point
+            bubble.zPosition = 31
+            glowers.addChild(bubble)
+            let angle = CGFloat(step) / CGFloat(count) * .pi + .pi * 0.05
+            let out = SKAction.move(by: CGVector(dx: cos(angle) * spread, dy: sin(angle) * spread * 0.8 + 4), duration: 0.4)
+            out.timingMode = .easeOut
+            bubble.run(.sequence([.group([out, .animate(with: sheet, timePerFrame: 0.4 / Double(sheet.count))]), .removeFromParent()]))
+        }
+    }
     /// The bounds gallery, while it's open.
     private var boundsGallery: BoundsGallery?
 
@@ -2777,6 +2860,7 @@ final class GameScene: SKScene {
                 headEsperMixes[index].particleBirthRate = 0
             }
 
+            placeSurf(index, player: player, body: node, head: headNode)
             if match.stage.features.shadows {
                 // The body and head cast down from the feet, flipped and sheared with the turf.
                 let feet = SpriteLibrary.point(player.position).y

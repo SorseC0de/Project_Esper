@@ -508,6 +508,11 @@ public struct Match: Equatable {
             bolt.position += bolt.velocity
             bolt.framesLeft -= 1
             let box = Box(center: bolt.position, width: 4, height: 4)
+            if let other = players.indices.first(where: { $0 != bolt.owner }), players[other].boardBlocks(bolt.position, radius: 2) {
+                events.append(.boardBlocked(player: other, at: bolt.position))
+                events.append(.boltLanded(at: bolt.position))
+                continue
+            }
             if let car = car(touching: box) {
                 hitCar(car, fire: false)
                 events.append(.boltLanded(at: bolt.position))
@@ -594,6 +599,13 @@ public struct Match: Equatable {
             fireball.framesLeft -= 1
             let box = Box(center: fireball.position, width: BallRules.radius * 2, height: BallRules.radius * 2)
             let other = players.indices.first { $0 != fireball.owner }
+            // The other's board catches it before their body does.
+            let onBoard = other.map { players[$0].boardBlocks(fireball.position, radius: BallRules.radius) } ?? false
+            if onBoard, let other {
+                events.append(.boardBlocked(player: other, at: fireball.position))
+                events.append(.fireballBurst(at: fireball.position))
+                continue
+            }
             let hitBody = other.map { players[$0].frozen == 0 && players[$0].body.overlaps(box) } ?? false
             if fireball.framesLeft <= 0 || stage.overlapsSolid(box) || hitBody {
                 events.append(.fireballBurst(at: fireball.position))
@@ -744,6 +756,14 @@ public struct Match: Equatable {
     private mutating func strikeWithThrow() {
         guard ball.strikes, ball.isLive, let thrower = ball.lastTouched,
               let other = players.indices.first(where: { $0 != thrower }) else { return }
+        if players[other].boardBlocks(ball.position, radius: BallRules.radius) {
+            // Off Surf Soda's board: turned back, and it strikes no more.
+            ball.velocity.x = -ball.velocity.x * BallRules.bounce
+            ball.strikes = false
+            ball.straight = false
+            events.append(.boardBlocked(player: other, at: ball.position))
+            return
+        }
         let victim = players[other]
         guard victim.frozen == 0, victim.snatchHitbox == nil, victim.body.overlaps(ball.box) else { return }
         let back = ball.velocity.x >= 0 ? -1.0 : 1.0

@@ -282,6 +282,17 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   stride on the run, and throw is the pull, the same pulse bringing everything toward
   the body. Numbers in `PulseRules`.
 
+- Surf Soda (K; the debug pick for now, while its movement is found). Running, the body
+  rides a board, the skid sheet's first frame still, floating three pixels and bobbing
+  two, leaving a trail of `bubbles`. Both jumps are a fixed crescent, a quarter circle 40
+  up and 30 forward the way it faces over 30 frames, whatever the stick says; from the
+  top the stick spins the body about its middle at 0.25 a frame instead of drifting it,
+  and within 30 of the ground it eases toward the nearest upright, landing in a burst of
+  bubbles. The board, 20 by 3 under the feet and turning with the body, stops the
+  other's bolts and fireballs and turns back their thrown ball: a shield to spin into
+  place. Its head's particles are `bubble_particle` at 20, and every bubble is a soft
+  brown. Numbers in `SurfRules`, first guesses.
+
 Hits share the strip: the victim is stunned 60 frames and any ball they hold pops
 free; the slash, the parry, the bolt, the burst and the pulse knock the body away as
 well (`Player.knock`), and the pulse doesn't stun. The slash strips a body with or
@@ -360,7 +371,7 @@ holds the variants; A is always the baseline as tuned.
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
-  Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
+  Punch, K Surf Soda, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
   60 in and drawn for a rim at 120, the gold 8 wide; the crossbar sits 20 below that,

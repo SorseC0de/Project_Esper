@@ -21,13 +21,13 @@ public struct Dice: Equatable {
 public enum Greateraid: CaseIterable, Equatable, Hashable {
     case hastyHorchata, jumperJuice, lungeLemonade, cannonCola, slideCider
     case webWater, superSmoothie, flashFizz, platformShake
-    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol
+    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda
 
     public enum Kind: Equatable { case booster, biomorph }
 
     public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .lungeLemonade, .cannonCola, .slideCider]
     public static let biomorphs: [Greateraid] = [.webWater, .superSmoothie, .flashFizz, .platformShake,
-                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol]
+                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol, .surfSoda]
 
     public var kind: Kind {
         Greateraid.boosters.contains(self) ? .booster : .biomorph
@@ -49,6 +49,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .frostTea: "Frost Tea"
         case .blazingBoba: "Blazing Boba"
         case .pulsepistol: "Pulsepistol Punch"
+        case .surfSoda: "Surf Soda"
         }
     }
 
@@ -64,6 +65,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .frostTea: .frostTea
         case .blazingBoba: .blazingBoba
         case .pulsepistol: .pulsepistol
+        case .surfSoda: .surfSoda
         default: nil
         }
     }
@@ -85,6 +87,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .frostTea: "Not to be confused with the gas station beverage"
         case .blazingBoba: "...Wait are those fireballs?"
         case .pulsepistol: "For those gunning for first place"
+        case .surfSoda: "..."
         }
     }
 
@@ -105,6 +108,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .frostTea: ("Snatch freezes what it reaches. Slides never stop until you say so.", "Double jumps and slides leave an ice clone that freezes on touch.")
         case .blazingBoba: ("Full runs and slides leave fire. Your shots burn: nobody else can catch them.", "Hold shoot through a slash for a fireball, shot or thrown, that bursts.")
         case .pulsepistol: ("Shoot fires a pulse across the screen that knocks the ball and them away.", "Shoot on the run, and throw pulls everything in.")
+        case .surfSoda: ("Ride a board: jumps are a crescent, and in the air you flip it to shield yourself.", "...")
         }
     }
 }

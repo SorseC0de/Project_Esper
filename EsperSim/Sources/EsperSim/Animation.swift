@@ -144,6 +144,9 @@ extension Player {
             return AnimationFrame(holding ? .dribbleIdle : .idle, (t * 12 / 60) % 10)
         case .walk:
             return AnimationFrame(holding ? .dribbleWalk : .walk, Int(animationPhase) % 8)
+        case .dash where power == .surfSoda && grounded, .run where power == .surfSoda && grounded:
+            // Riding the board: the skid's first frame, still.
+            return AnimationFrame(holding ? .skidBall : .skid, 0)
         case .dash, .run:
             if gunRunTimer > 0 { return AnimationFrame(.gunRunShoot, (PulseRules.runShotFrames - gunRunTimer) * 15 / 60) }
             return AnimationFrame(holding ? .dribbleRun : .run, Int(animationPhase) % 8)
@@ -157,6 +160,8 @@ extension Player {
             return AnimationFrame(.pivot, t * 12 / 60)
         case .jumpSquat:
             return AnimationFrame(.jumpSquat, t)
+        case .air where surfing:
+            return AnimationFrame(holding ? .skidBall : .skid, 0)
         case .air:
             if doubleJumpTimer > 0 {
                 return AnimationFrame(.doubleJump, (30 - doubleJumpTimer) * 12 / 60)

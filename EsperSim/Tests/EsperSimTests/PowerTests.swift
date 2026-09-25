@@ -197,6 +197,55 @@ final class PowerTests: XCTestCase {
         XCTAssertLessThan(taken, SnatchRules.frames, "the body is part of the reach")
     }
 
+    // MARK: Surf Soda
+
+    func testASurfJumpIsAFixedCrescent() {
+        var match = with(.surfSoda)
+        match.players[1].position.x = 300
+        let start = match.players[0].position
+        for _ in 0..<(match.players[0].spec.jumpSquatFrames + 1) { match.advance(inputs: [PlayerInput(jump: true), .idle]) }
+        XCTAssertTrue(match.players[0].surfing)
+        // Held against the way it faces all the while: the path doesn't care.
+        run(&match, frames: SurfRules.pathFrames, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) })
+        XCTAssertEqual(match.players[0].position.y - start.y, SurfRules.rise, accuracy: 2, "up the crescent's height")
+        XCTAssertEqual(match.players[0].position.x - start.x, SurfRules.reach, accuracy: 3, "and its reach forward")
+        XCTAssertEqual(match.players[0].surfPath, 0, "at its top")
+    }
+
+    func testPastTheTopTheStickSpinsAndTheLandingIsUpright() {
+        var match = with(.surfSoda)
+        match.players[1].position.x = 300
+        for _ in 0..<(match.players[0].spec.jumpSquatFrames + 1) { match.advance(inputs: [PlayerInput(jump: true), .idle]) }
+        run(&match, frames: SurfRules.pathFrames, input: { _ in .idle })
+        let x = match.players[0].position.x
+        run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        XCTAssertLessThan(match.players[0].surfAngle, -0.5, "spun")
+        XCTAssertEqual(match.players[0].position.x, x + 6 * match.players[0].velocity.x, accuracy: 1, "not drifted")
+        let landed = run(&match, frames: 120, input: { _ in .idle }) { $0.events.contains(.surfLanded(player: 0)) }
+        XCTAssertLessThan(landed, 120)
+        XCTAssertEqual(match.players[0].surfAngle, 0)
+        XCTAssertFalse(match.players[0].surfing)
+    }
+
+    func testTheBoardStopsTheOthersBolt() {
+        var match = with(.zeusJuice, other: .surfSoda)
+        match.players[1].position = Vec2(x: match.players[0].position.x + 60, y: 10)
+        match.players[1].surfing = true
+        // Turned so the board stands on the side facing the bolt.
+        match.players[1].surfAngle = -.pi / 2
+        match.players[1].grounded = false
+        match.players[1].state = .air
+        match.players[1].position.y = 90
+        // The board turned upright between them, at the bolt's height.
+        let board = match.players[1].board.centre
+        match.bolts = [Bolt(id: 9, owner: 0, position: Vec2(x: board.x - 5, y: board.y), velocity: Vec2(x: 6, y: 0), framesLeft: 60)]
+        match.advance(inputs: [.idle, .idle])
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertTrue(match.bolts.isEmpty)
+        XCTAssertTrue(match.events.contains { if case .boardBlocked(player: 1, _) = $0 { return true } else { return false } } || match.players[1].hitStun == 0)
+        XCTAssertEqual(match.players[1].hitStun, 0, "shielded")
+    }
+
     // MARK: Quake-Up Coffee
 
     func testQuakeStripsWhoeverStandsOnTheFloorAndHopsTheBall() {

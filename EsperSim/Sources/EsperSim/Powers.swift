@@ -37,6 +37,23 @@ public struct Fireball: Equatable {
     public var straight: Bool
 }
 
+/// Surf Soda: the jumps are a fixed crescent, a quarter circle this high and this far
+/// forward over these frames; from its top the stick spins the body at this rate a frame
+/// instead of drifting it, and within this height of the ground it eases upright, this
+/// share a frame. Under the feet a board this long and thick, turning with the body,
+/// stops the other's bolts and fireballs and turns back their thrown ball. First guesses,
+/// for tuning.
+public enum SurfRules {
+    public static let rise = 40.0
+    public static let reach = 30.0
+    public static let pathFrames = 30
+    public static let spinRate = 0.25
+    public static let uprightHeight = 30.0
+    public static let uprightShare = 0.15
+    public static let boardLength = 20.0
+    public static let boardThickness = 3.0
+}
+
 /// Slopes: a body's feet ride one up or down this far a frame at most, a block's height;
 /// the diagonal's normal is this share of each axis.
 public enum SlopeRules {

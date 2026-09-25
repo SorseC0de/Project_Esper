@@ -255,16 +255,40 @@ final class GameScene: SKScene {
         ballCamScreenX += (wanted - ballCamScreenX) * 0.1
     }
 
-    /// The moving things the ball cam copies: bodies, heads, the ball, helmets.
+    /// Everything that moves and is drawn near the ball, for the ball cam to copy: every
+    /// sprite in the bodies and effects layers and the shadows, but only those within its
+    /// window round the ball, with a margin for the ones that straddle its edge. The rest
+    /// are passed over after one position check each, so a busy field costs it little.
     var ballCamSnapshots: [SpriteSnapshot] {
-        var nodes: [SKSpriteNode] = playerNodes + headNodes + handBalls + [ballNode]
-        nodes += helmetNodes.values
-        return nodes.filter { !$0.isHidden && $0.texture != nil && $0.parent != nil }.map { node in
-            SpriteSnapshot(texture: node.texture!, position: node.position, anchor: node.anchorPoint,
-                           size: CGSize(width: node.size.width / abs(node.xScale == 0 ? 1 : node.xScale), height: node.size.height / abs(node.yScale == 0 ? 1 : node.yScale)),
-                           xScale: node.xScale, yScale: node.yScale, zRotation: node.zRotation,
-                           colour: node.color, colourBlend: node.colorBlendFactor, alpha: node.alpha, zPosition: node.zPosition)
+        let centre = ballCamCentre
+        let margin: CGFloat = 64
+        let window = CGRect(x: centre.x - BallCamScene.view.width / 2 - margin, y: centre.y - BallCamScene.view.height / 2 - margin,
+                            width: BallCamScene.view.width + margin * 2, height: BallCamScene.view.height + margin * 2)
+        var snapshots: [SpriteSnapshot] = []
+        func take(_ node: SKNode, offset: CGPoint, z: CGFloat, alpha: CGFloat) {
+            guard !node.isHidden else { return }
+            let at = CGPoint(x: offset.x + node.position.x, y: offset.y + node.position.y)
+            let depth = z + node.zPosition
+            if let sprite = node as? SKSpriteNode, let texture = sprite.texture {
+                guard window.contains(at) else { return }
+                let xScale = sprite.xScale == 0 ? 1 : sprite.xScale, yScale = sprite.yScale == 0 ? 1 : sprite.yScale
+                snapshots.append(SpriteSnapshot(texture: texture, position: at, anchor: sprite.anchorPoint,
+                                                size: CGSize(width: sprite.size.width / abs(xScale), height: sprite.size.height / abs(yScale)),
+                                                xScale: sprite.xScale, yScale: sprite.yScale, zRotation: sprite.zRotation,
+                                                colour: sprite.color, colourBlend: sprite.colorBlendFactor, alpha: alpha * sprite.alpha,
+                                                zPosition: depth, blendMode: sprite.blendMode, shader: sprite.shader, warp: sprite.warpGeometry))
+            }
+            // A plain container (a flash cluster, the backboards) passes its place on; it's
+            // skipped whole when it and its reach are nowhere near.
+            guard !node.children.isEmpty, !(node is SKSpriteNode) || node.children.count > 0 else { return }
+            if !(node is SKSpriteNode), node !== glowers, node !== bodies, node.position != .zero,
+               !window.insetBy(dx: -200, dy: -200).contains(at) { return }
+            for child in node.children { take(child, offset: at, z: depth, alpha: alpha * node.alpha) }
         }
+        take(bodies, offset: .zero, z: 0, alpha: 1)
+        take(glowers, offset: .zero, z: 0, alpha: 1)
+        for shadow in shadowBodies + shadowHeads { take(shadow, offset: .zero, z: 0, alpha: 1) }
+        return snapshots
     }
 
     /// The field's scenery and goalposts into the ball cam's own scene, once.

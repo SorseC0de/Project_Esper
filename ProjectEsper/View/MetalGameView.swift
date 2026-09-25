@@ -61,6 +61,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let nearest: MTLSamplerState
     private var ballCamTexture: MTLTexture?
     private var ballCamDepthStencil: MTLTexture?
+    /// Its glow, as the screen's is made: the bright parts at half size, blurred.
+    private var ballCamMask: MTLTexture?
+    private var ballCamGlowA: MTLTexture?
+    private var ballCamGlowB: MTLTexture?
     private var ballCamFrames = 0
     /// Drawn one frame in this many, to keep its cost down.
     private static let ballCamEvery = 3
@@ -239,6 +243,9 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             let width = Int(BallCamScene.view.width) * resolution, height = Int(BallCamScene.view.height) * resolution
             ballCamTexture = makeTexture(width: width, height: height)
             ballCamDepthStencil = makeTexture(width: width, height: height, pixelFormat: .depth32Float_stencil8)
+            ballCamMask = makeTexture(width: width, height: height)
+            ballCamGlowA = makeTexture(width: width / 2, height: height / 2)
+            ballCamGlowB = makeTexture(width: width / 2, height: height / 2)
             scene.fillBallCam(ballCamScene)
             ballCamFrames = 0
         }
@@ -261,9 +268,32 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             camPass.stencilAttachment.storeAction = .dontCare
             ballCamRenderer.render(withViewport: CGRect(x: 0, y: 0, width: target.width, height: target.height),
                                    commandBuffer: commands, renderPassDescriptor: camPass)
+            // The glow: an empty mask, so everything takes the plain threshold.
+            if let mask = ballCamMask, let glowA = ballCamGlowA, let glowB = ballCamGlowB {
+                let clear = MTLRenderPassDescriptor()
+                clear.colorAttachments[0].texture = mask
+                clear.colorAttachments[0].loadAction = .clear
+                clear.colorAttachments[0].storeAction = .store
+                clear.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+                commands.makeRenderCommandEncoder(descriptor: clear)?.endEncoding()
+                var uniforms = camGlowUniforms(glowA)
+                pass(commands, pipeline: bright, into: glowA, sources: [target, mask], uniforms: uniforms)
+                for _ in 0..<GlowSettings.blurPasses {
+                    uniforms.direction = SIMD2(1, 0)
+                    pass(commands, pipeline: blur, into: glowB, sources: [glowA], uniforms: uniforms)
+                    uniforms.direction = SIMD2(0, 1)
+                    pass(commands, pipeline: blur, into: glowA, sources: [glowB], uniforms: uniforms)
+                }
+            }
         }
         ballCamFrames += 1
         return true
+    }
+
+    private func camGlowUniforms(_ glow: MTLTexture) -> GlowUniforms {
+        GlowUniforms(texelSize: SIMD2(1 / Float(glow.width), 1 / Float(glow.height)), direction: .zero,
+                     threshold: GlowSettings.threshold, bodyThreshold: GlowSettings.bodyThreshold,
+                     softness: GlowSettings.softness, intensity: GlowSettings.intensity, tint: GlowSettings.tint)
     }
 
     /// The ball cam's texture on a trapezoid, a quarter of the screen across at the top and a
@@ -287,7 +317,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         encoder.setRenderPipelineState(ballCamPipeline)
         encoder.setVertexBytes(&corners, length: MemoryLayout<Corner>.stride * corners.count, index: 0)
         encoder.setFragmentTexture(texture, index: 0)
+        encoder.setFragmentTexture(ballCamGlowA ?? texture, index: 1)
         encoder.setFragmentSamplerState(nearest, index: 0)
+        encoder.setFragmentSamplerState(sampler, index: 1)
+        var uniforms = camGlowUniforms(ballCamGlowA ?? texture)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<GlowUniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
     }
 

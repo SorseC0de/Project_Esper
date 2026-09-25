@@ -502,8 +502,11 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   128 by 80 art pixels round it, hanging over the upper screen as a trapezoid wider at the
   top with a thin black edge, easing across after the local player. It has its own scene,
   with its own copy of the scenery built once, and its own renderer, drawn one frame in
-  three into a small texture the Metal pass lays down after the glow; the game scene is
-  never drawn twice in a frame.
+  three into a small texture with its own glow, laid down after the screen's; the game
+  scene is never drawn twice in a frame. It copies every sprite of the bodies and effects
+  layers and the shadows, but only those within its window round the ball and a margin:
+  the rest cost one position check each, so a busy field costs it little. Emitters and
+  shapes (the portal, webs, the pulse) aren't copied.
 - Shadows (`StageFeatures.shadows`, the view's alone): each body's current frame and its
   head, and the goalposts, cast in a dark greyed purple at two thirds, mirrored under the
   feet or the floor line and sheared by the turf's own lean where they stand, so they

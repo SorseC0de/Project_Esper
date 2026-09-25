@@ -95,10 +95,14 @@ vertex BallCamOut ballCamVertex(uint id [[vertex_id]], constant BallCamCorner *c
 
 fragment float4 ballCamFragment(BallCamOut in [[stage_in]],
                                 texture2d<float> cam [[texture(0)]],
-                                sampler nearest [[sampler(0)]]) {
+                                texture2d<float> glow [[texture(1)]],
+                                sampler nearest [[sampler(0)]],
+                                sampler linear [[sampler(1)]],
+                                constant GlowUniforms &u [[buffer(0)]]) {
     float2 uv = in.uvq.xy / in.uvq.z;
     float2 size = float2(cam.get_width(), cam.get_height());
     float2 edge = min(uv, 1 - uv) * size;
     if (min(edge.x, edge.y) < 2) { return float4(0, 0, 0, 1); }
-    return float4(cam.sample(nearest, uv).rgb, 1);
+    float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
+    return float4(cam.sample(nearest, uv).rgb + bloom, 1);
 }

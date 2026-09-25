@@ -13,6 +13,9 @@ struct SpriteSnapshot {
     var colourBlend: CGFloat
     var alpha: CGFloat
     var zPosition: CGFloat
+    var blendMode: SKBlendMode = .alpha
+    var shader: SKShader?
+    var warp: SKWarpGeometry?
 }
 
 /// The ball cam: a close view of the ball, drawn by its own renderer into a small texture
@@ -63,6 +66,9 @@ final class BallCamScene: SKScene {
             node.colorBlendFactor = snapshot.colourBlend
             node.alpha = snapshot.alpha
             node.zPosition = snapshot.zPosition
+            node.blendMode = snapshot.blendMode
+            node.shader = snapshot.shader
+            node.warpGeometry = snapshot.warp
         }
     }
 }

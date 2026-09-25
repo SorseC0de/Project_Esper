@@ -71,10 +71,9 @@ enum ZeusTuning {
     nonisolated(unsafe) static var chargeScale: Float = 0.17
 }
 
-/// The helicopter's size against its default 96 pixels across, on the HELICOPTER slider
-/// until it's settled.
+/// The helicopter's size against 96 pixels across.
 enum TrafficTuning {
-    nonisolated(unsafe) static var helicopterScale: Float = 1
+    static let helicopterScale: Float = 0.9
 }
 
 /// Gemini's rift, as the portal, with Project Stars' own numbers: the small pair's size

@@ -147,7 +147,10 @@ public struct Helicopter: Equatable {
     /// The rim it carries, by its index in the stage's hoops.
     public var hoop: Int
     public var x: Double
+    /// Its height as it sways, and frames since it came.
+    public var y = HighwayRules.helicopterHeight
     public var speed: Double
+    public var age = 0
 }
 
 public enum HighwayRules {
@@ -164,9 +167,12 @@ public enum HighwayRules {
     /// The helicopter flies at this height, the rim hanging this far under it, at this speed.
     public static let helicopterHeight = 140.0
     /// The rim against the helicopter: this far ahead of it the way it flies, and this far
-    /// under it; on the HOOP X and HOOP Y sliders offline until they're settled.
-    nonisolated(unsafe) public static var rimAhead = 0.0
-    nonisolated(unsafe) public static var rimBelowHelicopter = 32.0
+    /// under it.
+    public static let rimAhead = 22.0
+    public static let rimBelowHelicopter = 18.0
+    /// It sways up and down this far either way over this many frames.
+    public static let swayHeight = 6.0
+    public static let swayFrames = 120
     public static let helicopterSpeed = 1.0
     /// Where the rim waits while its helicopter isn't out: far over the sky, out of play.
     public static let parked = Vec2(x: -1000, y: 5000)
@@ -220,20 +226,26 @@ extension Match {
         for index in cars.indices where cars[index].guardFrames > 0 { cars[index].guardFrames -= 1 }
         guard stage.hoops.count >= 2 else { return }
         if helicopter == nil {
-            // The next rim, the other side's from the last, from the wall it's away from.
+            // The next rim, the other side's from the last. The one player one guards flies
+            // left to right, player two's right to left; the rim leads, its backboard toward
+            // the helicopter.
             let next = (lastHelicopterHoop ?? fieldDice.roll(2)) == 0 ? 1 : 0
             lastHelicopterHoop = next
-            let fromLeft = fieldDice.roll(2) == 0
+            let fromLeft = 1 - stage.hoops[next].owner == 0
+            stage.hoops[next].backboard = fromLeft ? .left : .right
             helicopter = Helicopter(id: stampId(), hoop: next, x: fromLeft ? -40 : stage.width + 40,
                                     speed: HighwayRules.helicopterSpeed * (fromLeft ? 1 : -1))
             events.append(.helicopterArrived(hoop: next))
         }
         guard var flying = helicopter else { return }
         flying.x += flying.speed
+        flying.age += 1
+        flying.y = HighwayRules.helicopterHeight
+            + HighwayRules.swayHeight * Trig.sin(Double(flying.age) / Double(HighwayRules.swayFrames) * 2 * Double.pi)
         let gone = flying.speed > 0 ? flying.x > stage.width + 40 : flying.x < -40
         for index in stage.hoops.indices {
             stage.hoops[index].position = index == flying.hoop && !gone
-                ? Vec2(x: flying.x + HighwayRules.rimAhead * (flying.speed > 0 ? 1 : -1), y: HighwayRules.helicopterHeight - HighwayRules.rimBelowHelicopter)
+                ? Vec2(x: flying.x + HighwayRules.rimAhead * (flying.speed > 0 ? 1 : -1), y: flying.y - HighwayRules.rimBelowHelicopter)
                 : HighwayRules.parked
         }
         helicopter = gone ? nil : flying

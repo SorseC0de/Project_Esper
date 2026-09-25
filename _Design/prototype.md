@@ -362,8 +362,6 @@ holds the variants; A is always the baseline as tuned.
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, at the level LEVEL picks. The left bumper steps this one; the local side's power
   and level are lettered under the pickers.
-- HELICOPTER, HOOP X and HOOP Y, sliders under the score: the helicopter's size, and the
-  rim ahead of it and under it, offline (both phones keep 0 and 32 online), until settled.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
   60 in and drawn for a rim at 120, the gold 8 wide; the crossbar sits 20 below that,
   tilted 20° with the end toward the field up, the uprights 100 over it; the back rod
@@ -490,7 +488,9 @@ centre.
   A body shivers a pixel under wheels drawn over it that stay put, each on its own beat, dips three
   pixels on its springs when someone lands on it, and flashes black when hit.
 - The rim: one at a time, carried under a helicopter flying from one wall to the other at
-  1 a frame, 140 up, the rim 32 under it; the next carries the other side's rim, and the
+  1 a frame, 140 up, swaying 6 either way every two seconds, the rim 22 ahead of it and
+  18 under, its backboard toward the helicopter; the rim player one guards flies left to
+  right, player two's right to left, and the next carries the other side's rim, and the
   one not out waits far over the sky. The helicopter's reds are the rim's guarding side's
   energy in dark tones, so the glow leaves them their colour; its tail rotor spins and its top rotor flips end over end every other frame.
 

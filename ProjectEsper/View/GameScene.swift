@@ -875,19 +875,6 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        controls.addSlider(title: "HELICOPTER", range: 0.5...2.5, notch: 0.05, value: TrafficTuning.helicopterScale) { [weak self] value in
-            TrafficTuning.helicopterScale = value
-            self?.helicopterId = -1
-        }
-        controls.addSlider(title: "HOOP X", range: -60...60, notch: 1, value: Float(HighwayRules.rimAhead)) { [weak self] value in
-            // Offline only: the sim's rule.
-            guard self?.online == nil else { return }
-            HighwayRules.rimAhead = Double(value)
-        }
-        controls.addSlider(title: "HOOP Y", range: -40...100, notch: 1, value: Float(HighwayRules.rimBelowHelicopter)) { [weak self] value in
-            guard self?.online == nil else { return }
-            HighwayRules.rimBelowHelicopter = Double(value)
-        }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
@@ -1996,7 +1983,7 @@ final class GameScene: SKScene {
                 ground.addChild(helicopterNode!)
                 helicopterId = flying.id
             }
-            helicopterNode?.position = SpriteLibrary.point(Vec2(x: flying.x, y: HighwayRules.helicopterHeight))
+            helicopterNode?.position = SpriteLibrary.point(Vec2(x: flying.x, y: flying.y))
         } else {
             helicopterNode?.removeFromParent()
             helicopterNode = nil
@@ -2893,6 +2880,7 @@ final class GameScene: SKScene {
             if index < match.stage.hoops.count {
                 let at = SpriteLibrary.point(match.stage.hoops[index].position)
                 rimNodes[index].position = at
+                rimNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
                 if index < netNodes.count { netNodes[index].position = at }
             }
         }
@@ -2942,10 +2930,9 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nhelicopter %.2f  hoop x %.0f  hoop y %.0f below",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
-                                 TrafficTuning.helicopterScale, HighwayRules.rimAhead, HighwayRules.rimBelowHelicopter)
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

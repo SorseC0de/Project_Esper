@@ -319,6 +319,12 @@ final class HighwayTests: XCTestCase {
         }
         XCTAssertNotNil(next)
         XCTAssertNotEqual(next!.hoop, first.hoop, "the other side's rim next")
+        // Player one's guarded rim flies left to right, player two's right to left, rim first.
+        for flying in [first, next!] {
+            let guardedBy = 1 - match.stage.hoops[flying.hoop].owner
+            XCTAssertEqual(flying.speed > 0, guardedBy == 0)
+            XCTAssertEqual(match.stage.hoops[flying.hoop].backboard, flying.speed > 0 ? .left : .right)
+        }
     }
 
     func testTheRoadStaysInStepAcrossTwoCopies() {

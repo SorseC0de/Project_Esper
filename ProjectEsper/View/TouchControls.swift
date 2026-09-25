@@ -182,8 +182,8 @@ final class TouchControls: SKNode {
     }
 
     /// The newest picker steps to its next option.
-    func cycleTopPicker() {
-        pickers.last?.selectNext()
+    func cyclePicker(titled title: String) {
+        pickers.first { $0.title == title }?.selectNext()
     }
 
     /// Where the next picker would go, so other corner text can sit under them.

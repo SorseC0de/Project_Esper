@@ -2093,4 +2093,36 @@ final class GreateraidTests: XCTestCase {
         XCTAssertEqual(fresh.wins, [0, 0])
         XCTAssertEqual(fresh.drinks, [.none, .none])
     }
+
+    func testAStageStaysForABestOfThree() {
+        var series = Series()
+        series.record(pointFor: 0)
+        series.record(pointFor: 1)
+        XCTAssertFalse(series.stageSelectDue)
+        series.record(pointFor: 0)
+        XCTAssertEqual(series.stageWinner, 0)
+        XCTAssertTrue(series.stageSelectDue)
+        series.move(to: .longballStadium)
+        XCTAssertEqual(series.stage, .longballStadium)
+        XCTAssertNil(series.stageWinner)
+        XCTAssertEqual(series.stagesPlayed, 1)
+        // The point that takes the series takes no stage select with it.
+        series.record(pointFor: 0)
+        series.record(pointFor: 0)
+        XCTAssertEqual(series.winner, 0)
+        XCTAssertFalse(series.stageSelectDue)
+    }
+
+    func testStageVotesSettleTheSameOnBothSides() {
+        var first = Series(seed: 42), second = Series(seed: 42)
+        XCTAssertEqual(first.settle(votes: [.slamstillTraffic, .slamstillTraffic]), .slamstillTraffic)
+        var landed = Set<StageChoice>()
+        for _ in 0..<40 {
+            let one = first.settle(votes: [.wreckCenter, .longballStadium])
+            XCTAssertEqual(one, second.settle(votes: [.wreckCenter, .longballStadium]))
+            XCTAssertTrue([.wreckCenter, .longballStadium].contains(one))
+            landed.insert(one)
+        }
+        XCTAssertEqual(landed.count, 2, "the coin lands both ways")
+    }
 }

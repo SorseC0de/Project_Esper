@@ -5,7 +5,7 @@ import Foundation
 /// most this far past the last remote input it knows, predicting it as held; and every
 /// packet carries this many of the newest inputs, so a lost packet costs nothing.
 public enum NetRules {
-    public static let protocolVersion: UInt8 = 2
+    public static let protocolVersion: UInt8 = 3
     public static let inputDelay = 2
     public static let predictionWindow = 8
     public static let redundantInputs = 8
@@ -85,8 +85,11 @@ public enum NetMessage: Equatable {
     /// After the win: another series, on a fresh seed from both randoms.
     case rematch(random: UInt32)
     case bye
+    /// A stage vote, or the pick of whoever lost the last stage: the stage's raw value, for
+    /// the stage select after `stagesPlayed` stages.
+    case stage(stagesPlayed: Int, choice: Int)
 
-    private enum Tag: UInt8 { case hello = 1, inputs, pick, rematch, bye }
+    private enum Tag: UInt8 { case hello = 1, inputs, pick, rematch, bye, stage }
 
     public var data: Data {
         var data = Data()
@@ -115,6 +118,10 @@ public enum NetMessage: Equatable {
             data.append(uint32: random)
         case .bye:
             data.append(Tag.bye.rawValue)
+        case .stage(let stagesPlayed, let choice):
+            data.append(Tag.stage.rawValue)
+            data.append(int32: Int32(stagesPlayed))
+            data.append(UInt8(clamping: choice))
         }
         return data
     }
@@ -144,6 +151,9 @@ public enum NetMessage: Equatable {
             self = .rematch(random: bytes.uint32(at: 1))
         case .bye:
             self = .bye
+        case .stage:
+            guard bytes.count >= 6 else { return nil }
+            self = .stage(stagesPlayed: Int(bytes.int32(at: 1)), choice: Int(bytes[5]))
         }
     }
 }

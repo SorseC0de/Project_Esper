@@ -99,6 +99,13 @@ class Screen: SKNode {
     /// Whether a tap on a choice that isn't the cursor's fires it straight away.
     var tapFiresAtOnce: Bool { true }
 
+    /// The cursor put on a choice without firing it.
+    func place(cursor index: Int) {
+        guard choices.indices.contains(index) else { return }
+        cursor = index
+        showCursor()
+    }
+
     func move(_ delta: Int) {
         guard !choices.isEmpty else { return }
         cursor = (cursor + delta + choices.count) % choices.count
@@ -262,4 +269,156 @@ final class WinScreen: Screen {
         TitleText.set(waiting, to: "WAITING FOR THEM", size: 14)
         waiting.isHidden = false
     }
+}
+
+/// The stages as rectangles in a row with their names inside. The one under a voter's
+/// cursor grows, and a circle in its bottom-right corner in that voter's colour marks
+/// their choice: a ring while they look, filled once they've picked. The other phone's
+/// voter shows only once their pick is in. Two different picks flip a coin between them,
+/// the light going back and forth before it lands.
+final class StageSelectScreen: Screen {
+    private var tiles: [SKShapeNode] = []
+    private var cursors: [Int: Int] = [:]
+    private var picks: [Int: Int] = [:]
+    private var marks: [Int: SKShapeNode] = [:]
+    private var flipLit: Int?
+    private let voters: [Int]
+    private let localVoters: [Int]
+    private let colours: [SKColor]
+    private let onPick: (Int, Int) -> Void
+    private static let markRadius: CGFloat = 7
+
+    /// `onPick` gets the voter and the stage's place in the row.
+    init(halfWidth: CGFloat, halfHeight: CGFloat, stages: [String], voters: [Int], localVoters: [Int], colours: [SKColor],
+         heading: String?, start: Int, onPick: @escaping (Int, Int) -> Void) {
+        self.voters = voters
+        self.localVoters = localVoters
+        self.colours = colours
+        self.onPick = onPick
+        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
+        let header = TitleText.node("STAGE SELECT", size: 44)
+        header.position = CGPoint(x: 0, y: halfHeight - 44)
+        addChild(header)
+        if let heading {
+            let sub = TitleText.node(heading, size: 22)
+            sub.position = CGPoint(x: 0, y: halfHeight - 80)
+            addChild(sub)
+        }
+        let width = min(halfWidth * 0.56, 180), height: CGFloat = 96
+        let spacing = width + 20
+        for (index, name) in stages.enumerated() {
+            let tile = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 8)
+            tile.position = CGPoint(x: (CGFloat(index) - CGFloat(stages.count - 1) / 2) * spacing, y: -12)
+            tile.fillColor = SKColor(white: 1, alpha: 0.08)
+            tile.strokeColor = SKColor(white: 1, alpha: 0.7)
+            tile.lineWidth = 2
+            let label = TitleText.node(name, size: 20)
+            label.setScale(min(1, (width - 16) / max(label.size.width, 1)))
+            tile.addChild(label)
+            addChild(tile)
+            tiles.append(tile)
+        }
+        for voter in localVoters { cursors[voter] = min(max(start, 0), stages.count - 1) }
+        for voter in voters {
+            let mark = SKShapeNode(circleOfRadius: StageSelectScreen.markRadius)
+            mark.strokeColor = colours.indices.contains(voter) ? colours[voter] : .white
+            mark.lineWidth = 2
+            mark.zPosition = 2
+            addChild(mark)
+            marks[voter] = mark
+        }
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func move(voter: Int, by delta: Int) {
+        guard picks[voter] == nil, flipLit == nil, let at = cursors[voter] else { return }
+        cursors[voter] = (at + delta + tiles.count) % tiles.count
+        refresh()
+    }
+
+    func lock(voter: Int) {
+        guard picks[voter] == nil, flipLit == nil, let at = cursors[voter] else { return }
+        picks[voter] = at
+        refresh()
+        onPick(voter, at)
+    }
+
+    /// A pick made elsewhere: the other phone's, or one already in when the screen is rebuilt.
+    func show(vote index: Int, by voter: Int) {
+        picks[voter] = index
+        cursors[voter] = index
+        refresh()
+    }
+
+    /// The coin flip's light on one stage.
+    func showFlip(lit index: Int) {
+        guard flipLit != index else { return }
+        flipLit = index
+        refresh()
+    }
+
+    override func move(_ delta: Int) {
+        if let voter = localVoters.first { move(voter: voter, by: delta) }
+    }
+
+    override func fire() {
+        if let voter = localVoters.first { lock(voter: voter) }
+    }
+
+    /// A tap on a stage moves the first local voter's cursor there, or picks it if it's there already.
+    override func tap(at point: CGPoint) -> Bool {
+        guard let voter = localVoters.first,
+              let index = tiles.firstIndex(where: { $0.frame.contains(point) }) else { return false }
+        if cursors[voter] == index {
+            lock(voter: voter)
+        } else if picks[voter] == nil {
+            cursors[voter] = index
+            refresh()
+        }
+        return true
+    }
+
+    private func refresh() {
+        let raised: Set<Int> = flipLit.map { [$0] } ?? Set(voters.compactMap { picks[$0] ?? cursors[$0] })
+        for (index, tile) in tiles.enumerated() {
+            tile.setScale(raised.contains(index) ? 1.12 : 1)
+            tile.fillColor = SKColor(white: 1, alpha: raised.contains(index) ? 0.18 : 0.08)
+        }
+        // Each voter's circle in the bottom-right corner of their stage, the second beside the first.
+        var taken: [Int: Int] = [:]
+        for voter in voters {
+            guard let mark = marks[voter] else { continue }
+            guard let index = picks[voter] ?? cursors[voter] else {
+                mark.isHidden = true
+                continue
+            }
+            let tile = tiles[index]
+            let frame = tile.frame
+            let order = taken[index, default: 0]
+            taken[index] = order + 1
+            let radius = StageSelectScreen.markRadius
+            mark.isHidden = false
+            mark.position = CGPoint(x: frame.maxX - radius - 8 - CGFloat(order) * (radius * 2 + 4), y: frame.minY + radius + 8)
+            mark.fillColor = picks[voter] != nil ? mark.strokeColor : .clear
+        }
+    }
+}
+
+/// The pause, against the computer: start the match over, go to the title, or play on.
+final class PauseScreen: Screen {
+    init(halfWidth: CGFloat, halfHeight: CGFloat, onRestart: @escaping () -> Void, onTitle: @escaping () -> Void, onResume: @escaping () -> Void) {
+        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
+        let title = TitleText.node("PAUSED", size: 56)
+        title.position = CGPoint(x: 0, y: halfHeight * 0.45)
+        addChild(title)
+        addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.05), action: onRestart)
+        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.25), action: onTitle)
+        addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.55), action: onResume)
+        // On RESUME, so a press of jump straight after pausing plays on.
+        place(cursor: 2)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
 }

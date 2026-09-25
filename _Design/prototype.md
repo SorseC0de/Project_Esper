@@ -19,14 +19,14 @@ neutral to get a shot off; catch it and the roles reverse.
   one controller is player 1, two controllers are players 0 and 1 in order; on the TV
   the controllers are players 0 and 1. A pad on player 1 sits the computer out, so a
   second person just picks up a pad. A keyboard on an iPad or a Mac is player 0 as well: WASD, space to jump, J to shoot,
-  K to throw, shift as the left bumper, Esc quits on a Mac or in the simulator. The HUD is laid out in the phone's points and
+  K to throw, shift as the left bumper, delete as the start button, Esc quits on a Mac or in the simulator. The HUD is laid out in the phone's points and
   scaled up by `HudScene.scale(forHeight:)` on a bigger screen, the lettering rendered
   at that scale so it stays crisp. `Net/GameCenter` is Game
   Center: signing in, the matchmaker, and the bytes between the two phones. Two
   targets build the same sources and catalog: `ProjectEsper` for iPhone and iPad, and
   `ProjectEsperTV` for Apple TV, same bundle ID so the two play each other. On the TV
   there's no pad on screen, a controller is required, and its menu button is claimed as
-  reset so it doesn't send the app home; the few phone-only calls sit behind
+  the pause so it doesn't send the app home; the few phone-only calls sit behind
   `#if os(iOS)`. The TV's icon is the empty `App Icon & Top Shelf Image` brand assets,
   waiting for art.
 - `Tools/import_sprites.py` — copies the GMS2 frames and slices the strips in
@@ -174,8 +174,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   floater's ball, and only until its first bounce off anything; a throw's never. Down
   through a rim scores unless the ball rose up through that rim first.
 
-Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the top
-tuning picker, menu resets, R3 switches the computer, L3 the hitboxes. Down on the stick
+Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the POWER
+picker, start (menu) pauses, R3 switches the computer, L2 the hitboxes. Down on the stick
 with the ball, standing or walking, is the sauce too: the taunt sheet for show, and any
 action or the stick cancels it.
 
@@ -333,7 +333,24 @@ added if the series gets there, and to either side of them each side's drinks wi
 levels, in its colour. What the computer drank goes up as a banner after BUCKET!!. Four points
 brings the win screen: NEW MATCH, a fresh
 best of seven with the drinks gone, or TITLE. RESET starts the round again with the
-drinks kept. A pick timer of twenty seconds for networked play is a number in `Series`,
+drinks kept.
+
+The stage select comes before the first round and after each stage's best of three:
+the first to two points on a stage (`Series.pointsPerStage`) ends it, and unless the
+series is over both go to the select before the drink. Rectangles in a row, The Wreck
+Center, Longball Stadium and Slamstill Traffic (`StageChoice`), the one under a cursor
+grown, and in its bottom-right corner a circle in the voter's colour, a ring while they
+look and filled once they've picked. Two picks the same go there; two different flip a
+coin on the series' dice, the light going back and forth for a second and a half before
+it lands. Against the computer this phone picks alone; with a second pad in, both vote.
+Online the first stage is a vote, and after that whoever lost the stage picks alone
+while the other watches. The new stage is a fresh match swapped in for the stopped one,
+keeping its frame, and the world is redrawn for it (`showStage`). What the computer
+drank at the end of a stage is lettered once play is back.
+
+Start on a pad, or delete on a keyboard, pauses a match offline: RESTART MATCH, a fresh
+best of seven on the stage the match started on; TITLE SCREEN; RESUME, where the cursor
+starts. Start again resumes too. A pick timer of twenty seconds for networked play is a number in `Series`,
 not enforced yet.
 
 Title lettering is `TitleText`: CardCourt's TwoXMark by another route, Avenir Next
@@ -387,14 +404,14 @@ holds the variants; A is always the baseline as tuned.
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
-  Punch, K Surf Soda, at the level LEVEL picks. The left bumper steps this one; the local side's power
+  Punch, K Surf Soda, at the level LEVEL picks. The left bumper always steps POWER; the local side's power
   and level are lettered under the pickers.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
   60 in and drawn for a rim at 120, the gold 8 wide; the crossbar sits 20 below that,
   tilted 20° with the end toward the field up, the uprights 100 over it; the back rod
   and the crossbar with its uprights each have their own 1 black outline, as do the
   light panels.
-- HITBOX, beside RESET, or a pad's left stick click (L3): draws the sim's boxes over the world. Bodies white, the loose
+- HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
 - AI, beside that: the computer plays the other side. Off, the second pad or nothing does.
@@ -408,8 +425,7 @@ lime #A6E51C, pink #F21188 and blue #1937FF. Each has an opposite: orange and te
 and lime, pink and blue. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two
-different colours can meet. The debug strip's COLOUR picker (offline only) sets the same saved choice
-mid-game, by initial. Purple is left out, as it's the loose ball's.
+different colours can meet. Purple is left out, as it's the loose ball's.
 
 ## Opponent
 
@@ -501,8 +517,7 @@ its length.
 
 ## Highway Traffic
 
-`Stage.highway`, built and tested but held back until stage selection; the court is in
-play (`Stage.current`). The court's 34 by 16,
+`Stage.highway`, Slamstill Traffic on the stage select. The court's 34 by 16,
 flat: a dark blue night, and a road where the field's grass is, the floor an invisible
 strip through its middle. Each player starts where the court has them, the ball loose at
 centre.
@@ -545,7 +560,7 @@ centre.
 
 ## Football Field
 
-`Stage.footballField`, built and tested but held back until stage selection. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
+`Stage.footballField`, Longball Stadium on the stage select. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
 invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
 at 107, 66 in from each wall, floating between the
 goalposts' uprights; by design a standing shot can't reach them, so scoring takes a
@@ -616,7 +631,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 
 ## Court
 
-The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The
+The Wreck Center on the stage select, and the default. The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The
 floor and walls start purple and shift over 20 frames to the colour of whoever holds the
 ball, and back. The backboard blocks wear the colour of the player who scores there's opponent, since you
 score on the other side's basket. The ledge is
@@ -674,7 +689,7 @@ first time the frame is reached, since it may already have gone over the wire; a
 that can't run drops its sample. Every packet carries every input the other side hasn't
 acknowledged, and the newest eight regardless, so a lost packet costs nothing: they go
 unreliably at 60 a second, five bytes an input (the stick and the aim in 127 steps a
-side, the buttons in one byte), which both sides simulate quantized. Hello, picks, the
+side, the buttons in one byte), which both sides simulate quantized. Hello, picks, stage votes, the
 rematch and bye go reliably. Each packet also carries a checksum of the sender's state
 before its last confirmed frame; a disagreement lights DESYNC in the corner readout,
 which also shows the lead and the rollback counts. Offline runs through the same session
@@ -691,7 +706,9 @@ both rolled off the shared dice. The pick is applied once every frame before the
 confirmed, as a change outside the inputs (`RollbackSession.mutate`), then both resume.
 Twenty seconds to pick, or the raised bottle drinks itself. The seed is the two phones'
 randoms together, exchanged in hello; the side whose Game Center player ID sorts first
-plays the left. MULTIPLAYER opens Apple's matchmaker sheet for two, invites or
+plays the left. A stage vote or pick crosses as the stage's raw value with the count of
+stages played, and goes in, like a drink, only once every frame before the stop is
+confirmed; a coin flip rolls on the shared dice, so both land the same. Protocol version 3. MULTIPLAYER opens Apple's matchmaker sheet for two, invites or
 automatch; it fails at once until the app's record in App Store Connect has Game
 Center on. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
 or a bye puts the title up with why under MULTIPLAYER. No computer, no reset, no

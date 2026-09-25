@@ -30,7 +30,8 @@ final class NetTests: XCTestCase {
     func testMessagesSurviveTheWire() {
         let packet = InputPacket(frame: 1234, advantage: -3, firstFrame: 1229, inputs: (0..<8).map { inputFor($0, player: 0).quantized },
                                  knownThrough: 1230, checkFrame: 1200, checksum: 0xDEADBEEF)
-        let messages: [NetMessage] = [.hello(random: 0xCAFEBABE, version: 2, colour: 4), .inputs(packet), .pick(round: 3, choice: 2), .rematch(random: 7), .bye]
+        let messages: [NetMessage] = [.hello(random: 0xCAFEBABE, version: 3, colour: 4), .inputs(packet), .pick(round: 3, choice: 2), .rematch(random: 7), .bye,
+                                .stage(stagesPlayed: 2, choice: 1)]
         for message in messages {
             XCTAssertEqual(NetMessage(data: message.data), message)
         }

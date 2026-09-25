@@ -39,7 +39,7 @@ final class GameScene: SKScene {
     /// one path: offline the other side's input is handed in each tick and every frame
     /// confirms at once; online the other phone's inputs arrive by frame and the sim
     /// rolls back when a prediction was wrong.
-    private var session = RollbackSession(match: Match(stage: .current, countdown: GameScene.countdownFrames), localIndex: 0)
+    private var session = RollbackSession(match: Match(stage: .court, countdown: GameScene.countdownFrames), localIndex: 0)
     private var match: Match { session.match }
     /// The computer on the other side, when the AI switch is on; never online.
     private var opponent = Opponent(index: 1)
@@ -57,6 +57,7 @@ final class GameScene: SKScene {
         var rematchRandom: UInt32?
         var theirRematch: UInt32?
         var theirColour: EnergyColour?
+        var theirStageVote: (stagesPlayed: Int, choice: Int)?
     }
     private var online: Online?
     private var localIndex: Int { online?.localIndex ?? 0 }
@@ -64,9 +65,9 @@ final class GameScene: SKScene {
     private var picker = 1
     private var pickFramesLeft = 0
 
-    /// The game loop round the sim: the title, a best of seven, a drink between rounds
-    /// for whoever was scored on, and the win.
-    private enum Flow { case title, playing, picking, won }
+    /// The game loop round the sim: the title, the stage select, a best of seven, a drink
+    /// between rounds for whoever was scored on, the pause, and the win.
+    private enum Flow { case title, stageSelect, playing, picking, paused, won }
     private var flow = Flow.title
     private var series = Series(seed: 1)
     private var screen: Screen?
@@ -76,6 +77,19 @@ final class GameScene: SKScene {
     /// online both phones stop the sim on that frame and change together.
     private var pendingFlow: Flow?
     private var pendingFlowFrame = 0
+    /// The stage select: who votes, the votes in, the coin flip's landing and its frames
+    /// left, whether the drink pick follows it, and the stage the series started on.
+    private var stageVoters: [Int] = []
+    private var stageVotes: [Int: StageChoice] = [:]
+    private var stageLanding: StageChoice?
+    private var stageFlipFrames = 0
+    private static let stageFlipLength = 90
+    private var pickAfterStage = false
+    private var firstStage = StageChoice.wreckCenter
+    /// What the computer drank at the end of a stage, lettered once play is back.
+    private var heldBanner: String?
+    /// Each side's energy colour, for the names on the screens.
+    private var sideColours = EnergyColour.pair(first: EnergyColour.saved, second: .teal)
     private static let flowDelayFrames = 60
     /// Frames the bodies stay hidden while the bolts bring them in, and the count's last
     /// value, to catch it reaching zero.
@@ -159,6 +173,7 @@ final class GameScene: SKScene {
     private var cameraBase = CGPoint.zero
     /// The HUD's scale for this screen, and the ice everything frozen goes.
     private var hudScale: CGFloat = 1
+    private var displayScale: CGFloat = 1
     private static let ice = SKColor(red: 0.62, green: 0.86, blue: 1, alpha: 1)
     private static let fireballColour = SKColor(red: 1, green: 0.45, blue: 0.15, alpha: 1)
     private static let flightTilt: CGFloat = .pi / 6
@@ -339,6 +354,11 @@ final class GameScene: SKScene {
 
     /// The field's scenery and goalposts into the ball cam's own scene, once.
     func fillBallCam(_ camScene: BallCamScene) {
+        if ballCamStale {
+            camScene.scenery.removeAllChildren()
+            camScene.built = false
+            ballCamStale = false
+        }
         guard !camScene.built, match.stage.features.ballCam else { return }
         camScene.built = true
         _ = FieldArt.build(for: match.stage, into: camScene.scenery, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
@@ -380,6 +400,7 @@ final class GameScene: SKScene {
             build()
             built = true
         }
+        self.displayScale = displayScale
         layout(displayScale: displayScale)
     }
 
@@ -416,103 +437,9 @@ final class GameScene: SKScene {
         warmNode.zPosition = 90
         glowHud.addChild(warmNode)
 
-        // The floor and walls take the holder's colour, the backboard blocks keep their rim's
-        // owner's, and the ledge is magenta.
-        let stage = match.stage
-        if stage.features.look == .highway {
-            HighwayArt.build(for: stage, into: ground) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
-        }
-        if stage.features.look == .footballField {
-            // The field: scenery in place of tiles, the floor invisible through the turf.
-            let handles = FieldArt.build(for: stage, into: ground, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
-                                         glow: sprites.softGlow(diameter: 64))
-            // The rail and the floodlights wear the possession's colour like the court's walls.
-            for rail in handles.rails {
-                rail.color = courtColour
-                courtTiles.append(rail)
-            }
-            fieldBlooms = handles.blooms
-            lightPanels = handles.panels
-            for panel in lightPanels { panel.fillColor = courtColour }
-            yardNumbers = handles.numbers
-            for number in yardNumbers { number.setScale(HelmetTuning.numberScale) }
-            for bloom in fieldBlooms { bloom.color = courtColour }
-            // Chevrons along the rail, pointing at the rim the holder attacks.
-            for (rail, line) in FieldArt.railLines.enumerated() {
-                var callX: CGFloat = 0
-                while callX < CGFloat(stage.columns) * GameScene.pixelsPerTile + GameScene.railCallSpacing {
-                    let call = TitleText.node(GameScene.railCall, size: 7)
-                    call.position = CGPoint(x: callX, y: line + FieldArt.railHeight / 2)
-                    call.zPosition = -16
-                    call.isHidden = true
-                    ground.addChild(call)
-                    railCalls.append((call, rail, callX))
-                    callX += GameScene.railCallSpacing
-                }
-                var x: CGFloat = 8
-                while x < CGFloat(stage.columns) * GameScene.pixelsPerTile {
-                    let chevron = SKSpriteNode(texture: sprites.symbol("chevron.right", pointSize: 9))
-                    chevron.color = SKColor(white: 1, alpha: 1)
-                    chevron.colorBlendFactor = 1
-                    chevron.alpha = 0.55
-                    chevron.position = CGPoint(x: x, y: line + FieldArt.railHeight / 2)
-                    chevron.zPosition = -16
-                    chevron.isHidden = true
-                    ground.addChild(chevron)
-                    railChevrons.append(chevron)
-                    railChevronHomes.append(x)
-                    x += 14
-                }
-            }
-            goalpostShadows.shouldRasterize = true
-            goalpostShadows.alpha = FieldArt.shadowAlpha
-            goalpostShadows.zPosition = -6
-            ground.addChild(goalpostShadows)
-            ground.addChild(goalposts)
-            buildGoalposts()
-            glowers.addChild(backboards)
-            buildBackboards()
-        }
-        for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.scenic {
-            for column in 0..<stage.columns {
-                // The side walls run on up through the sky, so a tall screen never sees their top.
-                let tile = row < stage.rows ? stage.tile(column: column, row: row) : ((column == 0 || column == stage.columns - 1) ? Tile.solid : Tile.empty)
-                guard tile != .empty else { continue }
-                let node = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
-                node.colorBlendFactor = 1
-                node.anchorPoint = .zero
-                node.position = CGPoint(x: CGFloat(column) * GameScene.pixelsPerTile, y: CGFloat(row) * GameScene.pixelsPerTile)
-                let x = (Double(column) + 0.5) * Stage.tileSize, y = (Double(row) + 0.5) * Stage.tileSize
-                let border = column == 0 || column == stage.columns - 1 || row == 0
-                if tile == .oneWay {
-                    node.color = SKColor(rgb: CourtLook.ledge)
-                } else if !border, let hoop = stage.hoops.min(by: { $0.position.distance(to: Vec2(x: x, y: y)) < $1.position.distance(to: Vec2(x: x, y: y)) }) {
-                    // You score on your opponent's basket, so the block wears the other colour.
-                    node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow))
-                    blockTiles.append((node, 1 - hoop.owner))
-                } else {
-                    node.color = courtColour
-                    courtTiles.append(node)
-                }
-                ground.addChild(node)
-            }
-        }
-
-        for hoop in stage.hoops {
-            let rim = SKSpriteNode(texture: sprites.texture("hoop_rim", 0))
-            rim.position = SpriteLibrary.point(hoop.position)
-            rim.zPosition = 5
-            // The sheet draws the rim with its backboard on the right.
-            rim.xScale = hoop.backboard == .left ? -1 : 1
-            ground.addChild(rim)
-            rimNodes.append(rim)
-            rimFlash.append(0)
-            // Drawn round nothing and placed, so it can follow a rim that moves.
-            let hanging = net(at: .zero)
-            hanging.position = rim.position
-            ground.addChild(hanging)
-            netNodes.append(hanging)
-        }
+        ground.addChild(stageGround)
+        glowers.addChild(stageGlowers)
+        buildStage()
 
         for player in match.players {
             let node = SKSpriteNode(texture: sprites.texture(player.animationFrame, player: player.index))
@@ -708,6 +635,148 @@ final class GameScene: SKScene {
         hud.addChild(fpsLabel)
     }
 
+    // MARK: The stage
+
+    /// Everything drawn for one stage, in its own layers so a stage change can take it all
+    /// away: the tiles or the scenery, the rims and their nets.
+    private let stageGround = SKNode()
+    private let stageGlowers = SKNode()
+    /// The stage the world is drawn for, and the ball cam's scenery due a redraw.
+    private var builtStage = StageChoice.wreckCenter
+    private var ballCamStale = false
+
+    private func buildStage() {
+        // The floor and walls take the holder's colour, the backboard blocks keep their rim's
+        // owner's, and the ledge is magenta.
+        let stage = match.stage
+        if stage.features.look == .highway {
+            HighwayArt.build(for: stage, into: stageGround) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
+        }
+        if stage.features.look == .footballField {
+            // The field: scenery in place of tiles, the floor invisible through the turf.
+            let handles = FieldArt.build(for: stage, into: stageGround, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
+                                         glow: sprites.softGlow(diameter: 64))
+            // The rail and the floodlights wear the possession's colour like the court's walls.
+            for rail in handles.rails {
+                rail.color = courtColour
+                courtTiles.append(rail)
+            }
+            fieldBlooms = handles.blooms
+            lightPanels = handles.panels
+            for panel in lightPanels { panel.fillColor = courtColour }
+            yardNumbers = handles.numbers
+            for number in yardNumbers { number.setScale(HelmetTuning.numberScale) }
+            for bloom in fieldBlooms { bloom.color = courtColour }
+            // Chevrons along the rail, pointing at the rim the holder attacks.
+            for (rail, line) in FieldArt.railLines.enumerated() {
+                var callX: CGFloat = 0
+                while callX < CGFloat(stage.columns) * GameScene.pixelsPerTile + GameScene.railCallSpacing {
+                    let call = TitleText.node(GameScene.railCall, size: 7)
+                    call.position = CGPoint(x: callX, y: line + FieldArt.railHeight / 2)
+                    call.zPosition = -16
+                    call.isHidden = true
+                    stageGround.addChild(call)
+                    railCalls.append((call, rail, callX))
+                    callX += GameScene.railCallSpacing
+                }
+                var x: CGFloat = 8
+                while x < CGFloat(stage.columns) * GameScene.pixelsPerTile {
+                    let chevron = SKSpriteNode(texture: sprites.symbol("chevron.right", pointSize: 9))
+                    chevron.color = SKColor(white: 1, alpha: 1)
+                    chevron.colorBlendFactor = 1
+                    chevron.alpha = 0.55
+                    chevron.position = CGPoint(x: x, y: line + FieldArt.railHeight / 2)
+                    chevron.zPosition = -16
+                    chevron.isHidden = true
+                    stageGround.addChild(chevron)
+                    railChevrons.append(chevron)
+                    railChevronHomes.append(x)
+                    x += 14
+                }
+            }
+            goalpostShadows.shouldRasterize = true
+            goalpostShadows.alpha = FieldArt.shadowAlpha
+            goalpostShadows.zPosition = -6
+            stageGround.addChild(goalpostShadows)
+            stageGround.addChild(goalposts)
+            buildGoalposts()
+            stageGlowers.addChild(backboards)
+            buildBackboards()
+        }
+        for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.scenic {
+            for column in 0..<stage.columns {
+                // The side walls run on up through the sky, so a tall screen never sees their top.
+                let tile = row < stage.rows ? stage.tile(column: column, row: row) : ((column == 0 || column == stage.columns - 1) ? Tile.solid : Tile.empty)
+                guard tile != .empty else { continue }
+                let node = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
+                node.colorBlendFactor = 1
+                node.anchorPoint = .zero
+                node.position = CGPoint(x: CGFloat(column) * GameScene.pixelsPerTile, y: CGFloat(row) * GameScene.pixelsPerTile)
+                let x = (Double(column) + 0.5) * Stage.tileSize, y = (Double(row) + 0.5) * Stage.tileSize
+                let border = column == 0 || column == stage.columns - 1 || row == 0
+                if tile == .oneWay {
+                    node.color = SKColor(rgb: CourtLook.ledge)
+                } else if !border, let hoop = stage.hoops.min(by: { $0.position.distance(to: Vec2(x: x, y: y)) < $1.position.distance(to: Vec2(x: x, y: y)) }) {
+                    // You score on your opponent's basket, so the block wears the other colour.
+                    node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow))
+                    blockTiles.append((node, 1 - hoop.owner))
+                } else {
+                    node.color = courtColour
+                    courtTiles.append(node)
+                }
+                stageGround.addChild(node)
+            }
+        }
+
+        for hoop in stage.hoops {
+            let rim = SKSpriteNode(texture: sprites.texture("hoop_rim", 0))
+            rim.position = SpriteLibrary.point(hoop.position)
+            rim.zPosition = 5
+            // The sheet draws the rim with its backboard on the right.
+            rim.xScale = hoop.backboard == .left ? -1 : 1
+            stageGround.addChild(rim)
+            rimNodes.append(rim)
+            rimFlash.append(0)
+            // Drawn round nothing and placed, so it can follow a rim that moves.
+            let hanging = net(at: .zero)
+            hanging.position = rim.position
+            stageGround.addChild(hanging)
+            netNodes.append(hanging)
+        }
+    }
+
+    /// The world redrawn for the series' stage, if it isn't the one drawn.
+    private func showStage() {
+        guard built, series.stage != builtStage else { return }
+        stageGround.removeAllChildren()
+        stageGlowers.removeAllChildren()
+        courtTiles = []
+        blockTiles = []
+        rimNodes = []
+        rimFlash = []
+        netNodes = []
+        fieldBlooms = []
+        lightPanels = []
+        yardNumbers = []
+        railCalls = []
+        railChevrons = []
+        railChevronHomes = []
+        helmetNodes = [:]
+        carNodes = [:]
+        carFlash = [:]
+        carDip = [:]
+        helicopterNode = nil
+        portalNode = nil
+        riftPlates = []
+        downMarker = nil
+        closeBoundsGallery()
+        buildStage()
+        builtStage = series.stage
+        ballCamStale = true
+        cameraBase = .zero
+        layout(displayScale: displayScale)
+    }
+
     /// A soft glow in the colour, added, which the glow pass then picks up.
     private func makeHalo(_ colour: SKColor) -> SKSpriteNode {
         let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
@@ -885,15 +954,6 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        // Same choice as the title's circles; online the colours are settled in the hello.
-        if online == nil {
-            let colours = EnergyColour.allCases
-            controls.addPicker(title: "COLOUR", options: colours.map { $0.rawValue.prefix(1).uppercased() },
-                               selected: colours.firstIndex(of: EnergyColour.saved) ?? 0) { [weak self] index in
-                UserDefaults.standard.set(colours[index].rawValue, forKey: EnergyColour.storageKey)
-                self?.applySavedColours()
-            }
-        }
         // The bounds gallery only means anything on the highway.
         if match.stage.features.traffic {
             controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
@@ -957,6 +1017,16 @@ final class GameScene: SKScene {
         hub.touch = flow == .playing ? controls?.sample() ?? .idle : .idle
         let inputs = hub.frames(players: match.players.count)
         tickOnline()
+        // Start or delete pauses a match offline, and again resumes it.
+        if hub.consumePause(), online == nil {
+            if flow == .playing {
+                menuLast = inputs.first ?? .idle
+                enter(.paused)
+            } else if flow == .paused {
+                enter(.playing)
+            }
+        }
+        if flow == .stageSelect { tickStageSelect(inputs) }
         if flow != .playing {
             // A screen is up: the stick moves its cursor and jump picks; the sim waits. On
             // the title, which the SwiftUI layer draws, jump starts the series.
@@ -983,8 +1053,7 @@ final class GameScene: SKScene {
             render()
             return
         }
-        if online == nil, hub.consumeReset() { reset() }
-        if hub.consumeCycle() { controls?.cycleTopPicker() }
+        if hub.consumeCycle() { controls?.cyclePicker(titled: "POWER") }
         if online == nil, hub.consumeAIToggle() {
             aiOn.toggle()
             controls?.aiOn = aiOn
@@ -1055,8 +1124,23 @@ final class GameScene: SKScene {
         startSeries(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
     }
 
+    /// The series, held still on the court until the first stage is chosen.
     private func startSeries(seed: UInt32) {
+        pendingFlow = nil
+        heldBanner = nil
         series = Series(seed: seed)
+        startRound()
+        session.stopAt = session.frame
+        pickAfterStage = false
+        enter(.stageSelect)
+    }
+
+    /// The pause's RESTART MATCH: a fresh best of seven on the stage this one started on.
+    private func restartMatch() {
+        pendingFlow = nil
+        heldBanner = nil
+        series = Series(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
+        series.stage = firstStage
         startRound()
         enter(.playing)
     }
@@ -1064,9 +1148,29 @@ final class GameScene: SKScene {
     /// A round: bodies with their drinks in them at their spawns, the count, and the
     /// bolts that bring them in.
     private func startRound() {
+        session = RollbackSession(match: freshMatch(), localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
+        showStage()
+        controls?.setOnline(online != nil)
+        freshRoundView()
+        bringPlayersIn()
+    }
+
+    /// The view's hold on the last round let go: the computer, the rim flashes, the ball's colour.
+    private func freshRoundView() {
+        opponent = Opponent(index: 1)
+        rimFlash = rimFlash.map { _ in 0 }
+        ballTeam = SKColor(rgb: BallLook.neutral)
+        ballHold = 0
+        ballShift = 0
+        lastCount = match.countdown
+        drawSeries()
+    }
+
+    /// A match on the series' stage with the drinks in it, and the picker's power offline.
+    private func freshMatch() -> Match {
         // The field's dice and coin flip come off the series' dice, the same on both phones.
         let fieldSeed = UInt32(series.dice.roll(1 << 16)) &+ 1
-        var fresh = Match(stage: .current, specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed)
+        var fresh = Match(stage: series.stage.stage, specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed)
         for index in fresh.players.indices {
             fresh.players[index].power = series.drinks[index].power
             fresh.players[index].powerLevel = series.drinks[index].powerLevel
@@ -1077,16 +1181,104 @@ final class GameScene: SKScene {
                 fresh.players[index].powerLevel = powerLevelVariant.level
             }
         }
-        session = RollbackSession(match: fresh, localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
-        controls?.setOnline(online != nil)
-        opponent = Opponent(index: 1)
-        rimFlash = rimFlash.map { _ in 0 }
-        ballTeam = SKColor(rgb: BallLook.neutral)
-        ballHold = 0
-        ballShift = 0
-        lastCount = match.countdown
-        drawSeries()
+        return fresh
+    }
+
+    // MARK: The stage select
+
+    /// Who votes and who of them is on this phone. Online the first stage is a vote and
+    /// after that the loser of the stage picks; offline this phone picks, with a second
+    /// pad voting too.
+    private var localStageVoters: [Int] {
+        online == nil ? stageVoters : stageVoters.filter { $0 == localIndex }
+    }
+
+    private func openStageSelect() {
+        if online != nil {
+            stageVoters = series.stageWinner.map { [1 - $0] } ?? [0, 1]
+        } else {
+            stageVoters = hub.playerTwoHasController ? [0, 1] : [0]
+        }
+        stageVotes = [:]
+        stageLanding = nil
+    }
+
+    /// Every frame on the stage select: the second pad's cursor offline, the other phone's
+    /// vote, the settle, and the coin flip.
+    private func tickStageSelect(_ inputs: [PlayerInput]) {
+        guard let select = screen as? StageSelectScreen else { return }
+        if online == nil, stageVoters.contains(1), inputs.count > 1 {
+            let pad = inputs[1]
+            if pad.stick.x >= 0.5, secondMenuLast.stick.x < 0.5 { select.move(voter: 1, by: 1) }
+            if pad.stick.x <= -0.5, secondMenuLast.stick.x > -0.5 { select.move(voter: 1, by: -1) }
+            if pad.jump, !secondMenuLast.jump { select.lock(voter: 1) }
+            secondMenuLast = pad
+        }
+        if let landing = stageLanding {
+            stageFlipFrames -= 1
+            let tail = 30
+            let other = stageVoters.compactMap { stageVotes[$0] }.first { $0 != landing } ?? landing
+            let step = max(stageFlipFrames - tail, 0) / 6
+            select.showFlip(lit: (step % 2 == 0 ? landing : other).rawValue)
+            if stageFlipFrames <= 0 { settleStage(landing) }
+            return
+        }
+        let remote = 1 - localIndex
+        if let theirs = online?.theirStageVote, theirs.stagesPlayed == series.stagesPlayed,
+           stageVoters.contains(remote), let choice = StageChoice(rawValue: theirs.choice) {
+            online?.theirStageVote = nil
+            stageVotes[remote] = choice
+            select.show(vote: choice.rawValue, by: remote)
+        }
+        guard stageVoters.allSatisfy({ stageVotes[$0] != nil }) else { return }
+        // Online the stage goes in only once every frame before the stop is confirmed.
+        if online != nil, !session.settled { return }
+        let votes = stageVoters.compactMap { stageVotes[$0] }
+        let landing = series.settle(votes: votes)
+        if Set(votes).count > 1 {
+            stageLanding = landing
+            stageFlipFrames = GameScene.stageFlipLength
+        } else {
+            settleStage(landing)
+        }
+    }
+    private var secondMenuLast = PlayerInput.idle
+
+    private func voteStage(_ choice: StageChoice, by voter: Int) {
+        guard flow == .stageSelect, stageVoters.contains(voter), stageVotes[voter] == nil else { return }
+        stageVotes[voter] = choice
+        if online != nil { send(.stage(stagesPlayed: series.stagesPlayed, choice: choice.rawValue), reliable: true) }
+    }
+
+    /// The chosen stage in: a fresh match on it in place of the stopped one, keeping the
+    /// frame so the session runs on; then the drink pick if one is due, or play.
+    private func settleStage(_ choice: StageChoice) {
+        stageLanding = nil
+        if series.rounds.isEmpty {
+            series.stage = choice
+            firstStage = choice
+        } else {
+            series.move(to: choice)
+        }
+        let fresh = freshMatch()
+        session.mutate { match in
+            let frame = match.frame
+            match = fresh
+            match.frame = frame
+        }
+        showStage()
+        freshRoundView()
+        if pickAfterStage {
+            enter(.picking)
+            return
+        }
+        session.stopAt = nil
         bringPlayersIn()
+        if let heldBanner {
+            bannerQueue.append((heldBanner, 26))
+            self.heldBanner = nil
+        }
+        enter(.playing)
     }
 
     /// The drinks onto the bodies as they stand, for the round about to count. The POWER
@@ -1135,13 +1327,24 @@ final class GameScene: SKScene {
             let offers = series.offers(for: 1)
             let drink = offers[series.dice.roll(offers.count)]
             series.drink(drink, by: 1)
-            applyDrinks()
             drawSeries()
-            bringPlayersIn()
-            bannerQueue.append(("\(sideName(1)) DRINKS \(drink.name.uppercased())", 26))
+            let banner = "\(sideName(1)) DRINKS \(drink.name.uppercased())"
+            if series.stageSelectDue {
+                // The stage is done: the select, and what the computer drank once play is back.
+                heldBanner = banner
+                pickAfterStage = false
+                pendingFlow = .stageSelect
+                pendingFlowFrame = frame + GameScene.flowDelayFrames
+                session.stopAt = pendingFlowFrame
+            } else {
+                applyDrinks()
+                bringPlayersIn()
+                bannerQueue.append((banner, 26))
+            }
         } else {
             picker = 1 - scorer
-            pendingFlow = .picking
+            pickAfterStage = true
+            pendingFlow = series.stageSelectDue ? .stageSelect : .picking
             pendingFlowFrame = frame + GameScene.flowDelayFrames
         }
         if online != nil, pendingFlow != nil { session.stopAt = pendingFlowFrame }
@@ -1151,6 +1354,7 @@ final class GameScene: SKScene {
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
         ballCamFrame.isHidden = next != .playing
         flow = next
+        if next == .stageSelect { openStageSelect() }
         if next == .picking {
             // Both phones roll the same offers off the shared dice.
             pickOffers = series.offers(for: picker)
@@ -1161,7 +1365,7 @@ final class GameScene: SKScene {
     }
 
     private func sideName(_ index: Int) -> String {
-        index == 0 ? "ORANGE" : "TEAL"
+        sideColours.indices.contains(index) ? sideColours[index].rawValue.uppercased() : "TEAL"
     }
 
     /// The pick, ours: applied at once offline, sent and then applied once the sim has
@@ -1242,6 +1446,22 @@ final class GameScene: SKScene {
             } else {
                 screen = WaitScreen(halfWidth: halfWidth, halfHeight: halfHeight, who: sideName(picker))
             }
+        case .stageSelect:
+            let colours = [0, 1].map { SKColor(rgb: sprites.look(for: $0).glow) }
+            let heading = online != nil && stageVoters.count == 1 ? "\(sideName(stageVoters[0])) PICKS" : nil
+            let select = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: StageChoice.allCases.map { $0.name.uppercased() },
+                                           voters: stageVoters, localVoters: localStageVoters, colours: colours, heading: heading,
+                                           start: series.stage.rawValue) { [weak self] voter, index in
+                self?.voteStage(StageChoice(rawValue: index) ?? .wreckCenter, by: voter)
+            }
+            for (voter, vote) in stageVotes { select.show(vote: vote.rawValue, by: voter) }
+            screen = select
+        case .paused:
+            let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight,
+                                    onRestart: { [weak self] in self?.restartMatch() },
+                                    onTitle: { [weak self] in self?.enter(.title) },
+                                    onResume: { [weak self] in self?.enter(.playing) })
+            screen = pause
         case .won:
             let winner = series.winner ?? 0
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(winner),
@@ -1399,6 +1619,7 @@ final class GameScene: SKScene {
     /// Both sides' colours onto everything drawn in them.
     func applyColours(_ colours: [EnergyColour]) {
         for (index, colour) in colours.enumerated() { sprites.setLook(colour.look, for: index) }
+        sideColours = colours
         headStreamsCache = [:]
         for (index, flashes) in zip(stunBodies.indices, zip(stunBodies, stunHeads)) {
             let dark = SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
@@ -1443,6 +1664,8 @@ final class GameScene: SKScene {
             startRematchIfBothIn()
         case .bye:
             endOnline("THEY LEFT")
+        case .stage(let stagesPlayed, let choice):
+            online?.theirStageVote = (stagesPlayed, choice)
         }
     }
 
@@ -2202,7 +2425,7 @@ final class GameScene: SKScene {
                 // The far lane behind everything that plays, and darker for being further off.
                 let far = car.level == 1
                 body.zPosition = far ? -7 : 3
-                ground.addChild(body)
+                stageGround.addChild(body)
                 var wheels: SKSpriteNode?
                 if let texture = HighwayArt.texture("vehicle_\(art)_wheels", art: art) {
                     let node = SKSpriteNode(texture: texture)
@@ -2214,7 +2437,7 @@ final class GameScene: SKScene {
                         node.color = .black
                         node.colorBlendFactor = GameScene.farLaneShade
                     }
-                    ground.addChild(node)
+                    stageGround.addChild(node)
                     wheels = node
                 }
                 // The drawings face right; the sim says which way this one faces.
@@ -2258,7 +2481,7 @@ final class GameScene: SKScene {
             if helicopterNode == nil || helicopterId != flying.id {
                 helicopterNode?.removeFromParent()
                 helicopterNode = makeHelicopter(for: flying)
-                ground.addChild(helicopterNode!)
+                stageGround.addChild(helicopterNode!)
                 helicopterId = flying.id
             }
             helicopterNode?.position = SpriteLibrary.point(Vec2(x: flying.x, y: flying.y))
@@ -2535,7 +2758,7 @@ final class GameScene: SKScene {
                 let colour = SKColor(rgb: sprites.look(for: helmet.owner).glow)
                 let node = SKSpriteNode(texture: helmetTexture(variant: helmet.variant, colour: colour))
                 node.zPosition = 6
-                glowers.addChild(node)
+                stageGlowers.addChild(node)
                 helmetNodes[helmet.id] = node
                 return node
             }()
@@ -2565,7 +2788,7 @@ final class GameScene: SKScene {
                 marker.size = CGSize(width: FieldArt.markerHeight * 121 / 512, height: FieldArt.markerHeight)
                 marker.anchorPoint = CGPoint(x: 0.5, y: 0)
                 marker.zPosition = -12
-                ground.addChild(marker)
+                stageGround.addChild(marker)
                 downMarker = marker
             }
             // It stays at the last spot a loose ball rested, until the next, or the point ends.
@@ -2598,7 +2821,7 @@ final class GameScene: SKScene {
             if portalNode == nil || portalId != portal.id {
                 portalNode?.removeFromParent()
                 portalNode = makeRift()
-                glowers.addChild(portalNode!)
+                stageGlowers.addChild(portalNode!)
                 portalId = portal.id
             }
             portalNode?.position = SpriteLibrary.point(portal.centre)

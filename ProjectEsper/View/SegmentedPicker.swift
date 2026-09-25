@@ -6,11 +6,13 @@ final class SegmentedPicker: SKNode {
 
     private var segments: [SKShapeNode] = []
     private(set) var selected: Int
+    let title: String
     private let onSelect: (Int) -> Void
 
     /// Laid out from the top-left corner of the title.
     init(title: String, options: [String], selected: Int, onSelect: @escaping (Int) -> Void) {
         self.selected = selected
+        self.title = title
         self.onSelect = onSelect
         super.init()
 

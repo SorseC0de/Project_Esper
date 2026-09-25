@@ -483,7 +483,26 @@ public struct Stage: Equatable {
         return stage
     }
 
-    /// The stage in play. The court, for now: the football field and the highway are built
-    /// and tested but held back until stage selection.
-    public static var current: Stage { court }
+}
+
+/// The stages to pick from, in the order the select screen shows them; the wire carries
+/// the raw value.
+public enum StageChoice: Int, CaseIterable {
+    case wreckCenter, longballStadium, slamstillTraffic
+
+    public var name: String {
+        switch self {
+        case .wreckCenter: "The Wreck Center"
+        case .longballStadium: "Longball Stadium"
+        case .slamstillTraffic: "Slamstill Traffic"
+        }
+    }
+
+    public var stage: Stage {
+        switch self {
+        case .wreckCenter: .court
+        case .longballStadium: .footballField
+        case .slamstillTraffic: .highway
+        }
+    }
 }

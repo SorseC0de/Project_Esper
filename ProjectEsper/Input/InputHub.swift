@@ -6,23 +6,25 @@ import GameController
 /// controller is player 1, and with two the first is player 0 and the second player 1.
 /// On the TV the first controller is player 0 and the second player 1. A keyboard, on an
 /// iPad or a Mac, is player 0 too: WASD moves, space jumps, J shoots, K throws, shift
-/// steps the picker like the left bumper. Everything is read as held state each frame,
+/// steps the power like the left bumper, delete pauses like the start button. Everything is read as held state each frame,
 /// so nothing queues and nothing is lost between frames.
 @MainActor
 final class InputHub {
     /// What the on-screen controls hold right now. The scene writes it.
     var touch = PlayerInput.idle
     private(set) var controllers: [GCController] = []
-    /// A pad's menu button went down since the last check; the left bumper likewise,
-    /// and the right stick's click, which switches the computer on and off.
-    private(set) var resetPressed = false
+    /// A pad's menu button or delete went down since the last check; the left bumper
+    /// likewise, the right stick's click, which switches the computer on and off, and the
+    /// left trigger, which shows the hitboxes.
+    private(set) var pausePressed = false
     private(set) var cyclePressed = false
     private(set) var aiTogglePressed = false
     private(set) var hitboxTogglePressed = false
     private var menuWasDown = false
     private var bumperWasDown = false
     private var stickClickWasDown = false
-    private var leftClickWasDown = false
+    private var leftTriggerWasDown = false
+    private var deleteWasDown = false
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -51,10 +53,10 @@ final class InputHub {
         controllers = GCController.controllers().filter { $0.extendedGamepad != nil }
         #if os(tvOS)
         // On the TV a menu button nobody handles sends the app home, so it's claimed
-        // here: it resets, as it does on a phone.
+        // here: it pauses, as it does on a phone.
         for controller in controllers {
             controller.extendedGamepad?.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
-                if pressed { MainActor.assumeIsolated { self?.resetPressed = true } }
+                if pressed { MainActor.assumeIsolated { self?.pausePressed = true } }
             }
             // B is a shoot button here; unclaimed, the TV reads it as back and leaves the app.
             controller.extendedGamepad?.buttonB.pressedChangedHandler = { _, _, _ in }
@@ -66,10 +68,13 @@ final class InputHub {
     func frames(players: Int) -> [PlayerInput] {
         #if !os(tvOS)
         let menuDown = controllers.contains { $0.extendedGamepad?.buttonMenu.isPressed ?? false }
-        if menuDown, !menuWasDown { resetPressed = true }
+        if menuDown, !menuWasDown { pausePressed = true }
         menuWasDown = menuDown
         #endif
         let keys = GCKeyboard.coalesced?.keyboardInput
+        let deleteDown = keys?.button(forKeyCode: .deleteOrBackspace)?.isPressed ?? false
+        if deleteDown, !deleteWasDown { pausePressed = true }
+        deleteWasDown = deleteDown
         let shiftDown = keys.map { $0.button(forKeyCode: .leftShift)?.isPressed ?? false || $0.button(forKeyCode: .rightShift)?.isPressed ?? false } ?? false
         let bumperDown = shiftDown || controllers.contains { $0.extendedGamepad?.leftShoulder.isPressed ?? false }
         if bumperDown, !bumperWasDown { cyclePressed = true }
@@ -77,9 +82,9 @@ final class InputHub {
         let stickClickDown = controllers.contains { $0.extendedGamepad?.rightThumbstickButton?.isPressed ?? false }
         if stickClickDown, !stickClickWasDown { aiTogglePressed = true }
         stickClickWasDown = stickClickDown
-        let leftClickDown = controllers.contains { $0.extendedGamepad?.leftThumbstickButton?.isPressed ?? false }
-        if leftClickDown, !leftClickWasDown { hitboxTogglePressed = true }
-        leftClickWasDown = leftClickDown
+        let leftTriggerDown = controllers.contains { $0.extendedGamepad?.leftTrigger.isPressed ?? false }
+        if leftTriggerDown, !leftTriggerWasDown { hitboxTogglePressed = true }
+        leftTriggerWasDown = leftTriggerDown
         return (0..<players).map { index in
             let pad = controller(for: index).map { read($0.extendedGamepad!) } ?? PlayerInput.idle
             return index == 0 ? merge(merge(touch, keyboard()), pad) : pad
@@ -120,10 +125,10 @@ final class InputHub {
     /// A second person is on a pad: the computer sits out.
     var playerTwoHasController: Bool { controller(for: 1) != nil }
 
-    /// True once per menu press.
-    func consumeReset() -> Bool {
-        defer { resetPressed = false }
-        return resetPressed
+    /// True once per menu or delete press.
+    func consumePause() -> Bool {
+        defer { pausePressed = false }
+        return pausePressed
     }
 
     /// True once per left bumper press.
@@ -138,15 +143,16 @@ final class InputHub {
         return aiTogglePressed
     }
 
-    /// True once per left stick click.
+    /// True once per left trigger press.
     func consumeHitboxToggle() -> Bool {
         defer { hitboxTogglePressed = false }
         return hitboxTogglePressed
     }
 
     /// A: jump. B, the right bumper and the right trigger: shoot, each its own button so a
-    /// second one cancels a shot. X: throw. Y: taunt. The left bumper steps the tuning
-    /// picker, the menu button resets, and clicking the right stick switches the computer.
+    /// second one cancels a shot. X: throw. Y: taunt. The left bumper steps the POWER
+    /// picker, the menu button pauses, the left trigger shows the hitboxes, and clicking
+    /// the right stick switches the computer.
     /// The right stick aims a stance; failing that, the left stick does.
     private func read(_ pad: GCExtendedGamepad) -> PlayerInput {
         var stick = deadzoned(Vec2(x: Double(pad.leftThumbstick.xAxis.value), y: Double(pad.leftThumbstick.yAxis.value)))

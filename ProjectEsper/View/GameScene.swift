@@ -95,6 +95,7 @@ final class GameScene: SKScene {
     /// value, to catch it reaching zero.
     private var roundIntro = 0
     private var lastCount = 0
+    private var lastCountSounded = 0
     /// Title lettering over the court: the count, BALL OUT, BUCKET, what the computer
     /// drank, one after another; the round circles; and each side's drinks beside them.
     private let banner = SKSpriteNode()
@@ -1305,6 +1306,8 @@ final class GameScene: SKScene {
     /// hidden until the flash.
     private func bringPlayersIn() {
         roundIntro = 12
+        SoundBoard.shared.play(.portIn)
+        lastCountSounded = 0
         let top = cameraNode.position.y + size.height * cameraNode.yScale / 2
         for player in match.players {
             let point = SpriteLibrary.point(player.position)
@@ -2046,6 +2049,7 @@ final class GameScene: SKScene {
             return
         }
         let zeus = power == .zeusJuice
+        if zeus, let crack = SoundBoard.lightning.randomElement() { SoundBoard.shared.play(crack) }
         let spark = (zeus ? EnergyEffect.lightningSparks : EnergyEffect.hitSparks).randomElement()!
         glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale * (zeus ? 0.5 : 1)))
     }
@@ -2057,6 +2061,7 @@ final class GameScene: SKScene {
     /// the same tone and the floor and walls go white, fading back. The crown erupts off
     /// the rim with it.
     private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
+        SoundBoard.shared.play(.basket)
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
         let bolt = EnergyEffect.strikes.randomElement()!
@@ -3482,10 +3487,17 @@ final class GameScene: SKScene {
         drawHitboxes()
         // The count in title lettering, BALL OUT as it ends, and any other banner for its frames.
         if match.countdown > 0 {
-            TitleText.set(banner, to: "\((match.countdown + 59) / 60)", size: 80)
+            let number = (match.countdown + 59) / 60
+            // Each number's own sound as it goes up, in play only, not under a screen.
+            if number != lastCountSounded, flow == .playing {
+                lastCountSounded = number
+                if let sound = SoundBoard.count[number] { SoundBoard.shared.play(sound) }
+            }
+            TitleText.set(banner, to: "\(number)", size: 80)
             banner.isHidden = false
             bannerFrames = 0
         } else if lastCount > 0 {
+            lastCountSounded = 0
             showBanner("BALL OUT!!!", size: 48)
         } else {
             tickBanner()

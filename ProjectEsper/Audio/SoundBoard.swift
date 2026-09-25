@@ -9,14 +9,22 @@ final class SoundBoard {
 
     enum Effect: String, CaseIterable {
         case ballBounce = "ball_bounce"
+        case basket
+        case countOne = "1"
+        case countTwo = "2"
+        case countThree = "3"
         case esperSlash = "esper_slash"
         case jump
+        case lightningOne = "lightning1"
+        case lightningTwo = "lightning2"
+        case lightningThree = "lightning3"
         case menuBack = "menu_back"
         case menuCursor = "menu_cursor"
         case menuSelect = "menu_select"
         case playerHit = "player_hit"
         case playerShoot = "player_shoot"
         case playerSnatch = "player_snatch"
+        case portIn = "port_in"
         case slashWallClank = "slash_wallclank"
         case step
     }
@@ -51,6 +59,9 @@ final class SoundBoard {
         }
         try? engine.start()
     }
+
+    static let lightning: [Effect] = [.lightningOne, .lightningTwo, .lightningThree]
+    static let count: [Int: Effect] = [1: .countOne, 2: .countTwo, 3: .countThree]
 
     /// Plays on the next voice round the ring, cutting off whatever it was playing.
     func play(_ effect: Effect, volume: Float = 1) {

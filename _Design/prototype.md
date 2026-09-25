@@ -659,7 +659,8 @@ ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's j
 
 ## Sound
 
-The user's effects in `_Sound FX`, brought into `ProjectEsper/Sounds` as 16-bit PCM by
+The user's effects in `_Sound FX`, any of WAV, MP3 or M4A, brought into `ProjectEsper/Sounds`
+as 16-bit 44.1 kHz mono WAV by
 `Tools/import_sounds.py` (run it after adding or changing one; the originals are only
 read). `SoundBoard` reads each into memory once and plays it on a ring of twelve voices
 through one engine, ambient, so the silent switch mutes it. Sounds come off the events
@@ -676,6 +677,10 @@ shown, once, like the effects.
   lowest, under five art pixels: the dribbles and the taunt (idle 3 and 8, walk 2 and 6,
   run 4, taunt 2 and 7).
 - step: the walk and run sheets' frames 0 and 4, on the ground.
+- 3, 2, 1: each number of the count as it goes up, in play.
+- port_in: the bolts that strike the bodies in at a round's start.
+- basket: a point, with the strike on the rim.
+- lightning1, 2, 3, one at random: with every lightning spark, Zeus Juice's hits.
 - menu_cursor: a cursor moving, a colour circle. menu_select: a choice or a stage picked,
   BEST OF 7, MULTIPLAYER. menu_back: RESUME, start to unpause, TITLE and TITLE SCREEN.
 

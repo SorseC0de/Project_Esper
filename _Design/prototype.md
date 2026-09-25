@@ -289,7 +289,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   off an edge too, floating as off a jump; a jump throws a cloud of bubbles in place of
   the spark, and a landing's bubbles spread wide along the ground at their own sizes. Both jumps are a fixed crescent, a quarter circle 40
   up and 30 forward the way it faces over 30 frames, whatever the stick says; from the
-  top the stick spins the body about its middle at 0.25 a frame instead of drifting it
+  top the stick spins the body about its middle at 0.25 a frame, toward the way it faces
+  a backspin, instead of drifting it
   (level two; at level one it always rights itself),
   and within 30 of the ground it eases toward the nearest upright, landing in a burst of
   bubbles. The board, 20 by 3 under the feet and turning with the body, stops the

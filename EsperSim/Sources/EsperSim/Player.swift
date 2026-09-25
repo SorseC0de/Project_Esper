@@ -597,8 +597,8 @@ public struct Player: Equatable {
                 floatDown(input)
             } else {
                 floatDown(input)
-                // Spinning it by hand is level two's.
-                if powerLevel >= 2 { surfAngle -= input.stick.x * SurfRules.spinRate }
+                // Spinning it by hand is level two's: toward the way it faces is a backspin.
+                if powerLevel >= 2 { surfAngle += input.stick.x * SurfRules.spinRate }
             }
             let drop = stage.drop(fromX: position.x, y: position.y)
             // Upright again near the ground, or whenever the stick isn't spinning it.

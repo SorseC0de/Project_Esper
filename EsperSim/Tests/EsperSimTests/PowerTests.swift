@@ -221,11 +221,12 @@ final class PowerTests: XCTestCase {
         let x = match.players[0].position.x
         let leaned = match.players[0].surfAngle
         run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
-        XCTAssertLessThan(match.players[0].surfAngle, leaned - 1.2, "spun")
+        XCTAssertGreaterThan(match.players[0].surfAngle, leaned + 1.2, "spun back, holding the way it faces")
         XCTAssertLessThanOrEqual(abs(match.players[0].position.x - x), 6 * SurfRules.reach * .pi / 2 / Double(SurfRules.pathFrames) + 1, "not drifted past the crescent's own speed")
         let spun = match.players[0].surfAngle
         run(&match, frames: 4, input: { _ in .idle })
-        XCTAssertGreaterThan(match.players[0].surfAngle, spun, "let go, it rights itself")
+        func offUpright(_ angle: Double) -> Double { abs(angle - (angle / (2 * .pi)).rounded() * 2 * .pi) }
+        XCTAssertLessThan(offUpright(match.players[0].surfAngle), offUpright(spun), "let go, it rights itself")
         let landed = run(&match, frames: 120, input: { _ in .idle }) { $0.events.contains(.surfLanded(player: 0)) }
         XCTAssertLessThan(landed, 120)
         XCTAssertLessThan(abs(match.players[0].surfAngle), 0.5, "upright, or close enough to ease the rest")

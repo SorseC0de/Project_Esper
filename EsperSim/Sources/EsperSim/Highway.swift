@@ -119,8 +119,9 @@ public enum Vehicle: Int, CaseIterable, Equatable {
 public struct Car: Equatable {
     public var id: Int
     public var vehicle: Vehicle
-    /// Which slot along the road it stands in.
+    /// Which slot along the road it stands in, and on which level: 0 the road, 1 the deck.
     public var slot: Int
+    public var level = 0
     /// The whole of it, and the one-tile boxes that follow its outline, which are what's
     /// solid and what takes hits. Facing left, the drawing and the outline are mirrored.
     public var box: Box
@@ -149,8 +150,12 @@ public struct Helicopter: Equatable {
 }
 
 public enum HighwayRules {
-    /// The road is cut into this many slots, each wide enough for the longest vehicle.
+    /// Each level is cut into this many slots, each wide enough for the longest vehicle.
     public static let slots = 4
+    /// The upper deck: an invisible one-way floor this many tiles up, a second row of
+    /// traffic on it facing the other way from the road's.
+    public static let deckRow = 4
+    public static var deckTop: Double { Double(deckRow + 1) * Stage.tileSize }
     public static let hitsToWreck = 3
     public static let hitGuardFrames = 20
     /// The helicopter flies at this height, the rim hanging this far under it, at this speed.
@@ -164,7 +169,7 @@ public enum HighwayRules {
 extension Match {
     /// The slots' cars at the start, one each, off the dice.
     mutating func fillTraffic() {
-        cars = (0..<HighwayRules.slots).map { makeCar(in: $0) }
+        cars = (0..<2).flatMap { level in (0..<HighwayRules.slots).map { makeCar(in: $0, level: level) } }
         refreshExtras()
     }
 
@@ -173,12 +178,14 @@ extension Match {
         return Stage.tileSize + inner * (Double(slot) + 0.5) / Double(HighwayRules.slots)
     }
 
-    private mutating func makeCar(in slot: Int) -> Car {
+    /// The road's row faces right and the deck's left.
+    private mutating func makeCar(in slot: Int, level: Int) -> Car {
         let vehicle = Vehicle.allCases[fieldDice.roll(Vehicle.allCases.count)]
         let size = vehicle.size
         let centre = slotCentre(slot)
-        let box = Box(min: Vec2(x: centre - size.x / 2, y: Stage.tileSize), max: Vec2(x: centre + size.x / 2, y: Stage.tileSize + size.y))
-        return Car(id: stampId(), vehicle: vehicle, slot: slot, box: box, facesLeft: slot % 2 == 1)
+        let floor = level == 0 ? Stage.tileSize : HighwayRules.deckTop
+        let box = Box(min: Vec2(x: centre - size.x / 2, y: floor), max: Vec2(x: centre + size.x / 2, y: floor + size.y))
+        return Car(id: stampId(), vehicle: vehicle, slot: slot, level: level, box: box, facesLeft: level == 1)
     }
 
     /// A hit on a car, from anything that would stun a player; `fire` for fire's own.
@@ -191,7 +198,7 @@ extension Match {
         if cars[index].hits >= HighwayRules.hitsToWreck || (fire && cars[index].vehicle.burnsAtOnce) {
             let wrecked = cars[index]
             events.append(.carWrecked(id: wrecked.id, at: wrecked.box.center))
-            cars[index] = makeCar(in: wrecked.slot)
+            cars[index] = makeCar(in: wrecked.slot, level: wrecked.level)
             events.append(.carArrived(id: cars[index].id))
             refreshExtras()
         }

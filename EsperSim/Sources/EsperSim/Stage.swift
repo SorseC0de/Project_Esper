@@ -423,6 +423,8 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...(columns - 1), rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
         stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
+        // The deck: invisible, one-way, the second row's floor.
+        stage.fill(.oneWay, columns: 1...(columns - 2), rows: HighwayRules.deckRow...HighwayRules.deckRow)
         stage.features = StageFeatures(traffic: true, look: .highway)
         return stage
     }

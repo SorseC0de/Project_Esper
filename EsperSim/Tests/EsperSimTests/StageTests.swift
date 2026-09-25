@@ -254,9 +254,12 @@ final class HighwayTests: XCTestCase {
 
     func testTheRoadFillsItsSlotsWithCarsOffTheDice() {
         let a = road(seed: 3), b = road(seed: 3)
-        XCTAssertEqual(a.cars.count, HighwayRules.slots)
+        XCTAssertEqual(a.cars.count, HighwayRules.slots * 2, "a row on the road and a row on the deck")
+        XCTAssertEqual(a.cars.filter { $0.level == 1 }.map(\.box.min.y), Array(repeating: HighwayRules.deckTop, count: HighwayRules.slots))
+        XCTAssertTrue(a.cars.filter { $0.level == 1 }.allSatisfy(\.facesLeft))
+        XCTAssertTrue(a.cars.filter { $0.level == 0 }.allSatisfy { !$0.facesLeft })
         XCTAssertEqual(a.cars.map(\.vehicle), b.cars.map(\.vehicle), "the same seed, the same traffic")
-        for car in a.cars {
+        for car in a.cars where car.level == 0 {
             XCTAssertEqual(car.box.min.y, Stage.tileSize, accuracy: 0.001, "on the road")
             for box in car.boxes { XCTAssertTrue(a.stage.extras.contains(box), "solid, tile by tile") }
             XCTAssertEqual(car.boxes.count, Int(car.vehicle.lengthTiles))
@@ -281,7 +284,7 @@ final class HighwayTests: XCTestCase {
     func testTheFuelTruckGoesUpOnOneHitOfFire() {
         var match = road()
         let box = match.cars[1].box
-        match.cars[1] = Car(id: 77, vehicle: .fuelTruck, slot: 1, box: box, facesLeft: false)
+        match.cars[1] = Car(id: 77, vehicle: .fuelTruck, slot: 1, level: 0, box: box, facesLeft: false)
         match.hitCar(1, fire: false)
         XCTAssertEqual(match.cars[1].id, 77, "a plain hit only counts")
         match.cars[1].guardFrames = 0
@@ -298,6 +301,19 @@ final class HighwayTests: XCTestCase {
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         for _ in 0..<SlashRules.frames { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.cars.first { $0.id == car.id }?.hits, 1)
+    }
+
+    func testTheDeckCanBeJumpedUpThroughAndStoodOn() {
+        var match = road()
+        match.players[1].position.x = 300
+        // In a gap between two slots, where no car stands.
+        let gap = (match.slotCentre(0) + match.slotCentre(1)) / 2
+        match.cars.removeAll { $0.level == 1 && abs($0.box.center.x - gap) < 60 }
+        match.refreshExtras()
+        match.players[0].position = Vec2(x: gap, y: 10)
+        for frame in 0..<60 { match.advance(inputs: [PlayerInput(jump: frame % 20 < 14), .idle]) }
+        for _ in 0..<60 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.players[0].position.y, HighwayRules.deckTop, accuracy: 0.001, "up through it and standing on it")
     }
 
     func testTheHelicopterCarriesOneRimAcrossThenTheOther() {

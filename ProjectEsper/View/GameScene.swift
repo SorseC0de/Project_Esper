@@ -875,6 +875,12 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
+        controls.addSlider(title: "NEAR LANE Y", range: -40...40, notch: 1, value: TrafficTuning.nearLaneLift) { value in
+            TrafficTuning.nearLaneLift = value
+        }
+        controls.addSlider(title: "FAR LANE Y", range: -40...60, notch: 1, value: TrafficTuning.farLaneLift) { value in
+            TrafficTuning.farLaneLift = value
+        }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
@@ -1948,7 +1954,8 @@ final class GameScene: SKScene {
                 carNodes[car.id] = made
                 return made
             }()
-            let foot = SpriteLibrary.point(Vec2(x: car.box.center.x, y: car.box.min.y))
+            var foot = SpriteLibrary.point(Vec2(x: car.box.center.x, y: car.box.min.y))
+            foot.y += CGFloat(car.level == 1 ? TrafficTuning.farLaneLift : TrafficTuning.nearLaneLift)
             // The idle: a pixel up and down, each car on its own beat.
             let idle: CGFloat = ((match.frame + car.id * 7) / 4) % 2 == 0 ? 0 : 1
             var dip: CGFloat = 0
@@ -2929,9 +2936,10 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@\nnear lane y %.0f  far lane y %.0f",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
-                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
+                                 p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side,
+                                 TrafficTuning.nearLaneLift, TrafficTuning.farLaneLift)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

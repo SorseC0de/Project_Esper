@@ -71,6 +71,14 @@ enum ZeusTuning {
     nonisolated(unsafe) static var chargeScale: Float = 0.17
 }
 
+/// Each lane of traffic drawn this many art pixels up from where the sim stands it, on the
+/// NEAR LANE Y and FAR LANE Y sliders until they're settled; the near lane's solid boxes
+/// stay on the floor whatever this says.
+enum TrafficTuning {
+    nonisolated(unsafe) static var nearLaneLift: Float = 0
+    nonisolated(unsafe) static var farLaneLift: Float = 0
+}
+
 /// Gemini's rift, as the portal, with Project Stars' own numbers: the small pair's size
 /// against the big, the length trade's period, the jumps' reach in art pixels and rate a
 /// second, and how faint a plate can roll.

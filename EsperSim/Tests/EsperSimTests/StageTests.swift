@@ -320,6 +320,63 @@ final class HighwayTests: XCTestCase {
         XCTAssertTrue(match.cars[0].boxes.contains { $0.min.x == left + 10 && $0.min.y == floor + 10 }, "mirrored")
     }
 
+    /// A car of one shape alone on the road, the others gone.
+    private func alone(_ rows: [String], facingLeft: Bool = false) -> Match {
+        var match = road()
+        Vehicle.edited[.car] = rows
+        match.cars = [Car(id: 50, vehicle: .car, slot: 1, level: 0,
+                          box: Box(min: Vec2(x: 150, y: 10), max: Vec2(x: 150 + Double(rows[0].count) * 5, y: 10 + Double(rows.count) * 5)),
+                          facesLeft: facingLeft)]
+        match.refreshExtras()
+        match.players[1].position.x = 320
+        match.ball.respawn(at: Vec2(x: 30, y: 120))
+        match.helicopter = nil
+        return match
+    }
+
+    func testABodyWalksUpASlopeOntoTheTopAndDownTheOther() {
+        var match = alone(["/##\\"])
+        defer { Vehicle.edited[.car] = nil }
+        match.players[0].position = Vec2(x: 130, y: 10)
+        var highest = 0.0
+        for _ in 0..<150 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0.5, y: 0)), .idle])
+            highest = max(highest, match.players[0].position.y)
+            XCTAssertTrue(match.players[0].grounded || match.players[0].state == .air, "walking")
+        }
+        XCTAssertEqual(highest, 15, accuracy: 0.01, "up onto the block's top")
+        XCTAssertGreaterThan(match.players[0].position.x, 175, "over and past")
+        XCTAssertEqual(match.players[0].position.y, 10, accuracy: 0.01, "and down the far slope")
+    }
+
+    func testABodyStandsStillOnASlope() {
+        var match = alone(["/#"])
+        defer { Vehicle.edited[.car] = nil }
+        match.players[0].position = Vec2(x: 152.5, y: 12.5)
+        match.players[0].grounded = true
+        for _ in 0..<60 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.players[0].position.x, 152.5, accuracy: 0.01, "stays put")
+        XCTAssertEqual(match.players[0].position.y, 12.5, accuracy: 0.01)
+    }
+
+    func testASlopesStraightSideIsAWall() {
+        var match = alone(["#/"], facingLeft: false)
+        defer { Vehicle.edited[.car] = nil }
+        // Coming from the right at the slope's straight side.
+        match.players[0].position = Vec2(x: 175, y: 10)
+        for _ in 0..<40 { match.advance(inputs: [PlayerInput(stick: Vec2(x: -0.5, y: 0)), .idle]) }
+        XCTAssertGreaterThanOrEqual(match.players[0].body.min.x, 160 - 0.01, "stopped at the straight side")
+    }
+
+    func testTheBallRollsDownASlope() {
+        var match = alone(["../", "./#", "/##"])
+        defer { Vehicle.edited[.car] = nil }
+        match.players[0].position.x = 30
+        match.ball.respawn(at: Vec2(x: 163, y: 32))
+        for _ in 0..<120 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertLessThan(match.ball.position.x, 150, "down the slope and off its low end")
+    }
+
     func testTheHelicopterCarriesOneRimAcrossThenTheOther() {
         var match = road()
         match.advance(inputs: [.idle, .idle])

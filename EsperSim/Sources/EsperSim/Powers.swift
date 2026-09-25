@@ -37,6 +37,13 @@ public struct Fireball: Equatable {
     public var straight: Bool
 }
 
+/// Slopes: a body's feet ride one up or down this far a frame at most, a block's height;
+/// the diagonal's normal is this share of each axis.
+public enum SlopeRules {
+    public static let step = 5.5
+    public static let diagonal = 0.7071067811865476
+}
+
 /// Quake-Up Coffee: a fast fall's landing shakes the floor. At level one whatever is
 /// grounded on the same floor is hit, the ball hopping up by this much and the other
 /// stripped; at level two the whole screen is the floor.

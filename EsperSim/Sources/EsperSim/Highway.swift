@@ -177,7 +177,27 @@ public struct Car: Equatable {
     /// solid and what takes hits. Facing left, the drawing and the outline are mirrored.
     public var box: Box
     public var facesLeft: Bool
-    /// Its blocks as boxes, each column's unbroken runs one box, mirrored when it faces left.
+    /// Its slope blocks as slopes, mirrored when it faces left, which turns a rising one
+    /// into a falling one.
+    public var slopes: [Slope] {
+        let rows = vehicle.blocks.map { Array($0) }
+        guard let width = rows.first?.count else { return [] }
+        let size = Vehicle.blockSize
+        var slopes: [Slope] = []
+        for (row, line) in rows.enumerated() {
+            for (column, kind) in line.enumerated() where kind == "/" || kind == "\\" {
+                let across = facesLeft ? width - 1 - column : column
+                let left = box.min.x + Double(across) * size
+                let bottom = box.min.y + Double(rows.count - 1 - row) * size
+                slopes.append(Slope(box: Box(min: Vec2(x: left, y: bottom), max: Vec2(x: left + size, y: bottom + size)),
+                                    rising: (kind == "/") != facesLeft))
+            }
+        }
+        return slopes
+    }
+
+    /// Its solid blocks as boxes, each column's unbroken runs one box, mirrored when it
+    /// faces left.
     public var boxes: [Box] {
         let rows = vehicle.blocks.map { Array($0) }
         guard let width = rows.first?.count else { return [] }
@@ -187,7 +207,7 @@ public struct Car: Equatable {
             let across = facesLeft ? width - 1 - column : column
             var run: (top: Int, bottom: Int)?
             for row in 0...rows.count {
-                let solid = row < rows.count && column < rows[row].count && rows[row][column] != "." 
+                let solid = row < rows.count && column < rows[row].count && rows[row][column] == "#" 
                 if solid {
                     run = (run?.top ?? row, row)
                 } else if let open = run {
@@ -284,7 +304,9 @@ extension Match {
 
     /// The first car a box touches, if any.
     func car(touching box: Box) -> Int? {
-        cars.firstIndex { car in car.level == 0 && car.box.overlaps(box) && car.boxes.contains { $0.overlaps(box) } }
+        cars.firstIndex { car in
+            car.level == 0 && car.box.overlaps(box) && (car.boxes.contains { $0.overlaps(box) } || car.slopes.contains { $0.box.overlaps(box) })
+        }
     }
 
     /// The traffic and the helicopter a frame on.
@@ -320,5 +342,6 @@ extension Match {
     /// The boxes solid to bodies: made slabs, helmets and cars.
     public mutating func refreshExtras() {
         stage.extras = platforms.map(\.box) + helmets.map(\.box) + cars.filter { $0.level == 0 }.flatMap(\.boxes)
+        stage.slopes = cars.filter { $0.level == 0 }.flatMap(\.slopes)
     }
 }

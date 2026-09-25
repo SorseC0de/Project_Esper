@@ -479,10 +479,15 @@ centre.
   pixels (`Vehicle.blocks`), each column's unbroken runs one box, mirrored when it faces
   left. The blocks are set by hand in the bounds gallery (the BOUNDS picker, offline): the
   vehicle blown up with see-through blocks over it, a tap going round a block's kinds
-  (solid, a slope rising to the right, one falling to the right, open; the slopes are
-  solid blocks until their behaviour is tuned), RESET goes back to the
+  (solid, a slope rising to the right, one falling to the right, open), RESET goes back to the
   measured outline, COPY puts the table on the clipboard as Swift for `Vehicle.set`.
-  Edits are kept between launches and stand in live until they're pasted in. Anything that would stun a player
+  Edits are kept between launches and stand in live until they're pasted in.
+  The slopes (`Stage.slopes`, `SlopeRules`) are 45°, solid under the diagonal and along
+  their two straight sides: the feet ride one up and down at walking speed, a block's
+  height a frame at most, stepping up over the block a slope climbs to; standing still
+  on one, a body stays put; its straight side is a wall and there's no clinging to it;
+  the ball bounces off the diagonal, the push into it turned back and a share kept, and
+  rolls down it. Anything that would stun a player
   hits one: the slash, a bolt, a strike, a fireball's burst, a thrown ball, a flame; one
   swing counts once. Three hits wreck it, the fuel truck one of fire, in a fire burst, and
   a new one off the dice takes its slot.

@@ -73,12 +73,19 @@ public struct Ball: Equatable {
             velocity.y = max(velocity.y - BallRules.gravity * pace * pace, -BallRules.fallSpeed * pace)
         }
 
+        // The way it came in, for a slope to turn: a block's flat top under the slope may
+        // already have bounced it straight.
+        let incoming = velocity
         let sweptX = stage.sweepHorizontally(box, by: velocity.x)
         position.x += sweptX.moved
         if sweptX.blocked != nil {
             bounceX(events: &events)
         }
-        let sweptY = stage.sweepVertically(box, by: velocity.y)
+        // Slopes are left out of the fall: they turn the ball off their diagonal below,
+        // rather than stopping it flat.
+        var flat = stage
+        flat.slopes = []
+        let sweptY = flat.sweepVertically(box, by: velocity.y)
         position.y += sweptY.moved
         if sweptY.landed || sweptY.ceiling {
             bounceY(events: &events)
@@ -96,6 +103,8 @@ public struct Ball: Equatable {
                 roseThrough = index
             }
         }
+
+        rollOffSlopes(stage, incoming: incoming, events: &events)
 
         let onFloor = stage.isGrounded(box)
         if onFloor, velocity.y == 0 {
@@ -121,6 +130,26 @@ public struct Ball: Equatable {
         let change = (needed - velocity.x) * BallRules.hoopSteerShare
         let most = BallRules.hoopSteerMax * pace
         velocity.x += min(max(change, -most), most)
+    }
+
+    /// Under a slope's surface, the ball is set back on it and bounces off the diagonal:
+    /// the push into it turned back, a share kept, the run along it kept whole, so gravity
+    /// rolls it down.
+    private mutating func rollOffSlopes(_ stage: Stage, incoming: Vec2, events: inout [MatchEvent]) {
+        for slope in stage.slopes where slope.box.min.x <= position.x && position.x <= slope.box.max.x {
+            let surface = slope.surface(at: position.x)
+            guard position.y - BallRules.radius < surface - Stage.edge, position.y > slope.box.min.y - BallRules.radius else { continue }
+            position.y = surface + BallRules.radius
+            let normal = slope.rising ? Vec2(x: -SlopeRules.diagonal, y: SlopeRules.diagonal) : Vec2(x: SlopeRules.diagonal, y: SlopeRules.diagonal)
+            // Resting on it, gravity alone still pushes in: that push is what rolls it down.
+            let arriving = Vec2(x: incoming.x, y: min(incoming.y, -BallRules.gravity))
+            let into = arriving.x * normal.x + arriving.y * normal.y
+            if into < 0 {
+                velocity = arriving - normal * (into * (1 + BallRules.bounce))
+                settlePace()
+                straight = false
+            }
+        }
     }
 
     /// The first bounce ends a paced shot: an ordinary ball's speed from here.

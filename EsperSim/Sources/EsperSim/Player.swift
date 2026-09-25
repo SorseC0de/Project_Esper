@@ -1422,11 +1422,31 @@ public struct Player: Equatable {
     }
 
     private mutating func move(in stage: Stage) {
-        let sweptX = stage.sweepHorizontally(body, by: velocity.x)
+        var sweptX = stage.sweepHorizontally(body, by: velocity.x)
+        // Standing on a slope against a lip no higher than a block, as where a slope meets
+        // the block it climbs to: up over it and on. Off a slope, a lip is a wall.
+        if sweptX.blocked != nil, grounded, velocity.y <= 0, stage.slopeSurface(under: body, reach: Stage.edge * 10) != nil {
+            let raised = body.offset(by: Vec2(x: 0, y: SlopeRules.step))
+            if !stage.overlapsSolid(raised) {
+                let over = stage.sweepHorizontally(raised, by: velocity.x)
+                if abs(over.moved) > abs(sweptX.moved) + Stage.edge {
+                    position.y += SlopeRules.step
+                    sweptX = over
+                    let down = stage.sweepVertically(body.offset(by: Vec2(x: over.moved, y: 0)), by: -SlopeRules.step)
+                    position.y += down.moved
+                }
+            }
+        }
         position.x += sweptX.moved
         if sweptX.blocked != nil {
             velocity.x = 0
             position.x = position.x.rounded(toPlaces: 6)
+        }
+        // On the ground and not jumping, the feet ride a slope up or down, a block's height
+        // at most; standing still on one, the body stays put.
+        if grounded, velocity.y <= 0, let surface = stage.slopeSurface(under: body, reach: SlopeRules.step) {
+            position.y = surface
+            velocity.y = 0
         }
         let sweptY = stage.sweepVertically(body, by: velocity.y)
         position.y += sweptY.moved

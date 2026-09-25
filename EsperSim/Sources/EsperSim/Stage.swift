@@ -59,6 +59,27 @@ public struct Box: Equatable {
     }
 }
 
+/// A 45° slope filling the lower half of its square: rising to the right, the surface
+/// runs from the bottom left corner to the top right; falling, from the top left to the
+/// bottom right. Solid under the diagonal, and along its two straight sides.
+public struct Slope: Equatable {
+    public var box: Box
+    public var rising: Bool
+
+    /// The surface's height at `x`, clamped into the square.
+    public func surface(at x: Double) -> Double {
+        let across = min(max(x - box.min.x, 0), box.width)
+        return box.min.y + (rising ? across : box.width - across)
+    }
+
+    /// Whether a box reaches under the diagonal.
+    public func overlaps(_ other: Box) -> Bool {
+        guard box.overlaps(other) else { return false }
+        let highest = rising ? min(other.max.x, box.max.x) : max(other.min.x, box.min.x)
+        return other.min.y < surface(at: highest) - Stage.edge
+    }
+}
+
 /// The court: a grid of tiles, row 0 at the bottom, plus the rims and where everyone starts.
 public struct Stage: Equatable {
     public static let tileSize = 10.0
@@ -79,6 +100,8 @@ public struct Stage: Equatable {
     public var features = StageFeatures()
     /// Boxes solid to the ball alone, such as the field's backboards.
     public var ballBlockers: [Box] = []
+    /// Slopes that come and go with what's standing, such as a car's.
+    public var slopes: [Slope] = []
 
     public var width: Double { Double(columns) * Stage.tileSize }
     public var height: Double { Double(rows) * Stage.tileSize }
@@ -118,7 +141,7 @@ public struct Stage: Equatable {
 
     // MARK: Collision
 
-    private static let edge = 1e-6
+    static let edge = 1e-6
 
     private func column(at x: Double) -> Int { Int((x / Stage.tileSize).rounded(.down)) }
     private func row(at y: Double) -> Int { Int((y / Stage.tileSize).rounded(.down)) }
@@ -139,7 +162,19 @@ public struct Stage: Equatable {
                 return true
             }
         }
-        return extras.contains { $0.overlaps(box) }
+        return extras.contains { $0.overlaps(box) } || slopes.contains { $0.overlaps(box) }
+    }
+
+    /// The slope under the box's middle whose surface is within `reach` of its feet, and
+    /// that surface's height there.
+    public func slopeSurface(under box: Box, reach: Double) -> Double? {
+        let middle = (box.min.x + box.max.x) / 2
+        var best: Double?
+        for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x {
+            let surface = slope.surface(at: middle)
+            if abs(surface - box.min.y) <= reach, best == nil || surface > best! { best = surface }
+        }
+        return best
     }
 
     private func spansY(_ extra: Box, _ box: Box) -> Bool {
@@ -173,6 +208,17 @@ public struct Stage: Equatable {
                 moved = wall - leading
                 blocked = direction
                 break
+            }
+        }
+        // A slope's straight side is a wall: a rising one's on its right, a falling one's on
+        // its left; its diagonal side is climbed, not bumped.
+        for slope in slopes where spansY(slope.box, box) && box.min.y < slope.box.max.y - Stage.edge {
+            if direction == .left, slope.rising, slope.box.max.x <= leading + Stage.edge, slope.box.max.x - leading > moved {
+                moved = min(slope.box.max.x - leading, 0)
+                blocked = direction
+            } else if direction == .right, !slope.rising, slope.box.min.x >= leading - Stage.edge, slope.box.min.x - leading < moved {
+                moved = max(slope.box.min.x - leading, 0)
+                blocked = direction
             }
         }
         for extra in extras where spansY(extra, box) {
@@ -219,6 +265,15 @@ public struct Stage: Equatable {
                 moved = min(extra.max.y - feet, 0)
                 landed = true
             }
+            // Down onto a slope's surface under the middle, crossing it this frame.
+            let middle = (box.min.x + box.max.x) / 2
+            for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x {
+                let surface = slope.surface(at: middle)
+                if surface <= feet + Stage.edge, surface - feet > moved {
+                    moved = min(surface - feet, 0)
+                    landed = true
+                }
+            }
             return (moved, landed, false)
         } else {
             let head = box.max.y
@@ -235,7 +290,7 @@ public struct Stage: Equatable {
                     break search
                 }
             }
-            for extra in extras where spansX(extra, box) && extra.min.y >= head - Stage.edge && extra.min.y - head < moved {
+            for extra in extras + slopes.map(\.box) where spansX(extra, box) && extra.min.y >= head - Stage.edge && extra.min.y - head < moved {
                 moved = max(extra.min.y - head, 0)
                 ceiling = true
             }
@@ -258,6 +313,7 @@ public struct Stage: Equatable {
                 continue
             }
         }
+        if let surface = slopeSurface(under: box, reach: 0.01), abs(surface - feet) < 0.01 { return true }
         return extras.contains { spansX($0, box) && abs($0.max.y - feet) < 0.01 }
     }
 

@@ -1948,6 +1948,10 @@ final class GameScene: SKScene {
         board.position = SpriteLibrary.point(player.board.centre) + CGPoint(x: 0, y: bob)
         board.zRotation = angle
         board.xScale = CGFloat(player.facing.sign)
+        // Coming down past the crescent's top, bubbles off the underside of the board.
+        if !riding, player.surfPath == 0, player.velocity.y < 0, match.frame % 4 == index {
+            spawnBubbles(at: board.position, count: 2, spread: 4, downward: true)
+        }
         // The trail on the ground.
         if riding {
             let frames = (surfTrailFrames[index] ?? 0) + 1
@@ -1961,22 +1965,23 @@ final class GameScene: SKScene {
                 trail.color = ParticleLook.soda
                 trail.colorBlendFactor = 1
                 trail.zPosition = 4
-                // Each from its own frame of the sheet, so the trail never pulses in step.
-                let start = Int.random(in: 0..<sheet.count)
-                let looped = Array(sheet[start...]) + Array(sheet[..<start])
-                trail.run(.sequence([.animate(with: looped, timePerFrame: 1.0 / 24), .removeFromParent()]))
+                // Each from its own early frame, played out to the end, so the trail never pulses
+                // in step and never shows the sheet's empty last frames mid-trail.
+                let start = Int.random(in: 0..<max(sheet.count / 4, 1))
+                trail.texture = sheet[start]
+                trail.run(.sequence([.animate(with: Array(sheet[start...]), timePerFrame: 1.0 / 24), .removeFromParent()]))
                 glowers.addChild(trail)
             }
         }
     }
 
     /// A burst of soda bubbles from a point, each playing the bubble sheet as it drifts off.
-    private func spawnBubbles(at point: CGPoint, count: Int, spread: CGFloat) {
+    private func spawnBubbles(at point: CGPoint, count: Int, spread: CGFloat, downward: Bool = false) {
         guard EffectSheets.frames["bubble_particle"] != nil else { return }
         let sheet = (0..<(EffectSheets.frames["bubble_particle"] ?? 1)).map { sprites.texture("bubble_particle", $0) }
         for step in 0..<count {
-            let start = Int.random(in: 0..<sheet.count)
-            let looped = Array(sheet[start...]) + Array(sheet[..<start])
+            let start = Int.random(in: 0..<max(sheet.count / 3, 1))
+            let looped = Array(sheet[start...])
             let bubble = SKSpriteNode(texture: looped[0])
             bubble.size = CGSize(width: ParticleLook.bubbleSize * 1.2, height: ParticleLook.bubbleSize * 1.2)
             bubble.color = ParticleLook.soda
@@ -1984,11 +1989,12 @@ final class GameScene: SKScene {
             bubble.position = point
             bubble.zPosition = 31
             glowers.addChild(bubble)
-            let angle = CGFloat(step) / CGFloat(count) * .pi + .pi * 0.05
-            let out = SKAction.move(by: CGVector(dx: cos(angle) * spread, dy: sin(angle) * spread * 0.8 + 4), duration: 0.4)
+            // Up and out from a landing, or down and out from under a falling board.
+            let angle = (CGFloat(step) + 0.5) / CGFloat(count) * .pi * (downward ? -1 : 1) + (downward ? 0 : .pi * 0.05)
+            let out = SKAction.move(by: CGVector(dx: cos(angle) * spread, dy: sin(angle) * spread * 0.8 + (downward ? -2 : 4)), duration: 0.4)
             out.timingMode = .easeOut
             // Each on its own frame and its own pace, so the burst isn't one pulse.
-            let pace = 0.4 / Double(sheet.count) * Double.random(in: 0.8...1.2)
+            let pace = 0.4 / Double(looped.count) * Double.random(in: 0.8...1.2)
             bubble.run(.sequence([.group([out, .animate(with: looped, timePerFrame: pace)]), .removeFromParent()]))
         }
     }

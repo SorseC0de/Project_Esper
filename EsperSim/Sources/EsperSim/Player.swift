@@ -207,6 +207,8 @@ public struct Player: Equatable {
     public var surfTurn = 0.0
     public var surfWall: Facing?
     public var surfFlip = 0
+    /// A flip off a wall's turn a frame: on round the way the ride turned it, to upright.
+    public var surfFlipRate = 0.0
 
     /// Whether Surf Soda's board is under the feet: running, or up on a surf jump.
     public var boardOut: Bool {
@@ -566,14 +568,15 @@ public struct Player: Equatable {
                 if surfPath >= SurfRules.pathFrames { surfPath = 0 }
             } else if surfFlip > 0 {
                 surfFlip -= 1
-                surfAngle += surfDirection * 2 * Double.pi / Double(SurfRules.flipFrames)
+                surfAngle += surfFlipRate
                 floatDown(input)
             } else {
                 floatDown(input)
                 surfAngle -= input.stick.x * SurfRules.spinRate
             }
             let drop = stage.drop(fromX: position.x, y: position.y)
-            if surfPath == 0, surfFlip == 0, drop < SurfRules.uprightHeight {
+            // Upright again near the ground, or whenever the stick isn't spinning it.
+            if surfPath == 0, surfFlip == 0, drop < SurfRules.uprightHeight || stickFacing(input) == nil {
                 // The nearest upright, not always back the way it came.
                 let turns = (surfAngle / (2 * Double.pi)).rounded()
                 surfAngle += (turns * 2 * Double.pi - surfAngle) * SurfRules.uprightShare
@@ -1490,7 +1493,11 @@ public struct Player: Equatable {
         velocity = Vec2(x: -wall.sign * SurfRules.wallLeap.x, y: SurfRules.wallLeap.y)
         facing = wall.flipped
         surfDirection = -wall.sign
+        // On round the way the ride turned it, to the next upright.
+        let target = (surfAngle / (2 * Double.pi)).rounded(wall.sign > 0 ? .up : .down) * 2 * Double.pi
+        let rest = abs(target - surfAngle) < 0.5 ? target + wall.sign * 2 * Double.pi : target
         surfFlip = SurfRules.flipFrames
+        surfFlipRate = (rest - surfAngle) / Double(SurfRules.flipFrames)
     }
 
     /// Surf Soda's jump: the crescent from here, forward the way the body faces, leaning

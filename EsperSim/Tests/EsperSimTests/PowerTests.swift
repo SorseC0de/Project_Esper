@@ -215,12 +215,17 @@ final class PowerTests: XCTestCase {
     func testPastTheTopTheStickSpinsAndTheLandingIsUpright() {
         var match = with(.surfSoda)
         match.players[1].position.x = 300
+        match.players[0].position.x = 60
         for _ in 0..<(match.players[0].spec.jumpSquatFrames + 1) { match.advance(inputs: [PlayerInput(jump: true), .idle]) }
         run(&match, frames: SurfRules.pathFrames, input: { _ in .idle })
         let x = match.players[0].position.x
+        let leaned = match.players[0].surfAngle
         run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
-        XCTAssertLessThan(match.players[0].surfAngle, -0.5, "spun")
-        XCTAssertEqual(match.players[0].position.x, x + 6 * match.players[0].velocity.x, accuracy: 1, "not drifted")
+        XCTAssertLessThan(match.players[0].surfAngle, leaned - 1.2, "spun")
+        XCTAssertLessThanOrEqual(abs(match.players[0].position.x - x), 6 * SurfRules.reach * .pi / 2 / Double(SurfRules.pathFrames) + 1, "not drifted past the crescent's own speed")
+        let spun = match.players[0].surfAngle
+        run(&match, frames: 4, input: { _ in .idle })
+        XCTAssertGreaterThan(match.players[0].surfAngle, spun, "let go, it rights itself")
         let landed = run(&match, frames: 120, input: { _ in .idle }) { $0.events.contains(.surfLanded(player: 0)) }
         XCTAssertLessThan(landed, 120)
         XCTAssertEqual(match.players[0].surfAngle, 0)
@@ -243,6 +248,7 @@ final class PowerTests: XCTestCase {
         XCTAssertNil(match.players[0].surfWall)
         XCTAssertLessThan(match.players[0].velocity.x, 0, "off it, away")
         XCTAssertGreaterThan(match.players[0].surfFlip, 0, "in a backflip")
+        XCTAssertGreaterThan(match.players[0].surfFlipRate, 0, "on round the way the ride turned it")
     }
 
     func testTheDoubleJumpIsAWholeBackflip() {
@@ -251,12 +257,12 @@ final class PowerTests: XCTestCase {
         // Clear of the ledge, whose top would count as the ground near below.
         match.players[0].position.x = 60
         for _ in 0..<(match.players[0].spec.jumpSquatFrames + 1) { match.advance(inputs: [PlayerInput(jump: true), .idle]) }
-        run(&match, frames: SurfRules.pathFrames + 2, input: { _ in .idle })
+        run(&match, frames: SurfRules.pathFrames - 2, input: { _ in .idle })
         let before = match.players[0].surfAngle
-        XCTAssertEqual(before, SurfRules.jumpLean, accuracy: 0.05, "the first jump leans back")
+        XCTAssertGreaterThan(before, SurfRules.jumpLean * 0.85, "the first jump leans back over its crescent")
         match.advance(inputs: [PlayerInput(jump: true), .idle])
-        run(&match, frames: SurfRules.pathFrames, input: { _ in .idle })
-        XCTAssertEqual(match.players[0].surfAngle - before, 2 * .pi, accuracy: 0.3, "the double jump turns a whole way back")
+        run(&match, frames: SurfRules.pathFrames - 2, input: { _ in .idle })
+        XCTAssertGreaterThan(match.players[0].surfAngle - before, 2 * .pi * 0.85, "the double jump turns a whole way back")
     }
 
     func testTheBoardStopsTheOthersBolt() {

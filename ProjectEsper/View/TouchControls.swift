@@ -21,6 +21,9 @@ final class TouchControls: SKNode {
     private let resetButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
     private let hitboxButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
     private let aiButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
+    private let pauseButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
+    /// The PAUSE button, offline only.
+    var onPause: (() -> Void)?
     /// Called when the corner button is tapped.
     var onReset: (() -> Void)?
     /// The HITBOX toggle beside it: whether the sim's boxes are drawn, and who to tell.
@@ -115,11 +118,24 @@ final class TouchControls: SKNode {
         aiText.fontColor = .init(white: 1, alpha: 0.8)
         aiButton.addChild(aiText)
         addChild(aiButton)
+
+        pauseButton.position = CGPoint(x: right - 179, y: top - 8)
+        pauseButton.fillColor = .init(white: 1, alpha: 0.1)
+        pauseButton.strokeColor = .init(white: 1, alpha: 0.4)
+        pauseButton.lineWidth = 1
+        let pauseText = SKLabelNode(text: "PAUSE")
+        pauseText.fontName = "Menlo-Bold"
+        pauseText.fontSize = 8
+        pauseText.verticalAlignmentMode = .center
+        pauseText.fontColor = .init(white: 1, alpha: 0.8)
+        pauseButton.addChild(pauseText)
+        addChild(pauseButton)
     }
 
-    /// Online there's no reset, no computer and no tuning: only the pad and HITBOX.
+    /// Online there's no reset, no pause, no computer and no tuning: only the pad and HITBOX.
     func setOnline(_ online: Bool) {
         resetButton.isHidden = online
+        pauseButton.isHidden = online
         aiButton.isHidden = online
         for picker in pickers { picker.isHidden = online }
         for slider in sliders { slider.isHidden = online }
@@ -196,6 +212,10 @@ final class TouchControls: SKNode {
     func began(_ touch: UITouch, at point: CGPoint) {
         if !resetButton.isHidden, resetButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             onReset?()
+            return
+        }
+        if !pauseButton.isHidden, pauseButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
+            onPause?()
             return
         }
         if hitboxButton.frame.insetBy(dx: -8, dy: -8).contains(point) {

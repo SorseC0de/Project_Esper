@@ -939,6 +939,10 @@ final class GameScene: SKScene {
         controls?.removeFromParent()
         let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight, insets: insets)
         controls.onReset = { [weak self] in self?.reset() }
+        controls.onPause = { [weak self] in
+            guard let self, self.online == nil, self.flow == .playing else { return }
+            self.enter(.paused)
+        }
         controls.showHitboxes = showHitboxes
         controls.onToggleHitboxes = { [weak self] on in self?.showHitboxes = on }
         controls.aiOn = aiOn

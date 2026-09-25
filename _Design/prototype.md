@@ -348,7 +348,7 @@ while the other watches. The new stage is a fresh match swapped in for the stopp
 keeping its frame, and the world is redrawn for it (`showStage`). What the computer
 drank at the end of a stage is lettered once play is back.
 
-Start on a pad, or delete on a keyboard, pauses a match offline: RESTART MATCH, a fresh
+Start on a pad, delete on a keyboard, or PAUSE beside AI on the phone pauses a match offline: RESTART MATCH, a fresh
 best of seven on the stage the match started on; TITLE SCREEN; RESUME, where the cursor
 starts. Start again resumes too. A pick timer of twenty seconds for networked play is a number in `Series`,
 not enforced yet.

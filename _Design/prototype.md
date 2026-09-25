@@ -461,6 +461,31 @@ flames loop `fire_trail`; fireballs are the ball in fire; frozen bodies and ball
 ice; the cape is seven short rectangles chained along the glide's trail with a wave down
 its length.
 
+## Highway Traffic
+
+`Stage.highway`, the stage in play for tuning (`Stage.current`). The court's 34 by 16,
+flat: a dark blue night, and a road where the field's grass is, the floor an invisible
+strip through its middle. Each player starts where the court has them, the ball loose at
+centre.
+
+- The traffic (`Highway.swift`): the road in four slots, each wide enough for the longest
+  vehicle, a car standing in each, solid, rideable. Which of the 23 vehicles stands where
+  comes off the match's dice, so both phones agree with nothing sent. Each has its own
+  length in tiles, and its height is the drawing's own. Anything that would stun a player
+  hits one: the slash, a bolt, a strike, a fireball's burst, a thrown ball, a flame; one
+  swing counts once. Three hits wreck it, the fuel truck one of fire, in a fire burst, and
+  a new one off the dice takes its slot.
+- The drawings: `Tools/split_vehicles.py` splits each vector into its body and its wheels
+  (a wheel is a tyre's circle through its hub's bolts), and the helicopter into its hull,
+  top rotor and tail rotor, each plain and its three reds, as imagesets in the catalog's
+  Traffic folder. The racer and both motorcycles have no wheels to split and idle whole.
+  A body shivers a pixel over wheels that stay put, each on its own beat, dips three
+  pixels on its springs when someone lands on it, and flashes black when hit.
+- The rim: one at a time, carried under a helicopter flying from one wall to the other at
+  1 a frame, 120 up, the rim 32 under it; the next carries the other side's rim, and the
+  one not out waits far over the sky. The helicopter's reds are the rim's guarding side's
+  energy; its tail rotor spins and its top rotor flips end over end every other frame.
+
 ## Football Field
 
 `Stage.footballField`, the stage in play for tuning (`Stage.current`); the court comes back

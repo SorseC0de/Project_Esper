@@ -1,0 +1,49 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 800 800" version="1.1" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+        </g>
+    <g id="propeller">
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            </g>
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            </g>
+    </g>
+    <g id="spin_me">
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            </g>
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            </g>
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            </g>
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            <path d="M25.8,197.323C31.4,202.923 51.4,232.523 45.8,238.923C40.2,244.523 10.6,224.523 4.2,218.923C-1.4,213.323 -1.4,203.723 4.2,197.323C10.6,191.723 20.2,191.723 25.8,197.323Z" style="fill:#157b93;fill-rule:nonzero;" />
+        </g>
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            <path d="M76.2,290.123C70.6,284.523 50.6,254.923 56.2,248.523C61.8,242.923 91.4,262.923 97.8,268.523C103.4,274.123 103.4,283.723 97.8,290.123C92.2,296.523 81.8,296.523 76.2,290.123Z" style="fill:#157b93;fill-rule:nonzero;" />
+        </g>
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            <path d="M97.8,218.923C92.2,224.523 62.6,244.523 56.2,238.923C50.6,233.323 70.6,203.723 76.2,197.323C81.8,191.723 91.4,191.723 97.8,197.323C103.4,203.723 103.4,212.523 97.8,218.923Z" style="fill:#157b93;fill-rule:nonzero;" />
+        </g>
+        <g transform="matrix(1.61225,0,0,1.61225,0,0)">
+            <path d="M5,268.523C10.6,262.923 40.2,242.923 46.6,248.523C52.2,254.123 32.2,283.723 26.6,290.123C21,296.523 11.4,295.723 5,290.123C-1.4,284.523 -1.4,274.923 5,268.523Z" style="fill:#157b93;fill-rule:nonzero;" />
+        </g>
+    </g>
+</svg>

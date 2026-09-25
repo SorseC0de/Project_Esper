@@ -26,17 +26,33 @@ public struct StageFeatures: Equatable {
     public var portals = false
     /// The ball starts in a player's hands, by the coin flip, rather than loose at centre.
     public var startsHeld = false
+    /// Standstill traffic, and the rim carried by a helicopter.
+    public var traffic = false
     /// Bodies and scenery cast shadows on the floor, and a ball cam hangs over the player;
-    /// only the view reads these.
+    /// only the view reads these, and which scenery to draw.
     public var shadows = false
     public var ballCam = false
-    public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, shadows: Bool = false, ballCam: Bool = false) {
+    public var look = StageLook.court
+    public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
+                shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court) {
         self.helmets = helmets
         self.portals = portals
         self.startsHeld = startsHeld
+        self.traffic = traffic
         self.shadows = shadows
         self.ballCam = ballCam
+        self.look = look
     }
+}
+
+/// The scenery a stage is drawn with.
+public enum StageLook: Equatable {
+    case court, footballField, highway
+}
+
+extension StageFeatures {
+    /// Drawn with scenery in place of tiles, the floor an invisible strip through the ground.
+    public var scenic: Bool { look != .court }
 }
 
 /// The field's numbers. Helmets are five tiles square, spawn every five seconds of
@@ -73,6 +89,7 @@ extension Match {
     mutating func stepField() {
         if stage.features.helmets { stepHelmets() }
         if stage.features.portals { stepPortal() }
+        if stage.features.traffic { stepHighway() }
     }
 
     private mutating func stepHelmets() {
@@ -118,7 +135,7 @@ extension Match {
             }
         }
         helmets = kept.enumerated().filter { !gone.contains($0.offset) }.map(\.element)
-        stage.extras = platforms.map(\.box) + helmets.map(\.box)
+        refreshExtras()
     }
 
     /// From the end the defender guards, the rim the holder scores on, toward the other.

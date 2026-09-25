@@ -247,3 +247,81 @@ final class StageTests: XCTestCase {
         XCTAssertEqual(a, b)
     }
 }
+
+/// Highway Traffic: the cars, their wrecking, and the helicopter's rim.
+final class HighwayTests: XCTestCase {
+    private func road(seed: UInt32 = 1) -> Match { Match(stage: .highway, seed: seed) }
+
+    func testTheRoadFillsItsSlotsWithCarsOffTheDice() {
+        let a = road(seed: 3), b = road(seed: 3)
+        XCTAssertEqual(a.cars.count, HighwayRules.slots)
+        XCTAssertEqual(a.cars.map(\.vehicle), b.cars.map(\.vehicle), "the same seed, the same traffic")
+        for car in a.cars {
+            XCTAssertEqual(car.box.min.y, Stage.tileSize, accuracy: 0.001, "on the road")
+            XCTAssertTrue(a.stage.extras.contains(car.box), "solid")
+        }
+        var kinds = Set<Vehicle>()
+        for seed in 1...40 { kinds.formUnion(road(seed: UInt32(seed)).cars.map(\.vehicle)) }
+        XCTAssertGreaterThan(kinds.count, 10, "every kind comes up")
+    }
+
+    func testThreeHitsWreckACarAndAnotherTakesItsPlace() {
+        var match = road()
+        let first = match.cars[0]
+        for _ in 0..<3 {
+            match.hitCar(0, fire: false)
+            match.cars[0].guardFrames = 0
+        }
+        XCTAssertNotEqual(match.cars[0].id, first.id)
+        XCTAssertEqual(match.cars[0].slot, 0)
+        XCTAssertEqual(match.cars[0].hits, 0)
+    }
+
+    func testTheFuelTruckGoesUpOnOneHitOfFire() {
+        var match = road()
+        let box = match.cars[1].box
+        match.cars[1] = Car(id: 77, vehicle: .fuelTruck, slot: 1, box: box)
+        match.hitCar(1, fire: false)
+        XCTAssertEqual(match.cars[1].id, 77, "a plain hit only counts")
+        match.cars[1].guardFrames = 0
+        match.hitCar(1, fire: true)
+        XCTAssertNotEqual(match.cars[1].id, 77)
+    }
+
+    func testASlashHitsACarOnceASwing() {
+        var match = road()
+        match.players[1].position.x = 300
+        let car = match.cars[0]
+        match.players[0].position = Vec2(x: car.box.min.x - 6, y: 10)
+        match.players[0].facing = .right
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        for _ in 0..<SlashRules.frames { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.cars.first { $0.id == car.id }?.hits, 1)
+    }
+
+    func testTheHelicopterCarriesOneRimAcrossThenTheOther() {
+        var match = road()
+        match.advance(inputs: [.idle, .idle])
+        let first = match.helicopter!
+        let carried = match.stage.hoops[first.hoop]
+        XCTAssertLessThan(carried.position.y, 200, "the carried rim is in play")
+        XCTAssertEqual(match.stage.hoops[1 - first.hoop].position, HighwayRules.parked)
+        var next: Helicopter?
+        for _ in 0..<2000 where next == nil {
+            match.advance(inputs: [.idle, .idle])
+            if let flying = match.helicopter, flying.id != first.id { next = flying }
+        }
+        XCTAssertNotNil(next)
+        XCTAssertNotEqual(next!.hoop, first.hoop, "the other side's rim next")
+    }
+
+    func testTheRoadStaysInStepAcrossTwoCopies() {
+        var a = road(seed: 9), b = road(seed: 9)
+        for frame in 0..<900 {
+            let input = PlayerInput(stick: Vec2(x: frame % 120 < 60 ? 1 : -1, y: 0), jump: frame % 40 == 0, shoot: frame % 50 == 0)
+            a.advance(inputs: [input, .idle])
+            b.advance(inputs: [input, .idle])
+        }
+        XCTAssertEqual(a, b)
+    }
+}

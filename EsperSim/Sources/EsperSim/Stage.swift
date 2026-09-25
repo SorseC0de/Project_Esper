@@ -51,6 +51,12 @@ public struct Box: Equatable {
     }
 
     public func offset(by d: Vec2) -> Box { Box(min: min + d, max: max + d) }
+
+    /// The smallest box holding both.
+    public func union(_ other: Box) -> Box {
+        Box(min: Vec2(x: Swift.min(min.x, other.min.x), y: Swift.min(min.y, other.min.y)),
+            max: Vec2(x: Swift.max(max.x, other.max.x), y: Swift.max(max.y, other.max.y)))
+    }
 }
 
 /// The court: a grid of tiles, row 0 at the bottom, plus the rims and where everyone starts.
@@ -389,7 +395,7 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...(columns - 1), rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
         stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
-        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true, ballCam: true)
+        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true, ballCam: true, look: .footballField)
         // The backboards: behind each rim and above it, solid to the ball.
         stage.ballBlockers = stage.hoops.map { hoop in
             let back = hoop.backboard.sign
@@ -399,6 +405,28 @@ public struct Stage: Equatable {
         return stage
     }
 
-    /// The stage being tuned; the court comes back with stage selection.
-    public static var current: Stage { footballField }
+    /// Highway Traffic: the court's width, flat, a road through the middle with standstill
+    /// traffic on it, and one rim at a time carried across under a helicopter. Each starts
+    /// where the court has them, the ball loose at centre as on the court.
+    public static var highway: Stage {
+        let columns = 34, rows = 16
+        var stage = Stage(
+            columns: columns, rows: rows,
+            hoops: [
+                Hoop(position: HighwayRules.parked, owner: 1, backboard: .left),
+                Hoop(position: HighwayRules.parked, owner: 0, backboard: .right),
+            ],
+            playerSpawns: [Vec2(x: 60, y: 10), Vec2(x: Double(columns) * tileSize - 60, y: 10)],
+            playerFacings: [.right, .left],
+            ballSpawn: Vec2(x: Double(columns) * tileSize / 2, y: 120)
+        )
+        stage.fill(.solid, columns: 0...(columns - 1), rows: 0...0)
+        stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
+        stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
+        stage.features = StageFeatures(traffic: true, look: .highway)
+        return stage
+    }
+
+    /// The stage being tuned; the others come back with stage selection.
+    public static var current: Stage { highway }
 }

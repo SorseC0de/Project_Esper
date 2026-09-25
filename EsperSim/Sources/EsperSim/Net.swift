@@ -202,6 +202,11 @@ extension Match {
             mix(helmet.box.min.y)
         }
         if let portal { mix(portal.centre.x) }
+        for car in cars {
+            mix(UInt32(truncatingIfNeeded: car.vehicle.rawValue))
+            mix(UInt32(truncatingIfNeeded: car.hits))
+        }
+        if let helicopter { mix(helicopter.x) }
         return hash
     }
 }

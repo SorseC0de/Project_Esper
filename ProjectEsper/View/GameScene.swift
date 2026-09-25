@@ -411,7 +411,10 @@ final class GameScene: SKScene {
         // The floor and walls take the holder's colour, the backboard blocks keep their rim's
         // owner's, and the ledge is magenta.
         let stage = match.stage
-        if stage.features.helmets {
+        if stage.features.look == .highway {
+            HighwayArt.build(for: stage, into: ground) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
+        }
+        if stage.features.look == .footballField {
             // The field: scenery in place of tiles, the floor invisible through the turf.
             let handles = FieldArt.build(for: stage, into: ground, flat: { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) },
                                          glow: sprites.softGlow(diameter: 64))
@@ -462,7 +465,7 @@ final class GameScene: SKScene {
             glowers.addChild(backboards)
             buildBackboards()
         }
-        for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.helmets {
+        for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.scenic {
             for column in 0..<stage.columns {
                 // The side walls run on up through the sky, so a tall screen never sees their top.
                 let tile = row < stage.rows ? stage.tile(column: column, row: row) : ((column == 0 || column == stage.columns - 1) ? Tile.solid : Tile.empty)
@@ -495,7 +498,9 @@ final class GameScene: SKScene {
             ground.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            let hanging = net(at: rim.position)
+            // Drawn round nothing and placed, so it can follow a rim that moves.
+            let hanging = net(at: .zero)
+            hanging.position = rim.position
             ground.addChild(hanging)
             netNodes.append(hanging)
         }
@@ -828,10 +833,10 @@ final class GameScene: SKScene {
     /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
     private func layout(displayScale screenScale: CGFloat) {
         let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
-        let scrolls = match.stage.features.helmets
-        // The field scrolls sideways, so only its height is fitted, the turf below the floor
-        // counted in so the players stand in the middle of it.
-        let below = scrolls ? FieldArt.viewBelowFloor : 0
+        let scrolls = match.stage.features.look == .footballField
+        // The field scrolls sideways, so only its height is fitted; a scenic stage counts the
+        // ground below the floor in, so the players stand in the middle of it.
+        let below = match.stage.features.scenic ? FieldArt.viewBelowFloor : 0
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
@@ -1540,6 +1545,18 @@ final class GameScene: SKScene {
                 for end in [from, to] {
                     glowers.addChild(EnergyEffect.flashSpark2.node(sprites, player: match.ball.lastTouched ?? 0, at: SpriteLibrary.point(end), scale: 0.5))
                 }
+            case .carHit(let id):
+                carFlash[id] = GameScene.carFlashFrames
+            case .carWrecked(_, let at):
+                let burst = Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at), flipped: false)
+                burst.setScale(1)
+                glowers.addChild(burst)
+            case .landed(let index):
+                // Landing on a car dips it on its springs.
+                let feet = match.players[index].position
+                if let car = match.cars.first(where: { abs($0.box.max.y - feet.y) < 0.5 && feet.x >= $0.box.min.x && feet.x <= $0.box.max.x }) {
+                    carDip[car.id] = GameScene.carDipFrames
+                }
             case .fireballMade(let index):
                 // The fire swirling into the hand.
                 let player = match.players[index]
@@ -1877,6 +1894,137 @@ final class GameScene: SKScene {
     private static let cameraLeadFrames: CGFloat = 20
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
+
+    // MARK: Traffic
+
+    /// Each car as its wheels and its body over them, by the sim's id; frames of the black
+    /// flash after a hit and of the dip after a landing.
+    private var carNodes: [Int: (body: SKSpriteNode, wheels: SKSpriteNode?)] = [:]
+    private var carFlash: [Int: Int] = [:]
+    private var carDip: [Int: Int] = [:]
+    private static let carFlashFrames = 12
+    private static let carDipFrames = 14
+    private var helicopterNode: SKNode?
+    private var helicopterId = 0
+
+    /// The cars idling, the body shivering a pixel over wheels that stay put, dipping when
+    /// someone lands on it, flashing black when hit; and the helicopter over its rim.
+    private func drawTraffic() {
+        guard match.stage.features.traffic else { return }
+        var seen = Set<Int>()
+        for car in match.cars {
+            seen.insert(car.id)
+            let art = car.vehicle.art
+            let nodes = carNodes[car.id] ?? {
+                let size = CGSize(width: CGFloat(car.box.width * SpriteLibrary.pixelsPerUnit), height: CGFloat(car.box.height * SpriteLibrary.pixelsPerUnit))
+                let body = SKSpriteNode(texture: HighwayArt.texture("vehicle_\(art)_body", art: art))
+                body.size = size
+                body.anchorPoint = CGPoint(x: 0.5, y: 0)
+                body.zPosition = 3
+                ground.addChild(body)
+                var wheels: SKSpriteNode?
+                if let texture = HighwayArt.texture("vehicle_\(art)_wheels", art: art) {
+                    let node = SKSpriteNode(texture: texture)
+                    node.size = size
+                    node.anchorPoint = CGPoint(x: 0.5, y: 0)
+                    node.zPosition = 2.9
+                    ground.addChild(node)
+                    wheels = node
+                }
+                // Facing the other way, half the time, by its id.
+                if car.id % 2 == 1 {
+                    body.xScale = -1
+                    wheels?.xScale = -1
+                }
+                let made = (body: body, wheels: wheels)
+                carNodes[car.id] = made
+                return made
+            }()
+            let foot = SpriteLibrary.point(Vec2(x: car.box.center.x, y: car.box.min.y))
+            // The idle: a pixel up and down, each car on its own beat.
+            let idle: CGFloat = ((match.frame + car.id * 7) / 4) % 2 == 0 ? 0 : 1
+            var dip: CGFloat = 0
+            if let left = carDip[car.id], left > 0 {
+                dip = -3 * CGFloat(left) / CGFloat(GameScene.carDipFrames)
+                carDip[car.id] = left - 1
+            }
+            nodes.body.position = CGPoint(x: foot.x, y: foot.y + idle + dip)
+            nodes.wheels?.position = foot
+            if let left = carFlash[car.id], left > 0 {
+                let on = (left / 2) % 2 == 0
+                nodes.body.color = .black
+                nodes.body.colorBlendFactor = on ? 0.85 : 0
+                carFlash[car.id] = left - 1
+            } else {
+                nodes.body.colorBlendFactor = 0
+            }
+        }
+        for (id, nodes) in carNodes where !seen.contains(id) {
+            nodes.body.removeFromParent()
+            nodes.wheels?.removeFromParent()
+            carNodes[id] = nil
+            carFlash[id] = nil
+            carDip[id] = nil
+        }
+
+        if let flying = match.helicopter {
+            if helicopterNode == nil || helicopterId != flying.id {
+                helicopterNode?.removeFromParent()
+                helicopterNode = makeHelicopter(for: flying)
+                ground.addChild(helicopterNode!)
+                helicopterId = flying.id
+            }
+            helicopterNode?.position = SpriteLibrary.point(Vec2(x: flying.x, y: HighwayRules.helicopterHeight))
+        } else {
+            helicopterNode?.removeFromParent()
+            helicopterNode = nil
+        }
+    }
+
+    /// The helicopter, its reds in the energy of the side whose basket it carries, facing the
+    /// way it flies: the hull, the tail rotor spinning about its hub, and the top rotor
+    /// flipped end over end every other frame so it reads as turning.
+    private func makeHelicopter(for flying: Helicopter) -> SKNode {
+        let node = SKNode()
+        node.zPosition = 6
+        node.xScale = flying.speed > 0 ? -1 : 1
+        let hoop = match.stage.hoops[flying.hoop]
+        let look = sprites.look(for: 1 - hoop.owner)
+        let width: CGFloat = 96
+        let rows = HighwayArt.artRows["helicopter"]!
+        let height = width * (rows.bottom - rows.top)
+        let tones: [SKColor?] = [nil, SKColor(rgb: look.energyTone(luminance: 0.75)),
+                                 SKColor(rgb: look.energyTone(luminance: 0.55)), SKColor(rgb: look.energyTone(luminance: 0.4))]
+        // A point on the drawing's 800 square, in the node's own space.
+        func place(_ share: CGPoint) -> CGPoint {
+            CGPoint(x: (share.x - 0.5) * width, y: (1 - (share.y - rows.top) / (rows.bottom - rows.top) - 0.5) * height)
+        }
+        for (part, hub) in [("hull", CGPoint?.none), ("propeller", HighwayArt.topRotorHub), ("spin_me", HighwayArt.tailRotorHub)] {
+            // A rotor turns about its hub: its layers hang off a pivot there.
+            let pivot = SKNode()
+            let at = hub.map(place) ?? .zero
+            pivot.position = at
+            node.addChild(pivot)
+            for (index, tint) in tones.enumerated() {
+                let name = "helicopter_\(part)_" + (index == 0 ? "plain" : "red\(index - 1)")
+                guard let texture = HighwayArt.texture(name, art: "helicopter", tint: tint) else { continue }
+                let layer = SKSpriteNode(texture: texture)
+                layer.size = CGSize(width: width, height: height)
+                layer.position = CGPoint(x: -at.x, y: -at.y)
+                pivot.addChild(layer)
+            }
+            switch part {
+            case "spin_me":
+                pivot.run(.repeatForever(.rotate(byAngle: -.pi * 2, duration: 0.25)))
+            case "propeller":
+                pivot.run(.repeatForever(.sequence([.scaleY(to: -1, duration: 0), .wait(forDuration: 1.0 / 30),
+                                                    .scaleY(to: 1, duration: 0), .wait(forDuration: 1.0 / 30)])))
+            default:
+                break
+            }
+        }
+        return node
+    }
     private var fieldBlooms: [SKSpriteNode] = []
     private var lightPanels: [SKShapeNode] = []
     private let goalposts = SKNode()
@@ -2615,6 +2763,7 @@ final class GameScene: SKScene {
         }
         drawPowersLeavings()
         drawField()
+        drawTraffic()
         // Riders follow their body, the offset turned with it.
         riders.removeAll { $0.node.parent == nil }
         for rider in riders {
@@ -2665,7 +2814,7 @@ final class GameScene: SKScene {
         ballNode.color = colour
         ballHalo.color = colour
         // The field's camera: level, gliding after the local player and leading them.
-        if match.stage.features.helmets {
+        if match.stage.features.look == .footballField {
             cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase
         }
         if match.stage.features.ballCam { easeBallCam() }
@@ -2717,6 +2866,12 @@ final class GameScene: SKScene {
         for index in rimNodes.indices {
             if rimFlash[index] > 0 { rimFlash[index] -= 1 }
             rimNodes[index].texture = sprites.texture("hoop_rim", rimFlash[index] > 0 ? 1 : 0)
+            // A rim that moves, under the highway's helicopter, and its net with it.
+            if index < match.stage.hoops.count {
+                let at = SpriteLibrary.point(match.stage.hoops[index].position)
+                rimNodes[index].position = at
+                if index < netNodes.count { netNodes[index].position = at }
+            }
         }
 
         var shownDots = 0

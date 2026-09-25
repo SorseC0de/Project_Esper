@@ -1430,6 +1430,9 @@ final class GameScene: SKScene {
                     spark.zPosition = 40
                     glowers.addChild(spark)
                 case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 0.42))
+                case .surfSoda:
+                    // A cloud of bubbles off the board, in place of the spark.
+                    spawnBubbles(at: SpriteLibrary.point(player.position), count: 8, spread: 10)
                 case .frostTea where EffectSheets.frames["ice_jumpspark"] != nil:
                     // The ice jump spark in the snowflake's blues, under the feet like the others.
                     let frames = (0..<(EffectSheets.frames["ice_jumpspark"] ?? 1)).map { sprites.iceTexture("ice_jumpspark", $0) }
@@ -1950,7 +1953,12 @@ final class GameScene: SKScene {
         board.xScale = CGFloat(player.facing.sign)
         // Coming down past the crescent's top, bubbles off the underside of the board.
         if !riding, player.surfPath == 0, player.velocity.y < 0, match.frame % 4 == index {
-            spawnBubbles(at: board.position, count: 2, spread: 4, downward: true)
+            // Anywhere along the board's length, as it lies.
+            for _ in 0..<2 {
+                let along = CGFloat.random(in: -0.5...0.5) * board.size.width
+                let at = board.position + CGPoint(x: cos(angle) * along, y: sin(angle) * along)
+                spawnBubbles(at: at, count: 1, spread: 4, downward: true)
+            }
         }
         // The trail on the ground.
         if riding {
@@ -1962,6 +1970,8 @@ final class GameScene: SKScene {
                 trail.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["bubbles"] ?? 0)
                 trail.position = SpriteLibrary.point(player.position) + CGPoint(x: -CGFloat(player.facing.sign) * 8, y: 0)
                 trail.setScale(0.25)
+                // Some the other way round, so the trail isn't one drawing over and over.
+                if Bool.random() { trail.xScale = -trail.xScale }
                 trail.color = ParticleLook.soda
                 trail.colorBlendFactor = 1
                 trail.zPosition = 4
@@ -1983,7 +1993,10 @@ final class GameScene: SKScene {
             let start = Int.random(in: 0..<max(sheet.count / 3, 1))
             let looped = Array(sheet[start...])
             let bubble = SKSpriteNode(texture: looped[0])
-            bubble.size = CGSize(width: ParticleLook.bubbleSize * 1.2, height: ParticleLook.bubbleSize * 1.2)
+            // Each its own size, and some the other way round.
+            let side = ParticleLook.bubbleSize * CGFloat.random(in: 0.8...1.8)
+            bubble.size = CGSize(width: side, height: side)
+            if Bool.random() { bubble.xScale = -1 }
             bubble.color = ParticleLook.soda
             bubble.colorBlendFactor = 1
             bubble.position = point
@@ -1991,7 +2004,8 @@ final class GameScene: SKScene {
             glowers.addChild(bubble)
             // Up and out from a landing, or down and out from under a falling board.
             let angle = (CGFloat(step) + 0.5) / CGFloat(count) * .pi * (downward ? -1 : 1) + (downward ? 0 : .pi * 0.05)
-            let out = SKAction.move(by: CGVector(dx: cos(angle) * spread, dy: sin(angle) * spread * 0.8 + (downward ? -2 : 4)), duration: 0.4)
+            // Spread wide along the ground more than up.
+            let out = SKAction.move(by: CGVector(dx: cos(angle) * spread * 2.2, dy: sin(angle) * spread * 0.5 + (downward ? -2 : 3)), duration: 0.4)
             out.timingMode = .easeOut
             // Each on its own frame and its own pace, so the burst isn't one pulse.
             let pace = 0.4 / Double(looped.count) * Double.random(in: 0.8...1.2)

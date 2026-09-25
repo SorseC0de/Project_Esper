@@ -67,7 +67,7 @@ enum ParticleLook {
     static let lightningSize: CGFloat = 8
     static let bubbleSize: CGFloat = 10
     /// Surf Soda's bubbles, all of them: a soft purple, grape soda.
-    static let soda = SKColor(red: 0.62, green: 0.44, blue: 0.82, alpha: 1)
+    static let soda = SKColor(red: 0.42, green: 0.25, blue: 0.62, alpha: 1)
 }
 
 /// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel

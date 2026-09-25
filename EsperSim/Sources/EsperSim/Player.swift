@@ -212,7 +212,7 @@ public struct Player: Equatable {
 
     /// Whether Surf Soda's board is under the feet: running, or up on a surf jump.
     public var boardOut: Bool {
-        power == .surfSoda && (surfing || (grounded && (state == .run || state == .dash)))
+        power == .surfSoda && (surfing || state == .air || (grounded && (state == .run || state == .dash)))
     }
 
     /// The board: its middle and its turn, under the feet as the body turns about its middle.
@@ -1662,6 +1662,11 @@ public struct Player: Equatable {
                 break
             }
         } else if state.isGroundState, state != .jumpSquat {
+            // Surf Soda off an edge: the board comes too, and the float with it.
+            if power == .surfSoda {
+                surfing = true
+                surfPath = 0
+            }
             wallLandCooldown = max(wallLandCooldown, spec.wallLandGroundLockoutFrames)
             coyote = spec.coyoteFrames
             ledgeCooldown = LedgeRules.walkOffCooldownFrames

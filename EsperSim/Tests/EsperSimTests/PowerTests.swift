@@ -265,6 +265,17 @@ final class PowerTests: XCTestCase {
         XCTAssertGreaterThan(match.players[0].surfAngle - before, 2 * .pi * 0.85, "the double jump turns a whole way back")
     }
 
+    func testOffAnEdgeTheBoardComesToo() {
+        var match = with(.surfSoda)
+        match.players[1].position.x = 60
+        // On the ledge, walking off its end.
+        match.players[0].position = Vec2(x: 185, y: 40)
+        let off = run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 0.5, y: 0)) }) { !$0.players[0].grounded }
+        XCTAssertLessThan(off, 60)
+        XCTAssertTrue(match.players[0].surfing)
+        XCTAssertTrue(match.players[0].boardOut)
+    }
+
     func testTheBoardStopsTheOthersBolt() {
         var match = with(.zeusJuice, other: .surfSoda)
         match.players[1].position = Vec2(x: match.players[0].position.x + 60, y: 10)

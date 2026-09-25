@@ -263,8 +263,8 @@ final class HighwayTests: XCTestCase {
         XCTAssertEqual(a.cars.map(\.vehicle), b.cars.map(\.vehicle), "the same seed, the same traffic")
         for car in a.cars where car.level == 0 {
             XCTAssertEqual(car.box.min.y, Stage.tileSize - HighwayRules.nearLaneDrop, accuracy: 0.001, "down in the near half of the road")
-            for box in car.boxes { XCTAssertTrue(a.stage.extras.contains(box), "solid, tile by tile") }
-            XCTAssertEqual(car.boxes.count, Int(car.vehicle.lengthTiles))
+            for box in car.boxes { XCTAssertTrue(a.stage.extras.contains(box), "solid, block by block") }
+            XCTAssertEqual(car.boxes.count, car.vehicle.blockColumns, "one run a column from the measured outline")
         }
         var kinds = Set<Vehicle>()
         for seed in 1...40 { kinds.formUnion(road(seed: UInt32(seed)).cars.map(\.vehicle)) }
@@ -303,6 +303,21 @@ final class HighwayTests: XCTestCase {
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         for _ in 0..<SlashRules.frames { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.cars.first { $0.id == car.id }?.hits, 1)
+    }
+
+    func testBlocksBecomeBoxesColumnByColumnAndMirror() {
+        var match = road()
+        Vehicle.edited[.car] = ["##.", "...", "###"]
+        defer { Vehicle.edited[.car] = nil }
+        match.cars[0].vehicle = .car
+        match.cars[0].facesLeft = false
+        let boxes = match.cars[0].boxes
+        XCTAssertEqual(boxes.count, 5, "the first two columns have a gap each")
+        let left = match.cars[0].box.min.x, floor = match.cars[0].box.min.y
+        XCTAssertTrue(boxes.contains { $0.min.x == left && $0.min.y == floor + 10 && $0.height == 5 }, "the top block, apart")
+        XCTAssertFalse(boxes.contains { $0.min.x == left + 10 && $0.min.y == floor + 10 }, "no top block on the right")
+        match.cars[0].facesLeft = true
+        XCTAssertTrue(match.cars[0].boxes.contains { $0.min.x == left + 10 && $0.min.y == floor + 10 }, "mirrored")
     }
 
     func testTheHelicopterCarriesOneRimAcrossThenTheOther() {

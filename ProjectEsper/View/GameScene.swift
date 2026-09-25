@@ -384,6 +384,8 @@ final class GameScene: SKScene {
     // MARK: Building
 
     private func build() {
+        // The vehicles' shapes as last set in the bounds gallery, offline.
+        BoundsGallery.loadSaved()
         addChild(world)
         world.addChild(ground)
         bodies.zPosition = 20
@@ -874,6 +876,9 @@ final class GameScene: SKScene {
         controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
+        }
+        controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
+            index == 1 ? self?.openBoundsGallery() : self?.closeBoundsGallery()
         }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
@@ -1894,6 +1899,22 @@ final class GameScene: SKScene {
     private static let cameraLeadFrames: CGFloat = 20
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
+    /// The bounds gallery, while it's open.
+    private var boundsGallery: BoundsGallery?
+
+    private func openBoundsGallery() {
+        guard boundsGallery == nil, online == nil else { return }
+        let gallery = BoundsGallery(halfWidth: size.width / 2 / hudScale, halfHeight: size.height / 2 / hudScale,
+                                    onChange: { [weak self] in self?.session.mutate { $0.refreshExtras() } },
+                                    onClose: { [weak self] in self?.closeBoundsGallery() })
+        hud.addChild(gallery)
+        boundsGallery = gallery
+    }
+
+    private func closeBoundsGallery() {
+        boundsGallery?.removeFromParent()
+        boundsGallery = nil
+    }
 
     // MARK: Traffic
 
@@ -3029,6 +3050,10 @@ final class GameScene: SKScene {
     }
 
     func touchBegan(_ touch: UITouch, at point: CGPoint, viewSize: CGSize) {
+        if let gallery = boundsGallery {
+            _ = gallery.tap(at: hudPoint(point, viewSize: viewSize))
+            return
+        }
         if flow != .playing, let screen {
             _ = screen.tap(at: hudPoint(point, viewSize: viewSize))
             return

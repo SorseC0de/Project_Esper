@@ -475,9 +475,12 @@ centre.
   vehicle, a car standing in each; the near lane's are solid and rideable and face right,
   the far lane's face left. Which of the 23 vehicles stands where
   comes off the match's dice, so both phones agree with nothing sent. Each has its own
-  length in tiles and its height the drawing's own; it's solid tile by tile, a box a tile
-  wide to each tile of its outline (`Vehicle.outline`, measured off the art), so a
-  sedan's hood and roof are each their own height. Anything that would stun a player
+  length in tiles and its height the drawing's own; it's solid in blocks of eight art
+  pixels (`Vehicle.blocks`), each column's unbroken runs one box, mirrored when it faces
+  left. The blocks are set by hand in the bounds gallery (the BOUNDS picker, offline): the
+  vehicle blown up under a grid, a tap adds or takes away a block, RESET goes back to the
+  measured outline, COPY puts the table on the clipboard as Swift for `Vehicle.set`.
+  Edits are kept between launches and stand in live until they're pasted in. Anything that would stun a player
   hits one: the slash, a bolt, a strike, a fireball's burst, a thrown ball, a flame; one
   swing counts once. Three hits wreck it, the fuel truck one of fire, in a fire burst, and
   a new one off the dice takes its slot.

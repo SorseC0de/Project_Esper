@@ -84,9 +84,33 @@ public enum Vehicle: Int, CaseIterable, Equatable {
     /// One hit of fire wrecks it.
     public var burnsAtOnce: Bool { self == .fuelTruck }
 
+    /// Its solid shape in blocks of eight art pixels (five units), rows from the top, `#`
+    /// solid and `.` open, drawn over the art facing right. Set by hand in the bounds
+    /// gallery; until then, the measured outline in blocks. Offline, the gallery's edits
+    /// stand in live.
+    nonisolated(unsafe) public static var edited: [Vehicle: [String]] = [:]
+    public static let blockSize = 5.0
+
+    public var blockColumns: Int { Int((lengthTiles * Stage.tileSize / Vehicle.blockSize).rounded()) }
+    public var blockRows: Int { Int((size.y / Vehicle.blockSize).rounded(.up)) }
+
+    public var blocks: [String] {
+        if let edited = Vehicle.edited[self] { return edited }
+        if let set = Vehicle.set[self] { return set }
+        // The measured outline, each tile two columns of blocks as tall as its share.
+        let rows = blockRows
+        let heights = outline.flatMap { share in [share, share] }.map { Int((max($0, 0.1) * Double(rows)).rounded()) }
+        return (0..<rows).map { row in
+            String(heights.map { rows - row <= $0 ? "#" : "." })
+        }
+    }
+
+    /// The shapes set by hand, pasted from the gallery.
+    public static let set: [Vehicle: [String]] = [:]
+
     /// Its outline, tile by tile from the drawing's left: each tile's height as a share of
     /// the whole, measured off the art at the top that four in five of its pixel columns
-    /// reach, so an aerial or a stack doesn't count. One solid box a tile.
+    /// reach, so an aerial or a stack doesn't count; the blocks' starting point.
     public var outline: [Double] {
         switch self {
         case .ambulance: [0.84, 0.93, 0.98, 0.93, 0.81, 0.49]
@@ -127,13 +151,29 @@ public struct Car: Equatable {
     /// solid and what takes hits. Facing left, the drawing and the outline are mirrored.
     public var box: Box
     public var facesLeft: Bool
+    /// Its blocks as boxes, each column's unbroken runs one box, mirrored when it faces left.
     public var boxes: [Box] {
-        let tile = Stage.tileSize
-        let heights = facesLeft ? Array(vehicle.outline.reversed()) : vehicle.outline
-        return heights.enumerated().map { column, share in
-            let left = box.min.x + Double(column) * tile
-            return Box(min: Vec2(x: left, y: box.min.y), max: Vec2(x: left + tile, y: box.min.y + max(share, 0.1) * box.height))
+        let rows = vehicle.blocks.map { Array($0) }
+        guard let width = rows.first?.count else { return [] }
+        let size = Vehicle.blockSize
+        var boxes: [Box] = []
+        for column in 0..<width {
+            let across = facesLeft ? width - 1 - column : column
+            var run: (top: Int, bottom: Int)?
+            for row in 0...rows.count {
+                let solid = row < rows.count && column < rows[row].count && rows[row][column] == "#"
+                if solid {
+                    run = (run?.top ?? row, row)
+                } else if let open = run {
+                    let left = box.min.x + Double(across) * size
+                    let bottom = box.min.y + Double(rows.count - 1 - open.bottom) * size
+                    let top = box.min.y + Double(rows.count - open.top) * size
+                    boxes.append(Box(min: Vec2(x: left, y: bottom), max: Vec2(x: left + size, y: top)))
+                    run = nil
+                }
+            }
         }
+        return boxes
     }
     public var hits = 0
     /// Frames before the same car can take another hit, so one swing counts once.
@@ -252,7 +292,7 @@ extension Match {
     }
 
     /// The boxes solid to bodies: made slabs, helmets and cars.
-    mutating func refreshExtras() {
+    public mutating func refreshExtras() {
         stage.extras = platforms.map(\.box) + helmets.map(\.box) + cars.filter { $0.level == 0 }.flatMap(\.boxes)
     }
 }

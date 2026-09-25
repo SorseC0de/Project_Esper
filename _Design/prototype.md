@@ -328,7 +328,10 @@ through, offers BEST OF 7 and, greyed for now, MULTIPLAYER; jump on the pad star
 A round starts with both bodies ported in at their
 spawns: a cluster of `flashspark2` over each in its energy, the backboards' 3 by 4 grid
 at 0.4 unskewed, held the 12 frames the body is hidden and faded over 0.3 seconds (the
-old bolt and crown are kept, `boltEntry`, for a power to come); then the three count in title lettering
+old bolt and crown are kept, `boltEntry`, for a power to come); then the three count. With
+a screen up or on its way (the drink, the stage select, the win) the port-in and the
+count both wait for it to close, BUCKET!! playing out meanwhile; the sim's own count is
+set again as play comes back in title lettering
 and BALL OUT!!! as it hits zero, when both can act. A point is a round: BUCKET!! goes up
 with the strike, and whoever was scored on drinks. The computer drinks at once, one of
 its three at random on the series' dice; the human gets the pick screen once the strike

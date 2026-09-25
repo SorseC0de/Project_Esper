@@ -1136,7 +1136,8 @@ final class GameScene: SKScene {
         pendingFlow = nil
         heldBanner = nil
         series = Series(seed: seed)
-        startRound()
+        // The port-in waits for the stage select to close.
+        startRound(portingIn: false)
         session.stopAt = session.frame
         pickAfterStage = false
         enter(.stageSelect)
@@ -1153,13 +1154,13 @@ final class GameScene: SKScene {
     }
 
     /// A round: bodies with their drinks in them at their spawns, the count, and the
-    /// bolts that bring them in.
-    private func startRound() {
+    /// port-in, unless a screen is to come first.
+    private func startRound(portingIn: Bool = true) {
         session = RollbackSession(match: freshMatch(), localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
         showStage()
         controls?.setOnline(online != nil)
         freshRoundView()
-        bringPlayersIn()
+        if portingIn { bringPlayersIn() }
     }
 
     /// The view's hold on the last round let go: the computer, the rim flashes, the ball's colour.
@@ -3503,10 +3504,15 @@ final class GameScene: SKScene {
 
         drawHitboxes()
         // The count in title lettering, BALL OUT as it ends, and any other banner for its frames.
-        if match.countdown > 0 {
+        // With a screen up or on its way, the count waits: it starts again as play comes back.
+        let counting = flow == .playing && pendingFlow == nil
+        if match.countdown > 0, !counting {
+            // BUCKET and the rest play out meanwhile.
+            tickBanner()
+        } else if match.countdown > 0 {
             let number = (match.countdown + 59) / 60
             // Each number's own sound as it goes up, in play only, not under a screen.
-            if number != lastCountSounded, flow == .playing {
+            if number != lastCountSounded {
                 lastCountSounded = number
                 if let sound = SoundBoard.count[number] { SoundBoard.shared.play(sound) }
             }

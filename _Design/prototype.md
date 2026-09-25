@@ -408,7 +408,8 @@ lime #A6E51C, pink #F21188 and blue #1937FF. Each has an opposite: orange and te
 and lime, pink and blue. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two
-different colours can meet. Purple is left out, as it's the loose ball's.
+different colours can meet. The debug strip's COLOUR picker (offline only) sets the same saved choice
+mid-game, by initial. Purple is left out, as it's the loose ball's.
 
 ## Opponent
 

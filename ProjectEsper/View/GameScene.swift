@@ -885,6 +885,15 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
+        // Same choice as the title's circles; online the colours are settled in the hello.
+        if online == nil {
+            let colours = EnergyColour.allCases
+            controls.addPicker(title: "COLOUR", options: colours.map { $0.rawValue.prefix(1).uppercased() },
+                               selected: colours.firstIndex(of: EnergyColour.saved) ?? 0) { [weak self] index in
+                UserDefaults.standard.set(colours[index].rawValue, forKey: EnergyColour.storageKey)
+                self?.applySavedColours()
+            }
+        }
         // The bounds gallery only means anything on the highway.
         if match.stage.features.traffic {
             controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in

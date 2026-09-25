@@ -605,7 +605,10 @@ public struct Player: Equatable {
                 let turns = (surfAngle / (2 * Double.pi)).rounded()
                 surfAngle += (turns * 2 * Double.pi - surfAngle) * SurfRules.uprightShare
             }
-            if surfWall == nil, jumpPressed, jumpsLeft > 0 {
+            if powerLevel >= 2, surfPath == 0, let wall = wallSide, stickFacing(input) == wall, wallLandCooldown == 0 {
+                // Onto a wall anywhere up it, held into it: the ride, as a wall land would be.
+                startWallRide(wall)
+            } else if surfWall == nil, jumpPressed, jumpsLeft > 0 {
                 jumpsLeft -= 1
                 startSurfJump(backflip: true, events: &events)
                 events.append(.doubleJumped(player: index))
@@ -1517,9 +1520,11 @@ public struct Player: Equatable {
         enter(.air)
     }
 
-    /// Off the wall in a backflip, away from it.
+    /// Off the wall in a backflip, away from it; the same wall can't be ridden again for a
+    /// moment, so the leap gets clear of it.
     private mutating func leapOffWall(_ wall: Facing) {
         surfWall = nil
+        wallLandCooldown = spec.wallLandCooldownFrames
         velocity = Vec2(x: -wall.sign * SurfRules.wallLeap.x, y: SurfRules.wallLeap.y)
         facing = wall.flipped
         surfDirection = -wall.sign

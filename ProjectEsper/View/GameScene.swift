@@ -220,7 +220,7 @@ final class GameScene: SKScene {
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
         playerNodes.filter { !$0.isHidden }.compactMap { node in
-            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size, zRotation: node.zRotation) }
         }
     }
 
@@ -1763,6 +1763,8 @@ final class GameScene: SKScene {
         var size: CGFloat
         var tint: SKColor?
         var rate: Double
+        /// Tints to pick from for each particle, in place of the one tint.
+        var tints: [SKColor] = []
     }
 
     private struct HeadParticle {
@@ -1799,7 +1801,7 @@ final class GameScene: SKScene {
             streams = [HeadStream(frames: energy.frames, size: energy.size, tint: colour, rate: 12),
                        HeadStream(frames: [SKTexture(imageNamed: "Snowflake")], size: ParticleLook.snowflakeSize, tint: GameScene.ice, rate: 12)]
         case .surfSoda where EffectSheets.frames["bubble_particle"] != nil:
-            streams = [HeadStream(frames: sheetFrames("bubble_particle"), size: ParticleLook.bubbleSize, tint: ParticleLook.soda, rate: 24)]
+            streams = [HeadStream(frames: sheetFrames("bubble_particle"), size: ParticleLook.bubbleSize, tint: nil, rate: 24, tints: ParticleLook.sodas)]
         case .zeusJuice where EffectSheets.frames["lightning_particle"] != nil:
             // The two bolts, half each, toned in the energy colour.
             streams = [HeadStream(frames: sheetFrames("lightning_particle", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 12)]
@@ -1826,7 +1828,7 @@ final class GameScene: SKScene {
                 credit[slot] -= 1
                 let node = SKSpriteNode(texture: stream.frames[0])
                 node.size = CGSize(width: stream.size, height: stream.size)
-                if let tint = stream.tint {
+                if let tint = stream.tints.randomElement() ?? stream.tint {
                     node.color = tint
                     node.colorBlendFactor = 1
                 }
@@ -1919,8 +1921,8 @@ final class GameScene: SKScene {
     private var surfTrailFrames: [Int: Int] = [:]
     private var boardWasOut: [Int: Bool] = [:]
 
-    /// The board as a white silhouette, its tail's shadow a shade off white, toned in the
-    /// player's energy as every white sheet is.
+    /// The board as a silhouette in a bright purple, bright enough for the glow to take,
+    /// its tail's shadow a shade darker.
     private func boardTexture(for index: Int) -> SKTexture? {
         guard let image = UIImage(named: "Surfboard") else { return nil }
         let width = 400, height = 46
@@ -1935,8 +1937,8 @@ final class GameScene: SKScene {
               let data = context.data else { return SKTexture(image: drawn) }
         context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
         let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
-        let look = sprites.look(for: index)
-        let white = look.energyTone(luminance: 1), shadow = look.energyTone(luminance: 240.0 / 255)
+        _ = index
+        let white = ParticleLook.boardPurple, shadow = ParticleLook.boardShadow
         for pixel in 0..<(width * height) {
             let at = pixel * 4
             let alpha = Int(pixels[at + 3])
@@ -2026,6 +2028,11 @@ final class GameScene: SKScene {
             head.position = turned(head.position + CGPoint(x: 0, y: bob))
             head.zRotation += angle
         }
+        // Whatever rides the body turns with it: the ball in hand, its glow, the energy, the charge.
+        for rider in [handBalls[index], handHalos[index], energyNodes[index], chargeNodes[index]] where !rider.isHidden {
+            rider.position = turned(rider.position + CGPoint(x: 0, y: bob))
+            rider.zRotation += angle
+        }
         board.position = SpriteLibrary.point(player.board.centre) + CGPoint(x: 0, y: bob)
         board.zRotation = angle
         board.xScale = CGFloat(player.facing.sign)
@@ -2050,7 +2057,7 @@ final class GameScene: SKScene {
                 trail.setScale(0.25)
                 // Some the other way round, so the trail isn't one drawing over and over.
                 if Bool.random() { trail.xScale = -trail.xScale }
-                trail.color = ParticleLook.soda
+                trail.color = ParticleLook.sodas.randomElement()!
                 trail.colorBlendFactor = 1
                 trail.zPosition = 4
                 // Each from its own early frame, played out to the end, so the trail never pulses
@@ -2075,7 +2082,7 @@ final class GameScene: SKScene {
             let side = ParticleLook.bubbleSize * CGFloat.random(in: 0.8...1.8)
             bubble.size = CGSize(width: side, height: side)
             if Bool.random() { bubble.xScale = -1 }
-            bubble.color = ParticleLook.soda
+            bubble.color = ParticleLook.sodas.randomElement()!
             bubble.colorBlendFactor = 1
             bubble.position = point
             bubble.zPosition = 31

@@ -257,6 +257,18 @@ final class PowerTests: XCTestCase {
         XCTAssertGreaterThan(match.players[0].surfFlipRate, 0, "on round the way the ride turned it")
     }
 
+    func testAWallRideStartsFromAnywhereUpTheWall() {
+        var match = with(.surfSoda, level: 2)
+        match.players[1].position.x = 60
+        // Up in the air beside the right wall, falling, held into it.
+        match.players[0].position = Vec2(x: 325, y: 90)
+        match.players[0].grounded = false
+        match.players[0].state = .air
+        match.players[0].surfing = true
+        let rode = run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) { $0.players[0].surfWall == .right }
+        XCTAssertLessThan(rode, 10)
+    }
+
     func testTheDoubleJumpIsAWholeBackflip() {
         var match = with(.surfSoda)
         match.players[1].position.x = 300

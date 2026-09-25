@@ -294,18 +294,19 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   and within 30 of the ground it eases toward the nearest upright, landing in a burst of
   bubbles. The board, 20 by 3 under the feet and turning with the body, stops the
   other's bolts and fireballs and turns back their thrown ball: a shield to spin into
-  place. The board is a white silhouette, its tail's shadow at 240, toned in the energy
-  colour; it comes and goes in a line of bubbles, and onto the rim the body goes upright
+  place. The board is a bright grape silhouette the glow takes, its tail's shadow a shade
+  darker; it comes and goes in a line of bubbles, and onto the rim the body goes upright
   and the board drops away to the floor. On the board the body is a tenth faster, on top of the defender's tenth, and
   past the crescent's top it floats down at half gravity and six tenths of the fall speed
   unless the fast fall cuts through, shedding bubbles along the board's underside. The
   first jump leans back a quarter turn over
   its crescent, the double jump a whole backflip. Running into a wall with the stick held
-  toward it (level two), the board turns back against it and rides up at the run speed; letting go,
+  toward it (level two), or meeting one anywhere up it in the air held into it, the board
+  turns back against it and rides up at the run speed; letting go,
   stalling or meeting the ceiling flips it off, pushed away, carrying on round the way
   the ride turned it to the next upright. In the air with the stick let go it rights
   itself. Its head's
-  particles are `bubble_particle` at 10, every bubble a darker purple, grape soda, each bubble in the
+  particles are `bubble_particle` at 10, every bubble one of two grape purples by a coin flip, each bubble in the
   trail and the landing on its own frame. Numbers in `SurfRules`, first guesses.
 
 Hits share the strip: the victim is stunned 60 frames and any ball they hold pops

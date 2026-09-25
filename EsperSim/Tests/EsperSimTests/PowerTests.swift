@@ -227,6 +227,38 @@ final class PowerTests: XCTestCase {
         XCTAssertFalse(match.players[0].surfing)
     }
 
+    func testRunningIntoAWallRidesUpItAndLettingGoFlipsOff() {
+        var match = with(.surfSoda)
+        match.players[1].position.x = 60
+        match.players[0].position.x = 280
+        // A smash from neutral, so it runs.
+        match.advance(inputs: [.idle, .idle])
+        let rode = run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) { $0.players[0].surfWall == .right }
+        XCTAssertLessThan(rode, 60, "up the wall")
+        let low = match.players[0].position.y
+        run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        XCTAssertGreaterThan(match.players[0].position.y, low + 20, "climbing")
+        XCTAssertEqual(match.players[0].surfAngle, .pi / 2, accuracy: 0.2, "the board against the wall")
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertNil(match.players[0].surfWall)
+        XCTAssertLessThan(match.players[0].velocity.x, 0, "off it, away")
+        XCTAssertGreaterThan(match.players[0].surfFlip, 0, "in a backflip")
+    }
+
+    func testTheDoubleJumpIsAWholeBackflip() {
+        var match = with(.surfSoda)
+        match.players[1].position.x = 300
+        // Clear of the ledge, whose top would count as the ground near below.
+        match.players[0].position.x = 60
+        for _ in 0..<(match.players[0].spec.jumpSquatFrames + 1) { match.advance(inputs: [PlayerInput(jump: true), .idle]) }
+        run(&match, frames: SurfRules.pathFrames + 2, input: { _ in .idle })
+        let before = match.players[0].surfAngle
+        XCTAssertEqual(before, SurfRules.jumpLean, accuracy: 0.05, "the first jump leans back")
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        run(&match, frames: SurfRules.pathFrames, input: { _ in .idle })
+        XCTAssertEqual(match.players[0].surfAngle - before, 2 * .pi, accuracy: 0.3, "the double jump turns a whole way back")
+    }
+
     func testTheBoardStopsTheOthersBolt() {
         var match = with(.zeusJuice, other: .surfSoda)
         match.players[1].position = Vec2(x: match.players[0].position.x + 60, y: 10)

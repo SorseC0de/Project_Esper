@@ -290,8 +290,14 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   and within 30 of the ground it eases toward the nearest upright, landing in a burst of
   bubbles. The board, 20 by 3 under the feet and turning with the body, stops the
   other's bolts and fireballs and turns back their thrown ball: a shield to spin into
-  place. Its head's particles are `bubble_particle` at 20, and every bubble is a soft
-  brown. Numbers in `SurfRules`, first guesses.
+  place. On the board the body is a tenth faster, on top of the defender's tenth, and
+  past the crescent's top it floats down at half gravity and six tenths of the fall speed
+  unless the fast fall cuts through. The first jump leans back an eighth of a turn over
+  its crescent, the double jump a whole backflip. Running into a wall with the stick held
+  toward it, the board turns back against it and rides up at the run speed; letting go,
+  stalling or meeting the ceiling flips it off in a backflip, pushed away. Its head's
+  particles are `bubble_particle` at 10, every bubble a soft brown, each bubble in the
+  trail and the landing on its own frame. Numbers in `SurfRules`, first guesses.
 
 Hits share the strip: the victim is stunned 60 frames and any ball they hold pops
 free; the slash, the parry, the bolt, the burst and the pulse knock the body away as

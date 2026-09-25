@@ -202,6 +202,11 @@ public struct Player: Equatable {
     public var surfDirection = 1.0
     public var surfing = false
     public var surfAngle = 0.0
+    /// How far the crescent turns the body, a lean or a whole backflip; the wall it's
+    /// riding up, if any; and frames left of a backflip off one.
+    public var surfTurn = 0.0
+    public var surfWall: Facing?
+    public var surfFlip = 0
 
     /// Whether Surf Soda's board is under the feet: running, or up on a surf jump.
     public var boardOut: Bool {
@@ -298,6 +303,8 @@ public struct Player: Equatable {
             if surfing, next.isGroundState || [.wallLand, .ledgeHang, .webbed, .webPull].contains(next) {
                 surfing = false
                 surfAngle = 0
+                surfWall = nil
+                surfFlip = 0
             }
         }
     }
@@ -535,28 +542,45 @@ public struct Player: Equatable {
                 }
             }
 
+        case .air where surfWall != nil:
+            // Surf Soda up a wall: the board against it, up at the run speed while the stick
+            // holds toward it; let go, stall, or meet the ceiling and it's a backflip off.
+            let wall = surfWall!
+            surfAngle += (wall.sign * Double.pi / 2 - surfAngle) * 0.3
+            velocity = Vec2(x: wall.sign * 0.5, y: runSpeed)
+            if stickFacing(input) != wall || wallSide != wall || stateTimer > 1 && position.y <= lastWallRideY {
+                leapOffWall(wall)
+            }
+            lastWallRideY = position.y
+
         case .air where surfPath > 0 || surfing:
-            // Surf Soda: the crescent, fixed; past its top the stick spins the body instead
-            // of drifting it, and it eases upright near the ground.
+            // Surf Soda: the crescent, fixed, the body turning back with it; past its top the
+            // stick spins the body instead of drifting it, the fall floats unless the fast
+            // fall cuts through, and it eases upright near the ground.
             if surfPath > 0 {
                 surfPath += 1
                 let step = Double.pi / 2 / Double(SurfRules.pathFrames)
                 let angle = Double(surfPath) * step
                 velocity = Vec2(x: surfDirection * SurfRules.reach * Trig.sin(angle) * step, y: SurfRules.rise * Trig.cos(angle) * step)
+                surfAngle += surfDirection * surfTurn / Double(SurfRules.pathFrames)
                 if surfPath >= SurfRules.pathFrames { surfPath = 0 }
+            } else if surfFlip > 0 {
+                surfFlip -= 1
+                surfAngle += surfDirection * 2 * Double.pi / Double(SurfRules.flipFrames)
+                floatDown(input)
             } else {
-                fall(.idle)
+                floatDown(input)
                 surfAngle -= input.stick.x * SurfRules.spinRate
             }
             let drop = stage.drop(fromX: position.x, y: position.y)
-            if surfPath == 0, drop < SurfRules.uprightHeight {
+            if surfPath == 0, surfFlip == 0, drop < SurfRules.uprightHeight {
                 // The nearest upright, not always back the way it came.
                 let turns = (surfAngle / (2 * Double.pi)).rounded()
                 surfAngle += (turns * 2 * Double.pi - surfAngle) * SurfRules.uprightShare
             }
-            if jumpPressed, jumpsLeft > 0 {
+            if surfWall == nil, jumpPressed, jumpsLeft > 0 {
                 jumpsLeft -= 1
-                startSurfJump(events: &events)
+                startSurfJump(backflip: true, events: &events)
                 events.append(.doubleJumped(player: index))
             } else if holding, input.shoot, shootReady {
                 enterShootStance()
@@ -1026,6 +1050,10 @@ public struct Player: Equatable {
         }
         wantsPlatform = false
         move(in: stage)
+        // Surf Soda: running into a wall with the stick held toward it takes the board up it.
+        if power == .surfSoda, grounded, state == .run || state == .dash || state == .walk, let wall = wallSide, stickFacing(input) == wall {
+            startWallRide(wall)
+        }
         if state == .webSwing, let anchor = webAnchor {
             let target = anchor + Vec2(x: Trig.sin(swingAngle), y: -Trig.cos(swingAngle)) * swingLength
             if position.distance(to: target) > 1 {
@@ -1427,12 +1455,53 @@ public struct Player: Equatable {
         return stage.wall(beside: wide)
     }
 
-    /// Surf Soda's jump: the crescent from here, forward the way the body faces.
-    private mutating func startSurfJump(events: inout [MatchEvent]) {
+    /// Past the crescent: gravity cut and the fall slowed, unless down on the stick fast
+    /// falls through it.
+    private mutating func floatDown(_ input: PlayerInput) {
+        if !fastFalling, velocity.y <= 0, input.stick.y < -0.65 {
+            fastFalling = true
+            velocity.y = -spec.fastFallSpeed
+        }
+        if fastFalling {
+            velocity.y = max(velocity.y - spec.gravity, -spec.fastFallSpeed)
+        } else {
+            velocity.y = max(velocity.y - spec.gravity * SurfRules.gravityShare, -spec.fallSpeed * SurfRules.fallShare)
+        }
+    }
+
+    /// Where the wall ride was last frame, to tell when it's stopped climbing.
+    private var lastWallRideY = 0.0
+
+    /// Up the wall ahead on the board.
+    private mutating func startWallRide(_ wall: Facing) {
+        surfWall = wall
+        facing = wall
+        surfing = true
+        surfPath = 0
+        fastFalling = false
+        grounded = false
+        lastWallRideY = position.y - 1
+        enter(.air)
+    }
+
+    /// Off the wall in a backflip, away from it.
+    private mutating func leapOffWall(_ wall: Facing) {
+        surfWall = nil
+        velocity = Vec2(x: -wall.sign * SurfRules.wallLeap.x, y: SurfRules.wallLeap.y)
+        facing = wall.flipped
+        surfDirection = -wall.sign
+        surfFlip = SurfRules.flipFrames
+    }
+
+    /// Surf Soda's jump: the crescent from here, forward the way the body faces, leaning
+    /// back with it; `backflip` makes it a whole turn back, as the double jump is.
+    private mutating func startSurfJump(backflip: Bool = false, events: inout [MatchEvent]) {
         jumpBuffer = 0
         surfPath = 1
         surfing = true
+        surfFlip = 0
         surfDirection = facing.sign
+        surfTurn = backflip ? 2 * Double.pi : SurfRules.jumpLean
         fastFalling = false
         platformArmed = true
         let step = Double.pi / 2 / Double(SurfRules.pathFrames)
@@ -1569,6 +1638,8 @@ public struct Player: Equatable {
                     surfing = false
                     surfPath = 0
                     surfAngle = 0
+                    surfWall = nil
+                    surfFlip = 0
                     events.append(.surfLanded(player: index))
                 }
                 events.append(.landed(player: index))

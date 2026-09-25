@@ -52,6 +52,19 @@ public enum SurfRules {
     public static let uprightShare = 0.15
     public static let boardLength = 20.0
     public static let boardThickness = 3.0
+    /// A tenth faster on the board, on top of the defender's tenth.
+    public static let speedShare = 1.1
+    /// Past the crescent's top it floats down: this share of gravity, falling no faster than
+    /// this share of the fall speed, unless the fast fall cuts through.
+    public static let gravityShare = 0.5
+    public static let fallShare = 0.6
+    /// The first jump leans back this far over its crescent; the double jump is a whole
+    /// backflip over it.
+    public static let jumpLean = Double.pi / 4
+    /// Into a wall on the board: up it at the run speed while the stick holds toward it;
+    /// off it with this push, in a backflip over this many frames.
+    public static let wallLeap = Vec2(x: 2.5, y: 2.5)
+    public static let flipFrames = 30
 }
 
 /// Slopes: a body's feet ride one up or down this far a frame at most, a block's height;

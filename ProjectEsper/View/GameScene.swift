@@ -1961,7 +1961,10 @@ final class GameScene: SKScene {
                 trail.color = ParticleLook.soda
                 trail.colorBlendFactor = 1
                 trail.zPosition = 4
-                trail.run(.sequence([.animate(with: sheet, timePerFrame: 1.0 / 24), .removeFromParent()]))
+                // Each from its own frame of the sheet, so the trail never pulses in step.
+                let start = Int.random(in: 0..<sheet.count)
+                let looped = Array(sheet[start...]) + Array(sheet[..<start])
+                trail.run(.sequence([.animate(with: looped, timePerFrame: 1.0 / 24), .removeFromParent()]))
                 glowers.addChild(trail)
             }
         }
@@ -1972,8 +1975,10 @@ final class GameScene: SKScene {
         guard EffectSheets.frames["bubble_particle"] != nil else { return }
         let sheet = (0..<(EffectSheets.frames["bubble_particle"] ?? 1)).map { sprites.texture("bubble_particle", $0) }
         for step in 0..<count {
-            let bubble = SKSpriteNode(texture: sheet[step % sheet.count])
-            bubble.size = CGSize(width: ParticleLook.bubbleSize * 0.6, height: ParticleLook.bubbleSize * 0.6)
+            let start = Int.random(in: 0..<sheet.count)
+            let looped = Array(sheet[start...]) + Array(sheet[..<start])
+            let bubble = SKSpriteNode(texture: looped[0])
+            bubble.size = CGSize(width: ParticleLook.bubbleSize * 1.2, height: ParticleLook.bubbleSize * 1.2)
             bubble.color = ParticleLook.soda
             bubble.colorBlendFactor = 1
             bubble.position = point
@@ -1982,7 +1987,9 @@ final class GameScene: SKScene {
             let angle = CGFloat(step) / CGFloat(count) * .pi + .pi * 0.05
             let out = SKAction.move(by: CGVector(dx: cos(angle) * spread, dy: sin(angle) * spread * 0.8 + 4), duration: 0.4)
             out.timingMode = .easeOut
-            bubble.run(.sequence([.group([out, .animate(with: sheet, timePerFrame: 0.4 / Double(sheet.count))]), .removeFromParent()]))
+            // Each on its own frame and its own pace, so the burst isn't one pulse.
+            let pace = 0.4 / Double(sheet.count) * Double.random(in: 0.8...1.2)
+            bubble.run(.sequence([.group([out, .animate(with: looped, timePerFrame: pace)]), .removeFromParent()]))
         }
     }
     /// The bounds gallery, while it's open.

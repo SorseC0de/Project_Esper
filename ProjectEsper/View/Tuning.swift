@@ -65,7 +65,7 @@ enum ParticleLook {
     static let snowflakeSize: CGFloat = 6
     static let fireSize: CGFloat = 12
     static let lightningSize: CGFloat = 8
-    static let bubbleSize: CGFloat = 20
+    static let bubbleSize: CGFloat = 10
     /// Surf Soda's bubbles, all of them: a soft brown, soda rather than water.
     static let soda = SKColor(red: 0.72, green: 0.52, blue: 0.34, alpha: 1)
 }

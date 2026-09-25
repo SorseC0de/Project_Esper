@@ -3,7 +3,8 @@ import UIKit
 import EsperSim
 
 /// The bounds gallery: each vehicle blown up with a grid of eight-pixel blocks over it, to
-/// be filled in like bricks for where it's solid. A tap adds or takes away a block; the
+/// be filled in like bricks for where it's solid. A tap goes round a block's kinds: solid,
+/// a slope rising to the right, one falling to the right, and open again; the
 /// arrows go through the vehicles; RESET puts one back to its measured outline; COPY puts
 /// the whole table on the clipboard as Swift, for `Vehicle.set`. Edits are kept between
 /// launches and stand in for the cars' shapes live, offline.
@@ -15,7 +16,7 @@ final class BoundsGallery: SKNode {
     private let onClose: () -> Void
     private let board = SKNode()
     private var buttons: [(node: SKNode, action: () -> Void)] = []
-    private var cells: [[SKSpriteNode]] = []
+    private var cells: [[SKNode]] = []
     private var cellSide: CGFloat = 1
     private var origin = CGPoint.zero
 
@@ -75,7 +76,8 @@ final class BoundsGallery: SKNode {
     private func copy() {
         var lines = ["    public static let set: [Vehicle: [String]] = ["]
         for vehicle in Vehicle.allCases {
-            let rows = vehicle.blocks.map { "\"\($0)\"" }.joined(separator: ", ")
+            // A falling slope is a backslash, escaped for Swift.
+            let rows = vehicle.blocks.map { "\"\($0.replacingOccurrences(of: "\\", with: "\\\\"))\"" }.joined(separator: ", ")
             lines.append("        .\(vehicle): [\(rows)],")
         }
         lines.append("    ]")
@@ -102,22 +104,45 @@ final class BoundsGallery: SKNode {
             sprite.size = CGSize(width: width, height: artHeight)
             sprite.anchorPoint = .zero
             sprite.position = origin
+            sprite.zPosition = 0
             board.addChild(sprite)
         }
         let blocks = vehicle.blocks.map { Array($0) }
         for row in 0..<rows {
-            var line: [SKSpriteNode] = []
+            var line: [SKNode] = []
             for column in 0..<columns {
-                let cell = SKSpriteNode(color: SKColor(red: 0.2, green: 1, blue: 0.4, alpha: 1), size: CGSize(width: cellSide - 1, height: cellSide - 1))
-                cell.anchorPoint = .zero
+                let kind: Character = row < blocks.count && column < blocks[row].count ? blocks[row][column] : "."
+                let cell = cellNode(kind)
                 cell.position = CGPoint(x: origin.x + CGFloat(column) * cellSide, y: origin.y + CGFloat(rows - 1 - row) * cellSide)
-                let solid = row < blocks.count && column < blocks[row].count && blocks[row][column] == "#"
-                cell.alpha = solid ? 0.45 : 0.08
                 board.addChild(cell)
                 line.append(cell)
             }
             cells.append(line)
         }
+    }
+
+    /// A block drawn over the art, see-through: a square, a triangle for a slope, or a
+    /// faint outline for an open one.
+    private func cellNode(_ kind: Character) -> SKNode {
+        let side = cellSide - 1
+        let path = CGMutablePath()
+        switch kind {
+        case "/": path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: side, y: side)])
+        case "\\": path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: 0, y: side)])
+        default: path.addRect(CGRect(x: 0, y: 0, width: side, height: side))
+        }
+        path.closeSubpath()
+        let node = SKShapeNode(path: path)
+        node.zPosition = 2
+        node.lineWidth = 1
+        if kind == "." {
+            node.fillColor = .clear
+            node.strokeColor = SKColor(white: 1, alpha: 0.12)
+        } else {
+            node.fillColor = SKColor(red: 0.2, green: 1, blue: 0.4, alpha: 0.4)
+            node.strokeColor = SKColor(red: 0.2, green: 1, blue: 0.4, alpha: 0.8)
+        }
+        return node
     }
 
     /// True when the gallery took the tap, which it always does while it's open.
@@ -133,9 +158,15 @@ final class BoundsGallery: SKNode {
         guard column >= 0, column < vehicle.blockColumns, row >= 0, row < rows else { return true }
         var blocks = vehicle.blocks.map { Array($0) }
         while blocks.count < rows { blocks.append(Array(repeating: ".", count: vehicle.blockColumns)) }
-        blocks[row][column] = blocks[row][column] == "#" ? "." : "#"
+        // Round the kinds: open, solid, rising, falling, open.
+        let next: [Character: Character] = [".": "#", "#": "/", "/": "\\", "\\": "."]
+        blocks[row][column] = next[blocks[row][column]] ?? "#"
         Vehicle.edited[vehicle] = blocks.map { String($0) }
-        cells[row][column].alpha = blocks[row][column] == "#" ? 0.45 : 0.08
+        let replaced = cellNode(blocks[row][column])
+        replaced.position = cells[row][column].position
+        cells[row][column].removeFromParent()
+        board.addChild(replaced)
+        cells[row][column] = replaced
         store()
         return true
     }

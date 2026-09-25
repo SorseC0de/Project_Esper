@@ -478,7 +478,9 @@ centre.
   length in tiles and its height the drawing's own; it's solid in blocks of eight art
   pixels (`Vehicle.blocks`), each column's unbroken runs one box, mirrored when it faces
   left. The blocks are set by hand in the bounds gallery (the BOUNDS picker, offline): the
-  vehicle blown up under a grid, a tap adds or takes away a block, RESET goes back to the
+  vehicle blown up with see-through blocks over it, a tap going round a block's kinds
+  (solid, a slope rising to the right, one falling to the right, open; the slopes are
+  solid blocks until their behaviour is tuned), RESET goes back to the
   measured outline, COPY puts the table on the clipboard as Swift for `Vehicle.set`.
   Edits are kept between launches and stand in live until they're pasted in. Anything that would stun a player
   hits one: the slash, a bolt, a strike, a fireball's burst, a thrown ball, a flame; one

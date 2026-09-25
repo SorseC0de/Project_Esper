@@ -85,7 +85,9 @@ public enum Vehicle: Int, CaseIterable, Equatable {
     public var burnsAtOnce: Bool { self == .fuelTruck }
 
     /// Its solid shape in blocks of eight art pixels (five units), rows from the top, `#`
-    /// solid and `.` open, drawn over the art facing right. Set by hand in the bounds
+    /// solid, `/` a slope rising to the right, `\\` one falling to the right, and `.` open,
+    /// drawn over the art facing right. The slopes are solid blocks until their own
+    /// behaviour is tuned. Set by hand in the bounds
     /// gallery; until then, the measured outline in blocks. Offline, the gallery's edits
     /// stand in live.
     nonisolated(unsafe) public static var edited: [Vehicle: [String]] = [:]
@@ -161,7 +163,7 @@ public struct Car: Equatable {
             let across = facesLeft ? width - 1 - column : column
             var run: (top: Int, bottom: Int)?
             for row in 0...rows.count {
-                let solid = row < rows.count && column < rows[row].count && rows[row][column] == "#"
+                let solid = row < rows.count && column < rows[row].count && rows[row][column] != "." 
                 if solid {
                     run = (run?.top ?? row, row)
                 } else if let open = run {

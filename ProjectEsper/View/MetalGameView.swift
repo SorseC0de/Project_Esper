@@ -109,6 +109,12 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         camDescriptor.vertexFunction = library.makeFunction(name: "ballCamVertex")
         camDescriptor.fragmentFunction = library.makeFunction(name: "ballCamFragment")
         camDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        // Laid over the screen at two thirds.
+        camDescriptor.colorAttachments[0].isBlendingEnabled = true
+        camDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        camDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        camDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+        camDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         ballCamPipeline = try! device.makeRenderPipelineState(descriptor: camDescriptor)
         let nearestDescriptor = MTLSamplerDescriptor()
         nearestDescriptor.minFilter = .nearest
@@ -301,19 +307,13 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private func layBallCam(_ encoder: MTLRenderCommandEncoder, aspect screenAspect: Float) {
         guard let texture = ballCamTexture else { return }
         assert(MemoryLayout<SIMD3<Float>>.stride == 16)
-        let camAspect = Float(BallCamScene.view.width / BallCamScene.view.height)
-        let topWidth: Float = 0.5, bottomWidth: Float = 0.42
-        let height = (topWidth + bottomWidth) / 2 * screenAspect / camAspect
-        let centreX = Float(scene.ballCamScreenX) * 2 - 1
-        let top: Float = 0.9, bottom = top - height
+        let points = BallCamScene.corners(centre: scene.ballCamScreenX * 2 - 1, screenAspect: CGFloat(screenAspect))
+        let topWidth = Float(BallCamScene.topWidth), bottomWidth = Float(BallCamScene.bottomWidth)
         // Laid out as Metal's float2 then float3: the float3 sits at 16, 32 bytes a corner.
         struct Corner { var position: SIMD2<Float>; var pad: SIMD2<Float> = .zero; var uvq: SIMD3<Float> }
-        var corners: [Corner] = [
-            Corner(position: SIMD2(centreX - topWidth / 2, top), uvq: SIMD3(0, 0, 1) * topWidth),
-            Corner(position: SIMD2(centreX + topWidth / 2, top), uvq: SIMD3(1, 0, 1) * topWidth),
-            Corner(position: SIMD2(centreX - bottomWidth / 2, bottom), uvq: SIMD3(0, 1, 1) * bottomWidth),
-            Corner(position: SIMD2(centreX + bottomWidth / 2, bottom), uvq: SIMD3(1, 1, 1) * bottomWidth),
-        ]
+        let uvq = [SIMD3<Float>(0, 0, 1) * topWidth, SIMD3<Float>(1, 0, 1) * topWidth,
+                   SIMD3<Float>(0, 1, 1) * bottomWidth, SIMD3<Float>(1, 1, 1) * bottomWidth]
+        var corners = points.indices.map { Corner(position: SIMD2(Float(points[$0].x), Float(points[$0].y)), uvq: uvq[$0]) }
         encoder.setRenderPipelineState(ballCamPipeline)
         encoder.setVertexBytes(&corners, length: MemoryLayout<Corner>.stride * corners.count, index: 0)
         encoder.setFragmentTexture(texture, index: 0)

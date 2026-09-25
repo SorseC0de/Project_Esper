@@ -500,7 +500,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   colour of the side that guards it, as the court's blocks are, the pole's width and five more, behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
 - The ball cam (`StageFeatures.ballCam`, the view's alone): a close view of the ball,
   128 by 80 art pixels round it, hanging over the upper screen as a trapezoid wider at the
-  top with a thin black edge, easing across after the local player. It has its own scene,
+  top at two thirds, lined with `flashspark2` in the local player's energy, each on its own
+  frame, easing across after the local player. It has its own scene,
   with its own copy of the scenery built once, and its own renderer, drawn one frame in
   three into a small texture with its own glow, laid down after the screen's; the game
   scene is never drawn twice in a frame. It copies every sprite of the bodies and effects

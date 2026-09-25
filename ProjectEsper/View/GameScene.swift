@@ -245,6 +245,49 @@ final class GameScene: SKScene {
         return SpriteLibrary.point(at)
     }
 
+    /// Flashes lining the cam's edges, in the HUD over it, each on its own frame.
+    private var ballCamFrame = SKNode()
+    private var ballCamFrameSparks: [(node: SKSpriteNode, edge: Int, share: CGFloat)] = []
+
+    private func buildBallCamFrame() {
+        ballCamFrame.removeFromParent()
+        ballCamFrame = SKNode()
+        ballCamFrame.zPosition = 1
+        ballCamFrameSparks = []
+        let frames = sprites.effectFrames(EnergyEffect.flashSpark2, player: localIndex)
+        let count = frames.count
+        // Edges: top, right, bottom, left, round the trapezoid's corners.
+        let perEdge = [9, 4, 8, 4]
+        for (edge, sparks) in perEdge.enumerated() {
+            for step in 0..<sparks {
+                let spark = SKSpriteNode(texture: frames[0])
+                spark.setScale(BackboardTuning.size)
+                spark.alpha = BallCamScene.opacity
+                let start = (edge * 5 + step * 7) % max(count, 1)
+                let looped: [SKTexture] = Array(frames[start...]) + Array(frames[..<start])
+                spark.run(SKAction.repeatForever(SKAction.animate(with: looped, timePerFrame: 1.0 / 24)))
+                ballCamFrame.addChild(spark)
+                ballCamFrameSparks.append((spark, edge, CGFloat(step) / CGFloat(sparks)))
+            }
+        }
+        hudScene.addChild(ballCamFrame)
+    }
+
+    /// The flashes along the trapezoid as it sits now, in the HUD's points.
+    private func placeBallCamFrame() {
+        guard ballCamEnabled, size.width > 0 else { ballCamFrame.isHidden = true; return }
+        if ballCamFrameSparks.isEmpty { buildBallCamFrame() }
+        ballCamFrame.isHidden = false
+        let corners = BallCamScene.corners(centre: ballCamScreenX * 2 - 1, screenAspect: size.width / size.height)
+            .map { CGPoint(x: $0.x * size.width / 2, y: $0.y * size.height / 2) }
+        // Round the outline clockwise from the top left.
+        let ring = [corners[0], corners[1], corners[3], corners[2]]
+        for spark in ballCamFrameSparks {
+            let from = ring[spark.edge], to = ring[(spark.edge + 1) % 4]
+            spark.node.position = CGPoint(x: from.x + (to.x - from.x) * spark.share, y: from.y + (to.y - from.y) * spark.share)
+        }
+    }
+
     /// The cam's middle across the screen, 0 to 1, easing after the local player.
     private(set) var ballCamScreenX: CGFloat = 0.5
     private func easeBallCam() {
@@ -2534,6 +2577,7 @@ final class GameScene: SKScene {
             cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase
         }
         if match.stage.features.ballCam { easeBallCam() }
+        placeBallCamFrame()
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.
         if shake > 0 {
             shake -= 1

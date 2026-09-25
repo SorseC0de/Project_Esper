@@ -25,6 +25,22 @@ struct SpriteSnapshot {
 final class BallCamScene: SKScene {
     /// Art pixels of the world it shows, across and up.
     static let view = CGSize(width: 128, height: 80)
+    /// Where it hangs on the screen, in the screen's -1 to 1 across and up: the trapezoid's
+    /// widths at the top and bottom and its top edge. Its height follows from the view's
+    /// shape. Laid down at two thirds.
+    static let topWidth: CGFloat = 0.5
+    static let bottomWidth: CGFloat = 0.42
+    static let top: CGFloat = 0.9
+    static let opacity: CGFloat = 0.66
+
+    /// The trapezoid's corners for a screen of this aspect, top left, top right, bottom
+    /// left, bottom right, with the cam's middle at `centre` across.
+    static func corners(centre: CGFloat, screenAspect: CGFloat) -> [CGPoint] {
+        let height = (topWidth + bottomWidth) / 2 * screenAspect / (view.width / view.height)
+        let bottom = top - height
+        return [CGPoint(x: centre - topWidth / 2, y: top), CGPoint(x: centre + topWidth / 2, y: top),
+                CGPoint(x: centre - bottomWidth / 2, y: bottom), CGPoint(x: centre + bottomWidth / 2, y: bottom)]
+    }
 
     private let cameraNode = SKCameraNode()
     let scenery = SKNode()

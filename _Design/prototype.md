@@ -714,8 +714,8 @@ shown, once, like the effects.
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`).
 - snatch: the snatch at full stretch. catch: a catch.
-- parry: a parry, the snatch's or the throw stance's; made by `Tools/sfx.py` (parry_a,
-  b and c are the takes).
+- parry and parry2, mixed at 0.3 each as they're read: a parry, the snatch's or the
+  throw stance's.
 - player_hit: struck, popped.
 - ball_bounce: every bounce faster than 0.6 across the surface, at full volume from 4;
   and in hand, on the ground, on each frame of a sheet where the landmarks put the ball

@@ -28,8 +28,7 @@ final class SoundBoard {
         case shootV2 = "shoot_v2"
         case swish
         case snatch
-        /// Made by `Tools/sfx.py`; the take in use until one is picked.
-        case parry = "parry_a"
+        case parry
         case portIn = "port_in"
         case slashWallClank = "slash_wallclank"
         case step
@@ -47,14 +46,18 @@ final class SoundBoard {
         try? AVAudioSession.sharedInstance().setCategory(.ambient)
         let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
         for effect in Effect.allCases {
-            guard let url = Bundle.main.url(forResource: effect.rawValue, withExtension: "wav")
-                    ?? Bundle.main.url(forResource: effect.rawValue, withExtension: "wav", subdirectory: "Sounds"),
-                  let file = try? AVAudioFile(forReading: url),
-                  file.processingFormat == format,
-                  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)),
-                  (try? file.read(into: buffer)) != nil else {
-                print("SoundBoard: \(effect.rawValue).wav missing or not 44.1 kHz mono")
+            let parts = SoundBoard.layers[effect] ?? [(effect.rawValue, 1)]
+            let read = parts.compactMap { part in SoundBoard.read(part.file, format: format).map { ($0, part.level) } }
+            guard read.count == parts.count, let longest = read.map({ $0.0.frameLength }).max(),
+                  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: longest), let mixed = buffer.floatChannelData?[0] else {
+                print("SoundBoard: \(effect.rawValue) missing a file or not 44.1 kHz mono")
                 continue
+            }
+            buffer.frameLength = longest
+            for index in 0..<Int(longest) { mixed[index] = 0 }
+            for (part, level) in read {
+                guard let samples = part.floatChannelData?[0] else { continue }
+                for index in 0..<Int(part.frameLength) { mixed[index] += samples[index] * level }
             }
             if SoundBoard.reversed.contains(effect), let samples = buffer.floatChannelData?[0] {
                 var frames = UnsafeMutableBufferPointer(start: samples, count: Int(buffer.frameLength))
@@ -86,7 +89,20 @@ final class SoundBoard {
     /// Louder than their files, which a voice's volume can't go past: the step is recorded
     /// very quietly, its peak at 3% of full.
     private static let gain: [Effect: Float] = [.step: 2]
+    /// Sounds made of more than one file, mixed as they're read, each at its own level: the
+    /// parry's two halves at 0.3, which sets them beside the hit, the snatch and the catch.
+    private static let layers: [Effect: [(file: String, level: Float)]] = [.parry: [("parry", 0.3), ("parry2", 0.3)]]
     static let count: [Int: Effect] = [1: .countOne, 2: .countTwo, 3: .countThree]
+
+    /// One file from `Sounds`, read whole.
+    private static func read(_ name: String, format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "wav")
+                ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "Sounds"),
+              let file = try? AVAudioFile(forReading: url), file.processingFormat == format,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: buffer)) != nil else { return nil }
+        return buffer
+    }
 
     /// Plays on a voice that has finished; with every voice busy, the one nearest its end is cut off.
     func play(_ effect: Effect, volume: Float = 1) {

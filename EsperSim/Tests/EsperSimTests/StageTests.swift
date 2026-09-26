@@ -461,5 +461,7 @@ final class HighwayTests: XCTestCase {
         XCTAssertEqual(match.countdown, 0, "no restart: play goes on")
         XCTAssertGreaterThan(match.players[0].pickupLockout, 0)
         XCTAssertFalse(match.players[0].canCatch(ballAt: match.players[0].chest), "the scorer can't take it yet")
+        XCTAssertFalse(match.ball.shotInFlight, "out of the net it's anyone's")
+        XCTAssertTrue(match.players[1].canCatch(ballAt: match.players[1].chest, shotInFlight: match.ball.shotInFlight), "the other can take it")
     }
 }

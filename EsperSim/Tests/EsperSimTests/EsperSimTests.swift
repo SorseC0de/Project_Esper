@@ -1805,6 +1805,20 @@ final class FootsiesTests: XCTestCase {
         XCTAssertLessThanOrEqual(match.players[0].velocity.x, 0)
     }
 
+    func testASlideStunsABodyWithoutTheBall() {
+        var match = neutral()
+        match.players[1].position.x = match.players[0].position.x + 100
+        run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) {
+            $0.players[0].state == .run && $0.players[1].position.x - $0.players[0].position.x < 50
+        }
+        run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.players[1].hitStun > 0 }
+        XCTAssertGreaterThan(match.players[1].hitStun, 0)
+        // Stunned, the stick moves nothing.
+        let x = match.players[1].position.x
+        for _ in 0..<10 { match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: 1, y: 0))]) }
+        XCTAssertEqual(match.players[1].position.x, x, accuracy: 3, "no walking out of a stun")
+    }
+
     func testDownLetsGoOfTheWallAndTheLedge() {
         var match = neutral()
         match.players[0].position = Vec2(x: 30, y: 60)

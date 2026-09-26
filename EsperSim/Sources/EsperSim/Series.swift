@@ -81,7 +81,7 @@ public enum GameMode: UInt8, CaseIterable {
 /// scorer can't take the ball for a second after, so play goes the other way.
 public enum FortySevenRules {
     public static let target = 47
-    public static let scorerLockoutFrames = 60
+    public static let scorerLockoutFrames = 120
     /// Without a one-way platform to reach, this far.
     public static let fallbackRadius = 90.0
 

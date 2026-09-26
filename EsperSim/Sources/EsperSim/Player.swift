@@ -412,7 +412,10 @@ public struct Player: Equatable {
         if snatchCooldown > 0 { snatchCooldown -= 1 }
         if ledgeCooldown > 0 { ledgeCooldown -= 1 }
         if hitStun > 0 {
+            // Stunned: nothing answers, the stick included, so it can't walk out of the hit.
             hitStun -= 1
+            input.stick = .zero
+            input.aim = .zero
             input.jump = false
             input.shootButtons = 0
             input.throwBall = false

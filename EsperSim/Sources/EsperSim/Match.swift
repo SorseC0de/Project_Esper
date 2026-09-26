@@ -136,6 +136,9 @@ public struct Match: Equatable {
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points))
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
                     ball.launchPoint = nil
+                    // Through the net it's nobody's shot any more: anyone but the scorer can take it.
+                    ball.shotInFlight = false
+                    ball.owned = false
                 } else {
                     scores[owner] += 1
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1))
@@ -327,6 +330,11 @@ public struct Match: Equatable {
         if let leg = player.slideHitbox, let other, players[other].hasBall, players[other].grounded, players[other].body.overlaps(leg) {
             players[index].slideHit = true
             pop(from: other, by: index)
+        } else if let leg = player.slideHitbox, let other, !players[other].hasBall, players[other].frozen == 0,
+                  players[other].hitStun == 0, players[other].body.overlaps(leg) {
+            // Without the ball the leg stuns, as every other attack does.
+            players[index].slideHit = true
+            strip(other, by: index, knock: nil)
         }
         if let blade = player.slashHitbox {
             // Clear of the floor the body stands on, the blade in a wall clanks, once a swing.

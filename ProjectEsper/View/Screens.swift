@@ -19,6 +19,9 @@ class Screen: SKNode {
 
     private(set) var choices: [Choice] = []
     private(set) var cursor = 0
+    /// Lettered buttons' plates, by choice: the plate, its own piece, and its size. The
+    /// cursor's plate turns gold.
+    private var plates: [Int: (plate: SKSpriteNode, piece: UIPiece, size: CGSize)] = [:]
     let halfWidth: CGFloat
     let halfHeight: CGFloat
     /// CardCourt's selection arrow, the one that hangs over a man, in its own greys,
@@ -44,22 +47,51 @@ class Screen: SKNode {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// A lettered button. Disabled ones are dimmed and never fire.
+    /// A lettered button on a plate from the pack, royal blue by default, plum for a way
+    /// back. Disabled ones are dimmed and never fire. `width` makes a row of them even.
     @discardableResult
     func addButton(_ text: String, size: CGFloat = 26, at point: CGPoint, enabled: Bool = true, sound: SoundBoard.Effect = SoundBoard.confirm,
-                   action: @escaping () -> Void) -> SKNode {
+                   piece: UIPiece = .buttonBlue, width: CGFloat? = nil, action: @escaping () -> Void) -> SKNode {
+        let button = SKNode()
+        button.position = point
+        button.alpha = enabled ? 1 : 0.45
         let label = TitleText.node(text, size: size)
-        label.position = point
-        label.alpha = enabled ? 1 : 0.35
-        addChild(label)
-        let hit = CGRect(x: point.x - label.size.width / 2 - 12, y: point.y - label.size.height / 2 - 8,
-                         width: label.size.width + 24, height: label.size.height + 16)
-        // The arrow sits to the left of a lettered button, turned to point at it.
-        let arrowAt = CGPoint(x: hit.minX - 16, y: point.y)
-        choices.append(Choice(node: label, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: .pi / 2, sound: sound, action: action))
+        let plateSize = CGSize(width: max(width ?? 0, label.size.width + 44), height: label.size.height + 22)
+        let plate = piece.node(size: plateSize)
+        plate.zPosition = -1
+        button.addChild(plate)
+        button.addChild(label)
+        addChild(button)
+        let hit = CGRect(x: point.x - plateSize.width / 2, y: point.y - plateSize.height / 2, width: plateSize.width, height: plateSize.height)
+        choices.append(Choice(node: button, hit: hit, enabled: enabled, arrowAt: CGPoint(x: hit.minX - 16, y: point.y), arrowTurn: .pi / 2, sound: sound, action: action))
+        plates[choices.count - 1] = (plate, piece, plateSize)
         if choices.count == 1 { cursor = 0 }
         showCursor()
-        return label
+        return button
+    }
+
+    /// A black card from the pack behind a screen's content, `size` points round `centre`.
+    @discardableResult
+    func addCard(size: CGSize, at centre: CGPoint) -> SKSpriteNode {
+        let card = UIPiece.cardBlack.node(size: size)
+        card.position = centre
+        card.zPosition = -5
+        addChild(card)
+        return card
+    }
+
+    /// A royal blue header ribbon with title lettering on it.
+    @discardableResult
+    func addHeader(_ text: String, size: CGFloat = 34, at point: CGPoint, width: CGFloat? = nil) -> SKNode {
+        let header = SKNode()
+        header.position = point
+        let label = TitleText.node(text, size: size)
+        let ribbon = UIPiece.headerBlue.node(size: CGSize(width: max(width ?? 0, label.size.width + 80), height: label.size.height + 24))
+        ribbon.zPosition = -1
+        header.addChild(ribbon)
+        header.addChild(label)
+        addChild(header)
+        return header
     }
 
     /// `arrowAt` is where the arrow sits for this choice, turned `arrowTurn` from pointing down.
@@ -68,12 +100,17 @@ class Screen: SKNode {
         showCursor()
     }
 
-    /// The cursor's choice is raised a little, the arrow points at it, and the rest sit still.
+    /// The cursor's choice is raised a little, a plated button's plate turning gold, the
+    /// arrow points at any other kind, and the rest sit still.
     func showCursor() {
         for (index, choice) in choices.enumerated() {
-            choice.node.setScale(index == cursor && choice.enabled ? 1.12 : 1)
+            let lit = index == cursor && choice.enabled
+            choice.node.setScale(lit ? 1.12 : 1)
+            if let plate = plates[index] { (lit ? UIPiece.buttonGold : plate.piece).fit(plate.plate, to: plate.size) }
         }
-        if choices.indices.contains(cursor) {
+        if plates[cursor] != nil {
+            arrow.isHidden = true
+        } else if choices.indices.contains(cursor) {
             arrow.isHidden = false
             arrow.position = choices[cursor].arrowAt
             arrow.zRotation = choices[cursor].arrowTurn
@@ -259,14 +296,14 @@ final class WinScreen: Screen {
     init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, score: [Int], again: String,
          onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        let title = TitleText.node("\(winner) WINS", size: 48)
-        title.position = CGPoint(x: 0, y: halfHeight * 0.55)
-        addChild(title)
+        let width: CGFloat = 220
+        addCard(size: CGSize(width: width + 140, height: halfHeight * 1.55), at: CGPoint(x: 0, y: -halfHeight * 0.1))
+        addHeader("\(winner) WINS", size: 36, at: CGPoint(x: 0, y: halfHeight * 0.64), width: width + 170)
         let final = TitleText.node(score.map(String.init).joined(separator: " - "), size: 80)
         final.position = CGPoint(x: 0, y: halfHeight * 0.2)
         addChild(final)
-        addButton(again, at: CGPoint(x: 0, y: -halfHeight * 0.2), action: onAgain)
-        addButton("TITLE", at: CGPoint(x: 0, y: -halfHeight * 0.5), sound: .menuBack, action: onTitle)
+        addButton(again, at: CGPoint(x: 0, y: -halfHeight * 0.2), width: width, action: onAgain)
+        addButton("TITLE", at: CGPoint(x: 0, y: -halfHeight * 0.52), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
         waiting.position = CGPoint(x: 0, y: -halfHeight * 0.35)
         waiting.isHidden = true
         addChild(waiting)
@@ -423,12 +460,12 @@ final class StageSelectScreen: Screen {
 final class PauseScreen: Screen {
     init(halfWidth: CGFloat, halfHeight: CGFloat, onRestart: @escaping () -> Void, onTitle: @escaping () -> Void, onResume: @escaping () -> Void) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        let title = TitleText.node("PAUSED", size: 56)
-        title.position = CGPoint(x: 0, y: halfHeight * 0.45)
-        addChild(title)
-        addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.05), action: onRestart)
-        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.25), sound: .menuBack, action: onTitle)
-        addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.55), sound: .menuBack, action: onResume)
+        let width: CGFloat = 230
+        addCard(size: CGSize(width: width + 60, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12))
+        addHeader("PAUSED", at: CGPoint(x: 0, y: halfHeight * 0.62), width: width + 90)
+        addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.25), width: width, action: onRestart)
+        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.1), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
+        addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.45), sound: .menuBack, piece: .buttonPlum, width: width, action: onResume)
         // On RESUME, so a press of jump straight after pausing plays on.
         place(cursor: 2)
     }

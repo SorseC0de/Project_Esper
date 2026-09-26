@@ -2,8 +2,8 @@ import EsperSim
 import SwiftUI
 
 /// The game and what its scene tells the SwiftUI layer: whether the title is up, whether
-/// a screen wants the dark material under it, and what to do when the title's button is
-/// pressed.
+/// a screen wants the royal blue ground under it, and what to do when the title's buttons
+/// are pressed.
 @MainActor
 final class FlowState: ObservableObject {
     let scene = GameScene()
@@ -17,10 +17,11 @@ final class FlowState: ObservableObject {
     }
 }
 
-/// The title screen, over the Metal view on a dark ultra-thin material so the court shows
-/// through it: the name, BEST OF 7 against the computer, and MULTIPLAYER, which opens
-/// Game Center's matchmaker for a best of seven against another phone, with Game
-/// Center's word lettered under it.
+/// The title screen, on the royal blue ground with the court just showing through, in the
+/// dobo UI pack's pieces: the name; BEST OF 7 and 47 against the computer on royal blue
+/// plates, with the VS CPU / VS HUMAN switch under them; MULTIPLAYER on gold, which opens
+/// Game Center's matchmaker, with the mode it asks for under it and Game Center's word
+/// under that; and the energy colours on a black plate in the upper right corner.
 struct TitleOverlay: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
@@ -40,8 +41,9 @@ struct TitleOverlay: View {
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
+            LinearGradient(colors: [Color(rgb: EsperPalette.royal.body), Color(rgb: EsperPalette.royal.shadow)],
+                           startPoint: .top, endPoint: .bottom)
+                .opacity(0.92)
                 .ignoresSafeArea()
                 // The energy colours in the upper right corner.
                 .overlay(alignment: .topTrailing) {
@@ -49,51 +51,46 @@ struct TitleOverlay: View {
                         .padding(.top, 20)
                         .padding(.trailing, 24)
                 }
-            VStack(spacing: 32) {
+            VStack(spacing: 22) {
                 Image(uiImage: TitleText.image("PROJECT ESPER", size: 56))
-                HStack(spacing: 40) {
-                    Button {
+                HStack(spacing: 24) {
+                    plated("BEST OF 7", piece: .buttonBlue, width: 170) {
                         SoundBoard.shared.play(SoundBoard.confirm)
                         flow.startSeries?(.rounds)
-                    } label: {
-                        Image(uiImage: TitleText.image("BEST OF 7", size: 28))
                     }
-                    .buttonStyle(.plain)
-                    .disabled(busy)
-                    Button {
+                    plated("47", piece: .buttonBlue, width: 170) {
                         SoundBoard.shared.play(SoundBoard.confirm)
                         flow.startSeries?(.fortySeven)
-                    } label: {
-                        Image(uiImage: TitleText.image("47", size: 28))
                     }
-                    .buttonStyle(.plain)
-                    .disabled(busy)
                 }
-                Button {
-                    vsCPU.toggle()
-                    SoundBoard.shared.play(SoundBoard.navigate)
-                } label: {
-                    Text(vsCPU ? "VS CPU" : "VS HUMAN")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.85))
+                HStack(spacing: 10) {
+                    small("VS CPU", picked: vsCPU) {
+                        vsCPU = true
+                        SoundBoard.shared.play(SoundBoard.navigate)
+                    }
+                    small("VS HUMAN", picked: !vsCPU) {
+                        vsCPU = false
+                        SoundBoard.shared.play(SoundBoard.navigate)
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(busy)
                 VStack(spacing: 10) {
-                    Button {
+                    plated("MULTIPLAYER", piece: .buttonGold, width: 240) {
                         SoundBoard.shared.play(SoundBoard.confirm)
                         net.findMatch()
-                    } label: {
-                        Image(uiImage: TitleText.image("MULTIPLAYER", size: 28))
-                            .opacity(busy ? 0.5 : 1)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(busy)
-                    onlineModePicker
+                    .opacity(busy ? 0.5 : 1)
+                    HStack(spacing: 10) {
+                        ForEach(GameMode.allCases, id: \.self) { mode in
+                            small(mode == .rounds ? "BEST OF 7" : "47", picked: onlineMode == Int(mode.rawValue)) {
+                                onlineMode = Int(mode.rawValue)
+                                SoundBoard.shared.play(SoundBoard.navigate)
+                            }
+                        }
+                    }
                     if let caption = net.state.caption {
                         Text(caption)
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.white.opacity(0.8))
                     }
                 }
             }
@@ -102,25 +99,33 @@ struct TitleOverlay: View {
         .onAppear { net.signIn() }
     }
 
-    /// Which mode multiplayer asks for: the two names, the picked one bright.
-    private var onlineModePicker: some View {
-        HStack(spacing: 16) {
-            ForEach(GameMode.allCases, id: \.self) { mode in
-                Button {
-                    onlineMode = Int(mode.rawValue)
-                    SoundBoard.shared.play(SoundBoard.navigate)
-                } label: {
-                    Text(mode == .rounds ? "BEST OF 7" : "47")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(onlineMode == Int(mode.rawValue) ? 1 : 0.35))
-                }
-                .buttonStyle(.plain)
-                .disabled(busy)
-            }
+    /// A lettered button on one of the pack's plates.
+    private func plated(_ text: String, piece: UIPiece, width: CGFloat, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(uiImage: TitleText.image(text, size: 26))
+                .frame(width: width, height: 54)
+                .background(piece.image)
         }
+        .buttonStyle(.plain)
+        .disabled(busy)
     }
 
-    /// The energy colours as a row of circles, the picked one ringed.
+    /// A small switch: gold when it's the one picked, black otherwise.
+    private func small(_ text: String, picked: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .shadow(color: .black, radius: 0, x: 1, y: 1)
+                .frame(minWidth: 96, minHeight: 30)
+                .padding(.horizontal, 8)
+                .background((picked ? UIPiece.buttonGold : UIPiece.buttonBlack).image)
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+    }
+
+    /// The energy colours as a row of circles on a black plate, the picked one ringed.
     private var colourPicker: some View {
         HStack(spacing: 10) {
             ForEach(EnergyColour.allCases, id: \.self) { choice in
@@ -137,10 +142,13 @@ struct TitleOverlay: View {
                 .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .background(UIPiece.buttonBlack.image)
     }
 }
 
-private extension Color {
+extension Color {
     init(rgb: RGB) {
         self.init(red: Double((rgb >> 16) & 0xFF) / 255, green: Double((rgb >> 8) & 0xFF) / 255, blue: Double(rgb & 0xFF) / 255)
     }

@@ -337,6 +337,24 @@ ball. Six is two frames of online input delay and about four of a slash start st
 its way from the other phone, the least that leaves a read online. A snatch still takes
 the ball through it.
 
+## Interface
+
+The menus, and in time the HUD and the touch pad, are built from the dobo Vector UI pack
+(`~/Downloads/Vector_UI_pack_dobo_UI-2`), the pieces the game uses brought into
+`ProjectEsper/UI` at half the pack's size by `Tools/import_ui.py`, which also turns the
+pack's purple into `EsperPalette`'s plum, the pack having none. `UIPiece` names each
+piece with the corners and rims that mustn't stretch, and stretches it for SpriteKit
+(a centre rect, scaled) or SwiftUI (a resizable image), 2.5 of its pixels to the point.
+Royal blue is the base, black, gold and plum beside it: the screens' ground is a royal
+blue gradient over the world at 0.88, in place of the old dark material; a dialog is a
+black card under a royal blue header ribbon; a choice is a royal blue plate, plum for a
+way back (RESUME, TITLE, TITLE SCREEN), and the cursor's plate turns gold and grows, in
+place of the arrow. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
+HUMAN as small switches, gold when picked and black when not, MULTIPLAYER on gold with
+its two mode switches under it, and the energy colours on a black plate. Phase one is
+the title, the pause and the win; the stage select, the Greateraid pick, the HUD and the
+touch pad follow.
+
 ## The game loop
 
 A best of seven, first to four points, in `Series`. The title screen, drawn by the

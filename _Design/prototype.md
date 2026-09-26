@@ -774,8 +774,9 @@ rim and following it, long ties two rows down so it hangs rather than stretches.
 swept from last frame's point to this one's so a fast shot can't slip between knots, pushes
 the knots out and drags them 0.4 of its travel; a swish is the ball going through, nothing
 scripted. Bodies near the rim push it too. It's drawn as lines of small downward chevrons
-(3 art pixels across, 2 deep, 3 apart, 1 thick) along the diamonds' strands and one on each
-knot, in the guarding side's energy, in the glow; still and with nothing near, it sleeps. The numbers are `NetTuning`. The football field's and
+(3 art pixels across and 2 deep at ×1, 3 apart, 1 thick) along the diamonds' strands and one on each
+knot; NET TOP and NET BOTTOM on the UI tuning panel, under HUD, scale them at the rim and
+the bottom row, those between by height, and NET SPREAD sets how far apart they sit, in the guarding side's energy, in the glow; still and with nothing near, it sleeps. The numbers are `NetTuning`. The football field's and
 the highway's backboards are to be fitted to it. The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The
 floor and walls start purple and shift over 20 frames to the colour of whoever holds the
 ball, and back. The backboard blocks wear the colour of the player who scores there's opponent, since you

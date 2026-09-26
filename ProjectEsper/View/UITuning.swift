@@ -139,6 +139,9 @@ struct UITuningPanel: View {
             }
             if screen == .hud {
                 lineRow("3PT WIDTH", key: ThreePointTuning.widthKey, value: ThreePointTuning.lineWidth, step: 1, range: 1...8)
+                lineRow("NET TOP", key: NetTuning.topScaleKey, value: NetTuning.topScale, step: 0.25, range: 0.25...4)
+                lineRow("NET BOTTOM", key: NetTuning.bottomScaleKey, value: NetTuning.bottomScale, step: 0.25, range: 0.25...4)
+                lineRow("NET SPREAD", key: NetTuning.spreadKey, value: NetTuning.spread, step: 1, range: 1...8)
             }
             HStack(spacing: 8) {
                 Text("TEXT Y").frame(width: 80, alignment: .leading)
@@ -163,10 +166,10 @@ struct UITuningPanel: View {
         .background(UIPiece.cardBlack.image)
     }
 
-    /// A row for 47's lines: − and + a step at a time, kept under its own key.
+    /// A row for 47's lines or the net: − and + a step at a time, kept under its own key.
     private func lineRow(_ title: String, key: String, value: CGFloat, step: CGFloat, range: ClosedRange<CGFloat>) -> some View {
         HStack(spacing: 8) {
-            Text(title).frame(width: 80, alignment: .leading)
+            Text(title).frame(width: 96, alignment: .leading)
             panelButton("−", picked: false) { setLine(key, value - step, range) }
             Text(String(format: step < 1 ? "%.2f" : "%.0f", value)).monospacedDigit().frame(width: 64)
             panelButton("+", picked: false) { setLine(key, value + step, range) }

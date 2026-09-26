@@ -66,11 +66,11 @@ enum ParticleLook {
     static let fireSize: CGFloat = 12
     static let lightningSize: CGFloat = 8
     static let bubbleSize: CGFloat = 10
-    /// Surf Soda's bubbles, each one of these two grape purples by a coin flip.
-    static let sodas = [SKColor(red: 0.62, green: 0.44, blue: 0.82, alpha: 1), SKColor(red: 0.42, green: 0.25, blue: 0.62, alpha: 1)]
-    /// The board, a bright grape the glow takes, and its tail's shadow.
-    static let boardPurple: UInt32 = 0xC89BFF
-    static let boardShadow: UInt32 = 0xB287EC
+    /// Surf Soda's bubbles, the plum ramp's lightest or darkest by a coin flip.
+    static let sodas = [SKColor(rgb: EsperPalette.plum.highlight), SKColor(rgb: EsperPalette.plum.shadow)]
+    /// The board, the plum's second darkest, and its tail's shadow, the darkest.
+    static let boardPurple: UInt32 = EsperPalette.plum.body
+    static let boardShadow: UInt32 = EsperPalette.plum.shadow
 }
 
 /// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel

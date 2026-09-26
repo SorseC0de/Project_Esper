@@ -123,12 +123,12 @@ struct Look: Hashable {
         return channel(16) | channel(8) | channel(0)
     }
 
-    static let orange: RGB = 0xF47E1B
-    static let teal: RGB = 0x5FCDE4
-    /// The bodies: an orange and a teal light enough to read as the body, deep enough that
-    /// the glow doesn't wash them out.
-    static let lightOrange: RGB = 0xFFB877
-    static let lightTeal: RGB = 0x8EDCE8
+    /// Orange and teal, as the two sides start: `EsperPalette`'s gold and blue.
+    static let orange: RGB = EsperPalette.gold.body
+    static let teal: RGB = EsperPalette.blue.body
+    /// The bodies: each energy ramp's highlight, light enough to read as the body.
+    static let lightOrange: RGB = EsperPalette.gold.highlight
+    static let lightTeal: RGB = EsperPalette.blue.highlight
 
     static let playerOne = team(orange, body: lightOrange)
     static let playerTwo = team(teal, body: lightTeal)
@@ -140,26 +140,23 @@ struct Look: Hashable {
 enum EnergyColour: String, CaseIterable {
     case orange, teal, red, lime, pink, blue
 
-    var glow: RGB {
+    /// Each one's ramp in `EsperPalette`: orange is the gold, teal the blue, blue the royal.
+    var ramp: EsperPalette.Ramp {
         switch self {
-        case .orange: Look.orange
-        case .teal: Look.teal
-        case .red: 0xFF282B
-        case .lime: 0xA6E51C
-        case .pink: 0xF21188
-        case .blue: 0x1937FF
+        case .orange: EsperPalette.gold
+        case .teal: EsperPalette.blue
+        case .red: EsperPalette.red
+        case .lime: EsperPalette.lime
+        case .pink: EsperPalette.pink
+        case .blue: EsperPalette.royal
         }
     }
 
-    /// The body: orange and teal as tuned; the others their glow lifted two fifths of the
-    /// way to white, about where the first two sit.
-    var body: RGB {
-        switch self {
-        case .orange: Look.lightOrange
-        case .teal: Look.lightTeal
-        default: Look.lightened(glow, 0.4)
-        }
-    }
+    /// The glow is the ramp's body shade.
+    var glow: RGB { ramp.body }
+
+    /// The body is the ramp's highlight.
+    var body: RGB { ramp.highlight }
 
     var opposite: EnergyColour {
         switch self {
@@ -189,7 +186,7 @@ enum EnergyColour: String, CaseIterable {
 
 enum BallLook {
     /// The loose ball is purple, after a while in the colour of whoever last let it go.
-    static let neutral: RGB = 0xBF7BFF
+    static let neutral: RGB = EsperPalette.purple.body
     /// Frames of the shift back to neutral once the ball has bounced and is nobody's.
     static let shiftFrames = 30
     /// The chevrons over a resting ball.

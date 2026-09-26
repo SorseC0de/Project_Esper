@@ -465,8 +465,13 @@ holds the variants; A is always the baseline as tuned.
 ## Energy colours
 
 Six to pick from on the title, circles in its upper right corner, the pick kept between
-launches (`EnergyColour`, `esper.energyColour`): orange, the default, teal, red #FF282B,
-lime #A6E51C, pink #F21188 and blue #1937FF. Each has an opposite: orange and teal, red
+launches (`EnergyColour`, `esper.energyColour`): orange, the default, teal, red, lime,
+pink and blue, each a ramp of `EsperPalette` (`_Graphic Assets/Esper_Palette.png`), the
+glow its body shade, the second from the right, and the body sprite's tone its
+highlight: orange the gold #EDA42F, teal the blue #36A9E0, red #E03662, lime #ADCA31, pink
+#E036A5, blue the royal #1F4AE4. The loose ball's purple is the purple ramp's #8D36E0,
+Surf Soda's bubbles the plum's lightest and darkest, its board the plum's second darkest
+with the darkest for the tail. Each has an opposite: orange and teal, red
 and lime, pink and blue. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two

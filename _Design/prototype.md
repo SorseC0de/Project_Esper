@@ -700,7 +700,8 @@ playing voice waits on the audio thread, which cost the TV 4 ms a frame of foots
 shown, once, like the effects.
 
 - jump: the jump, the double jump, the wall jump.
-- player_shoot: the shot, the throw, the fireball's throw and Zeus Juice's bolt.
+- shoot_v2: the shot, the throw, the fireball's throw and Zeus Juice's bolt (player_shoot
+  is unused).
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`).
 - player_snatch: the snatch at full stretch.
@@ -712,7 +713,7 @@ shown, once, like the effects.
 - step: the walk and run sheets' frames 0 and 4, on the ground.
 - 3, 2, 1: each number of the count as it goes up, in play.
 - port_in: the port-in at a round's start.
-- basket: a point, with the strike on the rim.
+- swish and basket, basket at half: a point, with the strike on the rim.
 - lightning1, 2, 3, one at random: with every lightning spark, Zeus Juice's hits.
 - menu_select: a cursor moving, a colour circle (menu_cursor, louder than the rest, is
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,

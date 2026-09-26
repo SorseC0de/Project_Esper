@@ -24,7 +24,8 @@ final class SoundBoard {
         case menuSelect = "menu_select"
         case menuSelectV2 = "menu_select_v2"
         case playerHit = "player_hit"
-        case playerShoot = "player_shoot"
+        case shootV2 = "shoot_v2"
+        case swish
         case playerSnatch = "player_snatch"
         case portIn = "port_in"
         case slashWallClank = "slash_wallclank"

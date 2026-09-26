@@ -107,6 +107,8 @@ final class GameScene: SKScene {
     private let circlesOverCam = SKNode()
     private var drinkLabels: [SKLabelNode] = []
     private var menuLast = PlayerInput.idle
+    /// This phone's input as last read, for the corner readout.
+    private var lastLocalInput = PlayerInput.idle
     /// The SwiftUI layer, which shows the title over the Metal view and the material
     /// under a screen.
     weak var flowState: FlowState?
@@ -1049,6 +1051,7 @@ final class GameScene: SKScene {
         if roundIntro > 0 { roundIntro -= 1 }
         hub.touch = flow == .playing ? controls?.sample() ?? .idle : .idle
         let inputs = hub.frames(players: match.players.count)
+        lastLocalInput = inputs.first ?? .idle
         tickOnline()
         // Start or delete pauses a match offline, and again resumes it.
         if hub.consumePause(), online == nil {
@@ -1762,7 +1765,7 @@ final class GameScene: SKScene {
         for event in events {
             switch event {
             case .jumped(let index), .doubleJumped(let index), .wallJumped(let index, _): play(.jump, at: body(index))
-            case .shot(let index), .thrown(let index), .fireballThrown(let index), .boltFired(let index): play(.playerShoot, at: body(index))
+            case .shot(let index), .thrown(let index), .fireballThrown(let index), .boltFired(let index): play(.shootV2, at: body(index))
             case .slashed(let index): play(.esperSlash, at: body(index))
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
             case .snatchReached(let index): play(.playerSnatch, at: body(index))
@@ -2133,7 +2136,9 @@ final class GameScene: SKScene {
     /// the same tone and the floor and walls go white, fading back. The crown erupts off
     /// the rim with it.
     private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
-        play(.basket, at: match.stage.hoops[hoop].position)
+        // The net's swish over the basket, which sits under it at half.
+        play(.swish, at: match.stage.hoops[hoop].position)
+        play(.basket, at: match.stage.hoops[hoop].position, volume: 0.5)
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
         let bolt = EnergyEffect.strikes.randomElement()!
@@ -3657,8 +3662,9 @@ final class GameScene: SKScene {
         } else {
             side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
         }
-        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  jumps %d%@%@%@",
-                                 String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y, p.jumpsLeft,
+        debugLabel.text = String(format: "%@ %d  v %.2f %.2f  stick %.2f %.2f  jumps %d%@%@%@",
+                                 String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y,
+                                 lastLocalInput.stick.x, lastLocalInput.stick.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)

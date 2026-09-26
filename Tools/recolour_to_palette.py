@@ -5,7 +5,8 @@ the eye judges nearest (CIE Lab), keeping each pixel's alpha. Overwrites them in
     ./Tools/recolour_to_palette.py                 every PNG in `_Graphic Assets/Pixel Art`
     ./Tools/recolour_to_palette.py a.png b.png     just those
 
-Sheets all in greys are the tint masks and are left alone. Back the originals up first;
+Sheets all in greys are the tint masks, and the player sheets' colours are body-part
+keys, so both are left alone. Back the originals up first;
 this doesn't.
 """
 import pathlib
@@ -44,6 +45,11 @@ def palette():
 
 def recolour(path, colours, cache):
     w, h, pixels = read_png(str(path))
+    # The player sheets paint each body part one flat colour the game recolours in the team's
+    # look; those colours are keys, and some would merge on the palette. Left as they are.
+    if path.name.startswith("player_"):
+        print(f"{path.name}: a player sheet, its colours are body-part keys, left alone")
+        return False
     # A sheet all in greys is a mask the game tints in the energy colour, which is itself a
     # palette colour: left as it is.
     if all(r == g == b for r, g, b, a in pixels if a > 0):

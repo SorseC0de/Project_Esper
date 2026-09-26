@@ -70,8 +70,9 @@ struct Look: Hashable {
     /// The team colour: what the glowing parts are drawn and outlined in, and their halo.
     var glow: RGB
     /// Drawn around the figure's silhouette, this many pixels thick. It follows the
-    /// outside edge, in `glow` where it borders a glowing part and in `outline` elsewhere.
-    var outline: RGB = 0x000000
+    /// outside edge, in `glow` where it borders a glowing part and in `outline` elsewhere,
+    /// the pixel palette's outline.
+    var outline: RGB = PixelPalette.outline
     var outlineWidth = 1
     /// Parts also outlined where they lie over the rest of the body, so they read on their own.
     var strokedParts: Set<BodyPart> = []

@@ -522,8 +522,10 @@ colour lifted two fifths of the way to white. The loose ball's purple is #793A80
 Soda's darker bubbles and its board's tail #403353; outlines drawn in code in the world
 (the field's panels and goalposts, the opponent chevron, the round circles) #242234. The
 sheets in `_Graphic Assets/Pixel Art` are recoloured to AAP-64's nearest by eye (CIE Lab),
-alpha kept, by `Tools/recolour_to_palette.py`, which leaves all-grey sheets alone: they're
-the masks the energy colour tints. The importer's `NOT_TONED` keeps the strike bolts,
+alpha kept, by `Tools/recolour_to_palette.py`, which leaves two kinds alone: all-grey
+sheets, the masks the energy colour tints, and the player sheets, whose flat colours are
+the body-part keys (some would merge on the palette); the players' outline is `Look`'s,
+the palette's #242234. The importer's `NOT_TONED` keeps the strike bolts,
 which the recolour took to pure white, drawn as painted. Each has an opposite: orange and teal, red
 and lime, pink and blue. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the

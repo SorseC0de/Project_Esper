@@ -19,18 +19,21 @@ enum NetTuning {
     static let drag: CGFloat = 0.4
     /// A body's reach, round its chest, for pushing the net.
     static let bodyRadius: CGFloat = 7
-    /// The flashspark2 frames' scale on a knot and on each strand between two.
-    static let knotScale: CGFloat = 0.06
-    static let strandScale: CGFloat = 0.04
+    /// The chevrons the strands are drawn in, pointing down: art pixels across, deep, and
+    /// apart along a strand.
+    static let chevronWidth: CGFloat = 3
+    static let chevronDepth: CGFloat = 2
+    static let chevronSpacing: CGFloat = 3
+    static let lineWidth: CGFloat = 1
 }
 
 /// A hoop's net: Verlet cloth hung from the rim, a diamond mesh of knots joined by strands,
 /// the top row pinned to the rim and following it. The ball pushes the knots out of its way
 /// and drags them along its path, swept from where it was to where it is so a fast shot
 /// can't pass between them; a body near the rim pushes them too. Nothing is scripted: a
-/// swish is the ball going through. Drawn as small flashspark2s on every knot and every
-/// strand's middle, overlapping so the strands read as chains, in the energy of the side
-/// guarding the rim. At rest with nothing near, it sleeps. The view's alone.
+/// swish is the ball going through. Drawn as lines of small downward chevrons along the
+/// strands, one on every knot, in the energy of the side guarding the rim. At rest with
+/// nothing near, it sleeps. The view's alone.
 final class HoopNet {
     private struct Knot {
         var at: CGPoint
@@ -46,15 +49,14 @@ final class HoopNet {
 
     private var knots: [Knot] = []
     private var strands: [Strand] = []
-    private var knotSprites: [SKSpriteNode] = []
-    private var strandSprites: [SKSpriteNode] = []
     private var drawnStrands: [Int] = []
+    private let shape = SKShapeNode()
     private var rim = CGPoint.zero
     private var awake = true
     private var stillFrames = 0
     private var lastBall: CGPoint?
 
-    init(at rim: CGPoint, frames: [SKTexture], frameCount: Int, into parent: SKNode) {
+    init(at rim: CGPoint, colour: SKColor, into parent: SKNode) {
         self.rim = rim
         let rows = NetTuning.rows, columns = NetTuning.columns
         var index: [[Int]] = []
@@ -88,30 +90,18 @@ final class HoopNet {
         // The bottom ring, knot to knot, so the mouth below keeps its round.
         for (a, b) in zip(index[rows - 1], index[rows - 1].dropFirst()) { join(a, b) }
 
-        func spark(scale: CGFloat, salt: Int) -> SKSpriteNode {
-            let node = SKSpriteNode(texture: frames.first)
-            node.setScale(scale)
-            node.zPosition = 4
-            let start = (salt * 7) % max(frameCount, 1)
-            let looped = Array(frames[start...]) + Array(frames[..<start])
-            node.run(.repeatForever(.animate(with: looped, timePerFrame: 1.0 / 24)), withKey: "shimmer")
-            parent.addChild(node)
-            return node
-        }
-        knotSprites = knots.indices.map { spark(scale: NetTuning.knotScale, salt: $0) }
-        // The long ties hold the shape; only the diamonds' strands and the ring are drawn.
         drawnStrands = strands.indices.filter { strands[$0].drawn }
-        strandSprites = drawnStrands.map { spark(scale: NetTuning.strandScale, salt: $0 + 11) }
+        shape.strokeColor = colour
+        shape.lineWidth = NetTuning.lineWidth
+        shape.lineCap = .square
+        shape.isAntialiased = false
+        shape.zPosition = 4
+        parent.addChild(shape)
         place()
     }
 
-    /// The sparks in another energy's frames.
-    func recolour(frames: [SKTexture], frameCount: Int) {
-        for (salt, node) in (knotSprites + strandSprites).enumerated() {
-            let start = (salt * 7) % max(frameCount, 1)
-            node.removeAction(forKey: "shimmer")
-            node.run(.repeatForever(.animate(with: Array(frames[start...]) + Array(frames[..<start]), timePerFrame: 1.0 / 24)), withKey: "shimmer")
-        }
+    func recolour(_ colour: SKColor) {
+        shape.strokeColor = colour
     }
 
     /// One frame: the rim where it is now, the ball where it is (nil while it's nowhere to
@@ -202,13 +192,27 @@ final class HoopNet {
         }
     }
 
-    /// The sparks onto the knots and the strands' middles.
+    /// The chevrons redrawn: one on every knot, and along each drawn strand as many as fit
+    /// between its ends.
     private func place() {
-        for (index, node) in knotSprites.enumerated() { node.position = knots[index].at }
-        for (node, index) in zip(strandSprites, drawnStrands) {
-            let a = knots[strands[index].a].at, b = knots[strands[index].b].at
-            node.position = CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+        let path = CGMutablePath()
+        func chevron(at point: CGPoint) {
+            let half = NetTuning.chevronWidth / 2
+            path.move(to: CGPoint(x: point.x - half, y: point.y + NetTuning.chevronDepth / 2))
+            path.addLine(to: CGPoint(x: point.x, y: point.y - NetTuning.chevronDepth / 2))
+            path.addLine(to: CGPoint(x: point.x + half, y: point.y + NetTuning.chevronDepth / 2))
         }
+        for knot in knots { chevron(at: knot.at) }
+        for index in drawnStrands {
+            let a = knots[strands[index].a].at, b = knots[strands[index].b].at
+            let between = Int((HoopNet.distance(a, b) / NetTuning.chevronSpacing).rounded()) - 1
+            guard between > 0 else { continue }
+            for step in 1...between {
+                let share = CGFloat(step) / CGFloat(between + 1)
+                chevron(at: CGPoint(x: a.x + (b.x - a.x) * share, y: a.y + (b.y - a.y) * share))
+            }
+        }
+        shape.path = path
     }
 
     private static func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {

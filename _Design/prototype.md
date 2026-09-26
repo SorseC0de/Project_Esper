@@ -773,9 +773,9 @@ across the top, 18 art pixels, tapering 45% to the bottom, 17 deep), the top row
 rim and following it, long ties two rows down so it hangs rather than stretches. The ball,
 swept from last frame's point to this one's so a fast shot can't slip between knots, pushes
 the knots out and drags them 0.4 of its travel; a swish is the ball going through, nothing
-scripted. Bodies near the rim push it too. It's drawn as small `flashspark2`s (0.06 on a knot, 0.04 on a strand) on every knot
-and every drawn strand's middle, each on its own frame, in the guarding side's energy, in
-the glow; still and with nothing near, it sleeps. The numbers are `NetTuning`. The football field's and
+scripted. Bodies near the rim push it too. It's drawn as lines of small downward chevrons
+(3 art pixels across, 2 deep, 3 apart, 1 thick) along the diamonds' strands and one on each
+knot, in the guarding side's energy, in the glow; still and with nothing near, it sleeps. The numbers are `NetTuning`. The football field's and
 the highway's backboards are to be fitted to it. The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The
 floor and walls start purple and shift over 20 frames to the colour of whoever holds the
 ball, and back. The backboard blocks wear the colour of the player who scores there's opponent, since you

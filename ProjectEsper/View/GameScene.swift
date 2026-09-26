@@ -830,9 +830,7 @@ final class GameScene: SKScene {
             stageGround.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            let frameCount = EffectSheets.frames[EnergyEffect.flashSpark2.name] ?? 1
-            nets.append(HoopNet(at: SpriteLibrary.point(hoop.position), frames: sprites.effectFrames(EnergyEffect.flashSpark2, player: 1 - hoop.owner),
-                                frameCount: frameCount, into: stageGlowers))
+            nets.append(HoopNet(at: SpriteLibrary.point(hoop.position), colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow), into: stageGlowers))
         }
     }
 
@@ -1877,10 +1875,7 @@ final class GameScene: SKScene {
         for tile in blockTiles { tile.node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: tile.side).glow)) }
         for arc in threePointArcSides { arc.node.strokeColor = SKColor(rgb: sprites.look(for: arc.side).glow) }
         for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
-        let netFrameCount = EffectSheets.frames[EnergyEffect.flashSpark2.name] ?? 1
-        for (net, hoop) in zip(nets, match.stage.hoops) {
-            net.recolour(frames: sprites.effectFrames(EnergyEffect.flashSpark2, player: 1 - hoop.owner), frameCount: netFrameCount)
-        }
+        for (net, hoop) in zip(nets, match.stage.hoops) { net.recolour(SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)) }
         drawSeries()
     }
 

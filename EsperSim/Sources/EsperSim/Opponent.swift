@@ -41,6 +41,10 @@ public struct Opponent: Equatable {
     private var throwRead: Bool?
     /// Last frame's output, to make a press an edge.
     private var pressed = PlayerInput.idle
+    /// The frames the other's last slashes started on, to tell spam from a one-off, and
+    /// whether the throw stance it's in is a parry, to be cancelled once it's done.
+    private var slashStarts: [Int] = []
+    private var parrying = false
 
     /// What it's up to.
     public enum Plan: Equatable {
@@ -84,6 +88,8 @@ public struct Opponent: Equatable {
             return .idle
         }
         humanStill = abs(human.velocity.x) < 0.2 && (human.state == .idle || human.state == .crouch) ? humanStill + 1 : 0
+        if human.state == .slashing, human.stateTimer == 0 { slashStarts.append(match.frame) }
+        slashStarts.removeAll { match.frame - $0 > Opponent.slashSpamFrames }
         if human.state == .throwStance {
             humanThrowCharge = human.stateTimer
         } else if human.state == .throwing {
@@ -106,6 +112,10 @@ public struct Opponent: Equatable {
         pressed = input
         return input
     }
+
+    /// Two slashes inside this many frames is spam, and the next is met with the throw
+    /// stance's parry.
+    private static let slashSpamFrames = 90
 
     // MARK: Helmets
 
@@ -229,6 +239,33 @@ public struct Opponent: Equatable {
         let level = abs(human.position.y - me.position.y) < 30
         let near = abs(gap) < 50 && level
         let inReach = abs(gap) < 26 && level
+
+        // The parry: held through its frames, then the shoot button cancels it, ball kept.
+        if parrying {
+            if me.state == .throwStance {
+                if me.stateTimer >= ThrowParryRules.frames {
+                    input.shoot = true
+                    parrying = false
+                } else {
+                    input.throwBall = true
+                }
+                return
+            }
+            parrying = false
+        }
+        // Spam in reach: the next slash's start is met with the stance.
+        let facingMe = (me.position.x - human.position.x) * human.facing.sign > 0
+        if human.state == .slashing, human.stateTimer < SlashRules.liveFrames.lowerBound, slashStarts.count >= 2,
+           abs(gap) < 34, level, facingMe, [.idle, .walk, .run, .dash, .air].contains(me.state) {
+            input.throwBall = true
+            parrying = true
+            return
+        }
+        // In the air by the rim: the dunk, whatever the plan was.
+        if !me.grounded, me.state == .air, hoop.position.distance(to: me.chest) < 60, me.chest.y > hoop.position.y - 40 {
+            plan = .dunk
+            planFrames = max(planFrames, 20)
+        }
         let dangerous = Opponent.dangerous(human)
         let open = Opponent.open(human) && abs(gap) < 60 && level
         let committed = dangerous || open
@@ -297,7 +334,7 @@ public struct Opponent: Equatable {
 
         // Near enough the rim and level with its floor: the dunk, up and onto it.
         let rimClose = abs(toHoop) < 55 && me.position.y < hoop.position.y && hoop.position.y - me.position.y < 60
-        if behind {
+        if behind, plan != .dunk {
             plan = .climb
             planFrames = 1
         } else if plan == .none, rimClose, !(dangerous && inReach), chance(70) {
@@ -435,7 +472,8 @@ public struct Opponent: Equatable {
                 fullHop(&input)
             } else if !me.grounded {
                 if me.velocity.y < 0.5, me.jumpsLeft > 0, hoop.position.y - me.chest.y > 20 { tapJump(&input) }
-                if hoop.position.distance(to: me.chest) < 45 { input.throwBall = true }
+                // Only inside the dunk's reach: a stance any further off is a throw let go.
+                if hoop.position.distance(to: me.chest) < BallRules.dunkRadius { input.throwBall = true }
             }
             if planFrames == 0 { plan = .none }
         default:
@@ -482,23 +520,10 @@ public struct Opponent: Equatable {
 
     /// Out from behind the block: to the wall, a full hop, the wall jump off it, the
     /// double jump inward over the block.
+    /// Out from behind the block: under it, along the floor, back out in front of the rim;
+    /// in the air, down and out the same way. The block floats, so the floor is open.
     private mutating func climbOut(me: Player, hoop: Hoop, into input: inout PlayerInput) {
-        let wallward = hoop.backboard.sign
-        if me.grounded {
-            input.stick = Vec2(x: wallward, y: 0)
-            fullHop(&input)
-        } else if me.state == .wallLand {
-            input.stick = Vec2(x: wallward, y: 0)
-            tapJump(&input)
-        } else if me.wallSide != nil, me.wallLandCooldown == 0 {
-            // Into the wall for the cling; the jump comes out of that.
-            input.stick = Vec2(x: wallward, y: 0)
-        } else if me.velocity.y < 0.5, me.jumpsLeft > 0 {
-            input.stick = Vec2(x: -wallward, y: 0)
-            tapJump(&input)
-        } else {
-            input.stick = Vec2(x: me.position.y > 85 ? -wallward : wallward, y: 0)
-        }
+        input.stick = Vec2(x: -hoop.backboard.sign, y: 0)
     }
 
     /// The flick that lands a shot from here nearest the rim, with `lift` added to its

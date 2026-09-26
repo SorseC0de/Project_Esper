@@ -468,7 +468,12 @@ differently, and it holds its jumps through the squat so its hops are full.
   out of reach and waits; the moment it's spent, the recovery of a slash or a snatch,
   the roll, a landing, a catch, it darts past, a dash with a full hop and the double
   jump over them if they're in the way. Crowded within 16 it darts or backs off. Behind
-  the block it climbs out: to the wall, a hop, the wall jump, the double jump inward.
+  the block it walks out underneath it, the block floating clear of the floor. In the
+  air within 60 of its rim, and not far below it, it drops whatever it was doing for the
+  dunk, and it only takes the stance for one inside the dunk's reach, 25, so the stance
+  goes onto the rim rather than letting go as a throw. Once the other has swung twice in
+  a second and a half, spam as it reads it, the next swing in reach facing it is met with
+  the throw stance's parry, held its six frames and cancelled with shoot, the ball kept.
 - Without the ball and the other holding it, it guards the rim they score on: it walks
   to a spot 25 in front of that rim on their side and stands facing them. It strikes,
   a dash in and the swing when the blade will reach, a hop first if they're above, when

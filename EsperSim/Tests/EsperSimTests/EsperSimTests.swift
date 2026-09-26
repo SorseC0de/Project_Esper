@@ -1852,6 +1852,62 @@ final class OpponentTests: XCTestCase {
         return frames
     }
 
+    func testFromBehindTheBlockItWalksOutUnderItAndScores() {
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        var brain = Opponent(index: 1)
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position = Vec2(x: 25, y: 10)
+        match.players[0].position = Vec2(x: 300, y: 10)
+        let out = play(&match, &brain, frames: 60, input: { _ in .idle }) { $0.players[1].position.x > 60 }
+        XCTAssertLessThan(out, 30, "out from under the block along the floor")
+        let scored = play(&match, &brain, frames: 400, input: { _ in .idle }) { $0.scores[1] > 0 }
+        XCTAssertLessThan(scored, 400)
+    }
+
+    func testInTheAirByTheRimItDunks() {
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        var brain = Opponent(index: 1)
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[0].position = Vec2(x: 300, y: 10)
+        // Rising just in front of the rim it scores on, the left one.
+        match.players[1].position = Vec2(x: 80, y: 50)
+        match.players[1].grounded = false
+        match.players[1].enter(.air)
+        match.players[1].velocity = Vec2(x: 0, y: 2)
+        let dunked = play(&match, &brain, frames: 40, input: { _ in .idle }) { $0.players[1].state == .dunking }
+        XCTAssertLessThan(dunked, 40, "up and onto the rim, not off to a shooting spot")
+    }
+
+    func testItParriesSlashSpamWithTheThrowStance() {
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        var brain = Opponent(index: 1)
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position = Vec2(x: 200, y: 10)
+        match.players[0].position = Vec2(x: 110, y: 10)
+        match.players[0].facing = .right
+        // Two swings at the air, well out of reach: spam, as it reads it.
+        for frame in 0..<60 { match.advance(inputs: [PlayerInput(shoot: frame % 30 == 0), brain.decide(match)]) }
+        XCTAssertTrue(match.players[1].hasBall)
+        // Then, with it free on the floor, in close facing it, and the swing.
+        match.players[1].position = Vec2(x: 200, y: 10)
+        match.players[1].velocity = .zero
+        match.players[1].grounded = true
+        match.players[1].enter(.idle)
+        match.players[0].position = Vec2(x: match.players[1].position.x - 22, y: 10)
+        match.players[0].facing = .right
+        match.players[0].velocity = .zero
+        var parried = false
+        for frame in 0..<30 where !parried {
+            match.advance(inputs: [PlayerInput(shoot: frame == 0), brain.decide(match)])
+            if match.events.contains(.parried(player: 0, by: 1)) { parried = true }
+        }
+        XCTAssertTrue(parried, "spammed, it meets the slash with the stance")
+        XCTAssertTrue(match.players[1].hasBall, "and keeps the ball")
+    }
+
     func testTheOpponentIsDeterministic() {
         var a = Match(), b = Match()
         var brainA = Opponent(index: 1), brainB = Opponent(index: 1)

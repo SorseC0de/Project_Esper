@@ -830,11 +830,9 @@ final class GameScene: SKScene {
             stageGround.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            // Drawn round nothing and placed, so it can follow a rim that moves.
-            let hanging = net(at: .zero)
-            hanging.position = rim.position
-            stageGround.addChild(hanging)
-            netNodes.append(hanging)
+            let frameCount = EffectSheets.frames[EnergyEffect.flashSpark2.name] ?? 1
+            nets.append(HoopNet(at: SpriteLibrary.point(hoop.position), frames: sprites.effectFrames(EnergyEffect.flashSpark2, player: 1 - hoop.owner),
+                                frameCount: frameCount, into: stageGlowers))
         }
     }
 
@@ -848,7 +846,7 @@ final class GameScene: SKScene {
         threePointArcSides = []
         rimNodes = []
         rimFlash = []
-        netNodes = []
+        nets = []
         fieldBlooms = []
         lightPanels = []
         yardNumbers = []
@@ -972,36 +970,6 @@ final class GameScene: SKScene {
         trail.particleColorBlendFactor = 1
         trail.particleBlendMode = .add
         return trail
-    }
-
-    /// The rim's net, as GMS2 built it: six columns, five rows, tapering to half width.
-    private func net(at rim: CGPoint) -> SKShapeNode {
-        let columns = 6, rows = 5
-        let width = 18.0, height = 14.0
-        var points: [[CGPoint]] = []
-        for column in 0..<columns {
-            var line: [CGPoint] = []
-            for row in 0..<rows {
-                var x = -width / 2 + Double(column) / Double(columns - 1) * width
-                if row % 2 == 1 { x += width / Double(columns * 2) }
-                let taper = Double(row) / Double(rows - 1) * 0.5
-                x += (0 - x) * taper
-                line.append(CGPoint(x: rim.x + x, y: rim.y - Double(row) / Double(rows - 1) * height))
-            }
-            points.append(line)
-        }
-        let path = CGMutablePath()
-        for column in 0..<columns {
-            path.addLines(between: points[column])
-        }
-        for row in 0..<rows {
-            path.addLines(between: (0..<columns).map { points[$0][row] })
-        }
-        let node = SKShapeNode(path: path)
-        node.strokeColor = SKColor(white: 1, alpha: 0.6)
-        node.lineWidth = 1
-        node.zPosition = 4
-        return node
     }
 
     /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
@@ -1909,6 +1877,10 @@ final class GameScene: SKScene {
         for tile in blockTiles { tile.node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: tile.side).glow)) }
         for arc in threePointArcSides { arc.node.strokeColor = SKColor(rgb: sprites.look(for: arc.side).glow) }
         for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
+        let netFrameCount = EffectSheets.frames[EnergyEffect.flashSpark2.name] ?? 1
+        for (net, hoop) in zip(nets, match.stage.hoops) {
+            net.recolour(frames: sprites.effectFrames(EnergyEffect.flashSpark2, player: 1 - hoop.owner), frameCount: netFrameCount)
+        }
         drawSeries()
     }
 
@@ -3052,7 +3024,7 @@ final class GameScene: SKScene {
         let above = (source.position.y - anchorY) * scale
         shadow.position = CGPoint(x: source.position.x - slope * above, y: ground - above)
     }
-    private var netNodes: [SKShapeNode] = []
+    private var nets: [HoopNet] = []
 
     /// The goalposts drawn at their rims.
     private func buildGoalposts() {
@@ -3817,7 +3789,11 @@ final class GameScene: SKScene {
                 let at = SpriteLibrary.point(match.stage.hoops[index].position)
                 rimNodes[index].position = GameScene.hoopArtPoint(for: match.stage.hoops[index])
                 rimNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
-                if index < netNodes.count { netNodes[index].position = at }
+                if index < nets.count {
+                    nets[index].step(rim: at, ball: ballNode.isHidden ? nil : ballNode.position,
+                                     ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
+                                     bodies: match.players.map { SpriteLibrary.point($0.chest) })
+                }
             }
         }
 

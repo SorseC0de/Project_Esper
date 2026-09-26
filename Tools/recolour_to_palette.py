@@ -47,7 +47,7 @@ def recolour(path, colours, cache):
     w, h, pixels = read_png(str(path))
     # The player sheets paint each body part one flat colour the game recolours in the team's
     # look; those colours are keys, and some would merge on the palette. Left as they are.
-    if path.name.startswith("player_"):
+    if path.name.lower().startswith("player_"):
         print(f"{path.name}: a player sheet, its colours are body-part keys, left alone")
         return False
     # A sheet all in greys is a mask the game tints in the energy colour, which is itself a

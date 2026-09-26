@@ -647,7 +647,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 - The camera is zonal, as Mega Man's and Nidhogg's: the field in seven zones a court wide,
   the camera level on one zone's centre, held inside the field's ends. Within
   `CameraTuning.zoneBufferTiles` (3) of the screen's edge the local player sends it
-  sliding to the next zone, eased a share of the way each frame, if that zone's centre is
+  sliding to the next zone over `CameraTuning.slideSeconds` (0.5), eased out, quick away
+  and slowing into the new centre, if that zone's centre is
   the nearer, so it never flips back at the line; each round it picks up the zone the
   local player starts in.
   The view takes in the stage's height and the turf below the floor. When the ball is off

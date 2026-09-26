@@ -111,6 +111,8 @@ enum HelmetTuning {
 /// local player sends it sliding to the next zone.
 enum CameraTuning {
     static let zoneBufferTiles: CGFloat = 3
+    /// Seconds for a whole slide, eased out: quick away, slowing into the new zone.
+    static let slideSeconds: Double = 0.5
 }
 
 enum BackboardTuning {

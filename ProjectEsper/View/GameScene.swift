@@ -2333,7 +2333,22 @@ final class GameScene: SKScene {
         if next != zone, abs(feet - centre(next)) < abs(feet - centre(zone)) { cameraZone = next }
         return centre(cameraZone ?? zone)
     }
-    private static let cameraEase: CGFloat = 0.08
+    /// The slide to a new zone's centre: from where the camera was, eased out over
+    /// `CameraTuning.slideSeconds`, a new target starting a new slide from where it is.
+    private var slide: (from: CGFloat, to: CGFloat, elapsed: Double)?
+    private func slideCamera(to target: CGFloat) {
+        if slide?.to != target {
+            guard cameraBase.x != target else { slide = nil; return }
+            slide = (cameraBase.x, target, 0)
+        }
+        guard var current = slide else { return }
+        current.elapsed += GameScene.stepSeconds
+        let share = min(current.elapsed / max(CameraTuning.slideSeconds, 0.01), 1)
+        let eased = 1 - pow(1 - share, 3)
+        cameraBase.x = current.from + (current.to - current.from) * CGFloat(eased)
+        slide = share < 1 ? current : nil
+        if share >= 1 { cameraBase.x = current.to }
+    }
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
 
@@ -3484,9 +3499,7 @@ final class GameScene: SKScene {
         ballNode.color = colour
         ballHalo.color = colour
         // The field's camera: level, sliding from zone to zone.
-        if match.stage.features.look == .footballField {
-            cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase
-        }
+        if match.stage.features.look == .footballField { slideCamera(to: cameraTargetX()) }
         placeBallCamFrame()
         circlesOverCam.isHidden = !ballCamEnabled
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.

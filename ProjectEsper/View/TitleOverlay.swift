@@ -73,7 +73,7 @@ struct TitleOverlay: View {
                     vsCPU.toggle()
                     SoundBoard.shared.play(SoundBoard.navigate)
                 } label: {
-                    Text(vsCPU ? "VS CPU: ON" : "VS CPU: OFF · PAD 2")
+                    Text(vsCPU ? "VS CPU" : "VS HUMAN")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.85))
                 }

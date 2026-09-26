@@ -44,7 +44,7 @@ final class GameScene: SKScene {
     private var opponent = Opponent(index: 1)
     /// VS CPU: the computer plays player 2, whatever pads are in; off, player 2 is the
     /// second pad. The title's toggle, the AI button and R3 all set it, kept between launches.
-    static let vsCPUKey = "esper.vsCPU"
+    static let vsCPUKey = InputHub.vsCPUKey
     private var aiOn: Bool {
         get { UserDefaults.standard.object(forKey: GameScene.vsCPUKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: GameScene.vsCPUKey) }

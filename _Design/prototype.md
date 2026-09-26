@@ -16,9 +16,10 @@ neutral to get a shot off; catch it and the roles reverse.
   by a transparent SpriteKit view (`HudView`) laid over the Metal view, so nothing in it
   glows; it takes the touches and hands them to the game scene. `InputHub` merges touch
   and controllers. `TouchControls` is the on-screen pad. Who drives whom: on a phone touch is player 0,
-  one controller is player 1, two controllers are players 0 and 1 in order; on the TV
-  and on a Mac, with no touch, the controllers are players 0 and 1. A pad on player 1 sits the computer out, so a
-  second person just picks up a pad. A keyboard on an iPad or a Mac is player 0 as well: WASD, space to jump, J to shoot,
+  a controller plays player 0 with them by default; only VS HUMAN makes a lone controller
+  player 1, two controllers then players 0 and 1; on the TV and on a Mac, with no touch,
+  the controllers are players 0 and 1. VS CPU, the default, has the computer on player 1
+  whatever pads are in; VS HUMAN gives player 1 to the second pad. A keyboard on an iPad or a Mac is player 0 as well: WASD, space to jump, J to shoot,
   K to throw, shift as the left bumper, delete as the start button, Esc quits on a Mac or in the simulator. The HUD is laid out in the phone's points and
   scaled up by `HudScene.scale(forHeight:)` on a bigger screen, the lettering rendered
   at that scale so it stays crisp. `Net/GameCenter` is Game
@@ -455,7 +456,7 @@ holds the variants; A is always the baseline as tuned.
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
 - AI, beside that: the computer plays the other side, whatever pads are in. Off, the second
-  pad or nothing does. The title's VS CPU toggle is the same switch, kept between launches;
+  pad or nothing does. The title's VS CPU / VS HUMAN toggle is the same switch, kept between launches;
   clicking a pad's right stick (R3) switches it too.
 
 ## Energy colours

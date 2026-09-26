@@ -2,9 +2,9 @@ import EsperSim
 import Foundation
 import GameController
 
-/// Where each player's input comes from. On a phone the touch controls are player 0; one
-/// controller is player 1, and with two the first is player 0 and the second player 1.
-/// On the TV the first controller is player 0 and the second player 1. A keyboard, on an
+/// Where each player's input comes from: see `controller(for:)`. By default a controller
+/// plays player 0 alongside touch and the keyboard; VS HUMAN on a phone or iPad makes a
+/// lone controller player 1. A keyboard, on an
 /// iPad or a Mac, is player 0 too: WASD moves, space jumps, J shoots, K throws, shift
 /// steps the power like the left bumper, delete pauses like the start button. Everything is read as held state each frame,
 /// so nothing queues and nothing is lost between frames.
@@ -28,6 +28,8 @@ final class InputHub {
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
+    /// The title's VS CPU / VS HUMAN toggle, which the scene also reads.
+    static let vsCPUKey = "esper.vsCPU"
 
     /// Running on a Mac, where there's a keyboard and no touch.
     static var onMac: Bool {
@@ -117,13 +119,15 @@ final class InputHub {
         return input
     }
 
-    /// The controller that drives this player, by the rule above. On a Mac there's no
-    /// touch to be player 0, so there as on the TV the first controller is player 0.
+    /// The controller that drives this player. The first is player 0, with touch and the
+    /// keyboard, unless it's VS HUMAN on a phone or iPad, where touch is player 0 and a lone
+    /// controller is player 1, so a friend can pick one up. The TV and a Mac have no touch.
     private func controller(for index: Int) -> GCController? {
         #if os(tvOS)
         return index < controllers.count ? controllers[index] : nil
         #else
-        if InputHub.onMac { return index < controllers.count ? controllers[index] : nil }
+        let vsCPU = UserDefaults.standard.object(forKey: InputHub.vsCPUKey) as? Bool ?? true
+        if InputHub.onMac || vsCPU { return index < controllers.count ? controllers[index] : nil }
         switch (controllers.count, index) {
         case (1, 1): return controllers[0]
         case (1, 0): return nil

@@ -81,7 +81,9 @@ final class BoundsGallery: SKNode {
             lines.append("        .\(vehicle): [\(rows)],")
         }
         lines.append("    ]")
+        #if !os(tvOS)
         UIPasteboard.general.string = lines.joined(separator: "\n")
+        #endif
     }
 
     /// The vehicle, its name, and its grid of blocks over it.

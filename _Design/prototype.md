@@ -726,6 +726,7 @@ shown, once, like the effects.
 - port_in: the port-in at a round's start.
 - swish: a point, with the strike on the rim; basket instead when a dunk scores it.
 - lightning1, 2, 3, one at random: with every lightning spark, Zeus Juice's hits.
+- fire_hit: with every fire spark, Blazing Boba's hits.
 - menu_select: a cursor moving, a colour circle (menu_cursor, louder than the rest, is
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,
   MULTIPLAYER. menu_back: RESUME, start to unpause, TITLE and TITLE SCREEN.

@@ -2116,7 +2116,8 @@ final class GameScene: SKScene {
         // Zeus Juice's hits spark in lightning; everyone else's in energy.
         let power = match.players.indices.contains(player) ? match.players[player].power : .none
         if power == .blazingBoba, let name = ["fire_spark", "fire_spark2", "fire_spark3"].filter({ EffectSheets.frames[$0] != nil }).randomElement() {
-            // Blazing Boba's hits spark in fire, painted as it is.
+            // Blazing Boba's hits spark in fire, painted as it is, and sound as fire.
+            play(.fireHit, at: position)
             let frames = (0..<(EffectSheets.frames[name] ?? 1)).map { sprites.texture(name, $0) }
             let node = SKSpriteNode(texture: frames[0])
             node.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY[name] ?? 0.5)

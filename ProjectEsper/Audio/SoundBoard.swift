@@ -13,6 +13,7 @@ final class SoundBoard {
         case ballBounce = "ball_bounce"
         case basket
         case catchBall = "catch"
+        case fireHit = "fire_hit"
         case countOne = "1"
         case countTwo = "2"
         case countThree = "3"

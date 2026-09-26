@@ -60,6 +60,9 @@ final class SoundBoard {
                 var frames = UnsafeMutableBufferPointer(start: samples, count: Int(buffer.frameLength))
                 frames.reverse()
             }
+            if let gain = SoundBoard.gain[effect], let samples = buffer.floatChannelData?[0] {
+                for index in 0..<Int(buffer.frameLength) { samples[index] = min(max(samples[index] * gain, -1), 1) }
+            }
             buffers[effect] = buffer
         }
         for _ in 0..<SoundBoard.voiceCount {
@@ -80,6 +83,9 @@ final class SoundBoard {
     static let confirm = Effect.menuSelectV2
     /// Played back to front.
     private static let reversed: Set<Effect> = [.menuSelectV2]
+    /// Louder than their files, which a voice's volume can't go past: the step is recorded
+    /// very quietly, its peak at 3% of full.
+    private static let gain: [Effect: Float] = [.step: 2]
     static let count: [Int: Effect] = [1: .countOne, 2: .countTwo, 3: .countThree]
 
     /// Plays on a voice that has finished; with every voice busy, the one nearest its end is cut off.

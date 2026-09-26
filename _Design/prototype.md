@@ -721,7 +721,7 @@ shown, once, like the effects.
   and in hand, on the ground, on each frame of a sheet where the landmarks put the ball
   lowest, under five art pixels: the dribbles and the taunt (idle 3 and 8, walk 2 and 6,
   run 4, taunt 2 and 7).
-- step: the walk and run sheets' frames 0 and 4, on the ground.
+- step: the walk and run sheets' frames 0 and 4, on the ground, at twice its file's level.
 - 3, 2, 1: each number of the count as it goes up, in play.
 - port_in: the port-in at a round's start.
 - swish: a point, with the strike on the rim; basket instead when a dunk scores it.

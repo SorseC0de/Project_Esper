@@ -30,10 +30,10 @@ enum NetTuning {
     static let offsetXKey = "ui.net.offsetX"
     static let offsetYKey = "ui.net.offsetY"
     static var topScale: CGFloat { stored(topScaleKey) ?? 1 }
-    static var bottomScale: CGFloat { stored(bottomScaleKey) ?? 0.5 }
-    static var spread: CGFloat { stored(spreadKey) ?? 4 }
-    static var rowSpacing: CGFloat { stored(rowSpacingKey) ?? 4 }
-    static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? 0, y: stored(offsetYKey) ?? 0) }
+    static var bottomScale: CGFloat { stored(bottomScaleKey) ?? 0.25 }
+    static var spread: CGFloat { stored(spreadKey) ?? 3 }
+    static var rowSpacing: CGFloat { stored(rowSpacingKey) ?? 3 }
+    static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? -2, y: stored(offsetYKey) ?? -4) }
     private static func stored(_ key: String) -> CGFloat? {
         (UserDefaults.standard.object(forKey: key) as? Double).map { CGFloat($0) }
     }

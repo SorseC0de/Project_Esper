@@ -769,10 +769,10 @@ the floor's row everything is the outline black, #242234. Its hoops are `hoop`, 
 to the players' scale, placed 5 art pixels out from the backboard and 10 up from the rim's point
 (`HoopTuning.offset`), kept out of the glow (the mask marks it, as it does the banner);
 the net is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
-(4) art pixels apart across and NET ROWS (4) apart down, each chevron smaller than the one
-above, from NET TOP (×1) at the rim to NET BOTTOM (×0.5) at the bottom (a chevron is 2.25
+(3) art pixels apart across and NET ROWS (3, in quarters) apart down, each chevron smaller than the one
+above, from NET TOP (×1) at the rim to NET BOTTOM (×0.25) at the bottom (a chevron is 2.25
 across and 1.5 deep at ×1, 1 thick), the whole net moved from the rim's point by NET X and
-NET Y (0, 0; x mirrored on a left backboard, as the hoop's art is); the sliders are on the
+NET Y (−2, −4; x mirrored on a left backboard, as the hoop's art is); the sliders are on the
 UI tuning panel, under HUD. Each chevron is a
 knot of a Verlet cloth, the top ones pinned to the rim and following it, each tied to the
 one below and its neighbours across. The ball, swept from last frame's point to this one's

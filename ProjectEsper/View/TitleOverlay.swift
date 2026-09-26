@@ -10,6 +10,9 @@ final class FlowState: ObservableObject {
     let net = GameCenter()
     @Published var showsTitle = true
     @Published var veiled = false
+    /// The ground under the screen is the palette's black rather than the royal blue: the
+    /// Greateraid pick and wait.
+    @Published var blackGround = false
     /// The UI tuning panel is open.
     @Published var tuningOpen = false
     var startSeries: ((GameMode) -> Void)?

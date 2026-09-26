@@ -17,6 +17,7 @@ enum UIPiece: String {
     case circlePlum = "ui_circle_plum"
     case circleGold = "ui_circle_gold"
     case plateBlack = "ui_plate_black"
+    case plateBlue = "ui_plate_blue"
 
     /// Left, bottom, right, top: what doesn't stretch.
     var insets: (left: CGFloat, bottom: CGFloat, right: CGFloat, top: CGFloat) {
@@ -26,7 +27,7 @@ enum UIPiece: String {
         case .cardBlack: (44, 44, 44, 44)
         // A round button scales whole, never stretched out of round.
         case .circleBlue, .circleBlack, .circlePlum, .circleGold: (54, 58, 54, 58)
-        case .plateBlack: (60, 26, 60, 26)
+        case .plateBlack, .plateBlue: (60, 26, 60, 26)
         }
     }
 
@@ -36,7 +37,7 @@ enum UIPiece: String {
     var faceRise: CGFloat {
         switch self {
         case .buttonBlue, .buttonGold, .buttonBlack, .buttonPlum, .circleBlue, .circleBlack, .circlePlum, .circleGold: 5 * UIPiece.pointsPerPixel
-        case .plateBlack: 7.5 * UIPiece.pointsPerPixel
+        case .plateBlack, .plateBlue: 7.5 * UIPiece.pointsPerPixel
         case .headerBlue, .cardBlack: 0
         }
     }

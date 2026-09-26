@@ -367,10 +367,14 @@ text 1.5, titles 1.5 and panels 0.9, as tuned on one; and the iPad's and the TV'
 at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the plate's
 face, above its lip, and is nudged up and left by half its own drop. TEXT Y on the panel
 scales that lift, one value a platform: half of it, 0.5, on all of them. The stage select: STAGE SELECT on a ribbon, each stage a royal blue plate
-with its name on the face, gold when a cursor or a pick is on it. The Greateraid pick:
-its ribbon, the line under it in title lettering, the quote and what the drink does on a
-black plate over the bottles, and online the seconds in a black round button, top right;
-the wait screen the same ribbon, and its seconds in the same round button. The HUD: the
+with its name on the face, gold when a cursor or a pick is on it. The Greateraid pick,
+on the palette's black rather than the royal blue: its ribbon, the line under it in title
+lettering, the raised drink's name under that (and "(Second Sip)" under the name when it
+is one), the quote and what the drink does on a blue banner below, and online the
+seconds in a blue round button, top right. The bottles carry no names and no arrow: the
+raised one grows and wears a thick white outline, white copies of it ringed behind it so
+it takes the lean. The wait screen: the same black, the same ribbon, and its seconds in
+the same blue round button. The HUD: the
 round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, THROW, SHOOT and
 JUMP as the pack's round buttons in blue, plum and black,

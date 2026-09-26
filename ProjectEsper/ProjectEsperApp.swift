@@ -24,7 +24,8 @@ struct GameView: View {
                 .ignoresSafeArea()
             if flow.veiled {
                 // The screens' ground: the royal blue, dark, the world just showing through.
-                LinearGradient(colors: [Color(rgb: EsperPalette.royal.body), Color(rgb: EsperPalette.royal.shadow)],
+                let ramp = flow.blackGround ? EsperPalette.black : EsperPalette.royal
+                LinearGradient(colors: [Color(rgb: flow.blackGround ? ramp.light : ramp.body), Color(rgb: ramp.shadow)],
                                startPoint: .top, endPoint: .bottom)
                     .ignoresSafeArea()
                     .transition(.opacity)

@@ -29,6 +29,7 @@ PIECES = {
     "ui_circle_plum": ("Buttons/buttonCircle_purple.png", True),
     "ui_circle_gold": ("Buttons/buttonCircle_yellow.png", False),
     "ui_plate_black": ("Labels/labelAdvanced_black.png", False),
+    "ui_plate_blue": ("Labels/labelAdvanced_blue.png", False),
 }
 
 # The pack's purple ramp, lightest to darkest, and the plum each shade becomes.

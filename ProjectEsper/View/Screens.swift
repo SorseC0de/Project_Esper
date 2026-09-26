@@ -128,7 +128,7 @@ class Screen: SKNode {
             choice.node.setScale(lit ? 1.12 : 1)
             if let plate = plates[index] { (lit ? UIPiece.buttonGold : plate.piece).fit(plate.plate, to: plate.size, corners: tuned(.buttons)) }
         }
-        if plates[cursor] != nil {
+        if plates[cursor] != nil || !showsArrow {
             arrow.isHidden = true
         } else if choices.indices.contains(cursor) {
             arrow.isHidden = false
@@ -155,6 +155,9 @@ class Screen: SKNode {
         }
         return true
     }
+
+    /// Whether the arrow points at the cursor's choice; a screen with its own mark goes without.
+    var showsArrow: Bool { true }
 
     /// Whether a tap on a choice that isn't the cursor's fires it straight away.
     var tapFiresAtOnce: Bool { true }
@@ -194,6 +197,11 @@ final class PickScreen: Screen {
     private let blurb = SKSpriteNode()
     private let comment = SKSpriteNode()
     private let clock = SKSpriteNode()
+    /// The raised drink's name, and "(Second Sip)" under it when it is one.
+    private let drinkName = SKSpriteNode()
+    private let secondSip = SKSpriteNode()
+    /// Each bottle's white outline, shown on the raised one.
+    private var outlines: [SKNode] = []
     private let onDrink: (Greateraid) -> Void
 
     /// `timed` shows the seconds left, for a networked pick.
@@ -207,19 +215,23 @@ final class PickScreen: Screen {
         let sub = TitleText.node("YOU WERE SCORED ON. DRINK UP.", size: 13 * tuned(.text))
         sub.position = CGPoint(x: 0, y: halfHeight * 0.5)
         addChild(sub)
+        drinkName.position = CGPoint(x: 0, y: halfHeight * 0.3)
+        addChild(drinkName)
+        secondSip.position = CGPoint(x: 0, y: halfHeight * 0.3 - 24 * tuned(.titles))
+        addChild(secondSip)
         if timed {
-            // The seconds in a black round button, top right.
-            let dial = UIPiece.circleBlack.node(size: CGSize(width: 52, height: 56).scaled(by: tuned(.buttons)), corners: tuned(.buttons))
+            // The seconds in a blue round button, top right.
+            let dial = UIPiece.circleBlue.node(size: CGSize(width: 52, height: 56).scaled(by: tuned(.buttons)), corners: tuned(.buttons))
             dial.position = CGPoint(x: halfWidth - 50, y: halfHeight * 0.74)
             dial.zPosition = -1
             addChild(dial)
-            clock.position = CGPoint(x: dial.position.x, y: dial.position.y + UIPiece.circleBlack.faceRise * tuned(.buttons))
+            clock.position = CGPoint(x: dial.position.x, y: dial.position.y + UIPiece.circleBlue.faceRise * tuned(.buttons))
             addChild(clock)
             showSeconds(Series.pickSeconds)
         }
-        // The quote and what the raised drink does, on a black plate over the bottles.
-        let plate = UIPiece.plateBlack.node(size: CGSize(width: min(halfWidth * 1.7, 620), height: 86).scaled(by: tuned(.panels)), corners: tuned(.panels))
-        plate.position = CGPoint(x: 0, y: 28)
+        // The quote and what the raised drink does, on a blue banner over the bottles.
+        let plate = UIPiece.plateBlue.node(size: CGSize(width: min(halfWidth * 1.7, 620), height: 86).scaled(by: tuned(.panels)), corners: tuned(.panels))
+        plate.position = CGPoint(x: 0, y: -halfHeight * 0.05)
         plate.zPosition = 1
         addChild(plate)
 
@@ -232,27 +244,17 @@ final class PickScreen: Screen {
             bottle.zRotation = lean
             bottle.position = CGPoint(x: x, y: -halfHeight - 24)
             addChild(bottle)
-            let name = TitleText.node(offer.name.uppercased(), size: (offer.name.count > 14 ? 21 : 23) * tuned(.text))
-            name.position = CGPoint(x: x, y: -halfHeight + 84)
-            name.zPosition = 2
-            addChild(name)
-            if drinks.isSecondSip(offer) {
-                let sip = TitleText.node("(Second Sip)", size: 20 * tuned(.text), italic: true)
-                sip.position = CGPoint(x: x, y: -halfHeight + 68)
-                sip.zPosition = 2
-                addChild(sip)
-            }
+            outlines.append(PickScreen.outline(of: bottle, width: 5 * tuned(.buttons)))
             let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight)
-            // The arrow hangs over the name, pointing down at the bottle.
-            addChoice(bottle, hit: hit, arrowAt: CGPoint(x: x, y: -halfHeight + 84 + 24), arrowTurn: 0) { [weak self] in
+            addChoice(bottle, hit: hit, arrowAt: CGPoint(x: x, y: -halfHeight + 108), arrowTurn: 0) { [weak self] in
                 guard let self else { return }
                 self.onDrink(offer)
             }
         }
-        comment.position = CGPoint(x: 0, y: 44)
+        comment.position = CGPoint(x: 0, y: plate.position.y + 16 * tuned(.panels))
         comment.zPosition = 2
         addChild(comment)
-        blurb.position = CGPoint(x: 0, y: 14)
+        blurb.position = CGPoint(x: 0, y: plate.position.y - 14 * tuned(.panels))
         blurb.zPosition = 2
         addChild(blurb)
         moved()
@@ -261,6 +263,27 @@ final class PickScreen: Screen {
     required init?(coder: NSCoder) { fatalError() }
 
     override var tapFiresAtOnce: Bool { false }
+    override var showsArrow: Bool { false }
+
+    /// A thick white outline round a bottle: white copies of it ringed behind it, so it
+    /// takes the bottle's lean. Hidden until the bottle is raised.
+    static func outline(of bottle: SKSpriteNode, width: CGFloat) -> SKNode {
+        let ring = SKNode()
+        ring.zPosition = -1
+        ring.isHidden = true
+        for step in 0..<16 {
+            let angle = CGFloat(step) / 16 * 2 * .pi
+            let copy = SKSpriteNode(texture: bottle.texture)
+            copy.size = bottle.size
+            copy.anchorPoint = bottle.anchorPoint
+            copy.color = .white
+            copy.colorBlendFactor = 1
+            copy.position = CGPoint(x: cos(angle) * width, y: sin(angle) * width)
+            ring.addChild(copy)
+        }
+        bottle.addChild(ring)
+        return ring
+    }
 
     /// The seconds left on the pick.
     func showSeconds(_ seconds: Int) {
@@ -271,6 +294,14 @@ final class PickScreen: Screen {
     override func moved() {
         guard choices.indices.contains(cursor) else { return }
         let offer = offers[cursor]
+        for (index, outline) in outlines.enumerated() { outline.isHidden = index != cursor }
+        TitleText.set(drinkName, to: offer.name.uppercased(), size: 30 * tuned(.titles))
+        if drinks.isSecondSip(offer) {
+            TitleText.set(secondSip, to: "(Second Sip)", size: 18 * tuned(.titles), italic: true)
+            secondSip.isHidden = false
+        } else {
+            secondSip.isHidden = true
+        }
         let text = drinks.level(of: offer) == 0 ? offer.blurbs.first : offer.blurbs.second
         let scale = tuned(.text)
         TitleText.set(blurb, to: text, size: (text.count > 70 ? 17 : (text.count > 50 ? 19 : 22)) * scale)
@@ -280,7 +311,7 @@ final class PickScreen: Screen {
     /// The bottle, the user's vector from the catalog, 180 points tall and anchored at its
     /// bottom so that runs off the screen: blue for a booster, gold for a biomorph or
     /// Bio-Boba.
-    static func bottle(for drink: Greateraid, colour: SKColor, height: CGFloat = 180) -> SKNode {
+    static func bottle(for drink: Greateraid, colour: SKColor, height: CGFloat = 180) -> SKSpriteNode {
         let texture = SKTexture(imageNamed: drink.kind == .booster ? "Greateraid" : "Greateraid-Gold")
         let aspect = texture.size().width / max(texture.size().height, 1)
         let bottle = SKSpriteNode(texture: texture)
@@ -300,11 +331,11 @@ final class WaitScreen: Screen {
         let sub = TitleText.node("\(who) IS DRINKING", size: 26 * tuned(.titles))
         sub.position = CGPoint(x: 0, y: 10)
         addChild(sub)
-        let dial = UIPiece.circleBlack.node(size: CGSize(width: 64, height: 69).scaled(by: tuned(.buttons)), corners: tuned(.buttons))
+        let dial = UIPiece.circleBlue.node(size: CGSize(width: 64, height: 69).scaled(by: tuned(.buttons)), corners: tuned(.buttons))
         dial.position = CGPoint(x: 0, y: -60)
         dial.zPosition = -1
         addChild(dial)
-        clock.position = CGPoint(x: 0, y: dial.position.y + UIPiece.circleBlack.faceRise * tuned(.buttons))
+        clock.position = CGPoint(x: 0, y: dial.position.y + UIPiece.circleBlue.faceRise * tuned(.buttons))
         addChild(clock)
         showSeconds(Series.pickSeconds)
     }

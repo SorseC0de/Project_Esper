@@ -12,6 +12,7 @@ final class SoundBoard {
     enum Effect: String, CaseIterable {
         case ballBounce = "ball_bounce"
         case basket
+        case catchBall = "catch"
         case countOne = "1"
         case countTwo = "2"
         case countThree = "3"
@@ -26,7 +27,9 @@ final class SoundBoard {
         case playerHit = "player_hit"
         case shootV2 = "shoot_v2"
         case swish
-        case playerSnatch = "player_snatch"
+        case snatch
+        /// Made by `Tools/sfx.py`; the take in use until one is picked.
+        case parry = "parry_a"
         case portIn = "port_in"
         case slashWallClank = "slash_wallclank"
         case step

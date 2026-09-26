@@ -85,6 +85,8 @@ public struct Player: Equatable {
     public var facing: Facing
     public var state: PlayerState = .idle
     public var previousState: PlayerState = .idle
+    /// The throw stance's opening frames, the parry's (`ThrowParryRules`).
+    public var throwParrying: Bool { state == .throwStance && hasBall && stateTimer < ThrowParryRules.frames }
     /// The run's speed as it last stood, for the pivot jump to carry.
     public var runMomentum = 0.0
     /// Frames spent in the state so far; 0 on the frame it was entered.

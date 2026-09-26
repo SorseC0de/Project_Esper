@@ -1597,6 +1597,43 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity, Vec2(x: 0, y: BallRules.floaterSpeed))
     }
 
+    func testASlashFromAFullRunCarriesTheBallOnForTheSlasher() {
+        var match = defending(otherAt: 260)
+        // Up to a run, then the slash as the holder comes into reach, running on after it.
+        run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) {
+            $0.players[1].position.x - $0.players[0].position.x < 26
+        }
+        XCTAssertEqual(match.players[0].state, .run)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        let popped = run(&match, frames: SlashRules.frames, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) {
+            $0.events.contains(.popped(player: 1, by: 0))
+        }
+        XCTAssertLessThan(popped, SlashRules.frames)
+        XCTAssertGreaterThan(match.ball.velocity.x, 0, "the ball goes on the slasher's way")
+        run(&match, frames: 90, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) { $0.ball.holder != nil }
+        XCTAssertEqual(match.ball.holder, 0, "the slasher catches it, not the one slashed")
+    }
+
+    func testAThrowStanceParriesASlashInItsOpeningFrames() {
+        func slashed(stanceFramesBefore: Int) -> Match {
+            var match = defending(otherAt: 150)
+            match.players[1].facing = .left
+            // The holder takes the throw stance, then the slash comes in.
+            for _ in 0..<stanceFramesBefore { match.advance(inputs: [.idle, PlayerInput(throwBall: true)]) }
+            match.advance(inputs: [PlayerInput(shoot: true), PlayerInput(throwBall: true)])
+            for _ in 0..<SlashRules.frames {
+                match.advance(inputs: [.idle, PlayerInput(throwBall: true)])
+                if match.events.contains(where: { if case .parried = $0 { return true }; if case .popped = $0 { return true }; return false }) { break }
+            }
+            return match
+        }
+        let early = slashed(stanceFramesBefore: 1)
+        XCTAssertTrue(early.events.contains(.parried(player: 0, by: 1)), "early in the stance it's a parry")
+        XCTAssertTrue(early.players[1].hasBall)
+        let late = slashed(stanceFramesBefore: 20)
+        XCTAssertTrue(late.events.contains(.popped(player: 1, by: 0)), "long into it the slash lands")
+    }
+
     func testSlashPopsTheBallOffAHolderTheBladeOnlyTouchesTheBodyOf() {
         // The other stands at the tip of the forward swing: its box reaches the near edge
         // of their body and not the ball at their centre.

@@ -125,7 +125,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   astride the corner, standing a unit in from the edge. No way off it but up. For 20
   frames after walking off an edge no corner is grabbed, so leaving a ledge doesn't grab
   it back. Never a made platform.
-- Knocked loose (by a slide or a slash), the ball pops straight up: the floater's drift
+- Knocked loose, the ball pops up: straight up off a slide, and off a slash carrying the
+  slasher's own sideways speed, so a slasher running on is under it as it comes down: the floater's drift
   for 10 frames, then a normal fall, nobody's, so Flash Fizz can't warp to it. The holder
   can't catch it back for 15 frames.
 - Throw: the `player_throw` sheet, `player_throw_air` off the ground, frames 4 to 7
@@ -325,7 +326,11 @@ well (`Player.knock`), and the pulse doesn't stun. The slash strips a body with 
 without the ball, knocking it 2.5 along the swing and 1.5 up. The snatch has no
 cooldown, as the slash has none, and meeting a live blade it's the parry: the slasher
 is the one stripped and knocked back, the blade spent, resolved before the blades so it
-always wins.
+always wins. The throw stance parries too, over its first six frames (`ThrowParryRules`),
+the body flashing white: a slash meeting it strips the slasher and the thrower keeps the
+ball. Six is two frames of online input delay and about four of a slash start still on
+its way from the other phone, the least that leaves a read online. A snatch still takes
+the ball through it.
 
 ## The game loop
 
@@ -689,6 +694,10 @@ ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's j
 
 ## Sound
 
+`Tools/sfx.py` makes sounds the bfxr way from recipes in `Tools/sfx.json` (oscillator,
+envelope, pitch slide and vibrato, arpeggio, filters, voices mixed) into `_Sound FX`, for
+the importer to take in like any other.
+
 The user's effects in `_Sound FX`, any of WAV, MP3 or M4A, brought into `ProjectEsper/Sounds`
 as 16-bit 44.1 kHz mono WAV by
 `Tools/import_sounds.py` (run it after adding or changing one; the originals are only
@@ -704,8 +713,10 @@ shown, once, like the effects.
   is unused).
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`).
-- player_snatch: the snatch at full stretch.
-- player_hit: struck, popped, parried.
+- snatch: the snatch at full stretch. catch: a catch.
+- parry: a parry, the snatch's or the throw stance's; made by `Tools/sfx.py` (parry_a,
+  b and c are the takes).
+- player_hit: struck, popped.
 - ball_bounce: every bounce faster than 0.6 across the surface, at full volume from 4;
   and in hand, on the ground, on each frame of a sheet where the landmarks put the ball
   lowest, under five art pixels: the dribbles and the taunt (idle 3 and 8, walk 2 and 6,
@@ -713,7 +724,7 @@ shown, once, like the effects.
 - step: the walk and run sheets' frames 0 and 4, on the ground.
 - 3, 2, 1: each number of the count as it goes up, in play.
 - port_in: the port-in at a round's start.
-- swish and basket, basket at half: a point, with the strike on the rim.
+- swish: a point, with the strike on the rim; basket instead when a dunk scores it.
 - lightning1, 2, 3, one at random: with every lightning spark, Zeus Juice's hits.
 - menu_select: a cursor moving, a colour circle (menu_cursor, louder than the rest, is
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,

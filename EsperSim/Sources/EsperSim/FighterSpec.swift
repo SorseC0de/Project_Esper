@@ -451,6 +451,15 @@ public enum SlashRules {
     public static let knock = Vec2(x: 2.5, y: 1.5)
 }
 
+/// The throw's stance parries a slash for its first frames, as the snatch does: the
+/// slasher is stripped and knocked back and the thrower keeps the ball; a snatch still
+/// takes it. Six: the two frames an input is held online and about four more (a 65 ms
+/// trip) before the other phone's slash start arrives, the least that still leaves a read
+/// online rather than luck.
+public enum ThrowParryRules {
+    public static let frames = 6
+}
+
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many
 /// frames; the hand is out over these, and the whole body plus this much of reach in
 /// front, or the hand's catch ring, takes any ball it touches while the body faces it,

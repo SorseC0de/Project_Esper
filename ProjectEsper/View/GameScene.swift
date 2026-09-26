@@ -1768,8 +1768,11 @@ final class GameScene: SKScene {
             case .shot(let index), .thrown(let index), .fireballThrown(let index), .boltFired(let index): play(.shootV2, at: body(index))
             case .slashed(let index): play(.esperSlash, at: body(index))
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
-            case .snatchReached(let index): play(.playerSnatch, at: body(index))
-            case .struck(let victim, _), .popped(let victim, _), .parried(let victim, _): play(.playerHit, at: body(victim))
+            case .snatchReached(let index): play(.snatch, at: body(index))
+            case .caught(let index): play(.catchBall, at: body(index))
+            case .struck(let victim, _), .popped(let victim, _): play(.playerHit, at: body(victim))
+            case .parried(let victim, _): play(.parry, at: body(victim))
+            case .dunked: dunkScoring = true
             // Quiet for a soft bounce, silent once it's only settling.
             case .ballBounced(let position, let speed) where speed > GameScene.bounceSoundFloor:
                 play(.ballBounce, at: position, volume: Float(min(speed / GameScene.bounceSoundFull, 1)))
@@ -1790,6 +1793,8 @@ final class GameScene: SKScene {
         let beyond = max(abs(at.x - cameraNode.position.x) - halfWidth, abs(at.y - cameraNode.position.y) - halfHeight, 0)
         return Float(max(1 - beyond / GameScene.soundFadeMargin, 0))
     }
+    /// A dunk went down, so the point it scores sounds as one.
+    private var dunkScoring = false
     /// Art pixels past the screen's edge over which a sound fades to nothing.
     private static let soundFadeMargin: CGFloat = 32
     private static let bounceSoundFloor = 0.6
@@ -2136,9 +2141,9 @@ final class GameScene: SKScene {
     /// the same tone and the floor and walls go white, fading back. The crown erupts off
     /// the rim with it.
     private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
-        // The net's swish over the basket, which sits under it at half.
-        play(.swish, at: match.stage.hoops[hoop].position)
-        play(.basket, at: match.stage.hoops[hoop].position, volume: 0.5)
+        // A dunk's point is the basket; any other goes in with the net's swish.
+        play(dunkScoring ? .basket : .swish, at: match.stage.hoops[hoop].position)
+        dunkScoring = false
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
         let bolt = EnergyEffect.strikes.randomElement()!
@@ -3267,11 +3272,13 @@ final class GameScene: SKScene {
                 node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y)
             }
             node.xScale = CGFloat(player.facing.sign)
-            // Frozen, the body goes ice.
-            node.color = GameScene.ice
-            node.colorBlendFactor = player.frozen > 0 ? 0.6 : 0
-            headNodes[index].color = GameScene.ice
-            headNodes[index].colorBlendFactor = player.frozen > 0 ? 0.6 : 0
+            // Frozen, the body goes ice; in the throw stance's parry frames, white.
+            let tint: SKColor = player.throwParrying ? .white : GameScene.ice
+            let tintShare: CGFloat = player.throwParrying ? 0.85 : (player.frozen > 0 ? 0.6 : 0)
+            node.color = tint
+            node.colorBlendFactor = tintShare
+            headNodes[index].color = tint
+            headNodes[index].colorBlendFactor = tintShare
 
             // In flight the body leans into its motion: forward tips it ahead, backward tips
             // it back, up to thirty degrees, eased so it doesn't snap.

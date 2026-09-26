@@ -1,0 +1,25 @@
+{
+    "_comment": "Recipes for Tools/sfx.py. Each sound mixes its voices; see VOICE_DEFAULTS there for every knob.",
+    "parry_a": {
+        "peak": 0.8,
+        "voices": [
+            {"wave": "sine", "frequency": 2093, "slide": -0.15, "attack": 0.002, "sustain": 0.02, "punch": 0.6, "decay": 0.38, "decay_curve": 2.2, "vibrato_depth": 0.004, "vibrato_speed": 11},
+            {"wave": "sine", "frequency": 3136, "slide": -0.15, "attack": 0.002, "sustain": 0.01, "decay": 0.22, "decay_curve": 2.5, "volume": 0.5},
+            {"wave": "noise", "frequency": 9000, "attack": 0.0, "sustain": 0.004, "decay": 0.02, "highpass": 3000, "volume": 0.35}
+        ]
+    },
+    "parry_b": {
+        "peak": 0.8,
+        "voices": [
+            {"wave": "square", "frequency": 1400, "slide": -1.6, "duty": 0.22, "duty_sweep": 0.6, "attack": 0.0, "sustain": 0.03, "punch": 0.8, "decay": 0.22, "decay_curve": 1.8, "lowpass": 6000, "lowpass_sweep": -3.0, "resonance": 0.5},
+            {"wave": "noise", "frequency": 4000, "sustain": 0.01, "decay": 0.06, "decay_curve": 1.5, "lowpass": 5000, "volume": 0.6, "seed": 7}
+        ]
+    },
+    "parry_c": {
+        "peak": 0.75,
+        "voices": [
+            {"wave": "saw", "frequency": 500, "slide": 12.0, "attack": 0.0, "sustain": 0.05, "decay": 0.03, "lowpass": 7000, "volume": 0.7},
+            {"wave": "square", "frequency": 1600, "duty": 0.35, "arpeggio": 2.0, "arpeggio_at": 0.03, "attack": 0.0, "sustain": 0.04, "punch": 0.5, "decay": 0.2, "decay_curve": 2.0, "delay": 0.05, "vibrato_depth": 0.01, "vibrato_speed": 30}
+        ]
+    }
+}

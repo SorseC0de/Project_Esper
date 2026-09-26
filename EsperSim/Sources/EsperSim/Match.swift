@@ -325,7 +325,8 @@ public struct Match: Equatable {
             if let other, players[other].body.overlaps(blade), players[other].frozen == 0 {
                 // The body, ball or no ball: stripped and knocked along the swing.
                 players[index].slashHit = true
-                strip(other, by: index, knock: Vec2(x: SlashRules.knock.x * player.facing.sign, y: SlashRules.knock.y))
+                strip(other, by: index, knock: Vec2(x: SlashRules.knock.x * player.facing.sign, y: SlashRules.knock.y),
+                      carry: player.velocity.x)
             } else if ball.isLive, ball.box.overlaps(blade) {
                 // Down and away at about the spike angle, jittered a little by the frame.
                 players[index].slashHit = true
@@ -373,12 +374,14 @@ public struct Match: Equatable {
         }
     }
 
-    /// A snatch's reach meeting a live blade: the slasher is the one stripped and knocked
-    /// back, and the blade is spent. Before the blades are resolved, so it wins.
+    /// A snatch's reach, or a throw stance in its opening frames, meeting a live blade: the
+    /// slasher is the one stripped and knocked back, and the blade is spent. Before the
+    /// blades are resolved, so it wins.
     private mutating func resolveParries() {
         for index in players.indices {
-            guard let reach = players[index].snatchHitbox, let other = players.indices.first(where: { $0 != index }),
-                  let blade = players[other].slashHitbox, blade.overlaps(reach) else { continue }
+            guard let other = players.indices.first(where: { $0 != index }), let blade = players[other].slashHitbox else { continue }
+            let reach = players[index].snatchHitbox ?? (players[index].throwParrying ? players[index].body : nil)
+            guard let reach, blade.overlaps(reach) else { continue }
             players[other].slashHit = true
             let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
             strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y))
@@ -388,17 +391,20 @@ public struct Match: Equatable {
 
     /// The ball knocked out of `victim`'s hands: it pops straight up, nobody's, and the
     /// victim is stunned, so the popper has first go at it.
-    private mutating func pop(from victim: Int, by popper: Int) {
+    /// `carry`: sideways speed for the ball, the slash's own, so a slasher going on at a run
+    /// is under it when it comes down.
+    private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0) {
         let from = players[victim].chest + Vec2(x: 0, y: 3)
         players[victim].loseBall()
         players[victim].hitStun = BallRules.hitStunFrames
         ball.pop(from: from)
+        ball.velocity.x = carry
         events.append(.popped(player: victim, by: popper))
     }
 
     /// The strip: the victim stunned, any ball they hold popped free, and knocked away if
     /// `knock` is given. Without stunning, only the ball pops and the knock lands.
-    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true) {
+    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0) {
         if !stun {
             // A push, not a hit: no stun and no spark, the ball let go of if held.
             let held = players[victim].hasBall
@@ -409,7 +415,7 @@ public struct Match: Equatable {
             }
             events.append(.pushed(player: victim, by: striker, ball: held))
         } else if players[victim].hasBall {
-            pop(from: victim, by: striker)
+            pop(from: victim, by: striker, carry: carry)
         } else {
             events.append(.struck(player: victim, by: striker))
         }

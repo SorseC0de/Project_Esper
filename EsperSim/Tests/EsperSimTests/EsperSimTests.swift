@@ -1805,6 +1805,24 @@ final class FootsiesTests: XCTestCase {
         XCTAssertLessThanOrEqual(match.players[0].velocity.x, 0)
     }
 
+    func testDownLetsGoOfTheWallAndTheLedge() {
+        var match = neutral()
+        match.players[0].position = Vec2(x: 30, y: 60)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { $0.players[0].state == .wallLand }
+        XCTAssertEqual(match.players[0].state, .wallLand)
+        // Down and into the wall at once: it lets go all the same.
+        run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: -0.6, y: -0.8)) })
+        XCTAssertNotEqual(match.players[0].state, .wallLand)
+        var hanging = neutral()
+        hanging.players[0].position = Vec2(x: 20, y: 20)
+        hanging.players[0].ledge = Vec2(x: 30, y: 90)
+        hanging.players[0].enter(.ledgeHang)
+        hanging.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])
+        XCTAssertEqual(hanging.players[0].state, .air, "down drops off the ledge rather than climbing")
+    }
+
     func testWalkingOffALedgeDoesNotGrabItBack() {
         var match = neutral()
         // Standing on the right block, walking off its left edge.

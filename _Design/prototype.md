@@ -109,6 +109,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   jump's somersault over 18 frames at the same pace with normal gravity and air drift, so
   the whole thing is a commitment; on the ground it's over when the swing is. Not in
   neutral.
+- Down lets go of any hang: the wall cling (unless a web line is being aimed), the ledge
+  hang, which it drops off rather than climbing, and the rim after a dunk's slam; neither
+  the wall nor the ledge can be taken again at once.
 - Throw (without ball, in neutral or on defence): the snatch. The sheet's ten frames at
   15 a second, 40 sim frames, the hand out over sheet frames 2 and 3
   (`SnatchRules.activeSheetFrames`), the third sheet frame held twice as long, when the
@@ -353,7 +356,7 @@ has played, and the round counts again after the drink. Five circles across the 
 dark purple, fill in the round winner's colour as they go, with a sixth and seventh
 added if the series gets there, and to either side of them each side's drinks with their
 levels, in its colour. What the computer drank goes up as a banner after BUCKET!!. Four points
-brings the win screen: NEW MATCH, a fresh
+brings the win screen, the final score large under who won: NEW MATCH, a fresh
 best of seven with the drinks gone, or TITLE. RESET starts the round again with the
 drinks kept.
 

@@ -250,19 +250,24 @@ final class WaitScreen: Screen {
     }
 }
 
-/// Who won, and the two ways on. `again` is NEW MATCH offline and REMATCH online, where
-/// it waits for the other side to press theirs.
+/// Who won, the final score large under it, and the two ways on. `again` is NEW MATCH
+/// offline and REMATCH online, where it waits for the other side to press theirs.
 final class WinScreen: Screen {
     private let waiting = SKSpriteNode()
 
-    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, again: String, onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
+    /// `score` is each side's, player one's first, as the match ended.
+    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, score: [Int], again: String,
+         onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        let title = TitleText.node("\(winner) WINS", size: 56)
-        title.position = CGPoint(x: 0, y: halfHeight * 0.35)
+        let title = TitleText.node("\(winner) WINS", size: 48)
+        title.position = CGPoint(x: 0, y: halfHeight * 0.55)
         addChild(title)
-        addButton(again, at: CGPoint(x: 0, y: -halfHeight * 0.1), action: onAgain)
-        addButton("TITLE", at: CGPoint(x: 0, y: -halfHeight * 0.4), sound: .menuBack, action: onTitle)
-        waiting.position = CGPoint(x: 0, y: -halfHeight * 0.25)
+        let final = TitleText.node(score.map(String.init).joined(separator: " - "), size: 80)
+        final.position = CGPoint(x: 0, y: halfHeight * 0.2)
+        addChild(final)
+        addButton(again, at: CGPoint(x: 0, y: -halfHeight * 0.2), action: onAgain)
+        addButton("TITLE", at: CGPoint(x: 0, y: -halfHeight * 0.5), sound: .menuBack, action: onTitle)
+        waiting.position = CGPoint(x: 0, y: -halfHeight * 0.35)
         waiting.isHidden = true
         addChild(waiting)
     }

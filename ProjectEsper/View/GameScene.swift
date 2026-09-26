@@ -1614,6 +1614,7 @@ final class GameScene: SKScene {
         case .won:
             let winner = gameMode == .fortySeven ? (fortySevenScores.firstIndex { $0 >= FortySevenRules.target } ?? 0) : (series.winner ?? 0)
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(winner),
+                               score: gameMode == .fortySeven ? fortySevenScores : series.wins,
                                again: online == nil ? "NEW MATCH" : "REMATCH",
                                onAgain: { [weak self] in self?.playAgain() },
                                onTitle: { [weak self] in self?.leaveToTitle() })

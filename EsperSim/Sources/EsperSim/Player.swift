@@ -720,6 +720,10 @@ public struct Player: Equatable {
             velocity = Vec2(x: 0, y: power == .webWater ? 0 : -spec.wallSlideSpeed)
             if jumpPressed {
                 wallJump(off: facing, events: &events)
+            } else if input.stick.y <= -0.5, !webAiming {
+                // Down lets go, and the wall can't be clung to again at once.
+                wallLandCooldown = spec.wallLandCooldownFrames
+                enter(.air)
             } else if wallSide == nil || (stickFacing(input) != facing && !webAiming) {
                 // Aiming a web line holds the cling whatever the stick does.
                 enter(.air)
@@ -878,7 +882,9 @@ public struct Player: Equatable {
                 catchCooldown = BallRules.catchCooldownFrames
                 events.append(.dunked(player: index))
                 action = .dunk(hoop: dunkHoop)
-            } else if stateTimer >= BallRules.dunkFrames + BallRules.dunkHangFrames {
+            } else if stateTimer >= BallRules.dunkFrames + BallRules.dunkHangFrames
+                        || stateTimer > BallRules.dunkFrames / 2 && input.stick.y <= -0.5 {
+                // Hung on the rim through the beat after, or let go with down once it's slammed.
                 enter(grounded ? .idle : .air)
             }
 
@@ -993,7 +999,12 @@ public struct Player: Equatable {
 
         case .ledgeHang:
             velocity = .zero
-            if stateTimer >= LedgeRules.hangFrames {
+            if input.stick.y <= -0.5 {
+                // Down drops off, and the ledge isn't grabbed again at once.
+                ledge = nil
+                ledgeCooldown = LedgeRules.walkOffCooldownFrames
+                enter(.air)
+            } else if stateTimer >= LedgeRules.hangFrames {
                 enter(.ledgeClimb)
             }
 

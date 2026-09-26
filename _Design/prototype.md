@@ -518,7 +518,7 @@ holds the variants; A is always the baseline as tuned.
 Two palettes, as CardCourt has: `PixelPalette` (`_Graphic Assets/Pixel_Palette.png`,
 AAP-64) for the world, `EsperPalette` for the interface. Six energy colours to pick from
 on the title, circles in its corner, the pick kept between launches (`EnergyColour`,
-`esper.energyColour`): orange #F9A31B, the default, teal #20D6C7, red #DF3E23, lime
+`esper.energyColour`): orange #FA6A0A, the default, teal #20D6C7, red #DF3E23, lime
 #9CDB43, pink #BC4A9B and blue #249FDE, all AAP-64's; the body sprite's tone is the
 colour lifted two fifths of the way to white. The loose ball's purple is #793A80; Surf
 Soda's darker bubbles and its board's tail #403353; outlines drawn in code in the world

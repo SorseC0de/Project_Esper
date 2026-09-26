@@ -406,10 +406,11 @@ public struct Stage: Equatable {
     /// 34 by 16 tiles with no ceiling: floor and walls, a backboard block each side, two cells
     /// in from the wall, with its rim on the inward face 70 units above the floor, and a
     /// one-way ledge in the middle. Player 0 starts left and scores on the right rim.
-    /// The court's rims: their height, 80 lowered by the RIM DROP slider's 7, and how far in
-    /// from each wall, 58 moved toward its block by RIM DEPTH, while they're tuned. The
+    /// The court's rims: their height, a tile under their block's top lowered by the RIM
+    /// DROP slider's 7, and how far in from each wall, 58 moved toward its block by RIM
+    /// DEPTH, while they're tuned. The rims hang off the blocks and go where they go; the
     /// dunk's hang and the hoop's art are measured from the rim, so they come with it.
-    public static let courtRimHeight = 80.0
+    public static let courtRimHeight = 90.0
     nonisolated(unsafe) public static var courtRimDrop = 7.0
     public static let courtRimInset = 58.0
     nonisolated(unsafe) public static var courtRimDepth = 0.0

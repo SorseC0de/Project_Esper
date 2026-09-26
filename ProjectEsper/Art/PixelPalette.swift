@@ -20,6 +20,7 @@ enum PixelPalette {
     static let orange: RGB = 0xFA6A0A
     static let lime: RGB = 0x9CDB43
     static let blue: RGB = 0x249FDE
+    static let gold: RGB = 0xFFD541
     static let red: RGB = 0xDF3E23
     /// The loose ball's purple.
     static let purple: RGB = 0x793A80

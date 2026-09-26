@@ -475,7 +475,7 @@ public enum StunRules {
 /// trip) before the other phone's slash start arrives, the least that still leaves a read
 /// online rather than luck.
 public enum ThrowParryRules {
-    public static let frames = 6
+    public static let frames = 10
 }
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many

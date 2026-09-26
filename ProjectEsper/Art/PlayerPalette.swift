@@ -139,7 +139,7 @@ struct Look: Hashable {
 /// The energy colours a player can pick on the title, each paired with its opposite: when
 /// two sides pick the same, the one that gives way takes the opposite.
 enum EnergyColour: String, CaseIterable {
-    case orange, teal, red, lime, pink, blue
+    case orange, teal, red, lime, pink, blue, gold
 
     /// The glow, from `PixelPalette`.
     var glow: RGB {
@@ -150,6 +150,7 @@ enum EnergyColour: String, CaseIterable {
         case .lime: PixelPalette.lime
         case .pink: PixelPalette.pink
         case .blue: PixelPalette.blue
+        case .gold: PixelPalette.gold
         }
     }
 
@@ -164,6 +165,7 @@ enum EnergyColour: String, CaseIterable {
         case .lime: .red
         case .pink: .blue
         case .blue: .pink
+        case .gold: .blue
         }
     }
 

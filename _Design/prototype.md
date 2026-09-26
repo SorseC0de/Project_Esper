@@ -335,7 +335,7 @@ well (`Player.knock`), and the pulse doesn't stun. The slash strips a body with 
 without the ball, knocking it 4 along the swing and 2 up. The snatch has no
 cooldown, as the slash has none, and meeting a live blade it's the parry: the slasher
 is the one stripped and knocked back, the blade spent, resolved before the blades so it
-always wins. The throw stance parries too, over its first six frames (`ThrowParryRules`),
+always wins. The throw stance parries too, over its first ten frames (`ThrowParryRules`),
 the body flashing white: a slash meeting it strips the slasher and the thrower keeps the
 ball. Six is two frames of online input delay and about four of a slash start still on
 its way from the other phone, the least that leaves a read online. A snatch still takes
@@ -516,10 +516,10 @@ holds the variants; A is always the baseline as tuned.
 ## Energy colours
 
 Two palettes, as CardCourt has: `PixelPalette` (`_Graphic Assets/Pixel_Palette.png`,
-AAP-64) for the world, `EsperPalette` for the interface. Six energy colours to pick from
+AAP-64) for the world, `EsperPalette` for the interface. Seven energy colours to pick from
 on the title, circles in its corner, the pick kept between launches (`EnergyColour`,
 `esper.energyColour`): orange #FA6A0A, the default, teal #20D6C7, red #DF3E23, lime
-#9CDB43, pink #BC4A9B and blue #249FDE, all AAP-64's; the body sprite's tone is the
+#9CDB43, pink #BC4A9B, blue #249FDE and gold #FFD541, all AAP-64's; the body sprite's tone is the
 colour lifted two fifths of the way to white. The loose ball's purple is #793A80; Surf
 Soda's darker bubbles and its board's tail #403353; outlines drawn in code in the world
 (the field's panels and goalposts, the opponent chevron, the round circles) #242234. The
@@ -529,7 +529,7 @@ sheets, the masks the energy colour tints, and the player sheets, whose flat col
 the body-part keys (some would merge on the palette); the players' outline is `Look`'s,
 the palette's #242234. The importer's `NOT_TONED` keeps the strike bolts,
 which the recolour took to pure white, drawn as painted. Each has an opposite: orange and teal, red
-and lime, pink and blue. Offline this phone's pick is player one and the other side teal,
+and lime, pink and blue, and gold gives way to blue. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two
 different colours can meet. Purple is left out, as it's the loose ball's.
@@ -558,7 +558,7 @@ differently, and it holds its jumps through the squat so its hops are full.
   dunk, and it only takes the stance for one inside the dunk's reach, 25, so the stance
   goes onto the rim rather than letting go as a throw. Once the other has swung twice in
   a second and a half, spam as it reads it, the next swing in reach facing it is met with
-  the throw stance's parry, held its six frames and cancelled with shoot, the ball kept.
+  the throw stance's parry, held its ten frames and cancelled with shoot, the ball kept.
 - Without the ball and the other holding it, it guards the rim they score on: it walks
   to a spot 25 in front of that rim on their side and stands facing them. It strikes,
   a dash in and the swing when the blade will reach, a hop first if they're above, when

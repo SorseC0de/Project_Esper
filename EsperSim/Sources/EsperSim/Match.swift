@@ -32,6 +32,8 @@ public struct Match: Equatable {
     public var helicopter: Helicopter?
     public var lastHelicopterHoop: Int?
     public var scores: [Int]
+    /// Rounds reset on a point; 47 plays on through its baskets.
+    public var mode = GameMode.rounds
     public var frame = 0
     /// The count before play: frames in which nobody moves or acts, at the start and after
     /// every point, and how long that is.
@@ -46,8 +48,10 @@ public struct Match: Equatable {
 
     /// `seed` drives the field's dice and, on a stage that starts held, the coin flip for
     /// who has the ball; both sides of a network match pass the same one.
-    public init(stage: Stage = .court, specs: [FighterSpec] = [.baseline, .baseline], countdown: Int = 0, seed: UInt32 = 1) {
+    public init(stage: Stage = .court, specs: [FighterSpec] = [.baseline, .baseline], countdown: Int = 0, seed: UInt32 = 1,
+                mode: GameMode = .rounds) {
         self.stage = stage
+        self.mode = mode
         players = specs.indices.map { index in
             Player(spec: specs[index], index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
         }
@@ -124,19 +128,29 @@ public struct Match: Equatable {
             ballStage.extras += stage.ballBlockers
             if let hoop = ball.step(stage: ballStage, events: &events) {
                 let owner = stage.hoops[hoop].owner
-                scores[owner] += 1
-                events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity))
-                if let other = players.indices.first(where: { $0 != owner }) {
-                    if players.contains(where: { $0.state == .dunking }) {
-                        // A dunk: the dunker hangs on the rim a beat, the ball dead, then the restart.
-                        restartIn = BallRules.dunkHangFrames
-                        restartBallTo = other
-                        ball.respawnTimer = BallRules.dunkHangFrames + 5
-                    } else {
-                        restart(ballTo: other)
+                if mode == .fortySeven {
+                    // 47: the points by where the ball left a hand, and play on, the scorer
+                    // kept off the ball a while.
+                    let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage)
+                    scores[owner] += points
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points))
+                    players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
+                    ball.launchPoint = nil
+                } else {
+                    scores[owner] += 1
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1))
+                    if let other = players.indices.first(where: { $0 != owner }) {
+                        if players.contains(where: { $0.state == .dunking }) {
+                            // A dunk: the dunker hangs on the rim a beat, the ball dead, then the restart.
+                            restartIn = BallRules.dunkHangFrames
+                            restartBallTo = other
+                            ball.respawnTimer = BallRules.dunkHangFrames + 5
+                        } else {
+                            restart(ballTo: other)
+                        }
                     }
+                    return
                 }
-                return
             }
             strikeWithThrow()
             // A thrown ball, sideways or down, against a car: a hit, fire if it's burning.
@@ -347,7 +361,7 @@ public struct Match: Equatable {
             let onTheBody = held.map { player.body.overlaps(players[$0].body) } ?? false
             let facingIt = (at.x - player.position.x) * player.facing.sign >= -1 || onTheBody
             // A burning ball is the thrower's alone.
-            let allowed = !ball.burning || ball.lastTouched == index || held != nil
+            let allowed = (!ball.burning || ball.lastTouched == index || held != nil) && (held != nil || player.pickupLockout == 0)
             if player.power == .frostTea, let other, players[other].frozen == 0, players[other].body.overlaps(reach),
                (players[other].body.center.x - player.position.x) * player.facing.sign >= -1 || players[other].body.overlaps(player.body) {
                 // Frost Tea: the body it reaches is frozen where it stands, and stripped.

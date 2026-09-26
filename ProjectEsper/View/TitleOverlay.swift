@@ -1,3 +1,4 @@
+import EsperSim
 import SwiftUI
 
 /// The game and what its scene tells the SwiftUI layer: whether the title is up, whether
@@ -9,7 +10,7 @@ final class FlowState: ObservableObject {
     let net = GameCenter()
     @Published var showsTitle = true
     @Published var veiled = false
-    var startSeries: (() -> Void)?
+    var startSeries: ((GameMode) -> Void)?
 
     init() {
         scene.flowState = self
@@ -25,6 +26,8 @@ struct TitleOverlay: View {
     @ObservedObject var net: GameCenter
     /// This phone's energy colour, kept between launches.
     @AppStorage(EnergyColour.storageKey) private var colour = EnergyColour.orange.rawValue
+    /// The mode multiplayer asks for; the host's is played.
+    @AppStorage(GameScene.onlineModeKey) private var onlineMode = Int(GameMode.rounds.rawValue)
 
     private var busy: Bool {
         switch net.state {
@@ -46,14 +49,24 @@ struct TitleOverlay: View {
                 }
             VStack(spacing: 32) {
                 Image(uiImage: TitleText.image("PROJECT ESPER", size: 56))
-                Button {
-                    SoundBoard.shared.play(SoundBoard.confirm)
-                    flow.startSeries?()
-                } label: {
-                    Image(uiImage: TitleText.image("BEST OF 7", size: 28))
+                HStack(spacing: 40) {
+                    Button {
+                        SoundBoard.shared.play(SoundBoard.confirm)
+                        flow.startSeries?(.rounds)
+                    } label: {
+                        Image(uiImage: TitleText.image("BEST OF 7", size: 28))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy)
+                    Button {
+                        SoundBoard.shared.play(SoundBoard.confirm)
+                        flow.startSeries?(.fortySeven)
+                    } label: {
+                        Image(uiImage: TitleText.image("47", size: 28))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy)
                 }
-                .buttonStyle(.plain)
-                .disabled(busy)
                 VStack(spacing: 10) {
                     Button {
                         SoundBoard.shared.play(SoundBoard.confirm)
@@ -64,6 +77,7 @@ struct TitleOverlay: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(busy)
+                    onlineModePicker
                     if let caption = net.state.caption {
                         Text(caption)
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
@@ -74,6 +88,24 @@ struct TitleOverlay: View {
         }
         .environment(\.colorScheme, .dark)
         .onAppear { net.signIn() }
+    }
+
+    /// Which mode multiplayer asks for: the two names, the picked one bright.
+    private var onlineModePicker: some View {
+        HStack(spacing: 16) {
+            ForEach(GameMode.allCases, id: \.self) { mode in
+                Button {
+                    onlineMode = Int(mode.rawValue)
+                    SoundBoard.shared.play(SoundBoard.navigate)
+                } label: {
+                    Text(mode == .rounds ? "BEST OF 7" : "47")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(onlineMode == Int(mode.rawValue) ? 1 : 0.35))
+                }
+                .buttonStyle(.plain)
+                .disabled(busy)
+            }
+        }
     }
 
     /// The energy colours as a row of circles, the picked one ringed.

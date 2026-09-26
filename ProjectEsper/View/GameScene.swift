@@ -56,6 +56,7 @@ final class GameScene: SKScene {
         var rematchRandom: UInt32?
         var theirRematch: UInt32?
         var theirColour: EnergyColour?
+        var theirMode: GameMode?
         var theirStageVote: (stagesPlayed: Int, choice: Int)?
     }
     private var online: Online?
@@ -69,6 +70,13 @@ final class GameScene: SKScene {
     private enum Flow { case title, stageSelect, playing, picking, paused, won }
     private var flow = Flow.title
     private var series = Series(seed: 1)
+    /// What the match is played to; online, the host's.
+    private var gameMode = GameMode.rounds
+    /// The mode multiplayer asks for, kept between launches.
+    static let onlineModeKey = "esper.onlineMode"
+    static var savedOnlineMode: GameMode {
+        GameMode(rawValue: UInt8(UserDefaults.standard.integer(forKey: onlineModeKey))) ?? .rounds
+    }
     private var screen: Screen?
     /// The bottles on offer while picking, kept so a re-laid-out screen shows the same.
     private var pickOffers: [Greateraid] = []
@@ -638,7 +646,7 @@ final class GameScene: SKScene {
             drinkLabels.append(label)
         }
         drawSeries()
-        flowState?.startSeries = { [weak self] in self?.startSeries() }
+        flowState?.startSeries = { [weak self] mode in self?.startSeries(mode: mode) }
         flowState?.net.onConnected = { [weak self] in self?.startOnline() }
         flowState?.net.onData = { [weak self] data in self?.handle(data) }
         flowState?.net.onDisconnect = { [weak self] why in self?.endOnline(why) }
@@ -670,6 +678,8 @@ final class GameScene: SKScene {
     /// away: the tiles or the scenery, the rims and their nets.
     private let stageGround = SKNode()
     private let stageGlowers = SKNode()
+    private let threePointArcs = SKNode()
+    private var threePointArcSides: [(node: SKShapeNode, side: Int)] = []
     /// The stage the world is drawn for, and the ball cam's scenery due a redraw.
     private var builtStage = StageChoice.wreckCenter
     private var ballCamStale = false
@@ -757,6 +767,26 @@ final class GameScene: SKScene {
             }
         }
 
+        // 47's three-point lines: the half of a circle round each rim that faces the middle,
+        // dim, glowing, in the colour of the side guarding that rim. Shown in 47 only.
+        threePointArcs.removeAllChildren()
+        threePointArcs.zPosition = -30
+        threePointArcs.isHidden = gameMode != .fortySeven
+        stageGlowers.addChild(threePointArcs)
+        for hoop in stage.hoops {
+            let radius = CGFloat(FortySevenRules.threePointRadius(for: hoop, on: stage) * SpriteLibrary.pixelsPerUnit)
+            let facingMiddle: CGFloat = hoop.backboard == .left ? 0 : .pi
+            let path = CGMutablePath()
+            path.addArc(center: .zero, radius: radius, startAngle: facingMiddle - .pi / 2, endAngle: facingMiddle + .pi / 2, clockwise: false)
+            let arc = SKShapeNode(path: path)
+            arc.position = SpriteLibrary.point(hoop.position)
+            arc.strokeColor = SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)
+            arc.lineWidth = 2
+            arc.alpha = 0.35
+            arc.blendMode = .add
+            threePointArcs.addChild(arc)
+            threePointArcSides.append((arc, 1 - hoop.owner))
+        }
         for hoop in stage.hoops {
             let rim = SKSpriteNode(texture: sprites.texture("hoop_rim", 0))
             rim.position = SpriteLibrary.point(hoop.position)
@@ -781,6 +811,7 @@ final class GameScene: SKScene {
         stageGlowers.removeAllChildren()
         courtTiles = []
         blockTiles = []
+        threePointArcSides = []
         rimNodes = []
         rimFlash = []
         netNodes = []
@@ -1161,8 +1192,9 @@ final class GameScene: SKScene {
 
     /// A new best of seven against the computer: the drinks gone, the dice rolled on,
     /// the first round.
-    private func startSeries() {
+    private func startSeries(mode: GameMode? = nil) {
         guard online == nil else { return }
+        if let mode { gameMode = mode }
         applySavedColours()
         startSeries(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
     }
@@ -1172,6 +1204,14 @@ final class GameScene: SKScene {
         pendingFlow = nil
         heldBanner = nil
         series = Series(seed: seed)
+        if gameMode == .fortySeven {
+            // 47 is the court's alone for now, straight into play.
+            series.stage = .wreckCenter
+            firstStage = .wreckCenter
+            startRound()
+            enter(.playing)
+            return
+        }
         // The port-in waits for the stage select to close.
         startRound(portingIn: false)
         session.stopAt = session.frame
@@ -1192,6 +1232,7 @@ final class GameScene: SKScene {
     /// A round: bodies with their drinks in them at their spawns, the count, and the
     /// port-in, unless a screen is to come first.
     private func startRound(portingIn: Bool = true) {
+        fortySevenScores = [0, 0]
         session = RollbackSession(match: freshMatch(), localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
         showStage()
         controls?.setOnline(online != nil)
@@ -1216,12 +1257,13 @@ final class GameScene: SKScene {
     private func freshMatch() -> Match {
         // The field's dice and coin flip come off the series' dice, the same on both phones.
         let fieldSeed = UInt32(series.dice.roll(1 << 16)) &+ 1
-        var fresh = Match(stage: series.stage.stage, specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed)
+        var fresh = Match(stage: series.stage.stage, specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed,
+                          mode: gameMode)
         for index in fresh.players.indices {
             fresh.players[index].power = series.drinks[index].power
             fresh.players[index].powerLevel = series.drinks[index].powerLevel
         }
-        if online == nil, powerVariant != .none {
+        if online == nil, powerVariant != .none, gameMode != .fortySeven {
             for index in fresh.players.indices {
                 fresh.players[index].power = powerVariant.power
                 fresh.players[index].powerLevel = powerLevelVariant.level
@@ -1417,6 +1459,21 @@ final class GameScene: SKScene {
         if online != nil, pendingFlow != nil { session.stopAt = pendingFlowFrame }
     }
 
+    /// 47's basket, confirmed on both sides: the tally, and the win at 47, the sim stopped on
+    /// the same frame online for the screen. Nothing else stops play.
+    private func fortySevenScored(by scorer: Int, points: Int, at frame: Int) {
+        guard flow == .playing, scorer < fortySevenScores.count else { return }
+        fortySevenScores[scorer] += points
+        drawSeries()
+        if fortySevenScores[scorer] >= FortySevenRules.target {
+            pendingFlow = .won
+            pendingFlowFrame = frame + GameScene.flowDelayFrames
+            if online != nil { session.stopAt = pendingFlowFrame }
+        }
+    }
+    /// 47's score as confirmed, which the screen shows.
+    private var fortySevenScores = [0, 0]
+
     private func enter(_ next: Flow) {
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
         ballCamFrame.isHidden = next != .playing
@@ -1530,7 +1587,7 @@ final class GameScene: SKScene {
                                     onResume: { [weak self] in self?.enter(.playing) })
             screen = pause
         case .won:
-            let winner = series.winner ?? 0
+            let winner = gameMode == .fortySeven ? (fortySevenScores.firstIndex { $0 >= FortySevenRules.target } ?? 0) : (series.winner ?? 0)
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(winner),
                                again: online == nil ? "NEW MATCH" : "REMATCH",
                                onAgain: { [weak self] in self?.playAgain() },
@@ -1548,6 +1605,30 @@ final class GameScene: SKScene {
     /// winner's colour as they go, a sixth and seventh added if the series gets there;
     /// and to either side of them each side's drinks, with their levels.
     private func drawSeries() {
+        threePointArcs.isHidden = gameMode != .fortySeven
+        if gameMode == .fortySeven {
+            // 47: each side's points either side of the middle, in its colour, no circles, no drinks.
+            for label in drinkLabels { label.text = "" }
+            circles.removeAllChildren()
+            circlesOverCam.removeAllChildren()
+            for (index, score) in fortySevenScores.enumerated() {
+                let label = SKLabelNode(text: "\(score)")
+                label.fontName = "Menlo-Bold"
+                label.fontSize = 18
+                label.fontColor = SKColor(rgb: sprites.look(for: index).glow)
+                label.verticalAlignmentMode = .center
+                label.horizontalAlignmentMode = index == 0 ? .right : .left
+                label.position = CGPoint(x: index == 0 ? -12 : 12, y: 0)
+                circles.addChild(label)
+            }
+            let target = SKLabelNode(text: "\(FortySevenRules.target)")
+            target.fontName = "Menlo-Bold"
+            target.fontSize = 8
+            target.fontColor = SKColor(white: 1, alpha: 0.5)
+            target.verticalAlignmentMode = .center
+            circles.addChild(target)
+            return
+        }
         for (index, label) in drinkLabels.enumerated() where index < series.drinks.count {
             let drinks = series.drinks[index]
             var lines: [String] = []
@@ -1645,6 +1726,8 @@ final class GameScene: SKScene {
                 // The host, player one, keeps their colour; the other gives way if they match.
                 let mine = EnergyColour.saved, other = online.theirColour ?? .teal
                 applyColours(online.localIndex == 0 ? EnergyColour.pair(first: mine, second: other) : EnergyColour.pair(first: other, second: mine))
+                // The host's mode is played.
+                gameMode = online.localIndex == 0 ? GameScene.savedOnlineMode : (online.theirMode ?? .rounds)
                 startSeries(seed: online.random ^ theirs)
             }
             return
@@ -1669,7 +1752,7 @@ final class GameScene: SKScene {
 
     private func sendHello(_ random: UInt32) {
         let colour = UInt8(EnergyColour.allCases.firstIndex(of: EnergyColour.saved) ?? 0)
-        send(.hello(random: random, version: NetRules.protocolVersion, colour: colour), reliable: true)
+        send(.hello(random: random, version: NetRules.protocolVersion, colour: colour, mode: GameScene.savedOnlineMode.rawValue), reliable: true)
     }
 
     // MARK: Colours
@@ -1701,6 +1784,7 @@ final class GameScene: SKScene {
         for (index, web) in swingWebs.enumerated() { web.strokeColor = SKColor(rgb: sprites.look(for: index).glow) }
         for (index, web) in shotWebs.enumerated() { web.strokeColor = SKColor(rgb: sprites.look(for: index).glow) }
         for tile in blockTiles { tile.node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: tile.side).glow)) }
+        for arc in threePointArcSides { arc.node.strokeColor = SKColor(rgb: sprites.look(for: arc.side).glow) }
         for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
         drawSeries()
     }
@@ -1712,7 +1796,7 @@ final class GameScene: SKScene {
     private func handle(_ data: Data) {
         guard online != nil, let message = NetMessage(data: data) else { return }
         switch message {
-        case .hello(let random, let version, let colour):
+        case .hello(let random, let version, let colour, let mode):
             guard version == NetRules.protocolVersion else {
                 endOnline("VERSIONS DIFFER")
                 return
@@ -1720,6 +1804,7 @@ final class GameScene: SKScene {
             if online?.theirRandom == nil {
                 online?.theirRandom = random
                 online?.theirColour = EnergyColour.allCases.indices.contains(Int(colour)) ? EnergyColour.allCases[Int(colour)] : .teal
+                online?.theirMode = GameMode(rawValue: mode) ?? .rounds
                 if let mine = online?.random { sendHello(mine) }
             }
         case .inputs(let packet):
@@ -1833,11 +1918,16 @@ final class GameScene: SKScene {
     /// The events of frames both sides' inputs have confirmed: the point.
     private func confirm(_ frames: [FrameEvents]) {
         for frameEvents in frames {
-            for case .scored(let scorer, let hoop, let entry) in frameEvents.events {
+            for case .scored(let scorer, let hoop, let entry, let points) in frameEvents.events {
                 rimFlash[hoop] = 8
                 strike(hoop: hoop, by: scorer, entry: entry)
-                showBanner("BUCKET!!", size: 48)
-                pointScored(by: scorer, at: frameEvents.frame)
+                if gameMode == .fortySeven {
+                    showBanner(points >= 3 ? "THREE!!" : "BUCKET!!", size: 48)
+                    fortySevenScored(by: scorer, points: points, at: frameEvents.frame)
+                } else {
+                    showBanner("BUCKET!!", size: 48)
+                    pointScored(by: scorer, at: frameEvents.frame)
+                }
             }
         }
     }

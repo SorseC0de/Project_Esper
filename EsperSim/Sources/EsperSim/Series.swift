@@ -69,3 +69,37 @@ public struct Series: Equatable {
         return next
     }
 }
+
+/// What a match is played to: a best of seven of rounds, a point each and a drink
+/// between, or 47, played on through its baskets, two or three points each, to 47.
+public enum GameMode: UInt8, CaseIterable {
+    case rounds, fortySeven
+}
+
+/// 47's numbers. A basket from outside the three-point line, a circle round the rim out
+/// to the middle platform's nearest edge, is three; from inside it, or a dunk, two. The
+/// scorer can't take the ball for a second after, so play goes the other way.
+public enum FortySevenRules {
+    public static let target = 47
+    public static let scorerLockoutFrames = 60
+    /// Without a one-way platform to reach, this far.
+    public static let fallbackRadius = 90.0
+
+    public static func threePointRadius(for hoop: Hoop, on stage: Stage) -> Double {
+        var nearest: Double?
+        for column in 0..<stage.columns {
+            guard (0..<stage.rows).contains(where: { stage.tile(column: column, row: $0) == .oneWay }) else { continue }
+            for edge in [Double(column) * Stage.tileSize, Double(column + 1) * Stage.tileSize] {
+                let reach = abs(edge - hoop.position.x)
+                if reach < nearest ?? .infinity { nearest = reach }
+            }
+        }
+        return nearest ?? fallbackRadius
+    }
+
+    /// Two or three for a basket through `hoop`, by where the ball left a hand.
+    public static func points(from launch: Vec2?, through hoop: Hoop, on stage: Stage) -> Int {
+        guard let launch else { return 2 }
+        return launch.distance(to: hoop.position) > threePointRadius(for: hoop, on: stage) ? 3 : 2
+    }
+}

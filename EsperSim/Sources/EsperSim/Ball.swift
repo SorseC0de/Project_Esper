@@ -47,6 +47,9 @@ public struct Ball: Equatable {
     public var resting = false
     /// Counting down to the respawn after a score, 0 when live.
     public var respawnTimer = 0
+    /// Where it last left a hand, or was knocked or swatted from: 47's three-point line
+    /// reads it.
+    public var launchPoint: Vec2?
     var previousY: Double
 
     public init(position: Vec2) {
@@ -201,6 +204,7 @@ public struct Ball: Equatable {
         shotInFlight = false
         roseThrough = nil
         lastTouched = player
+        launchPoint = position
         owned = true
         resting = false
     }
@@ -217,6 +221,7 @@ public struct Ball: Equatable {
     /// nobody's to warp to.
     public mutating func pop(from position: Vec2) {
         holder = nil
+        launchPoint = position
         self.position = position
         previousY = position.y
         velocity = Vec2(x: 0, y: BallRules.floaterSpeed)
@@ -245,9 +250,11 @@ public struct Ball: Equatable {
         steers = false
         shotInFlight = false
         lastTouched = player
+        launchPoint = position
     }
 
     public mutating func respawn(at spawn: Vec2) {
+        launchPoint = nil
         position = spawn
         previousY = spawn.y
         velocity = .zero

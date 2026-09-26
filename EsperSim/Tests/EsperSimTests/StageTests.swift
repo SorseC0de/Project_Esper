@@ -430,4 +430,36 @@ final class HighwayTests: XCTestCase {
         XCTAssertEqual(right.max.x, stage.width - Stage.tileSize, accuracy: 0.001)
         XCTAssertTrue(Stage.court.ballBlockers.isEmpty, "the court's backboards are its blocks")
     }
+
+    func testFortySevensLineReachesTheMiddlePlatform() {
+        let stage = Stage.court
+        for hoop in stage.hoops {
+            XCTAssertEqual(FortySevenRules.threePointRadius(for: hoop, on: stage), 92, accuracy: 0.001)
+        }
+        let left = stage.hoops.first { $0.backboard == .left }!
+        XCTAssertEqual(FortySevenRules.points(from: left.position + Vec2(x: 60, y: -30), through: left, on: stage), 2)
+        XCTAssertEqual(FortySevenRules.points(from: Vec2(x: 160, y: 10), through: left, on: stage), 3)
+        XCTAssertEqual(FortySevenRules.points(from: nil, through: left, on: stage), 2)
+    }
+
+    func testFortySevenPlaysOnAndKeepsTheScorerOffTheBall() {
+        var match = Match(stage: .court, mode: .fortySeven)
+        let right = match.stage.hoops.firstIndex { $0.owner == 0 }!
+        let rim = match.stage.hoops[right].position
+        // From well outside the line: dropped through the right rim, launched from mid-court.
+        match.ball.respawn(at: rim + Vec2(x: 0, y: 12))
+        match.ball.launchPoint = Vec2(x: 120, y: 10)
+        match.ball.lastTouched = 0
+        match.ball.velocity = Vec2(x: 0, y: -3)
+        var scored: Int?
+        for _ in 0..<20 where scored == nil {
+            match.advance(inputs: [.idle, .idle])
+            for case .scored(_, _, _, let points) in match.events { scored = points }
+        }
+        XCTAssertEqual(scored, 3)
+        XCTAssertEqual(match.scores, [3, 0])
+        XCTAssertEqual(match.countdown, 0, "no restart: play goes on")
+        XCTAssertGreaterThan(match.players[0].pickupLockout, 0)
+        XCTAssertFalse(match.players[0].canCatch(ballAt: match.players[0].chest), "the scorer can't take it yet")
+    }
 }

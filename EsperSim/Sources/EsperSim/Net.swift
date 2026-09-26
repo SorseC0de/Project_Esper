@@ -5,7 +5,7 @@ import Foundation
 /// most this far past the last remote input it knows, predicting it as held; and every
 /// packet carries this many of the newest inputs, so a lost packet costs nothing.
 public enum NetRules {
-    public static let protocolVersion: UInt8 = 3
+    public static let protocolVersion: UInt8 = 4
     public static let inputDelay = 2
     public static let predictionWindow = 8
     public static let redundantInputs = 8
@@ -77,8 +77,9 @@ public struct InputPacket: Equatable {
 /// reliably, once.
 public enum NetMessage: Equatable {
     /// Each side's random, at the start; the series' seed is the two together.
-    /// `colour`: the energy colour the sender picked, by its place in the app's list.
-    case hello(random: UInt32, version: UInt8, colour: UInt8 = 0)
+    /// `colour`: the energy colour the sender picked, by its place in the app's list;
+    /// `mode`: the game mode it wants, `GameMode`'s raw value. The host's mode is played.
+    case hello(random: UInt32, version: UInt8, colour: UInt8 = 0, mode: UInt8 = 0)
     case inputs(InputPacket)
     /// The scored-on side's drink for the round: its index in the offers both sides rolled.
     case pick(round: Int, choice: Int)
@@ -94,11 +95,12 @@ public enum NetMessage: Equatable {
     public var data: Data {
         var data = Data()
         switch self {
-        case .hello(let random, let version, let colour):
+        case .hello(let random, let version, let colour, let mode):
             data.append(Tag.hello.rawValue)
             data.append(version)
             data.append(uint32: random)
             data.append(colour)
+            data.append(mode)
         case .inputs(let packet):
             data.append(Tag.inputs.rawValue)
             data.append(int32: Int32(packet.frame))
@@ -132,7 +134,8 @@ public enum NetMessage: Equatable {
         switch tag {
         case .hello:
             guard bytes.count >= 6 else { return nil }
-            self = .hello(random: bytes.uint32(at: 2), version: bytes[1], colour: bytes.count >= 7 ? bytes[6] : 0)
+            self = .hello(random: bytes.uint32(at: 2), version: bytes[1], colour: bytes.count >= 7 ? bytes[6] : 0,
+                          mode: bytes.count >= 8 ? bytes[7] : 0)
         case .inputs:
             let header = 26
             guard bytes.count >= header else { return nil }

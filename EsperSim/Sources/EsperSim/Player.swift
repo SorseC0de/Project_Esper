@@ -111,6 +111,8 @@ public struct Player: Equatable {
     /// The last cardinal recorded in the throwing stance; zero throws forward.
     public var throwDirection: Vec2 = .zero
     public var catchCooldown = 0
+    /// 47: the scorer can't take the ball, by hand or snatch, until this runs out.
+    public var pickupLockout = 0
     public var wallLandCooldown = 0
     /// Frames left in which the stick doesn't steer, after a wall jump.
     public var airControlLock = 0
@@ -388,6 +390,7 @@ public struct Player: Equatable {
             }
         }
         if catchCooldown > 0 { catchCooldown -= 1 }
+        if pickupLockout > 0 { pickupLockout -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
         if webLineCooldown > 0 { webLineCooldown -= 1 }
         if swingCooldown > 0 { swingCooldown -= 1 }
@@ -1755,7 +1758,7 @@ public struct Player: Equatable {
     /// off, and so does one over the speed threshold, and a shot in flight goes through:
     /// those take the snatch.
     public func canCatch(ballAt ballPosition: Vec2, speed: Double = 0, shotInFlight: Bool = false) -> Bool {
-        guard !holding, catchCooldown == 0, hitStun == 0, frozen == 0, state.canCatch else { return false }
+        guard !holding, catchCooldown == 0, pickupLockout == 0, hitStun == 0, frozen == 0, state.canCatch else { return false }
         guard speed <= BallRules.catchSpeedThreshold, !shotInFlight else { return false }
         if ballPosition.distance(to: handCatchPoint) <= BallRules.handCatchRadius { return true }
         let offset = ballPosition - chest

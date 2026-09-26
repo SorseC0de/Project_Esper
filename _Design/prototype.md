@@ -378,6 +378,23 @@ Title lettering is `TitleText`: CardCourt's TwoXMark by another route, Avenir Ne
 Condensed Heavy, white over light blue split at the capitals' middle, a black outline
 walked round a ring, a black drop to the south-east, drawn into a texture per string.
 
+## 47
+
+A second mode (`GameMode.fortySeven`), on The Wreck Center only for now, no stage
+select, no drinks and no powers. The title has 47 beside BEST OF 7. A basket doesn't
+reset anything: the points go up and play goes on, the scorer unable to take the ball,
+by hand or by snatch, for 60 frames (`pickupLockout`), so it goes the other way. A
+basket is three from outside the three-point line, two from inside it or off a dunk,
+judged by where the ball last left a hand, or was knocked or swatted from
+(`Ball.launchPoint`). The line is a circle round each rim reaching the middle
+platform's nearest edge (92 units on the court, `FortySevenRules.threePointRadius`);
+the half facing the middle is drawn behind everything, dim and glowing, in the colour
+of the side guarding that rim. THREE!! goes up for three, BUCKET!! for two. Each side's
+points sit either side of a small 47 at the top, in its colour, in place of the round
+circles. The first to 47 wins, on the same win screen. RESET, and RESTART MATCH, start
+it again from nothing. Online, the host's mode is played: MULTIPLAYER has BEST OF 7 and
+47 under it, the pick kept between launches and sent in hello.
+
 ## Greateraid
 
 The drinks between rounds, in `Greateraid.swift`. Three bottles an offer, the user's
@@ -790,9 +807,10 @@ both rolled off the shared dice. The pick is applied once every frame before the
 confirmed, as a change outside the inputs (`RollbackSession.mutate`), then both resume.
 Twenty seconds to pick, or the raised bottle drinks itself. The seed is the two phones'
 randoms together, exchanged in hello; the side whose Game Center player ID sorts first
-plays the left. A stage vote or pick crosses as the stage's raw value with the count of
+plays the left. The hello also carries the mode each side wants (`NetMessage.hello`'s `mode`);
+the host's is played. A stage vote or pick crosses as the stage's raw value with the count of
 stages played, and goes in, like a drink, only once every frame before the stop is
-confirmed; a coin flip rolls on the shared dice, so both land the same. Protocol version 3. MULTIPLAYER opens Apple's matchmaker sheet for two, invites or
+confirmed; a coin flip rolls on the shared dice, so both land the same. Protocol version 4. MULTIPLAYER opens Apple's matchmaker sheet for two, invites or
 automatch; it fails at once until the app's record in App Store Connect has Game
 Center on. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
 or a bye puts the title up with why under MULTIPLAYER. No computer, no reset, no

@@ -650,7 +650,7 @@ final class BallTests: XCTestCase {
             match.advance(inputs: [.idle, .idle])
         }
         XCTAssertEqual(match.scores, [1, 0])
-        XCTAssertTrue(match.events.contains { if case .scored(player: 0, hoop: 1, _) = $0 { return true } else { return false } })
+        XCTAssertTrue(match.events.contains { if case .scored(player: 0, hoop: 1, _, _) = $0 { return true } else { return false } })
         XCTAssertEqual(match.ball.holder, 1)
         XCTAssertTrue(match.players[1].hasBall)
         XCTAssertEqual(match.players[0].position, match.stage.playerSpawns[0])

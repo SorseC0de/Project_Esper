@@ -789,6 +789,7 @@ final class GameScene: SKScene {
         builtStage = series.stage
         ballCamStale = true
         cameraBase = .zero
+        cameraZone = nil
         layout(displayScale: displayScale)
     }
 
@@ -1185,6 +1186,8 @@ final class GameScene: SKScene {
 
     /// The view's hold on the last round let go: the computer, the rim flashes, the ball's colour.
     private func freshRoundView() {
+        // The camera picks up the zone the local player starts in.
+        cameraZone = nil
         opponent = Opponent(index: 1)
         rimFlash = rimFlash.map { _ in 0 }
         ballTeam = SKColor(rgb: BallLook.neutral)
@@ -2305,17 +2308,32 @@ final class GameScene: SKScene {
 
     /// Where the field's camera wants to be: the local player, led by where they're heading,
     /// kept inside the field's ends.
+    /// The field's camera, zonal as Mega Man's and Nidhogg's: the field in zones a court
+    /// wide, the camera on one zone's centre, held inside the field's ends. Within the
+    /// buffer of the screen's edge the local player sends it on to the next zone, if its
+    /// centre is the nearer of the two, so it never flips back and forth at the line.
+    private var cameraZone: Int?
     private func cameraTargetX() -> CGFloat {
         guard match.players.indices.contains(localIndex) else { return cameraBase.x }
-        let player = match.players[localIndex]
-        let lead = CGFloat(player.velocity.x) * GameScene.cameraLeadFrames * CGFloat(SpriteLibrary.pixelsPerUnit)
-        let wanted = SpriteLibrary.point(player.position).x + lead
+        let feet = SpriteLibrary.point(match.players[localIndex].position).x
         let halfView = size.width * cameraNode.xScale / 2
         let width = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
-        return min(max(wanted, halfView), max(width - halfView, halfView))
+        let zoneWidth = CGFloat(Stage.court.columns) * GameScene.pixelsPerTile
+        let zones = max(Int((width / zoneWidth).rounded()), 1)
+        func centre(_ zone: Int) -> CGFloat { min(max((CGFloat(zone) + 0.5) * zoneWidth, halfView), max(width - halfView, halfView)) }
+        guard let zone = cameraZone else {
+            let start = min(max(Int(feet / zoneWidth), 0), zones - 1)
+            cameraZone = start
+            return centre(start)
+        }
+        let buffer = CameraTuning.zoneBufferTiles * GameScene.pixelsPerTile
+        var next = zone
+        if feet > centre(zone) + halfView - buffer, zone < zones - 1 { next = zone + 1 }
+        if feet < centre(zone) - halfView + buffer, zone > 0 { next = zone - 1 }
+        if next != zone, abs(feet - centre(next)) < abs(feet - centre(zone)) { cameraZone = next }
+        return centre(cameraZone ?? zone)
     }
     private static let cameraEase: CGFloat = 0.08
-    private static let cameraLeadFrames: CGFloat = 20
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
 
@@ -3465,7 +3483,7 @@ final class GameScene: SKScene {
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
         ballNode.color = colour
         ballHalo.color = colour
-        // The field's camera: level, gliding after the local player and leading them.
+        // The field's camera: level, sliding from zone to zone.
         if match.stage.features.look == .footballField {
             cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase
         }

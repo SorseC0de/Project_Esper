@@ -644,8 +644,12 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   solid to the ball, a 4 by 20 unit box (`FieldRules.backboardOffset`, `ballBlockers`).
   Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
   in the maker's energy.
-- The camera scrolls sideways only: level, gliding after the local player a share of the
-  way each frame and leading them by where they're heading, stopped at the field's ends.
+- The camera is zonal, as Mega Man's and Nidhogg's: the field in seven zones a court wide,
+  the camera level on one zone's centre, held inside the field's ends. Within
+  `CameraTuning.zoneBufferTiles` (3) of the screen's edge the local player sends it
+  sliding to the next zone, eased a share of the way each frame, if that zone's centre is
+  the nearer, so it never flips back at the line; each round it picks up the zone the
+  local player starts in.
   The view takes in the stage's height and the turf below the floor. When the ball is off
   the screen sideways, its chevrons sit at that edge at its height, pointing at it. All of
   it is the view; the sim never sees the camera, so it's safe online.

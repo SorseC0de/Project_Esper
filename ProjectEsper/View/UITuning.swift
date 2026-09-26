@@ -41,7 +41,8 @@ final class UITuning: ObservableObject {
     }
 
     func nudge(_ screen: UIScreenKind, _ part: UIPart, by steps: Int) {
-        let value = max(0.25, min(5, (scale(screen, part) + CGFloat(steps) * UITuning.step) * 100).rounded() / 100)
+        let stepped = ((scale(screen, part) + CGFloat(steps) * UITuning.step) * 100).rounded() / 100
+        let value = min(max(stepped, 0.25), 5)
         UserDefaults.standard.set(Double(value), forKey: UITuning.key(screen, part))
         revision += 1
     }

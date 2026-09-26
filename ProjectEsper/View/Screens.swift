@@ -202,37 +202,42 @@ final class PickScreen: Screen {
         self.offers = offers
         self.drinks = drinks
         self.onDrink = onDrink
-        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        let header = TitleText.node("GREATERAID", size: 60)
-        header.position = CGPoint(x: 0, y: halfHeight - 44)
-        addChild(header)
-        let sub = SKLabelNode(text: "You were scored on. Drink up.")
-        sub.fontName = "Menlo-Bold"
-        sub.fontSize = 11
-        sub.fontColor = SKColor(white: 1, alpha: 0.7)
-        sub.position = CGPoint(x: 0, y: halfHeight - 82)
+        super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pick)
+        addHeader("GREATERAID", size: 44, at: CGPoint(x: 0, y: halfHeight * 0.74), width: 360)
+        let sub = TitleText.node("YOU WERE SCORED ON. DRINK UP.", size: 13 * tuned(.text))
+        sub.position = CGPoint(x: 0, y: halfHeight * 0.5)
         addChild(sub)
         if timed {
-            clock.position = CGPoint(x: halfWidth - 60, y: halfHeight - 50)
+            // The seconds in a black round button, top right.
+            let dial = UIPiece.circleBlack.node(size: CGSize(width: 52, height: 56).scaled(by: tuned(.buttons)), corners: tuned(.buttons))
+            dial.position = CGPoint(x: halfWidth - 50, y: halfHeight * 0.74)
+            dial.zPosition = -1
+            addChild(dial)
+            clock.position = CGPoint(x: dial.position.x, y: dial.position.y + UIPiece.circleBlack.faceRise * tuned(.buttons))
             addChild(clock)
             showSeconds(Series.pickSeconds)
         }
+        // The quote and what the raised drink does, on a black plate over the bottles.
+        let plate = UIPiece.plateBlack.node(size: CGSize(width: min(halfWidth * 1.7, 620), height: 86).scaled(by: tuned(.panels)), corners: tuned(.panels))
+        plate.position = CGPoint(x: 0, y: 28)
+        plate.zPosition = 1
+        addChild(plate)
 
         let spacing = min(halfWidth * 0.55, 200)
         for (index, offer) in offers.enumerated() {
             let x = (CGFloat(index) - 1) * spacing
-            let bottle = PickScreen.bottle(for: offer, colour: colour)
+            let bottle = PickScreen.bottle(for: offer, colour: colour, height: 180 * tuned(.buttons))
             // Leaning between 5 and 30 degrees, either way; the bottom clipped by the screen's edge.
             let lean = CGFloat(5 + Int.random(in: 0...15)) * .pi / 180 * (Bool.random() ? 1 : -1)
             bottle.zRotation = lean
             bottle.position = CGPoint(x: x, y: -halfHeight - 24)
             addChild(bottle)
-            let name = TitleText.node(offer.name.uppercased(), size: offer.name.count > 14 ? 21 : 23)
+            let name = TitleText.node(offer.name.uppercased(), size: (offer.name.count > 14 ? 21 : 23) * tuned(.text))
             name.position = CGPoint(x: x, y: -halfHeight + 84)
             name.zPosition = 2
             addChild(name)
             if drinks.isSecondSip(offer) {
-                let sip = TitleText.node("(Second Sip)", size: 20, italic: true)
+                let sip = TitleText.node("(Second Sip)", size: 20 * tuned(.text), italic: true)
                 sip.position = CGPoint(x: x, y: -halfHeight + 68)
                 sip.zPosition = 2
                 addChild(sip)
@@ -245,8 +250,10 @@ final class PickScreen: Screen {
             }
         }
         comment.position = CGPoint(x: 0, y: 44)
+        comment.zPosition = 2
         addChild(comment)
         blurb.position = CGPoint(x: 0, y: 14)
+        blurb.zPosition = 2
         addChild(blurb)
         moved()
     }
@@ -258,22 +265,22 @@ final class PickScreen: Screen {
     /// The seconds left on the pick.
     func showSeconds(_ seconds: Int) {
         guard clock.parent != nil else { return }
-        TitleText.set(clock, to: "\(max(seconds, 0))", size: 32)
+        TitleText.set(clock, to: "\(max(seconds, 0))", size: 24 * tuned(.text))
     }
 
     override func moved() {
         guard choices.indices.contains(cursor) else { return }
         let offer = offers[cursor]
         let text = drinks.level(of: offer) == 0 ? offer.blurbs.first : offer.blurbs.second
-        TitleText.set(blurb, to: text, size: text.count > 70 ? 23 : (text.count > 50 ? 26 : 30))
-        TitleText.set(comment, to: "\u{201C}\(offer.comment)\u{201D}", size: 25, italic: true)
+        let scale = tuned(.text)
+        TitleText.set(blurb, to: text, size: (text.count > 70 ? 17 : (text.count > 50 ? 19 : 22)) * scale)
+        TitleText.set(comment, to: "\u{201C}\(offer.comment)\u{201D}", size: 18 * scale, italic: true)
     }
 
     /// The bottle, the user's vector from the catalog, 180 points tall and anchored at its
     /// bottom so that runs off the screen: blue for a booster, gold for a biomorph or
     /// Bio-Boba.
-    static func bottle(for drink: Greateraid, colour: SKColor) -> SKNode {
-        let height: CGFloat = 180
+    static func bottle(for drink: Greateraid, colour: SKColor, height: CGFloat = 180) -> SKNode {
         let texture = SKTexture(imageNamed: drink.kind == .booster ? "Greateraid" : "Greateraid-Gold")
         let aspect = texture.size().width / max(texture.size().height, 1)
         let bottle = SKSpriteNode(texture: texture)
@@ -288,14 +295,16 @@ final class WaitScreen: Screen {
     private let clock = SKSpriteNode()
 
     init(halfWidth: CGFloat, halfHeight: CGFloat, who: String) {
-        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        let header = TitleText.node("GREATERAID", size: 40)
-        header.position = CGPoint(x: 0, y: halfHeight - 44)
-        addChild(header)
-        let sub = TitleText.node("\(who) IS DRINKING", size: 26)
+        super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pick)
+        addHeader("GREATERAID", size: 38, at: CGPoint(x: 0, y: halfHeight * 0.62), width: 320)
+        let sub = TitleText.node("\(who) IS DRINKING", size: 26 * tuned(.titles))
         sub.position = CGPoint(x: 0, y: 10)
         addChild(sub)
-        clock.position = CGPoint(x: 0, y: -50)
+        let dial = UIPiece.circleBlack.node(size: CGSize(width: 64, height: 69).scaled(by: tuned(.buttons)), corners: tuned(.buttons))
+        dial.position = CGPoint(x: 0, y: -60)
+        dial.zPosition = -1
+        addChild(dial)
+        clock.position = CGPoint(x: 0, y: dial.position.y + UIPiece.circleBlack.faceRise * tuned(.buttons))
         addChild(clock)
         showSeconds(Series.pickSeconds)
     }
@@ -303,7 +312,7 @@ final class WaitScreen: Screen {
     required init?(coder: NSCoder) { fatalError() }
 
     func showSeconds(_ seconds: Int) {
-        TitleText.set(clock, to: "\(max(seconds, 0))", size: 32)
+        TitleText.set(clock, to: "\(max(seconds, 0))", size: 28 * tuned(.text))
     }
 }
 
@@ -344,7 +353,10 @@ final class WinScreen: Screen {
 /// voter shows only once their pick is in. Two different picks flip a coin between them,
 /// the light going back and forth before it lands.
 final class StageSelectScreen: Screen {
-    private var tiles: [SKShapeNode] = []
+    /// Each stage: its plate, royal blue or gold when raised, in a container that grows.
+    private var tiles: [SKNode] = []
+    private var tilePlates: [SKSpriteNode] = []
+    private var tileSize = CGSize.zero
     private var cursors: [Int: Int] = [:]
     private var picks: [Int: Int] = [:]
     private var marks: [Int: SKShapeNode] = [:]
@@ -362,28 +374,33 @@ final class StageSelectScreen: Screen {
         self.localVoters = localVoters
         self.colours = colours
         self.onPick = onPick
-        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
-        let header = TitleText.node("STAGE SELECT", size: 44)
-        header.position = CGPoint(x: 0, y: halfHeight - 44)
-        addChild(header)
+        super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .stageSelect)
+        addHeader("STAGE SELECT", size: 38, at: CGPoint(x: 0, y: halfHeight * 0.7), width: 360)
         if let heading {
-            let sub = TitleText.node(heading, size: 22)
-            sub.position = CGPoint(x: 0, y: halfHeight - 80)
+            let sub = TitleText.node(heading, size: 22 * tuned(.titles))
+            sub.position = CGPoint(x: 0, y: halfHeight * 0.44)
             addChild(sub)
         }
-        let width = min(halfWidth * 0.56, 180), height: CGFloat = 96
+        let buttons = tuned(.buttons)
+        let width = min(halfWidth * 0.56, 180 * buttons)
+        tileSize = CGSize(width: width, height: 96 * buttons)
         let spacing = width + 20
+        let rise = UITuning.shared.textRise
         for (index, name) in stages.enumerated() {
-            let tile = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 8)
-            tile.position = CGPoint(x: (CGFloat(index) - CGFloat(stages.count - 1) / 2) * spacing, y: -12)
-            tile.fillColor = SKColor(white: 1, alpha: 0.08)
-            tile.strokeColor = SKColor(white: 1, alpha: 0.7)
-            tile.lineWidth = 2
-            let label = TitleText.node(name, size: 20)
-            label.setScale(min(1, (width - 16) / max(label.size.width, 1)))
+            let tile = SKNode()
+            tile.position = CGPoint(x: (CGFloat(index) - CGFloat(stages.count - 1) / 2) * spacing, y: -halfHeight * 0.1)
+            let plate = UIPiece.buttonBlue.node(size: tileSize, corners: buttons)
+            plate.zPosition = -1
+            tile.addChild(plate)
+            let textSize = 20 * tuned(.text)
+            let label = TitleText.node(name, size: textSize)
+            label.setScale(min(1, (width - 20) / max(label.size.width, 1)))
+            let shift = TitleText.dropShift(size: textSize) * rise
+            label.position = CGPoint(x: -shift, y: UIPiece.buttonBlue.faceRise * buttons * rise + shift)
             tile.addChild(label)
             addChild(tile)
             tiles.append(tile)
+            tilePlates.append(plate)
         }
         for voter in localVoters { cursors[voter] = min(max(start, 0), stages.count - 1) }
         for voter in voters {
@@ -439,7 +456,7 @@ final class StageSelectScreen: Screen {
     /// A tap on a stage moves the first local voter's cursor there, or picks it if it's there already.
     override func tap(at point: CGPoint) -> Bool {
         guard let voter = localVoters.first,
-              let index = tiles.firstIndex(where: { $0.frame.contains(point) }) else { return false }
+              let index = tiles.firstIndex(where: { $0.calculateAccumulatedFrame().contains(point) }) else { return false }
         if cursors[voter] == index {
             lock(voter: voter)
         } else if picks[voter] == nil {
@@ -453,8 +470,9 @@ final class StageSelectScreen: Screen {
     private func refresh() {
         let raised: Set<Int> = flipLit.map { [$0] } ?? Set(voters.compactMap { picks[$0] ?? cursors[$0] })
         for (index, tile) in tiles.enumerated() {
-            tile.setScale(raised.contains(index) ? 1.12 : 1)
-            tile.fillColor = SKColor(white: 1, alpha: raised.contains(index) ? 0.18 : 0.08)
+            let lit = raised.contains(index)
+            tile.setScale(lit ? 1.12 : 1)
+            (lit ? UIPiece.buttonGold : UIPiece.buttonBlue).fit(tilePlates[index], to: tileSize, corners: tuned(.buttons))
         }
         // Each voter's circle in the bottom-right corner of their stage, the second beside the first.
         var taken: [Int: Int] = [:]
@@ -465,7 +483,7 @@ final class StageSelectScreen: Screen {
                 continue
             }
             let tile = tiles[index]
-            let frame = tile.frame
+            let frame = tile.calculateAccumulatedFrame()
             let order = taken[index, default: 0]
             taken[index] = order + 1
             let radius = StageSelectScreen.markRadius
@@ -492,4 +510,8 @@ final class PauseScreen: Screen {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+}
+
+extension CGSize {
+    func scaled(by factor: CGFloat) -> CGSize { CGSize(width: width * factor, height: height * factor) }
 }

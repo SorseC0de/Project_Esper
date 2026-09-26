@@ -8,29 +8,62 @@ final class TouchControls: SKNode {
     static let stickRadius = 40.0
     static let flickRadius = 32.0
 
+    /// A round button: its circle, invisible, for the touch; the pack's round button over
+    /// it, gold while it's held; and its name in title lettering on the face.
     private struct Button {
         let node: SKShapeNode
-        let label: SKLabelNode
+        let plate: SKSpriteNode
+        let piece: UIPiece
+        let label: SKSpriteNode
+        var text: String
         let radius: CGFloat
-        let set: (inout PlayerInput, Bool, Vec2) -> Void
     }
+    private var buttonSets: [(inout PlayerInput, Bool, Vec2) -> Void] = []
+
+    /// The touch pad's tuned sizes (`UITuning`, TOUCH).
+    private static var scale: CGFloat { UITuning.shared.scale(.touch, .buttons) }
+    private static var textScale: CGFloat { UITuning.shared.scale(.touch, .text) }
 
     private var buttons: [Button] = []
-    private let stickBase = SKShapeNode(circleOfRadius: stickRadius)
-    private let stickKnob = SKShapeNode(circleOfRadius: 14)
-    private let resetButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
-    private let hitboxButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
-    private let aiButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
-    private let pauseButton = SKShapeNode(rectOf: CGSize(width: 46, height: 16), cornerRadius: 4)
+    private let stickBase = UIPiece.circleBlack.node(size: CGSize(width: stickRadius * 2, height: stickRadius * 2 * 117 / 109))
+    private let stickKnob = UIPiece.circleBlue.node(size: CGSize(width: 30, height: 32))
+    /// The corner switches: an invisible rect for the touch, a black plate on it, plum when on.
+    private let resetButton = TouchControls.cornerButton("RESET")
+    private let hitboxButton = TouchControls.cornerButton("HITBOX")
+    private let aiButton = TouchControls.cornerButton("AI")
+    private let pauseButton = TouchControls.cornerButton("PAUSE")
+
+    private static let cornerSize = CGSize(width: 50, height: 22)
+
+    private static func cornerButton(_ text: String) -> SKShapeNode {
+        let size = cornerSize.scaled(by: scale)
+        let node = SKShapeNode(rectOf: size, cornerRadius: 4)
+        node.fillColor = .clear
+        node.strokeColor = .clear
+        let plate = UIPiece.buttonBlack.node(size: size, corners: scale * 0.5)
+        plate.name = "plate"
+        plate.zPosition = -1
+        node.addChild(plate)
+        let label = TitleText.node(text, size: 9 * textScale)
+        label.position = CGPoint(x: 0, y: UIPiece.buttonBlack.faceRise * scale * 0.5)
+        node.addChild(label)
+        return node
+    }
+
+    /// A corner switch on or off: plum when on, black when off.
+    private static func light(_ button: SKShapeNode, on: Bool) {
+        guard let plate = button.childNode(withName: "plate") as? SKSpriteNode else { return }
+        (on ? UIPiece.buttonPlum : UIPiece.buttonBlack).fit(plate, to: cornerSize.scaled(by: scale), corners: scale * 0.5)
+    }
     /// The PAUSE button, offline only.
     var onPause: (() -> Void)?
     /// Called when the corner button is tapped.
     var onReset: (() -> Void)?
     /// The HITBOX toggle beside it: whether the sim's boxes are drawn, and who to tell.
-    var showHitboxes = false { didSet { hitboxButton.fillColor = .init(white: 1, alpha: showHitboxes ? 0.4 : 0.1) } }
+    var showHitboxes = false { didSet { TouchControls.light(hitboxButton, on: showHitboxes) } }
     var onToggleHitboxes: ((Bool) -> Void)?
     /// The AI switch beside that: whether the computer plays the other side.
-    var aiOn = true { didSet { aiButton.fillColor = .init(white: 1, alpha: aiOn ? 0.4 : 0.1) } }
+    var aiOn = true { didSet { TouchControls.light(aiButton, on: aiOn) } }
     var onToggleAI: ((Bool) -> Void)?
     private var pickers: [SegmentedPicker] = []
     private let pickerOrigin: CGPoint
@@ -59,77 +92,36 @@ final class TouchControls: SKNode {
         super.init()
         zPosition = 100
 
-        stickBase.strokeColor = .init(white: 1, alpha: 0.3)
-        stickBase.fillColor = .init(white: 1, alpha: 0.08)
-        stickBase.lineWidth = 1
+        stickBase.alpha = 0.55
         stickBase.isHidden = true
-        stickKnob.fillColor = .init(white: 1, alpha: 0.5)
-        stickKnob.strokeColor = .clear
+        stickKnob.alpha = 0.85
         stickKnob.isHidden = true
         addChild(stickBase)
         addChild(stickKnob)
 
-        // Shoot and jump side by side, throw below and between them.
-        let jump = makeButton("JUMP", radius: 30, at: CGPoint(x: right - 38, y: bottom + 84)) { input, down, _ in
+        // Shoot and jump side by side, throw below and between them, all at the tuned size.
+        let k = TouchControls.scale
+        let jump = makeButton("JUMP", piece: .circleBlue, radius: 30 * k, at: CGPoint(x: right - 38 * k, y: bottom + 84 * k)) { input, down, _ in
             input.jump = down
         }
-        let shoot = makeButton("SHOOT", radius: 30, at: CGPoint(x: right - 114, y: bottom + 84)) { input, down, aim in
+        let shoot = makeButton("SHOOT", piece: .circlePlum, radius: 30 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", radius: 24, at: CGPoint(x: right - 76, y: bottom + 26)) { input, down, aim in
+        let throwButton = makeButton("THROW", piece: .circleBlack, radius: 24 * k, at: CGPoint(x: right - 76 * k, y: bottom + 26 * k)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }
-        buttons = [jump, shoot, throwButton]
+        buttons = [jump.button, shoot.button, throwButton.button]
+        buttonSets = [jump.set, shoot.set, throwButton.set]
 
-        resetButton.position = CGPoint(x: right - 23, y: top - 8)
-        resetButton.fillColor = .init(white: 1, alpha: 0.1)
-        resetButton.strokeColor = .init(white: 1, alpha: 0.4)
-        resetButton.lineWidth = 1
-        let resetText = SKLabelNode(text: "RESET")
-        resetText.fontName = "Menlo-Bold"
-        resetText.fontSize = 8
-        resetText.verticalAlignmentMode = .center
-        resetText.fontColor = .init(white: 1, alpha: 0.8)
-        resetButton.addChild(resetText)
-        addChild(resetButton)
-
-        hitboxButton.position = CGPoint(x: right - 75, y: top - 8)
-        hitboxButton.fillColor = .init(white: 1, alpha: 0.1)
-        hitboxButton.strokeColor = .init(white: 1, alpha: 0.4)
-        hitboxButton.lineWidth = 1
-        let hitboxText = SKLabelNode(text: "HITBOX")
-        hitboxText.fontName = "Menlo-Bold"
-        hitboxText.fontSize = 8
-        hitboxText.verticalAlignmentMode = .center
-        hitboxText.fontColor = .init(white: 1, alpha: 0.8)
-        hitboxButton.addChild(hitboxText)
-        addChild(hitboxButton)
-
-        aiButton.position = CGPoint(x: right - 127, y: top - 8)
-        aiButton.fillColor = .init(white: 1, alpha: 0.4)
-        aiButton.strokeColor = .init(white: 1, alpha: 0.4)
-        aiButton.lineWidth = 1
-        let aiText = SKLabelNode(text: "AI")
-        aiText.fontName = "Menlo-Bold"
-        aiText.fontSize = 8
-        aiText.verticalAlignmentMode = .center
-        aiText.fontColor = .init(white: 1, alpha: 0.8)
-        aiButton.addChild(aiText)
-        addChild(aiButton)
-
-        pauseButton.position = CGPoint(x: right - 179, y: top - 8)
-        pauseButton.fillColor = .init(white: 1, alpha: 0.1)
-        pauseButton.strokeColor = .init(white: 1, alpha: 0.4)
-        pauseButton.lineWidth = 1
-        let pauseText = SKLabelNode(text: "PAUSE")
-        pauseText.fontName = "Menlo-Bold"
-        pauseText.fontSize = 8
-        pauseText.verticalAlignmentMode = .center
-        pauseText.fontColor = .init(white: 1, alpha: 0.8)
-        pauseButton.addChild(pauseText)
-        addChild(pauseButton)
+        // The corner switches in a row along the top, right to left.
+        let step = (TouchControls.cornerSize.width + 6) * k
+        for (index, button) in [resetButton, hitboxButton, aiButton, pauseButton].enumerated() {
+            button.position = CGPoint(x: right - TouchControls.cornerSize.width * k / 2 - CGFloat(index) * step, y: top - TouchControls.cornerSize.height * k / 2)
+            addChild(button)
+        }
+        TouchControls.light(aiButton, on: aiOn)
     }
 
     /// Online there's no reset, no pause, no computer and no tuning: only the pad and HITBOX.
@@ -143,28 +135,37 @@ final class TouchControls: SKNode {
 
     /// The buttons' names, for what they'd do right now.
     func setLabels(jump: String, shoot: String, throwBall: String) {
-        for (button, text) in zip(buttons, [jump, shoot, throwBall]) where button.label.text != text {
-            button.label.text = text
+        for (index, text) in [jump, shoot, throwBall].enumerated() where buttons.indices.contains(index) && buttons[index].text != text {
+            buttons[index].text = text
+            TitleText.set(buttons[index].label, to: text, size: 10 * TouchControls.textScale)
         }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private func makeButton(_ label: String, radius: CGFloat, at point: CGPoint,
-                            set: @escaping (inout PlayerInput, Bool, Vec2) -> Void) -> Button {
+    private func makeButton(_ label: String, piece: UIPiece, radius: CGFloat, at point: CGPoint,
+                            set: @escaping (inout PlayerInput, Bool, Vec2) -> Void) -> (button: Button, set: (inout PlayerInput, Bool, Vec2) -> Void) {
         let node = SKShapeNode(circleOfRadius: radius)
         node.position = point
-        node.fillColor = .init(white: 1, alpha: 0.1)
-        node.strokeColor = .init(white: 1, alpha: 0.4)
-        node.lineWidth = 1
-        let text = SKLabelNode(text: label)
-        text.fontName = "Menlo-Bold"
-        text.fontSize = 9
-        text.verticalAlignmentMode = .center
-        text.fontColor = .init(white: 1, alpha: 0.8)
+        node.fillColor = .clear
+        node.strokeColor = .clear
+        let corners = radius * 2 / (109 * UIPiece.pointsPerPixel)
+        let plate = piece.node(size: CGSize(width: radius * 2, height: radius * 2 * 117 / 109), corners: corners)
+        plate.alpha = 0.9
+        plate.zPosition = -1
+        node.addChild(plate)
+        let text = TitleText.node(label, size: 10 * TouchControls.textScale)
+        text.position = CGPoint(x: 0, y: piece.faceRise * corners)
         node.addChild(text)
         addChild(node)
-        return Button(node: node, label: text, radius: radius, set: set)
+        return (Button(node: node, plate: plate, piece: piece, label: text, text: label, radius: radius), set)
+    }
+
+    /// A round button held or let go: gold while held.
+    private func press(_ index: Int, down: Bool) {
+        let button = buttons[index]
+        let corners = button.radius * 2 / (109 * UIPiece.pointsPerPixel)
+        (down ? UIPiece.circleGold : button.piece).fit(button.plate, to: CGSize(width: button.radius * 2, height: button.radius * 2 * 117 / 109), corners: corners)
     }
 
     /// The controls as the sim should see them this frame: what's held, plus anything that
@@ -253,11 +254,10 @@ final class TouchControls: SKNode {
             .filter { $0.distance <= buttons[$0.index].radius + 8 }
             .min { $0.distance < $1.distance }
         if let reach {
-            let button = buttons[reach.index]
             buttonTouches[touch] = (reach.index, point)
-            button.node.fillColor = .init(white: 1, alpha: 0.4)
-            button.set(&input, true, .zero)
-            button.set(&latched, true, .zero)
+            press(reach.index, down: true)
+            buttonSets[reach.index](&input, true, .zero)
+            buttonSets[reach.index](&latched, true, .zero)
         }
     }
 
@@ -277,7 +277,7 @@ final class TouchControls: SKNode {
         if let held = buttonTouches[touch] {
             let aim = Vec2(x: (point.x - held.origin.x) / TouchControls.flickRadius,
                            y: (point.y - held.origin.y) / TouchControls.flickRadius).clamped(to: 1)
-            buttons[held.index].set(&input, true, aim)
+            buttonSets[held.index](&input, true, aim)
             if aim.length >= BallRules.flickThreshold { latched.aim = aim }
         }
     }
@@ -292,8 +292,8 @@ final class TouchControls: SKNode {
             return
         }
         if let held = buttonTouches.removeValue(forKey: touch) {
-            buttons[held.index].node.fillColor = .init(white: 1, alpha: 0.1)
-            buttons[held.index].set(&input, false, .zero)
+            press(held.index, down: false)
+            buttonSets[held.index](&input, false, .zero)
             if buttonTouches.isEmpty { input.aim = .zero }
         }
     }

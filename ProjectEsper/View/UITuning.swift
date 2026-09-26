@@ -17,7 +17,18 @@ enum UIPlatform: String {
 
 /// The screens whose sizes are tuned, and what in them scales.
 enum UIScreenKind: String, CaseIterable {
-    case title, pause, win
+    case title, pause, win, stageSelect, pick, hud, touch
+
+    /// Shown on the tuning panel.
+    var label: String {
+        switch self {
+        case .stageSelect: "STAGE"
+        default: rawValue.uppercased()
+        }
+    }
+
+    /// The dialogs: a header, a card or plates, buttons. They share their sizes' starts.
+    var isDialog: Bool { [.pause, .win, .stageSelect, .pick].contains(self) }
 }
 
 /// The plates, the lettering on them, the title lettering, and the panels: the header
@@ -75,20 +86,19 @@ final class UITuning: ObservableObject {
         "ui.\(UIPlatform.current.rawValue).\(screen.rawValue).\(part.rawValue)"
     }
 
-    /// Where each platform starts: the phone's and the iPad's as tuned on one; the iPad's and the TV's title two and a
-    /// half times the size and the TV's text half as big again everywhere.
+    /// Where each platform starts, as tuned on each: the title, the dialogs (all sharing the
+    /// pause's and the win's), and the HUD and the touch pad as drawn.
     static func defaultScale(_ screen: UIScreenKind, _ part: UIPart, on platform: UIPlatform) -> CGFloat {
         switch (platform, screen, part) {
         case (.phone, .title, .buttons): 1.1
         case (.phone, .title, .titles): 0.8
-        case (.phone, .pause, .text), (.phone, .win, .text), (.phone, .pause, .titles), (.phone, .win, .titles): 0.8
-        case (.phone, .pause, .panels), (.phone, .win, .panels): 0.9
-        case (.phone, _, _): 1
-        case (.pad, .pause, .buttons), (.pad, .win, .buttons): 1
-        case (.pad, .pause, .text), (.pad, .win, .text), (.pad, .pause, .titles), (.pad, .win, .titles): 1.5
-        case (.pad, .pause, .panels), (.pad, .win, .panels): 0.9
-        case (_, .title, _): 2.5
-        case (_, _, .text): 1.5
+        case (.phone, .title, _): 1
+        case (.phone, _, .text) where screen.isDialog, (.phone, _, .titles) where screen.isDialog: 0.8
+        case (.phone, _, .panels) where screen.isDialog: 0.9
+        case (.pad, .title, _), (.tv, .title, _): 2.5
+        case (.pad, _, .text) where screen.isDialog, (.pad, _, .titles) where screen.isDialog: 1.5
+        case (.pad, _, .panels) where screen.isDialog: 0.9
+        case (.tv, _, .text) where screen.isDialog: 1.5
         default: 1
         }
     }
@@ -107,7 +117,7 @@ struct UITuningPanel: View {
                 .font(.system(size: 14, weight: .heavy, design: .rounded))
             HStack(spacing: 8) {
                 ForEach(UIScreenKind.allCases, id: \.self) { kind in
-                    panelButton(kind.rawValue.uppercased(), picked: kind == screen) {
+                    panelButton(kind.label, picked: kind == screen) {
                         screen = kind
                         flow.scene.preview(kind == .title ? nil : kind)
                     }

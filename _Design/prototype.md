@@ -363,9 +363,19 @@ pause and win at buttons 1, text 0.8, titles 0.8 and panels 0.9; the iPad's paus
 text 1.5, titles 1.5 and panels 0.9, as tuned on one; and the iPad's and the TV's title
 at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the plate's
 face, above its lip, and is nudged up and left by half its own drop. TEXT Y on the panel
-scales that lift, one value a platform: half of it, 0.5, on all of them. Phase one is
-the title, the pause and the win; the stage select, the Greateraid pick, the HUD and the
-touch pad follow.
+scales that lift, one value a platform: half of it, 0.5, on all of them. The stage select: STAGE SELECT on a ribbon, each stage a royal blue plate
+with its name on the face, gold when a cursor or a pick is on it. The Greateraid pick:
+its ribbon, the line under it in title lettering, the quote and what the drink does on a
+black plate over the bottles, and online the seconds in a black round button, top right;
+the wait screen the same ribbon, and its seconds in the same round button. The HUD: the
+round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
+touch pad: JUMP, SHOOT and THROW as the pack's round buttons in blue, plum and black,
+gold while held, their names in title lettering; the stick a faded black round button
+with a blue knob; PAUSE, AI, HITBOX and RESET small black plates along the top, plum when
+on. Every one of them is on the tuning panel (STAGE, PICK, HUD, TOUCH), the dialogs
+starting from the pause's and the win's sizes on each platform, the HUD and the pad at
+1; the HUD and the pad are previewed over the court, as in play. The debug pickers and
+sliders keep their plain look.
 
 ## The game loop
 

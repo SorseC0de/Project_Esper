@@ -1593,7 +1593,18 @@ final class GameScene: SKScene {
         screen?.removeFromParent()
         screen = nil
         let halfWidth = size.width / 2 / hudScale, halfHeight = size.height / 2 / hudScale
+        // The HUD and the touch pad are tuned where they are: over the court, as in play.
+        let inPlace = previewing == .hud || previewing == .touch
+        if inPlace, built { layout(displayScale: displayScale) }
+        controls?.isHidden = !(inPlace && GameScene.touchControlsShown)
         switch previewing {
+        case .stageSelect:
+            screen = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: StageChoice.allCases.map { $0.name.uppercased() },
+                                       voters: [0], localVoters: [0], colours: [0, 1].map { SKColor(rgb: sprites.look(for: $0).glow) },
+                                       heading: nil, start: 0) { _, _ in }
+        case .pick:
+            screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: Array(Greateraid.boosters.prefix(3)), drinks: .none,
+                                colour: SKColor(rgb: sprites.look(for: 0).glow), timed: true) { _ in }
         case .pause:
             screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, onRestart: {}, onTitle: {}, onResume: {})
         case .win:
@@ -1657,6 +1668,17 @@ final class GameScene: SKScene {
         flowState?.veiled = screen != nil
     }
 
+    /// The black plate under the round circles or 47's score, as dark as it is so the glow
+    /// passes it by; at the HUD's panels scale.
+    private func addHUDPlate(width: CGFloat, height: CGFloat) {
+        let panels = UITuning.shared.scale(.hud, .panels)
+        let plate = UIPiece.plateBlack.node(size: CGSize(width: width, height: height).scaled(by: panels), corners: panels * 0.5)
+        plate.position = CGPoint(x: 0, y: -UIPiece.plateBlack.faceRise * panels * 0.5)
+        plate.zPosition = -1
+        circles.addChild(plate)
+        circlesOverCam.addChild(plate.copy() as! SKSpriteNode)
+    }
+
     /// The rounds across the top: five circles in dark purple, filled in the round
     /// winner's colour as they go, a sixth and seventh added if the series gets there;
     /// and to either side of them each side's drinks, with their levels.
@@ -1670,13 +1692,14 @@ final class GameScene: SKScene {
             for (index, score) in fortySevenScores.enumerated() {
                 let label = SKLabelNode(text: "\(score)")
                 label.fontName = "Menlo-Bold"
-                label.fontSize = 18
+                label.fontSize = 18 * UITuning.shared.scale(.hud, .text)
                 label.fontColor = SKColor(rgb: sprites.look(for: index).glow)
                 label.verticalAlignmentMode = .center
                 label.horizontalAlignmentMode = index == 0 ? .right : .left
                 label.position = CGPoint(x: index == 0 ? -12 : 12, y: 0)
                 circles.addChild(label)
             }
+            addHUDPlate(width: 120, height: 34)
             let target = SKLabelNode(text: "\(FortySevenRules.target)")
             target.fontName = "Menlo-Bold"
             target.fontSize = 8
@@ -1699,9 +1722,12 @@ final class GameScene: SKScene {
         circles.removeAllChildren()
         circlesOverCam.removeAllChildren()
         let count = series.circles
-        let spacing: CGFloat = 18
-        let radius: CGFloat = 6
+        let circleScale = UITuning.shared.scale(.hud, .buttons)
+        let spacing: CGFloat = 18 * circleScale
+        let radius: CGFloat = 6 * circleScale
         let halfRow = CGFloat(count - 1) / 2 * spacing + radius
+        addHUDPlate(width: halfRow * 2 + 36, height: 30 * circleScale)
+        for label in drinkLabels { label.fontSize = 8 * UITuning.shared.scale(.hud, .text) }
         for (index, label) in drinkLabels.enumerated() {
             label.position = CGPoint(x: (halfRow + 8) * (index == 0 ? -1 : 1), y: circles.position.y + radius)
         }

@@ -1128,7 +1128,7 @@ final class GameScene: SKScene {
                 if pad.stick.y <= -0.5, menuLast.stick.y > -0.5 { screen.move(1) }
                 if pad.stick.y >= 0.5, menuLast.stick.y < 0.5 { screen.move(-1) }
                 if pad.jump, !menuLast.jump { screen.fire() }
-            } else if flow == .title, pad.jump, !menuLast.jump, online == nil {
+            } else if flow == .title, pad.jump, !menuLast.jump, online == nil, flowState?.tuningOpen != true {
                 SoundBoard.shared.play(SoundBoard.confirm)
                 startSeries()
             }
@@ -1575,6 +1575,36 @@ final class GameScene: SKScene {
         } else {
             enter(.title)
         }
+    }
+
+    // MARK: UI tuning
+
+    /// The screen the UI tuning panel shows behind itself, if not the title: built as it
+    /// would be, its buttons doing nothing.
+    private var previewing: UIScreenKind?
+
+    func preview(_ kind: UIScreenKind?) {
+        previewing = kind
+        refreshPreview()
+    }
+
+    func refreshPreview() {
+        guard flow == .title else { return }
+        screen?.removeFromParent()
+        screen = nil
+        let halfWidth = size.width / 2 / hudScale, halfHeight = size.height / 2 / hudScale
+        switch previewing {
+        case .pause:
+            screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, onRestart: {}, onTitle: {}, onResume: {})
+        case .win:
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(1), score: [1, 4], again: "NEW MATCH",
+                               onAgain: {}, onTitle: {})
+        default:
+            break
+        }
+        if let screen { hud.addChild(screen) }
+        flowState?.showsTitle = previewing == nil
+        flowState?.veiled = screen != nil
     }
 
     /// The screen for the flow, built for the view's size.

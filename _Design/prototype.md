@@ -346,13 +346,19 @@ The menus, and in time the HUD and the touch pad, are built from the dobo Vector
 pack's purple into `EsperPalette`'s plum, the pack having none. `UIPiece` names each
 piece with the corners and rims that mustn't stretch, and stretches it for SpriteKit
 (a centre rect, scaled) or SwiftUI (a resizable image), 2.5 of its pixels to the point.
-Royal blue is the base, black, gold and plum beside it: the screens' ground is a royal
-blue gradient over the world at 0.88, in place of the old dark material; a dialog is a
-black card under a royal blue header ribbon; a choice is a royal blue plate, plum for a
+Royal blue is the base, black, gold and plum beside it: the screens' ground is an opaque
+royal blue gradient over the world, in place of the old dark material; a dialog is a
+black card under a royal blue header ribbon as wide as it; a choice is a royal blue plate, plum for a
 way back (RESUME, TITLE, TITLE SCREEN), and the cursor's plate turns gold and grows, in
 place of the arrow. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
 HUMAN as small switches, gold when picked and black when not, MULTIPLAYER on gold with
-its two mode switches under it, and the energy colours on a black plate. Phase one is
+its two mode switches under it, the energy colours on a black plate in the bottom right,
+and UI, bottom left, the tuning panel. Each screen's buttons, text and titles scale
+per platform (`UITuning`: phone, iPad or Mac, TV), set on that panel a step of 0.05 at
+a time, − and + (which the TV's remote can reach), Pause and Win shown behind it as
+they'd be; the values are kept on the device until they're read off and made the
+defaults. It starts the phone's dialog buttons at 0.75, and the iPad's and the TV's
+title at 2.5 and their text elsewhere at 1.5. Phase one is
 the title, the pause and the win; the stage select, the Greateraid pick, the HUD and the
 touch pad follow.
 
@@ -747,6 +753,9 @@ ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's j
 `ice_jumpspark` toned in the snowflake's two blues.
 
 ## Sound
+
+Off for now (`SoundBoard.enabled`), the engine never started, while a performance dip and
+some crashes on the TV when several played at once are looked into.
 
 `Tools/sfx.py` makes sounds the bfxr way from recipes in `Tools/sfx.json` (oscillator,
 envelope, pitch slide and vibrato, arpeggio, filters, voices mixed) into `_Sound FX`, for

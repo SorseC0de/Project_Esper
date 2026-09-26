@@ -22,6 +22,11 @@ class Screen: SKNode {
     /// Lettered buttons' plates, by choice: the plate, its own piece, and its size. The
     /// cursor's plate turns gold.
     private var plates: [Int: (plate: SKSpriteNode, piece: UIPiece, size: CGSize)] = [:]
+
+    /// This screen's tuned scale for one of its parts, 1 for a screen that isn't tuned.
+    func tuned(_ part: UIPart) -> CGFloat {
+        kind.map { UITuning.shared.scale($0, part) } ?? 1
+    }
     let halfWidth: CGFloat
     let halfHeight: CGFloat
     /// CardCourt's selection arrow, the one that hangs over a man, in its own greys,
@@ -37,9 +42,13 @@ class Screen: SKNode {
         return node
     }()
 
-    init(halfWidth: CGFloat, halfHeight: CGFloat) {
+    /// The screen whose tuned sizes its buttons, text and titles take, if it has any.
+    let kind: UIScreenKind?
+
+    init(halfWidth: CGFloat, halfHeight: CGFloat, kind: UIScreenKind? = nil) {
         self.halfWidth = halfWidth
         self.halfHeight = halfHeight
+        self.kind = kind
         super.init()
         zPosition = 200
         addChild(arrow)
@@ -55,8 +64,9 @@ class Screen: SKNode {
         let button = SKNode()
         button.position = point
         button.alpha = enabled ? 1 : 0.45
-        let label = TitleText.node(text, size: size)
-        let plateSize = CGSize(width: max(width ?? 0, label.size.width + 44), height: label.size.height + 22)
+        let label = TitleText.node(text, size: size * tuned(.text))
+        let buttons = tuned(.buttons)
+        let plateSize = CGSize(width: max((width ?? 0) * buttons, label.size.width + 44 * buttons), height: max(label.size.height + 12, (26 + 22) * buttons))
         let plate = piece.node(size: plateSize)
         plate.zPosition = -1
         button.addChild(plate)
@@ -80,18 +90,20 @@ class Screen: SKNode {
         return card
     }
 
-    /// A royal blue header ribbon with title lettering on it.
+    /// A royal blue header ribbon with title lettering on it; its width, for a card to match.
     @discardableResult
-    func addHeader(_ text: String, size: CGFloat = 34, at point: CGPoint, width: CGFloat? = nil) -> SKNode {
+    func addHeader(_ text: String, size: CGFloat = 34, at point: CGPoint, width: CGFloat? = nil) -> CGFloat {
         let header = SKNode()
         header.position = point
-        let label = TitleText.node(text, size: size)
-        let ribbon = UIPiece.headerBlue.node(size: CGSize(width: max(width ?? 0, label.size.width + 80), height: label.size.height + 24))
+        let titles = tuned(.titles)
+        let label = TitleText.node(text, size: size * titles)
+        let ribbonSize = CGSize(width: max((width ?? 0) * titles, label.size.width + 80 * titles), height: label.size.height + 24 * titles)
+        let ribbon = UIPiece.headerBlue.node(size: ribbonSize)
         ribbon.zPosition = -1
         header.addChild(ribbon)
         header.addChild(label)
         addChild(header)
-        return header
+        return ribbonSize.width
     }
 
     /// `arrowAt` is where the arrow sits for this choice, turned `arrowTurn` from pointing down.
@@ -295,11 +307,11 @@ final class WinScreen: Screen {
     /// `score` is each side's, player one's first, as the match ended.
     init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, score: [Int], again: String,
          onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
-        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
+        super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .win)
         let width: CGFloat = 220
-        addCard(size: CGSize(width: width + 140, height: halfHeight * 1.55), at: CGPoint(x: 0, y: -halfHeight * 0.1))
-        addHeader("\(winner) WINS", size: 36, at: CGPoint(x: 0, y: halfHeight * 0.64), width: width + 170)
-        let final = TitleText.node(score.map(String.init).joined(separator: " - "), size: 80)
+        let headerWidth = addHeader("\(winner) WINS", size: 36, at: CGPoint(x: 0, y: halfHeight * 0.64), width: width + 170)
+        addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.55), at: CGPoint(x: 0, y: -halfHeight * 0.1))
+        let final = TitleText.node(score.map(String.init).joined(separator: " - "), size: 80 * tuned(.titles))
         final.position = CGPoint(x: 0, y: halfHeight * 0.2)
         addChild(final)
         addButton(again, at: CGPoint(x: 0, y: -halfHeight * 0.2), width: width, action: onAgain)
@@ -459,10 +471,11 @@ final class StageSelectScreen: Screen {
 /// The pause, against the computer: start the match over, go to the title, or play on.
 final class PauseScreen: Screen {
     init(halfWidth: CGFloat, halfHeight: CGFloat, onRestart: @escaping () -> Void, onTitle: @escaping () -> Void, onResume: @escaping () -> Void) {
-        super.init(halfWidth: halfWidth, halfHeight: halfHeight)
+        super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pause)
         let width: CGFloat = 230
-        addCard(size: CGSize(width: width + 60, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12))
-        addHeader("PAUSED", at: CGPoint(x: 0, y: halfHeight * 0.62), width: width + 90)
+        // The card as wide as the header over it, so their edges line up.
+        let headerWidth = addHeader("PAUSED", at: CGPoint(x: 0, y: halfHeight * 0.62), width: width + 90)
+        addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12))
         addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.25), width: width, action: onRestart)
         addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.1), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
         addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.45), sound: .menuBack, piece: .buttonPlum, width: width, action: onResume)

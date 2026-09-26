@@ -15,7 +15,8 @@ struct ProjectEsperApp: App {
 struct GameView: View {
     @StateObject private var flow = FlowState()
 
-    /// The world with its glow at the bottom; the royal blue over it while a screen is up; the HUD's own view over that, so nothing in it glows and the screens sit on
+    /// The world with its glow at the bottom; the royal blue over it while a screen is up,
+    /// opaque; the HUD's own view over that, so nothing in it glows and the screens sit on
     /// the material; and the title on top of everything.
     var body: some View {
         ZStack {
@@ -25,7 +26,6 @@ struct GameView: View {
                 // The screens' ground: the royal blue, dark, the world just showing through.
                 LinearGradient(colors: [Color(rgb: EsperPalette.royal.body), Color(rgb: EsperPalette.royal.shadow)],
                                startPoint: .top, endPoint: .bottom)
-                    .opacity(0.88)
                     .ignoresSafeArea()
                     .transition(.opacity)
             }
@@ -34,6 +34,11 @@ struct GameView: View {
             if flow.showsTitle {
                 TitleOverlay(flow: flow, net: flow.net)
                     .transition(.opacity)
+            }
+            if flow.tuningOpen {
+                UITuningPanel(flow: flow)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(20)
             }
         }
         .animation(.easeOut(duration: 0.25), value: flow.showsTitle)

@@ -10,6 +10,8 @@ final class FlowState: ObservableObject {
     let net = GameCenter()
     @Published var showsTitle = true
     @Published var veiled = false
+    /// The UI tuning panel is open.
+    @Published var tuningOpen = false
     var startSeries: ((GameMode) -> Void)?
 
     init() {
@@ -31,6 +33,8 @@ struct TitleOverlay: View {
     @AppStorage(GameScene.onlineModeKey) private var onlineMode = Int(GameMode.rounds.rawValue)
     /// Offline, whether the computer plays player 2 or a second pad does.
     @AppStorage(GameScene.vsCPUKey) private var vsCPU = true
+    @ObservedObject private var tuning = UITuning.shared
+    private func scale(_ part: UIPart) -> CGFloat { tuning.scale(.title, part) }
 
     private var busy: Bool {
         switch net.state {
@@ -43,17 +47,21 @@ struct TitleOverlay: View {
         ZStack {
             LinearGradient(colors: [Color(rgb: EsperPalette.royal.body), Color(rgb: EsperPalette.royal.shadow)],
                            startPoint: .top, endPoint: .bottom)
-                .opacity(0.92)
                 .ignoresSafeArea()
-                // The energy colours in the upper right corner.
-                .overlay(alignment: .topTrailing) {
+                // The energy colours in the bottom right corner, the UI tuning in the bottom left.
+                .overlay(alignment: .bottomTrailing) {
                     colourPicker
-                        .padding(.top, 20)
+                        .padding(.bottom, 20)
                         .padding(.trailing, 24)
                 }
-            VStack(spacing: 22) {
-                Image(uiImage: TitleText.image("PROJECT ESPER", size: 56))
-                HStack(spacing: 24) {
+                .overlay(alignment: .bottomLeading) {
+                    small("UI", picked: flow.tuningOpen) { flow.tuningOpen.toggle() }
+                        .padding(.bottom, 20)
+                        .padding(.leading, 24)
+                }
+            VStack(spacing: 22 * scale(.buttons)) {
+                Image(uiImage: TitleText.image("PROJECT ESPER", size: 56 * scale(.titles)))
+                HStack(spacing: 24 * scale(.buttons)) {
                     plated("BEST OF 7", piece: .buttonBlue, width: 170) {
                         SoundBoard.shared.play(SoundBoard.confirm)
                         flow.startSeries?(.rounds)
@@ -99,11 +107,11 @@ struct TitleOverlay: View {
         .onAppear { net.signIn() }
     }
 
-    /// A lettered button on one of the pack's plates.
+    /// A lettered button on one of the pack's plates, at the title's tuned sizes.
     private func plated(_ text: String, piece: UIPiece, width: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(uiImage: TitleText.image(text, size: 26))
-                .frame(width: width, height: 54)
+            Image(uiImage: TitleText.image(text, size: 26 * scale(.text)))
+                .frame(width: width * scale(.buttons), height: 54 * scale(.buttons))
                 .background(piece.image)
         }
         .buttonStyle(.plain)
@@ -114,10 +122,10 @@ struct TitleOverlay: View {
     private func small(_ text: String, picked: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(text)
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(.system(size: 12 * scale(.text), weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .shadow(color: .black, radius: 0, x: 1, y: 1)
-                .frame(minWidth: 96, minHeight: 30)
+                .frame(minWidth: 96 * scale(.buttons), minHeight: 30 * scale(.buttons))
                 .padding(.horizontal, 8)
                 .background((picked ? UIPiece.buttonGold : UIPiece.buttonBlack).image)
         }

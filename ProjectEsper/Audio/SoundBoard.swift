@@ -42,7 +42,12 @@ final class SoundBoard {
     /// When each voice's last sound ends.
     private var busyUntil: [CFTimeInterval] = []
 
+    /// Off for now, the engine never started: sound was suspected in a performance dip and
+    /// in crashes on the TV when several played at once.
+    static let enabled = false
+
     private init() {
+        guard SoundBoard.enabled else { return }
         // Ambient: under the silent switch, and mixed with whatever else is playing.
         try? AVAudioSession.sharedInstance().setCategory(.ambient)
         let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
@@ -107,7 +112,7 @@ final class SoundBoard {
 
     /// Plays on a voice that has finished; with every voice busy, the one nearest its end is cut off.
     func play(_ effect: Effect, volume: Float = 1) {
-        guard let buffer = buffers[effect], volume > 0 else { return }
+        guard SoundBoard.enabled, let buffer = buffers[effect], volume > 0 else { return }
         // A call or another app can stop the engine; it starts again on the next sound.
         if !engine.isRunning {
             try? engine.start()

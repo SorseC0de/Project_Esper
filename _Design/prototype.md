@@ -60,7 +60,8 @@ in the air brakes at the ground's traction; moves that don't steer (a wall jump'
 the shot's release, the throw, the Pulsepistol shot, a stance's first frame) coast on
 Fox's light air friction instead. Air acceleration 0.02 + 0.24; a jump with the stick held
 starts at air speed, and a double jump with the stick held sets the sideways speed, so it
-turns around. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
+turns around. A walk speeds up gently to walking speed, but past it, or against the
+stick, it brakes at traction, so one come into from a run doesn't slide on. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
 and are chosen to sit with the rest.
 
 ## Input grammar

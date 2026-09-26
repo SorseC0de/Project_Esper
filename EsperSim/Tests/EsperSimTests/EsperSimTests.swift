@@ -1794,6 +1794,17 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.players[0].position.y, 10, accuracy: 0.001)
     }
 
+    func testAWalkComeIntoFastBrakesAtOnce() {
+        var match = neutral()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[0].enter(.walk)
+        match.players[0].velocity.x = match.players[0].spec.runSpeed
+        // Tilted back the other way, it turns within a few frames rather than sliding on.
+        run(&match, frames: 4, input: { _ in PlayerInput(stick: Vec2(x: -0.4, y: 0)) })
+        XCTAssertLessThanOrEqual(match.players[0].velocity.x, 0)
+    }
+
     func testWalkingOffALedgeDoesNotGrabItBack() {
         var match = neutral()
         // Standing on the right block, walking off its left edge.

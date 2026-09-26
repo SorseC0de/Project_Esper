@@ -488,8 +488,11 @@ public struct Player: Equatable {
                         facing = direction
                         startDash(events: &events)
                     } else {
+                        // Up to walking speed gently; past it, or against the stick, the ground's
+                        // brake, so a walk come into at a run doesn't slide on for half a second.
                         let target = walkMaxSpeed * input.stick.x
-                        velocity.x = approach(velocity.x, target, spec.walkAcceleration)
+                        let braking = abs(velocity.x) > walkMaxSpeed || velocity.x * target < 0
+                        velocity.x = approach(velocity.x, target, braking ? spec.traction : spec.walkAcceleration)
                         // The cycle runs 15 frames a second at full walk and never under 10, so the ball can't hang on a tween.
                         animationPhase += max(abs(velocity.x) / walkMaxSpeed * 0.25, 10.0 / 60)
                     }

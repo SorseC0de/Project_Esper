@@ -1605,6 +1605,22 @@ final class FootsiesTests: XCTestCase {
         XCTAssertFalse(match.players[1].hasBall)
     }
 
+    func testAPivotJumpTurnsAndCarriesTheRunTheNewWay() {
+        var match = neutral()
+        match.players[0].position.x = 150
+        match.players[1].position.x = 320
+        run(&match, frames: 40, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        XCTAssertEqual(match.players[0].state, .run)
+        let speed = match.players[0].velocity.x
+        // Slammed back and jumped straight away.
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle])
+        run(&match, frames: match.players[0].spec.jumpSquatFrames + 2, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0), jump: true) })
+        XCTAssertFalse(match.players[0].grounded)
+        XCTAssertEqual(match.players[0].facing, .left)
+        XCTAssertLessThan(match.players[0].velocity.x, 0, "the jump goes the new way")
+        XCTAssertGreaterThanOrEqual(-match.players[0].velocity.x, speed / 2, "carrying what's left of the run, and the stick's push")
+    }
+
     func testTheSlashClanksOnAWallAndNotInTheOpen() {
         var open = defending()
         open.advance(inputs: [PlayerInput(shoot: true), .idle])

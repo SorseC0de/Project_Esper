@@ -9,7 +9,7 @@ final class StageTests: XCTestCase {
         let match = field()
         for player in match.players { XCTAssertFalse(match.stage.overlapsSolid(player.body)) }
         XCTAssertFalse(match.stage.overlapsSolid(Box(center: match.stage.ballSpawn, width: 5, height: 5)))
-        XCTAssertEqual(match.stage.columns, 340)
+        XCTAssertEqual(match.stage.columns, 238)
         XCTAssertEqual(match.stage.rows, 20)
     }
 

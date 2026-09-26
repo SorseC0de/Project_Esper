@@ -103,6 +103,9 @@ final class GameScene: SKScene {
     private var bannerQueue: [(text: String, size: CGFloat)] = []
     private static let bannerHold = 45
     private let circles = SKNode()
+    /// The same circles in the HUD, over the ball cam, which is laid down after the world;
+    /// shown only while it is, the glowing ones beneath.
+    private let circlesOverCam = SKNode()
     private var drinkLabels: [SKLabelNode] = []
     private var menuLast = PlayerInput.idle
     /// The SwiftUI layer, which shows the title over the Metal view and the material
@@ -604,6 +607,9 @@ final class GameScene: SKScene {
         glowHud.addChild(banner)
         circles.zPosition = 5
         glowHud.addChild(circles)
+        circlesOverCam.zPosition = 5
+        circlesOverCam.isHidden = true
+        hud.addChild(circlesOverCam)
         for index in 0..<2 {
             let label = SKLabelNode()
             label.fontName = "Menlo-Bold"
@@ -993,6 +999,7 @@ final class GameScene: SKScene {
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - insets.top - 8)
         circles.position = CGPoint(x: 0, y: halfHeight - insets.top - 16)
+        circlesOverCam.position = circles.position
         drawSeries()
         presentScreen()
         powerLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 4)
@@ -1320,7 +1327,9 @@ final class GameScene: SKScene {
     /// until it's up.
     private func bringPlayersIn() {
         roundIntro = 12
-        SoundBoard.shared.play(.portIn)
+        // Once for both, as loud as the nearer of the two is.
+        let nearest = match.players.map { audibility(at: $0.position) }.max() ?? 1
+        SoundBoard.shared.play(.portIn, volume: nearest)
         lastCountSounded = 0
         for player in match.players { portIn(player) }
     }
@@ -1533,6 +1542,7 @@ final class GameScene: SKScene {
             label.text = lines.joined(separator: "\n")
         }
         circles.removeAllChildren()
+        circlesOverCam.removeAllChildren()
         let count = series.circles
         let spacing: CGFloat = 18
         let radius: CGFloat = 6
@@ -1547,6 +1557,7 @@ final class GameScene: SKScene {
             circle.strokeColor = SKColor(white: 0, alpha: 0.6)
             circle.lineWidth = 1
             circles.addChild(circle)
+            circlesOverCam.addChild(circle.copy() as! SKShapeNode)
         }
     }
 
@@ -1732,22 +1743,37 @@ final class GameScene: SKScene {
 
     /// The sounds for a frame's events, shown once like the effects.
     private func playSounds(_ events: [MatchEvent]) {
-        let sounds = SoundBoard.shared
+        func body(_ index: Int) -> Vec2 { match.players.indices.contains(index) ? match.players[index].position : match.ball.position }
         for event in events {
             switch event {
-            case .jumped, .doubleJumped, .wallJumped: sounds.play(.jump)
-            case .shot, .thrown, .fireballThrown, .boltFired: sounds.play(.playerShoot)
-            case .slashed: sounds.play(.esperSlash)
-            case .slashClanked: sounds.play(.slashWallClank)
-            case .snatchReached: sounds.play(.playerSnatch)
-            case .struck, .popped, .parried: sounds.play(.playerHit)
+            case .jumped(let index), .doubleJumped(let index), .wallJumped(let index, _): play(.jump, at: body(index))
+            case .shot(let index), .thrown(let index), .fireballThrown(let index), .boltFired(let index): play(.playerShoot, at: body(index))
+            case .slashed(let index): play(.esperSlash, at: body(index))
+            case .slashClanked(let index): play(.slashWallClank, at: body(index))
+            case .snatchReached(let index): play(.playerSnatch, at: body(index))
+            case .struck(let victim, _), .popped(let victim, _), .parried(let victim, _): play(.playerHit, at: body(victim))
             // Quiet for a soft bounce, silent once it's only settling.
-            case .ballBounced(_, let speed) where speed > GameScene.bounceSoundFloor:
-                sounds.play(.ballBounce, volume: Float(min(speed / GameScene.bounceSoundFull, 1)))
+            case .ballBounced(let position, let speed) where speed > GameScene.bounceSoundFloor:
+                play(.ballBounce, at: position, volume: Float(min(speed / GameScene.bounceSoundFull, 1)))
             default: break
             }
         }
     }
+
+    /// A sound from somewhere in the world: full on the screen, fading out over a margin
+    /// past its edge, so nothing off the screen is heard.
+    private func play(_ effect: SoundBoard.Effect, at point: Vec2, volume: Float = 1) {
+        SoundBoard.shared.play(effect, volume: volume * audibility(at: point))
+    }
+
+    private func audibility(at point: Vec2) -> Float {
+        let at = SpriteLibrary.point(point)
+        let halfWidth = size.width * cameraNode.xScale / 2, halfHeight = size.height * cameraNode.yScale / 2
+        let beyond = max(abs(at.x - cameraNode.position.x) - halfWidth, abs(at.y - cameraNode.position.y) - halfHeight, 0)
+        return Float(max(1 - beyond / GameScene.soundFadeMargin, 0))
+    }
+    /// Art pixels past the screen's edge over which a sound fades to nothing.
+    private static let soundFadeMargin: CGFloat = 32
     private static let bounceSoundFloor = 0.6
     private static let bounceSoundFull = 4.0
 
@@ -1755,13 +1781,13 @@ final class GameScene: SKScene {
     /// the walk and run sheets' frames 0 and 4, and the ball's bounce on each frame of a
     /// sheet with the ball in hand where it's lowest, as the landmarks draw it.
     private var lastSoundFrames: [AnimationFrame?] = [nil, nil]
-    private func playFrameSounds(_ index: Int, frame: AnimationFrame, grounded: Bool) {
+    private func playFrameSounds(_ index: Int, frame: AnimationFrame, grounded: Bool, at feet: Vec2) {
         guard lastSoundFrames.indices.contains(index), lastSoundFrames[index] != frame else { return }
         lastSoundFrames[index] = frame
         guard grounded else { return }
         let walking: Set<Animation> = [.walk, .dribbleWalk, .run, .dribbleRun, .gunRun, .gunRunShoot]
-        if walking.contains(frame.animation), frame.frame % 4 == 0 { SoundBoard.shared.play(.step) }
-        if GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) { SoundBoard.shared.play(.ballBounce) }
+        if walking.contains(frame.animation), frame.frame % 4 == 0 { play(.step, at: feet) }
+        if GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) { play(.ballBounce, at: feet) }
     }
 
     /// The frames of a sheet where the ball in hand is at its lowest, under five art pixels
@@ -2080,7 +2106,7 @@ final class GameScene: SKScene {
             return
         }
         let zeus = power == .zeusJuice
-        if zeus, let crack = SoundBoard.lightning.randomElement() { SoundBoard.shared.play(crack) }
+        if zeus, let crack = SoundBoard.lightning.randomElement() { play(crack, at: position) }
         let spark = (zeus ? EnergyEffect.lightningSparks : EnergyEffect.hitSparks).randomElement()!
         glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale * (zeus ? 0.5 : 1)))
     }
@@ -2092,7 +2118,7 @@ final class GameScene: SKScene {
     /// the same tone and the floor and walls go white, fading back. The crown erupts off
     /// the rim with it.
     private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
-        SoundBoard.shared.play(.basket)
+        play(.basket, at: match.stage.hoops[hoop].position)
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
         let bolt = EnergyEffect.strikes.randomElement()!
@@ -3171,7 +3197,7 @@ final class GameScene: SKScene {
             let node = playerNodes[index]
             let frame = player.animationFrame
             section("bodies")
-            playFrameSounds(index, frame: frame, grounded: player.grounded)
+            playFrameSounds(index, frame: frame, grounded: player.grounded, at: player.position)
             section("sounds")
             // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
@@ -3444,6 +3470,7 @@ final class GameScene: SKScene {
             cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase
         }
         placeBallCamFrame()
+        circlesOverCam.isHidden = !ballCamEnabled
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.
         if shake > 0 {
             shake -= 1

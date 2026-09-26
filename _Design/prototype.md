@@ -174,6 +174,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   floater's ball, and only until its first bounce off anything; a throw's never. Down
   through a rim scores unless the ball rose up through that rim first.
 
+Out of a run or its pivot with the stick slammed the other way, the jump turns the new way
+(Mario 64's), what's left of the run's speed going that way.
+
 Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the POWER
 picker, start (menu) pauses, R3 switches the computer, L2 the hitboxes. Down on the stick
 with the ball, standing or walking, is the sauce too: the taunt sheet for show, and any
@@ -569,7 +572,7 @@ centre.
 
 ## Football Field
 
-`Stage.footballField`, Longball Stadium on the stage select. 340 by 20 tiles, ten courts long, flat and empty: the floor is an
+`Stage.footballField`, Longball Stadium on the stage select. 238 by 20 tiles, seven courts long, flat and empty: the floor is an
 invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
 at 107, 66 in from each wall, floating between the
 goalposts' uprights; by design a standing shot can't reach them, so scoring takes a
@@ -613,7 +616,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 - The ball cam (`StageFeatures.ballCam`, the view's alone): a close view of the ball,
   128 by 80 art pixels round it, only in play, hanging over the upper screen as a
   trapezoid wider at the top at a third, lined with `flashspark2` in the local player's energy, each on its own
-  frame, centred across the screen wherever the local player is. It has its own scene,
+  frame, centred across the screen wherever the local player is, the round circles drawn
+  over it (a copy in the HUD while it shows). It has its own scene,
   with its own copy of the scenery built once, and its own renderer, drawn one frame in
   three into a small texture with its own glow, laid down after the screen's; the game
   scene is never drawn twice in a frame. It copies every sprite of the bodies and effects
@@ -676,7 +680,9 @@ The user's effects in `_Sound FX`, any of WAV, MP3 or M4A, brought into `Project
 as 16-bit 44.1 kHz mono WAV by
 `Tools/import_sounds.py` (run it after adding or changing one; the originals are only
 read). `SoundBoard` reads each into memory once and plays it on a pool of twelve voices
-through one engine, left running, each sound to a voice that has finished (stopping a
+through one engine, left running, heard by where they happen: full on the screen,
+fading to nothing 32 art pixels past its edge, so nothing off the screen is heard (the
+menus and the count are everywhere); each sound to a voice that has finished (stopping a
 playing voice waits on the audio thread, which cost the TV 4 ms a frame of footsteps), ambient, so the silent switch mutes it. Sounds come off the events
 shown, once, like the effects.
 

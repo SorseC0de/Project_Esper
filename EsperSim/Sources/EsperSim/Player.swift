@@ -550,6 +550,12 @@ public struct Player: Equatable {
                 grounded = false
                 enter(.air)
             } else if stateTimer >= spec.jumpSquatFrames {
+                // The pivot jump, Mario 64's: out of a run or its pivot with the stick slammed the
+                // other way, the jump turns, what's left of the run's speed going the new way.
+                if previousState == .run || previousState == .pivot, let way = stickFacing(input), velocity.x * way.sign < 0 {
+                    facing = way
+                    velocity.x = -velocity.x
+                }
                 velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
                 let cap = max(abs(velocity.x), airSpeedMax)
                 velocity.x = min(max(velocity.x + input.stick.x * spec.jumpHorizontalVelocity, -cap), cap)

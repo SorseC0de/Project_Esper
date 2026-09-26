@@ -26,11 +26,27 @@ final class GameMetalView: MTKView {
         super.init(frame: .zero, device: device)
         colorPixelFormat = .bgra8Unorm
         preferredFramesPerSecond = 60
+        #if os(tvOS)
+        // 1080p, whatever the TV: the pixel art doubles exactly onto a 4K screen, unsmoothed.
+        // The view's scale won't hold at 1 there, so the drawable is sized by hand.
+        autoResizeDrawable = false
+        layer.magnificationFilter = .nearest
+        #endif
         isUserInteractionEnabled = false
         delegate = renderer
     }
 
     required init(coder: NSCoder) { fatalError() }
+
+    #if os(tvOS)
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if drawableSize != bounds.size { drawableSize = bounds.size }
+    }
+    #endif
+
+    /// Drawable pixels per point: the screen's scale, or 1 on the TV.
+    var renderScale: CGFloat { bounds.width > 0 ? drawableSize.width / bounds.width : contentScaleFactor }
 }
 
 /// Matches `GlowUniforms` in Glow.metal.
@@ -78,6 +94,19 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private var fpsWindowStart = CACurrentMediaTime()
     private var lastDraw = CACurrentMediaTime()
     private var worstGap = 0.0
+    /// The blur's step in the glow's texels. The TV renders at 1080p, half what the 4K screen
+    /// was drawn at, so its half-size glow steps half a texel to spread as far as it did.
+    #if os(tvOS)
+    private let blurStep: Float = 0.5
+    #else
+    private let blurStep: Float = 1
+    #endif
+    private var frameNumber = 0
+    /// Each stage's CPU time on this thread and GPU time in its own command buffer, summed
+    /// over the second and shown under the frame rate as milliseconds a frame.
+    private var cpuTotals: [String: Double] = [:]
+    private let gpuTotals = StageTimes()
+    private static let stageOrder = ["update", "scene", "mask", "glow", "cam", "comp"]
     private var sceneTexture: MTLTexture?
     /// The bodies alone, for the glow's per-object threshold.
     private var bodyMask: MTLTexture?
@@ -140,9 +169,13 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         sceneTexture = makeTexture(width: Int(size.width), height: Int(size.height))
         sceneDepthStencil = makeTexture(width: Int(size.width), height: Int(size.height), pixelFormat: .depth32Float_stencil8)
         bodyMask = makeTexture(width: Int(size.width), height: Int(size.height))
+        makeGlowTextures(for: size)
+        scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor, insets: view.safeAreaInsets)
+    }
+
+    private func makeGlowTextures(for size: CGSize) {
         glowA = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
         glowB = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
-        scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor, insets: view.safeAreaInsets)
     }
 
     private func makeTexture(width: Int, height: Int, pixelFormat: MTLPixelFormat = .bgra8Unorm) -> MTLTexture {
@@ -153,12 +186,16 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
+        // A drawable sized by hand may not have told the delegate.
+        if sceneTexture.map({ $0.width != Int(view.drawableSize.width) || $0.height != Int(view.drawableSize.height) }) ?? true {
+            mtkView(view, drawableSizeWillChange: view.drawableSize)
+        }
         guard let drawable = view.currentDrawable, let screenPass = view.currentRenderPassDescriptor,
               let sceneTexture, let sceneDepthStencil, let bodyMask, let glowA, let glowB,
               let commands = queue.makeCommandBuffer() else { return }
 
         if scene.size != view.bounds.size || scene.safeInsets != view.safeAreaInsets {
-            scene.attach(size: view.bounds.size, displayScale: view.contentScaleFactor, insets: view.safeAreaInsets)
+            scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor, insets: view.safeAreaInsets)
         }
         let now = CACurrentMediaTime()
         framesDrawn += 1
@@ -167,11 +204,42 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         if now - fpsWindowStart >= 1 {
             scene.framesPerSecond = Int((Double(framesDrawn) / (now - fpsWindowStart)).rounded())
             scene.worstFrameMilliseconds = Int((worstGap * 1000).rounded())
+            let frames = Double(max(framesDrawn, 1))
+            let gpu = gpuTotals.take()
+            func line(_ totals: [String: Double]) -> String {
+                GlowRenderer.stageOrder.compactMap { name in totals[name].map { "\(name) \(String(format: "%.1f", $0 * 1000 / frames))" } }.joined(separator: "  ")
+            }
+            let span = gpu["frame"].map { String(format: "%.1f", $0 * 1000 / frames) } ?? "-"
+            scene.frameReadout = "cpu  \(line(cpuTotals))\ngpu  \(line(gpu))\ngpu frame \(span)  \n\(Int(view.drawableSize.width))x\(Int(view.drawableSize.height))  glow \(glowA.width)x\(glowA.height)"
+            cpuTotals = [:]
             framesDrawn = 0
             worstGap = 0
             fpsWindowStart = now
         }
+        var mark = CACurrentMediaTime()
+        func lap(_ name: String) {
+            let time = CACurrentMediaTime()
+            cpuTotals[name, default: 0] += time - mark
+            mark = time
+        }
+        frameNumber += 1
+        let frame = frameNumber
+        func timed(_ name: String) -> MTLCommandBuffer? {
+            let buffer = queue.makeCommandBuffer()
+            buffer?.addCompletedHandler { [gpuTotals] done in
+                gpuTotals.add(name, done.gpuEndTime - done.gpuStartTime)
+                if name == "scene" { gpuTotals.begin(frame, at: done.gpuStartTime) }
+            }
+            return buffer
+        }
         skRenderer.update(atTime: now)
+        lap("update")
+        guard let sceneCommands = timed("scene"), let maskCommands = timed("mask"), let glowCommands = timed("glow"),
+              let camCommands = timed("cam") else { return }
+        commands.addCompletedHandler { [gpuTotals] done in
+            gpuTotals.add("comp", done.gpuEndTime - done.gpuStartTime)
+            gpuTotals.end(frame, at: done.gpuEndTime)
+        }
 
         let scenePass = MTLRenderPassDescriptor()
         scenePass.colorAttachments[0].texture = sceneTexture
@@ -188,7 +256,9 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         scenePass.stencilAttachment.loadAction = .clear
         scenePass.stencilAttachment.storeAction = .dontCare
         skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: sceneTexture.width, height: sceneTexture.height),
-                          commandBuffer: commands, renderPassDescriptor: scenePass)
+                          commandBuffer: sceneCommands, renderPassDescriptor: scenePass)
+        sceneCommands.commit()
+        lap("scene")
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
@@ -205,10 +275,12 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         maskPass.stencilAttachment.loadAction = .clear
         maskPass.stencilAttachment.storeAction = .dontCare
         maskRenderer.render(withViewport: CGRect(x: 0, y: 0, width: bodyMask.width, height: bodyMask.height),
-                            commandBuffer: commands, renderPassDescriptor: maskPass)
+                            commandBuffer: maskCommands, renderPassDescriptor: maskPass)
+        maskCommands.commit()
+        lap("mask")
 
         var uniforms = GlowUniforms(
-            texelSize: SIMD2(1 / Float(glowA.width), 1 / Float(glowA.height)),
+            texelSize: SIMD2(blurStep / Float(glowA.width), blurStep / Float(glowA.height)),
             direction: .zero,
             threshold: GlowSettings.threshold,
             bodyThreshold: GlowSettings.bodyThreshold,
@@ -216,19 +288,24 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             intensity: GlowSettings.intensity,
             tint: GlowSettings.tint)
 
-        pass(commands, pipeline: bright, into: glowA, sources: [sceneTexture, bodyMask], uniforms: uniforms)
+        pass(glowCommands, pipeline: bright, into: glowA, sources: [sceneTexture, bodyMask], uniforms: uniforms)
         for _ in 0..<GlowSettings.blurPasses {
             uniforms.direction = SIMD2(1, 0)
-            pass(commands, pipeline: blur, into: glowB, sources: [glowA], uniforms: uniforms)
+            pass(glowCommands, pipeline: blur, into: glowB, sources: [glowA], uniforms: uniforms)
             uniforms.direction = SIMD2(0, 1)
-            pass(commands, pipeline: blur, into: glowA, sources: [glowB], uniforms: uniforms)
+            pass(glowCommands, pipeline: blur, into: glowA, sources: [glowB], uniforms: uniforms)
         }
-        let camReady = drawBallCam(commands, at: now)
+        glowCommands.commit()
+        lap("glow")
+        let camReady = drawBallCam(camCommands, at: now)
+        camCommands.commit()
+        lap("cam")
         pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA], uniforms: uniforms,
              then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)
 
         commands.present(drawable)
         commands.commit()
+        lap("comp")
     }
 
     private func pass(_ commands: MTLCommandBuffer, pipeline: MTLRenderPipelineState, into target: MTLTexture,
@@ -338,5 +415,40 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         extra?(encoder)
         encoder.endEncoding()
+    }
+}
+
+/// GPU times by stage, added from the command buffers' completion handlers on their own
+/// thread and taken on the main one.
+final class StageTimes: @unchecked Sendable {
+    private let lock = NSLock()
+    private var totals: [String: Double] = [:]
+
+    func add(_ name: String, _ seconds: Double) {
+        lock.lock()
+        totals[name, default: 0] += seconds
+        lock.unlock()
+    }
+
+    /// The whole frame on the GPU: its first stage's start to its last one's end, as "frame".
+    private var starts: [Int: Double] = [:]
+
+    func begin(_ frame: Int, at time: Double) {
+        lock.lock()
+        starts[frame] = time
+        lock.unlock()
+    }
+
+    func end(_ frame: Int, at time: Double) {
+        lock.lock()
+        if let start = starts.removeValue(forKey: frame) { totals["frame", default: 0] += time - start }
+        starts = starts.filter { $0.key > frame - 10 }
+        lock.unlock()
+    }
+
+    func take() -> [String: Double] {
+        lock.lock()
+        defer { totals = [:]; lock.unlock() }
+        return totals
     }
 }

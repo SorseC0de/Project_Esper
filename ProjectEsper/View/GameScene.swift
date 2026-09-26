@@ -233,6 +233,8 @@ final class GameScene: SKScene {
     /// What the Metal view measured, shown in the corner.
     var framesPerSecond = 0
     var worstFrameMilliseconds = 0
+    /// Each render stage's milliseconds a frame, CPU and GPU, from the Metal view.
+    var frameReadout = ""
 
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
@@ -307,15 +309,8 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The cam's middle across the screen, 0 to 1, easing after the local player.
-    private(set) var ballCamScreenX: CGFloat = 0.5
-    private func easeBallCam() {
-        guard match.players.indices.contains(localIndex), size.width > 0 else { return }
-        let feet = SpriteLibrary.point(match.players[localIndex].position)
-        let onScreen = (feet.x - cameraNode.position.x) / (size.width * cameraNode.xScale) + 0.5
-        let wanted = min(max(onScreen, 0.2), 0.8)
-        ballCamScreenX += (wanted - ballCamScreenX) * 0.1
-    }
+    /// The cam's middle across the screen, 0 to 1: the centre, wherever the local player is.
+    let ballCamScreenX: CGFloat = 0.5
 
     /// Everything that moves and is drawn near the ball, for the ball cam to copy: every
     /// sprite in the bodies and effects layers and the shadows, but only those within its
@@ -633,6 +628,7 @@ final class GameScene: SKScene {
         fpsLabel.fontColor = SKColor(white: 1, alpha: 0.7)
         fpsLabel.horizontalAlignmentMode = .left
         fpsLabel.verticalAlignmentMode = .bottom
+        fpsLabel.numberOfLines = 0
         hud.addChild(fpsLabel)
     }
 
@@ -3421,7 +3417,6 @@ final class GameScene: SKScene {
         if match.stage.features.look == .footballField {
             cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase
         }
-        if match.stage.features.ballCam { easeBallCam() }
         placeBallCamFrame()
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.
         if shake > 0 {
@@ -3539,7 +3534,7 @@ final class GameScene: SKScene {
         } else {
             for node in playerNodes { node.isHidden = false }
         }
-        fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms"
+        fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms\n\(frameReadout)"
         let p = match.players[localIndex]
         let side: String
         if online != nil {

@@ -613,13 +613,21 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 - The ball cam (`StageFeatures.ballCam`, the view's alone): a close view of the ball,
   128 by 80 art pixels round it, only in play, hanging over the upper screen as a
   trapezoid wider at the top at a third, lined with `flashspark2` in the local player's energy, each on its own
-  frame, easing across after the local player. It has its own scene,
+  frame, centred across the screen wherever the local player is. It has its own scene,
   with its own copy of the scenery built once, and its own renderer, drawn one frame in
   three into a small texture with its own glow, laid down after the screen's; the game
   scene is never drawn twice in a frame. It copies every sprite of the bodies and effects
   layers and the shadows, but only those within its window round the ball and a margin:
   the rest cost one position check each, so a busy field costs it little. Emitters and
   shapes (webs, the pulse) aren't copied; the portal is sprites, so it is.
+- On the TV the game renders at 1080p whatever the screen, the pixel art doubled onto a
+  4K one unsmoothed (the HUD and menus stay at 4K); the Apple TV 4K's GPU spent about 50 ms
+  a frame at 4K, most of it the glow and the composite. The glow there is half size with
+  the blur's step halved, so it spreads as far as it did at 4K; side by side with a
+  full-size glow it looked the same and cost less. The corner readout shows each render
+  stage's CPU and GPU milliseconds a frame, the whole frame's GPU span (the stages are
+  separate command buffers and can overlap, so they don't sum), and the render and glow
+  sizes.
 - Shadows (`StageFeatures.shadows`, the view's alone): each body's current frame and its
   head, and the goalposts, cast in a dark greyed purple at two thirds, mirrored under the
   feet or the floor line and sheared by the turf's own lean where they stand, so they

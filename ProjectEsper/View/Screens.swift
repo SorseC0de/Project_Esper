@@ -67,7 +67,7 @@ class Screen: SKNode {
         let label = TitleText.node(text, size: size * tuned(.text))
         let buttons = tuned(.buttons)
         let plateSize = CGSize(width: max((width ?? 0) * buttons, label.size.width + 44 * buttons), height: max(label.size.height + 12, (26 + 22) * buttons))
-        let plate = piece.node(size: plateSize)
+        let plate = piece.node(size: plateSize, corners: buttons)
         plate.zPosition = -1
         button.addChild(plate)
         button.addChild(label)
@@ -80,10 +80,11 @@ class Screen: SKNode {
         return button
     }
 
-    /// A black card from the pack behind a screen's content, `size` points round `centre`.
+    /// A black card from the pack behind a screen's content, `size` points round `centre`,
+    /// its height at the panels' scale (its width comes from the header's, which has it).
     @discardableResult
     func addCard(size: CGSize, at centre: CGPoint) -> SKSpriteNode {
-        let card = UIPiece.cardBlack.node(size: size)
+        let card = UIPiece.cardBlack.node(size: CGSize(width: size.width, height: size.height * tuned(.panels)), corners: tuned(.panels))
         card.position = centre
         card.zPosition = -5
         addChild(card)
@@ -95,10 +96,11 @@ class Screen: SKNode {
     func addHeader(_ text: String, size: CGFloat = 34, at point: CGPoint, width: CGFloat? = nil) -> CGFloat {
         let header = SKNode()
         header.position = point
-        let titles = tuned(.titles)
-        let label = TitleText.node(text, size: size * titles)
-        let ribbonSize = CGSize(width: max((width ?? 0) * titles, label.size.width + 80 * titles), height: label.size.height + 24 * titles)
-        let ribbon = UIPiece.headerBlue.node(size: ribbonSize)
+        let panels = tuned(.panels)
+        let label = TitleText.node(text, size: size * tuned(.titles))
+        // The ribbon at the panels' scale, grown only when the lettering needs the room.
+        let ribbonSize = CGSize(width: max((width ?? 0) * panels, label.size.width + 60), height: max(58 * panels, label.size.height + 18))
+        let ribbon = UIPiece.headerBlue.node(size: ribbonSize, corners: panels)
         ribbon.zPosition = -1
         header.addChild(ribbon)
         header.addChild(label)
@@ -118,7 +120,7 @@ class Screen: SKNode {
         for (index, choice) in choices.enumerated() {
             let lit = index == cursor && choice.enabled
             choice.node.setScale(lit ? 1.12 : 1)
-            if let plate = plates[index] { (lit ? UIPiece.buttonGold : plate.piece).fit(plate.plate, to: plate.size) }
+            if let plate = plates[index] { (lit ? UIPiece.buttonGold : plate.piece).fit(plate.plate, to: plate.size, corners: tuned(.buttons)) }
         }
         if plates[cursor] != nil {
             arrow.isHidden = true

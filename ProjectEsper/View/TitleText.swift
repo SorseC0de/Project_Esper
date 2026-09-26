@@ -1,17 +1,25 @@
 import SpriteKit
 import UIKit
 
-/// Title lettering, as CardCourt's TwoXMark has it: Avenir Next Condensed Heavy, white
-/// over light blue split at the letters' middle, a thick black outline walked round a
-/// ring, and a black drop to the south-east. Drawn once per string and size into a
-/// texture, at the screen's scale.
+/// Title lettering: the system's rounded face at its heaviest, white over the palette's
+/// light blue split at the letters' middle, a thick black outline walked round a ring, and
+/// a black drop to the south-east, CardCourt's styling in a rounder face. Drawn once per
+/// string and size into a texture, at the screen's scale.
 enum TitleText {
-    static let face = "AvenirNextCondensed-Heavy"
-    static let italicFace = "AvenirNextCondensed-HeavyItalic"
+    /// SF Pro Rounded Black, italic when asked.
+    static func font(size: CGFloat, italic: Bool) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size, weight: .black)
+        var descriptor = base.fontDescriptor.withDesign(.rounded) ?? base.fontDescriptor
+        if italic { descriptor = descriptor.withSymbolicTraits(.traitItalic) ?? descriptor }
+        return UIFont(descriptor: descriptor, size: size)
+    }
     /// Times the screen's scale the lettering is rendered at, so a HUD scaled up for a
     /// big screen stays crisp. The scene sets it from its HUD scale.
     nonisolated(unsafe) static var renderScale: CGFloat = 1
-    static let lightBlue = UIColor(red: 0x89 / 255, green: 0xD7 / 255, blue: 0xED / 255, alpha: 1)
+    /// The lower half's fill: `EsperPalette`'s blue at its highlight.
+    static let lightBlue = UIColor(red: CGFloat((EsperPalette.blue.highlight >> 16) & 0xFF) / 255,
+                                   green: CGFloat((EsperPalette.blue.highlight >> 8) & 0xFF) / 255,
+                                   blue: CGFloat(EsperPalette.blue.highlight & 0xFF) / 255, alpha: 1)
     /// The outline and the drop, as shares of the text size, and the steps round the ring.
     private static let stroke: CGFloat = 0.09
     private static let drop: CGFloat = 0.12
@@ -31,7 +39,7 @@ enum TitleText {
     static func image(_ text: String, size: CGFloat, italic: Bool = false) -> UIImage {
         let key = "\(size)|\(italic)|\(renderScale)|\(text)"
         if let image = images[key] { return image }
-        let font = UIFont(name: italic ? italicFace : face, size: size) ?? UIFont.boldSystemFont(ofSize: size)
+        let font = font(size: size, italic: italic)
         let measured = (text as NSString).size(withAttributes: [.font: font])
         let ring = size * stroke
         let shadow = size * drop

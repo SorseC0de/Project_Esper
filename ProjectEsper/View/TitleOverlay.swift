@@ -112,7 +112,7 @@ struct TitleOverlay: View {
         Button(action: action) {
             Image(uiImage: TitleText.image(text, size: 26 * scale(.text)))
                 .frame(width: width * scale(.buttons), height: 54 * scale(.buttons))
-                .background(piece.image)
+                .background(piece.image(corners: scale(.buttons)))
         }
         .buttonStyle(.plain)
         .disabled(busy)
@@ -127,7 +127,7 @@ struct TitleOverlay: View {
                 .shadow(color: .black, radius: 0, x: 1, y: 1)
                 .frame(minWidth: 96 * scale(.buttons), minHeight: 30 * scale(.buttons))
                 .padding(.horizontal, 8)
-                .background((picked ? UIPiece.buttonGold : UIPiece.buttonBlack).image)
+                .background((picked ? UIPiece.buttonGold : UIPiece.buttonBlack).image(corners: scale(.buttons)))
         }
         .buttonStyle(.plain)
         .disabled(busy)

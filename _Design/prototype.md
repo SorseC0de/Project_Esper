@@ -350,11 +350,12 @@ Royal blue is the base, black, gold and plum beside it: the screens' ground is a
 royal blue gradient over the world, in place of the old dark material; a dialog is a
 black card under a royal blue header ribbon as wide as it; a choice is a royal blue plate, plum for a
 way back (RESUME, TITLE, TITLE SCREEN), and the cursor's plate turns gold and grows, in
-place of the arrow. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
+place of the arrow. A piece drawn bigger has its corners and rims scaled with it, so a big plate
+keeps the depth of a small one rather than flattening. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
 HUMAN as small switches, gold when picked and black when not, MULTIPLAYER on gold with
 its two mode switches under it, the energy colours on a black plate in the bottom right,
-and UI, bottom left, the tuning panel. Each screen's buttons, text and titles scale
-per platform (`UITuning`: phone, iPad or Mac, TV), set on that panel a step of 0.05 at
+and UI, bottom left, the tuning panel. Each screen's buttons, their text, its titles' lettering and its panels (the header
+ribbon and the card under it) scale per platform (`UITuning`: phone, iPad or Mac, TV), set on that panel a step of 0.05 at
 a time, − and + (which the TV's remote can reach), Pause and Win shown behind it as
 they'd be; the values are kept on the device until they're read off and made the
 defaults. It starts the phone's dialog buttons at 0.75, and the iPad's and the TV's
@@ -403,8 +404,8 @@ best of seven on the stage the match started on; TITLE SCREEN; RESUME, where the
 starts. Start again resumes too. A pick timer of twenty seconds for networked play is a number in `Series`,
 not enforced yet.
 
-Title lettering is `TitleText`: CardCourt's TwoXMark by another route, Avenir Next
-Condensed Heavy, white over light blue split at the capitals' middle, a black outline
+Title lettering is `TitleText`: CardCourt's TwoXMark styling in SF Pro Rounded Black, white
+over the palette blue's highlight (#6BD0FF) split at the capitals' middle, a black outline
 walked round a ring, a black drop to the south-east, drawn into a texture per string.
 
 ## 47

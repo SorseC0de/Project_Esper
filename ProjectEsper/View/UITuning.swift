@@ -20,8 +20,10 @@ enum UIScreenKind: String, CaseIterable {
     case title, pause, win
 }
 
+/// The plates, the lettering on them, the title lettering, and the panels: the header
+/// ribbons and the cards under them.
 enum UIPart: String, CaseIterable {
-    case buttons, text, titles
+    case buttons, text, titles, panels
 }
 
 /// Each screen's button, text and title scales on this platform, set on the UI tuning

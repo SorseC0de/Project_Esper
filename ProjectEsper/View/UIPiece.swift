@@ -35,15 +35,17 @@ enum UIPiece: String {
     }
     private static var textures: [UIPiece: SKTexture] = [:]
 
-    /// The piece stretched to `size` points, the corners kept.
-    func node(size: CGSize) -> SKSpriteNode {
+    /// The piece stretched to `size` points. `corners` scales the corners and rims with it,
+    /// so a plate drawn bigger keeps its depth rather than flattening round small corners.
+    func node(size: CGSize, corners: CGFloat = 1) -> SKSpriteNode {
         let node = SKSpriteNode(texture: texture)
-        fit(node, to: size)
+        fit(node, to: size, corners: corners)
         return node
     }
 
-    /// Resizes a node already showing this piece: its centre stretches, the corners don't.
-    func fit(_ node: SKSpriteNode, to size: CGSize) {
+    /// Resizes a node already showing this piece: its centre stretches, the corners at
+    /// `corners` times their size.
+    func fit(_ node: SKSpriteNode, to size: CGSize, corners: CGFloat = 1) {
         let pixels = texture.size()
         guard pixels.width > 0, pixels.height > 0 else { return }
         let inset = insets
@@ -53,18 +55,21 @@ enum UIPiece: String {
                                  height: max(1 - (inset.bottom + inset.top) / pixels.height, 0.01))
         // Sized at the piece's natural points, then scaled: with a centre rect only the middle stretches.
         node.setScale(1)
-        let natural = CGSize(width: pixels.width * UIPiece.pointsPerPixel, height: pixels.height * UIPiece.pointsPerPixel)
+        let natural = CGSize(width: pixels.width * UIPiece.pointsPerPixel * corners, height: pixels.height * UIPiece.pointsPerPixel * corners)
         node.size = natural
         node.xScale = max(size.width, natural.width * 0.3) / natural.width
         node.yScale = max(size.height, natural.height * 0.3) / natural.height
     }
 
-    /// For SwiftUI: the piece as a stretchable image, the corners kept.
-    var image: Image {
+    /// For SwiftUI: the piece as a stretchable image, the corners at their size.
+    var image: Image { image(corners: 1) }
+
+    /// For SwiftUI: the piece as a stretchable image, the corners at `corners` times their size.
+    func image(corners: CGFloat) -> Image {
         guard let ui = UIImage(named: rawValue) else { return Image(systemName: "square") }
         let inset = insets
-        let scaled = UIImage(cgImage: ui.cgImage!, scale: 1 / UIPiece.pointsPerPixel, orientation: .up)
-        let points = UIPiece.pointsPerPixel
+        let points = UIPiece.pointsPerPixel * corners
+        let scaled = UIImage(cgImage: ui.cgImage!, scale: 1 / points, orientation: .up)
         return Image(uiImage: scaled.resizableImage(withCapInsets: UIEdgeInsets(top: inset.top * points, left: inset.left * points,
                                                                                  bottom: inset.bottom * points, right: inset.right * points),
                                                      resizingMode: .stretch))

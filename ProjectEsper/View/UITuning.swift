@@ -145,6 +145,7 @@ struct UITuningPanel: View {
                 lineRow("NET ROWS", key: NetTuning.rowSpacingKey, value: NetTuning.rowSpacing, step: 0.25, range: 1...8)
                 lineRow("NET WEAVE", key: NetTuning.weaveKey, value: NetTuning.weave, step: 0.25, range: 0...1)
                 lineRow("NET TAPER", key: NetTuning.taperKey, value: NetTuning.taper, step: 0.25, range: 0...0.75)
+                lineRow("NET SKEW", key: NetTuning.skewKey, value: NetTuning.skew, step: 0.25, range: -4...4)
                 lineRow("NET X", key: NetTuning.offsetXKey, value: NetTuning.offset.x, step: 1, range: -20...20)
                 lineRow("NET Y", key: NetTuning.offsetYKey, value: NetTuning.offset.y, step: 1, range: -20...20)
             }

@@ -830,7 +830,7 @@ final class GameScene: SKScene {
             stageGround.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            nets.append(HoopNet(at: GameScene.netPoint(for: hoop), colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow), into: stageGlowers))
+            nets.append(HoopNet(at: GameScene.netPoint(for: hoop), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow), into: stageGlowers))
         }
     }
 

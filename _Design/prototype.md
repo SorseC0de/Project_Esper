@@ -769,19 +769,23 @@ the floor's row everything is the outline black, #242234. Its hoops are `hoop`, 
 to the players' scale, placed 5 art pixels out from the backboard and 10 up from the rim's point
 (`HoopTuning.offset`), kept out of the glow (the mask marks it, as it does the banner);
 the net is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
-(3) art pixels apart across and NET ROWS (2.5, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.5) of
+(4) art pixels apart across and NET ROWS (2.75, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.5) of
 the way to the neighbour it's knotted to on that row, toward the right-hand one on one row and
 the left-hand one on the next, an edge strand with no one that side hanging straight, so the
-chevrons run in diagonals both ways, diamonds with knots; NET TAPER (0) narrows it toward the
-bottom; each chevron smaller than the one
+chevrons run in diagonals both ways, diamonds with knots; NET TAPER (0.5) narrows it toward the
+bottom; NET SKEW (0) raises each column that many art pixels over the one before, toward
+the backboard, to match its angle; each chevron smaller than the one
 above, from NET TOP (×1) at the rim to NET BOTTOM (×0.25) at the bottom (a chevron is 2.25
 across and 1.5 deep at ×1, 1 thick), the whole net moved from the rim's point by NET X and
 NET Y (−2, −4; x mirrored on a left backboard, as the hoop's art is); the sliders are on the
-UI tuning panel, under HUD. Each chevron is a
-knot of a Verlet cloth, the top ones pinned to the rim and following it, each tied to the
-one below and its neighbours across. The ball, swept from last frame's point to this one's
-so a fast shot can't slip between knots, pushes them out and drags them 0.4 of its travel; a
-swish is the ball going through, nothing scripted. Bodies near the rim push it too. It's in
+UI tuning panel, under HUD. Each chevron is a knot of a Verlet cloth, the top ones pinned to the rim and following it,
+each tied to the one below and its neighbours across, and each pulled 0.08 of the way back to
+its place every frame, so the net always settles to its shape. The ball, swept from last
+frame's point to this one's so a fast shot can't slip between knots, pushes them out and drags
+them 0.4 of its travel. A ball dropping in through the rim's opening is a swish: from that
+frame the net is pushed by the ball as it came in, carried on at that speed and angle (at
+least a pixel a frame down) through the bottom or for 40 frames, not by the ball the sim then
+bounces off the back of the rim, so the net flares the way the shot was going. Bodies near the rim push it too. It's in
 the guarding side's energy, in the glow; still and with nothing near, it sleeps. The numbers
 are `NetTuning`. The football field's and
 the highway's backboards are to be fitted to it. The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The

@@ -1,8 +1,10 @@
 import AVFoundation
 
 /// The sound effects, from `Sounds` (brought in from `_Sound FX` by `Tools/import_sounds.py`).
-/// Each file is read into memory once and played on a ring of voices through one engine,
-/// so a sound starts the frame it's asked for and a few overlap.
+/// Each file is read into memory once and played on a pool of voices through one engine,
+/// so a sound starts the frame it's asked for and a few overlap. The voices are left
+/// running and a sound goes to one that has finished, since stopping a playing voice
+/// waits on the audio thread: on the TV that cost the main thread milliseconds a frame.
 @MainActor
 final class SoundBoard {
     static let shared = SoundBoard()
@@ -19,8 +21,8 @@ final class SoundBoard {
         case lightningTwo = "lightning2"
         case lightningThree = "lightning3"
         case menuBack = "menu_back"
-        case menuCursor = "menu_cursor"
         case menuSelect = "menu_select"
+        case menuSelectV2 = "menu_select_v2"
         case playerHit = "player_hit"
         case playerShoot = "player_shoot"
         case playerSnatch = "player_snatch"
@@ -33,7 +35,8 @@ final class SoundBoard {
     private let engine = AVAudioEngine()
     private var buffers: [Effect: AVAudioPCMBuffer] = [:]
     private var voices: [AVAudioPlayerNode] = []
-    private var nextVoice = 0
+    /// When each voice's last sound ends.
+    private var busyUntil: [CFTimeInterval] = []
 
     private init() {
         // Ambient: under the silent switch, and mixed with whatever else is playing.
@@ -49,6 +52,10 @@ final class SoundBoard {
                 print("SoundBoard: \(effect.rawValue).wav missing or not 44.1 kHz mono")
                 continue
             }
+            if SoundBoard.reversed.contains(effect), let samples = buffer.floatChannelData?[0] {
+                var frames = UnsafeMutableBufferPointer(start: samples, count: Int(buffer.frameLength))
+                frames.reverse()
+            }
             buffers[effect] = buffer
         }
         for _ in 0..<SoundBoard.voiceCount {
@@ -56,24 +63,39 @@ final class SoundBoard {
             engine.attach(voice)
             engine.connect(voice, to: engine.mainMixerNode, format: format)
             voices.append(voice)
+            busyUntil.append(0)
         }
         try? engine.start()
+        if engine.isRunning { for voice in voices { voice.play() } }
     }
 
     static let lightning: [Effect] = [.lightningOne, .lightningTwo, .lightningThree]
+    /// The menus' two sounds: moving the cursor, and choosing. menu_cursor was too loud
+    /// beside everything else; the old choice sound moves to the cursor.
+    static let navigate = Effect.menuSelect
+    static let confirm = Effect.menuSelectV2
+    /// Played back to front.
+    private static let reversed: Set<Effect> = [.menuSelectV2]
     static let count: [Int: Effect] = [1: .countOne, 2: .countTwo, 3: .countThree]
 
-    /// Plays on the next voice round the ring, cutting off whatever it was playing.
+    /// Plays on a voice that has finished; with every voice busy, the one nearest its end is cut off.
     func play(_ effect: Effect, volume: Float = 1) {
         guard let buffer = buffers[effect], volume > 0 else { return }
         // A call or another app can stop the engine; it starts again on the next sound.
-        if !engine.isRunning { try? engine.start() }
-        guard engine.isRunning else { return }
-        let voice = voices[nextVoice]
-        nextVoice = (nextVoice + 1) % voices.count
-        voice.stop()
+        if !engine.isRunning {
+            try? engine.start()
+            guard engine.isRunning else { return }
+            for voice in voices { voice.play() }
+        }
+        let now = CACurrentMediaTime()
+        let index = busyUntil.firstIndex { $0 <= now } ?? busyUntil.indices.min { busyUntil[$0] < busyUntil[$1] }!
+        let voice = voices[index]
+        if busyUntil[index] > now {
+            voice.stop()
+            voice.play()
+        }
+        busyUntil[index] = now + Double(buffer.frameLength) / buffer.format.sampleRate
         voice.volume = volume
         voice.scheduleBuffer(buffer, at: nil)
-        voice.play()
     }
 }

@@ -210,7 +210,15 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
                 GlowRenderer.stageOrder.compactMap { name in totals[name].map { "\(name) \(String(format: "%.1f", $0 * 1000 / frames))" } }.joined(separator: "  ")
             }
             let span = gpu["frame"].map { String(format: "%.1f", $0 * 1000 / frames) } ?? "-"
-            scene.frameReadout = "cpu  \(line(cpuTotals))\ngpu  \(line(gpu))\ngpu frame \(span)  \n\(Int(view.drawableSize.width))x\(Int(view.drawableSize.height))  glow \(glowA.width)x\(glowA.height)"
+            // Ours on the CPU against the whole frame: the difference is everything else on
+            // the main thread, the HUD's view among it.
+            let ours = cpuTotals.values.reduce(0, +) * 1000 / frames
+            let interval = (now - fpsWindowStart) * 1000 / frames
+            let readout = String(format: "cpu ours %.1f of %.1f frame", ours, interval)
+            // The update's own sections, the costliest first.
+            let sections = scene.takeSectionTimes().sorted { $0.value > $1.value }.prefix(6)
+                .map { "\($0.key) \(String(format: "%.1f", $0.value * 1000 / frames))" }.joined(separator: "  ")
+            scene.frameReadout = "cpu  \(line(cpuTotals))\nupdate  \(sections)\n\(readout)\ngpu  \(line(gpu))\ngpu frame \(span)  \n\(Int(view.drawableSize.width))x\(Int(view.drawableSize.height))  glow \(glowA.width)x\(glowA.height)"
             cpuTotals = [:]
             framesDrawn = 0
             worstGap = 0

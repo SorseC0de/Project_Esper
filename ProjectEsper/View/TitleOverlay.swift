@@ -47,7 +47,7 @@ struct TitleOverlay: View {
             VStack(spacing: 32) {
                 Image(uiImage: TitleText.image("PROJECT ESPER", size: 56))
                 Button {
-                    SoundBoard.shared.play(.menuSelect)
+                    SoundBoard.shared.play(SoundBoard.confirm)
                     flow.startSeries?()
                 } label: {
                     Image(uiImage: TitleText.image("BEST OF 7", size: 28))
@@ -56,7 +56,7 @@ struct TitleOverlay: View {
                 .disabled(busy)
                 VStack(spacing: 10) {
                     Button {
-                        SoundBoard.shared.play(.menuSelect)
+                        SoundBoard.shared.play(SoundBoard.confirm)
                         net.findMatch()
                     } label: {
                         Image(uiImage: TitleText.image("MULTIPLAYER", size: 28))
@@ -82,7 +82,7 @@ struct TitleOverlay: View {
             ForEach(EnergyColour.allCases, id: \.self) { choice in
                 Button {
                     colour = choice.rawValue
-                    SoundBoard.shared.play(.menuCursor)
+                    SoundBoard.shared.play(SoundBoard.navigate)
                     flow.scene.applySavedColours()
                 } label: {
                     Circle()

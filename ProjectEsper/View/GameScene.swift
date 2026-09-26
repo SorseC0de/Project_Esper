@@ -235,6 +235,18 @@ final class GameScene: SKScene {
     var worstFrameMilliseconds = 0
     /// Each render stage's milliseconds a frame, CPU and GPU, from the Metal view.
     var frameReadout = ""
+    /// Where `update` spends its time, by section, for the readout; taken once a second.
+    private var sectionTimes: [String: Double] = [:]
+    private var sectionMark = 0.0
+    private func section(_ name: String) {
+        let now = CACurrentMediaTime()
+        sectionTimes[name, default: 0] += now - sectionMark
+        sectionMark = now
+    }
+    func takeSectionTimes() -> [String: Double] {
+        defer { sectionTimes = [:] }
+        return sectionTimes
+    }
 
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
@@ -1040,7 +1052,7 @@ final class GameScene: SKScene {
                 if pad.stick.y >= 0.5, menuLast.stick.y < 0.5 { screen.move(-1) }
                 if pad.jump, !menuLast.jump { screen.fire() }
             } else if flow == .title, pad.jump, !menuLast.jump, online == nil {
-                SoundBoard.shared.play(.menuSelect)
+                SoundBoard.shared.play(SoundBoard.confirm)
                 startSeries()
             }
             menuLast = pad
@@ -1066,6 +1078,7 @@ final class GameScene: SKScene {
             controls?.showHitboxes = showHitboxes
         }
         var steps = 0
+        sectionMark = CACurrentMediaTime()
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
             let tick: SessionTick
             if online != nil {
@@ -1074,12 +1087,16 @@ final class GameScene: SKScene {
             } else {
                 var remote = inputs.count > 1 ? inputs[1] : .idle
                 if aiOn, !hub.playerTwoHasController { remote = opponent.decide(match) }
+                section("ai")
                 tick = session.tick(local: inputs[0], remote: remote)
             }
+            section("sim")
             show(tick.shown)
             confirm(tick.confirmed)
+            section("events")
             tickBallColour()
             tickCourtColour()
+            section("colours")
             accumulator -= GameScene.stepSeconds
             steps += 1
         }
@@ -3147,11 +3164,15 @@ final class GameScene: SKScene {
     // MARK: Drawing
 
     private func render() {
+        sectionMark = CACurrentMediaTime()
         stepHeadParticles()
+        section("particles")
         for (index, player) in match.players.enumerated() {
             let node = playerNodes[index]
             let frame = player.animationFrame
+            section("bodies")
             playFrameSounds(index, frame: frame, grounded: player.grounded)
+            section("sounds")
             // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
             node.texture = sprites.texture(frame, player: index, ballAsEnergy: wholeSheet)
@@ -3354,9 +3375,13 @@ final class GameScene: SKScene {
             }
             lastStates[index] = player.state
         }
+        section("bodies")
         drawPowersLeavings()
+        section("powers")
         drawField()
+        section("field")
         drawTraffic()
+        section("traffic")
         // Riders follow their body, the offset turned with it.
         riders.removeAll { $0.node.parent == nil }
         for rider in riders {
@@ -3405,6 +3430,7 @@ final class GameScene: SKScene {
         }
 
         drawPlatforms()
+        section("webs")
 
         let ball = match.ball
         ballNode.isHidden = ball.holder != nil
@@ -3496,8 +3522,10 @@ final class GameScene: SKScene {
             }
         }
         for dot in previewDots[shownDots...] { dot.isHidden = true }
+        section("ball")
 
         drawHitboxes()
+        section("hitbox")
         // The count in title lettering, BALL OUT as it ends, and any other banner for its frames.
         // With a screen up or on its way, the count waits: it starts again as play comes back.
         let counting = flow == .playing && pendingFlow == nil

@@ -46,7 +46,7 @@ class Screen: SKNode {
 
     /// A lettered button. Disabled ones are dimmed and never fire.
     @discardableResult
-    func addButton(_ text: String, size: CGFloat = 26, at point: CGPoint, enabled: Bool = true, sound: SoundBoard.Effect = .menuSelect,
+    func addButton(_ text: String, size: CGFloat = 26, at point: CGPoint, enabled: Bool = true, sound: SoundBoard.Effect = SoundBoard.confirm,
                    action: @escaping () -> Void) -> SKNode {
         let label = TitleText.node(text, size: size)
         label.position = point
@@ -64,7 +64,7 @@ class Screen: SKNode {
 
     /// `arrowAt` is where the arrow sits for this choice, turned `arrowTurn` from pointing down.
     func addChoice(_ node: SKNode, hit: CGRect, enabled: Bool = true, arrowAt: CGPoint, arrowTurn: CGFloat, action: @escaping () -> Void) {
-        choices.append(Choice(node: node, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: arrowTurn, sound: .menuSelect, action: action))
+        choices.append(Choice(node: node, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: arrowTurn, sound: SoundBoard.confirm, action: action))
         showCursor()
     }
 
@@ -93,7 +93,7 @@ class Screen: SKNode {
         } else {
             cursor = index
             showCursor()
-            SoundBoard.shared.play(.menuCursor)
+            SoundBoard.shared.play(SoundBoard.navigate)
             moved()
         }
         return true
@@ -113,7 +113,7 @@ class Screen: SKNode {
         guard !choices.isEmpty else { return }
         cursor = (cursor + delta + choices.count) % choices.count
         showCursor()
-        SoundBoard.shared.play(.menuCursor)
+        SoundBoard.shared.play(SoundBoard.navigate)
         moved()
     }
 
@@ -340,14 +340,14 @@ final class StageSelectScreen: Screen {
     func move(voter: Int, by delta: Int) {
         guard picks[voter] == nil, flipLit == nil, let at = cursors[voter] else { return }
         cursors[voter] = (at + delta + tiles.count) % tiles.count
-        SoundBoard.shared.play(.menuCursor)
+        SoundBoard.shared.play(SoundBoard.navigate)
         refresh()
     }
 
     func lock(voter: Int) {
         guard picks[voter] == nil, flipLit == nil, let at = cursors[voter] else { return }
         picks[voter] = at
-        SoundBoard.shared.play(.menuSelect)
+        SoundBoard.shared.play(SoundBoard.confirm)
         refresh()
         onPick(voter, at)
     }
@@ -382,7 +382,7 @@ final class StageSelectScreen: Screen {
             lock(voter: voter)
         } else if picks[voter] == nil {
             cursors[voter] = index
-            SoundBoard.shared.play(.menuCursor)
+            SoundBoard.shared.play(SoundBoard.navigate)
             refresh()
         }
         return true

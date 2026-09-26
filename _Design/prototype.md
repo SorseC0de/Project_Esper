@@ -352,14 +352,16 @@ black card under a royal blue header ribbon as wide as it; a choice is a royal b
 way back (RESUME, TITLE, TITLE SCREEN), and the cursor's plate turns gold and grows, in
 place of the arrow. A piece drawn bigger has its corners and rims scaled with it, so a big plate
 keeps the depth of a small one rather than flattening. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
-HUMAN as small switches, gold when picked and black when not, MULTIPLAYER on gold with
+HUMAN as small switches, plum when picked and black when not, MULTIPLAYER on plum with
 its two mode switches under it, the energy colours on a black plate in the bottom right,
 and UI, bottom left, the tuning panel. Each screen's buttons, their text, its titles' lettering and its panels (the header
 ribbon and the card under it) scale per platform (`UITuning`: phone, iPad or Mac, TV), set on that panel a step of 0.05 at
 a time, − and + (which the TV's remote can reach), Pause and Win shown behind it as
 they'd be; the values are kept on the device until they're read off and made the
-defaults. It starts the phone's dialog buttons at 0.75, and the iPad's and the TV's
-title at 2.5 and their text elsewhere at 1.5. Phase one is
+defaults. It starts the phone's dialog buttons at 0.75; the iPad's pause and win at buttons 1,
+text 1.5, titles 1.5 and panels 0.9, as tuned on one; and the iPad's and the TV's title
+at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the plate's
+face, above its lip, and is nudged up and left by half its own drop. Phase one is
 the title, the pause and the win; the stage select, the Greateraid pick, the HUD and the
 touch pad follow.
 

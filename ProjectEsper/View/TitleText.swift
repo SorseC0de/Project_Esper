@@ -75,6 +75,10 @@ enum TitleText {
         return image
     }
 
+    /// How far lettering of `size` reads off its middle, its black drop falling to the
+    /// south-east: half that drop, to take off when centring it on something.
+    static func dropShift(size: CGFloat) -> CGFloat { size * drop / 2 }
+
     /// A sprite of the lettering, sized in points.
     static func node(_ text: String, size: CGFloat, italic: Bool = false) -> SKSpriteNode {
         let texture = texture(text, size: size, italic: italic)

@@ -82,7 +82,7 @@ struct TitleOverlay: View {
                     }
                 }
                 VStack(spacing: 10) {
-                    plated("MULTIPLAYER", piece: .buttonGold, width: 240) {
+                    plated("MULTIPLAYER", piece: .buttonPlum, width: 240) {
                         SoundBoard.shared.play(SoundBoard.confirm)
                         net.findMatch()
                     }
@@ -110,7 +110,10 @@ struct TitleOverlay: View {
     /// A lettered button on one of the pack's plates, at the title's tuned sizes.
     private func plated(_ text: String, piece: UIPiece, width: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
+            let shift = TitleText.dropShift(size: 26 * scale(.text))
             Image(uiImage: TitleText.image(text, size: 26 * scale(.text)))
+                // Centred on the plate's face, the drop taken off (SwiftUI's y runs down).
+                .offset(x: -shift, y: -(piece.faceRise * scale(.buttons) + shift))
                 .frame(width: width * scale(.buttons), height: 54 * scale(.buttons))
                 .background(piece.image(corners: scale(.buttons)))
         }
@@ -125,9 +128,10 @@ struct TitleOverlay: View {
                 .font(.system(size: 12 * scale(.text), weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .shadow(color: .black, radius: 0, x: 1, y: 1)
+                .offset(y: -UIPiece.buttonPlum.faceRise * scale(.buttons))
                 .frame(minWidth: 96 * scale(.buttons), minHeight: 30 * scale(.buttons))
                 .padding(.horizontal, 8)
-                .background((picked ? UIPiece.buttonGold : UIPiece.buttonBlack).image(corners: scale(.buttons)))
+                .background((picked ? UIPiece.buttonPlum : UIPiece.buttonBlack).image(corners: scale(.buttons)))
         }
         .buttonStyle(.plain)
         .disabled(busy)

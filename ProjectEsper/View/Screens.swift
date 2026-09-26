@@ -70,6 +70,9 @@ class Screen: SKNode {
         let plate = piece.node(size: plateSize, corners: buttons)
         plate.zPosition = -1
         button.addChild(plate)
+        // Centred on the plate's face, the drop taken off.
+        let shift = TitleText.dropShift(size: size * tuned(.text))
+        label.position = CGPoint(x: -shift, y: piece.faceRise * buttons + shift)
         button.addChild(label)
         addChild(button)
         let hit = CGRect(x: point.x - plateSize.width / 2, y: point.y - plateSize.height / 2, width: plateSize.width, height: plateSize.height)
@@ -103,6 +106,8 @@ class Screen: SKNode {
         let ribbon = UIPiece.headerBlue.node(size: ribbonSize, corners: panels)
         ribbon.zPosition = -1
         header.addChild(ribbon)
+        let shift = TitleText.dropShift(size: size * tuned(.titles))
+        label.position = CGPoint(x: -shift, y: shift)
         header.addChild(label)
         addChild(header)
         return ribbonSize.width

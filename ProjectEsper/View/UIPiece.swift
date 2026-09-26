@@ -22,6 +22,16 @@ enum UIPiece: String {
         }
     }
 
+    /// Points, at its natural size, that the piece's face sits above its middle: a plate's
+    /// dark lip and drop shadow are along its bottom, so lettering centred on the whole
+    /// piece reads low on the face.
+    var faceRise: CGFloat {
+        switch self {
+        case .buttonBlue, .buttonGold, .buttonBlack, .buttonPlum: 5 * UIPiece.pointsPerPixel
+        case .headerBlue, .cardBlack: 0
+        }
+    }
+
     /// The piece's pixels count as this many points: the files are half the pack's size,
     /// and the pack draws at about three pixels to the point.
     static let pointsPerPixel: CGFloat = 1.0 / 2.5

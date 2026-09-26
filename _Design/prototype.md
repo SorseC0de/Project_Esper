@@ -769,9 +769,11 @@ the floor's row everything is the outline black, #242234. Its hoops are `hoop`, 
 to the players' scale, placed 5 art pixels out from the backboard and 10 up from the rim's point
 (`HoopTuning.offset`), kept out of the glow (the mask marks it, as it does the banner);
 the net is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
-(3) art pixels apart across and NET ROWS (2.5, in quarters) apart down, the strands crossing: by the 4th chevron column 1
-has moved over to column 4 and 2 to 5, and 4 to 1 and 5 to 2, the middle straight, those
-above on the line there and those below hanging straight under it; each chevron smaller than the one
+(3) art pixels apart across and NET ROWS (2.5, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.5) of
+the way to the neighbour it's knotted to on that row, toward the right-hand one on one row and
+the left-hand one on the next, an edge strand with no one that side hanging straight, so the
+chevrons run in diagonals both ways, diamonds with knots; NET TAPER (0) narrows it toward the
+bottom; each chevron smaller than the one
 above, from NET TOP (×1) at the rim to NET BOTTOM (×0.25) at the bottom (a chevron is 2.25
 across and 1.5 deep at ×1, 1 thick), the whole net moved from the rim's point by NET X and
 NET Y (−2, −4; x mirrored on a left backboard, as the hoop's art is); the sliders are on the

@@ -6,11 +6,6 @@ import SpriteKit
 enum NetTuning {
     static let columns = 5
     static let chevronsPerColumn = 7
-    /// The strands cross: by this chevron (0 at the rim) each column has moved over to the
-    /// column it's paired with, 1 with 4 and 2 with 5 each way, the middle staying; the
-    /// chevrons above lie on the line there, those below hang straight under it.
-    static let crossRow = 3
-    static let crossedColumn = [3, 4, 2, 0, 1]
     static let gravity: CGFloat = 0.18
     /// Share of its speed a knot keeps from one frame to the next.
     static let damping: CGFloat = 0.9
@@ -26,19 +21,27 @@ enum NetTuning {
     /// NET TOP and NET BOTTOM on the UI tuning panel, under HUD: the chevrons' scale at the
     /// rim and at the bottom, those between stepping down evenly; NET SPREAD, art pixels
     /// between the columns; NET ROWS, between chevrons down a column; NET X and NET Y, the
-    /// whole net against the rim, x mirrored on a left backboard as the hoop's art is.
-    /// Kept between launches.
+    /// whole net against the rim, x mirrored on a left backboard as the hoop's art is;
+    /// NET WEAVE, the share of the way each strand leans to the neighbour it's knotted to on
+    /// a row, the pairing flipping every row, so the chevrons run in diagonals both ways;
+    /// NET TAPER, the share of its width the net loses by the bottom. Kept between launches.
     static let topScaleKey = "ui.net.columns.topScale"
     static let bottomScaleKey = "ui.net.columns.bottomScale"
     static let spreadKey = "ui.net.columns.spread"
     static let rowSpacingKey = "ui.net.columns.rowSpacing"
     static let offsetXKey = "ui.net.offsetX"
     static let offsetYKey = "ui.net.offsetY"
+    static let weaveKey = "ui.net.weave"
+    static let taperKey = "ui.net.taper"
     static var topScale: CGFloat { stored(topScaleKey) ?? 1 }
     static var bottomScale: CGFloat { stored(bottomScaleKey) ?? 0.25 }
     static var spread: CGFloat { stored(spreadKey) ?? 3 }
     static var rowSpacing: CGFloat { stored(rowSpacingKey) ?? 2.5 }
+    static var weave: CGFloat { stored(weaveKey) ?? 0.5 }
+    static var taper: CGFloat { stored(taperKey) ?? 0 }
     static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? -2, y: stored(offsetYKey) ?? -4) }
+    /// What the mesh is built from; a change rebuilds it.
+    static var meshValues: [CGFloat] { [spread, rowSpacing, weave, taper] }
     private static func stored(_ key: String) -> CGFloat? {
         (UserDefaults.standard.object(forKey: key) as? Double).map { CGFloat($0) }
     }
@@ -86,9 +89,10 @@ final class HoopNet {
         buildMesh()
     }
 
-    /// The strands hung from the rim a spread apart, crossing to their paired columns.
+    /// The strands hung from the rim a spread apart, each row leaning pairs of neighbours
+    /// together into knots, the pairs shifting by one every row.
     private func buildMesh() {
-        builtSpacing = [NetTuning.spread, NetTuning.rowSpacing]
+        builtSpacing = NetTuning.meshValues
         knots = []
         ties = []
         let columns = NetTuning.columns, rows = NetTuning.chevronsPerColumn
@@ -97,10 +101,14 @@ final class HoopNet {
         for column in 0..<columns {
             var line: [Int] = []
             let topX = -halfWidth + CGFloat(column) * NetTuning.spread
-            let crossedX = -halfWidth + CGFloat(NetTuning.crossedColumn[column]) * NetTuning.spread
             for row in 0..<rows {
-                let crossShare = min(CGFloat(row) / CGFloat(NetTuning.crossRow), 1)
-                let offset = CGPoint(x: topX + (crossedX - topX) * crossShare, y: -CGFloat(row) * NetTuning.rowSpacing)
+                // Toward the right-hand neighbour on one row, the left-hand one on the next;
+                // an edge strand with no one that side hangs straight.
+                let partner = (column + row) % 2 == 1 ? column + 1 : column - 1
+                let lean: CGFloat = row == 0 || !(0..<columns).contains(partner) ? 0 : CGFloat(partner - column)
+                let widthShare = 1 - NetTuning.taper * CGFloat(row) / CGFloat(rows - 1)
+                let x = (topX + lean * NetTuning.weave * NetTuning.spread / 2) * widthShare
+                let offset = CGPoint(x: x, y: -CGFloat(row) * NetTuning.rowSpacing)
                 let at = CGPoint(x: rim.x + offset.x, y: rim.y + offset.y)
                 line.append(knots.count)
                 knots.append(Knot(at: at, was: at, row: row, pin: row == 0 ? offset : nil))
@@ -133,7 +141,7 @@ final class HoopNet {
     func step(rim: CGPoint, ball: CGPoint?, ballRadius: CGFloat, bodies: [CGPoint]) {
         let rimMoved = HoopNet.distance(rim, self.rim) > 0.01
         self.rim = rim
-        if builtSpacing != [NetTuning.spread, NetTuning.rowSpacing] { buildMesh() }
+        if builtSpacing != NetTuning.meshValues { buildMesh() }
         let reach = NetTuning.spread * CGFloat(NetTuning.columns) + NetTuning.rowSpacing * CGFloat(NetTuning.chevronsPerColumn) + 24
         let ballNear = ball.map { HoopNet.distance($0, rim) < reach } ?? false
         let bodyNear = bodies.contains { HoopNet.distance($0, rim) < reach }

@@ -421,4 +421,13 @@ final class HighwayTests: XCTestCase {
         XCTAssertEqual(stage.wall(beside: body), .right, "still a wall to everything else")
         XCTAssertNil(stage.wall(beside: body, riding: true))
     }
+
+    func testTheStadiumsBackboardsRunBackToTheWalls() {
+        let stage = Stage.footballField
+        let left = stage.ballBlockers.min { $0.min.x < $1.min.x }!
+        let right = stage.ballBlockers.max { $0.max.x < $1.max.x }!
+        XCTAssertEqual(left.min.x, Stage.tileSize, accuracy: 0.001)
+        XCTAssertEqual(right.max.x, stage.width - Stage.tileSize, accuracy: 0.001)
+        XCTAssertTrue(Stage.court.ballBlockers.isEmpty, "the court's backboards are its blocks")
+    }
 }

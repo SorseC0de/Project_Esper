@@ -1620,7 +1620,7 @@ final class FootsiesTests: XCTestCase {
         XCTAssertFalse(match.players[0].grounded)
         XCTAssertEqual(match.players[0].facing, .left)
         XCTAssertLessThan(match.players[0].velocity.x, 0, "the jump goes the new way")
-        XCTAssertGreaterThanOrEqual(-match.players[0].velocity.x, speed / 2, "carrying what's left of the run, and the stick's push")
+        XCTAssertEqual(-match.players[0].velocity.x, speed, accuracy: 0.001, "the run's whole speed, the new way")
     }
 
     func testTheSlashClanksOnAWallAndNotInTheOpen() {

@@ -115,11 +115,18 @@ enum CameraTuning {
     static let slideSeconds: Double = 0.5
 }
 
-/// 47's three-point lines, on the 3PT sliders until they're settled: their thickness in
-/// art pixels and their opacity.
+/// 47's three-point lines: their thickness in art pixels and their opacity, set on the UI
+/// tuning panel (3PT WIDTH and 3PT ALPHA, under HUD) and kept between launches.
 enum ThreePointTuning {
-    static var lineWidth: CGFloat = 2
-    static var alpha: CGFloat = 0.35
+    static let widthKey = "ui.threePoint.width"
+    static let alphaKey = "ui.threePoint.alpha"
+    static var lineWidth: CGFloat { (UserDefaults.standard.object(forKey: widthKey) as? Double).map { CGFloat($0) } ?? 2 }
+    static var alpha: CGFloat { (UserDefaults.standard.object(forKey: alphaKey) as? Double).map { CGFloat($0) } ?? 0.35 }
+}
+
+/// The hoop's art against the rim's point, in art pixels: across away from the backboard, and up.
+enum HoopTuning {
+    static let offset = CGPoint(x: 5, y: 10)
 }
 
 enum BackboardTuning {
@@ -150,15 +157,9 @@ enum GoalpostTuning {
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the
 /// right rim in the dunk, on the sequence frame the DUNK FRAME slider picks, and the
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
-/// The hoop's art against the rim's point, in art pixels, on the HOOP sliders until it's
-/// settled; across, it points away from the backboard.
-enum HoopTuning {
-    nonisolated(unsafe) static var offset = CGPoint.zero
-}
-
 enum DunkTuning {
-    /// On while the new hoop's art is placed: the game holds a body hung on the right rim.
-    static let enabled = true
+    /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
+    static let enabled = false
     nonisolated(unsafe) static var frame = 0
 }
 

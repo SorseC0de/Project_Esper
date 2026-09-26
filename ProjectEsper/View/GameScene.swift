@@ -281,14 +281,19 @@ final class GameScene: SKScene {
         }
     }
 
-    /// What's drawn in the world but must not glow, for the mask to mark: the banner.
+    /// What's drawn in the world but must not glow, for the mask to mark: the hoops and the banner.
     var flatSnapshots: [BodySnapshot] {
-        guard !banner.isHidden, let texture = banner.texture else { return [] }
+        // The hoops: their backboards read too hot with the glow on them.
+        var flat = rimNodes.filter { !$0.isHidden }.compactMap { rim in
+            rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size) }
+        }
+        guard !banner.isHidden, let texture = banner.texture else { return flat }
         let scale = glowHud.xScale
-        return [BodySnapshot(texture: texture,
-                             position: CGPoint(x: glowHud.position.x + banner.position.x * scale, y: glowHud.position.y + banner.position.y * scale),
-                             anchor: banner.anchorPoint, xScale: 1,
-                             size: CGSize(width: banner.size.width * scale, height: banner.size.height * scale))]
+        flat.append(BodySnapshot(texture: texture,
+                                 position: CGPoint(x: glowHud.position.x + banner.position.x * scale, y: glowHud.position.y + banner.position.y * scale),
+                                 anchor: banner.anchorPoint, xScale: 1,
+                                 size: CGSize(width: banner.size.width * scale, height: banner.size.height * scale)))
+        return flat
     }
 
     // MARK: Ball cam
@@ -1038,21 +1043,7 @@ final class GameScene: SKScene {
                 index == 1 ? self?.openBoundsGallery() : self?.closeBoundsGallery()
             }
         }
-        // 47's three-point lines, while they're being settled.
-        if gameMode == .fortySeven, online == nil {
-            controls.addSlider(title: "3PT WIDTH", range: 1...8, notch: 1, value: Float(ThreePointTuning.lineWidth)) { [weak self] value in
-                ThreePointTuning.lineWidth = CGFloat(value)
-                for arc in self?.threePointArcSides ?? [] { arc.node.lineWidth = CGFloat(value) }
-            }
-            controls.addSlider(title: "3PT ALPHA", range: 0.05...1, notch: 0.05, value: Float(ThreePointTuning.alpha)) { [weak self] value in
-                ThreePointTuning.alpha = CGFloat(value)
-                for arc in self?.threePointArcSides ?? [] { arc.node.alpha = CGFloat(value) }
-            }
-        }
         if DunkTuning.enabled {
-            // The hoop's art against the rim, tuned with a body hung on it.
-            controls.addSlider(title: "HOOP X", range: -32...32, notch: 1, value: Float(HoopTuning.offset.x)) { HoopTuning.offset.x = CGFloat($0) }
-            controls.addSlider(title: "HOOP Y", range: -32...32, notch: 1, value: Float(HoopTuning.offset.y)) { HoopTuning.offset.y = CGFloat($0) }
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
                 DunkArt.offsets[DunkTuning.frame].x = CGFloat($0)
@@ -1626,6 +1617,7 @@ final class GameScene: SKScene {
             break
         }
         if let screen { hud.addChild(screen) }
+        drawSeries()
         flowState?.blackGround = screen is PickScreen
         flowState?.showsTitle = previewing == nil
         flowState?.veiled = screen != nil
@@ -1697,7 +1689,11 @@ final class GameScene: SKScene {
     /// winner's colour as they go, a sixth and seventh added if the series gets there;
     /// and to either side of them each side's drinks, with their levels.
     private func drawSeries() {
-        threePointArcs.isHidden = gameMode != .fortySeven
+        threePointArcs.isHidden = gameMode != .fortySeven && previewing != .hud
+        for arc in threePointArcSides {
+            arc.node.lineWidth = ThreePointTuning.lineWidth
+            arc.node.alpha = ThreePointTuning.alpha
+        }
         if gameMode == .fortySeven {
             // 47: each side's points either side of the middle, in its colour, no circles, no drinks.
             for label in drinkLabels { label.text = "" }

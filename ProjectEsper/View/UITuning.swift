@@ -77,6 +77,9 @@ final class UITuning: ObservableObject {
 
     private static var textRiseKey: String { "ui.\(UIPlatform.current.rawValue).textRise" }
 
+    /// Something tuned outside the scales changed: redraw.
+    func touch() { revision += 1 }
+
     func reset(_ screen: UIScreenKind) {
         for part in UIPart.allCases { UserDefaults.standard.removeObject(forKey: UITuning.key(screen, part)) }
         revision += 1
@@ -134,6 +137,10 @@ struct UITuningPanel: View {
                 }
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
             }
+            if screen == .hud {
+                lineRow("3PT WIDTH", key: ThreePointTuning.widthKey, value: ThreePointTuning.lineWidth, step: 1, range: 1...8)
+                lineRow("3PT ALPHA", key: ThreePointTuning.alphaKey, value: ThreePointTuning.alpha, step: 0.05, range: 0.05...1)
+            }
             HStack(spacing: 8) {
                 Text("TEXT Y").frame(width: 80, alignment: .leading)
                 panelButton("−", picked: false) { tuning.nudgeTextRise(by: -1); flow.scene.refreshPreview() }
@@ -155,6 +162,23 @@ struct UITuningPanel: View {
         .foregroundStyle(.white)
         .padding(16)
         .background(UIPiece.cardBlack.image)
+    }
+
+    /// A row for 47's lines: − and + a step at a time, kept under its own key.
+    private func lineRow(_ title: String, key: String, value: CGFloat, step: CGFloat, range: ClosedRange<CGFloat>) -> some View {
+        HStack(spacing: 8) {
+            Text(title).frame(width: 80, alignment: .leading)
+            panelButton("−", picked: false) { setLine(key, value - step, range) }
+            Text(String(format: step < 1 ? "%.2f" : "%.0f", value)).monospacedDigit().frame(width: 64)
+            panelButton("+", picked: false) { setLine(key, value + step, range) }
+        }
+        .font(.system(size: 13, weight: .bold, design: .monospaced))
+    }
+
+    private func setLine(_ key: String, _ value: CGFloat, _ range: ClosedRange<CGFloat>) {
+        UserDefaults.standard.set(Double((min(max(value, range.lowerBound), range.upperBound) * 100).rounded() / 100), forKey: key)
+        tuning.touch()
+        flow.scene.refreshPreview()
     }
 
     private func change(_ part: UIPart, _ steps: Int) {

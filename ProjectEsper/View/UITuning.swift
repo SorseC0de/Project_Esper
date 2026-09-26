@@ -99,6 +99,8 @@ final class UITuning: ObservableObject {
         case (.pad, _, .text) where screen.isDialog, (.pad, _, .titles) where screen.isDialog: 1.5
         case (.pad, _, .panels) where screen.isDialog: 0.9
         case (.tv, _, .text) where screen.isDialog: 1.5
+        case (.pad, .touch, .buttons): 0.75
+        case (.pad, .touch, .text): 1.5
         default: 1
         }
     }

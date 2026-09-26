@@ -369,12 +369,13 @@ its ribbon, the line under it in title lettering, the quote and what the drink d
 black plate over the bottles, and online the seconds in a black round button, top right;
 the wait screen the same ribbon, and its seconds in the same round button. The HUD: the
 round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
-touch pad: JUMP, SHOOT and THROW as the pack's round buttons in blue, plum and black,
+touch pad: THROW and SHOOT side by side, JUMP below and between them, THROW, SHOOT and
+JUMP as the pack's round buttons in blue, plum and black,
 gold while held, their names in title lettering; the stick a faded black round button
 with a blue knob; PAUSE, AI, HITBOX and RESET small black plates along the top, plum when
 on. Every one of them is on the tuning panel (STAGE, PICK, HUD, TOUCH), the dialogs
 starting from the pause's and the win's sizes on each platform, the HUD and the pad at
-1; the HUD and the pad are previewed over the court, as in play. The debug pickers and
+1 (the iPad's pad at buttons 0.75 and text 1.5, as tuned); the HUD and the pad are previewed over the court, as in play. The debug pickers and
 sliders keep their plain look.
 
 ## The game loop

@@ -99,16 +99,16 @@ final class TouchControls: SKNode {
         addChild(stickBase)
         addChild(stickKnob)
 
-        // Shoot and jump side by side, throw below and between them, all at the tuned size.
+        // Throw and shoot side by side, jump below and between them, all at the tuned size.
         let k = TouchControls.scale
-        let jump = makeButton("JUMP", piece: .circleBlue, radius: 30 * k, at: CGPoint(x: right - 38 * k, y: bottom + 84 * k)) { input, down, _ in
+        let jump = makeButton("JUMP", piece: .circleBlue, radius: 30 * k, at: CGPoint(x: right - 76 * k, y: bottom + 26 * k)) { input, down, _ in
             input.jump = down
         }
-        let shoot = makeButton("SHOOT", piece: .circlePlum, radius: 30 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
+        let shoot = makeButton("SHOOT", piece: .circlePlum, radius: 30 * k, at: CGPoint(x: right - 38 * k, y: bottom + 84 * k)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", piece: .circleBlack, radius: 24 * k, at: CGPoint(x: right - 76 * k, y: bottom + 26 * k)) { input, down, aim in
+        let throwButton = makeButton("THROW", piece: .circleBlack, radius: 24 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }

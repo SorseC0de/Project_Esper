@@ -406,12 +406,18 @@ public struct Stage: Equatable {
     /// 34 by 16 tiles with no ceiling: floor and walls, a backboard block each side, two cells
     /// in from the wall, with its rim on the inward face 70 units above the floor, and a
     /// one-way ledge in the middle. Player 0 starts left and scores on the right rim.
-    public static let court: Stage = {
+    /// The court's rims' height, and how far the RIM DROP slider lowers it while it's tuned;
+    /// the dunk's hang and the hoop's art are measured from the rim, so they come with it.
+    public static let courtRimHeight = 80.0
+    nonisolated(unsafe) public static var courtRimDrop = 0.0
+
+    public static var court: Stage {
+        let rim = courtRimHeight - courtRimDrop
         var stage = Stage(
             columns: 34, rows: 16,
             hoops: [
-                Hoop(position: Vec2(x: 58, y: 80), owner: 1, backboard: .left),
-                Hoop(position: Vec2(x: 282, y: 80), owner: 0, backboard: .right),
+                Hoop(position: Vec2(x: 58, y: rim), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: 282, y: rim), owner: 0, backboard: .right),
             ],
             playerSpawns: [Vec2(x: 130, y: 10), Vec2(x: 210, y: 10)],
             playerFacings: [.right, .left],
@@ -420,12 +426,11 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...33, rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...15)
         stage.fill(.solid, columns: 33...33, rows: 0...15)
-        // The backboard blocks, three rows: the top one stands in for the backboard's own box.
-        stage.fill(.solid, columns: 3...4, rows: 7...9)
-        stage.fill(.solid, columns: 29...30, rows: 7...9)
+        stage.fill(.solid, columns: 3...4, rows: 7...8)
+        stage.fill(.solid, columns: 29...30, rows: 7...8)
         stage.fill(.oneWay, columns: 15...18, rows: 3...3)
         return stage
-    }()
+    }
 
     /// The football field: seven courts long and 20 rows high, flat and empty but for the
     /// floor and the end walls. The rims float between the goalposts' uprights, four tiles

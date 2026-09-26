@@ -760,8 +760,9 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 
 ## Court
 
-The Wreck Center on the stage select, and the default. Its backboard blocks are three
-tiles tall, the top row standing in for the backboard's own box until it has one. Below
+The Wreck Center on the stage select, and the default. Its rims can be lowered from 80
+(`Stage.courtRimDrop`, the RIM DROP slider while `DunkTuning` holds a body hung on the
+right rim), the hang and the hoop's art coming down with them. Below
 the floor's row everything is the outline black, #242234. Its hoops are `hoop`, the rim and a backboard drawn
 to the players' scale, placed 5 art pixels out from the backboard and 10 up from the rim's point
 (`HoopTuning.offset`), kept out of the glow (the mask marks it, as it does the banner);

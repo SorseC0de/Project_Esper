@@ -1060,6 +1060,14 @@ final class GameScene: SKScene {
             }
         }
         if DunkTuning.enabled {
+            // The court's rims lowered, the hanging body and the hoop's art with them.
+            controls.addSlider(title: "RIM DROP", range: 0...40, notch: 1, value: Float(Stage.courtRimDrop)) { [weak self] value in
+                Stage.courtRimDrop = Double(value)
+                self?.session.mutate { match in
+                    guard match.stage.features.look == Stage.court.features.look, match.stage.columns == Stage.court.columns else { return }
+                    match.stage.hoops = Stage.court.hoops
+                }
+            }
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
                 DunkArt.offsets[DunkTuning.frame].x = CGFloat($0)

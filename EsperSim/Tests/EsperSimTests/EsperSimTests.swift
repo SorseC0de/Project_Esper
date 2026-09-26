@@ -1768,7 +1768,7 @@ final class FootsiesTests: XCTestCase {
 
     func testFallingPastABlockCornerGrabsTheLedgeAndClimbsUp() {
         var match = neutral()
-        // Dropped just left of the right backboard block, whose top-left corner is (290, 100).
+        // Dropped just left of the right backboard block, whose top-left corner is (290, 90).
         match.players[0].position = Vec2(x: 282, y: 130)
         match.players[0].grounded = false
         match.players[0].enter(.air)
@@ -1776,11 +1776,11 @@ final class FootsiesTests: XCTestCase {
         XCTAssertLessThan(grabbed, 90, "never grabbed the ledge")
         XCTAssertTrue(match.events.contains(.ledgeGrabbed(player: 0)))
         XCTAssertEqual(match.players[0].facing, .right)
-        XCTAssertEqual(match.players[0].position, Vec2(x: 285, y: 100 - LedgeRules.hangDepth))
+        XCTAssertEqual(match.players[0].position, Vec2(x: 285, y: 90 - LedgeRules.hangDepth))
         let climb = LedgeRules.hangFrames + LedgeRules.climbFrames + 2
         let stood = run(&match, frames: climb, input: { _ in .idle }) { $0.players[0].state == .idle }
         XCTAssertLessThan(stood, climb)
-        XCTAssertEqual(match.players[0].position.y, 100, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].position.y, 90, accuracy: 0.001)
         XCTAssertGreaterThan(match.players[0].position.x, 290)
         XCTAssertTrue(match.players[0].grounded)
     }

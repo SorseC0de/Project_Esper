@@ -159,7 +159,7 @@ enum GoalpostTuning {
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
-    static let enabled = false
+    static let enabled = true
     nonisolated(unsafe) static var frame = 0
 }
 

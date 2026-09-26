@@ -3802,6 +3802,8 @@ final class GameScene: SKScene {
             }
         }
 
+        section("net")
+
         var shownDots = 0
         for player in match.players where player.state == .shootStance && player.shotAim != .zero {
             for (step, point) in match.shotPreview(for: player.index).enumerated() where shownDots < previewDots.count {

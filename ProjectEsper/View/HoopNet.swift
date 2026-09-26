@@ -1,16 +1,13 @@
 import EsperSim
 import SpriteKit
 
-/// The net's shape and feel: its mouth as wide as the rim's hole, tapering to the bottom,
-/// a diamond mesh of this many rows and top knots; how heavy and how loose it is; and the
-/// sparks it's drawn in.
+/// The net's shape and feel: straight columns of chevrons hung from the rim, how heavy and
+/// how loose they are, and the chevrons themselves.
 enum NetTuning {
-    static let topWidth: CGFloat = 18
-    static let height: CGFloat = 17
-    static let rows = 5
     static let columns = 5
-    /// Share of the mouth's width the bottom loses.
-    static let taper: CGFloat = 0.45
+    static let chevronsPerColumn = 5
+    /// Art pixels between neighbouring columns at the rim.
+    static let columnGap: CGFloat = 4
     static let gravity: CGFloat = 0.18
     /// Share of its speed a knot keeps from one frame to the next.
     static let damping: CGFloat = 0.9
@@ -19,98 +16,95 @@ enum NetTuning {
     static let drag: CGFloat = 0.4
     /// A body's reach, round its chest, for pushing the net.
     static let bodyRadius: CGFloat = 7
-    /// The chevrons the strands are drawn in, pointing down: art pixels across and deep at
-    /// ×1, and 1 thick.
+    /// A chevron, pointing down: art pixels across and deep at ×1, and 1 thick.
     static let chevronWidth: CGFloat = 3
     static let chevronDepth: CGFloat = 2
     static let lineWidth: CGFloat = 1
     /// NET TOP and NET BOTTOM on the UI tuning panel, under HUD: the chevrons' scale at the
-    /// rim and at the bottom row, those between taking their share by height; NET SPREAD,
-    /// art pixels apart along a strand. Kept between launches.
-    static let topScaleKey = "ui.net.topScale"
-    static let bottomScaleKey = "ui.net.bottomScale"
-    static let spreadKey = "ui.net.spread"
+    /// rim and at the bottom, those between stepping down evenly; NET SPREAD, art pixels
+    /// between chevrons down a column. Kept between launches.
+    static let topScaleKey = "ui.net.columns.topScale"
+    static let bottomScaleKey = "ui.net.columns.bottomScale"
+    static let spreadKey = "ui.net.columns.spread"
     static var topScale: CGFloat { stored(topScaleKey) ?? 1 }
-    static var bottomScale: CGFloat { stored(bottomScaleKey) ?? 1 }
-    static var spread: CGFloat { stored(spreadKey) ?? 3 }
+    static var bottomScale: CGFloat { stored(bottomScaleKey) ?? 0.5 }
+    static var spread: CGFloat { stored(spreadKey) ?? 4 }
     private static func stored(_ key: String) -> CGFloat? {
         (UserDefaults.standard.object(forKey: key) as? Double).map { CGFloat($0) }
     }
 }
 
-/// A hoop's net: Verlet cloth hung from the rim, a diamond mesh of knots joined by strands,
-/// the top row pinned to the rim and following it. The ball pushes the knots out of its way
-/// and drags them along its path, swept from where it was to where it is so a fast shot
-/// can't pass between them; a body near the rim pushes them too. Nothing is scripted: a
-/// swish is the ball going through. Drawn as lines of small downward chevrons along the
-/// strands, one on every knot, in the energy of the side guarding the rim. At rest with
-/// nothing near, it sleeps. The view's alone.
+/// A hoop's net: straight columns of chevrons hung from the rim, each chevron a knot of a
+/// Verlet cloth, the top ones pinned to the rim and following it, each tied to the one
+/// below and to its neighbours across. The ball pushes the knots out of its way and drags
+/// them along its path, swept from where it was to where it is so a fast shot can't pass
+/// between them; a body near the rim pushes them too. Nothing is scripted: a swish is the
+/// ball going through. In the energy of the side guarding the rim. At rest with nothing
+/// near, it sleeps. The view's alone.
 final class HoopNet {
     private struct Knot {
         var at: CGPoint
         var was: CGPoint
-        /// Its row's share of the way from the rim to the bottom.
-        let depthShare: CGFloat
+        /// Its place down the column, 0 at the rim.
+        let row: Int
         /// Pinned to the rim, at this offset from it.
         let pin: CGPoint?
     }
-    private struct Strand {
+    private struct Tie {
         let a: Int, b: Int
         let rest: CGFloat
-        let drawn: Bool
     }
 
     private var knots: [Knot] = []
-    private var strands: [Strand] = []
-    private var drawnStrands: [Int] = []
+    private var ties: [Tie] = []
     private let shape = SKShapeNode()
     private var rim = CGPoint.zero
     private var awake = true
     private var stillFrames = 0
     private var lastBall: CGPoint?
-    private var drawnTuning: [CGFloat] = []
+    private var builtSpread: CGFloat = 0
+    private var drawnScales: [CGFloat] = []
 
     init(at rim: CGPoint, colour: SKColor, into parent: SKNode) {
         self.rim = rim
-        let rows = NetTuning.rows, columns = NetTuning.columns
-        var index: [[Int]] = []
-        for row in 0..<rows {
-            let share = CGFloat(row) / CGFloat(rows - 1)
-            let width = NetTuning.topWidth * (1 - NetTuning.taper * share)
-            let count = row % 2 == 0 ? columns : columns - 1
-            var line: [Int] = []
-            for column in 0..<count {
-                let across = -width / 2 + (CGFloat(column) + (row % 2 == 0 ? 0 : 0.5)) * width / CGFloat(columns - 1)
-                let offset = CGPoint(x: across, y: -NetTuning.height * share)
-                let at = CGPoint(x: rim.x + offset.x, y: rim.y + offset.y)
-                line.append(knots.count)
-                knots.append(Knot(at: at, was: at, depthShare: share, pin: row == 0 ? offset : nil))
-            }
-            index.append(line)
-        }
-        func join(_ a: Int, _ b: Int, drawn: Bool = true) {
-            strands.append(Strand(a: a, b: b, rest: HoopNet.distance(knots[a].at, knots[b].at), drawn: drawn))
-        }
-        for row in 0..<(rows - 1) {
-            let line = index[row], below = index[row + 1]
-            for (column, knot) in line.enumerated() {
-                // The diamonds: each knot to the two below it on either side.
-                let under = row % 2 == 0 ? [column - 1, column] : [column, column + 1]
-                for next in under where below.indices.contains(next) { join(knot, below[next]) }
-                // A longer tie two rows down, so the net hangs rather than stretching.
-                if row + 2 < rows, index[row + 2].indices.contains(column) { join(knot, index[row + 2][column], drawn: false) }
-            }
-        }
-        // The bottom ring, knot to knot, so the mouth below keeps its round.
-        for (a, b) in zip(index[rows - 1], index[rows - 1].dropFirst()) { join(a, b) }
-
-        drawnStrands = strands.indices.filter { strands[$0].drawn }
         shape.strokeColor = colour
         shape.lineWidth = NetTuning.lineWidth
         shape.lineCap = .square
         shape.isAntialiased = false
         shape.zPosition = 4
         parent.addChild(shape)
+        buildMesh()
+    }
+
+    /// The columns hung straight down from the rim, a spread apart.
+    private func buildMesh() {
+        builtSpread = NetTuning.spread
+        knots = []
+        ties = []
+        let columns = NetTuning.columns, rows = NetTuning.chevronsPerColumn
+        let halfWidth = NetTuning.columnGap * CGFloat(columns - 1) / 2
+        var index: [[Int]] = []
+        for column in 0..<columns {
+            var line: [Int] = []
+            for row in 0..<rows {
+                let offset = CGPoint(x: -halfWidth + CGFloat(column) * NetTuning.columnGap, y: -CGFloat(row) * builtSpread)
+                let at = CGPoint(x: rim.x + offset.x, y: rim.y + offset.y)
+                line.append(knots.count)
+                knots.append(Knot(at: at, was: at, row: row, pin: row == 0 ? offset : nil))
+            }
+            index.append(line)
+        }
+        func tie(_ a: Int, _ b: Int) {
+            ties.append(Tie(a: a, b: b, rest: HoopNet.distance(knots[a].at, knots[b].at)))
+        }
+        for column in 0..<columns {
+            for row in 0..<rows {
+                if row + 1 < rows { tie(index[column][row], index[column][row + 1]) }
+                if column + 1 < columns, row > 0 { tie(index[column][row], index[column + 1][row]) }
+            }
+        }
+        awake = true
+        stillFrames = 0
         place()
     }
 
@@ -123,7 +117,8 @@ final class HoopNet {
     func step(rim: CGPoint, ball: CGPoint?, ballRadius: CGFloat, bodies: [CGPoint]) {
         let rimMoved = HoopNet.distance(rim, self.rim) > 0.01
         self.rim = rim
-        let reach = NetTuning.topWidth + NetTuning.height + 24
+        if NetTuning.spread != builtSpread { buildMesh() }
+        let reach = NetTuning.columnGap * CGFloat(NetTuning.columns) + builtSpread * CGFloat(NetTuning.chevronsPerColumn) + 24
         let ballNear = ball.map { HoopNet.distance($0, rim) < reach } ?? false
         let bodyNear = bodies.contains { HoopNet.distance($0, rim) < reach }
         if rimMoved || ballNear || bodyNear {
@@ -133,11 +128,10 @@ final class HoopNet {
         defer { lastBall = ball }
         guard awake else {
             // Asleep, it still redraws for the tuning panel.
-            if drawnTuning != [NetTuning.topScale, NetTuning.bottomScale, NetTuning.spread] { place() }
+            if drawnScales != [NetTuning.topScale, NetTuning.bottomScale] { place() }
             return
         }
 
-        var moved: CGFloat = 0
         for index in knots.indices {
             if let pin = knots[index].pin {
                 knots[index].at = CGPoint(x: rim.x + pin.x, y: rim.y + pin.y)
@@ -152,7 +146,7 @@ final class HoopNet {
         // The ball's sweep this frame, and its carry.
         let from = (ballNear ? lastBall : nil) ?? ball
         for iteration in 0..<NetTuning.iterations {
-            for strand in strands { relax(strand) }
+            for tie in ties { relax(tie) }
             if ballNear, let ball, let from {
                 push(outOf: from, to: ball, radius: ballRadius, carry: iteration == 0)
             }
@@ -160,6 +154,7 @@ final class HoopNet {
                 push(outOf: body, to: body, radius: NetTuning.bodyRadius, carry: false)
             }
         }
+        var moved: CGFloat = 0
         for knot in knots where knot.pin == nil { moved = max(moved, HoopNet.distance(knot.at, knot.was)) }
         place()
         // Settled, and nothing near: it sleeps until something comes.
@@ -169,18 +164,18 @@ final class HoopNet {
         }
     }
 
-    /// A strand back toward its length, each end taking half, a pinned end none.
-    private func relax(_ strand: Strand) {
-        let a = knots[strand.a].at, b = knots[strand.b].at
+    /// A tie back toward its length, each end taking half, a pinned end none.
+    private func relax(_ tie: Tie) {
+        let a = knots[tie.a].at, b = knots[tie.b].at
         let length = max(HoopNet.distance(a, b), 0.0001)
-        let error = (length - strand.rest) / length
-        let pinA = knots[strand.a].pin != nil, pinB = knots[strand.b].pin != nil
+        let error = (length - tie.rest) / length
+        let pinA = knots[tie.a].pin != nil, pinB = knots[tie.b].pin != nil
         guard !(pinA && pinB) else { return }
         let shareA: CGFloat = pinA ? 0 : (pinB ? 1 : 0.5)
         let shareB: CGFloat = pinB ? 0 : (pinA ? 1 : 0.5)
         let delta = CGPoint(x: (b.x - a.x) * error, y: (b.y - a.y) * error)
-        knots[strand.a].at = CGPoint(x: a.x + delta.x * shareA, y: a.y + delta.y * shareA)
-        knots[strand.b].at = CGPoint(x: b.x - delta.x * shareB, y: b.y - delta.y * shareB)
+        knots[tie.a].at = CGPoint(x: a.x + delta.x * shareA, y: a.y + delta.y * shareA)
+        knots[tie.b].at = CGPoint(x: b.x - delta.x * shareB, y: b.y - delta.y * shareB)
     }
 
     /// Every free knot out of the capsule swept from `from` to `to`, and on the first pass
@@ -210,29 +205,18 @@ final class HoopNet {
         }
     }
 
-    /// The chevrons redrawn: one on every knot, and along each drawn strand as many as fit
-    /// between its ends.
+    /// A chevron on every knot, smaller a step at a time down the column.
     private func place() {
-        let topScale = NetTuning.topScale, bottomScale = NetTuning.bottomScale, spread = NetTuning.spread
-        drawnTuning = [topScale, bottomScale, spread]
+        let topScale = NetTuning.topScale, bottomScale = NetTuning.bottomScale
+        drawnScales = [topScale, bottomScale]
+        let lastRow = CGFloat(max(NetTuning.chevronsPerColumn - 1, 1))
         let path = CGMutablePath()
-        func chevron(at point: CGPoint, depthShare: CGFloat) {
-            let scale = topScale + (bottomScale - topScale) * depthShare
+        for knot in knots {
+            let scale = topScale + (bottomScale - topScale) * CGFloat(knot.row) / lastRow
             let halfWidth = NetTuning.chevronWidth * scale / 2, halfDepth = NetTuning.chevronDepth * scale / 2
-            path.move(to: CGPoint(x: point.x - halfWidth, y: point.y + halfDepth))
-            path.addLine(to: CGPoint(x: point.x, y: point.y - halfDepth))
-            path.addLine(to: CGPoint(x: point.x + halfWidth, y: point.y + halfDepth))
-        }
-        for knot in knots { chevron(at: knot.at, depthShare: knot.depthShare) }
-        for index in drawnStrands {
-            let a = knots[strands[index].a], b = knots[strands[index].b]
-            let between = Int((HoopNet.distance(a.at, b.at) / spread).rounded()) - 1
-            guard between > 0 else { continue }
-            for step in 1...between {
-                let share = CGFloat(step) / CGFloat(between + 1)
-                chevron(at: CGPoint(x: a.at.x + (b.at.x - a.at.x) * share, y: a.at.y + (b.at.y - a.at.y) * share),
-                        depthShare: a.depthShare + (b.depthShare - a.depthShare) * share)
-            }
+            path.move(to: CGPoint(x: knot.at.x - halfWidth, y: knot.at.y + halfDepth))
+            path.addLine(to: CGPoint(x: knot.at.x, y: knot.at.y - halfDepth))
+            path.addLine(to: CGPoint(x: knot.at.x + halfWidth, y: knot.at.y + halfDepth))
         }
         shape.path = path
     }

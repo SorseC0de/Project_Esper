@@ -347,8 +347,13 @@ public struct Match: Equatable {
             if let other, players[other].body.overlaps(blade), players[other].frozen == 0 {
                 // The body, ball or no ball: stripped and knocked along the swing.
                 players[index].slashHit = true
+                // The ball pops back to the slasher, away from the one who had it, coming down
+                // on them where they'll be once their swing's slide is done.
+                let from = players[other].chest.x
+                let landing = player.position.x + player.slashSlide(over: BallRules.popAloftFrames)
+                let carry = (landing - from) / Double(BallRules.popAloftFrames)
                 strip(other, by: index, knock: Vec2(x: SlashRules.knock.x * player.facing.sign, y: SlashRules.knock.y),
-                      carry: player.velocity.x)
+                      carry: carry)
             } else if ball.isLive, ball.box.overlaps(blade) {
                 // Down and away at about the spike angle, jittered a little by the frame.
                 players[index].slashHit = true
@@ -413,8 +418,7 @@ public struct Match: Equatable {
 
     /// The ball knocked out of `victim`'s hands: it pops straight up, nobody's, and the
     /// victim is stunned, so the popper has first go at it.
-    /// `carry`: sideways speed for the ball, the slash's own, so a slasher going on at a run
-    /// is under it when it comes down.
+    /// `carry`: sideways speed for the ball: a slash sends it back toward the slasher.
     private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0) {
         let from = players[victim].chest + Vec2(x: 0, y: 3)
         players[victim].loseBall()

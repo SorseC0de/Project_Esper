@@ -320,6 +320,17 @@ public enum BallRules {
     /// A ball knocked out of a holder's hands pops straight up: the floater's drift for
     /// this many frames, then a normal fall, nobody's.
     public static let popFloatFrames = 10
+    /// Frames a popped ball takes to come back down to the height it left from: the float,
+    /// then the rise and the fall, stepped as the ball steps them.
+    public static let popAloftFrames: Int = {
+        var height = 0.0, rise = floaterSpeed, floating = popFloatFrames, frames = 0
+        repeat {
+            if floating > 0 { floating -= 1 } else { rise = max(rise - gravity, -fallSpeed) }
+            height += rise
+            frames += 1
+        } while height > 0 && frames < 600
+        return frames
+    }()
 
     /// A ball falling toward a rim from within this reach, sideways and above, has its
     /// sideways speed blended each frame toward what would carry it through the rim, by
@@ -448,7 +459,14 @@ public enum SlashRules {
     public static let spikeAngle = degrees(-45)
     public static let spikeJitter = degrees(10)
     public static let swatSpeed = 6.0
-    public static let knock = Vec2(x: 2.5, y: 1.5)
+    /// Knocked along the swing, harder while it's tried in place of the stun's lockout.
+    public static let knock = Vec2(x: 4, y: 2)
+}
+
+/// Whether a stun also locks the stick. Parked off while a harder knockback is tried
+/// instead; the lock stays, one switch away.
+public enum StunRules {
+    public static let locksMovement = false
 }
 
 /// The throw's stance parries a slash for its first frames, as the snatch does: the

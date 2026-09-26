@@ -1594,10 +1594,11 @@ final class FootsiesTests: XCTestCase {
         let hit = run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
         XCTAssertTrue(SlashRules.liveFrames.contains(hit + 1))
         XCTAssertFalse(match.players[1].hasBall)
-        XCTAssertEqual(match.ball.velocity, Vec2(x: 0, y: BallRules.floaterSpeed))
+        XCTAssertEqual(match.ball.velocity.y, BallRules.floaterSpeed)
+        XCTAssertLessThan(match.ball.velocity.x, 0, "back toward the slasher, away from the holder")
     }
 
-    func testASlashFromAFullRunCarriesTheBallOnForTheSlasher() {
+    func testASlashFromAFullRunPopsTheBallBackToTheSlasher() {
         var match = defending(otherAt: 260)
         // Up to a run, then the slash as the holder comes into reach, running on after it.
         run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) {
@@ -1609,8 +1610,9 @@ final class FootsiesTests: XCTestCase {
             $0.events.contains(.popped(player: 1, by: 0))
         }
         XCTAssertLessThan(popped, SlashRules.frames)
-        XCTAssertGreaterThan(match.ball.velocity.x, 0, "the ball goes on the slasher's way")
-        run(&match, frames: 90, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) { $0.ball.holder != nil }
+        // Aimed where the slasher's slide will have carried them, not at the holder.
+        // The slasher lets go of the stick; it comes down on them.
+        run(&match, frames: 90, input: { _ in .idle }) { $0.ball.holder != nil }
         XCTAssertEqual(match.ball.holder, 0, "the slasher catches it, not the one slashed")
     }
 
@@ -1813,10 +1815,12 @@ final class FootsiesTests: XCTestCase {
         }
         run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.players[1].hitStun > 0 }
         XCTAssertGreaterThan(match.players[1].hitStun, 0)
-        // Stunned, the stick moves nothing.
-        let x = match.players[1].position.x
-        for _ in 0..<10 { match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: 1, y: 0))]) }
-        XCTAssertEqual(match.players[1].position.x, x, accuracy: 3, "no walking out of a stun")
+        // With the lock on, the stick moves nothing; it's parked off for now.
+        if StunRules.locksMovement {
+            let x = match.players[1].position.x
+            for _ in 0..<10 { match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: 1, y: 0))]) }
+            XCTAssertEqual(match.players[1].position.x, x, accuracy: 3, "no walking out of a stun")
+        }
     }
 
     func testDownLetsGoOfTheWallAndTheLedge() {

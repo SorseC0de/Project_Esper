@@ -130,8 +130,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   astride the corner, standing a unit in from the edge. No way off it but up. For 20
   frames after walking off an edge no corner is grabbed, so leaving a ledge doesn't grab
   it back. Never a made platform.
-- Knocked loose, the ball pops up: straight up off a slide, and off a slash carrying the
-  slasher's own sideways speed, so a slasher running on is under it as it comes down: the floater's drift
+- Knocked loose, the ball pops up: straight up off a slide, and off a slash back to the
+  slasher, away from its holder, its sideways speed set so it comes down on the slasher
+  where their swing's slide will have left them (`Player.slashSlide`, over
+  `BallRules.popAloftFrames`): the floater's drift
   for 10 frames, then a normal fall, nobody's, so Flash Fizz can't warp to it. The holder
   can't catch it back for 15 frames.
 - Throw: the `player_throw` sheet, `player_throw_air` off the ground, frames 4 to 7
@@ -325,11 +327,12 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   particles are `bubble_particle` at 10, every bubble one of two grape purples by a coin flip, each bubble in the
   trail and the landing on its own frame. Numbers in `SurfRules`, first guesses.
 
-Hits share the strip: the victim is stunned 60 frames, the stick and every button
-dead, and any ball they hold pops free; the slide's leg stuns a body without the ball
+Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
+too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is
+tried), and any ball they hold pops free; the slide's leg stuns a body without the ball
 too; the slash, the parry, the bolt, the burst and the pulse knock the body away as
 well (`Player.knock`), and the pulse doesn't stun. The slash strips a body with or
-without the ball, knocking it 2.5 along the swing and 1.5 up. The snatch has no
+without the ball, knocking it 4 along the swing and 2 up. The snatch has no
 cooldown, as the slash has none, and meeting a live blade it's the parry: the slasher
 is the one stripped and knocked back, the blade spent, resolved before the blades so it
 always wins. The throw stance parries too, over its first six frames (`ThrowParryRules`),

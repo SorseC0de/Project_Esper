@@ -412,10 +412,12 @@ public struct Player: Equatable {
         if snatchCooldown > 0 { snatchCooldown -= 1 }
         if ledgeCooldown > 0 { ledgeCooldown -= 1 }
         if hitStun > 0 {
-            // Stunned: nothing answers, the stick included, so it can't walk out of the hit.
+            // Stunned: no button answers; with the lock on, the stick doesn't either.
             hitStun -= 1
-            input.stick = .zero
-            input.aim = .zero
+            if StunRules.locksMovement {
+                input.stick = .zero
+                input.aim = .zero
+            }
             input.jump = false
             input.shootButtons = 0
             input.throwBall = false
@@ -1800,5 +1802,21 @@ extension Player {
         let drop = grounded && dribbling ? stage.drop(fromX: x, y: position.y) : 0
         let phase = min(max(offset.y / BallRules.dribbleHandHeight, 0), 1)
         return Vec2(x: x, y: position.y + offset.y / 1.6 - drop * (1 - phase))
+    }
+}
+
+extension Player {
+    /// How far a slasher on the ground slides over the next `frames`: bleeding at the
+    /// swing's brake while it lasts, then stopped by the ground's traction, stepped as the
+    /// body steps them. A slash's pop is aimed where this puts them.
+    public func slashSlide(over frames: Int) -> Double {
+        guard grounded, state == .slashing else { return 0 }
+        let swingLeft = max(SlashRules.frames - stateTimer, 0)
+        var speed = velocity.x, travelled = 0.0
+        for frame in 0..<frames {
+            speed = approach(speed, 0, frame < swingLeft ? spec.attackBrake : spec.traction)
+            travelled += speed
+        }
+        return travelled
     }
 }

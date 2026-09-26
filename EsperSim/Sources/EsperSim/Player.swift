@@ -85,6 +85,8 @@ public struct Player: Equatable {
     public var facing: Facing
     public var state: PlayerState = .idle
     public var previousState: PlayerState = .idle
+    /// The run's speed as it last stood, for the pivot jump to carry.
+    public var runMomentum = 0.0
     /// Frames spent in the state so far; 0 on the frame it was entered.
     public var stateTimer = 0
     public var grounded = true
@@ -277,7 +279,11 @@ public struct Player: Equatable {
     var runSpeed: Double { spec.runSpeed * speedShare }
     var walkMaxSpeed: Double { spec.walkMaxSpeed * speedShare }
     var dashInitialVelocity: Double { runSpeed + (spec.dashInitialVelocity - spec.runSpeed) }
-    var airSpeedMax: Double { spec.airSpeedMax * speedShare }
+    /// The air moves as the ground does: the run's speed, which the jumps set off at too, and
+    /// the ground's traction to brake when the stick lets go. Moves that don't steer coast
+    /// on the spec's light air friction instead, so their momentum carries.
+    var airSpeedMax: Double { runSpeed }
+    var airBrake: Double { spec.traction }
 
     /// Crouched or sliding, the body is half as tall, so it fits under what a standing
     /// body can't.
@@ -520,9 +526,11 @@ public struct Player: Equatable {
                     }
                 } else if let direction = stickFacing(input) {
                     if direction != facing {
+                        runMomentum = abs(velocity.x)
                         enter(.pivot)
                     } else {
                         velocity.x = runSpeed * facing.sign
+                        runMomentum = runSpeed
                         animationPhase += runCycleStep
                     }
                 } else {
@@ -551,14 +559,15 @@ public struct Player: Equatable {
                 enter(.air)
             } else if stateTimer >= spec.jumpSquatFrames {
                 // The pivot jump, Mario 64's: out of a run or its pivot with the stick slammed the
-                // other way, the jump turns, what's left of the run's speed going the new way.
-                if previousState == .run || previousState == .pivot, let way = stickFacing(input), velocity.x * way.sign < 0 {
+                // other way, the jump turns with the run's whole speed, the new way.
+                if previousState == .run || previousState == .pivot, let way = stickFacing(input), runMomentum > 0,
+                   velocity.x * way.sign <= 0 {
                     facing = way
-                    velocity.x = -velocity.x
+                    velocity.x = runMomentum * way.sign
                 }
                 velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
                 let cap = max(abs(velocity.x), airSpeedMax)
-                velocity.x = min(max(velocity.x + input.stick.x * spec.jumpHorizontalVelocity, -cap), cap)
+                velocity.x = min(max(velocity.x + input.stick.x * airSpeedMax, -cap), cap)
                 jumpsLeft -= 1
                 platformArmed = true
                 grounded = false
@@ -636,7 +645,9 @@ public struct Player: Equatable {
         case .air:
             // The body turns with the stick in the air, at once.
             if airControlLock == 0, let direction = stickFacing(input) { facing = direction }
-            airDrift(airControlLock > 0 ? .idle : input)
+            // Into a stance the stick aims, not steers, so the frame it starts on coasts too.
+            let stancing = holding && ((input.shoot && shootReady) || (input.throwBall && throwReady))
+            if airControlLock > 0 || stancing { airCoast() } else { airDrift(input) }
             fall(input)
             if jumpPressed, coyote > 0 {
                 // Just off an edge: the jump the ground would have given.
@@ -761,7 +772,7 @@ public struct Player: Equatable {
                 velocity.x = approach(velocity.x, 0, spec.stanceAirBrake)
                 velocity.y = 0
             } else {
-                airDrift(.idle)
+                airCoast()
                 fall(.idle)
             }
             if stateTimer == BallRules.shotReleaseFrames {
@@ -827,7 +838,7 @@ public struct Player: Equatable {
             if grounded {
                 velocity.x = approach(velocity.x, 0, spec.traction)
             } else {
-                airDrift(.idle)
+                airCoast()
                 fall(.idle)
             }
             if stateTimer == BallRules.throwReleaseFrames {
@@ -923,7 +934,7 @@ public struct Player: Equatable {
             if grounded {
                 velocity.x = approach(velocity.x, 0, spec.attackBrake)
             } else {
-                velocity.x = approach(velocity.x, 0, spec.airFriction)
+                velocity.x = approach(velocity.x, 0, airBrake)
                 velocity.y = max(velocity.y - spec.gravity * SlashRules.gravityShare, -spec.fallSpeed)
             }
             if stateTimer >= SlashRules.frames {
@@ -1060,7 +1071,7 @@ public struct Player: Equatable {
             if grounded {
                 velocity.x = approach(velocity.x, 0, spec.traction)
             } else {
-                airDrift(.idle)
+                airCoast()
                 fall(.idle)
             }
             if stateTimer == PulseRules.fireFrame {
@@ -1566,7 +1577,7 @@ public struct Player: Equatable {
         velocity.y = spec.jumps >= 3 && jumpsLeft == 1 ? spec.thirdJumpVelocity : spec.doubleJumpVelocity
         if power == .frostTea, powerLevel >= 2 { wanted = .leaveClone }
         if input.stick.x != 0 {
-            velocity.x = input.stick.x * spec.doubleJumpHorizontalVelocity
+            velocity.x = input.stick.x * airSpeedMax
         }
         jumpsLeft -= 1
         fastFalling = false
@@ -1577,10 +1588,15 @@ public struct Player: Equatable {
 
     /// Air control. Above the air speed cap the body only slows toward it. A stick against
     /// the way it's going turns it at once, as Silksong does, rather than braking through.
+    /// Not steering: the momentum carries, the light air friction on it.
+    private mutating func airCoast() {
+        velocity.x = approach(velocity.x, 0, spec.airFriction)
+    }
+
     private mutating func airDrift(_ input: PlayerInput) {
         let x = input.stick.x
         if x == 0 {
-            velocity.x = approach(velocity.x, 0, spec.airFriction)
+            velocity.x = approach(velocity.x, 0, airBrake)
             return
         }
         let target = airSpeedMax * (x > 0 ? 1 : -1)
@@ -1588,7 +1604,7 @@ public struct Player: Equatable {
         if !sameWay {
             velocity.x = airSpeedMax * x
         } else if abs(velocity.x) > airSpeedMax {
-            velocity.x = approach(velocity.x, target, spec.airFriction)
+            velocity.x = approach(velocity.x, target, airBrake)
         } else {
             velocity.x = approach(velocity.x, target, spec.airAccelerationBase + spec.airAccelerationAdditional * abs(x))
         }
@@ -1749,5 +1765,18 @@ extension Double {
     func rounded(toPlaces places: Int) -> Double {
         let scale = Trig.powerOfTen(places)
         return (self * scale).rounded() / scale
+    }
+}
+
+extension Player {
+    /// Where the sheet draws the ball in hand this frame, from its landmark: on a dribble
+    /// over a drop, the bounce reaches the floor below, the more the lower the hand has it.
+    public func ballInHand(on stage: Stage) -> Vec2? {
+        guard let offset = BallLandmarks.offset(animationFrame) else { return nil }
+        let x = position.x + offset.x / 1.6 * facing.sign
+        let dribbling = [Animation.dribbleIdle, .dribbleWalk, .dribbleRun].contains(animationFrame.animation)
+        let drop = grounded && dribbling ? stage.drop(fromX: x, y: position.y) : 0
+        let phase = min(max(offset.y / BallRules.dribbleHandHeight, 0), 1)
+        return Vec2(x: x, y: position.y + offset.y / 1.6 - drop * (1 - phase))
     }
 }

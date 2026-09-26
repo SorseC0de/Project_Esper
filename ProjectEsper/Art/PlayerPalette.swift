@@ -194,6 +194,8 @@ enum BallLook {
     static let shiftFrames = 30
     /// The chevrons over a resting ball.
     static let chevron: RGB = 0xFBF236
+    /// The dark purple of an empty round circle and the ball's off-screen chevrons' outline.
+    static let darkPurple: RGB = 0x3A2A48
 }
 
 enum CourtLook {

@@ -22,14 +22,9 @@ public struct FighterSpec: Equatable {
     public var shortHopVelocity: Double
     public var doubleJumpVelocity: Double
     public var jumps: Int
-    /// A jump with the stick held starts at least this fast sideways.
-    public var jumpHorizontalVelocity: Double
-    /// A double jump with the stick held sets the sideways speed to this, which turns around.
-    public var doubleJumpHorizontalVelocity: Double
     public var gravity: Double
     public var fallSpeed: Double
     public var fastFallSpeed: Double
-    public var airSpeedMax: Double
     public var airAccelerationBase: Double
     public var airAccelerationAdditional: Double
     public var airFriction: Double
@@ -96,12 +91,9 @@ public struct FighterSpec: Equatable {
         shortHopVelocity: 1.4,
         doubleJumpVelocity: 2.2,
         jumps: 2,
-        jumpHorizontalVelocity: 0.86,
-        doubleJumpHorizontalVelocity: 0.86,
         gravity: 0.095,
         fallSpeed: 1.7,
         fastFallSpeed: 2.3,
-        airSpeedMax: 0.86,
         airAccelerationBase: 0.02,
         airAccelerationAdditional: 0.025,
         airFriction: 0.016,
@@ -132,12 +124,9 @@ public struct FighterSpec: Equatable {
         shortHopVelocity: 1.9,
         doubleJumpVelocity: 2.66,
         jumps: 2,
-        jumpHorizontalVelocity: 1.12,
-        doubleJumpHorizontalVelocity: 1.12,
         gravity: 0.13,
         fallSpeed: 2.9,
         fastFallSpeed: 3.5,
-        airSpeedMax: 1.12,
         airAccelerationBase: 0.02,
         airAccelerationAdditional: 0.04,
         airFriction: 0.01,
@@ -166,12 +155,9 @@ public struct FighterSpec: Equatable {
         shortHopVelocity: 2.1,
         doubleJumpVelocity: 4.19,
         jumps: 2,
-        jumpHorizontalVelocity: 0.83,
-        doubleJumpHorizontalVelocity: 0.83,
         gravity: 0.23,
         fallSpeed: 2.8,
         fastFallSpeed: 3.4,
-        airSpeedMax: 0.83,
         airAccelerationBase: 0.02,
         airAccelerationAdditional: 0.06,
         airFriction: 0.02,
@@ -200,12 +186,9 @@ public struct FighterSpec: Equatable {
         shortHopVelocity: 2.23,
         doubleJumpVelocity: 3.08,
         jumps: 2,
-        jumpHorizontalVelocity: 0.8,
-        doubleJumpHorizontalVelocity: 0.8,
         gravity: 0.13,
         fallSpeed: 2.13,
         fastFallSpeed: 3.0,
-        airSpeedMax: 0.8,
         airAccelerationBase: 0.02,
         airAccelerationAdditional: 0.04,
         airFriction: 0.04,
@@ -220,16 +203,13 @@ public struct FighterSpec: Equatable {
 }
 
 extension FighterSpec {
-    /// The body a match starts on: the baseline with half a unit less run, dash and air
-    /// speed, the double jump kept. One Hasty Horchata brings the speeds back.
+    /// The body a match starts on: the baseline with half a unit less run and dash speed,
+    /// and so of air speed, which is the run's; the double jump kept. One Hasty Horchata brings the speeds back.
     public static let starting: FighterSpec = {
         var spec = baseline
         spec.name = "Starting"
         spec.runSpeed = baseline.runSpeed - 0.5
         spec.dashInitialVelocity = spec.runSpeed + 0.4
-        spec.airSpeedMax = baseline.airSpeedMax - 0.5
-        spec.jumpHorizontalVelocity = baseline.jumpHorizontalVelocity - 0.5
-        spec.doubleJumpHorizontalVelocity = baseline.doubleJumpHorizontalVelocity - 0.5
         return spec
     }()
 
@@ -247,10 +227,7 @@ extension FighterSpec {
         spec.pivotFrames = 5
         // Near-instant: a full run is gone in a couple of frames.
         spec.traction = 1.5
-        spec.airSpeedMax = 1.6
         spec.airAccelerationAdditional = 0.24
-        spec.jumpHorizontalVelocity = 1.6
-        spec.doubleJumpHorizontalVelocity = 1.6
         spec.stanceAirBrake = 0.15
         return spec
     }()
@@ -271,6 +248,9 @@ public enum BallRules {
     /// Floor friction per frame while rolling, and the speed under which the ball rests.
     public static let rollingFriction = 0.9
     public static let restSpeed = 0.2
+    /// Art pixels above the feet the dribbling hand holds the ball at; below it the bounce
+    /// reaches down a drop.
+    public static let dribbleHandHeight = 16.0
 
     /// A shot leaves from this high above the feet, at the body's shot speed.
     public static let shotReleaseHeight = 25.0

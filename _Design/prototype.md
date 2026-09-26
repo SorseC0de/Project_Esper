@@ -55,7 +55,10 @@ Defending, without the ball while the other has it, a body walks, runs, dashes a
 drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, a 5-frame pivot, the burst always 0.4 over the
 3.2 run,
 traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
-the air turned up: air speed 1.6, air acceleration 0.02 + 0.24, a jump with the stick held
+the air in lockstep with the ground: air speed is the run's, and letting go of the stick
+in the air brakes at the ground's traction; moves that don't steer (a wall jump's lockout,
+the shot's release, the throw, the Pulsepistol shot, a stance's first frame) coast on
+Fox's light air friction instead. Air acceleration 0.02 + 0.24; a jump with the stick held
 starts at air speed, and a double jump with the stick held sets the sideways speed, so it
 turns around. Mario, Falcon, Fox and Sheik from the SSBWiki table are kept beside it. Walk acceleration, dash length, pivot, and the wall numbers aren't on the table
 and are chosen to sit with the rest.
@@ -109,7 +112,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   (`SnatchRules.activeSheetFrames`), the third sheet frame held twice as long, when the
   whole body plus a tile of reach in front, or the hand's catch ring at the spark's
   spot, takes any ball it touches while the body faces it: a loose one at any speed, or
-  the one in the other's hands, where the sheet draws it that frame, or the holder's
+  the one in the other's hands, where the sheet draws it that frame (down on the floor
+  below when it's dribbled over a drop, `Player.ballInHand`), or the holder's
   body itself, whichever way the snatcher faces while their bodies overlap. The last two
   sheet frames are left off. The catch spark shows on the hand on sheet frame 2.
   On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
@@ -175,7 +179,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   through a rim scores unless the ball rose up through that rim first.
 
 Out of a run or its pivot with the stick slammed the other way, the jump turns the new way
-(Mario 64's), what's left of the run's speed going that way.
+(Mario 64's) with the run's whole speed, as it stood before the pivot.
 
 Pad: A jump, B, R1 or R2 shoot, X throw, Y taunt, right stick aims a stance. L1 steps the POWER
 picker, start (menu) pauses, R3 switches the computer, L2 the hitboxes. Down on the stick
@@ -641,19 +645,22 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 - The backboard: behind each rim a 3 by 4 cluster of `flashspark2` in the guarding side's
   energy, each on its own frame so the board shimmers, on a grid sheared to the
   crossbar's lean, 10 behind the rim and 24 over it at 0.4, sheared 20°, at two thirds;
-  solid to the ball, a 4 by 20 unit box (`FieldRules.backboardOffset`, `ballBlockers`).
+  solid to the ball, a 20-unit-tall box (`FieldRules.backboardOffset`, `ballBlockers`)
+  from the backboard's face all the way back to the end wall, so nothing gets behind it.
   Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
   in the maker's energy.
 - The camera is zonal, as Mega Man's and Nidhogg's: the field in seven zones a court wide,
   the camera level on one zone's centre, held inside the field's ends. Within
-  `CameraTuning.zoneBufferTiles` (3) of the screen's edge the local player sends it
+  a quarter of the screen's width of its edge (`CameraTuning.zoneBufferShare`) the local
+  player sends it
   sliding to the next zone over `CameraTuning.slideSeconds` (0.5), eased out, quick away
   and slowing into the new centre, if that zone's centre is
   the nearer, so it never flips back at the line; each round it picks up the zone the
   local player starts in.
   The view takes in the stage's height and the turf below the floor. When the ball is off
-  the screen sideways, its chevrons sit at that edge at its height, pointing at it. The opponent
-  off the screen likewise: one chevron in their energy at that edge, at their chest's height. All of
+  the screen sideways, its chevrons sit at that edge at its height, pointing at it, purple
+  outlined in dark purple. The opponent off the screen likewise: one chevron in their
+  energy, outlined in black, at that edge, at their chest's height. All of
   it is the view; the sim never sees the camera, so it's safe online.
 
 ## Court

@@ -143,7 +143,8 @@ final class StageTests: XCTestCase {
         // The ball behind the helmet, so its way there runs into it.
         match.ball.respawn(at: Vec2(x: 400, y: 20))
         match.helmetClock = -10_000
-        match.players[1].position = Vec2(x: 900, y: 10)
+        // Far enough off to clear it at the run's speed, the air's too.
+        match.players[1].position = Vec2(x: 1000, y: 10)
         // One at its height: none spawn this low, but one met in the air is the same.
         let bottom = 10.0
         match.helmets = [Helmet(id: 5, box: Box(min: Vec2(x: 780, y: bottom), max: Vec2(x: 820, y: bottom + 40)), speed: 2, owner: 0, variant: 0)]

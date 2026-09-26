@@ -111,8 +111,10 @@ public struct Opponent: Equatable {
 
     /// A helmet coming at it at its height, close. Low enough to go under crouched, and
     /// with nothing in hand on the floor, it crouches, or slides from a run, until it's
-    /// past; otherwise a full hop and the double jump to get on top and ride it, the stick
-    /// into it so it lands there. True while it's doing either.
+    /// past; otherwise a full hop and the double jump to get on top and ride it, holding
+    /// still until clear of its top, then over. True while it's doing either.
+    private static let helmetLeadFrames = 20.0
+
     private mutating func clearHelmet(_ match: Match, me: Player, into input: inout PlayerInput) -> Bool {
         guard !Opponent.committedStates.contains(me.state) || me.state == .slide else { return false }
         let feet = me.position.y
@@ -122,8 +124,12 @@ public struct Opponent: Equatable {
         let coming = match.helmets.first { helmet in
             let ahead = (me.position.x - helmet.box.center.x) * (helmet.speed > 0 ? 1 : -1)
             let gap = ahead - helmet.box.width / 2 - halfWidth
-            let level = helmet.box.min.y < standingTop + 4 && helmet.box.max.y > feet
-            return ahead > -helmet.box.width && gap < 70 && level
+            // At its height, or up in the air over it on the way down onto it.
+            let above = !me.grounded && feet >= helmet.box.max.y - 1 && feet < helmet.box.max.y + 60
+            let level = (helmet.box.min.y < standingTop + 4 && helmet.box.max.y > feet) || above
+            // Close by time, not distance: the frames to meet it at the speed they're closing.
+            let closing = max(abs(helmet.speed) - me.velocity.x * (helmet.speed > 0 ? 1 : -1), 1)
+            return ahead > -helmet.box.width && gap < closing * Opponent.helmetLeadFrames && level
         }
         guard let helmet = coming else { return false }
         if me.grounded, !me.holding, helmet.box.min.y > crouchedTop + 1 {
@@ -132,7 +138,12 @@ public struct Opponent: Equatable {
             return true
         }
         guard me.state != .slide else { return true }
-        input.stick = Vec2(x: helmet.box.center.x > me.position.x ? 1 : -1, y: 0)
+        // In the air the stick lets go, and the air's brake holds it, until the feet clear the
+        // top; then into it, and let go again once over it, so it sets down there.
+        let over = abs(helmet.box.center.x - me.position.x) < helmet.box.width / 4
+        let clear = me.position.y > helmet.box.max.y + 1
+        let toward = Vec2(x: helmet.box.center.x > me.position.x ? 1 : -1, y: 0)
+        input.stick = me.grounded ? toward : (clear && !over ? toward : .zero)
         if me.grounded {
             fullHop(&input)
         } else if me.velocity.y < 0.5, me.jumpsLeft > 0, me.position.y < helmet.box.max.y + 2 {

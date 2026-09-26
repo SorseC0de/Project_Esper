@@ -464,6 +464,34 @@ final class SpriteLibrary {
     }
 
     /// An SF Symbol as a white texture, `pointSize` art pixels tall.
+    /// The symbol in `fill` with a `stroke` outline `width` points thick, walked round a ring
+    /// as the title lettering's is. Drawn in its colours, so leave it untinted, or fill it
+    /// white and tint to colour the fill alone.
+    func outlinedSymbol(_ name: String, pointSize: CGFloat, fill: UIColor, stroke: UIColor, width: CGFloat = 2,
+                        weight: UIImage.SymbolWeight = .heavy) -> SKTexture {
+        let key = "symbol_\(name)_\(pointSize)_\(fill)_\(stroke)_\(width)"
+        if let texture = cache[key] { return texture }
+        let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+        let base = UIImage(systemName: name, withConfiguration: configuration)!
+        let outline = base.withTintColor(stroke, renderingMode: .alwaysOriginal)
+        let body = base.withTintColor(fill, renderingMode: .alwaysOriginal)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let size = CGSize(width: base.size.width + width * 2, height: base.size.height + width * 2)
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        let image = renderer.image { _ in
+            for step in 0..<16 {
+                let angle = CGFloat(step) / 16 * 2 * .pi
+                outline.draw(at: CGPoint(x: width + cos(angle) * width, y: width + sin(angle) * width))
+            }
+            body.draw(at: CGPoint(x: width, y: width))
+        }
+        let texture = SKTexture(image: image)
+        texture.filteringMode = .linear
+        cache[key] = texture
+        return texture
+    }
+
     func symbol(_ name: String, pointSize: CGFloat, weight: UIImage.SymbolWeight = .heavy) -> SKTexture {
         let key = "symbol_\(name)_\(pointSize)"
         if let texture = cache[key] { return texture }

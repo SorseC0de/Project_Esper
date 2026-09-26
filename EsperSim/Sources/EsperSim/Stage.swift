@@ -455,11 +455,15 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
         stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
         stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true, ballCam: true, look: .footballField)
-        // The backboards: behind each rim and above it, solid to the ball.
+        // The backboards: behind each rim and above it, solid to the ball, and on back to the
+        // end wall so nothing gets in behind them.
         stage.ballBlockers = stage.hoops.map { hoop in
             let back = hoop.backboard.sign
             let centre = hoop.position + Vec2(x: back * FieldRules.backboardOffset.x, y: FieldRules.backboardOffset.y)
-            return Box(center: centre, width: FieldRules.backboardSize.x, height: FieldRules.backboardSize.y)
+            let front = centre.x - back * FieldRules.backboardSize.x / 2
+            let wall = back < 0 ? Stage.tileSize : width - Stage.tileSize
+            let half = FieldRules.backboardSize.y / 2
+            return Box(min: Vec2(x: min(front, wall), y: centre.y - half), max: Vec2(x: max(front, wall), y: centre.y + half))
         }
         return stage
     }

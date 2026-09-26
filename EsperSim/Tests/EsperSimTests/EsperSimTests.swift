@@ -252,7 +252,7 @@ final class MovementTests: XCTestCase {
         var match = Match()
         let jumped = run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) }) { $0.players[0].state == .air }
         XCTAssertLessThan(jumped, 10)
-        XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.airSpeedMax, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.runSpeed, accuracy: 0.001, "air speed is the run's")
     }
 
     func testTheBodyTurnsWithTheStickInTheAir() {
@@ -282,15 +282,17 @@ final class MovementTests: XCTestCase {
         run(&match, frames: 5, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
         XCTAssertGreaterThan(match.players[0].velocity.x, 0)
         match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle])
-        XCTAssertEqual(match.players[0].velocity.x, -match.players[0].spec.airSpeedMax, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, -match.players[0].spec.runSpeed, accuracy: 0.001)
     }
 
     func testDoubleJumpTurnsAround() {
         var match = Match()
+        // The ball well out of the way, so the faster air doesn't carry the body into a catch.
+        match.ball.respawn(at: Vec2(x: 40, y: 150))
         run(&match, frames: 6, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
         run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
         match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), jump: true), .idle])
-        XCTAssertEqual(match.players[0].velocity.x, -match.players[0].spec.doubleJumpHorizontalVelocity, accuracy: 0.001)
+        XCTAssertEqual(match.players[0].velocity.x, -match.players[0].spec.runSpeed, accuracy: 0.001)
         XCTAssertEqual(match.players[0].facing, .left)
     }
 
@@ -1760,8 +1762,12 @@ final class FootsiesTests: XCTestCase {
         // Standing on the right block, walking off its left edge.
         match.players[0].position = Vec2(x: 300, y: 90)
         match.players[0].grounded = true
-        run(&match, frames: 90, input: { _ in PlayerInput(stick: Vec2(x: -0.5, y: 0)) }) { $0.players[0].grounded && $0.players[0].position.y < 89 }
-        XCTAssertEqual(match.players[0].position.y, 10, accuracy: 0.001)
+        var grabbedBack = false
+        run(&match, frames: 90, input: { _ in PlayerInput(stick: Vec2(x: -0.5, y: 0)) }) {
+            if $0.players[0].state == .ledgeHang, $0.players[0].position.x > 250 { grabbedBack = true }
+            return false
+        }
+        XCTAssertFalse(grabbedBack, "the block walked off isn't grabbed back")
     }
 
     func testTheDunkRunsItsSheetFromTheStanceAndHoldsTheHang() {
@@ -1963,7 +1969,6 @@ final class GreateraidTests: XCTestCase {
         let spec = drinks.spec()
         XCTAssertEqual(spec.runSpeed, FighterSpec.baseline.runSpeed, accuracy: 0.001)
         XCTAssertEqual(spec.dashInitialVelocity, FighterSpec.baseline.dashInitialVelocity, accuracy: 0.001)
-        XCTAssertEqual(spec.airSpeedMax, FighterSpec.baseline.airSpeedMax, accuracy: 0.001)
         XCTAssertEqual(FighterSpec.starting.jumps, FighterSpec.baseline.jumps)
         XCTAssertEqual(FighterSpec.starting.runSpeed, FighterSpec.baseline.runSpeed - 0.5, accuracy: 0.001)
         drinks.drink(.jumperJuice)

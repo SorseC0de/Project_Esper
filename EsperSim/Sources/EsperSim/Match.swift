@@ -340,11 +340,7 @@ public struct Match: Equatable {
             // A held ball is where the holder's sheet draws it this frame, so the hand can
             // take it off the dribble; failing a landmark, the chest.
             let at = held.map { holder -> Vec2 in
-                let body = players[holder]
-                if let offset = BallLandmarks.offset(body.animationFrame) {
-                    return body.position + Vec2(x: offset.x / 1.6 * body.facing.sign, y: offset.y / 1.6)
-                }
-                return body.chest + Vec2(x: 0, y: 3)
+                players[holder].ballInHand(on: stage) ?? players[holder].chest + Vec2(x: 0, y: 3)
             } ?? ball.position
             // In front, or a holder the body itself overlaps: the body is part of the reach.
             let onTheBody = held.map { player.body.overlaps(players[$0].body) } ?? false

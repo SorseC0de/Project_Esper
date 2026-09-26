@@ -198,9 +198,6 @@ public struct Drinks: Equatable {
         let hasty = Double(level(of: .hastyHorchata))
         spec.runSpeed += 0.5 * hasty
         spec.dashInitialVelocity = spec.runSpeed + 0.4
-        spec.airSpeedMax += 0.5 * hasty
-        spec.jumpHorizontalVelocity += 0.5 * hasty
-        spec.doubleJumpHorizontalVelocity += 0.5 * hasty
         let jumper = level(of: .jumperJuice)
         if jumper >= 1 {
             spec.fullHopVelocity *= 1.1

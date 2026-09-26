@@ -107,10 +107,10 @@ enum HelmetTuning {
 
 /// The backboard, a cluster of flashes behind each rim: its place against the rim, in art
 /// pixels, its size, its shear in degrees and its opacity. The sim's box matches it.
-/// Longball Stadium's zonal camera: within this many tiles of the screen's edge, the
-/// local player sends it sliding to the next zone.
+/// Longball Stadium's zonal camera: within this share of the screen's width from its edge,
+/// the local player sends it sliding to the next zone.
 enum CameraTuning {
-    static let zoneBufferTiles: CGFloat = 3
+    static let zoneBufferShare: CGFloat = 0.25
     /// Seconds for a whole slide, eased out: quick away, slowing into the new zone.
     static let slideSeconds: Double = 0.5
 }

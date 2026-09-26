@@ -15,7 +15,6 @@ final class GameScene: SKScene {
     private static let headScale: CGFloat = 1.25
     /// Pixels above the feet the dribble's ball counts as in the hand, where a drop below
     /// the platform stops mattering.
-    private static let dribbleHandHeight: CGFloat = 16
     /// Pixels the head floats above its place on the body, so scaling it up doesn't sink it in.
     private static let headLift: CGFloat = 1
     /// Where to put the catch spark's feet so its ring lands on the snatch's hand: the ring
@@ -208,6 +207,11 @@ final class GameScene: SKScene {
     /// The opponent off the screen sideways: a chevron in their energy at that edge, at
     /// their chest's height, pointing at them.
     private var opponentChevron = SKSpriteNode()
+    /// The ball's chevrons: yellow over it at rest, purple outlined in dark purple at the
+    /// screen's edge when it's off it.
+    private lazy var ballChevronOver = sprites.symbol("chevron.down", pointSize: 14)
+    private lazy var ballChevronOffScreen = sprites.outlinedSymbol("chevron.down", pointSize: 14,
+                                                                   fill: SKColor(rgb: BallLook.neutral), stroke: SKColor(rgb: BallLook.darkPurple))
     /// The floor and walls, coloured for whoever holds the ball.
     private var courtTiles: [SKSpriteNode] = []
     private var courtColour = SKColor(rgb: CourtLook.neutral)
@@ -577,7 +581,7 @@ final class GameScene: SKScene {
             glowers.addChild(chevron)
             chevrons.append(chevron)
         }
-        opponentChevron = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 14))
+        opponentChevron = SKSpriteNode(texture: sprites.outlinedSymbol("chevron.down", pointSize: 14, fill: .white, stroke: .black))
         opponentChevron.colorBlendFactor = 1
         opponentChevron.zPosition = 6
         opponentChevron.isHidden = true
@@ -1564,7 +1568,7 @@ final class GameScene: SKScene {
         for index in 0..<count {
             let circle = SKShapeNode(circleOfRadius: radius)
             circle.position = CGPoint(x: (CGFloat(index) - CGFloat(count - 1) / 2) * spacing, y: 0)
-            circle.fillColor = index < series.rounds.count ? SKColor(rgb: sprites.look(for: series.rounds[index]).glow) : SKColor(rgb: 0x3A2A48)
+            circle.fillColor = index < series.rounds.count ? SKColor(rgb: sprites.look(for: series.rounds[index]).glow) : SKColor(rgb: BallLook.darkPurple)
             circle.strokeColor = SKColor(white: 0, alpha: 0.6)
             circle.lineWidth = 1
             circles.addChild(circle)
@@ -2334,7 +2338,7 @@ final class GameScene: SKScene {
             cameraZone = start
             return centre(start)
         }
-        let buffer = CameraTuning.zoneBufferTiles * GameScene.pixelsPerTile
+        let buffer = halfView * 2 * CameraTuning.zoneBufferShare
         var next = zone
         if feet > centre(zone) + halfView - buffer, zone < zones - 1 { next = zone + 1 }
         if feet < centre(zone) - halfView + buffer, zone > 0 { next = zone - 1 }
@@ -3320,7 +3324,7 @@ final class GameScene: SKScene {
                 let ballX = player.position.x + Double(inHand.x) * player.facing.sign / SpriteLibrary.pixelsPerUnit
                 let dribbling = [Animation.dribbleIdle, .dribbleWalk, .dribbleRun].contains(frame.animation)
                 let drop = player.grounded && dribbling ? match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit : 0
-                let phase = min(max(inHand.y / GameScene.dribbleHandHeight, 0), 1)
+                let phase = min(max(inHand.y / CGFloat(BallRules.dribbleHandHeight), 0), 1)
                 let y = inHand.y - CGFloat(drop) * (1 - phase)
                 let at = node.position + leaned(CGPoint(x: inHand.x * CGFloat(player.facing.sign), y: y.rounded()))
                 halo.isHidden = false
@@ -3534,12 +3538,18 @@ final class GameScene: SKScene {
         for (index, chevron) in chevrons.enumerated() {
             if let side = offSide {
                 chevron.isHidden = false
+                chevron.texture = ballChevronOffScreen
+                chevron.size = ballChevronOffScreen.size()
+                chevron.colorBlendFactor = 0
                 chevron.zRotation = side > 0 ? .pi / 2 : -.pi / 2
                 chevron.position = CGPoint(x: cameraNode.position.x + side * (halfView - 10 - CGFloat(index) * 7), y: ballAt.y)
                 chevron.alpha = step == index ? 1 : 0.3
                 continue
             }
             chevron.zRotation = 0
+            chevron.texture = ballChevronOver
+            chevron.size = ballChevronOver.size()
+            chevron.colorBlendFactor = 1
             chevron.isHidden = !showChevrons
             chevron.position = ballNode.position + CGPoint(x: 0, y: 32 - CGFloat(index) * 7)
             chevron.alpha = step == index ? 1 : 0.3

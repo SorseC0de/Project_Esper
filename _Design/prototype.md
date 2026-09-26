@@ -363,7 +363,7 @@ pause and win at buttons 1, text 0.8, titles 0.8 and panels 0.9; the iPad's paus
 text 1.5, titles 1.5 and panels 0.9, as tuned on one; and the iPad's and the TV's title
 at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the plate's
 face, above its lip, and is nudged up and left by half its own drop. TEXT Y on the panel
-scales that lift, one value a platform, until it's known. Phase one is
+scales that lift, one value a platform: half of it, 0.5, on all of them. Phase one is
 the title, the pause and the win; the stage select, the Greateraid pick, the HUD and the
 touch pad follow.
 

@@ -52,7 +52,7 @@ final class UITuning: ObservableObject {
     /// How much of the lift that centres lettering on a plate's face, and takes off its
     /// drop, is applied: one value for every screen on this platform.
     var textRise: CGFloat {
-        (UserDefaults.standard.object(forKey: UITuning.textRiseKey) as? Double).map { CGFloat($0) } ?? 1
+        (UserDefaults.standard.object(forKey: UITuning.textRiseKey) as? Double).map { CGFloat($0) } ?? UITuning.defaultTextRise
     }
 
     func nudgeTextRise(by steps: Int) {
@@ -60,6 +60,9 @@ final class UITuning: ObservableObject {
         UserDefaults.standard.set(Double(min(max(stepped, 0), 2)), forKey: UITuning.textRiseKey)
         revision += 1
     }
+
+    /// Half the lift, as tuned, the same on every platform.
+    static let defaultTextRise: CGFloat = 0.5
 
     private static var textRiseKey: String { "ui.\(UIPlatform.current.rawValue).textRise" }
 

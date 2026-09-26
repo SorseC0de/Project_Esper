@@ -520,7 +520,11 @@ on the title, circles in its corner, the pick kept between launches (`EnergyColo
 #9CDB43, pink #BC4A9B and blue #249FDE, all AAP-64's; the body sprite's tone is the
 colour lifted two fifths of the way to white. The loose ball's purple is #793A80; Surf
 Soda's darker bubbles and its board's tail #403353; outlines drawn in code in the world
-(the field's panels and goalposts, the opponent chevron, the round circles) #242234. Each has an opposite: orange and teal, red
+(the field's panels and goalposts, the opponent chevron, the round circles) #242234. The
+sheets in `_Graphic Assets/Pixel Art` are recoloured to AAP-64's nearest by eye (CIE Lab),
+alpha kept, by `Tools/recolour_to_palette.py`, which leaves all-grey sheets alone: they're
+the masks the energy colour tints. The importer's `NOT_TONED` keeps the strike bolts,
+which the recolour took to pure white, drawn as painted. Each has an opposite: orange and teal, red
 and lime, pink and blue. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two

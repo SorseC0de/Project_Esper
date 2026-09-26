@@ -40,6 +40,9 @@ REDUCE = {"esper_charge": 4, "flashspark": 4, "gemini_rift_v1": 4, "gemini_rift_
 # Strips whose frames aren't square: their frame height, after any reduction. The
 # flash's 256x144 frames come down to 64x36.
 FRAME_HEIGHT = {"flashspark": 36}
+# Sheets that come out grey but are drawn as painted, never toned: the strike bolts, which
+# the palette's recolour took to pure white.
+NOT_TONED = {"lightning1", "lightning2", "lightning3", "lightning4"}
 # Where the measurement reads a sheet's art wrong, the artist's word: 0 bottom edge, 0.5 centred.
 ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.5, "flashspark2": 0.5,
                    "lightning_particle": 0.5, "lightning_particle2": 0.5, "ice_jumpspark": 0.0,
@@ -226,7 +229,7 @@ def sheet_facts(short, width, height, bpp, rows):
         anchor = feet / cell
     else:
         anchor = 0.5
-    return {"frames": count, "anchor": anchor, "grey": grey}
+    return {"frames": count, "anchor": anchor, "grey": grey and short not in NOT_TONED}
 
 
 def write_effect_sheets(effects):

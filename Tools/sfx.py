@@ -2,7 +2,7 @@
 """A bfxr-style sound maker. Each sound in `Tools/sfx.json` is one or more voices mixed:
 an oscillator (square with a duty, saw, triangle, sine or noise), an envelope (attack,
 sustain, punch, decay), a pitch that slides and wobbles and can jump (arpeggio), and
-low- and high-pass filters. Written as 16-bit 44.1 kHz mono WAV into `_Sound FX`, where
+low- and high-pass filters; then, for the whole sound, an optional flanger. Written as 16-bit 44.1 kHz mono WAV into `_Sound FX`, where
 `Tools/import_sounds.py` takes it into the app like any other.
 
     ./Tools/sfx.py            every sound in the file
@@ -115,6 +115,40 @@ def render_voice(settings):
     return out
 
 
+FLANGER_DEFAULTS = {
+    "offset": 2.0,      # milliseconds of delay at the start
+    "sweep": 10.0,      # milliseconds a second the delay grows by, shrinking if negative
+    "depth": 0.0,       # milliseconds the delay also wobbles by
+    "rate": 0.0,        # Hz of that wobble
+    "feedback": 0.4,    # share of the delayed signal fed back in, 0 to 0.9
+    "mix": 0.6,         # share of the delayed copy in the output
+}
+
+
+def flange(samples, settings):
+    """The sound mixed with a copy of itself on a short, moving delay, fed back: the jet
+    whoosh of a comb filter sliding through the harmonics."""
+    f = dict(FLANGER_DEFAULTS, **settings)
+    tail = int(0.03 * RATE)
+    source = samples + [0.0] * tail
+    line = [0.0] * len(source)
+    out = []
+    for index, sample in enumerate(source):
+        t = index / RATE
+        delay_ms = f["offset"] + f["sweep"] * t + f["depth"] * math.sin(2 * math.pi * f["rate"] * t)
+        delay = max(delay_ms, 0.05) / 1000 * RATE
+        back = index - delay
+        if back >= 1:
+            low = int(back)
+            share = back - low
+            delayed = line[low] * (1 - share) + line[low + 1] * share if low + 1 < index else line[low]
+        else:
+            delayed = 0.0
+        line[index] = sample + delayed * min(f["feedback"], 0.9)
+        out.append(sample * (1 - f["mix"] / 2) + delayed * f["mix"])
+    return out
+
+
 def render(recipe):
     voices = [render_voice(voice) for voice in recipe["voices"]]
     length = max(len(voice) for voice in voices)
@@ -122,10 +156,16 @@ def render(recipe):
     for voice in voices:
         for index, sample in enumerate(voice):
             mixed[index] += sample
-    # Normalised to the recipe's peak, so every take comes out as loud as asked.
-    peak = max(max(abs(sample) for sample in mixed), 1e-9)
-    gain = recipe.get("peak", 0.8) / peak
-    return [sample * gain for sample in mixed]
+    if "flanger" in recipe:
+        mixed = flange(mixed, recipe["flanger"])
+    # Levelled to the recipe's peak off the loudest 0.5% but one, so a lone spike (the
+    # flanger's feedback throws them) can't leave the rest quiet; what's over is rounded
+    # off softly rather than clipped.
+    ordered = sorted(abs(sample) for sample in mixed)
+    near_peak = max(ordered[int(len(ordered) * 0.995)], 1e-9)
+    gain = recipe.get("peak", 0.8) / near_peak
+    ceiling = 0.95
+    return [ceiling * math.tanh(sample * gain / ceiling) for sample in mixed]
 
 
 def write(name, samples):

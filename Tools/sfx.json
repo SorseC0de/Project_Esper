@@ -282,5 +282,171 @@
                 "seed": 5
             }
         ]
+    },
+    "parry_g": {
+        "peak": 0.8,
+        "flanger": {
+            "offset": 0.6,
+            "sweep": 14.0,
+            "feedback": 0.6,
+            "mix": 0.7
+        },
+        "voices": [
+            {
+                "wave": "saw",
+                "frequency": 1600,
+                "slide": -3.5,
+                "attack": 0.001,
+                "sustain": 0.04,
+                "punch": 0.7,
+                "decay": 0.34,
+                "decay_curve": 1.6,
+                "lowpass": 9000,
+                "lowpass_sweep": -2.5,
+                "resonance": 0.3
+            },
+            {
+                "wave": "saw",
+                "frequency": 1648,
+                "slide": -3.5,
+                "attack": 0.001,
+                "sustain": 0.04,
+                "decay": 0.34,
+                "decay_curve": 1.6,
+                "lowpass": 9000,
+                "lowpass_sweep": -2.5,
+                "volume": 0.7
+            },
+            {
+                "wave": "sine",
+                "frequency": 2093,
+                "slide": -1.0,
+                "attack": 0.001,
+                "sustain": 0.015,
+                "punch": 0.6,
+                "decay": 0.2,
+                "decay_curve": 2.2,
+                "volume": 0.6
+            },
+            {
+                "wave": "noise",
+                "frequency": 7000,
+                "sustain": 0.01,
+                "decay": 0.08,
+                "decay_curve": 1.8,
+                "highpass": 2000,
+                "volume": 0.5,
+                "seed": 9
+            }
+        ]
+    },
+    "parry_h": {
+        "peak": 0.8,
+        "flanger": {
+            "offset": 5.0,
+            "sweep": -14.0,
+            "feedback": 0.7,
+            "mix": 0.7
+        },
+        "voices": [
+            {
+                "wave": "square",
+                "frequency": 500,
+                "slide": 7.0,
+                "slide_accel": -40.0,
+                "duty": 0.35,
+                "duty_sweep": -0.8,
+                "attack": 0.001,
+                "sustain": 0.05,
+                "punch": 0.6,
+                "decay": 0.3,
+                "decay_curve": 1.5,
+                "lowpass": 8000,
+                "resonance": 0.4
+            },
+            {
+                "wave": "sine",
+                "frequency": 2349,
+                "slide": -1.2,
+                "attack": 0.001,
+                "sustain": 0.02,
+                "punch": 0.5,
+                "decay": 0.22,
+                "decay_curve": 2.0,
+                "volume": 0.55,
+                "vibrato_depth": 0.01,
+                "vibrato_speed": 20
+            },
+            {
+                "wave": "noise",
+                "frequency": 3000,
+                "sustain": 0.02,
+                "decay": 0.1,
+                "decay_curve": 1.6,
+                "lowpass": 7000,
+                "highpass": 800,
+                "volume": 0.45,
+                "seed": 13
+            }
+        ]
+    },
+    "parry_i": {
+        "peak": 0.8,
+        "flanger": {
+            "offset": 1.0,
+            "sweep": 9.0,
+            "depth": 1.5,
+            "rate": 7.0,
+            "feedback": 0.75,
+            "mix": 0.8
+        },
+        "voices": [
+            {
+                "wave": "saw",
+                "frequency": 2200,
+                "slide": -5.0,
+                "attack": 0.001,
+                "sustain": 0.03,
+                "punch": 0.8,
+                "decay": 0.38,
+                "decay_curve": 1.4,
+                "lowpass": 10000,
+                "lowpass_sweep": -3.0,
+                "resonance": 0.5
+            },
+            {
+                "wave": "saw",
+                "frequency": 2290,
+                "slide": -5.2,
+                "attack": 0.001,
+                "sustain": 0.03,
+                "decay": 0.38,
+                "decay_curve": 1.4,
+                "lowpass": 10000,
+                "lowpass_sweep": -3.0,
+                "volume": 0.8
+            },
+            {
+                "wave": "square",
+                "frequency": 1400,
+                "duty": 0.25,
+                "arpeggio": 2.0,
+                "arpeggio_at": 0.02,
+                "sustain": 0.025,
+                "decay": 0.12,
+                "decay_curve": 2.0,
+                "volume": 0.4
+            },
+            {
+                "wave": "noise",
+                "frequency": 9000,
+                "sustain": 0.008,
+                "decay": 0.05,
+                "decay_curve": 2.0,
+                "highpass": 3000,
+                "volume": 0.45,
+                "seed": 21
+            }
+        ]
     }
 }

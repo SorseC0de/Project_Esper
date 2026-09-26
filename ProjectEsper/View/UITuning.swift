@@ -49,6 +49,20 @@ final class UITuning: ObservableObject {
         revision += 1
     }
 
+    /// How much of the lift that centres lettering on a plate's face, and takes off its
+    /// drop, is applied: one value for every screen on this platform.
+    var textRise: CGFloat {
+        (UserDefaults.standard.object(forKey: UITuning.textRiseKey) as? Double).map { CGFloat($0) } ?? 1
+    }
+
+    func nudgeTextRise(by steps: Int) {
+        let stepped = ((textRise + CGFloat(steps) * UITuning.step) * 100).rounded() / 100
+        UserDefaults.standard.set(Double(min(max(stepped, 0), 2)), forKey: UITuning.textRiseKey)
+        revision += 1
+    }
+
+    private static var textRiseKey: String { "ui.\(UIPlatform.current.rawValue).textRise" }
+
     func reset(_ screen: UIScreenKind) {
         for part in UIPart.allCases { UserDefaults.standard.removeObject(forKey: UITuning.key(screen, part)) }
         revision += 1
@@ -105,6 +119,13 @@ struct UITuningPanel: View {
                 }
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
             }
+            HStack(spacing: 8) {
+                Text("TEXT Y").frame(width: 80, alignment: .leading)
+                panelButton("−", picked: false) { tuning.nudgeTextRise(by: -1); flow.scene.refreshPreview() }
+                Text(String(format: "×%.2f", tuning.textRise)).monospacedDigit().frame(width: 64)
+                panelButton("+", picked: false) { tuning.nudgeTextRise(by: 1); flow.scene.refreshPreview() }
+            }
+            .font(.system(size: 13, weight: .bold, design: .monospaced))
             HStack(spacing: 8) {
                 panelButton("RESET", picked: false) {
                     tuning.reset(screen)

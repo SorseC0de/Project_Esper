@@ -1063,10 +1063,12 @@ final class GameScene: SKScene {
             // The court's rims lowered, the hanging body and the hoop's art with them.
             controls.addSlider(title: "RIM DROP", range: 0...40, notch: 1, value: Float(Stage.courtRimDrop)) { [weak self] value in
                 Stage.courtRimDrop = Double(value)
-                self?.session.mutate { match in
-                    guard match.stage.features.look == Stage.court.features.look, match.stage.columns == Stage.court.columns else { return }
-                    match.stage.hoops = Stage.court.hoops
-                }
+                self?.moveCourtRims()
+            }
+            // Toward the block, the rim, the body and the art with it.
+            controls.addSlider(title: "RIM DEPTH", range: -20...20, notch: 1, value: Float(Stage.courtRimDepth)) { [weak self] value in
+                Stage.courtRimDepth = Double(value)
+                self?.moveCourtRims()
             }
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
@@ -1208,6 +1210,14 @@ final class GameScene: SKScene {
         let at = SpriteLibrary.point(hoop.position)
         let across = HoopTuning.offset.x * (hoop.backboard == .left ? -1 : 1)
         return CGPoint(x: at.x + across, y: at.y + HoopTuning.offset.y)
+    }
+
+    /// The court's rims to where the RIM sliders have them, in the match as it stands.
+    private func moveCourtRims() {
+        session.mutate { match in
+            guard match.stage.features.look == Stage.court.features.look, match.stage.columns == Stage.court.columns else { return }
+            match.stage.hoops = Stage.court.hoops
+        }
     }
 
     /// The dunk tuning pose: the match held still, player 1 hanging on the right rim at the

@@ -760,9 +760,10 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 
 ## Court
 
-The Wreck Center on the stage select, and the default. Its rims can be lowered from 80
-(`Stage.courtRimDrop`, the RIM DROP slider while `DunkTuning` holds a body hung on the
-right rim), the hang and the hoop's art coming down with them. Below
+The Wreck Center on the stage select, and the default. Its rims sit at 73, 80 lowered 7
+(`Stage.courtRimDrop`), under backboard blocks a tile higher than before, rows 8 and 9;
+RIM DEPTH (`Stage.courtRimDepth`) slides each toward its block while `DunkTuning` holds a
+body hung on the right rim, the hang and the hoop's art coming with them. Below
 the floor's row everything is the outline black, #242234. Its hoops are `hoop`, the rim and a backboard drawn
 to the players' scale, placed 5 art pixels out from the backboard and 10 up from the rim's point
 (`HoopTuning.offset`), kept out of the glow (the mask marks it, as it does the banner);

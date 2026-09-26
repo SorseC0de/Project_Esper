@@ -420,8 +420,9 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...33, rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...15)
         stage.fill(.solid, columns: 33...33, rows: 0...15)
-        stage.fill(.solid, columns: 3...4, rows: 7...8)
-        stage.fill(.solid, columns: 29...30, rows: 7...8)
+        // The backboard blocks, three rows: the top one stands in for the backboard's own box.
+        stage.fill(.solid, columns: 3...4, rows: 7...9)
+        stage.fill(.solid, columns: 29...30, rows: 7...9)
         stage.fill(.oneWay, columns: 15...18, rows: 3...3)
         return stage
     }()

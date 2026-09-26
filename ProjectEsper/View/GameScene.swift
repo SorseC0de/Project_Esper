@@ -689,7 +689,8 @@ final class GameScene: SKScene {
     /// away: the tiles or the scenery, the rims and their nets.
     private let stageGround = SKNode()
     private let stageGlowers = SKNode()
-    private let threePointArcs = SKNode()
+    /// Cropped to the court's inside, the walls and the floor cutting the lines off.
+    private let threePointArcs = SKCropNode()
     private var threePointArcSides: [(node: SKShapeNode, side: Int)] = []
     /// The stage the world is drawn for, and the ball cam's scenery due a redraw.
     private var builtStage = StageChoice.wreckCenter
@@ -783,7 +784,22 @@ final class GameScene: SKScene {
         threePointArcs.removeAllChildren()
         threePointArcs.zPosition = -30
         threePointArcs.isHidden = gameMode != .fortySeven
+        let inside = CGRect(x: GameScene.pixelsPerTile, y: GameScene.pixelsPerTile,
+                            width: CGFloat(stage.columns - 2) * GameScene.pixelsPerTile,
+                            height: CGFloat(stage.rows + Stage.skyRows) * GameScene.pixelsPerTile)
+        let mask = SKSpriteNode(color: .white, size: inside.size)
+        mask.anchorPoint = .zero
+        mask.position = inside.origin
+        threePointArcs.maskNode = mask
         stageGlowers.addChild(threePointArcs)
+        // Under the floor's row, the outline black, all the way down and out.
+        if !stage.features.scenic {
+            let under = SKSpriteNode(color: SKColor(rgb: PixelPalette.outline), size: CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 4000, height: 2000))
+            under.anchorPoint = CGPoint(x: 0.5, y: 1)
+            under.position = CGPoint(x: CGFloat(stage.columns) * GameScene.pixelsPerTile / 2, y: 0)
+            under.zPosition = -20
+            stageGround.addChild(under)
+        }
         for hoop in stage.hoops {
             let radius = CGFloat(FortySevenRules.threePointRadius(for: hoop, on: stage) * SpriteLibrary.pixelsPerUnit)
             let facingMiddle: CGFloat = hoop.backboard == .left ? 0 : .pi
@@ -799,7 +815,7 @@ final class GameScene: SKScene {
             arc.position = SpriteLibrary.point(hoop.position)
             arc.strokeColor = SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)
             arc.lineWidth = ThreePointTuning.lineWidth
-            arc.alpha = ThreePointTuning.alpha
+            arc.alpha = 0
             arc.blendMode = .add
             threePointArcs.addChild(arc)
             threePointArcSides.append((arc, 1 - hoop.owner))
@@ -1690,10 +1706,7 @@ final class GameScene: SKScene {
     /// and to either side of them each side's drinks, with their levels.
     private func drawSeries() {
         threePointArcs.isHidden = gameMode != .fortySeven && previewing != .hud
-        for arc in threePointArcSides {
-            arc.node.lineWidth = ThreePointTuning.lineWidth
-            arc.node.alpha = ThreePointTuning.alpha
-        }
+        for arc in threePointArcSides { arc.node.lineWidth = ThreePointTuning.lineWidth }
         if gameMode == .fortySeven {
             // 47: each side's points either side of the middle, in its colour, no circles, no drinks.
             for label in drinkLabels { label.text = "" }
@@ -3709,6 +3722,11 @@ final class GameScene: SKScene {
         if match.stage.features.look == .footballField { slideCamera(to: cameraTargetX()) }
         placeBallCamFrame()
         circlesOverCam.isHidden = !ballCamEnabled
+        // 47's lines breathe, slowly, between gone and a quarter.
+        if !threePointArcs.isHidden {
+            let breath = CGFloat(0.5 - 0.5 * cos(CACurrentMediaTime() / ThreePointTuning.breathSeconds * 2 * .pi))
+            for arc in threePointArcSides { arc.node.alpha = ThreePointTuning.breathMax * breath }
+        }
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.
         if shake > 0 {
             shake -= 1

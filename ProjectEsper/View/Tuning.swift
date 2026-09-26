@@ -115,13 +115,13 @@ enum CameraTuning {
     static let slideSeconds: Double = 0.5
 }
 
-/// 47's three-point lines: their thickness in art pixels and their opacity, set on the UI
-/// tuning panel (3PT WIDTH and 3PT ALPHA, under HUD) and kept between launches.
+/// 47's three-point lines: their thickness in art pixels (3PT WIDTH on the UI tuning panel,
+/// under HUD, kept between launches), and their breath, from gone to a quarter and back.
 enum ThreePointTuning {
     static let widthKey = "ui.threePoint.width"
-    static let alphaKey = "ui.threePoint.alpha"
-    static var lineWidth: CGFloat { (UserDefaults.standard.object(forKey: widthKey) as? Double).map { CGFloat($0) } ?? 2 }
-    static var alpha: CGFloat { (UserDefaults.standard.object(forKey: alphaKey) as? Double).map { CGFloat($0) } ?? 0.35 }
+    static var lineWidth: CGFloat { (UserDefaults.standard.object(forKey: widthKey) as? Double).map { CGFloat($0) } ?? 4 }
+    static let breathMax: CGFloat = 0.25
+    static let breathSeconds = 6.0
 }
 
 /// The hoop's art against the rim's point, in art pixels: across away from the backboard, and up.

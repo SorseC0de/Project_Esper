@@ -139,7 +139,6 @@ struct UITuningPanel: View {
             }
             if screen == .hud {
                 lineRow("3PT WIDTH", key: ThreePointTuning.widthKey, value: ThreePointTuning.lineWidth, step: 1, range: 1...8)
-                lineRow("3PT ALPHA", key: ThreePointTuning.alphaKey, value: ThreePointTuning.alpha, step: 0.05, range: 0.05...1)
             }
             HStack(spacing: 8) {
                 Text("TEXT Y").frame(width: 80, alignment: .leading)

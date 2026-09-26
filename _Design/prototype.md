@@ -443,8 +443,8 @@ judged by where the ball last left a hand, or was knocked or swatted from
 platform's nearest edge (92 units on the court, `FortySevenRules.threePointRadius`);
 the half facing the middle is drawn behind everything, dim and glowing, in the colour
 of the side guarding that rim, its two ends run on straight to the screen's edge on the
-rim's side; 3PT WIDTH and 3PT ALPHA on the UI tuning panel, under HUD, set its thickness
-and opacity (2 and 0.35 to start), the HUD's preview showing the lines. THREE!! goes up for three, BUCKET!! for two. Each side's
+rim's side, cut off at the walls and the floor; 4 art pixels thick (3PT WIDTH on the
+UI tuning panel, under HUD), breathing between gone and a quarter every six seconds. THREE!! goes up for three, BUCKET!! for two. Each side's
 points sit either side of a small 47 at the top, in its colour, in place of the round
 circles. The first to 47 wins, on the same win screen. RESET, and RESTART MATCH, start
 it again from nothing. Online, the host's mode is played: MULTIPLAYER has BEST OF 7 and
@@ -760,7 +760,9 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 
 ## Court
 
-The Wreck Center on the stage select, and the default. Its hoops are `hoop`, the rim and a backboard drawn
+The Wreck Center on the stage select, and the default. Its backboard blocks are three
+tiles tall, the top row standing in for the backboard's own box until it has one. Below
+the floor's row everything is the outline black, #242234. Its hoops are `hoop`, the rim and a backboard drawn
 to the players' scale, placed 5 art pixels out from the backboard and 10 up from the rim's point
 (`HoopTuning.offset`), kept out of the glow (the mask marks it, as it does the banner);
 the net is to be made another way; the football field's and

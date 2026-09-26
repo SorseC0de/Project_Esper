@@ -270,7 +270,8 @@ public struct Opponent: Equatable {
         let open = Opponent.open(human) && abs(gap) < 60 && level
         let committed = dangerous || open
         // Behind the block: on the backboard's side of the rim, past the block's face.
-        let behind = (me.position.x - hoop.position.x) * hoop.backboard.sign > 5 && me.position.y < 90
+        let blockTop = hoop.position.y + 2 * Stage.tileSize
+        let behind = (me.position.x - hoop.position.x) * hoop.backboard.sign > 5 && me.position.y < blockTop
 
         // In the stance: a fake lets go with down on the ground; a shot holds through the
         // windup with the aim on the rim, then lets go, sooner if they're closing in; a

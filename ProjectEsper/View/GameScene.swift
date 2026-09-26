@@ -3476,11 +3476,15 @@ final class GameScene: SKScene {
             bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
             node.zRotation = bodyTilt[index]
 
-            // Hit by the blade, the body and head flicker white, every other pair of frames.
+            // Hit by the blade, the body and head flicker a dark shade of their energy, every
+            // other pair of frames; locked out after a 47 basket, black, every other four.
             let stunned = player.hitStun > 0 && (player.hitStun / 2) % 2 == 0
+            let lockedOut = player.hitStun == 0 && player.pickupLockout > 0 && (player.pickupLockout / 4) % 2 == 0
+            let flashColour = lockedOut ? SKColor(rgb: PixelPalette.outline) : SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
             for (flash, source) in [(stunBodies[index], node), (stunHeads[index], headNodes[index])] {
-                flash.isHidden = !stunned || source.isHidden
-                guard stunned else { continue }
+                flash.isHidden = !(stunned || lockedOut) || source.isHidden
+                guard stunned || lockedOut else { continue }
+                flash.color = flashColour
                 flash.texture = source.texture
                 flash.size = source.size
                 flash.anchorPoint = source.anchorPoint

@@ -435,7 +435,8 @@ walked round a ring, a black drop to the south-east, drawn into a texture per st
 A second mode (`GameMode.fortySeven`), on The Wreck Center only for now, no stage
 select, no drinks and no powers. The title has 47 beside BEST OF 7. A basket doesn't
 reset anything: the points go up and play goes on, the scorer unable to take the ball,
-by hand or by snatch, for 120 frames (`pickupLockout`), so it goes the other way;
+by hand or by snatch, for 120 frames (`pickupLockout`), flickering black (#242234)
+every other four frames while it lasts, so it goes the other way;
 through the net the ball is nobody's shot any more, so the other can take it at once. A
 basket is three from outside the three-point line, two from inside it or off a dunk,
 judged by where the ball last left a hand, or was knocked or swatted from

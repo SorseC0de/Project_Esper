@@ -652,7 +652,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   the nearer, so it never flips back at the line; each round it picks up the zone the
   local player starts in.
   The view takes in the stage's height and the turf below the floor. When the ball is off
-  the screen sideways, its chevrons sit at that edge at its height, pointing at it. All of
+  the screen sideways, its chevrons sit at that edge at its height, pointing at it. The opponent
+  off the screen likewise: one chevron in their energy at that edge, at their chest's height. All of
   it is the view; the sim never sees the camera, so it's safe online.
 
 ## Court

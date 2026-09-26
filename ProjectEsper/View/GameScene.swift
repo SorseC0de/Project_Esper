@@ -205,6 +205,9 @@ final class GameScene: SKScene {
     private var chevrons: [SKSpriteNode] = []
     /// Over the rim the holder scores on.
     private var targetChevrons: [SKSpriteNode] = []
+    /// The opponent off the screen sideways: a chevron in their energy at that edge, at
+    /// their chest's height, pointing at them.
+    private var opponentChevron = SKSpriteNode()
     /// The floor and walls, coloured for whoever holds the ball.
     private var courtTiles: [SKSpriteNode] = []
     private var courtColour = SKColor(rgb: CourtLook.neutral)
@@ -574,6 +577,11 @@ final class GameScene: SKScene {
             glowers.addChild(chevron)
             chevrons.append(chevron)
         }
+        opponentChevron = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 14))
+        opponentChevron.colorBlendFactor = 1
+        opponentChevron.zPosition = 6
+        opponentChevron.isHidden = true
+        glowers.addChild(opponentChevron)
         for _ in 0..<3 {
             let chevron = SKSpriteNode(texture: sprites.symbol("chevron.down", pointSize: 10))
             chevron.color = SKColor(rgb: CourtLook.targetChevron)
@@ -3535,6 +3543,17 @@ final class GameScene: SKScene {
             chevron.isHidden = !showChevrons
             chevron.position = ballNode.position + CGPoint(x: 0, y: 32 - CGFloat(index) * 7)
             chevron.alpha = step == index ? 1 : 0.3
+        }
+        let rival = 1 - localIndex
+        if match.players.indices.contains(rival) {
+            let chest = SpriteLibrary.point(match.players[rival].chest)
+            let side: CGFloat? = chest.x > cameraNode.position.x + halfView ? 1 : (chest.x < cameraNode.position.x - halfView ? -1 : nil)
+            opponentChevron.isHidden = side == nil
+            if let side {
+                opponentChevron.color = SKColor(rgb: sprites.look(for: rival).glow)
+                opponentChevron.zRotation = side > 0 ? .pi / 2 : -.pi / 2
+                opponentChevron.position = CGPoint(x: cameraNode.position.x + side * (halfView - 10), y: chest.y)
+            }
         }
         // The same, smaller and fainter and green, over the rim the holder scores on.
         let targetHoop = ball.holder.flatMap { holder in match.stage.hoops.first { $0.owner == holder } }

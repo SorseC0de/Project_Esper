@@ -50,9 +50,10 @@ struct TitleOverlay: View {
                 .ignoresSafeArea()
                 // The energy colours in the bottom right corner, the UI tuning in the bottom left.
                 .overlay(alignment: .bottomTrailing) {
+                    // Hard in the corner, clear of the buttons in the middle.
                     colourPicker
-                        .padding(.bottom, 20)
-                        .padding(.trailing, 24)
+                        .padding(.bottom, 12)
+                        .padding(.trailing, 8)
                 }
                 .overlay(alignment: .bottomLeading) {
                     small("UI", picked: flow.tuningOpen) { flow.tuningOpen.toggle() }

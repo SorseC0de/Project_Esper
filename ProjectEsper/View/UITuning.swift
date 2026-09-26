@@ -58,12 +58,14 @@ final class UITuning: ObservableObject {
         "ui.\(UIPlatform.current.rawValue).\(screen.rawValue).\(part.rawValue)"
     }
 
-    /// Where each platform starts: the phone's title as it was and its dialogs' buttons
-    /// smaller; the iPad's dialogs as tuned on one; the iPad's and the TV's title two and a
+    /// Where each platform starts: the phone's and the iPad's as tuned on one; the iPad's and the TV's title two and a
     /// half times the size and the TV's text half as big again everywhere.
     static func defaultScale(_ screen: UIScreenKind, _ part: UIPart, on platform: UIPlatform) -> CGFloat {
         switch (platform, screen, part) {
-        case (.phone, .pause, .buttons), (.phone, .win, .buttons): 0.75
+        case (.phone, .title, .buttons): 1.1
+        case (.phone, .title, .titles): 0.8
+        case (.phone, .pause, .text), (.phone, .win, .text), (.phone, .pause, .titles), (.phone, .win, .titles): 0.8
+        case (.phone, .pause, .panels), (.phone, .win, .panels): 0.9
         case (.phone, _, _): 1
         case (.pad, .pause, .buttons), (.pad, .win, .buttons): 1
         case (.pad, .pause, .text), (.pad, .win, .text), (.pad, .pause, .titles), (.pad, .win, .titles): 1.5

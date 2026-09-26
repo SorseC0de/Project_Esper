@@ -830,7 +830,7 @@ final class GameScene: SKScene {
             stageGround.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            nets.append(HoopNet(at: SpriteLibrary.point(hoop.position), colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow), into: stageGlowers))
+            nets.append(HoopNet(at: GameScene.netPoint(for: hoop), colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow), into: stageGlowers))
         }
     }
 
@@ -1176,6 +1176,13 @@ final class GameScene: SKScene {
         let at = SpriteLibrary.point(hoop.position)
         let across = HoopTuning.offset.x * (hoop.backboard == .left ? -1 : 1)
         return CGPoint(x: at.x + across, y: at.y + HoopTuning.offset.y)
+    }
+
+    /// Where the net hangs from: the rim's point, moved by NET X and NET Y.
+    static func netPoint(for hoop: Hoop) -> CGPoint {
+        let at = SpriteLibrary.point(hoop.position)
+        let across = NetTuning.offset.x * (hoop.backboard == .left ? -1 : 1)
+        return CGPoint(x: at.x + across, y: at.y + NetTuning.offset.y)
     }
 
     /// The court's rims to where the RIM sliders have them, in the match as it stands.
@@ -3783,13 +3790,12 @@ final class GameScene: SKScene {
             rimNodes[index].color = .white
             rimNodes[index].colorBlendFactor = rimFlash[index] > 0 ? 0.8 : 0
             // A rim that moves, under the highway's helicopter, and its net with it; the art
-            // at the tuned offset from the rim.
+            // and the net each at their tuned offset from the rim.
             if index < match.stage.hoops.count {
-                let at = SpriteLibrary.point(match.stage.hoops[index].position)
                 rimNodes[index].position = GameScene.hoopArtPoint(for: match.stage.hoops[index])
                 rimNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
                 if index < nets.count {
-                    nets[index].step(rim: at, ball: ballNode.isHidden ? nil : ballNode.position,
+                    nets[index].step(rim: GameScene.netPoint(for: match.stage.hoops[index]), ball: ballNode.isHidden ? nil : ballNode.position,
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
                                      bodies: match.players.map { SpriteLibrary.point($0.chest) })
                 }

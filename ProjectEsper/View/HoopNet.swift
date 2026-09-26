@@ -5,9 +5,7 @@ import SpriteKit
 /// how loose they are, and the chevrons themselves.
 enum NetTuning {
     static let columns = 5
-    static let chevronsPerColumn = 5
-    /// Art pixels between neighbouring columns at the rim.
-    static let columnGap: CGFloat = 4
+    static let chevronsPerColumn = 7
     static let gravity: CGFloat = 0.18
     /// Share of its speed a knot keeps from one frame to the next.
     static let damping: CGFloat = 0.9
@@ -17,18 +15,25 @@ enum NetTuning {
     /// A body's reach, round its chest, for pushing the net.
     static let bodyRadius: CGFloat = 7
     /// A chevron, pointing down: art pixels across and deep at ×1, and 1 thick.
-    static let chevronWidth: CGFloat = 3
-    static let chevronDepth: CGFloat = 2
+    static let chevronWidth: CGFloat = 2.25
+    static let chevronDepth: CGFloat = 1.5
     static let lineWidth: CGFloat = 1
     /// NET TOP and NET BOTTOM on the UI tuning panel, under HUD: the chevrons' scale at the
     /// rim and at the bottom, those between stepping down evenly; NET SPREAD, art pixels
-    /// between chevrons down a column. Kept between launches.
+    /// between the columns; NET ROWS, between chevrons down a column; NET X and NET Y, the
+    /// whole net against the rim, x mirrored on a left backboard as the hoop's art is.
+    /// Kept between launches.
     static let topScaleKey = "ui.net.columns.topScale"
     static let bottomScaleKey = "ui.net.columns.bottomScale"
     static let spreadKey = "ui.net.columns.spread"
+    static let rowSpacingKey = "ui.net.columns.rowSpacing"
+    static let offsetXKey = "ui.net.offsetX"
+    static let offsetYKey = "ui.net.offsetY"
     static var topScale: CGFloat { stored(topScaleKey) ?? 1 }
     static var bottomScale: CGFloat { stored(bottomScaleKey) ?? 0.5 }
     static var spread: CGFloat { stored(spreadKey) ?? 4 }
+    static var rowSpacing: CGFloat { stored(rowSpacingKey) ?? 4 }
+    static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? 0, y: stored(offsetYKey) ?? 0) }
     private static func stored(_ key: String) -> CGFloat? {
         (UserDefaults.standard.object(forKey: key) as? Double).map { CGFloat($0) }
     }
@@ -62,7 +67,7 @@ final class HoopNet {
     private var awake = true
     private var stillFrames = 0
     private var lastBall: CGPoint?
-    private var builtSpread: CGFloat = 0
+    private var builtSpacing: [CGFloat] = []
     private var drawnScales: [CGFloat] = []
 
     init(at rim: CGPoint, colour: SKColor, into parent: SKNode) {
@@ -78,16 +83,16 @@ final class HoopNet {
 
     /// The columns hung straight down from the rim, a spread apart.
     private func buildMesh() {
-        builtSpread = NetTuning.spread
+        builtSpacing = [NetTuning.spread, NetTuning.rowSpacing]
         knots = []
         ties = []
         let columns = NetTuning.columns, rows = NetTuning.chevronsPerColumn
-        let halfWidth = NetTuning.columnGap * CGFloat(columns - 1) / 2
+        let halfWidth = NetTuning.spread * CGFloat(columns - 1) / 2
         var index: [[Int]] = []
         for column in 0..<columns {
             var line: [Int] = []
             for row in 0..<rows {
-                let offset = CGPoint(x: -halfWidth + CGFloat(column) * NetTuning.columnGap, y: -CGFloat(row) * builtSpread)
+                let offset = CGPoint(x: -halfWidth + CGFloat(column) * NetTuning.spread, y: -CGFloat(row) * NetTuning.rowSpacing)
                 let at = CGPoint(x: rim.x + offset.x, y: rim.y + offset.y)
                 line.append(knots.count)
                 knots.append(Knot(at: at, was: at, row: row, pin: row == 0 ? offset : nil))
@@ -117,8 +122,8 @@ final class HoopNet {
     func step(rim: CGPoint, ball: CGPoint?, ballRadius: CGFloat, bodies: [CGPoint]) {
         let rimMoved = HoopNet.distance(rim, self.rim) > 0.01
         self.rim = rim
-        if NetTuning.spread != builtSpread { buildMesh() }
-        let reach = NetTuning.columnGap * CGFloat(NetTuning.columns) + builtSpread * CGFloat(NetTuning.chevronsPerColumn) + 24
+        if builtSpacing != [NetTuning.spread, NetTuning.rowSpacing] { buildMesh() }
+        let reach = NetTuning.spread * CGFloat(NetTuning.columns) + NetTuning.rowSpacing * CGFloat(NetTuning.chevronsPerColumn) + 24
         let ballNear = ball.map { HoopNet.distance($0, rim) < reach } ?? false
         let bodyNear = bodies.contains { HoopNet.distance($0, rim) < reach }
         if rimMoved || ballNear || bodyNear {

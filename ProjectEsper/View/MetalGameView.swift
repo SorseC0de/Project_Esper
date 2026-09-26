@@ -45,8 +45,16 @@ final class GameMetalView: MTKView {
     }
     #endif
 
-    /// Drawable pixels per point: the screen's scale, or 1 on the TV.
-    var renderScale: CGFloat { bounds.width > 0 ? drawableSize.width / bounds.width : contentScaleFactor }
+    /// Drawable pixels per point: the screen's scale, or 1 on the TV. Not read off the
+    /// drawable: when the delegate hears of a new size the drawable still has the old one,
+    /// 0 on the first, which put the camera at scale 0 and drew no world at all.
+    var renderScale: CGFloat {
+        #if os(tvOS)
+        1
+        #else
+        contentScaleFactor
+        #endif
+    }
 }
 
 /// Matches `GlowUniforms` in Glow.metal.

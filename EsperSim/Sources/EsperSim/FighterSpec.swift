@@ -103,7 +103,7 @@ public struct FighterSpec: Equatable {
         wallSlideSpeed: 0.3,
         wallLandCooldownFrames: 6,
         bodyWidth: 10,
-        bodyHeight: 15
+        bodyHeight: 17.5
     )
 
     /// Melee Captain Falcon, same table. Jump velocities come from the listed heights: full
@@ -136,7 +136,7 @@ public struct FighterSpec: Equatable {
         wallSlideSpeed: 0.5,
         wallLandCooldownFrames: 6,
         bodyWidth: 10,
-        bodyHeight: 15
+        bodyHeight: 17.5
     )
 
     /// Melee Fox. Full hop 31.3, short hop 10.7, double jump 40.2; 3-frame jumpsquat.
@@ -167,7 +167,7 @@ public struct FighterSpec: Equatable {
         wallSlideSpeed: 0.5,
         wallLandCooldownFrames: 6,
         bodyWidth: 10,
-        bodyHeight: 15
+        bodyHeight: 17.5
     )
 
     /// Melee Sheik. Full hop 34.1, short hop 20.2, double jump 38; 3-frame jumpsquat.
@@ -198,7 +198,7 @@ public struct FighterSpec: Equatable {
         wallSlideSpeed: 0.5,
         wallLandCooldownFrames: 6,
         bodyWidth: 10,
-        bodyHeight: 15
+        bodyHeight: 17.5
     )
 }
 

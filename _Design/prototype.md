@@ -505,7 +505,7 @@ holds the variants; A is always the baseline as tuned.
   tilted 20° with the end toward the field up, the uprights 100 over it; the back rod
   and the crossbar with its uprights each have their own 1 black outline, as do the
   light panels.
-- HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white, the loose
+- HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white (10 × 17.5 units, 16 × 28 art pixels), the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
 - AI, beside that: the computer plays the other side, whatever pads are in. Off, the second
@@ -772,7 +772,7 @@ across the top, 18 art pixels, tapering 45% to the bottom, 17 deep), the top row
 rim and following it, long ties two rows down so it hangs rather than stretches. The ball,
 swept from last frame's point to this one's so a fast shot can't slip between knots, pushes
 the knots out and drags them 0.4 of its travel; a swish is the ball going through, nothing
-scripted. Bodies near the rim push it too. It's drawn as small `flashspark2`s on every knot
+scripted. Bodies near the rim push it too. It's drawn as small `flashspark2`s (0.06 on a knot, 0.04 on a strand) on every knot
 and every drawn strand's middle, each on its own frame, in the guarding side's energy, in
 the glow; still and with nothing near, it sleeps. The numbers are `NetTuning`. The football field's and
 the highway's backboards are to be fitted to it. The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The

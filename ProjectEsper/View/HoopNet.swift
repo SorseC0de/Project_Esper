@@ -20,8 +20,8 @@ enum NetTuning {
     /// A body's reach, round its chest, for pushing the net.
     static let bodyRadius: CGFloat = 7
     /// The flashspark2 frames' scale on a knot and on each strand between two.
-    static let knotScale: CGFloat = 0.13
-    static let strandScale: CGFloat = 0.1
+    static let knotScale: CGFloat = 0.06
+    static let strandScale: CGFloat = 0.04
 }
 
 /// A hoop's net: Verlet cloth hung from the rim, a diamond mesh of knots joined by strands,

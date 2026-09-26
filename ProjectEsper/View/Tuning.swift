@@ -66,11 +66,11 @@ enum ParticleLook {
     static let fireSize: CGFloat = 12
     static let lightningSize: CGFloat = 8
     static let bubbleSize: CGFloat = 10
-    /// Surf Soda's bubbles, the plum ramp's lightest or darkest by a coin flip.
-    static let sodas = [SKColor(rgb: EsperPalette.plum.highlight), SKColor(rgb: EsperPalette.plum.shadow)]
-    /// The board, the plum's second darkest, and its tail's shadow, the darkest.
+    /// Surf Soda's bubbles, a light plum or the pixel palette's dark one by a coin flip.
+    static let sodas = [SKColor(rgb: EsperPalette.plum.highlight), SKColor(rgb: PixelPalette.plumDark)]
+    /// The board, a plum, and its tail's shadow, the pixel palette's dark plum.
     static let boardPurple: UInt32 = EsperPalette.plum.body
-    static let boardShadow: UInt32 = EsperPalette.plum.shadow
+    static let boardShadow: UInt32 = PixelPalette.plumDark
 }
 
 /// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel
@@ -150,8 +150,15 @@ enum GoalpostTuning {
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the
 /// right rim in the dunk, on the sequence frame the DUNK FRAME slider picks, and the
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
+/// The hoop's art against the rim's point, in art pixels, on the HOOP sliders until it's
+/// settled; across, it points away from the backboard.
+enum HoopTuning {
+    nonisolated(unsafe) static var offset = CGPoint.zero
+}
+
 enum DunkTuning {
-    static let enabled = false
+    /// On while the new hoop's art is placed: the game holds a body hung on the right rim.
+    static let enabled = true
     nonisolated(unsafe) static var frame = 0
 }
 

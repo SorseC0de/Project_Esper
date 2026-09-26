@@ -141,7 +141,7 @@ enum FieldArt {
                                          CGPoint(x: bank + 124, y: lightsBottom + 44), CGPoint(x: bank - 4, y: lightsBottom + 44)])
             panelPath.closeSubpath()
             let panel = SKShapeNode(path: panelPath)
-            panel.strokeColor = .black
+            panel.strokeColor = SKColor(rgb: PixelPalette.outline)
             panel.lineWidth = GoalpostTuning.outline
             panel.zPosition = -14
             parent.addChild(panel)
@@ -245,7 +245,7 @@ enum FieldArt {
         padPath.closeSubpath()
         let base = SKShapeNode(path: padPath)
         base.fillColor = centre == nil ? padColour : shadow
-        base.strokeColor = centre == nil ? .black : .clear
+        base.strokeColor = centre == nil ? SKColor(rgb: PixelPalette.outline) : .clear
         base.lineWidth = outline
         base.zPosition = -5
         parent.addChild(base)
@@ -268,7 +268,7 @@ enum FieldArt {
         }
         // Each part the gold over a black line as wide as it plus the outline each side.
         let layers: [(SKColor, CGFloat, CGFloat)] = centre == nil
-            ? [(SKColor.black, thickness + outline * 2, 0), (gold, thickness, 0.05)]
+            ? [(SKColor(rgb: PixelPalette.outline), thickness + outline * 2, 0), (gold, thickness, 0.05)]
             : [(shadow, thickness, 0)]
         for (part, z) in [(rod as CGPath, CGFloat(-4.6)), (path as CGPath, CGFloat(-4.4))] {
             for (colour, width, lift) in layers {

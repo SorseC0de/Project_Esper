@@ -513,14 +513,14 @@ holds the variants; A is always the baseline as tuned.
 
 ## Energy colours
 
-Six to pick from on the title, circles in its upper right corner, the pick kept between
-launches (`EnergyColour`, `esper.energyColour`): orange, the default, teal, red, lime,
-pink and blue, each a ramp of `EsperPalette` (`_Graphic Assets/Esper_Palette.png`), the
-glow its body shade, the second from the right, and the body sprite's tone its
-highlight: orange the gold #EDA42F, teal the blue #36A9E0, red #E03662, lime #ADCA31, pink
-#E036A5, blue the royal #1F4AE4. The loose ball's purple is the purple ramp's #8D36E0,
-Surf Soda's bubbles the plum's lightest and darkest, its board the plum's second darkest
-with the darkest for the tail. Each has an opposite: orange and teal, red
+Two palettes, as CardCourt has: `PixelPalette` (`_Graphic Assets/Pixel_Palette.png`,
+AAP-64) for the world, `EsperPalette` for the interface. Six energy colours to pick from
+on the title, circles in its corner, the pick kept between launches (`EnergyColour`,
+`esper.energyColour`): orange #F9A31B, the default, teal #20D6C7, red #DF3E23, lime
+#9CDB43, pink #BC4A9B and blue #249FDE, all AAP-64's; the body sprite's tone is the
+colour lifted two fifths of the way to white. The loose ball's purple is #793A80; Surf
+Soda's darker bubbles and its board's tail #403353; outlines drawn in code in the world
+(the field's panels and goalposts, the opponent chevron, the round circles) #242234. Each has an opposite: orange and teal, red
 and lime, pink and blue. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two
@@ -753,7 +753,10 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 
 ## Court
 
-The Wreck Center on the stage select, and the default. The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The
+The Wreck Center on the stage select, and the default. Its hoops are `hoop`, the rim and a backboard drawn
+to the players' scale, placed at `HoopTuning.offset` from the rim's point (the HOOP X and
+Y sliders while `DunkTuning` holds a body hung on the right rim); the football field's and
+the highway's backboards are to be fitted to it. The tiles are flat colour, in dark shades: each colour at 0.45 of its brightness. The
 floor and walls start purple and shift over 20 frames to the colour of whoever holds the
 ball, and back. The backboard blocks wear the colour of the player who scores there's opponent, since you
 score on the other side's basket. The ledge is

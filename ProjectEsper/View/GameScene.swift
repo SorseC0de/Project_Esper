@@ -403,8 +403,8 @@ final class GameScene: SKScene {
                               crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
                               angle: GoalpostTuning.crossbarAngle * .pi / 180, thickness: GoalpostTuning.thickness, outline: GoalpostTuning.outline,
                               padColour: SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow)))
-            let rim = SKSpriteNode(texture: sprites.texture("hoop_rim", 0))
-            rim.position = SpriteLibrary.point(hoop.position)
+            let rim = SKSpriteNode(texture: sprites.texture("hoop", 0))
+            rim.position = GameScene.hoopArtPoint(for: hoop)
             rim.xScale = hoop.backboard == .left ? -1 : 1
             rim.zPosition = 5
             camScene.scenery.addChild(rim)
@@ -597,7 +597,7 @@ final class GameScene: SKScene {
             glowers.addChild(chevron)
             chevrons.append(chevron)
         }
-        opponentChevron = SKSpriteNode(texture: sprites.outlinedSymbol("chevron.down", pointSize: 14, fill: .white, stroke: .black))
+        opponentChevron = SKSpriteNode(texture: sprites.outlinedSymbol("chevron.down", pointSize: 14, fill: .white, stroke: SKColor(rgb: PixelPalette.outline)))
         opponentChevron.colorBlendFactor = 1
         opponentChevron.zPosition = 6
         opponentChevron.isHidden = true
@@ -800,8 +800,9 @@ final class GameScene: SKScene {
             threePointArcSides.append((arc, 1 - hoop.owner))
         }
         for hoop in stage.hoops {
-            let rim = SKSpriteNode(texture: sprites.texture("hoop_rim", 0))
-            rim.position = SpriteLibrary.point(hoop.position)
+            // `hoop`, the rim and its backboard, drawn to the players' scale.
+            let rim = SKSpriteNode(texture: sprites.texture("hoop", 0))
+            rim.position = GameScene.hoopArtPoint(for: hoop)
             rim.zPosition = 5
             // The sheet draws the rim with its backboard on the right.
             rim.xScale = hoop.backboard == .left ? -1 : 1
@@ -1049,6 +1050,9 @@ final class GameScene: SKScene {
             }
         }
         if DunkTuning.enabled {
+            // The hoop's art against the rim, tuned with a body hung on it.
+            controls.addSlider(title: "HOOP X", range: -32...32, notch: 1, value: Float(HoopTuning.offset.x)) { HoopTuning.offset.x = CGFloat($0) }
+            controls.addSlider(title: "HOOP Y", range: -32...32, notch: 1, value: Float(HoopTuning.offset.y)) { HoopTuning.offset.y = CGFloat($0) }
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
                 DunkArt.offsets[DunkTuning.frame].x = CGFloat($0)
@@ -1181,6 +1185,14 @@ final class GameScene: SKScene {
             accumulator = 0
         }
         render()
+    }
+
+    /// Where the hoop's art sits for a rim: the rim's point, moved by `HoopTuning.offset` in
+    /// art pixels, across mirrored for a backboard on the left.
+    static func hoopArtPoint(for hoop: Hoop) -> CGPoint {
+        let at = SpriteLibrary.point(hoop.position)
+        let across = HoopTuning.offset.x * (hoop.backboard == .left ? -1 : 1)
+        return CGPoint(x: at.x + across, y: at.y + HoopTuning.offset.y)
     }
 
     /// The dunk tuning pose: the match held still, player 1 hanging on the right rim at the
@@ -1737,7 +1749,7 @@ final class GameScene: SKScene {
             let circle = SKShapeNode(circleOfRadius: radius)
             circle.position = CGPoint(x: (CGFloat(index) - CGFloat(count - 1) / 2) * spacing, y: 0)
             circle.fillColor = index < series.rounds.count ? SKColor(rgb: sprites.look(for: series.rounds[index]).glow) : SKColor(rgb: BallLook.darkPurple)
-            circle.strokeColor = SKColor(white: 0, alpha: 0.6)
+            circle.strokeColor = SKColor(rgb: PixelPalette.outline).withAlphaComponent(0.6)
             circle.lineWidth = 1
             circles.addChild(circle)
             circlesOverCam.addChild(circle.copy() as! SKShapeNode)
@@ -3764,11 +3776,14 @@ final class GameScene: SKScene {
 
         for index in rimNodes.indices {
             if rimFlash[index] > 0 { rimFlash[index] -= 1 }
-            rimNodes[index].texture = sprites.texture("hoop_rim", rimFlash[index] > 0 ? 1 : 0)
-            // A rim that moves, under the highway's helicopter, and its net with it.
+            // A basket flashes the hoop white; the art is one frame.
+            rimNodes[index].color = .white
+            rimNodes[index].colorBlendFactor = rimFlash[index] > 0 ? 0.8 : 0
+            // A rim that moves, under the highway's helicopter, and its net with it; the art
+            // at the tuned offset from the rim.
             if index < match.stage.hoops.count {
                 let at = SpriteLibrary.point(match.stage.hoops[index].position)
-                rimNodes[index].position = at
+                rimNodes[index].position = GameScene.hoopArtPoint(for: match.stage.hoops[index])
                 rimNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
                 if index < netNodes.count { netNodes[index].position = at }
             }

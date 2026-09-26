@@ -17,7 +17,7 @@ neutral to get a shot off; catch it and the roles reverse.
   glows; it takes the touches and hands them to the game scene. `InputHub` merges touch
   and controllers. `TouchControls` is the on-screen pad. Who drives whom: on a phone touch is player 0,
   one controller is player 1, two controllers are players 0 and 1 in order; on the TV
-  the controllers are players 0 and 1. A pad on player 1 sits the computer out, so a
+  and on a Mac, with no touch, the controllers are players 0 and 1. A pad on player 1 sits the computer out, so a
   second person just picks up a pad. A keyboard on an iPad or a Mac is player 0 as well: WASD, space to jump, J to shoot,
   K to throw, shift as the left bumper, delete as the start button, Esc quits on a Mac or in the simulator. The HUD is laid out in the phone's points and
   scaled up by `HudScene.scale(forHeight:)` on a bigger screen, the lettering rendered
@@ -389,7 +389,8 @@ judged by where the ball last left a hand, or was knocked or swatted from
 (`Ball.launchPoint`). The line is a circle round each rim reaching the middle
 platform's nearest edge (92 units on the court, `FortySevenRules.threePointRadius`);
 the half facing the middle is drawn behind everything, dim and glowing, in the colour
-of the side guarding that rim. THREE!! goes up for three, BUCKET!! for two. Each side's
+of the side guarding that rim, its two ends run on straight to the screen's edge on the
+rim's side; the 3PT WIDTH and 3PT ALPHA sliders set its thickness and opacity offline. THREE!! goes up for three, BUCKET!! for two. Each side's
 points sit either side of a small 47 at the top, in its colour, in place of the round
 circles. The first to 47 wins, on the same win screen. RESET, and RESTART MATCH, start
 it again from nothing. Online, the host's mode is played: MULTIPLAYER has BEST OF 7 and
@@ -453,8 +454,9 @@ holds the variants; A is always the baseline as tuned.
 - HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white, the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
-- AI, beside that: the computer plays the other side. Off, the second pad or nothing does.
-  Clicking a pad's right stick (R3) switches it too, which is the only way on the TV.
+- AI, beside that: the computer plays the other side, whatever pads are in. Off, the second
+  pad or nothing does. The title's VS CPU toggle is the same switch, kept between launches;
+  clicking a pad's right stick (R3) switches it too.
 
 ## Energy colours
 

@@ -115,6 +115,13 @@ enum CameraTuning {
     static let slideSeconds: Double = 0.5
 }
 
+/// 47's three-point lines, on the 3PT sliders until they're settled: their thickness in
+/// art pixels and their opacity.
+enum ThreePointTuning {
+    static var lineWidth: CGFloat = 2
+    static var alpha: CGFloat = 0.35
+}
+
 enum BackboardTuning {
     static let x: CGFloat = 10
     static let y: CGFloat = 24

@@ -42,7 +42,13 @@ final class GameScene: SKScene {
     private var match: Match { session.match }
     /// The computer on the other side, when the AI switch is on; never online.
     private var opponent = Opponent(index: 1)
-    private var aiOn = true
+    /// VS CPU: the computer plays player 2, whatever pads are in; off, player 2 is the
+    /// second pad. The title's toggle, the AI button and R3 all set it, kept between launches.
+    static let vsCPUKey = "esper.vsCPU"
+    private var aiOn: Bool {
+        get { UserDefaults.standard.object(forKey: GameScene.vsCPUKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: GameScene.vsCPUKey) }
+    }
 
     /// A networked series: this phone's side, the two randoms that seed the series, the
     /// pick waiting to be applied, and the rematch randoms after a win.
@@ -776,13 +782,19 @@ final class GameScene: SKScene {
         for hoop in stage.hoops {
             let radius = CGFloat(FortySevenRules.threePointRadius(for: hoop, on: stage) * SpriteLibrary.pixelsPerUnit)
             let facingMiddle: CGFloat = hoop.backboard == .left ? 0 : .pi
+            // Each end runs on straight to the screen's edge on the rim's side, well past the
+            // wall, as a real line meets the baseline.
+            let run = CGFloat(hoop.backboard.sign) * 1000
             let path = CGMutablePath()
-            path.addArc(center: .zero, radius: radius, startAngle: facingMiddle - .pi / 2, endAngle: facingMiddle + .pi / 2, clockwise: false)
+            path.move(to: CGPoint(x: run, y: -radius))
+            path.addLine(to: CGPoint(x: 0, y: -radius))
+            path.addArc(center: .zero, radius: radius, startAngle: -.pi / 2, endAngle: .pi / 2, clockwise: facingMiddle != 0)
+            path.addLine(to: CGPoint(x: run, y: radius))
             let arc = SKShapeNode(path: path)
             arc.position = SpriteLibrary.point(hoop.position)
             arc.strokeColor = SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)
-            arc.lineWidth = 2
-            arc.alpha = 0.35
+            arc.lineWidth = ThreePointTuning.lineWidth
+            arc.alpha = ThreePointTuning.alpha
             arc.blendMode = .add
             threePointArcs.addChild(arc)
             threePointArcSides.append((arc, 1 - hoop.owner))
@@ -1025,6 +1037,17 @@ final class GameScene: SKScene {
                 index == 1 ? self?.openBoundsGallery() : self?.closeBoundsGallery()
             }
         }
+        // 47's three-point lines, while they're being settled.
+        if gameMode == .fortySeven, online == nil {
+            controls.addSlider(title: "3PT WIDTH", range: 1...8, notch: 1, value: Float(ThreePointTuning.lineWidth)) { [weak self] value in
+                ThreePointTuning.lineWidth = CGFloat(value)
+                for arc in self?.threePointArcSides ?? [] { arc.node.lineWidth = CGFloat(value) }
+            }
+            controls.addSlider(title: "3PT ALPHA", range: 0.05...1, notch: 0.05, value: Float(ThreePointTuning.alpha)) { [weak self] value in
+                ThreePointTuning.alpha = CGFloat(value)
+                for arc in self?.threePointArcSides ?? [] { arc.node.alpha = CGFloat(value) }
+            }
+        }
         if DunkTuning.enabled {
             let last = Float(Animation.dunkSequence.count - 1)
             let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
@@ -1140,7 +1163,7 @@ final class GameScene: SKScene {
                 send(.inputs(session.outgoing()), reliable: false)
             } else {
                 var remote = inputs.count > 1 ? inputs[1] : .idle
-                if aiOn, !hub.playerTwoHasController { remote = opponent.decide(match) }
+                if aiOn { remote = opponent.decide(match) }
                 section("ai")
                 tick = session.tick(local: inputs[0], remote: remote)
             }
@@ -1204,6 +1227,8 @@ final class GameScene: SKScene {
         pendingFlow = nil
         heldBanner = nil
         series = Series(seed: seed)
+        // The debug strip is built for the mode (47 has its sliders), so again for this one.
+        if built { layout(displayScale: displayScale) }
         if gameMode == .fortySeven {
             // 47 is the court's alone for now, straight into play.
             series.stage = .wreckCenter
@@ -3758,7 +3783,7 @@ final class GameScene: SKScene {
         if online != nil {
             side = "  net lead \(session.frame - session.remoteFrame) rollbacks \(session.rollbacks)/\(session.framesRerun)\(session.desynced ? "  DESYNC" : "")"
         } else {
-            side = aiOn ? "  ai \(String(describing: opponent.current))" : ""
+            side = aiOn ? "  ai \(String(describing: opponent.current))" : "  vs pad"
         }
         debugLabel.text = String(format: "%@ %d  v %.2f %.2f  stick %.2f %.2f  jumps %d%@%@%@",
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y,

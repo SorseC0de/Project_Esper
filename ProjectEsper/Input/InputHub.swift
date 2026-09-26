@@ -29,6 +29,15 @@ final class InputHub {
 
     static let stickDeadzone = 0.2
 
+    /// Running on a Mac, where there's a keyboard and no touch.
+    static var onMac: Bool {
+        #if os(tvOS)
+        return false
+        #else
+        return ProcessInfo.processInfo.isiOSAppOnMac || ProcessInfo.processInfo.isMacCatalystApp
+        #endif
+    }
+
     /// Running on a Mac, or in the simulator, where a keyboard's Esc should close the app.
     static var onDesk: Bool {
         #if targetEnvironment(simulator)
@@ -108,11 +117,13 @@ final class InputHub {
         return input
     }
 
-    /// The controller that drives this player, by the rule above.
+    /// The controller that drives this player, by the rule above. On a Mac there's no
+    /// touch to be player 0, so there as on the TV the first controller is player 0.
     private func controller(for index: Int) -> GCController? {
         #if os(tvOS)
         return index < controllers.count ? controllers[index] : nil
         #else
+        if InputHub.onMac { return index < controllers.count ? controllers[index] : nil }
         switch (controllers.count, index) {
         case (1, 1): return controllers[0]
         case (1, 0): return nil

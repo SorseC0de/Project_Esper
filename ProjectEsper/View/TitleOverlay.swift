@@ -28,6 +28,8 @@ struct TitleOverlay: View {
     @AppStorage(EnergyColour.storageKey) private var colour = EnergyColour.orange.rawValue
     /// The mode multiplayer asks for; the host's is played.
     @AppStorage(GameScene.onlineModeKey) private var onlineMode = Int(GameMode.rounds.rawValue)
+    /// Offline, whether the computer plays player 2 or a second pad does.
+    @AppStorage(GameScene.vsCPUKey) private var vsCPU = true
 
     private var busy: Bool {
         switch net.state {
@@ -67,6 +69,16 @@ struct TitleOverlay: View {
                     .buttonStyle(.plain)
                     .disabled(busy)
                 }
+                Button {
+                    vsCPU.toggle()
+                    SoundBoard.shared.play(SoundBoard.navigate)
+                } label: {
+                    Text(vsCPU ? "VS CPU: ON" : "VS CPU: OFF · PAD 2")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                .buttonStyle(.plain)
+                .disabled(busy)
                 VStack(spacing: 10) {
                     Button {
                         SoundBoard.shared.play(SoundBoard.confirm)

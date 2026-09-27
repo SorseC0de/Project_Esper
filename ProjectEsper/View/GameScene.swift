@@ -473,6 +473,44 @@ final class GameScene: SKScene {
             sprite.alpha = 0.02
             warmNode.addChild(sprite)
         }
+        // One of each way of drawing the game uses, so SpriteKit builds their pipelines now
+        // and not the first time one appears mid-match: additive and tinted sprites, a
+        // stroked and a filled shape, an emitter, a crop and a label.
+        if let sample = sprites.allTextures.first {
+            let additive = SKSpriteNode(texture: sample)
+            additive.blendMode = .add
+            let tinted = SKSpriteNode(texture: sample)
+            tinted.color = .white
+            tinted.colorBlendFactor = 1
+            let additiveTinted = SKSpriteNode(texture: sample)
+            additiveTinted.blendMode = .add
+            additiveTinted.color = .white
+            additiveTinted.colorBlendFactor = 1
+            for sprite in [additive, tinted, additiveTinted] {
+                sprite.size = CGSize(width: 1, height: 1)
+                sprite.alpha = 0.02
+                warmNode.addChild(sprite)
+            }
+            let crop = SKCropNode()
+            crop.maskNode = SKSpriteNode(texture: sample, size: CGSize(width: 1, height: 1))
+            let cropped = SKSpriteNode(texture: sample, size: CGSize(width: 1, height: 1))
+            cropped.alpha = 0.02
+            crop.addChild(cropped)
+            warmNode.addChild(crop)
+        }
+        let stroke = SKShapeNode(rect: CGRect(x: 0, y: 0, width: 2, height: 2))
+        stroke.strokeColor = SKColor(white: 1, alpha: 0.02)
+        let fill = SKShapeNode(rect: CGRect(x: 0, y: 0, width: 2, height: 2))
+        fill.fillColor = SKColor(white: 1, alpha: 0.02)
+        fill.strokeColor = .clear
+        let label = SKLabelNode(text: "0")
+        label.fontName = "Menlo-Bold"
+        label.fontSize = 2
+        label.alpha = 0.02
+        let emitter = makeTrail()
+        emitter.particleAlpha = 0.02
+        emitter.particleBirthRate = 30
+        for node in [stroke, fill, label, emitter] as [SKNode] { warmNode.addChild(node) }
         warmNode.zPosition = 90
         glowHud.addChild(warmNode)
 
@@ -832,6 +870,7 @@ final class GameScene: SKScene {
             rimFlash.append(0)
             nets.append(HoopNet(at: GameScene.netPoint(for: hoop), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow), into: stageGlowers))
         }
+        warmDrawnArt()
     }
 
     /// The world redrawn for the series' stage, if it isn't the one drawn.
@@ -1883,12 +1922,7 @@ final class GameScene: SKScene {
         for arc in threePointArcSides { arc.node.strokeColor = SKColor(rgb: sprites.look(for: arc.side).glow) }
         for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
         for (net, hoop) in zip(nets, match.stage.hoops) { net.recolour(SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)) }
-        // The helmets drawn in the new colours now, not on the first one's spawn mid-match.
-        for index in colours.indices {
-            for variant in 0..<FieldRules.helmetVariants {
-                _ = helmetTexture(variant: variant, colour: SKColor(rgb: sprites.look(for: index).glow))
-            }
-        }
+        warmDrawnArt()
         drawSeries()
     }
 
@@ -2425,7 +2459,7 @@ final class GameScene: SKScene {
         case .frostTea:
             // Snowflakes among the energy.
             streams = [HeadStream(frames: energy.frames, size: energy.size, tint: colour, rate: 12),
-                       HeadStream(frames: [SKTexture(imageNamed: "Snowflake")], size: ParticleLook.snowflakeSize, tint: GameScene.ice, rate: 12)]
+                       HeadStream(frames: [sprites.snowflake], size: ParticleLook.snowflakeSize, tint: GameScene.ice, rate: 12)]
         case .surfSoda where EffectSheets.frames["bubble_particle"] != nil:
             streams = [HeadStream(frames: sheetFrames("bubble_particle"), size: ParticleLook.bubbleSize, tint: nil, rate: 24, tints: ParticleLook.sodas)]
         case .zeusJuice where EffectSheets.frames["lightning_particle"] != nil:
@@ -2581,7 +2615,14 @@ final class GameScene: SKScene {
 
     /// The board as a silhouette in a bright purple, bright enough for the glow to take,
     /// its tail's shadow a shade darker.
+    private var boardTextureMade: SKTexture?
     private func boardTexture(for index: Int) -> SKTexture? {
+        if let boardTextureMade { return boardTextureMade }
+        boardTextureMade = drawBoardTexture()
+        return boardTextureMade
+    }
+
+    private func drawBoardTexture() -> SKTexture? {
         guard let image = UIImage(named: "Surfboard") else { return nil }
         let width = 400, height = 46
         let format = UIGraphicsImageRendererFormat()
@@ -2595,7 +2636,6 @@ final class GameScene: SKScene {
               let data = context.data else { return SKTexture(image: drawn) }
         context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
         let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
-        _ = index
         let white = ParticleLook.boardPurple, shadow = ParticleLook.boardShadow
         for pixel in 0..<(width * height) {
             let at = pixel * 4
@@ -2785,6 +2825,44 @@ final class GameScene: SKScene {
     private var helicopterNode: SKNode?
     private var helicopterId = 0
 
+    /// The helicopter's layers: as drawn, then dark tones of the guarding side's energy, so
+    /// the glow doesn't wash them out.
+    private func helicopterTones(for hoop: Hoop) -> [SKColor?] {
+        let look = sprites.look(for: 1 - hoop.owner)
+        return [nil, SKColor(rgb: look.energyTone(luminance: 0.42)),
+                SKColor(rgb: look.energyTone(luminance: 0.3)), SKColor(rgb: look.energyTone(luminance: 0.2))]
+    }
+    private static let helicopterParts = ["hull", "propeller", "spin_me"]
+
+    /// The art drawn from vectors made now, before play, and sent to the GPU: the board,
+    /// the helmets in both colours, and on the highway every vehicle and the helicopter in
+    /// its rims' colours. Each is drawn once and kept, not on its first appearance.
+    private func warmDrawnArt() {
+        var made: [SKTexture] = []
+        if let board = boardTexture(for: 0) { made.append(board) }
+        for index in match.players.indices {
+            for variant in 0..<FieldRules.helmetVariants {
+                if let helmet = helmetTexture(variant: variant, colour: SKColor(rgb: sprites.look(for: index).glow)) { made.append(helmet) }
+            }
+        }
+        if match.stage.features.traffic {
+            for vehicle in Vehicle.allCases {
+                for part in ["body", "wheels"] {
+                    if let texture = HighwayArt.texture("vehicle_\(vehicle.art)_\(part)", art: vehicle.art) { made.append(texture) }
+                }
+            }
+            for hoop in match.stage.hoops {
+                for part in GameScene.helicopterParts {
+                    for (index, tint) in helicopterTones(for: hoop).enumerated() {
+                        let name = "helicopter_\(part)_" + (index == 0 ? "plain" : "red\(index - 1)")
+                        if let texture = HighwayArt.texture(name, art: "helicopter", tint: tint) { made.append(texture) }
+                    }
+                }
+            }
+        }
+        SKTexture.preload(made) {}
+    }
+
     /// The cars idling, the body shivering a pixel over wheels that stay put, dipping when
     /// someone lands on it, flashing black when hit; and the helicopter over its rim.
     private func drawTraffic() {
@@ -2875,13 +2953,10 @@ final class GameScene: SKScene {
         node.zPosition = 6
         node.xScale = flying.speed > 0 ? 1 : -1
         let hoop = match.stage.hoops[flying.hoop]
-        let look = sprites.look(for: 1 - hoop.owner)
         let width = 96 * CGFloat(TrafficTuning.helicopterScale)
         let rows = HighwayArt.artRows["helicopter"]!
         let height = width * (rows.bottom - rows.top)
-        // Dark tones of the energy, so the glow doesn't wash them out.
-        let tones: [SKColor?] = [nil, SKColor(rgb: look.energyTone(luminance: 0.42)),
-                                 SKColor(rgb: look.energyTone(luminance: 0.3)), SKColor(rgb: look.energyTone(luminance: 0.2))]
+        let tones = helicopterTones(for: hoop)
         // A point on the drawing's 800 square, in the node's own space.
         func place(_ share: CGPoint) -> CGPoint {
             CGPoint(x: (share.x - 0.5) * width, y: (1 - (share.y - rows.top) / (rows.bottom - rows.top) - 0.5) * height)
@@ -3211,7 +3286,7 @@ final class GameScene: SKScene {
 
     /// Frost Tea's snowflakes: the vector, small, thrown out from a point and fading.
     private func spawnSnowflakes(at point: CGPoint, count: Int, spread: CGFloat) {
-        let texture = SKTexture(imageNamed: "Snowflake")
+        let texture = sprites.snowflake
         for step in 0..<count {
             let flake = SKSpriteNode(texture: texture)
             let size = CGFloat(4 + step % 3)

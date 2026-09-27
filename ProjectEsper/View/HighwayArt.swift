@@ -53,9 +53,20 @@ enum HighwayArt {
     static let topRotorHub = CGPoint(x: 482.7 / 800, y: 119.5 / 800)
     static let tailRotorHub = CGPoint(x: 82.9 / 800, y: 394.2 / 800)
 
+    /// Each vector drawn once, by name, art and tint.
+    nonisolated(unsafe) private static var made: [String: SKTexture] = [:]
+
     /// A catalog vector as a texture, cut to its art's rows; `tint` fills it through its own
-    /// alpha in one colour.
+    /// alpha in one colour. Drawn once and kept.
     static func texture(_ name: String, art: String, tint: SKColor? = nil) -> SKTexture? {
+        let key = "\(name)|\(art)|\(tint.map { "\($0)" } ?? "")"
+        if let texture = made[key] { return texture }
+        guard let texture = draw(name, art: art, tint: tint) else { return nil }
+        made[key] = texture
+        return texture
+    }
+
+    private static func draw(_ name: String, art: String, tint: SKColor?) -> SKTexture? {
         guard let image = UIImage(named: name) else { return nil }
         let side: CGFloat = 256
         let format = UIGraphicsImageRendererFormat()

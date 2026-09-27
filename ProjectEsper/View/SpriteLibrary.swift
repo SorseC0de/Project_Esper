@@ -200,6 +200,14 @@ final class SpriteLibrary {
         return result
     }
 
+    /// Frost Tea's snowflake, from the catalog's root.
+    var snowflake: SKTexture {
+        if let texture = cache["Snowflake"] { return texture }
+        let texture = SKTexture(imageNamed: "Snowflake")
+        cache["Snowflake"] = texture
+        return texture
+    }
+
     /// A grey frame toned in the snowflake's two blues, dark to light, for Frost Tea.
     func iceTexture(_ name: String, _ frame: Int) -> SKTexture {
         let key = "ice_\(name)_\(frame)"
@@ -292,7 +300,15 @@ final class SpriteLibrary {
         _ = flatSquare(size: 4, alpha: 1)
         _ = symbol("chevron.down", pointSize: 14)
         _ = symbol("chevron.down", pointSize: 10)
-        SKTexture.preload(Array(cache.values), withCompletionHandler: completion)
+        _ = snowflake
+        for frame in 0..<(EffectSheets.frames["ice_jumpspark"] ?? 0) { _ = iceTexture("ice_jumpspark", frame) }
+        // The whole atlas too, every page, so nothing first drawn mid-match loads one.
+        let group = DispatchGroup()
+        group.enter()
+        SKTexture.preload(Array(cache.values)) { group.leave() }
+        group.enter()
+        SKTextureAtlas.preloadTextureAtlases([atlas]) { group.leave() }
+        group.notify(queue: .main, execute: completion)
     }
 
     /// A clear canvas. The memory a context is given isn't promised to be clean, and a frame

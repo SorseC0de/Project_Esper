@@ -739,9 +739,14 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   frame and toned effect is built and sent to the GPU; a colour change drops that player's
   and rebuilds all of them (frames, heads, energy, the ball-as-energy sheets, the toned
   effects and particle sheets, the wall-spark silhouettes) on a background queue, then
-  keeps them and preloads them, and draws the helmets in the new colours. Before this a
-  colour other than the launch defaults rebuilt each texture on its first use, a hitch of
-  up to 85 ms the first time each move or spark was seen.
+  keeps them and preloads them. Before this a colour other than the launch defaults rebuilt
+  each texture on its first use, a hitch of up to 85 ms the first time each move or spark
+  was seen. Also made before play: every page of the sprite atlas; Frost Tea's ice frames
+  and snowflake; the art drawn from vectors, each drawn once and kept (the surfboard, the
+  helmets in both colours, and on the highway every vehicle and the helicopter in its
+  rims' colours, on each stage build and colour change); and one of each way of drawing
+  (additive and tinted sprites, shapes, an emitter, a crop, a label) in the launch's
+  hidden warm-up, so SpriteKit builds their pipelines then.
 - Shadows (`StageFeatures.shadows`, the view's alone): each body's current frame and its
   head, and the goalposts, cast in a dark greyed purple at two thirds, mirrored under the
   feet or the floor line and sheared by the turf's own lean where they stand, so they

@@ -326,6 +326,20 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   itself. Its head's
   particles are `bubble_particle` at 10, every bubble one of two grape purples by a coin flip, each bubble in the
   trail and the landing on its own frame. Numbers in `SurfRules`, first guesses.
+- Titan Tea (L). Twice the size: the body box, its reaches (the blade, the snatch, the
+  slide's leg, the catch rings), the ledge hang and the heights the hands hold and let go
+  of the ball at, all doubled, and drawn at double size. Heavier: half of any knock, and a
+  fifth more gravity, fall speed and fast fall. It's stripped, the ball popping free, but
+  never stunned. One jump, no double jump unless Jumper Juice gives it back, and no
+  crouch. Every landing of its own is Quake-Up's level-one quake on the same floor, whatever
+  the level; a landing from a knock isn't, or two Titans would knock each other up forever. Its running steps shake the screen a little (3). At level one the walk and run
+  are a tenth slower, the dash still 0.4 over the run, and its actions (the stances, shot,
+  throw, dunk, catch, slide, slash, roll, snatch, wall and gun) a tenth slower: through one
+  the state's clock holds one frame in ten (`FighterSpec.actionHoldInterval`), and a check
+  for reaching a frame (`Player.reached`) ignores a held one so nothing fires twice. Level
+  two drops the slowdown, and running or dashing into the other strips them, once a
+  contact. It comes into a round on the old lightning entry at the ordinary size, then
+  grows to double over 30 frames drawn white.
 
 Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
 too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is
@@ -393,7 +407,7 @@ through, offers BEST OF 7 and, greyed for now, MULTIPLAYER; jump on the pad star
 A round starts with both bodies ported in at their
 spawns: a cluster of `flashspark2` over each in its energy, the backboards' 3 by 4 grid
 at 0.4 unskewed, held the 12 frames the body is hidden and faded over 0.3 seconds (the
-old bolt and crown are kept, `boltEntry`, for a power to come); then the three count. With
+old bolt and crown, `boltEntry`, are Titan Tea's entry); then the three count. With
 a screen up or on its way (the drink, the stage select, the win) the port-in and the
 count both wait for it to close, BUCKET!! playing out meanwhile; the sim's own count is
 set again as play comes back in title lettering
@@ -477,6 +491,8 @@ placeholder for one not written yet.
   spot, only faster, velocity up by the pace and gravity by its square; it's an ordinary
   ball again from its first bounce.
 - Slide Cider: eight frames of slide a drink, so further.
+- Feather Fresca: falling, a quarter of gravity gone a drink (×0.75, then ×0.5); a fast
+  fall is untouched, so it still lands quickly.
 - Web Water: the swing; level two adds the web line. The swing's line is drawn on past its anchor off
   the top of the screen, the view's alone.
 - Super Smoothie: flight; level two flies faster, with the ball as fast as level one
@@ -489,6 +505,7 @@ placeholder for one not written yet.
 - Frost Tea: the freezing snatch and the endless slide; level two adds the ice clones.
 - Blazing Boba: the flames and the burning ball; level two adds the fireball.
 - Pulsepistol Punch: the pulse; level two shoots on the run and adds the pull.
+- Titan Tea: the size and weight, slowed; level two at full speed, with the trample.
 
 ## Tuning pickers
 

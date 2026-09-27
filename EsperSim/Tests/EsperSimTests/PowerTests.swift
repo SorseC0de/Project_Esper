@@ -607,4 +607,101 @@ final class PowerTests: XCTestCase {
         one.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), jump: true), .idle])
         XCTAssertEqual(one.players[0].velocity.y, 0, accuracy: 0.001)
     }
+
+    // MARK: Feather Fresca and Titan Tea
+
+    private func drunk(_ drinks: [Greateraid]) -> (spec: FighterSpec, drinks: Drinks) {
+        var had = Drinks()
+        for drink in drinks { had.drink(drink) }
+        return (had.spec(from: .baseline), had)
+    }
+
+    private func titan(level: Int = 1) -> Match {
+        var match = with(.titanTea, level: level)
+        match.players[0].spec = drunk(Array(repeating: .titanTea, count: level)).spec
+        return match
+    }
+
+    func testFeatherFrescaFallsSlowerButFastFallsTheSame() {
+        XCTAssertEqual(drunk([.featherFresca]).spec.fallGravityShare, 0.75)
+        XCTAssertEqual(drunk([.featherFresca, .featherFresca]).spec.fallGravityShare, 0.5)
+        func landingFrames(_ spec: FighterSpec, fastFall: Bool) -> Int {
+            var match = Match()
+            match.players[0].spec = spec
+            match.players[0].position.y += 60
+            match.players[0].grounded = false
+            match.players[0].state = .air
+            return run(&match, frames: 600, input: { _ in fastFall ? PlayerInput(stick: Vec2(x: 0, y: -1)) : .idle }) { $0.players[0].grounded }
+        }
+        let plain = drunk([]).spec, feather = drunk([.featherFresca, .featherFresca]).spec
+        XCTAssertGreaterThan(landingFrames(feather, fastFall: false), landingFrames(plain, fastFall: false))
+        XCTAssertEqual(landingFrames(feather, fastFall: true), landingFrames(plain, fastFall: true))
+    }
+
+    func testTitanTeaIsTwiceTheSizeWithOneJumpUnlessJumperJuice() {
+        let plain = drunk([]).spec, titan = drunk([.titanTea]).spec
+        XCTAssertEqual(titan.bodyHeight, plain.bodyHeight * 2)
+        XCTAssertEqual(titan.bodyWidth, plain.bodyWidth * 2)
+        XCTAssertEqual(titan.jumps, 1)
+        XCTAssertEqual(drunk([.titanTea, .jumperJuice]).spec.jumps, plain.jumps)
+        XCTAssertEqual(titan.runSpeed, plain.runSpeed * 0.9, accuracy: 0.0001)
+        XCTAssertEqual(titan.dashInitialVelocity, titan.runSpeed + 0.4, accuracy: 0.0001)
+        XCTAssertEqual(drunk([.titanTea, .titanTea]).spec.runSpeed, plain.runSpeed, "level two has no slowdown")
+    }
+
+    func testTitanTeaIsStrippedButNeverStunned() {
+        var match = titan()
+        match.players[1].position.x = match.players[0].position.x + 20
+        match.players[1].facing = .left
+        match.advance(inputs: [.idle, PlayerInput(shoot: true)])
+        run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.struck(player: 0, by: 1)) }
+        XCTAssertEqual(match.players[0].hitStun, 0)
+    }
+
+    func testTitanTeaCannotCrouch() {
+        var match = titan()
+        run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) })
+        XCTAssertNotEqual(match.players[0].state, .crouch)
+    }
+
+    func testTitanTeaSlashesSlowerAndStillHitsOnce() {
+        var plain = with(.none)
+        plain.advance(inputs: [PlayerInput(shoot: true), .idle])
+        let plainFrames = run(&plain, frames: 200, input: { _ in .idle }) { $0.players[0].state != .slashing }
+        var match = titan()
+        match.players[1].position.x = match.players[0].position.x + 24
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        var struck = 0
+        let titanFrames = run(&match, frames: 200, input: { _ in .idle }) { match in
+            struck += match.events.filter { $0 == .struck(player: 1, by: 0) }.count
+            return match.players[0].state != .slashing
+        }
+        XCTAssertGreaterThan(titanFrames, plainFrames)
+        XCTAssertEqual(struck, 1)
+    }
+
+    func testTitanTeaLandingQuakes() {
+        var match = titan()
+        let landed = run(&match, frames: 300, input: { $0 < 10 ? PlayerInput(jump: true) : .idle }) { $0.events.contains(.quaked(player: 0)) }
+        XCTAssertLessThan(landed, 300)
+    }
+
+    func testTitanTeaLevelTwoTramplesOnTheRun() {
+        var match = titan(level: 2)
+        match.players[1].position.x = match.players[0].position.x + 60
+        let hit = run(&match, frames: 120, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) { $0.events.contains(.struck(player: 1, by: 0)) }
+        XCTAssertLessThan(hit, 120)
+    }
+
+    func testTwoTitansDoNotQuakeEachOtherForever() {
+        var match = titan()
+        match.players[1].power = .titanTea
+        match.players[1].spec = match.players[0].spec
+        var quakes = 0
+        run(&match, frames: 400, input: { $0 < 10 ? PlayerInput(jump: true) : .idle }) { match in
+            quakes += match.events.filter { if case .quaked = $0 { return true } else { return false } }.count
+            return false
+        }
+        XCTAssertEqual(quakes, 1, "the jump's landing quakes; the other's landing from the knock doesn't")
+    }
 }

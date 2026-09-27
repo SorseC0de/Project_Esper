@@ -534,7 +534,7 @@ public struct Opponent: Equatable {
         var best: (angle: Double, error: Double)?
         var angle = BallRules.shotAngleMin
         while angle <= BallRules.shotAngleMax + 0.001 {
-            var position = feet + Vec2(x: 0, y: BallRules.shotReleaseHeight)
+            var position = feet + Vec2(x: 0, y: BallRules.shotReleaseHeight * match.players[index].spec.scale)
             var velocity = Vec2(x: Trig.cos(angle) * sign, y: Trig.sin(angle)) * match.players[index].spec.shotSpeed + Vec2(x: 0, y: lift)
             var error: Double?
             for _ in 0..<200 {

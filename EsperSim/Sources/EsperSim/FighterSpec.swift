@@ -69,6 +69,17 @@ public struct FighterSpec: Equatable {
     public var slideFriction = 0.02
     /// A third jump's speed, when there is one: Jumper Juice's second drink.
     public var thirdJumpVelocity = 0.0
+    /// Share of gravity felt falling, not fast falling: Feather Fresca's float.
+    public var fallGravityShare = 1.0
+    /// Share of any knock the body takes: Titan Tea's weight.
+    public var knockbackShare = 1.0
+    /// The body's size against the ordinary one, its reaches and the heights its hands
+    /// hold and let go of the ball at with it: Titan Tea's 2.
+    public var scale = 1.0
+    public var canCrouch = true
+    /// Through an action, the state's clock holds one frame in this many, so the action
+    /// runs that much slower; 0 for never. Titan Tea's 10.
+    public var actionHoldInterval = 0
 
     /// Body box: full width and height, feet at the position.
     public var bodyWidth: Double

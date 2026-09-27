@@ -4,6 +4,7 @@ import SpriteKit
 extension CGPoint {
     static func + (a: CGPoint, b: CGPoint) -> CGPoint { CGPoint(x: a.x + b.x, y: a.y + b.y) }
     static func - (a: CGPoint, b: CGPoint) -> CGPoint { CGPoint(x: a.x - b.x, y: a.y - b.y) }
+    static func * (a: CGPoint, factor: CGFloat) -> CGPoint { CGPoint(x: a.x * factor, y: a.y * factor) }
 }
 
 /// Runs the match at a fixed 60 steps a second and draws the last state. Nothing in here
@@ -188,6 +189,13 @@ final class GameScene: SKScene {
     private var riders: [(node: SKSpriteNode, player: Int, offset: Vec2)] = []
     /// Frames of screenshake left, and where the camera sits unshaken.
     private var shake = 0
+    /// Titan Tea's running steps shake the screen this much.
+    private static let titanStepShake = 3
+    /// Titan Tea after its port-in: frames before it grows, and its growth from the
+    /// ordinary size to its own, 0 to 1, over `titanGrowFrames`, drawn white while it grows.
+    private var titanGrowDelay: [Int] = []
+    private var titanGrowth: [CGFloat] = []
+    private static let titanGrowFrames = 30
     private var cameraBase = CGPoint.zero
     /// The HUD's scale for this screen, and the ice everything frozen goes.
     private var hudScale: CGFloat = 1
@@ -305,7 +313,7 @@ final class GameScene: SKScene {
     /// Where the ball is, in art pixels, held or loose.
     var ballCamCentre: CGPoint {
         let ball = match.ball
-        let at = ball.holder.map { match.players[$0].chest + Vec2(x: 0, y: 3) } ?? ball.position
+        let at = ball.holder.map { match.players[$0].heldBallPoint } ?? ball.position
         return SpriteLibrary.point(at)
     }
 
@@ -567,6 +575,8 @@ final class GameScene: SKScene {
             headShown.append(.zero)
             bodyTilt.append(0)
             hover.append(0)
+            titanGrowDelay.append(0)
+            titanGrowth.append(1)
             lastStates.append(.idle)
             // Super Smoothie's cape: short rectangles in the energy colour, chained.
             var segments: [SKSpriteNode] = []
@@ -1331,19 +1341,26 @@ final class GameScene: SKScene {
     private func freshMatch() -> Match {
         // The field's dice and coin flip come off the series' dice, the same on both phones.
         let fieldSeed = UInt32(series.dice.roll(1 << 16)) &+ 1
-        var fresh = Match(stage: series.stage.stage, specs: series.drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed,
+        let pickerOn = online == nil && powerVariant != .none && gameMode != .fortySeven
+        let drinks = series.drinks.indices.map { drinksInPlay($0, pickerOn: pickerOn) }
+        var fresh = Match(stage: series.stage.stage, specs: drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed,
                           mode: gameMode)
         for index in fresh.players.indices {
-            fresh.players[index].power = series.drinks[index].power
-            fresh.players[index].powerLevel = series.drinks[index].powerLevel
-        }
-        if online == nil, powerVariant != .none, gameMode != .fortySeven {
-            for index in fresh.players.indices {
-                fresh.players[index].power = powerVariant.power
-                fresh.players[index].powerLevel = powerLevelVariant.level
-            }
+            fresh.players[index].power = drinks[index].power
+            fresh.players[index].powerLevel = drinks[index].powerLevel
         }
         return fresh
+    }
+
+    /// A side's drinks, with the POWER picker's biomorph and level in place of theirs, so
+    /// a biomorph that changes the body, Titan Tea, changes it from the picker too.
+    private func drinksInPlay(_ index: Int, pickerOn: Bool) -> Drinks {
+        var drinks = series.drinks[index]
+        if pickerOn, let bottle = Greateraid.biomorphs.first(where: { $0.power == powerVariant.power }) {
+            drinks.biomorph = bottle
+            drinks.biomorphLevel = powerLevelVariant.level
+        }
+        return drinks
     }
 
     // MARK: The stage select
@@ -1446,13 +1463,13 @@ final class GameScene: SKScene {
     /// The drinks onto the bodies as they stand, for the round about to count. The POWER
     /// picker's choice, offline, stands over the drinks.
     private func applyDrinks() {
-        let drinks = series.drinks
-        let picked = online == nil && powerVariant != .none ? powerVariant.power : nil
+        let pickerOn = online == nil && powerVariant != .none
+        let drinks = series.drinks.indices.map { drinksInPlay($0, pickerOn: pickerOn) }
         session.mutate { match in
             for index in match.players.indices {
                 match.players[index].spec = drinks[index].spec()
-                match.players[index].power = picked ?? drinks[index].power
-                match.players[index].powerLevel = picked == nil ? drinks[index].powerLevel : powerLevelVariant.level
+                match.players[index].power = drinks[index].power
+                match.players[index].powerLevel = drinks[index].powerLevel
             }
         }
     }
@@ -1465,7 +1482,16 @@ final class GameScene: SKScene {
         let nearest = match.players.map { audibility(at: $0.position) }.max() ?? 1
         SoundBoard.shared.play(.portIn, volume: nearest)
         lastCountSounded = 0
-        for player in match.players { portIn(player) }
+        for player in match.players {
+            if player.power == .titanTea {
+                // Titan Tea comes in on the bolt at the ordinary size, then grows.
+                boltEntry(player)
+                titanGrowDelay[player.index] = roundIntro
+                titanGrowth[player.index] = 0
+            } else {
+                portIn(player)
+            }
+        }
     }
 
     /// The port-in: a cluster of `flashspark2` over the body in its energy, the backboards'
@@ -1482,7 +1508,7 @@ final class GameScene: SKScene {
         glowers.addChild(cluster)
     }
 
-    /// The old entry, a bolt from the top of the screen and the crown, kept for a power to come.
+    /// The old entry, a bolt from the top of the screen and the crown: Titan Tea's.
     private func boltEntry(_ player: Player) {
         let top = cameraNode.position.y + size.height * cameraNode.yScale / 2
         let point = SpriteLibrary.point(player.position)
@@ -1820,17 +1846,11 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The picker's power onto both players, live. Offline only.
+    /// The picker's power onto both players, live, with the body it brings (Titan Tea's
+    /// size). Offline only.
     private func applyPower() {
         guard online == nil else { return }
-        let power = powerVariant.power
-        let level = powerLevelVariant.level
-        session.mutate { match in
-            for index in match.players.indices {
-                match.players[index].power = power
-                match.players[index].powerLevel = level
-            }
-        }
+        applyDrinks()
     }
 
     // MARK: Online
@@ -2031,7 +2051,14 @@ final class GameScene: SKScene {
         lastSoundFrames[index] = frame
         guard grounded else { return }
         let walking: Set<Animation> = [.walk, .dribbleWalk, .run, .dribbleRun, .gunRun, .gunRunShoot]
-        if walking.contains(frame.animation), frame.frame % 4 == 0 { play(.step, at: feet) }
+        if walking.contains(frame.animation), frame.frame % 4 == 0 {
+            play(.step, at: feet)
+            // Titan Tea's running steps shake the screen a little.
+            if match.players.indices.contains(index), match.players[index].power == .titanTea,
+               [Animation.run, .dribbleRun].contains(frame.animation) {
+                shake = max(shake, GameScene.titanStepShake)
+            }
+        }
         if GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) { play(.ballBounce, at: feet) }
     }
 
@@ -2129,7 +2156,7 @@ final class GameScene: SKScene {
                 }
             case .popped(let victim, let popper):
                 // A spark off the ball as it leaves the hands, in the colour of whoever knocked it.
-                spawnHitSpark(player: popper, at: match.players[victim].chest + Vec2(x: 0, y: 3))
+                spawnHitSpark(player: popper, at: match.players[victim].heldBallPoint)
             case .swatted(let index, hit: true):
                 spawnHitSpark(player: index, at: match.ball.position)
             case .wallJumped(let index, let wall):
@@ -2183,8 +2210,9 @@ final class GameScene: SKScene {
                 spawnHitSpark(player: by, at: match.players[victim].chest)
                 spawnHitSpark(player: by, at: match.players[by].handCatchPoint)
             case .quaked(let index):
-                shake = match.players[index].powerLevel >= 2 ? 18 : 14
-                spawnRocks(at: SpriteLibrary.point(match.players[index].position), whole: match.players[index].powerLevel >= 2)
+                let whole = match.players[index].power == .quakeUp && match.players[index].powerLevel >= 2
+                shake = whole ? 18 : 14
+                spawnRocks(at: SpriteLibrary.point(match.players[index].position), whole: whole)
             case .boltLanded(let at):
                 let owner = match.ball.lastTouched ?? 0
                 // Twice the size on a wall.
@@ -3531,7 +3559,15 @@ final class GameScene: SKScene {
             // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
             node.texture = sprites.texture(frame, player: index, ballAsEnergy: wholeSheet)
-            node.size = node.texture!.size()
+            // Titan Tea's size, grown into after its port-in.
+            if titanGrowDelay[index] > 0 {
+                titanGrowDelay[index] -= 1
+            } else if titanGrowth[index] < 1 {
+                titanGrowth[index] = min(titanGrowth[index] + 1 / CGFloat(GameScene.titanGrowFrames), 1)
+            }
+            let drawScale = 1 + (CGFloat(player.spec.scale) - 1) * titanGrowth[index]
+            let growing = player.spec.scale != 1 && titanGrowth[index] < 1
+            node.size = node.texture!.size().scaled(by: drawScale)
             node.anchorPoint = sprites.anchor(for: frame.animation)
             // A flight holding still hovers round a small circle, eased in and out.
             let stillFlight = player.state == .flying && player.velocity.length < 0.2
@@ -3543,12 +3579,12 @@ final class GameScene: SKScene {
             if player.state == .dunking {
                 // Each frame of the dunk sits where its art was placed on the rim.
                 let nudge = DunkArt.offsets[Animation.dunkEntry(at: player.stateTimer).index]
-                node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y)
+                node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y) * drawScale
             }
             node.xScale = CGFloat(player.facing.sign)
-            // Frozen, the body goes ice; in the throw stance's parry frames, white.
-            let tint: SKColor = player.throwParrying ? .white : GameScene.ice
-            let tintShare: CGFloat = player.throwParrying ? 0.85 : (player.frozen > 0 ? 0.6 : 0)
+            // Frozen, the body goes ice; in the throw stance's parry frames, and growing, white.
+            let tint: SKColor = player.throwParrying || growing ? .white : GameScene.ice
+            let tintShare: CGFloat = growing ? 1 : (player.throwParrying ? 0.85 : (player.frozen > 0 ? 0.6 : 0))
             node.color = tint
             node.colorBlendFactor = tintShare
             headNodes[index].color = tint
@@ -3610,11 +3646,12 @@ final class GameScene: SKScene {
             let teamColour = SKColor(rgb: sprites.look(for: index).glow)
             handBall.color = player.hasFireball ? GameScene.fireballColour : teamColour
             halo.color = player.hasFireball ? GameScene.fireballColour : teamColour
-            if player.holding, let inHand = sprites.landmark(.ball, in: frame, player: index) {
+            if player.holding, let landmark = sprites.landmark(.ball, in: frame, player: index) {
+                let inHand = landmark * drawScale
                 let ballX = player.position.x + Double(inHand.x) * player.facing.sign / SpriteLibrary.pixelsPerUnit
                 let dribbling = [Animation.dribbleIdle, .dribbleWalk, .dribbleRun].contains(frame.animation)
                 let drop = player.grounded && dribbling ? match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit : 0
-                let phase = min(max(inHand.y / CGFloat(BallRules.dribbleHandHeight), 0), 1)
+                let phase = min(max(inHand.y / (CGFloat(BallRules.dribbleHandHeight) * drawScale), 0), 1)
                 let y = inHand.y - CGFloat(drop) * (1 - phase)
                 let at = node.position + leaned(CGPoint(x: inHand.x * CGFloat(player.facing.sign), y: y.rounded()))
                 halo.isHidden = false
@@ -3689,9 +3726,10 @@ final class GameScene: SKScene {
 
             // The head follows its place on the body loosely and bobs, as if it only just belonged.
             let headNode = headNodes[index]
-            if let head = sprites.landmark(.head, in: frame, player: index),
+            if let landmark = sprites.landmark(.head, in: frame, player: index),
                let headTexture = sprites.headTexture(frame, player: index),
                let anchor = sprites.headAnchor(frame, player: index) {
+                let head = landmark * drawScale
                 let target = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                 if headShown[index] == .zero { headShown[index] = target }
                 let lag = headVariant.lag
@@ -3700,11 +3738,11 @@ final class GameScene: SKScene {
                 var offset = headShown[index] - target
                 if headVariant.reversedAcross { offset.x = -offset.x }
                 let bob = (sin(Double(match.frame) / 60 * 2 * .pi * 1.2) * 1).rounded()
-                let shown = CGPoint(x: (target.x + offset.x).rounded(), y: (target.y + offset.y).rounded() + bob + GameScene.headLift)
+                let shown = CGPoint(x: (target.x + offset.x).rounded(), y: (target.y + offset.y).rounded() + (bob + GameScene.headLift) * drawScale)
                 headNode.isHidden = false
                 headNode.texture = headTexture
                 // Sized outright rather than scaled, and only ever flipped.
-                headNode.size = CGSize(width: headTexture.size().width * GameScene.headScale, height: headTexture.size().height * GameScene.headScale)
+                headNode.size = headTexture.size().scaled(by: GameScene.headScale * drawScale)
                 headNode.anchorPoint = anchor
                 headNode.xScale = CGFloat(player.facing.sign)
                 headNode.yScale = 1

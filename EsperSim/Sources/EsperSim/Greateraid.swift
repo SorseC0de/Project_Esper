@@ -19,15 +19,15 @@ public struct Dice: Equatable {
 /// to two drinks; Biomorphs are the powers, one at a time, and the one in hand comes
 /// round again as a second sip that raises it to level two.
 public enum Greateraid: CaseIterable, Equatable, Hashable {
-    case hastyHorchata, jumperJuice, lungeLemonade, cannonCola, slideCider
+    case hastyHorchata, jumperJuice, lungeLemonade, cannonCola, slideCider, featherFresca
     case webWater, superSmoothie, flashFizz, platformShake
-    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda
+    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea
 
     public enum Kind: Equatable { case booster, biomorph }
 
-    public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .lungeLemonade, .cannonCola, .slideCider]
+    public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .lungeLemonade, .cannonCola, .slideCider, .featherFresca]
     public static let biomorphs: [Greateraid] = [.webWater, .superSmoothie, .flashFizz, .platformShake,
-                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol, .surfSoda]
+                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea]
 
     public var kind: Kind {
         Greateraid.boosters.contains(self) ? .booster : .biomorph
@@ -40,6 +40,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .lungeLemonade: "Lunge Lemonade"
         case .cannonCola: "Cannon Cola"
         case .slideCider: "Slide Cider"
+        case .featherFresca: "Feather Fresca"
         case .webWater: "Web Water"
         case .superSmoothie: "Super Smoothie"
         case .flashFizz: "Flash Fizz"
@@ -50,6 +51,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .blazingBoba: "Blazing Boba"
         case .pulsepistol: "Pulsepistol Punch"
         case .surfSoda: "Surf Soda"
+        case .titanTea: "Titan Tea"
         }
     }
 
@@ -66,6 +68,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .blazingBoba: .blazingBoba
         case .pulsepistol: .pulsepistol
         case .surfSoda: .surfSoda
+        case .titanTea: .titanTea
         default: nil
         }
     }
@@ -88,6 +91,8 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .blazingBoba: "...Wait are those fireballs?"
         case .pulsepistol: "For those gunning for first place"
         case .surfSoda: "..."
+        case .featherFresca: "..."
+        case .titanTea: "..."
         }
     }
 
@@ -109,6 +114,9 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .blazingBoba: ("Full runs and slides leave fire. Your shots burn: nobody else can catch them.", "Hold shoot through a slash for a fireball, shot or thrown, that bursts.")
         case .pulsepistol: ("Shoot fires a pulse across the screen that knocks the ball and them away.", "Shoot on the run, and throw pulls everything in.")
         case .surfSoda: ("Ride a board: jumps are a crescent, and in the air you flip it to shield yourself.", "...")
+        case .featherFresca: ("You fall slower. A fast fall still lands quick.", "Floatier still.")
+        case .titanTea: ("Twice the size and heavier: you can't be stunned, and your landings quake the floor. Slower, and no double jump or crouch.",
+                         "Full speed, and running into them strips them.")
         }
     }
 }
@@ -212,6 +220,28 @@ public struct Drinks: Equatable {
         spec.dashFrames += 4 * level(of: .lungeLemonade)
         spec.shotPace += 0.25 * Double(level(of: .cannonCola))
         spec.slideFrames += 8 * level(of: .slideCider)
+        // Feather Fresca: falling, a quarter of gravity gone a drink.
+        spec.fallGravityShare = 1 - 0.25 * Double(level(of: .featherFresca))
+        if biomorph == .titanTea {
+            // Titan Tea: twice the size, half the knock, a fifth more gravity and fall; at
+            // level one a tenth off the walk and run, the dash still 0.4 over the run, and
+            // actions a tenth slower. One jump, unless Jumper Juice gives the rest back.
+            spec.scale = 2
+            spec.bodyWidth *= 2
+            spec.bodyHeight *= 2
+            spec.knockbackShare = 0.5
+            spec.gravity *= 1.2
+            spec.fallSpeed *= 1.2
+            spec.fastFallSpeed *= 1.2
+            spec.canCrouch = false
+            spec.jumps = jumper == 0 ? 1 : spec.jumps
+            if biomorphLevel < 2 {
+                spec.walkMaxSpeed *= 0.9
+                spec.runSpeed *= 0.9
+                spec.dashInitialVelocity = spec.runSpeed + 0.4
+                spec.actionHoldInterval = 10
+            }
+        }
         return spec
     }
 }

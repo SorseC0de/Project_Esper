@@ -65,7 +65,7 @@ public struct Match: Equatable {
             let holder = fieldDice.roll(players.count)
             players[holder].hasBall = true
             ball.holder = holder
-            ball.position = players[holder].chest + Vec2(x: 0, y: 3)
+            ball.position = players[holder].heldBallPoint
         }
     }
 
@@ -174,7 +174,7 @@ public struct Match: Equatable {
         }
 
         if let holder = ball.holder {
-            ball.position = players[holder].chest + Vec2(x: 0, y: 3)
+            ball.position = players[holder].heldBallPoint
             ball.velocity = .zero
         }
     }
@@ -199,7 +199,7 @@ public struct Match: Equatable {
         ball.respawn(at: stage.ballSpawn)
         players[holder].hasBall = true
         ball.holder = holder
-        ball.position = players[holder].chest + Vec2(x: 0, y: 3)
+        ball.position = players[holder].heldBallPoint
         countdown = countdownLength
     }
 
@@ -208,16 +208,16 @@ public struct Match: Equatable {
         switch action {
         case .releaseShot(let velocity):
             // Cannon Cola's pace: the same arc run through that many times faster.
-            ball.release(from: player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight),
+            ball.release(from: player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight * player.spec.scale),
                          velocity: velocity * player.spec.shotPace, by: index, straight: false, pace: player.spec.shotPace)
             ball.shotInFlight = true
             ball.burning = player.power == .blazingBoba
         case .releaseThrow(let velocity):
             // The hand, pushed out of any wall the body is pressed against.
-            let reach = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
+            let reach = Vec2(x: player.position.x + player.facing.sign * 6 * player.spec.scale, y: player.position.y + BallRules.throwReleaseHeight * player.spec.scale)
             let hand = reach + stage.pushOut(Box(center: reach, width: BallRules.radius * 2, height: BallRules.radius * 2), reach: 12)
             if velocity.y > 0, velocity.x == 0 {
-                ball.releaseFloater(from: Vec2(x: player.position.x, y: player.position.y + BallRules.shotReleaseHeight),
+                ball.releaseFloater(from: Vec2(x: player.position.x, y: player.position.y + BallRules.shotReleaseHeight * player.spec.scale),
                                     sideways: player.throwStanceEntrySpeed * BallRules.floaterMomentumShare, by: index)
             } else {
                 ball.release(from: hand, velocity: velocity, by: index, straight: true)
@@ -225,7 +225,7 @@ public struct Match: Equatable {
             }
             ball.burning = player.power == .blazingBoba
         case .releaseFireball(let velocity, let straight):
-            let hand = Vec2(x: player.position.x + player.facing.sign * 6, y: player.position.y + BallRules.throwReleaseHeight)
+            let hand = Vec2(x: player.position.x + player.facing.sign * 6 * player.spec.scale, y: player.position.y + BallRules.throwReleaseHeight * player.spec.scale)
             fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity * BlazeRules.fireballSpeedShare,
                                       framesLeft: BlazeRules.fireballFrames, straight: straight))
             events.append(.fireballThrown(player: index))
@@ -278,7 +278,8 @@ public struct Match: Equatable {
             players[index].tear = Tear(position: players[index].chest, framesLeft: FizzRules.tearFrames)
             if let other = players.indices.first(where: { $0 != index }), players[other].hasBall {
                 let body = players[other].body
-                let ends = [from + Vec2(x: 0, y: BallRules.chestHeight), to + Vec2(x: 0, y: BallRules.chestHeight)]
+                let chestHeight = BallRules.chestHeight * player.spec.scale
+                let ends = [from + Vec2(x: 0, y: chestHeight), to + Vec2(x: 0, y: chestHeight)]
                 if ends.contains(where: { body.distance(to: $0) <= FizzRules.tearRadius }) {
                     pop(from: other, by: index)
                 }
@@ -294,7 +295,7 @@ public struct Match: Equatable {
                 return
             }
             guard ball.isLive else { return }
-            let feet = Vec2(x: ball.position.x, y: ball.position.y - BallRules.chestHeight)
+            let feet = Vec2(x: ball.position.x, y: ball.position.y - BallRules.chestHeight * player.spec.scale)
             players[index].warp(to: feet, in: stage)
             events.append(.warped(player: index, from: from, to: players[index].position))
             hand(ballTo: index)
@@ -327,6 +328,14 @@ public struct Match: Equatable {
             players[index].tear = nil
             hand(ballTo: index)
         }
+        // Titan Tea at level two: running or dashing into the other strips them, once a contact.
+        if player.power == .titanTea, player.powerLevel >= 2, let other {
+            let touching = player.body.overlaps(players[other].body)
+            if touching, !player.trampling, player.grounded, player.state == .run || player.state == .dash, players[other].frozen == 0 {
+                strip(other, by: index, knock: nil)
+            }
+            players[index].trampling = touching
+        }
         if let leg = player.slideHitbox, let other, players[other].hasBall, players[other].grounded, players[other].body.overlaps(leg) {
             players[index].slideHit = true
             pop(from: other, by: index)
@@ -338,7 +347,7 @@ public struct Match: Equatable {
         }
         if let blade = player.slashHitbox {
             // Clear of the floor the body stands on, the blade in a wall clanks, once a swing.
-            if player.stateTimer == SlashRules.liveFrames.lowerBound {
+            if player.reached(SlashRules.liveFrames.lowerBound) {
                 let clear = Box(min: Vec2(x: blade.min.x, y: max(blade.min.y, player.position.y + 1)), max: blade.max)
                 if stage.overlapsSolid(clear) { events.append(.slashClanked(player: index)) }
             }
@@ -368,7 +377,7 @@ public struct Match: Equatable {
             // A held ball is where the holder's sheet draws it this frame, so the hand can
             // take it off the dribble; failing a landmark, the chest.
             let at = held.map { holder -> Vec2 in
-                players[holder].ballInHand(on: stage) ?? players[holder].chest + Vec2(x: 0, y: 3)
+                players[holder].ballInHand(on: stage) ?? players[holder].heldBallPoint
             } ?? ball.position
             // In front, or a holder the body itself overlaps: the body is part of the reach.
             let onTheBody = held.map { player.body.overlaps(players[$0].body) } ?? false
@@ -420,7 +429,7 @@ public struct Match: Equatable {
     /// victim is stunned, so the popper has first go at it.
     /// `carry`: sideways speed for the ball: a slash sends it back toward the slasher.
     private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0) {
-        let from = players[victim].chest + Vec2(x: 0, y: 3)
+        let from = players[victim].heldBallPoint
         players[victim].loseBall()
         players[victim].hitStun = BallRules.hitStunFrames
         ball.pop(from: from)
@@ -435,7 +444,7 @@ public struct Match: Equatable {
             // A push, not a hit: no stun and no spark, the ball let go of if held.
             let held = players[victim].hasBall
             if held {
-                let from = players[victim].chest + Vec2(x: 0, y: 3)
+                let from = players[victim].heldBallPoint
                 players[victim].loseBall()
                 ball.pop(from: from)
             }
@@ -458,11 +467,11 @@ public struct Match: Equatable {
     // MARK: The powers' pieces
 
     /// Quake-Up Coffee: the floor shaken. At level one whatever stands on the same floor;
-    /// at level two whatever stands on any.
+    /// at level two whatever stands on any. Titan Tea's landings shake the same floor only.
     private mutating func quake(by index: Int) {
         let me = players[index]
         events.append(.quaked(player: index))
-        let whole = me.powerLevel >= 2
+        let whole = me.power == .quakeUp && me.powerLevel >= 2
         if ball.isLive, ball.frozen == 0, stage.isGrounded(ball.box),
            whole || abs(ball.position.y - BallRules.radius - me.position.y) <= QuakeRules.sameFloorSlack {
             ball.velocity.y = QuakeRules.ballHop
@@ -835,7 +844,7 @@ public struct Match: Equatable {
     /// The arc a shot would take from where the player stands, for the aiming guide.
     public func shotPreview(for index: Int, points: Int = 30, every stride: Int = 3) -> [Vec2] {
         let player = players[index]
-        var position = player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight)
+        var position = player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight * player.spec.scale)
         var velocity = player.shotVelocity
         // A fireball falls under a share of the ball's gravity.
         let share = player.hasFireball ? BlazeRules.fireballGravityShare : 1

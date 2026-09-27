@@ -14,6 +14,7 @@ public enum Power: Equatable, Hashable {
     case blazingBoba
     case pulsepistol
     case surfSoda
+    case titanTea
 
     /// Powers whose shoot button, without the ball, is something other than the slash.
     public var takesShoot: Bool {
@@ -59,6 +60,15 @@ public enum PlayerState: Equatable, Hashable {
     /// Super Smoothie: flying. Pulsepistol Punch: the shot, standing.
     case flying, gunShoot
 
+    /// The actions Titan Tea does slower.
+    public var isAction: Bool {
+        switch self {
+        case .shootStance, .shooting, .throwStance, .throwing, .dunking, .catching, .slide, .slashing, .rolling, .snatching,
+             .walling, .gunShoot: true
+        default: false
+        }
+    }
+
     public var isGroundState: Bool {
         switch self {
         case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .slide: true
@@ -91,6 +101,11 @@ public struct Player: Equatable {
     public var runMomentum = 0.0
     /// Frames spent in the state so far; 0 on the frame it was entered.
     public var stateTimer = 0
+    /// The clock held this frame, so a check for reaching a frame doesn't fire twice.
+    public private(set) var timerHeld = false
+    private var actionTicks = 0
+    /// The state's clock on `frame` this step, and not held on it from the last.
+    public func reached(_ frame: Int) -> Bool { stateTimer == frame && !timerHeld }
     public var grounded = true
     public var wallSide: Facing?
     /// The wall beside, if the board can ride it: not a car.
@@ -170,9 +185,17 @@ public struct Player: Equatable {
     /// The slide's leg and the slash's blade each hit once.
     public var slideHit = false
     public var slashHit = false
+    /// Titan Tea: already touching the body it last ran into.
+    public var trampling = false
+    /// In the air from a knock, not a jump or a fall of its own: Titan Tea's landing
+    /// doesn't quake then, or two Titans would knock each other up forever.
+    public var knockedAloft = false
     /// Frames left in which no button does anything and nothing is caught, after the ball
     /// was knocked or taken out of the hands; the stick still works.
-    public var hitStun = 0
+    public var hitStun = 0 {
+        // Titan Tea is stripped but never stunned.
+        didSet { if power == .titanTea, hitStun > 0 { hitStun = 0 } }
+    }
     public var snatchCooldown = 0
     /// The corner being hung from, and frames after walking off an edge before a corner
     /// can be grabbed.
@@ -306,22 +329,24 @@ public struct Player: Equatable {
     private func roomToStand(in stage: Stage) -> Bool { !stage.overlapsSolid(standingBody) }
     public var standingHeightTop: Double { standingBody.max.y }
 
-    public var chest: Vec2 { Vec2(x: position.x, y: position.y + BallRules.chestHeight) }
+    public var chest: Vec2 { Vec2(x: position.x, y: position.y + BallRules.chestHeight * spec.scale) }
+    /// Where a held ball sits: a little over the chest.
+    public var heldBallPoint: Vec2 { chest + Vec2(x: 0, y: 3 * spec.scale) }
 
     /// The centre of the second catch ring, the spark's, out in front.
     public var handCatchPoint: Vec2 {
-        Vec2(x: position.x + BallRules.handCatchCentre.x * facing.sign, y: position.y + BallRules.handCatchCentre.y)
+        Vec2(x: position.x + BallRules.handCatchCentre.x * spec.scale * facing.sign, y: position.y + BallRules.handCatchCentre.y * spec.scale)
     }
 
     /// The centre of the slash's blade: the body's, a little in front.
     public var bladeCentre: Vec2 {
-        Vec2(x: body.center.x + SlashRules.forward * facing.sign, y: body.center.y)
+        Vec2(x: body.center.x + SlashRules.forward * spec.scale * facing.sign, y: body.center.y)
     }
 
     public var inStance: Bool { state == .shootStance || state == .throwStance }
 
     /// The first step in a state, after `enter` on the step before.
-    private var stanceTimerJustEntered: Bool { stateTimer == 1 }
+    private var stanceTimerJustEntered: Bool { reached(1) }
 
     public mutating func enter(_ next: PlayerState) {
         previousState = state
@@ -375,7 +400,14 @@ public struct Player: Equatable {
             lastInput = input
             return nil
         }
-        stateTimer += 1
+        // Titan Tea's actions run slower: one frame in `actionHoldInterval` the clock holds.
+        if spec.actionHoldInterval > 0, state.isAction {
+            actionTicks += 1
+            timerHeld = actionTicks % spec.actionHoldInterval == 0
+        } else {
+            timerHeld = false
+        }
+        if !timerHeld { stateTimer += 1 }
         if boltCooldown > 0 { boltCooldown -= 1 }
         if strikeCooldown > 0 { strikeCooldown -= 1 }
         if pulseCooldown > 0 { pulseCooldown -= 1 }
@@ -792,7 +824,7 @@ public struct Player: Equatable {
                 airCoast()
                 fall(.idle)
             }
-            if stateTimer == BallRules.shotReleaseFrames {
+            if reached(BallRules.shotReleaseFrames) {
                 let lift = shotLift ? max(velocity.y, 0) : 0
                 if hasFireball {
                     hasFireball = false
@@ -826,7 +858,7 @@ public struct Player: Equatable {
                 // Zeus Juice: the charge calls a strike down onto the ball in hand.
                 strikeCooldown = ZeusRules.strikeCooldownFrames
                 // Onto the ball where the stance's sheet draws it, a little behind the chest.
-                let ball = BallLandmarks.offset(animationFrame).map { position + Vec2(x: $0.x / 1.6 * facing.sign, y: $0.y / 1.6) }
+                let ball = BallLandmarks.offset(animationFrame).map { position + Vec2(x: $0.x / 1.6 * spec.scale * facing.sign, y: $0.y / 1.6 * spec.scale) }
                     ?? Vec2(x: chest.x - facing.sign * 5, y: chest.y + 3)
                 wanted = .strikeBolt(x: ball.x, bottom: ball.y)
             }
@@ -858,7 +890,7 @@ public struct Player: Equatable {
                 airCoast()
                 fall(.idle)
             }
-            if stateTimer == BallRules.throwReleaseFrames {
+            if reached(BallRules.throwReleaseFrames) {
                 let direction = throwDirection == .zero ? Vec2(x: facing.sign, y: 0) : throwDirection
                 if hasFireball {
                     hasFireball = false
@@ -882,7 +914,7 @@ public struct Player: Equatable {
             let slam = BallRules.dunkFrames / 2
             let share = min(Double(stateTimer) / Double(slam), 1)
             position = dunkFrom + (place - dunkFrom) * share
-            if stateTimer == BallRules.dunkFrames / 2 {
+            if reached(BallRules.dunkFrames / 2) {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames
                 events.append(.dunked(player: index))
@@ -974,7 +1006,7 @@ public struct Player: Equatable {
                 airDrift(input)
                 fall(.idle)
             }
-            if stateTimer == SnatchRules.sparkFrame {
+            if reached(SnatchRules.sparkFrame) {
                 events.append(.snatchReached(player: index))
                 if power == .zeusJuice, powerLevel >= 2, strikeCooldown == 0 {
                     // Zeus Juice: the strike down onto the hand at full stretch.
@@ -995,7 +1027,7 @@ public struct Player: Equatable {
                 airDrift(input)
                 fall(.idle)
             }
-            if stateTimer == ShakeRules.wallAppearFrame {
+            if reached(ShakeRules.wallAppearFrame) {
                 action = .makeWall
             }
             if stateTimer >= ShakeRules.wallFrames {
@@ -1098,7 +1130,7 @@ public struct Player: Equatable {
                 airCoast()
                 fall(.idle)
             }
-            if stateTimer == PulseRules.fireFrame {
+            if reached(PulseRules.fireFrame) {
                 wanted = .pulse(pull: gunPull)
             }
             if stateTimer >= PulseRules.shotFrames {
@@ -1214,7 +1246,8 @@ public struct Player: Equatable {
         pullTarget = nil
         ledge = nil
         wantsPlatform = false
-        velocity = push
+        velocity = push * spec.knockbackShare
+        knockedAloft = true
         grounded = false
         fastFalling = false
         enter(.air)
@@ -1264,7 +1297,7 @@ public struct Player: Equatable {
 
     /// Down on the stick with nothing in hand.
     private func crouchAsked(_ input: PlayerInput) -> Bool {
-        !holding && input.stick.y < -0.65
+        spec.canCrouch && !holding && input.stick.y < -0.65
     }
 
     /// The slide: the dash burst the way the body faces, the leg out. Frost Tea at level
@@ -1305,13 +1338,18 @@ public struct Player: Equatable {
     /// Falling past a corner within a hand's reach with no ball: the hang, on either side,
     /// the body turned to face it. Not into anything solid, and not for a while after
     /// walking off an edge, so leaving a ledge doesn't grab it back.
+    /// The ledge's numbers at the body's size.
+    private var ledgeHangDepth: Double { LedgeRules.hangDepth * spec.scale }
+    private var ledgeGrabReach: Double { LedgeRules.grabReach * spec.scale }
+    private var ledgeGrabSlack: Double { LedgeRules.grabSlack * spec.scale }
+
     private mutating func grabLedgeIfThere(in stage: Stage, events: inout [MatchEvent]) {
         guard state == .air, !hasBall, velocity.y <= 0, ledgeCooldown == 0 else { return }
-        let hand = position.y + LedgeRules.hangDepth
+        let hand = position.y + ledgeHangDepth
         for side in [facing, facing.flipped] {
-            guard let corner = stage.ledge(beside: body, side: side, reach: LedgeRules.grabReach,
-                                           top: (hand - LedgeRules.grabSlack)...(hand + LedgeRules.grabSlack)) else { continue }
-            let hang = Vec2(x: corner.x - side.sign * spec.bodyWidth / 2, y: corner.y - LedgeRules.hangDepth)
+            guard let corner = stage.ledge(beside: body, side: side, reach: ledgeGrabReach,
+                                           top: (hand - ledgeGrabSlack)...(hand + ledgeGrabSlack)) else { continue }
+            let hang = Vec2(x: corner.x - side.sign * spec.bodyWidth / 2, y: corner.y - ledgeHangDepth)
             let hung = Box(min: Vec2(x: hang.x - spec.bodyWidth / 2, y: hang.y), max: Vec2(x: hang.x + spec.bodyWidth / 2, y: hang.y + spec.bodyHeight))
             guard !stage.overlapsSolid(hung) else { continue }
             facing = side
@@ -1329,8 +1367,8 @@ public struct Player: Equatable {
     /// it, and standing a unit in from its edge.
     private func ledgePositions(at corner: Vec2) -> [Vec2] {
         let half = spec.bodyWidth / 2
-        return [Vec2(x: corner.x - facing.sign * half, y: corner.y - LedgeRules.hangDepth),
-                Vec2(x: corner.x, y: corner.y - LedgeRules.hangDepth / 2),
+        return [Vec2(x: corner.x - facing.sign * half, y: corner.y - ledgeHangDepth),
+                Vec2(x: corner.x, y: corner.y - ledgeHangDepth / 2),
                 Vec2(x: corner.x + facing.sign * (half + 1), y: corner.y)]
     }
 
@@ -1340,14 +1378,14 @@ public struct Player: Equatable {
     public var slideHitbox: Box? {
         guard state == .slide, !slideHit, frozen == 0 else { return nil }
         let front = position.x + facing.sign * spec.bodyWidth / 2
-        let tip = front + facing.sign * SlideRules.legReach
-        return Box(min: Vec2(x: min(front, tip), y: position.y), max: Vec2(x: max(front, tip), y: position.y + SlideRules.legHeight))
+        let tip = front + facing.sign * SlideRules.legReach * spec.scale
+        return Box(min: Vec2(x: min(front, tip), y: position.y), max: Vec2(x: max(front, tip), y: position.y + SlideRules.legHeight * spec.scale))
     }
 
     /// The blade: a square round the body over the slash's live frames, until it has hit.
     public var slashHitbox: Box? {
         guard state == .slashing, !slashHit, frozen == 0, SlashRules.liveFrames.contains(stateTimer) else { return nil }
-        return Box(center: bladeCentre, width: SlashRules.reach * 2, height: SlashRules.reach * 2)
+        return Box(center: bladeCentre, width: SlashRules.reach * 2 * spec.scale, height: SlashRules.reach * 2 * spec.scale)
     }
 
     /// Whether the snatch's hand takes a ball centred here: the ball on the body and the
@@ -1355,7 +1393,7 @@ public struct Player: Equatable {
     public func snatchReaches(ballAt at: Vec2) -> Bool {
         guard let reach = snatchHitbox else { return false }
         let ball = Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2)
-        return ball.overlaps(reach) || at.distance(to: handCatchPoint) <= BallRules.handCatchRadius + BallRules.radius
+        return ball.overlaps(reach) || at.distance(to: handCatchPoint) <= BallRules.handCatchRadius * spec.scale + BallRules.radius
     }
 
     /// The whole body and the hand's reach in front, while the snatch's hand is out.
@@ -1363,8 +1401,8 @@ public struct Player: Equatable {
         guard state == .snatching, frozen == 0, SnatchRules.activeFrames.contains(stateTimer) else { return nil }
         let box = body
         return facing == .right
-            ? Box(min: box.min, max: Vec2(x: box.max.x + SnatchRules.reach, y: box.max.y))
-            : Box(min: Vec2(x: box.min.x - SnatchRules.reach, y: box.min.y), max: box.max)
+            ? Box(min: box.min, max: Vec2(x: box.max.x + SnatchRules.reach * spec.scale, y: box.max.y))
+            : Box(min: Vec2(x: box.min.x - SnatchRules.reach * spec.scale, y: box.min.y), max: box.max)
     }
 
     /// Web Water's line, on the throw button with no ball: held, it aims along the stick;
@@ -1411,7 +1449,7 @@ public struct Player: Equatable {
     /// on the floor under it. Nil when it isn't.
     public func overhangBall(in stage: Stage) -> Vec2? {
         guard hasBall, grounded, state.isGroundState, let offset = BallLandmarks.offset(animationFrame) else { return nil }
-        let ballX = position.x + offset.x / 1.6 * facing.sign
+        let ballX = position.x + offset.x / 1.6 * spec.scale * facing.sign
         let drop = stage.drop(fromX: ballX, y: position.y)
         guard drop > Stage.tileSize else { return nil }
         return Vec2(x: ballX, y: position.y - drop + BallRules.radius)
@@ -1646,7 +1684,9 @@ public struct Player: Equatable {
             if power == .platformShake, platformArmed, platformCooldown == 0 { wantsPlatform = true }
         }
         let floor = fastFalling ? -fastFall : -spec.fallSpeed
-        velocity.y = max(velocity.y - spec.gravity, floor)
+        // Feather Fresca floats down; a fast fall doesn't.
+        let gravity = velocity.y <= 0 && !fastFalling ? spec.gravity * spec.fallGravityShare : spec.gravity
+        velocity.y = max(velocity.y - gravity, floor)
     }
 
     /// A stance comes to a stop on the ground and drifts down slowly in the air, its
@@ -1717,7 +1757,11 @@ public struct Player: Equatable {
             if fastFalling, power == .quakeUp, state == .air || state == .rolling {
                 // Quake-Up Coffee: a fast fall's landing shakes the floor.
                 wanted = .quake
+            } else if power == .titanTea, !knockedAloft, [.air, .rolling, .wallLand, .webSwing, .flying].contains(state) {
+                // Titan Tea: every landing of its own does.
+                wanted = .quake
             }
+            knockedAloft = false
             jumpsLeft = spec.jumps
             fastFalling = false
             flightLeft = SmoothieRules.flightFrames(level: powerLevel)
@@ -1776,9 +1820,9 @@ public struct Player: Equatable {
     public func canCatch(ballAt ballPosition: Vec2, speed: Double = 0, shotInFlight: Bool = false) -> Bool {
         guard !holding, catchCooldown == 0, pickupLockout == 0, hitStun == 0, frozen == 0, state.canCatch else { return false }
         guard speed <= BallRules.catchSpeedThreshold, !shotInFlight else { return false }
-        if ballPosition.distance(to: handCatchPoint) <= BallRules.handCatchRadius { return true }
+        if ballPosition.distance(to: handCatchPoint) <= BallRules.handCatchRadius * spec.scale { return true }
         let offset = ballPosition - chest
-        guard offset.length <= BallRules.catchRadius else { return false }
+        guard offset.length <= BallRules.catchRadius * spec.scale else { return false }
         let ahead = offset.x * facing.sign >= -1
         let movingInto = velocity.lengthSquared > 0.01 && offset.x * velocity.x + offset.y * velocity.y > 0
         return ahead || movingInto
@@ -1797,11 +1841,11 @@ extension Player {
     /// over a drop, the bounce reaches the floor below, the more the lower the hand has it.
     public func ballInHand(on stage: Stage) -> Vec2? {
         guard let offset = BallLandmarks.offset(animationFrame) else { return nil }
-        let x = position.x + offset.x / 1.6 * facing.sign
+        let x = position.x + offset.x / 1.6 * spec.scale * facing.sign
         let dribbling = [Animation.dribbleIdle, .dribbleWalk, .dribbleRun].contains(animationFrame.animation)
         let drop = grounded && dribbling ? stage.drop(fromX: x, y: position.y) : 0
         let phase = min(max(offset.y / BallRules.dribbleHandHeight, 0), 1)
-        return Vec2(x: x, y: position.y + offset.y / 1.6 - drop * (1 - phase))
+        return Vec2(x: x, y: position.y + offset.y / 1.6 * spec.scale - drop * (1 - phase))
     }
 }
 

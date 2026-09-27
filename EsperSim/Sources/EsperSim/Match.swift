@@ -224,10 +224,16 @@ public struct Match: Equatable {
                 ball.strikes = true
             }
             ball.burning = player.power == .blazingBoba
-        case .releaseFireball(let velocity, let straight):
+        case .releaseFireball(let velocity, let straight, let ballArc):
             let hand = Vec2(x: player.position.x + player.facing.sign * 6 * player.spec.scale, y: player.position.y + BallRules.throwReleaseHeight * player.spec.scale)
-            fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity * BlazeRules.fireballSpeedShare,
-                                      framesLeft: BlazeRules.fireballFrames, straight: straight))
+            if ballArc {
+                // A quick shot's fireball takes the quick shot's preset arc, light as it is.
+                fireballs.append(Fireball(id: stamp(), owner: index, position: player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight * player.spec.scale),
+                                          velocity: velocity, framesLeft: BlazeRules.fireballFrames, straight: false, ballArc: true))
+            } else {
+                fireballs.append(Fireball(id: stamp(), owner: index, position: hand, velocity: velocity * BlazeRules.fireballSpeedShare,
+                                          framesLeft: BlazeRules.fireballFrames, straight: straight))
+            }
             events.append(.fireballThrown(player: index))
         case .quake:
             quake(by: index)
@@ -636,8 +642,8 @@ public struct Match: Equatable {
         var kept: [Fireball] = []
         for var fireball in fireballs {
             if !fireball.straight {
-                let gravity = BallRules.gravity * BlazeRules.fireballGravityShare
-                fireball.velocity.y = max(fireball.velocity.y - gravity, -BallRules.fallSpeed * BlazeRules.fireballGravityShare)
+                let share = fireball.ballArc ? 1 : BlazeRules.fireballGravityShare
+                fireball.velocity.y = max(fireball.velocity.y - BallRules.gravity * share, -BallRules.fallSpeed * share)
             }
             fireball.position += fireball.velocity
             fireball.framesLeft -= 1

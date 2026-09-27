@@ -1489,6 +1489,8 @@ final class GameScene: SKScene {
                 boltEntry(player)
                 titanGrowDelay[player.index] = roundIntro
                 titanGrowth[player.index] = 0
+            } else if player.power == .blazingBoba, EffectSheets.frames[GameScene.explosionEntrySheet] != nil {
+                explosionEntry(player)
             } else {
                 portIn(player)
             }
@@ -1507,6 +1509,19 @@ final class GameScene: SKScene {
         cluster.zPosition = 45
         cluster.run(.sequence([.wait(forDuration: Double(roundIntro) / 60), .fadeOut(withDuration: 0.3), .removeFromParent()]))
         glowers.addChild(cluster)
+    }
+
+    /// Blazing Boba's entry: the explosion, painted as it is, standing on the feet.
+    private static let explosionEntrySheet = "explosion_v2"
+    private func explosionEntry(_ player: Player) {
+        let name = GameScene.explosionEntrySheet
+        let frames = (0..<(EffectSheets.frames[name] ?? 1)).map { sprites.texture(name, $0) }
+        let node = SKSpriteNode(texture: frames[0])
+        node.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY[name] ?? 0)
+        node.position = SpriteLibrary.point(player.position)
+        node.zPosition = 45
+        node.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 24), .removeFromParent()]))
+        glowers.addChild(node)
     }
 
     /// The old entry, a bolt from the top of the screen and the crown: Titan Tea's.
@@ -2462,6 +2477,8 @@ final class GameScene: SKScene {
         var frames: [SKTexture]
         /// The sheet frame it started on, so a stream's particles don't play in step.
         var startFrame: Int
+        /// Rises and sways in the wind, as off a head; a ball's trail doesn't.
+        var drifts = true
     }
 
     private var headParticles: [HeadParticle] = []
@@ -2507,8 +2524,10 @@ final class GameScene: SKScene {
     }
 
     /// New particles off a head at `point` this frame, by its streams' rates; the ball's
-    /// fire trail uses the same, under its own credit and at its own rate.
-    private func emitHeadParticles(_ index: Int, power: Power, at point: CGPoint, creditKey: Int? = nil, rateScale: Double = 1) {
+    /// fire trail uses the same, under its own credit and at its own rate, `trailing` the
+    /// way the particles go, back along the ball's path and turned to it.
+    private func emitHeadParticles(_ index: Int, power: Power, at point: CGPoint, creditKey: Int? = nil, rateScale: Double = 1,
+                                   trailing: CGVector? = nil) {
         let streams = headStreams(index, power: power)
         let creditKey = creditKey ?? index
         var credit = headCredit[creditKey] ?? []
@@ -2529,13 +2548,16 @@ final class GameScene: SKScene {
                 node.position = CGPoint(x: point.x + CGFloat.random(in: -1...1), y: point.y + CGFloat.random(in: -0.5...0.5))
                 if stream.frames.count == 1 { node.zRotation = CGFloat.random(in: 0...(2 * .pi)) }
                 glowers.addChild(node)
-                let angle = Double.pi / 2 + Double.random(in: -Double.pi / 28...Double.pi / 28)
+                let heading = trailing.map { atan2(Double($0.dy), Double($0.dx)) } ?? Double.pi / 2
+                let angle = heading + Double.random(in: -Double.pi / 28...Double.pi / 28)
                 let speed = 24 + Double.random(in: -2...2)
+                // The sheet's flame points up; turned so it points the way it goes.
+                if trailing != nil { node.zRotation = CGFloat(heading - Double.pi / 2) }
                 // A sheet plays through once over the life; a single frame lives 0.6 s.
                 let life = stream.frames.count > 1 ? Double(stream.frames.count) / 24 : 0.6 + Double.random(in: -0.05...0.05)
                 headParticles.append(HeadParticle(node: node, owner: index, velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
                                                   age: 0, life: life, frames: stream.frames,
-                                                  startFrame: Int.random(in: 0..<stream.frames.count)))
+                                                  startFrame: Int.random(in: 0..<stream.frames.count), drifts: trailing == nil))
             }
         }
         headCredit[creditKey] = credit
@@ -2551,9 +2573,11 @@ final class GameScene: SKScene {
                 particle.node.removeFromParent()
                 return nil
             }
-            let wind = sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(particle.owner) * 2) * 140
-            particle.velocity.dx += wind * step
-            particle.velocity.dy += 10 * step
+            if particle.drifts {
+                let wind = sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(particle.owner) * 2) * 140
+                particle.velocity.dx += wind * step
+                particle.velocity.dy += 10 * step
+            }
             particle.node.position = CGPoint(x: particle.node.position.x + particle.velocity.dx * step,
                                              y: particle.node.position.y + particle.velocity.dy * step)
             let share = particle.age / particle.life
@@ -3863,7 +3887,8 @@ final class GameScene: SKScene {
         // Blazing Boba's burning shot trails the head's fire as well.
         if ball.burning, ball.holder == nil, ball.isLive, !ball.resting, ball.velocity.length > 1 {
             emitHeadParticles(ball.lastTouched ?? 0, power: .blazingBoba, at: ballNode.position,
-                              creditKey: GameScene.ballFireCreditKey, rateScale: GameScene.ballFireRate)
+                              creditKey: GameScene.ballFireCreditKey, rateScale: GameScene.ballFireRate,
+                              trailing: CGVector(dx: -ball.velocity.x, dy: -ball.velocity.y))
         }
 
         // Three dim chevrons stacked over a resting ball, lit one after another from the top, then

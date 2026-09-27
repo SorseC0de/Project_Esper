@@ -85,6 +85,6 @@ public enum PlayerAction: Equatable {
     case strikeBolt(x: Double, bottom: Double)
     case leaveClone
     case leaveFlame
-    case releaseFireball(velocity: Vec2, straight: Bool)
+    case releaseFireball(velocity: Vec2, straight: Bool, ballArc: Bool)
     case pulse(pull: Bool)
 }

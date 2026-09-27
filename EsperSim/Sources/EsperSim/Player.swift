@@ -828,7 +828,7 @@ public struct Player: Equatable {
                 let lift = shotLift ? max(velocity.y, 0) : 0
                 if hasFireball {
                     hasFireball = false
-                    action = .releaseFireball(velocity: shotVelocity + Vec2(x: 0, y: lift), straight: false)
+                    action = .releaseFireball(velocity: shotVelocity + Vec2(x: 0, y: lift), straight: false, ballArc: quickShot)
                 } else {
                     hasBall = false
                     catchCooldown = BallRules.catchCooldownFrames
@@ -894,7 +894,7 @@ public struct Player: Equatable {
                 let direction = throwDirection == .zero ? Vec2(x: facing.sign, y: 0) : throwDirection
                 if hasFireball {
                     hasFireball = false
-                    action = .releaseFireball(velocity: direction * BallRules.throwSpeed, straight: true)
+                    action = .releaseFireball(velocity: direction * BallRules.throwSpeed, straight: true, ballArc: false)
                 } else {
                     hasBall = false
                     catchCooldown = BallRules.catchCooldownFrames

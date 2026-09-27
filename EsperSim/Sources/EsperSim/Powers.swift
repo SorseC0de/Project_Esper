@@ -35,6 +35,8 @@ public struct Fireball: Equatable {
     /// Thrown, it flies dead straight, as a thrown ball does; shot, it arcs, floatier
     /// than the ball.
     public var straight: Bool
+    /// A quick shot's: the ball's own arc, at its speed and under its gravity.
+    public var ballArc = false
 }
 
 /// Surf Soda: the jumps are a fixed crescent, a quarter circle this high and this far

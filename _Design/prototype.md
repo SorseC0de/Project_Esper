@@ -283,12 +283,13 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   throw, shoot, the stick against it, or down let go cancel it. Level two: a double
   jump or a slide leaves an ice clone, the body's box, that freezes whatever touches it
   and shatters, or shatters after 60 frames. Numbers in `FrostRules`.
-- Blazing Boba (J). A run at full speed or a slide leaves a flame every 4 frames, six
+- Blazing Boba (J). It comes into a round in `explosion_v2`, painted, on the feet, in place of the
+  port-in's cluster. A run at full speed or a slide leaves a flame every 4 frames, six
   wide and four tall at the feet, for 45 frames; the other body in one is stripped and
   the flame is spent. Shots and throws set the ball alight until its first bounce, and
   nobody but the thrower can catch or snatch it; the slash still can. Level two: shoot
   and throw together with nothing in hand makes a fireball in hand, fire swirling into
-  it; it leaves at one and a half times the ball's speed; shot it arcs under half the ball's gravity with the aiming dots, thrown it flies
+  it; it leaves at one and a half times the ball's speed; shot it arcs under half the ball's gravity with the aiming dots, but a quick shot's takes the quick shot's preset arc, at the ball's speed and gravity, from where the ball leaves; thrown it flies
   dead straight, and it bursts on the first thing it meets and strips and knocks
   whatever's within 15 of the burst. Numbers in `BlazeRules`.
 - Pulsepistol Punch (K). Shoot without the ball is the pulse: a pillar ten units tall
@@ -553,8 +554,9 @@ the slash's pinks are left alone. Those are the part keys the game reads (`BodyP
 GMS2 sheets are written as strips in Pixel Art, taking over the GMS2 sprites, and each sheet
 as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s,
 the palette's #242234. The fire sheets are recoloured by hand after `fire_dash`: each of its
-original colours maps to one of #F9A31B, #FA6A0A, #DF3E23, #B4202A and #73172D, and the other
-fire sheets from the same ramp take that map (the rest to their nearest mapped colour);
+original colours maps to one of five AAP-64 shades, and the other fire sheets from the same
+ramp take that map (the rest to their nearest mapped colour); since moved up one index, to
+#FFD541, #F9A31B, #FA6A0A, #DF3E23 and #B4202A (indexes 8 down to 4);
 `fire_explosion`, a different sheet, is left as the tool had it. The importer's `NOT_TONED` keeps the strike bolts,
 which the recolour took to pure white, drawn as painted. Each has an opposite: orange and teal, red
 and lime, pink and blue, and gold gives way to blue. Offline this phone's pick is player one and the other side teal,
@@ -837,7 +839,7 @@ the holder scores on. The head particles are sprites of their own, not an emitte
 through at 24 a second over its life (`esper_particle` by default), rising on one
 swinging wind; a single-frame one (a snowflake, or the squares with
 `ParticleLook.sprites` off) steps down in size instead. The double jump's platform plays
-the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, Frost Tea's sheds snowflakes among the energy,
+the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, streaming back along the ball's path and turned to it, without the head's rise and wind, Frost Tea's sheds snowflakes among the energy,
 Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
 `ParticleLook`: energy 10, snowflake 6, fire 12, lightning 8. Hits spark with
 `esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and

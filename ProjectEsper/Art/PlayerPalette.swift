@@ -20,17 +20,17 @@ enum BodyPart: CaseIterable {
     /// What the sheets paint this part with, as the artist named the colours.
     var sourceColours: [RGB] {
         switch self {
-        case .backHand: [0x951799, 0xAF1AB2, 0x94149C]   // purple
+        case .backHand: [0x951799, 0xAF1AB2, 0x94149C, 0xAC18B4, 0xAD54B0] // purple; the last two strays in taunt and snatch
         case .backArm: [0xAC3232]                         // dark red
         case .backLeg: [0xCE5050]                         // red
         case .backThigh: [0xD95763]                       // red-orange
-        case .pelvis: [0xC46423, 0xB35B20]                // dark orange
+        case .pelvis: [0xC46423, 0xB35B20, 0xC56520]      // dark orange
         case .torso: [0xDF7126, 0xDE7120]                 // orange
         case .head: [0x5FCDE4]                            // teal
         case .frontThigh: [0xD1CC60]                      // light yellow
         case .frontLeg: [0xFBF236]                        // yellow
         case .frontArm: [0x6ABE30]                        // lime
-        case .frontHand: [0x99E550]                       // yellow-green
+        case .frontHand: [0x99E550, 0x9CE652]             // yellow-green
         case .ball: [0xFFFFFF]                            // white
         case .slash: [0xF065C4, 0xF9ABFF, 0xFBC2FF, 0xEEA6F5, 0xF098F5, 0xFDD9FF, 0xEDCEF0] // pinks, edge to core
         case .energy: []

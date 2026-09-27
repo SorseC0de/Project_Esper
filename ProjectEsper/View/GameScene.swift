@@ -2396,6 +2396,9 @@ final class GameScene: SKScene {
     }
 
     private var headParticles: [HeadParticle] = []
+    /// The ball's fire trail: its credit apart from the heads', at twice a head's rate.
+    private static let ballFireCreditKey = -1
+    private static let ballFireRate = 2.0
     private var headCredit: [Int: [Double]] = [:]
     private var headStreamsCache: [Int: (power: Power, streams: [HeadStream])] = [:]
 
@@ -2434,13 +2437,15 @@ final class GameScene: SKScene {
         return streams
     }
 
-    /// New particles off a head at `point` this frame, by its streams' rates.
-    private func emitHeadParticles(_ index: Int, power: Power, at point: CGPoint) {
+    /// New particles off a head at `point` this frame, by its streams' rates; the ball's
+    /// fire trail uses the same, under its own credit and at its own rate.
+    private func emitHeadParticles(_ index: Int, power: Power, at point: CGPoint, creditKey: Int? = nil, rateScale: Double = 1) {
         let streams = headStreams(index, power: power)
-        var credit = headCredit[index] ?? []
+        let creditKey = creditKey ?? index
+        var credit = headCredit[creditKey] ?? []
         while credit.count < streams.count { credit.append(0) }
         for (slot, stream) in streams.enumerated() {
-            credit[slot] += stream.rate / 60
+            credit[slot] += stream.rate * rateScale / 60
             while credit[slot] >= 1 {
                 credit[slot] -= 1
                 let node = SKSpriteNode(texture: stream.frames[0])
@@ -2464,7 +2469,7 @@ final class GameScene: SKScene {
                                                   startFrame: Int.random(in: 0..<stream.frames.count)))
             }
         }
-        headCredit[index] = credit
+        headCredit[creditKey] = credit
     }
 
     /// Every head particle a frame on: the sheet's frame for its age, the rise, the wind.
@@ -3735,6 +3740,11 @@ final class GameScene: SKScene {
         ballTrail.position = ballNode.position
         ballTrail.particleColor = colour
         ballTrail.particleBirthRate = ball.isLive && !ball.resting && ball.velocity.length > 1 ? 90 : 0
+        // Blazing Boba's burning shot trails the head's fire as well.
+        if ball.burning, ball.holder == nil, ball.isLive, !ball.resting, ball.velocity.length > 1 {
+            emitHeadParticles(ball.lastTouched ?? 0, power: .blazingBoba, at: ballNode.position,
+                              creditKey: GameScene.ballFireCreditKey, rateScale: GameScene.ballFireRate)
+        }
 
         // Three dim chevrons stacked over a resting ball, lit one after another from the top, then
         // a beat with none, four steps a second so each one reads as a step.

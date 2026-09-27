@@ -797,7 +797,7 @@ the holder scores on. The head particles are sprites of their own, not an emitte
 through at 24 a second over its life (`esper_particle` by default), rising on one
 swinging wind; a single-frame one (a snowflake, or the squares with
 `ParticleLook.sprites` off) steps down in size instead. The double jump's platform plays
-the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, Frost Tea's sheds snowflakes among the energy,
+the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, Frost Tea's sheds snowflakes among the energy,
 Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
 `ParticleLook`: energy 10, snowflake 6, fire 12, lightning 8. Hits spark with
 `esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and

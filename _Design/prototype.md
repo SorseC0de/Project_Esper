@@ -861,8 +861,13 @@ ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's j
 
 ## Sound
 
-Off for now (`SoundBoard.enabled`), the engine never started, while a performance dip and
-some crashes on the TV when several played at once are looked into.
+On again. At launch (`SoundBoard.prepare`, from `FlowState`) the engine starts at once, on the
+title, and everything is read and mixed on a background thread, each voice then playing a
+moment of silence so its first real sound has nothing to set up; nothing loads the first time a
+sound plays; a sound asked for before then is skipped. A route change (the TV's HDMI
+resetting) or an interruption stops the engine and its voices: they're started again on the
+main queue, away from a frame, and a sound that finds the engine or its voice down is
+skipped and asks for that restart, never starting the engine itself.
 
 `Tools/sfx.py` makes sounds the bfxr way from recipes in `Tools/sfx.json` (oscillator,
 envelope, pitch slide and vibrato, arpeggio, filters, voices mixed) into `_Sound FX`, for
@@ -871,11 +876,12 @@ the importer to take in like any other.
 The user's effects in `_Sound FX`, any of WAV, MP3 or M4A, brought into `ProjectEsper/Sounds`
 as 16-bit 44.1 kHz mono WAV by
 `Tools/import_sounds.py` (run it after adding or changing one; the originals are only
-read). `SoundBoard` reads each into memory once and plays it on a pool of twelve voices
+read). `SoundBoard` reads each into memory once and plays it on a pool of sixteen voices
 through one engine, left running, heard by where they happen: full on the screen,
 fading to nothing 32 art pixels past its edge, so nothing off the screen is heard (the
-menus and the count are everywhere); each sound to a voice that has finished (stopping a
-playing voice waits on the audio thread, which cost the TV 4 ms a frame of footsteps), ambient, so the silent switch mutes it. Sounds come off the events
+menus and the count are everywhere); each sound to a voice that has finished, or with all busy to the one
+nearest its end, the new sound scheduled to interrupt the old (stopping a playing voice waits
+on the audio thread, which cost the TV 4 ms a frame of footsteps), ambient, so the silent switch mutes it. Sounds come off the events
 shown, once, like the effects.
 
 - jump: the jump, the double jump, the wall jump.

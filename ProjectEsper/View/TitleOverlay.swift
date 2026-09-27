@@ -19,6 +19,7 @@ final class FlowState: ObservableObject {
 
     init() {
         scene.flowState = self
+        SoundBoard.shared.prepare()
     }
 }
 

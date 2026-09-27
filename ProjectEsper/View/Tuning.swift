@@ -125,6 +125,28 @@ enum ThreePointTuning {
     static let breathSeconds = 6.0
 }
 
+/// In the zone (a placeholder, off until something puts a player in it): the players' outline runs through these
+/// palette colours, easing from one to the next every `stepSeconds`, and each head particle
+/// comes out in one of them at random.
+enum ZoneTuning {
+    nonisolated(unsafe) static var inTheZone = false
+    static let colours: [RGB] = [7, 11, 19, 20, 27].map { PixelPalette.colours[$0] }
+    static let stepSeconds = 0.25
+
+    /// The outline's colour at `time`.
+    static func outline(at time: Double) -> SKColor {
+        let phase = time / stepSeconds
+        let index = Int(phase.rounded(.down)) % colours.count
+        let share = CGFloat(phase - phase.rounded(.down))
+        let from = colours[index], to = colours[(index + 1) % colours.count]
+        func channel(_ shift: RGB) -> CGFloat {
+            let start = CGFloat((from >> shift) & 0xFF), end = CGFloat((to >> shift) & 0xFF)
+            return (start + (end - start) * share) / 255
+        }
+        return SKColor(red: channel(16), green: channel(8), blue: channel(0), alpha: 1)
+    }
+}
+
 /// The hoop's art against the rim's point, in art pixels: across away from the backboard, and up.
 enum HoopTuning {
     static let offset = CGPoint(x: 5, y: 10)

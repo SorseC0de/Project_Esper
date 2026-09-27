@@ -158,6 +158,9 @@ final class GameScene: SKScene {
     /// Each body's energy, the slash's blade and the sheets' puffs and streaks, drawn over
     /// the body among the glowers so it blooms.
     private var energyNodes: [SKSpriteNode] = []
+    /// The line round each body, a child of it so it rides the body exactly, drawn in white
+    /// and coloured each frame: the look's outline, or the zone's.
+    private var outlineNodes: [SKSpriteNode] = []
     /// The charge round each player's ball while a throw is held, and whether it showed
     /// last frame, so the throw's release can be caught.
     private var chargeNodes: [SKSpriteNode] = []
@@ -294,6 +297,13 @@ final class GameScene: SKScene {
         // The hoops: their backboards read too hot with the glow on them.
         var flat = rimNodes.filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size) }
+        }
+        // The bodies' lines, which are drawn as they are and never glow.
+        for (body, outline) in zip(playerNodes, outlineNodes) where !body.isHidden && !outline.isHidden {
+            if let texture = outline.texture {
+                flat.append(BodySnapshot(texture: texture, position: body.position, anchor: body.anchorPoint, xScale: body.xScale,
+                                         size: body.size, zRotation: body.zRotation))
+            }
         }
         guard !banner.isHidden, let texture = banner.texture else { return flat }
         let scale = glowHud.xScale
@@ -494,7 +504,11 @@ final class GameScene: SKScene {
             additiveTinted.blendMode = .add
             additiveTinted.color = .white
             additiveTinted.colorBlendFactor = 1
-            for sprite in [additive, tinted, additiveTinted] {
+            // The energy's toning shader, compiled now rather than on the first slash.
+            let toned = SKSpriteNode(texture: sample)
+            toned.shader = energyToneShader
+            setGlow(toned, .white)
+            for sprite in [additive, tinted, additiveTinted, toned] {
                 sprite.size = CGSize(width: 1, height: 1)
                 sprite.alpha = 0.02
                 warmNode.addChild(sprite)
@@ -530,6 +544,11 @@ final class GameScene: SKScene {
             let node = SKSpriteNode(texture: sprites.texture(player.animationFrame, player: player.index))
             bodies.addChild(node)
             playerNodes.append(node)
+            let outline = SKSpriteNode()
+            outline.colorBlendFactor = 1
+            outline.zPosition = 0.1
+            node.addChild(outline)
+            outlineNodes.append(outline)
             for shadows in [\GameScene.shadowBodies, \GameScene.shadowHeads] {
                 let shadow = SKSpriteNode()
                 shadow.shader = shadowShader
@@ -546,6 +565,7 @@ final class GameScene: SKScene {
             let energy = SKSpriteNode()
             energy.zPosition = 3
             energy.isHidden = true
+            energy.shader = energyToneShader
             glowers.addChild(energy)
             energyNodes.append(energy)
             let charge = SKSpriteNode()
@@ -2466,6 +2486,8 @@ final class GameScene: SKScene {
         var rate: Double
         /// Tints to pick from for each particle, in place of the one tint.
         var tints: [SKColor] = []
+        /// The regular energy's stream: in the zone its particles take the zone's colours.
+        var zoneTinted = false
     }
 
     private struct HeadParticle {
@@ -2497,24 +2519,26 @@ final class GameScene: SKScene {
         if let cached = headStreamsCache[index], cached.power == power { return cached.streams }
         let colour = SKColor(rgb: sprites.look(for: index).glow)
         let energy = HeadStream(frames: ParticleLook.sprites ? sheetFrames("esper_particle") : [sprites.flatSquare(size: 4, alpha: 1)],
-                                size: ParticleLook.energySize, tint: colour, rate: 24)
+                                size: ParticleLook.energySize, tint: colour, rate: 24, zoneTinted: true)
         var streams = [energy]
+        // A power's own particles come half and half with the energy's, as Frost Tea's snowflakes do.
+        var halfEnergy = energy
+        halfEnergy.rate = 12
         switch power {
         case .blazingBoba where EffectSheets.frames["fire_particle"] != nil:
-            streams = [HeadStream(frames: sheetFrames("fire_particle"), size: ParticleLook.fireSize, tint: nil, rate: 24)]
+            streams = [halfEnergy, HeadStream(frames: sheetFrames("fire_particle"), size: ParticleLook.fireSize, tint: nil, rate: 12)]
         case .frostTea:
             // Snowflakes among the energy.
-            streams = [HeadStream(frames: energy.frames, size: energy.size, tint: colour, rate: 12),
-                       HeadStream(frames: [sprites.snowflake], size: ParticleLook.snowflakeSize, tint: GameScene.ice, rate: 12)]
+            streams = [halfEnergy, HeadStream(frames: [sprites.snowflake], size: ParticleLook.snowflakeSize, tint: GameScene.ice, rate: 12)]
         case .surfSoda where EffectSheets.frames["bubble_particle"] != nil:
-            streams = [HeadStream(frames: sheetFrames("bubble_particle"), size: ParticleLook.bubbleSize, tint: nil, rate: 24, tints: ParticleLook.sodas)]
+            streams = [halfEnergy, HeadStream(frames: sheetFrames("bubble_particle"), size: ParticleLook.bubbleSize, tint: nil, rate: 12, tints: ParticleLook.sodas)]
         case .zeusJuice where EffectSheets.frames["lightning_particle"] != nil:
-            // The two bolts, half each, toned in the energy colour.
-            streams = [HeadStream(frames: sheetFrames("lightning_particle", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 12)]
+            // The two bolts, a quarter each, toned in the energy colour.
+            streams = [halfEnergy, HeadStream(frames: sheetFrames("lightning_particle", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 6)]
             if EffectSheets.frames["lightning_particle2"] != nil {
-                streams.append(HeadStream(frames: sheetFrames("lightning_particle2", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 12))
+                streams.append(HeadStream(frames: sheetFrames("lightning_particle2", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 6))
             } else {
-                streams[0].rate = 24
+                streams[1].rate = 12
             }
         default:
             break
@@ -2538,7 +2562,9 @@ final class GameScene: SKScene {
                 credit[slot] -= 1
                 let node = SKSpriteNode(texture: stream.frames[0])
                 node.size = CGSize(width: stream.size, height: stream.size)
-                if let tint = stream.tints.randomElement() ?? stream.tint {
+                // In the zone a head's particles come out in the zone's colours.
+                let zoneTint = ZoneTuning.inTheZone && stream.zoneTinted && trailing == nil ? ZoneTuning.colours.randomElement().map { SKColor(rgb: $0) } : nil
+                if let tint = zoneTint ?? stream.tints.randomElement() ?? stream.tint {
                     node.color = tint
                     node.colorBlendFactor = 1
                 }
@@ -3120,6 +3146,28 @@ final class GameScene: SKScene {
     private let goalpostShadows = SKEffectNode()
     private var shadowBodies: [SKSpriteNode] = []
     private var shadowHeads: [SKSpriteNode] = []
+    /// A grey energy frame toned as `Look.energyTone` does: black to the colour over the
+    /// dark half, the colour to a quarter of the way to white over the light half; the
+    /// colour each node's own `a_glow`.
+    private lazy var energyToneShader: SKShader = {
+        let shader = SKShader(source: """
+        void main() {
+            vec4 texel = texture2D(u_texture, v_tex_coord);
+            float level = texel.a > 0.0 ? texel.r / texel.a : 0.0;
+            vec3 toned = level <= 0.5 ? a_glow * (level * 2.0) : mix(a_glow, vec3(1.0), (level * 2.0 - 1.0) * 0.25);
+            gl_FragColor = vec4(toned * texel.a, texel.a) * v_color_mix.a;
+        }
+        """)
+        shader.attributes = [SKAttribute(name: "a_glow", type: .vectorFloat3)]
+        return shader
+    }()
+
+    private func setGlow(_ node: SKSpriteNode, _ colour: SKColor) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        colour.getRed(&r, green: &g, blue: &b, alpha: &a)
+        node.setValue(SKAttributeValue(vectorFloat3: SIMD3<Float>(Float(r), Float(g), Float(b))), forAttribute: "a_glow")
+    }
+
     private lazy var shadowShader: SKShader = {
         let shader = SKShader(source: """
         void main() {
@@ -3494,6 +3542,16 @@ final class GameScene: SKScene {
                 let frame = owner.animationFrame
                 let node = SKSpriteNode(texture: sprites.texture(frame, player: clone.owner))
                 node.size = node.texture!.size()
+                if let outline = sprites.outlineTexture(frame, player: clone.owner) {
+                    // Its line too, in ice like the rest of it.
+                    let line = SKSpriteNode(texture: outline)
+                    line.size = node.size
+                    line.anchorPoint = sprites.anchor(for: frame.animation)
+                    line.color = GameScene.ice
+                    line.colorBlendFactor = 1
+                    line.zPosition = 0.1
+                    node.addChild(line)
+                }
                 node.anchorPoint = sprites.anchor(for: frame.animation)
                 node.xScale = CGFloat(owner.facing.sign)
                 node.color = GameScene.ice
@@ -3643,11 +3701,27 @@ final class GameScene: SKScene {
                 flash.zRotation = source.zRotation
             }
 
+            // The line round the body, in the look's outline or cycling through the zone's.
+            let outlineNode = outlineNodes[index]
+            if let outline = sprites.outlineTexture(frame, player: index, ballAsEnergy: wholeSheet) {
+                outlineNode.isHidden = false
+                outlineNode.texture = outline
+                outlineNode.size = node.size
+                outlineNode.anchorPoint = node.anchorPoint
+                // White as the body is, growing or parrying; ice, frozen; else the look's or the zone's.
+                let lineColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
+                outlineNode.color = growing || player.throwParrying ? .white : (player.frozen > 0 ? GameScene.ice : lineColour)
+            } else {
+                outlineNode.isHidden = true
+            }
+
             // The frame's energy rides exactly where the body is drawn.
             let energyNode = energyNodes[index]
             if let energy = sprites.energyTexture(frame, player: index, ballAsEnergy: wholeSheet) {
                 energyNode.isHidden = false
                 energyNode.texture = energy
+                // In the zone the energy (the slash's blade among it) runs the zone's colours.
+                setGlow(energyNode, ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).glow))
                 energyNode.size = node.size
                 energyNode.anchorPoint = node.anchorPoint
                 energyNode.position = node.position
@@ -3668,7 +3742,8 @@ final class GameScene: SKScene {
             let halo = handHalos[index]
             let handBall = handBalls[index]
             // A fireball in hand rides where the ball would, in fire.
-            let teamColour = SKColor(rgb: sprites.look(for: index).glow)
+            // In the zone the ball in hand runs the zone's colours.
+            let teamColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).glow)
             handBall.color = player.hasFireball ? GameScene.fireballColour : teamColour
             halo.color = player.hasFireball ? GameScene.fireballColour : teamColour
             if player.holding, let landmark = sprites.landmark(.ball, in: frame, player: index) {

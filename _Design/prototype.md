@@ -552,8 +552,15 @@ head #20D6C7, ball #FFFFFF, torso #FA6A0A and pelvis #BB7547, front thigh #FFD54
 go dark to light), front arm #59C135 and hand #9CDB43, back arm #793A80 and hand #BC4A9B;
 the slash's pinks are left alone. Those are the part keys the game reads (`BodyPart`). The
 GMS2 sheets are written as strips in Pixel Art, taking over the GMS2 sprites, and each sheet
-as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s,
-the palette's #242234. The fire sheets are recoloured by hand after `fire_dash`: each of its
+as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s, the palette's
+#242234, drawn as it is and never glowing, lifted off each frame onto its own white texture and
+drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
+In the zone (`ZoneTuning.inTheZone`, a placeholder, off
+until something puts a player in it, for now nothing) the outline eases through 7 #F9A31B, 11 #9CDB43, 19 #249FDE, 20 #20D6C7, 27 #BC4A9B a quarter second each, and so do the
+ball in hand and the energy on the body (the slash's blade, the skid's puffs, a release's streaks,
+drawn in grey and toned by a shader through `Look.energyTone`'s ramp, in the look's colour out
+of the zone); each regular energy particle off the head comes out in one of them at random,
+the powers' own particles keeping their colours. The fire sheets are recoloured by hand after `fire_dash`: each of its
 original colours maps to one of five AAP-64 shades, and the other fire sheets from the same
 ramp take that map (the rest to their nearest mapped colour); since moved up one index, to
 #FFD541, #F9A31B, #FA6A0A, #DF3E23 and #B4202A (indexes 8 down to 4);
@@ -839,7 +846,7 @@ the holder scores on. The head particles are sprites of their own, not an emitte
 through at 24 a second over its life (`esper_particle` by default), rising on one
 swinging wind; a single-frame one (a snowflake, or the squares with
 `ParticleLook.sprites` off) steps down in size instead. The double jump's platform plays
-the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, streaming back along the ball's path and turned to it, without the head's rise and wind, Frost Tea's sheds snowflakes among the energy,
+the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, Zeus Juice's sheds its bolts and Surf Soda's its bubbles, each half and half with the regular energy as Frost Tea's snowflakes are; and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, streaming back along the ball's path and turned to it, without the head's rise and wind, Frost Tea's sheds snowflakes among the energy,
 Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
 `ParticleLook`: energy 10, snowflake 6, fire 12, lightning 8. Hits spark with
 `esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and

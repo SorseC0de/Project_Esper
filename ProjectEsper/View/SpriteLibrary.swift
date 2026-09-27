@@ -115,6 +115,7 @@ final class SpriteLibrary {
         var textures = ["": result.texture]
         if let head = result.head { textures["_head"] = head }
         if let energy = result.energy { textures["_energy"] = energy }
+        if let outline = result.outline { textures["_outline"] = outline }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize
         let landmarks = result.centres.mapValues { centre in
@@ -130,10 +131,19 @@ final class SpriteLibrary {
     }
 
     /// The energy alone from a player frame, on the same canvas as the body: the slash's
-    /// blade, the skid's puffs, a release's streaks. Nil when the frame has none.
+    /// blade, the skid's puffs, a release's streaks. In grey, for the view's energy tone
+    /// (`Look.energyTone` in a shader) in the look's colour or the zone's. Nil when the
+    /// frame has none.
     func energyTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
         _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_energy"]
+    }
+
+    /// The line round a player frame alone, in white, on the same canvas as the body, for
+    /// the view to colour. Nil when the frame has none.
+    func outlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
+        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_outline"]
     }
 
     /// A strip's frame as a silhouette in the player's energy: every painted pixel white,
@@ -327,12 +337,16 @@ final class SpriteLibrary {
     /// centre of each glowing part found. The ball is looked for only where the sheet
     /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
     /// with no line, and the body is drawn and lined without them.
-    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, centres: [BodyPart: CGPoint]) {
+    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, [:]) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
+        // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
+        // grey, for the view to tone in any colour.
+        var lined = [Bool](repeating: false, count: count)
+        var greys = [Double](repeating: 0, count: count)
 
         // Which part each pixel came from, before anything changes.
         var parts = [BodyPart?](repeating: nil, count: count)
@@ -357,6 +371,7 @@ final class SpriteLibrary {
             }
             if part.isEnergy {
                 let grey = (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / 255
+                greys[pixel] = grey
                 paint(pixels, index, look.energyTone(luminance: grey))
             } else if let target = look.colours[part] {
                 paint(pixels, index, target)
@@ -377,9 +392,11 @@ final class SpriteLibrary {
                     paint(headPixels, index, look.colours[.head] ?? look.glow)
                     headPixels[index + 3] = 255
                 } else if part.isEnergy, let (_, energyPixels) = energyCanvas {
-                    energyPixels[index] = pixels[index]
-                    energyPixels[index + 1] = pixels[index + 1]
-                    energyPixels[index + 2] = pixels[index + 2]
+                    // In grey: the view tones it through the energy ramp in whatever colour.
+                    let level = UInt8((greys[pixel] * 255).rounded())
+                    energyPixels[index] = level
+                    energyPixels[index + 1] = level
+                    energyPixels[index + 2] = level
                     energyPixels[index + 3] = 255
                 }
                 pixels[index] = 0
@@ -408,6 +425,7 @@ final class SpriteLibrary {
             let stroked = parts.map { $0.map(look.strokedParts.contains) ?? false }
             for pixel in 0..<count where parts[pixel] != nil && !stroked[pixel] && neighbours(pixel, { stroked[$0] }) {
                 paint(pixels, pixel * 4, look.outline)
+                lined[pixel] = true
             }
         }
 
@@ -424,13 +442,32 @@ final class SpriteLibrary {
                     paint(pixels, pixel * 4, look.outline)
                     pixels[pixel * 4 + 3] = 255
                     body[pixel] = true
+                    lined[pixel] = true
                 }
             }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, [:]) }
+        // With `detach`, the line comes off onto its own canvas in white, so the view can
+        // draw it in any colour, frame by frame.
+        var outline: SKTexture?
+        if detach, lined.contains(true), let (lineContext, linePixels) = makeCanvas(width: width, height: height) {
+            for pixel in 0..<count where lined[pixel] {
+                let index = pixel * 4
+                linePixels[index] = 255
+                linePixels[index + 1] = 255
+                linePixels[index + 2] = 255
+                linePixels[index + 3] = 255
+                pixels[index] = 0
+                pixels[index + 1] = 0
+                pixels[index + 2] = 0
+                pixels[index + 3] = 0
+            }
+            outline = lineContext.makeImage().map { SKTexture(cgImage: $0) }
+        }
+
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, [:]) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, centres)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, centres)
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

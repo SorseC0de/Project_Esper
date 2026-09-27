@@ -527,7 +527,10 @@ sheets in `_Graphic Assets/Pixel Art` are recoloured to AAP-64's nearest by eye 
 alpha kept, by `Tools/recolour_to_palette.py`, which leaves two kinds alone: all-grey
 sheets, the masks the energy colour tints, and the player sheets, whose flat colours are
 the body-part keys (some would merge on the palette); the players' outline is `Look`'s,
-the palette's #242234. The importer's `NOT_TONED` keeps the strike bolts,
+the palette's #242234. The fire sheets are recoloured by hand after `fire_dash`: each of its
+original colours maps to one of #F9A31B, #FA6A0A, #DF3E23, #B4202A and #73172D, and the other
+fire sheets from the same ramp take that map (the rest to their nearest mapped colour);
+`fire_explosion`, a different sheet, is left as the tool had it. The importer's `NOT_TONED` keeps the strike bolts,
 which the recolour took to pure white, drawn as painted. Each has an opposite: orange and teal, red
 and lime, pink and blue, and gold gives way to blue. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the

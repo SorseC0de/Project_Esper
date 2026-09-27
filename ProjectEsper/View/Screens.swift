@@ -21,7 +21,7 @@ class Screen: SKNode {
     private(set) var cursor = 0
     /// Lettered buttons' plates, by choice: the plate, its own piece, and its size. The
     /// cursor's plate turns gold.
-    private var plates: [Int: (plate: SKSpriteNode, piece: UIPiece, size: CGSize)] = [:]
+    private var plates: [Int: (plate: SKSpriteNode, piece: UIPiece, size: CGSize, label: SKSpriteNode, text: String, textSize: CGFloat)] = [:]
 
     /// This screen's tuned scale for one of its parts, 1 for a screen that isn't tuned.
     func tuned(_ part: UIPart) -> CGFloat {
@@ -78,7 +78,7 @@ class Screen: SKNode {
         addChild(button)
         let hit = CGRect(x: point.x - plateSize.width / 2, y: point.y - plateSize.height / 2, width: plateSize.width, height: plateSize.height)
         choices.append(Choice(node: button, hit: hit, enabled: enabled, arrowAt: CGPoint(x: hit.minX - 16, y: point.y), arrowTurn: .pi / 2, sound: sound, action: action))
-        plates[choices.count - 1] = (plate, piece, plateSize)
+        plates[choices.count - 1] = (plate, piece, plateSize, label, text, size * tuned(.text))
         if choices.count == 1 { cursor = 0 }
         showCursor()
         return button
@@ -87,8 +87,8 @@ class Screen: SKNode {
     /// A black card from the pack behind a screen's content, `size` points round `centre`,
     /// its height at the panels' scale (its width comes from the header's, which has it).
     @discardableResult
-    func addCard(size: CGSize, at centre: CGPoint) -> SKSpriteNode {
-        let card = UIPiece.cardBlack.node(size: CGSize(width: size.width, height: size.height * tuned(.panels)), corners: tuned(.panels))
+    func addCard(size: CGSize, at centre: CGPoint, piece: UIPiece = .cardBlack) -> SKSpriteNode {
+        let card = piece.node(size: CGSize(width: size.width, height: size.height * tuned(.panels)), corners: tuned(.panels))
         card.position = centre
         card.zPosition = -5
         addChild(card)
@@ -126,7 +126,11 @@ class Screen: SKNode {
         for (index, choice) in choices.enumerated() {
             let lit = index == cursor && choice.enabled
             choice.node.setScale(lit ? 1.12 : 1)
-            if let plate = plates[index] { (lit ? UIPiece.buttonGold : plate.piece).fit(plate.plate, to: plate.size, corners: tuned(.buttons)) }
+            if let plate = plates[index] {
+                (lit ? UIPiece.buttonGold : plate.piece).fit(plate.plate, to: plate.size, corners: tuned(.buttons))
+                // On the gold plate the lettering's lower half goes light blue.
+                TitleText.set(plate.label, to: plate.text, size: plate.textSize, lit: lit)
+            }
         }
         if plates[cursor] != nil || !showsArrow {
             arrow.isHidden = true
@@ -358,7 +362,7 @@ final class WinScreen: Screen {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .win)
         let width: CGFloat = 220
         let headerWidth = addHeader("\(winner) WINS", size: 36, at: CGPoint(x: 0, y: halfHeight * 0.64), width: width + 170)
-        addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.55), at: CGPoint(x: 0, y: -halfHeight * 0.1))
+        addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.55), at: CGPoint(x: 0, y: -halfHeight * 0.1), piece: .cardPurple)
         let final = TitleText.node(score.map(String.init).joined(separator: " - "), size: 80 * tuned(.titles))
         final.position = CGPoint(x: 0, y: halfHeight * 0.2)
         addChild(final)
@@ -387,6 +391,7 @@ final class StageSelectScreen: Screen {
     /// Each stage: its plate, royal blue or gold when raised, in a container that grows.
     private var tiles: [SKNode] = []
     private var tilePlates: [SKSpriteNode] = []
+    private var tileLabels: [(label: SKSpriteNode, text: String, size: CGFloat)] = []
     private var tileSize = CGSize.zero
     private var cursors: [Int: Int] = [:]
     private var picks: [Int: Int] = [:]
@@ -432,6 +437,7 @@ final class StageSelectScreen: Screen {
             addChild(tile)
             tiles.append(tile)
             tilePlates.append(plate)
+            tileLabels.append((label, name, textSize))
         }
         for voter in localVoters { cursors[voter] = min(max(start, 0), stages.count - 1) }
         for voter in voters {
@@ -504,6 +510,7 @@ final class StageSelectScreen: Screen {
             let lit = raised.contains(index)
             tile.setScale(lit ? 1.12 : 1)
             (lit ? UIPiece.buttonGold : UIPiece.buttonBlue).fit(tilePlates[index], to: tileSize, corners: tuned(.buttons))
+            TitleText.set(tileLabels[index].label, to: tileLabels[index].text, size: tileLabels[index].size, lit: lit)
         }
         // Each voter's circle in the bottom-right corner of their stage, the second beside the first.
         var taken: [Int: Int] = [:]
@@ -532,7 +539,7 @@ final class PauseScreen: Screen {
         let width: CGFloat = 230
         // The card as wide as the header over it, so their edges line up.
         let headerWidth = addHeader("PAUSED", at: CGPoint(x: 0, y: halfHeight * 0.62), width: width + 90)
-        addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12))
+        addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12), piece: .cardPurple)
         addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.25), width: width, action: onRestart)
         addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.1), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
         addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.45), sound: .menuBack, piece: .buttonPlum, width: width, action: onResume)

@@ -16,10 +16,12 @@ enum TitleText {
     /// Times the screen's scale the lettering is rendered at, so a HUD scaled up for a
     /// big screen stays crisp. The scene sets it from its HUD scale.
     nonisolated(unsafe) static var renderScale: CGFloat = 1
-    /// The lower half's fill: `EsperPalette`'s blue at its highlight.
-    static let lightBlue = UIColor(red: CGFloat((EsperPalette.blue.highlight >> 16) & 0xFF) / 255,
-                                   green: CGFloat((EsperPalette.blue.highlight >> 8) & 0xFF) / 255,
-                                   blue: CGFloat(EsperPalette.blue.highlight & 0xFF) / 255, alpha: 1)
+    /// The lower half's fill, `UIColourPicks.letters`; `lit` on a gold plate, the cursor's.
+    private static func lowerColour(lit: Bool) -> UIColor {
+        let fill = lit ? UIColourPicks.litLetters : UIColourPicks.letters
+        return UIColor(red: CGFloat((fill >> 16) & 0xFF) / 255, green: CGFloat((fill >> 8) & 0xFF) / 255,
+                       blue: CGFloat(fill & 0xFF) / 255, alpha: 1)
+    }
     /// The outline and the drop, as shares of the text size, and the steps round the ring.
     private static let stroke: CGFloat = 0.09
     private static let drop: CGFloat = 0.12
@@ -27,17 +29,17 @@ enum TitleText {
     nonisolated(unsafe) private static var cache: [String: SKTexture] = [:]
     nonisolated(unsafe) private static var images: [String: UIImage] = [:]
 
-    static func texture(_ text: String, size: CGFloat, italic: Bool = false) -> SKTexture {
-        let key = "\(size)|\(italic)|\(renderScale)|\(text)"
+    static func texture(_ text: String, size: CGFloat, italic: Bool = false, lit: Bool = false) -> SKTexture {
+        let key = "\(size)|\(italic)|\(renderScale)|\(lit)|\(text)"
         if let texture = cache[key] { return texture }
-        let texture = SKTexture(image: image(text, size: size, italic: italic))
+        let texture = SKTexture(image: image(text, size: size, italic: italic, lit: lit))
         cache[key] = texture
         return texture
     }
 
     /// The lettering as an image, for the SwiftUI layer.
-    static func image(_ text: String, size: CGFloat, italic: Bool = false) -> UIImage {
-        let key = "\(size)|\(italic)|\(renderScale)|\(text)"
+    static func image(_ text: String, size: CGFloat, italic: Bool = false, lit: Bool = false) -> UIImage {
+        let key = "\(size)|\(italic)|\(renderScale)|\(lit)|\(text)"
         if let image = images[key] { return image }
         let font = font(size: size, italic: italic)
         let measured = (text as NSString).size(withAttributes: [.font: font])
@@ -68,7 +70,7 @@ enum TitleText {
             cg.restoreGState()
             cg.saveGState()
             cg.clip(to: CGRect(x: 0, y: middle, width: canvas.width, height: canvas.height - middle))
-            draw(lightBlue, offset: .zero)
+            draw(lowerColour(lit: lit), offset: .zero)
             cg.restoreGState()
         }
         images[key] = image
@@ -88,8 +90,8 @@ enum TitleText {
     }
 
     /// Swaps a sprite's lettering, keeping its place.
-    static func set(_ node: SKSpriteNode, to text: String, size: CGFloat, italic: Bool = false) {
-        let texture = texture(text, size: size, italic: italic)
+    static func set(_ node: SKSpriteNode, to text: String, size: CGFloat, italic: Bool = false, lit: Bool = false) {
+        let texture = texture(text, size: size, italic: italic, lit: lit)
         node.texture = texture
         node.size = CGSize(width: texture.size().width / renderScale, height: texture.size().height / renderScale)
     }

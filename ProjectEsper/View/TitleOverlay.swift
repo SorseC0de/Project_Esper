@@ -13,12 +13,17 @@ final class FlowState: ObservableObject {
     /// The ground under the screen is the palette's black rather than the royal blue: the
     /// Greateraid pick and wait.
     @Published var blackGround = false
+    /// The win screen's own ground.
+    @Published var winGround = false
     /// The UI tuning panel is open.
     @Published var tuningOpen = false
     var startSeries: ((GameMode) -> Void)?
     /// The title's cursor, the game's own on every platform: a pad moves it and A picks,
     /// and a tap picks straight away and moves it there.
     @Published var titleCursor = TitleItem.bestOfSeven
+    /// Which tone each grid picks.
+    @Published var tones: [UIColourPicks.Grid: UIColourPicks.Tone] = [:]
+    func tone(for grid: UIColourPicks.Grid) -> UIColourPicks.Tone { tones[grid] ?? .main }
 
     init() {
         scene.flowState = self
@@ -78,6 +83,15 @@ final class FlowState: ObservableObject {
             scene.applySavedColours()
         case .tuning:
             tuningOpen.toggle()
+        case .toneTab(let grid, let tone):
+            tones[grid] = tone
+            SoundBoard.shared.play(SoundBoard.navigate)
+        case .swatch(let grid, let index):
+            // Picking the one picked takes the pack's own tone back.
+            UIColourPicks.toggle(grid, tone(for: grid), index)
+            SoundBoard.shared.play(SoundBoard.navigate)
+            UITuning.shared.touch()
+            scene.refreshPreview()
         }
     }
 }
@@ -87,12 +101,24 @@ enum TitleItem: Hashable {
     case bestOfSeven, fortySeven, vsCPU, vsHuman, multiplayer, onlineRounds, onlineFortySeven
     case colour(EnergyColour)
     case tuning
+    /// A swatch on one of the grids, by its index in `EsperPalette.swatches`, and the tabs
+    /// that say which tone each grid picks.
+    case swatch(UIColourPicks.Grid, Int)
+    case toneTab(UIColourPicks.Grid, UIColourPicks.Tone)
+
+    /// The grids' swatches a row: two ramps of four.
+    static let swatchesPerRow = 8
 
     static let rows: [[TitleItem]] = [
         [.bestOfSeven, .fortySeven],
         [.vsCPU, .vsHuman],
         [.multiplayer],
         [.onlineRounds, .onlineFortySeven],
+        UIColourPicks.Grid.allCases.flatMap { grid in UIColourPicks.Tone.allCases.map { TitleItem.toneTab(grid, $0) } },
+    ] + stride(from: 0, to: EsperPalette.swatches.count, by: swatchesPerRow).map { start in
+        // The grids side by side, bottom left.
+        UIColourPicks.Grid.allCases.flatMap { grid in (start..<start + swatchesPerRow).map { TitleItem.swatch(grid, $0) } }
+    } + [
         [.tuning] + EnergyColour.allCases.map { .colour($0) },
     ]
 }
@@ -123,18 +149,30 @@ struct TitleOverlay: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(rgb: EsperPalette.royal.body), Color(rgb: EsperPalette.royal.shadow)],
-                           startPoint: .top, endPoint: .bottom)
+            Color(rgb: UIColourPicks.ground)
                 .ignoresSafeArea()
                 // The energy colours in the bottom right corner, the UI tuning in the bottom left.
                 .overlay(alignment: .bottomTrailing) {
                     // Hard in the corner, clear of the buttons in the middle.
                     colourPicker
-                        .padding(.bottom, 12)
-                        .padding(.trailing, 8)
+                    .padding(.bottom, 12)
+                    .padding(.trailing, 8)
                 }
                 .overlay(alignment: .bottomLeading) {
-                    small("UI", picked: flow.tuningOpen, item: .tuning)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .bottom, spacing: 8) {
+                            ForEach(UIColourPicks.Grid.allCases, id: \.self) { grid in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    pickerLabel(grid.label)
+                                    HStack(spacing: 4) {
+                                        ForEach(UIColourPicks.Tone.allCases, id: \.self) { tone in toneTab(grid, tone) }
+                                    }
+                                    SwatchGrid(flow: flow, grid: grid)
+                                }
+                            }
+                        }
+                        small("UI", picked: flow.tuningOpen, item: .tuning)
+                    }
                         .padding(.bottom, 20)
                         .padding(.leading, 24)
                 }
@@ -176,7 +214,8 @@ struct TitleOverlay: View {
         return Button { flow.activate(item) } label: {
             let rise = tuning.textRise
             let shift = TitleText.dropShift(size: 26 * scale(.text)) * rise
-            Image(uiImage: TitleText.image(text, size: 26 * scale(.text)))
+            // On the gold plate, the lettering's lower half goes light blue.
+            Image(uiImage: TitleText.image(text, size: 26 * scale(.text), lit: flow.titleCursor == item))
                 // Centred on the plate's face, the drop taken off (SwiftUI's y runs down).
                 .offset(x: -shift, y: -(piece.faceRise * scale(.buttons) * rise + shift))
                 .frame(width: width * scale(.buttons), height: 54 * scale(.buttons))
@@ -207,6 +246,29 @@ struct TitleOverlay: View {
         .buttonStyle(.plain)
         .disabled(busy && item != .tuning)
         .scaleEffect(flow.titleCursor == item ? TitleOverlay.cursorGrowth : 1)
+        .noSystemFocus()
+    }
+
+    private func pickerLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .shadow(color: .black, radius: 0, x: 1, y: 1)
+    }
+
+    /// Which of a grid's three tones it picks: gold under the cursor, plum when it's the grid's.
+    private func toneTab(_ grid: UIColourPicks.Grid, _ tone: UIColourPicks.Tone) -> some View {
+        let piece = flow.titleCursor == .toneTab(grid, tone) ? UIPiece.buttonGold : (flow.tone(for: grid) == tone ? UIPiece.buttonPlum : UIPiece.buttonBlack)
+        return Button { flow.activate(.toneTab(grid, tone)) } label: {
+            Text(tone.label)
+                .font(.system(size: 9, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .shadow(color: .black, radius: 0, x: 1, y: 1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(piece.image(corners: 0.5))
+        }
+        .buttonStyle(.plain)
         .noSystemFocus()
     }
 

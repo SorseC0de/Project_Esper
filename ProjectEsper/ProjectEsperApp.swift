@@ -14,6 +14,7 @@ struct ProjectEsperApp: App {
 
 struct GameView: View {
     @StateObject private var flow = FlowState()
+    @ObservedObject private var tuning = UITuning.shared
 
     /// The world with its glow at the bottom; the royal blue over it while a screen is up,
     /// opaque; the HUD's own view over that, so nothing in it glows and the screens sit on
@@ -24,8 +25,11 @@ struct GameView: View {
                 .ignoresSafeArea()
             if flow.veiled {
                 // The screens' ground: the royal blue, dark, the world just showing through.
-                let ramp = flow.blackGround ? EsperPalette.black : EsperPalette.royal
-                LinearGradient(colors: [Color(rgb: flow.blackGround ? ramp.light : ramp.body), Color(rgb: ramp.shadow)],
+                // Flat: the win screen on black's second, the rest on purple's last; the
+                // Greateraid pick and wait on black, shaded.
+                let ground: (top: RGB, bottom: RGB) = flow.blackGround ? (EsperPalette.black.light, EsperPalette.black.shadow)
+                    : (flow.winGround ? (UIColourPicks.winGround, UIColourPicks.winGround) : (UIColourPicks.ground, UIColourPicks.ground))
+                LinearGradient(colors: [Color(rgb: ground.top), Color(rgb: ground.bottom)],
                                startPoint: .top, endPoint: .bottom)
                     .ignoresSafeArea()
                     .transition(.opacity)

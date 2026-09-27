@@ -1741,6 +1741,7 @@ final class GameScene: SKScene {
         if let screen { hud.addChild(screen) }
         drawSeries()
         flowState?.blackGround = screen is PickScreen
+        flowState?.winGround = screen is WinScreen
         flowState?.showsTitle = previewing == nil
         flowState?.veiled = screen != nil
     }
@@ -1793,6 +1794,7 @@ final class GameScene: SKScene {
         if let screen { hud.addChild(screen) }
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
         flowState?.blackGround = screen is PickScreen || screen is WaitScreen
+        flowState?.winGround = screen is WinScreen
         flowState?.veiled = screen != nil
     }
 

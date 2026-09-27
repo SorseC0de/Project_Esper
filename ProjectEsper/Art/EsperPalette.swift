@@ -27,4 +27,14 @@ enum EsperPalette {
     static let tan = Ramp(0xFFE4BB, 0xF5C986, 0xE0B778, 0xC17A40)
     static let plum = Ramp(0x825391, 0x6D417D, 0x572C66, 0x3D1D52)
     static let brown = Ramp(0x79574B, 0x472E2B, 0x32201E, 0x251816)
+
+    /// The ramps in the palette's order, for the title's plum grid.
+    static let ramps: [Ramp] = [blue, lime, pink, purple, red, silver, gold, black, royal, tan, plum, brown]
+    /// Every ramp's shades in a row, lightest first, for the title's swatch grids.
+    static let swatches: [RGB] = ramps.flatMap(\.shades)
+}
+
+extension EsperPalette.Ramp {
+    /// Lightest to darkest.
+    var shades: [RGB] { [highlight, light, body, shadow] }
 }

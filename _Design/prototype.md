@@ -373,7 +373,21 @@ place of the arrow. A piece drawn bigger has its corners and rims scaled with it
 keeps the depth of a small one rather than flattening. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
 HUMAN as small switches, plum when picked and black when not, MULTIPLAYER on plum with
 its two mode switches under it, the energy colours on a black plate in the bottom right,
-and UI, bottom left, the tuning panel. The title has the game's own cursor on every
+and UI, bottom left, the tuning panel, with over it two placeholder pickers of every
+`EsperPalette` swatch (its twelve ramps two to a row, a black plate each; the pick ringed white,
+kept, picking it again takes the pack's own tone back; `UIColourPicks`), NON-SELECTED for the
+black buttons and BLUE for the light blue ones, each with MAIN, TOP and BOTTOM tabs over it (the
+face; the top edge and the oval; the bottom edge), each piece's pixels read as a mix of two of its
+shades, or of one and the black line (the pair and share that fit best), and drawn as the same
+mix of their tones, so the soft corners between the face and a rim stay blends of the new colours
+(`UIPiece.toneMap`; matching a shade alone confused a grey ramp's shades with one another). Swatches
+are 7 points on a phone, 12 on an iPad or a Mac, 16 on the TV. Settled (`UIColourPicks`): the
+plum pieces' face black's second #262634, top edge and oval blue's third #36A9E0, bottom edge
+gold's last #D26614; the screens' ground flat purple's last #4D14A3, the win screen's black's
+second #262634; the inside of the pause and win menus the black card on purple's last, its rims
+moved as they are from its face; the title lettering's lower half silver's second #D1CED7, and
+on a gold plate (the cursor's, on the title, the screens and the stage select) blue's lightest
+#6BD0FF. The title has the game's own cursor on every
 platform, as the screens do (`FlowState.titleCursor`, `TitleItem.rows`): the stick or the
 d-pad moves it row to row, to the nearest item across, or along a row, and A picks; the
 item under it sits on the gold plate a little bigger (1.08), a colour gets a gold ring; a tap

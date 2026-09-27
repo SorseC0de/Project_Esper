@@ -174,9 +174,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   snatch puts it, on the hand at full stretch: 16 art pixels, the spark's full size,
   round a point 18 ahead of and 19 above the feet, whichever way the body moves. Bodies
   never deflect the ball: a ball arriving from behind while standing still goes straight
-  through, and so does one faster than 5 a frame (a throw is 7) or a shot in flight
+  through, and to the other so does one faster than 5 a frame (a throw is 7) or a shot in flight
   before its first bounce, unless the body is reaching with a snatch or swinging the
-  blade. The snatch is the catch: there is no catch stance.
+  blade. Whoever last had the ball can take back their own shot or throw at any speed,
+  once the release's catch cooldown is up. The snatch is the catch: there is no catch stance.
 - Knocked loose by the blade or the slide's leg, or robbed by a snatch, a body can't
   press anything or catch anything for 60 frames, longer than the pop's round trip,
   though the stick still moves it, and its sprite flickers white: the taker has first
@@ -329,7 +330,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 - Titan Tea (L). Twice the size: the body box, its reaches (the blade, the snatch, the
   slide's leg, the catch rings), the ledge hang and the heights the hands hold and let go
   of the ball at, all doubled, and drawn at double size. Heavier: half of any knock, and a
-  fifth more gravity, fall speed and fast fall. It's stripped, the ball popping free, but
+  fifth more gravity falling (not rising, so it jumps as high as ever), fall speed and fast fall. It's stripped, the ball popping free, but
   never stunned. One jump, no double jump unless Jumper Juice gives it back, and no
   crouch. Every landing of its own is Quake-Up's level-one quake on the same floor, whatever
   the level; a landing from a knock isn't, or two Titans would knock each other up forever. Its running steps shake the screen a little (3). At level one the walk and run
@@ -516,7 +517,8 @@ holds the variants; A is always the baseline as tuned.
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
-  Punch, K Surf Soda, at the level LEVEL picks; A by default. The left bumper always steps POWER; the local side's power
+  Punch, K Surf Soda, L Titan Tea, at the level LEVEL picks, on this phone's player only, the
+  other side keeping its drinks, with the body the power brings; A by default. The left bumper always steps POWER; the local side's power
   and level are lettered under the pickers.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
   60 in and drawn for a rim at 120, the gold 8 wide; the crossbar sits 20 below that,

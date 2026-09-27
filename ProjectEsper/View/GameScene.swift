@@ -1352,11 +1352,12 @@ final class GameScene: SKScene {
         return fresh
     }
 
-    /// A side's drinks, with the POWER picker's biomorph and level in place of theirs, so
-    /// a biomorph that changes the body, Titan Tea, changes it from the picker too.
+    /// A side's drinks, with the POWER picker's biomorph and level in place of this phone's
+    /// player's, so a biomorph that changes the body, Titan Tea, changes it from the picker
+    /// too. The other side keeps its own.
     private func drinksInPlay(_ index: Int, pickerOn: Bool) -> Drinks {
         var drinks = series.drinks[index]
-        if pickerOn, let bottle = Greateraid.biomorphs.first(where: { $0.power == powerVariant.power }) {
+        if pickerOn, index == 0, let bottle = Greateraid.biomorphs.first(where: { $0.power == powerVariant.power }) {
             drinks.biomorph = bottle
             drinks.biomorphLevel = powerLevelVariant.level
         }
@@ -1846,8 +1847,8 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The picker's power onto both players, live, with the body it brings (Titan Tea's
-    /// size). Offline only.
+    /// The picker's power onto this phone's player, live, with the body it brings (Titan
+    /// Tea's size). Offline only.
     private func applyPower() {
         guard online == nil else { return }
         applyDrinks()

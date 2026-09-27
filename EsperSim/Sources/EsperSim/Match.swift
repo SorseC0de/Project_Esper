@@ -835,7 +835,7 @@ public struct Match: Equatable {
         let speed = ball.velocity.length
         let candidates = players.indices
             .filter { !ball.burning || ball.lastTouched == $0 }
-            .filter { players[$0].canCatch(ballAt: ball.position, speed: ball.returning && ball.lastTouched == $0 ? 0 : speed, shotInFlight: ball.shotInFlight) }
+            .filter { players[$0].canCatch(ballAt: ball.position, speed: ball.lastTouched == $0 ? 0 : speed, shotInFlight: ball.shotInFlight && ball.lastTouched != $0) }
             .sorted { players[$0].chest.distance(to: ball.position) < players[$1].chest.distance(to: ball.position) }
         guard let catcher = candidates.first else { return }
         hand(ballTo: catcher)

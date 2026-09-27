@@ -544,8 +544,14 @@ Soda's darker bubbles and its board's tail #403353; outlines drawn in code in th
 (the field's panels and goalposts, the opponent chevron, the round circles) #242234. The
 sheets in `_Graphic Assets/Pixel Art` are recoloured to AAP-64's nearest by eye (CIE Lab),
 alpha kept, by `Tools/recolour_to_palette.py`, which leaves two kinds alone: all-grey
-sheets, the masks the energy colour tints, and the player sheets, whose flat colours are
-the body-part keys (some would merge on the palette); the players' outline is `Look`'s,
+sheets, the masks the energy colour tints, and the player sheets, which
+`Tools/recolour_players.py` puts on twelve AAP-64 colours, one a part, the same in every sheet:
+head #20D6C7, ball #FFFFFF, torso #FA6A0A and pelvis #BB7547, front thigh #FFD541 and leg
+#FFFC40, back thigh #73172D and leg #B4202A (the thigh the darker, as the arms and front leg
+go dark to light), front arm #59C135 and hand #9CDB43, back arm #793A80 and hand #BC4A9B;
+the slash's pinks are left alone. Those are the part keys the game reads (`BodyPart`). The
+GMS2 sheets are written as strips in Pixel Art, taking over the GMS2 sprites, and each sheet
+as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s,
 the palette's #242234. The fire sheets are recoloured by hand after `fire_dash`: each of its
 original colours maps to one of #F9A31B, #FA6A0A, #DF3E23, #B4202A and #73172D, and the other
 fire sheets from the same ramp take that map (the rest to their nearest mapped colour);

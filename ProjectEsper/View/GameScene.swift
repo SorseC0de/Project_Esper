@@ -122,6 +122,9 @@ final class GameScene: SKScene {
     private let circlesOverCam = SKNode()
     private var drinkLabels: [SKLabelNode] = []
     private var menuLast = PlayerInput.idle
+    /// After a menu press, nothing more is picked until A has been let go: a press is one
+    /// pick, on this screen or whatever it opens.
+    private var menuNeedsRelease = false
     /// This phone's input as last read, for the corner readout.
     private var lastLocalInput = PlayerInput.idle
     /// The SwiftUI layer, which shows the title over the Metal view and the material
@@ -1176,17 +1179,28 @@ final class GameScene: SKScene {
         if flow == .stageSelect { tickStageSelect(inputs) }
         if flow != .playing {
             // A screen is up: the stick moves its cursor and jump picks; the sim waits. On
-            // the title, which the SwiftUI layer draws, jump starts the series.
+            // the title, which the SwiftUI layer draws, the stick moves the title's cursor.
             let pad = inputs.first ?? .idle
+            if menuNeedsRelease, !pad.jump { menuNeedsRelease = false }
+            let picked = pad.jump && !menuLast.jump && !menuNeedsRelease
+            let right = pad.stick.x >= 0.5 && menuLast.stick.x < 0.5, left = pad.stick.x <= -0.5 && menuLast.stick.x > -0.5
+            let down = pad.stick.y <= -0.5 && menuLast.stick.y > -0.5, up = pad.stick.y >= 0.5 && menuLast.stick.y < 0.5
             if let screen {
-                if pad.stick.x >= 0.5, menuLast.stick.x < 0.5 { screen.move(1) }
-                if pad.stick.x <= -0.5, menuLast.stick.x > -0.5 { screen.move(-1) }
-                if pad.stick.y <= -0.5, menuLast.stick.y > -0.5 { screen.move(1) }
-                if pad.stick.y >= 0.5, menuLast.stick.y < 0.5 { screen.move(-1) }
-                if pad.jump, !menuLast.jump { screen.fire() }
-            } else if flow == .title, pad.jump, !menuLast.jump, online == nil, flowState?.tuningOpen != true {
-                SoundBoard.shared.play(SoundBoard.confirm)
-                startSeries()
+                if right || down { screen.move(1) }
+                if left || up { screen.move(-1) }
+                if picked {
+                    menuNeedsRelease = true
+                    screen.fire()
+                }
+            } else if flow == .title, online == nil, let flowState, !flowState.tuningOpen {
+                if right { flowState.moveTitleCursor(across: 1, down: 0) }
+                if left { flowState.moveTitleCursor(across: -1, down: 0) }
+                if down { flowState.moveTitleCursor(across: 0, down: 1) }
+                if up { flowState.moveTitleCursor(across: 0, down: -1) }
+                if picked {
+                    menuNeedsRelease = true
+                    flowState.activate(flowState.titleCursor)
+                }
             }
             menuLast = pad
             accumulator = 0

@@ -373,7 +373,13 @@ place of the arrow. A piece drawn bigger has its corners and rims scaled with it
 keeps the depth of a small one rather than flattening. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
 HUMAN as small switches, plum when picked and black when not, MULTIPLAYER on plum with
 its two mode switches under it, the energy colours on a black plate in the bottom right,
-and UI, bottom left, the tuning panel. Each screen's buttons, their text, its titles' lettering and its panels (the header
+and UI, bottom left, the tuning panel. The title has the game's own cursor on every
+platform, as the screens do (`FlowState.titleCursor`, `TitleItem.rows`): the stick or the
+d-pad moves it row to row, to the nearest item across, or along a row, and A picks; the
+item under it sits on the gold plate a little bigger (1.08), a colour gets a gold ring; a tap
+picks and moves it there. The TV's focus engine is off on the title (`noSystemFocus`), so its
+own cursor never shows. A menu press is one pick: after one nothing more is picked until A is
+let go, on that screen or whatever it opens. Each screen's buttons, their text, its titles' lettering and its panels (the header
 ribbon and the card under it) scale per platform (`UITuning`: phone, iPad or Mac, TV), set on that panel a step of 0.05 at
 a time, − and + (which the TV's remote can reach), Pause and Win shown behind it as
 they'd be; the values are kept on the device until they're read off and made the

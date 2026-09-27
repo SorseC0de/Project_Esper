@@ -1883,6 +1883,12 @@ final class GameScene: SKScene {
         for arc in threePointArcSides { arc.node.strokeColor = SKColor(rgb: sprites.look(for: arc.side).glow) }
         for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
         for (net, hoop) in zip(nets, match.stage.hoops) { net.recolour(SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)) }
+        // The helmets drawn in the new colours now, not on the first one's spawn mid-match.
+        for index in colours.indices {
+            for variant in 0..<FieldRules.helmetVariants {
+                _ = helmetTexture(variant: variant, colour: SKColor(rgb: sprites.look(for: index).glow))
+            }
+        }
         drawSeries()
     }
 

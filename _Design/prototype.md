@@ -735,6 +735,13 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   stage's CPU and GPU milliseconds a frame, the whole frame's GPU span (the stages are
   separate command buffers and can overlap, so they don't sum), and the render and glow
   sizes.
+- Nothing is made mid-match that could have been made before it. At launch every player
+  frame and toned effect is built and sent to the GPU; a colour change drops that player's
+  and rebuilds all of them (frames, heads, energy, the ball-as-energy sheets, the toned
+  effects and particle sheets, the wall-spark silhouettes) on a background queue, then
+  keeps them and preloads them, and draws the helmets in the new colours. Before this a
+  colour other than the launch defaults rebuilt each texture on its first use, a hitch of
+  up to 85 ms the first time each move or spark was seen.
 - Shadows (`StageFeatures.shadows`, the view's alone): each body's current frame and its
   head, and the goalposts, cast in a dark greyed purple at two thirds, mirrored under the
   feet or the floor line and sheared by the turf's own lean where they stand, so they

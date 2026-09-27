@@ -21,11 +21,67 @@ final class SpriteLibrary {
         looks[min(player, looks.count - 1)]
     }
 
-    /// Changes what a player is drawn in; their frames are recoloured again as they're used.
+    /// Changes what a player is drawn in; everything in their old look is dropped and rebuilt
+    /// in the new one off the main thread.
     func setLook(_ look: Look, for player: Int) {
         guard look != looks[player] else { return }
         looks[player] = look
         cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
+        rewarm(player: player)
+    }
+
+    /// The toned sheets beyond the energy effects that a player's particles use.
+    static let tonedParticleSheets = ["lightning_particle", "lightning_particle2"]
+    private var rewarmGeneration: [Int: Int] = [:]
+    private let rewarmQueue = DispatchQueue(label: "SpriteLibrary.rewarm", qos: .userInitiated)
+
+    /// Everything drawn in a player's look rebuilt off the main thread after their look
+    /// changes, then kept and sent to the GPU, so no frame, head, energy or toned effect is
+    /// first made mid-match. Anything asked for before it lands is made as it always was;
+    /// a newer change supersedes it.
+    private func rewarm(player: Int) {
+        let look = look(for: player)
+        let generation = (rewarmGeneration[player] ?? 0) + 1
+        rewarmGeneration[player] = generation
+        var frameJobs: [(key: String, frame: AnimationFrame, source: SKTexture, ballAsEnergy: Bool)] = []
+        for animation in Animation.allCases {
+            for index in 0..<animation.frameCount {
+                let frame = AnimationFrame(animation, index)
+                let source = atlas.textureNamed("\(animation.rawValue)_\(index)")
+                let key = "p\(player)_\(animation.rawValue)_\(index)"
+                frameJobs.append((key, frame, source, false))
+                if animation.holdsBall { frameJobs.append((key + "_whole", frame, source, true)) }
+            }
+        }
+        var tonedJobs: [(key: String, source: SKTexture)] = []
+        let tonedNames = EnergyEffect.allCases.map(\.name) + Effect.inEnergyColour.map(\.name) + SpriteLibrary.tonedParticleSheets
+        for name in tonedNames {
+            for index in 0..<(EffectSheets.frames[name] ?? 0) {
+                tonedJobs.append(("p\(player)_fx_\(name)_\(index)", texture(name, index)))
+            }
+        }
+        var silhouetteJobs: [(key: String, source: SKTexture)] = []
+        for index in 0..<Effect.fireWallSpark.frameCount {
+            silhouetteJobs.append(("p\(player)_sil_\(Effect.fireWallSpark.name)_\(index)", texture(Effect.fireWallSpark.name, index)))
+        }
+        rewarmQueue.async { [weak self] in
+            guard let self else { return }
+            var built: [String: SKTexture] = [:]
+            var builtLandmarks: [String: [BodyPart: CGPoint]] = [:]
+            for job in frameJobs {
+                let made = makeFrame(job.frame, source: job.source, look: look, ballAsEnergy: job.ballAsEnergy)
+                for (suffix, texture) in made.textures { built[job.key + suffix] = texture }
+                builtLandmarks[job.key] = made.landmarks
+            }
+            for job in tonedJobs { built[job.key] = makeToned(job.source, look: look) }
+            for job in silhouetteJobs { built[job.key] = makeSilhouette(job.source, look: look) }
+            DispatchQueue.main.async {
+                guard self.rewarmGeneration[player] == generation, self.look(for: player) == look else { return }
+                for (key, texture) in built where self.cache[key] == nil { self.cache[key] = texture }
+                for (key, marks) in builtLandmarks where self.landmarks[key] == nil { self.landmarks[key] = marks }
+                SKTexture.preload(Array(built.values)) {}
+            }
+        }
     }
 
     /// A non-player frame, from the atlas or, like the ball, from the catalog's root.
@@ -44,25 +100,27 @@ final class SpriteLibrary {
     func texture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture {
         let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "")
         if let texture = cache[key] { return texture }
-        let look = look(for: player)
-        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look,
-                              holdsBall: frame.animation.holdsBall && !ballAsEnergy, detach: true)
-        let texture = result.texture
-        texture.filteringMode = .nearest
-        cache[key] = texture
-        if let head = result.head {
-            head.filteringMode = .nearest
-            cache[key + "_head"] = head
-        }
-        if let energy = result.energy {
-            energy.filteringMode = .nearest
-            cache[key + "_energy"] = energy
-        }
+        let made = makeFrame(frame, source: atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"),
+                             look: look(for: player), ballAsEnergy: ballAsEnergy)
+        for (suffix, texture) in made.textures { cache[key + suffix] = texture }
+        landmarks[key] = made.landmarks
+        return cache[key]!
+    }
+
+    /// A player frame recoloured in a look: the body under "", and "_head" and "_energy"
+    /// where the frame has them; and where its glowing parts sit. Touches nothing kept, so
+    /// it can be made off the main thread.
+    private func makeFrame(_ frame: AnimationFrame, source: SKTexture, look: Look, ballAsEnergy: Bool) -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint]) {
+        let result = recolour(source, look: look, holdsBall: frame.animation.holdsBall && !ballAsEnergy, detach: true)
+        var textures = ["": result.texture]
+        if let head = result.head { textures["_head"] = head }
+        if let energy = result.energy { textures["_energy"] = energy }
+        for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize
-        landmarks[key] = result.centres.mapValues { centre in
+        let landmarks = result.centres.mapValues { centre in
             CGPoint(x: centre.x - size / 2, y: size - centre.y - frame.animation.feetFromBottom)
         }
-        return texture
+        return (textures, landmarks)
     }
 
     /// The head alone from a player frame, on the same canvas as the body, if the frame has one.
@@ -83,12 +141,18 @@ final class SpriteLibrary {
     func silhouetteTexture(_ name: String, _ frame: Int, player: Int) -> SKTexture {
         let key = "p\(player)_sil_\(name)_\(frame)"
         if let texture = cache[key] { return texture }
-        let source = texture(name, frame)
+        let result = makeSilhouette(texture(name, frame), look: look(for: player))
+        cache[key] = result
+        return result
+    }
+
+    /// A frame as a silhouette in a look's white energy; touches nothing kept.
+    private func makeSilhouette(_ source: SKTexture, look: Look) -> SKTexture {
         let image = source.cgImage()
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let tone = look(for: player).energyTone(luminance: 1)
+        let tone = look.energyTone(luminance: 1)
         for pixel in 0..<(width * height) {
             let index = pixel * 4
             let alpha = Int(pixels[index + 3])
@@ -100,7 +164,6 @@ final class SpriteLibrary {
         guard let toned = context.makeImage() else { return source }
         let result = SKTexture(cgImage: toned)
         result.filteringMode = .nearest
-        cache[key] = result
         return result
     }
 
@@ -109,8 +172,13 @@ final class SpriteLibrary {
     func effectTexture(_ name: String, _ frame: Int, player: Int) -> SKTexture {
         let key = "p\(player)_fx_\(name)_\(frame)"
         if let texture = cache[key] { return texture }
-        let look = look(for: player)
-        let source = texture(name, frame)
+        let result = makeToned(texture(name, frame), look: look(for: player))
+        cache[key] = result
+        return result
+    }
+
+    /// A grey frame through a look's energy ramp; touches nothing kept.
+    private func makeToned(_ source: SKTexture, look: Look) -> SKTexture {
         let image = source.cgImage()
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
@@ -129,7 +197,6 @@ final class SpriteLibrary {
         guard let toned = context.makeImage() else { return source }
         let result = SKTexture(cgImage: toned)
         result.filteringMode = .nearest
-        cache[key] = result
         return result
     }
 

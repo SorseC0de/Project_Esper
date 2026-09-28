@@ -43,6 +43,9 @@ PARTS = {
     "backHand":   (0xBC4A9B, [0xAF1AB2, 0xAC18B4, 0xAD54B0]),
     "backThigh":  (0x73172D, [0xCE5050, 0xD95763]),
     "backLeg":    (0xB4202A, [0xAC3232]),
+    # The feet, marked afterwards: palette 21 in front, 26 behind.
+    "frontFoot":  (0xA6FCDB, []),
+    "backFoot":   (0xE86A73, []),
 }
 KEPT = [0xFFFFFF, 0xF065C4, 0xF9ABFF, 0xFBC2FF, 0xEEA6F5, 0xF098F5, 0xFDD9FF, 0xEDCEF0]
 

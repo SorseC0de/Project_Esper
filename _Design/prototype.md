@@ -581,7 +581,10 @@ sheets, the masks the energy colour tints, and the player sheets, which
 `Tools/recolour_players.py` puts on twelve AAP-64 colours, one a part, the same in every sheet:
 head #20D6C7, ball #FFFFFF, torso #FA6A0A and pelvis #BB7547, front thigh #FFD541 and leg
 #FFFC40, back thigh #73172D and leg #B4202A (the thigh the darker, as the arms and front leg
-go dark to light), front arm #59C135 and hand #9CDB43, back arm #793A80 and hand #BC4A9B;
+go dark to light), front arm #59C135 and hand #9CDB43, back arm #793A80 and hand #BC4A9B; and the feet, the lower leg's last
+third (from the user's walk: the foot starts 70% down from the knee), front #A6FCDB (palette
+21) and back #E86A73 (26), drawn for now as their legs are (`BodyPart.frontFoot`, `backFoot`;
+the sheets as they were before the feet are in `Player Backup/Pre-Feet`);
 the slash's pinks are left alone. Those are the part keys the game reads (`BodyPart`). The
 GMS2 sheets are written as strips in Pixel Art, taking over the GMS2 sprites, and each sheet
 as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s, the palette's

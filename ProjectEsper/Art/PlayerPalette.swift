@@ -10,9 +10,9 @@ typealias RGB = UInt32
 /// flat. Two of the parts are drawn in two close shades across the sheets, so a part can
 /// own more than one source colour.
 enum BodyPart: CaseIterable {
-    case backHand, backArm, backLeg, backThigh
+    case backHand, backArm, backLeg, backThigh, backFoot
     case pelvis, torso, head
-    case frontThigh, frontLeg, frontArm, frontHand
+    case frontThigh, frontLeg, frontArm, frontHand, frontFoot
     case ball
     case slash
     case energy
@@ -31,6 +31,8 @@ enum BodyPart: CaseIterable {
         case .frontLeg: [0xFFFC40]                        // 9
         case .frontArm: [0x59C135]                        // 12
         case .frontHand: [0x9CDB43]                       // 11
+        case .frontFoot: [0xA6FCDB]                       // 21
+        case .backFoot: [0xE86A73]                        // 26
         case .ball: [0xFFFFFF]                            // white
         case .slash: [0xF065C4, 0xF9ABFF, 0xFBC2FF, 0xEEA6F5, 0xF098F5, 0xFDD9FF, 0xEDCEF0] // pinks, edge to core
         case .energy: []
@@ -39,7 +41,7 @@ enum BodyPart: CaseIterable {
 
     var isBack: Bool {
         switch self {
-        case .backHand, .backArm, .backLeg, .backThigh: true
+        case .backHand, .backArm, .backLeg, .backThigh, .backFoot: true
         default: false
         }
     }
@@ -91,6 +93,9 @@ struct Look: Hashable {
         if HumanLook.enabled {
             for (part, skin) in HumanLook.skin { colours[part] = skin }
         }
+        // The feet, marked on the sheets, are drawn as their legs are for now.
+        colours[.frontFoot] = colours[.frontLeg]
+        colours[.backFoot] = colours[.backLeg]
         return Look(colours: colours, glow: glow, strokedParts: [.frontArm, .frontHand])
     }
 

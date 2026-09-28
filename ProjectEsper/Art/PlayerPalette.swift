@@ -44,8 +44,9 @@ enum BodyPart: CaseIterable {
         }
     }
 
-    /// The parts that burn: drawn in the team colour, outlined in it, and haloed.
-    var glows: Bool { self == .head || self == .ball }
+    /// The parts that burn: drawn in the team colour, outlined in it, and haloed. A human's
+    /// head doesn't.
+    var glows: Bool { (self == .head && !HumanLook.enabled) || self == .ball }
 
     /// The parts that are light rather than body: drawn on their own above the body so
     /// they bloom, with no line, in the team colour's tones by their brightness.
@@ -86,6 +87,9 @@ struct Look: Hashable {
         let back = greyedDarker(body)
         for part in BodyPart.allCases {
             colours[part] = part.glows || part.isEnergy ? glow : (part.isBack ? back : body)
+        }
+        if HumanLook.enabled {
+            for (part, skin) in HumanLook.skin { colours[part] = skin }
         }
         return Look(colours: colours, glow: glow, strokedParts: [.frontArm, .frontHand])
     }
@@ -216,4 +220,17 @@ enum CourtLook {
     static let shiftFrames = 20
     /// On a score the floor and walls go white with the bolt's flash and fade back over this many frames.
     static let strikeFadeFrames = 20
+}
+
+/// An experiment: the players drawn as people. Skin on the head, the arms and the hands and
+/// the lower legs, front in palette 35 and back in 34, the thighs, torso and pelvis still
+/// in the energy's colours; the head drawn as part of the body, not apart, and not
+/// glowing. `enabled` off puts everything back as it was.
+enum HumanLook {
+    static let enabled = true
+    static let skin: [BodyPart: RGB] = {
+        let front = PixelPalette.colours[35], back = PixelPalette.colours[34]
+        return [.head: front, .frontArm: front, .frontHand: front, .frontLeg: front,
+                .backArm: back, .backHand: back, .backLeg: back]
+    }()
 }

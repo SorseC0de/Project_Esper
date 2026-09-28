@@ -3953,6 +3953,12 @@ final class GameScene: SKScene {
                 headNode.isHidden = true
                 headEspers[index].particleBirthRate = 0
                 headEsperMixes[index].particleBirthRate = 0
+                // A human's head is on the body: its particles still rise off it.
+                if HumanLook.enabled, let landmark = sprites.landmark(.head, in: frame, player: index) {
+                    let head = landmark * drawScale
+                    let at = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
+                    emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + 4))
+                }
             }
 
             placeSurf(index, player: player, body: node, head: headNode)

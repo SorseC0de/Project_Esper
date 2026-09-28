@@ -585,7 +585,11 @@ go dark to light), front arm #59C135 and hand #9CDB43, back arm #793A80 and hand
 the slash's pinks are left alone. Those are the part keys the game reads (`BodyPart`). The
 GMS2 sheets are written as strips in Pixel Art, taking over the GMS2 sprites, and each sheet
 as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s, the palette's
-#242234, drawn as it is and never glowing, lifted off each frame onto its own white texture and
+#242234. An experiment, on (`HumanLook.enabled`; off puts it all back): the players drawn as
+people, skin on the head, the arms and hands and the lower legs, the front in palette 35
+#DBA463 and the back in 34 #BB7547, the thighs, torso and pelvis still the energy's; the head
+drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not
+glowing, its particles still rising off it. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
 drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
 In the zone (`ZoneTuning.inTheZone`, a placeholder, off
 until something puts a player in it, for now nothing) the outline eases through 7 #F9A31B, 11 #9CDB43, 19 #249FDE, 20 #20D6C7, 27 #BC4A9B a quarter second each, and so do the

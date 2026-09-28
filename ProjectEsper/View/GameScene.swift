@@ -753,7 +753,11 @@ final class GameScene: SKScene {
         }
         drawSeries()
         flowState?.startSeries = { [weak self] mode in self?.startSeries(mode: mode) }
-        flowState?.net.onConnected = { [weak self] in self?.startOnline() }
+        flowState?.net.onConnected = { [weak self] in
+            // Connected: the multiplayer screen gives way to the match.
+            self?.flowState?.multiplayerOpen = false
+            self?.startOnline()
+        }
         flowState?.net.onData = { [weak self] data in self?.handle(data) }
         flowState?.net.onDisconnect = { [weak self] why in self?.endOnline(why) }
 
@@ -1226,6 +1230,17 @@ final class GameScene: SKScene {
                 } else if backed, screen.back != nil {
                     menuNeedsRelease = true
                     screen.goBack()
+                }
+            } else if flow == .title, online == nil, let flowState, flowState.multiplayerOpen {
+                // The multiplayer screen over the title: its own column of choices, B back.
+                if down || right { flowState.moveMultiplayerCursor(1) }
+                if up || left { flowState.moveMultiplayerCursor(-1) }
+                if picked, let item = flowState.multiplayerSelection {
+                    menuNeedsRelease = true
+                    flowState.activate(item)
+                } else if backed {
+                    menuNeedsRelease = true
+                    flowState.multiplayerBack()
                 }
             } else if flow == .title, online == nil, let flowState, !flowState.tuningOpen {
                 if right { flowState.moveTitleCursor(across: 1, down: 0) }

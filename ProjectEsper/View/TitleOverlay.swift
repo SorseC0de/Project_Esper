@@ -28,6 +28,96 @@ final class FlowState: ObservableObject {
     init() {
         scene.flowState = self
         SoundBoard.shared.prepare()
+        // An invite accepted from outside the game opens the multiplayer screen on the joining.
+        net.onInviteAccepted = { [weak self] in self?.multiplayerOpen = true }
+    }
+
+    // MARK: The multiplayer screen
+
+    /// The game's own multiplayer screen, over the title: play now, invite a friend, and
+    /// the wait for either, on the same cursor as the title.
+    @Published var multiplayerOpen = false
+    enum MultiplayerPage { case menu, friends }
+    @Published var multiplayerPage = MultiplayerPage.menu
+    @Published var multiplayerCursor = 0
+
+    enum MultiplayerItem: Hashable {
+        case playNow, inviteFriend, friend(String), cancel, back
+    }
+
+    /// What the screen offers, top to bottom: the wait's cancel while matching, else the
+    /// page's choices.
+    var multiplayerItems: [MultiplayerItem] {
+        switch net.state {
+        case .finding, .connecting: return [.cancel]
+        default: break
+        }
+        switch multiplayerPage {
+        case .menu: return [.playNow, .inviteFriend, .back]
+        case .friends: return net.friends.map { .friend($0.gamePlayerID) } + [.back]
+        }
+    }
+
+    var multiplayerSelection: MultiplayerItem? {
+        let items = multiplayerItems
+        return items.indices.contains(multiplayerCursor) ? items[multiplayerCursor] : items.last
+    }
+
+    func openMultiplayer() {
+        multiplayerOpen = true
+        multiplayerPage = .menu
+        multiplayerCursor = 0
+        net.signIn()
+    }
+
+    func moveMultiplayerCursor(_ step: Int) {
+        let count = multiplayerItems.count
+        guard count > 0 else { return }
+        let next = min(max(multiplayerCursor + step, 0), count - 1)
+        guard next != multiplayerCursor else { return }
+        multiplayerCursor = next
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
+    func activate(_ item: MultiplayerItem) {
+        if let index = multiplayerItems.firstIndex(of: item) { multiplayerCursor = index }
+        switch item {
+        case .playNow:
+            SoundBoard.shared.play(SoundBoard.confirm)
+            net.playNow()
+            multiplayerCursor = 0
+        case .inviteFriend:
+            SoundBoard.shared.play(SoundBoard.confirm)
+            multiplayerPage = .friends
+            multiplayerCursor = 0
+            net.loadFriends()
+        case .friend(let id):
+            guard let friend = net.friends.first(where: { $0.gamePlayerID == id }) else { return }
+            SoundBoard.shared.play(SoundBoard.confirm)
+            net.invite(friend)
+            multiplayerCursor = 0
+        case .cancel, .back:
+            multiplayerBack()
+        }
+    }
+
+    /// Back: a search or invite cancelled, the friends list back to the menu, the menu shut.
+    func multiplayerBack() {
+        SoundBoard.shared.play(.menuBack)
+        switch net.state {
+        case .finding:
+            net.cancelFinding()
+            multiplayerCursor = 0
+            return
+        default:
+            break
+        }
+        if multiplayerPage == .friends {
+            multiplayerPage = .menu
+            multiplayerCursor = 1
+        } else {
+            multiplayerOpen = false
+        }
     }
 
     /// The cursor a row up or down, to the item nearest across, or along its row.
@@ -72,7 +162,7 @@ final class FlowState: ObservableObject {
         case .multiplayer:
             guard !busy else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
-            net.findMatch()
+            openMultiplayer()
         case .onlineRounds, .onlineFortySeven:
             guard !busy else { return }
             defaults.set(Int((item == .onlineRounds ? GameMode.rounds : .fortySeven).rawValue), forKey: GameScene.onlineModeKey)

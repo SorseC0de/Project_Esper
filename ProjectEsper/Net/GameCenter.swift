@@ -1,8 +1,9 @@
 import GameKit
 import UIKit
 
-/// Game Center: signing in, finding the other phone through Apple's matchmaker, and the
-/// match between them. Bytes go in and out here; the scene makes sense of them.
+/// Game Center: signing in, finding the other phone through GameKit's matchmaker behind the
+/// game's own multiplayer screen (play now, or invite a friend and hear back), and the match
+/// between them. Bytes go in and out here; the scene makes sense of them.
 @MainActor
 final class GameCenter: NSObject, ObservableObject {
     enum State: Equatable {
@@ -39,6 +40,17 @@ final class GameCenter: NSObject, ObservableObject {
     var onConnected: (() -> Void)?
     /// The link broke or they left, with why.
     var onDisconnect: ((String) -> Void)?
+    /// An invite was accepted from outside the game: the multiplayer screen shows the joining.
+    var onInviteAccepted: (() -> Void)?
+
+    /// A friend's answer to an invite.
+    enum InviteAnswer: Equatable { case waiting, accepted, declined }
+    /// Game Center friends to invite, once loaded, and why the list is empty if it is.
+    @Published private(set) var friends: [GKPlayer] = []
+    @Published private(set) var friendsNote: String?
+    /// Who was invited, and how each has answered, by player ID.
+    @Published private(set) var invited: [GKPlayer] = []
+    @Published private(set) var answers: [String: InviteAnswer] = [:]
 
     /// Whether this phone sorts first of the two by Game Center's player ID, so plays
     /// the left side; both phones sort the same way.
@@ -69,27 +81,103 @@ final class GameCenter: NSObject, ObservableObject {
         }
     }
 
-    /// Apple's matchmaker sheet: invite a friend or automatch, for two. It needs the
-    /// app's record in App Store Connect with Game Center on, or it fails at once.
-    func findMatch() {
+    /// Whether matching can start: signed in, multiplayer allowed, nothing under way. Signs in
+    /// or says why not otherwise.
+    private func readyToMatch() -> Bool {
         guard GKLocalPlayer.local.isAuthenticated else {
             signIn()
-            return
+            return false
         }
-        guard match == nil, state != .finding else { return }
         if GKLocalPlayer.local.isMultiplayerGamingRestricted {
             state = .failed("Multiplayer is off in Screen Time")
-            return
+            return false
         }
+        return match == nil && state != .finding
+    }
+
+    /// Two players; the app's record in App Store Connect needs Game Center on, or matching
+    /// fails at once.
+    private func matchRequest() -> GKMatchRequest {
         let request = GKMatchRequest()
         request.minPlayers = 2
         request.maxPlayers = 2
         request.defaultNumberOfPlayers = 2
         request.inviteMessage = "Project Esper: best of seven?"
-        guard let controller = GKMatchmakerViewController(matchRequest: request) else { return }
-        controller.matchmakerDelegate = self
+        return request
+    }
+
+    /// Play now: matched with anyone else looking.
+    func playNow() {
+        guard readyToMatch() else { return }
+        invited = []
+        answers = [:]
         state = .finding
-        present(controller)
+        GKMatchmaker.shared().findMatch(for: matchRequest()) { [weak self] found, error in
+            DispatchQueue.main.async { self?.finished(found, error) }
+        }
+    }
+
+    /// The friends list, asked for once; empty with a note if it's off or there are none.
+    func loadFriends() {
+        friendsNote = "LOADING FRIENDS"
+        GKLocalPlayer.local.loadFriendsAuthorizationStatus { [weak self] status, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard status == .authorized || status == .notDetermined else {
+                    self.friends = []
+                    self.friendsNote = "FRIENDS LIST IS OFF IN SETTINGS"
+                    return
+                }
+                GKLocalPlayer.local.loadFriends { players, error in
+                    DispatchQueue.main.async {
+                        self.friends = (players ?? []).sorted { $0.displayName < $1.displayName }
+                        self.friendsNote = error.map { self.short($0).uppercased() } ?? (self.friends.isEmpty ? "NO GAME CENTER FRIENDS YET" : nil)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Invites `friend` and waits for them; their answer comes back as it's given.
+    func invite(_ friend: GKPlayer) {
+        guard readyToMatch() else { return }
+        let request = matchRequest()
+        request.recipients = [friend]
+        request.recipientResponseHandler = { [weak self] player, response in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.answers[player.gamePlayerID] = response == .accepted ? .accepted : .declined
+                if response != .accepted, self.state == .finding {
+                    // Declined, or couldn't be reached: the wait is over.
+                    GKMatchmaker.shared().cancel()
+                    self.state = .failed("\(player.displayName) can't play")
+                }
+            }
+        }
+        invited = [friend]
+        answers = [friend.gamePlayerID: .waiting]
+        state = .finding
+        GKMatchmaker.shared().findMatch(for: request) { [weak self] found, error in
+            DispatchQueue.main.async { self?.finished(found, error) }
+        }
+    }
+
+    /// Stops a search or an invite under way.
+    func cancelFinding() {
+        guard state == .finding else { return }
+        GKMatchmaker.shared().cancel()
+        state = .ready
+    }
+
+    /// The matchmaker's answer: the match, or why not; a cancel is no failure.
+    private func finished(_ found: GKMatch?, _ error: Error?) {
+        if let found {
+            take(found)
+        } else if let error, (error as? GKError)?.code != .cancelled {
+            state = .failed(short(error))
+        } else if state == .finding {
+            state = .ready
+        }
     }
 
     func send(_ data: Data, reliable: Bool) {
@@ -156,29 +244,6 @@ final class GameCenter: NSObject, ObservableObject {
     }
 }
 
-extension GameCenter: GKMatchmakerViewControllerDelegate {
-    nonisolated func matchmakerViewControllerWasCancelled(_ viewController: GKMatchmakerViewController) {
-        DispatchQueue.main.async {
-            viewController.dismiss(animated: true)
-            self.state = .ready
-        }
-    }
-
-    nonisolated func matchmakerViewController(_ viewController: GKMatchmakerViewController, didFailWithError error: Error) {
-        DispatchQueue.main.async {
-            viewController.dismiss(animated: true)
-            self.state = .failed(self.short(error))
-        }
-    }
-
-    nonisolated func matchmakerViewController(_ viewController: GKMatchmakerViewController, didFind match: GKMatch) {
-        DispatchQueue.main.async {
-            viewController.dismiss(animated: true)
-            self.take(match)
-        }
-    }
-}
-
 extension GameCenter: GKMatchDelegate {
     nonisolated func match(_ match: GKMatch, didReceive data: Data, fromRemotePlayer player: GKPlayer) {
         DispatchQueue.main.async {
@@ -215,13 +280,18 @@ extension GameCenter: GKMatchDelegate {
 }
 
 extension GameCenter: GKLocalPlayerListener {
-    /// An invite accepted from Game Center's own UI: straight into the matchmaker with it.
+    /// An invite accepted from Game Center's own notification: the multiplayer screen opens
+    /// on the joining, and the match is made from the invite.
     nonisolated func player(_ player: GKPlayer, didAccept invite: GKInvite) {
         DispatchQueue.main.async {
-            guard self.match == nil, let controller = GKMatchmakerViewController(invite: invite) else { return }
-            controller.matchmakerDelegate = self
+            guard self.match == nil else { return }
+            self.invited = []
+            self.answers = [:]
             self.state = .finding
-            self.present(controller)
+            self.onInviteAccepted?()
+            GKMatchmaker.shared().match(for: invite) { [weak self] found, error in
+                DispatchQueue.main.async { self?.finished(found, error) }
+            }
         }
     }
 }

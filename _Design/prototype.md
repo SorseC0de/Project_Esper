@@ -1028,9 +1028,13 @@ randoms together, exchanged in hello; the side whose Game Center player ID sorts
 plays the left. The hello also carries the mode each side wants (`NetMessage.hello`'s `mode`);
 the host's is played. A stage vote or pick crosses as the stage's raw value with the count of
 stages played, and goes in, like a drink, only once every frame before the stop is
-confirmed; a coin flip rolls on the shared dice, so both land the same. Protocol version 4. MULTIPLAYER opens Apple's matchmaker sheet for two, invites or
-automatch; it fails at once until the app's record in App Store Connect has Game
-Center on. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
+confirmed; a coin flip rolls on the shared dice, so both land the same. Protocol version 4. MULTIPLAYER opens the game's own multiplayer screen (`MultiplayerScreen`, in place of Apple's
+matchmaker sheet, doing what it did, through GameKit's matchmaker): full screen on the screens' ground, PLAY NOW (matched with anyone looking), INVITE A FRIEND (the Game Center friends list,
+pick one; the app asks for the list with `NSGKFriendListUsageDescription`), BACK; while matching,
+the caption, whoever was invited with their answer (invited, on their way, can't play; a decline
+ends the wait) and CANCEL. On the title's cursor, B back. An invite accepted from Game Center's
+notification opens it on the joining. It fails at once until the app's record in App Store
+Connect has Game Center on. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
 or a bye puts the title up with why under MULTIPLAYER. No computer, no reset, no
 tuning pickers online; HITBOX stays. The sim calls nothing in the system's maths library: `Trig` is its own sine,
 cosine and arctangent in plain arithmetic, so two phones on different iOS versions

@@ -742,4 +742,18 @@ final class PowerTests: XCTestCase {
         match.advance(inputs: [PlayerInput(jump: true), .idle])
         XCTAssertNotEqual(match.players[0].state, .gunSnipe)
     }
+
+    // MARK: The finish
+
+    func testAFinishedMatchTakesNoInputAndNoCatches() {
+        var match = with(.none)
+        match.finished = true
+        let from = match.players[0].position
+        run(&match, frames: 30, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0), jump: true) })
+        XCTAssertEqual(match.players[0].position.x, from.x, accuracy: 0.01)
+        XCTAssertTrue(match.players[0].grounded)
+        match.ball.respawn(at: match.players[0].chest)
+        run(&match, frames: 5, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+    }
 }

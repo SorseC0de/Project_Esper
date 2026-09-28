@@ -45,6 +45,9 @@ public struct Match: Equatable {
     public var restartBallTo = 0
     /// What happened on the last `advance`.
     public var events: [MatchEvent] = []
+    /// The winning bucket's been made: no inputs and no catches from here, set by the
+    /// series when it confirms the point.
+    public var finished = false
 
     /// `seed` drives the field's dice and, on a stage that starts held, the coin flip for
     /// who has the ball; both sides of a network match pass the same one.
@@ -81,7 +84,8 @@ public struct Match: Equatable {
             restartIn -= 1
             if restartIn == 0 { restart(ballTo: restartBallTo) }
         }
-        let inputs = countdown > 0 ? [] : given
+        // Once the match is won nobody moves: no inputs, the computer's among them.
+        let inputs = countdown > 0 || finished ? [] : given
         if countdown > 0 { countdown -= 1 }
 
         // Platforms count down and go; the stage carries the ones standing.
@@ -858,6 +862,8 @@ public struct Match: Equatable {
     }
 
     private mutating func tryCatch() {
+        // Won: nobody catches.
+        guard !finished else { return }
         // A throw coming back off the other is the thrower's at any speed, facing or not,
         // in any state but a stun or a freeze.
         if ball.returning, let thrower = ball.lastTouched, !players[thrower].holding, players[thrower].hitStun == 0,

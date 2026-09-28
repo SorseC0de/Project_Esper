@@ -127,6 +127,8 @@ public struct Drinks: Equatable {
     public static let offerCount = 3
     /// A booster's weight against a biomorph's in an offer.
     public static let boosterWeight = 3
+    /// Titan Tea's jumps leave this much faster, so a body twice the size gets well off the floor.
+    public static let titanJumpShare = 1.25
 
     /// Levels by booster, looked up only, never walked.
     public var boosters: [Greateraid: Int] = [:]
@@ -235,6 +237,10 @@ public struct Drinks: Equatable {
             spec.fallSpeed *= 1.2
             spec.fastFallSpeed *= 1.2
             spec.canCrouch = false
+            spec.fullHopVelocity *= Drinks.titanJumpShare
+            spec.shortHopVelocity *= Drinks.titanJumpShare
+            spec.doubleJumpVelocity *= Drinks.titanJumpShare
+            spec.thirdJumpVelocity *= Drinks.titanJumpShare
             spec.jumps = jumper == 0 ? 1 : spec.jumps
             if biomorphLevel < 2 {
                 spec.walkMaxSpeed *= 0.9

@@ -473,7 +473,7 @@ public struct Opponent: Equatable {
             } else if !me.grounded {
                 if me.velocity.y < 0.5, me.jumpsLeft > 0, hoop.position.y - me.chest.y > 20 { tapJump(&input) }
                 // Only inside the dunk's reach: a stance any further off is a throw let go.
-                if hoop.position.distance(to: me.chest) < BallRules.dunkRadius { input.throwBall = true }
+                if hoop.position.distance(to: me.chest) < BallRules.dunkRadius * me.spec.scale { input.throwBall = true }
             }
             if planFrames == 0 { plan = .none }
         default:

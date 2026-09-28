@@ -338,10 +338,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   itself. Its head's
   particles are `bubble_particle` at 10, every bubble one of two grape purples by a coin flip, each bubble in the
   trail and the landing on its own frame. Numbers in `SurfRules`, first guesses.
-- Titan Tea (L). Twice the size: the body box, its reaches (the blade, the snatch, the
+- Titan Tea (L). Jumps leave 1.25 times as fast (`Drinks.titanJumpShare`), and the dunk puts the
+  feet off the rim at twice the offset and reaches twice as far, so the hands meet it. Twice the size: the body box, its reaches (the blade, the snatch, the
   slide's leg, the catch rings), the ledge hang and the heights the hands hold and let go
   of the ball at, all doubled, and drawn at double size. Heavier: half of any knock, and a
-  fifth more gravity falling (not rising, so it jumps as high as ever), fall speed and fast fall. It's stripped, the ball popping free, but
+  fifth more gravity falling (not rising), fall speed and fast fall. It's stripped, the ball popping free, but
   never stunned. One jump, no double jump unless Jumper Juice gives it back, and no
   crouch. Every landing of its own is Quake-Up's level-one quake on the same floor, whatever
   the level; a landing from a knock isn't, or two Titans would knock each other up forever. Its running steps shake the screen a little (3). At level one the walk and run
@@ -589,8 +590,8 @@ the slash's pinks are left alone. Those are the part keys the game reads (`BodyP
 GMS2 sheets are written as strips in Pixel Art, taking over the GMS2 sprites, and each sheet
 as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s, the palette's
 #242234. Besides the silhouette, groups are lined where they lie over the rest of the body, each on
-its own, front to back (`Look.strokedGroups`): the front arm and hand, the head, the torso, each
-shoe (the thighs as a group made a wedge where their line met the torso's); a pixel already lined is neither lined again nor counted as a
+its own, front to back (`Look.strokedGroups`): the front arm and hand, the head, each shoe (the
+torso's own off for now) (the thighs as a group made a wedge where their line met the torso's); a pixel already lined is neither lined again nor counted as a
 group's, so where two meet there's one line, on the later's pixels, and the earlier reads in
 front: the torso over the legs, the head over all but the arms (the head apart from the body,
 with the human look off, is its own sprite over everything). Each figure is one layer, the body, its line, head, energy,
@@ -671,7 +672,7 @@ one of four bolts each time, favouring vertical: it leans half as far as the bal
 in off vertical and never past 45°, so it never lies flat, at the sheet's own width and
 stretched tall enough to run past the top of the screen at that lean. On the sheet's two
 full-frame flash frames the whole screen flashes in the same tone and the floor and
-walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Every sheet plays at a steady rate, sixty split evenly (7.5, 10, 12, 15, 20, 24, 30 or 60 a second), nothing between: the walk, run and crouch walk's speed-led cycles snap to the nearest (`Player.steady`; the run and dash at 24 at most), the throw's release and windup at 15, the air shot's release at 30, the dunk's slam frames 8 sim frames each (7.5), the double jump's platform particles at 60, Surf Soda's bubbles at 30. Stunned, the body and head flicker a dark shade of the energy colour. `ParticleLook.sprites` draws the head's fire and the double jump's platform with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
+walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Every sheet plays at a steady rate, sixty split evenly (7.5, 10, 12, 15, 20, 24, 30 or 60 a second), nothing between: the walk, run and crouch walk's speed-led cycles snap to the nearest (`Player.steady`; the run and dash at 24 at most), the throw's release and windup at 15, the air shot's release at 30, the dunk's slam frames 8 sim frames each (7.5), the double jump's rings aren't a sheet, Surf Soda's bubbles at 30. Stunned, the body and head flicker a dark shade of the energy colour. `ParticleLook.sprites` draws the head's fire with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour. A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
@@ -891,8 +892,9 @@ magenta. Three small faint green chevrons stack over the rim
 the holder scores on. The head particles are sprites of their own, not an emitter, so each plays its sheet
 through at 24 a second over its life (`esper_particle` by default), rising on one
 swinging wind; a single-frame one (a snowflake, or the squares with
-`ParticleLook.sprites` off) steps down in size instead. The double jump's platform plays
-the particle sheet as its bits drop; Blazing Boba's head burns `fire_particle`, Zeus Juice's sheds its bolts and Surf Soda's its bubbles, each half and half with the regular energy as Frost Tea's snowflakes are; and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, streaming back along the ball's path and turned to it, without the head's rise and wind, Frost Tea's sheds snowflakes among the energy,
+`ParticleLook.sprites` off) steps down in size instead. The double jump throws three oval rings of
+energy under the feet (14 by 4 art pixels, a line thick), one every 0.06 seconds, each widening
+to 2.5 times as it fades over 0.3; Blazing Boba's head burns `fire_particle`, Zeus Juice's sheds its bolts and Surf Soda's its bubbles, each half and half with the regular energy as Frost Tea's snowflakes are; and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, streaming back along the ball's path and turned to it, without the head's rise and wind, Frost Tea's sheds snowflakes among the energy,
 Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
 `ParticleLook`: energy 10, snowflake 6, fire 12, lightning 8. Hits spark with
 `esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and
@@ -902,7 +904,8 @@ twice its size on a wall. Blazing Boba's hits spark with `fire_spark`, `fire_spa
 and with the hitboxes on its tear's reach rings both ends. Head particles each start on
 a random frame of their sheet, so a stream never plays in step. The wall jump spark is `fire_wallspark` as a
 silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark2` at 0.66 in the energy colour at both
-ends; the jump spark draws at three quarters, the ice one at half. Frost Tea's jump spark is
+ends; the jump spark draws at three quarters, the ice one at 0.625 (half, and a quarter more);
+Zeus Juice's, bottom-aligned, twelve pixels under the feet. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.
 
 ## Sound
@@ -953,7 +956,8 @@ shown, once, like the effects.
   thatlldoit, thatlldoit-2 or thatdecidesit, the finish slowing to 0.35 (offline) and the camera
   easing in on the ball to 0.55 of its view over 40 frames and then staying on it, in a hand or
   loose (where it was last seen while it's drawn nowhere), the HUD keeping its size, until
-  the win screen; otherwise a line drawn by weight: the generic score (score, -2, -3,
+  the win screen; from the winning bucket nobody moves or catches (`Match.finished`: no inputs,
+  the computer's among them, and no catches); otherwise a line drawn by weight: the generic score (score, -2, -3,
   whatascore) always in at 4, a dunk's (slamdunk, -2, -3, dunk) at 2 on a dunk, the wrist work
   (watchthewristwork, -2) at 1 on any other shot and 2 on a floater (`Ball.floaterShot`,
   carried by the score event), itsathree at 2 on a three in 47. winner, winner-2 or whatawin

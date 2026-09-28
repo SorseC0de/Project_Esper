@@ -103,9 +103,9 @@ struct Look: Hashable {
     static let frontShoe = PixelPalette.colours[22], backShoe = PixelPalette.colours[38]
     /// Lined on their own, front to back: where two meet, the first's line sits on the
     /// second's pixels, so the first reads in front. The front arm and hand over everything,
-    /// then the head, the torso over the legs, each shoe. (The thighs as a group made a
-    /// wedge where their line met the torso's.)
-    static let strokedGroups: [Set<BodyPart>] = [[.frontArm, .frontHand], [.head], [.torso], [.frontFoot], [.backFoot]]
+    /// then the head, each shoe. (The thighs as a group made a wedge where their line met
+    /// the torso's; the torso's own is off for now: add `[.torso]` after the head to bring it back.)
+    static let strokedGroups: [Set<BodyPart>] = [[.frontArm, .frontHand], [.head], [.frontFoot], [.backFoot]]
 
     /// A grey level as a tone of the team colour, for everything that's energy: the
     /// blade, the puffs and streaks, the effect sheets. Black up to the colour over the

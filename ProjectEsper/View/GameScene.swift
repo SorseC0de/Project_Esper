@@ -1615,6 +1615,7 @@ final class GameScene: SKScene {
         series.record(pointFor: scorer)
         drawSeries()
         if series.winner != nil {
+            session.mutate { $0.finished = true }
             pendingFlow = .won
             pendingFlowFrame = frame + GameScene.flowDelayFrames
         } else if online == nil, scorer == 0 {
@@ -1651,6 +1652,7 @@ final class GameScene: SKScene {
         fortySevenScores[scorer] += points
         drawSeries()
         if fortySevenScores[scorer] >= FortySevenRules.target {
+            session.mutate { $0.finished = true }
             pendingFlow = .won
             pendingFlowFrame = frame + GameScene.flowDelayFrames
             if online != nil { session.stopAt = pendingFlowFrame }
@@ -2247,7 +2249,9 @@ final class GameScene: SKScene {
                     let spark = Effect.fireJump.node(sprites, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: -3.75)), flipped: player.facing == .left)
                     spark.zPosition = 40
                     glowers.addChild(spark)
-                case .zeusJuice: glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position), scale: 0.42))
+                case .zeusJuice:
+                    // Bottom-aligned, twelve art pixels under the feet.
+                    glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: -7.5)), scale: 0.42))
                 case .surfSoda:
                     // A cloud of bubbles off the board, in place of the spark.
                     spawnBubbles(at: SpriteLibrary.point(player.position), count: 8, spread: 10)
@@ -2257,8 +2261,8 @@ final class GameScene: SKScene {
                     let spark = SKSpriteNode(texture: frames[0])
                     spark.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["ice_jumpspark"] ?? 0)
                     spark.position = SpriteLibrary.point(player.position + Vec2(x: 0, y: (EffectSheets.anchorY["ice_jumpspark"] ?? 0) == 0 ? -3.75 : 0))
-                    spark.xScale = player.facing == .left ? -0.5 : 0.5
-                    spark.yScale = 0.5
+                    spark.xScale = player.facing == .left ? -GameScene.iceJumpSparkScale : GameScene.iceJumpSparkScale
+                    spark.yScale = GameScene.iceJumpSparkScale
                     spark.zPosition = 30
                     spark.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 24), .removeFromParent()]))
                     glowers.addChild(spark)
@@ -2323,7 +2327,7 @@ final class GameScene: SKScene {
                 spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left)
             case .doubleJumped(let index):
                 let player = match.players[index]
-                spawnJumpPlatform(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow))
+                spawnJumpRings(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow))
             case .warped(let flasher, let from, let to), .flashed(let flasher, let from, let to):
                 // The flash's spark at both ends, the sheet at half size.
                 // The flash sheet at both ends, in the energy colour, at half size.
@@ -2455,27 +2459,33 @@ final class GameScene: SKScene {
 
     /// A short platform of loose digital squares under the feet where a double jump was
     /// taken: they hang a moment, then drop away and cut out.
-    private func spawnJumpPlatform(at feet: CGPoint, colour: SKColor) {
-        let count = 9
-        for index in 0..<count {
-            let square = SKSpriteNode(texture: ParticleLook.sprites ? sprites.texture("esper_particle", (EffectSheets.frames["esper_particle"] ?? 1) / 3 + index % 3) : sprites.flatSquare(size: 4, alpha: 1))
-            square.size = CGSize(width: 3, height: 3)
-            square.color = colour
-            square.colorBlendFactor = 1
-            square.blendMode = .alpha
-            square.zPosition = 3
-            let spread = CGFloat(index - count / 2) * 4
-            square.position = CGPoint(x: feet.x + spread, y: feet.y - 2 + CGFloat(index % 2))
-            glowers.addChild(square)
-            let hold = 0.12 + Double(abs(index - count / 2)) * 0.02
-            let drop = SKAction.moveBy(x: spread * 0.3, y: -10 - CGFloat(index % 3) * 4, duration: 0.3)
-            drop.timingMode = .easeIn
-            // The particle sheet played through as it drops, or the squares' step down.
-            let frames = sheetFrames("esper_particle")
-            let shrink = ParticleLook.sprites && frames.count > 1
-                ? SKAction.animate(with: frames, timePerFrame: 1.0 / 60)
-                : SKAction.sequence([.wait(forDuration: 0.15), .scale(to: 0.66, duration: 0), .wait(forDuration: 0.1), .scale(to: 0.33, duration: 0)])
-            square.run(.sequence([.wait(forDuration: hold), .group([drop, shrink]), .removeFromParent()]))
+    /// Frost Tea's jump spark: half its sheet's size, and a quarter more.
+    private static let iceJumpSparkScale: CGFloat = 0.625
+
+    /// The double jump: oval rings of energy under the feet, one after another, each
+    /// widening as it fades.
+    private static let jumpRingCount = 3
+    private static let jumpRingSize = CGSize(width: 14, height: 4)
+    private static let jumpRingGrowth: CGFloat = 2.5
+    private static let jumpRingSeconds = 0.3
+    private static let jumpRingStagger = 0.06
+    private func spawnJumpRings(at point: CGPoint, colour: SKColor) {
+        for ring in 0..<GameScene.jumpRingCount {
+            let size = GameScene.jumpRingSize
+            let shape = SKShapeNode(ellipseOf: size)
+            shape.strokeColor = colour
+            shape.lineWidth = 1
+            shape.fillColor = .clear
+            shape.isAntialiased = false
+            shape.position = point
+            shape.zPosition = 30
+            shape.alpha = 0
+            glowers.addChild(shape)
+            let grow = SKAction.scale(to: GameScene.jumpRingGrowth, duration: GameScene.jumpRingSeconds)
+            grow.timingMode = .easeOut
+            let fade = SKAction.fadeOut(withDuration: GameScene.jumpRingSeconds)
+            shape.run(.sequence([.wait(forDuration: Double(ring) * GameScene.jumpRingStagger), .fadeAlpha(to: 0.9, duration: 0),
+                                 .group([grow, fade]), .removeFromParent()]))
         }
     }
 

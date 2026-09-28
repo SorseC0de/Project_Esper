@@ -877,7 +877,7 @@ public struct Player: Equatable {
                     ?? Vec2(x: chest.x - facing.sign * 5, y: chest.y + 3)
                 wanted = .strikeBolt(x: ball.x, bottom: ball.y)
             }
-            if hasBall, let hoop = stage.hoops.indices.first(where: { stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius }) {
+            if hasBall, let hoop = stage.hoops.indices.first(where: { stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius * spec.scale }) {
                 // Onto the rim: the feet at the dunk's place on it, facing the backboard.
                 // Turned to the backboard; the body glides to its place on the rim through
                 // the wind-up, so it never jumps there.
@@ -925,7 +925,8 @@ public struct Player: Equatable {
             // and the beat after, until the point restarts; the ball leaves the hand at the slam.
             velocity = .zero
             let rim = stage.hoops[dunkHoop]
-            let place = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y)
+            // The feet's place off the rim, at the body's size, so the hands still meet it.
+            let place = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y) * spec.scale
             let slam = BallRules.dunkFrames / 2
             let share = min(Double(stateTimer) / Double(slam), 1)
             position = dunkFrom + (place - dunkFrom) * share

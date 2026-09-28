@@ -380,7 +380,14 @@ public struct Player: Equatable {
     /// The run cycle's advance this frame: 24 frames a second at full run speed, scaling
     /// with how fast the body actually moves, up to 26 in the dash and never under 10.
     private var runCycleStep: Double {
-        min(max(abs(velocity.x) / runSpeed * 24, 10), 26) / 60
+        Player.steady(min(max(abs(velocity.x) / runSpeed * 24, 10), 26)) / 60
+    }
+
+    /// The rates a sheet may play at, sixty split evenly: nothing in between.
+    static let steadyRates: [Double] = [7.5, 10, 12, 15, 20, 24, 30]
+    /// The nearest of them to `fps`.
+    static func steady(_ fps: Double) -> Double {
+        steadyRates.min { abs($0 - fps) < abs($1 - fps) } ?? fps
     }
 
     /// Whether the stick is pushed the way the body faces.
@@ -540,8 +547,9 @@ public struct Player: Equatable {
                         let target = walkMaxSpeed * input.stick.x
                         let braking = abs(velocity.x) > walkMaxSpeed || velocity.x * target < 0
                         velocity.x = approach(velocity.x, target, braking ? spec.traction : spec.walkAcceleration)
-                        // The cycle runs 15 frames a second at full walk and never under 10, so the ball can't hang on a tween.
-                        animationPhase += max(abs(velocity.x) / walkMaxSpeed * 0.25, 10.0 / 60)
+                        // The cycle runs 15 frames a second at full walk and never under 10, so the ball
+                        // can't hang on a tween, at the nearest steady rate.
+                        animationPhase += Player.steady(max(abs(velocity.x) / walkMaxSpeed * 15, 10)) / 60
                     }
                 } else {
                     enter(.idle)
@@ -947,7 +955,7 @@ public struct Player: Equatable {
             if let direction = stickFacing(input) { facing = direction }
             if state == .crouchWalk {
                 velocity.x = approach(velocity.x, spec.crouchWalkSpeed * input.stick.x, spec.walkAcceleration)
-                animationPhase += max(abs(velocity.x) / spec.crouchWalkSpeed * 0.25, 10.0 / 60)
+                animationPhase += Player.steady(max(abs(velocity.x) / spec.crouchWalkSpeed * 15, 10)) / 60
             } else {
                 velocity.x = approach(velocity.x, 0, spec.traction)
             }

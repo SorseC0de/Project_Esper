@@ -2470,7 +2470,7 @@ final class GameScene: SKScene {
             // The particle sheet played through as it drops, or the squares' step down.
             let frames = sheetFrames("esper_particle")
             let shrink = ParticleLook.sprites && frames.count > 1
-                ? SKAction.animate(with: frames, timePerFrame: 0.3 / Double(frames.count))
+                ? SKAction.animate(with: frames, timePerFrame: 1.0 / 60)
                 : SKAction.sequence([.wait(forDuration: 0.15), .scale(to: 0.66, duration: 0), .wait(forDuration: 0.1), .scale(to: 0.33, duration: 0)])
             square.run(.sequence([.wait(forDuration: hold), .group([drop, shrink]), .removeFromParent()]))
         }
@@ -2972,9 +2972,8 @@ final class GameScene: SKScene {
             // Spread wide along the ground more than up.
             let out = SKAction.move(by: CGVector(dx: cos(angle) * spread * 2.2, dy: sin(angle) * spread * 0.5 + (downward ? -2 : 3)), duration: 0.4)
             out.timingMode = .easeOut
-            // Each on its own frame and its own pace, so the burst isn't one pulse.
-            let pace = 0.4 / Double(looped.count) * Double.random(in: 0.8...1.2)
-            bubble.run(.sequence([.group([out, .animate(with: looped, timePerFrame: pace)]), .removeFromParent()]))
+            // Each on its own frame, so the burst isn't one pulse.
+            bubble.run(.sequence([.group([out, .animate(with: looped, timePerFrame: 1.0 / 30)]), .removeFromParent()]))
         }
     }
     /// The bounds gallery, while it's open.

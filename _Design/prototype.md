@@ -137,7 +137,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   for 10 frames, then a normal fall, nobody's, so Flash Fizz can't warp to it. The holder
   can't catch it back for 15 frames.
 - Throw: the `player_throw` sheet, `player_throw_air` off the ground, frames 4 to 7
-  spread over the recovery. Hold for the stance, stick picks a cardinal, release throws straight with no
+  at 15 a second, as the windup plays. Hold for the stance, stick picks a cardinal, release throws straight with no
   gravity until the first bounce. Sideways or down it's a projectile: the other body it
   meets is stripped and knocked as by the slash, and it bounces back toward the thrower,
   theirs to catch at any speed, so a throw holds off a defender coming in; a snatch with
@@ -671,7 +671,7 @@ one of four bolts each time, favouring vertical: it leans half as far as the bal
 in off vertical and never past 45°, so it never lies flat, at the sheet's own width and
 stretched tall enough to run past the top of the screen at that lean. On the sheet's two
 full-frame flash frames the whole screen flashes in the same tone and the floor and
-walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Stunned, the body and head flicker a dark shade of the energy colour. `ParticleLook.sprites` draws the head's fire and the double jump's platform with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
+walls go white, fading back over 20 frames, and the crown erupts off the rim with it. Sparks and bolts play at 24 a second. Every sheet plays at a steady rate, sixty split evenly (7.5, 10, 12, 15, 20, 24, 30 or 60 a second), nothing between: the walk, run and crouch walk's speed-led cycles snap to the nearest (`Player.steady`; the run and dash at 24 at most), the throw's release and windup at 15, the air shot's release at 30, the dunk's slam frames 8 sim frames each (7.5), the double jump's platform particles at 60, Surf Soda's bubbles at 30. Stunned, the body and head flicker a dark shade of the energy colour. `ParticleLook.sprites` draws the head's fire and the double jump's platform with `esper_spark` frames at the squares' size, in place of the hard squares. The jump spark and the dash's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour. A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head

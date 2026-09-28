@@ -86,9 +86,9 @@ extension Animation {
         (AnimationFrame(.throwForward, 3), 8),
         (AnimationFrame(.dunk, 0), 6),
         (AnimationFrame(.dunk, 1), 6),
-        (AnimationFrame(.dunk, 2), 10),
-        (AnimationFrame(.dunk, 3), 10),
-        (AnimationFrame(.dunk, 4), 10),
+        (AnimationFrame(.dunk, 2), 8),
+        (AnimationFrame(.dunk, 3), 8),
+        (AnimationFrame(.dunk, 4), 8),
         (AnimationFrame(.dunk, 5), 1),
     ]
 
@@ -183,13 +183,14 @@ extension Player {
             return grounded ? AnimationFrame(.shoot, min(t * 12 / 60, 4)) : AnimationFrame(.shootAir, min(t * 12 / 60, 3))
         case .shooting:
             // Both sheets smear the release on frame 6, where the ball leaves.
-            return grounded ? AnimationFrame(.shoot, 4 + t * 24 / 60) : AnimationFrame(.shootAir, 3 + t * 36 / 60)
+            return grounded ? AnimationFrame(.shoot, 4 + t * 24 / 60) : AnimationFrame(.shootAir, 3 + t * 30 / 60)
         case .throwStance:
             // Frame 3 is the set pose with the ring on the ball; 4 is the release smear.
             return AnimationFrame(grounded ? .throwForward : .throwAir, min(t * BallRules.throwSheetFramesPerSecond / 60, 3))
         case .throwing:
-            // Frames 4 to 7 spread over the recovery, so every one shows, the smear on the release.
-            return AnimationFrame(grounded ? .throwForward : .throwAir, 4 + t * 4 / BallRules.throwRecoveryFrames)
+            // Frames 4 to 7 at the windup's 15 a second, the smear on the release; the 15-frame
+            // recovery ends with the last shown three sim frames rather than four.
+            return AnimationFrame(grounded ? .throwForward : .throwAir, min(4 + t * BallRules.throwSheetFramesPerSecond / 60, 7))
         case .dunking:
             return Animation.dunkEntry(at: t).frame
         case .catching:

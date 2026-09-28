@@ -14,7 +14,8 @@ public enum MatchEvent: Equatable {
     case dunked(player: Int)
     case swatted(player: Int, hit: Bool)
     /// `entry` is the ball's velocity as it went through; `points` what it was worth.
-    case scored(player: Int, hoop: Int, entry: Vec2, points: Int)
+    /// `floater`: the ball went in as a floater, for the announcer.
+    case scored(player: Int, hoop: Int, entry: Vec2, points: Int, floater: Bool)
     /// `speed`: how fast it met the surface, across it.
     case ballBounced(position: Vec2, speed: Double)
     case ballRespawned

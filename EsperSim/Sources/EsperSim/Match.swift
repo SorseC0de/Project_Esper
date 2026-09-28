@@ -133,7 +133,7 @@ public struct Match: Equatable {
                     // kept off the ball a while.
                     let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage)
                     scores[owner] += points
-                    events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points))
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points, floater: ball.floaterShot))
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
                     ball.launchPoint = nil
                     // Through the net it's nobody's shot any more: anyone but the scorer can take it.
@@ -141,7 +141,7 @@ public struct Match: Equatable {
                     ball.owned = false
                 } else {
                     scores[owner] += 1
-                    events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1))
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1, floater: ball.floaterShot))
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking }) {
                             // A dunk: the dunker hangs on the rim a beat, the ball dead, then the restart.

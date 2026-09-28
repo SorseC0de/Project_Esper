@@ -12,12 +12,8 @@ final class SoundBoard {
 
     enum Effect: String, CaseIterable {
         case ballBounce = "ball_bounce"
-        case basket
         case catchBall = "catch"
         case fireHit = "fire_hit"
-        case countOne = "1"
-        case countTwo = "2"
-        case countThree = "3"
         case esperSlash = "esper_slash"
         case jump
         case lightningOne = "lightning_hit1"
@@ -34,7 +30,25 @@ final class SoundBoard {
         case portIn = "port_in"
         case slashWallClank = "slash_wallclank"
         case step
+        // The announcer, levelled by the importer.
+        case countA1 = "announcer_1", countA2 = "announcer_2", countA3 = "announcer_3"
+        case countB1 = "announcer_1-2", countB2 = "announcer_2-2", countB3 = "announcer_3-2"
+        case ballOut = "announcer_ballout", ballOut2 = "announcer_ballout2"
+        case thatllDoIt = "announcer_thatlldoit", thatllDoIt2 = "announcer_thatlldoit-2", thatDecidesIt = "announcer_thatdecidesit"
+        case score = "announcer_score", score2 = "announcer_score-2", score3 = "announcer_score-3", whatAScore = "announcer_whatascore"
+        case slamDunk = "announcer_slamdunk", slamDunk2 = "announcer_slamdunk-2", slamDunk3 = "announcer_slamdunk-3", dunk = "announcer_dunk"
+        case wristWork = "announcer_watchthewristwork", wristWork2 = "announcer_watchthewristwork-2"
+        case itsAThree = "announcer_itsathree"
+        case winner = "announcer_winner", winner2 = "announcer_winner-2", whatAWin = "announcer_whatawin"
+        case crowdCheer = "crowd_cheer"
     }
+
+    /// The announcer's lines by what they're for.
+    static let gameWinners: [Effect] = [.thatllDoIt, .thatllDoIt2, .thatDecidesIt]
+    static let scores: [Effect] = [.score, .score2, .score3, .whatAScore]
+    static let dunks: [Effect] = [.slamDunk, .slamDunk2, .slamDunk3, .dunk]
+    static let wristWorks: [Effect] = [.wristWork, .wristWork2]
+    static let winners: [Effect] = [.winner, .winner2, .whatAWin]
 
     private static let voiceCount = 16
     private let engine = AVAudioEngine()
@@ -173,7 +187,13 @@ final class SoundBoard {
     /// Sounds made of more than one file, mixed as they're read, each at its own level: the
     /// parry's two halves at 0.3, which sets them beside the hit, the snatch and the catch.
     nonisolated private static let layers: [Effect: [(file: String, level: Float)]] = [.parry: [("parry", 0.3), ("parry2", 0.3)]]
-    static let count: [Int: Effect] = [1: .countOne, 2: .countTwo, 3: .countThree]
+    /// The count: the announcer's first set or his second, on the COUNT picker (A or B).
+    static let countSetKey = "esper.countSet"
+    static var count: [Int: Effect] {
+        UserDefaults.standard.integer(forKey: countSetKey) == 1
+            ? [1: .countB1, 2: .countB2, 3: .countB3]
+            : [1: .countA1, 2: .countA2, 3: .countA3]
+    }
 
     /// One file from `Sounds`, read whole.
     nonisolated private static func read(_ name: String, format: AVAudioFormat) -> AVAudioPCMBuffer? {
@@ -189,7 +209,7 @@ final class SoundBoard {
     /// has its sound cut by the new one, scheduled to interrupt it, never stopped (a stop
     /// waits on the audio thread). With the engine down, the sound is skipped and a restart
     /// is asked for.
-    func play(_ effect: Effect, volume: Float = 1) {
+    func play(_ effect: Effect, volume: Float = 1, pan: Float = 0) {
         guard SoundBoard.enabled, ready, let buffer = buffers[effect], volume > 0 else { return }
         guard engine.isRunning else {
             scheduleRestart()
@@ -205,6 +225,7 @@ final class SoundBoard {
         let interrupting = busyUntil[index] > now
         busyUntil[index] = now + Double(buffer.frameLength) / buffer.format.sampleRate
         voice.volume = volume
+        voice.pan = pan
         voice.scheduleBuffer(buffer, at: nil, options: interrupting ? .interrupts : [])
     }
 }

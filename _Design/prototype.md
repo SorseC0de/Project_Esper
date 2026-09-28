@@ -920,10 +920,25 @@ shown, once, like the effects.
   lowest, under five art pixels: the dribbles and the taunt (idle 3 and 8, walk 2 and 6,
   run 4, taunt 2 and 7).
 - step: the walk and run sheets' frames 0 and 4, on the ground, at twice its file's level.
-- 3, 2, 1: each number of the count as it goes up, in play.
+- The announcer's 3, 2, 1 (announcer_1..3, or the second set announcer_1-2..3-2 on the COUNT
+  picker, A or B): each number of the count as it goes up, in play.
+- announcer_ballout and ballout2 together at BALL OUT, each panned halfway to its own side.
 - port_in: the port-in at a round's start.
-- swish: a point, with the strike on the rim; basket instead when a dunk scores it.
-- lightning1, 2, 3, one at random: with every lightning spark, Zeus Juice's hits.
+- swish: a point, with the strike on the rim; a dunk has none, the announcer's line instead.
+- crowd_cheer, behind the rest, on every basket, and with it the announcer: on the game's last,
+  thatlldoit, thatlldoit-2 or thatdecidesit, the finish slowing to 0.35 (offline) and the camera
+  easing in on the ball to 0.55 of its view over 40 frames and then staying on it, in a hand or
+  loose (where it was last seen while it's drawn nowhere), the HUD keeping its size, until
+  the win screen; otherwise a line drawn by weight: the generic score (score, -2, -3,
+  whatascore) always in at 4, a dunk's (slamdunk, -2, -3, dunk) at 2 on a dunk, the wrist work
+  (watchthewristwork, -2) at 1 on any other shot and 2 on a floater (`Ball.floaterShot`,
+  carried by the score event), itsathree at 2 on a three in 47. winner, winner-2 or whatawin
+  once as the game goes to the win screen, not again when it's redrawn (a rematch's wait).
+- The vocals come in from `_Sound FX/Vocals` by a list in `Tools/import_sounds.py`, the rest of
+  the folder left out, each levelled as it's converted: its loudness while sounding (the RMS
+  of its 10 ms stretches above -40 dBFS) to -21 dB for the announcer, just under the swish
+  (-20.5), and -27 for the crowd, its peak kept under -3.
+- lightning_hit1, 2, 3, one at random: with every lightning spark, Zeus Juice's hits.
 - fire_hit: with every fire spark, Blazing Boba's hits.
 - menu_select: a cursor moving, a colour circle (menu_cursor, louder than the rest, is
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,

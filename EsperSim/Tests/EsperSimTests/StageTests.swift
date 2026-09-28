@@ -454,7 +454,7 @@ final class HighwayTests: XCTestCase {
         var scored: Int?
         for _ in 0..<20 where scored == nil {
             match.advance(inputs: [.idle, .idle])
-            for case .scored(_, _, _, let points) in match.events { scored = points }
+            for case .scored(_, _, _, let points, _) in match.events { scored = points }
         }
         XCTAssertEqual(scored, 3)
         XCTAssertEqual(match.scores, [3, 0])

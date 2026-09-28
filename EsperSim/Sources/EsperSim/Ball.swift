@@ -9,6 +9,8 @@ public struct Ball: Equatable {
     public var straight = false
     /// Frames of floater left: drifting up with gravity off.
     public var floater = 0
+    /// Let go as a floater, until it's next let go or knocked: for the view's announcer.
+    public var floaterShot = false
     /// Released by a throw and not yet caught.
     public var thrown = false
     /// A throw sideways or down is a projectile: the other body it meets is stripped and
@@ -199,6 +201,7 @@ public struct Ball: Equatable {
         strikes = false
         returning = false
         floater = 0
+        floaterShot = false
         thrown = straight
         steers = !straight
         shotInFlight = false
@@ -215,6 +218,7 @@ public struct Ball: Equatable {
         release(from: position, velocity: Vec2(x: sideways, y: BallRules.floaterSpeed), by: player, straight: false)
         thrown = true
         floater = BallRules.floaterFrames
+        floaterShot = true
     }
 
     /// Knocked out of a holder's hands: a short floater straight up, then a normal fall,
@@ -231,6 +235,7 @@ public struct Ball: Equatable {
         returning = false
         straight = false
         floater = BallRules.popFloatFrames
+        floaterShot = false
         thrown = false
         steers = false
         shotInFlight = false
@@ -260,6 +265,7 @@ public struct Ball: Equatable {
         velocity = .zero
         pace = 1
         burning = false
+        floaterShot = false
         strikes = false
         returning = false
         frozen = 0

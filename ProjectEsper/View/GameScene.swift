@@ -203,6 +203,7 @@ final class GameScene: SKScene {
     private var titanGrowth: [CGFloat] = []
     private static let titanGrowFrames = 30
     private var cameraBase = CGPoint.zero
+    private var cameraBaseScale: CGFloat = 1
     /// The HUD's scale for this screen, and the ice everything frozen goes.
     private var hudScale: CGFloat = 1
     private var displayScale: CGFloat = 1
@@ -1055,6 +1056,7 @@ final class GameScene: SKScene {
         let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
         let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
+        cameraBaseScale = cameraNode.xScale
         cameraNode.position = CGPoint(x: scrolls ? cameraBase.x : stageWidth / 2, y: stageHeight / 2 - below)
         if scrolls, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
         cameraBase = cameraNode.position
@@ -1086,6 +1088,9 @@ final class GameScene: SKScene {
         controls.addPicker(title: "POWER", options: PowerVariant.allCases.map(\.label), selected: powerVariant.rawValue) { [weak self] index in
             self?.powerVariant = PowerVariant(rawValue: index)!
             self?.applyPower()
+        }
+        controls.addPicker(title: "COUNT", options: ["A", "B"], selected: UserDefaults.standard.integer(forKey: SoundBoard.countSetKey)) { index in
+            UserDefaults.standard.set(index, forKey: SoundBoard.countSetKey)
         }
         controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
@@ -1154,7 +1159,7 @@ final class GameScene: SKScene {
             render()
             return
         }
-        accumulator += min(currentTime - last, 0.1)
+        accumulator += min(currentTime - last, 0.1) * (finishFrames > 0 && online == nil ? GameScene.finishTimeScale : 1)
         guard accumulator >= GameScene.stepSeconds else { return }
 
         if let next = pendingFlow, match.frame >= pendingFlowFrame {
@@ -1634,6 +1639,8 @@ final class GameScene: SKScene {
     private func enter(_ next: Flow) {
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
         ballCamFrame.isHidden = next != .playing
+        // The winner's line once, as the win screen goes up, not each time it's redrawn.
+        if next == .won, flow != .won { SoundBoard.shared.play(SoundBoard.winners.randomElement()!) }
         flow = next
         if next == .stageSelect { openStageSelect() }
         if next == .picking {
@@ -2099,6 +2106,48 @@ final class GameScene: SKScene {
     }
     /// A dunk went down, so the point it scores sounds as one.
     private var dunkScoring = false
+
+    /// The announcer's odds: the generic score's weight, a unique line's, and a unique line's
+    /// where it fits best (a dunk's on a dunk, the wrist work on a floater, 47's three).
+    private static let scoreWeight = 4
+    private static let uniqueWeight = 1
+    private static let likelyWeight = 2
+
+    /// The announcer on a basket, over the crowd's cheer. The game's last is "that'll do it"
+    /// and the finish slows and closes in on the ball. Otherwise a line drawn by weight: the
+    /// generic score always in, and the unique lines, fewer, a little more where they fit.
+    private func announce(dunk: Bool, three: Bool, floater: Bool, winning: Bool) {
+        SoundBoard.shared.play(.crowdCheer)
+        if winning {
+            SoundBoard.shared.play(SoundBoard.gameWinners.randomElement()!)
+            startFinish()
+            return
+        }
+        var pool: [(lines: [SoundBoard.Effect], weight: Int)] = [(SoundBoard.scores, GameScene.scoreWeight)]
+        if dunk {
+            pool.append((SoundBoard.dunks, GameScene.likelyWeight))
+        } else {
+            pool.append((SoundBoard.wristWorks, floater ? GameScene.likelyWeight : GameScene.uniqueWeight))
+        }
+        if three { pool.append(([.itsAThree], GameScene.likelyWeight)) }
+        var roll = Int.random(in: 0..<pool.reduce(0) { $0 + $1.weight })
+        for entry in pool {
+            if roll < entry.weight {
+                SoundBoard.shared.play(entry.lines.randomElement()!)
+                return
+            }
+            roll -= entry.weight
+        }
+    }
+
+    /// The game-winning basket's finish: the game slowed (offline; online both sides must
+    /// keep time) and the camera easing in on the ball, until the win screen.
+    private var finishFrames = 0
+    private static let finishZoomFrames = 40
+    private static let finishZoom: CGFloat = 0.55
+    private static let finishTimeScale = 0.35
+    private var finishTarget: CGPoint?
+    private func startFinish() { finishFrames = 1 }
     /// Art pixels past the screen's edge over which a sound fades to nothing.
     private static let soundFadeMargin: CGFloat = 32
     private static let bounceSoundFloor = 0.6
@@ -2144,8 +2193,9 @@ final class GameScene: SKScene {
     /// The events of frames both sides' inputs have confirmed: the point.
     private func confirm(_ frames: [FrameEvents]) {
         for frameEvents in frames {
-            for case .scored(let scorer, let hoop, let entry, let points) in frameEvents.events {
+            for case .scored(let scorer, let hoop, let entry, let points, let floater) in frameEvents.events {
                 rimFlash[hoop] = 8
+                let dunk = dunkScoring
                 strike(hoop: hoop, by: scorer, entry: entry)
                 if gameMode == .fortySeven {
                     showBanner(points >= 3 ? "THREE!!" : "BUCKET!!", size: 48)
@@ -2154,6 +2204,7 @@ final class GameScene: SKScene {
                     showBanner("BUCKET!!", size: 48)
                     pointScored(by: scorer, at: frameEvents.frame)
                 }
+                announce(dunk: dunk, three: gameMode == .fortySeven && points >= 3, floater: floater, winning: pendingFlow == .won)
             }
         }
     }
@@ -2459,8 +2510,8 @@ final class GameScene: SKScene {
     /// the same tone and the floor and walls go white, fading back. The crown erupts off
     /// the rim with it.
     private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
-        // A dunk's point is the basket; any other goes in with the net's swish.
-        play(dunkScoring ? .basket : .swish, at: match.stage.hoops[hoop].position)
+        // A shot goes in with the net's swish; a dunk's sound is the announcer's.
+        if !dunkScoring { play(.swish, at: match.stage.hoops[hoop].position) }
         dunkScoring = false
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
@@ -3981,6 +4032,29 @@ final class GameScene: SKScene {
         } else {
             cameraNode.position = cameraBase
         }
+        // The game-winner's finish, easing in on the ball; the HUD kept its size.
+        if finishFrames > 0 {
+            if flow == .playing {
+                finishFrames += 1
+                let share = min(Double(finishFrames) / Double(GameScene.finishZoomFrames), 1)
+                let eased = CGFloat(0.5 - 0.5 * cos(share * .pi))
+                // On the ball wherever it's drawn, in a hand or loose, and where it was last
+                // seen while it's drawn nowhere.
+                if let holder = match.ball.holder, handBalls.indices.contains(holder), !handBalls[holder].isHidden {
+                    finishTarget = handBalls[holder].position
+                } else if !ballNode.isHidden {
+                    finishTarget = ballNode.position
+                }
+                let ballAt = finishTarget ?? cameraBase
+                cameraNode.position = cameraBase + (ballAt - cameraBase) * eased
+                cameraNode.setScale(cameraBaseScale * (1 - (1 - GameScene.finishZoom) * eased))
+            } else {
+                finishFrames = 0
+                finishTarget = nil
+                cameraNode.setScale(cameraBaseScale)
+            }
+            glowHud.setScale(cameraNode.xScale * hudScale)
+        }
         glowHud.position = cameraNode.position
         ballTrail.position = ballNode.position
         ballTrail.particleColor = colour
@@ -4105,6 +4179,9 @@ final class GameScene: SKScene {
         } else if lastCount > 0 {
             lastCountSounded = 0
             showBanner("BALL OUT!!!", size: 48)
+            // Both his takes at once, each half toward its own side.
+            SoundBoard.shared.play(.ballOut, pan: -0.5)
+            SoundBoard.shared.play(.ballOut2, pan: 0.5)
         } else {
             tickBanner()
         }

@@ -393,7 +393,9 @@ d-pad moves it row to row, to the nearest item across, or along a row, and A pic
 item under it sits on the gold plate a little bigger (1.08), a colour gets a gold ring; a tap
 picks and moves it there. The TV's focus engine is off on the title (`noSystemFocus`), so its
 own cursor never shows. A menu press is one pick: after one nothing more is picked until A is
-let go, on that screen or whatever it opens. Each screen's buttons, their text, its titles' lettering and its panels (the header
+let go, on that screen or whatever it opens. Circle or square (B or X) is back where a screen has one:
+the pause resumes, and the first stage select of an offline series goes back to the title;
+the win screen, a later stage pick and the drink pick have none. Each screen's buttons, their text, its titles' lettering and its panels (the header
 ribbon and the card under it) scale per platform (`UITuning`: phone, iPad or Mac, TV), set on that panel a step of 0.05 at
 a time, − and + (which the TV's remote can reach), Pause and Win shown behind it as
 they'd be; the values are kept on the device until they're read off and made the

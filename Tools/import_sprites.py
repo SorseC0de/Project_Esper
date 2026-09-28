@@ -45,7 +45,7 @@ FRAME_HEIGHT = {"flashspark": 36}
 NOT_TONED = {"lightning1", "lightning2", "lightning3", "lightning4"}
 # Where the measurement reads a sheet's art wrong, the artist's word: 0 bottom edge, 0.5 centred.
 ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.5, "flashspark2": 0.5,
-                   "lightning_particle": 0.5, "lightning_particle2": 0.5, "ice_jumpspark": 0.0,
+                   "lightning_particle": 0.5, "lightning_particle2": 0.5, "ice_jumpspark": 0.0, "lightning_jump": 0.0,
                    "lightning_spark": 0.5, "lightning_spark2": 0.5, "fire_explosion": 0.5,
                    "fire_spark": 0.5, "fire_spark2": 0.5, "fire_spark3": 0.5,
                    "gemini_rift_v1": 0.5, "gemini_rift_v2": 0.5, "bubble_particle": 0.5, "bubbles": 0.0}

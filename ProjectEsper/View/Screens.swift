@@ -189,6 +189,15 @@ class Screen: SKNode {
 
     /// The cursor moved to another choice.
     func moved() {}
+
+    /// What circle or square (B or X) does here: nothing on a screen without a way back.
+    var back: (() -> Void)?
+
+    func goBack() {
+        guard let back else { return }
+        SoundBoard.shared.play(.menuBack)
+        back()
+    }
 }
 
 /// Three bottles of Greateraid to choose from, large, their bottoms off the screen, each

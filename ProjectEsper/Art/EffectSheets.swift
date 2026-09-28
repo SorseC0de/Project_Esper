@@ -84,7 +84,7 @@ enum EffectSheets {
         "lightning3": 0.0000,
         "lightning4": 0.0000,
         "lightning_charge": 0.5000,
-        "lightning_jump": 0.0625,
+        "lightning_jump": 0.0000,
         "lightning_particle": 0.5000,
         "lightning_particle2": 0.5000,
         "lightning_spark": 0.5000,

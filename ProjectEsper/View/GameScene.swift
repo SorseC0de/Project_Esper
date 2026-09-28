@@ -1181,8 +1181,12 @@ final class GameScene: SKScene {
             // A screen is up: the stick moves its cursor and jump picks; the sim waits. On
             // the title, which the SwiftUI layer draws, the stick moves the title's cursor.
             let pad = inputs.first ?? .idle
-            if menuNeedsRelease, !pad.jump { menuNeedsRelease = false }
+            // Circle or square (B or X) is back.
+            let backDown = pad.shootButtons & 1 != 0 || pad.throwBall
+            let backWasDown = menuLast.shootButtons & 1 != 0 || menuLast.throwBall
+            if menuNeedsRelease, !pad.jump, !backDown { menuNeedsRelease = false }
             let picked = pad.jump && !menuLast.jump && !menuNeedsRelease
+            let backed = backDown && !backWasDown && !menuNeedsRelease
             let right = pad.stick.x >= 0.5 && menuLast.stick.x < 0.5, left = pad.stick.x <= -0.5 && menuLast.stick.x > -0.5
             let down = pad.stick.y <= -0.5 && menuLast.stick.y > -0.5, up = pad.stick.y >= 0.5 && menuLast.stick.y < 0.5
             if let screen {
@@ -1191,6 +1195,9 @@ final class GameScene: SKScene {
                 if picked {
                     menuNeedsRelease = true
                     screen.fire()
+                } else if backed, screen.back != nil {
+                    menuNeedsRelease = true
+                    screen.goBack()
                 }
             } else if flow == .title, online == nil, let flowState, !flowState.tuningOpen {
                 if right { flowState.moveTitleCursor(across: 1, down: 0) }
@@ -1773,12 +1780,15 @@ final class GameScene: SKScene {
                 self?.voteStage(StageChoice(rawValue: index) ?? .wreckCenter, by: voter)
             }
             for (voter, vote) in stageVotes { select.show(vote: vote.rawValue, by: voter) }
+            // Back to the title from the first pick offline, before anything's been played.
+            if online == nil, series.stagesPlayed == 0 { select.back = { [weak self] in self?.enter(.title) } }
             screen = select
         case .paused:
             let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight,
                                     onRestart: { [weak self] in self?.restartMatch() },
                                     onTitle: { [weak self] in self?.enter(.title) },
                                     onResume: { [weak self] in self?.enter(.playing) })
+            pause.back = { [weak self] in self?.enter(.playing) }
             screen = pause
         case .won:
             let winner = gameMode == .fortySeven ? (fortySevenScores.firstIndex { $0 >= FortySevenRules.target } ?? 0) : (series.winner ?? 0)

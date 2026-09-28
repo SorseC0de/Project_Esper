@@ -20,9 +20,9 @@ final class SoundBoard {
         case countThree = "3"
         case esperSlash = "esper_slash"
         case jump
-        case lightningOne = "lightning1"
-        case lightningTwo = "lightning2"
-        case lightningThree = "lightning3"
+        case lightningOne = "lightning_hit1"
+        case lightningTwo = "lightning_hit2"
+        case lightningThree = "lightning_hit3"
         case menuBack = "menu_back"
         case menuSelect = "menu_select"
         case menuSelectV2 = "menu_select_v2"
@@ -167,7 +167,9 @@ final class SoundBoard {
     nonisolated private static let reversed: Set<Effect> = [.menuSelectV2]
     /// Louder than their files, which a voice's volume can't go past: the step is recorded
     /// very quietly, its peak at 3% of full.
-    nonisolated private static let gain: [Effect: Float] = [.step: 2]
+    /// The lightning hits are recorded hot, about -9 dB while sounding: a quarter brings them
+    /// to about -21, beside the swish and the announcer.
+    nonisolated private static let gain: [Effect: Float] = [.step: 2, .lightningOne: 0.25, .lightningTwo: 0.25, .lightningThree: 0.25]
     /// Sounds made of more than one file, mixed as they're read, each at its own level: the
     /// parry's two halves at 0.3, which sets them beside the hit, the snatch and the catch.
     nonisolated private static let layers: [Effect: [(file: String, level: Float)]] = [.parry: [("parry", 0.3), ("parry2", 0.3)]]

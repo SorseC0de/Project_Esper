@@ -423,10 +423,12 @@ final class SpriteLibrary {
             return false
         }
 
-        // Stroked parts: the body pixels next to them take the line, so the part keeps its shape.
-        if !look.strokedParts.isEmpty {
-            let stroked = parts.map { $0.map(look.strokedParts.contains) ?? false }
-            for pixel in 0..<count where parts[pixel] != nil && !stroked[pixel] && neighbours(pixel, { stroked[$0] }) {
+        // Stroked groups: the body pixels next to one take the line, so it keeps its shape. A
+        // pixel already lined is neither lined again nor counted as the group's, so where two
+        // groups meet there's one line, not two.
+        for group in look.strokedGroups {
+            let stroked = (0..<count).map { parts[$0].map(group.contains) == true && !lined[$0] }
+            for pixel in 0..<count where parts[pixel] != nil && !stroked[pixel] && !lined[pixel] && neighbours(pixel, { stroked[$0] }) {
                 paint(pixels, pixel * 4, look.outline)
                 lined[pixel] = true
             }

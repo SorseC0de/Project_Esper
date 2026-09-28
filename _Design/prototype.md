@@ -583,12 +583,19 @@ head #20D6C7, ball #FFFFFF, torso #FA6A0A and pelvis #BB7547, front thigh #FFD54
 #FFFC40, back thigh #73172D and leg #B4202A (the thigh the darker, as the arms and front leg
 go dark to light), front arm #59C135 and hand #9CDB43, back arm #793A80 and hand #BC4A9B; and the feet, the lower leg's last
 third (from the user's walk: the foot starts 70% down from the knee), front #A6FCDB (palette
-21) and back #E86A73 (26), drawn for now as their legs are (`BodyPart.frontFoot`, `backFoot`;
+21) and back #E86A73 (26), drawn as shoes, palette 22 #FFFFFF in front and 38 #B3B9D1 behind (`Look.frontShoe`, `backShoe`; `BodyPart.frontFoot`, `backFoot`;
 the sheets as they were before the feet are in `Player Backup/Pre-Feet`);
 the slash's pinks are left alone. Those are the part keys the game reads (`BodyPart`). The
 GMS2 sheets are written as strips in Pixel Art, taking over the GMS2 sprites, and each sheet
 as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s, the palette's
-#242234. An experiment, on (`HumanLook.enabled`; off puts it all back): the players drawn as
+#242234. Besides the silhouette, groups are lined where they lie over the rest of the body, each on
+its own, front to back (`Look.strokedGroups`): the front arm and hand, the head, the torso, each
+shoe (the thighs as a group made a wedge where their line met the torso's); a pixel already lined is neither lined again nor counted as a
+group's, so where two meet there's one line, on the later's pixels, and the earlier reads in
+front: the torso over the legs, the head over all but the arms (the head apart from the body,
+with the human look off, is its own sprite over everything). Each figure is one layer, the body, its line, head, energy,
+cape, ball in hand and flashes, their depths packed under a tenth, so a whole body is in
+front of or behind the other: in front, the one with the ball, else the last to touch it. An experiment, on (`HumanLook.enabled`; off puts it all back): the players drawn as
 people, skin on the head, the arms and hands and the lower legs, the front in palette 35
 #DBA463 and the back in 34 #BB7547, the thighs, torso and pelvis still the energy's; the head
 drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not

@@ -164,6 +164,9 @@ final class GameScene: SKScene {
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
     /// and coloured each frame: the look's outline, or the zone's.
     private var outlineNodes: [SKSpriteNode] = []
+    /// Each player's figure, all of it, in one layer; the one in front a little higher.
+    private var figureLayers: [SKNode] = []
+    private var frontFigure = 0
     /// Pulsepistol Punch's snipe cursor, one a player, shown while they're prone.
     private var snipeCursors: [SKSpriteNode] = []
     private static let snipeCursorSize: CGFloat = 20
@@ -554,12 +557,17 @@ final class GameScene: SKScene {
         buildStage()
 
         for player in match.players {
+            // Everything drawn on one figure in one layer, so a whole body is in front of or
+            // behind the other, its line and all; the figure's own depths packed under 0.1.
+            let figure = SKNode()
+            bodies.addChild(figure)
+            figureLayers.append(figure)
             let node = SKSpriteNode(texture: sprites.texture(player.animationFrame, player: player.index))
-            bodies.addChild(node)
+            figure.addChild(node)
             playerNodes.append(node)
             let outline = SKSpriteNode()
             outline.colorBlendFactor = 1
-            outline.zPosition = 0.1
+            outline.zPosition = 0.005
             node.addChild(outline)
             outlineNodes.append(outline)
             let cursor = SKSpriteNode(texture: SKTexture(imageNamed: "Crosshair"))
@@ -578,25 +586,25 @@ final class GameScene: SKScene {
                 self[keyPath: shadows].append(shadow)
             }
             let head = SKSpriteNode(texture: sprites.headTexture(player.animationFrame, player: player.index))
-            head.zPosition = 4
-            glowers.addChild(head)
+            head.zPosition = 0.04
+            figure.addChild(head)
             headNodes.append(head)
             let energy = SKSpriteNode()
-            energy.zPosition = 3
+            energy.zPosition = 0.03
             energy.isHidden = true
             energy.shader = energyToneShader
-            glowers.addChild(energy)
+            figure.addChild(energy)
             energyNodes.append(energy)
             let charge = SKSpriteNode()
-            charge.zPosition = 5
+            charge.zPosition = 0.05
             charge.isHidden = true
             charge.setScale(EnergyEffect.chargeScale)
-            glowers.addChild(charge)
+            figure.addChild(charge)
             chargeNodes.append(charge)
             let overlay = SKSpriteNode()
-            overlay.zPosition = 6
+            overlay.zPosition = 0.06
             overlay.isHidden = true
-            glowers.addChild(overlay)
+            figure.addChild(overlay)
             chargeOverlays.append(overlay)
             charging.append(false)
             for flashes in [\GameScene.stunBodies, \GameScene.stunHeads] {
@@ -606,9 +614,9 @@ final class GameScene: SKScene {
                 flash.colorBlendFactor = 1
                 flash.blendMode = .alpha
                 flash.alpha = 0.85
-                flash.zPosition = 9
+                flash.zPosition = 0.09
                 flash.isHidden = true
-                glowers.addChild(flash)
+                figure.addChild(flash)
                 self[keyPath: flashes].append(flash)
             }
             headShown.append(.zero)
@@ -626,9 +634,9 @@ final class GameScene: SKScene {
                 segment.colorBlendFactor = 1
                 segment.blendMode = .add
                 segment.alpha = 0.9 - CGFloat(step) * 0.1
-                segment.zPosition = 2
+                segment.zPosition = 0.02
                 segment.isHidden = true
-                glowers.addChild(segment)
+                figure.addChild(segment)
                 segments.append(segment)
             }
             capes.append(segments)
@@ -637,12 +645,12 @@ final class GameScene: SKScene {
             let handBall = SKSpriteNode(texture: sprites.texture("ball", 0))
             handBall.color = colour
             handBall.colorBlendFactor = 1
-            handBall.zPosition = 3
-            glowers.addChild(handBall)
+            handBall.zPosition = 0.03
+            figure.addChild(handBall)
             handBalls.append(handBall)
             let halo = makeHalo(colour)
-            halo.zPosition = 2
-            glowers.addChild(halo)
+            halo.zPosition = 0.02
+            figure.addChild(halo)
             handHalos.append(halo)
             let esper = makeEsper(colour)
             esper.particleBirthRate = 0
@@ -3729,6 +3737,9 @@ final class GameScene: SKScene {
         sectionMark = CACurrentMediaTime()
         stepHeadParticles()
         section("particles")
+        // The figure in front: the one with the ball, else the last to touch it.
+        if let front = match.ball.holder ?? match.ball.lastTouched { frontFigure = front }
+        for (index, figure) in figureLayers.enumerated() { figure.zPosition = index == frontFigure ? 0.5 : 0 }
         for (index, player) in match.players.enumerated() {
             let node = playerNodes[index]
             let frame = player.animationFrame

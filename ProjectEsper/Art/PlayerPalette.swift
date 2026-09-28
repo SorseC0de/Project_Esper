@@ -77,8 +77,9 @@ struct Look: Hashable {
     /// the pixel palette's outline.
     var outline: RGB = PixelPalette.outline
     var outlineWidth = 1
-    /// Parts also outlined where they lie over the rest of the body, so they read on their own.
-    var strokedParts: Set<BodyPart> = []
+    /// Groups of parts also outlined where they lie over the rest of the body, so each reads
+    /// on its own; parts in one group take no line between them.
+    var strokedGroups: [Set<BodyPart>] = []
 
     /// The body in its colour and the back limbs in a greyed, darker version of it, the head
     /// and the ball in the team colour, a black line round the body, and the front arm
@@ -93,11 +94,18 @@ struct Look: Hashable {
         if HumanLook.enabled {
             for (part, skin) in HumanLook.skin { colours[part] = skin }
         }
-        // The feet, marked on the sheets, are drawn as their legs are for now.
-        colours[.frontFoot] = colours[.frontLeg]
-        colours[.backFoot] = colours[.backLeg]
-        return Look(colours: colours, glow: glow, strokedParts: [.frontArm, .frontHand])
+        // The feet, marked on the sheets: shoes, palette 22 in front and 38 behind.
+        colours[.frontFoot] = Look.frontShoe
+        colours[.backFoot] = Look.backShoe
+        return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups)
     }
+
+    static let frontShoe = PixelPalette.colours[22], backShoe = PixelPalette.colours[38]
+    /// Lined on their own, front to back: where two meet, the first's line sits on the
+    /// second's pixels, so the first reads in front. The front arm and hand over everything,
+    /// then the head, the torso over the legs, each shoe. (The thighs as a group made a
+    /// wedge where their line met the torso's.)
+    static let strokedGroups: [Set<BodyPart>] = [[.frontArm, .frontHand], [.head], [.torso], [.frontFoot], [.backFoot]]
 
     /// A grey level as a tone of the team colour, for everything that's energy: the
     /// blade, the puffs and streaks, the effect sheets. Black up to the colour over the

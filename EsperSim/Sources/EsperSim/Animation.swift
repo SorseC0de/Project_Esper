@@ -37,13 +37,14 @@ public enum Animation: String, CaseIterable {
     case dunk = "player_dunk"
     case gunShoot = "player_gun_shoot"
     case gunShootAir = "player_gun_shoot_air"
+    case gunSnipe = "player_gun_snipe"
     case gunRun = "player_gun_run"
     case gunRunShoot = "player_gun_run_shoot"
     case hurt = "player_hurt"
 
     public var frameCount: Int {
         switch self {
-        case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir: 10
+        case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir, .gunSnipe: 10
         case .hurt: 4
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall: 3
@@ -151,7 +152,12 @@ extension Player {
             if gunRunTimer > 0 { return AnimationFrame(.gunRunShoot, (PulseRules.runShotFrames - gunRunTimer) * 15 / 60) }
             return AnimationFrame(holding ? .dribbleRun : .run, Int(animationPhase) % 8)
         case .crouch:
+            // Pulsepistol Punch at level two holds the crouch's first frame on the way into the snipe.
+            if power == .pulsepistol, powerLevel >= 2, !holding { return AnimationFrame(.crouch, 0) }
             return AnimationFrame(.crouch, (t * 15 / 60) % 10)
+        case .gunSnipe:
+            // The aim held on the first frame; a shot plays the sheet through.
+            return AnimationFrame(.gunSnipe, snipeFire > 0 ? min(snipeFire * 15 / 60, 9) : 0)
         case .crouchWalk:
             return AnimationFrame(.crouchWalk, Int(animationPhase) % 10)
         case .slide:

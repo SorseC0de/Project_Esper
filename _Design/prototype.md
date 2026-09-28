@@ -301,6 +301,15 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   stride on the run, and throw is the pull, the same pulse bringing everything toward
   the body. Numbers in `PulseRules`.
 
+  Level two also snipes: with nothing in hand, down held in a crouch 30 frames (the crouch's
+  first frame held meanwhile) goes prone into `player_gun_snipe`, its first frame held. A
+  crosshair (`crosshair.svg`, 20 art pixels, out of the glow) starts 60 ahead of the hand and
+  the stick moves it anywhere on the stage, 3 a frame, not the body; shoot fires a repulsion and
+  throw an attraction at it (the sheet played through, the shot on its third frame, the pulse's
+  cooldown): whatever is within 12 of the cursor is sent the shot's way, from the hand to the
+  cursor, or back toward the shooter, a body knocked 3 with 1.5 of lift (a held ball popping, no
+  stun), the ball at 5. As kinetic and unseen as the pulse. Jump gets up; being hit or stunned
+  ends it (`SnipeRules`).
 - Surf Soda (K). Running, the body
   rides a board, the skid sheet's first frame still, leaning back 45° in a wheelie on the
   board's tail so the board stands up ahead as a shield, easing there and, stopping, back

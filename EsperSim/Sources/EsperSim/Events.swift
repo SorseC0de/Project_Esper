@@ -67,6 +67,7 @@ public enum MatchEvent: Equatable {
     case fireballThrown(player: Int)
     case fireballBurst(at: Vec2)
     case pulsed(player: Int, pull: Bool)
+    case sniped(player: Int, at: Vec2, pull: Bool)
     /// Pushed or pulled by a pulse, not stunned: `ball` when the ball left the hands with it.
     case pushed(player: Int, by: Int, ball: Bool)
 }
@@ -88,4 +89,6 @@ public enum PlayerAction: Equatable {
     case leaveFlame
     case releaseFireball(velocity: Vec2, straight: Bool, ballArc: Bool)
     case pulse(pull: Bool)
+    /// The snipe's shot at `at`: a repulsion, or with `pull` an attraction.
+    case snipe(at: Vec2, pull: Bool)
 }

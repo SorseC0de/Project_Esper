@@ -164,6 +164,9 @@ final class GameScene: SKScene {
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
     /// and coloured each frame: the look's outline, or the zone's.
     private var outlineNodes: [SKSpriteNode] = []
+    /// Pulsepistol Punch's snipe cursor, one a player, shown while they're prone.
+    private var snipeCursors: [SKSpriteNode] = []
+    private static let snipeCursorSize: CGFloat = 20
     /// The charge round each player's ball while a throw is held, and whether it showed
     /// last frame, so the throw's release can be caught.
     private var chargeNodes: [SKSpriteNode] = []
@@ -301,6 +304,12 @@ final class GameScene: SKScene {
         // The hoops: their backboards read too hot with the glow on them.
         var flat = rimNodes.filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size) }
+        }
+        // The snipe's cursors, drawn as they are.
+        for cursor in snipeCursors where !cursor.isHidden {
+            if let texture = cursor.texture {
+                flat.append(BodySnapshot(texture: texture, position: cursor.position, anchor: cursor.anchorPoint, xScale: 1, size: cursor.size))
+            }
         }
         // The bodies' lines, which are drawn as they are and never glow.
         for (body, outline) in zip(playerNodes, outlineNodes) where !body.isHidden && !outline.isHidden {
@@ -553,6 +562,12 @@ final class GameScene: SKScene {
             outline.zPosition = 0.1
             node.addChild(outline)
             outlineNodes.append(outline)
+            let cursor = SKSpriteNode(texture: SKTexture(imageNamed: "Crosshair"))
+            cursor.size = CGSize(width: GameScene.snipeCursorSize, height: GameScene.snipeCursorSize)
+            cursor.zPosition = 40
+            cursor.isHidden = true
+            glowers.addChild(cursor)
+            snipeCursors.append(cursor)
             for shadows in [\GameScene.shadowBodies, \GameScene.shadowHeads] {
                 let shadow = SKSpriteNode()
                 shadow.shader = shadowShader
@@ -2390,6 +2405,9 @@ final class GameScene: SKScene {
             case .pulsed(let index, let pull):
                 // Kinetic and unseen: the bar shows only with the hitboxes on.
                 if showHitboxes { spawnPulse(by: index, pull: pull) }
+            case .sniped:
+                // As kinetic as the pulse: the cursor is all there is to see.
+                break
             case .shot(let index), .thrown(let index), .dunked(let index):
                 ballTeam = SKColor(rgb: sprites.look(for: index).glow)
                 ballHold = 1
@@ -2996,6 +3014,7 @@ final class GameScene: SKScene {
     private func warmDrawnArt() {
         var made: [SKTexture] = []
         if let board = boardTexture(for: 0) { made.append(board) }
+        made += snipeCursors.compactMap(\.texture)
         for index in match.players.indices {
             for variant in 0..<FieldRules.helmetVariants {
                 if let helmet = helmetTexture(variant: variant, colour: SKColor(rgb: sprites.look(for: index).glow)) { made.append(helmet) }
@@ -3777,6 +3796,10 @@ final class GameScene: SKScene {
                 flash.yScale = source.yScale
                 flash.zRotation = source.zRotation
             }
+
+            // Prone in the snipe, the cursor where it's aimed.
+            snipeCursors[index].isHidden = player.state != .gunSnipe
+            if player.state == .gunSnipe { snipeCursors[index].position = SpriteLibrary.point(player.snipeCursor) }
 
             // The line round the body, in the look's outline or cycling through the zone's.
             let outlineNode = outlineNodes[index]

@@ -253,6 +253,8 @@ public struct Match: Equatable {
             events.append(.flameLeft(player: index, at: player.position))
         case .pulse(let pull):
             pulse(by: index, pull: pull)
+        case .snipe(let at, let pull):
+            snipe(by: index, at: at, pull: pull)
         case .dunk(let hoop):
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
         case .webLine(let direction):
@@ -542,6 +544,31 @@ public struct Match: Equatable {
         }
         if ball.isLive, ball.frozen == 0, ball.box.overlaps(pillar) {
             ball.velocity = Vec2(x: PulseRules.ballPush.x * way, y: PulseRules.ballPush.y)
+            ball.straight = false
+            ball.floater = 0
+            ball.steers = false
+            ball.shotInFlight = false
+            ball.resting = false
+            ball.lastTouched = index
+        }
+    }
+
+    /// Pulsepistol Punch's snipe: whatever is within reach of the cursor is sent the shot's
+    /// way, from the shooter's hand to the cursor, or with `pull` back toward the shooter;
+    /// a held ball pops free, no stun.
+    private mutating func snipe(by index: Int, at: Vec2, pull: Bool) {
+        let hand = players[index].position + Vec2(x: 0, y: PulseRules.handHeight)
+        let line = at - hand
+        let direction = line.length > 0.001 ? line.normalized : Vec2(x: players[index].facing.sign, y: 0)
+        let way = pull ? direction * -1 : direction
+        events.append(.sniped(player: index, at: at, pull: pull))
+        if let other = players.indices.first(where: { $0 != index }), players[other].frozen == 0,
+           players[other].body.distance(to: at) <= SnipeRules.reach {
+            strip(other, by: index, knock: way * SnipeRules.bodyPush + Vec2(x: 0, y: SnipeRules.bodyLift), stun: false)
+            if !players[other].hasBall, ball.isLive == false, ball.holder == nil { ball.velocity = way * SnipeRules.ballPush }
+        }
+        if ball.isLive, ball.frozen == 0, ball.position.distance(to: at) <= SnipeRules.reach + BallRules.radius {
+            ball.velocity = way * SnipeRules.ballPush
             ball.straight = false
             ball.floater = 0
             ball.steers = false

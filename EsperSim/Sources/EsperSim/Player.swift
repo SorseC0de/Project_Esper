@@ -59,6 +59,8 @@ public enum PlayerState: Equatable, Hashable {
     case webSwing, webPull, webbed
     /// Super Smoothie: flying. Pulsepistol Punch: the shot, standing.
     case flying, gunShoot
+    /// Pulsepistol Punch at level two: prone, aiming a cursor.
+    case gunSnipe
 
     /// The actions Titan Tea does slower.
     public var isAction: Bool {
@@ -71,7 +73,7 @@ public enum PlayerState: Equatable, Hashable {
 
     public var isGroundState: Bool {
         switch self {
-        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .slide: true
+        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .slide, .gunSnipe: true
         default: false
         }
     }
@@ -227,6 +229,10 @@ public struct Player: Equatable {
     /// Frames left of the running shot's pose, and whether the standing shot pulls.
     public var gunRunTimer = 0
     public var gunPull = false
+    /// The snipe's cursor, frames into its shot (0 between shots), and whether that shot pulls.
+    public var snipeCursor = Vec2.zero
+    public var snipeFire = 0
+    public var snipePull = false
     /// Surf Soda: frames into the crescent, the way it runs, whether the board is out in the
     /// air, and the body's turn about its middle.
     public var surfPath = 0
@@ -315,7 +321,7 @@ public struct Player: Equatable {
     /// Crouched or sliding, the body is half as tall, so it fits under what a standing
     /// body can't.
     public var body: Box {
-        let low = state == .crouch || state == .crouchWalk || state == .slide
+        let low = state == .crouch || state == .crouchWalk || state == .slide || state == .gunSnipe
         return Box(min: Vec2(x: position.x - spec.bodyWidth / 2, y: position.y),
                    max: Vec2(x: position.x + spec.bodyWidth / 2, y: position.y + spec.bodyHeight * (low ? 0.5 : 1)))
     }
@@ -444,7 +450,8 @@ public struct Player: Equatable {
         if snatchCooldown > 0 { snatchCooldown -= 1 }
         if ledgeCooldown > 0 { ledgeCooldown -= 1 }
         if hitStun > 0 {
-            // Stunned: no button answers; with the lock on, the stick doesn't either.
+            // Stunned: no button answers; with the lock on, the stick doesn't either. It ends a snipe.
+            if state == .gunSnipe { enter(.idle) }
             hitStun -= 1
             if StunRules.locksMovement {
                 input.stick = .zero
@@ -953,8 +960,34 @@ public struct Player: Equatable {
                 startSlide(events: &events)
             } else if !crouchAsked(input), roomToStand(in: stage) {
                 enter(stickFacing(input) == nil ? .idle : .walk)
+            } else if state == .crouch, snipes, stateTimer >= SnipeRules.holdFrames {
+                // Pulsepistol Punch at level two: down held goes prone into the snipe.
+                snipeCursor = Vec2(x: position.x + facing.sign * SnipeRules.cursorStart, y: position.y + PulseRules.handHeight)
+                snipeFire = 0
+                enter(.gunSnipe)
             } else if (input.stick.x != 0) != (state == .crouchWalk) {
                 enter(input.stick.x != 0 ? .crouchWalk : .crouch)
+            }
+
+        case .gunSnipe:
+            // Prone: the stick moves the cursor, not the body; shoot repels and throw
+            // attracts at it; jump gets up.
+            velocity.x = approach(velocity.x, 0, spec.traction)
+            let top = Double(stage.rows + Stage.skyRows) * Stage.tileSize
+            snipeCursor = Vec2(x: min(max(snipeCursor.x + input.stick.x * SnipeRules.cursorSpeed, 0), stage.width),
+                               y: min(max(snipeCursor.y + input.stick.y * SnipeRules.cursorSpeed, 0), top))
+            if snipeFire > 0 {
+                snipeFire += 1
+                if snipeFire == SnipeRules.fireFrame { wanted = .snipe(at: snipeCursor, pull: snipePull) }
+                if snipeFire >= SnipeRules.shotFrames { snipeFire = 0 }
+            }
+            if jumpPressed {
+                snipeFire = 0
+                enter(.idle)
+            } else if snipeFire == 0, shootPressed || throwPressed, pulseCooldown == 0 {
+                snipeFire = 1
+                snipePull = !shootPressed
+                pulseCooldown = PulseRules.cooldownFrames
             }
 
         case .slide:
@@ -1296,6 +1329,9 @@ public struct Player: Equatable {
     }
 
     /// Down on the stick with nothing in hand.
+    /// Pulsepistol Punch at level two, with nothing in hand: a held crouch goes into the snipe.
+    private var snipes: Bool { power == .pulsepistol && powerLevel >= 2 && !holding }
+
     private func crouchAsked(_ input: PlayerInput) -> Bool {
         spec.canCrouch && !holding && input.stick.y < -0.65
     }

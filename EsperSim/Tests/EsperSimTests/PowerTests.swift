@@ -704,4 +704,42 @@ final class PowerTests: XCTestCase {
         }
         XCTAssertEqual(quakes, 1, "the jump's landing quakes; the other's landing from the knock doesn't")
     }
+
+    // MARK: The snipe
+
+    private func sniping() -> Match {
+        var match = with(.pulsepistol, level: 2)
+        run(&match, frames: SnipeRules.holdFrames + 5, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) })
+        return match
+    }
+
+    func testAHeldCrouchGoesIntoTheSnipeAtLevelTwoOnly() {
+        XCTAssertEqual(sniping().players[0].state, .gunSnipe)
+        var levelOne = with(.pulsepistol, level: 1)
+        run(&levelOne, frames: SnipeRules.holdFrames + 5, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) })
+        XCTAssertEqual(levelOne.players[0].state, .crouch)
+    }
+
+    func testTheStickMovesTheCursorNotTheBody() {
+        var match = sniping()
+        let body = match.players[0].position, cursor = match.players[0].snipeCursor
+        run(&match, frames: 10, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 1)) })
+        XCTAssertEqual(match.players[0].position.x, body.x, accuracy: 0.01)
+        XCTAssertEqual(match.players[0].snipeCursor.x, cursor.x + 10 * SnipeRules.cursorSpeed, accuracy: 0.01)
+        XCTAssertEqual(match.players[0].state, .gunSnipe)
+    }
+
+    func testTheSnipeSendsTheBallTheShotsWayAndJumpGetsUp() {
+        var match = sniping()
+        match.ball.respawn(at: match.players[0].snipeCursor + Vec2(x: 0, y: 30))
+        match.players[0].snipeCursor = match.ball.position
+        match.ball.velocity = .zero
+        run(&match, frames: 2, input: { _ in PlayerInput(shoot: true) })
+        let fired = run(&match, frames: SnipeRules.shotFrames, input: { _ in .idle }) { $0.events.contains { if case .sniped = $0 { true } else { false } } }
+        XCTAssertLessThan(fired, SnipeRules.shotFrames)
+        XCTAssertGreaterThan(match.ball.velocity.x * match.players[0].facing.sign, 0, "away from the shooter")
+        run(&match, frames: SnipeRules.shotFrames, input: { _ in .idle })
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        XCTAssertNotEqual(match.players[0].state, .gunSnipe)
+    }
 }

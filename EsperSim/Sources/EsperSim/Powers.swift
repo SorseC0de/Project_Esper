@@ -149,6 +149,25 @@ public enum BlazeRules {
 /// the body faces, this tall at the hand, that knocks the ball and the other body away
 /// without stunning and without a spark, a held ball popping free. Level two runs while shooting, and throw
 /// is the pull, the same pulse bringing everything toward the body.
+/// Pulsepistol Punch at level two: down held this long in a crouch with no ball goes prone
+/// into the snipe. A cursor starts this far ahead of the hand and moves this fast at full
+/// stick, anywhere on the stage; shoot fires a repulsion and throw an attraction at it,
+/// reaching this far round it, with the pulse's cooldown. The sheet's ten frames at 15 a
+/// second, the shot on its third. Jump, or being hit, ends it.
+public enum SnipeRules {
+    public static let holdFrames = 30
+    public static let cursorStart = 60.0
+    public static let cursorSpeed = 3.0
+    public static let reach = 12.0
+    public static let shotFrames = 40
+    public static let fireFrame = 8
+    /// A body at the cursor is knocked this fast the shot's way, with this lift; the ball
+    /// sent this fast.
+    public static let bodyPush = 3.0
+    public static let bodyLift = 1.5
+    public static let ballPush = 5.0
+}
+
 public enum PulseRules {
     public static let halfHeight = 5.0
     public static let handHeight = 11.0

@@ -25,8 +25,6 @@ public struct Ball: Equatable {
     /// A shot still in flight, before its first bounce: the rings don't take it; only a
     /// snatch does. Bodies never deflect the ball; it goes through anyone not catching it.
     public var shotInFlight = false
-    /// The hoop it last rose up through; its next fall through that hoop isn't a score.
-    public var roseThrough: Int?
     /// Who released or swatted it last.
     public var lastTouched: Int?
     /// Reeled in by a web: the player pulling it.
@@ -96,16 +94,11 @@ public struct Ball: Equatable {
             bounceY(events: &events)
         }
 
-        // Down through a rim scores, unless it rose up through that rim first.
+        // Down through a rim scores, whatever it did before: a floater that rose up through
+        // it from under counts once it falls back in. Going up through one never does.
         for (index, hoop) in stage.hoops.enumerated() where abs(position.x - hoop.position.x) <= BallRules.rimHalfWidth {
             if previousY >= hoop.position.y, position.y < hoop.position.y {
-                if roseThrough == index {
-                    roseThrough = nil
-                } else {
-                    scoredHoop = index
-                }
-            } else if previousY < hoop.position.y, position.y >= hoop.position.y {
-                roseThrough = index
+                scoredHoop = index
             }
         }
 
@@ -205,7 +198,6 @@ public struct Ball: Equatable {
         thrown = straight
         steers = !straight
         shotInFlight = false
-        roseThrough = nil
         lastTouched = player
         launchPoint = position
         owned = true
@@ -239,7 +231,6 @@ public struct Ball: Equatable {
         thrown = false
         steers = false
         shotInFlight = false
-        roseThrough = nil
         tether = nil
         lastTouched = nil
         owned = false
@@ -275,7 +266,6 @@ public struct Ball: Equatable {
         thrown = false
         steers = false
         shotInFlight = false
-        roseThrough = nil
         tether = nil
         lastTouched = nil
         owned = false

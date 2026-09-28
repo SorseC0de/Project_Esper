@@ -185,7 +185,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
   would carry it through the rim, a share a frame, never snapped. Only a shot's or a
   floater's ball, and only until its first bounce off anything; a throw's never. Down
-  through a rim scores unless the ball rose up through that rim first.
+  through a rim scores, whatever the ball did before: a floater that rose up through it
+  from under counts once it falls back in. Going up through a rim never scores.
 
 Out of a run or its pivot with the stick slammed the other way, the jump turns the new way
 (Mario 64's) with the run's whole speed, as it stood before the pivot.

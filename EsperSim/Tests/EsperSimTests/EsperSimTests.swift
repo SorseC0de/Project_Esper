@@ -766,14 +766,16 @@ final class BallTests: XCTestCase {
         XCTAssertTrue(match.ball.steers)
     }
 
-    func testRisingUpThroughTheRimThenFallingBackIsNotAScore() {
+    func testRisingUpThroughTheRimIsNotAScoreButFallingBackInIs() {
         var match = Match()
-        // Straight up through the rim from under it, then down through it again.
+        // Straight up through the rim from under it: no score on the way up.
         match.ball.respawn(at: match.stage.hoops[1].position + Vec2(x: 0, y: -10))
         match.ball.velocity = Vec2(x: 0, y: 4)
-        run(&match, frames: 120, input: { _ in .idle }) { $0.ball.position.y < $0.stage.hoops[1].position.y - 10 && $0.ball.velocity.y < 0 }
-        XCTAssertEqual(match.scores, [0, 0])
-        XCTAssertNil(match.ball.roseThrough)
+        run(&match, frames: 120, input: { _ in .idle }) { $0.ball.velocity.y <= 0 }
+        XCTAssertEqual(match.scores, [0, 0], "going up through the rim")
+        // Then back down through it: that counts.
+        run(&match, frames: 120, input: { _ in .idle }) { $0.scores != [0, 0] }
+        XCTAssertEqual(match.scores.reduce(0, +), 1, "falling back in")
     }
 
     func testABallInTheSparkRingIsCaught() {

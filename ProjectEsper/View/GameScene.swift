@@ -2193,11 +2193,14 @@ final class GameScene: SKScene {
                 shake = max(shake, GameScene.titanStepShake)
             }
         }
-        if GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) { play(.ballBounce, at: feet) }
+        // The dribble's bounce, parked for now; a loose ball's bounces still sound.
+        if GameScene.dribbleSounds, GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) { play(.ballBounce, at: feet) }
     }
 
     /// The frames of a sheet where the ball in hand is at its lowest, under five art pixels
     /// off the floor and no higher than the frames either side: where it meets the floor.
+    /// The dribble's bounce sound, parked: true brings it back.
+    private static let dribbleSounds = false
     private static var bounceFramesCache: [Animation: Set<Int>] = [:]
     private static func dribbleBounceFrames(of animation: Animation) -> Set<Int> {
         if let cached = bounceFramesCache[animation] { return cached }

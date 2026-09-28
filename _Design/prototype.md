@@ -942,7 +942,7 @@ shown, once, like the effects.
 - ball_bounce: every bounce faster than 0.6 across the surface, at full volume from 4;
   and in hand, on the ground, on each frame of a sheet where the landmarks put the ball
   lowest, under five art pixels: the dribbles and the taunt (idle 3 and 8, walk 2 and 6,
-  run 4, taunt 2 and 7).
+  run 4, taunt 2 and 7). The dribble's bounce is parked for now (`GameScene.dribbleSounds`); a loose ball's still sounds.
 - step: the walk and run sheets' frames 0 and 4, on the ground, at twice its file's level.
 - The announcer's 3, 2, 1 (announcer_1..3, or the second set announcer_1-2..3-2 on the COUNT
   picker, A or B): each number of the count as it goes up, in play.

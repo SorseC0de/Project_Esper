@@ -105,6 +105,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let cubeVertices: MTLBuffer?
     private var cubeInstanceBuffers: [MTLBuffer] = []
     private static let cubeCapacity = 512
+    /// The players' bodies and lines on black, by a renderer of their own, drawn only on a
+    /// frame with cubes behind the players, which leave out whatever it covers.
+    private let occluderScene = MaskScene()
+    private let occluderRenderer: SKRenderer
+    private var occluderTexture: MTLTexture?
     private var framesDrawn = 0
     private var fpsWindowStart = CACurrentMediaTime()
     private var lastDraw = CACurrentMediaTime()
@@ -140,6 +145,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         maskRenderer.scene = maskScene
         ballCamRenderer = SKRenderer(device: device)
         ballCamRenderer.scene = ballCamScene
+        occluderRenderer = SKRenderer(device: device)
+        occluderRenderer.scene = occluderScene
 
         let library = device.makeDefaultLibrary()!
         func pipeline(_ fragment: String) -> MTLRenderPipelineState {
@@ -205,6 +212,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         sceneTexture = makeTexture(width: Int(size.width), height: Int(size.height))
         sceneDepthStencil = makeTexture(width: Int(size.width), height: Int(size.height), pixelFormat: .depth32Float_stencil8)
         bodyMask = makeTexture(width: Int(size.width), height: Int(size.height))
+        occluderTexture = makeTexture(width: Int(size.width), height: Int(size.height))
         makeGlowTextures(for: size)
         scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor, insets: view.safeAreaInsets)
     }
@@ -301,7 +309,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         scenePass.stencilAttachment.storeAction = .dontCare
         skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: sceneTexture.width, height: sceneTexture.height),
                           commandBuffer: sceneCommands, renderPassDescriptor: scenePass)
-        drawCubes(sceneCommands, into: sceneTexture, depth: sceneDepthStencil, frame: frame)
+        drawCubes(sceneCommands, into: sceneTexture, depth: sceneDepthStencil, frame: frame, now: now)
         sceneCommands.commit()
         lap("scene")
 
@@ -355,9 +363,28 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
     /// The scene's cubes over what SpriteKit drew, on the scene's camera: orthographic, one
     /// art pixel to the scene's, depth only sorting a cube's own faces; lit from above left.
-    private func drawCubes(_ commands: MTLCommandBuffer, into target: MTLTexture, depth: MTLTexture, frame: Int) {
+    private func drawCubes(_ commands: MTLCommandBuffer, into target: MTLTexture, depth: MTLTexture, frame: Int, now: CFTimeInterval) {
         let cubes = Array(scene.cubeInstances.prefix(GlowRenderer.cubeCapacity))
-        guard !cubes.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty else { return }
+        guard !cubes.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
+              let occluderTexture else { return }
+        if cubes.contains(where: { $0.flags.x > 0.5 }) {
+            // The bodies as they stand, for the cubes behind them to keep out of.
+            occluderScene.mirror(scene.occluderSnapshots, flat: [], size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
+            occluderRenderer.update(atTime: now)
+            let occluderPass = MTLRenderPassDescriptor()
+            occluderPass.colorAttachments[0].texture = occluderTexture
+            occluderPass.colorAttachments[0].loadAction = .clear
+            occluderPass.colorAttachments[0].storeAction = .store
+            occluderPass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+            occluderPass.depthAttachment.texture = depth
+            occluderPass.depthAttachment.loadAction = .clear
+            occluderPass.depthAttachment.storeAction = .dontCare
+            occluderPass.stencilAttachment.texture = depth
+            occluderPass.stencilAttachment.loadAction = .clear
+            occluderPass.stencilAttachment.storeAction = .dontCare
+            occluderRenderer.render(withViewport: CGRect(x: 0, y: 0, width: occluderTexture.width, height: occluderTexture.height),
+                                    commandBuffer: commands, renderPassDescriptor: occluderPass)
+        }
         let buffer = cubeInstanceBuffers[frame % cubeInstanceBuffers.count]
         buffer.contents().copyMemory(from: cubes, byteCount: cubes.count * MemoryLayout<CubeInstance>.stride)
         let descriptor = MTLRenderPassDescriptor()
@@ -389,6 +416,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         encoder.setVertexBuffer(buffer, offset: 0, index: 1)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<CubeUniforms>.stride, index: 2)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<CubeUniforms>.stride, index: 2)
+        encoder.setFragmentTexture(occluderTexture, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: CubeMesh.unit.count, instanceCount: cubes.count)
         encoder.endEncoding()
     }

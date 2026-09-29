@@ -385,7 +385,7 @@ final class SpriteLibrary {
             let index = pixel * 4
             // The glowing parts' middles, and the head's however it's drawn: where the head
             // and its particles go.
-            if part.glows || part == .head {
+            if part.glows || part == .head || (HumanLook.enabled && HumanLook.glowingParts.contains(part)) {
                 var sum = sums[part] ?? (0, 0, 0)
                 sum.x += CGFloat(pixel % width) + 0.5
                 sum.y += CGFloat(pixel / width) + 0.5

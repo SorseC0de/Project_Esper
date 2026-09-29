@@ -306,6 +306,18 @@ final class GameScene: SKScene {
         }
     }
 
+    /// The bodies and their lines whole, for the cubes behind the players to keep out of.
+    var occluderSnapshots: [BodySnapshot] {
+        var bodies: [BodySnapshot] = []
+        for (body, outline) in zip(playerNodes, outlineNodes) where !body.isHidden {
+            for texture in [body.texture, outline.isHidden ? nil : outline.texture].compactMap({ $0 }) {
+                bodies.append(BodySnapshot(texture: texture, position: body.position, anchor: body.anchorPoint, xScale: body.xScale,
+                                           size: body.size, zRotation: body.zRotation))
+            }
+        }
+        return bodies
+    }
+
     /// What's drawn in the world but must not glow, for the mask to mark: the hoops and the banner.
     var flatSnapshots: [BodySnapshot] {
         // The hoops: their backboards read too hot with the glow on them.
@@ -1147,6 +1159,8 @@ final class GameScene: SKScene {
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
+            controls.addSlider(title: "LEG CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.legCubeSize) { ParticleLook.legCubeSize = $0 }
+            controls.addSlider(title: "LEG CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.legCubeSpread) { ParticleLook.legCubeSpread = $0 }
             if HumanLook.enabled {
                 // How far down the head the energy's grade reaches; every frame redrawn to it.
                 controls.addSlider(title: "HEAD GRADIENT", range: 0...1, notch: 0.01, value: Float(HumanLook.headEnergyShare)) { [weak self] value in
@@ -2650,6 +2664,10 @@ final class GameScene: SKScene {
         var zoneTinted = false
         /// Its particles are cubes, drawn by the Metal layer.
         var cubes = false
+        /// Off a leg: the leg cubes' size and spread.
+        var legs = false
+        /// Drawn behind the players: the back leg's.
+        var behind = false
     }
 
     private struct HeadParticle {
@@ -2665,6 +2683,8 @@ final class GameScene: SKScene {
         var drifts = true
         /// A cube's turn, its spin, and its colour; its node, hidden, carries the rest.
         var cube: (orientation: simd_quatf, spin: SIMD3<Float>, colour: SIMD4<Float>)?
+        var legCube = false
+        var behind = false
     }
 
     private var headParticles: [HeadParticle] = []
@@ -2675,14 +2695,24 @@ final class GameScene: SKScene {
         headParticles.compactMap { particle in
             guard let cube = particle.cube else { return nil }
             let node = particle.node
-            let size = ParticleLook.cubeSize * Float(node.xScale)
+            let size = (particle.legCube ? ParticleLook.legCubeSize : ParticleLook.cubeSize) * Float(node.xScale)
             let model = simd_float4x4.translation(SIMD3<Float>(Float(node.position.x), Float(node.position.y), 0))
                 * simd_float4x4(cube.orientation) * simd_float4x4.scale(SIMD3<Float>(repeating: size))
             var colour = cube.colour
             colour.w = Float(node.alpha)
-            return CubeInstance(model: model, color: colour)
+            return CubeInstance(model: model, color: colour, flags: SIMD4<Float>(particle.behind ? 1 : 0, 0, 0, 0))
         }
     }
+    /// A leg's cubes, in the leg's own colour, the back leg's behind the players; each leg's
+    /// credit apart from the head's.
+    private static let legCreditKey = 1000
+    private func legStream(_ index: Int, part: BodyPart) -> HeadStream {
+        let look = sprites.look(for: index)
+        return HeadStream(frames: [sprites.flatSquare(size: 4, alpha: 1)], size: ParticleLook.energySize,
+                          tint: SKColor(rgb: look.colours[part] ?? look.glow), rate: Double(ParticleLook.legCubeRate),
+                          zoneTinted: true, cubes: true, legs: true, behind: part == .backLeg)
+    }
+
     /// The ball's fire trail: its credit apart from the heads', at twice a head's rate.
     private static let ballFireCreditKey = -1
     private static let ballFireRate = 2.0
@@ -2730,8 +2760,8 @@ final class GameScene: SKScene {
     /// fire trail uses the same, under its own credit and at its own rate, `trailing` the
     /// way the particles go, back along the ball's path and turned to it.
     private func emitHeadParticles(_ index: Int, power: Power, at point: CGPoint, creditKey: Int? = nil, rateScale: Double = 1,
-                                   trailing: CGVector? = nil) {
-        let streams = headStreams(index, power: power)
+                                   trailing: CGVector? = nil, streams given: [HeadStream]? = nil) {
+        let streams = given ?? headStreams(index, power: power)
         let creditKey = creditKey ?? index
         var credit = headCredit[creditKey] ?? []
         while credit.count < streams.count { credit.append(0) }
@@ -2753,7 +2783,7 @@ final class GameScene: SKScene {
                 node.blendMode = .alpha
                 node.zPosition = 1
                 // Cubes let go across the spread, so they don't rise in one tail.
-                let spread = stream.cubes ? CGFloat(ParticleLook.cubeSpread) : 1
+                let spread = stream.legs ? CGFloat(ParticleLook.legCubeSpread) : (stream.cubes ? CGFloat(ParticleLook.cubeSpread) : 1)
                 node.position = CGPoint(x: point.x + CGFloat.random(in: -spread...spread), y: point.y + CGFloat.random(in: -spread / 2...spread / 2))
                 if stream.frames.count == 1 { node.zRotation = CGFloat.random(in: 0...(2 * .pi)) }
                 glowers.addChild(node)
@@ -2779,7 +2809,7 @@ final class GameScene: SKScene {
                 let life = frames.count > 1 ? Double(frames.count) / 24 : 0.6 + Double.random(in: -0.05...0.05)
                 headParticles.append(HeadParticle(node: node, owner: index, velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
                                                   age: 0, life: life, frames: frames,
-                                                  startFrame: Int.random(in: 0..<frames.count), drifts: trailing == nil, cube: cube))
+                                                  startFrame: Int.random(in: 0..<frames.count), drifts: trailing == nil, cube: cube, legCube: stream.legs, behind: stream.behind))
             }
         }
         headCredit[creditKey] = credit
@@ -4070,6 +4100,16 @@ final class GameScene: SKScene {
                     let head = landmark * drawScale
                     let at = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                     emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + 4))
+                }
+            }
+            // A human's legs, in the energy's colours, give off smaller cubes of their own.
+            if HumanLook.enabled, ParticleLook.cubes {
+                for (slot, part) in [BodyPart.frontLeg, .backLeg].enumerated() {
+                    guard let landmark = sprites.landmark(part, in: frame, player: index) else { continue }
+                    let leg = landmark * drawScale
+                    let at = node.position + leaned(CGPoint(x: leg.x * CGFloat(player.facing.sign), y: leg.y))
+                    emitHeadParticles(index, power: player.power, at: at, creditKey: GameScene.legCreditKey + index * 2 + slot,
+                                      streams: [legStream(index, part: part)])
                 }
             }
 

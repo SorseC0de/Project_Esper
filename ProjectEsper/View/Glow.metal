@@ -114,6 +114,8 @@ struct CubeVertex {
 struct CubeInstance {
     float4x4 model;
     float4 color;
+    // x: 1 for a cube drawn behind the players, hidden wherever a body is.
+    float4 flags;
 };
 
 struct CubeUniforms {
@@ -125,6 +127,7 @@ struct CubeFragment {
     float4 position [[position]];
     float3 normal;
     float4 color;
+    float behind;
 };
 
 vertex CubeFragment cube_vertex(uint vid [[vertex_id]],
@@ -138,11 +141,15 @@ vertex CubeFragment cube_vertex(uint vid [[vertex_id]],
     out.position = uniforms.viewProjection * (inst.model * float4(v.position.xyz, 1));
     out.normal = normalize((inst.model * float4(v.normal.xyz, 0)).xyz);
     out.color = inst.color;
+    out.behind = inst.flags.x;
     return out;
 }
 
 fragment float4 cube_fragment(CubeFragment in [[stage_in]],
-                              constant CubeUniforms &uniforms [[buffer(2)]]) {
+                              constant CubeUniforms &uniforms [[buffer(2)]],
+                              texture2d<float, access::read> bodies [[texture(0)]]) {
+    // Behind the players: nothing where a body or its line is drawn.
+    if (in.behind > 0.5 && any(bodies.read(uint2(in.position.xy)).rgb > 0.02)) discard_fragment();
     // Energy, not a solid: no face goes dark, and the one facing the light runs toward
     // white, so the turn reads while the whole cube glows in its colour.
     float lit = max(dot(normalize(in.normal), normalize(uniforms.light.xyz)), 0.0);

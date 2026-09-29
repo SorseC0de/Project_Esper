@@ -6,10 +6,12 @@ struct CubeVertex {
     var normal: SIMD4<Float>
 }
 
-/// Matches `CubeInstance` in Glow.metal: a cube somewhere, turned and sized, in a colour.
+/// Matches `CubeInstance` in Glow.metal: a cube somewhere, turned and sized, in a colour,
+/// drawn behind the players when `flags.x` is 1.
 struct CubeInstance {
     var model: simd_float4x4
     var color: SIMD4<Float>
+    var flags = SIMD4<Float>(0, 0, 0, 0)
 }
 
 /// Matches `CubeUniforms` in Glow.metal.

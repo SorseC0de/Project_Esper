@@ -71,6 +71,11 @@ enum ParticleLook {
     static let cubeSliders = true
     nonisolated(unsafe) static var cubeSize: Float = 3
     static let cubeRate: Float = 24
+    /// A human's legs' own cubes, smaller: size and spread as the head's, on sliders beside
+    /// them; this many a second off each leg, cubes only.
+    nonisolated(unsafe) static var legCubeSize: Float = 2
+    nonisolated(unsafe) static var legCubeSpread: Float = 1
+    static let legCubeRate: Float = 12
     nonisolated(unsafe) static var cubeSpread: Float = 5
     static let cubeSpin: Float = 6
     /// Each head particle's size, in art pixels square.

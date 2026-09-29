@@ -934,7 +934,8 @@ by NET TILT X (−20°), TURN Y and ROLL Z (0), mirrored on a left backboard; ea
 thick through the cube renderer, glowing, left out wherever a body or a rim's art is drawn, so
 it hangs behind the players and the rim and over the backboard; each ring swaying with its row of
 the flat net's cloth, which runs unseen. The sliders are in the match with the tuning on, and on
-Longball Stadium. The flat net underneath, and with the cylinder off, is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
+Longball Stadium; what they set is saved, and `NetTuning.bakedVersion` going up drops every saved
+net value once at launch, so the values baked in come back. The flat net underneath, and with the cylinder off, is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
 (3) art pixels apart across and NET ROWS (2, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.25) of
 the way to the neighbour it's knotted to on that row, toward the right-hand one on one row and
 the left-hand one on the next, an edge strand with no one that side hanging straight, so the

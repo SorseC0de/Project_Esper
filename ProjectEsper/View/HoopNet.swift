@@ -83,6 +83,21 @@ enum NetTuning {
     static var tilt: CGFloat { stored(tiltKey) ?? -20 }
     static var turn: CGFloat { stored(turnKey) ?? 0 }
     static var roll: CGFloat { stored(rollKey) ?? 0 }
+    /// Every saved net value dropped once when `bakedVersion` goes up, so the values baked in
+    /// here come back over whatever a slider last saved.
+    static let bakedVersion = 1
+    private static let bakedVersionKey = "ui.net.bakedVersion"
+    static func dropSavedIfStale() {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: bakedVersionKey) != bakedVersion else { return }
+        let looks: [StageLook] = [.court, .footballField]
+        let keys = [topScaleKey, bottomScaleKey, spreadKey, rowSpacingKey, weaveKey, taperKey, skewKey,
+                    radiusTopKey, radiusBottomKey, ringsKey, aroundKey, tiltKey, turnKey, rollKey]
+            + looks.flatMap { [offsetXKey(for: $0), offsetYKey(for: $0)] }
+        for key in keys { defaults.removeObject(forKey: key) }
+        defaults.set(bakedVersion, forKey: bakedVersionKey)
+    }
+
     /// What the mesh is built from; a change rebuilds it.
     static var meshValues: [CGFloat] { [spread, rowSpacing, weave, taper, skew] }
     private static func stored(_ key: String) -> CGFloat? {

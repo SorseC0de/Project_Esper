@@ -501,6 +501,7 @@ final class GameScene: SKScene {
     private func build() {
         // The vehicles' shapes as last set in the bounds gallery, offline.
         BoundsGallery.loadSaved()
+        NetTuning.dropSavedIfStale()
         // The colours as last picked, before anything is drawn in them.
         for (index, colour) in EnergyColour.pair(first: EnergyColour.saved, second: .teal).enumerated() {
             sprites.setLook(colour.look, for: index)

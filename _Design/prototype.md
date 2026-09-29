@@ -700,7 +700,9 @@ on debug sliders with `cubeSliders`; stepping down with the squares' sizes), sha
 in its colour, no face dark, the face to the light running toward white: one instanced Metal draw into the scene after SpriteKit, before the glow (borrowed from Project RingOut). The `esper_spark` frames (`ParticleLook.sprites`) are parked under it. A human's lower legs give off cubes of their own, in each leg's colour, from the leg's middle, the back leg's drawn behind the players (a silhouette of the bodies and their lines, drawn only on a frame with such a cube, keeps them out of wherever a body is): `legCubeSize` (2) and `legCubeSpread` (1) on the LEG CUBE sliders, `legCubeRate` (12) a second a leg. The jump spark and the dash's and slide's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour, but stop at the colour itself,
 never lighter (`Look.sparkTone`), as the legs and the crown do; so do the wall spark and the
-sheets' own energy, the skid's puffs, the slide's lines, the slash's blade. A held throw shows the
+sheets' own energy, the skid's puffs, the slide's lines, the slash's blade. The catch spark,
+the snatch's and the catch's, is toned in the player's colour on the paler ramp, a quarter
+way to white at its lightest (`Look.energyTone`). A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
 and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on

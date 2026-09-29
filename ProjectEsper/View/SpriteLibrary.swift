@@ -768,16 +768,17 @@ enum EnergyEffect: CaseIterable {
 }
 
 /// One-shot sprites: sparks, smoke, the swish, and Blazing Boba's fire and Flash Fizz's
-/// flash, painted as they are. Each plays through and removes itself. The jump spark and
-/// the smoke are drawn in the player's energy colour.
+/// flash, painted as they are. Each plays through and removes itself. The jump spark, the
+/// smoke and the catch spark are drawn in the player's energy colour.
 enum Effect {
     case smoke, jumpSpark, catchSpark, wallJumpSpark
     case fireJump, fireDash, fireWallSpark, fireSkid, fireTrail, fireCharge, fireCharge2, fireExplosion, fireballSummon
     case flashSpark, flashSpark2
 
-    static let inEnergyColour: [Effect] = [.smoke, .jumpSpark]
-    /// Toned no lighter than the energy colour itself: the jump spark, and the smoke of the dash and slide.
-    static let sparkNames: Set<String> = Set(inEnergyColour.map(\.name))
+    static let inEnergyColour: [Effect] = [.smoke, .jumpSpark, .catchSpark]
+    /// Toned no lighter than the energy colour itself: the jump spark, and the smoke of the
+    /// dash and slide. The catch spark keeps the paler ramp.
+    static let sparkNames: Set<String> = [Effect.smoke.name, Effect.jumpSpark.name]
 
     var name: String {
         switch self {

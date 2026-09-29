@@ -2409,7 +2409,7 @@ final class GameScene: SKScene {
                     spawnHitSpark(player: index, at: player.handCatchPoint)
                 default:
                     // On the hand, and riding the body from there.
-                    let spark = Effect.catchSpark.node(sprites, at: SpriteLibrary.point(player.position + offset), flipped: player.facing == .left)
+                    let spark = Effect.catchSpark.node(sprites, at: SpriteLibrary.point(player.position + offset), flipped: player.facing == .left, player: index)
                     glowers.addChild(spark)
                     riders.append((spark, index, offset))
                 }
@@ -2440,7 +2440,7 @@ final class GameScene: SKScene {
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: 0, y: 5)), count: 4, spread: 10) }
             case .caught(let index):
                 let player = match.players[index]
-                spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left)
+                spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left, player: index)
             case .doubleJumped(let index):
                 let player = match.players[index]
                 spawnJumpRings(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow))

@@ -18,6 +18,8 @@ public enum MatchEvent: Equatable {
     case scored(player: Int, hoop: Int, entry: Vec2, points: Int, floater: Bool)
     /// `speed`: how fast it met the surface, across it.
     case ballBounced(position: Vec2, speed: Double)
+    /// A body or a ball came down on a rim's top and bounced off it; how fast it came.
+    case rimBounced(hoop: Int, speed: Double)
     case ballRespawned
     case helmetSpawned(at: Vec2, owner: Int)
     /// Gone at the far wall.

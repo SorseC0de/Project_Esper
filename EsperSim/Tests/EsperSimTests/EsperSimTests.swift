@@ -707,10 +707,43 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.holder, 0)
     }
 
+    func testABodyCantStandOnTheRimItBounces() {
+        var match = Match()
+        let rim = match.stage.hoops[1].position
+        // Over the rim's far side from the backboard, out of the block corner's reach.
+        match.players[0].position = rim + Vec2(x: -9, y: 30)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        var bounces = 0
+        for _ in 0..<120 {
+            match.advance(inputs: [.idle, .idle])
+            bounces += match.events.filter { if case .rimBounced(hoop: 1, _) = $0 { return true } else { return false } }.count
+            XCTAssertFalse(match.players[0].grounded && abs(match.players[0].position.y - rim.y) < 0.01, "never standing on it")
+        }
+        XCTAssertGreaterThan(bounces, 1)
+    }
+
+    func testOnlyAScoringBallGoesThroughTheRim() {
+        for scoring in [false, true] {
+            var match = Match()
+            match.ball.respawn(at: match.stage.hoops[1].position + Vec2(x: 0, y: 20))
+            match.ball.velocity = .zero
+            match.ball.scoring = scoring
+            var bounced = false
+            for _ in 0..<60 where match.scores[0] == 0 {
+                match.advance(inputs: [.idle, .idle])
+                if match.events.contains(where: { if case .rimBounced = $0 { return true } else { return false } }) { bounced = true }
+            }
+            XCTAssertEqual(match.scores[0], scoring ? 1 : 0)
+            XCTAssertEqual(bounced, !scoring)
+        }
+    }
+
     func testShotFallingBesideTheRimIsSteeredIn() {
         var match = Match()
         match.ball.position = match.stage.hoops[1].position + Vec2(x: -10, y: 20)
         match.ball.velocity = Vec2(x: 0.3, y: 0)
+        match.ball.scoring = true
         for _ in 0..<120 where match.scores[0] == 0 {
             match.advance(inputs: [.idle, .idle])
         }
@@ -723,6 +756,7 @@ final class BallTests: XCTestCase {
         match.players[0].position.x = 250
         match.ball.position = match.stage.hoops[1].position + Vec2(x: 0, y: 20)
         match.ball.velocity = .zero
+        match.ball.scoring = true
         for _ in 0..<120 where match.scores[0] == 0 {
             match.advance(inputs: [.idle, .idle])
         }
@@ -854,6 +888,7 @@ final class BallTests: XCTestCase {
         // Straight up through the rim from under it: no score on the way up.
         match.ball.respawn(at: match.stage.hoops[1].position + Vec2(x: 0, y: -10))
         match.ball.velocity = Vec2(x: 0, y: 4)
+        match.ball.scoring = true
         run(&match, frames: 120, input: { _ in .idle }) { $0.ball.velocity.y <= 0 }
         XCTAssertEqual(match.scores, [0, 0], "going up through the rim")
         // Then back down through it: that counts.
@@ -1909,8 +1944,11 @@ final class FootsiesTests: XCTestCase {
         match.players[0].position = Vec2(x: 282, y: 130)
         match.players[0].grounded = false
         match.players[0].enter(.air)
-        run(&match, frames: 90, input: { _ in .idle }) { $0.players[0].grounded }
-        XCTAssertEqual(match.players[0].position.y, 10, accuracy: 0.001)
+        // Down past the block's corner, and onto the rim, which bounces it: never a hang.
+        for _ in 0..<90 {
+            match.advance(inputs: [.idle, .idle])
+            XCTAssertNotEqual(match.players[0].state, .ledgeHang)
+        }
     }
 
     func testAWalkComeIntoFastBrakesAtOnce() {

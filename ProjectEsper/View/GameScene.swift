@@ -262,6 +262,9 @@ final class GameScene: SKScene {
     private var backboardNodes: [SKSpriteNode] = []
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
+    /// Each rim's dip in degrees, down at the front, and how fast it's turning.
+    private var rimDip: [CGFloat] = []
+    private var rimSpin: [CGFloat] = []
     private var previewDots: [SKSpriteNode] = []
     private static let webAimDots = 12
     private let scoreLabel = SKLabelNode()
@@ -322,7 +325,7 @@ final class GameScene: SKScene {
     var flatSnapshots: [BodySnapshot] {
         // The hoops: their backboards read too hot with the glow on them.
         var flat = (backboardNodes + rimNodes).filter { !$0.isHidden }.compactMap { rim in
-            rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size) }
+            rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
         }
         // The snipe's cursors, drawn as they are.
         for cursor in snipeCursors where !cursor.isHidden {
@@ -975,6 +978,8 @@ final class GameScene: SKScene {
             stageGround.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
+            rimDip.append(0)
+            rimSpin.append(0)
             nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
                                 into: stageGround, depth: 5.5))
         }
@@ -992,6 +997,8 @@ final class GameScene: SKScene {
         backboardNodes = []
         rimNodes = []
         rimFlash = []
+        rimDip = []
+        rimSpin = []
         nets = []
         fieldBlooms = []
         lightPanels = []
@@ -2465,6 +2472,8 @@ final class GameScene: SKScene {
             case .caught(let index):
                 let player = match.players[index]
                 spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left, player: index)
+            case .rimBounced(let hoop, let speed):
+                if hoop < rimSpin.count { rimSpin[hoop] += CGFloat(speed) * RimLook.kickPerSpeed }
             case .doubleJumped(let index):
                 let player = match.players[index]
                 spawnJumpRings(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow), scale: bodyScale(index))
@@ -2609,6 +2618,27 @@ final class GameScene: SKScene {
     private static let jumpRingGrowth: CGFloat = 2.5
     private static let jumpRingSeconds = 0.3
     private static let jumpRingStagger = 0.06
+    /// A rim's turn as drawn, in radians: its dip, down at the front, whichever side its backboard is.
+    private func rimTurn(_ index: Int) -> CGFloat {
+        guard index < rimDip.count, index < match.stage.hoops.count else { return 0 }
+        return rimDip[index] * .pi / 180 * CGFloat(match.stage.hoops[index].backboard.sign)
+    }
+
+    /// Where a rim turns: its art's back edge, on the backboard, in the scene.
+    private func rimPivot(_ index: Int) -> CGPoint {
+        let look = match.stage.features.look
+        let hoop = match.stage.hoops[index]
+        let art = GameScene.hoopArtPoint(for: hoop, on: look)
+        let pivot = HoopTuning.pivot(for: look)
+        let size = rimNodes.indices.contains(index) ? rimNodes[index].size : CGSize(width: 48, height: 48)
+        return CGPoint(x: art.x + (pivot.x - 0.5) * abs(size.width) * CGFloat(hoop.backboard.sign), y: art.y + (pivot.y - 0.5) * abs(size.height))
+    }
+
+    private func rotated(_ point: CGPoint, about centre: CGPoint, by angle: CGFloat) -> CGPoint {
+        let dx = point.x - centre.x, dy = point.y - centre.y
+        return CGPoint(x: centre.x + dx * cos(angle) - dy * sin(angle), y: centre.y + dx * sin(angle) + dy * cos(angle))
+    }
+
     /// A body's drawn size against a plain one's: Titan Tea's, grown into after its port-in.
     /// Its sparks, rings and cubes are drawn at it too.
     private func bodyScale(_ index: Int) -> CGFloat {
@@ -2814,10 +2844,13 @@ final class GameScene: SKScene {
             var colour = cube.colour
             colour.w = Float(node.alpha)
             return CubeInstance(model: model, color: colour, flags: SIMD4<Float>(particle.behind ? 1 : 0, 0, 0, 0))
-        } + (NetTuning.cylinder ? nets.flatMap { net in
+        } + (NetTuning.cylinder ? nets.enumerated().flatMap { index, net in
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             net.colour.getRed(&r, green: &g, blue: &b, alpha: &a)
-            return CylinderNet.instances(top: net.hangPoint, mirrored: net.mirrored, sways: net.rowSways, spreads: net.rowSpreads, flare: net.dunkFlare, swish: net.swishWeight,
+            // Hung from the rim as it's turned, and turned with it.
+            let turn = index < rimDip.count ? rimTurn(index) : 0
+            let top = index < rimDip.count ? rotated(net.hangPoint, about: rimPivot(index), by: turn) : net.hangPoint
+            return CylinderNet.instances(top: top, turn: turn, mirrored: net.mirrored, sways: net.rowSways, spreads: net.rowSpreads, flare: net.dunkFlare, swish: net.swishWeight,
                                          colour: SIMD4<Float>(Float(r), Float(g), Float(b), 1))
         } : [])
     }
@@ -2825,7 +2858,7 @@ final class GameScene: SKScene {
     /// The rims' art, for the net behind them to keep out of.
     var rimSnapshots: [BodySnapshot] {
         rimNodes.filter { !$0.isHidden }.compactMap { rim in
-            rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size) }
+            rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
         }
     }
     /// A leg's cubes, in the leg's own colour, the back leg's behind the players; each leg's
@@ -4059,6 +4092,12 @@ final class GameScene: SKScene {
             }
             bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
             node.zRotation = bodyTilt[index]
+            // Hanging on a rim the body turns with it, about the rim's back.
+            if player.state == .dunking, player.dunkHoop < rimDip.count {
+                let turn = rimTurn(player.dunkHoop)
+                node.position = rotated(node.position, about: rimPivot(player.dunkHoop), by: turn)
+                node.zRotation += turn
+            }
 
             // Hit by the blade, the body and head flicker a dark shade of their energy, every
             // other pair of frames; locked out after a 47 basket, black, every other four.
@@ -4448,9 +4487,17 @@ final class GameScene: SKScene {
             // A rim that moves, under the highway's helicopter, and its net with it; the art
             // and the net each at their tuned offset from the rim.
             if index < match.stage.hoops.count {
-                rimNodes[index].position = GameScene.hoopArtPoint(for: match.stage.hoops[index], on: match.stage.features.look)
+                // The rim's spring: toward its rest, or held down while someone dunks on it.
+                let dunkedOn = match.players.contains { $0.state == .dunking && $0.dunkHoop == index }
+                rimSpin[index] += ((dunkedOn ? RimLook.dunkDip : 0) - rimDip[index]) * RimLook.stiffness - rimSpin[index] * RimLook.damping
+                rimDip[index] += rimSpin[index]
+                let artPoint = GameScene.hoopArtPoint(for: match.stage.hoops[index], on: match.stage.features.look)
+                let pivot = HoopTuning.pivot(for: match.stage.features.look)
                 rimNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
-                backboardNodes[index].position = rimNodes[index].position
+                rimNodes[index].anchorPoint = pivot
+                rimNodes[index].position = rimPivot(index)
+                rimNodes[index].zRotation = rimTurn(index)
+                backboardNodes[index].position = artPoint
                 backboardNodes[index].xScale = rimNodes[index].xScale
                 if index < nets.count {
                     nets[index].step(rim: GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look), ball: ballNode.isHidden ? nil : ballNode.position,

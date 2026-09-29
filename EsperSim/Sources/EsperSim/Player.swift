@@ -1258,7 +1258,9 @@ public struct Player: Equatable {
             action = .makePlatform
         }
         wantsPlatform = false
+        let feetBefore = position.y
         move(in: stage)
+        bounceOffRims(in: stage, feetBefore: feetBefore, events: &events)
         // Surf Soda: running into a wall with the stick held toward it takes the board up it.
         if power == .surfSoda, powerLevel >= 2, grounded, state == .run || state == .dash || state == .walk, let wall = ridableWallSide, stickFacing(input) == wall {
             startWallRide(wall)
@@ -1828,6 +1830,22 @@ public struct Player: Equatable {
         var angle = Trig.atan2(shotAim.y, abs(forward))
         angle = min(max(angle, BallRules.shotAngleMin), BallRules.shotAngleMax)
         return Vec2(x: Trig.cos(angle) * facing.sign, y: Trig.sin(angle)) * spec.shotSpeed
+    }
+
+    /// Coming down onto a rim's top from above: straight back up, never standing on it. Not
+    /// while dunking, which hangs on it.
+    private mutating func bounceOffRims(in stage: Stage, feetBefore: Double, events: inout [MatchEvent]) {
+        guard state != .dunking, feetBefore > position.y else { return }
+        for (index, hoop) in stage.hoops.enumerated()
+        where feetBefore >= hoop.position.y && position.y < hoop.position.y
+            && body.max.x > hoop.position.x - BallRules.rimHalfWidth && body.min.x < hoop.position.x + BallRules.rimHalfWidth {
+            events.append(.rimBounced(hoop: index, speed: feetBefore - position.y))
+            position.y = hoop.position.y
+            velocity.y = RimRules.bodyBounce
+            grounded = false
+            if state.isGroundState || state == .land { enter(.air) }
+            return
+        }
     }
 
     private mutating func move(in stage: Stage) {

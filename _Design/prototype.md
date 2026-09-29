@@ -126,6 +126,16 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   frame shows, out of a throw the throw sheet's third), and its ball can't be snatched, by Frost Tea's
   either. Then back in the stance at its hold, aim and buttons kept. Down never cancels a stance: the
   shot and the throw cancel each other (protocol 24); off an edge, it's the air, the stance gone.
+- The rim's top is a thin platform that can't be stood on (`RimRules`): a body coming down on it
+  from above is sent back up at 3.5 a frame, and a ball that isn't scoring bounces off it; nothing
+  climbs it or drops through it, and a dunk hangs on it. A ball scores only if it was let go as a
+  shot, a floater or a dunk (`Ball.scoring`), kept through its bounces off the board and walls,
+  so a bank still drops; one thrown or knocked loose bounces off the top (protocol 25). The rim's
+  art gives, the view's alone (`RimLook`): it turns about its back edge on the backboard as a damped
+  spring, loose so it rings (stiffness 0.2, damping 0.08), kicked down 4° for every unit a frame
+whatever lands on it came at, held down 12° while someone
+  dunks on it with the dunker turning with it, and the net's top hanging from it and turning too.
+  After Tiny Toon Adventures: ACME All-Stars (1994).
 - Hit-stop: the whole match held, nothing moving or counting down, 4 frames when a hit lands
   (a strip, a pop, a snatch off a holder), 6 when a shot goes in, 10 on a counter
   (`HitStopRules`); a made point restarts after it, so the ball's held in the net. Protocol 22.

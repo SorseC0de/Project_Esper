@@ -25,6 +25,9 @@ public struct Ball: Equatable {
     /// A shot still in flight, before its first bounce: the rings don't take it; only a
     /// snatch does. Bodies never deflect the ball; it goes through anyone not catching it.
     public var shotInFlight = false
+    /// Let go as a shot, a floater or a dunk, and kept through its bounces: it can go down
+    /// through a rim. Anything else, thrown or knocked loose, bounces off the rim's top.
+    public var scoring = false
     /// Who released or swatted it last.
     public var lastTouched: Int?
     /// Reeled in by a web: the player pulling it.
@@ -100,7 +103,13 @@ public struct Ball: Equatable {
         // thrown flat at the rim's height, off the backboard, drops out under it.
         for (index, hoop) in stage.hoops.enumerated() where abs(position.x - hoop.position.x) <= BallRules.rimHalfWidth {
             if previousY - BallRules.radius >= hoop.position.y, position.y - BallRules.radius < hoop.position.y {
-                scoredHoop = index
+                if scoring {
+                    scoredHoop = index
+                } else {
+                    events.append(.rimBounced(hoop: index, speed: abs(velocity.y)))
+                    position.y = hoop.position.y + BallRules.radius
+                    bounceY(events: &events)
+                }
             }
         }
 
@@ -197,6 +206,7 @@ public struct Ball: Equatable {
         returning = false
         floater = 0
         floaterShot = false
+        scoring = false
         thrown = straight
         steers = !straight
         shotInFlight = false
@@ -213,6 +223,7 @@ public struct Ball: Equatable {
         thrown = true
         floater = BallRules.floaterFrames
         floaterShot = true
+        scoring = true
     }
 
     /// Knocked out of a holder's hands: a short floater straight up, then a normal fall,
@@ -233,6 +244,7 @@ public struct Ball: Equatable {
         thrown = false
         steers = false
         shotInFlight = false
+        scoring = false
         tether = nil
         lastTouched = nil
         owned = false
@@ -247,6 +259,7 @@ public struct Ball: Equatable {
         floater = 0
         steers = false
         shotInFlight = false
+        scoring = false
         lastTouched = player
         launchPoint = position
     }
@@ -268,6 +281,7 @@ public struct Ball: Equatable {
         thrown = false
         steers = false
         shotInFlight = false
+        scoring = false
         tether = nil
         lastTouched = nil
         owned = false

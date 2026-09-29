@@ -189,7 +189,22 @@ enum ZoneTuning {
 /// The hoop's art, backboard and rim together, against the rim's point, in art pixels:
 /// across away from the backboard, and up; the court's, and Longball Stadium's. On HOOP X
 /// and Y with `DunkTuning` on, for the stage being played.
+/// The rim's give, the view's alone: it turns about its back edge, on the backboard, as a
+/// damped spring; a landing on it kicks it down by how fast it came, and a dunk holds it down
+/// this far, the dunker turning with it. Degrees, and a share a frame.
+enum RimLook {
+    static let dunkDip: CGFloat = 12
+    static let kickPerSpeed: CGFloat = 4
+    static let stiffness: CGFloat = 0.2
+    static let damping: CGFloat = 0.08
+}
+
 enum HoopTuning {
+    /// Where the rim turns, on its art's canvas (0 to 1, from the bottom left): the back edge
+    /// of its ellipse, where it meets the backboard.
+    static func pivot(for look: StageLook) -> CGPoint {
+        look == .court ? CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48) : CGPoint(x: 27.5 / 48, y: 1 - 34 / 48)
+    }
     /// The hoop's two pieces for a stage: Wreck Center's straight on, the rest turned.
     static func art(for look: StageLook) -> (backboard: String, rim: String) {
         look == .court ? ("backboard_straight", "hoop_straight") : ("backboard", "hoop")

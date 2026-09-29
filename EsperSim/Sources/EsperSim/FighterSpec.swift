@@ -502,6 +502,13 @@ public enum StepbackRules {
     public static let sheetFrame = 2
 }
 
+/// The rim's top, a thin platform that can't be stood on: a body coming down on it is sent
+/// back up at this speed, a ball that isn't scoring bounces off it; nothing climbs it or
+/// drops through it.
+public enum RimRules {
+    public static let bodyBounce = 3.5
+}
+
 /// Hit-stop: the whole match held this many frames after a hit lands, a shot goes in, or a
 /// counter, the longest.
 public enum HitStopRules {

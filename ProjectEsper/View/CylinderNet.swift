@@ -10,7 +10,7 @@ import simd
 enum CylinderNet {
     /// The strokes of one net hung at `top`, mirrored for a backboard on the left, each
     /// ring moved by its row's sway, in `colour`, behind the bodies and the rims.
-    static func instances(top: CGPoint, mirrored: Bool, sways: [CGPoint], spreads: [CGFloat], flare: CGFloat, swish: CGFloat,
+    static func instances(top: CGPoint, turn rimTurn: CGFloat, mirrored: Bool, sways: [CGPoint], spreads: [CGFloat], flare: CGFloat, swish: CGFloat,
                           colour: SIMD4<Float>) -> [CubeInstance] {
         // Wider at the bottom in a dunk's flare; moved across further in a swish.
         let radiusBottom = NetTuning.radiusBottom + (NetTuning.dunkFlareRadius - NetTuning.radiusBottom) * flare
@@ -36,6 +36,10 @@ enum CylinderNet {
             func placed(_ angle: Float, _ height: Float) -> SIMD3<Float> {
                 var point = turn.act(SIMD3<Float>(radius * sin(angle), height, radius * cos(angle)))
                 if mirrored { point.x = -point.x }
+                // Turned with the rim it hangs from.
+                let sideways = point.x, up = point.y
+                point.x = sideways * Float(cos(rimTurn)) - up * Float(sin(rimTurn))
+                point.y = sideways * Float(sin(rimTurn)) + up * Float(cos(rimTurn))
                 return point + SIMD3<Float>(Float(top.x + sway.x), Float(top.y + sway.y), 0)
             }
             for chevron in 0..<around {

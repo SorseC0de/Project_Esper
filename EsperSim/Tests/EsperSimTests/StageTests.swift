@@ -256,6 +256,7 @@ final class StageTests: XCTestCase {
                 let from = trial.players[shooter].position + Vec2(x: 0, y: BallRules.shotReleaseHeight + 31)
                 trial.ball.release(from: from, velocity: Vec2(x: Trig.cos(angle) * -inward, y: Trig.sin(angle)) * trial.players[shooter].spec.shotSpeed, by: shooter, straight: false)
                 trial.ball.shotInFlight = true
+                trial.ball.scoring = true
                 for _ in 0..<240 where !scored {
                     trial.advance(inputs: [.idle, .idle])
                     if trial.events.contains(where: { if case .scored = $0 { return true } else { return false } }) { scored = true }
@@ -480,6 +481,7 @@ final class HighwayTests: XCTestCase {
         match.ball.launchPoint = Vec2(x: 120, y: 10)
         match.ball.lastTouched = 0
         match.ball.velocity = Vec2(x: 0, y: -3)
+        match.ball.scoring = true
         var scored: Int?
         for _ in 0..<20 where scored == nil {
             match.advance(inputs: [.idle, .idle])

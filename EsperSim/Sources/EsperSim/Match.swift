@@ -225,6 +225,7 @@ public struct Match: Equatable {
             ball.release(from: player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight * player.spec.scale),
                          velocity: velocity * player.spec.shotPace, by: index, straight: false, pace: player.spec.shotPace)
             ball.shotInFlight = true
+            ball.scoring = true
             ball.burning = player.power == .blazingBoba
         case .releaseThrow(let velocity):
             // The hand, pushed out of any wall the body is pressed against.
@@ -272,6 +273,7 @@ public struct Match: Equatable {
         case .dunk(let hoop):
             // Its bottom just over the rim, so it comes down through it.
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: BallRules.radius + 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
+            ball.scoring = true
         case .webLine(let direction):
             webLine(from: index, direction: direction)
         case .makePlatform:

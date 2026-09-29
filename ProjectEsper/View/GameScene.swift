@@ -1182,16 +1182,29 @@ final class GameScene: SKScene {
             controls.addSlider(title: "NET Y", range: -20...20, notch: 1, value: Float(NetTuning.setting(for: look).y)) {
                 UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetYKey(for: look))
             }
-            // The net's shape, the same on every stage, as on the UI tuning panel.
-            for (title, key, value, notch, range) in [
-                ("NET TOP", NetTuning.topScaleKey, NetTuning.topScale, Float(0.25), Float(0.25)...Float(4)),
+            // The net's shape, the same on every stage: the cylinder's, or the flat net's as on
+            // the UI tuning panel.
+            let shared: [(String, String, CGFloat, Float, ClosedRange<Float>)] = [
+                ("NET TOP", NetTuning.topScaleKey, NetTuning.topScale, 0.25, 0.25...4),
                 ("NET BOTTOM", NetTuning.bottomScaleKey, NetTuning.bottomScale, 0.25, 0.25...4),
-                ("NET SPREAD", NetTuning.spreadKey, NetTuning.spread, 1, 1...8),
                 ("NET ROWS", NetTuning.rowSpacingKey, NetTuning.rowSpacing, 0.25, 1...8),
+            ]
+            let flat: [(String, String, CGFloat, Float, ClosedRange<Float>)] = [
+                ("NET SPREAD", NetTuning.spreadKey, NetTuning.spread, 1, 1...8),
                 ("NET WEAVE", NetTuning.weaveKey, NetTuning.weave, 0.25, 0...1),
                 ("NET TAPER", NetTuning.taperKey, NetTuning.taper, 0.25, 0...0.75),
                 ("NET SKEW", NetTuning.skewKey, NetTuning.skew, 0.25, -4...4),
-            ] as [(String, String, CGFloat, Float, ClosedRange<Float>)] {
+            ]
+            let cylinder: [(String, String, CGFloat, Float, ClosedRange<Float>)] = [
+                ("NET RADIUS TOP", NetTuning.radiusTopKey, NetTuning.radiusTop, 0.5, 1...20),
+                ("NET RADIUS BOTTOM", NetTuning.radiusBottomKey, NetTuning.radiusBottom, 0.5, 1...20),
+                ("NET RINGS", NetTuning.ringsKey, NetTuning.rings, 1, 1...12),
+                ("NET AROUND", NetTuning.aroundKey, NetTuning.around, 1, 3...24),
+                ("NET TILT X", NetTuning.tiltKey, NetTuning.tilt, 1, -90...90),
+                ("NET TURN Y", NetTuning.turnKey, NetTuning.turn, 1, -180...180),
+                ("NET ROLL Z", NetTuning.rollKey, NetTuning.roll, 1, -90...90),
+            ]
+            for (title, key, value, notch, range) in shared + (NetTuning.cylinder ? cylinder : flat) {
                 controls.addSlider(title: title, range: range, notch: notch, value: Float(value)) { UserDefaults.standard.set(Double($0), forKey: key) }
             }
         }
@@ -2759,6 +2772,18 @@ final class GameScene: SKScene {
             var colour = cube.colour
             colour.w = Float(node.alpha)
             return CubeInstance(model: model, color: colour, flags: SIMD4<Float>(particle.behind ? 1 : 0, 0, 0, 0))
+        } + (NetTuning.cylinder ? nets.flatMap { net in
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            net.colour.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return CylinderNet.instances(top: net.hangPoint, mirrored: net.mirrored, sways: net.rowSways,
+                                         colour: SIMD4<Float>(Float(r), Float(g), Float(b), 1))
+        } : [])
+    }
+
+    /// The rims' art, for the net behind them to keep out of.
+    var rimSnapshots: [BodySnapshot] {
+        rimNodes.filter { !$0.isHidden }.compactMap { rim in
+            rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size) }
         }
     }
     /// A leg's cubes, in the leg's own colour, the back leg's behind the players; each leg's

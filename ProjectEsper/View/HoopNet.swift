@@ -63,6 +63,26 @@ enum NetTuning {
         let setting = setting(for: look)
         return CGPoint(x: setting.x + hoopMoved.x, y: setting.y + hoopMoved.y)
     }
+    /// The cylinder net, drawn by the Metal layer in place of the flat one, whose cloth
+    /// still runs for its sway: each ring's radius at the top and bottom (NET RADIUS TOP and
+    /// BOTTOM), how many rings (NET RINGS, NET ROWS apart) and chevrons round each (NET
+    /// AROUND), and its turn about its top in degrees (NET TILT X, TURN Y, ROLL Z), kept
+    /// between launches; the chevrons' sizes are NET TOP and NET BOTTOM.
+    static let cylinder = true
+    static let radiusTopKey = "ui.net.cylinder.radiusTop"
+    static let radiusBottomKey = "ui.net.cylinder.radiusBottom"
+    static let ringsKey = "ui.net.cylinder.rings"
+    static let aroundKey = "ui.net.cylinder.around"
+    static let tiltKey = "ui.net.cylinder.tilt"
+    static let turnKey = "ui.net.cylinder.turn"
+    static let rollKey = "ui.net.cylinder.roll"
+    static var radiusTop: CGFloat { stored(radiusTopKey) ?? 9 }
+    static var radiusBottom: CGFloat { stored(radiusBottomKey) ?? 5 }
+    static var rings: CGFloat { stored(ringsKey) ?? 7 }
+    static var around: CGFloat { stored(aroundKey) ?? 10 }
+    static var tilt: CGFloat { stored(tiltKey) ?? 33 }
+    static var turn: CGFloat { stored(turnKey) ?? 0 }
+    static var roll: CGFloat { stored(rollKey) ?? 0 }
     /// What the mesh is built from; a change rebuilds it.
     static var meshValues: [CGFloat] { [spread, rowSpacing, weave, taper, skew] }
     private static func stored(_ key: String) -> CGFloat? {
@@ -124,6 +144,7 @@ final class HoopNet {
         shape.lineCap = .square
         shape.isAntialiased = false
         shape.zPosition = depth
+        shape.isHidden = NetTuning.cylinder
         parent.addChild(shape)
         buildMesh()
     }
@@ -174,6 +195,22 @@ final class HoopNet {
 
     func recolour(_ colour: SKColor) {
         shape.strokeColor = colour
+    }
+
+    /// For the cylinder: where the net hangs from, which way it's mirrored, its colour, and
+    /// each row's sway, the cloth's knots on it against their places.
+    var hangPoint: CGPoint { rim }
+    var mirrored: Bool { facing < 0 }
+    var colour: SKColor { shape.strokeColor }
+    var rowSways: [CGPoint] {
+        (0..<NetTuning.chevronsPerColumn).map { row in
+            let inRow = knots.filter { $0.row == row }
+            guard !inRow.isEmpty else { return .zero }
+            let total = inRow.reduce(CGPoint.zero) { sum, knot in
+                CGPoint(x: sum.x + knot.at.x - rim.x - knot.home.x, y: sum.y + knot.at.y - rim.y - knot.home.y)
+            }
+            return CGPoint(x: total.x / CGFloat(inRow.count), y: total.y / CGFloat(inRow.count))
+        }
     }
 
     /// One frame: the rim where it is now, the ball where it is (nil while it's nowhere to

@@ -104,10 +104,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let cubeDepth: MTLDepthStencilState?
     private let cubeVertices: MTLBuffer?
     private var cubeInstanceBuffers: [MTLBuffer] = []
-    private static let cubeCapacity = 512
-    /// The players' bodies and lines on black, by a renderer of their own, drawn only on a
-    /// frame with cubes behind the players, which leave out whatever it covers.
-    private let occluderScene = MaskScene()
+    private static let cubeCapacity = 2048
+    /// The players' bodies and lines in white and the rims' art in green, on black, by a
+    /// renderer of their own, drawn only on a frame with cubes behind them: a back leg's
+    /// leaves out the bodies, the net's the bodies and the rims.
+    private let occluderScene = MaskScene(whiteBodies: true)
     private let occluderRenderer: SKRenderer
     private var occluderTexture: MTLTexture?
     private var framesDrawn = 0
@@ -369,7 +370,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
               let occluderTexture else { return }
         if cubes.contains(where: { $0.flags.x > 0.5 }) {
             // The bodies as they stand, for the cubes behind them to keep out of.
-            occluderScene.mirror(scene.occluderSnapshots, flat: [], size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
+            occluderScene.mirror(scene.occluderSnapshots, flat: scene.rimSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
             occluderRenderer.update(atTime: now)
             let occluderPass = MTLRenderPassDescriptor()
             occluderPass.colorAttachments[0].texture = occluderTexture

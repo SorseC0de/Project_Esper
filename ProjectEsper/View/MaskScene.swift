@@ -18,8 +18,11 @@ final class MaskScene: SKScene {
     private let cameraNode = SKCameraNode()
     private var bodies: [SKSpriteNode] = []
     private var flats: [SKSpriteNode] = []
+    /// The bodies drawn in plain white rather than as they are, for the cubes' occluder.
+    private let whiteBodies: Bool
 
-    override init() {
+    init(whiteBodies: Bool = false) {
+        self.whiteBodies = whiteBodies
         super.init(size: CGSize(width: 640, height: 288))
         scaleMode = .fill
         backgroundColor = .black
@@ -28,6 +31,20 @@ final class MaskScene: SKScene {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Every drawn pixel one colour, its alpha kept.
+    private static func flat(_ colour: SIMD4<Float>) -> SKShader {
+        let shader = SKShader(source: """
+        void main() {
+            float alpha = texture2D(u_texture, v_tex_coord).a;
+            gl_FragColor = vec4(u_flat.rgb * alpha, alpha);
+        }
+        """)
+        shader.uniforms = [SKUniform(name: "u_flat", vectorFloat4: colour)]
+        return shader
+    }
+    private static let flatWhite = flat(SIMD4<Float>(1, 1, 1, 1))
+    private static let flatGreen = flat(SIMD4<Float>(0, 1, 0, 1))
 
     /// Copies the game's bodies and camera, and the flat things in green.
     func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat) {
@@ -41,7 +58,12 @@ final class MaskScene: SKScene {
     private func place(_ snapshots: [BodySnapshot], in nodes: inout [SKSpriteNode], green: Bool) {
         while nodes.count < snapshots.count {
             let node = SKSpriteNode()
-            if green {
+            if whiteBodies {
+                // Flat through the art's alpha: a tint multiplies the art's own colours, so a
+                // dark rim or body tinted would come out too dark to read.
+                node.shader = green ? MaskScene.flatGreen : MaskScene.flatWhite
+                node.zPosition = green ? 1 : 2
+            } else if green {
                 node.color = SKColor(red: 0, green: 1, blue: 0, alpha: 1)
                 node.colorBlendFactor = 1
                 node.zPosition = 1

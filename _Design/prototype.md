@@ -905,7 +905,15 @@ sliders there too, as on the UI tuning panel, and on Longball Stadium with tunin
 Stadium, since it can't reach the stage select), both kept out of the glow
 (the mask marks them, as it does the banner). The rim is to get twitch physics. With twelve or so
 debug sliders on at once they sit eight to a column;
-the net is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
+the net is a cylinder of chevron rings drawn by the Metal layer (`CylinderNet`,
+`NetTuning.cylinder`): NET RINGS (7) rings NET ROWS apart, each NET AROUND (10) chevrons round,
+its radius from NET RADIUS TOP (9) to NET RADIUS BOTTOM (5) and its chevrons from NET TOP to
+NET BOTTOM, alternate rings turned half a chevron into diamonds, the whole turned about its top
+by NET TILT X (33°), TURN Y and ROLL Z, mirrored on a left backboard; each stroke a box a pixel
+thick through the cube renderer, glowing, left out wherever a body or a rim's art is drawn, so
+it hangs behind the players and the rim and over the backboard; each ring swaying with its row of
+the flat net's cloth, which runs unseen. The sliders are in the match with the tuning on, and on
+Longball Stadium. The flat net underneath, and with the cylinder off, is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
 (3) art pixels apart across and NET ROWS (2, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.25) of
 the way to the neighbour it's knotted to on that row, toward the right-hand one on one row and
 the left-hand one on the next, an edge strand with no one that side hanging straight, so the

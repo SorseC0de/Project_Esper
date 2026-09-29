@@ -187,6 +187,9 @@ public struct Player: Equatable {
     /// The slide's leg and the slash's blade each hit once.
     public var slideHit = false
     public var slashHit = false
+    /// Frames of down held on the ground, and frames left falling through one-ways after a drop.
+    public var dropHoldFrames = 0
+    public var dropThrough = 0
     /// Titan Tea: already touching the body it last ran into.
     public var trampling = false
     /// In the air from a knock, not a jump or a fall of its own: Titan Tea's landing
@@ -471,6 +474,16 @@ public struct Player: Equatable {
             jumpBuffer = 0
         }
         if doubleJumpTimer > 0 { doubleJumpTimer -= 1 }
+        // Down held on a one-way drops through it.
+        if dropThrough > 0 { dropThrough -= 1 }
+        dropHoldFrames = grounded && input.stick.y < -0.65 ? dropHoldFrames + 1 : 0
+        if dropHoldFrames >= DropRules.holdFrames, state.isGroundState, stage.standsOnlyOnOneWays(body) {
+            dropHoldFrames = 0
+            dropThrough = DropRules.passFrames
+            grounded = false
+            velocity.y = 0
+            enter(.air)
+        }
         stickAwayFrames = abs(input.stick.x) < 0.3 ? 0 : stickAwayFrames + 1
         downHeldFrames = input.stick.y < -0.65 ? downHeldFrames + 1 : 0
 
@@ -1769,7 +1782,7 @@ public struct Player: Equatable {
                 if abs(over.moved) > abs(sweptX.moved) + Stage.edge {
                     position.y += SlopeRules.step
                     sweptX = over
-                    let down = stage.sweepVertically(body.offset(by: Vec2(x: over.moved, y: 0)), by: -SlopeRules.step)
+                    let down = stage.sweepVertically(body.offset(by: Vec2(x: over.moved, y: 0)), by: -SlopeRules.step, oneWays: dropThrough == 0)
                     position.y += down.moved
                 }
             }
@@ -1785,7 +1798,7 @@ public struct Player: Equatable {
             position.y = surface
             velocity.y = 0
         }
-        let sweptY = stage.sweepVertically(body, by: velocity.y)
+        let sweptY = stage.sweepVertically(body, by: velocity.y, oneWays: dropThrough == 0)
         position.y += sweptY.moved
         if sweptY.landed || sweptY.ceiling {
             velocity.y = 0
@@ -1793,7 +1806,7 @@ public struct Player: Equatable {
         }
         wallSide = stage.wall(beside: body)
         ridableWallSide = stage.wall(beside: body, riding: true)
-        grounded = velocity.y <= 0 && stage.isGrounded(body)
+        grounded = velocity.y <= 0 && stage.isGrounded(body, oneWays: dropThrough == 0)
     }
 
     /// Landing and walking off ledges, after the move.

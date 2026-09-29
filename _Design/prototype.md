@@ -123,6 +123,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   sheet frames are left off. The catch spark shows on the hand on sheet frame 2.
   On the ground it carries the run or dash it came from, bleeding 0.15 a frame; in the
   air it drifts. Web Water keeps the web line on this button instead.
+- Drop through: down held on the ground for 10 frames (`DropRules.holdFrames`), standing only
+  on one-ways, falls through them; for 12 frames (`DropRules.passFrames`) one-ways don't hold
+  the body. Solid ground never lets go. Protocol 15.
 - Ledge (without ball): automatic. Falling past the top corner of a block or the one-way
   ledge, either side, with the corner within a tile of the body's side and within a tile
   either way of hand height, 17.5 above the feet, the hand catches it: the body turns to

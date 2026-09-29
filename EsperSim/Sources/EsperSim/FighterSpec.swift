@@ -531,6 +531,13 @@ public enum SnatchRules {
 /// hand height, which is this far above the feet, 28 art pixels as the sheet draws it.
 /// The hang lasts this long and the climb this long, and for this long after walking off
 /// an edge the corner just left can't be grabbed again.
+/// Down held this many frames standing on a one-way drops through it, and one-ways are
+/// passed through for this many after, time to fall clear of the platform's top.
+public enum DropRules {
+    public static let holdFrames = 10
+    public static let passFrames = 12
+}
+
 public enum LedgeRules {
     public static let hangDepth = 17.5
     public static let grabReach = 10.0

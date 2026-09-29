@@ -464,4 +464,21 @@ final class HighwayTests: XCTestCase {
         XCTAssertFalse(match.ball.shotInFlight, "out of the net it's anyone's")
         XCTAssertTrue(match.players[1].canCatch(ballAt: match.players[1].chest, shotInFlight: match.ball.shotInFlight), "the other can take it")
     }
+
+    // MARK: Dropping through
+
+    func testDownHeldOnAOneWayDropsThroughItButNotThroughTheFloor() {
+        var match = Match()
+        // The court's middle one-way, columns 15 to 18 on row 3: stood on its top.
+        match.players[0].position = Vec2(x: 16.5 * Stage.tileSize, y: 4 * Stage.tileSize)
+        match.players[0].grounded = true
+        for _ in 0..<5 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.players[0].grounded)
+        let top = match.players[0].position.y
+        for _ in 0..<(DropRules.holdFrames + 30) { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle]) }
+        XCTAssertLessThan(match.players[0].position.y, top - Stage.tileSize, "fell through the one-way")
+        let floor = match.players[0].position.y
+        for _ in 0..<(DropRules.holdFrames + 30) { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle]) }
+        XCTAssertEqual(match.players[0].position.y, floor, accuracy: 0.01, "the floor holds")
+    }
 }

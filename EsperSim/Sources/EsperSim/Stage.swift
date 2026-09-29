@@ -236,8 +236,9 @@ public struct Stage: Equatable {
     }
 
     /// Drops or lifts the box by `dy`. Falling stops on solids and on the top of one-way
-    /// platforms the feet were above; rising stops under solids.
-    public func sweepVertically(_ box: Box, by dy: Double) -> (moved: Double, landed: Bool, ceiling: Bool) {
+    /// platforms the feet were above, unless `oneWays` is off (dropping through); rising
+    /// stops under solids.
+    public func sweepVertically(_ box: Box, by dy: Double, oneWays: Bool = true) -> (moved: Double, landed: Bool, ceiling: Bool) {
         guard dy != 0 else { return (0, false, false) }
         if dy < 0 {
             let feet = box.min.y
@@ -254,7 +255,7 @@ public struct Stage: Equatable {
                         moved = top - feet
                         landed = true
                         break search
-                    case .oneWay where feet >= top - Stage.edge:
+                    case .oneWay where oneWays && feet >= top - Stage.edge:
                         moved = top - feet
                         landed = true
                         break search
@@ -300,8 +301,8 @@ public struct Stage: Equatable {
         }
     }
 
-    /// Whether there is floor right under the feet.
-    public func isGrounded(_ box: Box) -> Bool {
+    /// Whether there is floor right under the feet; one-ways count unless `oneWays` is off.
+    public func isGrounded(_ box: Box, oneWays: Bool = true) -> Bool {
         let feet = box.min.y
         let row = row(at: feet - Stage.edge)
         let top = Double(row + 1) * Stage.tileSize
@@ -309,7 +310,7 @@ public struct Stage: Equatable {
             switch tile(column: column, row: row) {
             case .solid:
                 return true
-            case .oneWay where abs(feet - top) < 0.01:
+            case .oneWay where oneWays && abs(feet - top) < 0.01:
                 return true
             default:
                 continue
@@ -317,6 +318,11 @@ public struct Stage: Equatable {
         }
         if let surface = slopeSurface(under: box, reach: 0.01), abs(surface - feet) < 0.01 { return true }
         return extras.contains { spansX($0, box) && abs($0.max.y - feet) < 0.01 }
+    }
+
+    /// Standing on one-ways and nothing else: what down held can drop through.
+    public func standsOnlyOnOneWays(_ box: Box) -> Bool {
+        isGrounded(box) && !isGrounded(box, oneWays: false)
     }
 
     /// The smallest nudge, up first, then sideways, then down, that gets the box clear of

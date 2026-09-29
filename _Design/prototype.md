@@ -895,15 +895,16 @@ Stadium, since it can't reach the stage select), both kept out of the glow
 (the mask marks them, as it does the banner). The rim is to get twitch physics. With twelve or so
 debug sliders on at once they sit eight to a column;
 the net is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
-(4) art pixels apart across and NET ROWS (2.75, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.5) of
+(3) art pixels apart across and NET ROWS (2, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.25) of
 the way to the neighbour it's knotted to on that row, toward the right-hand one on one row and
 the left-hand one on the next, an edge strand with no one that side hanging straight, so the
 chevrons run in diagonals both ways, diamonds with knots; NET TAPER (0.5) narrows it toward the
-bottom; NET SKEW (0) raises each column that many art pixels over the one before, toward
+bottom; NET SKEW (−0.25) raises each column that many art pixels over the one before, toward
 the backboard, to match its angle; each chevron smaller than the one
 above, from NET TOP (×1) at the rim to NET BOTTOM (×0.25) at the bottom (a chevron is 2.25
 across and 1.5 deep at ×1, 1 thick), the whole net moved from the rim's point by NET X and
-NET Y (−2, −4; x mirrored on a left backboard, as the hoop's art is); the sliders are on the
+NET Y (−2, −4 on the court, −1, −5 on Longball Stadium, then moved as far as its hoop art is from
+the court's; x mirrored on a left backboard, as the hoop's art is); the sliders are on the
 UI tuning panel, under HUD. Each chevron is a knot of a Verlet cloth, the top ones pinned to the rim and following it,
 each tied to the one below and its neighbours across, and each pulled 0.08 of the way back to
 its place every frame, so the net always settles to its shape. The ball, swept from last

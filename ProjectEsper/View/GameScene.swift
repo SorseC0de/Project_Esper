@@ -1176,10 +1176,10 @@ final class GameScene: SKScene {
         }
         // The net against the rim for a stage, and its shape, the same on every stage.
         func addNetSliders(_ look: StageLook) {
-            controls.addSlider(title: "NET X", range: -20...20, notch: 1, value: Float(NetTuning.offset(for: look).x)) {
+            controls.addSlider(title: "NET X", range: -20...20, notch: 1, value: Float(NetTuning.setting(for: look).x)) {
                 UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetXKey(for: look))
             }
-            controls.addSlider(title: "NET Y", range: -20...20, notch: 1, value: Float(NetTuning.offset(for: look).y)) {
+            controls.addSlider(title: "NET Y", range: -20...20, notch: 1, value: Float(NetTuning.setting(for: look).y)) {
                 UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetYKey(for: look))
             }
             // The net's shape, the same on every stage, as on the UI tuning panel.

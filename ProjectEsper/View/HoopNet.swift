@@ -42,19 +42,26 @@ enum NetTuning {
     static let skewKey = "ui.net.skew"
     static var topScale: CGFloat { stored(topScaleKey) ?? 1 }
     static var bottomScale: CGFloat { stored(bottomScaleKey) ?? 0.25 }
-    static var spread: CGFloat { stored(spreadKey) ?? 4 }
-    static var rowSpacing: CGFloat { stored(rowSpacingKey) ?? 2.75 }
-    static var weave: CGFloat { stored(weaveKey) ?? 0.5 }
+    static var spread: CGFloat { stored(spreadKey) ?? 3 }
+    static var rowSpacing: CGFloat { stored(rowSpacingKey) ?? 2 }
+    static var weave: CGFloat { stored(weaveKey) ?? 0.25 }
     static var taper: CGFloat { stored(taperKey) ?? 0.5 }
-    static var skew: CGFloat { stored(skewKey) ?? 0 }
+    static var skew: CGFloat { stored(skewKey) ?? -0.25 }
     static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? -2, y: stored(offsetYKey) ?? -4) }
     /// NET X and NET Y for a stage: Longball Stadium's kept apart, the court's until set;
     /// the net goes where the stage's hoop art does against the court's too.
     static func offsetXKey(for look: StageLook) -> String { look == .footballField ? offsetXKey + ".stadium" : offsetXKey }
     static func offsetYKey(for look: StageLook) -> String { look == .footballField ? offsetYKey + ".stadium" : offsetYKey }
+    /// What NET X and NET Y are set to on a stage: Longball Stadium's (-1, -5) as tuned.
+    static func setting(for look: StageLook) -> CGPoint {
+        let placed = look == .footballField ? CGPoint(x: -1, y: -5) : offset
+        return CGPoint(x: stored(offsetXKey(for: look)) ?? placed.x, y: stored(offsetYKey(for: look)) ?? placed.y)
+    }
+    /// Where the net hangs against the rim: the setting, moved as far as the stage's hoop art is from the court's.
     static func offset(for look: StageLook) -> CGPoint {
         let hoopMoved = HoopTuning.offset(for: look) - HoopTuning.courtOffset
-        return CGPoint(x: (stored(offsetXKey(for: look)) ?? offset.x) + hoopMoved.x, y: (stored(offsetYKey(for: look)) ?? offset.y) + hoopMoved.y)
+        let setting = setting(for: look)
+        return CGPoint(x: setting.x + hoopMoved.x, y: setting.y + hoopMoved.y)
     }
     /// What the mesh is built from; a change rebuilds it.
     static var meshValues: [CGFloat] { [spread, rowSpacing, weave, taper, skew] }

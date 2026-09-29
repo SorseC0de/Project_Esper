@@ -1,4 +1,5 @@
 import MetalKit
+import simd
 import SpriteKit
 import SwiftUI
 
@@ -98,6 +99,12 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let blur: MTLRenderPipelineState
     private let composite: MTLRenderPipelineState
     private let sampler: MTLSamplerState
+    /// The head's energy cubes, drawn into the scene after SpriteKit, before the glow.
+    private let cubePipeline: MTLRenderPipelineState?
+    private let cubeDepth: MTLDepthStencilState?
+    private let cubeVertices: MTLBuffer?
+    private var cubeInstanceBuffers: [MTLBuffer] = []
+    private static let cubeCapacity = 512
     private var framesDrawn = 0
     private var fpsWindowStart = CACurrentMediaTime()
     private var lastDraw = CACurrentMediaTime()
@@ -169,6 +176,27 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         samplerDescriptor.sAddressMode = .clampToEdge
         samplerDescriptor.tAddressMode = .clampToEdge
         sampler = device.makeSamplerState(descriptor: samplerDescriptor)!
+
+        let cubeDescriptor = MTLRenderPipelineDescriptor()
+        cubeDescriptor.vertexFunction = library.makeFunction(name: "cube_vertex")
+        cubeDescriptor.fragmentFunction = library.makeFunction(name: "cube_fragment")
+        cubeDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        cubeDescriptor.colorAttachments[0].isBlendingEnabled = true
+        cubeDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        cubeDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        cubeDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+        cubeDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        cubeDescriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
+        cubeDescriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
+        cubePipeline = try? device.makeRenderPipelineState(descriptor: cubeDescriptor)
+        let depth = MTLDepthStencilDescriptor()
+        depth.depthCompareFunction = .less
+        depth.isDepthWriteEnabled = true
+        cubeDepth = device.makeDepthStencilState(descriptor: depth)
+        cubeVertices = device.makeBuffer(bytes: CubeMesh.unit, length: CubeMesh.unit.count * MemoryLayout<CubeVertex>.stride)
+        cubeInstanceBuffers = (0..<3).compactMap { _ in
+            device.makeBuffer(length: GlowRenderer.cubeCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
+        }
         super.init()
     }
 
@@ -273,6 +301,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         scenePass.stencilAttachment.storeAction = .dontCare
         skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: sceneTexture.width, height: sceneTexture.height),
                           commandBuffer: sceneCommands, renderPassDescriptor: scenePass)
+        drawCubes(sceneCommands, into: sceneTexture, depth: sceneDepthStencil, frame: frame)
         sceneCommands.commit()
         lap("scene")
 
@@ -322,6 +351,46 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         commands.present(drawable)
         commands.commit()
         lap("comp")
+    }
+
+    /// The scene's cubes over what SpriteKit drew, on the scene's camera: orthographic, one
+    /// art pixel to the scene's, depth only sorting a cube's own faces; lit from above left.
+    private func drawCubes(_ commands: MTLCommandBuffer, into target: MTLTexture, depth: MTLTexture, frame: Int) {
+        let cubes = Array(scene.cubeInstances.prefix(GlowRenderer.cubeCapacity))
+        guard !cubes.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty else { return }
+        let buffer = cubeInstanceBuffers[frame % cubeInstanceBuffers.count]
+        buffer.contents().copyMemory(from: cubes, byteCount: cubes.count * MemoryLayout<CubeInstance>.stride)
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = target
+        descriptor.colorAttachments[0].loadAction = .load
+        descriptor.colorAttachments[0].storeAction = .store
+        descriptor.depthAttachment.texture = depth
+        descriptor.depthAttachment.loadAction = .clear
+        descriptor.depthAttachment.clearDepth = 1
+        descriptor.depthAttachment.storeAction = .dontCare
+        descriptor.stencilAttachment.texture = depth
+        descriptor.stencilAttachment.loadAction = .dontCare
+        descriptor.stencilAttachment.storeAction = .dontCare
+        guard let encoder = commands.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        // Scene coordinates to clip space: the camera's middle at the centre, its view the
+        // screen's points times its scale across; a cube's depth sorts only its own faces.
+        let viewWidth = Float(scene.size.width * scene.cameraScale), viewHeight = Float(scene.size.height * scene.cameraScale)
+        let camera = scene.cameraPosition
+        let projection = simd_float4x4(columns: (
+            SIMD4<Float>(2 / viewWidth, 0, 0, 0),
+            SIMD4<Float>(0, 2 / viewHeight, 0, 0),
+            SIMD4<Float>(0, 0, -0.001, 0),
+            SIMD4<Float>(-2 * Float(camera.x) / viewWidth, -2 * Float(camera.y) / viewHeight, 0.5, 1)))
+        var uniforms = CubeUniforms(viewProjection: projection, light: SIMD4<Float>(-0.4, 0.7, 0.6, 0))
+        encoder.setRenderPipelineState(cubePipeline)
+        encoder.setDepthStencilState(cubeDepth)
+        encoder.setCullMode(.back)
+        encoder.setVertexBuffer(cubeVertices, offset: 0, index: 0)
+        encoder.setVertexBuffer(buffer, offset: 0, index: 1)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<CubeUniforms>.stride, index: 2)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<CubeUniforms>.stride, index: 2)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: CubeMesh.unit.count, instanceCount: cubes.count)
+        encoder.endEncoding()
     }
 
     private func pass(_ commands: MTLCommandBuffer, pipeline: MTLRenderPipelineState, into target: MTLTexture,

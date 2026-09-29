@@ -1,5 +1,6 @@
 import EsperSim
 import SpriteKit
+import simd
 
 extension CGPoint {
     static func + (a: CGPoint, b: CGPoint) -> CGPoint { CGPoint(x: a.x + b.x, y: a.y + b.y) }
@@ -1128,6 +1129,10 @@ final class GameScene: SKScene {
             controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
                 index == 1 ? self?.openBoundsGallery() : self?.closeBoundsGallery()
             }
+        }
+        if ParticleLook.cubes && ParticleLook.cubeSliders {
+            controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
+            controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
         }
         if DunkTuning.enabled {
             // The court's rims lowered, the hanging body and the hoop's art with them.
@@ -2619,6 +2624,8 @@ final class GameScene: SKScene {
         var tints: [SKColor] = []
         /// The regular energy's stream: in the zone its particles take the zone's colours.
         var zoneTinted = false
+        /// Its particles are cubes, drawn by the Metal layer.
+        var cubes = false
     }
 
     private struct HeadParticle {
@@ -2632,9 +2639,26 @@ final class GameScene: SKScene {
         var startFrame: Int
         /// Rises and sways in the wind, as off a head; a ball's trail doesn't.
         var drifts = true
+        /// A cube's turn, its spin, and its colour; its node, hidden, carries the rest.
+        var cube: (orientation: simd_quatf, spin: SIMD3<Float>, colour: SIMD4<Float>)?
     }
 
     private var headParticles: [HeadParticle] = []
+
+    /// The cube particles as the Metal layer draws them: where each is, turned, at its
+    /// dissolve's size, in its colour and fade.
+    var cubeInstances: [CubeInstance] {
+        headParticles.compactMap { particle in
+            guard let cube = particle.cube else { return nil }
+            let node = particle.node
+            let size = ParticleLook.cubeSize * Float(node.xScale)
+            let model = simd_float4x4.translation(SIMD3<Float>(Float(node.position.x), Float(node.position.y), 0))
+                * simd_float4x4(cube.orientation) * simd_float4x4.scale(SIMD3<Float>(repeating: size))
+            var colour = cube.colour
+            colour.w = Float(node.alpha)
+            return CubeInstance(model: model, color: colour)
+        }
+    }
     /// The ball's fire trail: its credit apart from the heads', at twice a head's rate.
     private static let ballFireCreditKey = -1
     private static let ballFireRate = 2.0
@@ -2650,7 +2674,7 @@ final class GameScene: SKScene {
         if let cached = headStreamsCache[index], cached.power == power { return cached.streams }
         let colour = SKColor(rgb: sprites.look(for: index).glow)
         let energy = HeadStream(frames: ParticleLook.sprites ? sheetFrames("esper_particle") : [sprites.flatSquare(size: 4, alpha: 1)],
-                                size: ParticleLook.energySize, tint: colour, rate: 24, zoneTinted: true)
+                                size: ParticleLook.energySize, tint: colour, rate: 24, zoneTinted: true, cubes: ParticleLook.cubes)
         var streams = [energy]
         // A power's own particles come half and half with the energy's, as Frost Tea's snowflakes do.
         var halfEnergy = energy
@@ -2688,7 +2712,9 @@ final class GameScene: SKScene {
         var credit = headCredit[creditKey] ?? []
         while credit.count < streams.count { credit.append(0) }
         for (slot, stream) in streams.enumerated() {
-            credit[slot] += stream.rate * rateScale / 60
+            // Cubes come at the slider's rate, a power's half-stream at half of it.
+            let rate = stream.cubes ? stream.rate / 24 * Double(ParticleLook.cubeRate) : stream.rate
+            credit[slot] += rate * rateScale / 60
             while credit[slot] >= 1 {
                 credit[slot] -= 1
                 let node = SKSpriteNode(texture: stream.frames[0])
@@ -2702,30 +2728,51 @@ final class GameScene: SKScene {
                 // Drawn over, not added: added on top of the head they saturate to white.
                 node.blendMode = .alpha
                 node.zPosition = 1
-                node.position = CGPoint(x: point.x + CGFloat.random(in: -1...1), y: point.y + CGFloat.random(in: -0.5...0.5))
+                // Cubes let go across the spread, so they don't rise in one tail.
+                let spread = stream.cubes ? CGFloat(ParticleLook.cubeSpread) : 1
+                node.position = CGPoint(x: point.x + CGFloat.random(in: -spread...spread), y: point.y + CGFloat.random(in: -spread / 2...spread / 2))
                 if stream.frames.count == 1 { node.zRotation = CGFloat.random(in: 0...(2 * .pi)) }
                 glowers.addChild(node)
+                var cube: (orientation: simd_quatf, spin: SIMD3<Float>, colour: SIMD4<Float>)?
+                if stream.cubes {
+                    // Drawn by the Metal layer as a cube; the node only carries where it is.
+                    node.isHidden = true
+                    var r: CGFloat = 1, g: CGFloat = 1, b: CGFloat = 1, a: CGFloat = 1
+                    (zoneTint ?? stream.tints.randomElement() ?? stream.tint ?? .white).getRed(&r, green: &g, blue: &b, alpha: &a)
+                    let axis = simd_normalize(SIMD3<Float>.random(in: -1...1) + SIMD3<Float>(0, 0, 0.001))
+                    cube = (simd_quatf(angle: Float.random(in: 0..<(2 * .pi)), axis: axis),
+                            SIMD3<Float>.random(in: -ParticleLook.cubeSpin...ParticleLook.cubeSpin),
+                            SIMD4<Float>(Float(r), Float(g), Float(b), 1))
+                }
                 let heading = trailing.map { atan2(Double($0.dy), Double($0.dx)) } ?? Double.pi / 2
                 let angle = heading + Double.random(in: -Double.pi / 28...Double.pi / 28)
                 let speed = 24 + Double.random(in: -2...2)
                 // The sheet's flame points up; turned so it points the way it goes.
                 if trailing != nil { node.zRotation = CGFloat(heading - Double.pi / 2) }
-                // A sheet plays through once over the life; a single frame lives 0.6 s.
-                let life = stream.frames.count > 1 ? Double(stream.frames.count) / 24 : 0.6 + Double.random(in: -0.05...0.05)
+                // A sheet plays through once over the life; a single frame, or a cube, lives 0.6 s
+                // and steps down in size.
+                let frames = cube != nil ? [stream.frames[0]] : stream.frames
+                let life = frames.count > 1 ? Double(frames.count) / 24 : 0.6 + Double.random(in: -0.05...0.05)
                 headParticles.append(HeadParticle(node: node, owner: index, velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
-                                                  age: 0, life: life, frames: stream.frames,
-                                                  startFrame: Int.random(in: 0..<stream.frames.count), drifts: trailing == nil))
+                                                  age: 0, life: life, frames: frames,
+                                                  startFrame: Int.random(in: 0..<frames.count), drifts: trailing == nil, cube: cube))
             }
         }
         headCredit[creditKey] = credit
     }
 
-    /// Every head particle a frame on: the sheet's frame for its age, the rise, the wind.
+    /// Every head particle a frame on: the sheet's frame for its age, the rise, the wind, a
+    /// cube's turn.
     private func stepHeadParticles() {
         let step = 1.0 / 60
         headParticles = headParticles.compactMap { particle in
             var particle = particle
             particle.age += step
+            if var cube = particle.cube {
+                let rate = simd_length(cube.spin)
+                if rate > 0 { cube.orientation = simd_normalize(simd_quatf(angle: rate * Float(step), axis: cube.spin / rate) * cube.orientation) }
+                particle.cube = cube
+            }
             guard particle.age < particle.life else {
                 particle.node.removeFromParent()
                 return nil

@@ -103,3 +103,49 @@ fragment float4 ballCamFragment(BallCamOut in [[stage_in]],
     float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
     return float4(cam.sample(nearest, uv).rgb + bloom, 0.33);
 }
+
+// The head's energy as small cubes turning in 3D, borrowed from Project RingOut: one unit
+// cube drawn once an instance in the instance's colour and alpha, shaded as energy.
+struct CubeVertex {
+    float4 position;
+    float4 normal;
+};
+
+struct CubeInstance {
+    float4x4 model;
+    float4 color;
+};
+
+struct CubeUniforms {
+    float4x4 viewProjection;
+    float4 light;
+};
+
+struct CubeFragment {
+    float4 position [[position]];
+    float3 normal;
+    float4 color;
+};
+
+vertex CubeFragment cube_vertex(uint vid [[vertex_id]],
+                                uint iid [[instance_id]],
+                                const device CubeVertex *vertices [[buffer(0)]],
+                                const device CubeInstance *instances [[buffer(1)]],
+                                constant CubeUniforms &uniforms [[buffer(2)]]) {
+    CubeVertex v = vertices[vid];
+    CubeInstance inst = instances[iid];
+    CubeFragment out;
+    out.position = uniforms.viewProjection * (inst.model * float4(v.position.xyz, 1));
+    out.normal = normalize((inst.model * float4(v.normal.xyz, 0)).xyz);
+    out.color = inst.color;
+    return out;
+}
+
+fragment float4 cube_fragment(CubeFragment in [[stage_in]],
+                              constant CubeUniforms &uniforms [[buffer(2)]]) {
+    // Energy, not a solid: no face goes dark, and the one facing the light runs toward
+    // white, so the turn reads while the whole cube glows in its colour.
+    float lit = max(dot(normalize(in.normal), normalize(uniforms.light.xyz)), 0.0);
+    float3 colour = mix(in.color.rgb * (0.85 + 0.15 * lit), float3(1.0), 0.35 * lit * lit);
+    return float4(colour, in.color.a);
+}

@@ -61,6 +61,18 @@ enum DunkArt {
 /// scaled down to the squares' size, rather than the hard squares.
 enum ParticleLook {
     static let sprites = true
+    /// The regular energy off a head as small cubes turning in 3D, drawn by the Metal layer,
+    /// in place of the `esper_particle` sprite (parked: false brings it back): this many art
+    /// pixels on an edge, this many a second off a head (half with a power's own
+    /// particles), let go anywhere within `cubeSpread` art pixels of the crown's middle
+    /// either way, spun up to this fast on each axis, radians a second. `cubeSliders` puts
+    /// the size and the spread on the debug panel.
+    static let cubes = true
+    static let cubeSliders = true
+    nonisolated(unsafe) static var cubeSize: Float = 3
+    static let cubeRate: Float = 24
+    nonisolated(unsafe) static var cubeSpread: Float = 5
+    static let cubeSpin: Float = 6
     /// Each head particle's size, in art pixels square.
     static let energySize: CGFloat = 10
     static let snowflakeSize: CGFloat = 6

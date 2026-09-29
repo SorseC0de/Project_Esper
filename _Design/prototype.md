@@ -603,7 +603,9 @@ with the human look off, is its own sprite over everything). Each figure is one 
 cape, ball in hand and flashes, their depths packed under a tenth, so a whole body is in
 front of or behind the other: in front, the one with the ball, else the last to touch it. An experiment, on (`HumanLook.enabled`; off puts it all back): the players drawn as
 people, skin on the head, the arms and hands and the lower legs, the front in palette 35
-#DBA463 and the back in 34 #BB7547, the thighs, torso and pelvis still the energy's; the head
+#DBA463 and the back in 34 #BB7547, the thighs, torso and pelvis still the energy's, and glowing as energy does
+(`HumanLook.glowingParts`, left out of the glow's body mask with a per-frame glow mask, so
+they take the plain threshold), as does the crown's grade where it's mostly energy; the head
 drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not
 glowing, its particles still rising off it; its top two thirds (`HumanLook.headEnergyShare`, on the HEAD GRADIENT debug
 slider, every frame redrawn as it moves),

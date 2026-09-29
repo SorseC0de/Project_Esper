@@ -299,7 +299,8 @@ final class GameScene: SKScene {
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
         playerNodes.filter { !$0.isHidden }.compactMap { node in
-            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size, zRotation: node.zRotation) }
+            // A human's energy-coloured parts left out, so they glow.
+            node.texture.map { BodySnapshot(texture: sprites.glowMask(for: $0), position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size, zRotation: node.zRotation) }
         }
     }
 

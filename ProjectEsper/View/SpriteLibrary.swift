@@ -87,6 +87,7 @@ final class SpriteLibrary {
                 guard self.rewarmGeneration[player] == generation, self.look(for: player) == look else { return }
                 for (key, texture) in built where self.cache[key] == nil { self.cache[key] = texture }
                 for (key, marks) in builtLandmarks where self.landmarks[key] == nil { self.landmarks[key] = marks }
+                for job in frameJobs { self.pairGlowMask(job.key) }
                 SKTexture.preload(Array(built.values)) {}
             }
         }
@@ -112,6 +113,7 @@ final class SpriteLibrary {
                              look: look(for: player), ballAsEnergy: ballAsEnergy)
         for (suffix, texture) in made.textures { cache[key + suffix] = texture }
         landmarks[key] = made.landmarks
+        pairGlowMask(key)
         return cache[key]!
     }
 
@@ -124,6 +126,7 @@ final class SpriteLibrary {
         if let head = result.head { textures["_head"] = head }
         if let energy = result.energy { textures["_energy"] = energy }
         if let outline = result.outline { textures["_outline"] = outline }
+        if let glowMask = result.glowMask { textures["_glowmask"] = glowMask }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize
         let landmarks = result.centres.mapValues { centre in
@@ -131,6 +134,16 @@ final class SpriteLibrary {
         }
         return (textures, landmarks)
     }
+
+    /// Each body texture's glow mask, where it has one, looked up by the texture a node shows.
+    private let glowMasks = NSMapTable<SKTexture, SKTexture>.weakToStrongObjects()
+    private func pairGlowMask(_ key: String) {
+        if let body = cache[key], let mask = cache[key + "_glowmask"] { glowMasks.setObject(mask, forKey: body) }
+    }
+
+    /// What the glow's mask draws for a body texture: its glow mask if it has glowing
+    /// parts, else itself.
+    func glowMask(for body: SKTexture) -> SKTexture { glowMasks.object(forKey: body) ?? body }
 
     /// The head alone from a player frame, on the same canvas as the body, if the frame has one.
     func headTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
@@ -345,10 +358,10 @@ final class SpriteLibrary {
     /// centre of each glowing part found. The ball is looked for only where the sheet
     /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
     /// with no line, and the body is drawn and lined without them.
-    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, centres: [BodyPart: CGPoint]) {
+    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, [:]) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
         // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
@@ -463,6 +476,8 @@ final class SpriteLibrary {
         // A human's head tops out in the energy: its top third, line and all, grades from the
         // look's colour at the crown down into the skin, leading into the particles off it.
         // The line there stays on the body in its grade rather than lifting off with the rest.
+        // A human's energy-coloured parts glow; so does the crown's grade where it's mostly energy.
+        var glowing = (0..<count).map { HumanLook.enabled && parts[$0].map(HumanLook.glowingParts.contains) == true }
         if HumanLook.enabled {
             let isHead = (0..<count).map { parts[$0] == .head }
             let crown = (0..<count).map { isHead[$0] || (lined[$0] && neighbours($0, { isHead[$0] })) }
@@ -474,6 +489,7 @@ final class SpriteLibrary {
                     let under = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
                     paint(pixels, index, mix(under, look.glow, share))
                     lined[pixel] = false
+                    if share >= 0.5 { glowing[pixel] = true }
                 }
             }
         }
@@ -496,9 +512,23 @@ final class SpriteLibrary {
             outline = lineContext.makeImage().map { SKTexture(cgImage: $0) }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, [:]) }
+        // The body as the glow's mask sees it, in white, the glowing pixels left out so they
+        // take the glow's plain threshold rather than the body's.
+        var glowMask: SKTexture?
+        if detach, glowing.contains(true), let (maskContext, maskPixels) = makeCanvas(width: width, height: height) {
+            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
+                let index = pixel * 4
+                maskPixels[index] = 255
+                maskPixels[index + 1] = 255
+                maskPixels[index + 2] = 255
+                maskPixels[index + 3] = 255
+            }
+            glowMask = maskContext.makeImage().map { SKTexture(cgImage: $0) }
+        }
+
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, [:]) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, centres)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, centres)
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

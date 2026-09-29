@@ -117,14 +117,15 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Down lets go of any hang: the wall cling (unless a web line is being aimed), the ledge
   hang, which it drops off rather than climbing, and the rim after a dunk's slam; neither
   the wall nor the ledge can be taken again at once.
-- Stepback: down on the ground in a shot's or a throw's stance once it has reached its hold
-  (`shotWindupFrames`, `throwWindupFrames`), once a stance: the throw sheet's third frame, sliding
+- Stepback: down on the ground in a shot's or a throw's stance, once a stance, pressed any time in
+  it and coming once it has reached its hold (`shotWindupFrames`, `throwWindupFrames`): the throw sheet's third frame, sliding
   straight back 48 art pixels over 12 frames (`StepbackRules`), the facing kept, trailing
-  afterimages in the energy colour as Zeus Juice's bolt does, with the jump's sound; the whole way
+  afterimages in the colour's bright version, at 0.9, held a tenth of a second and fading over
+  three, as Zeus Juice's bolt does, with the jump's sound; the whole way
   a counter, as the throw stance's parry frames are (out of a shot the air-with-ball sheet's last
   frame shows, out of a throw the throw sheet's third), and its ball can't be snatched, by Frost Tea's
-  either. Then back in the stance at its hold, aim and buttons kept. Before the hold, or once
-  it's been had, down cancels the shot as it did; off an edge, it's the air, the stance gone.
+  either. Then back in the stance at its hold, aim and buttons kept. Down never cancels a stance: the
+  shot and the throw cancel each other (protocol 24); off an edge, it's the air, the stance gone.
 - Hit-stop: the whole match held, nothing moving or counting down, 4 frames when a hit lands
   (a strip, a pop, a snatch off a holder), 6 when a shot goes in, 10 on a counter
   (`HitStopRules`); a made point restarts after it, so the ball's held in the net. Protocol 22.
@@ -390,7 +391,7 @@ without the ball, knocking it 4 along the swing and 2 up. The snatch has no
 cooldown, as the slash has none, and meeting a live blade it's the parry: the slasher
 is the one stripped and knocked back, the blade spent, resolved before the blades so it
 always wins. The throw stance parries too, over its first ten frames (`ThrowParryRules`),
-the body flashing white: a slash meeting it strips the slasher and the thrower keeps the
+the body flashing white and its line the bright version of its colour: a slash meeting it strips the slasher and the thrower keeps the
 ball. Six is two frames of online input delay and about four of a slash start still on
 its way from the other phone, the least that leaves a read online. A snatch still takes
 the ball through it.
@@ -728,7 +729,9 @@ into the world so it streams behind a moving head. The loose ball is purple, and
 of whoever let it go, then shifts back over 30. A flying ball leaves a soft additive trail
 in its colour. The library finds where the ball and the head sit in each frame so the halo
 and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted a pixel off the body. Three dim
-yellow chevrons stack over a resting ball and light one after another from the top. A
+yellow chevrons stack over a resting ball and light one after another from the top; over the
+basket the holder scores on, the top one `ChevronTuning.basketLift` (30) art pixels over the rim, on
+the BASKET CHEVRON Y debug slider. A
 double jump leaves a short platform of loose digital squares under the feet where it was
 taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that one swinging wind bends as a whole, a scarf.
 The ball in hand is its own sprite on the frame's ball, and when a dribble's ball hangs

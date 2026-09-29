@@ -1220,6 +1220,9 @@ final class GameScene: SKScene {
                 self?.buildBackboards()
             }
         }
+        if ChevronTuning.slider {
+            controls.addSlider(title: "BASKET CHEVRON Y", range: 0...60, notch: 1, value: Float(ChevronTuning.basketLift)) { ChevronTuning.basketLift = CGFloat($0) }
+        }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
@@ -2721,8 +2724,11 @@ final class GameScene: SKScene {
         return path
     }
 
-    /// The body where it is, in its energy colour, fading behind it: the stepback's trail, as
-    /// Zeus Juice's bolt leaves one.
+    /// The body where it is, in its colour's bright version, held a moment then fading behind
+    /// it: the stepback's trail, as Zeus Juice's bolt leaves one.
+    private static let afterimageAlpha: CGFloat = 0.9
+    private static let afterimageHold = 0.1
+    private static let afterimageFade = 0.3
     private func spawnAfterimage(of body: SKSpriteNode, player index: Int) {
         guard let texture = body.texture else { return }
         let ghost = SKSpriteNode(texture: texture)
@@ -2731,12 +2737,12 @@ final class GameScene: SKScene {
         ghost.position = body.position
         ghost.xScale = body.xScale
         ghost.zRotation = body.zRotation
-        ghost.color = SKColor(rgb: sprites.look(for: index).glow)
+        ghost.color = SKColor(rgb: sprites.look(for: index).bright)
         ghost.colorBlendFactor = 1
-        ghost.alpha = 0.6
+        ghost.alpha = GameScene.afterimageAlpha
         ghost.zPosition = -1
         bodies.addChild(ghost)
-        ghost.run(.sequence([.fadeOut(withDuration: 0.15), .removeFromParent()]))
+        ghost.run(.sequence([.wait(forDuration: GameScene.afterimageHold), .fadeOut(withDuration: GameScene.afterimageFade), .removeFromParent()]))
     }
 
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool, player: Int? = nil) {
@@ -4068,7 +4074,10 @@ final class GameScene: SKScene {
                 outlineNode.anchorPoint = node.anchorPoint
                 // White as the body is, growing or parrying; ice, frozen; else the look's or the zone's.
                 let lineColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
-                outlineNode.color = growing || player.throwParrying ? .white : (player.frozen > 0 ? GameScene.ice : lineColour)
+                // In the parry frames the line goes the bright version of the body's colour.
+                outlineNode.color = growing ? .white
+                    : player.throwParrying ? SKColor(rgb: sprites.look(for: index).bright)
+                    : (player.frozen > 0 ? GameScene.ice : lineColour)
             } else {
                 outlineNode.isHidden = true
             }
@@ -4407,7 +4416,7 @@ final class GameScene: SKScene {
         for (index, chevron) in targetChevrons.enumerated() {
             chevron.isHidden = targetHoop == nil
             if let targetHoop {
-                chevron.position = SpriteLibrary.point(targetHoop.position) + CGPoint(x: 0, y: 30 - CGFloat(index) * 5)
+                chevron.position = SpriteLibrary.point(targetHoop.position) + CGPoint(x: 0, y: ChevronTuning.basketLift - CGFloat(index) * 5)
             }
             chevron.alpha = step == index ? 0.6 : 0.2
         }

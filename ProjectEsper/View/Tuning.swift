@@ -137,6 +137,13 @@ enum HelmetTuning {
 /// pixels, its size, its shear in degrees and its opacity. The sim's box matches it.
 /// Longball Stadium's zonal camera: within this share of the screen's width from its edge,
 /// the local player sends it sliding to the next zone.
+/// The chevrons over the basket the ball's holder scores on: the top one this many art
+/// pixels over the rim, on the BASKET CHEVRON Y debug slider with `slider`.
+enum ChevronTuning {
+    nonisolated(unsafe) static var basketLift: CGFloat = 30
+    static let slider = true
+}
+
 enum CameraTuning {
     /// Tiles from the screen's edge at which the local player sends the camera on to the
     /// next zone; on the CAMERA LEAD-IN debug slider on Longball Stadium.

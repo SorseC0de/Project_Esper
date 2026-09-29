@@ -104,6 +104,8 @@ public struct Player: Equatable {
     /// The stance a stepback came out of and goes back to, and whether this stance has had its one.
     public var stepbackFrom: PlayerState = .shootStance
     public var stepbackUsed = false
+    /// Down pressed in this stance: the stepback, once the stance is held.
+    public var stepbackAsked = false
     /// The run's speed as it last stood, for the pivot jump to carry.
     public var runMomentum = 0.0
     /// Frames spent in the state so far; 0 on the frame it was entered.
@@ -367,7 +369,10 @@ public struct Player: Equatable {
         state = next
         stateTimer = 0
         // A fresh stance has its stepback; coming back out of one doesn't.
-        if next == .shootStance || next == .throwStance, previousState != .stepback { stepbackUsed = false }
+        if next == .shootStance || next == .throwStance, previousState != .stepback {
+            stepbackUsed = false
+            stepbackAsked = false
+        }
         // Onto the rim the body goes upright and the board drops away.
         if next == .dunking {
             surfing = false
@@ -836,13 +841,10 @@ public struct Player: Equatable {
                 jumpShot = true
                 events.append(.jumped(player: index))
             }
-            if grounded, downHeldFrames == 1 {
-                // Down on the ground: held, the stepback, if it's not been had; else the cancel.
-                if stateTimer >= BallRules.shotWindupFrames, !stepbackUsed, hasBall || hasFireball {
-                    startStepback(from: .shootStance, events: &events)
-                } else {
-                    cancelShot()
-                }
+            // Down on the ground asks for the stepback, which comes once the stance is held.
+            if grounded, downHeldFrames == 1 { stepbackAsked = true }
+            if grounded, stepbackAsked, stateTimer >= BallRules.shotWindupFrames, !stepbackUsed, hasBall || hasFireball {
+                startStepback(from: .shootStance, events: &events)
                 break
             }
             if !input.shoot, !quickShot {
@@ -905,7 +907,8 @@ public struct Player: Equatable {
                 }
                 break
             }
-            if grounded, downHeldFrames == 1, stateTimer >= BallRules.throwWindupFrames, !stepbackUsed {
+            if grounded, downHeldFrames == 1 { stepbackAsked = true }
+            if grounded, stepbackAsked, stateTimer >= BallRules.throwWindupFrames, !stepbackUsed {
                 startStepback(from: .throwStance, events: &events)
                 break
             }
@@ -1562,6 +1565,7 @@ public struct Player: Equatable {
 
     private mutating func startStepback(from stance: PlayerState, events: inout [MatchEvent]) {
         stepbackUsed = true
+        stepbackAsked = false
         stepbackFrom = stance
         enter(.stepback)
         velocity = Vec2(x: -facing.sign * StepbackRules.distance / Double(StepbackRules.frames), y: 0)

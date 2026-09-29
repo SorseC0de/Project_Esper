@@ -358,13 +358,16 @@ final class BallTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .stepback)
     }
 
-    func testDownBeforeTheShotsHoldStillCancels() {
+    func testDownBeforeTheShotsHoldStepsBackOnceItsHeld() {
+        // Down never cancels a stance: pressed early, the stepback waits for the hold.
         var match = matchWithBallHeld()
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .shootStance)
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
-        XCTAssertNotEqual(match.players[0].state, .stepback)
-        XCTAssertNotEqual(match.players[0].state, .shootStance)
+        XCTAssertEqual(match.players[0].state, .shootStance)
+        let stepped = run(&match, frames: BallRules.shotWindupFrames + 2, input: { _ in PlayerInput(shoot: true) }) { $0.players[0].state == .stepback }
+        XCTAssertLessThanOrEqual(stepped, BallRules.shotWindupFrames)
+        XCTAssertEqual(match.players[0].state, .stepback)
     }
 
     func testAStepbacksBallCantBeSnatched() {
@@ -424,13 +427,14 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * FighterSpec.baseline.shotSpeed, accuracy: 0.001)
     }
 
-    func testDownOnTheGroundCancelsTheShot() {
+    func testDownOnTheGroundDoesntCancelTheShot() {
+        // The shot and the throw cancel each other; down is the stepback's alone.
         var match = matchWithBallHeld()
         for _ in 0..<10 {
             match.advance(inputs: [PlayerInput(shoot: true), .idle])
         }
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
-        XCTAssertEqual(match.players[0].state, .idle)
+        XCTAssertNotEqual(match.players[0].state, .idle)
         XCTAssertTrue(match.players[0].hasBall)
     }
 

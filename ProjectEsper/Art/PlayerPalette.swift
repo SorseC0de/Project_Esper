@@ -124,6 +124,9 @@ struct Look: Hashable {
         luminance <= 0.5 ? Look.scaled(glow, luminance * 2) : glow
     }
 
+    /// The colour's bright version: the energy ramp at its lightest.
+    var bright: RGB { energyTone(luminance: 1) }
+
     func energyTone(luminance: Double) -> RGB {
         luminance <= 0.5 ? Look.scaled(glow, luminance * 2) : Look.lightened(glow, (luminance * 2 - 1) * 0.25)
     }

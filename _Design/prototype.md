@@ -117,9 +117,11 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   the wall nor the ledge can be taken again at once.
 - Throw (without ball, in neutral or on defence): the snatch. The sheet's ten frames at
   15 a second, 40 sim frames, the hand out over sheet frames 2 and 3
-  (`SnatchRules.activeSheetFrames`), the third sheet frame held twice as long, when the
-  whole body plus a tile of reach in front, or the hand's catch ring at the spark's
-  spot, takes any ball it touches while the body faces it: a loose one at any speed, or
+  (`SnatchRules.activeSheetFrames`), the third sheet frame held twice as long, when its
+  reach, the snatcher's body and the hand's catch ring at the spark's spot, takes any ball
+  it touches while the body faces it, or the ball of a holder whose body it touches
+  (`Player.snatchReaches`; every drink's snatch, the upgrades only adding what they do on a
+  touch; protocol 21): a loose one at any speed, or
   the one in the other's hands, where the sheet draws it that frame (down on the floor
   below when it's dribbled over a drop, `Player.ballInHand`), or the holder's
   body itself, whichever way the snatcher faces while their bodies overlap. The last two

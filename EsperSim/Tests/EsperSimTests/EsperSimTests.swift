@@ -1746,12 +1746,33 @@ final class FootsiesTests: XCTestCase {
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         run(&match, frames: SnatchRules.activeFrames.lowerBound, input: { _ in .idle })
         let player = match.players[0]
-        let beyondBox = player.spec.bodyWidth / 2 + SnatchRules.reach + BallRules.radius + 1
+        let beyondBox = player.spec.bodyWidth / 2 + BallRules.radius + 1
         let spot = player.position + Vec2(x: beyondBox, y: BallRules.handCatchCentre.y)
         XCTAssertFalse(Box(center: spot, width: BallRules.radius * 2, height: BallRules.radius * 2).overlaps(player.snatchHitbox!))
         match.ball.respawn(at: spot)
         run(&match, frames: 4, input: { _ in .idle }) { $0.ball.holder == 0 }
         XCTAssertEqual(match.ball.holder, 0)
+    }
+
+    func testEverySnatchReachesAHoldersBodyWithTheHandsRing() {
+        // The ring alone touches the holder's body, not the snatcher's own: every drink's
+        // snatch reaches them, Zeus Juice's and Frost Tea's as the plain one.
+        for power in [Power.none, .zeusJuice, .frostTea] {
+            var match = Match()
+            match.players[0].position = Vec2(x: 150, y: match.players[0].position.y)
+            match.players[0].facing = .right
+            match.players[0].power = power
+            match.players[0].powerLevel = 2
+            match.players[1].position = Vec2(x: 174, y: match.players[0].position.y)
+            match.players[1].facing = .right
+            match.players[1].hasBall = true
+            match.ball.holder = 1
+            XCTAssertFalse(match.players[1].body.overlaps(match.players[0].body), "\(power)")
+            XCTAssertLessThanOrEqual(match.players[1].body.distance(to: match.players[0].handCatchPoint), BallRules.handCatchRadius, "\(power)")
+            match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+            run(&match, frames: SnatchRules.activeFrames.lowerBound + 2, input: { _ in .idle })
+            XCTAssertFalse(match.players[1].hasBall, "\(power) reached the holder")
+        }
     }
 
     func testSnatchTakesTheBallFromTheHoldersHands() {

@@ -524,7 +524,6 @@ public enum SnatchRules {
     public static var activeFrames: Range<Int> { simStart(ofSheetFrame: activeSheetFrames.lowerBound)..<simStart(ofSheetFrame: activeSheetFrames.upperBound) }
     public static let sparkSheetFrame = 2
     public static var sparkFrame: Int { simStart(ofSheetFrame: sparkSheetFrame) }
-    public static let reach = 10.0
     public static let cooldownFrames = 0
     public static let parryKnock = Vec2(x: 3, y: 1.5)
 }

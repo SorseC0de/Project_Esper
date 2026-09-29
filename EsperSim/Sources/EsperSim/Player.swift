@@ -1464,21 +1464,22 @@ public struct Player: Equatable {
         return Box(center: bladeCentre, width: SlashRules.reach * 2 * spec.scale, height: SlashRules.reach * 2 * spec.scale)
     }
 
-    /// Whether the snatch's hand takes a ball centred here: the ball on the body and the
-    /// reach in front, or on the hand's catch ring.
-    public func snatchReaches(ballAt at: Vec2) -> Bool {
-        guard let reach = snatchHitbox else { return false }
-        let ball = Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2)
-        return ball.overlaps(reach) || at.distance(to: handCatchPoint) <= BallRules.handCatchRadius * spec.scale + BallRules.radius
+    /// Whether the snatch's reach touches a box: the snatcher's body, or the hand's catch ring.
+    /// Every snatch's, whatever the drink; an upgrade only adds what it does on a touch.
+    public func snatchReaches(box: Box) -> Bool {
+        guard let body = snatchHitbox else { return false }
+        return box.overlaps(body) || box.distance(to: handCatchPoint) <= BallRules.handCatchRadius * spec.scale
     }
 
-    /// The whole body and the hand's reach in front, while the snatch's hand is out.
+    /// Whether the snatch's reach takes a ball centred here.
+    public func snatchReaches(ballAt at: Vec2) -> Bool {
+        snatchReaches(box: Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2))
+    }
+
+    /// The body, the part of the snatch's reach that isn't the hand's ring, while the hand is out.
     public var snatchHitbox: Box? {
         guard state == .snatching, frozen == 0, SnatchRules.activeFrames.contains(stateTimer) else { return nil }
-        let box = body
-        return facing == .right
-            ? Box(min: box.min, max: Vec2(x: box.max.x + SnatchRules.reach * spec.scale, y: box.max.y))
-            : Box(min: Vec2(x: box.min.x - SnatchRules.reach * spec.scale, y: box.min.y), max: box.max)
+        return body
     }
 
     /// Web Water's line, on the throw button with no ball: held, it aims along the stick;

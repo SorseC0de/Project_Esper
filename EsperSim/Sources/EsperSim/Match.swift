@@ -385,7 +385,7 @@ public struct Match: Equatable {
                 events.append(.swatted(player: index, hit: true))
             }
         }
-        if let reach = player.snatchHitbox {
+        if player.snatchHitbox != nil {
             let held = ball.holder.flatMap { $0 == index ? nil : $0 }
             // A held ball is where the holder's sheet draws it this frame, so the hand can
             // take it off the dribble; failing a landmark, the chest.
@@ -397,12 +397,13 @@ public struct Match: Equatable {
             let facingIt = (at.x - player.position.x) * player.facing.sign >= -1 || onTheBody
             // A burning ball is the thrower's alone.
             let allowed = (!ball.burning || ball.lastTouched == index || held != nil) && (held != nil || player.pickupLockout == 0)
-            if player.power == .frostTea, let other, players[other].frozen == 0, players[other].body.overlaps(reach),
+            if player.power == .frostTea, let other, players[other].frozen == 0, player.snatchReaches(box: players[other].body),
                (players[other].body.center.x - player.position.x) * player.facing.sign >= -1 || players[other].body.overlaps(player.body) {
-                // Frost Tea: the body it reaches is frozen where it stands, and stripped.
+                // Frost Tea's upgrade, on the snatch's own reach: the body it reaches is frozen
+                // where it stands, and stripped.
                 strip(other, by: index, knock: nil)
                 freeze(other)
-            } else if facingIt, allowed, player.snatchReaches(ballAt: at) || (held.map { players[$0].body.overlaps(reach) } ?? false),
+            } else if facingIt, allowed, player.snatchReaches(ballAt: at) || (held.map { player.snatchReaches(box: players[$0].body) } ?? false),
                       held != nil || ball.isLive {
                 if let held {
                     players[held].loseBall()
@@ -429,8 +430,9 @@ public struct Match: Equatable {
     private mutating func resolveParries() {
         for index in players.indices {
             guard let other = players.indices.first(where: { $0 != index }), let blade = players[other].slashHitbox else { continue }
-            let reach = players[index].snatchHitbox ?? (players[index].throwParrying ? players[index].body : nil)
-            guard let reach, blade.overlaps(reach) else { continue }
+            let reaches = players[index].snatchHitbox != nil ? players[index].snatchReaches(box: blade)
+                : players[index].throwParrying && blade.overlaps(players[index].body)
+            guard reaches else { continue }
             players[other].slashHit = true
             let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
             strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y))

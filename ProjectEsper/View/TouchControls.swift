@@ -181,8 +181,8 @@ final class TouchControls: SKNode {
     }
 
     /// Adds a picker under the ones already in the top-left corner.
-    func addPicker(title: String, options: [String], selected: Int, onSelect: @escaping (Int) -> Void) {
-        let picker = SegmentedPicker(title: title, options: options, selected: selected, onSelect: onSelect)
+    func addPicker(title: String, options: [String], selected: Int, perRow: Int = .max, onSelect: @escaping (Int) -> Void) {
+        let picker = SegmentedPicker(title: title, options: options, selected: selected, perRow: perRow, onSelect: onSelect)
         picker.position = CGPoint(x: pickerOrigin.x, y: pickerBottom)
         addChild(picker)
         pickers.append(picker)
@@ -205,7 +205,7 @@ final class TouchControls: SKNode {
 
     /// Where the next picker would go, so other corner text can sit under them.
     var pickerBottom: CGFloat {
-        pickerOrigin.y - CGFloat(pickers.count) * (SegmentedPicker.segmentSize.height + 4)
+        pickerOrigin.y - pickers.reduce(0) { $0 + $1.height + 4 }
     }
 
     // MARK: Touches, in this node's space

@@ -7,12 +7,17 @@ final class SegmentedPicker: SKNode {
     private var segments: [SKShapeNode] = []
     private(set) var selected: Int
     let title: String
+    /// Rows the segments wrap onto, `perRow` to a row.
+    let rows: Int
+    var height: CGFloat { CGFloat(rows) * SegmentedPicker.segmentSize.height + CGFloat(rows - 1) * 2 }
     private let onSelect: (Int) -> Void
 
-    /// Laid out from the top-left corner of the title.
-    init(title: String, options: [String], selected: Int, onSelect: @escaping (Int) -> Void) {
+    /// Laid out from the top-left corner of the title, wrapping every `perRow` segments.
+    init(title: String, options: [String], selected: Int, perRow: Int = .max, onSelect: @escaping (Int) -> Void) {
         self.selected = selected
         self.title = title
+        let perRow = min(perRow, max(options.count, 1))
+        rows = (options.count + perRow - 1) / perRow
         self.onSelect = onSelect
         super.init()
 
@@ -28,8 +33,9 @@ final class SegmentedPicker: SKNode {
         let start = CGFloat(title.count) * 5 + 10
         for (index, option) in options.enumerated() {
             let segment = SKShapeNode(rectOf: SegmentedPicker.segmentSize, cornerRadius: 2)
-            segment.position = CGPoint(x: start + (SegmentedPicker.segmentSize.width + 2) * CGFloat(index) + SegmentedPicker.segmentSize.width / 2,
-                                       y: -SegmentedPicker.segmentSize.height / 2)
+            let column = index % perRow, row = index / perRow
+            segment.position = CGPoint(x: start + (SegmentedPicker.segmentSize.width + 2) * CGFloat(column) + SegmentedPicker.segmentSize.width / 2,
+                                       y: -SegmentedPicker.segmentSize.height / 2 - (SegmentedPicker.segmentSize.height + 2) * CGFloat(row))
             segment.strokeColor = .init(white: 1, alpha: 0.4)
             segment.lineWidth = 1
             let text = SKLabelNode(text: option)

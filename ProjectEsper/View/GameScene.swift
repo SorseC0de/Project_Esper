@@ -1113,7 +1113,7 @@ final class GameScene: SKScene {
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
             self?.headVariant = HeadVariant(rawValue: index)!
         }
-        controls.addPicker(title: "POWER", options: PowerVariant.allCases.map(\.label), selected: powerVariant.rawValue) { [weak self] index in
+        controls.addPicker(title: "POWER", options: PowerVariant.allCases.map(\.label), selected: powerVariant.rawValue, perRow: 6) { [weak self] index in
             self?.powerVariant = PowerVariant(rawValue: index)!
             self?.applyPower()
         }

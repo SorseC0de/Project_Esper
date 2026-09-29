@@ -550,7 +550,7 @@ placeholder for one not written yet.
 ## Tuning pickers
 
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
-holds the variants; A is always the baseline as tuned.
+holds the variants; A is always the baseline as tuned. POWER's twelve sit in two rows of six.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.

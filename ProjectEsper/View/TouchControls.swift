@@ -199,8 +199,8 @@ final class TouchControls: SKNode {
         let columns = (sliders.count + perColumn - 1) / perColumn
         for (index, placed) in sliders.enumerated() {
             let column = CGFloat(index / perColumn) - CGFloat(columns - 1) / 2
-            placed.position = CGPoint(x: topCentre.x + column * (Slider.size.width + 20),
-                                      y: topCentre.y - 34 - CGFloat(index % perColumn) * 26)
+            placed.position = CGPoint(x: topCentre.x + column * (Slider.size.width + 14),
+                                      y: topCentre.y - 30 - CGFloat(index % perColumn) * 16)
         }
         return slider
     }

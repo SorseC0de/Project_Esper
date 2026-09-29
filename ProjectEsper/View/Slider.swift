@@ -2,10 +2,10 @@ import SpriteKit
 
 /// A track with a knob and the value printed over it, for a number to be felt out live.
 final class Slider: SKNode {
-    static let size = CGSize(width: 160, height: 14)
+    static let size = CGSize(width: 90, height: 10)
 
-    private let track = SKShapeNode(rectOf: CGSize(width: Slider.size.width, height: 4), cornerRadius: 2)
-    private let knob = SKShapeNode(circleOfRadius: 7)
+    private let track = SKShapeNode(rectOf: CGSize(width: Slider.size.width, height: 2), cornerRadius: 1)
+    private let knob = SKShapeNode(circleOfRadius: 4)
     private let label = SKLabelNode()
     private let title: String
     private let range: ClosedRange<Float>
@@ -28,10 +28,10 @@ final class Slider: SKNode {
         knob.strokeColor = .clear
         addChild(knob)
         label.fontName = "Menlo-Bold"
-        label.fontSize = 8
+        label.fontSize = 5
         label.fontColor = .init(white: 1, alpha: 0.8)
         label.verticalAlignmentMode = .bottom
-        label.position = CGPoint(x: 0, y: 8)
+        label.position = CGPoint(x: 0, y: 5)
         addChild(label)
         show()
     }

@@ -20,7 +20,9 @@ neutral to get a shot off; catch it and the roles reverse.
   player 1, two controllers then players 0 and 1; on the TV and on a Mac, with no touch,
   the controllers are players 0 and 1. VS CPU, the default, has the computer on player 1
   whatever pads are in; VS HUMAN gives player 1 to the second pad. A keyboard on an iPad or a Mac is player 0 as well: WASD, space to jump, J to shoot,
-  K to throw, shift as the left bumper, delete as the start button, Esc quits on a Mac or in the simulator. The HUD is laid out in the phone's points and
+  K to throw, shift as the left bumper, delete as the start button, M as the left trigger (the
+  hitboxes), Esc quits on a Mac or in the simulator; the arrow keys move player 1 when the
+  computer's off. The HUD is laid out in the phone's points and
   scaled up by `HudScene.scale(forHeight:)` on a bigger screen, the lettering rendered
   at that scale so it stays crisp. `Net/GameCenter` is Game
   Center: signing in, the matchmaker, and the bytes between the two phones. Two

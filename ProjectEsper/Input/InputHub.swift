@@ -6,7 +6,9 @@ import GameController
 /// plays player 0 alongside touch and the keyboard; VS HUMAN on a phone or iPad makes a
 /// lone controller player 1. A keyboard, on an
 /// iPad or a Mac, is player 0 too: WASD moves, space jumps, J shoots, K throws, shift
-/// steps the power like the left bumper, delete pauses like the start button. Everything is read as held state each frame,
+/// steps the power like the left bumper, delete pauses like the start button, M shows the
+/// hitboxes like the left trigger; the arrows move player 1, whom the computer plays unless
+/// it's switched off. Everything is read as held state each frame,
 /// so nothing queues and nothing is lost between frames.
 @MainActor
 final class InputHub {
@@ -25,6 +27,7 @@ final class InputHub {
     private var stickClickWasDown = false
     private var leftTriggerWasDown = false
     private var deleteWasDown = false
+    private var hitboxKeyWasDown = false
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -93,12 +96,19 @@ final class InputHub {
         let stickClickDown = controllers.contains { $0.extendedGamepad?.rightThumbstickButton?.isPressed ?? false }
         if stickClickDown, !stickClickWasDown { aiTogglePressed = true }
         stickClickWasDown = stickClickDown
+        let hitboxKeyDown = keys?.button(forKeyCode: .keyM)?.isPressed ?? false
+        if hitboxKeyDown, !hitboxKeyWasDown { hitboxTogglePressed = true }
+        hitboxKeyWasDown = hitboxKeyDown
         let leftTriggerDown = controllers.contains { $0.extendedGamepad?.leftTrigger.isPressed ?? false }
         if leftTriggerDown, !leftTriggerWasDown { hitboxTogglePressed = true }
         leftTriggerWasDown = leftTriggerDown
         return (0..<players).map { index in
             let pad = controller(for: index).map { read($0.extendedGamepad!) } ?? PlayerInput.idle
-            return index == 0 ? merge(merge(touch, keyboard()), pad) : pad
+            switch index {
+            case 0: return merge(merge(touch, keyboard()), pad)
+            case 1: return merge(arrows(), pad)
+            default: return pad
+            }
         }
     }
 
@@ -116,6 +126,18 @@ final class InputHub {
         input.jump = down(.spacebar)
         input.shoot = down(.keyJ)
         input.throwBall = down(.keyK)
+        return input
+    }
+
+    /// The arrow keys as player 1's stick.
+    private func arrows() -> PlayerInput {
+        guard let keys = GCKeyboard.coalesced?.keyboardInput else { return .idle }
+        func down(_ code: GCKeyCode) -> Bool { keys.button(forKeyCode: code)?.isPressed ?? false }
+        let x = (down(.rightArrow) ? 1.0 : 0) - (down(.leftArrow) ? 1.0 : 0)
+        let y = (down(.upArrow) ? 1.0 : 0) - (down(.downArrow) ? 1.0 : 0)
+        let stick = Vec2(x: x, y: y).clamped(to: 1)
+        var input = PlayerInput(stick: stick)
+        input.aim = stick
         return input
     }
 

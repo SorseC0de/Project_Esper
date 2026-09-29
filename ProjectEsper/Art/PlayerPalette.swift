@@ -172,7 +172,7 @@ struct Look: Hashable {
 /// The energy colours a player can pick on the title, each paired with its opposite: when
 /// two sides pick the same, the one that gives way takes the opposite.
 enum EnergyColour: String, CaseIterable {
-    case orange, teal, red, lime, pink, blue, gold
+    case orange, teal, red, lime, pink, blue, gold, purple
 
     /// The glow, from `PixelPalette`.
     var glow: RGB {
@@ -184,6 +184,21 @@ enum EnergyColour: String, CaseIterable {
         case .pink: PixelPalette.pink
         case .blue: PixelPalette.blue
         case .gold: PixelPalette.gold
+        case .purple: PixelPalette.colours[28]
+        }
+    }
+
+    /// Its name, a gem's.
+    var name: String {
+        switch self {
+        case .blue: "Sapphire"
+        case .orange: "Topaz"
+        case .red: "Ruby"
+        case .purple: "Amethyst"
+        case .pink: "Quartz"
+        case .lime: "Peridot"
+        case .teal: "Tourmaline"
+        case .gold: "Citrine"
         }
     }
 
@@ -192,13 +207,14 @@ enum EnergyColour: String, CaseIterable {
 
     var opposite: EnergyColour {
         switch self {
-        case .orange: .teal
-        case .teal: .orange
+        case .gold: .teal
+        case .teal: .gold
         case .red: .lime
         case .lime: .red
-        case .pink: .blue
-        case .blue: .pink
-        case .gold: .blue
+        case .purple: .pink
+        case .pink: .purple
+        case .orange: .blue
+        case .blue: .orange
         }
     }
 
@@ -218,8 +234,9 @@ enum EnergyColour: String, CaseIterable {
 }
 
 enum BallLook {
-    /// The loose ball is purple, after a while in the colour of whoever last let it go.
-    static let neutral: RGB = PixelPalette.purple
+    /// The loose ball is the neutral colour, palette 40, after a while in the colour of
+    /// whoever last let it go.
+    static let neutral: RGB = PixelPalette.colours[40]
     /// Frames of the shift back to neutral once the ball has bounced and is nobody's.
     static let shiftFrames = 30
     /// The chevrons over a resting ball.
@@ -234,8 +251,8 @@ enum CourtLook {
 
     /// The floor and walls with nobody holding the ball; they take the holder's colour.
     static let neutral: RGB = shaded(BallLook.neutral)
-    /// The one-way ledge in the middle.
-    static let ledge: RGB = shaded(0xF040E0)
+    /// The one-way ledge in the middle: palette 39, shaded as the rest.
+    static let ledge: RGB = shaded(PixelPalette.colours[39])
 
     static func shaded(_ colour: RGB) -> RGB {
         func channel(_ shift: RGB) -> RGB {

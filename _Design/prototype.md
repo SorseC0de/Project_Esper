@@ -605,8 +605,9 @@ Two palettes, as CardCourt has: `PixelPalette` (`_Graphic Assets/Pixel_Palette.p
 AAP-64) for the world, `EsperPalette` for the interface. Seven energy colours to pick from
 on the title, circles in its corner, the pick kept between launches (`EnergyColour`,
 `esper.energyColour`): orange #FA6A0A, the default, teal #20D6C7, red #DF3E23, lime
-#9CDB43, pink #BC4A9B, blue #285CC4 (palette 18, further from teal than 19) and gold #F9A31B, all AAP-64's; the body sprite's tone is the
-colour lifted two fifths of the way to white. The loose ball's purple is #793A80; Surf
+#9CDB43, pink #BC4A9B, blue #285CC4 (palette 18, further from teal than 19) gold #F9A31B and purple #793A80 (palette 28), all AAP-64's; the body sprite's tone is the
+colour lifted two fifths of the way to white. The loose ball, and the court's walls with nobody holding it, are the neutral colour, palette 40
+#6D758D (`BallLook.neutral`); Wreck Center's middle ledge palette 39 #8B93AF, shaded as the tiles are; Surf
 Soda's darker bubbles and its board's tail #403353; outlines drawn in code in the world
 (the field's panels and goalposts, the opponent chevron, the round circles) #242234. The
 sheets in `_Graphic Assets/Pixel Art` are recoloured to AAP-64's nearest by eye (CIE Lab),
@@ -652,11 +653,13 @@ original colours maps to one of five AAP-64 shades, and the other fire sheets fr
 ramp take that map (the rest to their nearest mapped colour); since moved up one index, to
 #FFD541, #F9A31B, #FA6A0A, #DF3E23 and #B4202A (indexes 8 down to 4);
 `fire_explosion`, a different sheet, is left as the tool had it. The importer's `NOT_TONED` keeps the strike bolts,
-which the recolour took to pure white, drawn as painted. Each has an opposite: orange and teal, red
-and lime, pink and blue, and gold gives way to blue. Offline this phone's pick is player one and the other side teal,
+which the recolour took to pure white, drawn as painted. Each has an opposite: gold and teal,
+red and lime, purple and pink, orange and blue. Each has a gem's name (`EnergyColour.name`):
+Sapphire blue, Topaz orange, Ruby red, Amethyst purple, Quartz pink, Peridot lime, Tourmaline
+teal, Citrine gold. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two
-different colours can meet. Purple is left out, as it's the loose ball's.
+different colours can meet.
 
 ## Opponent
 

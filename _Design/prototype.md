@@ -80,7 +80,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Slide (without ball): down at full run, or shoot while crouched. The dash burst the way
   the body faces, carried for 20 frames bleeding only 0.02 a frame, the leg out: a hitbox
   a tile past the body's front edge and 6 units high that knocks the ball out of a
-  grounded holder's hands. It ends in a crouch if down is still held, or stands up into
+  grounded holder's hands. It ends in a crouch if down is still held, into the run with the
+  stick still held forward (as out of a dash; Frost Tea's ice slide too), or stands up into
   the run's skid to stop. A slide can catch a loose ball on the way, which is what it's
   for. Numbers on the body (`slideFrames`, `slideFriction`) and in `SlideRules`.
 - Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. Shoot or

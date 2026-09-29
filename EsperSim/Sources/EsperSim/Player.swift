@@ -394,6 +394,11 @@ public struct Player: Equatable {
     }
 
     /// Whether the stick is pushed the way the body faces.
+    /// Up out of a slide: into the run with the stick still held forward, as out of a dash.
+    private func standUp(from input: PlayerInput) -> PlayerState {
+        abs(input.stick.x) >= 0.5 && stickForward(input) ? .run : .idle
+    }
+
     private func stickForward(_ input: PlayerInput) -> Bool {
         input.stick.x != 0 && (input.stick.x > 0) == (facing == .right)
     }
@@ -1038,12 +1043,12 @@ public struct Player: Equatable {
                 } else if shootPressed, slashAllowed {
                     startSlash(events: &events)
                 } else if !crouchAsked(input) || (input.stick.x != 0 && !stickForward(input)) {
-                    enter(roomToStand(in: stage) ? .idle : .crouch)
+                    enter(roomToStand(in: stage) ? standUp(from: input) : .crouch)
                 }
             } else {
                 velocity.x = approach(velocity.x, 0, spec.slideFriction)
                 if stateTimer >= spec.slideFrames {
-                    enter(crouchAsked(input) || !roomToStand(in: stage) ? .crouch : .idle)
+                    enter(crouchAsked(input) || !roomToStand(in: stage) ? .crouch : standUp(from: input))
                 }
             }
 

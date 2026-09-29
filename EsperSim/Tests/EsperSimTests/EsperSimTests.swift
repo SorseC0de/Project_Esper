@@ -1501,6 +1501,16 @@ final class FootsiesTests: XCTestCase {
         XCTAssertGreaterThan(match.players[0].velocity.x, match.players[0].spec.dashInitialVelocity - 0.5)
     }
 
+    func testForwardHeldOutOfASlideRuns() {
+        var match = neutral()
+        run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0.7, y: -0.7)), .idle])
+        XCTAssertEqual(match.players[0].state, .slide)
+        let frames = match.players[0].spec.slideFrames
+        run(&match, frames: frames + 2, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) { $0.players[0].state != .slide }
+        XCTAssertEqual(match.players[0].state, .run)
+    }
+
     func testShootWhileCrouchedIsASlide() {
         var match = neutral()
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])

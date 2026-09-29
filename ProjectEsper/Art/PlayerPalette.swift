@@ -92,20 +92,26 @@ struct Look: Hashable {
             colours[part] = part.glows || part.isEnergy ? glow : (part.isBack ? back : body)
         }
         if HumanLook.enabled {
+            // Skin and clothes; the legs and feet in the energy's own colour, as the head's crown
+            // is, the back ones at two thirds of it: darker but not greyed, so they glow too.
             for (part, skin) in HumanLook.skin { colours[part] = skin }
+            for part in HumanLook.clothed { colours[part] = part.isBack ? HumanLook.backClothes : HumanLook.clothes }
+            for part in HumanLook.glowingParts { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
+        } else {
+            // The feet, marked on the sheets: shoes, palette 22 in front and 38 behind.
+            colours[.frontFoot] = Look.frontShoe
+            colours[.backFoot] = Look.backShoe
         }
-        // The feet, marked on the sheets: shoes, palette 22 in front and 38 behind.
-        colours[.frontFoot] = Look.frontShoe
-        colours[.backFoot] = Look.backShoe
         return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups)
     }
 
     static let frontShoe = PixelPalette.colours[22], backShoe = PixelPalette.colours[38]
     /// Lined on their own, front to back: where two meet, the first's line sits on the
     /// second's pixels, so the first reads in front. The front arm and hand over everything,
-    /// then the head, each shoe. (The thighs as a group made a wedge where their line met
-    /// the torso's; the torso's own is off for now: add `[.torso]` after the head to bring it back.)
-    static let strokedGroups: [Set<BodyPart>] = [[.frontArm, .frontHand], [.head], [.frontFoot], [.backFoot]]
+    /// then the head. (The thighs as a group made a wedge where their line met the torso's;
+    /// the torso's own is off for now: add `[.torso]` after the head to bring it back. The
+    /// shoes' own are off with the feet in the energy's colours: `[.frontFoot], [.backFoot]`.)
+    static let strokedGroups: [Set<BodyPart>] = [[.frontArm, .frontHand], [.head]]
 
     /// A grey level as a tone of the team colour, for everything that's energy: the
     /// blade, the puffs and streaks, the effect sheets. Black up to the colour over the
@@ -235,20 +241,26 @@ enum CourtLook {
     static let strikeFadeFrames = 20
 }
 
-/// An experiment: the players drawn as people. Skin on the head, the arms and the hands and
-/// the lower legs, front in palette 35 and back in 34, the thighs, torso and pelvis still
-/// in the energy's colours; the head drawn as part of the body, not apart, and not
-/// glowing. `enabled` off puts everything back as it was.
+/// An experiment: the players drawn as people. Skin on the head, the arms and the hands,
+/// front in palette 35 and back in 34; the torso, pelvis and thighs in palette 41 for
+/// everyone; the lower legs and feet in the energy's colours, glowing; the head drawn as
+/// part of the body, not apart, and not glowing. `enabled` off puts everything back as it was.
 enum HumanLook {
     static let enabled = true
     /// The head's top share, its line included, in the energy's colour, grading down into
     /// the skin; on a debug slider beside the cubes'.
     nonisolated(unsafe) static var headEnergyShare = 0.66
     /// The parts still in the energy's colours, which glow as energy does.
-    static let glowingParts: Set<BodyPart> = [.torso, .pelvis, .frontThigh, .backThigh]
+    static let glowingParts: Set<BodyPart> = [.frontLeg, .backLeg, .frontFoot, .backFoot]
     static let skin: [BodyPart: RGB] = {
         let front = PixelPalette.colours[35], back = PixelPalette.colours[34]
-        return [.head: front, .frontArm: front, .frontHand: front, .frontLeg: front,
-                .backArm: back, .backHand: back, .backLeg: back]
+        return [.head: front, .frontArm: front, .frontHand: front,
+                .backArm: back, .backHand: back]
     }()
+    /// The back leg and foot's share of the energy colour's brightness.
+    static let backLegShare = 0.66
+    /// The torso, pelvis and thighs, the same for every player: palette 41, the back thigh
+    /// the next down its ramp, 42.
+    static let clothed: Set<BodyPart> = [.torso, .pelvis, .frontThigh, .backThigh]
+    static let clothes = PixelPalette.colours[41], backClothes = PixelPalette.colours[42]
 }

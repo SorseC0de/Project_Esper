@@ -62,6 +62,35 @@ final class StageTests: XCTestCase {
         XCTAssertEqual(match.players[1].position.x, riderX + 10, accuracy: 0.5, "carried")
     }
 
+    func testAHelmetBreaksOnATitanRatherThanPushingThem() {
+        var match = field()
+        match.players[0].hasBall = false
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        match.ball.respawn(at: Vec2(x: 900, y: 150))
+        match.players[0].power = .titanTea
+        match.helmets = [Helmet(id: 99, box: Box(min: Vec2(x: 500, y: 10), max: Vec2(x: 540, y: 50)), speed: 1, owner: 1, variant: 0)]
+        match.helmetClock = -10_000
+        match.players[0].position = Vec2(x: 545, y: 10)
+        let standing = match.players[0].position.x
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertTrue(match.helmets.isEmpty)
+        XCTAssertTrue(match.events.contains { if case .helmetRemoved = $0 { return true } else { return false } })
+        XCTAssertEqual(match.players[0].position.x, standing, accuracy: 0.5, "not pushed")
+    }
+
+    func testTheStadiumsEndWallsCantBeLandedOn() {
+        var match = field()
+        match.players[0].position = Vec2(x: Stage.tileSize + match.players[0].spec.bodyWidth / 2, y: 60)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.players[0].facing = .left
+        for _ in 0..<10 { match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle]) }
+        XCTAssertNotEqual(match.players[0].state, .wallLand)
+        XCTAssertNil(match.players[0].wallSide)
+        XCTAssertEqual(Stage.court.wall(beside: Box(center: Vec2(x: Stage.tileSize + 5, y: 60), width: 10, height: 17.5)), .left, "the court's still hold")
+    }
+
     func testAPinnedBodyIsPassedThrough() {
         var match = field()
         match.players[0].hasBall = false

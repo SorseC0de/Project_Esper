@@ -780,7 +780,8 @@ centre.
 invisible one-tile strip through the middle of the turf, the end walls solid. The rims sit
 at 107, 66 in from each wall, floating between the
 goalposts' uprights; by design a standing shot can't reach them, so scoring takes a
-jump shot, or a jump off a helmet to dunk or shoot. The computer always takes the jump
+jump shot, or a jump off a helmet to dunk or shoot. Its end walls can't be landed on, so
+there's no wall jump off them (`StageFeatures.tileWallsHold`); a helmet can be (protocol 20). The computer always takes the jump
 shot at a rim that high. Each player starts
 under the rim they guard, and the coin flip, off the series' dice so both phones agree,
 puts the ball in one pair of hands. A ball that leaves the world comes back at centre.
@@ -798,7 +799,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   that would put them in a wall it passes through them. It pushes the loose ball the same
   way, and a pushed ball is an ordinary ball again, falling. The computer, meeting one at
   its height, hops and double jumps onto it and rides it. Two going opposite ways that meet take each other out in a burst of `flashspark2`
-  in their colours.
+  in their colours. A Titan in a helmet's way isn't pushed: the helmet breaks on them, as at the
+  far wall; riding one is the same for everyone.
 - The portal: Gemini's rift from Project Stars (`gemini_rift_v1` and `v2`, boxed down by
   four), drawn as there without the lean: the two drawings as a tall pair and again half
   as wide turned end over end, the pairs trading length every 1.5 seconds, each plate

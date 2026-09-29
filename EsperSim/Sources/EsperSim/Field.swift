@@ -33,8 +33,11 @@ public struct StageFeatures: Equatable {
     public var shadows = false
     public var ballCam = false
     public var look = StageLook.court
+    /// A body can land on the stage's walls, and so wall jump; off, only on what moves or is
+    /// made (helmets, slabs), never the tiles. The board rides them either way.
+    public var tileWallsHold = true
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
-                shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court) {
+                shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets
         self.portals = portals
         self.startsHeld = startsHeld
@@ -42,6 +45,7 @@ public struct StageFeatures: Equatable {
         self.shadows = shadows
         self.ballCam = ballCam
         self.look = look
+        self.tileWallsHold = tileWallsHold
     }
 }
 
@@ -108,6 +112,11 @@ extension Match {
             let riders = players.indices.filter { stands(players[$0], on: helmet.box) }
             helmet.box = helmet.box.offset(by: Vec2(x: helmet.speed, y: 0))
             for index in riders { carry(index, by: helmet.speed) }
+            // A Titan in its way isn't pushed: it breaks on them.
+            if players.indices.contains(where: { !riders.contains($0) && players[$0].power == .titanTea && players[$0].body.overlaps(helmet.box) }) {
+                events.append(.helmetRemoved(at: helmet.box.center, owner: helmet.owner))
+                continue
+            }
             for index in players.indices where !riders.contains(index) && players[index].body.overlaps(helmet.box) {
                 push(index, ahead: helmet)
             }

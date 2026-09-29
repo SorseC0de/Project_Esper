@@ -365,7 +365,7 @@ public struct Stage: Equatable {
         let rows = rows(of: box)
         let rightColumn = column(at: box.max.x + Stage.edge)
         let leftColumn = column(at: box.min.x - Stage.edge)
-        for row in rows where row < self.rows {
+        for row in rows where row < self.rows && (riding || features.tileWallsHold) {
             if tile(column: rightColumn, row: row) == .solid { return .right }
             if tile(column: leftColumn, row: row) == .solid { return .left }
         }
@@ -471,7 +471,9 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...(columns - 1), rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...(rows - 1))
         stage.fill(.solid, columns: (columns - 1)...(columns - 1), rows: 0...(rows - 1))
-        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true, ballCam: true, look: .footballField)
+        // No wall landing on its end walls: up to a rim is off a helmet.
+        stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true, ballCam: true, look: .footballField,
+                                       tileWallsHold: false)
         // The backboards: behind each rim and above it, solid to the ball, and on back to the
         // end wall so nothing gets in behind them.
         stage.ballBlockers = stage.hoops.map { hoop in

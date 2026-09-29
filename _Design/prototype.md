@@ -565,7 +565,8 @@ holds the variants; A is always the baseline as tuned. POWER's twelve sit in two
   and level are lettered under the pickers.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
   60 in and drawn for a rim at 120, the gold 8 wide; the crossbar sits 20 below that,
-  tilted 20° with the end toward the field up, the uprights 100 over it; the back rod
+  tilted 25° with the end toward the field up (on the CROSSBAR ANGLE debug slider there, the
+  goalposts and backboards redrawn as it moves), the uprights 100 over it; the back rod
   and the crossbar with its uprights each have their own 1 black outline, as do the
   light panels.
 - HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white (10 × 17.5 units, 16 × 28 art pixels), the loose
@@ -853,9 +854,12 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   tip away from the field's middle as the yard lines tip toward it.
   A body's shadow stays on the ground under it: rising, it thins out and shrinks, gone at
   160 pixels up, half its size by then. It stays upright whatever the body's lean.
-- The backboard: behind each rim a 3 by 4 cluster of `flashspark2` in the guarding side's
-  energy, each on its own frame so the board shimmers, on a grid sheared to the
-  crossbar's lean, 10 behind the rim and 24 over it at 0.4, sheared 20°, at two thirds;
+- The backboard: behind each rim a cluster of `flashspark2` in the guarding side's
+  energy, 3 across, its bottom where the first 3 by 4 board's was (24 over the rim, its middle),
+  and as many rows up from there as reach the uprights' tops, each on its own frame so the board shimmers, on a grid sheared to the
+  crossbar's lean and angle, 10 behind the rim, at 0.4, at two thirds; for now the stands,
+  sky, rails and lights above the turf are under flat black (`GoalpostTuning.sceneryHidden`) so
+  the tuning sliders read;
   solid to the ball, a 20-unit-tall box (`FieldRules.backboardOffset`, `ballBlockers`)
   from the backboard's face all the way back to the end wall, so nothing gets behind it.
   Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
@@ -886,7 +890,7 @@ one-piece `Hoop.png`), placed 5 art pixels out from the backboard and 10 up from
 (`HoopTuning.courtOffset`, and Longball Stadium's own `stadiumOffset`, (0, 10), on HOOP X and Y with `DunkTuning` on
 for the stage picked, the net's NET X and Y kept per stage the same way, on top of where the stage's
 hoop art has moved from the court's, and its shape on the NET
-sliders there too, as on the UI tuning panel; the held match starts on `DunkTuning.stage`, Longball
+sliders there too, as on the UI tuning panel, and on Longball Stadium with tuning off as well; the held match starts on `DunkTuning.stage`, Longball
 Stadium, since it can't reach the stage select), both kept out of the glow
 (the mask marks them, as it does the banner). The rim is to get twitch physics. With twelve or so
 debug sliders on at once they sit eight to a column;

@@ -838,6 +838,17 @@ final class GameScene: SKScene {
             }
             fieldBlooms = handles.blooms
             lightPanels = handles.panels
+            if GoalpostTuning.sceneryHidden {
+                // Everything above the turf under flat black, over the scenery, under the turf's lines.
+                let cover = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
+                cover.anchorPoint = .zero
+                cover.position = CGPoint(x: -400, y: FieldArt.turfTop)
+                cover.size = CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 800, height: 2000)
+                cover.color = SKColor(rgb: PixelPalette.outline)
+                cover.colorBlendFactor = 1
+                cover.zPosition = -12.5
+                stageGround.addChild(cover)
+            }
             for panel in lightPanels { panel.fillColor = courtColour }
             yardNumbers = handles.numbers
             for number in yardNumbers { number.setScale(HelmetTuning.numberScale) }
@@ -1163,8 +1174,36 @@ final class GameScene: SKScene {
                 index == 1 ? self?.openBoundsGallery() : self?.closeBoundsGallery()
             }
         }
+        // The net against the rim for a stage, and its shape, the same on every stage.
+        func addNetSliders(_ look: StageLook) {
+            controls.addSlider(title: "NET X", range: -20...20, notch: 1, value: Float(NetTuning.offset(for: look).x)) {
+                UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetXKey(for: look))
+            }
+            controls.addSlider(title: "NET Y", range: -20...20, notch: 1, value: Float(NetTuning.offset(for: look).y)) {
+                UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetYKey(for: look))
+            }
+            // The net's shape, the same on every stage, as on the UI tuning panel.
+            for (title, key, value, notch, range) in [
+                ("NET TOP", NetTuning.topScaleKey, NetTuning.topScale, Float(0.25), Float(0.25)...Float(4)),
+                ("NET BOTTOM", NetTuning.bottomScaleKey, NetTuning.bottomScale, 0.25, 0.25...4),
+                ("NET SPREAD", NetTuning.spreadKey, NetTuning.spread, 1, 1...8),
+                ("NET ROWS", NetTuning.rowSpacingKey, NetTuning.rowSpacing, 0.25, 1...8),
+                ("NET WEAVE", NetTuning.weaveKey, NetTuning.weave, 0.25, 0...1),
+                ("NET TAPER", NetTuning.taperKey, NetTuning.taper, 0.25, 0...0.75),
+                ("NET SKEW", NetTuning.skewKey, NetTuning.skew, 0.25, -4...4),
+            ] as [(String, String, CGFloat, Float, ClosedRange<Float>)] {
+                controls.addSlider(title: title, range: range, notch: notch, value: Float(value)) { UserDefaults.standard.set(Double($0), forKey: key) }
+            }
+        }
         if series.stage.stage.features.look == .footballField {
+            // Longball's net, tuned in play.
+            addNetSliders(.footballField)
             controls.addSlider(title: "CAMERA LEAD-IN", range: 0...16, notch: 1, value: CameraTuning.leadInTiles) { CameraTuning.leadInTiles = $0 }
+            controls.addSlider(title: "CROSSBAR ANGLE", range: -45...45, notch: 1, value: Float(GoalpostTuning.crossbarAngle)) { [weak self] value in
+                GoalpostTuning.crossbarAngle = CGFloat(value)
+                self?.buildGoalposts()
+                self?.buildBackboards()
+            }
         }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
@@ -1206,24 +1245,7 @@ final class GameScene: SKScene {
             controls.addSlider(title: "HOOP Y", range: -24...24, notch: 1, value: Float(HoopTuning.offset(for: look).y)) {
                 HoopTuning.set(CGPoint(x: HoopTuning.offset(for: look).x, y: CGFloat($0)), for: look)
             }
-            controls.addSlider(title: "NET X", range: -20...20, notch: 1, value: Float(NetTuning.offset(for: look).x)) {
-                UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetXKey(for: look))
-            }
-            controls.addSlider(title: "NET Y", range: -20...20, notch: 1, value: Float(NetTuning.offset(for: look).y)) {
-                UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetYKey(for: look))
-            }
-            // The net's shape, the same on every stage, as on the UI tuning panel.
-            for (title, key, value, notch, range) in [
-                ("NET TOP", NetTuning.topScaleKey, NetTuning.topScale, Float(0.25), Float(0.25)...Float(4)),
-                ("NET BOTTOM", NetTuning.bottomScaleKey, NetTuning.bottomScale, 0.25, 0.25...4),
-                ("NET SPREAD", NetTuning.spreadKey, NetTuning.spread, 1, 1...8),
-                ("NET ROWS", NetTuning.rowSpacingKey, NetTuning.rowSpacing, 0.25, 1...8),
-                ("NET WEAVE", NetTuning.weaveKey, NetTuning.weave, 0.25, 0...1),
-                ("NET TAPER", NetTuning.taperKey, NetTuning.taper, 0.25, 0...0.75),
-                ("NET SKEW", NetTuning.skewKey, NetTuning.skew, 0.25, -4...4),
-            ] as [(String, String, CGFloat, Float, ClosedRange<Float>)] {
-                controls.addSlider(title: title, range: range, notch: notch, value: Float(value)) { UserDefaults.standard.set(Double($0), forKey: key) }
-            }
+            if look != .footballField { addNetSliders(look) }
             controls.addSlider(title: "DUNK FRAME", range: 0...last, notch: 1, value: Float(DunkTuning.frame)) { value in
                 DunkTuning.frame = Int(value)
                 xSlider.set(Float(DunkArt.offsets[DunkTuning.frame].x))
@@ -3342,7 +3364,8 @@ final class GameScene: SKScene {
     private let backboards = SKNode()
 
     /// Behind each rim a cluster of `flashspark2` in the guarding side's energy, each on its
-    /// own frame, laid out on a grid sheared to the crossbar's lean.
+    /// own frame, laid out on a grid sheared to the crossbar's lean: its bottom where the
+    /// first board's 4 rows had it, and as many rows up from there as reach the uprights' tops.
     private func buildBackboards() {
         backboards.removeAllChildren()
         let frameCount = EffectSheets.frames[EnergyEffect.flashSpark2.name] ?? 1
@@ -3351,10 +3374,17 @@ final class GameScene: SKScene {
             let frames = sprites.effectFrames(EnergyEffect.flashSpark2, player: owner)
             let back = CGFloat(hoop.backboard.sign)
             let rim = SpriteLibrary.point(hoop.position)
-            let centre = CGPoint(x: rim.x + back * BackboardTuning.x, y: rim.y + BackboardTuning.y)
-            let shear = tan(BackboardTuning.skew * .pi / 180) * -back
+            let shear = tan(GoalpostTuning.crossbarAngle * .pi / 180) * -back
             let step = BackboardTuning.spacing * BackboardTuning.size * 2
-            let cluster = flashCluster(frames: frames, frameCount: frameCount, columns: BackboardTuning.columns, rows: BackboardTuning.rows,
+            // The uprights' tops where the cluster stands: the crossbar there, and the prongs over it.
+            let postX = hoop.backboard == .left ? Stage.fieldPostInset : match.stage.width - Stage.fieldPostInset
+            let post = SpriteLibrary.point(Vec2(x: postX, y: GoalpostTuning.postRimHeight))
+            let x = rim.x + back * BackboardTuning.x
+            let top = post.y - GoalpostTuning.crossbarBelowRim + (x - post.x) * shear + GoalpostTuning.prongHeight
+            let bottom = rim.y + BackboardTuning.y - CGFloat(BackboardTuning.rows - 1) * step / 2
+            let rows = max(Int((top - bottom) / step) + 1, 1)
+            let centre = CGPoint(x: x, y: bottom + CGFloat(rows - 1) * step / 2)
+            let cluster = flashCluster(frames: frames, frameCount: frameCount, columns: BackboardTuning.columns, rows: rows,
                                        step: step, scale: BackboardTuning.size, shear: shear)
             cluster.position = centre
             cluster.alpha = BackboardTuning.alpha

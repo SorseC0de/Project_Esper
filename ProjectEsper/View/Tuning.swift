@@ -195,7 +195,10 @@ enum BackboardTuning {
 enum GoalpostTuning {
     static let crossbarBelowRim: CGFloat = 20
     static let prongHeight: CGFloat = 100
-    static let crossbarAngle: CGFloat = 20
+    nonisolated(unsafe) static var crossbarAngle: CGFloat = 25
+    /// For now, the stands, sky, rails and floodlights above the turf covered in flat
+    /// black, so the tuning sliders read over it.
+    static let sceneryHidden = true
     /// The gold's width, and the black line round it and round the light panels.
     static let thickness: CGFloat = 8
     static let outline: CGFloat = 1
@@ -208,7 +211,7 @@ enum GoalpostTuning {
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
-    static let enabled = true
+    static let enabled = false
     /// The stage the tuning starts on, since the held match can't reach the stage select.
     static let stage = StageChoice.longballStadium
     nonisolated(unsafe) static var frame = 0

@@ -3725,7 +3725,10 @@ final class GameScene: SKScene {
             seen.insert(clone.id)
             let node = cloneNodes[clone.id] ?? {
                 let owner = match.players[clone.owner]
-                let frame = owner.animationFrame
+                // Left in the air, any frame of the jump or the double jump, not just the one it was in.
+                let jumpSheets: [Animation] = [owner.hasBall ? .airBall : .air, .doubleJump]
+                let frame = owner.grounded ? owner.animationFrame
+                    : jumpSheets.flatMap { sheet in (0..<sheet.frameCount).map { AnimationFrame(sheet, $0) } }.randomElement()!
                 let node = SKSpriteNode(texture: sprites.texture(frame, player: clone.owner))
                 node.size = node.texture!.size()
                 if let outline = sprites.outlineTexture(frame, player: clone.owner) {

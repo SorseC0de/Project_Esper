@@ -717,7 +717,7 @@ so it glows, at both ends, in place of the diamonds; Frost Tea's sparks are snow
 vector, a sphere of them for the snatch; Quake-Up's quake shakes the camera a pixel or
 two for eight frames and throws rock squares up; bolts are the SF bolt in the energy
 colour with fading afterimages; the strike reuses a scoring bolt down to the point;
-the pulse is a bar from the hand to the edge; ice clones are the body's frame in ice;
+the pulse is a bar from the hand to the edge; ice clones are the body's frame in ice, one left in the air any frame of the jump or double jump at random;
 flames loop `fire_trail`; fireballs are the ball in fire; frozen bodies and balls go
 ice; the cape is seven short rectangles chained along the glide's trail with a wave down
 its length.

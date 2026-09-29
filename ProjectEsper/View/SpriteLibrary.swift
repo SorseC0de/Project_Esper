@@ -61,11 +61,11 @@ final class SpriteLibrary {
                 if animation.holdsBall { frameJobs.append((key + "_whole", frame, source, true)) }
             }
         }
-        var tonedJobs: [(key: String, source: SKTexture)] = []
+        var tonedJobs: [(key: String, source: SKTexture, capped: Bool)] = []
         let tonedNames = EnergyEffect.allCases.map(\.name) + Effect.inEnergyColour.map(\.name) + SpriteLibrary.tonedParticleSheets
         for name in tonedNames {
             for index in 0..<(EffectSheets.frames[name] ?? 0) {
-                tonedJobs.append(("p\(player)_fx_\(name)_\(index)", texture(name, index)))
+                tonedJobs.append(("p\(player)_fx_\(name)_\(index)", texture(name, index), Effect.sparkNames.contains(name)))
             }
         }
         var silhouetteJobs: [(key: String, source: SKTexture)] = []
@@ -81,7 +81,7 @@ final class SpriteLibrary {
                 for (suffix, texture) in made.textures { built[job.key + suffix] = texture }
                 builtLandmarks[job.key] = made.landmarks
             }
-            for job in tonedJobs { built[job.key] = makeToned(job.source, look: look) }
+            for job in tonedJobs { built[job.key] = makeToned(job.source, look: look, capped: job.capped) }
             for job in silhouetteJobs { built[job.key] = makeSilhouette(job.source, look: look) }
             DispatchQueue.main.async {
                 guard self.rewarmGeneration[player] == generation, self.look(for: player) == look else { return }
@@ -183,7 +183,7 @@ final class SpriteLibrary {
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let tone = look.energyTone(luminance: 1)
+        let tone = look.sparkTone(luminance: 1)
         for pixel in 0..<(width * height) {
             let index = pixel * 4
             let alpha = Int(pixels[index + 3])
@@ -203,13 +203,14 @@ final class SpriteLibrary {
     func effectTexture(_ name: String, _ frame: Int, player: Int) -> SKTexture {
         let key = "p\(player)_fx_\(name)_\(frame)"
         if let texture = cache[key] { return texture }
-        let result = makeToned(texture(name, frame), look: look(for: player))
+        let result = makeToned(texture(name, frame), look: look(for: player), capped: Effect.sparkNames.contains(name))
         cache[key] = result
         return result
     }
 
-    /// A grey frame through a look's energy ramp; touches nothing kept.
-    private func makeToned(_ source: SKTexture, look: Look) -> SKTexture {
+    /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which
+    /// stops at the colour; touches nothing kept.
+    private func makeToned(_ source: SKTexture, look: Look, capped: Bool = false) -> SKTexture {
         let image = source.cgImage()
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
@@ -220,7 +221,7 @@ final class SpriteLibrary {
             guard alpha > 0 else { continue }
             // The canvas is premultiplied: the grey level is the colour over the alpha.
             let grey = (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / Double(alpha)
-            let tone = look.energyTone(luminance: min(grey, 1))
+            let tone = capped ? look.sparkTone(luminance: min(grey, 1)) : look.energyTone(luminance: min(grey, 1))
             pixels[index] = UInt8(Int((tone >> 16) & 0xFF) * alpha / 255)
             pixels[index + 1] = UInt8(Int((tone >> 8) & 0xFF) * alpha / 255)
             pixels[index + 2] = UInt8(Int(tone & 0xFF) * alpha / 255)
@@ -775,6 +776,8 @@ enum Effect {
     case flashSpark, flashSpark2
 
     static let inEnergyColour: [Effect] = [.smoke, .jumpSpark]
+    /// Toned no lighter than the energy colour itself: the jump spark, and the smoke of the dash and slide.
+    static let sparkNames: Set<String> = Set(inEnergyColour.map(\.name))
 
     var name: String {
         switch self {

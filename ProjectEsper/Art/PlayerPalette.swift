@@ -117,6 +117,13 @@ struct Look: Hashable {
     /// blade, the puffs and streaks, the effect sheets. Black up to the colour over the
     /// dark half, the colour up to a quarter of the way to white over the light half, so
     /// mid grey is the colour itself and white a light tint that still reads as it.
+    /// The sparks' tone (the jump spark, the wall spark, the dash's and slide's smoke, the
+    /// skid's puffs and the sheets' energy): the ramp's dark half, then the colour itself,
+    /// never lighter, as the legs and the crown are.
+    func sparkTone(luminance: Double) -> RGB {
+        luminance <= 0.5 ? Look.scaled(glow, luminance * 2) : glow
+    }
+
     func energyTone(luminance: Double) -> RGB {
         luminance <= 0.5 ? Look.scaled(glow, luminance * 2) : Look.lightened(glow, (luminance * 2 - 1) * 0.25)
     }

@@ -3446,15 +3446,15 @@ final class GameScene: SKScene {
     private let goalpostShadows = SKEffectNode()
     private var shadowBodies: [SKSpriteNode] = []
     private var shadowHeads: [SKSpriteNode] = []
-    /// A grey energy frame toned as `Look.energyTone` does: black to the colour over the
-    /// dark half, the colour to a quarter of the way to white over the light half; the
-    /// colour each node's own `a_glow`.
+    /// A grey energy frame toned as `Look.sparkTone` does: black to the colour over the
+    /// dark half, the colour itself over the light half, never lighter; the colour each
+    /// node's own `a_glow`.
     private lazy var energyToneShader: SKShader = {
         let shader = SKShader(source: """
         void main() {
             vec4 texel = texture2D(u_texture, v_tex_coord);
             float level = texel.a > 0.0 ? texel.r / texel.a : 0.0;
-            vec3 toned = level <= 0.5 ? a_glow * (level * 2.0) : mix(a_glow, vec3(1.0), (level * 2.0 - 1.0) * 0.25);
+            vec3 toned = level <= 0.5 ? a_glow * (level * 2.0) : a_glow;
             gl_FragColor = vec4(toned * texel.a, texel.a) * v_color_mix.a;
         }
         """)

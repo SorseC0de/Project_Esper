@@ -94,7 +94,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   20-frame windup ends. Let go after that but before the windup ends and it's a cancel.
   Holding past the windup and releasing without a flick is the pump fake, and so is a second shoot button or the throw button pressed during the
   stance; after a cancel the buttons involved have to come up before another stance.
-  Shoot pressed during a throw stance cancels the throw the same way. On the ground, jump during the stance
+  Shoot pressed during a throw stance cancels the throw the same way, and jump cancels it into
+  a jump (on the ground the jump squat; in the air the air's jump, if one is left), the throw
+  button up before another stance. Protocol 16. On the ground, jump during the stance
   is a jump shot: released on the way up
   it fires on the preset arc if nothing was flicked and the ball leaves with the body's
   lift. On the way down it's an ordinary air shot.

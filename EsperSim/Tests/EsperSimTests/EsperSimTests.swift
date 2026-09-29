@@ -469,6 +469,19 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .idle)
     }
 
+    func testJumpCancelsTheThrowCharge() {
+        var match = matchWithBallHeld()
+        for _ in 0..<5 { match.advance(inputs: [PlayerInput(throwBall: true), .idle]) }
+        XCTAssertEqual(match.players[0].state, .throwStance)
+        match.advance(inputs: [PlayerInput(jump: true, throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .jumpSquat)
+        XCTAssertTrue(match.players[0].hasBall)
+        // Throw still held after the cancel doesn't take the stance again.
+        for _ in 0..<10 { match.advance(inputs: [PlayerInput(jump: true, throwBall: true), .idle]) }
+        XCTAssertEqual(match.players[0].state, .air)
+        XCTAssertTrue(match.players[0].hasBall)
+    }
+
     func testReleaseBeforeTheHoldFiresWhenTheWindupEnds() {
         var match = matchWithBallHeld()
         for _ in 0..<10 {

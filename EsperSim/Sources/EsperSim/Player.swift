@@ -876,6 +876,19 @@ public struct Player: Equatable {
                 enter(grounded ? .idle : .air)
                 break
             }
+            if jumpPressed, grounded || coyote > 0 || jumpsLeft > 0 {
+                // Jump cancels the charge: on the ground into the jump; in the air the
+                // buffered press takes the air's jump next frame.
+                throwReady = false
+                quickThrow = false
+                if grounded {
+                    pendingAerial = nil
+                    enter(.jumpSquat)
+                } else {
+                    enter(.air)
+                }
+                break
+            }
             stanceMovement(input, airBrake: spec.throwStanceAirBrake)
             let aim = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
             if aim.length >= 0.5 {

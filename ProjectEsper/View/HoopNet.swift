@@ -69,6 +69,8 @@ enum NetTuning {
     /// AROUND), and its turn about its top in degrees (NET TILT X, TURN Y, ROLL Z), kept
     /// between launches; the chevrons' sizes are NET TOP and NET BOTTOM.
     static let cylinder = true
+    /// How far the cylinder moves against its row of the cloth: twice as far.
+    static let swayShare: CGFloat = 2
     static let radiusTopKey = "ui.net.cylinder.radiusTop"
     static let radiusBottomKey = "ui.net.cylinder.radiusBottom"
     static let ringsKey = "ui.net.cylinder.rings"
@@ -225,6 +227,16 @@ final class HoopNet {
                 CGPoint(x: sum.x + knot.at.x - rim.x - knot.home.x, y: sum.y + knot.at.y - rim.y - knot.home.y)
             }
             return CGPoint(x: total.x / CGFloat(inRow.count), y: total.y / CGFloat(inRow.count))
+        }
+    }
+    /// Each row's width against its width at rest: a ball through the middle spreads the
+    /// row both ways, which its sway, the average, doesn't show.
+    var rowSpreads: [CGFloat] {
+        (0..<NetTuning.chevronsPerColumn).map { row in
+            let inRow = knots.filter { $0.row == row }
+            guard let restLeft = inRow.map(\.home.x).min(), let restRight = inRow.map(\.home.x).max(), restRight - restLeft > 0.01,
+                  let left = inRow.map(\.at.x).min(), let right = inRow.map(\.at.x).max() else { return 1 }
+            return (right - left) / (restRight - restLeft)
         }
     }
 

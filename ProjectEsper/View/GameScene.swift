@@ -2817,7 +2817,7 @@ final class GameScene: SKScene {
         } + (NetTuning.cylinder ? nets.flatMap { net in
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             net.colour.getRed(&r, green: &g, blue: &b, alpha: &a)
-            return CylinderNet.instances(top: net.hangPoint, mirrored: net.mirrored, sways: net.rowSways,
+            return CylinderNet.instances(top: net.hangPoint, mirrored: net.mirrored, sways: net.rowSways, spreads: net.rowSpreads,
                                          colour: SIMD4<Float>(Float(r), Float(g), Float(b), 1))
         } : [])
     }

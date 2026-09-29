@@ -36,6 +36,8 @@ public struct StageFeatures: Equatable {
     /// A body can land on the stage's walls, and so wall jump; off, only on what moves or is
     /// made (helmets, slabs), never the tiles. The board rides them either way.
     public var tileWallsHold = true
+    /// The height of lava along the bottom: feet under it burn, and go back to where they started.
+    public var lavaSurface: Double?
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets
@@ -51,7 +53,7 @@ public struct StageFeatures: Equatable {
 
 /// The scenery a stage is drawn with.
 public enum StageLook: Equatable {
-    case court, footballField, highway
+    case court, footballField, highway, elements
 }
 
 extension StageFeatures {

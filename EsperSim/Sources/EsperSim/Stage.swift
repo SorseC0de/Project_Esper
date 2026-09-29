@@ -487,6 +487,30 @@ public struct Stage: Equatable {
         return stage
     }
 
+    /// The Elements: two courts across and two high, no scrolling, floating rock from a tile
+    /// map built by hand over a bed of lava. The sides and the floor are the world's edge.
+    public static var elements: Stage {
+        let map = ElementsMap.current
+        let columns = ElementsRules.columns, rows = ElementsRules.rows
+        func centre(_ cell: ElementsMap.Cell) -> Vec2 {
+            Vec2(x: (Double(cell.column) + 0.5) * tileSize, y: (Double(cell.row) + 0.5) * tileSize)
+        }
+        var stage = Stage(
+            columns: columns, rows: rows,
+            hoops: [
+                Hoop(position: centre(map.leftRim), owner: 1, backboard: .left),
+                Hoop(position: centre(map.rightRim), owner: 0, backboard: .right),
+            ],
+            playerSpawns: map.spawns.map { Vec2(x: (Double($0.column) + 0.5) * tileSize, y: Double($0.row) * tileSize) },
+            playerFacings: map.spawns.map { Double($0.column) * tileSize < Double(columns) * tileSize / 2 ? .right : .left },
+            ballSpawn: centre(map.ball)
+        )
+        for tile in map.tiles where map.isSolid(tile) { stage.set(.solid, column: tile.cell.column, row: tile.cell.row) }
+        stage.features = StageFeatures(look: .elements)
+        stage.features.lavaSurface = ElementsRules.lavaSurface
+        return stage
+    }
+
     /// Highway Traffic: the court's width, flat, a road through the middle with standstill
     /// traffic on it, and one rim at a time carried across under a helicopter. Each starts
     /// where the court has them, the ball loose at centre as on the court.
@@ -514,13 +538,14 @@ public struct Stage: Equatable {
 /// The stages to pick from, in the order the select screen shows them; the wire carries
 /// the raw value.
 public enum StageChoice: Int, CaseIterable {
-    case wreckCenter, longballStadium, slamstillTraffic
+    case wreckCenter, longballStadium, slamstillTraffic, theElements
 
     public var name: String {
         switch self {
         case .wreckCenter: "The Wreck Center"
         case .longballStadium: "Longball Stadium"
         case .slamstillTraffic: "Slamstill Traffic"
+        case .theElements: "The Elements"
         }
     }
 
@@ -529,6 +554,7 @@ public enum StageChoice: Int, CaseIterable {
         case .wreckCenter: .court
         case .longballStadium: .footballField
         case .slamstillTraffic: .highway
+        case .theElements: .elements
         }
     }
 }

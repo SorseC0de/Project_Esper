@@ -39,6 +39,7 @@ enum EffectSheets {
         "hoop_straight": 1,
         "ice_jumpspark": 22,
         "jumpspark": 9,
+        "lava": 8,
         "lightning1": 25,
         "lightning2": 25,
         "lightning3": 25,
@@ -49,6 +50,7 @@ enum EffectSheets {
         "lightning_particle2": 13,
         "lightning_spark": 9,
         "lightning_spark2": 10,
+        "score_strike": 13,
     ]
 
     static let anchorY: [String: CGFloat] = [
@@ -85,6 +87,7 @@ enum EffectSheets {
         "hoop_straight": 0.1667,
         "ice_jumpspark": 0.0000,
         "jumpspark": 0.0000,
+        "lava": 0.0000,
         "lightning1": 0.0000,
         "lightning2": 0.0000,
         "lightning3": 0.0000,
@@ -95,6 +98,7 @@ enum EffectSheets {
         "lightning_particle2": 0.5000,
         "lightning_spark": 0.5000,
         "lightning_spark2": 0.5000,
+        "score_strike": 0.5000,
     ]
 
     static let toned: Set<String> = [

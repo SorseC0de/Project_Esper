@@ -427,7 +427,9 @@ final class StageSelectScreen: Screen {
             addChild(sub)
         }
         let buttons = tuned(.buttons)
-        let width = min(halfWidth * 0.56, 180 * buttons)
+        // As wide as fits the whole row on the screen, however many stages there are.
+        let fitting = (halfWidth * 2 * 0.92 - 20 * CGFloat(stages.count - 1)) / CGFloat(max(stages.count, 1))
+        let width = min(halfWidth * 0.56, 180 * buttons, fitting)
         tileSize = CGSize(width: width, height: 96 * buttons)
         let spacing = width + 20
         let rise = UITuning.shared.textRise

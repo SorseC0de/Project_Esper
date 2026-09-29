@@ -57,11 +57,11 @@ final class HudSKView: SKView {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        touches.forEach { game?.touchEnded($0) }
+        touches.forEach { game?.touchEnded($0, at: $0.location(in: self), viewSize: bounds.size) }
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        touches.forEach { game?.touchEnded($0) }
+        touches.forEach { game?.touchEnded($0, at: $0.location(in: self), viewSize: bounds.size) }
     }
 }
 

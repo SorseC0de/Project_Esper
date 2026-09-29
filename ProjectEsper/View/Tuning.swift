@@ -61,12 +61,12 @@ enum DunkArt {
         CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -2, y: 16), CGPoint(x: 2, y: 1),
         CGPoint(x: -3, y: 3), CGPoint(x: -1, y: -1), CGPoint(x: -1, y: -1),
     ]
-    static func offsets(for look: StageLook) -> [CGPoint] { look == .court ? courtOffsets : stadiumOffsets }
+    static func offsets(for look: StageLook) -> [CGPoint] { look == .footballField ? stadiumOffsets : courtOffsets }
     /// Titan Tea's whole dunk moved by this on top of each frame's, on every stage; on
     /// TITAN DUNK X and Y with `DunkTuning` on.
     nonisolated(unsafe) static var titanOffset = CGPoint(x: -5, y: -11)
     static func set(_ offset: CGPoint, frame: Int, for look: StageLook) {
-        if look == .court { courtOffsets[frame] = offset } else { stadiumOffsets[frame] = offset }
+        if look == .footballField { stadiumOffsets[frame] = offset } else { courtOffsets[frame] = offset }
     }
 }
 
@@ -203,11 +203,11 @@ enum HoopTuning {
     /// Where the rim turns, on its art's canvas (0 to 1, from the bottom left): the back edge
     /// of its ellipse, where it meets the backboard.
     static func pivot(for look: StageLook) -> CGPoint {
-        look == .court ? CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48) : CGPoint(x: 27.5 / 48, y: 1 - 34 / 48)
+        look == .court || look == .elements ? CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48) : CGPoint(x: 27.5 / 48, y: 1 - 34 / 48)
     }
     /// The hoop's two pieces for a stage: Wreck Center's straight on, the rest turned.
     static func art(for look: StageLook) -> (backboard: String, rim: String) {
-        look == .court ? ("backboard_straight", "hoop_straight") : ("backboard", "hoop")
+        look == .court || look == .elements ? ("backboard_straight", "hoop_straight") : ("backboard", "hoop")
     }
     nonisolated(unsafe) static var courtOffset = CGPoint(x: 5, y: 10)
     /// The hoop offset the nets' NET X and Y were first set against: a net goes as far

@@ -29,7 +29,12 @@ import zlib
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
 STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
-STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight"]
+STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava"]
+# Whole pictures, not strips: into the catalog's root as an image of this name.
+ROOT_IMAGES = {
+    "ElementsTileset": "Stages/Elements/tileset_elements.png",
+    "ElementsMountains": "Stages/Elements/mountains_bkg.png",
+}
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")
 LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources", "EsperSim", "BallLandmarks.swift")
 EFFECT_SHEETS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Art", "EffectSheets.swift")
@@ -273,6 +278,20 @@ def write_imageset(short, index, png_source=None, png_writer=None):
               open(os.path.join(imageset, "Contents.json"), "w"), indent=2)
 
 
+def write_root_images():
+    """The whole pictures in ROOT_IMAGES, each its own imageset at the catalog's root."""
+    root = os.path.dirname(ATLAS)
+    for name, source in ROOT_IMAGES.items():
+        imageset = os.path.join(root, name + ".imageset")
+        if os.path.isdir(imageset):
+            shutil.rmtree(imageset)
+        os.makedirs(imageset)
+        shutil.copy(os.path.join(STRIPS, source), os.path.join(imageset, name + ".png"))
+        json.dump({"images": [{"filename": name + ".png", "idiom": "universal", "scale": "1x"}],
+                   "info": {"author": "xcode", "version": 1}},
+                  open(os.path.join(imageset, "Contents.json"), "w"), indent=2)
+
+
 def main():
     landmarks = []
     # The atlas's own Contents.json is kept as Xcode last wrote it.
@@ -314,7 +333,8 @@ def main():
     # The stage pieces named in STAGE_ART come from Stages, over a root sheet of the same name.
     strips = {os.path.splitext(os.path.basename(p))[0].lower(): p for p in glob.glob(os.path.join(STRIPS, "*.png"))}
     for name in STAGE_ART:
-        strips[name.lower()] = os.path.join(STRIPS, "Stages", name + ".png")
+        strips[os.path.basename(name).lower()] = os.path.join(STRIPS, "Stages", name + ".png")
+    write_root_images()
     for strip in [strips[name] for name in sorted(strips)]:
         # Exports arrive in whatever case the tool gave them; the atlas is lower case.
         short = os.path.splitext(os.path.basename(strip))[0].lower()

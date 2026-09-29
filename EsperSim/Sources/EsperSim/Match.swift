@@ -112,6 +112,7 @@ public struct Match: Equatable {
                                                    events: &events) else { continue }
             perform(action, by: index)
         }
+        burnInLava()
         resolveParries()
         for index in players.indices {
             resolveHits(by: index)
@@ -467,6 +468,26 @@ public struct Match: Equatable {
         ball.velocity.x = carry
         events.append(.popped(player: victim, by: popper))
         holdHitStop(HitStopRules.hitFrames)
+    }
+
+    /// The lava: whoever's feet are under its surface goes back to where they started, the
+    /// ball they held back to its own start; a loose ball in it goes back too. For now.
+    private mutating func burnInLava() {
+        guard let surface = stage.features.lavaSurface else { return }
+        for index in players.indices where players[index].position.y < surface {
+            let was = players[index]
+            players[index] = Player(spec: was.spec, index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
+            players[index].power = was.power
+            players[index].powerLevel = was.powerLevel
+            events.append(.lavaBurned(player: index))
+            if ball.holder == index {
+                ball.holder = nil
+                ball.respawn(at: stage.ballSpawn)
+            }
+        }
+        if ball.holder == nil, ball.isLive, ball.position.y < surface {
+            ball.respawn(at: stage.ballSpawn)
+        }
     }
 
     /// Hit-stop to at least this many frames.

@@ -55,6 +55,8 @@ public enum MatchEvent: Equatable {
     case struck(player: Int, by: Int)
     /// A snatch met a live blade: the slasher is the one stripped.
     case parried(player: Int, by: Int)
+    /// Someone's feet went into the lava and they went back to their start.
+    case lavaBurned(player: Int)
     /// A stance's stepback began.
     case steppedBack(player: Int)
     case quaked(player: Int)

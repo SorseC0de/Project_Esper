@@ -825,10 +825,19 @@ final class GameScene: SKScene {
     private var builtStage = StageChoice.wreckCenter
     private var ballCamStale = false
 
+    /// The Elements' placed tiles, while it's the stage drawn.
+    private var elementsArt: ElementsArt.Handles?
+
     private func buildStage() {
         // The floor and walls take the holder's colour, the backboard blocks keep their rim's
         // owner's, and the ledge is magenta.
         let stage = match.stage
+        let isElements = stage.features.look == .elements
+        backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : GameScene.background
+        elementsArt = nil
+        if isElements {
+            elementsArt = ElementsArt.build(stage: stage, map: ElementsMap.current, into: stageGround, sprites: sprites)
+        }
         if stage.features.look == .highway {
             HighwayArt.build(for: stage, into: stageGround) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
         }
@@ -894,7 +903,7 @@ final class GameScene: SKScene {
             stageGlowers.addChild(backboards)
             buildBackboards()
         }
-        for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.scenic {
+        for row in 0..<(stage.rows + Stage.skyRows) where !stage.features.scenic && !isElements {
             for column in 0..<stage.columns {
                 // The side walls run on up through the sky, so a tall screen never sees their top.
                 let tile = row < stage.rows ? stage.tile(column: column, row: row) : ((column == 0 || column == stage.columns - 1) ? Tile.solid : Tile.empty)
@@ -933,7 +942,7 @@ final class GameScene: SKScene {
         threePointArcs.maskNode = mask
         stageGlowers.addChild(threePointArcs)
         // Under the floor's row, the outline black, all the way down and out.
-        if !stage.features.scenic {
+        if !stage.features.scenic && !isElements {
             let under = SKSpriteNode(color: SKColor(rgb: PixelPalette.outline), size: CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 4000, height: 2000))
             under.anchorPoint = CGPoint(x: 0.5, y: 1)
             under.position = CGPoint(x: CGFloat(stage.columns) * GameScene.pixelsPerTile / 2, y: 0)
@@ -989,6 +998,12 @@ final class GameScene: SKScene {
     /// The world redrawn for the series' stage, if it isn't the one drawn.
     private func showStage() {
         guard built, series.stage != builtStage else { return }
+        closeMapEditor()
+        redrawStage()
+    }
+
+    /// The world drawn again from the match's stage, everything for it taken away first.
+    private func redrawStage() {
         stageGround.removeAllChildren()
         stageGlowers.removeAllChildren()
         courtTiles = []
@@ -1000,6 +1015,7 @@ final class GameScene: SKScene {
         rimDip = []
         rimSpin = []
         nets = []
+        elementsArt = nil
         fieldBlooms = []
         lightPanels = []
         yardNumbers = []
@@ -1178,6 +1194,14 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
+        // The map maker only means anything on the Elements, offline, with a mouse.
+        #if !os(tvOS)
+        if match.stage.features.look == .elements, online == nil {
+            controls.addPicker(title: "MAP", options: ["OFF", "ON"], selected: mapEditor == nil ? 0 : 1) { [weak self] index in
+                index == 1 ? self?.openMapEditor() : self?.closeMapEditor(restart: true)
+            }
+        }
+        #endif
         // The bounds gallery only means anything on the highway.
         if match.stage.features.traffic {
             controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
@@ -1311,6 +1335,13 @@ final class GameScene: SKScene {
             return
         }
         guard let last = lastTime else { return }
+        #if !os(tvOS)
+        if mapEditor != nil {
+            // The match held still while the map's being laid out.
+            render()
+            return
+        }
+        #endif
         if DunkTuning.enabled {
             holdDunkPose()
             render()
@@ -1559,6 +1590,10 @@ final class GameScene: SKScene {
         let fieldSeed = UInt32(series.dice.roll(1 << 16)) &+ 1
         let pickerOn = online == nil && powerVariant != .none && gameMode != .fortySeven
         let drinks = series.drinks.indices.map { drinksInPlay($0, pickerOn: pickerOn) }
+        if series.stage == .theElements {
+            // The map every phone plays, but on this one offline what the map maker last kept.
+            ElementsMap.current = online == nil ? (SavedElementsMap.value ?? .baked) : .baked
+        }
         var fresh = Match(stage: series.stage.stage, specs: drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed,
                           mode: gameMode)
         for index in fresh.players.indices {
@@ -3267,6 +3302,50 @@ final class GameScene: SKScene {
             bubble.run(.sequence([.group([out, .animate(with: looped, timePerFrame: 1.0 / 30)]), .removeFromParent()]))
         }
     }
+    #if !os(tvOS)
+    /// The map maker, while it's open, and where the pointer last was in it.
+    private var mapEditor: MapEditor?
+    private var lastEditorPoint = CGPoint.zero
+
+    private func openMapEditor() {
+        guard mapEditor == nil, online == nil, match.stage.features.look == .elements else { return }
+        let scale = hudScale * cameraNode.xScale
+        let editor = MapEditor(
+            map: ElementsMap.current, halfWidth: size.width / 2 / hudScale, halfHeight: size.height / 2 / hudScale, unitsPerHud: scale,
+            world: { [weak self] point in
+                guard let self else { return .zero }
+                return CGPoint(x: self.cameraNode.position.x + point.x * scale, y: self.cameraNode.position.y + point.y * scale)
+            },
+            hudFromWorld: { [weak self] point in
+                guard let self else { return .zero }
+                return CGPoint(x: (point.x - self.cameraNode.position.x) / scale, y: (point.y - self.cameraNode.position.y) / scale)
+            },
+            onTiles: { [weak self] cells in
+                guard let self else { return }
+                let map = ElementsMap.current
+                for cell in cells { self.elementsArt?.set(map.tiles.first { $0.cell == cell }, at: cell) }
+                self.session.mutate { match in
+                    match.stage = .elements
+                    match.refreshExtras()
+                }
+            },
+            onMarkers: { [weak self] in self?.session.mutate { $0.stage = .elements; $0.refreshExtras() } },
+            onClose: { [weak self] in self?.closeMapEditor(restart: true) })
+        hud.addChild(editor)
+        mapEditor = editor
+    }
+
+    private func closeMapEditor(restart: Bool = false) {
+        guard mapEditor != nil else { return }
+        mapEditor?.removeFromParent()
+        mapEditor = nil
+        // Back to play from where everyone starts, on the map as it now is.
+        if restart { reset() }
+    }
+    #else
+    private func closeMapEditor(restart: Bool = false) {}
+    #endif
+
     /// The bounds gallery, while it's open.
     private var boundsGallery: BoundsGallery?
 
@@ -4686,6 +4765,12 @@ final class GameScene: SKScene {
     }
 
     func touchBegan(_ touch: UITouch, at point: CGPoint, viewSize: CGSize) {
+        #if !os(tvOS)
+        if let editor = mapEditor {
+            editor.began(at: hudPoint(point, viewSize: viewSize))
+            return
+        }
+        #endif
         if let gallery = boundsGallery {
             _ = gallery.tap(at: hudPoint(point, viewSize: viewSize))
             return
@@ -4698,10 +4783,22 @@ final class GameScene: SKScene {
     }
 
     func touchMoved(_ touch: UITouch, to point: CGPoint, viewSize: CGSize) {
+        #if !os(tvOS)
+        if let editor = mapEditor {
+            editor.moved(to: hudPoint(point, viewSize: viewSize))
+            return
+        }
+        #endif
         controls?.moved(touch, to: hudPoint(point, viewSize: viewSize))
     }
 
-    func touchEnded(_ touch: UITouch) {
+    func touchEnded(_ touch: UITouch, at point: CGPoint? = nil, viewSize: CGSize = .zero) {
+        #if !os(tvOS)
+        if let editor = mapEditor {
+            editor.ended(at: point.map { hudPoint($0, viewSize: viewSize) } ?? lastEditorPoint)
+            return
+        }
+        #endif
         controls?.ended(touch)
     }
 }

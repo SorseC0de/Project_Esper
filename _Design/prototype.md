@@ -920,6 +920,35 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   energy, outlined in black, at that edge, at their chest's height. All of
   it is the view; the sim never sees the camera, so it's safe online.
 
+## The Elements
+
+`Stage.elements`, The Elements on the stage select (a working title): 67 by 32 tiles, two
+Wreck Centers across less a column, so there's a middle one, and two high, no scrolling, the whole stage on screen at half the court's
+zoom. Palette 2 flat behind everything, `mountains_bkg` stretched over the stage in front of
+it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
+through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16
+by 16 cell of `tileset_elements` (`Pixel Art/Stages/Elements`; the importer's `STAGE_ART` and
+`ROOT_IMAGES`). The sides and the floor are the world's edge. Every tile of the map is solid,
+bar the tileset's flecks (`ElementsMap.decoration`), drawn but with nothing to stand on. Hoops
+are the straight-on pair, the court's placements.
+
+The lava: whoever's feet go under its surface (`ElementsRules.lavaSurface`, 25 units) is put
+back where they started, any ball they held back at the ball's start, and a loose ball in it
+too. For now (protocol 27).
+
+The map is `ElementsMap`: the placed tiles by cell, the two rims (backboard on the left and on
+the right; build a rock block behind each), the two starts (the cell their feet stand at the
+bottom of) and the ball's. `ElementsMap.baked` is what every phone plays, online included; a
+map kept by the map maker stands in for it offline only (`SavedElementsMap`). The map maker
+(`MapEditor`, for a mouse; not on the TV) is the MAP picker on the debug panel, on this stage
+offline: the match held still, a grid over the stage, a panel with the tileset. Drag a tile
+from the panel onto the stage to drop it, and with a tile chosen press an empty cell and drag
+to paint; press a placed tile to pick it up and drop it elsewhere, or back on the panel to take
+it away. ERASE, the rims, P1, P2 and BALL are picked from the button rows and dropped the same
+way (press a marker to move it). UNDO steps back, RESET returns to the baked map, TILES shows
+or hides the panel, COPY puts the map on the clipboard as Swift for `ElementsMap.defaultMap`,
+and CLOSE restarts the round on the new map. Edits are kept between launches.
+
 ## Court
 
 The Wreck Center on the stage select, and the default. Its backboard blocks are rows 8 and 9, and

@@ -62,6 +62,9 @@ enum DunkArt {
         CGPoint(x: -3, y: 3), CGPoint(x: -1, y: -1), CGPoint(x: -1, y: -1),
     ]
     static func offsets(for look: StageLook) -> [CGPoint] { look == .court ? courtOffsets : stadiumOffsets }
+    /// Titan Tea's whole dunk moved by this on top of each frame's, on every stage; on
+    /// TITAN DUNK X and Y with `DunkTuning` on.
+    nonisolated(unsafe) static var titanOffset = CGPoint(x: -5, y: -11)
     static func set(_ offset: CGPoint, frame: Int, for look: StageLook) {
         if look == .court { courtOffsets[frame] = offset } else { stadiumOffsets[frame] = offset }
     }

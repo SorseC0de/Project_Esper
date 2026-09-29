@@ -381,6 +381,10 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   two drops the slowdown, and running or dashing into the other strips them, once a
   contact. It comes into a round on the old lightning entry at the ordinary size, then
   grows to double over 30 frames drawn white.
+  Everything drawn off the body goes at its size too: the jump, dash, slide, wall and skid
+  sparks, the double jump's rings, the head's and legs' cubes (`GameScene.bodyScale`). Its dunk
+  is moved as a whole by `DunkArt.titanOffset`, (−5, −11), on top of each frame's, on TITAN DUNK X and Y with
+  `DunkTuning` on.
 
 Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
 too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is

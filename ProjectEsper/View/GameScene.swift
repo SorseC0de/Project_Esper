@@ -1267,6 +1267,8 @@ final class GameScene: SKScene {
                 HoopTuning.set(CGPoint(x: HoopTuning.offset(for: look).x, y: CGFloat($0)), for: look)
             }
             if look != .footballField { addNetSliders(look) }
+            controls.addSlider(title: "TITAN DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.titanOffset.x)) { DunkArt.titanOffset.x = CGFloat($0) }
+            controls.addSlider(title: "TITAN DUNK Y", range: -32...32, notch: 1, value: Float(DunkArt.titanOffset.y)) { DunkArt.titanOffset.y = CGFloat($0) }
             controls.addSlider(title: "DUNK FRAME", range: 0...last, notch: 1, value: Float(DunkTuning.frame)) { value in
                 DunkTuning.frame = Int(value)
                 xSlider.set(Float(DunkArt.offsets(for: dunkLook)[DunkTuning.frame].x))
@@ -2406,17 +2408,17 @@ final class GameScene: SKScene {
                 default:
                     let drop = Effect.jumpSpark.bottomAligned ? -3.75 : 0
                     let spark = Effect.jumpSpark.node(sprites, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: drop)), flipped: player.facing == .left, player: index)
-                    spark.xScale *= 0.75
-                    spark.yScale *= 0.75
+                    spark.xScale *= 0.75 * bodyScale(index)
+                    spark.yScale *= 0.75 * bodyScale(index)
                     glowers.addChild(spark)
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
             case .dashed(let index), .slid(let index):
                 let player = match.players[index]
                 if player.power == .blazingBoba {
-                    spawn(.fireDash, at: player.position, flipped: player.facing == .left)
+                    spawn(.fireDash, at: player.position, flipped: player.facing == .left, scale: bodyScale(index))
                 } else {
-                    spawn(.smoke, at: player.position, flipped: player.facing == .left, player: index)
+                    spawn(.smoke, at: player.position, flipped: player.facing == .left, player: index, scale: bodyScale(index))
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
             case .snatchReached(let index):
@@ -2446,14 +2448,14 @@ final class GameScene: SKScene {
                 // a silhouette in their energy. Both painted the other way round from the old spark.
                 let at = SpriteLibrary.point(player.position + Vec2(x: wall.sign * 4, y: 5))
                 if player.power == .blazingBoba {
-                    spawn(.fireSkid, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .right)
+                    spawn(.fireSkid, at: player.position + Vec2(x: wall.sign * 4, y: 5), flipped: wall == .right, scale: bodyScale(index))
                 } else {
                     let frames = (0..<Effect.fireWallSpark.frameCount).map { sprites.silhouetteTexture(Effect.fireWallSpark.name, $0, player: index) }
                     let spark = SKSpriteNode(texture: frames[0])
                     spark.anchorPoint = Effect.fireWallSpark.anchor
                     spark.position = at
-                    spark.xScale = (wall == .right ? -1 : 1) * Effect.fireWallSpark.scale
-                    spark.yScale = Effect.fireWallSpark.scale
+                    spark.xScale = (wall == .right ? -1 : 1) * Effect.fireWallSpark.scale * bodyScale(index)
+                    spark.yScale = Effect.fireWallSpark.scale * bodyScale(index)
                     spark.zPosition = 30
                     spark.run(.sequence([.animate(with: frames, timePerFrame: 1 / Effect.fireWallSpark.fps), .removeFromParent()]))
                     glowers.addChild(spark)
@@ -2464,7 +2466,7 @@ final class GameScene: SKScene {
                 spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left, player: index)
             case .doubleJumped(let index):
                 let player = match.players[index]
-                spawnJumpRings(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow))
+                spawnJumpRings(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow), scale: bodyScale(index))
             case .warped(let flasher, let from, let to), .flashed(let flasher, let from, let to):
                 // The flash's spark at both ends, the sheet at half size.
                 // The flash sheet at both ends, in the energy colour, at half size.
@@ -2606,9 +2608,16 @@ final class GameScene: SKScene {
     private static let jumpRingGrowth: CGFloat = 2.5
     private static let jumpRingSeconds = 0.3
     private static let jumpRingStagger = 0.06
-    private func spawnJumpRings(at point: CGPoint, colour: SKColor) {
+    /// A body's drawn size against a plain one's: Titan Tea's, grown into after its port-in.
+    /// Its sparks, rings and cubes are drawn at it too.
+    private func bodyScale(_ index: Int) -> CGFloat {
+        guard match.players.indices.contains(index), titanGrowth.indices.contains(index) else { return 1 }
+        return 1 + (CGFloat(match.players[index].spec.scale) - 1) * titanGrowth[index]
+    }
+
+    private func spawnJumpRings(at point: CGPoint, colour: SKColor, scale: CGFloat = 1) {
         for ring in 0..<GameScene.jumpRingCount {
-            let size = GameScene.jumpRingSize
+            let size = CGSize(width: GameScene.jumpRingSize.width * scale, height: GameScene.jumpRingSize.height * scale)
             let shape = SKShapeNode(ellipseOf: size)
             shape.strokeColor = colour
             shape.lineWidth = 1
@@ -2745,8 +2754,11 @@ final class GameScene: SKScene {
         ghost.run(.sequence([.wait(forDuration: GameScene.afterimageHold), .fadeOut(withDuration: GameScene.afterimageFade), .removeFromParent()]))
     }
 
-    private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool, player: Int? = nil) {
-        glowers.addChild(effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped, player: player))
+    private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool, player: Int? = nil, scale: CGFloat = 1) {
+        let node = effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped, player: player)
+        node.xScale *= scale
+        node.yScale *= scale
+        glowers.addChild(node)
     }
 
     /// The head's particles, sprites of their own rather than an emitter, since an emitter
@@ -2795,7 +2807,7 @@ final class GameScene: SKScene {
         headParticles.compactMap { particle in
             guard let cube = particle.cube else { return nil }
             let node = particle.node
-            let size = (particle.legCube ? ParticleLook.legCubeSize : ParticleLook.cubeSize) * Float(node.xScale)
+            let size = (particle.legCube ? ParticleLook.legCubeSize : ParticleLook.cubeSize) * Float(node.xScale) * Float(bodyScale(particle.owner))
             let model = simd_float4x4.translation(SIMD3<Float>(Float(node.position.x), Float(node.position.y), 0))
                 * simd_float4x4(cube.orientation) * simd_float4x4.scale(SIMD3<Float>(repeating: size))
             var colour = cube.colour
@@ -2818,6 +2830,8 @@ final class GameScene: SKScene {
     /// A leg's cubes, in the leg's own colour, the back leg's behind the players; each leg's
     /// credit apart from the head's.
     private static let legCreditKey = 1000
+    /// From the head's middle up to its crown, where its particles leave, in art pixels at a plain body's size.
+    private static let crownLift: CGFloat = 4
     private func legStream(_ index: Int, part: BodyPart) -> HeadStream {
         let look = sprites.look(for: index)
         return HeadStream(frames: [sprites.flatSquare(size: 4, alpha: 1)], size: ParticleLook.energySize,
@@ -4008,7 +4022,7 @@ final class GameScene: SKScene {
             } else if titanGrowth[index] < 1 {
                 titanGrowth[index] = min(titanGrowth[index] + 1 / CGFloat(GameScene.titanGrowFrames), 1)
             }
-            let drawScale = 1 + (CGFloat(player.spec.scale) - 1) * titanGrowth[index]
+            let drawScale = bodyScale(index)
             let growing = player.spec.scale != 1 && titanGrowth[index] < 1
             node.size = node.texture!.size().scaled(by: drawScale)
             node.anchorPoint = sprites.anchor(for: frame.animation)
@@ -4021,7 +4035,9 @@ final class GameScene: SKScene {
             node.position = SpriteLibrary.point(player.position) + drift
             if player.state == .dunking {
                 // Each frame of the dunk sits where its art was placed on the rim.
-                let nudge = DunkArt.offsets(for: match.stage.features.look)[Animation.dunkEntry(at: player.stateTimer).index]
+                // Titan Tea's whole dunk moved again by its own offset.
+                let titan = player.power == .titanTea ? DunkArt.titanOffset : .zero
+                let nudge = DunkArt.offsets(for: match.stage.features.look)[Animation.dunkEntry(at: player.stateTimer).index] + titan
                 node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y) * drawScale
             }
             node.xScale = CGFloat(player.facing.sign)
@@ -4215,7 +4231,7 @@ final class GameScene: SKScene {
                 headNode.yScale = 1
                 headNode.zRotation = tilt
                 headNode.position = shown
-                emitHeadParticles(index, power: player.power, at: CGPoint(x: shown.x, y: shown.y + 4))
+                emitHeadParticles(index, power: player.power, at: CGPoint(x: shown.x, y: shown.y + GameScene.crownLift * drawScale))
             } else {
                 headNode.isHidden = true
                 headEspers[index].particleBirthRate = 0
@@ -4224,7 +4240,7 @@ final class GameScene: SKScene {
                 if HumanLook.enabled, let landmark = sprites.landmark(.head, in: frame, player: index) {
                     let head = landmark * drawScale
                     let at = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
-                    emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + 4))
+                    emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + GameScene.crownLift * drawScale))
                 }
             }
             // A human's legs, in the energy's colours, give off smaller cubes of their own.
@@ -4254,7 +4270,7 @@ final class GameScene: SKScene {
             // Blazing Boba's skid: the fire sheet as the run stops.
             if player.power == .blazingBoba, player.state == .idle, lastStates[index] == .run || lastStates[index] == .dash {
                 // The sheet skids the other way from the run sheets.
-                spawn(.fireSkid, at: player.position, flipped: player.facing == .right)
+                spawn(.fireSkid, at: player.position, flipped: player.facing == .right, scale: bodyScale(index))
             }
             lastStates[index] = player.state
         }

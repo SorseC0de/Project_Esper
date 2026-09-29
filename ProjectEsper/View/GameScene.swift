@@ -1133,6 +1133,14 @@ final class GameScene: SKScene {
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
+            if HumanLook.enabled {
+                // How far down the head the energy's grade reaches; every frame redrawn to it.
+                controls.addSlider(title: "HEAD GRADIENT", range: 0...1, notch: 0.01, value: Float(HumanLook.headEnergyShare)) { [weak self] value in
+                    guard Double(value) != HumanLook.headEnergyShare else { return }
+                    HumanLook.headEnergyShare = Double(value)
+                    self?.sprites.redrawPlayers()
+                }
+            }
         }
         if DunkTuning.enabled {
             // The court's rims lowered, the hanging body and the hoop's art with them.

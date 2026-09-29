@@ -241,6 +241,9 @@ enum CourtLook {
 /// glowing. `enabled` off puts everything back as it was.
 enum HumanLook {
     static let enabled = true
+    /// The head's top share, its line included, in the energy's colour, grading down into
+    /// the skin; on a debug slider beside the cubes'.
+    nonisolated(unsafe) static var headEnergyShare = 0.66
     static let skin: [BodyPart: RGB] = {
         let front = PixelPalette.colours[35], back = PixelPalette.colours[34]
         return [.head: front, .frontArm: front, .frontHand: front, .frontLeg: front,

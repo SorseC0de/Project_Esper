@@ -30,6 +30,14 @@ final class SpriteLibrary {
         rewarm(player: player)
     }
 
+    /// Every player's frames dropped and rebuilt, for a change to how all looks are drawn.
+    func redrawPlayers() {
+        for player in looks.indices {
+            cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
+            rewarm(player: player)
+        }
+    }
+
     /// The toned sheets beyond the energy effects that a player's particles use.
     static let tonedParticleSheets = ["lightning_particle", "lightning_particle2"]
     private var rewarmGeneration: [Int: Int] = [:]
@@ -452,6 +460,24 @@ final class SpriteLibrary {
             }
         }
 
+        // A human's head tops out in the energy: its top third, line and all, grades from the
+        // look's colour at the crown down into the skin, leading into the particles off it.
+        // The line there stays on the body in its grade rather than lifting off with the rest.
+        if HumanLook.enabled {
+            let isHead = (0..<count).map { parts[$0] == .head }
+            let crown = (0..<count).map { isHead[$0] || (lined[$0] && neighbours($0, { isHead[$0] })) }
+            if let top = crown.firstIndex(of: true).map({ $0 / width }), let bottom = crown.lastIndex(of: true).map({ $0 / width }) {
+                let band = Int((Double(bottom - top + 1) * HumanLook.headEnergyShare).rounded())
+                for pixel in (top * width)..<(min(top + band, height) * width) where band > 0 && crown[pixel] {
+                    let share = 1 - Double(pixel / width - top) / Double(band)
+                    let index = pixel * 4
+                    let under = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
+                    paint(pixels, index, mix(under, look.glow, share))
+                    lined[pixel] = false
+                }
+            }
+        }
+
         // With `detach`, the line comes off onto its own canvas in white, so the view can
         // draw it in any colour, frame by frame.
         var outline: SKTexture?
@@ -511,6 +537,14 @@ final class SpriteLibrary {
         let ball = sizes[biggest] >= SpriteLibrary.ballMinPixels ? biggest : 0
         for pixel in parts.indices where parts[pixel] == .ball && label[pixel] != ball {
             parts[pixel] = .energy
+        }
+    }
+
+    /// `from` moved `share` of the way to `to`, channel by channel.
+    private func mix(_ from: RGB, _ to: RGB, _ share: Double) -> RGB {
+        [16, 8, 0].reduce(RGB(0)) { result, shift in
+            let a = Double((from >> RGB(shift)) & 0xFF), b = Double((to >> RGB(shift)) & 0xFF)
+            return result | RGB((a + (b - a) * share).rounded()) << RGB(shift)
         }
     }
 

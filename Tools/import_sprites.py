@@ -28,6 +28,8 @@ import zlib
 
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
 STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
+# Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
+STAGE_ART = ["Backboard", "Hoop"]
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")
 LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources", "EsperSim", "BallLandmarks.swift")
 EFFECT_SHEETS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Art", "EffectSheets.swift")
@@ -309,7 +311,11 @@ def main():
                         sequence["xorigin"], sequence["yorigin"], sequence["playbackSpeed"])
 
     effects = {}
-    for strip in sorted(glob.glob(os.path.join(STRIPS, "*.png"))):
+    # The stage pieces named in STAGE_ART come from Stages, over a root sheet of the same name.
+    strips = {os.path.splitext(os.path.basename(p))[0].lower(): p for p in glob.glob(os.path.join(STRIPS, "*.png"))}
+    for name in STAGE_ART:
+        strips[name.lower()] = os.path.join(STRIPS, "Stages", name + ".png")
+    for strip in [strips[name] for name in sorted(strips)]:
         # Exports arrive in whatever case the tool gave them; the atlas is lower case.
         short = os.path.splitext(os.path.basename(strip))[0].lower()
         if " " in short:

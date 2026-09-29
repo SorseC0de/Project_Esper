@@ -101,14 +101,14 @@ final class HoopNet {
     private var builtSpacing: [CGFloat] = []
     private var drawnScales: [CGFloat] = []
 
-    init(at rim: CGPoint, mirrored: Bool, colour: SKColor, into parent: SKNode) {
+    init(at rim: CGPoint, mirrored: Bool, colour: SKColor, into parent: SKNode, depth: CGFloat = 4) {
         self.rim = rim
         facing = mirrored ? -1 : 1
         shape.strokeColor = colour
         shape.lineWidth = NetTuning.lineWidth
         shape.lineCap = .square
         shape.isAntialiased = false
-        shape.zPosition = 4
+        shape.zPosition = depth
         parent.addChild(shape)
         buildMesh()
     }

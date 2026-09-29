@@ -159,9 +159,10 @@ enum ZoneTuning {
     }
 }
 
-/// The hoop's art against the rim's point, in art pixels: across away from the backboard, and up.
+/// The hoop's art, backboard and rim together, against the rim's point, in art pixels:
+/// across away from the backboard, and up. On HOOP X and Y with `DunkTuning` on.
 enum HoopTuning {
-    static let offset = CGPoint(x: 5, y: 10)
+    nonisolated(unsafe) static var offset = CGPoint(x: 5, y: 10)
 }
 
 enum BackboardTuning {
@@ -194,7 +195,7 @@ enum GoalpostTuning {
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
-    static let enabled = false
+    static let enabled = true
     nonisolated(unsafe) static var frame = 0
 }
 

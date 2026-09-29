@@ -188,13 +188,20 @@ final class TouchControls: SKNode {
         pickers.append(picker)
     }
 
-    /// Adds a slider across the top, under the score, below any already there.
+    /// Adds a slider across the top, under the score, below any already there, six to a column.
     @discardableResult
     func addSlider(title: String, range: ClosedRange<Float>, notch: Float, value: Float, onChange: @escaping (Float) -> Void) -> Slider {
         let slider = Slider(title: title, range: range, notch: notch, value: value, onChange: onChange)
-        slider.position = CGPoint(x: topCentre.x, y: topCentre.y - 34 - CGFloat(sliders.count) * 26)
         addChild(slider)
         sliders.append(slider)
+        // Six to a column, the columns side by side about the middle, so a long set fits.
+        let perColumn = 6
+        let columns = (sliders.count + perColumn - 1) / perColumn
+        for (index, placed) in sliders.enumerated() {
+            let column = CGFloat(index / perColumn) - CGFloat(columns - 1) / 2
+            placed.position = CGPoint(x: topCentre.x + column * (Slider.size.width + 20),
+                                      y: topCentre.y - 34 - CGFloat(index % perColumn) * 26)
+        }
         return slider
     }
 

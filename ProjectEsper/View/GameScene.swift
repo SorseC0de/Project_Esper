@@ -258,6 +258,8 @@ final class GameScene: SKScene {
     /// A score's flash on the floor and walls: frames until it, then how white they are, fading.
     private var courtWhiteIn = 0
     private var courtWhite: CGFloat = 0
+    /// Each hoop in two layers under the bodies: its backboard, then the net, then its rim.
+    private var backboardNodes: [SKSpriteNode] = []
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
     private var previewDots: [SKSpriteNode] = []
@@ -307,7 +309,7 @@ final class GameScene: SKScene {
     /// What's drawn in the world but must not glow, for the mask to mark: the hoops and the banner.
     var flatSnapshots: [BodySnapshot] {
         // The hoops: their backboards read too hot with the glow on them.
-        var flat = rimNodes.filter { !$0.isHidden }.compactMap { rim in
+        var flat = (backboardNodes + rimNodes).filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size) }
         }
         // The snipe's cursors, drawn as they are.
@@ -444,11 +446,13 @@ final class GameScene: SKScene {
                               crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
                               angle: GoalpostTuning.crossbarAngle * .pi / 180, thickness: GoalpostTuning.thickness, outline: GoalpostTuning.outline,
                               padColour: SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow)))
-            let rim = SKSpriteNode(texture: sprites.texture("hoop", 0))
-            rim.position = GameScene.hoopArtPoint(for: hoop)
-            rim.xScale = hoop.backboard == .left ? -1 : 1
-            rim.zPosition = 5
-            camScene.scenery.addChild(rim)
+            for name in ["backboard", "hoop"] {
+                let art = SKSpriteNode(texture: sprites.texture(name, 0))
+                art.position = GameScene.hoopArtPoint(for: hoop)
+                art.xScale = hoop.backboard == .left ? -1 : 1
+                art.zPosition = name == "hoop" ? 6 : 5
+                camScene.scenery.addChild(art)
+            }
         }
     }
 
@@ -922,16 +926,24 @@ final class GameScene: SKScene {
             threePointArcSides.append((arc, 1 - hoop.owner))
         }
         for hoop in stage.hoops {
-            // `hoop`, the rim and its backboard, drawn to the players' scale.
+            // `backboard`, the net, then `hoop`, the rim, all under the bodies, drawn to the
+            // players' scale on one canvas that keeps them together, the backboard on the right.
+            // TODO: twitch physics on the rim, its own layer for it.
+            let backboard = SKSpriteNode(texture: sprites.texture("backboard", 0))
+            backboard.position = GameScene.hoopArtPoint(for: hoop)
+            backboard.zPosition = 5
+            backboard.xScale = hoop.backboard == .left ? -1 : 1
+            stageGround.addChild(backboard)
+            backboardNodes.append(backboard)
             let rim = SKSpriteNode(texture: sprites.texture("hoop", 0))
             rim.position = GameScene.hoopArtPoint(for: hoop)
-            rim.zPosition = 5
-            // The sheet draws the rim with its backboard on the right.
             rim.xScale = hoop.backboard == .left ? -1 : 1
+            rim.zPosition = 6
             stageGround.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            nets.append(HoopNet(at: GameScene.netPoint(for: hoop), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow), into: stageGlowers))
+            nets.append(HoopNet(at: GameScene.netPoint(for: hoop), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
+                                into: stageGround, depth: 5.5))
         }
         warmDrawnArt()
     }
@@ -944,6 +956,7 @@ final class GameScene: SKScene {
         courtTiles = []
         blockTiles = []
         threePointArcSides = []
+        backboardNodes = []
         rimNodes = []
         rimFlash = []
         nets = []
@@ -1161,6 +1174,8 @@ final class GameScene: SKScene {
             let ySlider = controls.addSlider(title: "DUNK Y", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].y)) {
                 DunkArt.offsets[DunkTuning.frame].y = CGFloat($0)
             }
+            controls.addSlider(title: "HOOP X", range: -24...24, notch: 1, value: Float(HoopTuning.offset.x)) { HoopTuning.offset.x = CGFloat($0) }
+            controls.addSlider(title: "HOOP Y", range: -24...24, notch: 1, value: Float(HoopTuning.offset.y)) { HoopTuning.offset.y = CGFloat($0) }
             controls.addSlider(title: "DUNK FRAME", range: 0...last, notch: 1, value: Float(DunkTuning.frame)) { value in
                 DunkTuning.frame = Int(value)
                 xSlider.set(Float(DunkArt.offsets[DunkTuning.frame].x))
@@ -1317,8 +1332,8 @@ final class GameScene: SKScene {
         render()
     }
 
-    /// Where the hoop's art sits for a rim: the rim's point, moved by `HoopTuning.offset` in
-    /// art pixels, across mirrored for a backboard on the left.
+    /// Where the hoop's art sits for a rim, backboard and rim together: the rim's point, moved
+    /// by `HoopTuning.offset` in art pixels, across mirrored for a backboard on the left.
     static func hoopArtPoint(for hoop: Hoop) -> CGPoint {
         let at = SpriteLibrary.point(hoop.position)
         let across = HoopTuning.offset.x * (hoop.backboard == .left ? -1 : 1)
@@ -4242,14 +4257,18 @@ final class GameScene: SKScene {
 
         for index in rimNodes.indices {
             if rimFlash[index] > 0 { rimFlash[index] -= 1 }
-            // A basket flashes the hoop white; the art is one frame.
-            rimNodes[index].color = .white
-            rimNodes[index].colorBlendFactor = rimFlash[index] > 0 ? 0.8 : 0
+            // A basket flashes the hoop white, rim and backboard; the art is one frame.
+            for art in [rimNodes[index], backboardNodes[index]] {
+                art.color = .white
+                art.colorBlendFactor = rimFlash[index] > 0 ? 0.8 : 0
+            }
             // A rim that moves, under the highway's helicopter, and its net with it; the art
             // and the net each at their tuned offset from the rim.
             if index < match.stage.hoops.count {
                 rimNodes[index].position = GameScene.hoopArtPoint(for: match.stage.hoops[index])
                 rimNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
+                backboardNodes[index].position = rimNodes[index].position
+                backboardNodes[index].xScale = rimNodes[index].xScale
                 if index < nets.count {
                     nets[index].step(rim: GameScene.netPoint(for: match.stage.hoops[index]), ball: ballNode.isHidden ? nil : ballNode.position,
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,

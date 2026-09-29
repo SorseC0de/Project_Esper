@@ -878,9 +878,13 @@ The Wreck Center on the stage select, and the default. Its backboard blocks are 
 the rims hang off them a tile under their top, lowered 7, at 83 (`Stage.courtRimDrop`);
 RIM DEPTH (`Stage.courtRimDepth`) slides each toward its block while `DunkTuning` holds a
 body hung on the right rim, the hang and the hoop's art coming with them. Below
-the floor's row everything is the outline black, #242234. Its hoops are `hoop`, the rim and a backboard drawn
-to the players' scale, placed 5 art pixels out from the backboard and 10 up from the rim's point
-(`HoopTuning.offset`), kept out of the glow (the mask marks it, as it does the banner);
+the floor's row everything is the outline black, #242234. Every stage's hoops are two layers on one 48-pixel canvas,
+drawn to the players' scale and kept together as drawn, all under the bodies: `backboard`, then
+the net, then `hoop`, the rim (`Pixel Art/Stages`, the importer's `STAGE_ART`, over the old
+one-piece `Hoop.png`), placed 5 art pixels out from the backboard and 10 up from the rim's point
+(`HoopTuning.offset`, on HOOP X and Y with `DunkTuning` on), both kept out of the glow
+(the mask marks them, as it does the banner). The rim is to get twitch physics. With twelve or so
+debug sliders on at once they sit six to a column;
 the net is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
 (4) art pixels apart across and NET ROWS (2.75, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.5) of
 the way to the neighbour it's knotted to on that row, toward the right-hand one on one row and

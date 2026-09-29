@@ -6,6 +6,7 @@ import CoreGraphics
 /// Tools/import_sprites.py; don't edit.
 enum EffectSheets {
     static let frames: [String: Int] = [
+        "backboard": 1,
         "bubble_particle": 12,
         "bubbles": 40,
         "charge": 12,
@@ -49,6 +50,7 @@ enum EffectSheets {
     ]
 
     static let anchorY: [String: CGFloat] = [
+        "backboard": 0.5000,
         "bubble_particle": 0.5000,
         "bubbles": 0.0000,
         "charge": 0.5000,
@@ -76,7 +78,7 @@ enum EffectSheets {
         "flashspark2": 0.5000,
         "gemini_rift_v1": 0.5000,
         "gemini_rift_v2": 0.5000,
-        "hoop": 0.5000,
+        "hoop": 0.1667,
         "ice_jumpspark": 0.0000,
         "jumpspark": 0.0000,
         "lightning1": 0.0000,

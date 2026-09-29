@@ -121,7 +121,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   (`shotWindupFrames`, `throwWindupFrames`), once a stance: the throw sheet's third frame, sliding
   straight back 48 art pixels over 12 frames (`StepbackRules`), the facing kept, trailing
   afterimages in the energy colour as Zeus Juice's bolt does, with the jump's sound; the whole way
-  a counter, as the throw stance's parry frames are, and its ball can't be snatched, by Frost Tea's
+  a counter, as the throw stance's parry frames are (out of a shot the air-with-ball sheet's last
+  frame shows, out of a throw the throw sheet's third), and its ball can't be snatched, by Frost Tea's
   either. Then back in the stance at its hold, aim and buttons kept. Before the hold, or once
   it's been had, down cancels the shot as it did; off an edge, it's the air, the stance gone.
 - Hit-stop: the whole match held, nothing moving or counting down, 4 frames when a hit lands
@@ -516,7 +517,7 @@ through the net the ball is nobody's shot any more, so the other can take it at 
 basket is three from outside the three-point line, two from inside it or off a dunk,
 judged by where the ball last left a hand, or was knocked or swatted from
 (`Ball.launchPoint`). The line is a circle round each rim reaching the middle
-platform's nearest edge (97 units on the court, `FortySevenRules.threePointRadius`);
+platform's nearest edge (92 units on the court, `FortySevenRules.threePointRadius`);
 the half facing the middle is drawn behind everything, dim and glowing, in the colour
 of the side guarding that rim, its two ends run on straight to the screen's edge on the
 rim's side, cut off at the walls and the floor; 4 art pixels thick (3PT WIDTH on the
@@ -903,8 +904,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 
 The Wreck Center on the stage select, and the default. Its backboard blocks are rows 8 and 9, and
 the rims hang off them a tile under their top, lowered 6, at 84 (`Stage.courtRimDrop`; protocol 19);
-RIM DEPTH (`Stage.courtRimDepth`, 5: as near as the rim can sit and a ball at its
-centre still clear the block, a ball's radius off its face) slides each toward its block while `DunkTuning` holds a
+RIM DEPTH (`Stage.courtRimDepth`, 0; protocol 23; no more than 5, as near as the rim can sit
+and a ball at its centre still clear the block, a ball's radius off its face) slides each toward its block while `DunkTuning` holds a
 body hung on the right rim, the hang and the hoop's art coming with them. Below
 the floor's row everything is the outline black, #242234. Every stage's hoops are two layers on one 48-pixel canvas,
 drawn to the players' scale and kept together as drawn, all under the bodies: `backboard`, then
@@ -919,10 +920,10 @@ Stadium, since it can't reach the stage select), both kept out of the glow
 (the mask marks them, as it does the banner). The rim is to get twitch physics. With twelve or so
 debug sliders on at once they sit eight to a column;
 the net is a cylinder of chevron rings drawn by the Metal layer (`CylinderNet`,
-`NetTuning.cylinder`): NET RINGS (7) rings NET ROWS apart, each NET AROUND (10) chevrons round,
-its radius from NET RADIUS TOP (9) to NET RADIUS BOTTOM (5) and its chevrons from NET TOP to
+`NetTuning.cylinder`): NET RINGS (7) rings NET ROWS apart, each NET AROUND (9) chevrons round,
+its radius from NET RADIUS TOP (7.5) to NET RADIUS BOTTOM (4.5) and its chevrons from NET TOP to
 NET BOTTOM, alternate rings turned half a chevron into diamonds, the whole turned about its top
-by NET TILT X (33°), TURN Y and ROLL Z, mirrored on a left backboard; each stroke a box a pixel
+by NET TILT X (−20°), TURN Y and ROLL Z (0), mirrored on a left backboard; each stroke a box a pixel
 thick through the cube renderer, glowing, left out wherever a body or a rim's art is drawn, so
 it hangs behind the players and the rim and over the backboard; each ring swaying with its row of
 the flat net's cloth, which runs unseen. The sliders are in the match with the tuning on, and on
@@ -935,8 +936,8 @@ bottom; NET SKEW (−0.25) raises each column that many art pixels over the one 
 the backboard, to match its angle; each chevron smaller than the one
 above, from NET TOP (×1) at the rim to NET BOTTOM (×0.25) at the bottom (a chevron is 2.25
 across and 1.5 deep at ×1, 1 thick), the whole net moved from the rim's point by NET X and
-NET Y (−2, −4 on the court, −1, −5 on Longball Stadium, then moved as far as its hoop art is from
-the court's; x mirrored on a left backboard, as the hoop's art is); the sliders are on the
+NET Y (0, −5 on the court, −1, −5 on Longball Stadium, then moved as far as its hoop art is from
+`HoopTuning.netReference`, (5, 10); x mirrored on a left backboard, as the hoop's art is); the sliders are on the
 UI tuning panel, under HUD. Each chevron is a knot of a Verlet cloth, the top ones pinned to the rim and following it,
 each tied to the one below and its neighbours across, and each pulled 0.08 of the way back to
 its place every frame, so the net always settles to its shape. The ball, swept from last

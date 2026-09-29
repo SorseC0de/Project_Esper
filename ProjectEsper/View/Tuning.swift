@@ -185,6 +185,9 @@ enum HoopTuning {
         look == .court ? ("backboard_straight", "hoop_straight") : ("backboard", "hoop")
     }
     nonisolated(unsafe) static var courtOffset = CGPoint(x: 5, y: 10)
+    /// The hoop offset the nets' NET X and Y were first set against: a net goes as far
+    /// from there as its stage's hoop art does.
+    static let netReference = CGPoint(x: 5, y: 10)
     nonisolated(unsafe) static var stadiumOffset = CGPoint(x: 0, y: 10)
     static func offset(for look: StageLook) -> CGPoint { look == .footballField ? stadiumOffset : courtOffset }
     static func set(_ offset: CGPoint, for look: StageLook) {
@@ -225,7 +228,7 @@ enum GoalpostTuning {
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
-    static let enabled = true
+    static let enabled = false
     /// The stage the tuning starts on, since the held match can't reach the stage select.
     static let stage = StageChoice.wreckCenter
     nonisolated(unsafe) static var frame = 0

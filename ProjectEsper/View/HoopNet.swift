@@ -47,7 +47,7 @@ enum NetTuning {
     static var weave: CGFloat { stored(weaveKey) ?? 0.25 }
     static var taper: CGFloat { stored(taperKey) ?? 0.5 }
     static var skew: CGFloat { stored(skewKey) ?? -0.25 }
-    static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? -2, y: stored(offsetYKey) ?? -4) }
+    static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? 0, y: stored(offsetYKey) ?? -5) }
     /// NET X and NET Y for a stage: Longball Stadium's kept apart, the court's until set;
     /// the net goes where the stage's hoop art does against the court's too.
     static func offsetXKey(for look: StageLook) -> String { look == .footballField ? offsetXKey + ".stadium" : offsetXKey }
@@ -57,9 +57,9 @@ enum NetTuning {
         let placed = look == .footballField ? CGPoint(x: -1, y: -5) : offset
         return CGPoint(x: stored(offsetXKey(for: look)) ?? placed.x, y: stored(offsetYKey(for: look)) ?? placed.y)
     }
-    /// Where the net hangs against the rim: the setting, moved as far as the stage's hoop art is from the court's.
+    /// Where the net hangs against the rim: the setting, moved as far as the stage's hoop art is from `HoopTuning.netReference`.
     static func offset(for look: StageLook) -> CGPoint {
-        let hoopMoved = HoopTuning.offset(for: look) - HoopTuning.courtOffset
+        let hoopMoved = HoopTuning.offset(for: look) - HoopTuning.netReference
         let setting = setting(for: look)
         return CGPoint(x: setting.x + hoopMoved.x, y: setting.y + hoopMoved.y)
     }
@@ -76,11 +76,11 @@ enum NetTuning {
     static let tiltKey = "ui.net.cylinder.tilt"
     static let turnKey = "ui.net.cylinder.turn"
     static let rollKey = "ui.net.cylinder.roll"
-    static var radiusTop: CGFloat { stored(radiusTopKey) ?? 9 }
-    static var radiusBottom: CGFloat { stored(radiusBottomKey) ?? 5 }
+    static var radiusTop: CGFloat { stored(radiusTopKey) ?? 7.5 }
+    static var radiusBottom: CGFloat { stored(radiusBottomKey) ?? 4.5 }
     static var rings: CGFloat { stored(ringsKey) ?? 7 }
-    static var around: CGFloat { stored(aroundKey) ?? 10 }
-    static var tilt: CGFloat { stored(tiltKey) ?? 33 }
+    static var around: CGFloat { stored(aroundKey) ?? 9 }
+    static var tilt: CGFloat { stored(tiltKey) ?? -20 }
     static var turn: CGFloat { stored(turnKey) ?? 0 }
     static var roll: CGFloat { stored(rollKey) ?? 0 }
     /// What the mesh is built from; a change rebuilds it.

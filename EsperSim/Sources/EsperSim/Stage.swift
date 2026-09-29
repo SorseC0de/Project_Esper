@@ -419,7 +419,7 @@ public struct Stage: Equatable {
     public static let courtRimHeight = 90.0
     nonisolated(unsafe) public static var courtRimDrop = 6.0
     public static let courtRimInset = 58.0
-    nonisolated(unsafe) public static var courtRimDepth = 5.0
+    nonisolated(unsafe) public static var courtRimDepth = 0.0
 
     public static var court: Stage {
         let rim = courtRimHeight - courtRimDrop

@@ -188,6 +188,8 @@ extension Player {
             // Frame 3 is the set pose with the ring on the ball; 4 is the release smear.
             return AnimationFrame(grounded ? .throwForward : .throwAir, min(t * BallRules.throwSheetFramesPerSecond / 60, 3))
         case .stepback:
+            // Out of a shot, the air-with-ball sheet's last frame; out of a throw, the throw sheet's third.
+            if stepbackFrom == .shootStance { return AnimationFrame(.airBall, Animation.airBall.frameCount - 1) }
             return AnimationFrame(grounded ? .throwForward : .throwAir, StepbackRules.sheetFrame)
         case .throwing:
             // Frames 4 to 7 at the windup's 15 a second, the smear on the release; the 15-frame

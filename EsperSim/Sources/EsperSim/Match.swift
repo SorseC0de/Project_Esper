@@ -42,6 +42,8 @@ public struct Match: Equatable {
     /// A point waiting to restart, after a dunk: frames left with the dunker on the rim,
     /// and whose hands the ball then goes to.
     public var restartIn = 0
+    /// Frames left of hit-stop: while it runs the match is held, nothing moves or counts down.
+    public var hitStop = 0
     public var restartBallTo = 0
     /// What happened on the last `advance`.
     public var events: [MatchEvent] = []
@@ -80,6 +82,10 @@ public struct Match: Equatable {
     public mutating func advance(inputs given: [PlayerInput]) {
         frame += 1
         events = []
+        if hitStop > 0 {
+            hitStop -= 1
+            return
+        }
         if restartIn > 0 {
             restartIn -= 1
             if restartIn == 0 { restart(ballTo: restartBallTo) }
@@ -138,6 +144,7 @@ public struct Match: Equatable {
                     let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage)
                     scores[owner] += points
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points, floater: ball.floaterShot))
+                    holdHitStop(HitStopRules.shotFrames)
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
                     ball.launchPoint = nil
                     // Through the net it's nobody's shot any more: anyone but the scorer can take it.
@@ -146,6 +153,7 @@ public struct Match: Equatable {
                 } else {
                     scores[owner] += 1
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1, floater: ball.floaterShot))
+                    holdHitStop(HitStopRules.shotFrames)
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking }) {
                             // A dunk: the dunker hangs on the rim a beat, the ball dead, then the restart.
@@ -153,7 +161,9 @@ public struct Match: Equatable {
                             restartBallTo = other
                             ball.respawnTimer = BallRules.dunkHangFrames + 5
                         } else {
-                            restart(ballTo: other)
+                            // The point restarts once the hit-stop's held the ball in the net.
+                            restartIn = 1
+                            restartBallTo = other
                         }
                     }
                     return
@@ -386,7 +396,8 @@ public struct Match: Equatable {
             }
         }
         if player.snatchHitbox != nil {
-            let held = ball.holder.flatMap { $0 == index ? nil : $0 }
+            // A stepback's ball can't be snatched.
+            let held = ball.holder.flatMap { $0 == index || players[$0].state == .stepback ? nil : $0 }
             // A held ball is where the holder's sheet draws it this frame, so the hand can
             // take it off the dribble; failing a landmark, the chest.
             let at = held.map { holder -> Vec2 in
@@ -397,7 +408,8 @@ public struct Match: Equatable {
             let facingIt = (at.x - player.position.x) * player.facing.sign >= -1 || onTheBody
             // A burning ball is the thrower's alone.
             let allowed = (!ball.burning || ball.lastTouched == index || held != nil) && (held != nil || player.pickupLockout == 0)
-            if player.power == .frostTea, let other, players[other].frozen == 0, player.snatchReaches(box: players[other].body),
+            if player.power == .frostTea, let other, players[other].frozen == 0, players[other].state != .stepback,
+               player.snatchReaches(box: players[other].body),
                (players[other].body.center.x - player.position.x) * player.facing.sign >= -1 || players[other].body.overlaps(player.body) {
                 // Frost Tea's upgrade, on the snatch's own reach: the body it reaches is frozen
                 // where it stands, and stripped.
@@ -408,6 +420,7 @@ public struct Match: Equatable {
                 if let held {
                     players[held].loseBall()
                     players[held].hitStun = BallRules.hitStunFrames
+                    holdHitStop(HitStopRules.hitFrames)
                     if player.power == .frostTea { freeze(held) }
                 }
                 if held == nil, player.power == .frostTea {
@@ -437,6 +450,7 @@ public struct Match: Equatable {
             let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
             strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y))
             events.append(.parried(player: other, by: index))
+            holdHitStop(HitStopRules.counterFrames)
         }
     }
 
@@ -450,6 +464,12 @@ public struct Match: Equatable {
         ball.pop(from: from)
         ball.velocity.x = carry
         events.append(.popped(player: victim, by: popper))
+        holdHitStop(HitStopRules.hitFrames)
+    }
+
+    /// Hit-stop to at least this many frames.
+    private mutating func holdHitStop(_ frames: Int) {
+        hitStop = max(hitStop, frames)
     }
 
     /// The strip: the victim stunned, any ball they hold popped free, and knocked away if
@@ -468,6 +488,7 @@ public struct Match: Equatable {
             pop(from: victim, by: striker, carry: carry)
         } else {
             events.append(.struck(player: victim, by: striker))
+            holdHitStop(HitStopRules.hitFrames)
         }
         if stun { players[victim].hitStun = BallRules.hitStunFrames }
         if let knock { players[victim].knock(knock) }

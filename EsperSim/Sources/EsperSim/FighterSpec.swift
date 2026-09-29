@@ -492,6 +492,24 @@ public enum ThrowParryRules {
     public static let frames = 10
 }
 
+/// The stepback: down on the ground in a shot's or throw's stance once it's held, once a
+/// stance, sliding straight back 48 art pixels over this many frames on the throw sheet's
+/// third frame, facing kept, countering a blade and not to be snatched the whole way, then
+/// back in the stance at its hold.
+public enum StepbackRules {
+    public static let distance = 48 / 1.6
+    public static let frames = 12
+    public static let sheetFrame = 2
+}
+
+/// Hit-stop: the whole match held this many frames after a hit lands, a shot goes in, or a
+/// counter, the longest.
+public enum HitStopRules {
+    public static let hitFrames = 4
+    public static let shotFrames = 6
+    public static let counterFrames = 10
+}
+
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many
 /// frames; the hand is out over these, and the whole body plus this much of reach in
 /// front, or the hand's catch ring, takes any ball it touches while the body faces it,

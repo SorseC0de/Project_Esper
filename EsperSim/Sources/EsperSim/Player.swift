@@ -55,6 +55,8 @@ public enum PlayerState: Equatable, Hashable {
     case ledgeHang, ledgeClimb
     /// Platform Protein Shake's wall, made on the snatch's reach.
     case walling
+    /// A shot's or throw's stance, stepping back.
+    case stepback
     /// Web Water: swinging under a web, reeling to a wall, and being reeled by the other.
     case webSwing, webPull, webbed
     /// Super Smoothie: flying. Pulsepistol Punch: the shot, standing.
@@ -98,7 +100,10 @@ public struct Player: Equatable {
     public var state: PlayerState = .idle
     public var previousState: PlayerState = .idle
     /// The throw stance's opening frames, the parry's (`ThrowParryRules`).
-    public var throwParrying: Bool { state == .throwStance && hasBall && stateTimer < ThrowParryRules.frames }
+    public var throwParrying: Bool { (state == .throwStance && hasBall && stateTimer < ThrowParryRules.frames) || state == .stepback }
+    /// The stance a stepback came out of and goes back to, and whether this stance has had its one.
+    public var stepbackFrom: PlayerState = .shootStance
+    public var stepbackUsed = false
     /// The run's speed as it last stood, for the pivot jump to carry.
     public var runMomentum = 0.0
     /// Frames spent in the state so far; 0 on the frame it was entered.
@@ -361,6 +366,8 @@ public struct Player: Equatable {
         previousState = state
         state = next
         stateTimer = 0
+        // A fresh stance has its stepback; coming back out of one doesn't.
+        if next == .shootStance || next == .throwStance, previousState != .stepback { stepbackUsed = false }
         // Onto the rim the body goes upright and the board drops away.
         if next == .dunking {
             surfing = false
@@ -830,8 +837,12 @@ public struct Player: Equatable {
                 events.append(.jumped(player: index))
             }
             if grounded, downHeldFrames == 1 {
-                // Down on the ground: the cancel.
-                cancelShot()
+                // Down on the ground: held, the stepback, if it's not been had; else the cancel.
+                if stateTimer >= BallRules.shotWindupFrames, !stepbackUsed, hasBall || hasFireball {
+                    startStepback(from: .shootStance, events: &events)
+                } else {
+                    cancelShot()
+                }
                 break
             }
             if !input.shoot, !quickShot {
@@ -892,6 +903,10 @@ public struct Player: Equatable {
                 } else {
                     enter(.air)
                 }
+                break
+            }
+            if grounded, downHeldFrames == 1, stateTimer >= BallRules.throwWindupFrames, !stepbackUsed {
+                startStepback(from: .throwStance, events: &events)
                 break
             }
             stanceMovement(input, airBrake: spec.throwStanceAirBrake)
@@ -1090,6 +1105,19 @@ public struct Player: Equatable {
             if stateTimer >= SnatchRules.frames {
                 snatchCooldown = SnatchRules.cooldownFrames
                 enter(grounded ? .idle : .air)
+            }
+
+        case .stepback:
+            // Straight back at an even speed, the facing kept; off an edge the stance is lost.
+            if !grounded {
+                enter(.air)
+            } else if stateTimer >= StepbackRules.frames {
+                velocity.x = 0
+                let hold = stepbackFrom == .shootStance ? BallRules.shotWindupFrames : BallRules.throwWindupFrames
+                enter(stepbackFrom)
+                stateTimer = hold
+            } else {
+                velocity = Vec2(x: -facing.sign * StepbackRules.distance / Double(StepbackRules.frames), y: 0)
             }
 
         case .walling:
@@ -1530,6 +1558,14 @@ public struct Player: Equatable {
         let drop = stage.drop(fromX: ballX, y: position.y)
         guard drop > Stage.tileSize else { return nil }
         return Vec2(x: ballX, y: position.y - drop + BallRules.radius)
+    }
+
+    private mutating func startStepback(from stance: PlayerState, events: inout [MatchEvent]) {
+        stepbackUsed = true
+        stepbackFrom = stance
+        enter(.stepback)
+        velocity = Vec2(x: -facing.sign * StepbackRules.distance / Double(StepbackRules.frames), y: 0)
+        events.append(.steppedBack(player: index))
     }
 
     private mutating func enterShootStance() {

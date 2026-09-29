@@ -2229,7 +2229,7 @@ final class GameScene: SKScene {
         func body(_ index: Int) -> Vec2 { match.players.indices.contains(index) ? match.players[index].position : match.ball.position }
         for event in events {
             switch event {
-            case .jumped(let index), .doubleJumped(let index), .wallJumped(let index, _): play(.jump, at: body(index))
+            case .jumped(let index), .doubleJumped(let index), .wallJumped(let index, _), .steppedBack(let index): play(.jump, at: body(index))
             case .shot(let index), .thrown(let index), .fireballThrown(let index), .boltFired(let index): play(.shootV2, at: body(index))
             case .slashed(let index): play(.esperSlash, at: body(index))
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
@@ -2714,6 +2714,24 @@ final class GameScene: SKScene {
         path.move(to: a)
         path.addLine(to: b)
         return path
+    }
+
+    /// The body where it is, in its energy colour, fading behind it: the stepback's trail, as
+    /// Zeus Juice's bolt leaves one.
+    private func spawnAfterimage(of body: SKSpriteNode, player index: Int) {
+        guard let texture = body.texture else { return }
+        let ghost = SKSpriteNode(texture: texture)
+        ghost.size = CGSize(width: abs(body.size.width), height: abs(body.size.height))
+        ghost.anchorPoint = body.anchorPoint
+        ghost.position = body.position
+        ghost.xScale = body.xScale
+        ghost.zRotation = body.zRotation
+        ghost.color = SKColor(rgb: sprites.look(for: index).glow)
+        ghost.colorBlendFactor = 1
+        ghost.alpha = 0.6
+        ghost.zPosition = -1
+        bodies.addChild(ghost)
+        ghost.run(.sequence([.fadeOut(withDuration: 0.15), .removeFromParent()]))
     }
 
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool, player: Int? = nil) {
@@ -4215,6 +4233,7 @@ final class GameScene: SKScene {
                 castShadow(shadowHeads[index], of: headNode, anchorY: feet, facing: headNode.xScale, ground: feet - drop, rise: drop)
             }
             drawCape(index, player: player, behind: node.position)
+            if player.state == .stepback, match.frame % 2 == 0 { spawnAfterimage(of: node, player: index) }
             if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {
                 spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: -player.facing.sign * 4, y: 2)), count: 2, spread: 6)
             }

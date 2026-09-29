@@ -117,6 +117,16 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Down lets go of any hang: the wall cling (unless a web line is being aimed), the ledge
   hang, which it drops off rather than climbing, and the rim after a dunk's slam; neither
   the wall nor the ledge can be taken again at once.
+- Stepback: down on the ground in a shot's or a throw's stance once it has reached its hold
+  (`shotWindupFrames`, `throwWindupFrames`), once a stance: the throw sheet's third frame, sliding
+  straight back 48 art pixels over 12 frames (`StepbackRules`), the facing kept, trailing
+  afterimages in the energy colour as Zeus Juice's bolt does, with the jump's sound; the whole way
+  a counter, as the throw stance's parry frames are, and its ball can't be snatched, by Frost Tea's
+  either. Then back in the stance at its hold, aim and buttons kept. Before the hold, or once
+  it's been had, down cancels the shot as it did; off an edge, it's the air, the stance gone.
+- Hit-stop: the whole match held, nothing moving or counting down, 4 frames when a hit lands
+  (a strip, a pop, a snatch off a holder), 6 when a shot goes in, 10 on a counter
+  (`HitStopRules`); a made point restarts after it, so the ball's held in the net. Protocol 22.
 - Throw (without ball, in neutral or on defence): the snatch. The sheet's ten frames at
   15 a second, 40 sim frames, the hand out over sheet frames 2 and 3
   (`SnatchRules.activeSheetFrames`), the third sheet frame held twice as long, when its

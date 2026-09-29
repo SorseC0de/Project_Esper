@@ -332,6 +332,66 @@ final class BallTests: XCTestCase {
         return match
     }
 
+    func testDownInAHeldThrowStanceStepsBackAndReturnsToTheHold() {
+        var match = matchWithBallHeld()
+        match.players[0].position.x = 150
+        match.players[0].facing = .right
+        let hold = PlayerInput(throwBall: true)
+        for _ in 0..<BallRules.throwWindupFrames + 1 { match.advance(inputs: [hold, .idle]) }
+        XCTAssertEqual(match.players[0].state, .throwStance)
+        let from = match.players[0].position.x
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .stepback)
+        XCTAssertTrue(match.events.contains(.steppedBack(player: 0)))
+        XCTAssertTrue(match.players[0].throwParrying, "a counter the whole way")
+        let back = run(&match, frames: StepbackRules.frames + 2, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true) }) {
+            $0.players[0].state != .stepback
+        }
+        XCTAssertLessThanOrEqual(back, StepbackRules.frames)
+        XCTAssertEqual(match.players[0].state, .throwStance)
+        XCTAssertEqual(match.players[0].facing, .right)
+        XCTAssertEqual(match.players[0].position.x, from - StepbackRules.distance, accuracy: 0.01)
+        XCTAssertGreaterThanOrEqual(match.players[0].stateTimer, BallRules.throwWindupFrames)
+        // One a stance: down again doesn't step back.
+        match.advance(inputs: [hold, .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+        XCTAssertNotEqual(match.players[0].state, .stepback)
+    }
+
+    func testDownBeforeTheShotsHoldStillCancels() {
+        var match = matchWithBallHeld()
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .shootStance)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
+        XCTAssertNotEqual(match.players[0].state, .stepback)
+        XCTAssertNotEqual(match.players[0].state, .shootStance)
+    }
+
+    func testAStepbacksBallCantBeSnatched() {
+        // Kept pressed up against the holder all the way: in the stance the snatch takes it,
+        // stepping back it doesn't.
+        for stepping in [false, true] {
+            var match = Match()
+            match.players[1].hasBall = true
+            match.ball.holder = 1
+            match.players[1].position.x = 200
+            match.players[1].facing = .left
+            match.players[0].facing = .right
+            for _ in 0..<BallRules.shotWindupFrames + 1 { match.advance(inputs: [.idle, PlayerInput(shoot: true)]) }
+            let holder = PlayerInput(stick: Vec2(x: 0, y: stepping ? -1 : 0), shoot: true)
+            // The snatch's hand is out within the slide's frames; after it, the ball's fair game.
+            XCTAssertLessThan(SnatchRules.activeFrames.lowerBound, StepbackRules.frames)
+            for frame in 0..<(stepping ? StepbackRules.frames : SnatchRules.activeFrames.upperBound) {
+                match.players[0].position.x = match.players[1].position.x - 12
+                match.advance(inputs: [PlayerInput(throwBall: frame == 0), frame == 0 ? holder : PlayerInput(shoot: true)])
+                if stepping, frame < StepbackRules.frames { XCTAssertEqual(match.players[1].state, .stepback) }
+                if !match.players[1].hasBall { break }
+            }
+            XCTAssertEqual(match.players[1].hasBall, stepping, stepping ? "stepping back" : "in the stance")
+            if stepping { break }
+        }
+    }
+
     func testStanceFlickReleaseShoots() {
         var match = matchWithBallHeld()
         for _ in 0..<BallRules.shotWindupFrames + 2 {
@@ -664,11 +724,17 @@ final class BallTests: XCTestCase {
         }
         XCTAssertEqual(match.scores, [1, 0])
         XCTAssertTrue(match.events.contains { if case .scored(player: 0, hoop: 1, _, _, _) = $0 { return true } else { return false } })
+        // Held in the net for the shot's hit-stop, then the restart.
+        XCTAssertEqual(match.hitStop, HitStopRules.shotFrames)
+        let held = match.ball.position
+        run(&match, frames: HitStopRules.shotFrames, input: { _ in .idle })
+        XCTAssertEqual(match.ball.position, held)
+        match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.ball.holder, 1)
         XCTAssertTrue(match.players[1].hasBall)
         XCTAssertEqual(match.players[0].position, match.stage.playerSpawns[0])
         XCTAssertEqual(match.players[1].position, match.stage.playerSpawns[1])
-        XCTAssertEqual(match.countdown, 30)
+        XCTAssertEqual(match.countdown, 30 - 1)
     }
 
     func testADunkHangsOnTheRimBeforeThePointRestarts() {
@@ -702,8 +768,8 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].position.y, rim.y + BallRules.dunkOffset.y, accuracy: 0.001)
         XCTAssertEqual(match.players[0].animationFrame.animation, .dunk)
         XCTAssertEqual(match.restartIn, BallRules.dunkHangFrames)
-        // Still hanging there, the point not yet restarted, for the beat.
-        run(&match, frames: BallRules.dunkHangFrames - 2, input: { _ in .idle })
+        // Still hanging there, the point not yet restarted, for the hit-stop and the beat.
+        run(&match, frames: HitStopRules.shotFrames + BallRules.dunkHangFrames - 2, input: { _ in .idle })
         XCTAssertEqual(match.players[0].state, .dunking)
         XCTAssertEqual(match.countdown, 0)
         run(&match, frames: 2, input: { _ in .idle })
@@ -1495,8 +1561,9 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.dashInitialVelocity, accuracy: 0.001)
         // Held down through it, it ends in a crouch still carrying most of the burst.
         let frames = match.players[0].spec.slideFrames
-        let ended = run(&match, frames: frames + 2, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.players[0].state != .slide }
-        XCTAssertLessThanOrEqual(ended, frames)
+        // The slide meets the other body on the way: a hit, and its hit-stop.
+        let ended = run(&match, frames: frames + HitStopRules.hitFrames + 2, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.players[0].state != .slide }
+        XCTAssertLessThanOrEqual(ended, frames + HitStopRules.hitFrames)
         XCTAssertEqual(match.players[0].state, .crouch)
         XCTAssertGreaterThan(match.players[0].velocity.x, match.players[0].spec.dashInitialVelocity - 0.5)
     }
@@ -1507,7 +1574,7 @@ final class FootsiesTests: XCTestCase {
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0.7, y: -0.7)), .idle])
         XCTAssertEqual(match.players[0].state, .slide)
         let frames = match.players[0].spec.slideFrames
-        run(&match, frames: frames + 2, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) { $0.players[0].state != .slide }
+        run(&match, frames: frames + HitStopRules.hitFrames + 2, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) }) { $0.players[0].state != .slide }
         XCTAssertEqual(match.players[0].state, .run)
     }
 
@@ -2118,6 +2185,8 @@ final class OpponentTests: XCTestCase {
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
         XCTAssertEqual(match.players[1].hitStun, BallRules.hitStunFrames)
+        XCTAssertEqual(match.hitStop, HitStopRules.hitFrames)
+        run(&match, frames: HitStopRules.hitFrames, input: { _ in .idle })
         // A jump press does nothing while stunned, and the stick still moves it.
         match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: 1, y: 0), jump: true)])
         XCTAssertNotEqual(match.players[1].state, .jumpSquat)

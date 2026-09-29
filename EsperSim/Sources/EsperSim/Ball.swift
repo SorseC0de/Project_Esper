@@ -95,9 +95,11 @@ public struct Ball: Equatable {
         }
 
         // Down through a rim scores, whatever it did before: a floater that rose up through
-        // it from under counts once it falls back in. Going up through one never does.
+        // it from under counts once it falls back in. Going up through one never does. The
+        // ball's bottom has to come down through it, so all of it was above the rim: one
+        // thrown flat at the rim's height, off the backboard, drops out under it.
         for (index, hoop) in stage.hoops.enumerated() where abs(position.x - hoop.position.x) <= BallRules.rimHalfWidth {
-            if previousY >= hoop.position.y, position.y < hoop.position.y {
+            if previousY - BallRules.radius >= hoop.position.y, position.y - BallRules.radius < hoop.position.y {
                 scoredHoop = index
             }
         }

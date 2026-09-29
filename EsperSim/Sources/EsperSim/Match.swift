@@ -260,7 +260,8 @@ public struct Match: Equatable {
         case .snipe(let at, let pull):
             snipe(by: index, at: at, pull: pull)
         case .dunk(let hoop):
-            ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
+            // Its bottom just over the rim, so it comes down through it.
+            ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: BallRules.radius + 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
         case .webLine(let direction):
             webLine(from: index, direction: direction)
         case .makePlatform:

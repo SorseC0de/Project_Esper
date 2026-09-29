@@ -192,7 +192,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   would carry it through the rim, a share a frame, never snapped. Only a shot's or a
   floater's ball, and only until its first bounce off anything; a throw's never. Down
   through a rim scores, whatever the ball did before: a floater that rose up through it
-  from under counts once it falls back in. Going up through a rim never scores.
+  from under counts once it falls back in. Going up through a rim never scores. It's the
+  ball's bottom that has to come down through, so all of it was above the rim first: one thrown
+  flat at the rim's height, off the backboard, drops out under it (protocol 18). The dunk lets
+  go of it with its bottom just over the rim.
 
 Out of a run or its pivot with the stick slammed the other way, the jump turns the new way
 (Mario 64's) with the run's whole speed, as it stood before the pivot.

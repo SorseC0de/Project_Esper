@@ -1916,6 +1916,29 @@ final class OpponentTests: XCTestCase {
         XCTAssertLessThan(scored, 400)
     }
 
+    func testAThrowFlatAtTheRimsHeightOffTheBackboardDoesntScore() {
+        // Run in, jump, double jump, tap throw: the ball leaves the hand level with the rim,
+        // flies through its span, off the backboard, and drops out under it.
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        let hoop = match.stage.hoops[1]
+        match.countdown = 0
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[1].position = Vec2(x: 30, y: 10)
+        match.players[0].position = Vec2(x: hoop.position.x - 180, y: 10)
+        match.players[0].facing = .right
+        var releasedAt: Double?
+        for frame in 0..<110 {
+            var input = PlayerInput(stick: Vec2(x: 1, y: 0))
+            input.jump = (10..<18).contains(frame) || (34..<37).contains(frame)
+            input.throwBall = frame == 36
+            match.advance(inputs: [input, .idle])
+            if releasedAt == nil, match.ball.holder == nil { releasedAt = match.ball.position.y }
+        }
+        XCTAssertEqual(releasedAt ?? 0, hoop.position.y, accuracy: BallRules.radius)
+        XCTAssertEqual(match.scores, [0, 0])
+    }
+
     func testTheThrowStanceByTheRimDunksOnlyAfterItsFirstFrames() {
         var match = Match(stage: .court, specs: [.starting, .starting])
         let hoop = match.stage.hoops[1]

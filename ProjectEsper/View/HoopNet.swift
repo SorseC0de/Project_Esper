@@ -71,6 +71,12 @@ enum NetTuning {
     static let cylinder = true
     /// How far the cylinder moves against its row of the cloth: twice as far.
     static let swayShare: CGFloat = 2
+    /// A dunk flares the net out at the bottom, like a lampshade: the bottom ring's radius out
+    /// to this, eased in and back over these frames.
+    static let dunkFlareRadius: CGFloat = 12
+    static let dunkFlareFrames = 10
+    /// A made shot's swish moves it across this much further again, fading over the swish.
+    static let swishShare: CGFloat = 3
     static let radiusTopKey = "ui.net.cylinder.radiusTop"
     static let radiusBottomKey = "ui.net.cylinder.radiusBottom"
     static let ringsKey = "ui.net.cylinder.rings"
@@ -217,6 +223,10 @@ final class HoopNet {
     /// For the cylinder: where the net hangs from, which way it's mirrored, its colour, and
     /// each row's sway, the cloth's knots on it against their places.
     var hangPoint: CGPoint { rim }
+    /// How far into its dunk flare, 0 to 1; the scene eases it while someone hangs on the rim.
+    var dunkFlare: CGFloat = 0
+    /// 1 as a swish starts, fading to 0 over the swish's frames.
+    private(set) var swishWeight: CGFloat = 0
     var mirrored: Bool { facing < 0 }
     var colour: SKColor { shape.strokeColor }
     var rowSways: [CGPoint] {
@@ -250,6 +260,7 @@ final class HoopNet {
         let ballNear = ball.map { HoopNet.distance($0, rim) < reach } ?? false
         let bodyNear = bodies.contains { HoopNet.distance($0, rim) < reach }
         if let ball, let lastBall, swish == nil { catchSwish(from: lastBall, to: ball, radius: ballRadius) }
+        if swishWeight > 0 { swishWeight = max(swishWeight - 1 / CGFloat(NetTuning.swishFrames), 0) }
         if rimMoved || ballNear || bodyNear || swish != nil {
             awake = true
             stillFrames = 0
@@ -316,6 +327,7 @@ final class HoopNet {
         let velocity = CGPoint(x: to.x - from.x, y: min(to.y - from.y, -1))
         let entry = CGPoint(x: crossingX, y: rim.y)
         swish = Swish(at: entry, was: entry, velocity: velocity, framesLeft: NetTuning.swishFrames)
+        swishWeight = 1
     }
 
     /// A tie back toward its length, each end taking half, a pinned end none.

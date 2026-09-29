@@ -10,7 +10,11 @@ import simd
 enum CylinderNet {
     /// The strokes of one net hung at `top`, mirrored for a backboard on the left, each
     /// ring moved by its row's sway, in `colour`, behind the bodies and the rims.
-    static func instances(top: CGPoint, mirrored: Bool, sways: [CGPoint], spreads: [CGFloat], colour: SIMD4<Float>) -> [CubeInstance] {
+    static func instances(top: CGPoint, mirrored: Bool, sways: [CGPoint], spreads: [CGFloat], flare: CGFloat, swish: CGFloat,
+                          colour: SIMD4<Float>) -> [CubeInstance] {
+        // Wider at the bottom in a dunk's flare; moved across further in a swish.
+        let radiusBottom = NetTuning.radiusBottom + (NetTuning.dunkFlareRadius - NetTuning.radiusBottom) * flare
+        let across = NetTuning.swayShare * (1 + (NetTuning.swishShare - 1) * swish)
         let rings = max(Int(NetTuning.rings), 1), around = max(Int(NetTuning.around), 3)
         let degrees = Float.pi / 180
         let turn = simd_quatf(angle: Float(NetTuning.roll) * degrees, axis: [0, 0, 1])
@@ -22,13 +26,13 @@ enum CylinderNet {
             let share = rings > 1 ? Float(ring) / Float(rings - 1) : 0
             // Widened, too, as far as its row of the cloth is spread, twice over.
             let rowSpread = spreads.isEmpty ? 1 : spreads[min(Int((share * Float(spreads.count - 1)).rounded()), spreads.count - 1)]
-            let widened = 1 + (rowSpread - 1) * NetTuning.swayShare
-            let radius = max(Float((NetTuning.radiusTop + (NetTuning.radiusBottom - NetTuning.radiusTop) * CGFloat(share)) * widened), 0.5)
+            let widened = 1 + (rowSpread - 1) * across
+            let radius = max(Float((NetTuning.radiusTop + (radiusBottom - NetTuning.radiusTop) * CGFloat(share)) * widened), 0.5)
             let scale = Float(NetTuning.topScale + (NetTuning.bottomScale - NetTuning.topScale) * CGFloat(share))
             let halfWidth = Float(NetTuning.chevronWidth) * scale / 2, halfDepth = Float(NetTuning.chevronDepth) * scale / 2
             let y = -Float(ring) * Float(NetTuning.rowSpacing)
             let row = sways.isEmpty ? .zero : sways[min(Int((share * Float(sways.count - 1)).rounded()), sways.count - 1)]
-            let sway = CGPoint(x: row.x * NetTuning.swayShare, y: row.y * NetTuning.swayShare)
+            let sway = CGPoint(x: row.x * across, y: row.y * NetTuning.swayShare)
             func placed(_ angle: Float, _ height: Float) -> SIMD3<Float> {
                 var point = turn.act(SIMD3<Float>(radius * sin(angle), height, radius * cos(angle)))
                 if mirrored { point.x = -point.x }

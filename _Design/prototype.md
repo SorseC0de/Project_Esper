@@ -934,7 +934,11 @@ by NET TILT X (−20°), TURN Y and ROLL Z (0), mirrored on a left backboard; ea
 thick through the cube renderer, glowing, left out wherever a body or a rim's art is drawn, so
 it hangs behind the players and the rim and over the backboard; each ring swaying twice as far as its row of
 the flat net's cloth (`NetTuning.swayShare`), and widening twice as far as the row spreads, so a
-ball through the middle, which spreads a row both ways, opens it; the cloth runs unseen. The sliders are in the match with the tuning on, and on
+ball through the middle, which spreads a row both ways, opens it; the cloth runs unseen. A made
+shot's swish moves it across three times as far again, fading over the swish's 40 frames
+(`NetTuning.swishShare`). While someone hangs on a rim its net flares out at the bottom like a
+lampshade, the bottom ring's radius out to 12 (`NetTuning.dunkFlareRadius`) over 10 frames and
+easing back after. The sliders are in the match with the tuning on, and on
 Longball Stadium; what they set is saved, and `NetTuning.bakedVersion` going up drops every saved
 net value once at launch, so the values baked in come back. The flat net underneath, and with the cylinder off, is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
 (3) art pixels apart across and NET ROWS (2, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.25) of

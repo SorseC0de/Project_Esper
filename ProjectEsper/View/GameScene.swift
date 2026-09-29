@@ -2817,7 +2817,7 @@ final class GameScene: SKScene {
         } + (NetTuning.cylinder ? nets.flatMap { net in
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             net.colour.getRed(&r, green: &g, blue: &b, alpha: &a)
-            return CylinderNet.instances(top: net.hangPoint, mirrored: net.mirrored, sways: net.rowSways, spreads: net.rowSpreads,
+            return CylinderNet.instances(top: net.hangPoint, mirrored: net.mirrored, sways: net.rowSways, spreads: net.rowSpreads, flare: net.dunkFlare, swish: net.swishWeight,
                                          colour: SIMD4<Float>(Float(r), Float(g), Float(b), 1))
         } : [])
     }
@@ -4456,6 +4456,10 @@ final class GameScene: SKScene {
                     nets[index].step(rim: GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look), ball: ballNode.isHidden ? nil : ballNode.position,
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
                                      bodies: match.players.map { SpriteLibrary.point($0.chest) })
+                    // Someone hanging on this rim: its net flares out at the bottom, easing in and back.
+                    let dunkedOn = match.players.contains { $0.state == .dunking && $0.dunkHoop == index }
+                    let step = 1 / CGFloat(NetTuning.dunkFlareFrames)
+                    nets[index].dunkFlare = dunkedOn ? min(nets[index].dunkFlare + step, 1) : max(nets[index].dunkFlare - step, 0)
                 }
             }
         }

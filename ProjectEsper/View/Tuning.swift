@@ -52,8 +52,8 @@ enum PowerVariant: Int, CaseIterable {
 /// six sheet frames.
 enum DunkArt {
     nonisolated(unsafe) static var offsets: [CGPoint] = [
-        CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -2, y: 16), CGPoint(x: 4, y: 2),
-        CGPoint(x: -3, y: 3), CGPoint(x: -2, y: 2), CGPoint(x: -2, y: 2),
+        CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -2, y: 16), CGPoint(x: 2, y: 1),
+        CGPoint(x: -3, y: 3), CGPoint(x: -1, y: -1), CGPoint(x: -1, y: -1),
     ]
 }
 
@@ -195,7 +195,7 @@ enum GoalpostTuning {
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
-    static let enabled = true
+    static let enabled = false
     nonisolated(unsafe) static var frame = 0
 }
 

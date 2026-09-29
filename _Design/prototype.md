@@ -165,8 +165,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   through the 45 frames, each frame held twice as long as first cut (40 frames to the slam) before the point restarts. Each frame of it is drawn nudged by
   `DunkArt.offsets`, in art pixels, found with `DunkTuning` on: the match held, player 1
   on the right rim on the frame the DUNK FRAME slider picks, DUNK X and DUNK Y nudging
-  that frame, the table in the corner readout. As placed: (-6, 10), (-4, 12), (-2, 16),
-  (4, 2), (-3, 3), (-2, 2), (-2, 2).
+  that frame, the table in the corner readout. As placed for the new hoop: (-6, 10), (-4, 12),
+  (-2, 16), (2, 1), (-3, 3), (-1, -1), (-1, -1).
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
@@ -499,7 +499,7 @@ through the net the ball is nobody's shot any more, so the other can take it at 
 basket is three from outside the three-point line, two from inside it or off a dunk,
 judged by where the ball last left a hand, or was knocked or swatted from
 (`Ball.launchPoint`). The line is a circle round each rim reaching the middle
-platform's nearest edge (92 units on the court, `FortySevenRules.threePointRadius`);
+platform's nearest edge (97 units on the court, `FortySevenRules.threePointRadius`);
 the half facing the middle is drawn behind everything, dim and glowing, in the colour
 of the side guarding that rim, its two ends run on straight to the screen's edge on the
 rim's side, cut off at the walls and the floor; 4 art pixels thick (3PT WIDTH on the
@@ -877,8 +877,9 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 ## Court
 
 The Wreck Center on the stage select, and the default. Its backboard blocks are rows 8 and 9, and
-the rims hang off them a tile under their top, lowered 7, at 83 (`Stage.courtRimDrop`);
-RIM DEPTH (`Stage.courtRimDepth`) slides each toward its block while `DunkTuning` holds a
+the rims hang off them a tile under their top, lowered 6, at 84 (`Stage.courtRimDrop`; protocol 19);
+RIM DEPTH (`Stage.courtRimDepth`, 5: as near as the rim can sit and a ball at its
+centre still clear the block, a ball's radius off its face) slides each toward its block while `DunkTuning` holds a
 body hung on the right rim, the hang and the hoop's art coming with them. Below
 the floor's row everything is the outline black, #242234. Every stage's hoops are two layers on one 48-pixel canvas,
 drawn to the players' scale and kept together as drawn, all under the bodies: `backboard`, then

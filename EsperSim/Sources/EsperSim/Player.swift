@@ -903,7 +903,7 @@ public struct Player: Equatable {
                     ?? Vec2(x: chest.x - facing.sign * 5, y: chest.y + 3)
                 wanted = .strikeBolt(x: ball.x, bottom: ball.y)
             }
-            if hasBall, let hoop = stage.hoops.indices.first(where: { stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius * spec.scale }) {
+            if hasBall, stateTimer >= BallRules.dunkStanceFrames, let hoop = stage.hoops.indices.first(where: { stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius * spec.scale }) {
                 // Onto the rim: the feet at the dunk's place on it, facing the backboard.
                 // Turned to the backboard; the body glides to its place on the rim through
                 // the wind-up, so it never jumps there.

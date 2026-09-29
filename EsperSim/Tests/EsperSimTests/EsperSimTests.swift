@@ -681,8 +681,8 @@ final class BallTests: XCTestCase {
         match.players[0].position = rim + Vec2(x: -20, y: -BallRules.chestHeight)
         match.players[0].grounded = false
         match.players[0].enter(.air)
-        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
-        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        // The stance's first frames, then the dunk.
+        for _ in 0...BallRules.dunkStanceFrames { match.advance(inputs: [PlayerInput(throwBall: true), .idle]) }
         // The dunk turns the body to the backboard and glides it to its place on the rim
         // through the wind-up, from the throw stance's frame, the ball in hand until the slam.
         XCTAssertEqual(match.players[0].state, .dunking)
@@ -1914,6 +1914,26 @@ final class OpponentTests: XCTestCase {
         XCTAssertLessThan(out, 30, "out from under the block along the floor")
         let scored = play(&match, &brain, frames: 400, input: { _ in .idle }) { $0.scores[1] > 0 }
         XCTAssertLessThan(scored, 400)
+    }
+
+    func testTheThrowStanceByTheRimDunksOnlyAfterItsFirstFrames() {
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        let hoop = match.stage.hoops[1]
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[1].position = Vec2(x: 40, y: 10)
+        match.players[0].position = hoop.position - Vec2(x: 12, y: 20)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.players[0].velocity = .zero
+        XCTAssertLessThanOrEqual(match.players[0].chest.distance(to: hoop.position), BallRules.dunkRadius)
+        var states: [PlayerState] = []
+        for _ in 0..<(BallRules.dunkStanceFrames + 2) {
+            match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+            states.append(match.players[0].state)
+        }
+        XCTAssertEqual(Array(states.prefix(BallRules.dunkStanceFrames)), Array(repeating: .throwStance, count: BallRules.dunkStanceFrames))
+        XCTAssertTrue(states.contains(.dunking))
     }
 
     func testInTheAirByTheRimItDunks() {

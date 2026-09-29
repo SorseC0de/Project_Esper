@@ -154,8 +154,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the air the throw stance keeps its run,
-  bleeding only 0.03 a frame, so a jump carries it to the rim. In the stance with the
-  chest within 25 units of a rim, wider than the basket, it's a dunk: the body turns to
+  bleeding only 0.03 a frame, so a jump carries it to the rim. In the stance, from its
+  fourth frame (`BallRules.dunkStanceFrames`, 3; protocol 17), with the chest within 25 units
+  of a rim, wider than the basket, it's a dunk: the body turns to
   the backboard and glides to the dunk's place on the rim, `BallRules.dunkOffset` from
   its centre, 16 art pixels back and 24 down, mirrored across for the other rim, over the
   wind-up, there by the slam, so it never jumps into place. The dunk

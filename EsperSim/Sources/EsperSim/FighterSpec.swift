@@ -304,6 +304,9 @@ public enum BallRules {
     /// basket. The ball goes in halfway through the dunk's frames, and the dunker hangs
     /// on the rim for this long after before the point restarts.
     public static let dunkRadius = 25.0
+    /// Frames in the throw stance before one by a rim becomes a dunk, so a throw let go
+    /// in passing doesn't.
+    public static let dunkStanceFrames = 3
     public static let dunkFrames = 40
     public static let dunkHangFrames = 45
     /// Where the dunker's feet go on the rim, from the rim's centre, for a rim with its

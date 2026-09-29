@@ -460,7 +460,7 @@ final class GameScene: SKScene {
                               padColour: SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow)))
             for name in ["backboard", "hoop"] {
                 let art = SKSpriteNode(texture: sprites.texture(name, 0))
-                art.position = GameScene.hoopArtPoint(for: hoop)
+                art.position = GameScene.hoopArtPoint(for: hoop, on: match.stage.features.look)
                 art.xScale = hoop.backboard == .left ? -1 : 1
                 art.zPosition = name == "hoop" ? 6 : 5
                 camScene.scenery.addChild(art)
@@ -572,7 +572,14 @@ final class GameScene: SKScene {
 
         ground.addChild(stageGround)
         glowers.addChild(stageGlowers)
+        if DunkTuning.enabled {
+            // Tuning holds the match from launch, so it starts on the stage being tuned.
+            series.stage = DunkTuning.stage
+            firstStage = DunkTuning.stage
+            session = RollbackSession(match: Match(stage: series.stage.stage, countdown: GameScene.countdownFrames), localIndex: 0)
+        }
         buildStage()
+        builtStage = series.stage
 
         for player in match.players {
             // Everything drawn on one figure in one layer, so a whole body is in front of or
@@ -942,19 +949,19 @@ final class GameScene: SKScene {
             // players' scale on one canvas that keeps them together, the backboard on the right.
             // TODO: twitch physics on the rim, its own layer for it.
             let backboard = SKSpriteNode(texture: sprites.texture("backboard", 0))
-            backboard.position = GameScene.hoopArtPoint(for: hoop)
+            backboard.position = GameScene.hoopArtPoint(for: hoop, on: stage.features.look)
             backboard.zPosition = 5
             backboard.xScale = hoop.backboard == .left ? -1 : 1
             stageGround.addChild(backboard)
             backboardNodes.append(backboard)
             let rim = SKSpriteNode(texture: sprites.texture("hoop", 0))
-            rim.position = GameScene.hoopArtPoint(for: hoop)
+            rim.position = GameScene.hoopArtPoint(for: hoop, on: stage.features.look)
             rim.xScale = hoop.backboard == .left ? -1 : 1
             rim.zPosition = 6
             stageGround.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
-            nets.append(HoopNet(at: GameScene.netPoint(for: hoop), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
+            nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
                                 into: stageGround, depth: 5.5))
         }
         warmDrawnArt()
@@ -1191,8 +1198,32 @@ final class GameScene: SKScene {
             let ySlider = controls.addSlider(title: "DUNK Y", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].y)) {
                 DunkArt.offsets[DunkTuning.frame].y = CGFloat($0)
             }
-            controls.addSlider(title: "HOOP X", range: -24...24, notch: 1, value: Float(HoopTuning.offset.x)) { HoopTuning.offset.x = CGFloat($0) }
-            controls.addSlider(title: "HOOP Y", range: -24...24, notch: 1, value: Float(HoopTuning.offset.y)) { HoopTuning.offset.y = CGFloat($0) }
+            // The hoop's art and the net against the rim, for the stage picked.
+            let look = series.stage.stage.features.look
+            controls.addSlider(title: "HOOP X", range: -24...24, notch: 1, value: Float(HoopTuning.offset(for: look).x)) {
+                HoopTuning.set(CGPoint(x: CGFloat($0), y: HoopTuning.offset(for: look).y), for: look)
+            }
+            controls.addSlider(title: "HOOP Y", range: -24...24, notch: 1, value: Float(HoopTuning.offset(for: look).y)) {
+                HoopTuning.set(CGPoint(x: HoopTuning.offset(for: look).x, y: CGFloat($0)), for: look)
+            }
+            controls.addSlider(title: "NET X", range: -20...20, notch: 1, value: Float(NetTuning.offset(for: look).x)) {
+                UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetXKey(for: look))
+            }
+            controls.addSlider(title: "NET Y", range: -20...20, notch: 1, value: Float(NetTuning.offset(for: look).y)) {
+                UserDefaults.standard.set(Double($0), forKey: NetTuning.offsetYKey(for: look))
+            }
+            // The net's shape, the same on every stage, as on the UI tuning panel.
+            for (title, key, value, notch, range) in [
+                ("NET TOP", NetTuning.topScaleKey, NetTuning.topScale, Float(0.25), Float(0.25)...Float(4)),
+                ("NET BOTTOM", NetTuning.bottomScaleKey, NetTuning.bottomScale, 0.25, 0.25...4),
+                ("NET SPREAD", NetTuning.spreadKey, NetTuning.spread, 1, 1...8),
+                ("NET ROWS", NetTuning.rowSpacingKey, NetTuning.rowSpacing, 0.25, 1...8),
+                ("NET WEAVE", NetTuning.weaveKey, NetTuning.weave, 0.25, 0...1),
+                ("NET TAPER", NetTuning.taperKey, NetTuning.taper, 0.25, 0...0.75),
+                ("NET SKEW", NetTuning.skewKey, NetTuning.skew, 0.25, -4...4),
+            ] as [(String, String, CGFloat, Float, ClosedRange<Float>)] {
+                controls.addSlider(title: title, range: range, notch: notch, value: Float(value)) { UserDefaults.standard.set(Double($0), forKey: key) }
+            }
             controls.addSlider(title: "DUNK FRAME", range: 0...last, notch: 1, value: Float(DunkTuning.frame)) { value in
                 DunkTuning.frame = Int(value)
                 xSlider.set(Float(DunkArt.offsets[DunkTuning.frame].x))
@@ -1350,18 +1381,20 @@ final class GameScene: SKScene {
     }
 
     /// Where the hoop's art sits for a rim, backboard and rim together: the rim's point, moved
-    /// by `HoopTuning.offset` in art pixels, across mirrored for a backboard on the left.
-    static func hoopArtPoint(for hoop: Hoop) -> CGPoint {
-        let at = SpriteLibrary.point(hoop.position)
-        let across = HoopTuning.offset.x * (hoop.backboard == .left ? -1 : 1)
-        return CGPoint(x: at.x + across, y: at.y + HoopTuning.offset.y)
+    /// by the stage's `HoopTuning.offset` in art pixels, across mirrored for a backboard on the left.
+    static func hoopArtPoint(for hoop: Hoop, on look: StageLook) -> CGPoint {
+        point(for: hoop, moved: HoopTuning.offset(for: look))
     }
 
-    /// Where the net hangs from: the rim's point, moved by NET X and NET Y.
-    static func netPoint(for hoop: Hoop) -> CGPoint {
+    /// Where the net hangs from: the rim's point, moved by the stage's NET X and NET Y.
+    static func netPoint(for hoop: Hoop, on look: StageLook) -> CGPoint {
+        point(for: hoop, moved: NetTuning.offset(for: look))
+    }
+
+    private static func point(for hoop: Hoop, moved offset: CGPoint) -> CGPoint {
         let at = SpriteLibrary.point(hoop.position)
-        let across = NetTuning.offset.x * (hoop.backboard == .left ? -1 : 1)
-        return CGPoint(x: at.x + across, y: at.y + NetTuning.offset.y)
+        let across = offset.x * (hoop.backboard == .left ? -1 : 1)
+        return CGPoint(x: at.x + across, y: at.y + offset.y)
     }
 
     /// The court's rims to where the RIM sliders have them, in the match as it stands.
@@ -4310,12 +4343,12 @@ final class GameScene: SKScene {
             // A rim that moves, under the highway's helicopter, and its net with it; the art
             // and the net each at their tuned offset from the rim.
             if index < match.stage.hoops.count {
-                rimNodes[index].position = GameScene.hoopArtPoint(for: match.stage.hoops[index])
+                rimNodes[index].position = GameScene.hoopArtPoint(for: match.stage.hoops[index], on: match.stage.features.look)
                 rimNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
                 backboardNodes[index].position = rimNodes[index].position
                 backboardNodes[index].xScale = rimNodes[index].xScale
                 if index < nets.count {
-                    nets[index].step(rim: GameScene.netPoint(for: match.stage.hoops[index]), ball: ballNode.isHidden ? nil : ballNode.position,
+                    nets[index].step(rim: GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look), ball: ballNode.isHidden ? nil : ballNode.position,
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
                                      bodies: match.players.map { SpriteLibrary.point($0.chest) })
                 }

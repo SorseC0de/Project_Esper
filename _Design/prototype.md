@@ -883,9 +883,13 @@ the floor's row everything is the outline black, #242234. Every stage's hoops ar
 drawn to the players' scale and kept together as drawn, all under the bodies: `backboard`, then
 the net, then `hoop`, the rim (`Pixel Art/Stages`, the importer's `STAGE_ART`, over the old
 one-piece `Hoop.png`), placed 5 art pixels out from the backboard and 10 up from the rim's point
-(`HoopTuning.offset`, on HOOP X and Y with `DunkTuning` on), both kept out of the glow
+(`HoopTuning.courtOffset`, and Longball Stadium's own `stadiumOffset`, (0, 10), on HOOP X and Y with `DunkTuning` on
+for the stage picked, the net's NET X and Y kept per stage the same way, on top of where the stage's
+hoop art has moved from the court's, and its shape on the NET
+sliders there too, as on the UI tuning panel; the held match starts on `DunkTuning.stage`, Longball
+Stadium, since it can't reach the stage select), both kept out of the glow
 (the mask marks them, as it does the banner). The rim is to get twitch physics. With twelve or so
-debug sliders on at once they sit six to a column;
+debug sliders on at once they sit eight to a column;
 the net is `HoopNet`: 5 straight columns of 7 downward chevrons hung from the rim, NET SPREAD
 (4) art pixels apart across and NET ROWS (2.75, in quarters) apart down, each strand from the second row down leaning NET WEAVE (0.5) of
 the way to the neighbour it's knotted to on that row, toward the right-hand one on one row and

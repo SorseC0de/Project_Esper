@@ -48,6 +48,14 @@ enum NetTuning {
     static var taper: CGFloat { stored(taperKey) ?? 0.5 }
     static var skew: CGFloat { stored(skewKey) ?? 0 }
     static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? -2, y: stored(offsetYKey) ?? -4) }
+    /// NET X and NET Y for a stage: Longball Stadium's kept apart, the court's until set;
+    /// the net goes where the stage's hoop art does against the court's too.
+    static func offsetXKey(for look: StageLook) -> String { look == .footballField ? offsetXKey + ".stadium" : offsetXKey }
+    static func offsetYKey(for look: StageLook) -> String { look == .footballField ? offsetYKey + ".stadium" : offsetYKey }
+    static func offset(for look: StageLook) -> CGPoint {
+        let hoopMoved = HoopTuning.offset(for: look) - HoopTuning.courtOffset
+        return CGPoint(x: (stored(offsetXKey(for: look)) ?? offset.x) + hoopMoved.x, y: (stored(offsetYKey(for: look)) ?? offset.y) + hoopMoved.y)
+    }
     /// What the mesh is built from; a change rebuilds it.
     static var meshValues: [CGFloat] { [spread, rowSpacing, weave, taper, skew] }
     private static func stored(_ key: String) -> CGFloat? {

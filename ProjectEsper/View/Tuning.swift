@@ -167,9 +167,15 @@ enum ZoneTuning {
 }
 
 /// The hoop's art, backboard and rim together, against the rim's point, in art pixels:
-/// across away from the backboard, and up. On HOOP X and Y with `DunkTuning` on.
+/// across away from the backboard, and up; the court's, and Longball Stadium's. On HOOP X
+/// and Y with `DunkTuning` on, for the stage being played.
 enum HoopTuning {
-    nonisolated(unsafe) static var offset = CGPoint(x: 5, y: 10)
+    nonisolated(unsafe) static var courtOffset = CGPoint(x: 5, y: 10)
+    nonisolated(unsafe) static var stadiumOffset = CGPoint(x: 0, y: 10)
+    static func offset(for look: StageLook) -> CGPoint { look == .footballField ? stadiumOffset : courtOffset }
+    static func set(_ offset: CGPoint, for look: StageLook) {
+        if look == .footballField { stadiumOffset = offset } else { courtOffset = offset }
+    }
 }
 
 enum BackboardTuning {
@@ -202,7 +208,9 @@ enum GoalpostTuning {
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
-    static let enabled = false
+    static let enabled = true
+    /// The stage the tuning starts on, since the held match can't reach the stage select.
+    static let stage = StageChoice.longballStadium
     nonisolated(unsafe) static var frame = 0
 }
 

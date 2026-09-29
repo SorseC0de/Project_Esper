@@ -991,7 +991,7 @@ final class GameScene: SKScene {
         builtStage = series.stage
         ballCamStale = true
         cameraBase = .zero
-        cameraZone = nil
+        cameraPage = nil
         layout(displayScale: displayScale)
     }
 
@@ -1155,6 +1155,9 @@ final class GameScene: SKScene {
             controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
                 index == 1 ? self?.openBoundsGallery() : self?.closeBoundsGallery()
             }
+        }
+        if series.stage.stage.features.look == .footballField {
+            controls.addSlider(title: "CAMERA LEAD-IN", range: 0...16, notch: 1, value: CameraTuning.leadInTiles) { CameraTuning.leadInTiles = $0 }
         }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
@@ -1453,8 +1456,8 @@ final class GameScene: SKScene {
 
     /// The view's hold on the last round let go: the computer, the rim flashes, the ball's colour.
     private func freshRoundView() {
-        // The camera picks up the zone the local player starts in.
-        cameraZone = nil
+        // The camera starts each round on the local player.
+        cameraPage = nil
         opponent = Opponent(index: 1)
         rimFlash = rimFlash.map { _ in 0 }
         ballTeam = SKColor(rgb: BallLook.neutral)
@@ -2872,34 +2875,36 @@ final class GameScene: SKScene {
         return texture
     }
 
-    /// Where the field's camera wants to be: the local player, led by where they're heading,
-    /// kept inside the field's ends.
-    /// The field's camera, zonal as Mega Man's and Nidhogg's: the field in zones a court
-    /// wide, the camera on one zone's centre, held inside the field's ends. Within the
-    /// buffer of the screen's edge the local player sends it on to the next zone, if its
-    /// centre is the nearer of the two, so it never flips back and forth at the line.
-    private var cameraZone: Int?
+    /// The field's camera, paged as Mega Man's and Nidhogg's: it holds still until the local
+    /// player's feet come within the lead-in of either edge of the screen, then moves on a
+    /// screen less a lead-in each side and a tile, so the feet land a tile inside the lead-in
+    /// on the far side and it never flips back; held inside the field's ends.
+    private var cameraPage: CGFloat?
     private func cameraTargetX() -> CGFloat {
         guard match.players.indices.contains(localIndex) else { return cameraBase.x }
         let feet = SpriteLibrary.point(match.players[localIndex].position).x
         let halfView = size.width * cameraNode.xScale / 2
         let width = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
-        let zoneWidth = CGFloat(Stage.court.columns) * GameScene.pixelsPerTile
-        let zones = max(Int((width / zoneWidth).rounded()), 1)
-        func centre(_ zone: Int) -> CGFloat { min(max((CGFloat(zone) + 0.5) * zoneWidth, halfView), max(width - halfView, halfView)) }
-        guard let zone = cameraZone else {
-            let start = min(max(Int(feet / zoneWidth), 0), zones - 1)
-            cameraZone = start
-            return centre(start)
+        let tile = GameScene.pixelsPerTile
+        func held(_ x: CGFloat) -> CGFloat { min(max(x, halfView), max(width - halfView, halfView)) }
+        guard let current = cameraPage else {
+            let start = held(feet)
+            cameraPage = start
+            return start
         }
-        let buffer = halfView * 2 * CameraTuning.zoneBufferShare
-        var next = zone
-        if feet > centre(zone) + halfView - buffer, zone < zones - 1 { next = zone + 1 }
-        if feet < centre(zone) - halfView + buffer, zone > 0 { next = zone - 1 }
-        if next != zone, abs(feet - centre(next)) < abs(feet - centre(zone)) { cameraZone = next }
-        return centre(cameraZone ?? zone)
+        let lead = min(CGFloat(CameraTuning.leadInTiles) * tile, halfView - tile)
+        let step = max(halfView * 2 - lead * 2 - tile, tile)
+        var page = held(current)
+        // A page on, or further if the feet got further than that at once.
+        if feet > page + halfView - lead {
+            page = held(max(page + step, feet - halfView + lead + tile))
+        } else if feet < page - halfView + lead {
+            page = held(min(page - step, feet + halfView - lead - tile))
+        }
+        cameraPage = page
+        return page
     }
-    /// The slide to a new zone's centre: from where the camera was, eased out over
+    /// The slide to a new page: from where the camera was, eased out over
     /// `CameraTuning.slideSeconds`, a new target starting a new slide from where it is.
     private var slide: (from: CGFloat, to: CGFloat, elapsed: Double)?
     private func slideCamera(to target: CGFloat) {

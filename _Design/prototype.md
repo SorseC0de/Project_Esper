@@ -860,14 +860,12 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   from the backboard's face all the way back to the end wall, so nothing gets behind it.
   Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
   in the maker's energy.
-- The camera is zonal, as Mega Man's and Nidhogg's: the field in seven zones a court wide,
-  the camera level on one zone's centre, held inside the field's ends. Within
-  a quarter of the screen's width of its edge (`CameraTuning.zoneBufferShare`) the local
-  player sends it
-  sliding to the next zone over `CameraTuning.slideSeconds` (0.5), eased out, quick away
-  and slowing into the new centre, if that zone's centre is
-  the nearer, so it never flips back at the line; each round it picks up the zone the
-  local player starts in.
+- The camera pages, as Mega Man's and Nidhogg's: it holds still until the local player's feet
+  come within `CameraTuning.leadInTiles` (8, on the CAMERA LEAD-IN debug slider there) of either
+  edge of the screen, then slides on a screen less a lead-in each side and a tile over
+  `CameraTuning.slideSeconds` (0.5), eased out, quick away and slowing in, so the feet land a
+  tile inside the far side's lead-in and it never flips back; the same on every screen and
+  either way, held inside the field's ends; each round it starts on the local player.
   The view takes in the stage's height and the turf below the floor. When the ball is off
   the screen sideways, its chevrons sit at that edge at its height, pointing at it, purple
   outlined in dark purple. The opponent off the screen likewise: one chevron in their

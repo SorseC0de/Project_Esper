@@ -128,7 +128,9 @@ enum HelmetTuning {
 /// Longball Stadium's zonal camera: within this share of the screen's width from its edge,
 /// the local player sends it sliding to the next zone.
 enum CameraTuning {
-    static let zoneBufferShare: CGFloat = 0.25
+    /// Tiles from the screen's edge at which the local player sends the camera on to the
+    /// next zone; on the CAMERA LEAD-IN debug slider on Longball Stadium.
+    nonisolated(unsafe) static var leadInTiles: Float = 8
     /// Seconds for a whole slide, eased out: quick away, slowing into the new zone.
     static let slideSeconds: Double = 0.5
 }

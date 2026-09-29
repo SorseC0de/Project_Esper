@@ -180,8 +180,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   through the 45 frames, each frame held twice as long as first cut (40 frames to the slam) before the point restarts. Each frame of it is drawn nudged by
   `DunkArt.offsets`, in art pixels, found with `DunkTuning` on: the match held, player 1
   on the right rim on the frame the DUNK FRAME slider picks, DUNK X and DUNK Y nudging
-  that frame, the table in the corner readout. As placed for the new hoop: (-6, 10), (-4, 12),
-  (-2, 16), (2, 1), (-3, 3), (-1, -1), (-1, -1).
+  that frame, the table in the corner readout. Kept per stage, each stage's hoop art its own (`DunkArt.courtOffsets`,
+  `stadiumOffsets`); Longball Stadium's as placed: (-6, 10), (-4, 12), (-2, 16), (2, 1), (-3, 3),
+  (-1, -1), (-1, -1); Wreck Center's start there, to be placed for the straight hoop, the tuning
+  starting on it (`DunkTuning.stage`).
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
@@ -907,7 +909,8 @@ body hung on the right rim, the hang and the hoop's art coming with them. Below
 the floor's row everything is the outline black, #242234. Every stage's hoops are two layers on one 48-pixel canvas,
 drawn to the players' scale and kept together as drawn, all under the bodies: `backboard`, then
 the net, then `hoop`, the rim (`Pixel Art/Stages`, the importer's `STAGE_ART`, over the old
-one-piece `Hoop.png`), placed 5 art pixels out from the backboard and 10 up from the rim's point
+one-piece `Hoop.png`); Wreck Center's are drawn straight on, `backboard_straight` and
+`hoop_straight` (`HoopTuning.art`), placed 5 art pixels out from the backboard and 10 up from the rim's point
 (`HoopTuning.courtOffset`, and Longball Stadium's own `stadiumOffset`, (0, 10), on HOOP X and Y with `DunkTuning` on
 for the stage picked, the net's NET X and Y kept per stage the same way, on top of where the stage's
 hoop art has moved from the court's, and its shape on the NET

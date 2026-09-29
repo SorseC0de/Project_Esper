@@ -51,10 +51,20 @@ enum PowerVariant: Int, CaseIterable {
 /// sliders with `DunkTuning` on, as the user placed them: the throw stance, then the
 /// six sheet frames.
 enum DunkArt {
-    nonisolated(unsafe) static var offsets: [CGPoint] = [
+    /// Per stage, since each stage's hoop art is its own: Wreck Center's for the straight-on
+    /// hoop (starting from Stadium's, to be tuned), and Longball Stadium's.
+    nonisolated(unsafe) static var courtOffsets: [CGPoint] = [
         CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -2, y: 16), CGPoint(x: 2, y: 1),
         CGPoint(x: -3, y: 3), CGPoint(x: -1, y: -1), CGPoint(x: -1, y: -1),
     ]
+    nonisolated(unsafe) static var stadiumOffsets: [CGPoint] = [
+        CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -2, y: 16), CGPoint(x: 2, y: 1),
+        CGPoint(x: -3, y: 3), CGPoint(x: -1, y: -1), CGPoint(x: -1, y: -1),
+    ]
+    static func offsets(for look: StageLook) -> [CGPoint] { look == .court ? courtOffsets : stadiumOffsets }
+    static func set(_ offset: CGPoint, frame: Int, for look: StageLook) {
+        if look == .court { courtOffsets[frame] = offset } else { stadiumOffsets[frame] = offset }
+    }
 }
 
 /// Whether the head's fire and the double jump's platform are drawn with `esper_spark`,
@@ -170,6 +180,10 @@ enum ZoneTuning {
 /// across away from the backboard, and up; the court's, and Longball Stadium's. On HOOP X
 /// and Y with `DunkTuning` on, for the stage being played.
 enum HoopTuning {
+    /// The hoop's two pieces for a stage: Wreck Center's straight on, the rest turned.
+    static func art(for look: StageLook) -> (backboard: String, rim: String) {
+        look == .court ? ("backboard_straight", "hoop_straight") : ("backboard", "hoop")
+    }
     nonisolated(unsafe) static var courtOffset = CGPoint(x: 5, y: 10)
     nonisolated(unsafe) static var stadiumOffset = CGPoint(x: 0, y: 10)
     static func offset(for look: StageLook) -> CGPoint { look == .footballField ? stadiumOffset : courtOffset }
@@ -211,9 +225,9 @@ enum GoalpostTuning {
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
-    static let enabled = false
+    static let enabled = true
     /// The stage the tuning starts on, since the held match can't reach the stage select.
-    static let stage = StageChoice.longballStadium
+    static let stage = StageChoice.wreckCenter
     nonisolated(unsafe) static var frame = 0
 }
 

@@ -458,11 +458,12 @@ final class GameScene: SKScene {
                               crossbarBelowRim: GoalpostTuning.crossbarBelowRim, prongHeight: GoalpostTuning.prongHeight,
                               angle: GoalpostTuning.crossbarAngle * .pi / 180, thickness: GoalpostTuning.thickness, outline: GoalpostTuning.outline,
                               padColour: SKColor(rgb: CourtLook.shaded(sprites.look(for: 1 - hoop.owner).glow)))
-            for name in ["backboard", "hoop"] {
+            let pieces = HoopTuning.art(for: match.stage.features.look)
+            for name in [pieces.backboard, pieces.rim] {
                 let art = SKSpriteNode(texture: sprites.texture(name, 0))
                 art.position = GameScene.hoopArtPoint(for: hoop, on: match.stage.features.look)
                 art.xScale = hoop.backboard == .left ? -1 : 1
-                art.zPosition = name == "hoop" ? 6 : 5
+                art.zPosition = name == pieces.rim ? 6 : 5
                 camScene.scenery.addChild(art)
             }
         }
@@ -959,13 +960,14 @@ final class GameScene: SKScene {
             // `backboard`, the net, then `hoop`, the rim, all under the bodies, drawn to the
             // players' scale on one canvas that keeps them together, the backboard on the right.
             // TODO: twitch physics on the rim, its own layer for it.
-            let backboard = SKSpriteNode(texture: sprites.texture("backboard", 0))
+            let art = HoopTuning.art(for: stage.features.look)
+            let backboard = SKSpriteNode(texture: sprites.texture(art.backboard, 0))
             backboard.position = GameScene.hoopArtPoint(for: hoop, on: stage.features.look)
             backboard.zPosition = 5
             backboard.xScale = hoop.backboard == .left ? -1 : 1
             stageGround.addChild(backboard)
             backboardNodes.append(backboard)
-            let rim = SKSpriteNode(texture: sprites.texture("hoop", 0))
+            let rim = SKSpriteNode(texture: sprites.texture(art.rim, 0))
             rim.position = GameScene.hoopArtPoint(for: hoop, on: stage.features.look)
             rim.xScale = hoop.backboard == .left ? -1 : 1
             rim.zPosition = 6
@@ -1244,11 +1246,14 @@ final class GameScene: SKScene {
                 self?.moveCourtRims()
             }
             let last = Float(Animation.dunkSequence.count - 1)
-            let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].x)) {
-                DunkArt.offsets[DunkTuning.frame].x = CGFloat($0)
+            let dunkLook = series.stage.stage.features.look
+            let xSlider = controls.addSlider(title: "DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.offsets(for: dunkLook)[DunkTuning.frame].x)) {
+                let at = DunkArt.offsets(for: dunkLook)[DunkTuning.frame]
+                DunkArt.set(CGPoint(x: CGFloat($0), y: at.y), frame: DunkTuning.frame, for: dunkLook)
             }
-            let ySlider = controls.addSlider(title: "DUNK Y", range: -32...32, notch: 1, value: Float(DunkArt.offsets[DunkTuning.frame].y)) {
-                DunkArt.offsets[DunkTuning.frame].y = CGFloat($0)
+            let ySlider = controls.addSlider(title: "DUNK Y", range: -32...32, notch: 1, value: Float(DunkArt.offsets(for: dunkLook)[DunkTuning.frame].y)) {
+                let at = DunkArt.offsets(for: dunkLook)[DunkTuning.frame]
+                DunkArt.set(CGPoint(x: at.x, y: CGFloat($0)), frame: DunkTuning.frame, for: dunkLook)
             }
             // The hoop's art and the net against the rim, for the stage picked.
             let look = series.stage.stage.features.look
@@ -1261,8 +1266,8 @@ final class GameScene: SKScene {
             if look != .footballField { addNetSliders(look) }
             controls.addSlider(title: "DUNK FRAME", range: 0...last, notch: 1, value: Float(DunkTuning.frame)) { value in
                 DunkTuning.frame = Int(value)
-                xSlider.set(Float(DunkArt.offsets[DunkTuning.frame].x))
-                ySlider.set(Float(DunkArt.offsets[DunkTuning.frame].y))
+                xSlider.set(Float(DunkArt.offsets(for: dunkLook)[DunkTuning.frame].x))
+                ySlider.set(Float(DunkArt.offsets(for: dunkLook)[DunkTuning.frame].y))
             }
         }
         controls.setOnline(online != nil)
@@ -1458,7 +1463,7 @@ final class GameScene: SKScene {
             match.ball.holder = match.players[0].hasBall ? 0 : nil
             if match.ball.holder == nil { match.ball.respawn(at: Vec2(x: 170, y: 12.5)) }
         }
-        let table = DunkArt.offsets.map { "(\(Int($0.x)), \(Int($0.y)))" }.joined(separator: " ")
+        let table = DunkArt.offsets(for: match.stage.features.look).map { "(\(Int($0.x)), \(Int($0.y)))" }.joined(separator: " ")
         debugLabel.text = "dunk frame \(DunkTuning.frame)  offsets \(table)"
     }
 
@@ -4010,7 +4015,7 @@ final class GameScene: SKScene {
             node.position = SpriteLibrary.point(player.position) + drift
             if player.state == .dunking {
                 // Each frame of the dunk sits where its art was placed on the rim.
-                let nudge = DunkArt.offsets[Animation.dunkEntry(at: player.stateTimer).index]
+                let nudge = DunkArt.offsets(for: match.stage.features.look)[Animation.dunkEntry(at: player.stateTimer).index]
                 node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y) * drawScale
             }
             node.xScale = CGFloat(player.facing.sign)

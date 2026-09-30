@@ -438,9 +438,14 @@ public struct Player: Equatable {
     /// `opponentX` is where the other body stands; a walk with the ball faces it.
     /// `ballHolder` is who has the ball in hand, and `ballOwner` whose the loose ball still
     /// is, for Flash Fizz's warp to it.
-    public mutating func step(input given: PlayerInput, stage: Stage, opponentX: Double? = nil,
+    public mutating func step(input given: PlayerInput, stage sharedStage: Stage, opponentX: Double? = nil,
                               ballHolder: Int? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         var input = given
+        // Surf Soda rides the lava as ground.
+        var stage = sharedStage
+        if power == .surfSoda, let lava = stage.features.lavaSurface {
+            stage.extras.append(Box(min: Vec2(x: 0, y: lava - Stage.tileSize * 4), max: Vec2(x: stage.width, y: lava)))
+        }
         if frozen > 0 {
             // Held exactly as it is: no timers, no moves, nothing.
             frozen -= 1
@@ -554,8 +559,13 @@ public struct Player: Equatable {
         // A slide slope: nobody stands on it. Held uphill, the body walks against it and is
         // carried back down, as up a down escalator; otherwise it turns downhill into the forced slide.
         var slideSlopeResisted: Facing?
-        if grounded, velocity.y <= 0, [.idle, .walk, .dash, .run, .pivot, .land, .crouch, .crouchWalk, .slide].contains(state),
-           let downhill = stage.slideSlopeDownhill(under: body, reach: SlopeRules.step) {
+        var surfingDownSlide: Facing?
+        let onSlideSlope = grounded && velocity.y <= 0 && [.idle, .walk, .dash, .run, .pivot, .land, .crouch, .crouchWalk, .slide].contains(state)
+            ? stage.slideSlopeDownhill(under: body, reach: SlopeRules.step) : nil
+        if power == .surfSoda, let downhill = onSlideSlope {
+            // Surf Soda surfs a slide slope: down it on the board unless the stick takes it up.
+            if stickFacing(input) != downhill.flipped { surfingDownSlide = downhill }
+        } else if let downhill = onSlideSlope {
             if stickFacing(input) == downhill.flipped, !jumpPressed {
                 if state != .walk { enter(.walk) }
                 slideSlopeResisted = downhill
@@ -1328,6 +1338,11 @@ public struct Player: Equatable {
 
         if throwingBolt, state.isGroundState {
             velocity.x = approach(boltCarry, 0, spec.attackBrake)
+        }
+        if let downhill = surfingDownSlide, state.isGroundState, state != .jumpSquat {
+            if state != .run { enter(.run) }
+            facing = downhill
+            velocity.x = approach(velocity.x, downhill.sign * runSpeed, SlopeRules.slideGain)
         }
         if let downhill = slideSlopeResisted, state == .walk {
             facing = downhill.flipped

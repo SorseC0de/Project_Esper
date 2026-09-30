@@ -130,6 +130,8 @@ public struct Stage: Equatable {
     public var fixedExtras: [Box] = []
     /// Where each tornado stands when it's up, its whole square.
     public var tornados: [Box] = []
+    /// The middles of the open tops of rock lightning can strike: under no ceiling, nothing on them.
+    public var lightningSpots: [Vec2] = []
     /// The shafts the players drop in by, from just under the ceiling up: nothing in them is a wall to land on.
     public var chutes: [Box] = []
     /// Extras Surf Soda's board can't ride up: the cars.
@@ -671,6 +673,10 @@ public struct Stage: Equatable {
             stage.chutes.append(Box(min: Vec2(x: left.max.x, y: Double(rows - 3) * tileSize), max: Vec2(x: right.min.x, y: skyTop)))
         }
         stage.extras = stage.fixedExtras
+        stage.lightningSpots = map.walls.filter { wall in
+            wall.kind == .solid && wall.cell.row < rows - 1 && map.wall(at: .init(wall.cell.column, wall.cell.row + 1)) == nil
+        }.map { Vec2(x: (Double($0.cell.column) + 0.5) * tileSize, y: Double($0.cell.row + 1) * tileSize) }
+            .sorted { ($0.y, $0.x) < ($1.y, $1.x) }
         stage.tornados = map.tornados.map { base in
             Box(min: Vec2(x: Double(base.column - 1) * tileSize, y: Double(base.row) * tileSize),
                 max: Vec2(x: Double(base.column + 2) * tileSize, y: Double(base.row + 3) * tileSize))

@@ -340,7 +340,7 @@ final class GameScene: SKScene {
     var tornadoSnapshots: [BodySnapshot] {
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
-        return windSnapshots(windPuffs.back + rainSplashes + rainSizzles) + (art.tornados + art.tornadoOverlays).compactMap { GameScene.snapshot($0, above: ElementsArt.lavaTop) }
+        return windSnapshots(windPuffs.back + rainSizzles) + (art.tornados + art.tornadoOverlays).compactMap { GameScene.snapshot($0, above: ElementsArt.lavaTop) }
     }
 
     /// A node anchored at its lower left as the mask should draw it: only what's above `line`.
@@ -375,7 +375,8 @@ final class GameScene: SKScene {
             }
         }
         // The Elements' wind in front of everything.
-        flat += windSnapshots(windPuffs.front)
+        flat += windSnapshots(windPuffs.front + rainSplashes + lightningDots + lightningBolts)
+        if let flash = lightningFlash, flash.parent != nil { flat += windSnapshots([flash]) }
         // And its rain, over everything.
         if !rainLayer.isHidden {
             flat += rainTiles.joined().filter { !$0.isHidden }.compactMap { GameScene.snapshot($0, above: ElementsArt.lavaSurfaceLine) }
@@ -917,6 +918,7 @@ final class GameScene: SKScene {
         // owner's, and the ledge is magenta.
         let stage = match.stage
         let isElements = stage.features.look == .elements
+        Ambience.shared.play(isElements ? "thunderstorm" : nil)
         backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : GameScene.background
         elementsArt = nil
         if isElements {
@@ -1157,10 +1159,10 @@ final class GameScene: SKScene {
     private var stageFireballLast: Vec2?
     private static let stageFireballFramesPerSecond = 15
     private func placeStageFireball() {
-        // Only above the lava; going under, it splashes.
+        // Only above the lava; coming out of it and going under, it splashes.
         let surface = Double(ElementsArt.lavaSurfaceLine) / SpriteLibrary.pixelsPerUnit
         let fireball = match.stageFireball
-        if let was = stageFireballLast, let now = fireball?.position, was.y >= surface, now.y < surface {
+        if let was = stageFireballLast, let now = fireball?.position, (was.y >= surface) != (now.y >= surface) {
             splashLava(at: Vec2(x: now.x, y: surface), ball: false, splash: true, only: "lava_splash")
         }
         stageFireballLast = fireball?.position
@@ -1207,7 +1209,7 @@ final class GameScene: SKScene {
             let puff = SKSpriteNode(texture: frames[0])
             puff.position = CGPoint(x: cameraNode.position.x + .random(in: -halfWidth...halfWidth),
                                     y: cameraNode.position.y + .random(in: -halfHeight...halfHeight))
-            puff.alpha = [1, 0.75, 0.5, 0.25].randomElement()!
+            puff.alpha = [1, 0.75, 0.5].randomElement()!
             puff.run(.sequence([
                 .group([.animate(with: frames, timePerFrame: 1 / GameScene.windFramesPerSecond),
                         .moveBy(x: -.random(in: GameScene.windTravel), y: 0, duration: seconds),
@@ -1294,6 +1296,7 @@ final class GameScene: SKScene {
     private var rainSplashSpots: [(x: ClosedRange<CGFloat>, y: (CGFloat) -> CGFloat, turn: CGFloat)] = []
     private var rainSplashes: [SKSpriteNode] = []
     private static let rainSplashesPerSecond = 24.0
+    private static let rainSplashScale: CGFloat = 0.5
 
     private func findRainSplashSpots() {
         rainSplashSpots = []
@@ -1318,10 +1321,11 @@ final class GameScene: SKScene {
     /// Where the rain meets the lava it sizzles, small, here and there along its top on screen.
     private var rainSizzles: [SKSpriteNode] = []
     private static let rainSizzleScale: CGFloat = 0.25
+    private static let rainSizzlesPerSecond = 20.0
     private func sizzleRain() {
         rainSizzles.removeAll { $0.parent == nil }
         guard match.stage.features.look == .elements, RainTuning.density > 0,
-              Double.random(in: 0..<1) < GameScene.rainSplashesPerSecond * GameScene.stepSeconds else { return }
+              Double.random(in: 0..<1) < GameScene.rainSizzlesPerSecond * GameScene.stepSeconds else { return }
         let sheet = Bool.random() ? "sizzle1" : "sizzle2"
         guard let count = EffectSheets.frames[sheet] else { return }
         let halfWidth = size.width * cameraNode.xScale / 2
@@ -1334,6 +1338,62 @@ final class GameScene: SKScene {
         sizzle.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 15), .removeFromParent()]))
         stageGround.addChild(sizzle)
         rainSizzles.append(sizzle)
+    }
+
+    /// The Elements' lightning: the sky flashes, a column of dots floats up from where it'll
+    /// strike, and two seconds on the bolt comes down there.
+    private var lightningDots: [SKSpriteNode] = []
+    private var lightningBolts: [SKSpriteNode] = []
+    private var lightningFlash: SKSpriteNode?
+    private static let lightningFlashAlpha: CGFloat = 0.6
+    private static let lightningFlashSeconds = 0.3
+    private static let lightningDotsPerSecond = 14.0
+    private static let lightningDotRise: CGFloat = 16
+    private static let lightningDotSeconds = 1.2
+
+    private func flashLightning() {
+        let flash = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
+        flash.color = .white
+        flash.colorBlendFactor = 1
+        flash.anchorPoint = .zero
+        flash.size = CGSize(width: size.width * cameraNode.xScale, height: size.height * cameraNode.yScale)
+        flash.position = cameraNode.position - CGPoint(x: flash.size.width / 2, y: flash.size.height / 2)
+        flash.alpha = GameScene.lightningFlashAlpha
+        flash.zPosition = 89
+        flash.run(.sequence([.fadeOut(withDuration: GameScene.lightningFlashSeconds), .removeFromParent()]))
+        world.addChild(flash)
+        lightningFlash = flash
+    }
+
+    private func riseLightningDots() {
+        lightningDots.removeAll { $0.parent == nil }
+        lightningBolts.removeAll { $0.parent == nil }
+        guard let warning = match.lightningWarning,
+              Double.random(in: 0..<1) < GameScene.lightningDotsPerSecond * GameScene.stepSeconds else { return }
+        let base = SpriteLibrary.point(warning.target)
+        let dot = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
+        dot.color = SKColor(rgb: PixelPalette.colours[22])
+        dot.colorBlendFactor = 1
+        dot.size = CGSize(width: 1, height: 1)
+        dot.anchorPoint = .zero
+        dot.position = CGPoint(x: base.x + CGFloat(Int.random(in: -1...0)), y: base.y + CGFloat(Int.random(in: 0...6)))
+        dot.zPosition = 24
+        dot.run(.sequence([.group([.moveBy(x: 0, y: GameScene.lightningDotRise, duration: GameScene.lightningDotSeconds),
+                                   .fadeOut(withDuration: GameScene.lightningDotSeconds)]), .removeFromParent()]))
+        world.addChild(dot)
+        lightningDots.append(dot)
+    }
+
+    private func strikeLightning(at target: Vec2) {
+        guard let count = EffectSheets.frames["small_lightning"] else { return }
+        let frames = (0..<count).map { sprites.texture("small_lightning", $0) }
+        let bolt = SKSpriteNode(texture: frames[0])
+        bolt.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["small_lightning"] ?? 0)
+        bolt.position = SpriteLibrary.point(target)
+        bolt.zPosition = 24
+        bolt.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 15), .removeFromParent()]))
+        world.addChild(bolt)
+        lightningBolts.append(bolt)
     }
 
     /// Splashes here and there, at random, on what's on screen.
@@ -1350,9 +1410,11 @@ final class GameScene: SKScene {
         splash.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["splash"] ?? 0)
         splash.position = CGPoint(x: x, y: spot.y(x))
         splash.zRotation = spot.turn
-        splash.zPosition = -7
+        splash.setScale(GameScene.rainSplashScale)
+        // Over the players.
+        splash.zPosition = 24
         splash.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 15), .removeFromParent()]))
-        stageGround.addChild(splash)
+        world.addChild(splash)
         rainSplashes.append(splash)
     }
 
@@ -2944,6 +3006,10 @@ final class GameScene: SKScene {
                 glowers.addChild(summon)
             case .lavaSplashed(let at, let isBall):
                 splashLava(at: at, ball: isBall)
+            case .lightningFlashed:
+                flashLightning()
+            case .lightningStruck(let at):
+                strikeLightning(at: at)
             case .tornadoBurned(let at):
                 splashLava(at: at, ball: false, splash: false)
             case .stageFireballBurst(let at):
@@ -4808,6 +4874,7 @@ final class GameScene: SKScene {
         blowWind()
         splashRain()
         sizzleRain()
+        riseLightningDots()
         fallRain()
         elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime(),
                                    burstFrame: TornadoRules.burstFrame(at: match.frame),

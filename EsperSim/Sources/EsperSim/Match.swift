@@ -103,6 +103,7 @@ public struct Match: Equatable {
         stepField()
         stepTornados()
         stepStageFireball()
+        stepLightning()
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
@@ -592,6 +593,40 @@ public struct Match: Equatable {
         strip(victim, by: other, knock: Vec2(x: BlazeRules.burstKnock.x * fireball.heading.sign, y: BlazeRules.burstKnock.y))
         // Carried by the knock a while, the stick not braking it.
         players[victim].airControlLock = StageFireballRules.knockCoastFrames
+    }
+
+    /// Where the Elements' lightning will strike on `frame`'s flash, and frames left till it
+    /// does, while the warning's out.
+    public var lightningWarning: (target: Vec2, framesLeft: Int)? {
+        guard !stage.lightningSpots.isEmpty else { return nil }
+        let time = frame % LightningRules.everyFrames
+        guard time < LightningRules.warningFrames else { return nil }
+        return (lightningTarget(flash: frame / LightningRules.everyFrames), LightningRules.warningFrames - time)
+    }
+
+    /// Each flash's spot, picked by its count: the same on every phone.
+    private func lightningTarget(flash: Int) -> Vec2 {
+        var mixed = UInt64(flash + 1) &* 0x9E37_79B9_7F4A_7C15
+        mixed ^= mixed >> 31
+        mixed = mixed &* 0xBF58_476D_1CE4_E5B9
+        mixed ^= mixed >> 29
+        return stage.lightningSpots[Int(mixed % UInt64(stage.lightningSpots.count))]
+    }
+
+    /// The flash, then the strike: whoever the bolt's line touches, up from its spot, is
+    /// stripped, but Zeus Juice.
+    private mutating func stepLightning() {
+        guard !stage.lightningSpots.isEmpty else { return }
+        let time = frame % LightningRules.everyFrames
+        let target = lightningTarget(flash: frame / LightningRules.everyFrames)
+        if time == 0 { events.append(.lightningFlashed(at: target)) }
+        guard time == LightningRules.warningFrames else { return }
+        events.append(.lightningStruck(at: target))
+        let line = Box(min: Vec2(x: target.x - LightningRules.halfWidth, y: target.y),
+                       max: Vec2(x: target.x + LightningRules.halfWidth, y: Double(stage.rows) * Stage.tileSize))
+        for victim in players.indices where players[victim].power != .zeusJuice && players[victim].frozen == 0 && players[victim].body.overlaps(line) {
+            strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil)
+        }
     }
 
     /// Hit-stop to at least this many frames.

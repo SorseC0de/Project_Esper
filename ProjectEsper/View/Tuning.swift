@@ -151,12 +151,12 @@ enum ChevronTuning {
     static let slider = true
 }
 
-/// The Elements' rain: how many streaks, from none to four times as many as at 1 (RAIN DENSITY on
+/// The Elements' rain: how many streaks, 0.5 unless moved, from none to four times as many as at 1 (RAIN DENSITY on
 /// the debug panel there, kept between launches).
 enum RainTuning {
-    static let densityKey = "elements.rain.density"
+    static let densityKey = "elements.rain.density.2"
     static var density: Double {
-        get { (UserDefaults.standard.object(forKey: densityKey) as? Double) ?? 1 }
+        get { (UserDefaults.standard.object(forKey: densityKey) as? Double) ?? 0.5 }
         set { UserDefaults.standard.set(newValue, forKey: densityKey) }
     }
 }

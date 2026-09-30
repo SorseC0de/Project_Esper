@@ -1004,24 +1004,39 @@ the rightmost and back under, each pass the other way from the last, first left 
 on it 20 frames before the stick has them again (`StageFireballRules.knockCoastFrames`), and bursts
 (`fire_explosion`, `fire_hit`), gone for the rest of the pass; on Blazing Boba it only bursts.
 It's drawn only above the lava's drawn surface (`ElementsArt.lavaSurfaceLine`, 32 pixels up, under
-its crests), and going under it plays `lava_splash` there. A body
+its crests), and coming out of it and going under it plays `lava_splash` there. A body
 knocked out of a tornado, by anything, isn't taken straight back.
 
 The wind (`wind`, nine 32 pixel frames at ten a second): a puff about every third of a second in each
-of two layers, behind the rock and in front of everything, each at 1, 0.75, 0.5 or 0.25, starting
+of two layers, behind the rock and in front of everything, each at 1, 0.75 or 0.5, starting
 anywhere on screen and blowing 64 to 160 pixels leftward as it plays through, fading out; none of it
 glows. On this stage the head's and legs' particles blow leftward rather than toward the ball.
 The rain: streaks 2 to 5 pixels long at 45 degrees, falling from the top right to the bottom left,
 in palette 48 or 22 at any strength from 0.2 up, not glowing, stopping at the lava's drawn surface.
 Thousands, drawn as two textures made once (256 pixel tiles, 260 and 200 streaks times RAIN DENSITY,
-0 to 4 on the debug panel there, kept between launches, `RainTuning`), each tiled over the screen and slid along, 240 and 360
+0 to 4 on the debug panel there, 0.5 unless moved, kept between launches, `RainTuning`), each tiled over the screen and slid along, 240 and 360
 pixels a second, whole pixels. It's the world's topmost layer (z 90, under the HUD), room left under it.
-The rain splashes (`splash`, seven 48 pixel frames at 15 a second, full size for now) about 24
-times a second at random on screen: on any open top of rock under the ceiling, and on the left
-side's slopes, turned to lie on them; never on the right side's slopes. On the lava it sizzles as often, `sizzle1` or `sizzle2` at a
+The rain splashes (`splash`, seven 48 pixel frames at 15 a second, half size, over the players)
+about 24 times a second at random on screen: on any open top of rock under the ceiling, and on the left
+side's slopes, turned to lie on them; never on the right side's slopes. On the lava it sizzles 20 times a second, `sizzle1` or `sizzle2` at a
 quarter size, anywhere along its surface on screen.
 
-Protocol 41.
+Surf Soda rides the lava as ground (the sim gives that body a floor at the lava's surface), and
+surfs the slide slopes rather than sliding: down them on the board at its run unless the stick
+takes it up them, which it can.
+
+Under it all plays `thunderstorm`, low (0.2), looped (`Ambience`): the first five minutes of
+`_Sound FX/thunderstorm.mp3`, faded in and out four seconds at each end, as AAC
+(`Tools/import_ambience.py`; `import_sounds.py` leaves it alone).
+
+The lightning (`LightningRules`, `Match.lightningWarning`): every ten seconds the screen flashes
+white (0.6, fading over 0.3 seconds, over everything but the rain), a column of palette 22 dots
+floats slowly up from where it'll strike, and two seconds after the flash `small_lightning` (eight
+32 by 96 frames at 15 a second) strikes there: an open top of rock under no ceiling, picked by the
+flash's count, the same on both phones. Whoever its line touches, up from the rock, is stripped,
+but Zeus Juice. None of it glows.
+
+Protocol 42.
 
 The map's walls (`ElementsMap.walls`) are kept apart from the art: by default a block under
 every solid tile, or as painted in the map maker's walls mode, each cell a block or a slope by

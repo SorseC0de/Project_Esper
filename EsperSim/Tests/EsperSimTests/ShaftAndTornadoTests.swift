@@ -272,4 +272,64 @@ final class ShaftAndTornadoTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .suspended, "knocked out, not held")
         XCTAssertGreaterThan(match.players[0].velocity.x, 0, "knocked the fireball's way")
     }
+
+    private func standingUnderLightning(_ power: Power) -> Match {
+        var match = elements()
+        match.frame = LightningRules.everyFrames - 1
+        match.advance(inputs: [.idle, .idle])
+        guard let warning = match.lightningWarning else { XCTFail("no warning after the flash"); return match }
+        XCTAssertTrue(match.events.contains(.lightningFlashed(at: warning.target)))
+        match.players[0].power = power
+        match.players[0].position = warning.target
+        match.players[0].grounded = true
+        match.players[0].enter(.idle)
+        match.players[1].position = Vec2(x: 30, y: 400)
+        for _ in 0..<warning.framesLeft { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.events.contains(.lightningStruck(at: warning.target)), "two seconds after the flash")
+        return match
+    }
+
+    func testLightningStrikesItsSpotTwoSecondsAfterTheFlashAndStripsButNotZeusJuice() {
+        XCTAssertGreaterThan(standingUnderLightning(.none).players[0].hitStun, 0)
+        XCTAssertEqual(standingUnderLightning(.zeusJuice).players[0].hitStun, 0)
+    }
+
+    func testLightningPicksOpenRockTopsAndMovesAround() {
+        var match = elements()
+        var targets = Set<Double>()
+        for flash in 0..<12 {
+            match.frame = flash * LightningRules.everyFrames
+            let target = match.lightningWarning!.target
+            XCTAssertTrue(match.stage.lightningSpots.contains(target))
+            targets.insert(target.x)
+        }
+        XCTAssertGreaterThan(targets.count, 4)
+    }
+
+    func testSurfSodaRidesTheLavaAndSurfsDownASlideSlope() {
+        var match = elements()
+        match.players[0].power = .surfSoda
+        match.players[0].position = Vec2(x: 300, y: 60)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.players[1].position = Vec2(x: 30, y: 400)
+        for _ in 0..<90 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertFalse(match.events.contains(.lavaBurned(player: 0)))
+        XCTAssertEqual(match.players[0].position.y, ElementsRules.lavaSurface, accuracy: 0.001, "on the lava")
+        XCTAssertTrue(match.players[0].grounded)
+        var slope = elements()
+        let x = 155.0
+        slope.players[0].power = .surfSoda
+        slope.players[0].position = Vec2(x: x, y: slope.stage.slopeHeight(atX: x, near: 185, reach: 20)!)
+        slope.players[0].grounded = true
+        slope.players[0].enter(.idle)
+        slope.players[1].position = Vec2(x: 30, y: 400)
+        slope.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(slope.players[0].state, .run, "surfing it, not sliding")
+        XCTAssertEqual(slope.players[0].facing, .right)
+        var up = slope
+        let from = up.players[0].position.x
+        for _ in 0..<10 { up.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle]) }
+        XCTAssertLessThan(up.players[0].position.x, from, "up it on the stick")
+    }
 }

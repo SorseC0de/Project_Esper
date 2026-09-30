@@ -60,6 +60,7 @@ enum EffectSheets {
         "shine": 5,
         "sizzle1": 6,
         "sizzle2": 6,
+        "small_lightning": 8,
         "splash": 7,
         "tornado": 8,
         "tornado_burst": 10,
@@ -121,6 +122,7 @@ enum EffectSheets {
         "shine": 0.0000,
         "sizzle1": 0.0000,
         "sizzle2": 0.0000,
+        "small_lightning": 0.5000,
         "splash": 0.0000,
         "tornado": 0.0000,
         "tornado_burst": 0.5000,
@@ -146,6 +148,7 @@ enum EffectSheets {
         "lightning_spark",
         "lightning_spark2",
         "shine",
+        "small_lightning",
         "splash",
         "wind",
     ]

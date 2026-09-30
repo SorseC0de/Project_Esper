@@ -213,6 +213,16 @@ public enum StageFireballRules {
     public static let underLava = -10.0
 }
 
+/// The Elements' lightning: every ten seconds the sky flashes, and two seconds later a small
+/// bolt strikes an open top of rock, picked by the flash's count, stripping whoever it
+/// touches; Zeus Juice it doesn't touch.
+public enum LightningRules {
+    public static let everyFrames = 600
+    public static let warningFrames = 120
+    /// The bolt's reach either side of its line, in units.
+    public static let halfWidth = 8.0
+}
+
 public enum ElementsRules {
     /// Two Wreck Centers across, less a column so there's a middle one, and 24 high: a large stage's most, all of it on screen at 3x on a phone.
     public static let columns = 67

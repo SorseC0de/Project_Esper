@@ -39,6 +39,8 @@ VOCALS = {
 }
 
 SUFFIXES = {".wav", ".mp3", ".m4a", ".aif", ".aiff", ".caf"}
+# Long backgrounds that come in through Tools/import_ambience.py instead, as AAC.
+AMBIENCE = {"thunderstorm.mp3"}
 
 
 def convert(sound, out):
@@ -88,7 +90,7 @@ def level(path, target):
 DESTINATION.mkdir(exist_ok=True)
 wanted = set()
 for sound in sorted(SOURCE.iterdir()):
-    if sound.suffix.lower() not in SUFFIXES:
+    if sound.suffix.lower() not in SUFFIXES or sound.name in AMBIENCE:
         continue
     out = DESTINATION / (sound.stem.lower() + ".wav")
     wanted.add(out.name)

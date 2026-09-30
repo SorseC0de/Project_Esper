@@ -340,7 +340,7 @@ final class GameScene: SKScene {
     var tornadoSnapshots: [BodySnapshot] {
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
-        return windSnapshots(windPuffs.back + rainSizzles) + (art.tornados + art.tornadoOverlays).compactMap { GameScene.snapshot($0, above: ElementsArt.lavaTop) }
+        return windSnapshots(windPuffs.back + rainSizzles + art.icicles + fallingIcicles) + (art.tornados + art.tornadoOverlays).compactMap { GameScene.snapshot($0, above: ElementsArt.lavaTop) }
     }
 
     /// A node anchored at its lower left as the mask should draw it: only what's above `line`.
@@ -904,7 +904,7 @@ final class GameScene: SKScene {
     private func refreshStaticFlats() {
         var flats: [BodySnapshot] = []
         if let art = elementsArt {
-            let nodes = ([art.mountains].compactMap { $0 }) + art.spareFills + art.shaftWalls + art.icicles + Array(art.tiles.values)
+            let nodes = ([art.mountains].compactMap { $0 }) + art.spareFills + art.shaftWalls + Array(art.tiles.values)
             flats = nodes.compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
@@ -1388,12 +1388,80 @@ final class GameScene: SKScene {
         guard let count = EffectSheets.frames["small_lightning"] else { return }
         let frames = (0..<count).map { sprites.texture("small_lightning", $0) }
         let bolt = SKSpriteNode(texture: frames[0])
-        bolt.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["small_lightning"] ?? 0)
+        // Drawn standing on its frame's bottom.
+        bolt.anchorPoint = CGPoint(x: 0.5, y: 0)
         bolt.position = SpriteLibrary.point(target)
         bolt.zPosition = 24
         bolt.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 15), .removeFromParent()]))
         world.addChild(bolt)
         lightningBolts.append(bolt)
+    }
+
+    /// The Elements' icicles: now and then a socket grows one (`icicle_form`), which hangs a
+    /// while, then drops (`icicle`'s first frame) and shatters where it lands (the rest).
+    private var fallingIcicles: [SKSpriteNode] = []
+    private static let iciclesFormingPerSecond = 0.5
+    private static let icicleHangSeconds: ClosedRange<Double> = 2...5
+    private static let icicleFramesPerSecond = 15.0
+    /// Pixels down from a socket's top to the bottom of the icicle grown in it.
+    private static let icicleHangLength: CGFloat = 26
+    /// The sim's gravity in pixels a second a second.
+    private static let fallGravity = BallRules.gravity * SpriteLibrary.pixelsPerUnit * 3600
+
+    private func growIcicles() {
+        fallingIcicles.removeAll { $0.parent == nil }
+        guard let art = elementsArt, let formCount = EffectSheets.frames["icicle_form"], let fallCount = EffectSheets.frames["icicle"],
+              Double.random(in: 0..<1) < GameScene.iciclesFormingPerSecond * GameScene.stepSeconds,
+              let socket = art.icicles.filter({ $0.action(forKey: "icicle") == nil }).randomElement() else { return }
+        let empty = socket.texture
+        let form = (0..<formCount).map { sprites.texture("icicle_form", $0) }
+        let fall = (0..<fallCount).map { sprites.texture("icicle", $0) }
+        socket.run(.sequence([
+            .animate(with: form, timePerFrame: 1 / GameScene.icicleFramesPerSecond),
+            .wait(forDuration: .random(in: GameScene.icicleHangSeconds)),
+            .run { [weak self, weak socket] in
+                guard let self, let socket else { return }
+                socket.texture = empty
+                self.dropIcicle(from: CGPoint(x: socket.position.x + socket.size.width / 2,
+                                              y: socket.position.y + socket.size.height - GameScene.icicleHangLength), frames: fall)
+            },
+        ]), withKey: "icicle")
+    }
+
+    /// Falls as the sim's bodies do, from rest, onto the first ground under it, and shatters there.
+    private func dropIcicle(from start: CGPoint, frames: [SKTexture]) {
+        let icicle = SKSpriteNode(texture: frames[0])
+        icicle.anchorPoint = CGPoint(x: 0.5, y: 0)
+        icicle.position = start
+        icicle.zPosition = -7
+        let ground = groundUnder(x: start.x, below: start.y)
+        let seconds = (2 * Double(start.y - ground) / GameScene.fallGravity).squareRoot()
+        let drop = SKAction.moveTo(y: ground, duration: seconds)
+        drop.timingMode = .easeIn
+        icicle.run(.sequence([drop, .animate(with: Array(frames.dropFirst()), timePerFrame: 1 / GameScene.icicleFramesPerSecond), .removeFromParent()]))
+        stageGround.addChild(icicle)
+        fallingIcicles.append(icicle)
+    }
+
+    /// The top of the first wall under a point on the Elements, or the lava's surface.
+    private func groundUnder(x: CGFloat, below y: CGFloat) -> CGFloat {
+        let map = ElementsMap.current, tile = ElementsArt.tileSide
+        let column = Int(x / tile)
+        var row = Int(y / tile)
+        while row >= 0 {
+            if let kind = map.wall(at: .init(column, row)) {
+                let bottom = CGFloat(row) * tile, across = x - CGFloat(column) * tile
+                let top: CGFloat
+                switch kind {
+                case .lowerRight, .slideLowerRight: top = bottom + across
+                case .lowerLeft, .slideLowerLeft: top = bottom + tile - across
+                default: top = bottom + tile
+                }
+                if top <= y { return top }
+            }
+            row -= 1
+        }
+        return ElementsArt.lavaSurfaceLine
     }
 
     /// Splashes here and there, at random, on what's on screen.
@@ -4875,6 +4943,7 @@ final class GameScene: SKScene {
         splashRain()
         sizzleRain()
         riseLightningDots()
+        growIcicles()
         fallRain()
         elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime(),
                                    burstFrame: TornadoRules.burstFrame(at: match.frame),

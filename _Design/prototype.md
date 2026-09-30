@@ -960,7 +960,11 @@ None of the stage's art glows but the lava: the tiles, the mountains and the ici
 into the glow's mask in green under the bodies (`MaskScene.syncStatic`), redone only when the map
 changes; the flat background colour still lifts a little. The tornados and their overlays are drawn into it each frame as they animate, the part above the lava only.
 
-The ceiling's icicles leave out columns 16 and under and their mirror, 50 and over.
+The ceiling's icicles leave out columns 16 and under and their mirror, 50 and over. Now and then
+(about one every two seconds) an empty socket grows an icicle (`icicle_form`, six 32 by 48 frames at
+15 a second), holds its last frame two to five seconds, then drops it: `icicle`'s first frame (four
+32 pixel frames) falls as the sim's bodies do onto the first ground under it, rock, a slope's
+surface or the lava, and the other three play there. For now it's only drawn: it hits nobody.
 Over each gap in the ceiling's row a shaft runs up through the sky (`Stage.fixedExtras`: the sky
 above the ceiling is solid but for them, up to its top), walled in rock edges drawn on up through
 a taller screen's spare rows (the tileset's (5, 3) on its left, (1, 3) on its right). The players
@@ -1032,7 +1036,7 @@ Under it all plays `thunderstorm`, low (0.2), looped (`Ambience`): the first fiv
 The lightning (`LightningRules`, `Match.lightningWarning`): every ten seconds the screen flashes
 white (0.6, fading over 0.3 seconds, over everything but the rain), a column of palette 22 dots
 floats slowly up from where it'll strike, and two seconds after the flash `small_lightning` (eight
-32 by 96 frames at 15 a second) strikes there: an open top of rock under no ceiling, picked by the
+32 by 96 frames at 15 a second, standing on its frame's bottom) strikes there: an open top of rock under no ceiling, picked by the
 flash's count, the same on both phones. Whoever its line touches, up from the rock, is stripped,
 but Zeus Juice. None of it glows.
 

@@ -117,8 +117,8 @@ public struct Ball: Equatable {
 
         let onFloor = stage.isGrounded(box)
         if onFloor, velocity.y == 0 {
-            velocity.x *= BallRules.rollingFriction
-            if abs(velocity.x) < BallRules.restSpeed { velocity.x = 0 }
+            let slowed = abs(velocity.x) * (1 - BallRules.rollingFriction) - BallRules.rollingDrag
+            velocity.x = slowed > 0 ? (velocity.x < 0 ? -slowed : slowed) : 0
         }
         resting = onFloor && velocity == .zero
         return scoredHoop

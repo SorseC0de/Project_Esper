@@ -137,3 +137,31 @@ final class SlopeTests: XCTestCase {
         }
     }
 }
+
+final class BoundsAndRollTests: XCTestCase {
+    func testTheInvisibleBoundsOutsideTheGridAreNeverAWall() {
+        let stage = Stage.elements
+        let atLeftEdge = Box(min: Vec2(x: 0, y: 150), max: Vec2(x: 10, y: 167.5))
+        let atRightEdge = Box(min: Vec2(x: stage.width - 10, y: 150), max: Vec2(x: stage.width, y: 167.5))
+        XCTAssertNil(stage.wall(beside: atLeftEdge))
+        XCTAssertNil(stage.wall(beside: atRightEdge))
+        XCTAssertNotNil(Stage.court.wall(beside: Box(min: Vec2(x: Stage.tileSize, y: 50), max: Vec2(x: Stage.tileSize + 10, y: 67.5))), "a drawn side wall still holds")
+    }
+
+    func testARollingBallSlowsSmoothlyToAStop() {
+        var match = Match()
+        match.countdown = 0
+        match.players[0].position = Vec2(x: 30, y: 10)
+        match.players[1].position = Vec2(x: 310, y: 10)
+        match.ball.respawn(at: Vec2(x: 100, y: 12.5))
+        match.ball.velocity = Vec2(x: 2, y: 0)
+        var speeds: [Double] = []
+        for _ in 0..<300 {
+            match.advance(inputs: [.idle, .idle])
+            speeds.append(abs(match.ball.velocity.x))
+        }
+        XCTAssertEqual(speeds.last, 0, "at rest")
+        let lastMoving = speeds.lastIndex { $0 > 0 }!
+        XCTAssertLessThan(speeds[lastMoving], 0.02, "no snap from speed to nothing")
+    }
+}

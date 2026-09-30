@@ -256,9 +256,10 @@ public enum BallRules {
     public static let radius = 2.5
     /// Speed kept after hitting a wall, the floor, or a body.
     public static let bounce = 0.75
-    /// Floor friction per frame while rolling, and the speed under which the ball rests.
-    public static let rollingFriction = 0.9
-    public static let restSpeed = 0.2
+    /// Rolling on the floor, the speed lost a frame: this share of it, and this much more, down to
+    /// a stop at zero rather than a snap.
+    public static let rollingFriction = 0.03
+    public static let rollingDrag = 0.01
     /// Art pixels above the feet the dribbling hand holds the ball at; below it the bounce
     /// reaches down a drop.
     public static let dribbleHandHeight = 16.0

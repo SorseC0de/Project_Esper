@@ -917,6 +917,11 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   from the backboard's face all the way back to the end wall, so nothing gets behind it.
   Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
   in the maker's energy.
+- A global stage rule: the invisible bounds outside a stage's grid are never a wall to land on or
+  jump off (`Stage.wall(beside:)`, protocol 36).
+- A loose ball rolling on the floor loses 3% of its speed a frame and 0.01 more
+  (`BallRules.rollingFriction`, `rollingDrag`), easing down to a stop at zero rather than snapping
+  to rest.
 - The camera on a scrolling stage (Longball, the Elements) glides after the local player, led
   by where they're heading (20 frames of their speed), 8% of the way there a frame, held inside
   the stage's ends; each round it starts on the local player.
@@ -929,7 +934,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 ## The Elements
 
 `Stage.elements`, The Elements on the stage select (a working title): 67 by 24 tiles, two
-Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (#FA6A0A) on down under it, the ceiling rock's deep purple (#403353) on up over it, not glowing. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
+Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's deep purple (#403353) on up over it, not glowing. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
 they're recoloured), `mountains_bkg` stretched over the stage in front of
 it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
 through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16
@@ -970,7 +975,7 @@ map kept by the map maker stands in for it offline only (`SavedElementsMap`), un
 map has been baked since (`ElementsMap.bakedVersion`, up by one with each bake), when it's put
 aside under `esper.elementsMap.beforeBake` and the baked one shows. The map maker
 (`MapEditor`, for a mouse; not on the TV) is the MAP picker on the debug panel, on this stage
-offline: the match held still, a grid over the stage, a small panel in the upper right corner
+offline: the match held still, the camera zoomed out to the whole stage at once (as big as it fits, not by whole pixels; back to play's zoom on close), a grid over the stage, a small panel in the upper right corner
 with the tileset. Drag a tile
 from the panel onto the stage to drop it, and with a tile chosen press an empty cell and drag
 to paint; press a placed tile to pick it up and drop it elsewhere, or back on the panel to take

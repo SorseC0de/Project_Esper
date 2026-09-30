@@ -9,8 +9,8 @@ enum ElementsArt {
     static let tileSide: CGFloat = 16
     static let lavaFrames = 8
     /// The lava's orange below its surface, and the deep purple inside the ceiling's rock.
-    static let lavaOrange: UInt32 = 0xFA6A0A
-    static let ceilingPurple: UInt32 = 0x403353
+    static let lavaOrange: RGB = PixelPalette.colours[6]
+    static let ceilingPurple: RGB = 0x403353
     static let lavaSide: CGFloat = 48
     /// Seconds a lava frame shows.
     static let lavaFrameSeconds = 0.18
@@ -161,7 +161,7 @@ enum ElementsArt {
         // A taller screen's spare rows: the lava's orange on down below it, the ceiling's deep
         // purple on up above it, wider than the stage so nothing shows past either end.
         let spare = tileSide * 16
-        func fill(_ colour: UInt32, y: CGFloat, z: CGFloat) -> SKSpriteNode {
+        func fill(_ colour: RGB, y: CGFloat, z: CGFloat) -> SKSpriteNode {
             let node = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
             node.color = SKColor(rgb: colour)
             node.colorBlendFactor = 1

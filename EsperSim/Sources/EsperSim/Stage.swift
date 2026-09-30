@@ -464,10 +464,12 @@ public struct Stage: Equatable {
         let rows = rows(of: box)
         let rightColumn = column(at: box.max.x + Stage.edge)
         let leftColumn = column(at: box.min.x - Stage.edge)
+        // Outside the grid the bounds are invisible, never a wall to land on.
+        let inGrid = 0..<columns
         for row in rows where row < self.rows && (riding || features.tileWallsHold) {
             // A block whose face abuts a slope is the slope's own fill, never a wall.
-            if tile(column: rightColumn, row: row) == .solid, !isSlopeCell(column: rightColumn - 1, row: row) { return .right }
-            if tile(column: leftColumn, row: row) == .solid, !isSlopeCell(column: leftColumn + 1, row: row) { return .left }
+            if inGrid.contains(rightColumn), tile(column: rightColumn, row: row) == .solid, !isSlopeCell(column: rightColumn - 1, row: row) { return .right }
+            if inGrid.contains(leftColumn), tile(column: leftColumn, row: row) == .solid, !isSlopeCell(column: leftColumn + 1, row: row) { return .left }
         }
         for extra in extras where spansY(extra, box) && !(riding && unridable.contains(extra)) {
             if abs(extra.min.x - box.max.x) < 0.01 { return .right }

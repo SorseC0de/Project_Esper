@@ -1222,11 +1222,12 @@ final class GameScene: SKScene {
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
         let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
-        let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
+        // The map maker sees the whole stage at once, as big as it fits, not by whole pixels.
+        let pointsPerGamePixel = wholeStageView ? min(size.width / stageWidth, size.height / stageHeight) : screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale
-        cameraNode.position = CGPoint(x: scrolls ? cameraBase.x : stageWidth / 2, y: stageHeight / 2 - below)
-        if scrolls, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
+        cameraNode.position = CGPoint(x: scrolls && !wholeStageView ? cameraBase.x : stageWidth / 2, y: stageHeight / 2 - below)
+        if scrolls, !wholeStageView, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
         cameraBase = cameraNode.position
         // The HUD is laid out in the phone's points and scaled up for a bigger screen.
         hudScale = HudScene.scale(forHeight: size.height)
@@ -3343,6 +3344,8 @@ final class GameScene: SKScene {
             bubble.run(.sequence([.group([out, .animate(with: looped, timePerFrame: 1.0 / 30)]), .removeFromParent()]))
         }
     }
+    /// The whole stage on screen at once, for the map maker.
+    private var wholeStageView = false
     #if !os(tvOS)
     /// The map maker, while it's open, and where the pointer last was in it.
     private var mapEditor: MapEditor?
@@ -3350,6 +3353,8 @@ final class GameScene: SKScene {
 
     private func openMapEditor() {
         guard mapEditor == nil, online == nil, match.stage.features.look == .elements else { return }
+        wholeStageView = true
+        layout(displayScale: displayScale)
         let scale = hudScale * cameraNode.xScale
         let editor = MapEditor(
             map: ElementsMap.current, halfWidth: size.width / 2 / hudScale, halfHeight: size.height / 2 / hudScale, unitsPerHud: scale,
@@ -3383,6 +3388,9 @@ final class GameScene: SKScene {
         guard mapEditor != nil else { return }
         mapEditor?.removeFromParent()
         mapEditor = nil
+        wholeStageView = false
+        cameraBase = .zero
+        layout(displayScale: displayScale)
         // Back to play from where everyone starts, on the map as it now is.
         if restart { reset() }
     }
@@ -4505,7 +4513,7 @@ final class GameScene: SKScene {
         ballHalo.color = colour
         spinBall(ball)
         // The camera on a scrolling stage: level, gliding after the local player and leading them.
-        if [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }
+        if !wholeStageView, [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }
         placeBallCamFrame()
         circlesOverCam.isHidden = !ballCamEnabled
         // 47's lines breathe, slowly, between gone and a quarter.

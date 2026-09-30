@@ -1215,8 +1215,9 @@ final class GameScene: SKScene {
         let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
         let scrolls = [StageLook.footballField, .elements].contains(match.stage.features.look)
         // The field and the Elements scroll sideways, so only its height is fitted; a scenic stage counts the
-        // ground below the floor in, so the players stand in the middle of it.
-        let below = match.stage.features.scenic ? FieldArt.viewBelowFloor : 0
+        // ground below the floor in, so the players stand in the middle of it; not the Elements,
+        // whose floor is the lava at the screen's bottom.
+        let below = match.stage.features.scenic && match.stage.features.look != .elements ? FieldArt.viewBelowFloor : 0
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)

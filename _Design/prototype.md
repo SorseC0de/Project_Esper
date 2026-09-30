@@ -87,7 +87,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   the run's skid to stop. A slide can catch a loose ball on the way, which is what it's
   for. Numbers on the body (`slideFrames`, `slideFriction`) and in `SlideRules`.
   A slide on a slope going down the way the body faces is forced (`Player.forcedSlide`, protocol
-  30): the body speeds up to the burst (`SlopeRules.slideGain`) and rides the surface with no
+  31): the body speeds up to the burst (`SlopeRules.slideGain`) and rides the surface with no
   friction and no timer, and nothing gets out of it but a jump, which cancels it: no stick,
   shoot, throw, slash or snatch, Frost Tea's cancels included. It ends on flat ground, when the
   slide's own timer then finishes it, or in open air, off the slope's end. Up a slope it's the
@@ -801,8 +801,11 @@ centre.
   measured outline, COPY puts the table on the clipboard as Swift for `Vehicle.set`.
   Edits are kept between launches and stand in live until they're pasted in.
   The slopes (`Stage.slopes`, `SlopeRules`) are 45°, solid under the diagonal and along
-  their two straight sides: the feet ride one up and down at walking speed, a block's
-  height a frame at most, stepping up over the block a slope climbs to; standing still
+  their two straight sides: the body rides one up and down at the flat pace along the
+  surface (the step is scaled by `SlopeRules.diagonal`, so no speed-up), its lead edge's
+  ground read ahead so it climbs either way and onto the block a slope ends in, the
+  ground snapped to on the way down so a descent never leaves it; standing, crouching
+  and uncrouching on one work like on the flat; standing still
   on one, a body stays put; its straight side is a wall and there's no clinging to it;
   the ball bounces off the diagonal, the push into it turned back and a share kept, and
   rolls down it. Anything that would stun a player

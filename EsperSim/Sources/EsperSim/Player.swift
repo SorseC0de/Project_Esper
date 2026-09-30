@@ -1863,31 +1863,46 @@ public struct Player: Equatable {
     }
 
     private mutating func move(in stage: Stage) {
-        var sweptX = stage.sweepHorizontally(body, by: velocity.x)
-        // Standing on a slope against a lip no higher than a block, as where a slope meets
-        // the block it climbs to: up over it and on. Off a slope, a lip is a wall.
-        if sweptX.blocked != nil, grounded, velocity.y <= 0, stage.slopeSurface(under: body, reach: Stage.edge * 10) != nil {
-            let raised = body.offset(by: Vec2(x: 0, y: SlopeRules.step))
-            if !stage.overlapsSolid(raised) {
-                let over = stage.sweepHorizontally(raised, by: velocity.x)
-                if abs(over.moved) > abs(sweptX.moved) + Stage.edge {
-                    position.y += SlopeRules.step
-                    sweptX = over
-                    let down = stage.sweepVertically(body.offset(by: Vec2(x: over.moved, y: 0)), by: -SlopeRules.step, oneWays: dropThrough == 0)
-                    position.y += down.moved
-                }
+        // On a slope the pace is the same along the surface as on the flat: a step across is
+        // shorter by the diagonal, up or down, or it would be a run's speed times root two.
+        var step = velocity.x
+        var lift = 0.0
+        var onSlope = false
+        if grounded, velocity.y <= 0, step != 0 {
+            let here = stage.slopeSurface(under: body, reach: 0.01) != nil
+            let there = stage.slopeSurface(under: body.offset(by: Vec2(x: step * SlopeRules.diagonal, y: 0)), reach: SlopeRules.step) != nil
+            if here || there {
+                onSlope = true
+                step *= SlopeRules.diagonal
+                // Climbing, the box is tried lifted to the ground under its leading edge, a slope's
+                // surface or the top of a block, so the hill's own blocks, which its uphill corner
+                // is over, don't catch it. The edge is half a body and a step ahead, so a
+                // diagonal's surface there is that much higher.
+                let leading = step > 0 ? body.max.x + step : body.min.x + step
+                let reach = SlopeRules.step + body.width / 2 + abs(step)
+                let edge = Box(min: Vec2(x: leading - 0.001, y: position.y), max: Vec2(x: leading + 0.001, y: position.y + 1))
+                let ahead = [stage.slopeHeight(atX: leading, near: position.y, reach: reach),
+                             stage.blockTop(under: edge, near: position.y, reach: SlopeRules.step)].compactMap { $0 }.max()
+                if let ahead, ahead > position.y { lift = ahead - position.y }
             }
         }
+        let sweptX = stage.sweepHorizontally(body.offset(by: Vec2(x: 0, y: lift)), by: step)
         position.x += sweptX.moved
         if sweptX.blocked != nil {
             velocity.x = 0
             position.x = position.x.rounded(toPlaces: 6)
         }
         // On the ground and not jumping, the feet ride a slope up or down, a block's height
-        // at most; standing still on one, the body stays put.
-        if grounded, velocity.y <= 0, let surface = stage.slopeSurface(under: body, reach: SlopeRules.step) {
-            position.y = surface
-            velocity.y = 0
+        // at most; standing still on one, the body stays put. Off the slope's end, where the
+        // middle has left it, the feet go to the top of the block stepped onto or down from.
+        if grounded, velocity.y <= 0 {
+            if let surface = stage.slopeSurface(under: body, reach: SlopeRules.step) {
+                position.y = surface
+                velocity.y = 0
+            } else if onSlope, let top = stage.blockTop(under: body, near: position.y, reach: SlopeRules.step) {
+                position.y = top
+                velocity.y = 0
+            }
         }
         let sweptY = stage.sweepVertically(body, by: velocity.y, oneWays: dropThrough == 0)
         position.y += sweptY.moved

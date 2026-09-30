@@ -72,11 +72,13 @@ public struct Slope: Equatable {
         return box.min.y + (rising ? across : box.width - across)
     }
 
-    /// Whether a box reaches under the diagonal.
+    /// Whether a box is down in the slope. A body stands on a slope by its middle: its feet
+    /// are on the surface there, and its uphill corner is over the diagonal without being
+    /// stuck in it, so the surface's height is read at the box's middle (clamped into the
+    /// square, so a box beside the slope's tall side is still in it and one beside its low end isn't).
     public func overlaps(_ other: Box) -> Bool {
         guard box.overlaps(other) else { return false }
-        let highest = rising ? min(other.max.x, box.max.x) : max(other.min.x, box.min.x)
-        return other.min.y < surface(at: highest) - Stage.edge
+        return other.min.y < surface(at: (other.min.x + other.max.x) / 2) - Stage.edge
     }
 
     // A ceiling slope (one in `Stage.ceilingSlopes`) is the square's upper half, solid above
@@ -185,6 +187,34 @@ public struct Stage: Equatable {
             }
         }
         return extras.contains { $0.overlaps(box) } || slopes.contains { $0.overlaps(box) } || ceilingSlopes.contains { $0.ceilingOverlaps(box) }
+    }
+
+    /// The top of the highest exposed solid block under the box's span whose top is within
+    /// `reach` of `y`, above or below: a step to climb onto or down from.
+    public func blockTop(under box: Box, near y: Double, reach: Double) -> Double? {
+        var best: Double?
+        for column in columns(of: box) {
+            for row in max(row(at: y - reach - Stage.edge), 0)...max(row(at: y + reach + Stage.edge), 0)
+            where tile(column: column, row: row) == .solid && tile(column: column, row: row + 1) != .solid {
+                let top = Double(row + 1) * Stage.tileSize
+                if abs(top - y) <= reach + Stage.edge, best == nil || top > best! { best = top }
+            }
+        }
+        // Made slabs, helmets and a car's blocks count as blocks too.
+        for extra in extras where spansX(extra, box) && abs(extra.max.y - y) <= reach + Stage.edge {
+            if best == nil || extra.max.y > best! { best = extra.max.y }
+        }
+        return best
+    }
+
+    /// The highest floor slope surface at `x` within `reach` of `y`, if any.
+    public func slopeHeight(atX x: Double, near y: Double, reach: Double) -> Double? {
+        var best: Double?
+        for slope in slopes where slope.box.min.x <= x && x <= slope.box.max.x {
+            let surface = slope.surface(at: x)
+            if abs(surface - y) <= reach, best == nil || surface > best! { best = surface }
+        }
+        return best
     }
 
     /// Whether the floor slope under the box's middle, close under the feet, goes down the way

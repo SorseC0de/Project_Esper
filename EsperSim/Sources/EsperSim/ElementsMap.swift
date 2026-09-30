@@ -153,12 +153,13 @@ public struct ElementsMap: Equatable, Codable {
 /// every fourth to come up is fire, which burns whoever it touches. A regular one holds
 /// whoever comes into it, and the ball, while it's up or rising: drawn to its middle a share
 /// of the way a frame, the stick drifting a body sideways; jumped out of, it can't take them
-/// again for a moment. Bursting, it has nothing to hold with.
+/// again for a moment. Bursting, it has nothing to hold with. Blazing Boba is held by a fire
+/// one as by a regular one.
 public enum TornadoRules {
     public static let upFrames = 180
-    /// The burst's ten frames at twelve a second.
-    public static let burstFrames = 50
-    public static let burstSheetFramesPerSecond = 12
+    /// The burst's ten frames at fifteen a second.
+    public static let burstFrames = 40
+    public static let burstSheetFramesPerSecond = 15
     public static let underFrames = 60
     public static let riseFrames = 30
     public static var cycleFrames: Int { upFrames + burstFrames + underFrames + riseFrames }
@@ -166,7 +167,7 @@ public enum TornadoRules {
     public static let pullShare = 0.15
     public static let jumpOutCooldownFrames = 30
     /// A body held in one drifts sideways at this share of the air's drift.
-    public static let driftShare = 0.1
+    public static let driftShare = 0.25
     /// Where a sunk tornado's bottom is, in units: under the lava's surface.
     public static let sunkBottom = -30.0
 
@@ -195,6 +196,19 @@ public enum TornadoRules {
         let share = Double(time - upFrames - burstFrames - underFrames) / Double(riseFrames)
         return (1 - share) * (1 - share)
     }
+}
+
+/// The Elements' fireball: every five seconds one rises out of the lava two tiles short of
+/// the leftmost tornado and arcs through every tornado's middle to two tiles past the
+/// rightmost, back under the lava, each pass the other way from the last. It strips whoever
+/// it touches and bursts on them; Blazing Boba it only bursts on.
+public enum StageFireballRules {
+    public static let everyFrames = 300
+    public static let travelFrames = 150
+    public static let radius = 5.0
+    /// Tiles out past the end tornados it rises and sets, and how far under the lava's surface.
+    public static let reachPastTornados = 2.0
+    public static let underLava = -10.0
 }
 
 public enum ElementsRules {

@@ -937,7 +937,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 ## The Elements
 
 `Stage.elements`, The Elements on the stage select (a working title): 67 by 24 tiles, two
-Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's deep purple (#403353) on up over it, neither glowing. Palette 17 flat behind everything (showing up the shafts above the ceiling too), which never glows
+Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's inner colour (palette 30, #242234) on up over it, neither glowing. Palette 17 flat behind everything (showing up the shafts above the ceiling too), which never glows
 (the glow's bright pass leaves out that exact colour), `mountains_bkg` stretched over the stage in front of
 it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
 through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16
@@ -973,22 +973,39 @@ facing uphill but is carried back down at a quarter of walking speed
 (`SlopeRules.slideSlopePushBack`), as up a down escalator, and let go it turns round and slides.
 
 The tornados (`Stage.tornados`, `TornadoRules`, `Match.tornadoBoxes`): up for three seconds, then
-bursting where they stand (`tornado_burst`, `fire_tornado_burst`, ten 96 pixel frames boxed down to
-48 by the importer's `REDUCE`, at twelve a second), holding and burning nothing from the burst's
+bursting where they stand (`tornado_burst`, `fire_tornado_burst`, ten 96 pixel frames at full size,
+centred on the tornado, at fifteen a second, as the tornados play), holding and burning nothing from the burst's
 first frame, gone a second, and half a second rising back up out of the lava to their places,
 over and over, all together; every fourth to come up is `fire_tornado`, which burns
 whoever it touches as the lava does. A regular one that's up or rising takes whoever comes into it out of
 the air (`PlayerState.suspended`), jumps back to full, and holds them, their middle drawn to its
 middle 15% of the way a frame, gravity off, in the falling frame, the stick drifting them
-sideways at a tenth of the air's drift (`TornadoRules.driftShare`), out if held; drawn hovering
-round a 2 pixel circle counter-clockwise, as Smoothie's flight hovers, while the tornados hover
-round one clockwise (`ElementsArt.hoverRadius`); from it they can shoot, throw,
+sideways at a quarter of the air's drift (`TornadoRules.driftShare`), out if held; drawn hovering
+round a 3 pixel circle counter-clockwise, as Smoothie's flight hovers, and the tornados hover
+round one too (`ElementsArt.hoverRadius`); Blazing Boba is held by a fire one as by a regular one; from it they can shoot, throw,
 snatch or slash as in Super Smoothie's flight, and jump is a full hop out, after which no tornado
 takes them for half a second. Bursting, it lets them go. It takes the loose ball the same way,
 coming in from outside (not one let go of inside it, as a shot from a body held there), and holds
 it at its middle until it bursts. Each tornado is drawn behind the lava, so
 it sinks into it, and again over the players at 33% (`ElementsArt.tornadoOverlayAlpha`), cropped to
-above the lava. Protocol 39.
+above the lava.
+
+Falling into the lava, a body or the ball, plays `fire_hit` and three sheets at the surface where it
+went in, the explosion on top (`explosion`, at 24 a second), `sizzle1` or `sizzle2` by a coin flip
+under it, and `lava_splash` under that (15 a second), half the size for the ball.
+
+The fireball (`Match.stageFireball`, `StageFireballRules`, `fireball`, four 16 pixel frames at 15 a
+second): every five seconds one rises out of the lava two tiles short of the leftmost tornado and
+takes two and a half seconds along a smooth curve through every tornado's middle to two tiles past
+the rightmost and back under, each pass the other way from the last, first left to right. It strips
+whoever it touches, knocked its way, and bursts (`fire_explosion`, `fire_hit`), gone for the rest of
+the pass; on Blazing Boba it only bursts.
+
+The wind (`wind`, nine 32 pixel frames at ten a second): a puff about every third of a second in each
+of two layers, behind the rock and in front of everything, each at 1, 0.75, 0.5 or 0.25, starting
+anywhere on screen and blowing 64 to 160 pixels leftward as it plays through, fading out; none of it
+glows. On this stage the head's and legs' particles blow leftward rather than toward the ball.
+Protocol 40.
 
 The map's walls (`ElementsMap.walls`) are kept apart from the art: by default a block under
 every solid tile, or as painted in the map maker's walls mode, each cell a block or a slope by

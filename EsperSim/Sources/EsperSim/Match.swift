@@ -102,6 +102,7 @@ public struct Match: Equatable {
         if portalCooldown > 0 { portalCooldown -= 1 }
         stepField()
         stepTornados()
+        stepStageFireball()
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
@@ -476,9 +477,11 @@ public struct Match: Equatable {
     private mutating func burnInLava() {
         guard let surface = stage.features.lavaSurface else { return }
         for index in players.indices where players[index].position.y < surface {
+            events.append(.lavaSplashed(at: Vec2(x: players[index].position.x, y: surface), ball: false))
             burn(index)
         }
         if ball.holder == nil, ball.isLive, ball.position.y < surface {
+            events.append(.lavaSplashed(at: Vec2(x: ball.position.x, y: surface), ball: true))
             ball.respawn(at: stage.ballSpawn)
         }
     }
@@ -524,7 +527,8 @@ public struct Match: Equatable {
                 if players[index].state == .suspended { players[index].enter(.air) }
                 continue
             }
-            if fire {
+            // Blazing Boba is at home in a fire one.
+            if fire, players[index].power != .blazingBoba {
                 burn(index)
             } else if players[index].state == .suspended {
                 players[index].tornadoCentre = boxes[hit].center
@@ -535,6 +539,53 @@ public struct Match: Equatable {
                 players[index].tornadoCentre = boxes[hit].center
             }
         }
+    }
+
+    /// The pass the Elements' fireball last burst on, so it's gone for the rest of that pass.
+    public var stageFireballBurstPass: Int?
+
+    /// The Elements' fireball this frame, if one is out: where it is, and which way it's going.
+    public var stageFireball: (position: Vec2, heading: Facing)? {
+        guard stage.tornados.count > 0 else { return nil }
+        let pass = frame / StageFireballRules.everyFrames
+        let time = frame % StageFireballRules.everyFrames
+        guard time < StageFireballRules.travelFrames, stageFireballBurstPass != pass else { return nil }
+        let heading: Facing = pass % 2 == 0 ? .right : .left
+        let centres = stage.tornados.map(\.center).sorted { $0.x < $1.x }
+        let reach = StageFireballRules.reachPastTornados * Stage.tileSize
+        var points = [Vec2(x: stage.tornados.map(\.min.x).min()! - reach, y: StageFireballRules.underLava)] + centres
+            + [Vec2(x: stage.tornados.map(\.max.x).max()! + reach, y: StageFireballRules.underLava)]
+        if heading == .left { points.reverse() }
+        return (Match.alongCurve(points, share: Double(time) / Double(StageFireballRules.travelFrames)), heading)
+    }
+
+    /// A point `share` of the way along a smooth curve through `points`, each stretch between
+    /// two of them taking time by its length (Catmull-Rom, the ends doubled).
+    static func alongCurve(_ points: [Vec2], share: Double) -> Vec2 {
+        let lengths = zip(points, points.dropFirst()).map { $0.distance(to: $1) }
+        var left = min(max(share, 0), 1) * lengths.reduce(0, +)
+        var stretch = 0
+        while stretch < lengths.count - 1, left > lengths[stretch] {
+            left -= lengths[stretch]
+            stretch += 1
+        }
+        let t = lengths[stretch] > 0 ? min(left / lengths[stretch], 1) : 0
+        let p0 = points[max(stretch - 1, 0)], p1 = points[stretch], p2 = points[stretch + 1], p3 = points[min(stretch + 2, points.count - 1)]
+        let t2 = t * t, t3 = t2 * t
+        let a = p1 * 2, b = (p2 - p0) * t, c = (p0 * 2 - p1 * 5 + p2 * 4 - p3) * t2, d = (p1 * 3 - p0 - p2 * 3 + p3) * t3
+        return (a + b + c + d) * 0.5
+    }
+
+    /// The Elements' fireball: whoever it touches is stripped and it bursts, Blazing Boba only burst on.
+    private mutating func stepStageFireball() {
+        guard let fireball = stageFireball else { return }
+        let box = Box(center: fireball.position, width: StageFireballRules.radius * 2, height: StageFireballRules.radius * 2)
+        guard let victim = players.indices.first(where: { players[$0].body.overlaps(box) && players[$0].frozen == 0 }) else { return }
+        stageFireballBurstPass = frame / StageFireballRules.everyFrames
+        events.append(.stageFireballBurst(at: fireball.position))
+        guard players[victim].power != .blazingBoba else { return }
+        let other = players.indices.first { $0 != victim } ?? victim
+        strip(victim, by: other, knock: Vec2(x: BlazeRules.burstKnock.x * fireball.heading.sign, y: BlazeRules.burstKnock.y))
     }
 
     /// Hit-stop to at least this many frames.

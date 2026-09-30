@@ -340,7 +340,7 @@ final class GameScene: SKScene {
     var tornadoSnapshots: [BodySnapshot] {
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
-        return (art.tornados + art.tornadoOverlays).compactMap { node in
+        return windSnapshots(windPuffs.back) + (art.tornados + art.tornadoOverlays).compactMap { node in
             guard let texture = node.texture else { return nil }
             let visible = min(max((node.position.y + node.size.height - ElementsArt.lavaTop) / node.size.height, 0), 1)
             guard visible > 0 else { return nil }
@@ -348,6 +348,13 @@ final class GameScene: SKScene {
             return BodySnapshot(texture: SKTexture(rect: CGRect(x: 0, y: 1 - visible, width: 1, height: visible), in: texture),
                                 position: CGPoint(x: node.position.x, y: ElementsArt.lavaTop), anchor: .zero, xScale: 1,
                                 size: CGSize(width: node.size.width, height: node.size.height * visible))
+        }
+    }
+
+    /// Wind puffs as drawn, for the mask to keep from glowing.
+    private func windSnapshots(_ puffs: [SKSpriteNode]) -> [BodySnapshot] {
+        puffs.compactMap { puff in
+            puff.texture.map { BodySnapshot(texture: $0, position: puff.position, anchor: puff.anchorPoint, xScale: 1, size: puff.size) }
         }
     }
 
@@ -364,6 +371,8 @@ final class GameScene: SKScene {
                                          anchor: node.anchorPoint, xScale: 1, size: node.size, zRotation: node.zRotation))
             }
         }
+        // The Elements' wind in front of everything.
+        flat += windSnapshots(windPuffs.front)
         // The snipe's cursors, drawn as they are.
         for cursor in snipeCursors where !cursor.isHidden {
             if let texture = cursor.texture {
@@ -1102,6 +1111,92 @@ final class GameScene: SKScene {
     }
 
     /// A soft glow in the colour, added, which the glow pass then picks up.
+    // MARK: The Elements' lava, fireball and wind
+
+    /// Into the lava: an explosion over a sizzle, either, over the lava's splash, and the fire's
+    /// hit; half the size for the ball.
+    private func splashLava(at position: Vec2, ball: Bool) {
+        play(.fireHit, at: position)
+        let scale: CGFloat = ball ? 0.5 : 1
+        let layers: [(sheet: String, fps: Double, z: CGFloat)] = [
+            ("lava_splash", 15, 40), (Bool.random() ? "sizzle1" : "sizzle2", 15, 41), ("explosion", 24, 42),
+        ]
+        for layer in layers {
+            guard let count = EffectSheets.frames[layer.sheet] else { continue }
+            let frames = (0..<count).map { sprites.texture(layer.sheet, $0) }
+            let node = SKSpriteNode(texture: frames[0])
+            node.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY[layer.sheet] ?? 0.5)
+            node.position = SpriteLibrary.point(position)
+            node.setScale(scale)
+            node.zPosition = layer.z
+            node.run(.sequence([.animate(with: frames, timePerFrame: 1 / layer.fps), .removeFromParent()]))
+            glowers.addChild(node)
+        }
+    }
+
+    /// The Elements' fireball where the sim has it, its four frames at fifteen a second, facing its way.
+    private var stageFireballNode: SKSpriteNode?
+    private static let stageFireballFramesPerSecond = 15
+    private func placeStageFireball() {
+        guard let fireball = match.stageFireball else {
+            stageFireballNode?.isHidden = true
+            return
+        }
+        let node = stageFireballNode ?? {
+            let made = SKSpriteNode(texture: sprites.texture("fireball", 0))
+            made.zPosition = 7
+            glowers.addChild(made)
+            stageFireballNode = made
+            return made
+        }()
+        node.isHidden = false
+        node.texture = sprites.texture("fireball", (match.frame * GameScene.stageFireballFramesPerSecond / 60) % (EffectSheets.frames["fireball"] ?? 1))
+        node.size = node.texture?.size() ?? .zero
+        node.position = SpriteLibrary.point(fireball.position)
+        node.xScale = CGFloat(fireball.heading.sign)
+    }
+
+    /// The Elements' wind: puffs of `wind` behind the stage's rock and in front of everything, each
+    /// at 1, 0.75, 0.5 or 0.25, starting anywhere on screen and blowing leftward as it plays through
+    /// at ten a second, fading out.
+    private var windPuffs: (back: [SKSpriteNode], front: [SKSpriteNode]) = ([], [])
+    private var windClock = 0.0
+    private static let windSecondsBetween = 0.35
+    private static let windFramesPerSecond = 10.0
+    private static let windTravel: ClosedRange<CGFloat> = 64...160
+    private func blowWind() {
+        windPuffs.back.removeAll { $0.parent == nil }
+        windPuffs.front.removeAll { $0.parent == nil }
+        guard match.stage.features.look == .elements, let count = EffectSheets.frames["wind"] else { return }
+        windClock += GameScene.stepSeconds
+        guard windClock >= GameScene.windSecondsBetween else { return }
+        windClock = 0
+        let frames = (0..<count).map { sprites.texture("wind", $0) }
+        let seconds = Double(count) / GameScene.windFramesPerSecond
+        let halfWidth = size.width * cameraNode.xScale / 2, halfHeight = size.height * cameraNode.yScale / 2
+        for front in [false, true] {
+            let puff = SKSpriteNode(texture: frames[0])
+            puff.position = CGPoint(x: cameraNode.position.x + .random(in: -halfWidth...halfWidth),
+                                    y: cameraNode.position.y + .random(in: -halfHeight...halfHeight))
+            puff.alpha = [1, 0.75, 0.5, 0.25].randomElement()!
+            puff.run(.sequence([
+                .group([.animate(with: frames, timePerFrame: 1 / GameScene.windFramesPerSecond),
+                        .moveBy(x: -.random(in: GameScene.windTravel), y: 0, duration: seconds),
+                        .fadeOut(withDuration: seconds)]),
+                .removeFromParent(),
+            ]))
+            if front {
+                puff.zPosition = 23
+                world.addChild(puff)
+                windPuffs.front.append(puff)
+            } else {
+                puff.zPosition = -8.5
+                stageGround.addChild(puff)
+                windPuffs.back.append(puff)
+            }
+        }
+    }
+
     /// The loose ball's turning, from what it does: backspin off a shot or a throw, kept through the
     /// air, a bounce trading half of it for the roll the floor gives, and a ball rolling turning with its path.
     private func spinBall(_ ball: Ball) {
@@ -2681,6 +2776,11 @@ final class GameScene: SKScene {
                 let summon = Effect.fireballSummon.node(sprites, at: SpriteLibrary.point(hand), flipped: player.facing == .left)
                 summon.zPosition = 41
                 glowers.addChild(summon)
+            case .lavaSplashed(let at, let isBall):
+                splashLava(at: at, ball: isBall)
+            case .stageFireballBurst(let at):
+                play(.fireHit, at: at)
+                glowers.addChild(Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at), flipped: false))
             case .fireballBurst(let at):
                 let burst = Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at + Vec2(x: 0, y: -4)), flipped: false)
                 // Twice the size on a wall.
@@ -3118,7 +3218,10 @@ final class GameScene: SKScene {
                 // Flowing toward the ball along x, always: a steady push, easing off as the
                 // body and the ball come level, as with the ball in hand.
                 var flow = 0.0
-                if match.players.indices.contains(particle.owner) {
+                if match.stage.features.look == .elements {
+                    // The Elements' wind blows it all leftward.
+                    flow = -Double(ParticleLook.flowSpeed)
+                } else if match.players.indices.contains(particle.owner) {
                     let gap = Double(SpriteLibrary.point(match.ball.position).x - SpriteLibrary.point(match.players[particle.owner].position).x)
                     flow = min(max(gap / Double(ParticleLook.flowEaseDistance), -1), 1) * Double(ParticleLook.flowSpeed)
                 }
@@ -4532,6 +4635,8 @@ final class GameScene: SKScene {
         }
 
         drawPlatforms()
+        placeStageFireball()
+        blowWind()
         elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime(),
                                    burstFrame: TornadoRules.burstFrame(at: match.frame),
                                    hoverLap: Double(match.frame) / 60 / GameScene.hoverSeconds * 2 * .pi)

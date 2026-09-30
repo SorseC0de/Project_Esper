@@ -33,6 +33,7 @@ enum EffectSheets {
         "fire_tornado_burst": 10,
         "fire_trail": 11,
         "fire_wallspark": 11,
+        "fireball": 4,
         "fireball_summon": 22,
         "flashspark": 9,
         "flashspark2": 22,
@@ -44,6 +45,7 @@ enum EffectSheets {
         "icicle_empty": 1,
         "jumpspark": 9,
         "lava": 8,
+        "lava_splash": 12,
         "lightning1": 25,
         "lightning2": 25,
         "lightning3": 25,
@@ -56,8 +58,11 @@ enum EffectSheets {
         "lightning_spark2": 10,
         "score_strike": 13,
         "shine": 5,
+        "sizzle1": 6,
+        "sizzle2": 6,
         "tornado": 8,
         "tornado_burst": 10,
+        "wind": 9,
     ]
 
     static let anchorY: [String: CGFloat] = [
@@ -88,6 +93,7 @@ enum EffectSheets {
         "fire_tornado_burst": 0.5000,
         "fire_trail": 0.0000,
         "fire_wallspark": 0.5000,
+        "fireball": 0.5000,
         "fireball_summon": 0.5000,
         "flashspark": 0.5000,
         "flashspark2": 0.5000,
@@ -99,6 +105,7 @@ enum EffectSheets {
         "icicle_empty": 0.5000,
         "jumpspark": 0.0000,
         "lava": 0.0000,
+        "lava_splash": 0.5000,
         "lightning1": 0.0000,
         "lightning2": 0.0000,
         "lightning3": 0.0000,
@@ -111,8 +118,11 @@ enum EffectSheets {
         "lightning_spark2": 0.5000,
         "score_strike": 0.5000,
         "shine": 0.0000,
+        "sizzle1": 0.0000,
+        "sizzle2": 0.0000,
         "tornado": 0.0000,
         "tornado_burst": 0.5000,
+        "wind": 0.5000,
     ]
 
     static let toned: Set<String> = [
@@ -134,5 +144,6 @@ enum EffectSheets {
         "lightning_spark",
         "lightning_spark2",
         "shine",
+        "wind",
     ]
 }

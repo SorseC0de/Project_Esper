@@ -184,4 +184,71 @@ final class ShaftAndTornadoTests: XCTestCase {
             XCTAssertGreaterThan(match.ball.position.x, startX + 5, "rolled on from \(startX)")
         }
     }
+
+    func testTheFireballArcsThroughEveryTornadoOutOfTheLavaAndBackAlternatingSides() {
+        var match = elements()
+        let centres = match.stage.tornados.map(\.center)
+        for pass in 0..<2 {
+            var path: [Vec2] = []
+            for time in 0..<StageFireballRules.travelFrames {
+                match.frame = pass * StageFireballRules.everyFrames + time
+                path.append(match.stageFireball!.position)
+            }
+            match.frame = pass * StageFireballRules.everyFrames + StageFireballRules.travelFrames
+            XCTAssertNil(match.stageFireball, "back under")
+            XCTAssertLessThan(path.first!.y, ElementsRules.lavaSurface)
+            XCTAssertLessThan(path.last!.y, ElementsRules.lavaSurface)
+            XCTAssertEqual(path.last!.x > path.first!.x, pass == 0, "left to right, then back")
+            for centre in centres {
+                XCTAssertLessThan(path.map { $0.distance(to: centre) }.min()!, 4, "through the tornado at \(centre)")
+            }
+        }
+    }
+
+    private func fireballMeets(_ power: Power) -> Match {
+        var match = elements()
+        match.frame = 40
+        let at = match.stageFireball!.position
+        match.frame = 39
+        match.players[0].position = Vec2(x: at.x, y: at.y - 8)
+        match.players[0].power = power
+        match.players[0].grounded = false
+        match.players[0].tornadoCooldown = 999
+        match.players[0].enter(.air)
+        match.players[1].position = Vec2(x: 30, y: 400)
+        match.advance(inputs: [.idle, .idle])
+        return match
+    }
+
+    func testTheFireballStripsWhoeverItTouchesAndBurstsButBlazingBobaIsOnlyBurstOn() {
+        let hit = fireballMeets(.none)
+        XCTAssertTrue(hit.events.contains { if case .stageFireballBurst = $0 { return true }; return false })
+        XCTAssertGreaterThan(hit.players[0].hitStun, 0, "stripped")
+        XCTAssertNil(hit.stageFireball, "gone for the pass")
+        let boba = fireballMeets(.blazingBoba)
+        XCTAssertTrue(boba.events.contains { if case .stageFireballBurst = $0 { return true }; return false })
+        XCTAssertEqual(boba.players[0].hitStun, 0)
+    }
+
+    func testBlazingBobaHangsInAFireTornado() {
+        var match = elements()
+        let tornado = match.stage.tornados[0]
+        match.frame = 3 * TornadoRules.cycleFrames
+        match.players[0].power = .blazingBoba
+        match.players[0].position = Vec2(x: tornado.center.x, y: tornado.center.y - 8)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .suspended)
+    }
+
+    func testFallingInTheLavaSplashesForABodyAndTheBall() {
+        var match = elements()
+        match.players[0].position = Vec2(x: 300, y: ElementsRules.lavaSurface - 1)
+        match.players[1].position = Vec2(x: 30, y: 400)
+        match.ball.respawn(at: Vec2(x: 350, y: ElementsRules.lavaSurface - 1))
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertTrue(match.events.contains(.lavaSplashed(at: Vec2(x: 300, y: ElementsRules.lavaSurface), ball: false)))
+        XCTAssertTrue(match.events.contains { if case .lavaSplashed(_, true) = $0 { return true }; return false })
+    }
 }

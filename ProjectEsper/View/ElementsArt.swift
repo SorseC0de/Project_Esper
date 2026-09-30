@@ -10,19 +10,20 @@ enum ElementsArt {
     static let lavaFrames = 8
     /// The lava's orange below its surface, and the deep purple inside the ceiling's rock.
     static let lavaOrange: RGB = PixelPalette.colours[6]
-    static let ceilingPurple: RGB = 0x403353
+    static let ceilingPurple: RGB = PixelPalette.colours[30]
     static let lavaSide: CGFloat = 48
     /// Seconds a lava frame shows.
     static let lavaFrameSeconds = 0.18
     static let tornadoFrames = 8
     static let burstFrames = 10
+    static let burstSide: CGFloat = 96
     static let tornadoSide: CGFloat = 48
     /// Seconds a tornado's frame shows: twelve a second.
-    static let tornadoFrameSeconds = 1.0 / 12
+    static let tornadoFrameSeconds = 1.0 / 15
     /// The copy of each tornado drawn over the players.
     static let tornadoOverlayAlpha: CGFloat = 0.33
-    /// Pixels round the circle a tornado hovers on, clockwise, and a body held in one, counter-clockwise.
-    static let hoverRadius: CGFloat = 2
+    /// Pixels round the circle a tornado hovers on, and a body held in one, both counter-clockwise.
+    static let hoverRadius: CGFloat = 3
     /// Where the lava's art tops out, for what sinks into it.
     static var lavaTop: CGFloat { lavaSide }
     /// No icicle hangs over these columns or their mirror: the ceiling's ends, over the rock and the shafts.
@@ -119,17 +120,21 @@ enum ElementsArt {
 
         /// The tornados where the sim has them this frame, each on a frame of its own, in fire or not.
         func placeTornados(_ boxes: [Box], fire: Bool, time: Double, burstFrame: Int?, hoverLap: Double) {
-            let hover = CGPoint(x: (cos(-hoverLap) * Double(ElementsArt.hoverRadius)).rounded(),
-                                y: (sin(-hoverLap) * Double(ElementsArt.hoverRadius)).rounded())
+            let hover = CGPoint(x: (cos(hoverLap) * Double(ElementsArt.hoverRadius)).rounded(),
+                                y: (sin(hoverLap) * Double(ElementsArt.hoverRadius)).rounded())
             let sheet = fire ? "fire_tornado" : "tornado"
             let step = Int(time / ElementsArt.tornadoFrameSeconds)
             for (index, box) in boxes.enumerated() where index < tornados.count {
                 // Bursting where it stands, the burst's sheet through once, all together.
                 let texture = burstFrame.map { sprites.texture(sheet + "_burst", min($0 * TornadoRules.burstSheetFramesPerSecond / 60, ElementsArt.burstFrames - 1)) }
                     ?? sprites.texture(sheet, (step + index * 3) % ElementsArt.tornadoFrames)
+                // The burst at its full size, twice the tornado's, on its middle.
+                let side = burstFrame == nil ? ElementsArt.tornadoSide : ElementsArt.burstSide
+                let inset = (side - ElementsArt.tornadoSide) / 2
                 for node in [tornados[index], tornadoOverlays[index]] {
                     node.texture = texture
-                    node.position = SpriteLibrary.point(box.min) + hover
+                    node.size = CGSize(width: side, height: side)
+                    node.position = SpriteLibrary.point(box.min) + hover - CGPoint(x: inset, y: inset)
                 }
             }
         }

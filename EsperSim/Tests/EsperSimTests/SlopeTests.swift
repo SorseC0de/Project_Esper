@@ -17,6 +17,7 @@ final class SlopeTests: XCTestCase {
         var map = ElementsMap.baked
         map.tiles = []
         map.walls = walls
+        map.tornados = []
         ElementsMap.current = map
         defer { ElementsMap.current = ElementsMap.baked }
         var match = Match(stage: .elements, specs: [.starting, .starting])

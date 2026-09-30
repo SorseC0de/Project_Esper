@@ -928,7 +928,9 @@ zoom. Palette 2 flat behind everything, `mountains_bkg` stretched over the stage
 it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
 through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16
 by 16 cell of `tileset_elements` (`Pixel Art/Stages/Elements`; the importer's `STAGE_ART` and
-`ROOT_IMAGES`). The sides and the floor are the world's edge. Every tile of the map is solid,
+`ROOT_IMAGES`; re-run the importer after changing the sheet, which can be any number of cells
+across and down, its drawn cells read off it, though `ElementsMap.decoration` and a saved map
+name cells by place, so tiles are added at the end or in the empty cells). The sides and the floor are the world's edge. Every tile of the map is solid,
 bar the tileset's flecks (`ElementsMap.decoration`), drawn but with nothing to stand on. Hoops
 are the straight-on pair, the court's placements.
 

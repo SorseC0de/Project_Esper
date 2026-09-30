@@ -91,7 +91,11 @@ final class MapEditor: SKNode {
     private var paletteRect = CGRect.zero
     private var panelRect = CGRect.zero
     private var paletteShown = true
-    private static let paletteScale: CGFloat = 1.25
+    /// Screen points to a tileset pixel: 1.25, or less if the sheet is big for the screen.
+    private var paletteScale: CGFloat {
+        let sheet = ElementsArt.tileset.size()
+        return min(1.25, halfWidth * 1.4 / max(sheet.width, 1), halfHeight * 1.1 / max(sheet.height, 1))
+    }
 
     init(map: ElementsMap, halfWidth: CGFloat, halfHeight: CGFloat, unitsPerHud: CGFloat, world: @escaping (CGPoint) -> CGPoint,
          hudFromWorld: @escaping (CGPoint) -> CGPoint, onTiles: @escaping ([ElementsMap.Cell]) -> Void,
@@ -162,8 +166,9 @@ final class MapEditor: SKNode {
     private func buildPanel() {
         panel.removeAllChildren()
         buttons = []
-        let scale = MapEditor.paletteScale
-        let paletteSize = CGSize(width: 240 * scale, height: 112 * scale)
+        let scale = paletteScale
+        let sheetSize = ElementsArt.tileset.size()
+        let paletteSize = CGSize(width: sheetSize.width * scale, height: sheetSize.height * scale)
         let margin: CGFloat = 8
         let left = -halfWidth + margin, bottom = -halfHeight + margin
         let rowHeight: CGFloat = 22
@@ -235,14 +240,14 @@ final class MapEditor: SKNode {
     private func showSelection() {
         guard paletteShown, case .brush(let art) = tool else { selection.isHidden = true; return }
         selection.isHidden = false
-        let side = 16 * MapEditor.paletteScale
+        let side = 16 * paletteScale
         selection.path = CGPath(rect: CGRect(x: paletteRect.minX + CGFloat(art.column) * side,
                                              y: paletteRect.maxY - CGFloat(art.row + 1) * side, width: side, height: side), transform: nil)
     }
 
     private func paletteCell(at point: CGPoint) -> ElementsMap.Cell? {
         guard paletteShown, paletteRect.contains(point) else { return nil }
-        let side = 16 * MapEditor.paletteScale
+        let side = 16 * paletteScale
         let cell = ElementsMap.Cell(Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
         return ElementsArt.filled.contains(cell) ? cell : nil
     }

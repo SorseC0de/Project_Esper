@@ -7,17 +7,33 @@ enum ElementsArt {
     /// The flat colour behind everything: palette 2.
     static let background: RGB = PixelPalette.colours[2]
     static let tileSide: CGFloat = 16
-    static let tilesetColumns = 15, tilesetRows = 7
     static let lavaFrames = 8
     static let lavaSide: CGFloat = 48
     /// Seconds a lava frame shows.
     static let lavaFrameSeconds = 0.18
 
-    /// The tileset cells with anything drawn in them: what the map maker offers.
+    /// The tileset as many cells across and down as the sheet holds, so a bigger sheet is picked up as it is.
+    static var tilesetColumns: Int { max(Int(tileset.size().width / tileSide), 1) }
+    static var tilesetRows: Int { max(Int(tileset.size().height / tileSide), 1) }
+
+    /// The tileset cells with anything drawn in them, read off the sheet: what the map maker offers.
     static let filled: [ElementsMap.Cell] = {
-        let rows: [[Int]] = [[2, 4], [2, 3, 4, 5, 6, 7, 9, 11, 12, 13], [1, 2, 3, 4, 5],
-                             [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13], [1, 2, 3, 4, 5, 8, 9, 10, 11, 12], [9, 10, 11]]
-        return rows.enumerated().flatMap { row, columns in columns.map { ElementsMap.Cell($0, row) } }
+        let image = tileset.cgImage()
+        guard let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let data = context.data else { return [] }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)
+        let side = Int(tileSide)
+        var cells: [ElementsMap.Cell] = []
+        for row in 0..<(image.height / side) {
+            for column in 0..<(image.width / side) {
+                let drawn = (0..<side).contains { y in (0..<side).contains { x in pixels[((row * side + y) * image.width + column * side + x) * 4 + 3] > 0 } }
+                if drawn { cells.append(ElementsMap.Cell(column, row)) }
+            }
+        }
+        return cells
     }()
 
     static let tileset: SKTexture = {

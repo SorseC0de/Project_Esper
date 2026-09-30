@@ -972,13 +972,20 @@ map kept by the map maker stands in for it offline only (`SavedElementsMap`), un
 map has been baked since (`ElementsMap.bakedVersion`, up by one with each bake), when it's put
 aside under `esper.elementsMap.beforeBake` and the baked one shows. The map maker
 (`MapEditor`, for a mouse; not on the TV) is the MAP picker on the debug panel, on this stage
-offline: the match held still, a grid over the stage, a panel with the tileset. Drag a tile
+offline: the match held still, a grid over the stage, a small panel in the upper right corner
+with the tileset. Drag a tile
 from the panel onto the stage to drop it, and with a tile chosen press an empty cell and drag
 to paint; press a placed tile to pick it up and drop it elsewhere, or back on the panel to take
 it away. ERASE, TORNADO, the rims, P1, P2 and BALL are picked from the button rows and dropped the same
-way (press a marker to move it). UNDO steps back, RESET returns to the baked map, TILES shows
-or hides the panel, COPY puts the map on the clipboard as Swift for `ElementsMap.defaultMap`,
-and CLOSE restarts the round on the new map. Edits are kept between launches.
+way (press a marker to move it). UNDO steps back, RESET returns to the baked map, HIDE or
+PALETTE shows or hides the tileset, COPY puts the map on the clipboard as Swift for
+`ElementsMap.defaultMap`, and CLOSE restarts the round on the new map. Edits are kept between
+launches. WALLS puts it in walls mode (TILES to come back): the walls, apart from the art, drawn as
+transparent red over the stage, and the tool row is the wall kinds: SOLID, the four slopes by where
+their solid half lies (◢ ◣ ◥ ◤) and OPEN. Press a cell and drag to lay the chosen kind; pressing a
+cell that already has it opens it, and the stroke opens cells instead. In the tile mode a tile
+placed brings a solid wall with it where there's none, and one taken off takes a solid wall,
+never a painted slope.
 
 ## Court
 

@@ -3360,6 +3360,7 @@ final class GameScene: SKScene {
             },
             onMarkers: { [weak self] in self?.session.mutate { $0.stage = .elements; $0.refreshExtras() } },
             onTornados: { [weak self] in self?.elementsArt?.setTornados(ElementsMap.current.tornados) },
+            onWalls: { [weak self] in self?.session.mutate { $0.stage = .elements; $0.refreshExtras() } },
             onClose: { [weak self] in self?.closeMapEditor(restart: true) })
         hud.addChild(editor)
         mapEditor = editor

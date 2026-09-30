@@ -50,6 +50,8 @@ final class MapEditor: SKNode {
         case marker(Marker)
         /// A whole tornado, placed by the cell its base's middle is in.
         case tornado
+        /// In walls mode: a wall kind, or nil to open a cell.
+        case wall(ElementsMap.Kind?)
     }
 
     private enum Marker: Equatable, CaseIterable {
@@ -90,6 +92,12 @@ final class MapEditor: SKNode {
     /// Cells whose tile changed since the game was last told, and whether the tornados did.
     private var dirty: Set<ElementsMap.Cell> = []
     private var tornadosDirty = false
+    private var wallsDirty = false
+    /// Walls mode: the walls shown as transparent red over the stage, and painted instead of tiles.
+    private var wallsMode = false
+    /// While a stroke paints walls: the kind it lays, nil opening cells.
+    private var strokeKind: ElementsMap.Kind?
+    private let wallLayer = SKNode()
 
     private let halfWidth: CGFloat, halfHeight: CGFloat
     /// Stage units for a HUD point and back: the camera's place and how many units a point covers.
@@ -99,6 +107,7 @@ final class MapEditor: SKNode {
     private let onTiles: ([ElementsMap.Cell]) -> Void
     private let onMarkers: () -> Void
     private let onTornados: () -> Void
+    private let onWalls: () -> Void
     private let onClose: () -> Void
 
     private let grid = SKShapeNode()
@@ -112,15 +121,15 @@ final class MapEditor: SKNode {
     private var paletteRect = CGRect.zero
     private var panelRect = CGRect.zero
     private var paletteShown = true
-    /// Screen points to a tileset pixel: 1.25, or less if the sheet is big for the screen.
+    /// Screen points to a tileset pixel: small, in the corner, or less if the sheet is big for the screen.
     private var paletteScale: CGFloat {
         let sheet = ElementsArt.tileset.size()
-        return min(1.25, halfWidth * 1.4 / max(sheet.width, 1), halfHeight * 1.1 / max(sheet.height, 1))
+        return min(0.85, halfWidth * 0.6 / max(sheet.width, 1), halfHeight * 0.5 / max(sheet.height, 1))
     }
 
     init(map: ElementsMap, halfWidth: CGFloat, halfHeight: CGFloat, unitsPerHud: CGFloat, world: @escaping (CGPoint) -> CGPoint,
          hudFromWorld: @escaping (CGPoint) -> CGPoint, onTiles: @escaping ([ElementsMap.Cell]) -> Void,
-         onMarkers: @escaping () -> Void, onTornados: @escaping () -> Void, onClose: @escaping () -> Void) {
+         onMarkers: @escaping () -> Void, onTornados: @escaping () -> Void, onWalls: @escaping () -> Void, onClose: @escaping () -> Void) {
         self.map = map
         self.halfWidth = halfWidth
         self.halfHeight = halfHeight
@@ -130,11 +139,13 @@ final class MapEditor: SKNode {
         self.onTiles = onTiles
         self.onMarkers = onMarkers
         self.onTornados = onTornados
+        self.onWalls = onWalls
         self.onClose = onClose
         tool = .brush(ElementsArt.filled.first { $0 == ElementsMap.Cell(3, 3) } ?? ElementsArt.filled[0])
         super.init()
         zPosition = 500
         addChild(grid)
+        addChild(wallLayer)
         addChild(markerLayer)
         addChild(panel)
         hover.strokeColor = .white
@@ -145,6 +156,8 @@ final class MapEditor: SKNode {
         buildGrid()
         buildPanel()
         showMarkers()
+        showWalls()
+        wallLayer.isHidden = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -185,26 +198,77 @@ final class MapEditor: SKNode {
 
     // MARK: The panel
 
+    /// The panel, small, in the upper right corner: a row of actions, a row of tools (the wall kinds in
+    /// walls mode), and under them the tileset to pick tiles from.
     private func buildPanel() {
         panel.removeAllChildren()
         buttons = []
         let scale = paletteScale
         let sheetSize = ElementsArt.tileset.size()
-        let paletteSize = CGSize(width: sheetSize.width * scale, height: sheetSize.height * scale)
-        let margin: CGFloat = 8
-        let left = -halfWidth + margin, bottom = -halfHeight + margin
-        let rowHeight: CGFloat = 22
-        let controlRows: CGFloat = 2
-        let panelHeight = (paletteShown ? paletteSize.height + margin : 0) + rowHeight * controlRows + margin
-        panelRect = CGRect(x: left - 4, y: bottom - 4, width: max(paletteSize.width, 330) + 8, height: panelHeight + 8)
-        let back = SKSpriteNode(color: SKColor(white: 0.05, alpha: 0.9), size: panelRect.size)
+        let showsSheet = paletteShown && !wallsMode
+        let paletteSize = showsSheet ? CGSize(width: sheetSize.width * scale, height: sheetSize.height * scale) : .zero
+        let margin: CGFloat = 5, rowHeight: CGFloat = 15, gap: CGFloat = 3, fontSize: CGFloat = 7
+        let actionRow: [(String, () -> Void)] = [
+            ("UNDO", { [weak self] in self?.undo() }), ("RESET", { [weak self] in self?.reset() }), ("COPY", { [weak self] in self?.copy() }),
+            (wallsMode ? "TILES" : "WALLS", { [weak self] in self?.toggleWallsMode() }),
+        ] + (wallsMode ? [] : [(paletteShown ? "HIDE" : "PALETTE", { [weak self] in self?.togglePalette() })])
+            + [("CLOSE", { [weak self] in self?.onClose() })]
+        // The tools, each with the tool it picks, so the one in hand can be lit.
+        let tools: [(String, Tool)]
+        if wallsMode {
+            let kinds: [(String, ElementsMap.Kind?)] = [("SOLID", .solid), ("\u{25E2}", .lowerRight), ("\u{25E3}", .lowerLeft),
+                                                       ("\u{25E5}", .upperRight), ("\u{25E4}", .upperLeft), ("OPEN", nil)]
+            tools = kinds.map { ($0.0, .wall($0.1)) }
+        } else {
+            tools = [("ERASE", .erase), ("TORNADO", .tornado)] + Marker.allCases.map { ($0.label, .marker($0)) }
+        }
+        let toolRow: [(String, () -> Void)] = tools.map { title, picked in (title, { [weak self] in self?.tool = picked; self?.buildPanel() }) }
+        let lit = Set(tools.filter { $0.1 == tool }.map(\.0))
+        func labelWidth(_ title: String) -> CGFloat {
+            let label = SKLabelNode(text: title)
+            label.fontName = "Menlo-Bold"
+            label.fontSize = fontSize
+            return label.frame.width + 8
+        }
+        let rows = [actionRow, toolRow]
+        let rowWidths = rows.map { row in row.reduce(CGFloat(0)) { $0 + labelWidth($1.0) } + gap * CGFloat(max(row.count - 1, 0)) }
+        let contentWidth = max(rowWidths.max() ?? 0, paletteSize.width)
+        let contentHeight = rowHeight * CGFloat(rows.count) + (showsSheet ? paletteSize.height + margin : 0)
+        let right = halfWidth - margin, top = halfHeight - margin
+        let left = right - contentWidth
+        panelRect = CGRect(x: left - 4, y: top - contentHeight - 4, width: contentWidth + 8, height: contentHeight + 8)
+        let back = SKSpriteNode(color: SKColor(white: 0.05, alpha: 0.88), size: panelRect.size)
         back.anchorPoint = .zero
         back.position = panelRect.origin
         panel.addChild(back)
         selection.removeFromParent()
-        var y = bottom
-        if paletteShown {
-            paletteRect = CGRect(x: left, y: y, width: paletteSize.width, height: paletteSize.height)
+        for (index, items) in rows.enumerated() {
+            var x = left
+            let y = top - rowHeight * CGFloat(index + 1)
+            for (title, action) in items {
+                let width = labelWidth(title)
+                let rect = CGRect(x: x, y: y + 1, width: width, height: rowHeight - 3)
+                let box = SKShapeNode(rect: rect, cornerRadius: 2)
+                box.fillColor = index == 1 && lit.contains(title) ? SKColor(red: 0.75, green: 0.55, blue: 0.1, alpha: 1) : SKColor(white: 0.25, alpha: 1)
+                box.strokeColor = SKColor(white: 1, alpha: 0.3)
+                box.lineWidth = 0.5
+                box.zPosition = 1
+                let label = SKLabelNode(text: title)
+                label.fontName = "Menlo-Bold"
+                label.fontSize = fontSize
+                label.fontColor = .white
+                label.verticalAlignmentMode = .center
+                label.horizontalAlignmentMode = .center
+                label.position = CGPoint(x: rect.midX, y: rect.midY)
+                label.zPosition = 2
+                panel.addChild(box)
+                panel.addChild(label)
+                buttons.append((rect, action))
+                x += width + gap
+            }
+        }
+        if showsSheet {
+            paletteRect = CGRect(x: left, y: top - contentHeight, width: paletteSize.width, height: paletteSize.height)
             let sheet = SKSpriteNode(texture: ElementsArt.tileset)
             sheet.anchorPoint = .zero
             sheet.size = paletteSize
@@ -213,49 +277,29 @@ final class MapEditor: SKNode {
             panel.addChild(sheet)
             selection.zPosition = 2
             selection.strokeColor = SKColor(red: 1, green: 0.9, blue: 0.2, alpha: 1)
-            selection.lineWidth = 1.5
+            selection.lineWidth = 1
             selection.fillColor = .clear
             panel.addChild(selection)
-            y += paletteSize.height + margin
         } else {
             paletteRect = .zero
-        }
-        // Two rows of buttons: the tools and markers, then the actions.
-        let toolRow: [(String, () -> Void)] = [("ERASE", { [weak self] in self?.tool = .erase; self?.showSelection() }),
-                                               ("TORNADO", { [weak self] in self?.tool = .tornado; self?.showSelection() })]
-            + Marker.allCases.map { marker in (marker.label, { [weak self] in self?.tool = .marker(marker); self?.showSelection() }) }
-        let actionRow: [(String, () -> Void)] = [
-            ("UNDO", { [weak self] in self?.undo() }), ("RESET", { [weak self] in self?.reset() }), ("COPY", { [weak self] in self?.copy() }),
-            (paletteShown ? "HIDE TILES" : "TILES", { [weak self] in self?.togglePalette() }), ("CLOSE", { [weak self] in self?.onClose() }),
-        ]
-        for (row, items) in [actionRow, toolRow].enumerated() {
-            var x = left
-            for (title, action) in items {
-                let label = SKLabelNode(text: title)
-                label.fontName = "Menlo-Bold"
-                label.fontSize = 9
-                label.fontColor = .white
-                label.verticalAlignmentMode = .center
-                label.horizontalAlignmentMode = .left
-                let width = label.frame.width + 10
-                let rect = CGRect(x: x, y: y + CGFloat(row) * rowHeight, width: width, height: rowHeight - 4)
-                let box = SKShapeNode(rect: rect, cornerRadius: 3)
-                box.fillColor = SKColor(white: 0.25, alpha: 1)
-                box.strokeColor = SKColor(white: 1, alpha: 0.3)
-                box.zPosition = 1
-                label.position = CGPoint(x: rect.minX + 5, y: rect.midY)
-                label.zPosition = 2
-                panel.addChild(box)
-                panel.addChild(label)
-                buttons.append((rect, action))
-                x += width + 4
-            }
         }
         showSelection()
     }
 
     private func togglePalette() {
         paletteShown.toggle()
+        buildPanel()
+    }
+
+    /// Into walls mode, the tool a wall kind (or back to a tile brush), the overlay shown or hidden.
+    private func toggleWallsMode() {
+        wallsMode.toggle()
+        if wallsMode {
+            tool = .wall(.solid)
+        } else if case .wall = tool {
+            tool = .brush(ElementsArt.filled.first { $0 == ElementsMap.Cell(3, 3) } ?? ElementsArt.filled[0])
+        }
+        wallLayer.isHidden = !wallsMode
         buildPanel()
     }
 
@@ -269,7 +313,7 @@ final class MapEditor: SKNode {
     }
 
     private func paletteCell(at point: CGPoint) -> ElementsMap.Cell? {
-        guard paletteShown, paletteRect.contains(point) else { return nil }
+        guard paletteShown, !wallsMode, paletteRect.contains(point) else { return nil }
         let side = 16 * paletteScale
         let cell = ElementsMap.Cell(Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
         return ElementsArt.filled.contains(cell) ? cell : nil
@@ -313,17 +357,58 @@ final class MapEditor: SKNode {
         map.tiles.removeAll { $0.cell == cell }
         map.tiles.append(.init(cell, art: art))
         dirty.insert(cell)
+        // A tile brings a block with it where there's no wall yet, decoration excepted.
+        if !ElementsMap.decoration.contains(art), map.wall(at: cell) == nil { setWall(.solid, at: cell) }
+    }
+
+    /// A tile taken off its cell takes a block with it; a slope painted there stays.
+    private func takeAwayTile(at cell: ElementsMap.Cell) {
+        map.tiles.removeAll { $0.cell == cell }
+        dirty.insert(cell)
+        if map.wall(at: cell) == .solid { setWall(nil, at: cell) }
     }
 
     private func erase(at cell: ElementsMap.Cell) {
         guard tile(at: cell) != nil else { return }
-        map.tiles.removeAll { $0.cell == cell }
-        dirty.insert(cell)
+        takeAwayTile(at: cell)
     }
 
     private func remember() {
         history.append(map)
         if history.count > 200 { history.removeFirst() }
+    }
+
+    // MARK: The walls
+
+    private func setWall(_ kind: ElementsMap.Kind?, at cell: ElementsMap.Cell) {
+        guard map.wall(at: cell) != kind else { return }
+        map.walls.removeAll { $0.cell == cell }
+        if let kind { map.walls.append(.init(cell, kind)) }
+        wallsDirty = true
+    }
+
+    /// Every wall as a transparent red square, or a triangle for a slope where its solid half lies.
+    private func showWalls() {
+        wallLayer.removeAllChildren()
+        for wall in map.walls {
+            let rect = hudRect(of: wall.cell)
+            let side = rect.width
+            let path = CGMutablePath()
+            switch wall.kind {
+            case .solid: path.addRect(CGRect(x: 0, y: 0, width: side, height: side))
+            case .lowerRight: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: side, y: side)])
+            case .lowerLeft: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: 0, y: side)])
+            case .upperRight: path.addLines(between: [CGPoint(x: 0, y: side), CGPoint(x: side, y: side), CGPoint(x: side, y: 0)])
+            case .upperLeft: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: 0, y: side), CGPoint(x: side, y: side)])
+            }
+            path.closeSubpath()
+            let node = SKShapeNode(path: path)
+            node.position = rect.origin
+            node.fillColor = SKColor(red: 1, green: 0.1, blue: 0.1, alpha: 0.38)
+            node.strokeColor = SKColor(red: 1, green: 0.2, blue: 0.2, alpha: 0.85)
+            node.lineWidth = 0.75
+            wallLayer.addChild(node)
+        }
     }
 
     /// The map kept and given to the game, which is told which tiles changed.
@@ -338,6 +423,11 @@ final class MapEditor: SKNode {
         if tornadosDirty {
             tornadosDirty = false
             onTornados()
+        }
+        if wallsDirty {
+            wallsDirty = false
+            showWalls()
+            onWalls()
         }
         showMarkers()
     }
@@ -356,6 +446,7 @@ final class MapEditor: SKNode {
         let changed = Set(map.tiles.map(\.cell)).symmetricDifference(Set(next.tiles.map(\.cell)))
             .union(Set(map.tiles).symmetricDifference(Set(next.tiles)).map(\.cell))
         tornadosDirty = tornadosDirty || next.tornados != map.tornados
+        wallsDirty = wallsDirty || next.walls != map.walls
         map = next
         dirty.formUnion(changed)
         commit()
@@ -416,6 +507,16 @@ final class MapEditor: SKNode {
         }
         guard !over(point), let cell = cell(at: point) else { return }
         lastCell = cell
+        if wallsMode {
+            // Walls mode: lay the chosen kind, or open a cell that already has it; a stroke goes on doing the same.
+            guard case .wall(let kind) = tool else { return }
+            remember()
+            strokeKind = map.wall(at: cell) == kind ? nil : kind
+            painting = true
+            setWall(strokeKind, at: cell)
+            commit()
+            return
+        }
         if let marker = marker(at: cell) {
             remember()
             carried = .marker(marker, from: cell)
@@ -458,8 +559,7 @@ final class MapEditor: SKNode {
             if let placed = tile(at: cell) {
                 // Picked up to be moved.
                 remember()
-                map.tiles.removeAll { $0.cell == cell }
-                dirty.insert(cell)
+                takeAwayTile(at: cell)
                 commit()
                 carried = .tile(art: placed.art, taken: true)
                 showGhost(at: point)
@@ -469,6 +569,9 @@ final class MapEditor: SKNode {
                 place(art, at: cell)
                 commit()
             }
+        case .wall:
+            // Only in walls mode, handled above.
+            break
         }
     }
 
@@ -494,6 +597,7 @@ final class MapEditor: SKNode {
                 tornadosDirty = true
             }
         case .brush(let art): place(art, at: under)
+        case .wall: setWall(strokeKind, at: under)
         case .marker, .tornado: break
         }
         commit()

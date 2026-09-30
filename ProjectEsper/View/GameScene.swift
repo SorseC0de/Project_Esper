@@ -1214,22 +1214,18 @@ final class GameScene: SKScene {
     /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
     private func layout(displayScale screenScale: CGFloat) {
         let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
-        let scrolls = match.stage.features.look == .footballField
-        // The field scrolls sideways, so only its height is fitted; a scenic stage counts the
+        let scrolls = [StageLook.footballField, .elements].contains(match.stage.features.look)
+        // The field and the Elements scroll sideways, so only its height is fitted; a scenic stage counts the
         // ground below the floor in, so the players stand in the middle of it.
         let below = match.stage.features.scenic ? FieldArt.viewBelowFloor : 0
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
         let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
-        // The Elements is zoomed to fill the screen, not by whole pixels: as big as the whole
-        // stage fits, on the bottom edge, the lava the last row of the screen.
-        let fills = match.stage.features.look == .elements
-        let pointsPerGamePixel = fills ? min(size.width / stageWidth, size.height / stageHeight) : screenPixelsPerGamePixel / screenScale
+        let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale
-        cameraNode.position = CGPoint(x: scrolls ? cameraBase.x : stageWidth / 2,
-                                      y: fills ? size.height * cameraNode.yScale / 2 : stageHeight / 2 - below)
+        cameraNode.position = CGPoint(x: scrolls ? cameraBase.x : stageWidth / 2, y: stageHeight / 2 - below)
         if scrolls, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
         cameraBase = cameraNode.position
         // The HUD is laid out in the phone's points and scaled up for a bigger screen.
@@ -3147,7 +3143,7 @@ final class GameScene: SKScene {
         return texture
     }
 
-    /// The field's camera, paged as Mega Man's and Nidhogg's: it holds still until the local
+    /// The field's and the Elements' camera, paged as Mega Man's and Nidhogg's: it holds still until the local
     /// player's feet come within the lead-in of either edge of the screen, then moves on a
     /// screen less a lead-in each side and a tile, so the feet land a tile inside the lead-in
     /// on the far side and it never flips back; held inside the field's ends.
@@ -4544,7 +4540,7 @@ final class GameScene: SKScene {
         ballHalo.color = colour
         spinBall(ball)
         // The field's camera: level, sliding from zone to zone.
-        if match.stage.features.look == .footballField { slideCamera(to: cameraTargetX()) }
+        if [StageLook.footballField, .elements].contains(match.stage.features.look) { slideCamera(to: cameraTargetX()) }
         placeBallCamFrame()
         circlesOverCam.isHidden = !ballCamEnabled
         // 47's lines breathe, slowly, between gone and a quarter.

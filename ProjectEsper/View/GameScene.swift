@@ -233,6 +233,17 @@ final class GameScene: SKScene {
     private var shotWebs: [SKShapeNode] = []
     /// Each player's made platform.
     private var ballNode = SKSpriteNode()
+    /// The basketball's art: three 8x8 frames, painted as they are; the team's colour is the halo round it.
+    private static let basketballSize = CGSize(width: 8, height: 8)
+    /// Seconds a dribbling ball holds each of its frames.
+    private static let dribbleFrameSeconds = 0.2
+    /// Turns a second a shot or a throw leaves the hand spinning, backwards, and the most the ball ever turns.
+    private static let backspinTurnsPerSecond = 1.5
+    private static let mostSpinTurnsPerSecond = 4.0
+    /// The loose ball's spin: its angle and rate (counter-clockwise up, radians), the frame it turns on,
+    /// and what it was doing last update, to tell a launch and a bounce from a fall.
+    private var ballSpin = (angle: CGFloat(0), rate: CGFloat(0), frame: 0)
+    private var ballSeen: (velocity: Vec2, y: Double, held: Bool, time: Double)?
     private var ballHalo = SKSpriteNode()
     private var ballTrail = SKEmitterNode()
     /// The ball's colour: a team's for a while after it's let go, then back to neutral.
@@ -334,6 +345,13 @@ final class GameScene: SKScene {
         // The hoops: their backboards read too hot with the glow on them.
         var flat = (backboardNodes + rimNodes).filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
+        }
+        // The ball, in hand or loose: drawn as painted, its halo the glow.
+        for node in handBalls + [ballNode] where !node.isHidden {
+            if let texture = node.texture {
+                flat.append(BodySnapshot(texture: texture, position: node.position,
+                                         anchor: node.anchorPoint, xScale: 1, size: node.size, zRotation: node.zRotation))
+            }
         }
         // The snipe's cursors, drawn as they are.
         for cursor in snipeCursors where !cursor.isHidden {
@@ -680,9 +698,8 @@ final class GameScene: SKScene {
             capes.append(segments)
             capeTrails.append([])
             let colour = SKColor(rgb: sprites.look(for: player.index).glow)
-            let handBall = SKSpriteNode(texture: sprites.texture("ball", 0))
-            handBall.color = colour
-            handBall.colorBlendFactor = 1
+            let handBall = SKSpriteNode(texture: sprites.basketballFrames[0])
+            handBall.size = GameScene.basketballSize
             handBall.zPosition = 0.03
             figure.addChild(handBall)
             handBalls.append(handBall)
@@ -715,8 +732,8 @@ final class GameScene: SKScene {
         }
         // The wings are parked: `Wing.swift` stays, nothing is added to the scene.
 
-        ballNode = SKSpriteNode(texture: sprites.texture("ball", 0))
-        ballNode.colorBlendFactor = 1
+        ballNode = SKSpriteNode(texture: sprites.basketballFrames[0])
+        ballNode.size = GameScene.basketballSize
         ballNode.zPosition = 6
         glowers.addChild(ballNode)
         ballHalo = makeHalo(ballTeam)
@@ -1066,6 +1083,33 @@ final class GameScene: SKScene {
     }
 
     /// A soft glow in the colour, added, which the glow pass then picks up.
+    /// The loose ball's turning, from what it does: backspin off a shot or a throw, kept through the
+    /// air, a bounce trading half of it for the roll the floor gives, and a ball rolling turning with its path.
+    private func spinBall(_ ball: Ball) {
+        let now = CACurrentMediaTime()
+        defer { ballSeen = (ball.velocity, ball.position.y, ball.holder != nil, now) }
+        guard ball.holder == nil else { ballSpin.rate = 0; ballSpin.angle = 0; return }
+        let turnsToRadians = 2 * CGFloat.pi
+        let mostSpin = GameScene.mostSpinTurnsPerSecond * turnsToRadians
+        // Radians a second the ball would turn rolling at this speed, clockwise going right.
+        let rolling = { (velocity: Vec2) in CGFloat(-velocity.x * 60 / BallRules.radius) }
+        if let seen = ballSeen {
+            let dt = CGFloat(min(max(now - seen.time, 0), 0.05))
+            if seen.held, ball.velocity.length > 1 {
+                ballSpin.frame = Int.random(in: 0..<SpriteLibrary.basketballFrameCount)
+                ballSpin.rate = CGFloat(ball.velocity.x < 0 ? -1 : 1) * GameScene.backspinTurnsPerSecond * turnsToRadians
+            } else if abs(ball.velocity.x - seen.velocity.x) > 0.25 || ball.velocity.y - seen.velocity.y > 0.5 {
+                ballSpin.rate = ballSpin.rate * 0.5 + rolling(ball.velocity) * 0.5
+            } else if abs(ball.position.y - seen.y) < 0.01, abs(ball.velocity.y) < 0.2 {
+                ballSpin.rate = rolling(ball.velocity)
+            }
+            ballSpin.rate = min(max(ballSpin.rate, -mostSpin), mostSpin)
+            ballSpin.angle += ballSpin.rate * dt
+        }
+        ballNode.texture = sprites.basketballFrames[ballSpin.frame]
+        ballNode.zRotation = ballSpin.angle
+    }
+
     private func makeHalo(_ colour: SKColor) -> SKSpriteNode {
         let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
         halo.size = CGSize(width: 18, height: 18)
@@ -4285,7 +4329,6 @@ final class GameScene: SKScene {
             // A fireball in hand rides where the ball would, in fire.
             // In the zone the ball in hand runs the zone's colours.
             let teamColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).glow)
-            handBall.color = player.hasFireball ? GameScene.fireballColour : teamColour
             halo.color = player.hasFireball ? GameScene.fireballColour : teamColour
             if player.holding, let landmark = sprites.landmark(.ball, in: frame, player: index) {
                 let inHand = landmark * drawScale
@@ -4299,6 +4342,7 @@ final class GameScene: SKScene {
                 halo.position = at
                 handBall.isHidden = false
                 handBall.position = at
+                handBall.texture = sprites.basketballFrames[dribbling ? Int(CACurrentMediaTime() / GameScene.dribbleFrameSeconds) % SpriteLibrary.basketballFrameCount : 0]
             } else {
                 halo.isHidden = true
                 handBall.isHidden = true
@@ -4494,8 +4538,8 @@ final class GameScene: SKScene {
         ballNode.position = SpriteLibrary.point(ball.position)
         // Frozen it goes ice; burning it goes fire.
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
-        ballNode.color = colour
         ballHalo.color = colour
+        spinBall(ball)
         // The field's camera: level, sliding from zone to zone.
         if match.stage.features.look == .footballField { slideCamera(to: cameraTargetX()) }
         placeBallCamFrame()
@@ -4606,7 +4650,8 @@ final class GameScene: SKScene {
             // and the net each at their tuned offset from the rim.
             if index < match.stage.hoops.count {
                 // The rim's spring: toward its rest, or held down while someone dunks on it.
-                let dunkedOn = match.players.contains { $0.state == .dunking && $0.dunkHoop == index }
+                // The rim gives only for the dunk's last two frames.
+                let dunkedOn = match.players.contains { $0.state == .dunking && $0.dunkHoop == index && Animation.dunkEntry(at: $0.stateTimer).index >= Animation.dunkSequence.count - 2 }
                 rimSpin[index] += ((dunkedOn ? RimLook.dunkDip : 0) - rimDip[index]) * RimLook.stiffness - rimSpin[index] * RimLook.damping
                 rimDip[index] += rimSpin[index]
                 let artPoint = GameScene.hoopArtPoint(for: match.stage.hoops[index], on: match.stage.features.look)
@@ -4622,7 +4667,8 @@ final class GameScene: SKScene {
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
                                      bodies: match.players.map { SpriteLibrary.point($0.chest) })
                     // Someone hanging on this rim: its net flares out at the bottom, easing in and back.
-                    let dunkedOn = match.players.contains { $0.state == .dunking && $0.dunkHoop == index }
+                    // The rim gives only for the dunk's last two frames.
+                let dunkedOn = match.players.contains { $0.state == .dunking && $0.dunkHoop == index && Animation.dunkEntry(at: $0.stateTimer).index >= Animation.dunkSequence.count - 2 }
                     let step = 1 / CGFloat(NetTuning.dunkFlareFrames)
                     nets[index].dunkFlare = dunkedOn ? min(nets[index].dunkFlare + step, 1) : max(nets[index].dunkFlare - step, 0)
                 }

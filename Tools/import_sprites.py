@@ -34,6 +34,7 @@ STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elemen
 # A list of places a picture may have been saved: the newest is taken.
 ROOT_IMAGES = {
     "ElementsTileset": ["Stages/Elements/tileset_elements.png", "Stages/tileset_elements.png"],
+    "Basketball": ["basketball.png"],
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")

@@ -106,6 +106,8 @@ public struct Player: Equatable {
     public var stepbackUsed = false
     /// Down pressed in this stance: the stepback, once the stance is held.
     public var stepbackAsked = false
+    /// The stick is still down from the stepback: it aims nothing until it's let go and pressed again.
+    public var stepbackAimLocked = false
     /// The run's speed as it last stood, for the pivot jump to carry.
     public var runMomentum = 0.0
     /// Frames spent in the state so far; 0 on the frame it was entered.
@@ -376,6 +378,7 @@ public struct Player: Equatable {
         if next == .shootStance || next == .throwStance, previousState != .stepback {
             stepbackUsed = false
             stepbackAsked = false
+            stepbackAimLocked = false
         }
         // Onto the rim the body goes upright and the board drops away.
         if next == .dunking {
@@ -830,7 +833,8 @@ public struct Player: Equatable {
                 break
             }
             stanceMovement(input, airBrake: spec.stanceAirBrake)
-            if input.aim.length >= BallRules.flickThreshold {
+            if downHeldFrames == 0 { stepbackAimLocked = false }
+            if input.aim.length >= BallRules.flickThreshold, !stepbackAimLocked {
                 shotAim = input.aim
                 if shotAim.x != 0 { facing = shotAim.x > 0 ? .right : .left }
             } else if let direction = stickFacing(input) {
@@ -918,7 +922,8 @@ public struct Player: Equatable {
             }
             stanceMovement(input, airBrake: spec.throwStanceAirBrake)
             let aim = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
-            if aim.length >= 0.5 {
+            if downHeldFrames == 0 { stepbackAimLocked = false }
+            if aim.length >= 0.5, !stepbackAimLocked {
                 throwDirection = abs(aim.x) >= abs(aim.y) ? Vec2(x: aim.x > 0 ? 1 : -1, y: 0) : Vec2(x: 0, y: aim.y > 0 ? 1 : -1)
                 if throwDirection.x != 0 { facing = throwDirection.x > 0 ? .right : .left }
             }
@@ -1582,6 +1587,9 @@ public struct Player: Equatable {
     private mutating func startStepback(from stance: PlayerState, events: inout [MatchEvent]) {
         stepbackUsed = true
         stepbackAsked = false
+        stepbackAimLocked = true
+        shotAim = .zero
+        throwDirection = .zero
         stepbackFrom = stance
         enter(.stepback)
         velocity = Vec2(x: -facing.sign * StepbackRules.distance / Double(StepbackRules.frames), y: 0)

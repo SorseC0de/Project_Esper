@@ -452,6 +452,11 @@ public struct Stage: Equatable {
         return nearest
     }
 
+    /// Whether a floor or ceiling slope fills this grid cell.
+    private func isSlopeCell(column: Int, row: Int) -> Bool {
+        (fixedSlopes + ceilingSlopes).contains { self.column(at: $0.box.center.x) == column && self.row(at: $0.box.center.y) == row }
+    }
+
     /// The side with a wall pressed against the box, if either. Only within the court's
     /// rows: the walls up in the sky can't be clung to or jumped off.
     /// `riding`: the board's question, which passes over the unridable extras.
@@ -460,8 +465,9 @@ public struct Stage: Equatable {
         let rightColumn = column(at: box.max.x + Stage.edge)
         let leftColumn = column(at: box.min.x - Stage.edge)
         for row in rows where row < self.rows && (riding || features.tileWallsHold) {
-            if tile(column: rightColumn, row: row) == .solid { return .right }
-            if tile(column: leftColumn, row: row) == .solid { return .left }
+            // A block whose face abuts a slope is the slope's own fill, never a wall.
+            if tile(column: rightColumn, row: row) == .solid, !isSlopeCell(column: rightColumn - 1, row: row) { return .right }
+            if tile(column: leftColumn, row: row) == .solid, !isSlopeCell(column: leftColumn + 1, row: row) { return .left }
         }
         for extra in extras where spansY(extra, box) && !(riding && unridable.contains(extra)) {
             if abs(extra.min.x - box.max.x) < 0.01 { return .right }

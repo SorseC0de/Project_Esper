@@ -358,6 +358,20 @@ final class BallTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .stepback)
     }
 
+    func testTheStickHeldDownThroughAStepbackAimsNothingUntilItsPressedAgain() {
+        var match = matchWithBallHeld()
+        match.players[0].facing = .right
+        let hold = PlayerInput(throwBall: true)
+        let down = PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true)
+        for _ in 0..<BallRules.throwWindupFrames + 1 { match.advance(inputs: [hold, .idle]) }
+        for _ in 0..<StepbackRules.frames + 6 { match.advance(inputs: [down, .idle]) }
+        XCTAssertEqual(match.players[0].state, .throwStance)
+        XCTAssertEqual(match.players[0].throwDirection, .zero, "still down from the stepback")
+        match.advance(inputs: [hold, .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].throwDirection, Vec2(x: 1, y: 0), "a fresh press aims")
+    }
+
     func testDownBeforeTheShotsHoldStepsBackOnceItsHeld() {
         // Down never cancels a stance: pressed early, the stepback waits for the hold.
         var match = matchWithBallHeld()

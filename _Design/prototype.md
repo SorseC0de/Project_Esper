@@ -130,7 +130,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   three, as Zeus Juice's bolt does, with the jump's sound; the whole way
   a counter, as the throw stance's parry frames are (out of a shot the air-with-ball sheet's last
   frame shows, out of a throw the throw sheet's third), and its ball can't be snatched, by Frost Tea's
-  either. Then back in the stance at its hold, aim and buttons kept. Down never cancels a stance: the
+  either. Then back in the stance at its hold, buttons kept, the aim cleared: the stick still down from the stepback aims nothing until it's let go and pressed again, so a quick shot or throw out of it goes off the preset, not down (`stepbackAimLocked`, protocol 33). Down never cancels a stance: the
   shot and the throw cancel each other (protocol 24); off an edge, it's the air, the stance gone.
 - The rim's top is a thin platform that can't be stood on (`RimRules`): a body coming down on it
   from above is sent back up at 3.5 a frame, and a ball that isn't scoring bounces off it; nothing
@@ -742,8 +742,8 @@ the snatch's and the catch's, is toned in the player's colour on the paler ramp,
 way to white at its lightest (`Look.energyTone`). A held throw shows the
 charge, the swirl round the ball in hand at 30 a second and half its sheet's size: up to frame 67, then frames 35 to 67 round again for as long as the throw is held,
 and when the throw is let go the frames after 67 play out where the ball was. Each player has a look with a team colour: orange for player 1, teal for player 2. The head
-and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo on
-the ball and the fire off the head. The body a light orange or a light teal toward the team colour, the back limbs a greyed,
+and the ball in hand are drawn in it, the ball's outline is in it, and so are the halo round
+the ball (the ball itself is `Basketball`, three 8x8 frames painted as they are: cycling every 0.2 s in a dribbling hand, and loose it spins in the view only: backspin off a shot or a throw at 1.5 turns a second, kept through the air, half traded for the roll at a bounce, turning with its path when rolling, at most 4 turns a second) and the fire off the head. The body a light orange or a light teal toward the team colour, the back limbs a greyed,
 darker version of it, a black line one pixel thick round the body following the outside
 edge only, and the front arm stroked on its own where it lies over the body. The head is
 split out of every frame and drawn as its own sprite with no line, trailing its place on
@@ -800,7 +800,7 @@ centre.
   (solid, a slope rising to the right, one falling to the right, open), RESET goes back to the
   measured outline, COPY puts the table on the clipboard as Swift for `Vehicle.set`.
   Edits are kept between launches and stand in live until they're pasted in.
-  The slopes (`Stage.slopes`, `SlopeRules`) are 45°, solid under the diagonal and along
+  The slopes (`Stage.slopes`, `SlopeRules`) are 45° and can't be clung to or jumped off: a block whose face abuts a slope is its fill, never a wall (`Stage.wall(beside:)`), solid under the diagonal and along
   their two straight sides: the body rides one up and down at the flat pace along the
   surface (the step is scaled by `SlopeRules.diagonal`, so no speed-up), its lead edge's
   ground read ahead so it climbs either way and onto the block a slope ends in, the

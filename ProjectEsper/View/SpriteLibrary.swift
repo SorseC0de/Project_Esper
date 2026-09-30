@@ -103,6 +103,19 @@ final class SpriteLibrary {
         return texture
     }
 
+    /// The ball's three frames, cut from the 24x8 picture in the catalog's root.
+    static let basketballFrameCount = 3
+    private(set) lazy var basketballFrames: [SKTexture] = {
+        let sheet = SKTexture(imageNamed: "Basketball")
+        sheet.filteringMode = .nearest
+        let share = 1 / CGFloat(SpriteLibrary.basketballFrameCount)
+        return (0..<SpriteLibrary.basketballFrameCount).map { index in
+            let frame = SKTexture(rect: CGRect(x: CGFloat(index) * share, y: 0, width: share, height: 1), in: sheet)
+            frame.filteringMode = .nearest
+            return frame
+        }
+    }()
+
     /// A player frame in that player's look, without its head or its energy.
     /// With `ballAsEnergy`, a sheet that draws the ball has its whites taken as energy,
     /// ball and all, for a throw made with nothing in hand.

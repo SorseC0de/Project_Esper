@@ -7,7 +7,7 @@ final class SlopeTests: XCTestCase {
     /// A hill of six slope cells over solid fill, on a floor, with a plateau on top: rising to the
     /// right, its plateau at y 110 from x 260 to 330, or to the left, from x 280 to 350.
     private func hill(rising right: Bool) -> Match {
-        var walls: [ElementsMap.Wall] = (0..<60).map { .init(.init($0, 4), .solid) }
+        var walls: [ElementsMap.Wall] = (0..<67).map { .init(.init($0, 4), .solid) }
         for i in 0..<6 {
             let column = right ? 20 + i : 40 - i
             walls.append(.init(.init(column, 5 + i), right ? .lowerRight : .lowerLeft))
@@ -105,5 +105,35 @@ final class SlopeTests: XCTestCase {
         let player = match.players[0]
         XCTAssertTrue(player.grounded)
         XCTAssertEqual(player.position.y, surface(player.position.x) ?? -1, accuracy: 0.001, "standing on the surface")
+    }
+
+    func testASlopesFillIsNeverAWallToCling() {
+        for right in [true, false] {
+            var match = hill(rising: right)
+            match.players[0].position = Vec2(x: right ? 150 : 460, y: 50)
+            match.players[0].facing = right ? .right : .left
+            var clung = 0
+            walk(&match, stick: Vec2(x: right ? 1 : -1, y: 0), frames: 65) { if $0.wallSide != nil { clung += 1 } }
+            XCTAssertEqual(clung, 0, "no wall beside a slope going \(right ? "right" : "left")")
+        }
+    }
+
+    func testABallDroppedOnAHillRollsDownItAndNeverSinksIn() {
+        for right in [true, false] {
+            var match = hill(rising: right)
+            match.players[0].position = Vec2(x: 30, y: 50)
+            match.players[1].position = Vec2(x: 30, y: 150)
+            let x = right ? 215.0 : 385.0
+            match.ball.respawn(at: Vec2(x: x, y: 180))
+            var deepest = 0.0
+            for _ in 0..<400 {
+                match.advance(inputs: [.idle, .idle])
+                let surface = match.stage.slopeHeight(atX: match.ball.position.x, near: match.ball.position.y, reach: 40)
+                if let surface { deepest = max(deepest, surface - (match.ball.position.y - BallRules.radius)) }
+            }
+            XCTAssertLessThan(deepest, 1, "never inside the slope")
+            let rolled = match.ball.position.x - x
+            XCTAssertLessThan(rolled * (right ? 1 : -1), -5, "rolled down toward the low side")
+        }
     }
 }

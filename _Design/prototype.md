@@ -86,6 +86,12 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   stick still held forward (as out of a dash; Frost Tea's ice slide too), or stands up into
   the run's skid to stop. A slide can catch a loose ball on the way, which is what it's
   for. Numbers on the body (`slideFrames`, `slideFriction`) and in `SlideRules`.
+  A slide on a slope going down the way the body faces is forced (`Player.forcedSlide`, protocol
+  30): the body speeds up to the burst (`SlopeRules.slideGain`) and rides the surface with no
+  friction and no timer, and nothing gets out of it but a jump, which cancels it: no stick,
+  shoot, throw, slash or snatch, Frost Tea's cancels included. It ends on flat ground, when the
+  slide's own timer then finishes it, or in open air, off the slope's end. Up a slope it's the
+  ordinary slide.
 - Jump: tap. Held through the jumpsquat is a full hop, let go is a short hop. Shoot or
   throw pressed with the jump or during the squat is Smash's rising aerial: out of the
   squat straight into the slash or the snatch on the jump's first frame, still rising. In the air
@@ -947,6 +953,13 @@ to 38, centred on the middle column, 33, where the ball starts.
 None of the stage's art glows but the lava: the tiles, the mountains and the icicles are drawn once
 into the glow's mask in green under the bodies (`MaskScene.syncStatic`), redone only when the map
 changes; the flat background colour still lifts a little, and the tornados glow.
+
+The map's walls (`ElementsMap.walls`) are kept apart from the art: by default a block under
+every solid tile, or as painted in the map maker's walls mode, each cell a block or a slope by
+where its solid half lies, the lower right or left (a floor slope, `Stage.fixedSlopes`) or the
+upper right or left (a ceiling slope, `Stage.ceilingSlopes`: solid above a diagonal, its flat top
+a floor, its underside stopping a head where it comes down, its straight side a wall). A ball
+takes a ceiling slope as its whole square.
 
 The lava: whoever's feet go under its surface (`ElementsRules.lavaSurface`, 25 units) is put
 back where they started, any ball they held back at the ball's start, and a loose ball in it

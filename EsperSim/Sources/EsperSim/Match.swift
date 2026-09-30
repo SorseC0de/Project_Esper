@@ -136,7 +136,7 @@ public struct Match: Equatable {
         } else if ball.isLive, ball.tether == nil {
             // The ball sees the stage's ball-only solids as well.
             var ballStage = stage
-            ballStage.extras += stage.ballBlockers
+            ballStage.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
             if let hoop = ball.step(stage: ballStage, events: &events) {
                 let owner = stage.hoops[hoop].owner
                 if mode == .fortySeven {

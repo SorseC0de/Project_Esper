@@ -78,6 +78,23 @@ public struct Slope: Equatable {
         let highest = rising ? min(other.max.x, box.max.x) : max(other.min.x, box.min.x)
         return other.min.y < surface(at: highest) - Stage.edge
     }
+
+    // A ceiling slope (one in `Stage.ceilingSlopes`) is the square's upper half, solid above
+    // a diagonal, flat across the top: rising, its underside rises to the right and the solid
+    // is upper left; falling, the solid is upper right.
+
+    /// The underside's height at `x`, clamped into the square.
+    public func underside(at x: Double) -> Double {
+        let across = min(max(x - box.min.x, 0), box.width)
+        return box.min.y + (rising ? across : box.width - across)
+    }
+
+    /// Whether a box reaches up into the solid over the underside.
+    public func ceilingOverlaps(_ other: Box) -> Bool {
+        guard box.overlaps(other) else { return false }
+        let lowest = rising ? max(other.min.x, box.min.x) : min(other.max.x, box.max.x)
+        return other.max.y > underside(at: lowest) + Stage.edge
+    }
 }
 
 /// The court: a grid of tiles, row 0 at the bottom, plus the rims and where everyone starts.
@@ -102,8 +119,11 @@ public struct Stage: Equatable {
     public var features = StageFeatures()
     /// Boxes solid to the ball alone, such as the field's backboards.
     public var ballBlockers: [Box] = []
-    /// Slopes that come and go with what's standing, such as a car's.
+    /// Slopes that come and go with what's standing, such as a car's, plus `fixedSlopes`.
     public var slopes: [Slope] = []
+    /// Floor slopes that are part of the stage, and the ceiling slopes, which are all fixed.
+    public var fixedSlopes: [Slope] = []
+    public var ceilingSlopes: [Slope] = []
 
     public var width: Double { Double(columns) * Stage.tileSize }
     public var height: Double { Double(rows) * Stage.tileSize }
@@ -164,7 +184,17 @@ public struct Stage: Equatable {
                 return true
             }
         }
-        return extras.contains { $0.overlaps(box) } || slopes.contains { $0.overlaps(box) }
+        return extras.contains { $0.overlaps(box) } || slopes.contains { $0.overlaps(box) } || ceilingSlopes.contains { $0.ceilingOverlaps(box) }
+    }
+
+    /// Whether the floor slope under the box's middle, close under the feet, goes down the way
+    /// `facing` looks: a falling one to the right, a rising one to the left.
+    public func slopeDescends(under box: Box, facing: Facing, reach: Double) -> Bool {
+        let middle = (box.min.x + box.max.x) / 2
+        for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x && abs(slope.surface(at: middle) - box.min.y) <= reach {
+            return slope.rising == (facing == .left)
+        }
+        return false
     }
 
     /// The slope under the box's middle whose surface is within `reach` of its feet, and
@@ -223,6 +253,25 @@ public struct Stage: Equatable {
                 blocked = direction
             }
         }
+        // A ceiling slope: its straight side is a wall, and toward its diagonal the head
+        // stops where the underside comes down to it.
+        for slope in ceilingSlopes where spansY(slope.box, box) {
+            var wall: Double?
+            if direction == .right {
+                wall = slope.rising ? slope.box.min.x : slope.box.max.x - (box.max.y - slope.box.min.y)
+            } else {
+                wall = slope.rising ? slope.box.min.x + (box.max.y - slope.box.min.y) : slope.box.max.x
+            }
+            guard var edge = wall else { continue }
+            edge = min(max(edge, slope.box.min.x), slope.box.max.x)
+            if direction == .right, edge >= leading - Stage.edge, edge - leading < moved {
+                moved = max(edge - leading, 0)
+                blocked = direction
+            } else if direction == .left, edge <= leading + Stage.edge, edge - leading > moved {
+                moved = min(edge - leading, 0)
+                blocked = direction
+            }
+        }
         for extra in extras where spansY(extra, box) {
             if direction == .right, extra.min.x >= leading - Stage.edge, extra.min.x - leading < moved {
                 moved = max(extra.min.x - leading, 0)
@@ -268,6 +317,11 @@ public struct Stage: Equatable {
                 moved = min(extra.max.y - feet, 0)
                 landed = true
             }
+            // A ceiling slope's flat top.
+            for slope in ceilingSlopes where spansX(slope.box, box) && slope.box.max.y <= feet + Stage.edge && slope.box.max.y - feet > moved {
+                moved = min(slope.box.max.y - feet, 0)
+                landed = true
+            }
             // Down onto a slope's surface under the middle, crossing it this frame.
             let middle = (box.min.x + box.max.x) / 2
             for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x {
@@ -297,6 +351,15 @@ public struct Stage: Equatable {
                 moved = max(extra.min.y - head, 0)
                 ceiling = true
             }
+            // Up into a ceiling slope's underside, at the lowest point the body is under.
+            for slope in ceilingSlopes where spansX(slope.box, box) && slope.box.max.y > head {
+                let lowest = slope.rising ? max(box.min.x, slope.box.min.x) : min(box.max.x, slope.box.max.x)
+                let under = slope.underside(at: lowest)
+                if under >= head - Stage.edge, under - head < moved {
+                    moved = max(under - head, 0)
+                    ceiling = true
+                }
+            }
             return (moved, false, ceiling)
         }
     }
@@ -317,6 +380,7 @@ public struct Stage: Equatable {
             }
         }
         if let surface = slopeSurface(under: box, reach: 0.01), abs(surface - feet) < 0.01 { return true }
+        if ceilingSlopes.contains(where: { spansX($0.box, box) && abs($0.box.max.y - feet) < 0.01 }) { return true }
         return extras.contains { spansX($0, box) && abs($0.max.y - feet) < 0.01 }
     }
 
@@ -505,7 +569,21 @@ public struct Stage: Equatable {
             playerFacings: map.spawns.map { Double($0.column) * tileSize < Double(columns) * tileSize / 2 ? .right : .left },
             ballSpawn: centre(map.ball)
         )
-        for tile in map.tiles where map.isSolid(tile) { stage.set(.solid, column: tile.cell.column, row: tile.cell.row) }
+        // The walls, apart from the art: blocks in the grid, slopes each in their own square.
+        for wall in map.walls {
+            let cell = wall.cell
+            guard (0..<columns).contains(cell.column), (0..<rows).contains(cell.row) else { continue }
+            let square = Box(min: Vec2(x: Double(cell.column) * tileSize, y: Double(cell.row) * tileSize),
+                             max: Vec2(x: Double(cell.column + 1) * tileSize, y: Double(cell.row + 1) * tileSize))
+            switch wall.kind {
+            case .solid: stage.set(.solid, column: cell.column, row: cell.row)
+            case .lowerRight: stage.fixedSlopes.append(Slope(box: square, rising: true))
+            case .lowerLeft: stage.fixedSlopes.append(Slope(box: square, rising: false))
+            case .upperLeft: stage.ceilingSlopes.append(Slope(box: square, rising: true))
+            case .upperRight: stage.ceilingSlopes.append(Slope(box: square, rising: false))
+            }
+        }
+        stage.slopes = stage.fixedSlopes
         stage.features = StageFeatures(look: .elements)
         stage.features.lavaSurface = ElementsRules.lavaSurface
         return stage

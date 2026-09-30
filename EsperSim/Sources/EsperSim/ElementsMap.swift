@@ -8,6 +8,20 @@ public struct ElementsMap: Equatable, Codable {
         public init(_ column: Int, _ row: Int) { self.column = column; self.row = row }
     }
 
+    /// What a wall cell is: a block, or a slope by where its solid half lies: the lower right
+    /// (the surface rises to the right), the lower left (falls to the right), and the same
+    /// two up under a ceiling.
+    public enum Kind: String, Codable, CaseIterable {
+        case solid, lowerRight, lowerLeft, upperRight, upperLeft
+    }
+
+    /// One cell of the walls: what bodies and the ball can't pass, kept apart from the art.
+    public struct Wall: Equatable, Hashable, Codable {
+        public var cell: Cell
+        public var kind: Kind
+        public init(_ cell: Cell, _ kind: Kind) { self.cell = cell; self.kind = kind }
+    }
+
     /// A tile placed on the stage's grid, drawn as the tileset's cell `art`.
     public struct Placed: Equatable, Hashable, Codable {
         public var cell: Cell
@@ -25,17 +39,25 @@ public struct ElementsMap: Equatable, Codable {
     /// The tornados, each a whole 48 by 48 sprite three tiles across and three high, given
     /// by the cell its base's middle is in: it fills the columns either side and the two rows above.
     public var tornados: [Cell]
+    /// The walls, painted in the map maker's walls mode; by default a block under every solid tile.
+    public var walls: [Wall]
 
-    public init(tiles: [Placed], leftRim: Cell, rightRim: Cell, spawns: [Cell], ball: Cell, tornados: [Cell] = []) {
+    public init(tiles: [Placed], leftRim: Cell, rightRim: Cell, spawns: [Cell], ball: Cell, tornados: [Cell] = [], walls: [Wall]? = nil) {
         self.tiles = tiles
         self.leftRim = leftRim
         self.rightRim = rightRim
         self.spawns = spawns
         self.ball = ball
         self.tornados = tornados
+        self.walls = walls ?? ElementsMap.derivedWalls(from: tiles)
     }
 
-    private enum CodingKeys: String, CodingKey { case tiles, leftRim, rightRim, spawns, ball, tornados }
+    /// A block under every tile that isn't decoration, for a map with no walls of its own.
+    public static func derivedWalls(from tiles: [Placed]) -> [Wall] {
+        tiles.filter { !decoration.contains($0.art) }.map { Wall($0.cell, .solid) }
+    }
+
+    private enum CodingKeys: String, CodingKey { case tiles, leftRim, rightRim, spawns, ball, tornados, walls }
 
     /// A map kept before tornados were in it reads as having none.
     public init(from decoder: Decoder) throws {
@@ -46,6 +68,7 @@ public struct ElementsMap: Equatable, Codable {
         spawns = try values.decode([Cell].self, forKey: .spawns)
         ball = try values.decode(Cell.self, forKey: .ball)
         tornados = try values.decodeIfPresent([Cell].self, forKey: .tornados) ?? []
+        walls = try values.decodeIfPresent([Wall].self, forKey: .walls) ?? ElementsMap.derivedWalls(from: tiles)
     }
 
     /// Where a tornado's sprite lies, in tile cells: its three columns and three rows.
@@ -72,6 +95,9 @@ public struct ElementsMap: Equatable, Codable {
 
     public func isSolid(_ tile: Placed) -> Bool { !ElementsMap.decoration.contains(tile.art) }
 
+    /// What the wall at a cell is, if it has one.
+    public func wall(at cell: Cell) -> Kind? { walls.first { $0.cell == cell }?.kind }
+
     /// The map as Swift, for `ElementsMap.baked` to be pasted over.
     public var swiftSource: String {
         func cell(_ value: Cell) -> String { "Cell(\(value.column), \(value.row))" }
@@ -86,9 +112,22 @@ public struct ElementsMap: Equatable, Codable {
         }
         lines.append(line)
         lines.append("        ]")
+        // Walls of their own only when they aren't the blocks under the tiles.
+        let ownWalls = walls != ElementsMap.derivedWalls(from: tiles)
+        if ownWalls {
+            lines.append("        let walls: [Wall] = [")
+            var wallLine = "           "
+            for wall in walls.sorted(by: { ($0.cell.row, $0.cell.column) < ($1.cell.row, $1.cell.column) }) {
+                let next = " Wall(\(cell(wall.cell)), .\(wall.kind.rawValue)),"
+                if wallLine.count + next.count > 118 { lines.append(wallLine); wallLine = "           " }
+                wallLine += next
+            }
+            lines.append(wallLine)
+            lines.append("        ]")
+        }
         lines.append("        return ElementsMap(tiles: tiles, leftRim: \(cell(leftRim)), rightRim: \(cell(rightRim)),")
         lines.append("                           spawns: [\(spawns.map(cell).joined(separator: ", "))], ball: \(cell(ball)),")
-        lines.append("                           tornados: [\(tornados.map(cell).joined(separator: ", "))])")
+        lines.append("                           tornados: [\(tornados.map(cell).joined(separator: ", "))]\(ownWalls ? ", walls: walls)" : ")")")
         lines.append("    }")
         return lines.joined(separator: "\n")
     }

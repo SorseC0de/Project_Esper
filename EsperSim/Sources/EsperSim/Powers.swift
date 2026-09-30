@@ -78,6 +78,8 @@ public enum SurfRules {
 /// the diagonal's normal is this share of each axis.
 public enum SlopeRules {
     public static let step = 5.5
+    /// A slide down a slope speeds up to the slide's burst by this much a frame.
+    public static let slideGain = 0.15
     public static let diagonal = 0.7071067811865476
 }
 

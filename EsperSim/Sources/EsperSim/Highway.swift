@@ -342,7 +342,7 @@ extension Match {
     /// The boxes solid to bodies: made slabs, helmets and cars.
     public mutating func refreshExtras() {
         stage.extras = platforms.map(\.box) + helmets.map(\.box) + cars.filter { $0.level == 0 }.flatMap(\.boxes)
-        stage.slopes = cars.filter { $0.level == 0 }.flatMap(\.slopes)
+        stage.slopes = stage.fixedSlopes + cars.filter { $0.level == 0 }.flatMap(\.slopes)
         stage.unridable = cars.filter { $0.level == 0 }.flatMap(\.boxes)
     }
 }

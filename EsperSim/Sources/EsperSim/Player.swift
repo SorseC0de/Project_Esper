@@ -193,6 +193,9 @@ public struct Player: Equatable {
     public var platformCooldown = 0
     /// The slide's leg and the slash's blade each hit once.
     public var slideHit = false
+    /// A slide on a slope going down the way it faces: the body rides it on its own, and only a
+    /// jump gets out, until flat ground or open air.
+    public var forcedSlide = false
     public var slashHit = false
     /// Frames of down held on the ground, and frames left falling through one-ways after a drop.
     public var dropHoldFrames = 0
@@ -368,6 +371,7 @@ public struct Player: Equatable {
         previousState = state
         state = next
         stateTimer = 0
+        if next != .slide { forcedSlide = false }
         // A fresh stance has its stepback; coming back out of one doesn't.
         if next == .shootStance || next == .throwStance, previousState != .stepback {
             stepbackUsed = false
@@ -1053,7 +1057,17 @@ public struct Player: Equatable {
             // the skid, or a crouch if down is still held. On Frost Tea it's ice: no
             // friction and no end, until jump, throw, shoot, the stick, or down let go
             // cancel it.
-            if power == .frostTea {
+            // Down a slope the slide is forced: no friction, no timer, nothing to do but a jump,
+            // until it reaches flat ground, or open air, which the fall out of a ground state ends.
+            if grounded, stage.slopeDescends(under: body, facing: facing, reach: SlopeRules.step) {
+                forcedSlide = true
+            } else if grounded {
+                forcedSlide = false
+            }
+            if forcedSlide {
+                velocity.x = approach(velocity.x, dashInitialVelocity * facing.sign, SlopeRules.slideGain)
+                if jumpPressed { enter(.jumpSquat) }
+            } else if power == .frostTea {
                 if jumpPressed {
                     enter(.jumpSquat)
                 } else if throwPressed, snatchCooldown == 0 {

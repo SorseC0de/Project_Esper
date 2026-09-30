@@ -3027,8 +3027,14 @@ final class GameScene: SKScene {
                 return nil
             }
             if particle.drifts {
-                let wind = sin(Double(match.frame) / 60 * 2 * .pi * 1.1 + Double(particle.owner) * 2) * 140
-                particle.velocity.dx += wind * step
+                // Flowing toward the ball along x, always: a steady push, easing off as the
+                // body and the ball come level, as with the ball in hand.
+                var flow = 0.0
+                if match.players.indices.contains(particle.owner) {
+                    let gap = Double(SpriteLibrary.point(match.ball.position).x - SpriteLibrary.point(match.players[particle.owner].position).x)
+                    flow = min(max(gap / Double(ParticleLook.flowEaseDistance), -1), 1) * Double(ParticleLook.flowSpeed)
+                }
+                particle.velocity.dx += flow * step
                 particle.velocity.dy += 10 * step
             }
             particle.node.position = CGPoint(x: particle.node.position.x + particle.velocity.dx * step,

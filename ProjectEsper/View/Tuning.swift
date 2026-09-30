@@ -84,6 +84,10 @@ enum ParticleLook {
     static let cubeSliders = true
     nonisolated(unsafe) static var cubeSize: Float = 3
     static let cubeRate: Float = 24
+    /// What rises off a head or a leg leans toward the ball's side: pushed this hard along x,
+    /// art pixels a second each second, easing off inside this many art pixels of level with it.
+    static let flowSpeed: CGFloat = 140
+    static let flowEaseDistance: CGFloat = 6
     /// A human's legs' own cubes, smaller: size and spread as the head's, on sliders beside
     /// them; this many a second off each leg, cubes only.
     nonisolated(unsafe) static var legCubeSize: Float = 2

@@ -750,7 +750,7 @@ yellow chevrons stack over a resting ball and light one after another from the t
 basket the holder scores on, the top one `ChevronTuning.basketLift` (30) art pixels over the rim, on
 the BASKET CHEVRON Y debug slider. A
 double jump leaves a short platform of loose digital squares under the feet where it was
-taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that one swinging wind bends as a whole, a scarf.
+taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that a steady push bends toward the ball along x, as a whole (`ParticleLook.flowSpeed`, 140, easing off within 6 pixels of level with it, as with the ball in hand); the legs' cubes go the same way.
 The ball in hand is its own sprite on the frame's ball, and when a dribble's ball hangs
 off a ledge it reaches down to the real floor under it over the same frames; only the
 dribble sheets do that, so a stance's ball never sags off the edge of a slab. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
@@ -1020,7 +1020,7 @@ score on the other side's basket. The ledge is
 magenta. Three small faint green chevrons stack over the rim
 the holder scores on. The head particles are sprites of their own, not an emitter, so each plays its sheet
 through at 24 a second over its life (`esper_particle` by default), rising on one
-swinging wind; a single-frame one (a snowflake, or the squares with
+a steady push toward the ball along x; a single-frame one (a snowflake, or the squares with
 `ParticleLook.sprites` off) steps down in size instead. The double jump throws three oval rings of
 energy under the feet (14 by 4 art pixels, a line thick), one every 0.06 seconds, each widening
 to 2.5 times as it fades over 0.3; Blazing Boba's head burns `fire_particle`, Zeus Juice's sheds its bolts and Surf Soda's its bubbles, each half and half with the regular energy as Frost Tea's snowflakes are; and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, streaming back along the ball's path and turned to it, without the head's rise and wind, Frost Tea's sheds snowflakes among the energy,

@@ -321,6 +321,14 @@ final class GameScene: SKScene {
         return bodies
     }
 
+    /// The tornados as they look this frame, green under the bodies: they animate, so they can't
+    /// live in the static layer.
+    var tornadoSnapshots: [BodySnapshot] {
+        (elementsArt?.tornados ?? []).compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
+        }
+    }
+
     /// What's drawn in the world but must not glow, for the mask to mark: the hoops and the banner.
     var flatSnapshots: [BodySnapshot] {
         // The hoops: their backboards read too hot with the glow on them.

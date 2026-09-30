@@ -18,6 +18,7 @@ final class MaskScene: SKScene {
     private let cameraNode = SKCameraNode()
     private var bodies: [SKSpriteNode] = []
     private var flats: [SKSpriteNode] = []
+    private var underFlats: [SKSpriteNode] = []
     /// The bodies drawn in plain white rather than as they are, for the cubes' occluder.
     private let whiteBodies: Bool
     /// What the stage keeps still and must not glow, drawn once under the bodies; rebuilt
@@ -68,15 +69,16 @@ final class MaskScene: SKScene {
     }
 
     /// Copies the game's bodies and camera, and the flat things in green.
-    func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat) {
+    func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], under: [BodySnapshot] = [], size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat) {
         if self.size != size { self.size = size }
         cameraNode.position = cameraPosition
         cameraNode.setScale(cameraScale)
         place(snapshots, in: &bodies, green: false)
         place(flat, in: &flats, green: true)
+        place(under, in: &underFlats, green: true, depth: -0.5)
     }
 
-    private func place(_ snapshots: [BodySnapshot], in nodes: inout [SKSpriteNode], green: Bool) {
+    private func place(_ snapshots: [BodySnapshot], in nodes: inout [SKSpriteNode], green: Bool, depth: CGFloat? = nil) {
         while nodes.count < snapshots.count {
             let node = SKSpriteNode()
             if whiteBodies {
@@ -89,6 +91,7 @@ final class MaskScene: SKScene {
                 node.colorBlendFactor = 1
                 node.zPosition = 1
             }
+            if let depth { node.zPosition = depth }
             addChild(node)
             nodes.append(node)
         }

@@ -316,7 +316,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.syncStatic(scene.staticFlats, version: scene.staticFlatsVersion)
-        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
+        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
         maskRenderer.update(atTime: now)
         let maskPass = MTLRenderPassDescriptor()
         maskPass.colorAttachments[0].texture = bodyMask

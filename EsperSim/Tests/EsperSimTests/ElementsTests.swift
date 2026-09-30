@@ -95,6 +95,24 @@ final class ElementsTests: XCTestCase {
         XCTAssertEqual(match.ball.position.x, match.stage.ballSpawn.x, accuracy: 20)
     }
 
+    func testTornadosAreKeptWholeOnTheStageAndReadFromAMapWithout() throws {
+        var map = ElementsMap.baked
+        map.tornados = [.init(30, 4), .init(50, 4)]
+        XCTAssertEqual(try JSONDecoder().decode(ElementsMap.self, from: JSONEncoder().encode(map)), map)
+        XCTAssertTrue(map.swiftSource.contains("tornados: [Cell(30, 4), Cell(50, 4)]"))
+        // A map kept before tornados were in it has none.
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(map)) as! [String: Any]
+        json["tornados"] = nil
+        let old = try JSONDecoder().decode(ElementsMap.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(old.tornados, [])
+        // Moved in until the whole sprite fits: three across, three up.
+        XCTAssertEqual(ElementsMap.fittingTornado(.init(0, 40)), .init(1, ElementsRules.rows - 3))
+        XCTAssertEqual(ElementsMap.fittingTornado(.init(ElementsRules.columns - 1, -3)), .init(ElementsRules.columns - 2, 0))
+        let span = ElementsMap.tornadoCells(.init(10, 5))
+        XCTAssertEqual(span.columns, 9...11)
+        XCTAssertEqual(span.rows, 5...7)
+    }
+
     func testTheMapRoundTripsThroughItsSource() {
         XCTAssertTrue(ElementsMap.baked.swiftSource.contains("Placed(Cell(2, 9), art: Cell(7, 3))"))
         let data = try! JSONEncoder().encode(ElementsMap.baked)

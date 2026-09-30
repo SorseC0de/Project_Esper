@@ -4,13 +4,20 @@ import SpriteKit
 /// The Elements' scenery: the mountains stretched over the stage on a flat ground, a bed of
 /// lava along the bottom, and a sprite for every tile the map has placed, cut from the tileset.
 enum ElementsArt {
-    /// The flat colour behind everything: palette 2.
-    static let background: RGB = PixelPalette.colours[2]
+    /// The flat colour behind everything: palette 29.
+    static let background: RGB = PixelPalette.colours[29]
     static let tileSide: CGFloat = 16
     static let lavaFrames = 8
     static let lavaSide: CGFloat = 48
     /// Seconds a lava frame shows.
     static let lavaFrameSeconds = 0.18
+    static let tornadoFrames = 8
+    static let tornadoSide: CGFloat = 48
+    /// Seconds a tornado's frame shows: twelve a second.
+    static let tornadoFrameSeconds = 1.0 / 12
+    /// The icicles' sockets along the ceiling, 32 wide and 48 tall, the art at their tops.
+    static let icicleWidth: CGFloat = 32
+    static let icicleHeight: CGFloat = 48
 
     /// The tileset as many cells across and down as the sheet holds, so a bigger sheet is picked up as it is.
     static var tilesetColumns: Int { max(Int(tileset.size().width / tileSide), 1) }
@@ -54,6 +61,9 @@ enum ElementsArt {
         return texture
     }
 
+    /// A tornado's first frame, for the map maker's hand, set as the stage is drawn.
+    nonisolated(unsafe) static var tornadoPreview: SKTexture?
+
     static let mountains: SKTexture = {
         let texture = SKTexture(imageNamed: "ElementsMountains")
         texture.filteringMode = .nearest
@@ -63,8 +73,26 @@ enum ElementsArt {
     /// What the stage's art gives back: each placed tile's sprite by its cell, to be changed by the map maker.
     struct Handles {
         var tiles: [ElementsMap.Cell: SKSpriteNode] = [:]
+        var tornados: [SKSpriteNode] = []
         let parent: SKNode
         let sprites: SpriteLibrary
+
+        /// The tornados as the map has them, drawn whole, each animated on a frame of its own.
+        mutating func setTornados(_ bases: [ElementsMap.Cell]) {
+            tornados.forEach { $0.removeFromParent() }
+            let frames = (0..<ElementsArt.tornadoFrames).map { sprites.texture("tornado", $0) }
+            tornados = bases.enumerated().map { index, base in
+                let node = SKSpriteNode(texture: frames[0])
+                node.anchorPoint = .zero
+                node.size = CGSize(width: ElementsArt.tornadoSide, height: ElementsArt.tornadoSide)
+                node.position = CGPoint(x: CGFloat(base.column - 1) * ElementsArt.tileSide, y: CGFloat(base.row) * ElementsArt.tileSide)
+                node.zPosition = -7
+                let start = (index * 3) % ElementsArt.tornadoFrames
+                node.run(.repeatForever(.animate(with: Array(frames[start...]) + Array(frames[..<start]), timePerFrame: ElementsArt.tornadoFrameSeconds)))
+                parent.addChild(node)
+                return node
+            }
+        }
 
         mutating func set(_ placed: ElementsMap.Placed?, at cell: ElementsMap.Cell) {
             tiles[cell]?.removeFromParent()
@@ -82,6 +110,7 @@ enum ElementsArt {
 
     static func build(stage: Stage, map: ElementsMap, into parent: SKNode, sprites: SpriteLibrary) -> Handles {
         let width = CGFloat(stage.columns) * tileSide, height = CGFloat(stage.rows) * tileSide
+        tornadoPreview = sprites.texture("tornado", 0)
         // The mountains over the whole stage, stretched to fill.
         let range = SKSpriteNode(texture: mountains)
         range.anchorPoint = .zero
@@ -105,8 +134,23 @@ enum ElementsArt {
             x += lavaSide
             strip += 1
         }
+        // The ceiling lined with icicle sockets, side by side across it, centred, hanging
+        // from the ceiling row's underside.
+        let socket = sprites.texture("icicle_empty", 0)
+        let count = Int(width / icicleWidth)
+        var icicleX = (width - CGFloat(count) * icicleWidth) / 2
+        for _ in 0..<count {
+            let icicle = SKSpriteNode(texture: socket)
+            icicle.anchorPoint = .zero
+            icicle.size = CGSize(width: icicleWidth, height: icicleHeight)
+            icicle.position = CGPoint(x: icicleX, y: height - tileSide - icicleHeight)
+            icicle.zPosition = -7.5
+            parent.addChild(icicle)
+            icicleX += icicleWidth
+        }
         var handles = Handles(parent: parent, sprites: sprites)
         for placed in map.tiles { handles.set(placed, at: placed.cell) }
+        handles.setTornados(map.tornados)
         return handles
     }
 }

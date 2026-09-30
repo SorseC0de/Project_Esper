@@ -22,13 +22,40 @@ public struct ElementsMap: Equatable, Codable {
     /// Where each player starts: the cell their feet stand at the bottom of.
     public var spawns: [Cell]
     public var ball: Cell
+    /// The tornados, each a whole 48 by 48 sprite three tiles across and three high, given
+    /// by the cell its base's middle is in: it fills the columns either side and the two rows above.
+    public var tornados: [Cell]
 
-    public init(tiles: [Placed], leftRim: Cell, rightRim: Cell, spawns: [Cell], ball: Cell) {
+    public init(tiles: [Placed], leftRim: Cell, rightRim: Cell, spawns: [Cell], ball: Cell, tornados: [Cell] = []) {
         self.tiles = tiles
         self.leftRim = leftRim
         self.rightRim = rightRim
         self.spawns = spawns
         self.ball = ball
+        self.tornados = tornados
+    }
+
+    private enum CodingKeys: String, CodingKey { case tiles, leftRim, rightRim, spawns, ball, tornados }
+
+    /// A map kept before tornados were in it reads as having none.
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        tiles = try values.decode([Placed].self, forKey: .tiles)
+        leftRim = try values.decode(Cell.self, forKey: .leftRim)
+        rightRim = try values.decode(Cell.self, forKey: .rightRim)
+        spawns = try values.decode([Cell].self, forKey: .spawns)
+        ball = try values.decode(Cell.self, forKey: .ball)
+        tornados = try values.decodeIfPresent([Cell].self, forKey: .tornados) ?? []
+    }
+
+    /// Where a tornado's sprite lies, in tile cells: its three columns and three rows.
+    public static func tornadoCells(_ base: Cell) -> (columns: ClosedRange<Int>, rows: ClosedRange<Int>) {
+        ((base.column - 1)...(base.column + 1), base.row...(base.row + 2))
+    }
+
+    /// A base cell moved to where a whole tornado fits on the stage.
+    public static func fittingTornado(_ cell: Cell) -> Cell {
+        Cell(min(max(cell.column, 1), ElementsRules.columns - 2), min(max(cell.row, 0), ElementsRules.rows - 3))
     }
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
@@ -60,7 +87,8 @@ public struct ElementsMap: Equatable, Codable {
         lines.append(line)
         lines.append("        ]")
         lines.append("        return ElementsMap(tiles: tiles, leftRim: \(cell(leftRim)), rightRim: \(cell(rightRim)),")
-        lines.append("                           spawns: [\(spawns.map(cell).joined(separator: ", "))], ball: \(cell(ball)))")
+        lines.append("                           spawns: [\(spawns.map(cell).joined(separator: ", "))], ball: \(cell(ball)),")
+        lines.append("                           tornados: [\(tornados.map(cell).joined(separator: ", "))])")
         lines.append("    }")
         return lines.joined(separator: "\n")
     }
@@ -276,6 +304,7 @@ extension ElementsMap {
             Placed(Cell(66, 31), art: Cell(2, 4)),
         ]
         return ElementsMap(tiles: tiles, leftRim: Cell(2, 16), rightRim: Cell(64, 16),
-                           spawns: [Cell(13, 26), Cell(53, 26)], ball: Cell(33, 18))
+                           spawns: [Cell(13, 26), Cell(53, 26)], ball: Cell(33, 18),
+                           tornados: [])
     }
 }

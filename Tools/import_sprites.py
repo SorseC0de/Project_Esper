@@ -29,7 +29,7 @@ import zlib
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
 STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
-STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava"]
+STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/icicle_empty"]
 # Whole pictures, not strips: into the catalog's root as an image of this name.
 # A list of places a picture may have been saved: the newest is taken.
 ROOT_IMAGES = {
@@ -47,7 +47,7 @@ BALL_MIN_PIXELS = 12
 REDUCE = {"esper_charge": 4, "flashspark": 4, "gemini_rift_v1": 4, "gemini_rift_v2": 4}
 # Strips whose frames aren't square: their frame height, after any reduction. The
 # flash's 256x144 frames come down to 64x36.
-FRAME_HEIGHT = {"flashspark": 36}
+FRAME_HEIGHT = {"flashspark": 36, "icicle_empty": 48}
 # Sheets that come out grey but are drawn as painted, never toned: the strike bolts, which
 # the palette's recolour took to pure white.
 NOT_TONED = {"lightning1", "lightning2", "lightning3", "lightning4"}

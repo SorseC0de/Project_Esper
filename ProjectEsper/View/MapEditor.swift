@@ -48,6 +48,8 @@ final class MapEditor: SKNode {
         case brush(ElementsMap.Cell)
         case erase
         case marker(Marker)
+        /// A whole tornado, placed by the cell its base's middle is in.
+        case tornado
     }
 
     private enum Marker: Equatable, CaseIterable {
@@ -76,6 +78,7 @@ final class MapEditor: SKNode {
     private enum Carried {
         case tile(art: ElementsMap.Cell, taken: Bool)
         case marker(Marker, from: ElementsMap.Cell)
+        case tornado(from: ElementsMap.Cell)
     }
 
     private(set) var map: ElementsMap
@@ -84,8 +87,9 @@ final class MapEditor: SKNode {
     private var carried: Carried?
     private var painting = false
     private var lastCell: ElementsMap.Cell?
-    /// Cells whose tile changed since the game was last told.
+    /// Cells whose tile changed since the game was last told, and whether the tornados did.
     private var dirty: Set<ElementsMap.Cell> = []
+    private var tornadosDirty = false
 
     private let halfWidth: CGFloat, halfHeight: CGFloat
     /// Stage units for a HUD point and back: the camera's place and how many units a point covers.
@@ -94,6 +98,7 @@ final class MapEditor: SKNode {
     private let unitsPerHud: CGFloat
     private let onTiles: ([ElementsMap.Cell]) -> Void
     private let onMarkers: () -> Void
+    private let onTornados: () -> Void
     private let onClose: () -> Void
 
     private let grid = SKShapeNode()
@@ -115,7 +120,7 @@ final class MapEditor: SKNode {
 
     init(map: ElementsMap, halfWidth: CGFloat, halfHeight: CGFloat, unitsPerHud: CGFloat, world: @escaping (CGPoint) -> CGPoint,
          hudFromWorld: @escaping (CGPoint) -> CGPoint, onTiles: @escaping ([ElementsMap.Cell]) -> Void,
-         onMarkers: @escaping () -> Void, onClose: @escaping () -> Void) {
+         onMarkers: @escaping () -> Void, onTornados: @escaping () -> Void, onClose: @escaping () -> Void) {
         self.map = map
         self.halfWidth = halfWidth
         self.halfHeight = halfHeight
@@ -124,6 +129,7 @@ final class MapEditor: SKNode {
         self.hudFromWorld = hudFromWorld
         self.onTiles = onTiles
         self.onMarkers = onMarkers
+        self.onTornados = onTornados
         self.onClose = onClose
         tool = .brush(ElementsArt.filled.first { $0 == ElementsMap.Cell(3, 3) } ?? ElementsArt.filled[0])
         super.init()
@@ -215,7 +221,8 @@ final class MapEditor: SKNode {
             paletteRect = .zero
         }
         // Two rows of buttons: the tools and markers, then the actions.
-        let toolRow: [(String, () -> Void)] = [("ERASE", { [weak self] in self?.tool = .erase; self?.showSelection() })]
+        let toolRow: [(String, () -> Void)] = [("ERASE", { [weak self] in self?.tool = .erase; self?.showSelection() }),
+                                               ("TORNADO", { [weak self] in self?.tool = .tornado; self?.showSelection() })]
             + Marker.allCases.map { marker in (marker.label, { [weak self] in self?.tool = .marker(marker); self?.showSelection() }) }
         let actionRow: [(String, () -> Void)] = [
             ("UNDO", { [weak self] in self?.undo() }), ("RESET", { [weak self] in self?.reset() }), ("COPY", { [weak self] in self?.copy() }),
@@ -282,6 +289,14 @@ final class MapEditor: SKNode {
         }
     }
 
+    /// The tornado whose sprite has this cell in it, if any.
+    private func tornado(at cell: ElementsMap.Cell) -> Int? {
+        map.tornados.firstIndex { base in
+            let span = ElementsMap.tornadoCells(base)
+            return span.columns.contains(cell.column) && span.rows.contains(cell.row)
+        }
+    }
+
     private func marker(at cell: ElementsMap.Cell) -> Marker? { Marker.allCases.first { markerCell($0) == cell } }
 
     private func move(_ marker: Marker, to cell: ElementsMap.Cell) {
@@ -320,6 +335,10 @@ final class MapEditor: SKNode {
             dirty = []
             onTiles(changed)
         }
+        if tornadosDirty {
+            tornadosDirty = false
+            onTornados()
+        }
         showMarkers()
     }
 
@@ -336,6 +355,7 @@ final class MapEditor: SKNode {
     private func applyWholeMap(_ next: ElementsMap) {
         let changed = Set(map.tiles.map(\.cell)).symmetricDifference(Set(next.tiles.map(\.cell)))
             .union(Set(map.tiles).symmetricDifference(Set(next.tiles)).map(\.cell))
+        tornadosDirty = tornadosDirty || next.tornados != map.tornados
         map = next
         dirty.formUnion(changed)
         commit()
@@ -403,7 +423,27 @@ final class MapEditor: SKNode {
             showGhost(at: point)
             return
         }
+        if let index = tornado(at: cell) {
+            remember()
+            let base = map.tornados.remove(at: index)
+            tornadosDirty = true
+            if tool == .erase {
+                painting = true
+                commit()
+            } else {
+                // Picked up whole, to be moved.
+                commit()
+                carried = .tornado(from: base)
+                showGhost(at: point)
+            }
+            return
+        }
         switch tool {
+        case .tornado:
+            remember()
+            map.tornados.append(ElementsMap.fittingTornado(cell))
+            tornadosDirty = true
+            commit()
         case .erase:
             remember()
             painting = true
@@ -447,9 +487,14 @@ final class MapEditor: SKNode {
         guard painting, let under, under != lastCell else { return }
         lastCell = under
         switch tool {
-        case .erase: erase(at: under)
+        case .erase:
+            erase(at: under)
+            if let index = tornado(at: under) {
+                map.tornados.remove(at: index)
+                tornadosDirty = true
+            }
         case .brush(let art): place(art, at: under)
-        case .marker: break
+        case .marker, .tornado: break
         }
         commit()
     }
@@ -480,6 +525,13 @@ final class MapEditor: SKNode {
             move(marker, to: target ?? from)
             commit()
             onMarkers()
+        case .tornado:
+            // Dropped on the stage it stands there whole; on the panel or off the stage it's taken away.
+            if let target {
+                map.tornados.append(ElementsMap.fittingTornado(target))
+                tornadosDirty = true
+            }
+            commit()
         }
         showMarkers()
     }
@@ -493,6 +545,15 @@ final class MapEditor: SKNode {
         case .tile(let art, _):
             let sprite = SKSpriteNode(texture: ElementsArt.tile(art))
             sprite.size = CGSize(width: cellSide, height: cellSide)
+            sprite.alpha = 0.8
+            sprite.zPosition = 10
+            sprite.position = point
+            addChild(sprite)
+            ghost = sprite
+        case .tornado:
+            let sprite = SKSpriteNode(texture: ElementsArt.tornadoPreview)
+            sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
+            sprite.size = CGSize(width: cellSide * 3, height: cellSide * 3)
             sprite.alpha = 0.8
             sprite.zPosition = 10
             sprite.position = point

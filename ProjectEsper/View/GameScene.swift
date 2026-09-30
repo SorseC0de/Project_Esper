@@ -1152,10 +1152,14 @@ final class GameScene: SKScene {
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
         let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
-        let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
+        // The Elements is zoomed to fill the screen, not by whole pixels: as big as the whole
+        // stage fits, on the bottom edge, the lava the last row of the screen.
+        let fills = match.stage.features.look == .elements
+        let pointsPerGamePixel = fills ? min(size.width / stageWidth, size.height / stageHeight) : screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale
-        cameraNode.position = CGPoint(x: scrolls ? cameraBase.x : stageWidth / 2, y: stageHeight / 2 - below)
+        cameraNode.position = CGPoint(x: scrolls ? cameraBase.x : stageWidth / 2,
+                                      y: fills ? size.height * cameraNode.yScale / 2 : stageHeight / 2 - below)
         if scrolls, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
         cameraBase = cameraNode.position
         // The HUD is laid out in the phone's points and scaled up for a bigger screen.
@@ -3336,6 +3340,7 @@ final class GameScene: SKScene {
                 }
             },
             onMarkers: { [weak self] in self?.session.mutate { $0.stage = .elements; $0.refreshExtras() } },
+            onTornados: { [weak self] in self?.elementsArt?.setTornados(ElementsMap.current.tornados) },
             onClose: { [weak self] in self?.closeMapEditor(restart: true) })
         hud.addChild(editor)
         mapEditor = editor

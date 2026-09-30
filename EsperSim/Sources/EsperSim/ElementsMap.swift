@@ -31,6 +31,10 @@ public struct ElementsMap: Equatable, Codable {
         self.ball = ball
     }
 
+    /// Up by one whenever a new map is baked in below, so a map kept from before it, which
+    /// would stand in for it offline, is put aside and the baked one shows.
+    public static let bakedVersion = 1
+
     /// The map every phone plays; the map maker's edits stand in for it offline only.
     public static let baked: ElementsMap = ElementsMap.defaultMap()
     nonisolated(unsafe) public static var current = baked
@@ -72,43 +76,206 @@ public enum ElementsRules {
 }
 
 extension ElementsMap {
-    /// A first map to play on: two islands with a rock block each for a backboard, one over
-    /// the middle, and steps between, all over the lava.
+    /// The map as laid out by hand: the left side and the middle platform the ball starts on
+    /// drawn, the right side its counterpart tile for tile, each tile the one opposite it in
+    /// its piece of the tileset (a slope's left tile for its right), and the ceiling along the
+    /// top. The middle platform is 11 across, columns 28 to 38, centred on the middle column.
     private static func defaultMap() -> ElementsMap {
-        var tiles: [Placed] = []
-        func put(_ column: Int, _ row: Int, _ art: Cell) { tiles.append(Placed(Cell(column, row), art: art)) }
-        /// A hanging island: a top row down to a point, `width` across.
-        func island(left: Int, top: Int, width: Int) {
-            put(left, top, Cell(7, 3))
-            put(left + width - 1, top, Cell(13, 3))
-            for offset in 1..<(width - 1) { put(left + offset, top, Cell(8 + (offset - 1) % 5, 3)) }
-            put(left + 1, top - 1, Cell(8, 4))
-            put(left + width - 2, top - 1, Cell(12, 4))
-            for offset in 2..<(width - 2) { put(left + offset, top - 1, Cell(9 + (offset - 2) % 3, 4)) }
-            let middle = left + width / 2
-            put(middle - 1, top - 2, Cell(9, 5))
-            put(middle, top - 2, Cell(10, 5))
-            put(middle + 1, top - 2, Cell(11, 5))
-        }
-        /// A block of rock, `width` across and `height` tall, its top row and its bottom edge from the big rock.
-        func rock(left: Int, bottom: Int, width: Int, height: Int) {
-            for row in 0..<height {
-                let artRow = row == height - 1 ? 2 : (row == 0 ? 4 : 3)
-                for offset in 0..<width { put(left + offset, bottom + row, Cell(2 + offset % 3, artRow)) }
-            }
-        }
-        // Laid out to mirror about the middle column, 33.
-        island(left: 2, top: 9, width: 15)
-        island(left: 50, top: 9, width: 15)
-        island(left: 28, top: 14, width: 11)
-        rock(left: 0, bottom: 15, width: 2, height: 5)
-        rock(left: 65, bottom: 15, width: 2, height: 5)
-        // Steps over the gap, and ledges high up.
-        put(20, 11, Cell(6, 1)); put(21, 11, Cell(7, 1))
-        put(45, 11, Cell(6, 1)); put(46, 11, Cell(7, 1))
-        for offset in 0..<3 { put(12 + offset, 20, Cell(11 + offset, 1)); put(52 + offset, 20, Cell(11 + offset, 1)) }
-        put(33, 23, Cell(9, 1))
-        return ElementsMap(tiles: tiles, leftRim: Cell(2, 17), rightRim: Cell(64, 17),
-                           spawns: [Cell(5, 10), Cell(61, 10)], ball: Cell(33, 18))
+        let tiles: [Placed] = [
+            Placed(Cell(20, 5), art: Cell(6, 1)), Placed(Cell(21, 5), art: Cell(7, 1)),
+            Placed(Cell(45, 5), art: Cell(6, 1)), Placed(Cell(46, 5), art: Cell(7, 1)),
+            Placed(Cell(8, 7), art: Cell(9, 5)), Placed(Cell(9, 7), art: Cell(10, 5)),
+            Placed(Cell(10, 7), art: Cell(11, 5)), Placed(Cell(56, 7), art: Cell(9, 5)),
+            Placed(Cell(57, 7), art: Cell(10, 5)), Placed(Cell(58, 7), art: Cell(11, 5)),
+            Placed(Cell(3, 8), art: Cell(9, 5)), Placed(Cell(4, 8), art: Cell(10, 5)),
+            Placed(Cell(5, 8), art: Cell(2, 4)), Placed(Cell(6, 8), art: Cell(3, 4)),
+            Placed(Cell(7, 8), art: Cell(4, 4)), Placed(Cell(8, 8), art: Cell(10, 4)),
+            Placed(Cell(9, 8), art: Cell(11, 4)), Placed(Cell(10, 8), art: Cell(11, 4)),
+            Placed(Cell(11, 8), art: Cell(4, 4)), Placed(Cell(12, 8), art: Cell(10, 5)),
+            Placed(Cell(13, 8), art: Cell(10, 5)), Placed(Cell(14, 8), art: Cell(11, 5)),
+            Placed(Cell(26, 8), art: Cell(6, 1)), Placed(Cell(27, 8), art: Cell(7, 1)),
+            Placed(Cell(39, 8), art: Cell(6, 1)), Placed(Cell(40, 8), art: Cell(7, 1)),
+            Placed(Cell(52, 8), art: Cell(9, 5)), Placed(Cell(53, 8), art: Cell(10, 5)),
+            Placed(Cell(54, 8), art: Cell(10, 5)), Placed(Cell(55, 8), art: Cell(2, 4)),
+            Placed(Cell(56, 8), art: Cell(9, 4)), Placed(Cell(57, 8), art: Cell(9, 4)),
+            Placed(Cell(58, 8), art: Cell(10, 4)), Placed(Cell(59, 8), art: Cell(2, 4)),
+            Placed(Cell(60, 8), art: Cell(3, 4)), Placed(Cell(61, 8), art: Cell(4, 4)),
+            Placed(Cell(62, 8), art: Cell(10, 5)), Placed(Cell(63, 8), art: Cell(11, 5)),
+            Placed(Cell(2, 9), art: Cell(7, 3)), Placed(Cell(3, 9), art: Cell(8, 3)),
+            Placed(Cell(4, 9), art: Cell(9, 3)), Placed(Cell(5, 9), art: Cell(10, 3)),
+            Placed(Cell(6, 9), art: Cell(11, 3)), Placed(Cell(7, 9), art: Cell(12, 3)),
+            Placed(Cell(8, 9), art: Cell(8, 3)), Placed(Cell(9, 9), art: Cell(9, 3)),
+            Placed(Cell(10, 9), art: Cell(10, 3)), Placed(Cell(11, 9), art: Cell(11, 3)),
+            Placed(Cell(12, 9), art: Cell(12, 3)), Placed(Cell(13, 9), art: Cell(8, 3)),
+            Placed(Cell(14, 9), art: Cell(9, 3)), Placed(Cell(15, 9), art: Cell(13, 3)),
+            Placed(Cell(51, 9), art: Cell(7, 3)), Placed(Cell(52, 9), art: Cell(11, 3)),
+            Placed(Cell(53, 9), art: Cell(12, 3)), Placed(Cell(54, 9), art: Cell(8, 3)),
+            Placed(Cell(55, 9), art: Cell(9, 3)), Placed(Cell(56, 9), art: Cell(10, 3)),
+            Placed(Cell(57, 9), art: Cell(11, 3)), Placed(Cell(58, 9), art: Cell(12, 3)),
+            Placed(Cell(59, 9), art: Cell(8, 3)), Placed(Cell(60, 9), art: Cell(9, 3)),
+            Placed(Cell(61, 9), art: Cell(10, 3)), Placed(Cell(62, 9), art: Cell(11, 3)),
+            Placed(Cell(63, 9), art: Cell(12, 3)), Placed(Cell(64, 9), art: Cell(13, 3)),
+            Placed(Cell(21, 10), art: Cell(9, 5)), Placed(Cell(22, 10), art: Cell(10, 5)),
+            Placed(Cell(23, 10), art: Cell(5, 4)), Placed(Cell(43, 10), art: Cell(1, 4)),
+            Placed(Cell(44, 10), art: Cell(10, 5)), Placed(Cell(45, 10), art: Cell(11, 5)),
+            Placed(Cell(20, 11), art: Cell(8, 4)), Placed(Cell(21, 11), art: Cell(9, 4)),
+            Placed(Cell(22, 11), art: Cell(3, 3)), Placed(Cell(23, 11), art: Cell(5, 3)),
+            Placed(Cell(43, 11), art: Cell(1, 3)), Placed(Cell(44, 11), art: Cell(3, 3)),
+            Placed(Cell(45, 11), art: Cell(11, 4)), Placed(Cell(46, 11), art: Cell(12, 4)),
+            Placed(Cell(19, 12), art: Cell(8, 4)), Placed(Cell(20, 12), art: Cell(9, 4)),
+            Placed(Cell(21, 12), art: Cell(3, 3)), Placed(Cell(22, 12), art: Cell(3, 2)),
+            Placed(Cell(23, 12), art: Cell(5, 3)), Placed(Cell(32, 12), art: Cell(9, 5)),
+            Placed(Cell(33, 12), art: Cell(10, 5)), Placed(Cell(34, 12), art: Cell(11, 5)),
+            Placed(Cell(43, 12), art: Cell(1, 3)), Placed(Cell(44, 12), art: Cell(3, 2)),
+            Placed(Cell(45, 12), art: Cell(3, 3)), Placed(Cell(46, 12), art: Cell(11, 4)),
+            Placed(Cell(47, 12), art: Cell(12, 4)), Placed(Cell(15, 13), art: Cell(9, 5)),
+            Placed(Cell(16, 13), art: Cell(10, 5)), Placed(Cell(17, 13), art: Cell(10, 5)),
+            Placed(Cell(18, 13), art: Cell(10, 5)), Placed(Cell(19, 13), art: Cell(9, 4)),
+            Placed(Cell(20, 13), art: Cell(3, 3)), Placed(Cell(21, 13), art: Cell(2, 3)),
+            Placed(Cell(22, 13), art: Cell(3, 3)), Placed(Cell(23, 13), art: Cell(5, 3)),
+            Placed(Cell(29, 13), art: Cell(8, 4)), Placed(Cell(30, 13), art: Cell(10, 5)),
+            Placed(Cell(31, 13), art: Cell(4, 4)), Placed(Cell(32, 13), art: Cell(9, 4)),
+            Placed(Cell(33, 13), art: Cell(3, 3)), Placed(Cell(34, 13), art: Cell(11, 4)),
+            Placed(Cell(35, 13), art: Cell(3, 4)), Placed(Cell(36, 13), art: Cell(2, 4)),
+            Placed(Cell(37, 13), art: Cell(12, 4)), Placed(Cell(43, 13), art: Cell(1, 3)),
+            Placed(Cell(44, 13), art: Cell(3, 3)), Placed(Cell(45, 13), art: Cell(4, 3)),
+            Placed(Cell(46, 13), art: Cell(3, 3)), Placed(Cell(47, 13), art: Cell(11, 4)),
+            Placed(Cell(48, 13), art: Cell(10, 5)), Placed(Cell(49, 13), art: Cell(10, 5)),
+            Placed(Cell(50, 13), art: Cell(10, 5)), Placed(Cell(51, 13), art: Cell(11, 5)),
+            Placed(Cell(14, 14), art: Cell(8, 4)), Placed(Cell(15, 14), art: Cell(9, 4)),
+            Placed(Cell(16, 14), art: Cell(2, 3)), Placed(Cell(17, 14), art: Cell(3, 3)),
+            Placed(Cell(18, 14), art: Cell(3, 3)), Placed(Cell(19, 14), art: Cell(4, 2)),
+            Placed(Cell(20, 14), art: Cell(3, 1)), Placed(Cell(21, 14), art: Cell(3, 1)),
+            Placed(Cell(22, 14), art: Cell(3, 1)), Placed(Cell(23, 14), art: Cell(4, 1)),
+            Placed(Cell(28, 14), art: Cell(7, 3)), Placed(Cell(29, 14), art: Cell(8, 3)),
+            Placed(Cell(30, 14), art: Cell(9, 3)), Placed(Cell(31, 14), art: Cell(10, 3)),
+            Placed(Cell(32, 14), art: Cell(11, 3)), Placed(Cell(33, 14), art: Cell(12, 3)),
+            Placed(Cell(34, 14), art: Cell(8, 3)), Placed(Cell(35, 14), art: Cell(3, 1)),
+            Placed(Cell(36, 14), art: Cell(3, 1)), Placed(Cell(37, 14), art: Cell(12, 3)),
+            Placed(Cell(38, 14), art: Cell(13, 3)), Placed(Cell(43, 14), art: Cell(2, 1)),
+            Placed(Cell(44, 14), art: Cell(3, 1)), Placed(Cell(45, 14), art: Cell(3, 1)),
+            Placed(Cell(46, 14), art: Cell(3, 1)), Placed(Cell(47, 14), art: Cell(2, 2)),
+            Placed(Cell(48, 14), art: Cell(3, 3)), Placed(Cell(49, 14), art: Cell(3, 3)),
+            Placed(Cell(50, 14), art: Cell(4, 3)), Placed(Cell(51, 14), art: Cell(11, 4)),
+            Placed(Cell(52, 14), art: Cell(12, 4)), Placed(Cell(0, 15), art: Cell(11, 5)),
+            Placed(Cell(13, 15), art: Cell(8, 4)), Placed(Cell(14, 15), art: Cell(9, 4)),
+            Placed(Cell(15, 15), art: Cell(3, 3)), Placed(Cell(16, 15), art: Cell(3, 3)),
+            Placed(Cell(17, 15), art: Cell(3, 3)), Placed(Cell(18, 15), art: Cell(4, 2)),
+            Placed(Cell(19, 15), art: Cell(6, 5)), Placed(Cell(21, 15), art: Cell(5, 1)),
+            Placed(Cell(23, 15), art: Cell(4, 0)), Placed(Cell(33, 15), art: Cell(5, 1)),
+            Placed(Cell(43, 15), art: Cell(2, 0)), Placed(Cell(45, 15), art: Cell(5, 1)),
+            Placed(Cell(47, 15), art: Cell(7, 5)), Placed(Cell(48, 15), art: Cell(2, 2)),
+            Placed(Cell(49, 15), art: Cell(3, 3)), Placed(Cell(50, 15), art: Cell(3, 3)),
+            Placed(Cell(51, 15), art: Cell(3, 3)), Placed(Cell(52, 15), art: Cell(11, 4)),
+            Placed(Cell(53, 15), art: Cell(12, 4)), Placed(Cell(66, 15), art: Cell(9, 5)),
+            Placed(Cell(0, 16), art: Cell(11, 4)), Placed(Cell(1, 16), art: Cell(5, 4)),
+            Placed(Cell(12, 16), art: Cell(8, 4)), Placed(Cell(13, 16), art: Cell(9, 4)),
+            Placed(Cell(14, 16), art: Cell(3, 3)), Placed(Cell(15, 16), art: Cell(3, 3)),
+            Placed(Cell(16, 16), art: Cell(3, 3)), Placed(Cell(17, 16), art: Cell(4, 2)),
+            Placed(Cell(18, 16), art: Cell(6, 5)), Placed(Cell(48, 16), art: Cell(7, 5)),
+            Placed(Cell(49, 16), art: Cell(2, 2)), Placed(Cell(50, 16), art: Cell(3, 3)),
+            Placed(Cell(51, 16), art: Cell(3, 3)), Placed(Cell(52, 16), art: Cell(3, 3)),
+            Placed(Cell(53, 16), art: Cell(11, 4)), Placed(Cell(54, 16), art: Cell(12, 4)),
+            Placed(Cell(65, 16), art: Cell(1, 4)), Placed(Cell(66, 16), art: Cell(9, 4)),
+            Placed(Cell(0, 17), art: Cell(4, 3)), Placed(Cell(1, 17), art: Cell(5, 3)),
+            Placed(Cell(11, 17), art: Cell(9, 5)), Placed(Cell(12, 17), art: Cell(9, 4)),
+            Placed(Cell(13, 17), art: Cell(3, 3)), Placed(Cell(14, 17), art: Cell(3, 3)),
+            Placed(Cell(15, 17), art: Cell(3, 3)), Placed(Cell(16, 17), art: Cell(4, 2)),
+            Placed(Cell(17, 17), art: Cell(6, 5)), Placed(Cell(49, 17), art: Cell(7, 5)),
+            Placed(Cell(50, 17), art: Cell(2, 2)), Placed(Cell(51, 17), art: Cell(3, 3)),
+            Placed(Cell(52, 17), art: Cell(3, 3)), Placed(Cell(53, 17), art: Cell(3, 3)),
+            Placed(Cell(54, 17), art: Cell(11, 4)), Placed(Cell(55, 17), art: Cell(11, 5)),
+            Placed(Cell(65, 17), art: Cell(1, 3)), Placed(Cell(66, 17), art: Cell(2, 3)),
+            Placed(Cell(0, 18), art: Cell(2, 3)), Placed(Cell(1, 18), art: Cell(5, 3)),
+            Placed(Cell(10, 18), art: Cell(8, 4)), Placed(Cell(11, 18), art: Cell(9, 4)),
+            Placed(Cell(12, 18), art: Cell(3, 3)), Placed(Cell(13, 18), art: Cell(3, 3)),
+            Placed(Cell(14, 18), art: Cell(3, 2)), Placed(Cell(15, 18), art: Cell(4, 2)),
+            Placed(Cell(16, 18), art: Cell(6, 5)), Placed(Cell(50, 18), art: Cell(7, 5)),
+            Placed(Cell(51, 18), art: Cell(2, 2)), Placed(Cell(52, 18), art: Cell(3, 2)),
+            Placed(Cell(53, 18), art: Cell(3, 3)), Placed(Cell(54, 18), art: Cell(3, 3)),
+            Placed(Cell(55, 18), art: Cell(11, 4)), Placed(Cell(56, 18), art: Cell(12, 4)),
+            Placed(Cell(65, 18), art: Cell(1, 3)), Placed(Cell(66, 18), art: Cell(4, 3)),
+            Placed(Cell(0, 19), art: Cell(3, 3)), Placed(Cell(1, 19), art: Cell(11, 4)),
+            Placed(Cell(2, 19), art: Cell(11, 5)), Placed(Cell(9, 19), art: Cell(9, 5)),
+            Placed(Cell(10, 19), art: Cell(9, 4)), Placed(Cell(11, 19), art: Cell(3, 3)),
+            Placed(Cell(12, 19), art: Cell(3, 3)), Placed(Cell(13, 19), art: Cell(3, 3)),
+            Placed(Cell(14, 19), art: Cell(4, 2)), Placed(Cell(15, 19), art: Cell(6, 5)),
+            Placed(Cell(51, 19), art: Cell(7, 5)), Placed(Cell(52, 19), art: Cell(2, 2)),
+            Placed(Cell(53, 19), art: Cell(3, 3)), Placed(Cell(54, 19), art: Cell(3, 3)),
+            Placed(Cell(55, 19), art: Cell(3, 3)), Placed(Cell(56, 19), art: Cell(11, 4)),
+            Placed(Cell(57, 19), art: Cell(11, 5)), Placed(Cell(64, 19), art: Cell(9, 5)),
+            Placed(Cell(65, 19), art: Cell(9, 4)), Placed(Cell(66, 19), art: Cell(3, 3)),
+            Placed(Cell(0, 20), art: Cell(3, 3)), Placed(Cell(1, 20), art: Cell(3, 2)),
+            Placed(Cell(2, 20), art: Cell(11, 4)), Placed(Cell(3, 20), art: Cell(10, 5)),
+            Placed(Cell(4, 20), art: Cell(2, 4)), Placed(Cell(5, 20), art: Cell(3, 4)),
+            Placed(Cell(6, 20), art: Cell(4, 4)), Placed(Cell(7, 20), art: Cell(2, 4)),
+            Placed(Cell(8, 20), art: Cell(10, 5)), Placed(Cell(9, 20), art: Cell(9, 4)),
+            Placed(Cell(10, 20), art: Cell(2, 3)), Placed(Cell(11, 20), art: Cell(3, 3)),
+            Placed(Cell(12, 20), art: Cell(3, 3)), Placed(Cell(13, 20), art: Cell(4, 2)),
+            Placed(Cell(14, 20), art: Cell(6, 5)), Placed(Cell(52, 20), art: Cell(7, 5)),
+            Placed(Cell(53, 20), art: Cell(2, 2)), Placed(Cell(54, 20), art: Cell(3, 3)),
+            Placed(Cell(55, 20), art: Cell(3, 3)), Placed(Cell(56, 20), art: Cell(4, 3)),
+            Placed(Cell(57, 20), art: Cell(11, 4)), Placed(Cell(58, 20), art: Cell(10, 5)),
+            Placed(Cell(59, 20), art: Cell(4, 4)), Placed(Cell(60, 20), art: Cell(2, 4)),
+            Placed(Cell(61, 20), art: Cell(3, 4)), Placed(Cell(62, 20), art: Cell(4, 4)),
+            Placed(Cell(63, 20), art: Cell(10, 5)), Placed(Cell(64, 20), art: Cell(9, 4)),
+            Placed(Cell(65, 20), art: Cell(3, 2)), Placed(Cell(66, 20), art: Cell(3, 3)),
+            Placed(Cell(0, 21), art: Cell(3, 1)), Placed(Cell(1, 21), art: Cell(3, 1)),
+            Placed(Cell(2, 21), art: Cell(3, 1)), Placed(Cell(3, 21), art: Cell(3, 1)),
+            Placed(Cell(4, 21), art: Cell(3, 1)), Placed(Cell(5, 21), art: Cell(3, 1)),
+            Placed(Cell(6, 21), art: Cell(3, 1)), Placed(Cell(7, 21), art: Cell(3, 1)),
+            Placed(Cell(8, 21), art: Cell(3, 1)), Placed(Cell(9, 21), art: Cell(3, 1)),
+            Placed(Cell(10, 21), art: Cell(3, 1)), Placed(Cell(11, 21), art: Cell(3, 1)),
+            Placed(Cell(12, 21), art: Cell(3, 1)), Placed(Cell(13, 21), art: Cell(6, 5)),
+            Placed(Cell(53, 21), art: Cell(7, 5)), Placed(Cell(54, 21), art: Cell(3, 1)),
+            Placed(Cell(55, 21), art: Cell(3, 1)), Placed(Cell(56, 21), art: Cell(3, 1)),
+            Placed(Cell(57, 21), art: Cell(3, 1)), Placed(Cell(58, 21), art: Cell(3, 1)),
+            Placed(Cell(59, 21), art: Cell(3, 1)), Placed(Cell(60, 21), art: Cell(3, 1)),
+            Placed(Cell(61, 21), art: Cell(3, 1)), Placed(Cell(62, 21), art: Cell(3, 1)),
+            Placed(Cell(63, 21), art: Cell(3, 1)), Placed(Cell(64, 21), art: Cell(3, 1)),
+            Placed(Cell(65, 21), art: Cell(3, 1)), Placed(Cell(66, 21), art: Cell(3, 1)),
+            Placed(Cell(0, 22), art: Cell(5, 1)), Placed(Cell(4, 22), art: Cell(2, 0)),
+            Placed(Cell(10, 22), art: Cell(5, 1)), Placed(Cell(56, 22), art: Cell(5, 1)),
+            Placed(Cell(62, 22), art: Cell(4, 0)), Placed(Cell(66, 22), art: Cell(5, 1)),
+            Placed(Cell(12, 25), art: Cell(11, 1)), Placed(Cell(13, 25), art: Cell(12, 1)),
+            Placed(Cell(14, 25), art: Cell(13, 1)), Placed(Cell(52, 25), art: Cell(11, 1)),
+            Placed(Cell(53, 25), art: Cell(12, 1)), Placed(Cell(54, 25), art: Cell(13, 1)),
+            Placed(Cell(0, 31), art: Cell(2, 4)), Placed(Cell(1, 31), art: Cell(3, 4)),
+            Placed(Cell(2, 31), art: Cell(4, 4)), Placed(Cell(3, 31), art: Cell(2, 4)),
+            Placed(Cell(4, 31), art: Cell(3, 4)), Placed(Cell(5, 31), art: Cell(4, 4)),
+            Placed(Cell(6, 31), art: Cell(2, 4)), Placed(Cell(7, 31), art: Cell(3, 4)),
+            Placed(Cell(8, 31), art: Cell(4, 4)), Placed(Cell(9, 31), art: Cell(2, 4)),
+            Placed(Cell(10, 31), art: Cell(3, 4)), Placed(Cell(11, 31), art: Cell(4, 4)),
+            Placed(Cell(12, 31), art: Cell(2, 4)), Placed(Cell(13, 31), art: Cell(3, 4)),
+            Placed(Cell(14, 31), art: Cell(4, 4)), Placed(Cell(15, 31), art: Cell(2, 4)),
+            Placed(Cell(16, 31), art: Cell(3, 4)), Placed(Cell(17, 31), art: Cell(4, 4)),
+            Placed(Cell(18, 31), art: Cell(2, 4)), Placed(Cell(19, 31), art: Cell(3, 4)),
+            Placed(Cell(20, 31), art: Cell(4, 4)), Placed(Cell(21, 31), art: Cell(2, 4)),
+            Placed(Cell(22, 31), art: Cell(3, 4)), Placed(Cell(23, 31), art: Cell(4, 4)),
+            Placed(Cell(24, 31), art: Cell(2, 4)), Placed(Cell(25, 31), art: Cell(3, 4)),
+            Placed(Cell(26, 31), art: Cell(4, 4)), Placed(Cell(27, 31), art: Cell(2, 4)),
+            Placed(Cell(28, 31), art: Cell(3, 4)), Placed(Cell(29, 31), art: Cell(4, 4)),
+            Placed(Cell(30, 31), art: Cell(2, 4)), Placed(Cell(31, 31), art: Cell(3, 4)),
+            Placed(Cell(32, 31), art: Cell(4, 4)), Placed(Cell(33, 31), art: Cell(2, 4)),
+            Placed(Cell(34, 31), art: Cell(3, 4)), Placed(Cell(35, 31), art: Cell(4, 4)),
+            Placed(Cell(36, 31), art: Cell(2, 4)), Placed(Cell(37, 31), art: Cell(3, 4)),
+            Placed(Cell(38, 31), art: Cell(4, 4)), Placed(Cell(39, 31), art: Cell(2, 4)),
+            Placed(Cell(40, 31), art: Cell(3, 4)), Placed(Cell(41, 31), art: Cell(4, 4)),
+            Placed(Cell(42, 31), art: Cell(2, 4)), Placed(Cell(43, 31), art: Cell(3, 4)),
+            Placed(Cell(44, 31), art: Cell(4, 4)), Placed(Cell(45, 31), art: Cell(2, 4)),
+            Placed(Cell(46, 31), art: Cell(3, 4)), Placed(Cell(47, 31), art: Cell(4, 4)),
+            Placed(Cell(48, 31), art: Cell(2, 4)), Placed(Cell(49, 31), art: Cell(3, 4)),
+            Placed(Cell(50, 31), art: Cell(4, 4)), Placed(Cell(51, 31), art: Cell(2, 4)),
+            Placed(Cell(52, 31), art: Cell(3, 4)), Placed(Cell(53, 31), art: Cell(4, 4)),
+            Placed(Cell(54, 31), art: Cell(2, 4)), Placed(Cell(55, 31), art: Cell(3, 4)),
+            Placed(Cell(56, 31), art: Cell(4, 4)), Placed(Cell(57, 31), art: Cell(2, 4)),
+            Placed(Cell(58, 31), art: Cell(3, 4)), Placed(Cell(59, 31), art: Cell(4, 4)),
+            Placed(Cell(60, 31), art: Cell(2, 4)), Placed(Cell(61, 31), art: Cell(3, 4)),
+            Placed(Cell(62, 31), art: Cell(4, 4)), Placed(Cell(63, 31), art: Cell(2, 4)),
+            Placed(Cell(64, 31), art: Cell(3, 4)), Placed(Cell(65, 31), art: Cell(4, 4)),
+            Placed(Cell(66, 31), art: Cell(2, 4)),
+        ]
+        return ElementsMap(tiles: tiles, leftRim: Cell(2, 16), rightRim: Cell(64, 16),
+                           spawns: [Cell(13, 26), Cell(53, 26)], ball: Cell(33, 18))
     }
 }

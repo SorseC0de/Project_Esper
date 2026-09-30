@@ -2,13 +2,29 @@ import EsperSim
 import Foundation
 import SpriteKit
 
-/// The Elements' map, as last kept between launches by the map maker; nil until it's used.
+/// The Elements' map, as last kept between launches by the map maker; nil until it's used,
+/// and put aside (under `beforeBakeKey`, not deleted) when a newer map has been baked since.
 enum SavedElementsMap {
     private static let key = "esper.elementsMap"
-    static var value: ElementsMap? {
-        UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(ElementsMap.self, from: $0) }
+    private static let versionKey = "esper.elementsMap.bakedVersion"
+    private static let beforeBakeKey = "esper.elementsMap.beforeBake"
+
+    /// A map kept against an older baked one is moved aside, once.
+    private static func putAsideIfStale() {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: versionKey) != ElementsMap.bakedVersion else { return }
+        if let data = defaults.data(forKey: key) { defaults.set(data, forKey: beforeBakeKey) }
+        defaults.removeObject(forKey: key)
+        defaults.set(ElementsMap.bakedVersion, forKey: versionKey)
     }
+
+    static var value: ElementsMap? {
+        putAsideIfStale()
+        return UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(ElementsMap.self, from: $0) }
+    }
+
     static func store(_ map: ElementsMap?) {
+        putAsideIfStale()
         if let map, let data = try? JSONEncoder().encode(map) {
             UserDefaults.standard.set(data, forKey: key)
         } else {

@@ -27,11 +27,29 @@ final class ElementsTests: XCTestCase {
     func testTheDefaultMapMirrorsAboutTheMiddleAndTheBallStartsDeadCentre() {
         let map = ElementsMap.baked
         let last = ElementsRules.columns - 1
-        XCTAssertEqual(Set(map.tiles.map { [$0.cell.column, $0.cell.row] }), Set(map.tiles.map { [last - $0.cell.column, $0.cell.row] }))
+        // Everything but the ceiling and the middle platform the ball starts on.
+        let sides = map.tiles.filter { $0.cell.row != ElementsRules.rows - 1 && !((28...38).contains($0.cell.column) && (12...15).contains($0.cell.row)) }
+        XCTAssertEqual(Set(sides.map { [$0.cell.column, $0.cell.row] }), Set(sides.map { [last - $0.cell.column, $0.cell.row] }))
         XCTAssertEqual(map.leftRim.column, last - map.rightRim.column)
+        XCTAssertEqual(map.leftRim.row, map.rightRim.row)
         XCTAssertEqual(map.spawns[0].column, last - map.spawns[1].column)
+        XCTAssertEqual(map.spawns[0].row, map.spawns[1].row)
+        XCTAssertTrue(map.tiles.allSatisfy { (0...last).contains($0.cell.column) && (0..<ElementsRules.rows).contains($0.cell.row) }, "nothing off the stage")
         let stage = Stage.elements
         XCTAssertEqual(stage.ballSpawn.x, stage.width / 2, accuracy: 0.0001)
+        // The middle platform is centred too: its top row runs 28 to 38 about the middle column, 33.
+        let top = map.tiles.filter { $0.cell.row == 14 && (26...40).contains($0.cell.column) }.map(\.cell.column).sorted()
+        XCTAssertEqual(top, Array(28...38))
+    }
+
+    func testTheRightSideUsesTheOppositeTilesOfTheLeft() {
+        // A slope's left tile on the left is its right tile on the right, across the middle.
+        let map = ElementsMap.baked
+        func art(_ column: Int, _ row: Int) -> ElementsMap.Cell? { map.tiles.first { $0.cell == .init(column, row) }?.art }
+        XCTAssertEqual(art(19, 15), .init(6, 5))
+        XCTAssertEqual(art(47, 15), .init(7, 5))
+        XCTAssertEqual(art(2, 9), .init(7, 3))
+        XCTAssertEqual(art(64, 9), .init(13, 3))
     }
 
     func testDecorationTilesArentSolid() {

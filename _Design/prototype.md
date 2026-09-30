@@ -934,6 +934,12 @@ name cells by place, so tiles are added at the end or in the empty cells). The s
 bar the tileset's flecks (`ElementsMap.decoration`), drawn but with nothing to stand on. Hoops
 are the straight-on pair, the court's placements.
 
+The baked map (`ElementsMap.baked`, protocol 29) is laid out by hand: the left side and the middle
+platform the ball starts on drawn, the ceiling along the top, and the right side generated
+from the left, tile for tile, each the tile opposite it in its piece of the tileset (a slope's
+left tile for its right; the V's two halves swap). The middle platform is 11 across, columns 28
+to 38, centred on the middle column, 33, where the ball starts.
+
 The lava: whoever's feet go under its surface (`ElementsRules.lavaSurface`, 25 units) is put
 back where they started, any ball they held back at the ball's start, and a loose ball in it
 too. For now (protocol 27).
@@ -941,7 +947,9 @@ too. For now (protocol 27).
 The map is `ElementsMap`: the placed tiles by cell, the two rims (backboard on the left and on
 the right; build a rock block behind each), the two starts (the cell their feet stand at the
 bottom of) and the ball's. `ElementsMap.baked` is what every phone plays, online included; a
-map kept by the map maker stands in for it offline only (`SavedElementsMap`). The map maker
+map kept by the map maker stands in for it offline only (`SavedElementsMap`), unless a newer
+map has been baked since (`ElementsMap.bakedVersion`, up by one with each bake), when it's put
+aside under `esper.elementsMap.beforeBake` and the baked one shows. The map maker
 (`MapEditor`, for a mouse; not on the TV) is the MAP picker on the debug panel, on this stage
 offline: the match held still, a grid over the stage, a panel with the tileset. Drag a tile
 from the panel onto the stage to drop it, and with a tile chosen press an empty cell and drag

@@ -960,11 +960,13 @@ None of the stage's art glows but the lava: the tiles, the mountains and the ici
 into the glow's mask in green under the bodies (`MaskScene.syncStatic`), redone only when the map
 changes; the flat background colour still lifts a little. The tornados and their overlays are drawn into it each frame as they animate, the part above the lava only.
 
-The ceiling's icicles leave out columns 16 and under and their mirror, 50 and over. Now and then
-(about one every two seconds) an empty socket grows an icicle (`icicle_form`, six 32 by 48 frames at
-15 a second), holds its last frame two to five seconds, then drops it: `icicle`'s first frame (four
-32 pixel frames) falls as the sim's bodies do onto the first ground under it, rock, a slope's
-surface or the lava, and the other three play there. For now it's only drawn: it hits nobody.
+The ceiling's icicles (`Stage.icicleSockets`, `IcicleRules`, `Match.icicles`) leave out columns 16
+and under and their mirror, 50 and over. Every two seconds a socket picked by the count, the same on
+both phones, grows an icicle if it's empty (`icicle_form`, six 32 by 48 frames at 15 a second),
+holds its last frame two to five seconds, then drops it: `icicle`'s first frame (four 32 pixel
+frames) falls as the ball does, from rest, and shatters on the first ground under it, rock, a
+slope or the lava, or on whoever it meets, the other three frames playing there. Whoever it meets is
+stripped and frozen; Frost Tea it only shatters on. Protocol 43.
 Over each gap in the ceiling's row a shaft runs up through the sky (`Stage.fixedExtras`: the sky
 above the ceiling is solid but for them, up to its top), walled in rock edges drawn on up through
 a taller screen's spare rows (the tileset's (5, 3) on its left, (1, 3) on its right). The players

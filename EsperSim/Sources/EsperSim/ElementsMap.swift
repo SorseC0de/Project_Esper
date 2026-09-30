@@ -223,12 +223,43 @@ public enum LightningRules {
     public static let halfWidth = 8.0
 }
 
+/// The Elements' icicles: sockets side by side along the ceiling, centred, but for the
+/// ceiling's ends (`freeColumns` and under, and their mirror). Every two seconds one socket,
+/// picked by the count, grows an icicle if it's empty, holds it two to five seconds, then
+/// drops it: falling as the ball falls, it shatters on the first ground or the lava, and on
+/// whoever it meets, whom it strips and freezes; Frost Tea it only shatters on.
+public enum IcicleRules {
+    /// A socket's width and height in units, and how far down from its top the grown icicle hangs.
+    public static let socketWidth = 20.0
+    public static let socketHeight = 30.0
+    public static let hangLength = 16.25
+    public static let freeColumns = 16
+    public static let everyFrames = 120
+    /// The grow's six frames at fifteen a second, then the hold.
+    public static let formFrames = 24
+    public static let holdFrames = 120...300
+    /// The falling icicle's box: its tip at the bottom.
+    public static let width = 5.0
+    public static let length = 13.0
+
+}
+
 public enum ElementsRules {
     /// Two Wreck Centers across, less a column so there's a middle one, and 24 high: a large stage's most, all of it on screen at 3x on a phone.
     public static let columns = 67
     public static let rows = 24
     /// The lava's surface, in units above the floor: anyone whose feet go under it burns.
     public static let lavaSurface = 25.0
+
+    /// A count mixed into a number to pick by, the same on every phone: which spot lightning
+    /// strikes, which socket grows an icicle.
+    public static func pick(_ count: Int) -> UInt64 {
+        var mixed = UInt64(truncatingIfNeeded: count + 1) &* 0x9E37_79B9_7F4A_7C15
+        mixed ^= mixed >> 31
+        mixed = mixed &* 0xBF58_476D_1CE4_E5B9
+        mixed ^= mixed >> 29
+        return mixed
+    }
 }
 
 extension ElementsMap {

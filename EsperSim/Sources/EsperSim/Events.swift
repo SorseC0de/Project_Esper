@@ -65,6 +65,8 @@ public enum MatchEvent: Equatable {
     case lightningFlashed(at: Vec2)
     /// The Elements' lightning struck here, on the top of rock.
     case lightningStruck(at: Vec2)
+    /// An Elements icicle shattered here, its tip.
+    case icicleShattered(at: Vec2)
     /// The Elements' fireball burst here.
     case stageFireballBurst(at: Vec2)
     /// A stance's stepback began.

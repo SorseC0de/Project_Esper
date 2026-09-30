@@ -28,8 +28,6 @@ enum ElementsArt {
     static var lavaTop: CGFloat { lavaSide }
     /// Where the lava's body starts under its flecks and crests, as drawn: what rain and a fireball stop at.
     static let lavaSurfaceLine: CGFloat = 32
-    /// No icicle hangs over these columns or their mirror: the ceiling's ends, over the rock and the shafts.
-    static let icicleFreeColumns = 16
     /// The icicles' sockets along the ceiling, 32 wide and 48 tall, the art at their tops.
     static let icicleWidth: CGFloat = 32
     static let icicleHeight: CGFloat = 48
@@ -184,23 +182,15 @@ enum ElementsArt {
         // The ceiling lined with icicle sockets, side by side across it, centred, hanging
         // from the ceiling row's underside.
         let socket = sprites.texture("icicle_empty", 0)
-        let count = Int(width / icicleWidth)
-        var icicleX = (width - CGFloat(count) * icicleWidth) / 2
         var icicles: [SKSpriteNode] = []
-        for _ in 0..<count {
-            let firstColumn = Int(icicleX / tileSide), lastColumn = Int((icicleX + icicleWidth) / tileSide) - 1
-            guard firstColumn > icicleFreeColumns, lastColumn < stage.columns - 1 - icicleFreeColumns else {
-                icicleX += icicleWidth
-                continue
-            }
+        for tip in stage.icicleSockets {
             let icicle = SKSpriteNode(texture: socket)
             icicle.anchorPoint = .zero
             icicle.size = CGSize(width: icicleWidth, height: icicleHeight)
-            icicle.position = CGPoint(x: icicleX, y: height - tileSide - icicleHeight)
+            icicle.position = CGPoint(x: SpriteLibrary.point(tip).x - icicleWidth / 2, y: height - tileSide - icicleHeight)
             icicle.zPosition = -7.5
             parent.addChild(icicle)
             icicles.append(icicle)
-            icicleX += icicleWidth
         }
         // A taller screen's spare rows: the lava's orange on down below it, the ceiling's deep
         // purple on up above it, wider than the stage so nothing shows past either end.

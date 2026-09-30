@@ -332,4 +332,68 @@ final class ShaftAndTornadoTests: XCTestCase {
         for _ in 0..<10 { up.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle]) }
         XCTAssertLessThan(up.players[0].position.x, from, "up it on the stick")
     }
+
+    private func icicleFalling(on power: Power?) -> Match {
+        var match = elements()
+        match.frame = 1
+        match.advance(inputs: [.idle, .idle])
+        let socket = match.stage.icicleSockets[0]
+        match.icicles[0].falling = socket
+        match.players[1].position = Vec2(x: 30, y: 400)
+        if let power {
+            match.players[0].power = power
+            match.players[0].position = Vec2(x: socket.x, y: socket.y - 40)
+            match.players[0].grounded = false
+            match.players[0].tornadoCooldown = 999
+            match.players[0].enter(.air)
+        } else {
+            match.players[0].position = Vec2(x: 30, y: 400)
+        }
+        return match
+    }
+
+    private func shattered(_ match: Match) -> Bool {
+        match.events.contains { if case .icicleShattered = $0 { return true }; return false }
+    }
+
+    func testAFallingIcicleStripsAndFreezesWhomeverItMeets() {
+        var match = icicleFalling(on: Power.none)
+        var hit = false
+        for _ in 0..<40 where !hit { match.advance(inputs: [.idle, .idle]); hit = shattered(match) }
+        XCTAssertTrue(hit)
+        XCTAssertGreaterThan(match.players[0].frozen, 0)
+        XCTAssertGreaterThan(match.players[0].hitStun, 0)
+    }
+
+    func testAFallingIcicleOnlyShattersOnFrostTea() {
+        var match = icicleFalling(on: .frostTea)
+        var hit = false
+        for _ in 0..<40 where !hit { match.advance(inputs: [.idle, .idle]); hit = shattered(match) }
+        XCTAssertTrue(hit)
+        XCTAssertEqual(match.players[0].frozen, 0)
+        XCTAssertEqual(match.players[0].hitStun, 0)
+    }
+
+    func testAnIcicleShattersOnTheGroundUnderIt() {
+        var match = icicleFalling(on: nil)
+        var at: Vec2?
+        for _ in 0..<200 where at == nil {
+            match.advance(inputs: [.idle, .idle])
+            at = match.events.compactMap { if case .icicleShattered(let spot) = $0 { return spot }; return nil }.first
+        }
+        let tip = try! XCTUnwrap(at)
+        XCTAssertTrue(match.stage.isGrounded(Box(min: Vec2(x: tip.x - 1, y: tip.y), max: Vec2(x: tip.x + 1, y: tip.y + 5))) || tip.y <= ElementsRules.lavaSurface,
+                      "on the ground or the lava")
+    }
+
+    func testIciclesGrowAndDropOnTheirOwn() {
+        var match = elements()
+        var dropped = 0
+        for _ in 0..<(IcicleRules.everyFrames * 6) {
+            let before = match.icicles.filter { $0.falling != nil }.count
+            match.advance(inputs: [.idle, .idle])
+            if match.icicles.filter({ $0.falling != nil }).count > before { dropped += 1 }
+        }
+        XCTAssertGreaterThan(dropped, 0)
+    }
 }

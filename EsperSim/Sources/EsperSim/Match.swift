@@ -104,6 +104,7 @@ public struct Match: Equatable {
         stepTornados()
         stepStageFireball()
         stepLightning()
+        stepIcicles()
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
@@ -595,6 +596,56 @@ public struct Match: Equatable {
         players[victim].airControlLock = StageFireballRules.knockCoastFrames
     }
 
+    /// One icicle socket: when its icicle started growing and when it drops, while it's in the
+    /// socket; where the falling one's tip is and how fast it's falling, once it's dropped.
+    public struct Icicle: Equatable {
+        public var formedAt: Int?
+        public var dropAt = 0
+        public var falling: Vec2?
+        public var fallSpeed = 0.0
+    }
+    public var icicles: [Icicle] = []
+
+    /// Grown, held, dropped, fallen: shattering on the ground, the lava or a body.
+    private mutating func stepIcicles() {
+        let sockets = stage.icicleSockets
+        if icicles.count != sockets.count { icicles = Array(repeating: Icicle(), count: sockets.count) }
+        guard !sockets.isEmpty else { return }
+        if frame % IcicleRules.everyFrames == 0 {
+            let pick = ElementsRules.pick(frame / IcicleRules.everyFrames + 1_000_000)
+            let index = Int(pick % UInt64(sockets.count))
+            if icicles[index].formedAt == nil, icicles[index].falling == nil {
+                let hold = IcicleRules.holdFrames
+                icicles[index].formedAt = frame
+                icicles[index].dropAt = frame + IcicleRules.formFrames + hold.lowerBound + Int((pick >> 32) % UInt64(hold.count))
+            }
+        }
+        for index in icicles.indices {
+            if icicles[index].formedAt != nil, frame >= icicles[index].dropAt {
+                icicles[index].formedAt = nil
+                icicles[index].falling = sockets[index]
+                icicles[index].fallSpeed = 0
+            }
+            guard var tip = icicles[index].falling else { continue }
+            icicles[index].fallSpeed = min(icicles[index].fallSpeed + BallRules.gravity, BallRules.fallSpeed)
+            let box = Box(min: Vec2(x: tip.x - IcicleRules.width / 2, y: tip.y), max: Vec2(x: tip.x + IcicleRules.width / 2, y: tip.y + IcicleRules.length))
+            let swept = stage.sweepVertically(box, by: -icicles[index].fallSpeed, oneWays: false)
+            tip.y += swept.moved
+            let now = Box(min: Vec2(x: tip.x - IcicleRules.width / 2, y: tip.y), max: Vec2(x: tip.x + IcicleRules.width / 2, y: tip.y + IcicleRules.length))
+            if let victim = players.indices.first(where: { players[$0].body.overlaps(now) }) {
+                if players[victim].power != .frostTea {
+                    strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil)
+                    freeze(victim)
+                }
+            } else if !swept.landed, stage.features.lavaSurface.map({ tip.y > $0 }) ?? true {
+                icicles[index].falling = tip
+                continue
+            }
+            icicles[index].falling = nil
+            events.append(.icicleShattered(at: tip))
+        }
+    }
+
     /// Where the Elements' lightning will strike on `frame`'s flash, and frames left till it
     /// does, while the warning's out.
     public var lightningWarning: (target: Vec2, framesLeft: Int)? {
@@ -606,11 +657,7 @@ public struct Match: Equatable {
 
     /// Each flash's spot, picked by its count: the same on every phone.
     private func lightningTarget(flash: Int) -> Vec2 {
-        var mixed = UInt64(flash + 1) &* 0x9E37_79B9_7F4A_7C15
-        mixed ^= mixed >> 31
-        mixed = mixed &* 0xBF58_476D_1CE4_E5B9
-        mixed ^= mixed >> 29
-        return stage.lightningSpots[Int(mixed % UInt64(stage.lightningSpots.count))]
+        stage.lightningSpots[Int(ElementsRules.pick(flash) % UInt64(stage.lightningSpots.count))]
     }
 
     /// The flash, then the strike: whoever the bolt's line touches, up from its spot, is

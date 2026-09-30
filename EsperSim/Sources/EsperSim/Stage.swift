@@ -130,6 +130,8 @@ public struct Stage: Equatable {
     public var fixedExtras: [Box] = []
     /// Where each tornado stands when it's up, its whole square.
     public var tornados: [Box] = []
+    /// Where each icicle socket's grown icicle hangs its tip, along the ceiling.
+    public var icicleSockets: [Vec2] = []
     /// The middles of the open tops of rock lightning can strike: under no ceiling, nothing on them.
     public var lightningSpots: [Vec2] = []
     /// The shafts the players drop in by, from just under the ceiling up: nothing in them is a wall to land on.
@@ -673,6 +675,14 @@ public struct Stage: Equatable {
             stage.chutes.append(Box(min: Vec2(x: left.max.x, y: Double(rows - 3) * tileSize), max: Vec2(x: right.min.x, y: skyTop)))
         }
         stage.extras = stage.fixedExtras
+        let socketCount = Int(stage.width / IcicleRules.socketWidth)
+        let underside = Double(rows - 1) * tileSize
+        stage.icicleSockets = (0..<socketCount).compactMap { index in
+            let left = (stage.width - Double(socketCount) * IcicleRules.socketWidth) / 2 + Double(index) * IcicleRules.socketWidth
+            let firstColumn = Int(left / tileSize), lastColumn = Int((left + IcicleRules.socketWidth) / tileSize) - 1
+            guard firstColumn > IcicleRules.freeColumns, lastColumn < columns - 1 - IcicleRules.freeColumns else { return nil }
+            return Vec2(x: left + IcicleRules.socketWidth / 2, y: underside - IcicleRules.hangLength)
+        }
         stage.lightningSpots = map.walls.filter { wall in
             wall.kind == .solid && wall.cell.row < rows - 1 && map.wall(at: .init(wall.cell.column, wall.cell.row + 1)) == nil
         }.map { Vec2(x: (Double($0.cell.column) + 0.5) * tileSize, y: Double($0.cell.row + 1) * tileSize) }

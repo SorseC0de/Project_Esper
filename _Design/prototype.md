@@ -127,7 +127,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   it and coming once it has reached its hold (`shotWindupFrames`, `throwWindupFrames`): the throw sheet's third frame, sliding
   straight back 48 art pixels over 12 frames (`StepbackRules`), the facing kept, trailing
   afterimages in the colour's bright version, at 0.9, held a tenth of a second and fading over
-  three, as Zeus Juice's bolt does (a jump out of the shooting stance, the throw and the slash leave the same), with the jump's sound; the whole way
+  three, as Zeus Juice's bolt does (a jump out of the shooting stance and the throw leave the same; the slash leaves its blade's, not the body's), with the jump's sound; the whole way
   a counter, as the throw stance's parry frames are (out of a shot the air-with-ball sheet's last
   frame shows, out of a throw the throw sheet's third), and its ball can't be snatched, by Frost Tea's
   either. Then back in the stance at its hold, buttons kept, the aim cleared: the stick still down from the stepback aims nothing until it's let go and pressed again, so a quick shot or throw out of it goes off the preset, not down (`stepbackAimLocked`, protocol 33). Down never cancels a stance: the
@@ -992,7 +992,8 @@ above the lava.
 
 Falling into the lava, a body or the ball, plays `fire_hit` and three sheets at the surface where it
 went in, `lava_splash` on top (15 a second), `sizzle1` or `sizzle2` by a coin flip under it (15 a
-second), and `explosion` under that (24 a second), all at half size, a quarter for the ball. Burned
+second), and `explosion` under that (24 a second), all at half size, a quarter for the ball, the
+splash at twice the others'. Burned
 by a fire tornado, the same at the body's middle but the splash (`MatchEvent.tornadoBurned`).
 
 The fireball (`Match.stageFireball`, `StageFireballRules`, `fireball`, four 16 pixel frames at 15 a
@@ -1001,7 +1002,9 @@ takes two and a half seconds along a smooth curve through every tornado's middle
 the rightmost and back under, each pass the other way from the last, first left to right, the sprite
 (drawn pointing right) turned to its path. It strips whoever it touches, knocked its way and coasting
 on it 20 frames before the stick has them again (`StageFireballRules.knockCoastFrames`), and bursts
-(`fire_explosion`, `fire_hit`), gone for the rest of the pass; on Blazing Boba it only bursts. A body
+(`fire_explosion`, `fire_hit`), gone for the rest of the pass; on Blazing Boba it only bursts.
+It's drawn only above the lava's drawn surface (`ElementsArt.lavaSurfaceLine`, 32 pixels up, under
+its crests), and going under it plays `lava_splash` there. A body
 knocked out of a tornado, by anything, isn't taken straight back.
 
 The wind (`wind`, nine 32 pixel frames at ten a second): a puff about every third of a second in each
@@ -1009,12 +1012,14 @@ of two layers, behind the rock and in front of everything, each at 1, 0.75, 0.5 
 anywhere on screen and blowing 64 to 160 pixels leftward as it plays through, fading out; none of it
 glows. On this stage the head's and legs' particles blow leftward rather than toward the ball.
 The rain: streaks 2 to 5 pixels long at 45 degrees, falling from the top right to the bottom left,
-in palette 48 or 22 at any strength from 0.2 up, not glowing. Thousands, drawn as two textures made
-once (256 pixel tiles, 260 and 200 streaks), each tiled over the screen and slid along, 240 and 360
+in palette 48 or 22 at any strength from 0.2 up, not glowing, stopping at the lava's drawn surface.
+Thousands, drawn as two textures made once (256 pixel tiles, 260 and 200 streaks times RAIN DENSITY,
+0 to 4 on the debug panel there, kept between launches, `RainTuning`), each tiled over the screen and slid along, 240 and 360
 pixels a second, whole pixels. It's the world's topmost layer (z 90, under the HUD), room left under it.
-The rain splashes (`splash`, seven 48 pixel frames at 15 a second, full size for now) about twelve
+The rain splashes (`splash`, seven 48 pixel frames at 15 a second, full size for now) about 24
 times a second at random on screen: on any open top of rock under the ceiling, and on the left
-side's slopes, turned to lie on them; never on the right side's slopes.
+side's slopes, turned to lie on them; never on the right side's slopes. On the lava it sizzles as often, `sizzle1` or `sizzle2` at a
+quarter size, anywhere along its surface on screen.
 
 Protocol 41.
 

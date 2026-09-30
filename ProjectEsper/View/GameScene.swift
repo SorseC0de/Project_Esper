@@ -340,15 +340,18 @@ final class GameScene: SKScene {
     var tornadoSnapshots: [BodySnapshot] {
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
-        return windSnapshots(windPuffs.back + rainSplashes) + (art.tornados + art.tornadoOverlays).compactMap { node in
-            guard let texture = node.texture else { return nil }
-            let visible = min(max((node.position.y + node.size.height - ElementsArt.lavaTop) / node.size.height, 0), 1)
-            guard visible > 0 else { return nil }
-            if visible >= 1 { return BodySnapshot(texture: texture, position: node.position, anchor: .zero, xScale: 1, size: node.size) }
-            return BodySnapshot(texture: SKTexture(rect: CGRect(x: 0, y: 1 - visible, width: 1, height: visible), in: texture),
-                                position: CGPoint(x: node.position.x, y: ElementsArt.lavaTop), anchor: .zero, xScale: 1,
-                                size: CGSize(width: node.size.width, height: node.size.height * visible))
-        }
+        return windSnapshots(windPuffs.back + rainSplashes + rainSizzles) + (art.tornados + art.tornadoOverlays).compactMap { GameScene.snapshot($0, above: ElementsArt.lavaTop) }
+    }
+
+    /// A node anchored at its lower left as the mask should draw it: only what's above `line`.
+    private static func snapshot(_ node: SKSpriteNode, above line: CGFloat) -> BodySnapshot? {
+        guard let texture = node.texture else { return nil }
+        let visible = min(max((node.position.y + node.size.height - line) / node.size.height, 0), 1)
+        guard visible > 0 else { return nil }
+        if visible >= 1 { return BodySnapshot(texture: texture, position: node.position, anchor: .zero, xScale: 1, size: node.size) }
+        return BodySnapshot(texture: SKTexture(rect: CGRect(x: 0, y: 1 - visible, width: 1, height: visible), in: texture),
+                            position: CGPoint(x: node.position.x, y: line), anchor: .zero, xScale: 1,
+                            size: CGSize(width: node.size.width, height: node.size.height * visible))
     }
 
     /// Wind puffs as drawn, for the mask to keep from glowing.
@@ -375,7 +378,7 @@ final class GameScene: SKScene {
         flat += windSnapshots(windPuffs.front)
         // And its rain, over everything.
         if !rainLayer.isHidden {
-            flat += rainTiles.joined().filter { !$0.isHidden }.map { BodySnapshot(texture: $0.texture!, position: $0.position, anchor: .zero, xScale: 1, size: $0.size) }
+            flat += rainTiles.joined().filter { !$0.isHidden }.compactMap { GameScene.snapshot($0, above: ElementsArt.lavaSurfaceLine) }
         }
         // The snipe's cursors, drawn as they are.
         for cursor in snipeCursors where !cursor.isHidden {
@@ -574,7 +577,11 @@ final class GameScene: SKScene {
         tornadoOverlays.maskNode = overLava
         tornadoOverlays.zPosition = 22
         world.addChild(tornadoOverlays)
-        // The rain over everything in the world, room left under it for more.
+        // The rain over everything in the world, room left under it for more, stopping at the lava.
+        let aboveLava = SKSpriteNode(color: .white, size: CGSize(width: 100_000, height: 100_000))
+        aboveLava.anchorPoint = CGPoint(x: 0.5, y: 0)
+        aboveLava.position = CGPoint(x: 0, y: ElementsArt.lavaSurfaceLine)
+        rainLayer.maskNode = aboveLava
         rainLayer.zPosition = 90
         world.addChild(rainLayer)
         camera = cameraNode
@@ -1123,20 +1130,22 @@ final class GameScene: SKScene {
 
     /// Into the lava: the lava's splash over a sizzle, either, over an explosion, and the fire's
     /// hit, at half size, a quarter for the ball; burned in a fire tornado, the same but the splash.
-    private func splashLava(at position: Vec2, ball: Bool, splash: Bool = true) {
-        play(.fireHit, at: position)
+    private func splashLava(at position: Vec2, ball: Bool, splash: Bool = true, only: String? = nil) {
+        if only == nil { play(.fireHit, at: position) }
         let scale: CGFloat = ball ? 0.25 : 0.5
         var layers: [(sheet: String, fps: Double, z: CGFloat)] = [
             ("explosion", 24, 40), (Bool.random() ? "sizzle1" : "sizzle2", 15, 41),
         ]
         if splash { layers.append(("lava_splash", 15, 42)) }
+        if let only { layers = layers.filter { $0.sheet == only } }
         for layer in layers {
             guard let count = EffectSheets.frames[layer.sheet] else { continue }
             let frames = (0..<count).map { sprites.texture(layer.sheet, $0) }
             let node = SKSpriteNode(texture: frames[0])
             node.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY[layer.sheet] ?? 0.5)
             node.position = SpriteLibrary.point(position)
-            node.setScale(scale)
+            // The splash twice the others' size.
+            node.setScale(layer.sheet == "lava_splash" ? scale * 2 : scale)
             node.zPosition = layer.z
             node.run(.sequence([.animate(with: frames, timePerFrame: 1 / layer.fps), .removeFromParent()]))
             glowers.addChild(node)
@@ -1145,9 +1154,17 @@ final class GameScene: SKScene {
 
     /// The Elements' fireball where the sim has it, its four frames at fifteen a second, facing its way.
     private var stageFireballNode: SKSpriteNode?
+    private var stageFireballLast: Vec2?
     private static let stageFireballFramesPerSecond = 15
     private func placeStageFireball() {
-        guard let fireball = match.stageFireball else {
+        // Only above the lava; going under, it splashes.
+        let surface = Double(ElementsArt.lavaSurfaceLine) / SpriteLibrary.pixelsPerUnit
+        let fireball = match.stageFireball
+        if let was = stageFireballLast, let now = fireball?.position, was.y >= surface, now.y < surface {
+            splashLava(at: Vec2(x: now.x, y: surface), ball: false, splash: true, only: "lava_splash")
+        }
+        stageFireballLast = fireball?.position
+        guard let fireball, fireball.position.y >= surface else {
             stageFireballNode?.isHidden = true
             return
         }
@@ -1213,12 +1230,15 @@ final class GameScene: SKScene {
     /// to the bottom left, in palette 48 or 22 at any strength. Thousands of them, but drawn as
     /// two textures made once, each a tile repeated over the screen and slid along: a near layer
     /// and a far one, slower. Over everything in the world, under the HUD.
-    private let rainLayer = SKNode()
+    private let rainLayer = SKCropNode()
     private var rainTiles: [[SKSpriteNode]] = [[], []]
     private static let rainTileSide = 256
     private static let rainSpeeds: [CGFloat] = [240, 360]
     private static let rainStreaksPerTile = [260, 200]
-    private static let rainTextures: [SKTexture] = rainStreaksPerTile.map { GameScene.makeRainTexture(streaks: $0) }
+    private static var rainTextures: [SKTexture] = makeRainTextures()
+    private static func makeRainTextures() -> [SKTexture] {
+        rainStreaksPerTile.map { GameScene.makeRainTexture(streaks: Int((Double($0) * RainTuning.density).rounded())) }
+    }
 
     private static func makeRainTexture(streaks: Int) -> SKTexture {
         let side = rainTileSide
@@ -1273,7 +1293,7 @@ final class GameScene: SKScene {
     /// slopes, turned to lie on them; not the right side's.
     private var rainSplashSpots: [(x: ClosedRange<CGFloat>, y: (CGFloat) -> CGFloat, turn: CGFloat)] = []
     private var rainSplashes: [SKSpriteNode] = []
-    private static let rainSplashesPerSecond = 12.0
+    private static let rainSplashesPerSecond = 24.0
 
     private func findRainSplashSpots() {
         rainSplashSpots = []
@@ -1293,6 +1313,27 @@ final class GameScene: SKScene {
                 break
             }
         }
+    }
+
+    /// Where the rain meets the lava it sizzles, small, here and there along its top on screen.
+    private var rainSizzles: [SKSpriteNode] = []
+    private static let rainSizzleScale: CGFloat = 0.25
+    private func sizzleRain() {
+        rainSizzles.removeAll { $0.parent == nil }
+        guard match.stage.features.look == .elements, RainTuning.density > 0,
+              Double.random(in: 0..<1) < GameScene.rainSplashesPerSecond * GameScene.stepSeconds else { return }
+        let sheet = Bool.random() ? "sizzle1" : "sizzle2"
+        guard let count = EffectSheets.frames[sheet] else { return }
+        let halfWidth = size.width * cameraNode.xScale / 2
+        let frames = (0..<count).map { sprites.texture(sheet, $0) }
+        let sizzle = SKSpriteNode(texture: frames[0])
+        sizzle.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY[sheet] ?? 0.5)
+        sizzle.position = CGPoint(x: cameraNode.position.x + .random(in: -halfWidth...halfWidth), y: ElementsArt.lavaSurfaceLine)
+        sizzle.setScale(GameScene.rainSizzleScale)
+        sizzle.zPosition = -7
+        sizzle.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 15), .removeFromParent()]))
+        stageGround.addChild(sizzle)
+        rainSizzles.append(sizzle)
     }
 
     /// Splashes here and there, at random, on what's on screen.
@@ -1553,6 +1594,13 @@ final class GameScene: SKScene {
                 GoalpostTuning.crossbarAngle = CGFloat(value)
                 self?.buildGoalposts()
                 self?.buildBackboards()
+            }
+        }
+        if series.stage.stage.features.look == .elements {
+            controls.addSlider(title: "RAIN DENSITY", range: 0...4, notch: 0.25, value: Float(RainTuning.density)) { [weak self] value in
+                RainTuning.density = Double(value)
+                GameScene.rainTextures = GameScene.makeRainTextures()
+                self?.rainTiles.joined().enumerated().forEach { index, tile in tile.texture = GameScene.rainTextures[index < (self?.rainTiles[0].count ?? 0) ? 0 : 1] }
             }
         }
         if ChevronTuning.slider {
@@ -4687,9 +4735,10 @@ final class GameScene: SKScene {
             }
             drawCape(index, player: player, behind: node.position)
             // The stepback, a jump out of the shooting stance, the throw and the slash leave the trail.
-            let trailing = player.state == .stepback || player.state == .throwing || player.state == .slashing
-                || (player.state == .shootStance && !player.grounded)
+            let trailing = player.state == .stepback || player.state == .throwing || (player.state == .shootStance && !player.grounded)
             if trailing, match.frame % 2 == 0 { spawnAfterimage(of: node, player: index) }
+            // The slash's trail is its blade, not the body.
+            if player.state == .slashing, match.frame % 2 == 0, !energyNodes[index].isHidden { spawnAfterimage(of: energyNodes[index], player: index) }
             if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {
                 spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: -player.facing.sign * 4, y: 2)), count: 2, spread: 6)
             }
@@ -4758,6 +4807,7 @@ final class GameScene: SKScene {
         placeStageFireball()
         blowWind()
         splashRain()
+        sizzleRain()
         fallRain()
         elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime(),
                                    burstFrame: TornadoRules.burstFrame(at: match.frame),

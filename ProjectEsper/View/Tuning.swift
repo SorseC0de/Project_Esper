@@ -151,6 +151,16 @@ enum ChevronTuning {
     static let slider = true
 }
 
+/// The Elements' rain: how many streaks, from none to four times as many as at 1 (RAIN DENSITY on
+/// the debug panel there, kept between launches).
+enum RainTuning {
+    static let densityKey = "elements.rain.density"
+    static var density: Double {
+        get { (UserDefaults.standard.object(forKey: densityKey) as? Double) ?? 1 }
+        set { UserDefaults.standard.set(newValue, forKey: densityKey) }
+    }
+}
+
 /// 47's three-point lines: their thickness in art pixels (3PT WIDTH on the UI tuning panel,
 /// under HUD, kept between launches), and their breath, from gone to a quarter and back.
 enum ThreePointTuning {

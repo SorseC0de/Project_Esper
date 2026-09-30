@@ -26,6 +26,8 @@ enum ElementsArt {
     static let hoverRadius: CGFloat = 3
     /// Where the lava's art tops out, for what sinks into it.
     static var lavaTop: CGFloat { lavaSide }
+    /// Where the lava's body starts under its flecks and crests, as drawn: what rain and a fireball stop at.
+    static let lavaSurfaceLine: CGFloat = 32
     /// No icicle hangs over these columns or their mirror: the ceiling's ends, over the rock and the shafts.
     static let icicleFreeColumns = 16
     /// The icicles' sockets along the ceiling, 32 wide and 48 tall, the art at their tops.

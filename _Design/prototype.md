@@ -928,8 +928,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 
 ## The Elements
 
-`Stage.elements`, The Elements on the stage select (a working title): 67 by 25 tiles, two
-Wreck Centers across less a column, so there's a middle one, and 25 high (a large stage's most: lava to the ceiling of icicles), at a court's zoom (the 34 by 16 court fitted, whole pixels) and scrolling on the same gliding camera as Longball, up and down as well as sideways, the lava the bottom row. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
+`Stage.elements`, The Elements on the stage select (a working title): 67 by 24 tiles, two
+Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
 they're recoloured), `mountains_bkg` stretched over the stage in front of
 it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
 through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16

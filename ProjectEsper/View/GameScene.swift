@@ -1218,14 +1218,17 @@ final class GameScene: SKScene {
         // ground below the floor in, so the players stand in the middle of it.
         let below = match.stage.features.scenic ? FieldArt.viewBelowFloor : 0
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
-        let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
-        let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
-        let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
+        // The Elements, two courts across and two high, is drawn at a court's zoom and scrolls.
+        let elements = match.stage.features.look == .elements
+        let fitHeight = (screenScale * size.height / (elements ? GameScene.courtRows * GameScene.pixelsPerTile : stageHeight)).rounded(.down)
+        let fitWidth = (screenScale * size.width / (elements ? GameScene.courtColumns * GameScene.pixelsPerTile : stageWidth)).rounded(.down)
+        let screenPixelsPerGamePixel = max(1, scrolls && !elements ? fitHeight : min(fitHeight, fitWidth))
         let pointsPerGamePixel = screenPixelsPerGamePixel / screenScale
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale
         cameraNode.position = CGPoint(x: scrolls ? cameraBase.x : stageWidth / 2, y: stageHeight / 2 - below)
         if scrolls, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
+        if elements { cameraNode.position.y = cameraBase.y == 0 ? cameraTargetY() : cameraBase.y }
         cameraBase = cameraNode.position
         // The HUD is laid out in the phone's points and scaled up for a bigger screen.
         hudScale = HudScene.scale(forHeight: size.height)
@@ -3150,6 +3153,17 @@ final class GameScene: SKScene {
         let width = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
         return min(max(wanted, halfView), max(width - halfView, halfView))
     }
+    /// Up and down on the Elements, too tall for a court's zoom: the local player, held inside the stage.
+    private func cameraTargetY() -> CGFloat {
+        let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile
+        guard match.players.indices.contains(localIndex) else { return stageHeight / 2 }
+        let wanted = SpriteLibrary.point(match.players[localIndex].position).y
+        let halfView = size.height * cameraNode.yScale / 2
+        return min(max(wanted, halfView), max(stageHeight - halfView, halfView))
+    }
+    /// The court every other stage is sized to, in tiles: the Elements takes its zoom.
+    private static let courtColumns: CGFloat = 34
+    private static let courtRows: CGFloat = 16
     private static let cameraEase: CGFloat = 0.08
     private static let cameraLeadFrames: CGFloat = 20
 
@@ -4505,6 +4519,7 @@ final class GameScene: SKScene {
         spinBall(ball)
         // The camera on a scrolling stage: level, gliding after the local player and leading them.
         if [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }
+        if match.stage.features.look == .elements { cameraBase.y += (cameraTargetY() - cameraBase.y) * GameScene.cameraEase }
         placeBallCamFrame()
         circlesOverCam.isHidden = !ballCamEnabled
         // 47's lines breathe, slowly, between gone and a quarter.

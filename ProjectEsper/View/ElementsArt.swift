@@ -18,6 +18,12 @@ enum ElementsArt {
     static let tornadoSide: CGFloat = 48
     /// Seconds a tornado's frame shows: twelve a second.
     static let tornadoFrameSeconds = 1.0 / 12
+    /// The copy of each tornado drawn over the players.
+    static let tornadoOverlayAlpha: CGFloat = 0.33
+    /// Where the lava's art tops out, for what sinks into it.
+    static var lavaTop: CGFloat { lavaSide }
+    /// No icicle hangs over these columns or their mirror: the ceiling's ends, over the rock and the shafts.
+    static let icicleFreeColumns = 16
     /// The icicles' sockets along the ceiling, 32 wide and 48 tall, the art at their tops.
     static let icicleWidth: CGFloat = 32
     static let icicleHeight: CGFloat = 48
@@ -77,28 +83,47 @@ enum ElementsArt {
     struct Handles {
         var tiles: [ElementsMap.Cell: SKSpriteNode] = [:]
         var tornados: [SKSpriteNode] = []
+        var tornadoOverlays: [SKSpriteNode] = []
         /// The stage's fixed art, for the glow's mask to leave out: the mountains, the icicles.
         var mountains: SKSpriteNode?
         var icicles: [SKSpriteNode] = []
-        /// The rock's deep purple carried on above the ceiling into a taller screen's spare rows.
-        var aboveCeiling: SKSpriteNode?
+        /// A taller screen's spare rows, the lava's orange below and the rock's purple above, and
+        /// the shafts' walls up through them: none of it glows.
+        var spareFills: [SKSpriteNode] = []
+        var shaftWalls: [SKSpriteNode] = []
         let parent: SKNode
+        let overlayParent: SKNode
         let sprites: SpriteLibrary
 
-        /// The tornados as the map has them, drawn whole, each animated on a frame of its own.
+        /// The tornados as the map has them, drawn whole, and each again over the players, faint,
+        /// in `overlayParent`, cropped to above the lava.
         mutating func setTornados(_ bases: [ElementsMap.Cell]) {
-            tornados.forEach { $0.removeFromParent() }
-            let frames = (0..<ElementsArt.tornadoFrames).map { sprites.texture("tornado", $0) }
-            tornados = bases.enumerated().map { index, base in
-                let node = SKSpriteNode(texture: frames[0])
+            (tornados + tornadoOverlays).forEach { $0.removeFromParent() }
+            func node(_ base: ElementsMap.Cell, z: CGFloat, alpha: CGFloat, into layer: SKNode) -> SKSpriteNode {
+                let node = SKSpriteNode(texture: sprites.texture("tornado", 0))
                 node.anchorPoint = .zero
                 node.size = CGSize(width: ElementsArt.tornadoSide, height: ElementsArt.tornadoSide)
                 node.position = CGPoint(x: CGFloat(base.column - 1) * ElementsArt.tileSide, y: CGFloat(base.row) * ElementsArt.tileSide)
-                node.zPosition = -7
-                let start = (index * 3) % ElementsArt.tornadoFrames
-                node.run(.repeatForever(.animate(with: Array(frames[start...]) + Array(frames[..<start]), timePerFrame: ElementsArt.tornadoFrameSeconds)))
-                parent.addChild(node)
+                node.zPosition = z
+                node.alpha = alpha
+                layer.addChild(node)
                 return node
+            }
+            // Behind the lava, so one sinks into it.
+            tornados = bases.map { node($0, z: -9.5, alpha: 1, into: parent) }
+            tornadoOverlays = bases.map { node($0, z: 0, alpha: ElementsArt.tornadoOverlayAlpha, into: overlayParent) }
+        }
+
+        /// The tornados where the sim has them this frame, each on a frame of its own, in fire or not.
+        func placeTornados(_ boxes: [Box], fire: Bool, time: Double) {
+            let sheet = fire ? "fire_tornado" : "tornado"
+            let step = Int(time / ElementsArt.tornadoFrameSeconds)
+            for (index, box) in boxes.enumerated() where index < tornados.count {
+                let texture = sprites.texture(sheet, (step + index * 3) % ElementsArt.tornadoFrames)
+                for node in [tornados[index], tornadoOverlays[index]] {
+                    node.texture = texture
+                    node.position = SpriteLibrary.point(box.min)
+                }
             }
         }
 
@@ -116,7 +141,7 @@ enum ElementsArt {
         }
     }
 
-    static func build(stage: Stage, map: ElementsMap, into parent: SKNode, sprites: SpriteLibrary) -> Handles {
+    static func build(stage: Stage, map: ElementsMap, into parent: SKNode, overlayParent: SKNode, sprites: SpriteLibrary) -> Handles {
         let width = CGFloat(stage.columns) * tileSide, height = CGFloat(stage.rows) * tileSide
         tornadoPreview = sprites.texture("tornado", 0)
         // The mountains over the whole stage, stretched to fill.
@@ -149,6 +174,11 @@ enum ElementsArt {
         var icicleX = (width - CGFloat(count) * icicleWidth) / 2
         var icicles: [SKSpriteNode] = []
         for _ in 0..<count {
+            let firstColumn = Int(icicleX / tileSide), lastColumn = Int((icicleX + icicleWidth) / tileSide) - 1
+            guard firstColumn > icicleFreeColumns, lastColumn < stage.columns - 1 - icicleFreeColumns else {
+                icicleX += icicleWidth
+                continue
+            }
             let icicle = SKSpriteNode(texture: socket)
             icicle.anchorPoint = .zero
             icicle.size = CGSize(width: icicleWidth, height: icicleHeight)
@@ -172,10 +202,28 @@ enum ElementsArt {
             parent.addChild(node)
             return node
         }
-        _ = fill(lavaOrange, y: -spare, z: -9)
+        let below = fill(lavaOrange, y: -spare, z: -9)
         let above = fill(ceilingPurple, y: height, z: -8)
-        var handles = Handles(parent: parent, sprites: sprites)
-        handles.aboveCeiling = above
+        // The shafts up through the sky over the ceiling's gaps, walled in rock edges.
+        var shaftWalls: [SKSpriteNode] = []
+        let ceilingRow = stage.rows - 1
+        for column in 0..<stage.columns where map.wall(at: .init(column, ceilingRow)) != .solid {
+            for (wallColumn, art) in [(column - 1, ElementsMap.Cell(5, 3)), (column + 1, ElementsMap.Cell(1, 3))]
+            where (0..<stage.columns).contains(wallColumn) && map.wall(at: .init(wallColumn, ceilingRow)) == .solid {
+                for row in stage.rows..<(stage.rows + Int(spare / tileSide)) {
+                    let wall = SKSpriteNode(texture: tile(art))
+                    wall.size = CGSize(width: tileSide, height: tileSide)
+                    wall.anchorPoint = .zero
+                    wall.position = CGPoint(x: CGFloat(wallColumn) * tileSide, y: CGFloat(row) * tileSide)
+                    wall.zPosition = -7.9
+                    parent.addChild(wall)
+                    shaftWalls.append(wall)
+                }
+            }
+        }
+        var handles = Handles(parent: parent, overlayParent: overlayParent, sprites: sprites)
+        handles.spareFills = [below, above]
+        handles.shaftWalls = shaftWalls
         handles.mountains = range
         handles.icicles = icicles
         for placed in map.tiles { handles.set(placed, at: placed.cell) }

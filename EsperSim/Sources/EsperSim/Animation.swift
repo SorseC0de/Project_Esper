@@ -218,6 +218,9 @@ extension Player {
             return AnimationFrame(hasBall ? .airBall : .air, 2)
         case .flying:
             return AnimationFrame(hasBall ? .airBall : .air, 1)
+        case .suspended:
+            // Falling, as it hangs.
+            return AnimationFrame(hasBall ? .airBall : .air, 2)
         case .gunShoot:
             return AnimationFrame(grounded ? .gunShoot : .gunShootAir, t * 15 / 60)
         }

@@ -10,13 +10,13 @@ final class ElementsTests: XCTestCase {
         XCTAssertEqual(StageChoice.theElements.stage.features.look, .elements)
     }
 
-    func testTheDefaultMapStandsEveryoneOnSomethingAndHangsTheRimsInTheOpen() {
+    func testTheDefaultMapDropsEveryoneInFromAboveAndHangsTheRimsInTheOpen() {
         let stage = Stage.elements
         for (index, spawn) in stage.playerSpawns.enumerated() {
             let feet = Box(min: Vec2(x: spawn.x - 2, y: spawn.y), max: Vec2(x: spawn.x + 2, y: spawn.y + 17.5))
             XCTAssertFalse(stage.overlapsSolid(feet), "player \(index) starts clear")
-            XCTAssertTrue(stage.isGrounded(feet), "player \(index) starts standing")
-            XCTAssertGreaterThan(spawn.y, ElementsRules.lavaSurface)
+            XCTAssertFalse(stage.isGrounded(feet), "player \(index) starts in the air")
+            XCTAssertGreaterThan(spawn.y, stage.height, "above the stage, in its shaft")
         }
         for hoop in stage.hoops {
             XCTAssertFalse(stage.overlapsSolid(Box(center: hoop.position, width: 10, height: 6)), "the rim's in the open")
@@ -46,8 +46,8 @@ final class ElementsTests: XCTestCase {
         // A slope's left tile on the left is its right tile on the right, across the middle.
         let map = ElementsMap.baked
         func art(_ column: Int, _ row: Int) -> ElementsMap.Cell? { map.tiles.first { $0.cell == .init(column, row) }?.art }
-        XCTAssertEqual(art(19, 15), .init(6, 5))
-        XCTAssertEqual(art(47, 15), .init(7, 5))
+        XCTAssertEqual(art(18, 15), .init(6, 5))
+        XCTAssertEqual(art(48, 15), .init(7, 5))
         XCTAssertEqual(art(2, 9), .init(7, 3))
         XCTAssertEqual(art(64, 9), .init(13, 3))
     }
@@ -82,7 +82,7 @@ final class ElementsTests: XCTestCase {
         XCTAssertFalse(match.players[0].hasBall)
         XCTAssertNil(match.ball.holder)
         XCTAssertEqual(match.ball.position.x, match.stage.ballSpawn.x, accuracy: 0.001)
-        XCTAssertEqual(match.players[1].position, match.stage.playerSpawns[1], "the other's left alone")
+        XCTAssertEqual(match.players[1].position.x, match.stage.playerSpawns[1].x, "the other's left alone")
     }
 
     func testALooseBallInTheLavaGoesBackToItsStart() {

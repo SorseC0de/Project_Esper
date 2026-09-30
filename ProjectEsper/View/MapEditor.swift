@@ -217,7 +217,8 @@ final class MapEditor: SKNode {
         let tools: [(String, Tool)]
         if wallsMode {
             let kinds: [(String, ElementsMap.Kind?)] = [("SOLID", .solid), ("\u{25E2}", .lowerRight), ("\u{25E3}", .lowerLeft),
-                                                       ("\u{25E5}", .upperRight), ("\u{25E4}", .upperLeft), ("OPEN", nil)]
+                                                       ("\u{25E5}", .upperRight), ("\u{25E4}", .upperLeft),
+                                                       ("SLIDE \u{25E2}", .slideLowerRight), ("SLIDE \u{25E3}", .slideLowerLeft), ("OPEN", nil)]
             tools = kinds.map { ($0.0, .wall($0.1)) }
         } else {
             tools = [("ERASE", .erase), ("TORNADO", .tornado)] + Marker.allCases.map { ($0.label, .marker($0)) }
@@ -396,16 +397,18 @@ final class MapEditor: SKNode {
             let path = CGMutablePath()
             switch wall.kind {
             case .solid: path.addRect(CGRect(x: 0, y: 0, width: side, height: side))
-            case .lowerRight: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: side, y: side)])
-            case .lowerLeft: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: 0, y: side)])
+            case .lowerRight, .slideLowerRight: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: side, y: side)])
+            case .lowerLeft, .slideLowerLeft: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: 0, y: side)])
             case .upperRight: path.addLines(between: [CGPoint(x: 0, y: side), CGPoint(x: side, y: side), CGPoint(x: side, y: 0)])
             case .upperLeft: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: 0, y: side), CGPoint(x: side, y: side)])
             }
             path.closeSubpath()
             let node = SKShapeNode(path: path)
             node.position = rect.origin
-            node.fillColor = SKColor(red: 1, green: 0.1, blue: 0.1, alpha: 0.38)
-            node.strokeColor = SKColor(red: 1, green: 0.2, blue: 0.2, alpha: 0.85)
+            // Slide slopes in orange, apart from the red of the rest.
+            let slides = wall.kind == .slideLowerRight || wall.kind == .slideLowerLeft
+            node.fillColor = slides ? SKColor(red: 1, green: 0.6, blue: 0.1, alpha: 0.45) : SKColor(red: 1, green: 0.1, blue: 0.1, alpha: 0.38)
+            node.strokeColor = slides ? SKColor(red: 1, green: 0.7, blue: 0.2, alpha: 0.9) : SKColor(red: 1, green: 0.2, blue: 0.2, alpha: 0.85)
             node.lineWidth = 0.75
             wallLayer.addChild(node)
         }

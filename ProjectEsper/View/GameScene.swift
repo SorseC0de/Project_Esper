@@ -335,8 +335,16 @@ final class GameScene: SKScene {
     /// The tornados as they look this frame, green under the bodies: they animate, so they can't
     /// live in the static layer.
     var tornadoSnapshots: [BodySnapshot] {
-        (elementsArt?.tornados ?? []).compactMap { node in
-            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
+        // Only what's above the lava: sunk, the lava in front of them still glows.
+        guard let art = elementsArt else { return [] }
+        return (art.tornados + art.tornadoOverlays).compactMap { node in
+            guard let texture = node.texture else { return nil }
+            let visible = min(max((node.position.y + node.size.height - ElementsArt.lavaTop) / node.size.height, 0), 1)
+            guard visible > 0 else { return nil }
+            if visible >= 1 { return BodySnapshot(texture: texture, position: node.position, anchor: .zero, xScale: 1, size: node.size) }
+            return BodySnapshot(texture: SKTexture(rect: CGRect(x: 0, y: 1 - visible, width: 1, height: visible), in: texture),
+                                position: CGPoint(x: node.position.x, y: ElementsArt.lavaTop), anchor: .zero, xScale: 1,
+                                size: CGSize(width: node.size.width, height: node.size.height * visible))
         }
     }
 
@@ -543,6 +551,13 @@ final class GameScene: SKScene {
         world.addChild(glowers)
         hitboxLayer.zPosition = 30
         world.addChild(hitboxLayer)
+        // The Elements' tornados again over the players, only above the lava.
+        let overLava = SKSpriteNode(color: .white, size: CGSize(width: 100_000, height: 100_000))
+        overLava.anchorPoint = CGPoint(x: 0.5, y: 0)
+        overLava.position = CGPoint(x: 0, y: ElementsArt.lavaTop)
+        tornadoOverlays.maskNode = overLava
+        tornadoOverlays.zPosition = 22
+        world.addChild(tornadoOverlays)
         camera = cameraNode
         addChild(cameraNode)
         glowHud.zPosition = 100
@@ -852,6 +867,7 @@ final class GameScene: SKScene {
 
     /// The Elements' placed tiles, while it's the stage drawn.
     private var elementsArt: ElementsArt.Handles?
+    private let tornadoOverlays = SKCropNode()
 
     /// What the stage draws that must not glow, its tiles, its mountains and its icicles, with
     /// a version for the glow's mask to redo them only when they change. The lava glows.
@@ -861,7 +877,7 @@ final class GameScene: SKScene {
     private func refreshStaticFlats() {
         var flats: [BodySnapshot] = []
         if let art = elementsArt {
-            let nodes = ([art.mountains, art.aboveCeiling].compactMap { $0 }) + art.icicles + Array(art.tiles.values)
+            let nodes = ([art.mountains].compactMap { $0 }) + art.spareFills + art.shaftWalls + art.icicles + Array(art.tiles.values)
             flats = nodes.compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
@@ -878,7 +894,8 @@ final class GameScene: SKScene {
         backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : GameScene.background
         elementsArt = nil
         if isElements {
-            elementsArt = ElementsArt.build(stage: stage, map: ElementsMap.current, into: stageGround, sprites: sprites)
+            tornadoOverlays.removeAllChildren()
+            elementsArt = ElementsArt.build(stage: stage, map: ElementsMap.current, into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
         }
         refreshStaticFlats()
         if stage.features.look == .highway {
@@ -3377,7 +3394,10 @@ final class GameScene: SKScene {
                 }
             },
             onMarkers: { [weak self] in self?.session.mutate { $0.stage = .elements; $0.refreshExtras() } },
-            onTornados: { [weak self] in self?.elementsArt?.setTornados(ElementsMap.current.tornados) },
+            onTornados: { [weak self] in
+                self?.elementsArt?.setTornados(ElementsMap.current.tornados)
+                self?.session.mutate { $0.stage = .elements; $0.refreshExtras() }
+            },
             onWalls: { [weak self] in self?.session.mutate { $0.stage = .elements; $0.refreshExtras() } },
             onClose: { [weak self] in self?.closeMapEditor(restart: true) })
         hud.addChild(editor)
@@ -4503,6 +4523,7 @@ final class GameScene: SKScene {
         }
 
         drawPlatforms()
+        elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime())
         section("webs")
 
         let ball = match.ball

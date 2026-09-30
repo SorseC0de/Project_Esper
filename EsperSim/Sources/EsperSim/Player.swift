@@ -63,6 +63,8 @@ public enum PlayerState: Equatable, Hashable {
     case flying, gunShoot
     /// Pulsepistol Punch at level two: prone, aiming a cursor.
     case gunSnipe
+    /// Held in one of the Elements' tornados, hovering at its middle.
+    case suspended
 
     /// The actions Titan Tea does slower.
     public var isAction: Bool {
@@ -84,7 +86,7 @@ public enum PlayerState: Equatable, Hashable {
     public var canCatch: Bool {
         switch self {
         case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull, .flying,
-             .crouch, .crouchWalk, .slide: true
+             .crouch, .crouchWalk, .slide, .suspended: true
         default: false
         }
     }
@@ -198,6 +200,10 @@ public struct Player: Equatable {
     /// A slide on a slope going down the way it faces: the body rides it on its own, and only a
     /// jump gets out, until flat ground or open air.
     public var forcedSlide = false
+    /// Held in a tornado: where its middle is, for the body's middle to be drawn to; and
+    /// frames left before a tornado can take the body again after it jumped out.
+    public var tornadoCentre: Vec2?
+    public var tornadoCooldown = 0
     public var slashHit = false
     /// Frames of down held on the ground, and frames left falling through one-ways after a drop.
     public var dropHoldFrames = 0
@@ -374,6 +380,7 @@ public struct Player: Equatable {
         state = next
         stateTimer = 0
         if next != .slide { forcedSlide = false }
+        if next != .suspended { tornadoCentre = nil }
         // A fresh stance has its stepback; coming back out of one doesn't.
         if next == .shootStance || next == .throwStance, previousState != .stepback {
             stepbackUsed = false
@@ -478,6 +485,7 @@ public struct Player: Equatable {
             webLine = line.frames > 1 ? WebLine(target: line.target, frames: line.frames - 1) : nil
         }
         if airControlLock > 0 { airControlLock -= 1 }
+        if tornadoCooldown > 0 { tornadoCooldown -= 1 }
         if coyote > 0 { coyote -= 1 }
         if input.shootButtons == 0 { shootReady = true }
         if !input.throwBall { throwReady = true }
@@ -520,7 +528,7 @@ public struct Player: Equatable {
         let onDefence = ballHolder != nil && ballHolder != index
         var action: PlayerAction?
         let free = state == .idle || state == .walk || state == .run || state == .dash || state == .air || state == .land || state == .wallLand
-            || state == .flying || state == .crouch || state == .crouchWalk
+            || state == .flying || state == .suspended || state == .crouch || state == .crouchWalk
         if free {
             action = webLineIfAsked(input, throwPressed: throwPressed)
         }
@@ -542,6 +550,23 @@ public struct Player: Equatable {
         let throwingBolt = boltPose > 0 && grounded && state.isGroundState
         let boltCarry = velocity.x
         if throwingBolt { input.stick.x = 0 }
+
+        // A slide slope: nobody stands on it. Held uphill, the body walks against it and is
+        // carried back down, as up a down escalator; otherwise it turns downhill into the forced slide.
+        var slideSlopeResisted: Facing?
+        if grounded, velocity.y <= 0, [.idle, .walk, .dash, .run, .pivot, .land, .crouch, .crouchWalk, .slide].contains(state),
+           let downhill = stage.slideSlopeDownhill(under: body, reach: SlopeRules.step) {
+            if stickFacing(input) == downhill.flipped, !jumpPressed {
+                if state != .walk { enter(.walk) }
+                slideSlopeResisted = downhill
+            } else if state != .slide {
+                facing = downhill
+                enter(.slide)
+                forcedSlide = true
+            } else {
+                facing = downhill
+            }
+        }
 
         switch state {
         case .idle:
@@ -1245,6 +1270,32 @@ public struct Player: Equatable {
                 enter(.air)
             }
 
+        case .suspended:
+            // Held in a tornado: the body's middle drawn to its middle, a share of the way a
+            // frame, gravity off. Jump leaves it with a jump; the rest is as in flight.
+            guard let centre = tornadoCentre else { enter(.air); break }
+            let middle = Vec2(x: position.x, y: position.y + spec.bodyHeight / 2)
+            velocity = (centre - middle) * TornadoRules.pullShare
+            if jumpPressed {
+                jumpBuffer = 0
+                velocity = Vec2(x: velocity.x, y: spec.fullHopVelocity)
+                jumpsLeft = spec.jumps - 1
+                tornadoCooldown = TornadoRules.jumpOutCooldownFrames
+                events.append(.jumped(player: index))
+                enter(.air)
+            } else if holding, input.shoot, shootReady {
+                enterShootStance()
+            } else if holding, input.throwBall, throwReady {
+                throwDirection = .zero
+                quickThrow = false
+                throwStanceEntrySpeed = velocity.x
+                enter(.throwStance)
+            } else if !holding, throwPressed, snatchCooldown == 0 {
+                startSnatch()
+            } else if !holding, shootPressed {
+                startSlash(events: &events)
+            }
+
         case .gunShoot:
             // Pulsepistol Punch's shot, standing: braked, the pulse on its frame.
             if grounded {
@@ -1272,6 +1323,10 @@ public struct Player: Equatable {
 
         if throwingBolt, state.isGroundState {
             velocity.x = approach(boltCarry, 0, spec.attackBrake)
+        }
+        if let downhill = slideSlopeResisted, state == .walk {
+            facing = downhill.flipped
+            velocity.x = downhill.sign * walkMaxSpeed * SlopeRules.slideSlopePushBack
         }
         if action == nil, wantsPlatform {
             action = .makePlatform
@@ -1955,7 +2010,7 @@ public struct Player: Equatable {
                 webAnchor = nil
                 events.append(.landed(player: index))
                 enter(.land)
-            case .flying:
+            case .flying, .suspended:
                 events.append(.landed(player: index))
                 enter(.land)
             default:

@@ -101,6 +101,7 @@ public struct Match: Equatable {
         refreshExtras()
         if portalCooldown > 0 { portalCooldown -= 1 }
         stepField()
+        stepTornados()
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
@@ -475,18 +476,59 @@ public struct Match: Equatable {
     private mutating func burnInLava() {
         guard let surface = stage.features.lavaSurface else { return }
         for index in players.indices where players[index].position.y < surface {
-            let was = players[index]
-            players[index] = Player(spec: was.spec, index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
-            players[index].power = was.power
-            players[index].powerLevel = was.powerLevel
-            events.append(.lavaBurned(player: index))
-            if ball.holder == index {
-                ball.holder = nil
-                ball.respawn(at: stage.ballSpawn)
-            }
+            burn(index)
         }
         if ball.holder == nil, ball.isLive, ball.position.y < surface {
             ball.respawn(at: stage.ballSpawn)
+        }
+    }
+
+    /// Burned, by the lava or a fire tornado: back to the start, the ball it held back to its own.
+    private mutating func burn(_ index: Int) {
+        let was = players[index]
+        players[index] = Player(spec: was.spec, index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
+        players[index].power = was.power
+        players[index].powerLevel = was.powerLevel
+        events.append(.lavaBurned(player: index))
+        if ball.holder == index {
+            ball.holder = nil
+            ball.respawn(at: stage.ballSpawn)
+        }
+    }
+
+    /// Where the stage's tornados are this frame: up, or on the way down into the lava or back.
+    public var tornadoBoxes: [Box] {
+        let share = TornadoRules.sunkShare(at: frame)
+        return stage.tornados.map { box in
+            let drop = (TornadoRules.sunkBottom - box.min.y) * share
+            return Box(min: Vec2(x: box.min.x, y: box.min.y + drop), max: Vec2(x: box.max.x, y: box.max.y + drop))
+        }
+    }
+
+    /// A regular tornado that's up takes whoever comes into it out of the air, and holds
+    /// them; sinking, it lets them go. A fire one burns whoever it touches.
+    private mutating func stepTornados() {
+        guard !stage.tornados.isEmpty else { return }
+        let boxes = tornadoBoxes
+        let up = TornadoRules.isUp(at: frame), fire = TornadoRules.isFire(at: frame)
+        for index in players.indices {
+            let body = players[index].body
+            guard let hit = boxes.firstIndex(where: { $0.overlaps(body) }) else {
+                if players[index].state == .suspended { players[index].enter(.air) }
+                continue
+            }
+            if fire {
+                burn(index)
+            } else if !up {
+                if players[index].state == .suspended { players[index].enter(.air) }
+            } else if players[index].state == .suspended {
+                players[index].tornadoCentre = boxes[hit].center
+            } else if players[index].state == .air, players[index].tornadoCooldown == 0 {
+                players[index].enter(.suspended)
+                players[index].fastFalling = false
+                players[index].jumpsLeft = players[index].spec.jumps
+                players[index].tornadoCentre = boxes[hit].center
+            }
         }
     }
 

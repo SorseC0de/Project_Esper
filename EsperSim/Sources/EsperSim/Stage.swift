@@ -65,6 +65,17 @@ public struct Box: Equatable {
 public struct Slope: Equatable {
     public var box: Box
     public var rising: Bool
+    /// A slide slope: whoever is on it slides down, and held uphill is carried back down.
+    public var slides = false
+
+    public init(box: Box, rising: Bool, slides: Bool = false) {
+        self.box = box
+        self.rising = rising
+        self.slides = slides
+    }
+
+    /// The way down it.
+    public var downhill: Facing { rising ? .left : .right }
 
     /// The surface's height at `x`, clamped into the square.
     public func surface(at x: Double) -> Double {
@@ -115,6 +126,10 @@ public struct Stage: Equatable {
     /// Solid boxes that come and go, such as a made platform. Everything that asks the
     /// stage about solids sees them.
     public var extras: [Box] = []
+    /// Extras that are part of the stage, under whatever comes and goes.
+    public var fixedExtras: [Box] = []
+    /// Where each tornado stands when it's up, its whole square.
+    public var tornados: [Box] = []
     /// Extras Surf Soda's board can't ride up: the cars.
     public var unridable: [Box] = []
     /// What the stage has beyond its tiles.
@@ -225,6 +240,16 @@ public struct Stage: Equatable {
             return slope.rising == (facing == .left)
         }
         return false
+    }
+
+    /// The way down a slide slope under the box's middle, close under its feet, if it's on one.
+    public func slideSlopeDownhill(under box: Box, reach: Double) -> Facing? {
+        let middle = (box.min.x + box.max.x) / 2
+        for slope in slopes where slope.slides && slope.box.min.x <= middle && middle <= slope.box.max.x
+            && abs(slope.surface(at: middle) - box.min.y) <= reach {
+            return slope.downhill
+        }
+        return nil
     }
 
     /// The slope under the box's middle whose surface is within `reach` of its feet, and
@@ -499,6 +524,9 @@ public struct Stage: Equatable {
                 guard tile(column: toward, row: row) == .empty,
                       tile(column: column, row: row + 1) == .empty,
                       tile(column: toward, row: row + 1) == .empty else { continue }
+                // Nor under a solid extra, such as the sky over the Elements' ceiling.
+                let above = Box(min: Vec2(x: Double(column) * Stage.tileSize, y: tileTop), max: Vec2(x: Double(column + 1) * Stage.tileSize, y: tileTop + Stage.tileSize))
+                guard !extras.contains(where: { $0.overlaps(above) }) else { continue }
                 let face = side == .right ? Double(column) * Stage.tileSize : Double(column + 1) * Stage.tileSize
                 let ahead = (face - near) * side.sign
                 guard ahead >= -2, ahead <= reach, abs(ahead) < bestDistance else { continue }
@@ -589,8 +617,8 @@ public struct Stage: Equatable {
         return stage
     }
 
-    /// The Elements: two courts across and two high, no scrolling, floating rock from a tile
-    /// map built by hand over a bed of lava. The sides and the floor are the world's edge.
+    /// The Elements: two courts across, floating rock from a tile map built by hand over a bed
+    /// of lava, shafts up through the sky over the ceiling's gaps for the players to drop in by. The sides and the floor are the world's edge.
     public static var elements: Stage {
         let map = ElementsMap.current
         let columns = ElementsRules.columns, rows = ElementsRules.rows
@@ -619,9 +647,28 @@ public struct Stage: Equatable {
             case .lowerLeft: stage.fixedSlopes.append(Slope(box: square, rising: false))
             case .upperLeft: stage.ceilingSlopes.append(Slope(box: square, rising: true))
             case .upperRight: stage.ceilingSlopes.append(Slope(box: square, rising: false))
+            case .slideLowerRight: stage.fixedSlopes.append(Slope(box: square, rising: true, slides: true))
+            case .slideLowerLeft: stage.fixedSlopes.append(Slope(box: square, rising: false, slides: true))
             }
         }
         stage.slopes = stage.fixedSlopes
+        // Above the ceiling the sky is solid, but for a shaft up over each open cell of the
+        // ceiling's row, up to the sky's top.
+        let skyBottom = Double(rows) * tileSize, skyTop = Double(rows + Stage.skyRows) * tileSize
+        var runStart: Int?
+        for column in 0...columns {
+            let solid = column < columns && map.wall(at: .init(column, rows - 1)) == .solid
+            if solid, runStart == nil { runStart = column }
+            if !solid, let start = runStart {
+                stage.fixedExtras.append(Box(min: Vec2(x: Double(start) * tileSize, y: skyBottom), max: Vec2(x: Double(column) * tileSize, y: skyTop)))
+                runStart = nil
+            }
+        }
+        stage.extras = stage.fixedExtras
+        stage.tornados = map.tornados.map { base in
+            Box(min: Vec2(x: Double(base.column - 1) * tileSize, y: Double(base.row) * tileSize),
+                max: Vec2(x: Double(base.column + 2) * tileSize, y: Double(base.row + 3) * tileSize))
+        }
         stage.features = StageFeatures(look: .elements)
         stage.features.lavaSurface = ElementsRules.lavaSurface
         return stage

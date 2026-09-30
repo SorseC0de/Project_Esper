@@ -8,6 +8,7 @@ enum EffectSheets {
     static let frames: [String: Int] = [
         "backboard": 1,
         "backboard_straight": 1,
+        "basketball": 1,
         "bubble_particle": 12,
         "bubbles": 40,
         "charge": 12,
@@ -28,6 +29,7 @@ enum EffectSheets {
         "fire_spark": 15,
         "fire_spark2": 13,
         "fire_spark3": 16,
+        "fire_tornado": 8,
         "fire_trail": 11,
         "fire_wallspark": 11,
         "fireball_summon": 22,
@@ -52,12 +54,14 @@ enum EffectSheets {
         "lightning_spark": 9,
         "lightning_spark2": 10,
         "score_strike": 13,
+        "shine": 5,
         "tornado": 8,
     ]
 
     static let anchorY: [String: CGFloat] = [
         "backboard": 0.5000,
         "backboard_straight": 0.5000,
+        "basketball": 0.5000,
         "bubble_particle": 0.5000,
         "bubbles": 0.0000,
         "charge": 0.5000,
@@ -78,6 +82,7 @@ enum EffectSheets {
         "fire_spark": 0.5000,
         "fire_spark2": 0.5000,
         "fire_spark3": 0.5000,
+        "fire_tornado": 0.0000,
         "fire_trail": 0.0000,
         "fire_wallspark": 0.5000,
         "fireball_summon": 0.5000,
@@ -102,6 +107,7 @@ enum EffectSheets {
         "lightning_spark": 0.5000,
         "lightning_spark2": 0.5000,
         "score_strike": 0.5000,
+        "shine": 0.0000,
         "tornado": 0.0000,
     ]
 
@@ -123,5 +129,6 @@ enum EffectSheets {
         "lightning_particle2",
         "lightning_spark",
         "lightning_spark2",
+        "shine",
     ]
 }

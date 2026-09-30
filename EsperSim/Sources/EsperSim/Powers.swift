@@ -81,6 +81,8 @@ public enum SlopeRules {
     /// A slide down a slope speeds up to the slide's burst by this much a frame.
     public static let slideGain = 0.15
     public static let diagonal = 0.7071067811865476
+    /// Held uphill on a slide slope, the walk comes out as a drift back down at this share of walking speed.
+    public static let slideSlopePushBack = 0.25
 }
 
 /// Quake-Up Coffee: a fast fall's landing shakes the floor. At level one whatever is

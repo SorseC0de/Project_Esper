@@ -934,20 +934,20 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 ## The Elements
 
 `Stage.elements`, The Elements on the stage select (a working title): 67 by 24 tiles, two
-Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's deep purple (#403353) on up over it, not glowing. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
+Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's deep purple (#403353) on up over it, neither glowing. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
 they're recoloured), `mountains_bkg` stretched over the stage in front of
 it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
 through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16
 by 16 cell of `tileset_elements` (`Pixel Art/Stages/Elements`; the importer's `STAGE_ART` and
 `ROOT_IMAGES`; the ceiling is lined with `icicle_empty` sockets, 32 across and side by side, and
 `tornado` (eight 48 by 48 frames, twelve a second) is a whole sprite the map maker places, three
-tiles across and three up from the cell its base's middle is in, its behaviour still to come; re-run the importer after changing the sheet, which can be any number of cells
+tiles across and three up from the cell its base's middle is in (see the tornados below); re-run the importer after changing the sheet, which can be any number of cells
 across and down, its drawn cells read off it, though `ElementsMap.decoration` and a saved map
 name cells by place, so tiles are added at the end or in the empty cells). The sides and the floor are the world's edge. Every tile of the map is solid,
 bar the tileset's flecks (`ElementsMap.decoration`), drawn but with nothing to stand on. Hoops
 are the straight-on pair, the court's placements.
 
-The baked map (`ElementsMap.baked`, protocol 29) is laid out by hand: the left side and the middle
+The baked map (`ElementsMap.baked`, protocol 37, `bakedVersion` 4) is laid out by hand: the left side and the middle
 platform the ball starts on drawn, the ceiling along the top, and the right side generated
 from the left, tile for tile, each the tile opposite it in its piece of the tileset (a slope's
 left tile for its right; the V's two halves swap). The middle platform is 11 across, columns 28
@@ -955,7 +955,29 @@ to 38, centred on the middle column, 33, where the ball starts.
 
 None of the stage's art glows but the lava: the tiles, the mountains and the icicles are drawn once
 into the glow's mask in green under the bodies (`MaskScene.syncStatic`), redone only when the map
-changes; the flat background colour still lifts a little, and the tornados glow.
+changes; the flat background colour still lifts a little. The tornados and their overlays are drawn into it each frame as they animate, the part above the lava only.
+
+The ceiling's icicles leave out columns 16 and under and their mirror, 50 and over.
+Over each gap in the ceiling's row a shaft runs up through the sky (`Stage.fixedExtras`: the sky
+above the ceiling is solid but for them, up to its top), walled in rock edges drawn on up through
+a taller screen's spare rows (the tileset's (5, 3) on its left, (1, 3) on its right). The players
+start in the air in the two shafts, columns 12 to 14 and 52 to 54, row 29, a few tiles above the
+screen, and drop in, as they do again when burned. They land on slide slopes (`Kind.slideLowerRight`,
+`slideLowerLeft`, orange in the map maker's walls mode): nobody stands or walks up one. On one,
+anything on the ground turns downhill into the forced slide; held uphill, the body walks up it
+facing uphill but is carried back down at a quarter of walking speed
+(`SlopeRules.slideSlopePushBack`), as up a down escalator, and let go it turns round and slides.
+
+The tornados (`Stage.tornados`, `TornadoRules`, `Match.tornadoBoxes`): up for three seconds, then
+down into the lava over half a second, eased in, a second under, and half a second back up to their
+places, over and over, all together; every fourth to come up is `fire_tornado`, which burns
+whoever it touches as the lava does. A regular one that's up takes whoever comes into it out of
+the air (`PlayerState.suspended`), jumps back to full, and holds them, their middle drawn to its
+middle 15% of the way a frame, gravity off, in the falling frame; from it they can shoot, throw,
+snatch or slash as in Super Smoothie's flight, and jump is a full hop out, after which no tornado
+takes them for half a second. Sinking, it lets them go. Each tornado is drawn behind the lava, so
+it sinks into it, and again over the players at 33% (`ElementsArt.tornadoOverlayAlpha`), cropped to
+above the lava. Protocol 37.
 
 The map's walls (`ElementsMap.walls`) are kept apart from the art: by default a block under
 every solid tile, or as painted in the map maker's walls mode, each cell a block or a slope by

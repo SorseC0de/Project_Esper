@@ -29,7 +29,7 @@ import zlib
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
 STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
-STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/icicle_empty"]
+STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/icicle_empty"]
 # Whole pictures, not strips: into the catalog's root as an image of this name.
 # A list of places a picture may have been saved: the newest is taken.
 ROOT_IMAGES = {

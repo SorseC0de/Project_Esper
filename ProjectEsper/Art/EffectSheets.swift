@@ -30,6 +30,7 @@ enum EffectSheets {
         "fire_spark2": 13,
         "fire_spark3": 16,
         "fire_tornado": 8,
+        "fire_tornado_burst": 10,
         "fire_trail": 11,
         "fire_wallspark": 11,
         "fireball_summon": 22,
@@ -56,6 +57,7 @@ enum EffectSheets {
         "score_strike": 13,
         "shine": 5,
         "tornado": 8,
+        "tornado_burst": 10,
     ]
 
     static let anchorY: [String: CGFloat] = [
@@ -83,6 +85,7 @@ enum EffectSheets {
         "fire_spark2": 0.5000,
         "fire_spark3": 0.5000,
         "fire_tornado": 0.0000,
+        "fire_tornado_burst": 0.5000,
         "fire_trail": 0.0000,
         "fire_wallspark": 0.5000,
         "fireball_summon": 0.5000,
@@ -109,6 +112,7 @@ enum EffectSheets {
         "score_strike": 0.5000,
         "shine": 0.0000,
         "tornado": 0.0000,
+        "tornado_burst": 0.5000,
     ]
 
     static let toned: Set<String> = [

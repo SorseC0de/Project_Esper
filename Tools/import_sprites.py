@@ -29,7 +29,7 @@ import zlib
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
 STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
-STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/icicle_empty"]
+STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/tornado_burst", "Elements/fire_tornado_burst", "Elements/icicle_empty"]
 # Whole pictures, not strips: into the catalog's root as an image of this name.
 # A list of places a picture may have been saved: the newest is taken.
 ROOT_IMAGES = {
@@ -45,7 +45,7 @@ STRIP_FPS = 15
 BALL_MIN_PIXELS = 12
 # Strips rendered at a multiple of their playing size, boxed down by this factor. The
 # charge is a 512px soft render whose swirl fills the middle 150.
-REDUCE = {"esper_charge": 4, "flashspark": 4, "gemini_rift_v1": 4, "gemini_rift_v2": 4}
+REDUCE = {"tornado_burst": 2, "fire_tornado_burst": 2, "esper_charge": 4, "flashspark": 4, "gemini_rift_v1": 4, "gemini_rift_v2": 4}
 # Strips whose frames aren't square: their frame height, after any reduction. The
 # flash's 256x144 frames come down to 64x36.
 FRAME_HEIGHT = {"flashspark": 36, "icicle_empty": 48}

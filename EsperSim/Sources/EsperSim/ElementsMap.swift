@@ -97,7 +97,7 @@ public struct ElementsMap: Equatable, Codable {
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
     /// would stand in for it offline, is put aside and the baked one shows.
-    public static let bakedVersion = 4
+    public static let bakedVersion = 5
 
     /// The map every phone plays; the map maker's edits stand in for it offline only.
     public static let baked: ElementsMap = ElementsMap.defaultMap()
@@ -148,47 +148,51 @@ public struct ElementsMap: Equatable, Codable {
 }
 
 /// The Elements' numbers: the size, and the lava along the bottom.
-/// The Elements' tornados, in sim frames: up for three seconds, then down into the lava
-/// over half a second, a second under, and half a second back up; every fourth one to
-/// come up is fire, which burns whoever it touches. A regular one holds whoever comes into
-/// it, up or rising, drawn to its middle a share of the way a frame, the stick drifting it
-/// sideways; jumped out of, it can't take them again for a moment.
+/// The Elements' tornados, in sim frames: up for three seconds, then bursting where they
+/// stand, gone a second, and half a second rising back up out of the lava to their places;
+/// every fourth to come up is fire, which burns whoever it touches. A regular one holds
+/// whoever comes into it, and the ball, while it's up or rising: drawn to its middle a share
+/// of the way a frame, the stick drifting a body sideways; jumped out of, it can't take them
+/// again for a moment. Bursting, it has nothing to hold with.
 public enum TornadoRules {
     public static let upFrames = 180
-    public static let sinkFrames = 30
+    /// The burst's ten frames at twelve a second.
+    public static let burstFrames = 50
+    public static let burstSheetFramesPerSecond = 12
     public static let underFrames = 60
     public static let riseFrames = 30
-    public static var cycleFrames: Int { upFrames + sinkFrames + underFrames + riseFrames }
+    public static var cycleFrames: Int { upFrames + burstFrames + underFrames + riseFrames }
     public static let fireEvery = 4
     public static let pullShare = 0.15
     public static let jumpOutCooldownFrames = 30
+    /// A body held in one drifts sideways at this share of the air's drift.
+    public static let driftShare = 0.1
     /// Where a sunk tornado's bottom is, in units: under the lava's surface.
     public static let sunkBottom = -30.0
 
     /// Which rise it's on at `frame`: each counts from the start of its rise.
     public static func appearance(at frame: Int) -> Int { (frame + riseFrames) / cycleFrames }
     public static func isFire(at frame: Int) -> Bool { appearance(at: frame) % fireEvery == fireEvery - 1 }
-    /// Up and holding, not sinking or rising.
+    /// Up and holding, before it bursts.
     public static func isUp(at frame: Int) -> Bool { frame % cycleFrames < upFrames }
-    /// Up, or rising back: whoever it catches it holds. Sinking or under, it lets go.
+    /// Up, or rising back: it holds whoever and whatever it catches, and a fire one burns.
     public static func holds(at frame: Int) -> Bool {
         let time = frame % cycleFrames
-        return time < upFrames || time >= upFrames + sinkFrames + underFrames
+        return time < upFrames || time >= upFrames + burstFrames + underFrames
     }
-    /// A body held in one drifts sideways at this share of the air's drift.
-    public static let driftShare = 0.1
+    /// Frames into its burst, if it's bursting.
+    public static func burstFrame(at frame: Int) -> Int? {
+        let time = frame % cycleFrames - upFrames
+        return (0..<burstFrames).contains(time) ? time : nil
+    }
 
-    /// How far down from its place a tornado is at `frame`, from 0 up to 1 all the way sunk,
-    /// eased in going down and out coming up.
+    /// How far down from its place a tornado is at `frame`, from 0 up to 1 all the way sunk:
+    /// in place up and bursting, sunk while it's gone, eased out rising.
     public static func sunkShare(at frame: Int) -> Double {
         let time = frame % cycleFrames
-        if time < upFrames { return 0 }
-        if time < upFrames + sinkFrames {
-            let share = Double(time - upFrames) / Double(sinkFrames)
-            return share * share
-        }
-        if time < upFrames + sinkFrames + underFrames { return 1 }
-        let share = Double(time - upFrames - sinkFrames - underFrames) / Double(riseFrames)
+        if time < upFrames + burstFrames { return 0 }
+        if time < upFrames + burstFrames + underFrames { return 1 }
+        let share = Double(time - upFrames - burstFrames - underFrames) / Double(riseFrames)
         return (1 - share) * (1 - share)
     }
 }
@@ -208,19 +212,6 @@ extension ElementsMap {
     /// top. The middle platform is 11 across, columns 28 to 38, centred on the middle column.
     private static func defaultMap() -> ElementsMap {
         let tiles: [Placed] = [
-            Placed(Cell(14, 2), art: Cell(3, 3)), Placed(Cell(17, 2), art: Cell(3, 3)),
-            Placed(Cell(18, 2), art: Cell(3, 3)), Placed(Cell(19, 2), art: Cell(3, 3)),
-            Placed(Cell(20, 2), art: Cell(3, 3)), Placed(Cell(21, 2), art: Cell(3, 3)),
-            Placed(Cell(22, 2), art: Cell(3, 3)), Placed(Cell(23, 2), art: Cell(3, 3)),
-            Placed(Cell(43, 2), art: Cell(3, 3)), Placed(Cell(44, 2), art: Cell(3, 3)),
-            Placed(Cell(45, 2), art: Cell(3, 3)), Placed(Cell(46, 2), art: Cell(3, 3)),
-            Placed(Cell(47, 2), art: Cell(3, 3)), Placed(Cell(48, 2), art: Cell(3, 3)),
-            Placed(Cell(49, 2), art: Cell(3, 3)), Placed(Cell(52, 2), art: Cell(3, 3)),
-            Placed(Cell(11, 3), art: Cell(3, 3)), Placed(Cell(16, 3), art: Cell(3, 3)),
-            Placed(Cell(17, 3), art: Cell(3, 3)), Placed(Cell(18, 3), art: Cell(3, 3)),
-            Placed(Cell(48, 3), art: Cell(3, 3)), Placed(Cell(49, 3), art: Cell(3, 3)),
-            Placed(Cell(50, 3), art: Cell(3, 3)), Placed(Cell(55, 3), art: Cell(3, 3)),
-            Placed(Cell(9, 4), art: Cell(3, 3)), Placed(Cell(57, 4), art: Cell(3, 3)),
             Placed(Cell(8, 7), art: Cell(9, 5)), Placed(Cell(9, 7), art: Cell(10, 5)),
             Placed(Cell(10, 7), art: Cell(11, 5)), Placed(Cell(56, 7), art: Cell(9, 5)),
             Placed(Cell(57, 7), art: Cell(10, 5)), Placed(Cell(58, 7), art: Cell(11, 5)),

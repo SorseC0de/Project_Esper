@@ -937,7 +937,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 ## The Elements
 
 `Stage.elements`, The Elements on the stage select (a working title): 67 by 24 tiles, two
-Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's deep purple (#403353) on up over it, neither glowing. Palette 17 flat behind everything (showing up the shafts above the ceiling too), `mountains_bkg` stretched over the stage in front of
+Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's deep purple (#403353) on up over it, neither glowing. Palette 17 flat behind everything (showing up the shafts above the ceiling too), which never glows
+(the glow's bright pass leaves out that exact colour), `mountains_bkg` stretched over the stage in front of
 it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
 through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16
 by 16 cell of `tileset_elements` (`Pixel Art/Stages/Elements`; the importer's `STAGE_ART` and
@@ -972,8 +973,10 @@ facing uphill but is carried back down at a quarter of walking speed
 (`SlopeRules.slideSlopePushBack`), as up a down escalator, and let go it turns round and slides.
 
 The tornados (`Stage.tornados`, `TornadoRules`, `Match.tornadoBoxes`): up for three seconds, then
-down into the lava over half a second, eased in, a second under, and half a second back up to their
-places, over and over, all together; every fourth to come up is `fire_tornado`, which burns
+bursting where they stand (`tornado_burst`, `fire_tornado_burst`, ten 96 pixel frames boxed down to
+48 by the importer's `REDUCE`, at twelve a second), holding and burning nothing from the burst's
+first frame, gone a second, and half a second rising back up out of the lava to their places,
+over and over, all together; every fourth to come up is `fire_tornado`, which burns
 whoever it touches as the lava does. A regular one that's up or rising takes whoever comes into it out of
 the air (`PlayerState.suspended`), jumps back to full, and holds them, their middle drawn to its
 middle 15% of the way a frame, gravity off, in the falling frame, the stick drifting them
@@ -981,9 +984,11 @@ sideways at a tenth of the air's drift (`TornadoRules.driftShare`), out if held;
 round a 2 pixel circle counter-clockwise, as Smoothie's flight hovers, while the tornados hover
 round one clockwise (`ElementsArt.hoverRadius`); from it they can shoot, throw,
 snatch or slash as in Super Smoothie's flight, and jump is a full hop out, after which no tornado
-takes them for half a second. Sinking, it lets them go. Each tornado is drawn behind the lava, so
+takes them for half a second. Bursting, it lets them go. It takes the loose ball the same way,
+coming in from outside (not one let go of inside it, as a shot from a body held there), and holds
+it at its middle until it bursts. Each tornado is drawn behind the lava, so
 it sinks into it, and again over the players at 33% (`ElementsArt.tornadoOverlayAlpha`), cropped to
-above the lava. Protocol 38.
+above the lava. Protocol 39.
 
 The map's walls (`ElementsMap.walls`) are kept apart from the art: by default a block under
 every solid tile, or as painted in the map maker's walls mode, each cell a block or a slope by

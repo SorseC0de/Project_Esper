@@ -506,11 +506,18 @@ public struct Match: Equatable {
     }
 
     /// A regular tornado that's up or rising takes whoever comes into it out of the air, and
-    /// holds them; sinking, it lets them go. A fire one burns whoever it touches.
+    /// the loose ball, and holds them; bursting, it lets them go. A fire one burns whoever it touches.
     private mutating func stepTornados() {
         guard !stage.tornados.isEmpty else { return }
-        let boxes = tornadoBoxes
         let holds = TornadoRules.holds(at: frame), fire = TornadoRules.isFire(at: frame)
+        // Bursting or gone, none has anything to hold or burn with.
+        let boxes = holds ? tornadoBoxes : []
+        // The ball is taken coming in from outside, not let go of inside one, as a shot from a
+        // body held there is.
+        let ballFree = ball.isLive && ball.tether == nil && ball.frozen == 0
+        let ballIn = ballFree ? boxes.first(where: { $0.overlaps(ball.box) })?.center : nil
+        ball.tornadoCentre = fire || (ball.tornadoCentre == nil && !ball.outsideTornados) ? nil : ballIn
+        ball.outsideTornados = ballFree && ballIn == nil
         for index in players.indices {
             let body = players[index].body
             guard let hit = boxes.firstIndex(where: { $0.overlaps(body) }) else {
@@ -519,8 +526,6 @@ public struct Match: Equatable {
             }
             if fire {
                 burn(index)
-            } else if !holds {
-                if players[index].state == .suspended { players[index].enter(.air) }
             } else if players[index].state == .suspended {
                 players[index].tornadoCentre = boxes[hit].center
             } else if players[index].state == .air, players[index].tornadoCooldown == 0 {

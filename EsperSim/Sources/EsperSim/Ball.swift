@@ -47,6 +47,10 @@ public struct Ball: Equatable {
     /// Blazing Boba: alight from a shot or a throw until the first bounce; nobody but the
     /// thrower can catch or snatch it.
     public var burning = false
+    /// The middle of the tornado holding it, if one is.
+    public var tornadoCentre: Vec2?
+    /// Loose and in no tornado last frame, so one can take it.
+    public var outsideTornados = false
     public var resting = false
     /// Counting down to the respawn after a score, 0 when live.
     public var respawnTimer = 0
@@ -73,7 +77,10 @@ public struct Ball: Equatable {
             steer(toward: hoop)
         }
 
-        if floater > 0 {
+        if let centre = tornadoCentre {
+            // Held in a tornado: drawn to its middle, gravity off.
+            velocity = (centre - position) * TornadoRules.pullShare
+        } else if floater > 0 {
             floater -= 1
         } else if !straight {
             velocity.y = max(velocity.y - BallRules.gravity * pace * pace, -BallRules.fallSpeed * pace)
@@ -293,5 +300,6 @@ public struct Ball: Equatable {
         owned = false
         resting = false
         respawnTimer = 0
+        tornadoCentre = nil
     }
 }

@@ -67,6 +67,7 @@ struct GlowUniforms {
     var softness: Float
     var intensity: Float
     var tint: SIMD4<Float>
+    var unglowed: SIMD4<Float> = .zero
 }
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.
@@ -342,6 +343,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             softness: GlowSettings.softness,
             intensity: GlowSettings.intensity,
             tint: GlowSettings.tint)
+        if let background = scene.unglowedBackground {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            background.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            uniforms.unglowed = SIMD4(Float(red), Float(green), Float(blue), 1)
+        }
 
         pass(glowCommands, pipeline: bright, into: glowA, sources: [sceneTexture, bodyMask], uniforms: uniforms)
         for _ in 0..<GlowSettings.blurPasses {

@@ -15,6 +15,7 @@ enum ElementsArt {
     /// Seconds a lava frame shows.
     static let lavaFrameSeconds = 0.18
     static let tornadoFrames = 8
+    static let burstFrames = 10
     static let tornadoSide: CGFloat = 48
     /// Seconds a tornado's frame shows: twelve a second.
     static let tornadoFrameSeconds = 1.0 / 12
@@ -117,13 +118,15 @@ enum ElementsArt {
         }
 
         /// The tornados where the sim has them this frame, each on a frame of its own, in fire or not.
-        func placeTornados(_ boxes: [Box], fire: Bool, time: Double, hoverLap: Double) {
+        func placeTornados(_ boxes: [Box], fire: Bool, time: Double, burstFrame: Int?, hoverLap: Double) {
             let hover = CGPoint(x: (cos(-hoverLap) * Double(ElementsArt.hoverRadius)).rounded(),
                                 y: (sin(-hoverLap) * Double(ElementsArt.hoverRadius)).rounded())
             let sheet = fire ? "fire_tornado" : "tornado"
             let step = Int(time / ElementsArt.tornadoFrameSeconds)
             for (index, box) in boxes.enumerated() where index < tornados.count {
-                let texture = sprites.texture(sheet, (step + index * 3) % ElementsArt.tornadoFrames)
+                // Bursting where it stands, the burst's sheet through once, all together.
+                let texture = burstFrame.map { sprites.texture(sheet + "_burst", min($0 * TornadoRules.burstSheetFramesPerSecond / 60, ElementsArt.burstFrames - 1)) }
+                    ?? sprites.texture(sheet, (step + index * 3) % ElementsArt.tornadoFrames)
                 for node in [tornados[index], tornadoOverlays[index]] {
                     node.texture = texture
                     node.position = SpriteLibrary.point(box.min) + hover

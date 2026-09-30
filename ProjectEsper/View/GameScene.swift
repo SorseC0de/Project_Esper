@@ -332,6 +332,9 @@ final class GameScene: SKScene {
         return bodies
     }
 
+    /// The Elements' flat background, which never glows; nil elsewhere.
+    var unglowedBackground: SKColor? { match.stage.features.look == .elements ? backgroundColor : nil }
+
     /// The tornados as they look this frame, green under the bodies: they animate, so they can't
     /// live in the static layer.
     var tornadoSnapshots: [BodySnapshot] {
@@ -1116,7 +1119,7 @@ final class GameScene: SKScene {
                 ballSpin.rate = CGFloat(ball.velocity.x < 0 ? -1 : 1) * GameScene.backspinTurnsPerSecond * turnsToRadians
             } else if abs(ball.velocity.x - seen.velocity.x) > 0.25 || ball.velocity.y - seen.velocity.y > 0.5 {
                 ballSpin.rate = ballSpin.rate * 0.5 + rolling(ball.velocity) * 0.5
-            } else if abs(ball.position.y - seen.y) < 0.01, abs(ball.velocity.y) < 0.2 {
+            } else if abs(ball.position.y - seen.y) < 0.01, abs(ball.velocity.y) < 0.2, match.stage.isGrounded(ball.box) {
                 ballSpin.rate = rolling(ball.velocity)
             }
             ballSpin.rate = min(max(ballSpin.rate, -mostSpin), mostSpin)
@@ -4530,6 +4533,7 @@ final class GameScene: SKScene {
 
         drawPlatforms()
         elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime(),
+                                   burstFrame: TornadoRules.burstFrame(at: match.frame),
                                    hoverLap: Double(match.frame) / 60 / GameScene.hoverSeconds * 2 * .pi)
         section("webs")
 

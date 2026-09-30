@@ -12,6 +12,8 @@ struct GlowUniforms {
     float softness;
     float intensity;
     float4 tint;
+    // A colour that never glows, the stage's flat background, where its alpha is 1.
+    float4 unglowed;
 };
 
 struct FullScreen {
@@ -43,7 +45,8 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
     float flat = step(0.5, mask.g) * step(mask.r, 0.05) * step(mask.b, 0.05);
     float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body));
     float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
-    float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance) * (1 - flat);
+    float background = u.unglowed.a * step(distance(color.rgb, u.unglowed.rgb), 0.01);
+    float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance) * (1 - flat) * (1 - background);
     return float4(color.rgb * amount, 1);
 }
 

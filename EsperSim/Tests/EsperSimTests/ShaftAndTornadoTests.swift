@@ -92,19 +92,55 @@ final class ShaftAndTornadoTests: XCTestCase {
         XCTAssertEqual(match.players[0].position, match.stage.playerSpawns[0])
     }
 
-    func testATornadoSinksIntoTheLavaAndComesBack() {
+    func testATornadoBurstsInPlaceHoldingNothingThenRisesBackOutOfTheLava() {
         let match = elements()
-        var sunk = match
-        sunk.frame = TornadoRules.upFrames + TornadoRules.sinkFrames + 1
-        XCTAssertLessThan(sunk.tornadoBoxes[0].max.y, ElementsRules.lavaSurface)
+        var bursting = match
+        bursting.frame = TornadoRules.upFrames
+        XCTAssertEqual(TornadoRules.burstFrame(at: bursting.frame), 0)
+        XCTAssertEqual(bursting.tornadoBoxes, match.stage.tornados, "bursting where it stood")
+        XCTAssertFalse(TornadoRules.holds(at: bursting.frame))
+        var gone = match
+        gone.frame = TornadoRules.upFrames + TornadoRules.burstFrames + 1
+        XCTAssertLessThan(gone.tornadoBoxes[0].max.y, ElementsRules.lavaSurface)
         var back = match
         back.frame = TornadoRules.cycleFrames
         XCTAssertEqual(back.tornadoBoxes, match.stage.tornados)
     }
 
+    func testABurstLetsGoAtOnce() {
+        var match = elements()
+        let tornado = match.stage.tornados[0]
+        match.frame = TornadoRules.upFrames - 30
+        match.players[0].position = Vec2(x: tornado.center.x, y: tornado.center.y - 8)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        for _ in 0..<29 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.players[0].state, .suspended)
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .air, "let go on the burst's first frame")
+    }
+
+    func testARegularTornadoTakesTheLooseBallButNotOneLetGoInsideIt() {
+        var match = elements()
+        let tornado = match.stage.tornados[0]
+        match.players[0].position = Vec2(x: 30, y: 400)
+        match.players[1].position = Vec2(x: 600, y: 400)
+        match.ball.respawn(at: Vec2(x: tornado.center.x, y: tornado.max.y + 20))
+        for _ in 0..<60 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertNotNil(match.ball.tornadoCentre)
+        XCTAssertEqual(match.ball.position.x, tornado.center.x, accuracy: 0.1)
+        XCTAssertEqual(match.ball.position.y, tornado.center.y, accuracy: 0.1, "held at the middle")
+        var inside = elements()
+        inside.players[0].position = Vec2(x: 30, y: 400)
+        inside.players[1].position = Vec2(x: 600, y: 400)
+        inside.ball.release(from: tornado.center, velocity: Vec2(x: 3, y: 1), by: 0, straight: false)
+        inside.advance(inputs: [.idle, .idle])
+        XCTAssertNil(inside.ball.tornadoCentre, "let go inside, it flies on")
+    }
+
     func testARisingTornadoCatchesToo() {
         var match = elements()
-        match.frame = TornadoRules.upFrames + TornadoRules.sinkFrames + TornadoRules.underFrames + TornadoRules.riseFrames / 2
+        match.frame = TornadoRules.upFrames + TornadoRules.burstFrames + TornadoRules.underFrames + TornadoRules.riseFrames / 2
         let tornado = match.tornadoBoxes[0]
         match.players[0].position = Vec2(x: tornado.center.x, y: tornado.center.y - 8)
         match.players[0].grounded = false

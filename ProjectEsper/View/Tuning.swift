@@ -147,7 +147,7 @@ enum HelmetTuning {
 /// The chevrons over the basket the ball's holder scores on: the top one this many art
 /// pixels over the rim, on the BASKET CHEVRON Y debug slider with `slider`.
 enum ChevronTuning {
-    nonisolated(unsafe) static var basketLift: CGFloat = 30
+    nonisolated(unsafe) static var basketLift: CGFloat = 18
     static let slider = true
 }
 

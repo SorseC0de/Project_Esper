@@ -747,7 +747,7 @@ of whoever let it go, then shifts back over 30. A flying ball leaves a soft addi
 in its colour. The library finds where the ball and the head sit in each frame so the halo
 and the fire follow them. The head is drawn at 1.25 times about its own centre and lifted a pixel off the body. Three dim
 yellow chevrons stack over a resting ball and light one after another from the top; over the
-basket the holder scores on, the top one `ChevronTuning.basketLift` (30) art pixels over the rim, on
+basket the holder scores on, the top one `ChevronTuning.basketLift` (18) art pixels over the rim, on
 the BASKET CHEVRON Y debug slider. A
 double jump leaves a short platform of loose digital squares under the feet where it was
 taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that a steady push bends toward the ball along x, as a whole (`ParticleLook.flowSpeed`, 140, easing off within 6 pixels of level with it, as with the ball in hand); the legs' cubes go the same way.
@@ -943,6 +943,10 @@ platform the ball starts on drawn, the ceiling along the top, and the right side
 from the left, tile for tile, each the tile opposite it in its piece of the tileset (a slope's
 left tile for its right; the V's two halves swap). The middle platform is 11 across, columns 28
 to 38, centred on the middle column, 33, where the ball starts.
+
+None of the stage's art glows but the lava: the tiles, the mountains and the icicles are drawn once
+into the glow's mask in green under the bodies (`MaskScene.syncStatic`), redone only when the map
+changes; the flat background colour still lifts a little, and the tornados glow.
 
 The lava: whoever's feet go under its surface (`ElementsRules.lavaSurface`, 25 units) is put
 back where they started, any ball they held back at the ball's start, and a loose ball in it

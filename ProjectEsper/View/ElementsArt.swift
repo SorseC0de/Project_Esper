@@ -74,6 +74,9 @@ enum ElementsArt {
     struct Handles {
         var tiles: [ElementsMap.Cell: SKSpriteNode] = [:]
         var tornados: [SKSpriteNode] = []
+        /// The stage's fixed art, for the glow's mask to leave out: the mountains, the icicles.
+        var mountains: SKSpriteNode?
+        var icicles: [SKSpriteNode] = []
         let parent: SKNode
         let sprites: SpriteLibrary
 
@@ -139,6 +142,7 @@ enum ElementsArt {
         let socket = sprites.texture("icicle_empty", 0)
         let count = Int(width / icicleWidth)
         var icicleX = (width - CGFloat(count) * icicleWidth) / 2
+        var icicles: [SKSpriteNode] = []
         for _ in 0..<count {
             let icicle = SKSpriteNode(texture: socket)
             icicle.anchorPoint = .zero
@@ -146,9 +150,12 @@ enum ElementsArt {
             icicle.position = CGPoint(x: icicleX, y: height - tileSide - icicleHeight)
             icicle.zPosition = -7.5
             parent.addChild(icicle)
+            icicles.append(icicle)
             icicleX += icicleWidth
         }
         var handles = Handles(parent: parent, sprites: sprites)
+        handles.mountains = range
+        handles.icicles = icicles
         for placed in map.tiles { handles.set(placed, at: placed.cell) }
         handles.setTornados(map.tornados)
         return handles

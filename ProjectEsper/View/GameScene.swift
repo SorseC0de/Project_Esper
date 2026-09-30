@@ -828,6 +828,23 @@ final class GameScene: SKScene {
     /// The Elements' placed tiles, while it's the stage drawn.
     private var elementsArt: ElementsArt.Handles?
 
+    /// What the stage draws that must not glow, its tiles, its mountains and its icicles, with
+    /// a version for the glow's mask to redo them only when they change. The lava glows.
+    private(set) var staticFlats: [BodySnapshot] = []
+    private(set) var staticFlatsVersion = 0
+
+    private func refreshStaticFlats() {
+        var flats: [BodySnapshot] = []
+        if let art = elementsArt {
+            let nodes = ([art.mountains].compactMap { $0 }) + art.icicles + Array(art.tiles.values)
+            flats = nodes.compactMap { node in
+                node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
+            }
+        }
+        staticFlats = flats
+        staticFlatsVersion += 1
+    }
+
     private func buildStage() {
         // The floor and walls take the holder's colour, the backboard blocks keep their rim's
         // owner's, and the ledge is magenta.
@@ -838,6 +855,7 @@ final class GameScene: SKScene {
         if isElements {
             elementsArt = ElementsArt.build(stage: stage, map: ElementsMap.current, into: stageGround, sprites: sprites)
         }
+        refreshStaticFlats()
         if stage.features.look == .highway {
             HighwayArt.build(for: stage, into: stageGround) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
         }
@@ -3334,6 +3352,7 @@ final class GameScene: SKScene {
                 guard let self else { return }
                 let map = ElementsMap.current
                 for cell in cells { self.elementsArt?.set(map.tiles.first { $0.cell == cell }, at: cell) }
+                self.refreshStaticFlats()
                 self.session.mutate { match in
                     match.stage = .elements
                     match.refreshExtras()

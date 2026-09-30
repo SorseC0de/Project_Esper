@@ -20,6 +20,10 @@ final class MaskScene: SKScene {
     private var flats: [SKSpriteNode] = []
     /// The bodies drawn in plain white rather than as they are, for the cubes' occluder.
     private let whiteBodies: Bool
+    /// What the stage keeps still and must not glow, drawn once under the bodies; rebuilt
+    /// only when its version changes.
+    private let staticLayer = SKNode()
+    private var staticVersion = -1
 
     init(whiteBodies: Bool = false) {
         self.whiteBodies = whiteBodies
@@ -28,6 +32,8 @@ final class MaskScene: SKScene {
         backgroundColor = .black
         camera = cameraNode
         addChild(cameraNode)
+        staticLayer.zPosition = -1
+        addChild(staticLayer)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -45,6 +51,21 @@ final class MaskScene: SKScene {
     }
     private static let flatWhite = flat(SIMD4<Float>(1, 1, 1, 1))
     private static let flatGreen = flat(SIMD4<Float>(0, 1, 0, 1))
+
+    /// The stage's still, non-glowing art in green, redone when `version` changes.
+    func syncStatic(_ flats: [BodySnapshot], version: Int) {
+        guard version != staticVersion else { return }
+        staticVersion = version
+        staticLayer.removeAllChildren()
+        for flat in flats {
+            let node = SKSpriteNode(texture: flat.texture)
+            node.shader = MaskScene.flatGreen
+            node.anchorPoint = flat.anchor
+            node.position = flat.position
+            node.size = flat.size
+            staticLayer.addChild(node)
+        }
+    }
 
     /// Copies the game's bodies and camera, and the flat things in green.
     func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat) {

@@ -861,7 +861,7 @@ final class GameScene: SKScene {
     private func refreshStaticFlats() {
         var flats: [BodySnapshot] = []
         if let art = elementsArt {
-            let nodes = ([art.mountains].compactMap { $0 }) + art.icicles + Array(art.tiles.values)
+            let nodes = ([art.mountains, art.aboveCeiling].compactMap { $0 }) + art.icicles + Array(art.tiles.values)
             flats = nodes.compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }

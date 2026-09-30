@@ -8,6 +8,9 @@ enum ElementsArt {
     static let background: RGB = PixelPalette.colours[29]
     static let tileSide: CGFloat = 16
     static let lavaFrames = 8
+    /// The lava's orange below its surface, and the deep purple inside the ceiling's rock.
+    static let lavaOrange: UInt32 = 0xFA6A0A
+    static let ceilingPurple: UInt32 = 0x403353
     static let lavaSide: CGFloat = 48
     /// Seconds a lava frame shows.
     static let lavaFrameSeconds = 0.18
@@ -77,6 +80,8 @@ enum ElementsArt {
         /// The stage's fixed art, for the glow's mask to leave out: the mountains, the icicles.
         var mountains: SKSpriteNode?
         var icicles: [SKSpriteNode] = []
+        /// The rock's deep purple carried on above the ceiling into a taller screen's spare rows.
+        var aboveCeiling: SKSpriteNode?
         let parent: SKNode
         let sprites: SpriteLibrary
 
@@ -153,7 +158,24 @@ enum ElementsArt {
             icicles.append(icicle)
             icicleX += icicleWidth
         }
+        // A taller screen's spare rows: the lava's orange on down below it, the ceiling's deep
+        // purple on up above it, wider than the stage so nothing shows past either end.
+        let spare = tileSide * 16
+        func fill(_ colour: UInt32, y: CGFloat, z: CGFloat) -> SKSpriteNode {
+            let node = SKSpriteNode(texture: sprites.flatSquare(size: 16, alpha: 1))
+            node.color = SKColor(rgb: colour)
+            node.colorBlendFactor = 1
+            node.anchorPoint = .zero
+            node.size = CGSize(width: width + spare * 2, height: spare)
+            node.position = CGPoint(x: -spare, y: y)
+            node.zPosition = z
+            parent.addChild(node)
+            return node
+        }
+        _ = fill(lavaOrange, y: -spare, z: -9)
+        let above = fill(ceilingPurple, y: height, z: -8)
         var handles = Handles(parent: parent, sprites: sprites)
+        handles.aboveCeiling = above
         handles.mountains = range
         handles.icicles = icicles
         for placed in map.tiles { handles.set(placed, at: placed.cell) }

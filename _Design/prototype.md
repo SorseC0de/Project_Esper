@@ -127,7 +127,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   it and coming once it has reached its hold (`shotWindupFrames`, `throwWindupFrames`): the throw sheet's third frame, sliding
   straight back 48 art pixels over 12 frames (`StepbackRules`), the facing kept, trailing
   afterimages in the colour's bright version, at 0.9, held a tenth of a second and fading over
-  three, as Zeus Juice's bolt does, with the jump's sound; the whole way
+  three, as Zeus Juice's bolt does (a jump out of the shooting stance, the throw and the slash leave the same), with the jump's sound; the whole way
   a counter, as the throw stance's parry frames are (out of a shot the air-with-ball sheet's last
   frame shows, out of a throw the throw sheet's third), and its ball can't be snatched, by Frost Tea's
   either. Then back in the stance at its hold, buttons kept, the aim cleared: the stick still down from the stepback aims nothing until it's let go and pressed again, so a quick shot or throw out of it goes off the preset, not down (`stepbackAimLocked`, protocol 33). Down never cancels a stance: the

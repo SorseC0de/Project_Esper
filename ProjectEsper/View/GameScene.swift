@@ -2874,7 +2874,7 @@ final class GameScene: SKScene {
     }
 
     /// The body where it is, in its colour's bright version, held a moment then fading behind
-    /// it: the stepback's trail, as Zeus Juice's bolt leaves one.
+    /// it: the stepback's trail (and the jump shot's, the throw's, the slash's), as Zeus Juice's bolt leaves one.
     private static let afterimageAlpha: CGFloat = 0.9
     private static let afterimageHold = 0.1
     private static let afterimageFade = 0.3
@@ -4465,7 +4465,10 @@ final class GameScene: SKScene {
                 castShadow(shadowHeads[index], of: headNode, anchorY: feet, facing: headNode.xScale, ground: feet - drop, rise: drop)
             }
             drawCape(index, player: player, behind: node.position)
-            if player.state == .stepback, match.frame % 2 == 0 { spawnAfterimage(of: node, player: index) }
+            // The stepback, a jump out of the shooting stance, the throw and the slash leave the trail.
+            let trailing = player.state == .stepback || player.state == .throwing || player.state == .slashing
+                || (player.state == .shootStance && !player.grounded)
+            if trailing, match.frame % 2 == 0 { spawnAfterimage(of: node, player: index) }
             if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {
                 spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: -player.facing.sign * 4, y: 2)), count: 2, spread: 6)
             }

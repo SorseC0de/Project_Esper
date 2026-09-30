@@ -5,7 +5,7 @@ final class ElementsTests: XCTestCase {
     func testTheElementsIsTwoCourtsAcrossAndTwoHigh() {
         let stage = Stage.elements
         XCTAssertEqual(stage.columns, Stage.court.columns * 2 - 1, "two courts across, less a column for a middle one")
-        XCTAssertEqual(stage.rows, Stage.court.rows * 2)
+        XCTAssertEqual(stage.rows, 25)
         XCTAssertEqual(stage.features.look, .elements)
         XCTAssertEqual(StageChoice.theElements.stage.features.look, .elements)
     }
@@ -54,14 +54,14 @@ final class ElementsTests: XCTestCase {
 
     func testDecorationTilesArentSolid() {
         var map = ElementsMap.baked
-        map.tiles.append(.init(.init(30, 25), art: .init(2, 0)))
-        map.tiles.append(.init(.init(31, 25), art: .init(2, 2)))
+        map.tiles.append(.init(.init(30, 23), art: .init(2, 0)))
+        map.tiles.append(.init(.init(31, 23), art: .init(2, 2)))
         map.walls = ElementsMap.derivedWalls(from: map.tiles)
         ElementsMap.current = map
         defer { ElementsMap.current = ElementsMap.baked }
         let stage = Stage.elements
-        XCTAssertEqual(stage.tile(column: 30, row: 25), .empty)
-        XCTAssertEqual(stage.tile(column: 31, row: 25), .solid)
+        XCTAssertEqual(stage.tile(column: 30, row: 23), .empty)
+        XCTAssertEqual(stage.tile(column: 31, row: 23), .solid)
     }
 
     func testTheLavaSendsWhoeverFallsInBackToTheirStart() {

@@ -917,12 +917,9 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   from the backboard's face all the way back to the end wall, so nothing gets behind it.
   Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
   in the maker's energy.
-- The camera pages, as Mega Man's and Nidhogg's: it holds still until the local player's feet
-  come within `CameraTuning.leadInTiles` (8, on the CAMERA LEAD-IN debug slider there) of either
-  edge of the screen, then slides on a screen less a lead-in each side and a tile over
-  `CameraTuning.slideSeconds` (0.5), eased out, quick away and slowing in, so the feet land a
-  tile inside the far side's lead-in and it never flips back; the same on every screen and
-  either way, held inside the field's ends; each round it starts on the local player.
+- The camera on a scrolling stage (Longball, the Elements) glides after the local player, led
+  by where they're heading (20 frames of their speed), 8% of the way there a frame, held inside
+  the stage's ends; each round it starts on the local player.
   The view takes in the stage's height and the turf below the floor. When the ball is off
   the screen sideways, its chevrons sit at that edge at its height, pointing at it, purple
   outlined in dark purple. The opponent off the screen likewise: one chevron in their
@@ -932,7 +929,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 ## The Elements
 
 `Stage.elements`, The Elements on the stage select (a working title): 67 by 32 tiles, two
-Wreck Centers across less a column, so there's a middle one, and two high, at the normal zoom (whole pixels, the stage's height fitted) and scrolling sideways on the paged camera Longball has, the lava the bottom row. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
+Wreck Centers across less a column, so there's a middle one, and two high, at the normal zoom (whole pixels, the stage's height fitted) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
 they're recoloured), `mountains_bkg` stretched over the stage in front of
 it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
 through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16

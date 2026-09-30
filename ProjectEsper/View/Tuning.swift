@@ -151,14 +151,6 @@ enum ChevronTuning {
     static let slider = true
 }
 
-enum CameraTuning {
-    /// Tiles from the screen's edge at which the local player sends the camera on to the
-    /// next zone; on the CAMERA LEAD-IN debug slider on Longball Stadium.
-    nonisolated(unsafe) static var leadInTiles: Float = 8
-    /// Seconds for a whole slide, eased out: quick away, slowing into the new zone.
-    static let slideSeconds: Double = 0.5
-}
-
 /// 47's three-point lines: their thickness in art pixels (3PT WIDTH on the UI tuning panel,
 /// under HUD, kept between launches), and their breath, from gone to a quarter and back.
 enum ThreePointTuning {

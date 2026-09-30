@@ -1078,7 +1078,6 @@ final class GameScene: SKScene {
         builtStage = series.stage
         ballCamStale = true
         cameraBase = .zero
-        cameraPage = nil
         layout(displayScale: displayScale)
     }
 
@@ -1315,7 +1314,6 @@ final class GameScene: SKScene {
         if series.stage.stage.features.look == .footballField {
             // Longball's net, tuned in play.
             addNetSliders(.footballField)
-            controls.addSlider(title: "CAMERA LEAD-IN", range: 0...16, notch: 1, value: CameraTuning.leadInTiles) { CameraTuning.leadInTiles = $0 }
             controls.addSlider(title: "CROSSBAR ANGLE", range: -45...45, notch: 1, value: Float(GoalpostTuning.crossbarAngle)) { [weak self] value in
                 GoalpostTuning.crossbarAngle = CGFloat(value)
                 self?.buildGoalposts()
@@ -1643,8 +1641,6 @@ final class GameScene: SKScene {
 
     /// The view's hold on the last round let go: the computer, the rim flashes, the ball's colour.
     private func freshRoundView() {
-        // The camera starts each round on the local player.
-        cameraPage = nil
         opponent = Opponent(index: 1)
         rimFlash = rimFlash.map { _ in 0 }
         ballTeam = SKColor(rgb: BallLook.neutral)
@@ -3143,51 +3139,19 @@ final class GameScene: SKScene {
         return texture
     }
 
-    /// The field's and the Elements' camera, paged as Mega Man's and Nidhogg's: it holds still until the local
-    /// player's feet come within the lead-in of either edge of the screen, then moves on a
-    /// screen less a lead-in each side and a tile, so the feet land a tile inside the lead-in
-    /// on the far side and it never flips back; held inside the field's ends.
-    private var cameraPage: CGFloat?
+    /// Where the camera wants to be on a scrolling stage: the local player, led by where they're
+    /// heading, kept inside the stage's ends.
     private func cameraTargetX() -> CGFloat {
         guard match.players.indices.contains(localIndex) else { return cameraBase.x }
-        let feet = SpriteLibrary.point(match.players[localIndex].position).x
+        let player = match.players[localIndex]
+        let lead = CGFloat(player.velocity.x) * GameScene.cameraLeadFrames * CGFloat(SpriteLibrary.pixelsPerUnit)
+        let wanted = SpriteLibrary.point(player.position).x + lead
         let halfView = size.width * cameraNode.xScale / 2
         let width = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
-        let tile = GameScene.pixelsPerTile
-        func held(_ x: CGFloat) -> CGFloat { min(max(x, halfView), max(width - halfView, halfView)) }
-        guard let current = cameraPage else {
-            let start = held(feet)
-            cameraPage = start
-            return start
-        }
-        let lead = min(CGFloat(CameraTuning.leadInTiles) * tile, halfView - tile)
-        let step = max(halfView * 2 - lead * 2 - tile, tile)
-        var page = held(current)
-        // A page on, or further if the feet got further than that at once.
-        if feet > page + halfView - lead {
-            page = held(max(page + step, feet - halfView + lead + tile))
-        } else if feet < page - halfView + lead {
-            page = held(min(page - step, feet + halfView - lead - tile))
-        }
-        cameraPage = page
-        return page
+        return min(max(wanted, halfView), max(width - halfView, halfView))
     }
-    /// The slide to a new page: from where the camera was, eased out over
-    /// `CameraTuning.slideSeconds`, a new target starting a new slide from where it is.
-    private var slide: (from: CGFloat, to: CGFloat, elapsed: Double)?
-    private func slideCamera(to target: CGFloat) {
-        if slide?.to != target {
-            guard cameraBase.x != target else { slide = nil; return }
-            slide = (cameraBase.x, target, 0)
-        }
-        guard var current = slide else { return }
-        current.elapsed += GameScene.stepSeconds
-        let share = min(current.elapsed / max(CameraTuning.slideSeconds, 0.01), 1)
-        let eased = 1 - pow(1 - share, 3)
-        cameraBase.x = current.from + (current.to - current.from) * CGFloat(eased)
-        slide = share < 1 ? current : nil
-        if share >= 1 { cameraBase.x = current.to }
-    }
+    private static let cameraEase: CGFloat = 0.08
+    private static let cameraLeadFrames: CGFloat = 20
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
 
@@ -4539,8 +4503,8 @@ final class GameScene: SKScene {
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
         ballHalo.color = colour
         spinBall(ball)
-        // The field's camera: level, sliding from zone to zone.
-        if [StageLook.footballField, .elements].contains(match.stage.features.look) { slideCamera(to: cameraTargetX()) }
+        // The camera on a scrolling stage: level, gliding after the local player and leading them.
+        if [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }
         placeBallCamFrame()
         circlesOverCam.isHidden = !ballCamEnabled
         // 47's lines breathe, slowly, between gone and a quarter.

@@ -1276,6 +1276,11 @@ public struct Player: Equatable {
             guard let centre = tornadoCentre else { enter(.air); break }
             let middle = Vec2(x: position.x, y: position.y + spec.bodyHeight / 2)
             velocity = (centre - middle) * TornadoRules.pullShare
+            // The stick drifts it sideways, slowly, out if held long enough; let go, back to the middle.
+            if abs(input.stick.x) >= 0.3 {
+                velocity.x = input.stick.x * airSpeedMax * TornadoRules.driftShare
+                facing = input.stick.x > 0 ? .right : .left
+            }
             if jumpPressed {
                 jumpBuffer = 0
                 velocity = Vec2(x: velocity.x, y: spec.fullHopVelocity)

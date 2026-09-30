@@ -101,4 +101,51 @@ final class ShaftAndTornadoTests: XCTestCase {
         back.frame = TornadoRules.cycleFrames
         XCTAssertEqual(back.tornadoBoxes, match.stage.tornados)
     }
+
+    func testARisingTornadoCatchesToo() {
+        var match = elements()
+        match.frame = TornadoRules.upFrames + TornadoRules.sinkFrames + TornadoRules.underFrames + TornadoRules.riseFrames / 2
+        let tornado = match.tornadoBoxes[0]
+        match.players[0].position = Vec2(x: tornado.center.x, y: tornado.center.y - 8)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .suspended)
+    }
+
+    func testTheStickDriftsABodySidewaysInATornadoAndOutOfIt() {
+        var match = elements()
+        let tornado = match.stage.tornados[0]
+        match.players[0].position = Vec2(x: tornado.center.x, y: tornado.center.y - 8)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        for _ in 0..<20 { match.advance(inputs: [.idle, .idle]) }
+        let from = match.players[0].position.x
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle])
+        let step = match.players[0].position.x - from
+        XCTAssertEqual(step, match.players[0].airSpeedMax * TornadoRules.driftShare, accuracy: 0.001)
+        for _ in 0..<150 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
+        XCTAssertNotEqual(match.players[0].state, .suspended, "drifted out")
+    }
+
+    func testTheChutesHaveNoWallToLandOn() {
+        let stage = Stage.elements
+        let chute = stage.chutes[0]
+        let againstLeft = Box(min: Vec2(x: chute.min.x, y: 260), max: Vec2(x: chute.min.x + 10, y: 277.5))
+        let againstRight = Box(min: Vec2(x: chute.max.x - 10, y: 225), max: Vec2(x: chute.max.x, y: 242.5))
+        XCTAssertNil(stage.wall(beside: againstLeft))
+        XCTAssertNil(stage.wall(beside: againstRight))
+    }
+
+    func testABallParkedAnywhereOnASlopeRollsDownIt() {
+        for startX in stride(from: 141.0, through: 179.0, by: 1) {
+            var match = elements()
+            match.players[0].position = Vec2(x: 30, y: 400)
+            match.players[1].position = Vec2(x: 600, y: 400)
+            guard let surface = match.stage.slopeHeight(atX: startX, near: 180, reach: 25) else { continue }
+            match.ball.respawn(at: Vec2(x: startX, y: surface + BallRules.radius))
+            for _ in 0..<60 { match.advance(inputs: [.idle, .idle]) }
+            XCTAssertGreaterThan(match.ball.position.x, startX + 5, "rolled on from \(startX)")
+        }
+    }
 }

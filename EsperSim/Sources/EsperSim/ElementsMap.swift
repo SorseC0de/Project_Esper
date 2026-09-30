@@ -151,8 +151,8 @@ public struct ElementsMap: Equatable, Codable {
 /// The Elements' tornados, in sim frames: up for three seconds, then down into the lava
 /// over half a second, a second under, and half a second back up; every fourth one to
 /// come up is fire, which burns whoever it touches. A regular one holds whoever comes into
-/// it, drawn to its middle a share of the way a frame; jumped out of, it can't take them
-/// again for a moment.
+/// it, up or rising, drawn to its middle a share of the way a frame, the stick drifting it
+/// sideways; jumped out of, it can't take them again for a moment.
 public enum TornadoRules {
     public static let upFrames = 180
     public static let sinkFrames = 30
@@ -170,6 +170,13 @@ public enum TornadoRules {
     public static func isFire(at frame: Int) -> Bool { appearance(at: frame) % fireEvery == fireEvery - 1 }
     /// Up and holding, not sinking or rising.
     public static func isUp(at frame: Int) -> Bool { frame % cycleFrames < upFrames }
+    /// Up, or rising back: whoever it catches it holds. Sinking or under, it lets go.
+    public static func holds(at frame: Int) -> Bool {
+        let time = frame % cycleFrames
+        return time < upFrames || time >= upFrames + sinkFrames + underFrames
+    }
+    /// A body held in one drifts sideways at this share of the air's drift.
+    public static let driftShare = 0.1
 
     /// How far down from its place a tornado is at `frame`, from 0 up to 1 all the way sunk,
     /// eased in going down and out coming up.

@@ -130,6 +130,8 @@ public struct Stage: Equatable {
     public var fixedExtras: [Box] = []
     /// Where each tornado stands when it's up, its whole square.
     public var tornados: [Box] = []
+    /// The shafts the players drop in by, from just under the ceiling up: nothing in them is a wall to land on.
+    public var chutes: [Box] = []
     /// Extras Surf Soda's board can't ride up: the cars.
     public var unridable: [Box] = []
     /// What the stage has beyond its tiles.
@@ -486,6 +488,7 @@ public struct Stage: Equatable {
     /// rows: the walls up in the sky can't be clung to or jumped off.
     /// `riding`: the board's question, which passes over the unridable extras.
     public func wall(beside box: Box, riding: Bool = false) -> Facing? {
+        if chutes.contains(where: { $0.overlaps(box) }) { return nil }
         let rows = rows(of: box)
         let rightColumn = column(at: box.max.x + Stage.edge)
         let leftColumn = column(at: box.min.x - Stage.edge)
@@ -663,6 +666,9 @@ public struct Stage: Equatable {
                 stage.fixedExtras.append(Box(min: Vec2(x: Double(start) * tileSize, y: skyBottom), max: Vec2(x: Double(column) * tileSize, y: skyTop)))
                 runStart = nil
             }
+        }
+        for (left, right) in zip(stage.fixedExtras, stage.fixedExtras.dropFirst()) where right.min.x > left.max.x {
+            stage.chutes.append(Box(min: Vec2(x: left.max.x, y: Double(rows - 3) * tileSize), max: Vec2(x: right.min.x, y: skyTop)))
         }
         stage.extras = stage.fixedExtras
         stage.tornados = map.tornados.map { base in

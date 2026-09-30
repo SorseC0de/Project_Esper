@@ -116,7 +116,13 @@ public struct Ball: Equatable {
         rollOffSlopes(stage, incoming: incoming, events: &events)
 
         let onFloor = stage.isGrounded(box)
-        if onFloor, velocity.y == 0 {
+        // Held up at a slope's foot, on the corner of the block under the slope above, it's
+        // tipped on down the slope under its middle rather than parked there.
+        if onFloor, velocity.y == 0, let slope = stage.slopes.first(where: {
+            $0.box.min.x <= position.x && position.x <= $0.box.max.x && abs($0.surface(at: position.x) - (position.y - BallRules.radius)) <= BallRules.radius
+        }) {
+            velocity.x += slope.downhill.sign * BallRules.gravity * SlopeRules.diagonal
+        } else if onFloor, velocity.y == 0 {
             let slowed = abs(velocity.x) * (1 - BallRules.rollingFriction) - BallRules.rollingDrag
             velocity.x = slowed > 0 ? (velocity.x < 0 ? -slowed : slowed) : 0
         }

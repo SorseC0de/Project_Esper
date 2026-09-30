@@ -919,11 +919,14 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   in the maker's energy.
 - A global stage rule: the invisible bounds outside a stage's grid are never a wall to land on or
   jump off (`Stage.wall(beside:)`, protocol 36).
+- A ball held up at a slope's foot, on the corner of the block under the slope above it, is
+  tipped on down the slope under its middle, not parked there.
 - A loose ball rolling on the floor loses 3% of its speed a frame and 0.01 more
   (`BallRules.rollingFriction`, `rollingDrag`), easing down to a stop at zero rather than snapping
   to rest.
 - The camera on a scrolling stage (Longball, the Elements) glides after the local player, led
-  by where they're heading (20 frames of their speed), 8% of the way there a frame, held inside
+  by where they're heading (20 frames of their speed, the lead itself eased 5% a frame so a
+  speed that keeps flipping doesn't shake it), 8% of the way there a frame, held inside
   the stage's ends; each round it starts on the local player.
   The view takes in the stage's height and the turf below the floor. When the ball is off
   the screen sideways, its chevrons sit at that edge at its height, pointing at it, purple
@@ -934,8 +937,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 ## The Elements
 
 `Stage.elements`, The Elements on the stage select (a working title): 67 by 24 tiles, two
-Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's deep purple (#403353) on up over it, neither glowing. Palette 29 flat behind everything (the mountains' own colour, so they don't show against it until
-they're recoloured), `mountains_bkg` stretched over the stage in front of
+Wreck Centers across less a column, so there's a middle one, and 24 high (a large stage's most: lava to the ceiling of icicles, all of it on screen at 3x on a phone), zoomed by whole pixels to fit its height (3x on a phone, 5x on the iPad) and scrolling sideways on the same gliding camera as Longball, the lava the bottom row. A screen taller than that shows its spare rows split above and below: the lava's orange (palette 6) on down under it, the ceiling rock's deep purple (#403353) on up over it, neither glowing. Palette 17 flat behind everything (showing up the shafts above the ceiling too), `mountains_bkg` stretched over the stage in front of
 it, a bed of lava along the bottom (`lava`, eight 48 pixel frames, each strip a step further
 through them, three tiles high) and, in front of both, the tiles of a hand-made map, each a 16
 by 16 cell of `tileset_elements` (`Pixel Art/Stages/Elements`; the importer's `STAGE_ART` and
@@ -962,7 +964,8 @@ Over each gap in the ceiling's row a shaft runs up through the sky (`Stage.fixed
 above the ceiling is solid but for them, up to its top), walled in rock edges drawn on up through
 a taller screen's spare rows (the tileset's (5, 3) on its left, (1, 3) on its right). The players
 start in the air in the two shafts, columns 12 to 14 and 52 to 54, row 29, a few tiles above the
-screen, and drop in, as they do again when burned. They land on slide slopes (`Kind.slideLowerRight`,
+screen, and drop in, as they do again when burned. Nothing in a shaft, from just under the
+ceiling up, is a wall to land on or jump off (`Stage.chutes`). They land on slide slopes (`Kind.slideLowerRight`,
 `slideLowerLeft`, orange in the map maker's walls mode): nobody stands or walks up one. On one,
 anything on the ground turns downhill into the forced slide; held uphill, the body walks up it
 facing uphill but is carried back down at a quarter of walking speed
@@ -971,13 +974,16 @@ facing uphill but is carried back down at a quarter of walking speed
 The tornados (`Stage.tornados`, `TornadoRules`, `Match.tornadoBoxes`): up for three seconds, then
 down into the lava over half a second, eased in, a second under, and half a second back up to their
 places, over and over, all together; every fourth to come up is `fire_tornado`, which burns
-whoever it touches as the lava does. A regular one that's up takes whoever comes into it out of
+whoever it touches as the lava does. A regular one that's up or rising takes whoever comes into it out of
 the air (`PlayerState.suspended`), jumps back to full, and holds them, their middle drawn to its
-middle 15% of the way a frame, gravity off, in the falling frame; from it they can shoot, throw,
+middle 15% of the way a frame, gravity off, in the falling frame, the stick drifting them
+sideways at a tenth of the air's drift (`TornadoRules.driftShare`), out if held; drawn hovering
+round a 2 pixel circle counter-clockwise, as Smoothie's flight hovers, while the tornados hover
+round one clockwise (`ElementsArt.hoverRadius`); from it they can shoot, throw,
 snatch or slash as in Super Smoothie's flight, and jump is a full hop out, after which no tornado
 takes them for half a second. Sinking, it lets them go. Each tornado is drawn behind the lava, so
 it sinks into it, and again over the players at 33% (`ElementsArt.tornadoOverlayAlpha`), cropped to
-above the lava. Protocol 37.
+above the lava. Protocol 38.
 
 The map's walls (`ElementsMap.walls`) are kept apart from the art: by default a block under
 every solid tile, or as painted in the map maker's walls mode, each cell a block or a slope by

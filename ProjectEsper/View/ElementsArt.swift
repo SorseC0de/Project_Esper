@@ -5,7 +5,7 @@ import SpriteKit
 /// lava along the bottom, and a sprite for every tile the map has placed, cut from the tileset.
 enum ElementsArt {
     /// The flat colour behind everything: palette 29.
-    static let background: RGB = PixelPalette.colours[29]
+    static let background: RGB = PixelPalette.colours[17]
     static let tileSide: CGFloat = 16
     static let lavaFrames = 8
     /// The lava's orange below its surface, and the deep purple inside the ceiling's rock.
@@ -20,6 +20,8 @@ enum ElementsArt {
     static let tornadoFrameSeconds = 1.0 / 12
     /// The copy of each tornado drawn over the players.
     static let tornadoOverlayAlpha: CGFloat = 0.33
+    /// Pixels round the circle a tornado hovers on, clockwise, and a body held in one, counter-clockwise.
+    static let hoverRadius: CGFloat = 2
     /// Where the lava's art tops out, for what sinks into it.
     static var lavaTop: CGFloat { lavaSide }
     /// No icicle hangs over these columns or their mirror: the ceiling's ends, over the rock and the shafts.
@@ -115,14 +117,16 @@ enum ElementsArt {
         }
 
         /// The tornados where the sim has them this frame, each on a frame of its own, in fire or not.
-        func placeTornados(_ boxes: [Box], fire: Bool, time: Double) {
+        func placeTornados(_ boxes: [Box], fire: Bool, time: Double, hoverLap: Double) {
+            let hover = CGPoint(x: (cos(-hoverLap) * Double(ElementsArt.hoverRadius)).rounded(),
+                                y: (sin(-hoverLap) * Double(ElementsArt.hoverRadius)).rounded())
             let sheet = fire ? "fire_tornado" : "tornado"
             let step = Int(time / ElementsArt.tornadoFrameSeconds)
             for (index, box) in boxes.enumerated() where index < tornados.count {
                 let texture = sprites.texture(sheet, (step + index * 3) % ElementsArt.tornadoFrames)
                 for node in [tornados[index], tornadoOverlays[index]] {
                     node.texture = texture
-                    node.position = SpriteLibrary.point(box.min)
+                    node.position = SpriteLibrary.point(box.min) + hover
                 }
             }
         }
@@ -203,10 +207,25 @@ enum ElementsArt {
             return node
         }
         let below = fill(lavaOrange, y: -spare, z: -9)
-        let above = fill(ceilingPurple, y: height, z: -8)
+        // The rock's purple above, but for the shafts, which show the background.
+        let ceilingRow = stage.rows - 1
+        var above: [SKSpriteNode] = []
+        var runStart: CGFloat? = -spare
+        for column in 0...stage.columns {
+            let solid = column == stage.columns || map.wall(at: .init(column, ceilingRow)) == .solid
+            let x = CGFloat(column) * tileSide
+            if solid, runStart == nil { runStart = x }
+            if !solid || column == stage.columns, let start = runStart {
+                let end = column == stage.columns ? width + spare : x
+                let piece = fill(ceilingPurple, y: height, z: -8)
+                piece.position.x = start
+                piece.size.width = end - start
+                above.append(piece)
+                runStart = nil
+            }
+        }
         // The shafts up through the sky over the ceiling's gaps, walled in rock edges.
         var shaftWalls: [SKSpriteNode] = []
-        let ceilingRow = stage.rows - 1
         for column in 0..<stage.columns where map.wall(at: .init(column, ceilingRow)) != .solid {
             for (wallColumn, art) in [(column - 1, ElementsMap.Cell(5, 3)), (column + 1, ElementsMap.Cell(1, 3))]
             where (0..<stage.columns).contains(wallColumn) && map.wall(at: .init(wallColumn, ceilingRow)) == .solid {
@@ -222,7 +241,7 @@ enum ElementsArt {
             }
         }
         var handles = Handles(parent: parent, overlayParent: overlayParent, sprites: sprites)
-        handles.spareFills = [below, above]
+        handles.spareFills = [below] + above
         handles.shaftWalls = shaftWalls
         handles.mountains = range
         handles.icicles = icicles

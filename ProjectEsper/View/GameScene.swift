@@ -3163,14 +3163,18 @@ final class GameScene: SKScene {
     private func cameraTargetX() -> CGFloat {
         guard match.players.indices.contains(localIndex) else { return cameraBase.x }
         let player = match.players[localIndex]
+        // The lead eased, so a speed that keeps flipping, as against a slide slope, doesn't shake it.
         let lead = CGFloat(player.velocity.x) * GameScene.cameraLeadFrames * CGFloat(SpriteLibrary.pixelsPerUnit)
-        let wanted = SpriteLibrary.point(player.position).x + lead
+        cameraLead += (lead - cameraLead) * GameScene.cameraLeadEase
+        let wanted = SpriteLibrary.point(player.position).x + cameraLead
         let halfView = size.width * cameraNode.xScale / 2
         let width = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
         return min(max(wanted, halfView), max(width - halfView, halfView))
     }
     private static let cameraEase: CGFloat = 0.08
     private static let cameraLeadFrames: CGFloat = 20
+    private static let cameraLeadEase: CGFloat = 0.05
+    private var cameraLead: CGFloat = 0
 
     private var helmetNodes: [Int: SKSpriteNode] = [:]
 
@@ -4211,12 +4215,14 @@ final class GameScene: SKScene {
             let growing = player.spec.scale != 1 && titanGrowth[index] < 1
             node.size = node.texture!.size().scaled(by: drawScale)
             node.anchorPoint = sprites.anchor(for: frame.animation)
-            // A flight holding still hovers round a small circle, eased in and out.
+            // A flight holding still hovers round a small circle, eased in and out, counter-clockwise;
+            // held in a tornado, a smaller one.
             let stillFlight = player.state == .flying && player.velocity.length < 0.2
-            hover[index] += ((stillFlight ? 1 : 0) - hover[index]) * 0.1
+            let inTornado = player.state == .suspended
+            hover[index] += ((stillFlight || inTornado ? 1 : 0) - hover[index]) * 0.1
             let lap = Double(match.frame) / 60 / GameScene.hoverSeconds * 2 * .pi
-            let drift = CGPoint(x: (cos(lap) * Double(GameScene.hoverRadius * hover[index])).rounded(),
-                                y: (sin(lap) * Double(GameScene.hoverRadius * hover[index])).rounded())
+            let radius = (inTornado ? ElementsArt.hoverRadius : GameScene.hoverRadius) * hover[index]
+            let drift = CGPoint(x: (cos(lap) * Double(radius)).rounded(), y: (sin(lap) * Double(radius)).rounded())
             node.position = SpriteLibrary.point(player.position) + drift
             if player.state == .dunking {
                 // Each frame of the dunk sits where its art was placed on the rim.
@@ -4523,7 +4529,8 @@ final class GameScene: SKScene {
         }
 
         drawPlatforms()
-        elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime())
+        elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime(),
+                                   hoverLap: Double(match.frame) / 60 / GameScene.hoverSeconds * 2 * .pi)
         section("webs")
 
         let ball = match.ball

@@ -991,21 +991,32 @@ it sinks into it, and again over the players at 33% (`ElementsArt.tornadoOverlay
 above the lava.
 
 Falling into the lava, a body or the ball, plays `fire_hit` and three sheets at the surface where it
-went in, the explosion on top (`explosion`, at 24 a second), `sizzle1` or `sizzle2` by a coin flip
-under it, and `lava_splash` under that (15 a second), half the size for the ball.
+went in, `lava_splash` on top (15 a second), `sizzle1` or `sizzle2` by a coin flip under it (15 a
+second), and `explosion` under that (24 a second), all at half size, a quarter for the ball. Burned
+by a fire tornado, the same at the body's middle but the splash (`MatchEvent.tornadoBurned`).
 
 The fireball (`Match.stageFireball`, `StageFireballRules`, `fireball`, four 16 pixel frames at 15 a
 second): every five seconds one rises out of the lava two tiles short of the leftmost tornado and
 takes two and a half seconds along a smooth curve through every tornado's middle to two tiles past
-the rightmost and back under, each pass the other way from the last, first left to right. It strips
-whoever it touches, knocked its way, and bursts (`fire_explosion`, `fire_hit`), gone for the rest of
-the pass; on Blazing Boba it only bursts.
+the rightmost and back under, each pass the other way from the last, first left to right, the sprite
+(drawn pointing right) turned to its path. It strips whoever it touches, knocked its way and coasting
+on it 20 frames before the stick has them again (`StageFireballRules.knockCoastFrames`), and bursts
+(`fire_explosion`, `fire_hit`), gone for the rest of the pass; on Blazing Boba it only bursts. A body
+knocked out of a tornado, by anything, isn't taken straight back.
 
 The wind (`wind`, nine 32 pixel frames at ten a second): a puff about every third of a second in each
 of two layers, behind the rock and in front of everything, each at 1, 0.75, 0.5 or 0.25, starting
 anywhere on screen and blowing 64 to 160 pixels leftward as it plays through, fading out; none of it
 glows. On this stage the head's and legs' particles blow leftward rather than toward the ball.
-Protocol 40.
+The rain: streaks 2 to 5 pixels long at 45 degrees, falling from the top right to the bottom left,
+in palette 48 or 22 at any strength from 0.2 up, not glowing. Thousands, drawn as two textures made
+once (256 pixel tiles, 260 and 200 streaks), each tiled over the screen and slid along, 240 and 360
+pixels a second, whole pixels. It's the world's topmost layer (z 90, under the HUD), room left under it.
+The rain splashes (`splash`, seven 48 pixel frames at 15 a second, full size for now) about twelve
+times a second at random on screen: on any open top of rock under the ceiling, and on the left
+side's slopes, turned to lie on them; never on the right side's slopes.
+
+Protocol 41.
 
 The map's walls (`ElementsMap.walls`) are kept apart from the art: by default a block under
 every solid tile, or as painted in the map maker's walls mode, each cell a block or a slope by

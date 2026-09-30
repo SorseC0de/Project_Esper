@@ -4,9 +4,11 @@ import XCTest
 /// The Elements' drop in: down a shaft through the sky onto a slide slope, which nobody
 /// stands or walks up on; and its tornados, which hold, sink, and every fourth time burn.
 final class ShaftAndTornadoTests: XCTestCase {
-    private func elements() -> Match {
+    /// The Elements, its first fireball out of the way unless a test wants it.
+    private func elements(fireball: Bool = false) -> Match {
         var match = Match(stage: .elements, specs: [.starting, .starting])
         match.countdown = 0
+        if !fireball { match.stageFireballBurstPass = 0 }
         return match
     }
 
@@ -89,6 +91,7 @@ final class ShaftAndTornadoTests: XCTestCase {
         match.players[0].enter(.air)
         match.advance(inputs: [.idle, .idle])
         XCTAssertTrue(match.events.contains(.lavaBurned(player: 0)))
+        XCTAssertTrue(match.events.contains { if case .tornadoBurned = $0 { return true }; return false })
         XCTAssertEqual(match.players[0].position, match.stage.playerSpawns[0])
     }
 
@@ -186,7 +189,7 @@ final class ShaftAndTornadoTests: XCTestCase {
     }
 
     func testTheFireballArcsThroughEveryTornadoOutOfTheLavaAndBackAlternatingSides() {
-        var match = elements()
+        var match = elements(fireball: true)
         let centres = match.stage.tornados.map(\.center)
         for pass in 0..<2 {
             var path: [Vec2] = []
@@ -206,7 +209,7 @@ final class ShaftAndTornadoTests: XCTestCase {
     }
 
     private func fireballMeets(_ power: Power) -> Match {
-        var match = elements()
+        var match = elements(fireball: true)
         match.frame = 40
         let at = match.stageFireball!.position
         match.frame = 39
@@ -250,5 +253,23 @@ final class ShaftAndTornadoTests: XCTestCase {
         match.advance(inputs: [.idle, .idle])
         XCTAssertTrue(match.events.contains(.lavaSplashed(at: Vec2(x: 300, y: ElementsRules.lavaSurface), ball: false)))
         XCTAssertTrue(match.events.contains { if case .lavaSplashed(_, true) = $0 { return true }; return false })
+    }
+
+    func testTheFireballKnocksABodyOutOfATornado() {
+        var match = elements(fireball: true)
+        let tornado = match.stage.tornados.min { $0.min.x < $1.min.x }!
+        match.players[1].position = Vec2(x: 30, y: 400)
+        match.players[0].position = Vec2(x: tornado.center.x, y: tornado.center.y - 8)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        var struck = false
+        for _ in 0..<StageFireballRules.travelFrames {
+            match.advance(inputs: [.idle, .idle])
+            if match.events.contains(where: { if case .stageFireballBurst = $0 { return true }; return false }) { struck = true; break }
+        }
+        XCTAssertTrue(struck)
+        for _ in 0..<8 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertNotEqual(match.players[0].state, .suspended, "knocked out, not held")
+        XCTAssertGreaterThan(match.players[0].velocity.x, 0, "knocked the fireball's way")
     }
 }

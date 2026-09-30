@@ -206,6 +206,8 @@ public enum StageFireballRules {
     public static let everyFrames = 300
     public static let travelFrames = 150
     public static let radius = 5.0
+    /// Frames a body it strikes coasts on the knock before the stick has it again.
+    public static let knockCoastFrames = 20
     /// Tiles out past the end tornados it rises and sets, and how far under the lava's surface.
     public static let reachPastTornados = 2.0
     public static let underLava = -10.0

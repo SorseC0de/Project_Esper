@@ -529,6 +529,7 @@ public struct Match: Equatable {
             }
             // Blazing Boba is at home in a fire one.
             if fire, players[index].power != .blazingBoba {
+                events.append(.tornadoBurned(at: players[index].body.center))
                 burn(index)
             } else if players[index].state == .suspended {
                 players[index].tornadoCentre = boxes[hit].center
@@ -545,7 +546,10 @@ public struct Match: Equatable {
     public var stageFireballBurstPass: Int?
 
     /// The Elements' fireball this frame, if one is out: where it is, and which way it's going.
-    public var stageFireball: (position: Vec2, heading: Facing)? {
+    public var stageFireball: (position: Vec2, heading: Facing)? { stageFireball(at: frame) }
+
+    /// Where the Elements' fireball is on `frame`, burst or not.
+    public func stageFireball(at frame: Int) -> (position: Vec2, heading: Facing)? {
         guard stage.tornados.count > 0 else { return nil }
         let pass = frame / StageFireballRules.everyFrames
         let time = frame % StageFireballRules.everyFrames
@@ -586,6 +590,8 @@ public struct Match: Equatable {
         guard players[victim].power != .blazingBoba else { return }
         let other = players.indices.first { $0 != victim } ?? victim
         strip(victim, by: other, knock: Vec2(x: BlazeRules.burstKnock.x * fireball.heading.sign, y: BlazeRules.burstKnock.y))
+        // Carried by the knock a while, the stick not braking it.
+        players[victim].airControlLock = StageFireballRules.knockCoastFrames
     }
 
     /// Hit-stop to at least this many frames.

@@ -1432,6 +1432,8 @@ public struct Player: Equatable {
         ledge = nil
         wantsPlatform = false
         velocity = push * spec.knockbackShare
+        // Knocked out of a tornado, it doesn't take the body straight back.
+        if state == .suspended { tornadoCooldown = TornadoRules.jumpOutCooldownFrames }
         knockedAloft = true
         grounded = false
         fastFalling = false

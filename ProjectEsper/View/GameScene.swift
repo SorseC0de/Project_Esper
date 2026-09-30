@@ -340,7 +340,7 @@ final class GameScene: SKScene {
     var tornadoSnapshots: [BodySnapshot] {
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
-        return windSnapshots(windPuffs.back) + (art.tornados + art.tornadoOverlays).compactMap { node in
+        return windSnapshots(windPuffs.back + rainSplashes) + (art.tornados + art.tornadoOverlays).compactMap { node in
             guard let texture = node.texture else { return nil }
             let visible = min(max((node.position.y + node.size.height - ElementsArt.lavaTop) / node.size.height, 0), 1)
             guard visible > 0 else { return nil }
@@ -373,6 +373,10 @@ final class GameScene: SKScene {
         }
         // The Elements' wind in front of everything.
         flat += windSnapshots(windPuffs.front)
+        // And its rain, over everything.
+        if !rainLayer.isHidden {
+            flat += rainTiles.joined().filter { !$0.isHidden }.map { BodySnapshot(texture: $0.texture!, position: $0.position, anchor: .zero, xScale: 1, size: $0.size) }
+        }
         // The snipe's cursors, drawn as they are.
         for cursor in snipeCursors where !cursor.isHidden {
             if let texture = cursor.texture {
@@ -570,6 +574,9 @@ final class GameScene: SKScene {
         tornadoOverlays.maskNode = overLava
         tornadoOverlays.zPosition = 22
         world.addChild(tornadoOverlays)
+        // The rain over everything in the world, room left under it for more.
+        rainLayer.zPosition = 90
+        world.addChild(rainLayer)
         camera = cameraNode
         addChild(cameraNode)
         glowHud.zPosition = 100
@@ -910,6 +917,7 @@ final class GameScene: SKScene {
             elementsArt = ElementsArt.build(stage: stage, map: ElementsMap.current, into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
         }
         refreshStaticFlats()
+        findRainSplashSpots()
         if stage.features.look == .highway {
             HighwayArt.build(for: stage, into: stageGround) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
         }
@@ -1113,14 +1121,15 @@ final class GameScene: SKScene {
     /// A soft glow in the colour, added, which the glow pass then picks up.
     // MARK: The Elements' lava, fireball and wind
 
-    /// Into the lava: an explosion over a sizzle, either, over the lava's splash, and the fire's
-    /// hit; half the size for the ball.
-    private func splashLava(at position: Vec2, ball: Bool) {
+    /// Into the lava: the lava's splash over a sizzle, either, over an explosion, and the fire's
+    /// hit, at half size, a quarter for the ball; burned in a fire tornado, the same but the splash.
+    private func splashLava(at position: Vec2, ball: Bool, splash: Bool = true) {
         play(.fireHit, at: position)
-        let scale: CGFloat = ball ? 0.5 : 1
-        let layers: [(sheet: String, fps: Double, z: CGFloat)] = [
-            ("lava_splash", 15, 40), (Bool.random() ? "sizzle1" : "sizzle2", 15, 41), ("explosion", 24, 42),
+        let scale: CGFloat = ball ? 0.25 : 0.5
+        var layers: [(sheet: String, fps: Double, z: CGFloat)] = [
+            ("explosion", 24, 40), (Bool.random() ? "sizzle1" : "sizzle2", 15, 41),
         ]
+        if splash { layers.append(("lava_splash", 15, 42)) }
         for layer in layers {
             guard let count = EffectSheets.frames[layer.sheet] else { continue }
             let frames = (0..<count).map { sprites.texture(layer.sheet, $0) }
@@ -1153,7 +1162,10 @@ final class GameScene: SKScene {
         node.texture = sprites.texture("fireball", (match.frame * GameScene.stageFireballFramesPerSecond / 60) % (EffectSheets.frames["fireball"] ?? 1))
         node.size = node.texture?.size() ?? .zero
         node.position = SpriteLibrary.point(fireball.position)
-        node.xScale = CGFloat(fireball.heading.sign)
+        // Drawn pointing right: turned to where it's going next.
+        let ahead = match.stageFireball(at: match.frame + 1)?.position ?? fireball.position + Vec2(x: fireball.heading.sign, y: 0)
+        let way = ahead - fireball.position
+        node.zRotation = CGFloat(atan2(way.y, way.x))
     }
 
     /// The Elements' wind: puffs of `wind` behind the stage's rock and in front of everything, each
@@ -1195,6 +1207,112 @@ final class GameScene: SKScene {
                 windPuffs.back.append(puff)
             }
         }
+    }
+
+    /// The Elements' rain: streaks 2 to 5 pixels long at 45 degrees, falling from the top right
+    /// to the bottom left, in palette 48 or 22 at any strength. Thousands of them, but drawn as
+    /// two textures made once, each a tile repeated over the screen and slid along: a near layer
+    /// and a far one, slower. Over everything in the world, under the HUD.
+    private let rainLayer = SKNode()
+    private var rainTiles: [[SKSpriteNode]] = [[], []]
+    private static let rainTileSide = 256
+    private static let rainSpeeds: [CGFloat] = [240, 360]
+    private static let rainStreaksPerTile = [260, 200]
+    private static let rainTextures: [SKTexture] = rainStreaksPerTile.map { GameScene.makeRainTexture(streaks: $0) }
+
+    private static func makeRainTexture(streaks: Int) -> SKTexture {
+        let side = rainTileSide
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
+            for _ in 0..<streaks {
+                let colour = SKColor(rgb: PixelPalette.colours[Bool.random() ? 48 : 22])
+                colour.withAlphaComponent(.random(in: 0.2...1)).setFill()
+                let x = Int.random(in: 0..<side), y = Int.random(in: 0..<side)
+                let length = Int.random(in: 2...5)
+                // Down and to the left, one pixel each, the tile's edges wrapping so it repeats.
+                for step in 0..<length {
+                    context.fill(CGRect(x: (x - step + side) % side, y: (y + step) % side, width: 1, height: 1))
+                }
+            }
+        }
+        let texture = SKTexture(image: image)
+        texture.filteringMode = .nearest
+        return texture
+    }
+
+    private func fallRain() {
+        let raining = match.stage.features.look == .elements
+        rainLayer.isHidden = !raining
+        guard raining else { return }
+        let side = CGFloat(GameScene.rainTileSide)
+        let halfWidth = size.width * cameraNode.xScale / 2, halfHeight = size.height * cameraNode.yScale / 2
+        let left = cameraNode.position.x - halfWidth, bottom = cameraNode.position.y - halfHeight
+        let across = Int((halfWidth * 2 / side).rounded(.up)) + 1, up = Int((halfHeight * 2 / side).rounded(.up)) + 1
+        for layer in 0..<2 {
+            while rainTiles[layer].count < across * up {
+                let tile = SKSpriteNode(texture: GameScene.rainTextures[layer])
+                tile.anchorPoint = .zero
+                tile.size = CGSize(width: side, height: side)
+                tile.zPosition = CGFloat(layer)
+                rainLayer.addChild(tile)
+                rainTiles[layer].append(tile)
+            }
+            // Slid down and left, whole pixels, wrapping every tile.
+            let travel = (CGFloat(CACurrentMediaTime()) * GameScene.rainSpeeds[layer]).truncatingRemainder(dividingBy: side)
+            let originX = ((left + travel) / side).rounded(.down) * side - travel
+            let originY = ((bottom + travel) / side).rounded(.down) * side - travel
+            for (index, tile) in rainTiles[layer].enumerated() {
+                tile.isHidden = index >= across * up
+                tile.position = CGPoint(x: (originX + CGFloat(index % across) * side).rounded(), y: (originY + CGFloat(index / across) * side).rounded())
+            }
+        }
+    }
+
+    /// Where rain splashes on the Elements: along every open top of rock, and up the left side's
+    /// slopes, turned to lie on them; not the right side's.
+    private var rainSplashSpots: [(x: ClosedRange<CGFloat>, y: (CGFloat) -> CGFloat, turn: CGFloat)] = []
+    private var rainSplashes: [SKSpriteNode] = []
+    private static let rainSplashesPerSecond = 12.0
+
+    private func findRainSplashSpots() {
+        rainSplashSpots = []
+        guard match.stage.features.look == .elements else { return }
+        let map = ElementsMap.current, tile = ElementsArt.tileSide, stage = match.stage
+        for wall in map.walls where wall.cell.row < stage.rows - 1 {
+            let above = map.wall(at: .init(wall.cell.column, wall.cell.row + 1))
+            let x = CGFloat(wall.cell.column) * tile, top = CGFloat(wall.cell.row + 1) * tile, bottom = CGFloat(wall.cell.row) * tile
+            switch wall.kind {
+            case .solid where above == nil:
+                rainSplashSpots.append((x...(x + tile), { _ in top }, 0))
+            case .lowerLeft, .slideLowerLeft where x < CGFloat(stage.columns) * tile / 2:
+                rainSplashSpots.append((x...(x + tile), { at in bottom + (x + tile - at) }, -.pi / 4))
+            case .lowerRight, .slideLowerRight where x < CGFloat(stage.columns) * tile / 2:
+                rainSplashSpots.append((x...(x + tile), { at in bottom + (at - x) }, .pi / 4))
+            default:
+                break
+            }
+        }
+    }
+
+    /// Splashes here and there, at random, on what's on screen.
+    private func splashRain() {
+        rainSplashes.removeAll { $0.parent == nil }
+        guard match.stage.features.look == .elements, !rainSplashSpots.isEmpty, let count = EffectSheets.frames["splash"],
+              Double.random(in: 0..<1) < GameScene.rainSplashesPerSecond * GameScene.stepSeconds else { return }
+        let halfWidth = size.width * cameraNode.xScale / 2
+        let seen = rainSplashSpots.filter { abs($0.x.lowerBound - cameraNode.position.x) < halfWidth }
+        guard let spot = seen.randomElement() else { return }
+        let x = CGFloat.random(in: spot.x)
+        let frames = (0..<count).map { sprites.texture("splash", $0) }
+        let splash = SKSpriteNode(texture: frames[0])
+        splash.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY["splash"] ?? 0)
+        splash.position = CGPoint(x: x, y: spot.y(x))
+        splash.zRotation = spot.turn
+        splash.zPosition = -7
+        splash.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 15), .removeFromParent()]))
+        stageGround.addChild(splash)
+        rainSplashes.append(splash)
     }
 
     /// The loose ball's turning, from what it does: backspin off a shot or a throw, kept through the
@@ -2778,6 +2896,8 @@ final class GameScene: SKScene {
                 glowers.addChild(summon)
             case .lavaSplashed(let at, let isBall):
                 splashLava(at: at, ball: isBall)
+            case .tornadoBurned(let at):
+                splashLava(at: at, ball: false, splash: false)
             case .stageFireballBurst(let at):
                 play(.fireHit, at: at)
                 glowers.addChild(Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at), flipped: false))
@@ -4637,6 +4757,8 @@ final class GameScene: SKScene {
         drawPlatforms()
         placeStageFireball()
         blowWind()
+        splashRain()
+        fallRain()
         elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime(),
                                    burstFrame: TornadoRules.burstFrame(at: match.frame),
                                    hoverLap: Double(match.frame) / 60 / GameScene.hoverSeconds * 2 * .pi)

@@ -59,6 +59,8 @@ public enum MatchEvent: Equatable {
     case lavaBurned(player: Int)
     /// Something fell into the lava here: a body, or the ball.
     case lavaSplashed(at: Vec2, ball: Bool)
+    /// Burned by a fire tornado, here.
+    case tornadoBurned(at: Vec2)
     /// The Elements' fireball burst here.
     case stageFireballBurst(at: Vec2)
     /// A stance's stepback began.

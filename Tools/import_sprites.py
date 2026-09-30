@@ -31,9 +31,10 @@ STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
 STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava"]
 # Whole pictures, not strips: into the catalog's root as an image of this name.
+# A list of places a picture may have been saved: the newest is taken.
 ROOT_IMAGES = {
-    "ElementsTileset": "Stages/Elements/tileset_elements.png",
-    "ElementsMountains": "Stages/Elements/mountains_bkg.png",
+    "ElementsTileset": ["Stages/Elements/tileset_elements.png", "Stages/tileset_elements.png"],
+    "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")
 LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources", "EsperSim", "BallLandmarks.swift")
@@ -286,7 +287,8 @@ def write_root_images():
         if os.path.isdir(imageset):
             shutil.rmtree(imageset)
         os.makedirs(imageset)
-        shutil.copy(os.path.join(STRIPS, source), os.path.join(imageset, name + ".png"))
+        saved = [os.path.join(STRIPS, path) for path in source if os.path.exists(os.path.join(STRIPS, path))]
+        shutil.copy(max(saved, key=os.path.getmtime), os.path.join(imageset, name + ".png"))
         json.dump({"images": [{"filename": name + ".png", "idiom": "universal", "scale": "1x"}],
                    "info": {"author": "xcode", "version": 1}},
                   open(os.path.join(imageset, "Contents.json"), "w"), indent=2)

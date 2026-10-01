@@ -309,10 +309,13 @@ public enum IcicleRules {
 public enum WetshotRules {
     public static let columns = 30
     public static let rows = 17
-    /// The rim's centre from the Hooperfish's bottom left, in units: `hoop_straight` sits on its
-    /// leftmost 48 pixels, 10 up, and the rim is 5 left and 10 down of that art's middle
-    /// (`HoopTuning.courtOffset`): 19 and 24 pixels.
-    public static let rimFromHooperfish = Vec2(x: 19 / 1.6, y: 24 / 1.6)
+    /// The rim's centre from the Hooperfish's bottom left, in whole art pixels: `hoop_straight`
+    /// sits on its leftmost 48 pixels, 10 up, and the rim is 5 left and 10 down of that art's
+    /// middle (`HoopTuning.courtOffset`): 19 across and 24 up. Across is on the HOOP X slider
+    /// while it's tuned, offline.
+    nonisolated(unsafe) public static var rimPixelsAcross = 19
+    public static let rimPixelsUp = 24
+    public static var rimFromHooperfish: Vec2 { Vec2(x: Double(rimPixelsAcross) / 1.6, y: Double(rimPixelsUp) / 1.6) }
 }
 
 public enum ElementsRules {

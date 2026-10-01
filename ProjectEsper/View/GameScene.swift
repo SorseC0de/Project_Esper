@@ -1518,7 +1518,7 @@ final class GameScene: SKScene {
         var wobbleRate: Double
     }
     private var bubbles: [Bubble] = []
-    private static let bubblesPerSecond = 3.0
+    private static let bubblesPerSecond = 8.0
     private static let bubbleClusterChance = 0.25
     /// The bubble cells' weights: the first as likely as near half the others together.
     private static let bubbleCellWeights = [0.4, 0.15, 0.15, 0.15, 0.15]
@@ -1591,6 +1591,8 @@ final class GameScene: SKScene {
             return fish
         }
         guard wet, EffectSheets.frames["bubbles_jellyfish"] != nil else { return }
+        // One group across at a time.
+        guard jellyfish.isEmpty else { jellyfishClock = 0; return }
         jellyfishClock += step
         guard jellyfishClock >= nextJellyfish else { return }
         jellyfishClock = 0
@@ -1750,10 +1752,14 @@ final class GameScene: SKScene {
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
         let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
         // The map maker sees the whole stage at once, as big as it fits, not by whole pixels.
-        let pointsPerGamePixel = wholeStageView ? min(size.width / stageWidth, size.height / stageHeight) : screenPixelsPerGamePixel / screenScale
+        // Wetshot Wake fills the screen, its bottom on the screen's, cropped at the top or the sides.
+        let fills = match.stage.features.look == .wetshot && !wholeStageView
+        let pointsPerGamePixel = wholeStageView ? min(size.width / stageWidth, size.height / stageHeight)
+            : (fills ? max(size.width / stageWidth, size.height / stageHeight) : screenPixelsPerGamePixel / screenScale)
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale
-        cameraNode.position = CGPoint(x: scrolls && !wholeStageView ? cameraBase.x : stageWidth / 2, y: stageHeight / 2 - below)
+        cameraNode.position = CGPoint(x: scrolls && !wholeStageView ? cameraBase.x : stageWidth / 2,
+                                      y: fills ? size.height * cameraNode.yScale / 2 : stageHeight / 2 - below)
         if scrolls, !wholeStageView, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
         cameraBase = cameraNode.position
         // The HUD is laid out in the phone's points and scaled up for a bigger screen.
@@ -1854,6 +1860,15 @@ final class GameScene: SKScene {
                 RainTuning.density = Double(value)
                 GameScene.rainTextures = GameScene.makeRainTextures()
                 self?.rainTiles.joined().enumerated().forEach { index, tile in tile.texture = GameScene.rainTextures[index < (self?.rainTiles[0].count ?? 0) ? 0 : 1] }
+            }
+        }
+        if series.stage.stage.features.look == .wetshot, online == nil {
+            // The rim's place across the Hooperfish, a whole art pixel at a time.
+            controls.addSlider(title: "HOOP X", range: 0...96, notch: 1, value: Float(WetshotRules.rimPixelsAcross)) { [weak self] value in
+                let pixels = Int(value.rounded())
+                guard pixels != WetshotRules.rimPixelsAcross else { return }
+                WetshotRules.rimPixelsAcross = pixels
+                self?.session.mutate { $0.stage = .wetshot; $0.refreshExtras() }
             }
         }
         if ChevronTuning.slider {

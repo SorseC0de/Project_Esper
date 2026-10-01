@@ -9,6 +9,8 @@ final class TransformTests: XCTestCase {
         match.countdown = 0
         match.players[0].position = Vec2(x: 100, y: 10)
         match.players[0].grounded = true
+        // Parked: nobody has the change unless given it.
+        match.players[0].transformReady = true
         return match
     }
 
@@ -16,7 +18,6 @@ final class TransformTests: XCTestCase {
 
     func testThrowAndShootTogetherChangeIntoTheEnergyFormHeldStill() {
         var match = standing()
-        XCTAssertTrue(match.players[0].transformReady)
         match.advance(inputs: [both, .idle])
         XCTAssertEqual(match.players[0].state, .transforming)
         let at = match.players[0].position

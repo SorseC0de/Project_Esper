@@ -130,7 +130,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   fireball keeps the two together where it's asked for. The change holds the body still where it
   is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
   from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
-  it's `transformed`. For now everyone has the change there to make (`transformReady`), shown by
+  it's `transformed`. Parked: nobody has the change there to make (`transformReady` off, protocol 49); given it, it's shown by
   the zone's cycling colours round the line, and the head's and legs' cubes in the zone's colours,
   until it's made. As drawn: seven pixels up off the
   ground the whole change, the eyes over the body in the energy's colour, all white and glowing on
@@ -1108,7 +1108,8 @@ never a painted slope.
 
 ## Wetshot Wake
 
-`Stage.wetshot`, `StageChoice.wetshotWake`: 30 by 17 tiles, one court across, under water,
+`Stage.wetshot`, `StageChoice.wetshotWake`: 30 by 17 tiles, one court across, under water, zoomed to fill the
+screen (not by whole pixels), its bottom on the screen's, cropped at the top or the sides,
 laid out in the map maker like the Elements (`MapStage.wetshot`, `StageMap.current[.wetshot]`,
 kept offline under `esper.wetshotMap`; its first map a floor along the bottom row, the
 Hooperfish over the middle). Drawn: `Background.png` (480 by 272, `WetshotBackground`) over the
@@ -1121,17 +1122,18 @@ up. None of it glows, nor the background colour. The props come in through the i
 
 The Hooperfish carries the stage's one rim (`Hoop.shared`): both players score on it, the point
 to whoever put the ball through (`ball.lastTouched`), protocol 48. Its centre is 19 pixels across
-and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`); there's no
+and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`), across on the
+HOOP X debug slider offline, a whole pixel at a time, rim, art and net together; there's no
 backboard. There's only ever one Hooperfish. Each of its parts will be animated, to be detailed.
 
 The map maker here has the props in its panel in place of a tileset: pick one and press a cell
 to place it, or drag it on; press a placed one to pick it up, drop it on the panel to take it
 away, or ERASE it. The markers are P1, P2 and BALL. Walls are painted as on the Elements.
 
-Bubbles rise around the screen, three a second, a quarter of the time three to six together,
+Bubbles rise around the screen, eight a second, a quarter of the time three to six together,
 each one of the first five cells of `bubbles_jellyfish` (cell 0 about as often as two of the
 rest together), wobbling a pixel or three side to side and fading over two to four seconds.
-Every six to twelve seconds one to three jellyfish (cell 5) drift across from one side of the
+One group at a time, six to twelve seconds after the last has gone, one to three jellyfish (cell 5) drift across from one side of the
 screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds.
 Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
 at its top at 10%.

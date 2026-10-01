@@ -202,9 +202,9 @@ public struct Player: Equatable {
     /// A slide on a slope going down the way it faces: the body rides it on its own, and only a
     /// jump gets out, until flat ground or open air.
     public var forcedSlide = false
-    /// In the energy form; and whether the change is there to be made (for now, always).
+    /// In the energy form; and whether the change is there to be made (parked: never, for now).
     public var transformed = false
-    public var transformReady = true
+    public var transformReady = false
     /// Held in a tornado: where its middle is, for the body's middle to be drawn to; and
     /// frames left before a tornado can take the body again after it jumped out.
     public var tornadoCentre: Vec2?

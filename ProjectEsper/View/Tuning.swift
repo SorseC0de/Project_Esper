@@ -81,7 +81,7 @@ enum ParticleLook {
     /// either way, spun up to this fast on each axis, radians a second. `cubeSliders` puts
     /// the size and the spread on the debug panel.
     static let cubes = true
-    static let cubeSliders = true
+    static let cubeSliders = false
     nonisolated(unsafe) static var cubeSize: Float = 3
     static let cubeRate: Float = 24
     /// What rises off a head or a leg leans toward the ball's side: pushed this hard along x,
@@ -148,7 +148,7 @@ enum HelmetTuning {
 /// pixels over the rim, on the BASKET CHEVRON Y debug slider with `slider`.
 enum ChevronTuning {
     nonisolated(unsafe) static var basketLift: CGFloat = 18
-    static let slider = true
+    static let slider = false
 }
 
 /// The Elements' rain: how many streaks, 0.5 unless moved, from none to four times as many as at 1 (RAIN DENSITY on

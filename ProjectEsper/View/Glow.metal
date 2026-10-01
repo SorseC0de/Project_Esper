@@ -50,12 +50,24 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
     float3 mask = bodies.sample(linear, in.uv).rgb;
     float body = dot(mask, float3(0.2126, 0.7152, 0.0722));
     float flat = step(0.5, mask.g) * step(mask.r, 0.05) * step(mask.b, 0.05);
-    // Pure blue glows through the flats under it, from its colour before the water's tint.
-    float through = step(0.5, mask.b) * step(mask.r, 0.05) * step(mask.g, 0.05);
+    // Blue glows through the flats under it, from its colour before the water's tint. It can be
+    // a single art pixel wide, so any blue at all counts, and the brightest of the full-size
+    // pixels under this half-size one is taken rather than their blend with the flats.
+    float through = step(0.1, mask.b) * step(mask.r, 0.05);
     float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body) * (1 - through));
-    if (through > 0 && u.waterTop.a > 0 && u.waterTop.a < 1) {
-        float3 water = mix(u.waterTop.rgb, u.waterBottom.rgb, in.uv.y);
-        color.rgb = saturate((color.rgb - water * u.waterTop.a) / (1 - u.waterTop.a));
+    if (through > 0) {
+        float2 halfTexel = 0.5 / float2(scene.get_width(), scene.get_height());
+        float brightest = -1;
+        for (int corner = 0; corner < 4; corner++) {
+            float2 offset = float2(corner % 2 == 0 ? -1 : 1, corner < 2 ? -1 : 1) * halfTexel;
+            float3 sampled = scene.sample(linear, in.uv + offset).rgb;
+            if (u.waterTop.a > 0 && u.waterTop.a < 1) {
+                float3 water = mix(u.waterTop.rgb, u.waterBottom.rgb, in.uv.y);
+                sampled = saturate((sampled - water * u.waterTop.a) / (1 - u.waterTop.a));
+            }
+            float sampledLuminance = dot(sampled, float3(0.2126, 0.7152, 0.0722));
+            if (sampledLuminance > brightest) { brightest = sampledLuminance; color.rgb = sampled; }
+        }
     }
     float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
     float background = u.unglowed.a * step(distance(color.rgb, u.unglowed.rgb), 0.01);

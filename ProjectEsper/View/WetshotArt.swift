@@ -70,6 +70,8 @@ enum WetshotArt {
     static let finSwing = CGFloat.pi / 18
     static let frontFinSwing = CGFloat.pi / 12
     static let antennaNod = CGFloat.pi / 36
+    /// How far the front fin rises, in whole art pixels, at the far end of its swing either way.
+    static let frontFinLift: CGFloat = 2
 
     static func antennaTurn(at time: Double, dunkedOn: Bool) -> CGFloat {
         dunkedOn ? 0 : antennaNod * CGFloat(0.5 - 0.5 * cos(time / antennaSeconds * 2 * .pi))
@@ -122,7 +124,9 @@ enum WetshotArt {
             // front fin the whole arc, 15 either way.
             case "HooperfishTopfin": part.zRotation = -oneWay
             case "HooperfishTailfin": part.zRotation = oneWay
-            case "HooperfishFrontfin": part.zRotation = fin / finSwing * frontFinSwing
+            case "HooperfishFrontfin":
+                part.zRotation = fin / finSwing * frontFinSwing
+                part.position.y = hooperfishParts[4].pivot.y + (frontFinLift * abs(fin) / finSwing).rounded()
             case "HooperfishAntenna": part.zRotation = antennaTurn(at: time, dunkedOn: dunkedOn)
             default: break
             }

@@ -923,7 +923,7 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   full-size glow it looked the same and cost less. The corner readout shows each render
   stage's CPU and GPU milliseconds a frame, the whole frame's GPU span (the stages are
   separate command buffers and can overlap, so they don't sum), and the render and glow
-  sizes.
+  sizes. It's parked, hidden, until performance is being diagnosed (`GameScene.diagnosingPerformance`).
 - Nothing is made mid-match that could have been made before it. At launch every player
   frame and toned effect is built and sent to the GPU; a colour change drops that player's
   and rebuilds all of them (frames, heads, energy, the ball-as-energy sheets, the toned
@@ -1140,7 +1140,8 @@ changes only off screen: once the ball's been taken, the stage's rim from then o
 The ball hangs on the antenna at its own point, 24 across and 24 up (`WetshotRules.ballPixelsAcross`/`Up`,
 on BALL X and BALL Y offline); a stage's decider puts it back there. As drawn: the body breathing between 0.9 and 1.1 over two seconds, the fins swinging
 out to 10 degrees and back over a second and a half (the top one clockwise, the tail one
-counter-clockwise), the front one the whole arc, 15 either way, the antenna, and the rim, net and ball on it, nodding 0 to 5
+counter-clockwise), the front one the whole arc, 15 either way, rising as it swings away from
+level to 2 whole pixels at either end (`WetshotArt.frontFinLift`), the antenna, and the rim, net and ball on it, nodding 0 to 5
 degrees counter-clockwise over two seconds, still while someone dunks (and a rim swimming off the stage,
 or gone, lets go of whoever hangs on it); each turning where it meets the
 body (`WetshotArt.hooperfishParts`). Its rim and net glow, and so do its red rings and eye (left out of the
@@ -1148,8 +1149,12 @@ body's mask, `WetshotArt.bodyGlowMask`), the background's no-glow under them let
 pure blue in the mask over it (`MaskScene`'s `through`, under the fish's flats, and `throughFront`
 and the net strands over them; `GameScene.glowThroughSnapshots`, `glowThroughFrontSnapshots`,
 `glowThroughNets`), where the bright pass undoes the water's tint, so they glow in their own colours,
-not the tinted ones. The rest of it doesn't. A rim can't be dunked on in the stage's first or last column, and one swimming into either
-lets go of whoever hangs on it (`Stage.dunkable`, protocol 59). No chevrons point at the ball off
+not the tinted ones. The rings are a single art pixel wide: any blue in the half-size mask counts,
+and the brightest of the four full-size pixels under it is taken. The rest of it doesn't. A rim can't be dunked on in the stage's first or last column, and one swimming into either
+lets go of whoever hangs on it (`Stage.dunkable`, protocol 59). A body bouncing off the rim's top
+rises half as high as it would under water elsewhere (`RimRules.underwaterBounceShare`, the push
+at the square root of a half; protocol 60). The ball's and the hoop's chevrons and the swimming
+three-point line draw over the water's tint, not under it. No chevrons point at the ball off
 screen here: off screen it's only ever on the antenna. The plants sway 5 degrees either way over four
 seconds, each on its own beat, from their bottom middle. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
 to whoever put the ball through (`ball.lastTouched`), protocol 48. For 20 frames after any point no

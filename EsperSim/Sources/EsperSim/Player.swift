@@ -2005,7 +2005,7 @@ public struct Player: Equatable {
             && body.max.x > hoop.position.x - BallRules.rimHalfWidth && body.min.x < hoop.position.x + BallRules.rimHalfWidth {
             events.append(.rimBounced(hoop: index, speed: feetBefore - position.y))
             position.y = hoop.position.y
-            velocity.y = RimRules.bodyBounce
+            velocity.y = RimRules.bodyBounce * (underwater ? RimRules.underwaterBounceShare : 1)
             grounded = false
             if state.isGroundState || state == .land { enter(.air) }
             return

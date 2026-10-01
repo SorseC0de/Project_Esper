@@ -285,6 +285,8 @@ final class GameScene: SKScene {
     /// The local side's power and level, lettered top-left under the pickers.
     private let powerLabel = SKSpriteNode()
     private let fpsLabel = SKLabelNode()
+    /// The performance readout in the corner, parked until performance is being diagnosed.
+    static let diagnosingPerformance = false
     private var lastTime: TimeInterval?
     private var accumulator = 0.0
     private var built = false
@@ -346,7 +348,8 @@ final class GameScene: SKScene {
             swimmingThreeLine = (0..<GameScene.swimmingThreeSegments).map { _ in
                 let segment = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
                 segment.colorBlendFactor = 1
-                segment.zPosition = 22
+                // Over the water's tint.
+                segment.zPosition = 96
                 segment.isHidden = true
                 world.addChild(segment)
                 return segment
@@ -1651,6 +1654,8 @@ final class GameScene: SKScene {
         waterOverlay.alpha = WaterTuning.overlayAlpha
         waterOverlay.size = CGSize(width: halfWidth * 2, height: halfHeight * 2)
         waterOverlay.position = cameraNode.position
+        // The ball's and the hoop's chevrons stay clear of the water, over it (glowers sit at 21).
+        for chevron in chevrons + targetChevrons + [opponentChevron] { chevron.zPosition = wet ? 80 : 6 }
         let step = GameScene.stepSeconds
         bubbles = bubbles.compactMap { bubble in
             var bubble = bubble
@@ -5531,7 +5536,8 @@ final class GameScene: SKScene {
         } else {
             for node in playerNodes { node.isHidden = false }
         }
-        fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms\n\(frameReadout)"
+        fpsLabel.isHidden = !GameScene.diagnosingPerformance
+        if GameScene.diagnosingPerformance { fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms\n\(frameReadout)" }
         let p = match.players[localIndex]
         let side: String
         if online != nil {

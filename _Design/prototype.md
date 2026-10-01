@@ -1124,12 +1124,17 @@ up. None of it glows, nor the background colour. The props come in through the i
 
 The Hooperfish (`Hooperfish.swift`, `HooperfishRules`, `Match.hooperfish`) swims. It starts where
 the map puts it with the ball on its antenna, no rim out, and swims off the side it faces (left) at
-its crossing speed; a hand can take the ball off it, and if none has by the time it's off screen,
-the ball goes back to where it starts. Two seconds off screen, it comes back from that side turned
-round, from a height to a height off the count (the same on both phones), five seconds across from
-wholly off one side to wholly off the other, swaying 14 units up and down two and a half times as
-it goes, over and over. What's on its antenna changes only off screen: from the second crossing on
-it's the stage's rim, turned with it. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
+its crossing speed. The ball stays on it, crossing after crossing, until a hand takes it off. Two
+seconds off screen, it comes back from that side turned round, from a height to a height off the
+count (the same on both phones), ten seconds across from wholly off one side to wholly off the
+other, swaying 30 units up and down two and a half times as it goes, its bottom kept between the
+twelfth row from the top and as high as its three rows fit, over and over. What's on its antenna
+changes only off screen: once the ball's been taken, the stage's rim from then on, turned with it.
+As drawn: the body breathing between 0.9 and 1.1 over three seconds, the fins swinging 10 degrees
+either way over a second and a half (the top one clockwise as the tail and front ones go
+counter-clockwise), the antenna, and the rim and net on it, nodding 0 to 5 degrees
+counter-clockwise over two seconds, still while someone dunks; each turning where it meets the
+body (`WetshotArt.hooperfishParts`). It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
 to whoever put the ball through (`ball.lastTouched`), protocol 48. Its centre is 15 pixels across
 (mirrored when it faces right) and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`), across on the
 HOOP X debug slider offline, a whole pixel at a time, rim, art and net together; there's no
@@ -1146,9 +1151,10 @@ rest together), wobbling a pixel or three side to side and fading over two to fo
 One group at a time, six to twelve seconds after the last has gone, one to three jellyfish (cell 5) drift across from one side of the
 screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds, turned to face the way they drift.
 
-Under water (`StageFeatures.underwater`, protocol 52): gravity is halved for bodies and the ball,
-the ground's speeds (the walk, the run and its dash, the crouch walk) halved but not the air's,
-and the bodies' sheets play at half their rate.
+Under water (`StageFeatures.underwater`, protocol 53): gravity and the fall speeds are halved for
+bodies and the ball, the ground's speeds (the walk, the run and its dash, the crouch walk) and the
+air's pick-up halved but not the air's top speed, and every state's clock holds every other frame,
+so each state, and its sheet with it, runs at half speed; the walk and run cycles too.
 Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
 at its top, at 50% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
 game pixel side to side in three waves down the screen (WATER SWAY), in the glow's composite

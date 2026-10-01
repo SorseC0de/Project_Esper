@@ -335,11 +335,15 @@ public struct Player: Equatable {
     /// Defending, the body moves this much faster than the one with the ball; the match
     /// sets it each frame from who holds the ball.
     public var speedShare = 1.0
-    /// Under water (`StageFeatures.underwater`), set from the stage each step: gravity and the
-    /// ground's speeds at half, and the sheets at half their rate.
+    /// Under water (`StageFeatures.underwater`), set from the stage each step: gravity, the fall
+    /// speeds, the ground's speeds and the air's pick-up at half (not the air's top speed), and
+    /// the clock, every state's timing and its sheet with it, at half its rate.
     public var underwater = false
+    var waterTicks = 0
     var waterShare: Double { underwater ? 0.5 : 1 }
     var gravity: Double { spec.gravity * waterShare }
+    var fallSpeed: Double { spec.fallSpeed * waterShare }
+    var fastFallSpeed: Double { spec.fastFallSpeed * waterShare }
     var runSpeed: Double { spec.runSpeed * speedShare * waterShare }
     var walkMaxSpeed: Double { spec.walkMaxSpeed * speedShare * waterShare }
     var dashInitialVelocity: Double { runSpeed + (spec.dashInitialVelocity - spec.runSpeed) }
@@ -469,6 +473,11 @@ public struct Player: Equatable {
             timerHeld = actionTicks % spec.actionHoldInterval == 0
         } else {
             timerHeld = false
+        }
+        // Under water the clock holds every other frame: the whole of every state, and its sheet, at half speed.
+        if underwater {
+            waterTicks += 1
+            if waterTicks % 2 == 0 { timerHeld = true }
         }
         if !timerHeld { stateTimer += 1 }
         if boltCooldown > 0 { boltCooldown -= 1 }
@@ -1162,7 +1171,7 @@ public struct Player: Equatable {
                 velocity.x = approach(velocity.x, 0, spec.attackBrake)
             } else {
                 velocity.x = approach(velocity.x, 0, airBrake)
-                velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -spec.fallSpeed)
+                velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -fallSpeed)
             }
             if stateTimer >= SlashRules.frames {
                 endSlash()
@@ -1834,12 +1843,12 @@ public struct Player: Equatable {
     private mutating func floatDown(_ input: PlayerInput) {
         if !fastFalling, velocity.y <= 0, input.stick.y < -0.65 {
             fastFalling = true
-            velocity.y = -spec.fastFallSpeed
+            velocity.y = -fastFallSpeed
         }
         if fastFalling {
-            velocity.y = max(velocity.y - gravity, -spec.fastFallSpeed)
+            velocity.y = max(velocity.y - gravity, -fastFallSpeed)
         } else {
-            velocity.y = max(velocity.y - gravity * SurfRules.gravityShare, -spec.fallSpeed * SurfRules.fallShare)
+            velocity.y = max(velocity.y - gravity * SurfRules.gravityShare, -fallSpeed * SurfRules.fallShare)
         }
     }
 
@@ -1925,7 +1934,7 @@ public struct Player: Equatable {
         } else if abs(velocity.x) > airSpeedMax {
             velocity.x = approach(velocity.x, target, airBrake)
         } else {
-            velocity.x = approach(velocity.x, target, spec.airAccelerationBase + spec.airAccelerationAdditional * abs(x))
+            velocity.x = approach(velocity.x, target, (spec.airAccelerationBase + spec.airAccelerationAdditional * abs(x)) * waterShare)
         }
     }
 
@@ -1934,13 +1943,13 @@ public struct Player: Equatable {
     private mutating func fall(_ input: PlayerInput) {
         let aimingThrow = hasBall && input.throwBall
         // Quake-Up Coffee drops faster than anyone.
-        let fastFall = spec.fastFallSpeed * (power == .quakeUp ? QuakeRules.fastFallMultiplier : 1)
+        let fastFall = fastFallSpeed * (power == .quakeUp ? QuakeRules.fastFallMultiplier : 1)
         if !fastFalling, !aimingThrow, velocity.y <= 0, input.stick.y < -0.65 {
             fastFalling = true
             velocity.y = -fastFall
             if power == .platformShake, platformArmed, platformCooldown == 0 { wantsPlatform = true }
         }
-        let floor = fastFalling ? -fastFall : -spec.fallSpeed
+        let floor = fastFalling ? -fastFall : -fallSpeed
         // Feather Fresca floats down; a fast fall doesn't.
         let gravity = velocity.y <= 0 && !fastFalling ? gravity * spec.fallGravityShare : gravity
         velocity.y = max(velocity.y - gravity, floor)

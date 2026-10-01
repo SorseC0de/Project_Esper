@@ -139,7 +139,7 @@ public struct StageMap: Equatable, Codable {
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
     /// would stand in for it offline, is put aside and the baked one shows.
-    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .elements ? 5 : 4 }
+    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .elements ? 5 : 5 }
 
     /// The map every phone plays; the map maker's edits stand in for it offline only.
     public static func baked(_ stage: MapStage) -> StageMap { stage == .elements ? elementsBaked : wetshotBaked }
@@ -660,15 +660,16 @@ extension StageMap {
 
 extension StageMap {
     /// Wetshot Wake's map, laid out in the map maker: the floor along the bottom row, under the
-    /// background, a ledge on the left, the plants and rocks, and where the Hooperfish starts.
+    /// background, a one-way ledge either side, the plants and rocks, and where the Hooperfish starts.
     private static func wetshotDefaultMap() -> StageMap {
         let props: [Prop] = [
             Prop(.rock1, at: Cell(0, 1)), Prop(.plant3, at: Cell(4, 1)), Prop(.plant1, at: Cell(5, 1)),
             Prop(.plant1, at: Cell(13, 1)), Prop(.plant2, at: Cell(14, 1)), Prop(.plant5, at: Cell(25, 1)),
             Prop(.rock2, at: Cell(30, 1)), Prop(.plant4, at: Cell(34, 1)), Prop(.hooperfish, at: Cell(17, 11)),
         ]
-        let walls: [Wall] = (0..<WetshotRules.columns).map { Wall(Cell($0, 0), .solid) } + (1...5).map { Wall(Cell($0, 4), .solid) }
+        let walls: [Wall] = (0..<WetshotRules.columns).map { Wall(Cell($0, 0), .solid) }
+            + ((1...5).map { $0 } + (31...35).map { $0 }).map { Wall(Cell($0, 4), .oneWay) }
         return StageMap(props: props, leftRim: Cell(0, 0), rightRim: Cell(0, 0),
-                        spawns: [Cell(5, 5), Cell(31, 5)], ball: Cell(18, 12), walls: walls)
+                        spawns: [Cell(3, 5), Cell(33, 5)], ball: Cell(18, 12), walls: walls)
     }
 }

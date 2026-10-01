@@ -497,16 +497,10 @@ public struct Match: Equatable {
     }
 
     /// The Hooperfish a frame on, and its load with it: the rim where its antenna is, or parked
-    /// when it isn't carrying it; the ball held there, or, still on it when it's swum off,
-    /// back to where the ball starts.
+    /// when it isn't carrying it; the ball held there until a hand takes it.
     private mutating func stepHooperfish() {
         guard var fish = hooperfish else { return }
-        let wasAway = fish.away
         fish.step(on: stage)
-        if fish.away, !wasAway, fish.carrying == .ball, ball.holder == nil {
-            ball.respawn(at: stage.ballSpawn)
-            fish.carrying = .nothing
-        }
         hooperfish = fish
         placeHooperfishLoad()
     }

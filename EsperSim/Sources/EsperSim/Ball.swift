@@ -64,7 +64,7 @@ public struct Ball: Equatable {
         previousY = position.y
     }
 
-    /// Under water the ball falls at half the pull.
+    /// Under water the ball falls at half the pull, and no faster than half the speed.
     static func gravityShare(_ stage: Stage) -> Double { stage.features.underwater ? 0.5 : 1 }
 
     public var box: Box { Box(center: position, width: BallRules.radius * 2, height: BallRules.radius * 2) }
@@ -86,7 +86,7 @@ public struct Ball: Equatable {
         } else if floater > 0 {
             floater -= 1
         } else if !straight {
-            velocity.y = max(velocity.y - BallRules.gravity * Ball.gravityShare(stage) * pace * pace, -BallRules.fallSpeed * pace)
+            velocity.y = max(velocity.y - BallRules.gravity * Ball.gravityShare(stage) * pace * pace, -BallRules.fallSpeed * Ball.gravityShare(stage) * pace)
         }
 
         // The way it came in, for a slope to turn: a block's flat top under the slope may

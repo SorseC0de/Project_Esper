@@ -50,10 +50,43 @@ enum WetshotArt {
         }
     }
 
-    /// The Hooperfish's parts back to front, each over the last, and how high each sits.
-    static let hooperfishParts: [(name: String, z: CGFloat)] = [
-        ("HooperfishTopfin", 5.1), ("HooperfishTailfin", 5.2), ("HooperfishBody", 5.3), ("HooperfishAntenna", 5.35), ("HooperfishFrontfin", 5.4),
+    /// The Hooperfish's parts back to front, each over the last, how high each sits, and where
+    /// each turns: where it meets the body, in art pixels from the picture's bottom left (the
+    /// body's middle for the body, which breathes rather than turns).
+    static let hooperfishParts: [(name: String, z: CGFloat, pivot: CGPoint)] = [
+        ("HooperfishTopfin", 5.1, CGPoint(x: 60, y: 27)), ("HooperfishTailfin", 5.2, CGPoint(x: 68, y: 19)),
+        ("HooperfishBody", 5.3, CGPoint(x: 51, y: 20.5)), ("HooperfishAntenna", 5.35, antennaPivot),
+        ("HooperfishFrontfin", 5.4, CGPoint(x: 59, y: 13)),
     ]
+    /// Where the antenna meets the body, which the rim on it turns about too.
+    static let antennaPivot = CGPoint(x: 43, y: 29)
+
+    /// Its swimming: the body breathing between 0.9 and 1.1, the fins swinging 10 degrees either
+    /// way (the top one clockwise as the other two go counter-clockwise), and the antenna, and
+    /// the rim with it, nodding 0 to 5 degrees counter-clockwise; still while someone dunks.
+    static let breathSeconds = 3.0
+    static let finSeconds = 1.5
+    static let antennaSeconds = 2.0
+    static let finSwing = CGFloat.pi / 18
+    static let antennaNod = CGFloat.pi / 36
+
+    static func antennaTurn(at time: Double, dunkedOn: Bool) -> CGFloat {
+        dunkedOn ? 0 : antennaNod * CGFloat(0.5 - 0.5 * cos(time / antennaSeconds * 2 * .pi))
+    }
+
+    static func animate(_ fish: SKNode?, at time: Double, dunkedOn: Bool) {
+        guard let fish else { return }
+        let fin = finSwing * CGFloat(sin(time / finSeconds * 2 * .pi))
+        for case let part as SKSpriteNode in fish.children {
+            switch part.name {
+            case "HooperfishBody": part.setScale(CGFloat(1 + 0.1 * sin(time / breathSeconds * 2 * .pi)))
+            case "HooperfishTopfin": part.zRotation = -fin
+            case "HooperfishTailfin", "HooperfishFrontfin": part.zRotation = fin
+            case "HooperfishAntenna": part.zRotation = antennaTurn(at: time, dunkedOn: dunkedOn)
+            default: break
+            }
+        }
+    }
 
     /// What's drawn for the map's props, to be redrawn when the map maker moves them.
     struct Handles {
@@ -67,15 +100,22 @@ enum WetshotArt {
         /// Everything here as the glow's mask should mark it: none of it glows.
         var flats: [BodySnapshot] {
             var sprites: [(SKSpriteNode, CGPoint)] = backdrop.map { ($0, $0.position) }
-            for prop in props {
-                if let sprite = prop as? SKSpriteNode {
-                    sprites.append((sprite, sprite.position))
-                } else {
-                    for case let part as SKSpriteNode in prop.children { sprites.append((part, prop.position + part.position)) }
-                }
-            }
+            // The Hooperfish swims, so it's marked frame by frame instead (`fishFlats`).
+            for case let sprite as SKSpriteNode in props { sprites.append((sprite, sprite.position)) }
             return sprites.compactMap { sprite, at in
                 sprite.texture.map { BodySnapshot(texture: $0, position: at, anchor: sprite.anchorPoint, xScale: 1, size: sprite.size) }
+            }
+        }
+
+        /// The Hooperfish's parts as drawn this frame, turned, breathing and flipped.
+        var fishFlats: [BodySnapshot] {
+            guard let fish = hooperfish else { return [] }
+            return fish.children.compactMap { child in
+                guard let part = child as? SKSpriteNode, let texture = part.texture else { return nil }
+                let at = CGPoint(x: fish.position.x + part.position.x * fish.xScale, y: fish.position.y + part.position.y)
+                return BodySnapshot(texture: texture, position: at, anchor: part.anchorPoint, xScale: fish.xScale,
+                                    size: CGSize(width: part.size.width * part.yScale, height: part.size.height * part.yScale),
+                                    zRotation: part.zRotation * fish.xScale)
             }
         }
 
@@ -91,7 +131,9 @@ enum WetshotArt {
                     fish.position = origin
                     for part in WetshotArt.hooperfishParts {
                         let node = SKSpriteNode(texture: WetshotArt.picture(part.name))
-                        node.anchorPoint = .zero
+                        // Hung by where it turns, so it turns there.
+                        node.anchorPoint = CGPoint(x: part.pivot.x / size.width, y: part.pivot.y / size.height)
+                        node.position = part.pivot
                         node.size = size
                         node.zPosition = part.z
                         node.name = part.name

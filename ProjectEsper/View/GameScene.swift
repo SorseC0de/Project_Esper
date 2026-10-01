@@ -334,6 +334,19 @@ final class GameScene: SKScene {
         return bodies
     }
 
+    /// How the Hooperfish's antenna nods this frame, as a turn of a world point about where it
+    /// meets the body, mirrored as the fish faces; none off Wetshot Wake or with no fish.
+    private func hooperfishNod(_ hoop: Int) -> (angle: CGFloat, turn: (CGPoint) -> CGPoint) {
+        guard hoop == 0, let fish = match.hooperfish, let node = wetshotArt?.hooperfish, !wholeStageView else { return (0, { $0 }) }
+        let dunkedOn = match.players.contains { $0.state == .dunking }
+        let angle = WetshotArt.antennaTurn(at: CACurrentMediaTime(), dunkedOn: dunkedOn) * (fish.facesRight ? -1 : 1)
+        let pivot = CGPoint(x: node.position.x + WetshotArt.antennaPivot.x * node.xScale, y: node.position.y + WetshotArt.antennaPivot.y)
+        return (angle, { point in
+            let offset = point - pivot
+            return CGPoint(x: pivot.x + offset.x * cos(angle) - offset.y * sin(angle), y: pivot.y + offset.x * sin(angle) + offset.y * cos(angle))
+        })
+    }
+
     /// Wetshot Wake's sway over the whole screen, but not in the map maker: its reach in the
     /// drawable's pixels, how many waves down the screen, and where it is in them.
     var screenWave: (reach: Double, waves: Double, phase: Double)? {
@@ -348,6 +361,7 @@ final class GameScene: SKScene {
     /// The tornados as they look this frame, green under the bodies: they animate, so they can't
     /// live in the static layer.
     var tornadoSnapshots: [BodySnapshot] {
+        if let wet = wetshotArt { return wet.fishFlats }
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
         return windSnapshots(windPuffs.back + rainSizzles + art.icicles + Array(fallingIcicles.values) + shatteringIcicles) + (art.tornados + art.tornadoOverlays).compactMap { GameScene.snapshot($0, above: ElementsArt.lavaTop) }
@@ -1612,8 +1626,9 @@ final class GameScene: SKScene {
                                       wobble: .random(in: 1...2), wobbleRate: .random(in: 0.5...1)))
             }
         }
-        // The Hooperfish where the sim has it; in the map maker, where it's placed.
+        // The Hooperfish where the sim has it, swimming; in the map maker, where it's placed.
         WetshotArt.place(wetshotArt?.hooperfish, as: wholeStageView ? nil : match.hooperfish, placed: StageMap.current[.wetshot].hooperfish)
+        WetshotArt.animate(wetshotArt?.hooperfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
         jellyfish = jellyfish.compactMap { fish in
             var fish = fish
             fish.age += step
@@ -5343,13 +5358,17 @@ final class GameScene: SKScene {
                 rimNodes[index].anchorPoint = pivot
                 rimNodes[index].position = rimPivot(index)
                 rimNodes[index].zRotation = rimTurn(index)
+                // Wetshot Wake's rim nods with the Hooperfish's antenna, about where it meets the body.
+                let nod = hooperfishNod(index)
+                rimNodes[index].position = nod.turn(rimNodes[index].position)
+                rimNodes[index].zRotation += nod.angle
                 backboardNodes[index].position = artPoint
                 backboardNodes[index].xScale = rimNodes[index].xScale
                 if index < nets.count {
                     // The Elements' wind blows the nets leftward, in gusts.
                     let gust = 0.7 + 0.3 * sin(CACurrentMediaTime() * GameScene.netGustRate)
                     nets[index].wind = match.stage.features.look == .elements ? -GameScene.netWind * CGFloat(gust) : 0
-                    nets[index].step(rim: GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look), ball: ballNode.isHidden ? nil : ballNode.position,
+                    nets[index].step(rim: nod.turn(GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look)), ball: ballNode.isHidden ? nil : ballNode.position,
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
                                      bodies: match.players.map { SpriteLibrary.point($0.chest) })
                     // Someone hanging on this rim: its net flares out at the bottom, easing in and back.

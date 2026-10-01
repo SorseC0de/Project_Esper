@@ -78,23 +78,43 @@ final class WetshotTests: XCTestCase {
         XCTAssertEqual(match.hooperfish?.carrying, Hooperfish.Carrying.nothing)
     }
 
-    func testOffScreenItTurnsRoundAndComesBackWithTheRimAtAHeightOffTheCount() {
+    private func throughCrossing(_ match: inout Match) {
+        let fish = match.hooperfish!
+        for _ in 0..<(fish.swimFrames - fish.age + HooperfishRules.waitFrames) { match.advance(inputs: [.idle, .idle]) }
+    }
+
+    func testUntakenTheBallComesBackOnItsAntennaTurnedRoundFromAHeightToAHeight() {
         var match = wetshot()
         let first = match.hooperfish!
         for _ in 0..<first.swimFrames { match.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(match.hooperfish!.away)
         XCTAssertEqual(match.hooperfish!.position.x, -HooperfishRules.size.x, accuracy: 0.001, "wholly off the left")
-        XCTAssertNotEqual(match.ball.position, match.hooperfish!.antenna, "the ball it still had, left behind")
+        XCTAssertEqual(match.ball.position, match.hooperfish!.antenna, "the ball still on it")
         for _ in 0..<HooperfishRules.waitFrames { match.advance(inputs: [.idle, .idle]) }
         let back = match.hooperfish!
         XCTAssertFalse(back.away)
         XCTAssertTrue(back.facesRight, "turned round")
-        XCTAssertEqual(back.carrying, .hoop)
-        XCTAssertEqual(back.swimFrames, HooperfishRules.swimFrames, "five seconds across")
+        XCTAssertEqual(back.carrying, .ball, "back with the ball, not yet taken")
+        XCTAssertEqual(back.swimFrames, HooperfishRules.swimFrames, "ten seconds across")
         XCTAssertNotEqual(back.from.y, back.to.y, "a height to a height")
+        for y in [back.from.y, back.to.y] {
+            XCTAssertGreaterThanOrEqual(y, HooperfishRules.lowest)
+            XCTAssertLessThanOrEqual(y, match.stage.height - 3 * Stage.tileSize)
+        }
+    }
+
+    func testOnceTheBallsTakenTheRimComesOnItsNextCrossingAndStays() {
+        var match = wetshot()
+        match.ball.holder = 0
+        match.players[0].hasBall = true
+        match.hooperfish!.carrying = .nothing
+        throughCrossing(&match)
         match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.hooperfish!.carrying, .hoop)
         XCTAssertEqual(match.stage.hoops[0].position, match.hooperfish!.antenna, "the rim on its antenna")
         XCTAssertEqual(match.stage.hoops[0].backboard, .left, "turned with it")
+        throughCrossing(&match)
+        XCTAssertEqual(match.hooperfish!.carrying, .hoop, "from then on")
     }
 
     func testUnderWaterGravityAndTheGroundsSpeedsAreHalvedButNotTheAirs() {
@@ -105,11 +125,12 @@ final class WetshotTests: XCTestCase {
         XCTAssertEqual(wet.runSpeed, dry.runSpeed / 2)
         XCTAssertEqual(wet.walkMaxSpeed, dry.walkMaxSpeed / 2)
         XCTAssertEqual(wet.airSpeedMax, dry.airSpeedMax)
-        dry.enter(.land)
-        wet.enter(.land)
-        dry.stateTimer = 10
-        wet.stateTimer = 10
-        XCTAssertEqual(wet.animationFrame.frame * 2, dry.animationFrame.frame, "the sheet at half its rate")
+        XCTAssertEqual(wet.fallSpeed, dry.fallSpeed / 2)
+        var match = wetshot()
+        match.players[0].enter(.idle)
+        match.players[1].enter(.idle)
+        for _ in 0..<10 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.players[0].stateTimer, 5, "every state's clock, and so its sheet, at half speed")
         XCTAssertTrue(Stage.wetshot.features.underwater)
     }
 }

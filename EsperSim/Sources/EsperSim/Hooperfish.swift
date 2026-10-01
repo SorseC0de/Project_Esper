@@ -1,8 +1,9 @@
 /// Wetshot Wake's Hooperfish: it starts where the map puts it with the ball on its antenna and
 /// swims off the side it faces; then, two seconds off screen, it comes back from that side,
-/// turned round, at a height off the count, swimming five seconds across to a height off the
-/// count on the far side, swaying up and down as it goes, over and over. What's on its antenna
-/// changes only off screen: after the first crossing it's always the stage's rim.
+/// turned round, from a height off the count, swimming ten seconds across to a height off the
+/// count on the far side, swaying up and down as it goes, over and over. The ball stays on its
+/// antenna until a hand takes it, crossing after crossing; what's on the antenna changes only
+/// off screen, and once the ball's been taken it's the stage's rim from then on.
 public struct Hooperfish: Equatable {
     public enum Carrying: Equatable { case ball, hoop, nothing }
 
@@ -41,7 +42,8 @@ public struct Hooperfish: Equatable {
         if age < swimFrames {
             let share = Double(age) / Double(swimFrames)
             let sway = HooperfishRules.swayHeight * Trig.sin(share * HooperfishRules.swaysPerCrossing * 2 * Double.pi)
-            position = Vec2(x: from.x + (to.x - from.x) * share, y: from.y + (to.y - from.y) * share + sway)
+            let y = min(max(from.y + (to.y - from.y) * share + sway, HooperfishRules.lowest), HooperfishRules.highest(stage))
+            position = Vec2(x: from.x + (to.x - from.x) * share, y: y)
             return
         }
         position = to
@@ -49,7 +51,7 @@ public struct Hooperfish: Equatable {
         crossing += 1
         age = 0
         facesRight.toggle()
-        carrying = .hoop
+        if carrying == .nothing { carrying = .hoop }
         let offLeft = -HooperfishRules.size.x, offRight = stage.width
         let start = HooperfishRules.height(crossing * 2, on: stage), end = HooperfishRules.height(crossing * 2 + 1, on: stage)
         from = Vec2(x: facesRight ? offLeft : offRight, y: start)
@@ -63,22 +65,23 @@ public enum HooperfishRules {
     /// Its picture, 96 by 48 art pixels, in units.
     public static let pixelWidth = 96
     public static let size = Vec2(x: 96 / 1.6, y: 48 / 1.6)
-    /// Five seconds across the screen, two waiting off it.
-    public static let swimFrames = 300
+    /// Ten seconds across the screen, two waiting off it.
+    public static let swimFrames = 600
     public static let waitFrames = 120
-    /// It sways this far up and down, this many times a crossing.
-    public static let swayHeight = 14.0
+    /// It sways this far up and down, this many times a crossing, kept between its lowest and highest.
+    public static let swayHeight = 30.0
     public static let swaysPerCrossing = 2.5
-    /// Its heights: its bottom no lower than this over the floor, its top no nearer the stage's top.
-    public static let lowest = 20.0
-    public static let topClearance = 20.0
+    /// Its bottom no lower than the twelfth row from the top (row 7 from the floor's), and no
+    /// higher than its three rows of height fit under the stage's top.
+    public static let lowest = 7 * Stage.tileSize
+    static func highest(_ stage: Stage) -> Double { stage.height - 3 * Stage.tileSize }
 
     /// The way across: from wholly off one side to wholly off the other.
     static func crossing(_ stage: Stage) -> Double { stage.width + size.x }
 
-    /// A height off the count, the same on both phones, inside the swaying room.
+    /// A height off the count, the same on both phones, anywhere it can be.
     static func height(_ count: Int, on stage: Stage) -> Double {
-        let low = lowest + swayHeight, high = stage.height - size.y - topClearance - swayHeight
+        let low = lowest, high = highest(stage)
         let pick = Double(ElementsRules.pick(count + 2_000_000) % 1000) / 999
         return low + (high - low) * pick
     }

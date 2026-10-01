@@ -1,10 +1,9 @@
 import Foundation
 
 /// Highway Traffic: standstill traffic on the road, the rim carried across by a helicopter.
-/// The cars are solid and stand still; three hits from anything that would stun a player
-/// wreck one, the fuel truck one hit of fire, and a new one takes its place. Which vehicle
-/// stands in each slot comes off the match's dice, so both phones agree without sending a
-/// word of it.
+/// The cars are solid and stand still, and nothing harms them. Which vehicle stands in each
+/// slot comes off the match's dice, a different set each match, so both phones agree without
+/// sending a word of it.
 public enum Vehicle: Int, CaseIterable, Equatable {
     case ambulance, bus, cab, car, batmobile, droptop, police, racer, supercar, fuelTruck, hearse,
          limousine, moped, motorcycle, motorcycle2, truck, truck2, fireTruck, foodTruck, van, van2, van3, vespa
@@ -80,9 +79,6 @@ public enum Vehicle: Int, CaseIterable, Equatable {
         let length = lengthTiles * Stage.tileSize
         return Vec2(x: length, y: length * aspect)
     }
-
-    /// One hit of fire wrecks it.
-    public var burnsAtOnce: Bool { self == .fuelTruck }
 
     /// Its solid shape in blocks of eight art pixels (five units), rows from the top, `#`
     /// solid, `/` a slope rising to the right, `\\` one falling to the right, and `.` open,
@@ -180,6 +176,8 @@ public struct Car: Equatable {
     /// Its slope blocks as slopes, mirrored when it faces left, which turns a rising one
     /// into a falling one.
     public var slopes: [Slope] {
+        // Solid blocks, for now: see `boxes`.
+        guard Car.slopesActive else { return [] }
         let rows = vehicle.blocks.map { Array($0) }
         guard let width = rows.first?.count else { return [] }
         let size = Vehicle.blockSize
@@ -196,8 +194,12 @@ public struct Car: Equatable {
         return slopes
     }
 
-    /// Its solid blocks as boxes, each column's unbroken runs one box, mirrored when it
-    /// faces left.
+    /// A car's slope blocks are solid blocks until their own behaviour is tuned: as five-unit
+    /// slopes they let bodies sink into the car and stick there.
+    public static let slopesActive = false
+
+    /// Its solid blocks as boxes, each column's unbroken runs one box, the slope blocks among
+    /// them, mirrored when it faces left.
     public var boxes: [Box] {
         let rows = vehicle.blocks.map { Array($0) }
         guard let width = rows.first?.count else { return [] }
@@ -207,7 +209,7 @@ public struct Car: Equatable {
             let across = facesLeft ? width - 1 - column : column
             var run: (top: Int, bottom: Int)?
             for row in 0...rows.count {
-                let solid = row < rows.count && column < rows[row].count && rows[row][column] == "#" 
+                let solid = row < rows.count && column < rows[row].count && rows[row][column] != "." 
                 if solid {
                     run = (run?.top ?? row, row)
                 } else if let open = run {
@@ -221,9 +223,6 @@ public struct Car: Equatable {
         }
         return boxes
     }
-    public var hits = 0
-    /// Frames before the same car can take another hit, so one swing counts once.
-    public var guardFrames = 0
 }
 
 /// The helicopter carrying one rim across, from one wall to the other, the next carrying
@@ -248,8 +247,6 @@ public enum HighwayRules {
     /// near lane's; drawn behind, not solid, never hit.
     public static let nearLaneDrop = 17.5
     public static let farLaneLift = 7.5
-    public static let hitsToWreck = 3
-    public static let hitGuardFrames = 20
     /// The helicopter flies at this height, the rim hanging this far under it, at this speed.
     public static let helicopterHeight = 140.0
     /// The rim against the helicopter: this far ahead of it the way it flies, and this far
@@ -286,22 +283,6 @@ extension Match {
         return Car(id: stampId(), vehicle: vehicle, slot: slot, level: level, box: box, facesLeft: level == 1)
     }
 
-    /// A hit on a car, from anything that would stun a player; `fire` for fire's own.
-    /// Wrecked, a new car takes its slot.
-    mutating func hitCar(_ index: Int, fire: Bool) {
-        guard cars.indices.contains(index), cars[index].guardFrames == 0 else { return }
-        cars[index].hits += 1
-        cars[index].guardFrames = HighwayRules.hitGuardFrames
-        events.append(.carHit(id: cars[index].id))
-        if cars[index].hits >= HighwayRules.hitsToWreck || (fire && cars[index].vehicle.burnsAtOnce) {
-            let wrecked = cars[index]
-            events.append(.carWrecked(id: wrecked.id, at: wrecked.box.center))
-            cars[index] = makeCar(in: wrecked.slot, level: wrecked.level)
-            events.append(.carArrived(id: cars[index].id))
-            refreshExtras()
-        }
-    }
-
     /// The first car a box touches, if any.
     func car(touching box: Box) -> Int? {
         cars.firstIndex { car in
@@ -311,7 +292,6 @@ extension Match {
 
     /// The traffic and the helicopter a frame on.
     mutating func stepHighway() {
-        for index in cars.indices where cars[index].guardFrames > 0 { cars[index].guardFrames -= 1 }
         guard stage.hoops.count >= 2 else { return }
         if helicopter == nil {
             // The next rim, the other side's from the last. The one player one guards flies

@@ -1123,7 +1123,6 @@ final class GameScene: SKScene {
         railChevronHomes = []
         helmetNodes = [:]
         carNodes = [:]
-        carFlash = [:]
         carDip = [:]
         helicopterNode = nil
         portalNode = nil
@@ -3033,12 +3032,6 @@ final class GameScene: SKScene {
                 spawnBubbles(at: SpriteLibrary.point(match.players[index].position), count: 10, spread: 14)
             case .boardBlocked(_, let at):
                 spawnBubbles(at: SpriteLibrary.point(at), count: 6, spread: 8)
-            case .carHit(let id):
-                carFlash[id] = GameScene.carFlashFrames
-            case .carWrecked(_, let at):
-                let burst = Effect.fireExplosion.node(sprites, at: SpriteLibrary.point(at), flipped: false)
-                burst.setScale(1)
-                glowers.addChild(burst)
             case .landed(let index):
                 // Landing on a car dips it on its springs.
                 let feet = match.players[index].position
@@ -3882,12 +3875,10 @@ final class GameScene: SKScene {
 
     // MARK: Traffic
 
-    /// Each car as its wheels and its body over them, by the sim's id; frames of the black
-    /// flash after a hit and of the dip after a landing.
+    /// Each car as its wheels and its body over them, by the sim's id; frames of the dip
+    /// after a landing.
     private var carNodes: [Int: (body: SKSpriteNode, wheels: SKSpriteNode?)] = [:]
-    private var carFlash: [Int: Int] = [:]
     private var carDip: [Int: Int] = [:]
-    private static let carFlashFrames = 12
     private static let carDipFrames = 14
     private static let farLaneShade: CGFloat = 0.35
     private var helicopterNode: SKNode?
@@ -3982,21 +3973,13 @@ final class GameScene: SKScene {
             }
             nodes.body.position = CGPoint(x: foot.x, y: foot.y + idle + dip)
             nodes.wheels?.position = foot
-            if let left = carFlash[car.id], left > 0 {
-                let on = (left / 2) % 2 == 0
-                nodes.body.color = .black
-                nodes.body.colorBlendFactor = on ? 0.85 : 0
-                carFlash[car.id] = left - 1
-            } else {
-                nodes.body.color = .black
-                nodes.body.colorBlendFactor = car.level == 1 ? GameScene.farLaneShade : 0
-            }
+            nodes.body.color = .black
+            nodes.body.colorBlendFactor = car.level == 1 ? GameScene.farLaneShade : 0
         }
         for (id, nodes) in carNodes where !seen.contains(id) {
             nodes.body.removeFromParent()
             nodes.wheels?.removeFromParent()
             carNodes[id] = nil
-            carFlash[id] = nil
             carDip[id] = nil
         }
 

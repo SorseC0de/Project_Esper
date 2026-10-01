@@ -244,9 +244,9 @@ enum GoalpostTuning {
     static let crossbarBelowRim: CGFloat = 20
     static let prongHeight: CGFloat = 100
     nonisolated(unsafe) static var crossbarAngle: CGFloat = 25
-    /// For now, the stands, sky, rails and floodlights above the turf covered in flat
-    /// black, so the tuning sliders read over it.
-    static let sceneryHidden = true
+    /// The stands, sky, rails and floodlights above the turf covered in flat black, so tuning
+    /// sliders read over it; off, they show.
+    static let sceneryHidden = false
     /// The gold's width, and the black line round it and round the light panels.
     static let thickness: CGFloat = 8
     static let outline: CGFloat = 1

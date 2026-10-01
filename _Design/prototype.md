@@ -811,14 +811,16 @@ centre.
   7.5 up. Each slot is each wide enough for the longest
   vehicle, a car standing in each; the near lane's are solid and rideable and face right,
   the far lane's face left. Which of the 23 vehicles stands where
-  comes off the match's dice, so both phones agree with nothing sent. Each has its own
+  comes off the match's dice, a different set each match, so both phones agree with nothing sent. Each has its own
   length in tiles and its height the drawing's own; it's solid in blocks of eight art
   pixels (`Vehicle.blocks`), each column's unbroken runs one box, mirrored when it faces
   left. The blocks are set by hand in the bounds gallery (the BOUNDS picker, offline): the
   vehicle blown up with see-through blocks over it, a tap going round a block's kinds
   (solid, a slope rising to the right, one falling to the right, open), RESET goes back to the
   measured outline, COPY puts the table on the clipboard as Swift for `Vehicle.set`.
-  Edits are kept between launches and stand in live until they're pasted in.
+  Edits are kept between launches and stand in live until they're pasted in. A car's slope
+  blocks are solid blocks for now (`Car.slopesActive` off): as five-unit slopes they let bodies
+  sink into the car and stick there.
   The slopes (`Stage.slopes`, `SlopeRules`) are 45° and can't be clung to or jumped off: a block whose face abuts a slope is its fill, never a wall (`Stage.wall(beside:)`), solid under the diagonal and along
   their two straight sides: the body rides one up and down at the flat pace along the
   surface (the step is scaled by `SlopeRules.diagonal`, so no speed-up), its lead edge's
@@ -827,16 +829,14 @@ centre.
   and uncrouching on one work like on the flat; standing still
   on one, a body stays put; its straight side is a wall and there's no clinging to it;
   the ball bounces off the diagonal, the push into it turned back and a share kept, and
-  rolls down it. Anything that would stun a player
-  hits one: the slash, a bolt, a strike, a fireball's burst, a thrown ball, a flame; one
-  swing counts once. Three hits wreck it, the fuel truck one of fire, in a fire burst, and
-  a new one off the dice takes its slot.
+  rolls down it. Nothing harms a car (protocol 46).
 - The drawings: `Tools/split_vehicles.py` splits each vector into its body and its wheels
-  (a wheel is a tyre's circle through its hub's bolts), and the helicopter into its hull,
+  (a wheel is a top-level group starting at a tyre, as the artist grouped them in an Affinity
+  export, whose DPI scale comes off; else a tyre's circle through its hub's bolts), and the helicopter into its hull,
   top rotor and tail rotor, each plain and its three reds, as imagesets in the catalog's
-  Traffic folder. The racer and both motorcycles have no wheels to split and idle whole.
+  Traffic folder; every vehicle's wheels now come apart.
   A body shivers a pixel under wheels drawn over it that stay put, each on its own beat, dips three
-  pixels on its springs when someone lands on it, and flashes black when hit.
+  pixels on its springs when someone lands on it.
 - The rim: one at a time, carried under a helicopter flying from one wall to the other at
   1 a frame, 140 up, swaying 6 either way every two seconds, the rim 22 ahead of it and
   18 under, its backboard toward the helicopter; the rim player one guards flies left to
@@ -929,9 +929,9 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
 - The backboard: behind each rim a cluster of `flashspark2` in the guarding side's
   energy, 3 across, its bottom where the first 3 by 4 board's was (24 over the rim, its middle),
   and as many rows up from there as reach the uprights' tops, each on its own frame so the board shimmers, on a grid sheared to the
-  crossbar's lean and angle, 10 behind the rim, at 0.4, at two thirds; for now the stands,
-  sky, rails and lights above the turf are under flat black (`GoalpostTuning.sceneryHidden`) so
-  the tuning sliders read;
+  crossbar's lean and angle, 10 behind the rim, at 0.4, at two thirds; the stands, sky, rails
+  and lights show (`GoalpostTuning.sceneryHidden` off; on, they go under flat black so tuning
+  sliders read);
   solid to the ball, a 20-unit-tall box (`FieldRules.backboardOffset`, `ballBlockers`)
   from the backboard's face all the way back to the end wall, so nothing gets behind it.
   Platform Protein Shake's slabs and walls are the same flash clusters, filling their box

@@ -175,11 +175,6 @@ public struct Match: Equatable {
                 }
             }
             strikeWithThrow()
-            // A thrown ball, sideways or down, against a car: a hit, fire if it's burning.
-            if ball.strikes, let car = car(touching: ball.box.offset(by: Vec2(x: ball.velocity.x.sign == .minus ? -1 : 1, y: 0)).union(ball.box)) {
-                hitCar(car, fire: ball.burning)
-                ball.strikes = false
-            }
             tryCatch()
             keepBallInWorld()
         } else if ball.respawnTimer > 0 {
@@ -381,8 +376,6 @@ public struct Match: Equatable {
                 let clear = Box(min: Vec2(x: blade.min.x, y: max(blade.min.y, player.position.y + 1)), max: blade.max)
                 if stage.overlapsSolid(clear) { events.append(.slashClanked(player: index)) }
             }
-            // A car in the blade takes a hit too; its guard keeps one swing to one.
-            if let car = car(touching: blade) { hitCar(car, fire: false) }
             if let other, players[other].body.overlaps(blade), players[other].frozen == 0 {
                 // The body, ball or no ball: stripped and knocked along the swing.
                 players[index].slashHit = true
@@ -749,7 +742,6 @@ public struct Match: Equatable {
             }
             if let car = car(touching: bit) {
                 events.append(.boltStruck(player: index, x: x, bottom: cars[car].box.max.y))
-                hitCar(car, fire: false)
                 return
             }
             if stage.overlapsSolid(bit) {
@@ -827,8 +819,7 @@ public struct Match: Equatable {
                 events.append(.boltLanded(at: bolt.position))
                 continue
             }
-            if let car = car(touching: box) {
-                hitCar(car, fire: false)
+            if car(touching: box) != nil {
                 events.append(.boltLanded(at: bolt.position))
                 continue
             }
@@ -886,8 +877,7 @@ public struct Match: Equatable {
         for var flame in flames {
             flame.framesLeft -= 1
             guard flame.framesLeft > 0 else { continue }
-            if let car = car(touching: flame.box) {
-                hitCar(car, fire: true)
+            if car(touching: flame.box) != nil {
                 continue
             }
             if let other = players.indices.first(where: { $0 != flame.owner }), players[other].frozen == 0,
@@ -923,9 +913,6 @@ public struct Match: Equatable {
             let hitBody = other.map { players[$0].frozen == 0 && players[$0].body.overlaps(box) } ?? false
             if fireball.framesLeft <= 0 || stage.overlapsSolid(box) || hitBody {
                 events.append(.fireballBurst(at: fireball.position))
-                for car in cars.indices.reversed() where cars[car].box.distance(to: fireball.position) <= BlazeRules.burstReach {
-                    hitCar(car, fire: true)
-                }
                 if let other, players[other].body.distance(to: fireball.position) <= BlazeRules.burstReach, players[other].frozen == 0 {
                     let sign = players[other].position.x >= fireball.position.x ? 1.0 : -1.0
                     strip(other, by: fireball.owner, knock: Vec2(x: BlazeRules.burstKnock.x * sign, y: BlazeRules.burstKnock.y))

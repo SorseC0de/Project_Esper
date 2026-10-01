@@ -28,9 +28,6 @@ public enum MatchEvent: Equatable {
     case portalOpened(at: Vec2)
     case portalClosed(at: Vec2)
     case portalWarped(from: Vec2, to: Vec2)
-    case carHit(id: Int)
-    case carWrecked(id: Int, at: Vec2)
-    case carArrived(id: Int)
     case helicopterArrived(hoop: Int)
     case surfLanded(player: Int)
     /// Something the other threw or fired stopped on Surf Soda's board.

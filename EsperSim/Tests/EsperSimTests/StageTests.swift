@@ -302,38 +302,23 @@ final class HighwayTests: XCTestCase {
         XCTAssertGreaterThan(kinds.count, 10, "every kind comes up")
     }
 
-    func testThreeHitsWreckACarAndAnotherTakesItsPlace() {
-        var match = road()
-        let first = match.cars[0]
-        for _ in 0..<3 {
-            match.hitCar(0, fire: false)
-            match.cars[0].guardFrames = 0
-        }
-        XCTAssertNotEqual(match.cars[0].id, first.id)
-        XCTAssertEqual(match.cars[0].slot, 0)
-        XCTAssertEqual(match.cars[0].hits, 0)
-    }
-
-    func testTheFuelTruckGoesUpOnOneHitOfFire() {
-        var match = road()
-        let box = match.cars[1].box
-        match.cars[1] = Car(id: 77, vehicle: .fuelTruck, slot: 1, level: 0, box: box, facesLeft: false)
-        match.hitCar(1, fire: false)
-        XCTAssertEqual(match.cars[1].id, 77, "a plain hit only counts")
-        match.cars[1].guardFrames = 0
-        match.hitCar(1, fire: true)
-        XCTAssertNotEqual(match.cars[1].id, 77)
-    }
-
-    func testASlashHitsACarOnceASwing() {
+    func testNothingWrecksACar() {
         var match = road()
         match.players[1].position.x = 300
+        let cars = match.cars.map(\.id)
         let car = match.cars[0]
         match.players[0].position = Vec2(x: car.box.min.x - 6, y: 10)
         match.players[0].facing = .right
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        for _ in 0..<SlashRules.frames { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertEqual(match.cars.first { $0.id == car.id }?.hits, 1)
+        for _ in 0..<6 {
+            match.advance(inputs: [PlayerInput(shoot: true), .idle])
+            for _ in 0..<(SlashRules.frames + 20) { match.advance(inputs: [.idle, .idle]) }
+        }
+        XCTAssertEqual(match.cars.map(\.id), cars, "every car still where it stood")
+    }
+
+    func testEachMatchOnTheRoadDrawsItsOwnTraffic() {
+        let sets = Set((1...6).map { road(seed: UInt32($0)).cars.map(\.vehicle.rawValue) })
+        XCTAssertGreaterThan(sets.count, 4)
     }
 
     func testBlocksBecomeBoxesColumnByColumnAndMirror() {
@@ -365,29 +350,11 @@ final class HighwayTests: XCTestCase {
         return match
     }
 
-    func testABodyWalksUpASlopeOntoTheTopAndDownTheOther() {
-        var match = alone(["/##\\"])
+    func testACarsSlopeBlocksAreSolidForNow() {
+        let match = alone(["/#"])
         defer { Vehicle.edited[.car] = nil }
-        match.players[0].position = Vec2(x: 130, y: 10)
-        var highest = 0.0
-        for _ in 0..<150 {
-            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0.5, y: 0)), .idle])
-            highest = max(highest, match.players[0].position.y)
-            XCTAssertTrue(match.players[0].grounded || match.players[0].state == .air, "walking")
-        }
-        XCTAssertEqual(highest, 15, accuracy: 0.01, "up onto the block's top")
-        XCTAssertGreaterThan(match.players[0].position.x, 175, "over and past")
-        XCTAssertEqual(match.players[0].position.y, 10, accuracy: 0.01, "and down the far slope")
-    }
-
-    func testABodyStandsStillOnASlope() {
-        var match = alone(["/#"])
-        defer { Vehicle.edited[.car] = nil }
-        match.players[0].position = Vec2(x: 152.5, y: 12.5)
-        match.players[0].grounded = true
-        for _ in 0..<60 { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertEqual(match.players[0].position.x, 152.5, accuracy: 0.01, "stays put")
-        XCTAssertEqual(match.players[0].position.y, 12.5, accuracy: 0.01)
+        XCTAssertTrue(match.cars[0].slopes.isEmpty)
+        XCTAssertEqual(match.cars[0].boxes.count, 2, "the slope block a box like the rest")
     }
 
     func testASlopesStraightSideIsAWall() {
@@ -397,15 +364,6 @@ final class HighwayTests: XCTestCase {
         match.players[0].position = Vec2(x: 175, y: 10)
         for _ in 0..<40 { match.advance(inputs: [PlayerInput(stick: Vec2(x: -0.5, y: 0)), .idle]) }
         XCTAssertGreaterThanOrEqual(match.players[0].body.min.x, 160 - 0.01, "stopped at the straight side")
-    }
-
-    func testTheBallRollsDownASlope() {
-        var match = alone(["../", "./#", "/##"])
-        defer { Vehicle.edited[.car] = nil }
-        match.players[0].position.x = 30
-        match.ball.respawn(at: Vec2(x: 163, y: 32))
-        for _ in 0..<120 { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertLessThan(match.ball.position.x, 150, "down the slope and off its low end")
     }
 
     func testTheHelicopterCarriesOneRimAcrossThenTheOther() {
@@ -511,5 +469,31 @@ final class HighwayTests: XCTestCase {
         let floor = match.players[0].position.y
         for _ in 0..<(DropRules.holdFrames + 30) { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle]) }
         XCTAssertEqual(match.players[0].position.y, floor, accuracy: 0.01, "the floor holds")
+    }
+}
+
+final class CarBoundsTests: XCTestCase {
+    /// Dropped on any vehicle and walked off either end, a body never sinks into it or sticks.
+    func testEveryVehicleCanBeStoodOnAndWalkedOffEitherWay() {
+        for vehicle in Vehicle.allCases {
+            for way in [1.0, -1.0] {
+                var match = Match(stage: .highway, seed: 1)
+                match.countdown = 0
+                let size = vehicle.size, centre = match.slotCentre(1), floor = Stage.tileSize - HighwayRules.nearLaneDrop
+                let box = Box(min: Vec2(x: centre - size.x / 2, y: floor), max: Vec2(x: centre + size.x / 2, y: floor + size.y))
+                match.cars = match.cars.filter { $0.level == 1 } + [Car(id: 900, vehicle: vehicle, slot: 1, level: 0, box: box, facesLeft: false)]
+                match.refreshExtras()
+                match.players[1].position = Vec2(x: 30, y: 10)
+                match.players[0].position = Vec2(x: box.center.x, y: box.max.y + 15)
+                match.players[0].grounded = false
+                match.players[0].enter(.air)
+                for _ in 0..<60 { match.advance(inputs: [.idle, .idle]) }
+                for _ in 0..<120 {
+                    match.advance(inputs: [PlayerInput(stick: Vec2(x: way, y: 0)), .idle])
+                    XCTAssertFalse(match.stage.overlapsSolid(match.players[0].body), "\(vehicle) never sinks in")
+                }
+                XCTAssertFalse(box.overlaps(match.players[0].body), "\(vehicle): walked off the \(way > 0 ? "right" : "left")")
+            }
+        }
     }
 }

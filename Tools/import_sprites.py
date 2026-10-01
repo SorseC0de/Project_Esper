@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import struct
+import tempfile
 import sys
 import zlib
 
@@ -129,6 +130,66 @@ def read_png(path):
             out[x * 4 + 3] = transparency[index] if index < len(transparency) else 255
         expanded.append(bytes(out))
     return width, height, 6, 4, expanded
+
+
+# Aseprite files read directly, each layer named here a vertical strip of its own, as if
+# exported; a PNG of the same name in Pixel Art wins.
+ASEPRITE = {"Player_Transform.aseprite": {"Sprite Sheet": "player_transform", "Layer 1": "transform_eyes"}}
+
+
+def read_aseprite(path):
+    """Each layer's frames of an RGBA .aseprite, by layer name: a list of row lists, the
+    cels placed on the full canvas."""
+    data = open(path, "rb").read()
+    frame_count, width, height, depth = struct.unpack("<HHHH", data[6:14])
+    assert depth == 32, f"{path}: only RGBA sprites"
+    names, out, pos = [], {}, 128
+    for frame in range(frame_count):
+        frame_size = struct.unpack("<I", data[pos:pos + 4])[0]
+        chunks = struct.unpack("<I", data[pos + 12:pos + 16])[0] or struct.unpack("<H", data[pos + 6:pos + 8])[0]
+        at = pos + 16
+        canvases = {}
+        for _ in range(chunks):
+            size, kind = struct.unpack("<IH", data[at:at + 6])
+            body = data[at + 6:at + size]
+            if kind == 0x2004 and frame == 0:
+                length = struct.unpack("<H", body[16:18])[0]
+                names.append(body[18:18 + length].decode())
+            elif kind == 0x2005:
+                layer, x, y, _, cel_type = struct.unpack("<HhhBH", body[:9])
+                if cel_type == 2:
+                    cel_width, cel_height = struct.unpack("<HH", body[16:20])
+                    pixels = zlib.decompress(body[20:])
+                    canvas = canvases.setdefault(layer, [bytearray(width * 4) for _ in range(height)])
+                    for row in range(cel_height):
+                        for column in range(cel_width):
+                            px, py = x + column, y + row
+                            if 0 <= px < width and 0 <= py < height:
+                                canvas[py][px * 4:px * 4 + 4] = pixels[(row * cel_width + column) * 4:(row * cel_width + column) * 4 + 4]
+            at += size
+        for index, name in enumerate(names):
+            canvas = canvases.get(index, [bytearray(width * 4) for _ in range(height)])
+            out.setdefault(name, []).append([bytes(row) for row in canvas])
+        pos += frame_size
+    return width, height, out
+
+
+def export_aseprites(folder):
+    """The layers named in ASEPRITE as PNG strips in `folder`, by sheet name."""
+    made = {}
+    for file, layers in ASEPRITE.items():
+        path = os.path.join(STRIPS, file)
+        if not os.path.exists(path):
+            continue
+        width, height, frames = read_aseprite(path)
+        for layer, sheet in layers.items():
+            rows = [row for frame in frames.get(layer, []) for row in frame]
+            if not rows:
+                continue
+            out = os.path.join(folder, sheet + ".png")
+            write_png(out, width, len(rows), 6, rows)
+            made[sheet] = out
+    return made
 
 
 def write_png(path, width, height, ctype, rows):
@@ -338,6 +399,9 @@ def main():
     strips = {os.path.splitext(os.path.basename(p))[0].lower(): p for p in glob.glob(os.path.join(STRIPS, "*.png"))}
     for name in STAGE_ART:
         strips[os.path.basename(name).lower()] = os.path.join(STRIPS, "Stages", name + ".png")
+    aseprite_folder = tempfile.mkdtemp()
+    for sheet, path in export_aseprites(aseprite_folder).items():
+        strips.setdefault(sheet, path)
     write_root_images()
     for strip in [strips[name] for name in sorted(strips)]:
         # Exports arrive in whatever case the tool gave them; the atlas is lower case.

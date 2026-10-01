@@ -165,6 +165,8 @@ final class GameScene: SKScene {
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
     /// and coloured each frame: the look's outline, or the zone's.
     private var outlineNodes: [SKSpriteNode] = []
+    /// The change's eyes, `transform_eyes` in the energy's colour over the body.
+    private var eyesNodes: [SKSpriteNode] = []
     /// Each player's figure, all of it, in one layer; the one in front a little higher.
     private var figureLayers: [SKNode] = []
     private var frontFigure = 0
@@ -693,6 +695,12 @@ final class GameScene: SKScene {
             energy.shader = energyToneShader
             figure.addChild(energy)
             energyNodes.append(energy)
+            let eyes = SKSpriteNode()
+            eyes.zPosition = 0.035
+            eyes.isHidden = true
+            eyes.colorBlendFactor = 1
+            figure.addChild(eyes)
+            eyesNodes.append(eyes)
             let charge = SKSpriteNode()
             charge.zPosition = 0.05
             charge.isHidden = true
@@ -1484,7 +1492,8 @@ final class GameScene: SKScene {
                 ballSpin.rate = rolling(ball.velocity)
             }
             ballSpin.rate = min(max(ballSpin.rate, -mostSpin), mostSpin)
-            ballSpin.angle += ballSpin.rate * dt
+            // Frozen, it holds its turn.
+            if ball.frozen == 0 { ballSpin.angle += ballSpin.rate * dt }
         }
         ballNode.texture = (ball.frozen > 0 ? sprites.basketballIceFrames : sprites.basketballFrames)[ballSpin.frame]
         ballNode.zRotation = ballSpin.angle
@@ -3315,6 +3324,8 @@ final class GameScene: SKScene {
         var legs = false
         /// Drawn behind the players: the back leg's.
         var behind = false
+        /// Spiralling round the body this far out while a change is on, rather than rising.
+        var helixRadius: CGFloat?
     }
 
     private struct HeadParticle {
@@ -3332,6 +3343,8 @@ final class GameScene: SKScene {
         var cube: (orientation: simd_quatf, spin: SIMD3<Float>, colour: SIMD4<Float>)?
         var legCube = false
         var behind = false
+        /// Rising round a line straight up while its body changes: the line's x, how far out, how far round.
+        var helix: (centreX: CGFloat, radius: CGFloat, angle: Double, rise: CGFloat)?
     }
 
     private var headParticles: [HeadParticle] = []
@@ -3370,12 +3383,25 @@ final class GameScene: SKScene {
     private static let legCreditKey = 1000
     /// From the head's middle up to its crown, where its particles leave, in art pixels at a plain body's size.
     private static let crownLift: CGFloat = 4
-    private func legStream(_ index: Int, part: BodyPart) -> HeadStream {
+    private func legStream(_ index: Int, part: BodyPart, energyColour: Bool = false) -> HeadStream {
         let look = sprites.look(for: index)
         return HeadStream(frames: [sprites.flatSquare(size: 4, alpha: 1)], size: ParticleLook.energySize,
-                          tint: SKColor(rgb: look.colours[part] ?? look.glow), rate: Double(ParticleLook.legCubeRate),
-                          zoneTinted: true, cubes: true, legs: true, behind: part == .backLeg)
+                          tint: SKColor(rgb: energyColour ? look.glow : (look.colours[part] ?? look.glow)), rate: Double(ParticleLook.legCubeRate),
+                          zoneTinted: true, cubes: true, legs: true, behind: part.isBack)
     }
+
+    /// The change into the energy form, as drawn: lifted off the ground, all white on the
+    /// sheet's fifth frame and the energy form from its sixth; cubes spiralling up round the
+    /// body until then, and the head's and legs' cubes rising in a helix.
+    private static let transformLift: CGFloat = 3
+    private static let transformWhiteFrame = 4
+    private static let transformEnergyFrame = 5
+    private static let transformCreditKey = 2000
+    private static let transformSpiralRate = 30.0
+    private static let transformSpiralRadius: CGFloat = 10
+    private static let transformHelixRadius: CGFloat = 3
+    private static let helixTurnsPerSecond = 2.0
+    private static let spiralRise: CGFloat = 50
 
     /// The ball's fire trail: its credit apart from the heads', at twice a head's rate.
     private static let ballFireCreditKey = -1
@@ -3471,9 +3497,17 @@ final class GameScene: SKScene {
                 // and steps down in size.
                 let frames = cube != nil ? [stream.frames[0]] : stream.frames
                 let life = frames.count > 1 ? Double(frames.count) / 24 : 0.6 + Double.random(in: -0.05...0.05)
+                // While its body changes, it rises in a helix rather than straight.
+                var helix: (centreX: CGFloat, radius: CGFloat, angle: Double, rise: CGFloat)?
+                if trailing == nil, match.players.indices.contains(index), match.players[index].state == .transforming,
+                   match.players[index].animationFrame.frame < GameScene.transformEnergyFrame {
+                    let radius = stream.helixRadius ?? GameScene.transformHelixRadius
+                    helix = (point.x, radius, Double.random(in: 0..<(2 * .pi)), stream.helixRadius == nil ? CGFloat(speed) : GameScene.spiralRise)
+                }
                 headParticles.append(HeadParticle(node: node, owner: index, velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
                                                   age: 0, life: life, frames: frames,
-                                                  startFrame: Int.random(in: 0..<frames.count), drifts: trailing == nil, cube: cube, legCube: stream.legs, behind: stream.behind))
+                                                  startFrame: Int.random(in: 0..<frames.count), drifts: trailing == nil, cube: cube, legCube: stream.legs,
+                                                  behind: stream.behind, helix: helix))
             }
         }
         headCredit[creditKey] = credit
@@ -3495,7 +3529,19 @@ final class GameScene: SKScene {
                 particle.node.removeFromParent()
                 return nil
             }
-            if particle.drifts {
+            if var helix = particle.helix {
+                let owner = match.players.indices.contains(particle.owner) ? match.players[particle.owner] : nil
+                if let owner, owner.state == .transforming, owner.animationFrame.frame < GameScene.transformEnergyFrame {
+                    helix.angle += 2 * .pi * GameScene.helixTurnsPerSecond * step
+                    particle.node.position = CGPoint(x: helix.centreX + CGFloat(cos(helix.angle)) * helix.radius,
+                                                     y: particle.node.position.y + helix.rise * CGFloat(step))
+                    particle.helix = helix
+                } else {
+                    // The change done, it rises on as the rest do.
+                    particle.helix = nil
+                    particle.velocity = CGVector(dx: 0, dy: helix.rise)
+                }
+            } else if particle.drifts {
                 // Flowing toward the ball along x, always: a steady push, easing off as the
                 // body and the ball come level, as with the ball in hand.
                 var flow = 0.0
@@ -3509,8 +3555,10 @@ final class GameScene: SKScene {
                 particle.velocity.dx += flow * step
                 particle.velocity.dy += 10 * step
             }
-            particle.node.position = CGPoint(x: particle.node.position.x + particle.velocity.dx * step,
-                                             y: particle.node.position.y + particle.velocity.dy * step)
+            if particle.helix == nil {
+                particle.node.position = CGPoint(x: particle.node.position.x + particle.velocity.dx * step,
+                                                 y: particle.node.position.y + particle.velocity.dy * step)
+            }
             let share = particle.age / particle.life
             if particle.frames.count > 1 {
                 particle.node.texture = particle.frames[(particle.startFrame + Int(particle.age * 24)) % particle.frames.count]
@@ -4590,7 +4638,10 @@ final class GameScene: SKScene {
             // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
             // Frozen, the body is drawn in the ice look.
-            let drawnAs = player.frozen > 0 ? SpriteLibrary.icePlayer : index
+            // Changing, the energy form from the sheet's sixth frame on.
+            let changing = player.state == .transforming
+            let energyForm = player.transformed || (changing && frame.frame >= GameScene.transformEnergyFrame)
+            let drawnAs = player.frozen > 0 ? SpriteLibrary.icePlayer : (energyForm ? SpriteLibrary.transformedPlayer(index) : index)
             node.texture = sprites.texture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
             // Titan Tea's size, grown into after its port-in.
             if titanGrowDelay[index] > 0 {
@@ -4611,6 +4662,8 @@ final class GameScene: SKScene {
             let radius = (inTornado ? ElementsArt.hoverRadius : GameScene.hoverRadius) * hover[index]
             let drift = CGPoint(x: (cos(lap) * Double(radius)).rounded(), y: (sin(lap) * Double(radius)).rounded())
             node.position = SpriteLibrary.point(player.position) + drift
+            // Held a few pixels up off the ground the whole change.
+            if changing { node.position.y += GameScene.transformLift }
             if player.state == .dunking {
                 // Each frame of the dunk sits where its art was placed on the rim.
                 // Titan Tea's whole dunk moved again by its own offset.
@@ -4621,7 +4674,9 @@ final class GameScene: SKScene {
             node.xScale = CGFloat(player.facing.sign)
             // In the throw stance's parry frames, and growing, white.
             let tint: SKColor = .white
-            let tintShare: CGFloat = growing ? 1 : (player.throwParrying ? 0.85 : 0)
+            // And all white, glowing, on the change's fifth frame.
+            let flashWhite = changing && frame.frame == GameScene.transformWhiteFrame
+            let tintShare: CGFloat = growing || flashWhite ? 1 : (player.throwParrying ? 0.85 : 0)
             node.color = tint
             node.colorBlendFactor = tintShare
             headNodes[index].color = tint
@@ -4673,7 +4728,9 @@ final class GameScene: SKScene {
                 outlineNode.size = node.size
                 outlineNode.anchorPoint = node.anchorPoint
                 // White as the body is, growing or parrying; ice, frozen; else the look's or the zone's.
-                let lineColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
+                // The zone's colours cycle round it in the zone, and while the change is there to be made.
+                let cycling = ZoneTuning.inTheZone || (player.transformReady && !player.transformed && !changing)
+                let lineColour = cycling ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
                 // In the parry frames the line goes the bright version of the body's colour.
                 outlineNode.color = growing ? .white
                     : player.throwParrying ? SKColor(rgb: sprites.look(for: index).bright)
@@ -4822,21 +4879,43 @@ final class GameScene: SKScene {
                 headEspers[index].particleBirthRate = 0
                 headEsperMixes[index].particleBirthRate = 0
                 // A human's head is on the body: its particles still rise off it.
-                if HumanLook.enabled, let landmark = sprites.landmark(.head, in: frame, player: index) {
+                if sprites.look(for: drawnAs).human, let landmark = sprites.landmark(.head, in: frame, player: drawnAs) {
                     let head = landmark * drawScale
                     let at = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                     emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + GameScene.crownLift * drawScale))
                 }
             }
-            // A human's legs, in the energy's colours, give off smaller cubes of their own.
+            // A human's legs, in the energy's colours, give off smaller cubes of their own; in
+            // the energy form, the hands too.
             if HumanLook.enabled, ParticleLook.cubes {
-                for (slot, part) in [BodyPart.frontLeg, .backLeg].enumerated() {
-                    guard let landmark = sprites.landmark(part, in: frame, player: index) else { continue }
+                let limbs: [BodyPart] = energyForm ? [.frontLeg, .backLeg, .frontHand, .backHand] : [.frontLeg, .backLeg]
+                for (slot, part) in limbs.enumerated() {
+                    guard let landmark = sprites.landmark(part, in: frame, player: drawnAs) else { continue }
                     let leg = landmark * drawScale
                     let at = node.position + leaned(CGPoint(x: leg.x * CGFloat(player.facing.sign), y: leg.y))
-                    emitHeadParticles(index, power: player.power, at: at, creditKey: GameScene.legCreditKey + index * 2 + slot,
-                                      streams: [legStream(index, part: part)])
+                    emitHeadParticles(index, power: player.power, at: at, creditKey: GameScene.legCreditKey + index * 4 + slot,
+                                      streams: [legStream(index, part: part, energyColour: energyForm)])
                 }
+            }
+            // Changing, up to the white frame cubes spiral up round the whole body.
+            if changing, frame.frame <= GameScene.transformWhiteFrame, ParticleLook.cubes {
+                var spiral = legStream(index, part: .frontLeg, energyColour: true)
+                spiral.rate = GameScene.transformSpiralRate
+                spiral.helixRadius = GameScene.transformSpiralRadius
+                emitHeadParticles(index, power: player.power, at: SpriteLibrary.point(player.position) + CGPoint(x: 0, y: GameScene.transformLift),
+                                  creditKey: GameScene.transformCreditKey + index, streams: [spiral])
+            }
+            // The change's eyes over the body, in the energy's colour.
+            let eyes = eyesNodes[index]
+            eyes.isHidden = !changing || EffectSheets.frames["transform_eyes"] == nil
+            if !eyes.isHidden {
+                eyes.texture = sprites.texture("transform_eyes", frame.frame)
+                eyes.size = node.size
+                eyes.anchorPoint = node.anchorPoint
+                eyes.position = node.position
+                eyes.xScale = node.xScale
+                eyes.zRotation = node.zRotation
+                eyes.color = SKColor(rgb: sprites.look(for: index).glow)
             }
 
             placeSurf(index, player: player, body: node, head: headNode)

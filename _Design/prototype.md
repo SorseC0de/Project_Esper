@@ -123,6 +123,21 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - Down lets go of any hang: the wall cling (unless a web line is being aimed), the ledge
   hang, which it drops off rather than climbing, and the rim after a dunk's slam; neither
   the wall nor the ledge can be taken again at once.
+- The change (`PlayerState.transforming`, `TransformRules`, protocol 44): throw and shoot together,
+  from anything free or within four frames of the stance one of them took, change the human form
+  into the energy form; the same again in it changes straight back. Blazing Boba's level-two
+  fireball keeps the two together where it's asked for. The change holds the body still where it
+  is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
+  from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
+  it's `transformed`. For now everyone has the change there to make (`transformReady`), shown by
+  the zone's cycling colours round the line until it's made. As drawn: three pixels up off the
+  ground the whole change, the eyes over the body in the energy's colour, all white and glowing on
+  frame 4 and the energy form from frame 5 (0-based); up to frame 4 cubes spiral up round the
+  body (30 a second, 10 pixels out) and the head's and legs' cubes rise in a helix. The energy form
+  is the look from before the human one (`Look.transformed`, `human: false`): the body in the
+  energy's light colour, the back limbs greyed darker, the head apart in the energy's colour, and
+  cubes off the hands as off the legs; drawn as a player of its own
+  (`SpriteLibrary.transformedPlayer`), warmed with the rest.
 - Stepback: down on the ground in a shot's or a throw's stance, once a stance, pressed any time in
   it and coming once it has reached its hold (`shotWindupFrames`, `throwWindupFrames`): the throw sheet's third frame, sliding
   straight back 48 art pixels over 12 frames (`StepbackRules`), the facing kept, trailing
@@ -778,7 +793,7 @@ the pulse is a bar from the hand to the edge; ice clones are the body's frame in
 flames loop `fire_trail`; fireballs are the ball in fire; frozen bodies and ice clones are
 drawn in the ice look (`Look.ice`: the front parts, the head and the torso's light in palette 57,
 the back parts and the torso's shadow, the pelvis, in 49, outlined in 22; `SpriteLibrary.icePlayer`, warmed
-with the rest), the clones at 0.8; a frozen ball, loose or in hand, is `basketball_ice`, with no halo, so no glow; the cape is seven short rectangles chained along the glide's trail with a wave down
+with the rest), the clones at 0.8; a frozen ball, loose or in hand, is `basketball_ice`, with no halo, so no glow, and holds its turn; the cape is seven short rectangles chained along the glide's trail with a wave down
 its length.
 
 ## Highway Traffic

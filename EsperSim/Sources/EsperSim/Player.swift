@@ -65,6 +65,8 @@ public enum PlayerState: Equatable, Hashable {
     case gunSnipe
     /// Held in one of the Elements' tornados, hovering at its middle.
     case suspended
+    /// Changing from the human form into the energy form, held still in the air.
+    case transforming
 
     /// The actions Titan Tea does slower.
     public var isAction: Bool {
@@ -200,6 +202,9 @@ public struct Player: Equatable {
     /// A slide on a slope going down the way it faces: the body rides it on its own, and only a
     /// jump gets out, until flat ground or open air.
     public var forcedSlide = false
+    /// In the energy form; and whether the change is there to be made (for now, always).
+    public var transformed = false
+    public var transformReady = true
     /// Held in a tornado: where its middle is, for the body's middle to be drawn to; and
     /// frames left before a tornado can take the body again after it jumped out.
     public var tornadoCentre: Vec2?
@@ -527,7 +532,7 @@ public struct Player: Equatable {
         if input.jump && !lastInput.jump { jumpBuffer = 5 } else if jumpBuffer > 0 { jumpBuffer -= 1 }
         let jumpPressed = jumpBuffer > 0
         var shootPressed = input.shoot && !lastInput.shoot
-        let throwPressed = input.throwBall && !lastInput.throwBall
+        var throwPressed = input.throwBall && !lastInput.throwBall
         let tauntPressed = input.taunt && !lastInput.taunt
         let smash = abs(input.stick.x) >= spec.dashThreshold && stickAwayFrames <= 3
         let onDefence = ballHolder != nil && ballHolder != index
@@ -555,6 +560,26 @@ public struct Player: Equatable {
         let throwingBolt = boltPose > 0 && grounded && state.isGroundState
         let boltCarry = velocity.x
         if throwingBolt { input.stick.x = 0 }
+
+        // Throw and shoot together, out of anything free or a stance just taken: the change into
+        // the energy form, or, in it, straight back out.
+        let changeFrom = [.idle, .walk, .dash, .run, .pivot, .land, .crouch, .crouchWalk, .air].contains(state)
+            || ((state == .shootStance || state == .throwStance) && stateTimer <= TransformRules.pressWindowFrames)
+        // Blazing Boba's fireball keeps the two together for now, where it's asked for.
+        if input.shoot, input.throwBall, shootPressed || throwPressed, changeFrom, hitStun == 0,
+           !fireballAsked(input, shootPressed: shootPressed, throwPressed: throwPressed) {
+            shootPressed = false
+            throwPressed = false
+            input.shootButtons = 0
+            input.throwBall = false
+            if transformed {
+                transformed = false
+                if state == .shootStance || state == .throwStance { enter(grounded ? .idle : .air) }
+            } else if transformReady {
+                velocity = .zero
+                enter(.transforming)
+            }
+        }
 
         // A slide slope: nobody stands on it. Held uphill, the body walks against it and is
         // carried back down, as up a down escalator; otherwise it turns downhill into the forced slide.
@@ -1278,6 +1303,14 @@ public struct Player: Equatable {
                 startSlash(events: &events)
             } else if !input.jump || flightLeft <= 0 {
                 enter(.air)
+            }
+
+        case .transforming:
+            // Held still where it started, off the ground, until the sheet's played through.
+            velocity = .zero
+            if stateTimer >= TransformRules.frames {
+                transformed = true
+                enter(grounded ? .idle : .air)
             }
 
         case .suspended:

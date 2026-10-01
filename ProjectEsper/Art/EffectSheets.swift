@@ -67,6 +67,7 @@ enum EffectSheets {
         "splash": 7,
         "tornado": 8,
         "tornado_burst": 10,
+        "transform_eyes": 9,
         "wind": 9,
     ]
 
@@ -132,6 +133,7 @@ enum EffectSheets {
         "splash": 0.0000,
         "tornado": 0.0000,
         "tornado_burst": 0.5000,
+        "transform_eyes": 0.5000,
         "wind": 0.5000,
     ]
 
@@ -156,6 +158,7 @@ enum EffectSheets {
         "shine",
         "small_lightning",
         "splash",
+        "transform_eyes",
         "wind",
     ]
 }

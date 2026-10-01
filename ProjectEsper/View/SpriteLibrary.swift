@@ -17,8 +17,10 @@ final class SpriteLibrary {
     private var landmarks: [String: [BodyPart: CGPoint]] = [:]
     /// The two players' looks, then the ice look frozen bodies and ice clones are drawn in,
     /// asked for as the player `icePlayer`.
-    private var looks = Look.byPlayer + [Look.ice]
+    private var looks = Look.byPlayer + [Look.ice] + Look.byPlayer.map(\.transformed)
     static let icePlayer = Look.byPlayer.count
+    /// A player's energy form, asked for as a player of its own.
+    static func transformedPlayer(_ player: Int) -> Int { icePlayer + 1 + player }
 
     func look(for player: Int) -> Look {
         looks[min(player, looks.count - 1)]
@@ -29,8 +31,11 @@ final class SpriteLibrary {
     func setLook(_ look: Look, for player: Int) {
         guard look != looks[player] else { return }
         looks[player] = look
-        cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
+        let energyForm = SpriteLibrary.transformedPlayer(player)
+        looks[energyForm] = look.transformed
+        cache = cache.filter { !$0.key.hasPrefix("p\(player)_") && !$0.key.hasPrefix("p\(energyForm)_") }
         rewarm(player: player)
+        rewarm(player: energyForm)
     }
 
     /// Every player's frames dropped and rebuilt, for a change to how all looks are drawn.
@@ -331,10 +336,13 @@ final class SpriteLibrary {
     /// Builds every frame of every player up front and sends them to the GPU, so nothing
     /// is made mid-draw.
     func warmUp(players: Int, completion: @escaping () -> Void) {
-        // The ice look's frames as well, so a freeze never makes them mid-match.
-        for animation in Animation.allCases {
-            for frame in 0..<animation.frameCount {
-                _ = texture(AnimationFrame(animation, frame), player: SpriteLibrary.icePlayer)
+        // The ice look's frames as well, and each player's energy form, so a freeze or a
+        // change never makes them mid-match.
+        for drawn in [SpriteLibrary.icePlayer] + (0..<players).map(SpriteLibrary.transformedPlayer) {
+            for animation in Animation.allCases {
+                for frame in 0..<animation.frameCount {
+                    _ = texture(AnimationFrame(animation, frame), player: drawn)
+                }
             }
         }
         for player in 0..<players {
@@ -412,7 +420,8 @@ final class SpriteLibrary {
             let index = pixel * 4
             // The glowing parts' middles, and the head's however it's drawn: where the head
             // and its particles go.
-            if part.glows || part == .head || (HumanLook.enabled && HumanLook.glowingParts.contains(part)) {
+            // And the limbs' ends, where cubes come off them.
+            if part.glows(human: look.human) || part == .head || [.frontLeg, .backLeg, .frontHand, .backHand].contains(part) {
                 var sum = sums[part] ?? (0, 0, 0)
                 sum.x += CGFloat(pixel % width) + 0.5
                 sum.y += CGFloat(pixel / width) + 0.5
@@ -433,11 +442,11 @@ final class SpriteLibrary {
         var head: SKTexture?
         var energy: SKTexture?
         if detach {
-            let headCanvas = sums[.head] != nil && !HumanLook.enabled ? makeCanvas(width: width, height: height) : nil
+            let headCanvas = sums[.head] != nil && !look.human ? makeCanvas(width: width, height: height) : nil
             let energyCanvas = parts.contains { $0?.isEnergy == true } ? makeCanvas(width: width, height: height) : nil
             for pixel in 0..<count {
                 // A human's head stays on the body.
-                guard let part = parts[pixel], (part == .head && !HumanLook.enabled) || part == .ball || part.isEnergy else { continue }
+                guard let part = parts[pixel], (part == .head && !look.human) || part == .ball || part.isEnergy else { continue }
                 let index = pixel * 4
                 if part == .head, let (_, headPixels) = headCanvas {
                     paint(headPixels, index, look.colours[.head] ?? look.glow)
@@ -485,7 +494,7 @@ final class SpriteLibrary {
         // The outside line, grown a pixel at a time round the body. The glowing parts get
         // none: a clear pixel next to nothing but the ball stays clear.
         if look.outlineWidth > 0 {
-            var body = (0..<count).map { pixels[$0 * 4 + 3] != 0 && parts[$0]?.glows != true }
+            var body = (0..<count).map { pixels[$0 * 4 + 3] != 0 && parts[$0]?.glows(human: look.human) != true }
             for _ in 0..<look.outlineWidth {
                 var grown: [Int] = []
                 for pixel in 0..<count where pixels[pixel * 4 + 3] == 0 && neighbours(pixel, { body[$0] }) {
@@ -504,8 +513,8 @@ final class SpriteLibrary {
         // look's colour at the crown down into the skin, leading into the particles off it.
         // The line there stays on the body in its grade rather than lifting off with the rest.
         // A human's energy-coloured parts glow; so does the crown's grade where it's mostly energy.
-        var glowing = (0..<count).map { HumanLook.enabled && parts[$0].map(HumanLook.glowingParts.contains) == true }
-        if HumanLook.enabled {
+        var glowing = (0..<count).map { look.human && parts[$0].map(HumanLook.glowingParts.contains) == true }
+        if look.human {
             let isHead = (0..<count).map { parts[$0] == .head }
             let crown = (0..<count).map { isHead[$0] || (lined[$0] && neighbours($0, { isHead[$0] })) }
             if let top = crown.firstIndex(of: true).map({ $0 / width }), let bottom = crown.lastIndex(of: true).map({ $0 / width }) {

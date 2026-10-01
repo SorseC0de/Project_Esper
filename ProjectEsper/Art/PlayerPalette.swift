@@ -48,7 +48,7 @@ enum BodyPart: CaseIterable {
 
     /// The parts that burn: drawn in the team colour, outlined in it, and haloed. A human's
     /// head doesn't.
-    var glows: Bool { (self == .head && !HumanLook.enabled) || self == .ball }
+    func glows(human: Bool) -> Bool { (self == .head && !human) || self == .ball }
 
     /// The parts that are light rather than body: drawn on their own above the body so
     /// they bloom, with no line, in the team colour's tones by their brightness.
@@ -80,18 +80,26 @@ struct Look: Hashable {
     /// Groups of parts also outlined where they lie over the rest of the body, so each reads
     /// on its own; parts in one group take no line between them.
     var strokedGroups: [Set<BodyPart>] = []
+    /// Drawn as a human, skin and clothes, the head on the body; else the energy form, the
+    /// whole body in the energy's colours and the head apart.
+    var human = HumanLook.enabled
+    /// The body colour the look was made from, for its other form.
+    var body: RGB?
+
+    /// The same player in the energy form.
+    var transformed: Look { Look.team(glow, body: body ?? glow, human: false) }
 
     /// The body in its colour and the back limbs in a greyed, darker version of it, the head
     /// and the ball in the team colour, a black line round the body, and the front arm
     /// stroked on its own. The head is drawn apart from the body, with no line, and so is
     /// the energy, toned by `energyTone`.
-    static func team(_ glow: RGB, body: RGB) -> Look {
+    static func team(_ glow: RGB, body: RGB, human: Bool = HumanLook.enabled) -> Look {
         var colours: [BodyPart: RGB] = [:]
         let back = greyedDarker(body)
         for part in BodyPart.allCases {
-            colours[part] = part.glows || part.isEnergy ? glow : (part.isBack ? back : body)
+            colours[part] = part.glows(human: human) || part.isEnergy ? glow : (part.isBack ? back : body)
         }
-        if HumanLook.enabled {
+        if human {
             // Skin and clothes; the legs and feet in the energy's own colour, as the head's crown
             // is, the back ones at two thirds of it: darker but not greyed, so they glow too.
             for (part, skin) in HumanLook.skin { colours[part] = skin }
@@ -102,7 +110,7 @@ struct Look: Hashable {
             colours[.frontFoot] = Look.frontShoe
             colours[.backFoot] = Look.backShoe
         }
-        return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups)
+        return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body)
     }
 
     static let frontShoe = PixelPalette.colours[22], backShoe = PixelPalette.colours[38]

@@ -41,11 +41,13 @@ public enum Animation: String, CaseIterable {
     case gunRun = "player_gun_run"
     case gunRunShoot = "player_gun_run_shoot"
     case hurt = "player_hurt"
+    case transform = "player_transform"
 
     public var frameCount: Int {
         switch self {
         case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir, .gunSnipe: 10
         case .hurt: 4
+        case .transform: 9
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall: 3
         case .jumpSquat: 4
@@ -218,6 +220,8 @@ extension Player {
             return AnimationFrame(hasBall ? .airBall : .air, 2)
         case .flying:
             return AnimationFrame(hasBall ? .airBall : .air, 1)
+        case .transforming:
+            return AnimationFrame(.transform, min(t * TransformRules.sheetFramesPerSecond / 60, Animation.transform.frameCount - 1))
         case .suspended:
             // Falling, as it hangs.
             return AnimationFrame(hasBall ? .airBall : .air, 2)

@@ -1108,11 +1108,11 @@ never a painted slope.
 
 ## Wetshot Wake
 
-`Stage.wetshot`, `StageChoice.wetshotWake`: 30 by 17 tiles, one court across, under water, zoomed to fill the
+`Stage.wetshot`, `StageChoice.wetshotWake`: 37 by 17 tiles (a current phone's whole screen at 17 rows), under water, zoomed to fill the
 screen (not by whole pixels), its bottom on the screen's, cropped at the top or the sides,
 laid out in the map maker like the Elements (`MapStage.wetshot`, `StageMap.current[.wetshot]`,
 kept offline under `esper.wetshotMap`; its first map a floor along the bottom row, the
-Hooperfish over the middle). Drawn: `Background.png` (480 by 272, `WetshotBackground`) over the
+Hooperfish over the middle). Drawn: `Background.png` (592 by 272, `WetshotBackground`) over the
 stage, the water's top colour (palette 19) behind and its floor's (16) below for a bigger screen;
 then the map's props (`StageMap.Prop`, placed by their bottom left cell): `Plant 1` to `5`, the
 two halves of `Rocks.png` (the top one first), and the Hooperfish, assembled back to front from

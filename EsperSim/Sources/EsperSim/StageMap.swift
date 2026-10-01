@@ -138,7 +138,7 @@ public struct StageMap: Equatable, Codable {
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
     /// would stand in for it offline, is put aside and the baked one shows.
-    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .elements ? 5 : 1 }
+    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .elements ? 5 : 2 }
 
     /// The map every phone plays; the map maker's edits stand in for it offline only.
     public static func baked(_ stage: MapStage) -> StageMap { stage == .elements ? elementsBaked : wetshotBaked }
@@ -305,9 +305,9 @@ public enum IcicleRules {
 
 }
 
-/// Wetshot Wake: one court across, under water, its one rim on the Hooperfish.
+/// Wetshot Wake: 37 by 17, a phone's whole screen at 17 rows, under water, its one rim on the Hooperfish.
 public enum WetshotRules {
-    public static let columns = 30
+    public static let columns = 37
     public static let rows = 17
     /// The rim's centre from the Hooperfish's bottom left, in whole art pixels: `hoop_straight`
     /// sits on its leftmost 48 pixels, 10 up, and the rim is 5 left and 10 down of that art's
@@ -661,7 +661,7 @@ extension StageMap {
     /// the players either side of it; the plants and rocks for the map maker to place.
     private static func wetshotDefaultMap() -> StageMap {
         let walls = (0..<WetshotRules.columns).map { Wall(Cell($0, 0), .solid) }
-        return StageMap(props: [Prop(.hooperfish, at: Cell(12, 8))], leftRim: Cell(0, 0), rightRim: Cell(0, 0),
-                        spawns: [Cell(5, 1), Cell(24, 1)], ball: Cell(15, 6), walls: walls)
+        return StageMap(props: [Prop(.hooperfish, at: Cell(15, 8))], leftRim: Cell(0, 0), rightRim: Cell(0, 0),
+                        spawns: [Cell(5, 1), Cell(31, 1)], ball: Cell(18, 6), walls: walls)
     }
 }

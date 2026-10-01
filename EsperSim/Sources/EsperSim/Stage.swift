@@ -647,12 +647,12 @@ public struct Stage: Equatable {
         }
     }
 
-    /// Wetshot Wake: one court across, under water, laid out in the map maker; its one rim,
+    /// Wetshot Wake: 37 by 17, under water, laid out in the map maker; its one rim,
     /// both players' to score on, rides the Hooperfish.
     public static var wetshot: Stage {
         let map = StageMap.current[.wetshot]
         let columns = WetshotRules.columns, rows = WetshotRules.rows
-        let fish = map.hooperfish?.cell ?? StageMap.Cell(12, 8)
+        let fish = map.hooperfish?.cell ?? StageMap.Cell(15, 8)
         let rim = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize) + WetshotRules.rimFromHooperfish
         var stage = Stage(
             columns: columns, rows: rows,

@@ -5,7 +5,7 @@ import XCTest
 final class WetshotTests: XCTestCase {
     func testTheOneRimRidesTheHooperfish() {
         let stage = Stage.wetshot
-        XCTAssertEqual(stage.columns, 30)
+        XCTAssertEqual(stage.columns, 37)
         XCTAssertEqual(stage.rows, 17)
         XCTAssertEqual(stage.hoops.count, 1)
         XCTAssertTrue(stage.hoops[0].shared)

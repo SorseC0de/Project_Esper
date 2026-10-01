@@ -336,13 +336,20 @@ public struct Player: Equatable {
     /// sets it each frame from who holds the ball.
     public var speedShare = 1.0
     /// Under water (`StageFeatures.underwater`), set from the stage each step: gravity, the fall
-    /// speeds, the ground's speeds and the air's pick-up at half (not the air's top speed), and
-    /// the clock, every state's timing and its sheet with it, at half its rate.
+    /// speeds, the jumps, the ground's and the air's speeds and every pick-up and brake at half,
+    /// and the clock, every state's timing and its sheet with it, at half its rate.
     public var underwater = false
     var waterTicks = 0
     var waterShare: Double { underwater ? 0.5 : 1 }
     var gravity: Double { spec.gravity * waterShare }
     var fallSpeed: Double { spec.fallSpeed * waterShare }
+    /// The jumps' push, and off a wall, at half under water.
+    var fullHopVelocity: Double { spec.fullHopVelocity * waterShare }
+    var shortHopVelocity: Double { spec.shortHopVelocity * waterShare }
+    var doubleJumpVelocity: Double { spec.doubleJumpVelocity * waterShare }
+    var thirdJumpVelocity: Double { spec.thirdJumpVelocity * waterShare }
+    var wallJumpHorizontal: Double { spec.wallJumpHorizontal * waterShare }
+    var wallJumpVertical: Double { spec.wallJumpVertical * waterShare }
     /// Every change of speed a frame, picking up and braking, at half under water.
     var traction: Double { spec.traction * waterShare }
     var walkAcceleration: Double { spec.walkAcceleration * waterShare }
@@ -358,7 +365,7 @@ public struct Player: Equatable {
     /// The air moves as the ground does: the run's speed, which the jumps set off at too, and
     /// the ground's traction to brake when the stick lets go. Moves that don't steer coast
     /// on the spec's light air friction instead, so their momentum carries.
-    var airSpeedMax: Double { spec.runSpeed * speedShare }
+    var airSpeedMax: Double { spec.runSpeed * speedShare * waterShare }
     var airBrake: Double { traction }
 
     /// Crouched or sliding, the body is half as tall, so it fits under what a standing
@@ -745,7 +752,7 @@ public struct Player: Equatable {
                     facing = way
                     velocity.x = runMomentum * way.sign
                 }
-                velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
+                velocity.y = input.jump ? fullHopVelocity : shortHopVelocity
                 let cap = max(abs(velocity.x), airSpeedMax)
                 velocity.x = min(max(velocity.x + input.stick.x * airSpeedMax, -cap), cap)
                 jumpsLeft -= 1
@@ -833,7 +840,7 @@ public struct Player: Equatable {
                 // Just off an edge: the jump the ground would have given.
                 jumpBuffer = 0
                 coyote = 0
-                velocity.y = input.jump ? spec.fullHopVelocity : spec.shortHopVelocity
+                velocity.y = input.jump ? fullHopVelocity : shortHopVelocity
                 jumpsLeft = spec.jumps - 1
                 platformArmed = true
                 fastFalling = false
@@ -926,7 +933,7 @@ public struct Player: Equatable {
             }
             if grounded, jumpPressed {
                 jumpBuffer = 0
-                velocity.y = spec.fullHopVelocity
+                velocity.y = fullHopVelocity
                 jumpsLeft = 0
                 grounded = false
                 jumpShot = true
@@ -1289,7 +1296,7 @@ public struct Player: Equatable {
                 // The exit keeps the arc's direction but not all its speed, so the stick can turn it.
                 endSwing()
                 velocity.x = min(max(velocity.x, -airSpeedMax), airSpeedMax)
-                velocity.y = min(velocity.y, spec.fullHopVelocity)
+                velocity.y = min(velocity.y, fullHopVelocity)
                 enter(.air)
             }
 
@@ -1349,7 +1356,7 @@ public struct Player: Equatable {
             }
             if jumpPressed {
                 jumpBuffer = 0
-                velocity = Vec2(x: velocity.x, y: spec.fullHopVelocity)
+                velocity = Vec2(x: velocity.x, y: fullHopVelocity)
                 jumpsLeft = spec.jumps - 1
                 tornadoCooldown = TornadoRules.jumpOutCooldownFrames
                 events.append(.jumped(player: index))
@@ -1831,7 +1838,7 @@ public struct Player: Equatable {
         jumpBuffer = 0
         jumpsLeft = max(jumpsLeft, spec.jumps - 1)
         platformArmed = true
-        velocity = Vec2(x: spec.wallJumpHorizontal * -wall.sign, y: spec.wallJumpVertical)
+        velocity = Vec2(x: wallJumpHorizontal * -wall.sign, y: wallJumpVertical)
         facing = wall.flipped
         fastFalling = false
         wallLandCooldown = spec.wallLandCooldownFrames
@@ -1910,7 +1917,7 @@ public struct Player: Equatable {
         jumpBuffer = 0
         platformArmed = true
         // Jumper Juice's third jump is the last one left of three, lower.
-        velocity.y = spec.jumps >= 3 && jumpsLeft == 1 ? spec.thirdJumpVelocity : spec.doubleJumpVelocity
+        velocity.y = spec.jumps >= 3 && jumpsLeft == 1 ? thirdJumpVelocity : doubleJumpVelocity
         if power == .frostTea, powerLevel >= 2 { wanted = .leaveClone }
         if input.stick.x != 0 {
             velocity.x = input.stick.x * airSpeedMax

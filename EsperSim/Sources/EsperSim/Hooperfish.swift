@@ -76,7 +76,7 @@ public enum HooperfishRules {
     public static let waitFrames = 120
     /// It sways this far up and down, this many times a crossing, kept between its lowest and highest.
     public static let swayHeight = 30.0
-    public static let swaysPerCrossing = 2.5
+    public static let swaysPerCrossing = 1.25
     /// Its bottom no lower than the twelfth row from the top (row 7 from the floor's), and no
     /// higher than its three rows of height fit under the stage's top.
     public static let lowest = 7 * Stage.tileSize

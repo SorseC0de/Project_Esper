@@ -61,7 +61,8 @@ enum WetshotArt {
     static let antennaPivot = CGPoint(x: 43, y: 29)
 
     /// Its swimming: the body breathing between 0.9 and 1.1, the fins swinging 10 degrees either
-    /// way (the front one 15; the top one clockwise as the other two go counter-clockwise), and the antenna, and
+    /// way: the top one out to 10 clockwise and back, the tail one counter-clockwise, the front one
+    /// the whole arc, 15 either way; and the antenna, and
     /// the rim with it, nodding 0 to 5 degrees counter-clockwise; still while someone dunks.
     static let breathSeconds = 2.0
     static let finSeconds = 1.5
@@ -93,9 +94,12 @@ enum WetshotArt {
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
               let data = context.data?.bindMemory(to: UInt8.self, capacity: width * height * 4) else { return picture("HooperfishBody") }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        for pixel in 0..<(width * height) where data[pixel * 4 + 3] == 255 {
-            let colour = RGB(data[pixel * 4]) << 16 | RGB(data[pixel * 4 + 1]) << 8 | RGB(data[pixel * 4 + 2])
-            if glowing.contains(colour) { for channel in 0..<4 { data[pixel * 4 + channel] = 0 } }
+        // Near enough each colour, as drawing the picture can shift a channel a step or two.
+        for pixel in 0..<(width * height) where data[pixel * 4 + 3] > 0 {
+            let close = glowing.contains { colour in
+                (0..<3).allSatisfy { channel in abs(Int(data[pixel * 4 + channel]) - Int((colour >> RGB(16 - channel * 8)) & 0xFF)) <= 6 }
+            }
+            if close { for channel in 0..<4 { data[pixel * 4 + channel] = 0 } }
         }
         guard let masked = context.makeImage() else { return picture("HooperfishBody") }
         let texture = SKTexture(cgImage: masked)
@@ -106,11 +110,14 @@ enum WetshotArt {
     static func animate(_ fish: SKNode?, at time: Double, dunkedOn: Bool) {
         guard let fish else { return }
         let fin = finSwing * CGFloat(sin(time / finSeconds * 2 * .pi))
+        let oneWay = finSwing * CGFloat(0.5 - 0.5 * cos(time / finSeconds * 2 * .pi))
         for case let part as SKSpriteNode in fish.children {
             switch part.name {
             case "HooperfishBody": part.setScale(CGFloat(1 + 0.1 * sin(time / breathSeconds * 2 * .pi)))
-            case "HooperfishTopfin": part.zRotation = -fin
-            case "HooperfishTailfin": part.zRotation = fin
+            // The top fin out to 10 degrees clockwise and back, the tail fin counter-clockwise; the
+            // front fin the whole arc, 15 either way.
+            case "HooperfishTopfin": part.zRotation = -oneWay
+            case "HooperfishTailfin": part.zRotation = oneWay
             case "HooperfishFrontfin": part.zRotation = fin / finSwing * frontFinSwing
             case "HooperfishAntenna": part.zRotation = antennaTurn(at: time, dunkedOn: dunkedOn)
             default: break

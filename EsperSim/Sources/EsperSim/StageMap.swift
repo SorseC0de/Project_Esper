@@ -321,7 +321,7 @@ public enum WetshotRules {
     public static let rimPixelsUp = 24
     /// Where the ball hangs on the antenna before it's taken, the same way, whole art pixels from
     /// the Hooperfish's bottom left: on the BALL X and BALL Y sliders while it's tuned, offline.
-    nonisolated(unsafe) public static var ballPixelsAcross = 15
+    nonisolated(unsafe) public static var ballPixelsAcross = 24
     nonisolated(unsafe) public static var ballPixelsUp = 24
     public static var rimFromHooperfish: Vec2 { Vec2(x: Double(rimPixelsAcross) / 1.6, y: Double(rimPixelsUp) / 1.6) }
 }

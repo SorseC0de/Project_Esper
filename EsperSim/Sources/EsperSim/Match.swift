@@ -233,6 +233,10 @@ public struct Match: Equatable {
             players[holder].hasBall = true
             ball.holder = holder
             ball.position = players[holder].heldBallPoint
+        } else if hooperfish != nil {
+            // In neutral on Wetshot Wake is back on the Hooperfish's antenna.
+            hooperfish?.carrying = .ball
+            placeHooperfishLoad()
         }
         countdown = countdownLength
     }

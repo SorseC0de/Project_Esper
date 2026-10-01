@@ -68,7 +68,7 @@ final class WetshotTests: XCTestCase {
 
     func testAHandTakesTheBallOffTheAntenna() {
         var match = wetshot()
-        match.players[0].position = match.hooperfish!.antenna - Vec2(x: 0, y: 10)
+        match.players[0].position = match.hooperfish!.ballPoint - Vec2(x: 0, y: 10)
         // Facing the way it swims, so the ball comes to the hands.
         match.players[0].facing = .left
         match.players[0].grounded = false
@@ -117,14 +117,15 @@ final class WetshotTests: XCTestCase {
         XCTAssertEqual(match.hooperfish!.carrying, .hoop, "from then on")
     }
 
-    func testUnderWaterGravityAndTheGroundsSpeedsAreHalvedButNotTheAirs() {
+    func testUnderWaterGravityTheJumpsAndEverySpeedAreHalved() {
         var dry = Player(spec: .starting, index: 0, position: Vec2(x: 100, y: 10), facing: .right)
         var wet = dry
         wet.underwater = true
         XCTAssertEqual(wet.gravity, dry.gravity / 2)
         XCTAssertEqual(wet.runSpeed, dry.runSpeed / 2)
         XCTAssertEqual(wet.walkMaxSpeed, dry.walkMaxSpeed / 2)
-        XCTAssertEqual(wet.airSpeedMax, dry.airSpeedMax)
+        XCTAssertEqual(wet.airSpeedMax, dry.airSpeedMax / 2)
+        XCTAssertEqual(wet.fullHopVelocity, dry.fullHopVelocity / 2)
         XCTAssertEqual(wet.fallSpeed, dry.fallSpeed / 2)
         var match = wetshot()
         match.players[0].enter(.idle)
@@ -157,5 +158,15 @@ final class DeciderTests: XCTestCase {
         XCTAssertEqual(match.scores, [1, 1])
         XCTAssertNil(match.ball.holder, "level: the decider from neutral")
         XCTAssertEqual(match.ball.position.x, match.stage.ballSpawn.x, "loose where it starts")
+    }
+
+    func testOnWetshotWakeTheDecidersBallGoesBackOnTheHooperfish() {
+        var match = Match(stage: .wetshot)
+        match.hooperfish!.carrying = .hoop
+        match.scores = [1, 1]
+        match.restart(ballTo: nil)
+        XCTAssertEqual(match.hooperfish!.carrying, .ball)
+        XCTAssertNil(match.ball.holder)
+        XCTAssertEqual(match.ball.position, match.hooperfish!.ballPoint)
     }
 }

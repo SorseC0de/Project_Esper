@@ -334,6 +334,50 @@ final class GameScene: SKScene {
         return bodies
     }
 
+    /// 47 on a stage whose rim swims: while the local player aims a shot, a short stretch of the
+    /// three-point line round wherever the rim is, toward them, 5 tiles long and 2 pixels thick,
+    /// fading in and out along its length in their energy.
+    private var swimmingThreeLine: [SKSpriteNode] = []
+    private static let swimmingThreeSegments = 20
+    private static let swimmingThreeLength: CGFloat = 80
+
+    private func drawSwimmingThreeLine() {
+        if swimmingThreeLine.isEmpty {
+            swimmingThreeLine = (0..<GameScene.swimmingThreeSegments).map { _ in
+                let segment = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
+                segment.colorBlendFactor = 1
+                segment.zPosition = 22
+                segment.isHidden = true
+                world.addChild(segment)
+                return segment
+            }
+        }
+        let hoop = match.stage.hoops.first
+        let aiming = match.players.indices.contains(localIndex) && match.players[localIndex].state == .shootStance
+        guard gameMode == .fortySeven, aiming, let hoop, hoop.shared, hoop.position != HighwayRules.parked else {
+            swimmingThreeLine.forEach { $0.isHidden = true }
+            return
+        }
+        let rim = SpriteLibrary.point(hoop.position)
+        let radius = CGFloat(FortySevenRules.threePointRadius(for: hoop, on: match.stage) * SpriteLibrary.pixelsPerUnit)
+        let chest = SpriteLibrary.point(match.players[localIndex].chest)
+        let toward = atan2(chest.y - rim.y, chest.x - rim.x)
+        let half = GameScene.swimmingThreeLength / 2 / radius
+        let count = CGFloat(swimmingThreeLine.count)
+        let colour = SKColor(rgb: sprites.look(for: localIndex).glow)
+        for (index, segment) in swimmingThreeLine.enumerated() {
+            let share = (CGFloat(index) + 0.5) / count
+            let angle = toward - half + share * half * 2
+            segment.isHidden = false
+            segment.color = colour
+            segment.size = CGSize(width: 2, height: GameScene.swimmingThreeLength / count + 0.5)
+            segment.position = CGPoint(x: rim.x + radius * cos(angle), y: rim.y + radius * sin(angle))
+            segment.zRotation = angle
+            // Clear at both ends, the energy's colour in the middle.
+            segment.alpha = sin(.pi * share)
+        }
+    }
+
     /// How the Hooperfish's antenna nods this frame, as a turn of a world point about where it
     /// meets the body, mirrored as the fish faces; none off Wetshot Wake or with no fish.
     private func hooperfishNod(_ hoop: Int) -> (angle: CGFloat, turn: (CGPoint) -> CGPoint) {
@@ -958,11 +1002,12 @@ final class GameScene: SKScene {
         elementsArt = nil
         wetshotArt = nil
         fallingIcicles = [:]
+        // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
+        tornadoOverlays.removeAllChildren()
         if isWetshot {
             wetshotArt = WetshotArt.build(stage: stage, map: StageMap.current[.wetshot], into: stageGround)
         }
         if isElements {
-            tornadoOverlays.removeAllChildren()
             elementsArt = ElementsArt.build(stage: stage, map: StageMap.current[.elements], into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
         }
         refreshStaticFlats()
@@ -1920,7 +1965,7 @@ final class GameScene: SKScene {
             }
         }
         if series.stage.stage.features.look == .wetshot, online == nil {
-            controls.addSlider(title: "WATER TINT", range: 0...0.6, notch: 0.05, value: Float(WaterTuning.overlayAlpha)) { WaterTuning.overlayAlpha = CGFloat($0) }
+            controls.addSlider(title: "WATER TINT", range: 0...1, notch: 0.01, value: Float(WaterTuning.overlayAlpha)) { WaterTuning.overlayAlpha = CGFloat($0) }
             controls.addSlider(title: "WATER SWAY", range: 0...4, notch: 0.25, value: Float(WaterTuning.swayPixels)) { WaterTuning.swayPixels = Double($0) }
             // The rim's place across the Hooperfish, a whole art pixel at a time.
             // Where the ball hangs on the antenna, a whole art pixel at a time.
@@ -5252,6 +5297,7 @@ final class GameScene: SKScene {
         placeBallCamFrame()
         circlesOverCam.isHidden = !ballCamEnabled
         // 47's lines breathe, slowly, between gone and a quarter.
+        drawSwimmingThreeLine()
         if !threePointArcs.isHidden {
             let breath = CGFloat(0.5 - 0.5 * cos(CACurrentMediaTime() / ThreePointTuning.breathSeconds * 2 * .pi))
             for arc in threePointArcSides { arc.node.alpha = ThreePointTuning.breathMax * breath }

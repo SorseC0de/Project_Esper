@@ -86,6 +86,8 @@ public enum FortySevenRules {
     public static let fallbackRadius = 90.0
 
     public static func threePointRadius(for hoop: Hoop, on stage: Stage) -> Double {
+        // A rim that swims has no ledge to measure from: the plain radius round wherever it is.
+        if hoop.shared { return fallbackRadius }
         var nearest: Double?
         for column in 0..<stage.columns {
             guard (0..<stage.rows).contains(where: { stage.tile(column: column, row: $0) == .oneWay }) else { continue }

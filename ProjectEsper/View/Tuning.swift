@@ -151,6 +151,15 @@ enum ChevronTuning {
     static let slider = false
 }
 
+/// Wetshot Wake's water: the tint over everything (WATER TINT), and the screen's sway (WATER
+/// SWAY), its reach in game pixels, waves down the screen and speed, on the debug panel there.
+enum WaterTuning {
+    nonisolated(unsafe) static var overlayAlpha: CGFloat = 0.25
+    nonisolated(unsafe) static var swayPixels = 1.0
+    static let swayWaves = 3.0
+    static let swaySpeed = 1.5
+}
+
 /// The Elements' rain: how many streaks, 0.5 unless moved, from none to four times as many as at 1 (RAIN DENSITY on
 /// the debug panel there, kept between launches).
 enum RainTuning {

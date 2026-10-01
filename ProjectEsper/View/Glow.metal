@@ -14,6 +14,8 @@ struct GlowUniforms {
     float4 tint;
     // A colour that never glows, the stage's flat background, where its alpha is 1.
     float4 unglowed;
+    // The screen's sway: x its reach across in uv, y waves down the screen, z its phase; none at 0.
+    float4 wave;
 };
 
 struct FullScreen {
@@ -71,8 +73,11 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
                               texture2d<float> glow [[texture(1)]],
                               sampler linear [[sampler(0)]],
                               constant GlowUniforms &u [[buffer(0)]]) {
-    float4 color = scene.sample(linear, in.uv);
-    float3 bloom = glow.sample(linear, in.uv).rgb * u.tint.rgb * u.intensity;
+    // Under water each row sways a little side to side.
+    float2 uv = in.uv;
+    uv.x += u.wave.x * sin(uv.y * u.wave.y * 6.2831853 + u.wave.z);
+    float4 color = scene.sample(linear, uv);
+    float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
     return float4(color.rgb + bloom, 1);
 }
 

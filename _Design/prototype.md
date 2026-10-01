@@ -1138,7 +1138,9 @@ rest together), wobbling a pixel or three side to side and fading over two to fo
 One group at a time, six to twelve seconds after the last has gone, one to three jellyfish (cell 5) drift across from one side of the
 screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds.
 Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
-at its top at 10%.
+at its top, at 25% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
+game pixel side to side in three waves down the screen (WATER SWAY), in the glow's composite
+(`GameScene.screenWave`), but not in the map maker. The floor's fill doesn't glow either.
 
 ## Sky Net
 

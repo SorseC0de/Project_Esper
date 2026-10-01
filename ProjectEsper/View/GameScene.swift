@@ -334,6 +334,14 @@ final class GameScene: SKScene {
         return bodies
     }
 
+    /// Wetshot Wake's sway over the whole screen, but not in the map maker: its reach in the
+    /// drawable's pixels, how many waves down the screen, and where it is in them.
+    var screenWave: (reach: Double, waves: Double, phase: Double)? {
+        guard match.stage.features.look == .wetshot, !wholeStageView else { return nil }
+        let pixelsPerGamePixel = Double(displayScale / cameraNode.xScale)
+        return (WaterTuning.swayPixels * pixelsPerGamePixel, WaterTuning.swayWaves, CACurrentMediaTime() * WaterTuning.swaySpeed)
+    }
+
     /// The Elements' flat background, which never glows; nil elsewhere.
     var unglowedBackground: SKColor? { [StageLook.elements, .wetshot].contains(match.stage.features.look) ? backgroundColor : nil }
 
@@ -1485,7 +1493,6 @@ final class GameScene: SKScene {
     /// The water over everything in the world, under the HUD: palette 18 at the bottom of the
     /// screen to 19 at the top, faint, so the play stays clear.
     private let waterOverlay = SKSpriteNode()
-    private static let waterOverlayAlpha: CGFloat = 0.1
     private static let waterGradient: SKTexture = {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -1545,11 +1552,11 @@ final class GameScene: SKScene {
         let halfWidth = size.width * cameraNode.xScale / 2, halfHeight = size.height * cameraNode.yScale / 2
         if waterOverlay.parent == nil {
             waterOverlay.texture = GameScene.waterGradient
-            waterOverlay.alpha = GameScene.waterOverlayAlpha
             waterOverlay.zPosition = 95
             world.addChild(waterOverlay)
         }
         waterOverlay.isHidden = !wet
+        waterOverlay.alpha = WaterTuning.overlayAlpha
         waterOverlay.size = CGSize(width: halfWidth * 2, height: halfHeight * 2)
         waterOverlay.position = cameraNode.position
         let step = GameScene.stepSeconds
@@ -1864,6 +1871,8 @@ final class GameScene: SKScene {
             }
         }
         if series.stage.stage.features.look == .wetshot, online == nil {
+            controls.addSlider(title: "WATER TINT", range: 0...0.6, notch: 0.05, value: Float(WaterTuning.overlayAlpha)) { WaterTuning.overlayAlpha = CGFloat($0) }
+            controls.addSlider(title: "WATER SWAY", range: 0...4, notch: 0.25, value: Float(WaterTuning.swayPixels)) { WaterTuning.swayPixels = Double($0) }
             // The rim's place across the Hooperfish, a whole art pixel at a time.
             controls.addSlider(title: "HOOP X", range: 0...96, notch: 1, value: Float(WetshotRules.rimPixelsAcross)) { [weak self] value in
                 let pixels = Int(value.rounded())

@@ -20,6 +20,15 @@ enum WetshotArt {
     }
 
     static let background = picture("WetshotBackground")
+    /// A white square to colour, for fills the glow's mask must see.
+    private static let flat: SKTexture = {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return SKTexture(image: UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4), format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        })
+    }()
     private static let rocks = picture("WetshotRocks")
 
     /// A prop's picture: a plant whole, a rock its half of the rocks sheet (the first the top),
@@ -112,7 +121,11 @@ enum WetshotArt {
         parent.addChild(back)
         // The floor's row under it, and a bigger screen's spare below that, in the floor's colour.
         let spare = tileSide * 16
-        let below = SKSpriteNode(color: SKColor(rgb: floorColour), size: CGSize(width: width + spare * 2, height: spare + tileSide * CGFloat(WetshotArt.floorRows)))
+        // Textured, so the glow's mask can mark it as not glowing.
+        let below = SKSpriteNode(texture: flat)
+        below.color = SKColor(rgb: floorColour)
+        below.colorBlendFactor = 1
+        below.size = CGSize(width: width + spare * 2, height: spare + tileSide * CGFloat(WetshotArt.floorRows))
         below.anchorPoint = .zero
         below.position = CGPoint(x: -spare, y: -spare)
         below.zPosition = -20

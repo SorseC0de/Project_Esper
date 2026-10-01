@@ -41,7 +41,7 @@ enum WetshotArt {
 
     /// The Hooperfish's parts back to front, each over the last, and how high each sits.
     static let hooperfishParts: [(name: String, z: CGFloat)] = [
-        ("HooperfishTopfin", 5.1), ("HooperfishTailfin", 5.2), ("HooperfishBody", 5.3), ("HooperfishFrontfin", 5.4),
+        ("HooperfishTopfin", 5.1), ("HooperfishTailfin", 5.2), ("HooperfishBody", 5.3), ("HooperfishAntenna", 5.35), ("HooperfishFrontfin", 5.4),
     ]
 
     /// What's drawn for the map's props, to be redrawn when the map maker moves them.

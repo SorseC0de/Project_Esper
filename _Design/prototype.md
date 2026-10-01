@@ -1116,7 +1116,7 @@ Hooperfish over the middle). Drawn: `Background.png` (480 by 272, `WetshotBackgr
 stage, the water's top colour (palette 19) behind and its floor's (16) below for a bigger screen;
 then the map's props (`StageMap.Prop`, placed by their bottom left cell): `Plant 1` to `5`, the
 two halves of `Rocks.png` (the top one first), and the Hooperfish, assembled back to front from
-`topfin`, `tailfin`, `body` and `frontfin` with `hoop_straight` over its leftmost 48 pixels, 10
+`topfin`, `tailfin`, `body`, `antenna` and `frontfin` with `hoop_straight` over its leftmost 48 pixels, 10
 up. None of it glows, nor the background colour. The props come in through the importer's
 `ROOT_IMAGES`.
 

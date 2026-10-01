@@ -46,6 +46,7 @@ ROOT_IMAGES = {
     "WetshotRocks": ["Stages/Wetshot Wake/Rocks.png"],
     "HooperfishBody": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_body.png"],
     "HooperfishFrontfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_frontfin.png"],
+    "HooperfishAntenna": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_antenna.png"],
     "HooperfishTailfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_tailfin.png"],
     "HooperfishTopfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_topfin.png"],
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],

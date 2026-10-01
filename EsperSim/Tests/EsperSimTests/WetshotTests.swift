@@ -134,3 +134,28 @@ final class WetshotTests: XCTestCase {
         XCTAssertTrue(Stage.wetshot.features.underwater)
     }
 }
+
+final class DeciderTests: XCTestCase {
+    /// A point that levels the stage's best of three puts the ball in neutral for the decider;
+    /// any other point gives it to whoever was scored on.
+    func testTheDeciderStartsWithTheBallInNeutral() {
+        var match = Match()
+        match.countdown = 0
+        func score(_ match: inout Match, owner: Int) {
+            let hoop = match.stage.hoops.firstIndex { $0.owner == owner }!
+            let rim = match.stage.hoops[hoop].position
+            match.ball.respawn(at: rim + Vec2(x: 0, y: 6))
+            match.ball.velocity = Vec2(x: 0, y: -2)
+            match.ball.scoring = true
+            match.ball.lastTouched = owner
+            for _ in 0..<40 { match.advance(inputs: [.idle, .idle]) }
+        }
+        score(&match, owner: 0)
+        XCTAssertEqual(match.scores, [1, 0])
+        XCTAssertEqual(match.ball.holder, 1, "to whoever was scored on")
+        score(&match, owner: 1)
+        XCTAssertEqual(match.scores, [1, 1])
+        XCTAssertNil(match.ball.holder, "level: the decider from neutral")
+        XCTAssertEqual(match.ball.position.x, match.stage.ballSpawn.x, "loose where it starts")
+    }
+}

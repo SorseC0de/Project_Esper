@@ -524,8 +524,11 @@ drinks kept.
 
 The stage select comes before the first round and after each stage's best of three:
 the first to two points on a stage (`Series.pointsPerStage`) ends it, and unless the
-series is over both go to the select before the drink. Rectangles in a row, The Wreck
-Center, Longball Stadium and Slamstill Traffic (`StageChoice`), the one under a cursor
+series is over both go to the select before the drink. A stage that goes to its third point
+starts that decider with the ball in neutral, loose where it starts, rather than in the hands of
+whoever was just scored on (`Match.restartBallTo` nil when a point levels it, protocol 55).
+Rectangles in a row, the stages not parked (`StageChoice.selectable`: The Wreck Center, Longball
+Stadium, The Elements, Sky Net and Wetshot Wake), the one under a cursor
 grown, and in its bottom-right corner a circle in the voter's colour, a ring while they
 look and filled once they've picked. Two picks the same go there; two different flip a
 coin on the series' dice, the light going back and forth for a second and a half before

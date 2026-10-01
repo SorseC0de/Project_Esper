@@ -42,11 +42,11 @@ public struct Match: Equatable {
     public var countdown: Int
     public let countdownLength: Int
     /// A point waiting to restart, after a dunk: frames left with the dunker on the rim,
-    /// and whose hands the ball then goes to.
+    /// and whose hands the ball then goes to, nobody's for a decider, in neutral.
     public var restartIn = 0
+    public var restartBallTo: Int? = 0
     /// Frames left of hit-stop: while it runs the match is held, nothing moves or counts down.
     public var hitStop = 0
-    public var restartBallTo = 0
     /// What happened on the last `advance`.
     public var events: [MatchEvent] = []
     /// The winning bucket's been made: no inputs and no catches from here, set by the
@@ -172,18 +172,21 @@ public struct Match: Equatable {
                     ball.owned = false
                 } else {
                     scores[owner] += 1
+                    // Level after a point, the next is the stage's decider: it starts from the ball in
+                    // neutral rather than in the hands of whoever was just scored on.
+                    let tiedDecider = scores[0] == scores[1]
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1, floater: ball.floaterShot))
                     holdHitStop(HitStopRules.shotFrames)
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking }) {
                             // A dunk: the dunker hangs on the rim a beat, the ball dead, then the restart.
                             restartIn = BallRules.dunkHangFrames
-                            restartBallTo = other
+                            restartBallTo = tiedDecider ? nil : other
                             ball.respawnTimer = BallRules.dunkHangFrames + 5
                         } else {
                             // The point restarts once the hit-stop's held the ball in the net.
                             restartIn = 1
-                            restartBallTo = other
+                            restartBallTo = tiedDecider ? nil : other
                         }
                     }
                     return
@@ -209,8 +212,8 @@ public struct Match: Equatable {
     }
 
     /// After a point: everyone back to their spawn as they began, the ball in `holder`'s
-    /// hands, any slab gone, and the count again.
-    public mutating func restart(ballTo holder: Int) {
+    /// hands, or loose where it starts with no holder (in neutral), any slab gone, and the count again.
+    public mutating func restart(ballTo holder: Int?) {
         for index in players.indices {
             let was = players[index]
             players[index] = Player(spec: was.spec, index: index, position: spawnPoint(index), facing: stage.playerFacings[index])
@@ -226,9 +229,11 @@ public struct Match: Equatable {
         helmets = []
         helmetClock = 0
         ball.respawn(at: stage.ballSpawn)
-        players[holder].hasBall = true
-        ball.holder = holder
-        ball.position = players[holder].heldBallPoint
+        if let holder {
+            players[holder].hasBall = true
+            ball.holder = holder
+            ball.position = players[holder].heldBallPoint
+        }
         countdown = countdownLength
     }
 

@@ -25,7 +25,7 @@ final class ElementsTests: XCTestCase {
     }
 
     func testTheDefaultMapMirrorsAboutTheMiddleAndTheBallStartsDeadCentre() {
-        let map = ElementsMap.baked
+        let map = StageMap.baked(.elements)
         let last = ElementsRules.columns - 1
         // Everything but the ceiling and the middle platform the ball starts on.
         let sides = map.tiles.filter { $0.cell.row != ElementsRules.rows - 1 && !((28...38).contains($0.cell.column) && (12...15).contains($0.cell.row)) }
@@ -44,8 +44,8 @@ final class ElementsTests: XCTestCase {
 
     func testTheRightSideUsesTheOppositeTilesOfTheLeft() {
         // A slope's left tile on the left is its right tile on the right, across the middle.
-        let map = ElementsMap.baked
-        func art(_ column: Int, _ row: Int) -> ElementsMap.Cell? { map.tiles.first { $0.cell == .init(column, row) }?.art }
+        let map = StageMap.baked(.elements)
+        func art(_ column: Int, _ row: Int) -> StageMap.Cell? { map.tiles.first { $0.cell == .init(column, row) }?.art }
         XCTAssertEqual(art(18, 15), .init(6, 5))
         XCTAssertEqual(art(48, 15), .init(7, 5))
         XCTAssertEqual(art(2, 9), .init(7, 3))
@@ -53,12 +53,12 @@ final class ElementsTests: XCTestCase {
     }
 
     func testDecorationTilesArentSolid() {
-        var map = ElementsMap.baked
+        var map = StageMap.baked(.elements)
         map.tiles.append(.init(.init(30, 20), art: .init(2, 0)))
         map.tiles.append(.init(.init(31, 20), art: .init(2, 2)))
-        map.walls = ElementsMap.derivedWalls(from: map.tiles)
-        ElementsMap.current = map
-        defer { ElementsMap.current = ElementsMap.baked }
+        map.walls = StageMap.derivedWalls(from: map.tiles)
+        StageMap.current[.elements] = map
+        defer { StageMap.current[.elements] = StageMap.baked(.elements) }
         let stage = Stage.elements
         XCTAssertEqual(stage.tile(column: 30, row: 20), .empty)
         XCTAssertEqual(stage.tile(column: 31, row: 20), .solid)
@@ -97,34 +97,34 @@ final class ElementsTests: XCTestCase {
     }
 
     func testTornadosAreKeptWholeOnTheStageAndReadFromAMapWithout() throws {
-        var map = ElementsMap.baked
+        var map = StageMap.baked(.elements)
         map.tornados = [.init(30, 4), .init(50, 4)]
-        XCTAssertEqual(try JSONDecoder().decode(ElementsMap.self, from: JSONEncoder().encode(map)), map)
-        XCTAssertTrue(map.swiftSource.contains("tornados: [Cell(30, 4), Cell(50, 4)]"))
+        XCTAssertEqual(try JSONDecoder().decode(StageMap.self, from: JSONEncoder().encode(map)), map)
+        XCTAssertTrue(map.swiftSource(.elements).contains("tornados: [Cell(30, 4), Cell(50, 4)]"))
         // A map kept before tornados were in it has none.
         var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(map)) as! [String: Any]
         json["tornados"] = nil
-        let old = try JSONDecoder().decode(ElementsMap.self, from: JSONSerialization.data(withJSONObject: json))
+        let old = try JSONDecoder().decode(StageMap.self, from: JSONSerialization.data(withJSONObject: json))
         XCTAssertEqual(old.tornados, [])
         // Moved in until the whole sprite fits: three across, three up.
-        XCTAssertEqual(ElementsMap.fittingTornado(.init(0, 40)), .init(1, ElementsRules.rows - 3))
-        XCTAssertEqual(ElementsMap.fittingTornado(.init(ElementsRules.columns - 1, -3)), .init(ElementsRules.columns - 2, 0))
-        let span = ElementsMap.tornadoCells(.init(10, 5))
+        XCTAssertEqual(StageMap.fittingTornado(.init(0, 40)), .init(1, ElementsRules.rows - 3))
+        XCTAssertEqual(StageMap.fittingTornado(.init(ElementsRules.columns - 1, -3)), .init(ElementsRules.columns - 2, 0))
+        let span = StageMap.tornadoCells(.init(10, 5))
         XCTAssertEqual(span.columns, 9...11)
         XCTAssertEqual(span.rows, 5...7)
     }
 
-    private func withWalls(_ walls: [ElementsMap.Wall], _ body: (Stage) -> Void) {
-        var map = ElementsMap.baked
+    private func withWalls(_ walls: [StageMap.Wall], _ body: (Stage) -> Void) {
+        var map = StageMap.baked(.elements)
         map.tiles = []
         map.walls = walls
-        ElementsMap.current = map
-        defer { ElementsMap.current = ElementsMap.baked }
+        StageMap.current[.elements] = map
+        defer { StageMap.current[.elements] = StageMap.baked(.elements) }
         body(Stage.elements)
     }
 
     func testTheWallsAreBlocksAndSlopesApartFromTheArt() {
-        let cells: [ElementsMap.Wall] = [.init(.init(10, 10), .solid), .init(.init(11, 10), .lowerRight), .init(.init(12, 10), .lowerLeft),
+        let cells: [StageMap.Wall] = [.init(.init(10, 10), .solid), .init(.init(11, 10), .lowerRight), .init(.init(12, 10), .lowerLeft),
                                          .init(.init(13, 10), .upperRight), .init(.init(14, 10), .upperLeft)]
         withWalls(cells) { stage in
             XCTAssertEqual(stage.tile(column: 10, row: 10), .solid)
@@ -133,7 +133,7 @@ final class ElementsTests: XCTestCase {
             XCTAssertEqual(stage.slopes, stage.fixedSlopes)
         }
         // A map with no walls of its own has a block under each solid tile, and none under decoration.
-        let map = ElementsMap(tiles: [.init(.init(1, 1), art: .init(2, 2)), .init(.init(2, 1), art: .init(2, 0))],
+        let map = StageMap(tiles: [.init(.init(1, 1), art: .init(2, 2)), .init(.init(2, 1), art: .init(2, 0))],
                               leftRim: .init(2, 16), rightRim: .init(64, 16), spawns: [.init(5, 10), .init(61, 10)], ball: .init(33, 18))
         XCTAssertEqual(map.walls, [.init(.init(1, 1), .solid)])
     }
@@ -173,16 +173,16 @@ final class ElementsTests: XCTestCase {
     /// floor, or with `floor` off only the slopes, so they end over open air. The first player
     /// stands on the top one facing right, in a slide.
     private func slideDown(floor: Bool = true, facing: Facing = .right, rising: Bool = false) -> Match {
-        var walls: [ElementsMap.Wall] = (0..<8).map { i in
+        var walls: [StageMap.Wall] = (0..<8).map { i in
             rising ? .init(.init(20 + i, 5 + i), .lowerRight) : .init(.init(20 + i, 12 - i), .lowerLeft)
         }
         if floor { walls += (0..<60).map { .init(.init($0, 4), .solid) } }
-        var map = ElementsMap.baked
+        var map = StageMap.baked(.elements)
         map.tiles = []
         map.walls = walls
-        ElementsMap.current = map
+        StageMap.current[.elements] = map
         var match = Match(stage: .elements, specs: [.starting, .starting])
-        ElementsMap.current = ElementsMap.baked
+        StageMap.current[.elements] = StageMap.baked(.elements)
         match.countdown = 0
         match.players[0].position = rising ? Vec2(x: 205, y: 55) : Vec2(x: 205, y: 125)
         match.players[0].facing = facing
@@ -250,8 +250,8 @@ final class ElementsTests: XCTestCase {
     }
 
     func testTheMapRoundTripsThroughItsSource() {
-        XCTAssertTrue(ElementsMap.baked.swiftSource.contains("Placed(Cell(2, 9), art: Cell(7, 3))"))
-        let data = try! JSONEncoder().encode(ElementsMap.baked)
-        XCTAssertEqual(try! JSONDecoder().decode(ElementsMap.self, from: data), ElementsMap.baked)
+        XCTAssertTrue(StageMap.baked(.elements).swiftSource(.elements).contains("Placed(Cell(2, 9), art: Cell(7, 3))"))
+        let data = try! JSONEncoder().encode(StageMap.baked(.elements))
+        XCTAssertEqual(try! JSONDecoder().decode(StageMap.self, from: data), StageMap.baked(.elements))
     }
 }

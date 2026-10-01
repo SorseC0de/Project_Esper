@@ -800,6 +800,8 @@ its length.
 
 ## Highway Traffic
 
+Parked: off the stage select (`StageChoice.selectable`), its code kept.
+
 `Stage.highway`, Slamstill Traffic on the stage select. The court's 34 by 16,
 flat: a dark blue night, and a road where the field's grass is, the floor an invisible
 strip through its middle. Each player starts where the court has them, the ball loose at
@@ -971,12 +973,12 @@ by 16 cell of `tileset_elements` (`Pixel Art/Stages/Elements`; the importer's `S
 `ROOT_IMAGES`; the ceiling is lined with `icicle_empty` sockets, 32 across and side by side, and
 `tornado` (eight 48 by 48 frames, twelve a second) is a whole sprite the map maker places, three
 tiles across and three up from the cell its base's middle is in (see the tornados below); re-run the importer after changing the sheet, which can be any number of cells
-across and down, its drawn cells read off it, though `ElementsMap.decoration` and a saved map
+across and down, its drawn cells read off it, though `StageMap.decoration` and a saved map
 name cells by place, so tiles are added at the end or in the empty cells). The sides and the floor are the world's edge. Every tile of the map is solid,
-bar the tileset's flecks (`ElementsMap.decoration`), drawn but with nothing to stand on. Hoops
+bar the tileset's flecks (`StageMap.decoration`), drawn but with nothing to stand on. Hoops
 are the straight-on pair, the court's placements.
 
-The baked map (`ElementsMap.baked`, protocol 37, `bakedVersion` 4) is laid out by hand: the left side and the middle
+The baked map (`StageMap.baked`, protocol 37, `bakedVersion` 4) is laid out by hand: the left side and the middle
 platform the ball starts on drawn, the ceiling along the top, and the right side generated
 from the left, tile for tile, each the tile opposite it in its piece of the tileset (a slope's
 left tile for its right; the V's two halves swap). The middle platform is 11 across, columns 28
@@ -1071,7 +1073,7 @@ but Zeus Juice. None of it glows.
 
 Protocol 42.
 
-The map's walls (`ElementsMap.walls`) are kept apart from the art: by default a block under
+The map's walls (`StageMap.walls`) are kept apart from the art: by default a block under
 every solid tile, or as painted in the map maker's walls mode, each cell a block or a slope by
 where its solid half lies, the lower right or left (a floor slope, `Stage.fixedSlopes`) or the
 upper right or left (a ceiling slope, `Stage.ceilingSlopes`: solid above a diagonal, its flat top
@@ -1082,11 +1084,11 @@ The lava: whoever's feet go under its surface (`ElementsRules.lavaSurface`, 25 u
 back where they started, any ball they held back at the ball's start, and a loose ball in it
 too. For now (protocol 27).
 
-The map is `ElementsMap`: the placed tiles by cell, the two rims (backboard on the left and on
+The map is `StageMap`: the placed tiles by cell, the two rims (backboard on the left and on
 the right; build a rock block behind each), the two starts (the cell their feet stand at the
-bottom of) and the ball's. `ElementsMap.baked` is what every phone plays, online included; a
-map kept by the map maker stands in for it offline only (`SavedElementsMap`), unless a newer
-map has been baked since (`ElementsMap.bakedVersion`, up by one with each bake), when it's put
+bottom of) and the ball's. `StageMap.baked` is what every phone plays, online included; a
+map kept by the map maker stands in for it offline only (`SavedStageMap`), unless a newer
+map has been baked since (`StageMap.bakedVersion`, up by one with each bake), when it's put
 aside under `esper.elementsMap.beforeBake` and the baked one shows. The map maker
 (`MapEditor`, for a mouse; not on the TV) is the MAP picker on the debug panel, on this stage
 offline: the match held still, the camera zoomed out to the whole stage at once (as big as it fits, not by whole pixels; back to play's zoom on close), a grid over the stage, a small panel in the upper right corner
@@ -1096,13 +1098,47 @@ to paint; press a placed tile to pick it up and drop it elsewhere, or back on th
 it away. ERASE, TORNADO, the rims, P1, P2 and BALL are picked from the button rows and dropped the same
 way (press a marker to move it). UNDO steps back, RESET returns to the baked map, HIDE or
 PALETTE shows or hides the tileset, COPY puts the map on the clipboard as Swift for
-`ElementsMap.defaultMap`, and CLOSE restarts the round on the new map. Edits are kept between
+`StageMap.defaultMap`, and CLOSE restarts the round on the new map. Edits are kept between
 launches. WALLS puts it in walls mode (TILES to come back): the walls, apart from the art, drawn as
 transparent red over the stage, and the tool row is the wall kinds: SOLID, the four slopes by where
 their solid half lies (◢ ◣ ◥ ◤) and OPEN. Press a cell and drag to lay the chosen kind; pressing a
 cell that already has it opens it, and the stroke opens cells instead. In the tile mode a tile
 placed brings a solid wall with it where there's none, and one taken off takes a solid wall,
 never a painted slope.
+
+## Wetshot Wake
+
+`Stage.wetshot`, `StageChoice.wetshotWake`: 30 by 17 tiles, one court across, under water,
+laid out in the map maker like the Elements (`MapStage.wetshot`, `StageMap.current[.wetshot]`,
+kept offline under `esper.wetshotMap`; its first map a floor along the bottom row, the
+Hooperfish over the middle). Drawn: `Background.png` (480 by 272, `WetshotBackground`) over the
+stage, the water's top colour (palette 19) behind and its floor's (16) below for a bigger screen;
+then the map's props (`StageMap.Prop`, placed by their bottom left cell): `Plant 1` to `5`, the
+two halves of `Rocks.png` (the top one first), and the Hooperfish, assembled back to front from
+`topfin`, `tailfin`, `body` and `frontfin` with `hoop_straight` over its leftmost 48 pixels, 10
+up. None of it glows, nor the background colour. The props come in through the importer's
+`ROOT_IMAGES`.
+
+The Hooperfish carries the stage's one rim (`Hoop.shared`): both players score on it, the point
+to whoever put the ball through (`ball.lastTouched`), protocol 48. Its centre is 19 pixels across
+and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`); there's no
+backboard. There's only ever one Hooperfish. Each of its parts will be animated, to be detailed.
+
+The map maker here has the props in its panel in place of a tileset: pick one and press a cell
+to place it, or drag it on; press a placed one to pick it up, drop it on the panel to take it
+away, or ERASE it. The markers are P1, P2 and BALL. Walls are painted as on the Elements.
+
+Bubbles rise around the screen, three a second, a quarter of the time three to six together,
+each one of the first five cells of `bubbles_jellyfish` (cell 0 about as often as two of the
+rest together), wobbling a pixel or three side to side and fading over two to four seconds.
+Every six to twelve seconds one to three jellyfish (cell 5) drift across from one side of the
+screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds.
+Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
+at its top at 10%.
+
+## Sky Net
+
+`StageChoice.skyNet`, on the select: to be detailed; the court for now.
 
 ## Court
 

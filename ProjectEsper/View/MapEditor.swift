@@ -2,33 +2,34 @@ import EsperSim
 import Foundation
 import SpriteKit
 
-/// The Elements' map, as last kept between launches by the map maker; nil until it's used,
-/// and put aside (under `beforeBakeKey`, not deleted) when a newer map has been baked since.
-enum SavedElementsMap {
-    private static let key = "esper.elementsMap"
-    private static let versionKey = "esper.elementsMap.bakedVersion"
-    private static let beforeBakeKey = "esper.elementsMap.beforeBake"
+/// A hand-laid stage's map, as last kept between launches by the map maker; nil until it's
+/// used, and put aside (under its `beforeBake` key, not deleted) when a newer map has been
+/// baked since.
+enum SavedStageMap {
+    private static func key(_ stage: MapStage) -> String { stage == .elements ? "esper.elementsMap" : "esper.\(stage.rawValue)Map" }
+    private static func versionKey(_ stage: MapStage) -> String { key(stage) + ".bakedVersion" }
+    private static func beforeBakeKey(_ stage: MapStage) -> String { key(stage) + ".beforeBake" }
 
     /// A map kept against an older baked one is moved aside, once.
-    private static func putAsideIfStale() {
+    private static func putAsideIfStale(_ stage: MapStage) {
         let defaults = UserDefaults.standard
-        guard defaults.integer(forKey: versionKey) != ElementsMap.bakedVersion else { return }
-        if let data = defaults.data(forKey: key) { defaults.set(data, forKey: beforeBakeKey) }
-        defaults.removeObject(forKey: key)
-        defaults.set(ElementsMap.bakedVersion, forKey: versionKey)
+        guard defaults.integer(forKey: versionKey(stage)) != StageMap.bakedVersion(stage) else { return }
+        if let data = defaults.data(forKey: key(stage)) { defaults.set(data, forKey: beforeBakeKey(stage)) }
+        defaults.removeObject(forKey: key(stage))
+        defaults.set(StageMap.bakedVersion(stage), forKey: versionKey(stage))
     }
 
-    static var value: ElementsMap? {
-        putAsideIfStale()
-        return UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(ElementsMap.self, from: $0) }
+    static func value(_ stage: MapStage) -> StageMap? {
+        putAsideIfStale(stage)
+        return UserDefaults.standard.data(forKey: key(stage)).flatMap { try? JSONDecoder().decode(StageMap.self, from: $0) }
     }
 
-    static func store(_ map: ElementsMap?) {
-        putAsideIfStale()
+    static func store(_ map: StageMap?, for stage: MapStage) {
+        putAsideIfStale(stage)
         if let map, let data = try? JSONEncoder().encode(map) {
-            UserDefaults.standard.set(data, forKey: key)
+            UserDefaults.standard.set(data, forKey: key(stage))
         } else {
-            UserDefaults.standard.removeObject(forKey: key)
+            UserDefaults.standard.removeObject(forKey: key(stage))
         }
     }
 }
@@ -36,26 +37,33 @@ enum SavedElementsMap {
 #if !os(tvOS)
 import UIKit
 
-/// The Elements' map maker, for a mouse: the tileset laid out in a panel to pick tiles from,
-/// the stage under a grid. Drag a tile from the panel onto the stage to drop it; press one on
-/// the stage to pick it up and move it, dropping it back on the panel to take it away; press
-/// an empty cell with a tile chosen and drag to paint with it. The markers (the two rims,
-/// the two starts and the ball) are chosen and dropped the same way. UNDO steps back, COPY
-/// puts the map on the clipboard as Swift for `ElementsMap.defaultMap`. The map is kept
+/// The map maker, for a mouse, for the Elements and Wetshot Wake: the stage under a grid, and
+/// a panel to pick from: the Elements' tileset, or Wetshot Wake's plants, rocks and Hooperfish.
+/// Drag a tile or a prop from the panel onto the stage to drop it; press one on the stage to
+/// pick it up and move it, dropping it back on the panel to take it away; press an empty cell
+/// with a tile or a prop chosen to place it (tiles paint as the pointer drags). The markers
+/// (the Elements' two rims, the two starts and the ball) are chosen and dropped the same way;
+/// Wetshot Wake's one rim rides the Hooperfish, and there's only ever one. UNDO steps back,
+/// COPY puts the map on the clipboard as Swift for the stage's baked map. The map is kept
 /// between launches and stands in for the baked one offline.
 final class MapEditor: SKNode {
     private enum Tool: Equatable {
-        case brush(ElementsMap.Cell)
+        case brush(StageMap.Cell)
         case erase
         case marker(Marker)
         /// A whole tornado, placed by the cell its base's middle is in.
         case tornado
         /// In walls mode: a wall kind, or nil to open a cell.
-        case wall(ElementsMap.Kind?)
+        case wall(StageMap.Kind?)
+        /// Wetshot Wake's: a prop to place whole.
+        case prop(StageMap.PropKind)
     }
 
     private enum Marker: Equatable, CaseIterable {
         case leftRim, rightRim, firstStart, secondStart, ball
+
+        /// The markers a stage has: Wetshot Wake's one rim rides the Hooperfish, so no rims.
+        static func on(_ stage: MapStage) -> [Marker] { stage == .elements ? allCases : [.firstStart, .secondStart, .ball] }
 
         var label: String {
             switch self {
@@ -78,25 +86,29 @@ final class MapEditor: SKNode {
 
     /// What's on the pointer between pressing and letting go.
     private enum Carried {
-        case tile(art: ElementsMap.Cell, taken: Bool)
-        case marker(Marker, from: ElementsMap.Cell)
-        case tornado(from: ElementsMap.Cell)
+        case tile(art: StageMap.Cell, taken: Bool)
+        case marker(Marker, from: StageMap.Cell)
+        case tornado(from: StageMap.Cell)
+        case prop(StageMap.PropKind, taken: Bool)
     }
 
-    private(set) var map: ElementsMap
-    private var history: [ElementsMap] = []
+    /// Which hand-laid stage this is the map of.
+    private let stage: MapStage
+    private(set) var map: StageMap
+    private var history: [StageMap] = []
     private var tool: Tool
     private var carried: Carried?
     private var painting = false
-    private var lastCell: ElementsMap.Cell?
+    private var lastCell: StageMap.Cell?
     /// Cells whose tile changed since the game was last told, and whether the tornados did.
-    private var dirty: Set<ElementsMap.Cell> = []
+    private var dirty: Set<StageMap.Cell> = []
     private var tornadosDirty = false
+    private var propsDirty = false
     private var wallsDirty = false
     /// Walls mode: the walls shown as transparent red over the stage, and painted instead of tiles.
     private var wallsMode = false
     /// While a stroke paints walls: the kind it lays, nil opening cells.
-    private var strokeKind: ElementsMap.Kind?
+    private var strokeKind: StageMap.Kind?
     private let wallLayer = SKNode()
 
     private let halfWidth: CGFloat, halfHeight: CGFloat
@@ -104,9 +116,10 @@ final class MapEditor: SKNode {
     private let world: (CGPoint) -> CGPoint
     private let hudFromWorld: (CGPoint) -> CGPoint
     private let unitsPerHud: CGFloat
-    private let onTiles: ([ElementsMap.Cell]) -> Void
+    private let onTiles: ([StageMap.Cell]) -> Void
     private let onMarkers: () -> Void
     private let onTornados: () -> Void
+    private let onProps: () -> Void
     private let onWalls: () -> Void
     private let onClose: () -> Void
 
@@ -119,6 +132,8 @@ final class MapEditor: SKNode {
     private var ghostMarker: SKNode?
     private var buttons: [(rect: CGRect, action: () -> Void)] = []
     private var paletteRect = CGRect.zero
+    /// Wetshot Wake's props laid out in the panel in place of a tileset, each where it's drawn.
+    private var propButtons: [(rect: CGRect, kind: StageMap.PropKind)] = []
     private var panelRect = CGRect.zero
     private var paletteShown = true
     /// Screen points to a tileset pixel: small, in the corner, or less if the sheet is big for the screen.
@@ -127,9 +142,11 @@ final class MapEditor: SKNode {
         return min(0.85, halfWidth * 0.6 / max(sheet.width, 1), halfHeight * 0.5 / max(sheet.height, 1))
     }
 
-    init(map: ElementsMap, halfWidth: CGFloat, halfHeight: CGFloat, unitsPerHud: CGFloat, world: @escaping (CGPoint) -> CGPoint,
-         hudFromWorld: @escaping (CGPoint) -> CGPoint, onTiles: @escaping ([ElementsMap.Cell]) -> Void,
-         onMarkers: @escaping () -> Void, onTornados: @escaping () -> Void, onWalls: @escaping () -> Void, onClose: @escaping () -> Void) {
+    init(stage: MapStage, map: StageMap, halfWidth: CGFloat, halfHeight: CGFloat, unitsPerHud: CGFloat, world: @escaping (CGPoint) -> CGPoint,
+         hudFromWorld: @escaping (CGPoint) -> CGPoint, onTiles: @escaping ([StageMap.Cell]) -> Void,
+         onMarkers: @escaping () -> Void, onTornados: @escaping () -> Void, onProps: @escaping () -> Void, onWalls: @escaping () -> Void,
+         onClose: @escaping () -> Void) {
+        self.stage = stage
         self.map = map
         self.halfWidth = halfWidth
         self.halfHeight = halfHeight
@@ -139,9 +156,10 @@ final class MapEditor: SKNode {
         self.onTiles = onTiles
         self.onMarkers = onMarkers
         self.onTornados = onTornados
+        self.onProps = onProps
         self.onWalls = onWalls
         self.onClose = onClose
-        tool = .brush(ElementsArt.filled.first { $0 == ElementsMap.Cell(3, 3) } ?? ElementsArt.filled[0])
+        tool = MapEditor.firstTool(for: stage)
         super.init()
         zPosition = 500
         addChild(grid)
@@ -162,33 +180,38 @@ final class MapEditor: SKNode {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// What's in hand to start with, and back from walls mode: a tile, or Wetshot Wake's first plant.
+    private static func firstTool(for stage: MapStage) -> Tool {
+        stage == .wetshot ? .prop(.plant1) : .brush(ElementsArt.filled.first { $0 == StageMap.Cell(3, 3) } ?? ElementsArt.filled[0])
+    }
+
     // MARK: Geometry
 
     private var cellSide: CGFloat { ElementsArt.tileSide / unitsPerHud }
 
-    private func cell(at hudPoint: CGPoint) -> ElementsMap.Cell? {
+    private func cell(at hudPoint: CGPoint) -> StageMap.Cell? {
         let point = world(hudPoint)
         let column = Int((point.x / ElementsArt.tileSide).rounded(.down)), row = Int((point.y / ElementsArt.tileSide).rounded(.down))
-        guard (0..<ElementsRules.columns).contains(column), (0..<ElementsRules.rows).contains(row) else { return nil }
-        return ElementsMap.Cell(column, row)
+        guard (0..<stage.columns).contains(column), (0..<stage.rows).contains(row) else { return nil }
+        return StageMap.Cell(column, row)
     }
 
-    private func hudRect(of cell: ElementsMap.Cell) -> CGRect {
+    private func hudRect(of cell: StageMap.Cell) -> CGRect {
         let origin = hudFromWorld(CGPoint(x: CGFloat(cell.column) * ElementsArt.tileSide, y: CGFloat(cell.row) * ElementsArt.tileSide))
         return CGRect(x: origin.x, y: origin.y, width: cellSide, height: cellSide)
     }
 
     private func buildGrid() {
         let path = CGMutablePath()
-        for column in 0...ElementsRules.columns {
+        for column in 0...stage.columns {
             let x = hudFromWorld(CGPoint(x: CGFloat(column) * ElementsArt.tileSide, y: 0)).x
             path.move(to: CGPoint(x: x, y: hudFromWorld(.zero).y))
-            path.addLine(to: CGPoint(x: x, y: hudFromWorld(CGPoint(x: 0, y: CGFloat(ElementsRules.rows) * ElementsArt.tileSide)).y))
+            path.addLine(to: CGPoint(x: x, y: hudFromWorld(CGPoint(x: 0, y: CGFloat(stage.rows) * ElementsArt.tileSide)).y))
         }
-        for row in 0...ElementsRules.rows {
+        for row in 0...stage.rows {
             let y = hudFromWorld(CGPoint(x: 0, y: CGFloat(row) * ElementsArt.tileSide)).y
             path.move(to: CGPoint(x: hudFromWorld(.zero).x, y: y))
-            path.addLine(to: CGPoint(x: hudFromWorld(CGPoint(x: CGFloat(ElementsRules.columns) * ElementsArt.tileSide, y: 0)).x, y: y))
+            path.addLine(to: CGPoint(x: hudFromWorld(CGPoint(x: CGFloat(stage.columns) * ElementsArt.tileSide, y: 0)).x, y: y))
         }
         grid.path = path
         grid.strokeColor = SKColor(white: 1, alpha: 0.13)
@@ -205,8 +228,18 @@ final class MapEditor: SKNode {
         buttons = []
         let scale = paletteScale
         let sheetSize = ElementsArt.tileset.size()
-        let showsSheet = paletteShown && !wallsMode
-        let paletteSize = showsSheet ? CGSize(width: sheetSize.width * scale, height: sheetSize.height * scale) : .zero
+        let showsSheet = paletteShown && !wallsMode && stage == .elements
+        let showsProps = paletteShown && !wallsMode && stage == .wetshot
+        // The props in a row, each scaled to the row's height but no wider than it allows.
+        let propHeight: CGFloat = 28
+        let propSizes = StageMap.PropKind.allCases.map { kind -> CGSize in
+            let pixels = kind.pixelSize
+            let fit = min(propHeight / CGFloat(pixels.height), 48 / CGFloat(pixels.width))
+            return CGSize(width: CGFloat(pixels.width) * fit, height: CGFloat(pixels.height) * fit)
+        }
+        let propsWidth = propSizes.reduce(CGFloat(0)) { $0 + $1.width } + 3 * CGFloat(propSizes.count - 1)
+        let paletteSize = showsSheet ? CGSize(width: sheetSize.width * scale, height: sheetSize.height * scale)
+            : (showsProps ? CGSize(width: propsWidth, height: propHeight) : .zero)
         let margin: CGFloat = 5, rowHeight: CGFloat = 15, gap: CGFloat = 3, fontSize: CGFloat = 7
         let actionRow: [(String, () -> Void)] = [
             ("UNDO", { [weak self] in self?.undo() }), ("RESET", { [weak self] in self?.reset() }), ("COPY", { [weak self] in self?.copy() }),
@@ -216,12 +249,13 @@ final class MapEditor: SKNode {
         // The tools, each with the tool it picks, so the one in hand can be lit.
         let tools: [(String, Tool)]
         if wallsMode {
-            let kinds: [(String, ElementsMap.Kind?)] = [("SOLID", .solid), ("\u{25E2}", .lowerRight), ("\u{25E3}", .lowerLeft),
+            let kinds: [(String, StageMap.Kind?)] = [("SOLID", .solid), ("\u{25E2}", .lowerRight), ("\u{25E3}", .lowerLeft),
                                                        ("\u{25E5}", .upperRight), ("\u{25E4}", .upperLeft),
                                                        ("SLIDE \u{25E2}", .slideLowerRight), ("SLIDE \u{25E3}", .slideLowerLeft), ("OPEN", nil)]
             tools = kinds.map { ($0.0, .wall($0.1)) }
         } else {
-            tools = [("ERASE", .erase), ("TORNADO", .tornado)] + Marker.allCases.map { ($0.label, .marker($0)) }
+            tools = (stage == .elements ? [("ERASE", .erase), ("TORNADO", .tornado)] : [("ERASE", .erase)])
+                + Marker.on(stage).map { ($0.label, .marker($0)) }
         }
         let toolRow: [(String, () -> Void)] = tools.map { title, picked in (title, { [weak self] in self?.tool = picked; self?.buildPanel() }) }
         let lit = Set(tools.filter { $0.1 == tool }.map(\.0))
@@ -234,7 +268,7 @@ final class MapEditor: SKNode {
         let rows = [actionRow, toolRow]
         let rowWidths = rows.map { row in row.reduce(CGFloat(0)) { $0 + labelWidth($1.0) } + gap * CGFloat(max(row.count - 1, 0)) }
         let contentWidth = max(rowWidths.max() ?? 0, paletteSize.width)
-        let contentHeight = rowHeight * CGFloat(rows.count) + (showsSheet ? paletteSize.height + margin : 0)
+        let contentHeight = rowHeight * CGFloat(rows.count) + (showsSheet || showsProps ? paletteSize.height + margin : 0)
         let right = halfWidth - margin, top = halfHeight - margin
         let left = right - contentWidth
         panelRect = CGRect(x: left - 4, y: top - contentHeight - 4, width: contentWidth + 8, height: contentHeight + 8)
@@ -284,6 +318,29 @@ final class MapEditor: SKNode {
         } else {
             paletteRect = .zero
         }
+        propButtons = []
+        if showsProps {
+            var x = left
+            let bottom = top - contentHeight
+            for (kind, size) in zip(StageMap.PropKind.allCases, propSizes) {
+                let rect = CGRect(x: x, y: bottom, width: size.width, height: size.height)
+                let sprite = SKSpriteNode(texture: WetshotArt.texture(kind))
+                sprite.anchorPoint = .zero
+                sprite.size = size
+                sprite.position = rect.origin
+                sprite.zPosition = 1
+                panel.addChild(sprite)
+                if case .prop(let held) = tool, held == kind {
+                    let ring = SKShapeNode(rect: rect.insetBy(dx: -1, dy: -1))
+                    ring.strokeColor = SKColor(red: 1, green: 0.9, blue: 0.2, alpha: 1)
+                    ring.lineWidth = 1
+                    ring.zPosition = 2
+                    panel.addChild(ring)
+                }
+                propButtons.append((rect, kind))
+                x += size.width + 3
+            }
+        }
         showSelection()
     }
 
@@ -298,7 +355,7 @@ final class MapEditor: SKNode {
         if wallsMode {
             tool = .wall(.solid)
         } else if case .wall = tool {
-            tool = .brush(ElementsArt.filled.first { $0 == ElementsMap.Cell(3, 3) } ?? ElementsArt.filled[0])
+            tool = MapEditor.firstTool(for: stage)
         }
         wallLayer.isHidden = !wallsMode
         buildPanel()
@@ -313,18 +370,18 @@ final class MapEditor: SKNode {
                                              y: paletteRect.maxY - CGFloat(art.row + 1) * side, width: side, height: side), transform: nil)
     }
 
-    private func paletteCell(at point: CGPoint) -> ElementsMap.Cell? {
-        guard paletteShown, !wallsMode, paletteRect.contains(point) else { return nil }
+    private func paletteCell(at point: CGPoint) -> StageMap.Cell? {
+        guard paletteShown, !wallsMode, stage == .elements, paletteRect.contains(point) else { return nil }
         let side = 16 * paletteScale
-        let cell = ElementsMap.Cell(Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
+        let cell = StageMap.Cell(Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
         return ElementsArt.filled.contains(cell) ? cell : nil
     }
 
     // MARK: The map
 
-    private func tile(at cell: ElementsMap.Cell) -> ElementsMap.Placed? { map.tiles.first { $0.cell == cell } }
+    private func tile(at cell: StageMap.Cell) -> StageMap.Placed? { map.tiles.first { $0.cell == cell } }
 
-    private func markerCell(_ marker: Marker) -> ElementsMap.Cell {
+    private func markerCell(_ marker: Marker) -> StageMap.Cell {
         switch marker {
         case .leftRim: map.leftRim
         case .rightRim: map.rightRim
@@ -335,16 +392,32 @@ final class MapEditor: SKNode {
     }
 
     /// The tornado whose sprite has this cell in it, if any.
-    private func tornado(at cell: ElementsMap.Cell) -> Int? {
+    private func tornado(at cell: StageMap.Cell) -> Int? {
         map.tornados.firstIndex { base in
-            let span = ElementsMap.tornadoCells(base)
+            let span = StageMap.tornadoCells(base)
             return span.columns.contains(cell.column) && span.rows.contains(cell.row)
         }
     }
 
-    private func marker(at cell: ElementsMap.Cell) -> Marker? { Marker.allCases.first { markerCell($0) == cell } }
+    private func marker(at cell: StageMap.Cell) -> Marker? { Marker.on(stage).first { markerCell($0) == cell } }
 
-    private func move(_ marker: Marker, to cell: ElementsMap.Cell) {
+    /// The last placed prop whose picture covers this cell, if any.
+    private func prop(at cell: StageMap.Cell) -> Int? {
+        map.props.lastIndex { prop in
+            let size = prop.kind.pixelSize
+            let columns = Int((CGFloat(size.width) / ElementsArt.tileSide).rounded(.up)), rows = Int((CGFloat(size.height) / ElementsArt.tileSide).rounded(.up))
+            return (prop.cell.column..<(prop.cell.column + columns)).contains(cell.column) && (prop.cell.row..<(prop.cell.row + rows)).contains(cell.row)
+        }
+    }
+
+    /// A prop put down with its bottom left on the cell; there's only ever one Hooperfish.
+    private func place(_ kind: StageMap.PropKind, at cell: StageMap.Cell) {
+        if kind == .hooperfish { map.props.removeAll { $0.kind == .hooperfish } }
+        map.props.append(.init(kind, at: cell))
+        propsDirty = true
+    }
+
+    private func move(_ marker: Marker, to cell: StageMap.Cell) {
         switch marker {
         case .leftRim: map.leftRim = cell
         case .rightRim: map.rightRim = cell
@@ -354,22 +427,22 @@ final class MapEditor: SKNode {
         }
     }
 
-    private func place(_ art: ElementsMap.Cell, at cell: ElementsMap.Cell) {
+    private func place(_ art: StageMap.Cell, at cell: StageMap.Cell) {
         map.tiles.removeAll { $0.cell == cell }
         map.tiles.append(.init(cell, art: art))
         dirty.insert(cell)
         // A tile brings a block with it where there's no wall yet, decoration excepted.
-        if !ElementsMap.decoration.contains(art), map.wall(at: cell) == nil { setWall(.solid, at: cell) }
+        if !StageMap.decoration.contains(art), map.wall(at: cell) == nil { setWall(.solid, at: cell) }
     }
 
     /// A tile taken off its cell takes a block with it; a slope painted there stays.
-    private func takeAwayTile(at cell: ElementsMap.Cell) {
+    private func takeAwayTile(at cell: StageMap.Cell) {
         map.tiles.removeAll { $0.cell == cell }
         dirty.insert(cell)
         if map.wall(at: cell) == .solid { setWall(nil, at: cell) }
     }
 
-    private func erase(at cell: ElementsMap.Cell) {
+    private func erase(at cell: StageMap.Cell) {
         guard tile(at: cell) != nil else { return }
         takeAwayTile(at: cell)
     }
@@ -381,7 +454,7 @@ final class MapEditor: SKNode {
 
     // MARK: The walls
 
-    private func setWall(_ kind: ElementsMap.Kind?, at cell: ElementsMap.Cell) {
+    private func setWall(_ kind: StageMap.Kind?, at cell: StageMap.Cell) {
         guard map.wall(at: cell) != kind else { return }
         map.walls.removeAll { $0.cell == cell }
         if let kind { map.walls.append(.init(cell, kind)) }
@@ -416,8 +489,8 @@ final class MapEditor: SKNode {
 
     /// The map kept and given to the game, which is told which tiles changed.
     private func commit() {
-        SavedElementsMap.store(map)
-        ElementsMap.current = map
+        SavedStageMap.store(map, for: stage)
+        StageMap.current[stage] = map
         if !dirty.isEmpty {
             let changed = Array(dirty)
             dirty = []
@@ -426,6 +499,10 @@ final class MapEditor: SKNode {
         if tornadosDirty {
             tornadosDirty = false
             onTornados()
+        }
+        if propsDirty {
+            propsDirty = false
+            onProps()
         }
         if wallsDirty {
             wallsDirty = false
@@ -442,13 +519,14 @@ final class MapEditor: SKNode {
 
     private func reset() {
         remember()
-        applyWholeMap(ElementsMap.baked)
+        applyWholeMap(StageMap.baked(stage))
     }
 
-    private func applyWholeMap(_ next: ElementsMap) {
+    private func applyWholeMap(_ next: StageMap) {
         let changed = Set(map.tiles.map(\.cell)).symmetricDifference(Set(next.tiles.map(\.cell)))
             .union(Set(map.tiles).symmetricDifference(Set(next.tiles)).map(\.cell))
         tornadosDirty = tornadosDirty || next.tornados != map.tornados
+        propsDirty = propsDirty || next.props != map.props
         wallsDirty = wallsDirty || next.walls != map.walls
         map = next
         dirty.formUnion(changed)
@@ -457,13 +535,13 @@ final class MapEditor: SKNode {
     }
 
     private func copy() {
-        UIPasteboard.general.string = map.swiftSource
+        UIPasteboard.general.string = map.swiftSource(stage)
     }
 
     /// Where each marker sits, as a coloured square with its letters.
     private func showMarkers() {
         markerLayer.removeAllChildren()
-        for marker in Marker.allCases {
+        for marker in Marker.on(stage) {
             guard !(isCarrying(marker)) else { continue }
             markerLayer.addChild(markerNode(marker, at: markerCell(marker)))
         }
@@ -474,7 +552,7 @@ final class MapEditor: SKNode {
         return false
     }
 
-    private func markerNode(_ marker: Marker, at cell: ElementsMap.Cell) -> SKNode {
+    private func markerNode(_ marker: Marker, at cell: StageMap.Cell) -> SKNode {
         let rect = hudRect(of: cell)
         let node = SKShapeNode(rect: CGRect(origin: .zero, size: rect.size))
         node.position = rect.origin
@@ -499,6 +577,13 @@ final class MapEditor: SKNode {
     func began(at point: CGPoint) {
         for button in buttons where button.rect.contains(point) {
             button.action()
+            return
+        }
+        if let button = propButtons.first(where: { $0.rect.contains(point) }) {
+            tool = .prop(button.kind)
+            buildPanel()
+            carried = .prop(button.kind, taken: false)
+            showGhost(at: point)
             return
         }
         if let art = paletteCell(at: point) {
@@ -527,6 +612,21 @@ final class MapEditor: SKNode {
             showGhost(at: point)
             return
         }
+        if let index = prop(at: cell) {
+            remember()
+            let picked = map.props.remove(at: index)
+            propsDirty = true
+            if tool == .erase {
+                painting = true
+                commit()
+            } else {
+                // Picked up whole, to be moved.
+                commit()
+                carried = .prop(picked.kind, taken: true)
+                showGhost(at: point)
+            }
+            return
+        }
         if let index = tornado(at: cell) {
             remember()
             let base = map.tornados.remove(at: index)
@@ -543,9 +643,13 @@ final class MapEditor: SKNode {
             return
         }
         switch tool {
+        case .prop(let kind):
+            remember()
+            place(kind, at: cell)
+            commit()
         case .tornado:
             remember()
-            map.tornados.append(ElementsMap.fittingTornado(cell))
+            map.tornados.append(StageMap.fittingTornado(cell))
             tornadosDirty = true
             commit()
         case .erase:
@@ -588,7 +692,11 @@ final class MapEditor: SKNode {
         } else {
             hover.isHidden = true
         }
-        ghost?.position = point
+        if case .prop = carried {
+            ghost?.position = CGPoint(x: point.x - cellSide / 2, y: point.y - cellSide / 2)
+        } else {
+            ghost?.position = point
+        }
         ghostMarker?.position = point
         guard painting, let under, under != lastCell else { return }
         lastCell = under
@@ -599,9 +707,13 @@ final class MapEditor: SKNode {
                 map.tornados.remove(at: index)
                 tornadosDirty = true
             }
+            if let index = prop(at: under) {
+                map.props.remove(at: index)
+                propsDirty = true
+            }
         case .brush(let art): place(art, at: under)
         case .wall: setWall(strokeKind, at: under)
-        case .marker, .tornado: break
+        case .marker, .tornado, .prop: break
         }
         commit()
     }
@@ -632,10 +744,17 @@ final class MapEditor: SKNode {
             move(marker, to: target ?? from)
             commit()
             onMarkers()
+        case .prop(let kind, let taken):
+            // Dropped on the stage it stands there whole; on the panel or off the stage it's taken away.
+            if let target {
+                if !taken { remember() }
+                place(kind, at: target)
+            }
+            commit()
         case .tornado:
             // Dropped on the stage it stands there whole; on the panel or off the stage it's taken away.
             if let target {
-                map.tornados.append(ElementsMap.fittingTornado(target))
+                map.tornados.append(StageMap.fittingTornado(target))
                 tornadosDirty = true
             }
             commit()
@@ -666,8 +785,19 @@ final class MapEditor: SKNode {
             sprite.position = point
             addChild(sprite)
             ghost = sprite
+        case .prop(let kind, _):
+            // Held by its bottom left cell's middle.
+            let sprite = SKSpriteNode(texture: WetshotArt.texture(kind))
+            sprite.anchorPoint = .zero
+            let pixels = kind.pixelSize
+            sprite.size = CGSize(width: CGFloat(pixels.width) * cellSide / ElementsArt.tileSide, height: CGFloat(pixels.height) * cellSide / ElementsArt.tileSide)
+            sprite.alpha = 0.8
+            sprite.zPosition = 10
+            sprite.position = CGPoint(x: point.x - cellSide / 2, y: point.y - cellSide / 2)
+            addChild(sprite)
+            ghost = sprite
         case .marker(let marker, _):
-            let node = markerNode(marker, at: ElementsMap.Cell(0, 0))
+            let node = markerNode(marker, at: StageMap.Cell(0, 0))
             let holder = SKNode()
             holder.zPosition = 10
             node.position = CGPoint(x: -cellSide / 2, y: -cellSide / 2)

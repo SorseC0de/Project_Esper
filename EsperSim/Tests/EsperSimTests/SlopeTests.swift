@@ -7,19 +7,19 @@ final class SlopeTests: XCTestCase {
     /// A hill of six slope cells over solid fill, on a floor, with a plateau on top: rising to the
     /// right, its plateau at y 110 from x 260 to 330, or to the left, from x 280 to 350.
     private func hill(rising right: Bool) -> Match {
-        var walls: [ElementsMap.Wall] = (0..<67).map { .init(.init($0, 4), .solid) }
+        var walls: [StageMap.Wall] = (0..<67).map { .init(.init($0, 4), .solid) }
         for i in 0..<6 {
             let column = right ? 20 + i : 40 - i
             walls.append(.init(.init(column, 5 + i), right ? .lowerRight : .lowerLeft))
             for row in 5..<(5 + i) { walls.append(.init(.init(column, row), .solid)) }
         }
         for column in (right ? 26...32 : 28...34) { for row in 5...10 { walls.append(.init(.init(column, row), .solid)) } }
-        var map = ElementsMap.baked
+        var map = StageMap.baked(.elements)
         map.tiles = []
         map.walls = walls
         map.tornados = []
-        ElementsMap.current = map
-        defer { ElementsMap.current = ElementsMap.baked }
+        StageMap.current[.elements] = map
+        defer { StageMap.current[.elements] = StageMap.baked(.elements) }
         var match = Match(stage: .elements, specs: [.starting, .starting])
         match.countdown = 0
         match.players[1].position = Vec2(x: 600, y: 60)

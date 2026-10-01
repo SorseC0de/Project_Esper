@@ -37,7 +37,7 @@ enum ElementsArt {
     static var tilesetRows: Int { max(Int(tileset.size().height / tileSide), 1) }
 
     /// The tileset cells with anything drawn in them, read off the sheet: what the map maker offers.
-    static let filled: [ElementsMap.Cell] = {
+    static let filled: [StageMap.Cell] = {
         let image = tileset.cgImage()
         guard let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -46,11 +46,11 @@ enum ElementsArt {
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         let pixels = data.bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)
         let side = Int(tileSide)
-        var cells: [ElementsMap.Cell] = []
+        var cells: [StageMap.Cell] = []
         for row in 0..<(image.height / side) {
             for column in 0..<(image.width / side) {
                 let drawn = (0..<side).contains { y in (0..<side).contains { x in pixels[((row * side + y) * image.width + column * side + x) * 4 + 3] > 0 } }
-                if drawn { cells.append(ElementsMap.Cell(column, row)) }
+                if drawn { cells.append(StageMap.Cell(column, row)) }
             }
         }
         return cells
@@ -62,9 +62,9 @@ enum ElementsArt {
         return texture
     }()
 
-    private static var cutTiles: [ElementsMap.Cell: SKTexture] = [:]
+    private static var cutTiles: [StageMap.Cell: SKTexture] = [:]
     /// One 16 by 16 cell of the tileset.
-    static func tile(_ art: ElementsMap.Cell) -> SKTexture {
+    static func tile(_ art: StageMap.Cell) -> SKTexture {
         if let cut = cutTiles[art] { return cut }
         let columns = CGFloat(tilesetColumns), rows = CGFloat(tilesetRows)
         let rect = CGRect(x: CGFloat(art.column) / columns, y: (rows - 1 - CGFloat(art.row)) / rows, width: 1 / columns, height: 1 / rows)
@@ -85,7 +85,7 @@ enum ElementsArt {
 
     /// What the stage's art gives back: each placed tile's sprite by its cell, to be changed by the map maker.
     struct Handles {
-        var tiles: [ElementsMap.Cell: SKSpriteNode] = [:]
+        var tiles: [StageMap.Cell: SKSpriteNode] = [:]
         var tornados: [SKSpriteNode] = []
         var tornadoOverlays: [SKSpriteNode] = []
         /// The stage's fixed art, for the glow's mask to leave out: the mountains, the icicles.
@@ -101,9 +101,9 @@ enum ElementsArt {
 
         /// The tornados as the map has them, drawn whole, and each again over the players, faint,
         /// in `overlayParent`, cropped to above the lava.
-        mutating func setTornados(_ bases: [ElementsMap.Cell]) {
+        mutating func setTornados(_ bases: [StageMap.Cell]) {
             (tornados + tornadoOverlays).forEach { $0.removeFromParent() }
-            func node(_ base: ElementsMap.Cell, z: CGFloat, alpha: CGFloat, into layer: SKNode) -> SKSpriteNode {
+            func node(_ base: StageMap.Cell, z: CGFloat, alpha: CGFloat, into layer: SKNode) -> SKSpriteNode {
                 let node = SKSpriteNode(texture: sprites.texture("tornado", 0))
                 node.anchorPoint = .zero
                 node.size = CGSize(width: ElementsArt.tornadoSide, height: ElementsArt.tornadoSide)
@@ -139,7 +139,7 @@ enum ElementsArt {
             }
         }
 
-        mutating func set(_ placed: ElementsMap.Placed?, at cell: ElementsMap.Cell) {
+        mutating func set(_ placed: StageMap.Placed?, at cell: StageMap.Cell) {
             tiles[cell]?.removeFromParent()
             tiles[cell] = nil
             guard let placed else { return }
@@ -153,7 +153,7 @@ enum ElementsArt {
         }
     }
 
-    static func build(stage: Stage, map: ElementsMap, into parent: SKNode, overlayParent: SKNode, sprites: SpriteLibrary) -> Handles {
+    static func build(stage: Stage, map: StageMap, into parent: SKNode, overlayParent: SKNode, sprites: SpriteLibrary) -> Handles {
         let width = CGFloat(stage.columns) * tileSide, height = CGFloat(stage.rows) * tileSide
         tornadoPreview = sprites.texture("tornado", 0)
         // The mountains over the whole stage, stretched to fill.
@@ -227,7 +227,7 @@ enum ElementsArt {
         // The shafts up through the sky over the ceiling's gaps, walled in rock edges.
         var shaftWalls: [SKSpriteNode] = []
         for column in 0..<stage.columns where map.wall(at: .init(column, ceilingRow)) != .solid {
-            for (wallColumn, art) in [(column - 1, ElementsMap.Cell(5, 3)), (column + 1, ElementsMap.Cell(1, 3))]
+            for (wallColumn, art) in [(column - 1, StageMap.Cell(5, 3)), (column + 1, StageMap.Cell(1, 3))]
             where (0..<stage.columns).contains(wallColumn) && map.wall(at: .init(wallColumn, ceilingRow)) == .solid {
                 for row in stage.rows..<(stage.rows + Int(spare / tileSide)) {
                     let wall = SKSpriteNode(texture: tile(art))

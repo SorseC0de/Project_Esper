@@ -12,11 +12,14 @@ public struct Hoop: Equatable {
     public var owner: Int
     /// The side the backboard is on; the rim opens the other way.
     public var backboard: Facing
+    /// Both players' to score on, the point to whoever put the ball through: a stage's only rim.
+    public var shared: Bool
 
-    public init(position: Vec2, owner: Int, backboard: Facing) {
+    public init(position: Vec2, owner: Int, backboard: Facing, shared: Bool = false) {
         self.position = position
         self.owner = owner
         self.backboard = backboard
+        self.shared = shared
     }
 }
 
@@ -624,12 +627,52 @@ public struct Stage: Equatable {
         return stage
     }
 
+    /// A hand-laid map's walls: blocks in the grid, slopes each in their own square.
+    mutating func lay(_ walls: [StageMap.Wall]) {
+        for wall in walls {
+            let cell = wall.cell
+            guard (0..<columns).contains(cell.column), (0..<rows).contains(cell.row) else { continue }
+            let size = Stage.tileSize
+            let square = Box(min: Vec2(x: Double(cell.column) * size, y: Double(cell.row) * size),
+                             max: Vec2(x: Double(cell.column + 1) * size, y: Double(cell.row + 1) * size))
+            switch wall.kind {
+            case .solid: set(.solid, column: cell.column, row: cell.row)
+            case .lowerRight: fixedSlopes.append(Slope(box: square, rising: true))
+            case .lowerLeft: fixedSlopes.append(Slope(box: square, rising: false))
+            case .upperLeft: ceilingSlopes.append(Slope(box: square, rising: true))
+            case .upperRight: ceilingSlopes.append(Slope(box: square, rising: false))
+            case .slideLowerRight: fixedSlopes.append(Slope(box: square, rising: true, slides: true))
+            case .slideLowerLeft: fixedSlopes.append(Slope(box: square, rising: false, slides: true))
+            }
+        }
+    }
+
+    /// Wetshot Wake: one court across, under water, laid out in the map maker; its one rim,
+    /// both players' to score on, rides the Hooperfish.
+    public static var wetshot: Stage {
+        let map = StageMap.current[.wetshot]
+        let columns = WetshotRules.columns, rows = WetshotRules.rows
+        let fish = map.hooperfish?.cell ?? StageMap.Cell(12, 8)
+        let rim = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize) + WetshotRules.rimFromHooperfish
+        var stage = Stage(
+            columns: columns, rows: rows,
+            hoops: [Hoop(position: rim, owner: 0, backboard: .right, shared: true)],
+            playerSpawns: map.spawns.map { Vec2(x: (Double($0.column) + 0.5) * tileSize, y: Double($0.row) * tileSize) },
+            playerFacings: map.spawns.map { Double($0.column) * tileSize < Double(columns) * tileSize / 2 ? .right : .left },
+            ballSpawn: Vec2(x: (Double(map.ball.column) + 0.5) * tileSize, y: (Double(map.ball.row) + 0.5) * tileSize)
+        )
+        stage.lay(map.walls)
+        stage.slopes = stage.fixedSlopes
+        stage.features = StageFeatures(look: .wetshot)
+        return stage
+    }
+
     /// The Elements: two courts across, floating rock from a tile map built by hand over a bed
     /// of lava, shafts up through the sky over the ceiling's gaps for the players to drop in by. The sides and the floor are the world's edge.
     public static var elements: Stage {
-        let map = ElementsMap.current
+        let map = StageMap.current[.elements]
         let columns = ElementsRules.columns, rows = ElementsRules.rows
-        func centre(_ cell: ElementsMap.Cell) -> Vec2 {
+        func centre(_ cell: StageMap.Cell) -> Vec2 {
             Vec2(x: (Double(cell.column) + 0.5) * tileSize, y: (Double(cell.row) + 0.5) * tileSize)
         }
         var stage = Stage(
@@ -642,22 +685,7 @@ public struct Stage: Equatable {
             playerFacings: map.spawns.map { Double($0.column) * tileSize < Double(columns) * tileSize / 2 ? .right : .left },
             ballSpawn: centre(map.ball)
         )
-        // The walls, apart from the art: blocks in the grid, slopes each in their own square.
-        for wall in map.walls {
-            let cell = wall.cell
-            guard (0..<columns).contains(cell.column), (0..<rows).contains(cell.row) else { continue }
-            let square = Box(min: Vec2(x: Double(cell.column) * tileSize, y: Double(cell.row) * tileSize),
-                             max: Vec2(x: Double(cell.column + 1) * tileSize, y: Double(cell.row + 1) * tileSize))
-            switch wall.kind {
-            case .solid: stage.set(.solid, column: cell.column, row: cell.row)
-            case .lowerRight: stage.fixedSlopes.append(Slope(box: square, rising: true))
-            case .lowerLeft: stage.fixedSlopes.append(Slope(box: square, rising: false))
-            case .upperLeft: stage.ceilingSlopes.append(Slope(box: square, rising: true))
-            case .upperRight: stage.ceilingSlopes.append(Slope(box: square, rising: false))
-            case .slideLowerRight: stage.fixedSlopes.append(Slope(box: square, rising: true, slides: true))
-            case .slideLowerLeft: stage.fixedSlopes.append(Slope(box: square, rising: false, slides: true))
-            }
-        }
+        stage.lay(map.walls)
         stage.slopes = stage.fixedSlopes
         // Above the ceiling the sky is solid, but for a shaft up over each open cell of the
         // ceiling's row, up to the sky's top.
@@ -724,7 +752,10 @@ public struct Stage: Equatable {
 /// The stages to pick from, in the order the select screen shows them; the wire carries
 /// the raw value.
 public enum StageChoice: Int, CaseIterable {
-    case wreckCenter, longballStadium, slamstillTraffic, theElements
+    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, wetshotWake
+
+    /// The stages on the select, in its order: Slamstill Traffic parked off it.
+    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .wetshotWake]
 
     public var name: String {
         switch self {
@@ -732,6 +763,8 @@ public enum StageChoice: Int, CaseIterable {
         case .longballStadium: "Longball Stadium"
         case .slamstillTraffic: "Slamstill Traffic"
         case .theElements: "The Elements"
+        case .skyNet: "Sky Net"
+        case .wetshotWake: "Wetshot Wake"
         }
     }
 
@@ -741,6 +774,9 @@ public enum StageChoice: Int, CaseIterable {
         case .longballStadium: .footballField
         case .slamstillTraffic: .highway
         case .theElements: .elements
+        // To be detailed: the court for now.
+        case .skyNet: .court
+        case .wetshotWake: .wetshot
         }
     }
 }

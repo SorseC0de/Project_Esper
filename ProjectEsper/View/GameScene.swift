@@ -335,7 +335,7 @@ final class GameScene: SKScene {
     }
 
     /// The Elements' flat background, which never glows; nil elsewhere.
-    var unglowedBackground: SKColor? { match.stage.features.look == .elements ? backgroundColor : nil }
+    var unglowedBackground: SKColor? { [StageLook.elements, .wetshot].contains(match.stage.features.look) ? backgroundColor : nil }
 
     /// The tornados as they look this frame, green under the bodies: they animate, so they can't
     /// live in the static layer.
@@ -900,8 +900,9 @@ final class GameScene: SKScene {
     private var builtStage = StageChoice.wreckCenter
     private var ballCamStale = false
 
-    /// The Elements' placed tiles, while it's the stage drawn.
+    /// The Elements' placed tiles, while it's the stage drawn; Wetshot Wake's props likewise.
     private var elementsArt: ElementsArt.Handles?
+    private var wetshotArt: WetshotArt.Handles?
     private let tornadoOverlays = SKCropNode()
 
     /// What the stage draws that must not glow, its tiles, its mountains and its icicles, with
@@ -917,6 +918,7 @@ final class GameScene: SKScene {
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
         }
+        if let art = wetshotArt { flats += art.flats }
         staticFlats = flats
         staticFlatsVersion += 1
     }
@@ -927,12 +929,17 @@ final class GameScene: SKScene {
         let stage = match.stage
         let isElements = stage.features.look == .elements
         Ambience.shared.play(isElements ? "thunderstorm" : nil)
-        backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : GameScene.background
+        let isWetshot = stage.features.look == .wetshot
+        backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : (isWetshot ? SKColor(rgb: WetshotArt.waterTop) : GameScene.background)
         elementsArt = nil
+        wetshotArt = nil
         fallingIcicles = [:]
+        if isWetshot {
+            wetshotArt = WetshotArt.build(stage: stage, map: StageMap.current[.wetshot], into: stageGround)
+        }
         if isElements {
             tornadoOverlays.removeAllChildren()
-            elementsArt = ElementsArt.build(stage: stage, map: ElementsMap.current, into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
+            elementsArt = ElementsArt.build(stage: stage, map: StageMap.current[.elements], into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
         }
         refreshStaticFlats()
         findRainSplashSpots()
@@ -1076,6 +1083,8 @@ final class GameScene: SKScene {
             backboard.position = GameScene.hoopArtPoint(for: hoop, on: stage.features.look)
             backboard.zPosition = 5
             backboard.xScale = hoop.backboard == .left ? -1 : 1
+            // Wetshot Wake's rim rides the Hooperfish, with no backboard.
+            backboard.isHidden = stage.features.look == .wetshot
             stageGround.addChild(backboard)
             backboardNodes.append(backboard)
             let rim = SKSpriteNode(texture: sprites.texture(art.rim, 0))
@@ -1114,6 +1123,7 @@ final class GameScene: SKScene {
         rimSpin = []
         nets = []
         elementsArt = nil
+        wetshotArt = nil
         fallingIcicles = [:]
         fieldBlooms = []
         lightPanels = []
@@ -1310,7 +1320,7 @@ final class GameScene: SKScene {
     private func findRainSplashSpots() {
         rainSplashSpots = []
         guard match.stage.features.look == .elements else { return }
-        let map = ElementsMap.current, tile = ElementsArt.tileSide, stage = match.stage
+        let map = StageMap.current[.elements], tile = ElementsArt.tileSide, stage = match.stage
         for wall in map.walls where wall.cell.row < stage.rows - 1 {
             let above = map.wall(at: .init(wall.cell.column, wall.cell.row + 1))
             let x = CGFloat(wall.cell.column) * tile, top = CGFloat(wall.cell.row + 1) * tile, bottom = CGFloat(wall.cell.row) * tile
@@ -1470,6 +1480,134 @@ final class GameScene: SKScene {
         rainSplashes.append(splash)
     }
 
+    // MARK: Wetshot Wake's water
+
+    /// The water over everything in the world, under the HUD: palette 18 at the bottom of the
+    /// screen to 19 at the top, faint, so the play stays clear.
+    private let waterOverlay = SKSpriteNode()
+    private static let waterOverlayAlpha: CGFloat = 0.1
+    private static let waterGradient: SKTexture = {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let height = 64
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 1, height: height), format: format).image { context in
+            let bottom = PixelPalette.colours[18], top = PixelPalette.colours[19]
+            for row in 0..<height {
+                // Row 0 is the image's top.
+                let share = CGFloat(row) / CGFloat(height - 1)
+                func channel(_ shift: RGB) -> CGFloat {
+                    let from = CGFloat((top >> shift) & 0xFF), to = CGFloat((bottom >> shift) & 0xFF)
+                    return (from + (to - from) * share) / 255
+                }
+                SKColor(red: channel(16), green: channel(8), blue: channel(0), alpha: 1).setFill()
+                context.fill(CGRect(x: 0, y: row, width: 1, height: 1))
+            }
+        }
+        return SKTexture(image: image)
+    }()
+
+    /// Bubbles rising here and there, sometimes a few at once, wobbling side to side as they
+    /// fade; each one of the sheet's five bubbles, the first the commonest.
+    private struct Bubble {
+        var node: SKSpriteNode
+        var baseX: CGFloat
+        var age: Double
+        var life: Double
+        var rise: CGFloat
+        var wobble: CGFloat
+        var wobbleRate: Double
+    }
+    private var bubbles: [Bubble] = []
+    private static let bubblesPerSecond = 3.0
+    private static let bubbleClusterChance = 0.25
+    /// The bubble cells' weights: the first as likely as near half the others together.
+    private static let bubbleCellWeights = [0.4, 0.15, 0.15, 0.15, 0.15]
+
+    /// Jellyfish drifting lazily across from one side to the other, one to three together,
+    /// bobbing as they go and breathing between 0.9 and 1.1.
+    private struct Jellyfish {
+        var node: SKSpriteNode
+        var baseY: CGFloat
+        var age: Double
+        var speed: CGFloat
+        var bob: CGFloat
+        var bobRate: Double
+        var breathOffset: Double
+    }
+    private var jellyfish: [Jellyfish] = []
+    private var jellyfishClock = 0.0
+    private static let jellyfishSecondsBetween: ClosedRange<Double> = 6...12
+    private var nextJellyfish = 3.0
+    private static let breathSeconds = 2.5
+
+    private func stepWater() {
+        let wet = match.stage.features.look == .wetshot
+        let halfWidth = size.width * cameraNode.xScale / 2, halfHeight = size.height * cameraNode.yScale / 2
+        if waterOverlay.parent == nil {
+            waterOverlay.texture = GameScene.waterGradient
+            waterOverlay.alpha = GameScene.waterOverlayAlpha
+            waterOverlay.zPosition = 95
+            world.addChild(waterOverlay)
+        }
+        waterOverlay.isHidden = !wet
+        waterOverlay.size = CGSize(width: halfWidth * 2, height: halfHeight * 2)
+        waterOverlay.position = cameraNode.position
+        let step = GameScene.stepSeconds
+        bubbles = bubbles.compactMap { bubble in
+            var bubble = bubble
+            bubble.age += step
+            guard bubble.age < bubble.life, bubble.node.parent != nil else { bubble.node.removeFromParent(); return nil }
+            bubble.node.position = CGPoint(x: (bubble.baseX + bubble.wobble * CGFloat(sin(bubble.age * bubble.wobbleRate * 2 * .pi))).rounded(),
+                                           y: bubble.node.position.y + bubble.rise * CGFloat(step))
+            bubble.node.alpha = CGFloat(1 - bubble.age / bubble.life)
+            return bubble
+        }
+        if wet, let count = EffectSheets.frames["bubbles_jellyfish"], count >= 6,
+           Double.random(in: 0..<1) < GameScene.bubblesPerSecond * step {
+            let at = CGPoint(x: cameraNode.position.x + .random(in: -halfWidth...halfWidth), y: cameraNode.position.y + .random(in: -halfHeight...halfHeight))
+            let many = Double.random(in: 0..<1) < GameScene.bubbleClusterChance ? Int.random(in: 3...6) : 1
+            for _ in 0..<many {
+                var pick = Double.random(in: 0..<1), cell = 0
+                for (index, weight) in GameScene.bubbleCellWeights.enumerated() {
+                    if pick < weight { cell = index; break }
+                    pick -= weight
+                }
+                let node = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", cell))
+                let x = at.x + (many > 1 ? .random(in: -8...8) : 0)
+                node.position = CGPoint(x: x, y: at.y + (many > 1 ? .random(in: -8...8) : 0))
+                node.zPosition = 4.5
+                stageGround.addChild(node)
+                bubbles.append(Bubble(node: node, baseX: x, age: 0, life: .random(in: 2...4), rise: .random(in: 12...24),
+                                      wobble: .random(in: 1...3), wobbleRate: .random(in: 0.5...1)))
+            }
+        }
+        jellyfish = jellyfish.compactMap { fish in
+            var fish = fish
+            fish.age += step
+            let x = fish.node.position.x + fish.speed * CGFloat(step)
+            guard fish.node.parent != nil, abs(x - cameraNode.position.x) < halfWidth + 80 else { fish.node.removeFromParent(); return nil }
+            fish.node.position = CGPoint(x: x, y: fish.baseY + fish.bob * CGFloat(sin(fish.age * fish.bobRate * 2 * .pi)))
+            fish.node.setScale(CGFloat(1 + 0.1 * sin((fish.age + fish.breathOffset) / GameScene.breathSeconds * 2 * .pi)))
+            return fish
+        }
+        guard wet, EffectSheets.frames["bubbles_jellyfish"] != nil else { return }
+        jellyfishClock += step
+        guard jellyfishClock >= nextJellyfish else { return }
+        jellyfishClock = 0
+        nextJellyfish = .random(in: GameScene.jellyfishSecondsBetween)
+        let fromLeft = Bool.random()
+        let baseY = cameraNode.position.y + .random(in: -halfHeight * 0.5...halfHeight * 0.8)
+        for member in 0..<Int.random(in: 1...3) {
+            let node = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", 5))
+            let startX = cameraNode.position.x + (fromLeft ? -1 : 1) * (halfWidth + 16 + CGFloat(member) * 20)
+            node.position = CGPoint(x: startX, y: baseY + CGFloat(member) * .random(in: -14...14))
+            node.zPosition = -10
+            stageGround.addChild(node)
+            jellyfish.append(Jellyfish(node: node, baseY: node.position.y, age: 0, speed: (fromLeft ? 1 : -1) * .random(in: 8...14),
+                                       bob: .random(in: 6...12), bobRate: .random(in: 0.08...0.15), breathOffset: .random(in: 0...GameScene.breathSeconds)))
+        }
+    }
+
     /// The loose ball's turning, from what it does: backspin off a shot or a throw, kept through the
     /// air, a bounce trading half of it for the roll the floor gives, and a ball rolling turning with its path.
     private func spinBall(_ ball: Ball) {
@@ -1606,7 +1744,7 @@ final class GameScene: SKScene {
         // The field and the Elements scroll sideways, so only its height is fitted; a scenic stage counts the
         // ground below the floor in, so the players stand in the middle of it; not the Elements,
         // whose floor is the lava at the screen's bottom.
-        let below = match.stage.features.scenic && match.stage.features.look != .elements ? FieldArt.viewBelowFloor : 0
+        let below = match.stage.features.scenic && ![StageLook.elements, .wetshot].contains(match.stage.features.look) ? FieldArt.viewBelowFloor : 0
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
@@ -1654,9 +1792,9 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        // The map maker only means anything on the Elements, offline, with a mouse.
+        // The map maker only means anything on a hand-laid stage, offline, with a mouse.
         #if !os(tvOS)
-        if match.stage.features.look == .elements, online == nil {
+        if [StageLook.elements, .wetshot].contains(match.stage.features.look), online == nil {
             controls.addPicker(title: "MAP", options: ["OFF", "ON"], selected: mapEditor == nil ? 0 : 1) { [weak self] index in
                 index == 1 ? self?.openMapEditor() : self?.closeMapEditor(restart: true)
             }
@@ -2054,9 +2192,9 @@ final class GameScene: SKScene {
         let fieldSeed = UInt32(series.dice.roll(1 << 16)) &+ 1
         let pickerOn = online == nil && powerVariant != .none && gameMode != .fortySeven
         let drinks = series.drinks.indices.map { drinksInPlay($0, pickerOn: pickerOn) }
-        if series.stage == .theElements {
-            // The map every phone plays, but on this one offline what the map maker last kept.
-            ElementsMap.current = online == nil ? (SavedElementsMap.value ?? .baked) : .baked
+        // A hand-laid stage's map: the one every phone plays, but offline what the map maker last kept.
+        for mapStage in MapStage.allCases {
+            StageMap.current[mapStage] = online == nil ? (SavedStageMap.value(mapStage) ?? StageMap.baked(mapStage)) : StageMap.baked(mapStage)
         }
         var fresh = Match(stage: series.stage.stage, specs: drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed,
                           mode: gameMode)
@@ -2409,7 +2547,7 @@ final class GameScene: SKScene {
         controls?.isHidden = !(inPlace && GameScene.touchControlsShown)
         switch previewing {
         case .stageSelect:
-            screen = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: StageChoice.allCases.map { $0.name.uppercased() },
+            screen = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: StageChoice.selectable.map { $0.name.uppercased() },
                                        voters: [0], localVoters: [0], colours: [0, 1].map { SKColor(rgb: sprites.look(for: $0).glow) },
                                        heading: nil, start: 0) { _, _ in }
         case .pick:
@@ -2452,12 +2590,14 @@ final class GameScene: SKScene {
         case .stageSelect:
             let colours = [0, 1].map { SKColor(rgb: sprites.look(for: $0).glow) }
             let heading = online != nil && stageVoters.count == 1 ? "\(sideName(stageVoters[0])) PICKS" : nil
-            let select = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: StageChoice.allCases.map { $0.name.uppercased() },
+            // The select lists only the stages not parked, by their place in it.
+            let listed = StageChoice.selectable
+            let select = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: listed.map { $0.name.uppercased() },
                                            voters: stageVoters, localVoters: localStageVoters, colours: colours, heading: heading,
-                                           start: series.stage.rawValue) { [weak self] voter, index in
-                self?.voteStage(StageChoice(rawValue: index) ?? .wreckCenter, by: voter)
+                                           start: listed.firstIndex(of: series.stage) ?? 0) { [weak self] voter, index in
+                self?.voteStage(listed.indices.contains(index) ? listed[index] : .wreckCenter, by: voter)
             }
-            for (voter, vote) in stageVotes { select.show(vote: vote.rawValue, by: voter) }
+            for (voter, vote) in stageVotes { select.show(vote: listed.firstIndex(of: vote) ?? 0, by: voter) }
             // Back to the title from the first pick offline, before anything's been played.
             if online == nil, series.stagesPlayed == 0 { select.back = { [weak self] in self?.enter(.title) } }
             screen = select
@@ -3807,12 +3947,15 @@ final class GameScene: SKScene {
     private var lastEditorPoint = CGPoint.zero
 
     private func openMapEditor() {
-        guard mapEditor == nil, online == nil, match.stage.features.look == .elements else { return }
+        let look = match.stage.features.look
+        guard mapEditor == nil, online == nil, look == .elements || look == .wetshot else { return }
+        let mapStage: MapStage = look == .elements ? .elements : .wetshot
+        let rebuilt: () -> Stage = { mapStage == .elements ? .elements : .wetshot }
         wholeStageView = true
         layout(displayScale: displayScale)
         let scale = hudScale * cameraNode.xScale
         let editor = MapEditor(
-            map: ElementsMap.current, halfWidth: size.width / 2 / hudScale, halfHeight: size.height / 2 / hudScale, unitsPerHud: scale,
+            stage: mapStage, map: StageMap.current[mapStage], halfWidth: size.width / 2 / hudScale, halfHeight: size.height / 2 / hudScale, unitsPerHud: scale,
             world: { [weak self] point in
                 guard let self else { return .zero }
                 return CGPoint(x: self.cameraNode.position.x + point.x * scale, y: self.cameraNode.position.y + point.y * scale)
@@ -3823,20 +3966,26 @@ final class GameScene: SKScene {
             },
             onTiles: { [weak self] cells in
                 guard let self else { return }
-                let map = ElementsMap.current
+                let map = StageMap.current[.elements]
                 for cell in cells { self.elementsArt?.set(map.tiles.first { $0.cell == cell }, at: cell) }
                 self.refreshStaticFlats()
                 self.session.mutate { match in
-                    match.stage = .elements
+                    match.stage = rebuilt()
                     match.refreshExtras()
                 }
             },
-            onMarkers: { [weak self] in self?.session.mutate { $0.stage = .elements; $0.refreshExtras() } },
+            onMarkers: { [weak self] in self?.session.mutate { $0.stage = rebuilt(); $0.refreshExtras() } },
             onTornados: { [weak self] in
-                self?.elementsArt?.setTornados(ElementsMap.current.tornados)
-                self?.session.mutate { $0.stage = .elements; $0.refreshExtras() }
+                self?.elementsArt?.setTornados(StageMap.current[.elements].tornados)
+                self?.session.mutate { $0.stage = rebuilt(); $0.refreshExtras() }
             },
-            onWalls: { [weak self] in self?.session.mutate { $0.stage = .elements; $0.refreshExtras() } },
+            onProps: { [weak self] in
+                // The Hooperfish carries the rim: the stage again, for where it now is.
+                self?.wetshotArt?.setProps(StageMap.current[.wetshot].props)
+                self?.refreshStaticFlats()
+                self?.session.mutate { $0.stage = rebuilt(); $0.refreshExtras() }
+            },
+            onWalls: { [weak self] in self?.session.mutate { $0.stage = rebuilt(); $0.refreshExtras() } },
             onClose: { [weak self] in self?.closeMapEditor(restart: true) })
         hud.addChild(editor)
         mapEditor = editor
@@ -5000,6 +5149,7 @@ final class GameScene: SKScene {
         drawPlatforms()
         placeStageFireball()
         blowWind()
+        stepWater()
         splashRain()
         sizzleRain()
         riseLightningDots()

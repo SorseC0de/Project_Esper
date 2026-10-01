@@ -145,7 +145,8 @@ public struct Match: Equatable {
             var ballStage = stage
             ballStage.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
             if let hoop = ball.step(stage: ballStage, events: &events) {
-                let owner = stage.hoops[hoop].owner
+                // A shared rim's point goes to whoever put the ball through.
+                let owner = stage.hoops[hoop].shared ? (ball.lastTouched ?? stage.hoops[hoop].owner) : stage.hoops[hoop].owner
                 if mode == .fortySeven {
                     // 47: the points by where the ball left a hand, and play on, the scorer
                     // kept off the ball a while.

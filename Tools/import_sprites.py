@@ -30,13 +30,24 @@ import zlib
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
 STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
-STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/tornado_burst", "Elements/fire_tornado_burst", "Elements/fireball", "Elements/sizzle1", "Elements/sizzle2", "Elements/lava_splash", "Elements/wind", "Elements/splash", "Elements/small_lightning", "Elements/icicle_empty", "Elements/icicle_form", "Elements/icicle"]
+STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/tornado_burst", "Elements/fire_tornado_burst", "Elements/fireball", "Elements/sizzle1", "Elements/sizzle2", "Elements/lava_splash", "Elements/wind", "Elements/splash", "Elements/small_lightning", "Elements/icicle_empty", "Elements/icicle_form", "Elements/icicle", "Wetshot Wake/bubbles_jellyfish"]
 # Whole pictures, not strips: into the catalog's root as an image of this name.
 # A list of places a picture may have been saved: the newest is taken.
 ROOT_IMAGES = {
     "ElementsTileset": ["Stages/Elements/tileset_elements.png", "Stages/tileset_elements.png"],
     "Basketball": ["basketball.png"],
     "BasketballIce": ["basketball_ice.png"],
+    "WetshotBackground": ["Stages/Wetshot Wake/Background.png"],
+    "WetshotPlant1": ["Stages/Wetshot Wake/Plant 1.png"],
+    "WetshotPlant2": ["Stages/Wetshot Wake/Plant 2.png"],
+    "WetshotPlant3": ["Stages/Wetshot Wake/Plant 3.png"],
+    "WetshotPlant4": ["Stages/Wetshot Wake/Plant 4.png"],
+    "WetshotPlant5": ["Stages/Wetshot Wake/Plant 5.png"],
+    "WetshotRocks": ["Stages/Wetshot Wake/Rocks.png"],
+    "HooperfishBody": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_body.png"],
+    "HooperfishFrontfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_frontfin.png"],
+    "HooperfishTailfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_tailfin.png"],
+    "HooperfishTopfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_topfin.png"],
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")

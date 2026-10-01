@@ -561,10 +561,10 @@ public struct Player: Equatable {
         let boltCarry = velocity.x
         if throwingBolt { input.stick.x = 0 }
 
-        // Throw and shoot together, out of anything free or a stance just taken: the change into
-        // the energy form, or, in it, straight back out.
-        let changeFrom = [.idle, .walk, .dash, .run, .pivot, .land, .crouch, .crouchWalk, .air].contains(state)
-            || ((state == .shootStance || state == .throwStance) && stateTimer <= TransformRules.pressWindowFrames)
+        // Throw and shoot together, out of anything free, or a stance, a slash or a snatch the
+        // first of them just started: the change into the energy form, or, in it, straight back out.
+        let changeFrom = [.idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .air].contains(state)
+            || ([.shootStance, .throwStance, .slashing, .snatching].contains(state) && stateTimer <= TransformRules.pressWindowFrames)
         // Blazing Boba's fireball keeps the two together for now, where it's asked for.
         if input.shoot, input.throwBall, shootPressed || throwPressed, changeFrom, hitStun == 0,
            !fireballAsked(input, shootPressed: shootPressed, throwPressed: throwPressed) {
@@ -574,7 +574,7 @@ public struct Player: Equatable {
             input.throwBall = false
             if transformed {
                 transformed = false
-                if state == .shootStance || state == .throwStance { enter(grounded ? .idle : .air) }
+                if ![.idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .air].contains(state) { enter(grounded ? .idle : .air) }
             } else if transformReady {
                 velocity = .zero
                 enter(.transforming)

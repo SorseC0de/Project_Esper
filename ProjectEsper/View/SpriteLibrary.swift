@@ -513,7 +513,8 @@ final class SpriteLibrary {
         // look's colour at the crown down into the skin, leading into the particles off it.
         // The line there stays on the body in its grade rather than lifting off with the rest.
         // A human's energy-coloured parts glow; so does the crown's grade where it's mostly energy.
-        var glowing = (0..<count).map { look.human && parts[$0].map(HumanLook.glowingParts.contains) == true }
+        // The energy form glows all over, as its head does.
+        var glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true : parts[$0] != nil }
         if look.human {
             let isHead = (0..<count).map { parts[$0] == .head }
             let crown = (0..<count).map { isHead[$0] || (lined[$0] && neighbours($0, { isHead[$0] })) }

@@ -54,4 +54,17 @@ final class TransformTests: XCTestCase {
         for _ in 0..<30 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.transform, 5))
     }
+
+    func testThePressesAFrameApartStillChangeBothWays() {
+        var match = standing()
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .slashing)
+        match.advance(inputs: [both, .idle])
+        XCTAssertEqual(match.players[0].state, .transforming, "the slash just started gives way")
+        for _ in 0..<TransformRules.frames { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.players[0].transformed)
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        match.advance(inputs: [both, .idle])
+        XCTAssertFalse(match.players[0].transformed, "back, the snatch just started given way")
+    }
 }

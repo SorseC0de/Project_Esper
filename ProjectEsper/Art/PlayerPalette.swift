@@ -106,14 +106,15 @@ struct Look: Hashable {
             for part in HumanLook.clothed { colours[part] = part.isBack ? HumanLook.backClothes : HumanLook.clothes }
             for part in HumanLook.glowingParts { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         } else {
-            // The feet, marked on the sheets: shoes, palette 22 in front and 38 behind.
-            colours[.frontFoot] = Look.frontShoe
-            colours[.backFoot] = Look.backShoe
+            // The energy form: the whole body in the energy's colour as the head is, the back
+            // parts down its ramp as a human's back leg is.
+            for part in BodyPart.allCases where !part.isEnergy {
+                colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow
+            }
         }
         return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body)
     }
 
-    static let frontShoe = PixelPalette.colours[22], backShoe = PixelPalette.colours[38]
     /// Lined on their own, front to back: where two meet, the first's line sits on the
     /// second's pixels, so the first reads in front. The front arm and hand over everything,
     /// then the head. (The thighs as a group made a wedge where their line met the torso's;

@@ -124,19 +124,21 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   hang, which it drops off rather than climbing, and the rim after a dunk's slam; neither
   the wall nor the ledge can be taken again at once.
 - The change (`PlayerState.transforming`, `TransformRules`, protocol 44): throw and shoot together,
-  from anything free or within four frames of the stance one of them took, change the human form
+  from anything free, or within four frames of the stance, slash or snatch the first of them
+  started (so the two a frame apart still do it), change the human form
   into the energy form; the same again in it changes straight back. Blazing Boba's level-two
   fireball keeps the two together where it's asked for. The change holds the body still where it
   is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
   from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
   it's `transformed`. For now everyone has the change there to make (`transformReady`), shown by
-  the zone's cycling colours round the line until it's made. As drawn: three pixels up off the
+  the zone's cycling colours round the line, and the head's and legs' cubes in the zone's colours,
+  until it's made. As drawn: seven pixels up off the
   ground the whole change, the eyes over the body in the energy's colour, all white and glowing on
   frame 4 and the energy form from frame 5 (0-based); up to frame 4 cubes spiral up round the
-  body (30 a second, 10 pixels out) and the head's and legs' cubes rise in a helix. The energy form
-  is the look from before the human one (`Look.transformed`, `human: false`): the body in the
-  energy's light colour, the back limbs greyed darker, the head apart in the energy's colour, and
-  cubes off the hands as off the legs; drawn as a player of its own
+  body (30 a second, 10 pixels out, at the head's cube size) and the head's and legs' cubes rise in a helix. The energy form
+  is the look from before the human one (`Look.transformed`, `human: false`), but all of it in the
+  energy's colour as the head is, no shoes, the back parts down its ramp as a human's back leg
+  (0.66), glowing all over as the head does; the head apart, and cubes off the hands as off the legs; drawn as a player of its own
   (`SpriteLibrary.transformedPlayer`), warmed with the rest.
 - Stepback: down on the ground in a shot's or a throw's stance, once a stance, pressed any time in
   it and coming once it has reached its hold (`shotWindupFrames`, `throwWindupFrames`): the throw sheet's third frame, sliding
@@ -1030,7 +1032,8 @@ It's drawn only above the lava's drawn surface (`ElementsArt.lavaSurfaceLine`, 3
 its crests), and coming out of it and going under it plays `lava_splash` there. A body
 knocked out of a tornado, by anything, isn't taken straight back.
 
-The wind (`wind`, nine 32 pixel frames at ten a second): a puff about every third of a second in each
+The nets flow leftward in the wind, in gusts (`HoopNet.wind`: 0.4 pixels a frame at the bottom,
+easing to none at the rim, 70 to 100% as it gusts). The wind (`wind`, nine 32 pixel frames at ten a second): a puff about every third of a second in each
 of two layers, behind the rock and in front of everything, each at 1, 0.75 or 0.5, starting
 anywhere on screen and blowing 64 to 160 pixels leftward as it plays through, fading out; none of it
 glows. On this stage the head's and legs' particles blow leftward rather than toward the ball.

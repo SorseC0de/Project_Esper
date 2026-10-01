@@ -152,6 +152,9 @@ final class HoopNet {
     private var rim = CGPoint.zero
     private var awake = true
     private var stillFrames = 0
+    /// A wind's push on the net, pixels a frame along x at its bottom, less up toward the rim;
+    /// while there's any it never sleeps.
+    var wind: CGFloat = 0
     private var lastBall: CGPoint?
     private var swish: Swish?
     /// A left backboard mirrors the skew.
@@ -261,7 +264,7 @@ final class HoopNet {
         let bodyNear = bodies.contains { HoopNet.distance($0, rim) < reach }
         if let ball, let lastBall, swish == nil { catchSwish(from: lastBall, to: ball, radius: ballRadius) }
         if swishWeight > 0 { swishWeight = max(swishWeight - 1 / CGFloat(NetTuning.swishFrames), 0) }
-        if rimMoved || ballNear || bodyNear || swish != nil {
+        if rimMoved || ballNear || bodyNear || swish != nil || wind != 0 {
             awake = true
             stillFrames = 0
         }
@@ -282,7 +285,9 @@ final class HoopNet {
             }
             let velocity = CGPoint(x: (knot.at.x - knot.was.x) * NetTuning.damping, y: (knot.at.y - knot.was.y) * NetTuning.damping)
             knots[index].was = knot.at
-            knots[index].at = CGPoint(x: knot.at.x + velocity.x + (home.x - knot.at.x) * NetTuning.settle,
+            let depth = max(-(knots.map(\.home.y).min() ?? -1), 1)
+            let push = wind * min(max(-knot.home.y / depth, 0), 1)
+            knots[index].at = CGPoint(x: knot.at.x + velocity.x + push + (home.x - knot.at.x) * NetTuning.settle,
                                       y: knot.at.y + velocity.y + (home.y - knot.at.y) * NetTuning.settle)
         }
         // This frame's sweep: the swish's carried-on ball while there is one, else the ball.

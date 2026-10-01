@@ -77,7 +77,8 @@ public enum SurfRules {
 /// Slopes: a body's feet ride one up or down this far a frame at most, a block's height;
 /// the diagonal's normal is this share of each axis.
 /// The change into the energy form: throw and shoot pressed together, from anything free or
-/// within a few frames of the stance one of them took; the sheet plays at ten a second.
+/// within a few frames of the stance, slash or snatch the first of them started; the sheet
+/// plays at ten a second.
 public enum TransformRules {
     public static let sheetFramesPerSecond = 10
     public static let frames = 54

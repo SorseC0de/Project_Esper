@@ -3393,7 +3393,7 @@ final class GameScene: SKScene {
     /// The change into the energy form, as drawn: lifted off the ground, all white on the
     /// sheet's fifth frame and the energy form from its sixth; cubes spiralling up round the
     /// body until then, and the head's and legs' cubes rising in a helix.
-    private static let transformLift: CGFloat = 3
+    private static let transformLift: CGFloat = 7
     private static let transformWhiteFrame = 4
     private static let transformEnergyFrame = 5
     private static let transformCreditKey = 2000
@@ -3401,6 +3401,9 @@ final class GameScene: SKScene {
     private static let transformSpiralRadius: CGFloat = 10
     private static let transformHelixRadius: CGFloat = 3
     private static let helixTurnsPerSecond = 2.0
+    /// The Elements' wind on the nets: the push at their bottom, and how fast it gusts.
+    private static let netWind: CGFloat = 0.4
+    private static let netGustRate = 1.3
     private static let spiralRise: CGFloat = 50
 
     /// The ball's fire trail: its credit apart from the heads', at twice a head's rate.
@@ -3464,7 +3467,10 @@ final class GameScene: SKScene {
                 let node = SKSpriteNode(texture: stream.frames[0])
                 node.size = CGSize(width: stream.size, height: stream.size)
                 // In the zone a head's particles come out in the zone's colours.
-                let zoneTint = ZoneTuning.inTheZone && stream.zoneTinted && trailing == nil ? ZoneTuning.colours.randomElement().map { SKColor(rgb: $0) } : nil
+                // And while the change is there to be made.
+                let changeReady = match.players.indices.contains(index) && match.players[index].transformReady
+                    && !match.players[index].transformed && match.players[index].state != .transforming
+                let zoneTint = (ZoneTuning.inTheZone || changeReady) && stream.zoneTinted && trailing == nil ? ZoneTuning.colours.randomElement().map { SKColor(rgb: $0) } : nil
                 if let tint = zoneTint ?? stream.tints.randomElement() ?? stream.tint {
                     node.color = tint
                     node.colorBlendFactor = 1
@@ -4902,6 +4908,8 @@ final class GameScene: SKScene {
                 var spiral = legStream(index, part: .frontLeg, energyColour: true)
                 spiral.rate = GameScene.transformSpiralRate
                 spiral.helixRadius = GameScene.transformSpiralRadius
+                // At the head's cube size, bigger than the legs'.
+                spiral.legs = false
                 emitHeadParticles(index, power: player.power, at: SpriteLibrary.point(player.position) + CGPoint(x: 0, y: GameScene.transformLift),
                                   creditKey: GameScene.transformCreditKey + index, streams: [spiral])
             }
@@ -5141,6 +5149,9 @@ final class GameScene: SKScene {
                 backboardNodes[index].position = artPoint
                 backboardNodes[index].xScale = rimNodes[index].xScale
                 if index < nets.count {
+                    // The Elements' wind blows the nets leftward, in gusts.
+                    let gust = 0.7 + 0.3 * sin(CACurrentMediaTime() * GameScene.netGustRate)
+                    nets[index].wind = match.stage.features.look == .elements ? -GameScene.netWind * CGFloat(gust) : 0
                     nets[index].step(rim: GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look), ball: ballNode.isHidden ? nil : ballNode.position,
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
                                      bodies: match.players.map { SpriteLibrary.point($0.chest) })

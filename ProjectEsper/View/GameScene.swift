@@ -388,7 +388,9 @@ final class GameScene: SKScene {
     /// What's drawn in the world but must not glow, for the mask to mark: the hoops and the banner.
     var flatSnapshots: [BodySnapshot] {
         // The hoops: their backboards read too hot with the glow on them.
-        var flat = (backboardNodes + rimNodes).filter { !$0.isHidden }.compactMap { rim in
+        // Wetshot Wake's rim glows, as the Hooperfish's rings and eyes do.
+        let unglowedRims = match.stage.features.look == .wetshot ? [] : rimNodes
+        var flat = (backboardNodes + unglowedRims).filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
         }
         // The ball, in hand or loose: drawn as painted, its halo the glow.
@@ -1059,7 +1061,8 @@ final class GameScene: SKScene {
         // dim, glowing, in the colour of the side guarding that rim. Shown in 47 only.
         threePointArcs.removeAllChildren()
         threePointArcs.zPosition = -30
-        threePointArcs.isHidden = gameMode != .fortySeven
+        // The line stays put; Wetshot Wake's rim swims, so it has none drawn.
+        threePointArcs.isHidden = gameMode != .fortySeven || stage.features.look == .wetshot
         let inside = CGRect(x: GameScene.pixelsPerTile, y: GameScene.pixelsPerTile,
                             width: CGFloat(stage.columns - 2) * GameScene.pixelsPerTile,
                             height: CGFloat(stage.rows + Stage.skyRows) * GameScene.pixelsPerTile)
@@ -1629,6 +1632,7 @@ final class GameScene: SKScene {
         // The Hooperfish where the sim has it, swimming; in the map maker, where it's placed.
         WetshotArt.place(wetshotArt?.hooperfish, as: wholeStageView ? nil : match.hooperfish, placed: StageMap.current[.wetshot].hooperfish)
         WetshotArt.animate(wetshotArt?.hooperfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
+        WetshotArt.sway(wetshotArt?.props ?? [], at: CACurrentMediaTime())
         jellyfish = jellyfish.compactMap { fish in
             var fish = fish
             fish.age += step
@@ -1683,7 +1687,8 @@ final class GameScene: SKScene {
             }
             ballSpin.rate = min(max(ballSpin.rate, -mostSpin), mostSpin)
             // Frozen, it holds its turn.
-            if ball.frozen == 0 { ballSpin.angle += ballSpin.rate * dt }
+            // Under water it turns at half the rate.
+            if ball.frozen == 0 { ballSpin.angle += ballSpin.rate * dt * (match.stage.features.underwater ? 0.5 : 1) }
         }
         ballNode.texture = (ball.frozen > 0 ? sprites.basketballIceFrames : sprites.basketballFrames)[ballSpin.frame]
         ballNode.zRotation = ballSpin.angle
@@ -1918,6 +1923,13 @@ final class GameScene: SKScene {
             controls.addSlider(title: "WATER TINT", range: 0...0.6, notch: 0.05, value: Float(WaterTuning.overlayAlpha)) { WaterTuning.overlayAlpha = CGFloat($0) }
             controls.addSlider(title: "WATER SWAY", range: 0...4, notch: 0.25, value: Float(WaterTuning.swayPixels)) { WaterTuning.swayPixels = Double($0) }
             // The rim's place across the Hooperfish, a whole art pixel at a time.
+            // Where the ball hangs on the antenna, a whole art pixel at a time.
+            controls.addSlider(title: "BALL X", range: 0...96, notch: 1, value: Float(WetshotRules.ballPixelsAcross)) { value in
+                WetshotRules.ballPixelsAcross = Int(value.rounded())
+            }
+            controls.addSlider(title: "BALL Y", range: 0...48, notch: 1, value: Float(WetshotRules.ballPixelsUp)) { value in
+                WetshotRules.ballPixelsUp = Int(value.rounded())
+            }
             controls.addSlider(title: "HOOP X", range: 0...96, notch: 1, value: Float(WetshotRules.rimPixelsAcross)) { [weak self] value in
                 let pixels = Int(value.rounded())
                 guard pixels != WetshotRules.rimPixelsAcross else { return }
@@ -2208,14 +2220,6 @@ final class GameScene: SKScene {
         series = Series(seed: seed)
         // The debug strip is built for the mode (47 has its sliders), so again for this one.
         if built { layout(displayScale: displayScale) }
-        if gameMode == .fortySeven {
-            // 47 is the court's alone for now, straight into play.
-            series.stage = .wreckCenter
-            firstStage = .wreckCenter
-            startRound()
-            enter(.playing)
-            return
-        }
         // The port-in waits for the stage select to close.
         startRound(portingIn: false)
         session.stopAt = session.frame
@@ -2345,6 +2349,9 @@ final class GameScene: SKScene {
         }
     }
     private var secondMenuLast = PlayerInput.idle
+
+    /// The stages on the select: 47 plays on the Wreck Center or Wetshot Wake.
+    private var stageList: [StageChoice] { gameMode == .fortySeven ? StageChoice.fortySeven : StageChoice.selectable }
 
     private func voteStage(_ choice: StageChoice, by voter: Int) {
         guard flow == .stageSelect, stageVoters.contains(voter), stageVotes[voter] == nil else { return }
@@ -2616,7 +2623,7 @@ final class GameScene: SKScene {
         controls?.isHidden = !(inPlace && GameScene.touchControlsShown)
         switch previewing {
         case .stageSelect:
-            screen = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: StageChoice.selectable.map { $0.name.uppercased() },
+            screen = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: stageList.map { $0.name.uppercased() },
                                        voters: [0], localVoters: [0], colours: [0, 1].map { SKColor(rgb: sprites.look(for: $0).glow) },
                                        heading: nil, start: 0) { _, _ in }
         case .pick:
@@ -2660,7 +2667,7 @@ final class GameScene: SKScene {
             let colours = [0, 1].map { SKColor(rgb: sprites.look(for: $0).glow) }
             let heading = online != nil && stageVoters.count == 1 ? "\(sideName(stageVoters[0])) PICKS" : nil
             // The select lists only the stages not parked, by their place in it.
-            let listed = StageChoice.selectable
+            let listed = stageList
             let select = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: listed.map { $0.name.uppercased() },
                                            voters: stageVoters, localVoters: localStageVoters, colours: colours, heading: heading,
                                            start: listed.firstIndex(of: series.stage) ?? 0) { [weak self] voter, index in
@@ -2710,7 +2717,7 @@ final class GameScene: SKScene {
     /// winner's colour as they go, a sixth and seventh added if the series gets there;
     /// and to either side of them each side's drinks, with their levels.
     private func drawSeries() {
-        threePointArcs.isHidden = gameMode != .fortySeven && previewing != .hud
+        threePointArcs.isHidden = (gameMode != .fortySeven && previewing != .hud) || match.stage.features.look == .wetshot
         for arc in threePointArcSides { arc.node.lineWidth = ThreePointTuning.lineWidth }
         if gameMode == .fortySeven {
             // 47: each side's points either side of the middle, in its colour, no circles, no drinks.
@@ -5232,6 +5239,8 @@ final class GameScene: SKScene {
         let ball = match.ball
         ballNode.isHidden = ball.holder != nil
         ballNode.position = SpriteLibrary.point(ball.position)
+        // On the Hooperfish's antenna it nods with it.
+        if match.hooperfish?.carrying == .ball, ball.holder == nil { ballNode.position = hooperfishNod(0).turn(ballNode.position) }
         // Frozen it goes ice; burning it goes fire.
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
         ballHalo.color = colour
@@ -5296,7 +5305,9 @@ final class GameScene: SKScene {
         // Off the screen sideways, the chevrons sit at its edge at the ball's height, pointing at it.
         let halfView = size.width * cameraNode.xScale / 2
         let ballAt = SpriteLibrary.point(ball.position)
-        let offSide: CGFloat? = ballAt.x > cameraNode.position.x + halfView ? 1 : (ballAt.x < cameraNode.position.x - halfView ? -1 : nil)
+        // Not on Wetshot Wake, where the ball off screen is only ever on the Hooperfish's antenna.
+        let offSide: CGFloat? = match.stage.features.look == .wetshot ? nil
+            : (ballAt.x > cameraNode.position.x + halfView ? 1 : (ballAt.x < cameraNode.position.x - halfView ? -1 : nil))
         for (index, chevron) in chevrons.enumerated() {
             if let side = offSide {
                 chevron.isHidden = false

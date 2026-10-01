@@ -761,6 +761,8 @@ public enum StageChoice: Int, CaseIterable {
 
     /// The stages on the select, in its order: Slamstill Traffic parked off it.
     public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .wetshotWake]
+    /// The stages 47 plays on.
+    public static let fortySeven: [StageChoice] = [.wreckCenter, .wetshotWake]
 
     public var name: String {
         switch self {

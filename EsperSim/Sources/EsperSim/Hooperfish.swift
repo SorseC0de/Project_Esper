@@ -25,6 +25,12 @@ public struct Hooperfish: Equatable {
         return position + Vec2(x: across / 1.6, y: Double(WetshotRules.rimPixelsUp) / 1.6)
     }
 
+    /// Where the ball hangs on its antenna until a hand takes it.
+    public var ballPoint: Vec2 {
+        let across = Double(facesRight ? HooperfishRules.pixelWidth - WetshotRules.ballPixelsAcross : WetshotRules.ballPixelsAcross)
+        return position + Vec2(x: across / 1.6, y: Double(WetshotRules.ballPixelsUp) / 1.6)
+    }
+
     /// Off screen, between crossings.
     public var away: Bool { age >= swimFrames }
 

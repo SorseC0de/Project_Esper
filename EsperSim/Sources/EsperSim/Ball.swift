@@ -64,7 +64,8 @@ public struct Ball: Equatable {
         previousY = position.y
     }
 
-    /// Under water the ball falls at half the pull, and no faster than half the speed.
+    /// Under water the ball falls at half the pull, no faster than half the speed, and rolls to a
+    /// stop at half the drag: every change of its speed at half.
     static func gravityShare(_ stage: Stage) -> Double { stage.features.underwater ? 0.5 : 1 }
 
     public var box: Box { Box(center: position, width: BallRules.radius * 2, height: BallRules.radius * 2) }
@@ -133,7 +134,8 @@ public struct Ball: Equatable {
         }) {
             velocity.x += slope.downhill.sign * BallRules.gravity * Ball.gravityShare(stage) * SlopeRules.diagonal
         } else if onFloor, velocity.y == 0 {
-            let slowed = abs(velocity.x) * (1 - BallRules.rollingFriction) - BallRules.rollingDrag
+            let share = Ball.gravityShare(stage)
+            let slowed = abs(velocity.x) * (1 - BallRules.rollingFriction * share) - BallRules.rollingDrag * share
             velocity.x = slowed > 0 ? (velocity.x < 0 ? -slowed : slowed) : 0
         }
         resting = onFloor && velocity == .zero

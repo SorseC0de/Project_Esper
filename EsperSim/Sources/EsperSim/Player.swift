@@ -343,6 +343,14 @@ public struct Player: Equatable {
     var waterShare: Double { underwater ? 0.5 : 1 }
     var gravity: Double { spec.gravity * waterShare }
     var fallSpeed: Double { spec.fallSpeed * waterShare }
+    /// Every change of speed a frame, picking up and braking, at half under water.
+    var traction: Double { spec.traction * waterShare }
+    var walkAcceleration: Double { spec.walkAcceleration * waterShare }
+    var attackBrake: Double { spec.attackBrake * waterShare }
+    var airFriction: Double { spec.airFriction * waterShare }
+    var slideFriction: Double { spec.slideFriction * waterShare }
+    var stanceAirBrake: Double { spec.stanceAirBrake * waterShare }
+    var throwStanceAirBrake: Double { spec.throwStanceAirBrake * waterShare }
     var fastFallSpeed: Double { spec.fastFallSpeed * waterShare }
     var runSpeed: Double { spec.runSpeed * speedShare * waterShare }
     var walkMaxSpeed: Double { spec.walkMaxSpeed * speedShare * waterShare }
@@ -351,7 +359,7 @@ public struct Player: Equatable {
     /// the ground's traction to brake when the stick lets go. Moves that don't steer coast
     /// on the spec's light air friction instead, so their momentum carries.
     var airSpeedMax: Double { spec.runSpeed * speedShare }
-    var airBrake: Double { spec.traction }
+    var airBrake: Double { traction }
 
     /// Crouched or sliding, the body is half as tall, so it fits under what a standing
     /// body can't.
@@ -620,7 +628,7 @@ public struct Player: Equatable {
 
         switch state {
         case .idle:
-            velocity.x = approach(velocity.x, 0, spec.traction)
+            velocity.x = approach(velocity.x, 0, traction)
             if !groundActions(input, jumpPressed: jumpPressed, shootPressed: shootPressed, throwPressed: throwPressed,
                               tauntPressed: tauntPressed, onDefence: onDefence, events: &events) {
                 if crouchAsked(input) {
@@ -658,7 +666,7 @@ public struct Player: Equatable {
                         // brake, so a walk come into at a run doesn't slide on for half a second.
                         let target = walkMaxSpeed * input.stick.x
                         let braking = abs(velocity.x) > walkMaxSpeed || velocity.x * target < 0
-                        velocity.x = approach(velocity.x, target, braking ? spec.traction : spec.walkAcceleration)
+                        velocity.x = approach(velocity.x, target, braking ? traction : walkAcceleration)
                         // The cycle runs 15 frames a second at full walk and never under 10, so the ball
                         // can't hang on a tween, at the nearest steady rate.
                         animationPhase += (Player.steady(max(abs(velocity.x) / walkMaxSpeed * 15, 10)) / 60) * waterShare
@@ -691,7 +699,7 @@ public struct Player: Equatable {
                     startSlide(events: &events)
                 } else if downHeldFrames >= spec.runBrakeHoldFrames {
                     // Held down: the run brakes, and at walking speed it becomes a walk.
-                    velocity.x = approach(velocity.x, 0, spec.traction)
+                    velocity.x = approach(velocity.x, 0, traction)
                     animationPhase += (runCycleStep) * waterShare
                     if abs(velocity.x) <= walkMaxSpeed {
                         enter(stickFacing(input) == nil ? .idle : .walk)
@@ -711,7 +719,7 @@ public struct Player: Equatable {
             }
 
         case .pivot:
-            velocity.x = approach(velocity.x, 0, spec.traction * 2)
+            velocity.x = approach(velocity.x, 0, traction * 2)
             if jumpPressed {
                 enter(.jumpSquat)
             } else if stateTimer >= spec.pivotFrames {
@@ -894,7 +902,7 @@ public struct Player: Equatable {
             }
 
         case .land:
-            velocity.x = approach(velocity.x, 0, spec.traction)
+            velocity.x = approach(velocity.x, 0, traction)
             if stateTimer >= spec.landingLagFrames {
                 enter(crouchAsked(input) ? .crouch : (stickFacing(input) == nil ? .idle : .walk))
             }
@@ -907,7 +915,7 @@ public struct Player: Equatable {
                 throwReady = !throwPressed
                 break
             }
-            stanceMovement(input, airBrake: spec.stanceAirBrake)
+            stanceMovement(input, airBrake: stanceAirBrake)
             if downHeldFrames == 0 { stepbackAimLocked = false }
             if input.aim.length >= BallRules.flickThreshold, !stepbackAimLocked {
                 shotAim = input.aim
@@ -944,10 +952,10 @@ public struct Player: Equatable {
 
         case .shooting:
             if grounded {
-                velocity.x = approach(velocity.x, 0, spec.traction)
+                velocity.x = approach(velocity.x, 0, traction)
             } else if stateTimer > BallRules.shotReleaseFrames {
                 // Hanging after the release, in the pose.
-                velocity.x = approach(velocity.x, 0, spec.stanceAirBrake)
+                velocity.x = approach(velocity.x, 0, stanceAirBrake)
                 velocity.y = 0
             } else {
                 airCoast()
@@ -995,7 +1003,7 @@ public struct Player: Equatable {
                 startStepback(from: .throwStance, events: &events)
                 break
             }
-            stanceMovement(input, airBrake: spec.throwStanceAirBrake)
+            stanceMovement(input, airBrake: throwStanceAirBrake)
             let aim = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
             if downHeldFrames == 0 { stepbackAimLocked = false }
             if aim.length >= 0.5, !stepbackAimLocked {
@@ -1033,7 +1041,7 @@ public struct Player: Equatable {
 
         case .throwing:
             if grounded {
-                velocity.x = approach(velocity.x, 0, spec.traction)
+                velocity.x = approach(velocity.x, 0, traction)
             } else {
                 airCoast()
                 fall(.idle)
@@ -1088,10 +1096,10 @@ public struct Player: Equatable {
             // Down with no ball. The crouch walk is slow, and the stick turns the body.
             if let direction = stickFacing(input) { facing = direction }
             if state == .crouchWalk {
-                velocity.x = approach(velocity.x, spec.crouchWalkSpeed * waterShare * input.stick.x, spec.walkAcceleration)
+                velocity.x = approach(velocity.x, spec.crouchWalkSpeed * waterShare * input.stick.x, walkAcceleration)
                 animationPhase += (Player.steady(max(abs(velocity.x) / spec.crouchWalkSpeed * 15, 10)) / 60) * waterShare
             } else {
-                velocity.x = approach(velocity.x, 0, spec.traction)
+                velocity.x = approach(velocity.x, 0, traction)
             }
             if jumpPressed {
                 enter(.jumpSquat)
@@ -1114,7 +1122,7 @@ public struct Player: Equatable {
         case .gunSnipe:
             // Prone: the stick moves the cursor, not the body; shoot repels and throw
             // attracts at it; jump gets up.
-            velocity.x = approach(velocity.x, 0, spec.traction)
+            velocity.x = approach(velocity.x, 0, traction)
             let top = Double(stage.rows + Stage.skyRows) * Stage.tileSize
             snipeCursor = Vec2(x: min(max(snipeCursor.x + input.stick.x * SnipeRules.cursorSpeed, 0), stage.width),
                                y: min(max(snipeCursor.y + input.stick.y * SnipeRules.cursorSpeed, 0), top))
@@ -1145,7 +1153,7 @@ public struct Player: Equatable {
                 forcedSlide = false
             }
             if forcedSlide {
-                velocity.x = approach(velocity.x, dashInitialVelocity * facing.sign, SlopeRules.slideGain)
+                velocity.x = approach(velocity.x, dashInitialVelocity * facing.sign, SlopeRules.slideGain * waterShare)
                 if jumpPressed { enter(.jumpSquat) }
             } else if power == .frostTea {
                 if jumpPressed {
@@ -1158,7 +1166,7 @@ public struct Player: Equatable {
                     enter(roomToStand(in: stage) ? standUp(from: input) : .crouch)
                 }
             } else {
-                velocity.x = approach(velocity.x, 0, spec.slideFriction)
+                velocity.x = approach(velocity.x, 0, slideFriction)
                 if stateTimer >= spec.slideFrames {
                     enter(crouchAsked(input) || !roomToStand(in: stage) ? .crouch : standUp(from: input))
                 }
@@ -1168,7 +1176,7 @@ public struct Player: Equatable {
             // On the ground the swing carries the run it came from, bleeding it off; in the
             // air gravity is cut, so the body hangs through it, and the roll follows.
             if grounded {
-                velocity.x = approach(velocity.x, 0, spec.attackBrake)
+                velocity.x = approach(velocity.x, 0, attackBrake)
             } else {
                 velocity.x = approach(velocity.x, 0, airBrake)
                 velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -fallSpeed)
@@ -1186,7 +1194,7 @@ public struct Player: Equatable {
 
         case .snatching:
             if grounded {
-                velocity.x = approach(velocity.x, 0, spec.attackBrake)
+                velocity.x = approach(velocity.x, 0, attackBrake)
             } else {
                 airDrift(input)
                 fall(.idle)
@@ -1220,7 +1228,7 @@ public struct Player: Equatable {
         case .walling:
             // The snatch's reach, and the wall appears at the hand's full stretch.
             if grounded {
-                velocity.x = approach(velocity.x, 0, spec.attackBrake)
+                velocity.x = approach(velocity.x, 0, attackBrake)
             } else {
                 airDrift(input)
                 fall(.idle)
@@ -1362,7 +1370,7 @@ public struct Player: Equatable {
         case .gunShoot:
             // Pulsepistol Punch's shot, standing: braked, the pulse on its frame.
             if grounded {
-                velocity.x = approach(velocity.x, 0, spec.traction)
+                velocity.x = approach(velocity.x, 0, traction)
             } else {
                 airCoast()
                 fall(.idle)
@@ -1385,12 +1393,12 @@ public struct Player: Equatable {
         }
 
         if throwingBolt, state.isGroundState {
-            velocity.x = approach(boltCarry, 0, spec.attackBrake)
+            velocity.x = approach(boltCarry, 0, attackBrake)
         }
         if let downhill = surfingDownSlide, state.isGroundState, state != .jumpSquat {
             if state != .run { enter(.run) }
             facing = downhill
-            velocity.x = approach(velocity.x, downhill.sign * runSpeed, SlopeRules.slideGain)
+            velocity.x = approach(velocity.x, downhill.sign * runSpeed, SlopeRules.slideGain * waterShare)
         }
         if let downhill = slideSlopeResisted, state == .walk {
             facing = downhill.flipped
@@ -1918,7 +1926,7 @@ public struct Player: Equatable {
     /// the way it's going turns it at once, as Silksong does, rather than braking through.
     /// Not steering: the momentum carries, the light air friction on it.
     private mutating func airCoast() {
-        velocity.x = approach(velocity.x, 0, spec.airFriction)
+        velocity.x = approach(velocity.x, 0, airFriction)
     }
 
     private mutating func airDrift(_ input: PlayerInput) {
@@ -1959,7 +1967,7 @@ public struct Player: Equatable {
     /// sideways speed bleeding off at `airBrake`.
     private mutating func stanceMovement(_ input: PlayerInput, airBrake: Double) {
         if grounded {
-            velocity.x = approach(velocity.x, 0, spec.traction)
+            velocity.x = approach(velocity.x, 0, traction)
         } else {
             velocity.x = approach(velocity.x, 0, airBrake)
             if velocity.y <= 0 {
@@ -2155,7 +2163,7 @@ extension Player {
         let swingLeft = max(SlashRules.frames - stateTimer, 0)
         var speed = velocity.x, travelled = 0.0
         for frame in 0..<frames {
-            speed = approach(speed, 0, frame < swingLeft ? spec.attackBrake : spec.traction)
+            speed = approach(speed, 0, frame < swingLeft ? attackBrake : traction)
             travelled += speed
         }
         return travelled

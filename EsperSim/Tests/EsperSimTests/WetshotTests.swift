@@ -59,11 +59,11 @@ final class WetshotTests: XCTestCase {
         let fish = match.hooperfish!
         XCTAssertEqual(fish.carrying, .ball)
         XCTAssertEqual(fish.position, match.stage.hooperfishStart)
-        XCTAssertEqual(match.ball.position, fish.antenna)
+        XCTAssertEqual(match.ball.position, fish.ballPoint)
         XCTAssertEqual(match.stage.hoops[0].position, HighwayRules.parked)
         for _ in 0..<30 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertLessThan(match.hooperfish!.position.x, fish.position.x, "swimming off the way it faces")
-        XCTAssertEqual(match.ball.position, match.hooperfish!.antenna, "the ball rides along")
+        XCTAssertEqual(match.ball.position, match.hooperfish!.ballPoint, "the ball rides along")
     }
 
     func testAHandTakesTheBallOffTheAntenna() {
@@ -89,7 +89,7 @@ final class WetshotTests: XCTestCase {
         for _ in 0..<first.swimFrames { match.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(match.hooperfish!.away)
         XCTAssertEqual(match.hooperfish!.position.x, -HooperfishRules.size.x, accuracy: 0.001, "wholly off the left")
-        XCTAssertEqual(match.ball.position, match.hooperfish!.antenna, "the ball still on it")
+        XCTAssertEqual(match.ball.position, match.hooperfish!.ballPoint, "the ball still on it")
         for _ in 0..<HooperfishRules.waitFrames { match.advance(inputs: [.idle, .idle]) }
         let back = match.hooperfish!
         XCTAssertFalse(back.away)

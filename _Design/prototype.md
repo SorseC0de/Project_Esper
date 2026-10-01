@@ -546,7 +546,8 @@ walked round a ring, a black drop to the south-east, drawn into a texture per st
 
 ## 47
 
-A second mode (`GameMode.fortySeven`), on The Wreck Center only for now, no stage
+A second mode (`GameMode.fortySeven`), on The Wreck Center or Wetshot Wake (`StageChoice.fortySeven`,
+picked on the stage select; the three-point line isn't drawn on Wetshot Wake, whose rim swims), no stage
 select, no drinks and no powers. The title has 47 beside BEST OF 7. A basket doesn't
 reset anything: the points go up and play goes on, the scorer unable to take the ball,
 by hand or by snatch, for 120 frames (`pickupLockout`), flickering black (#242234)
@@ -1114,8 +1115,8 @@ a squarer screen shows more water over it,
 laid out in the map maker like the Elements (`MapStage.wetshot`, `StageMap.current[.wetshot]`,
 kept offline under `esper.wetshotMap`; its first map a floor along the bottom row, the
 Hooperfish over the middle). Drawn: `Background.png` (592 by 272, `WetshotBackground`) a row up
-off the floor's row, which is palette 16 as is everything below it, the row over it the water's top
-colour (palette 19), the scene's background;
+off the floor's row, which is the outline colour as is everything below it, everything over it the
+water's top colour (palette 19), neither glowing;
 then the map's props (`StageMap.Prop`, placed by their bottom left cell): `Plant 1` to `5`, the
 two halves of `Rocks.png` (the top one first), and the Hooperfish, assembled back to front from
 `topfin`, `tailfin`, `body`, `antenna` and `frontfin` with `hoop_straight` over its leftmost 48 pixels, 10
@@ -1130,11 +1131,15 @@ count (the same on both phones), ten seconds across from wholly off one side to 
 other, swaying 30 units up and down two and a half times as it goes, its bottom kept between the
 twelfth row from the top and as high as its three rows fit, over and over. What's on its antenna
 changes only off screen: once the ball's been taken, the stage's rim from then on, turned with it.
-As drawn: the body breathing between 0.9 and 1.1 over three seconds, the fins swinging 10 degrees
-either way over a second and a half (the top one clockwise as the tail and front ones go
-counter-clockwise), the antenna, and the rim and net on it, nodding 0 to 5 degrees
-counter-clockwise over two seconds, still while someone dunks; each turning where it meets the
-body (`WetshotArt.hooperfishParts`). It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
+The ball hangs on the antenna at its own point (`WetshotRules.ballPixelsAcross`/`Up`, on BALL X and
+BALL Y offline). As drawn: the body breathing between 0.9 and 1.1 over two seconds, the fins swinging
+10 degrees either way over a second and a half, the front one 15 (the top one clockwise as the tail
+and front ones go counter-clockwise), the antenna, and the rim, net and ball on it, nodding 0 to 5
+degrees counter-clockwise over two seconds, still while someone dunks; each turning where it meets the
+body (`WetshotArt.hooperfishParts`). Its rim glows, and so do its red rings and eye (left out of the
+body's mask, `WetshotArt.bodyGlowMask`); the rest of it doesn't. No chevrons point at the ball off
+screen here: off screen it's only ever on the antenna. The plants sway 5 degrees either way over four
+seconds, each on its own beat, from their bottom middle. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
 to whoever put the ball through (`ball.lastTouched`), protocol 48. Its centre is 15 pixels across
 (mirrored when it faces right) and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`), across on the
 HOOP X debug slider offline, a whole pixel at a time, rim, art and net together; there's no
@@ -1151,9 +1156,10 @@ rest together), wobbling a pixel or three side to side and fading over two to fo
 One group at a time, six to twelve seconds after the last has gone, one to three jellyfish (cell 5) drift across from one side of the
 screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds, turned to face the way they drift.
 
-Under water (`StageFeatures.underwater`, protocol 53): gravity and the fall speeds are halved for
-bodies and the ball, the ground's speeds (the walk, the run and its dash, the crouch walk) and the
-air's pick-up halved but not the air's top speed, and every state's clock holds every other frame,
+Under water (`StageFeatures.underwater`, protocol 54): gravity and the fall speeds are halved for
+bodies and the ball, the ground's speeds (the walk, the run and its dash, the crouch walk) and every
+change of speed (the pick-ups, the brakes, the frictions, the ball's roll) halved but not the air's top
+speed, the ball's turning in the view halved, and every state's clock holds every other frame,
 so each state, and its sheet with it, runs at half speed; the walk and run cycles too.
 Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
 at its top, at 50% (WATER TINT on the debug panel offline). And the whole screen sways, each row a

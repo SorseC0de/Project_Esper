@@ -59,6 +59,8 @@ public struct StageMap: Equatable, Codable {
     public enum PropKind: String, Codable, CaseIterable {
         case plant1, plant2, plant3, plant4, plant5, rock1, rock2, hooperfish
 
+        public var isPlant: Bool { [.plant1, .plant2, .plant3, .plant4, .plant5].contains(self) }
+
         /// Its size in art pixels.
         public var pixelSize: (width: Int, height: Int) {
             switch self {
@@ -317,6 +319,10 @@ public enum WetshotRules {
     /// while it's tuned, offline.
     nonisolated(unsafe) public static var rimPixelsAcross = 15
     public static let rimPixelsUp = 24
+    /// Where the ball hangs on the antenna before it's taken, the same way, whole art pixels from
+    /// the Hooperfish's bottom left: on the BALL X and BALL Y sliders while it's tuned, offline.
+    nonisolated(unsafe) public static var ballPixelsAcross = 15
+    nonisolated(unsafe) public static var ballPixelsUp = 24
     public static var rimFromHooperfish: Vec2 { Vec2(x: Double(rimPixelsAcross) / 1.6, y: Double(rimPixelsUp) / 1.6) }
 }
 

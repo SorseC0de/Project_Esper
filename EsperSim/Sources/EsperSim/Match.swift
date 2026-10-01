@@ -510,7 +510,7 @@ public struct Match: Equatable {
         stage.hoops[0].position = fish.carrying == .hoop && !fish.away ? fish.antenna : HighwayRules.parked
         stage.hoops[0].backboard = fish.facesRight ? .left : .right
         if fish.carrying == .ball, ball.holder == nil {
-            ball.position = fish.antenna
+            ball.position = fish.ballPoint
             ball.velocity = .zero
         }
     }

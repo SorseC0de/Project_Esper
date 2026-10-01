@@ -1108,8 +1108,9 @@ never a painted slope.
 
 ## Wetshot Wake
 
-`Stage.wetshot`, `StageChoice.wetshotWake`: 37 by 19 tiles, under water, all of it on screen as the map maker
-shows it (as big as it fits, not by whole pixels), its bottom on the screen's,
+`Stage.wetshot`, `StageChoice.wetshotWake`: 37 by 19 tiles, under water, zoomed to the screen's width (not by
+whole pixels), its bottom on the screen's: a phone crops blank water off the top (about two rows),
+a squarer screen shows more water over it,
 laid out in the map maker like the Elements (`MapStage.wetshot`, `StageMap.current[.wetshot]`,
 kept offline under `esper.wetshotMap`; its first map a floor along the bottom row, the
 Hooperfish over the middle). Drawn: `Background.png` (592 by 272, `WetshotBackground`) a row up

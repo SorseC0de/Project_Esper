@@ -1752,9 +1752,11 @@ final class GameScene: SKScene {
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
         let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
         // The map maker sees the whole stage at once, as big as it fits, not by whole pixels.
-        // Wetshot Wake the same, all of it on screen, its bottom on the screen's.
+        // Wetshot Wake fills the screen's width, its bottom on the screen's: a phone crops blank
+        // water off the top, a squarer screen shows more of it.
         let fills = match.stage.features.look == .wetshot && !wholeStageView
-        let pointsPerGamePixel = wholeStageView || fills ? min(size.width / stageWidth, size.height / stageHeight) : screenPixelsPerGamePixel / screenScale
+        let pointsPerGamePixel = wholeStageView ? min(size.width / stageWidth, size.height / stageHeight)
+            : (fills ? size.width / stageWidth : screenPixelsPerGamePixel / screenScale)
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale
         cameraNode.position = CGPoint(x: scrolls && !wholeStageView ? cameraBase.x : stageWidth / 2,

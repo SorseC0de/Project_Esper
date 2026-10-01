@@ -35,6 +35,7 @@ STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elemen
 ROOT_IMAGES = {
     "ElementsTileset": ["Stages/Elements/tileset_elements.png", "Stages/tileset_elements.png"],
     "Basketball": ["basketball.png"],
+    "BasketballIce": ["basketball_ice.png"],
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")

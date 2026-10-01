@@ -1486,7 +1486,7 @@ final class GameScene: SKScene {
             ballSpin.rate = min(max(ballSpin.rate, -mostSpin), mostSpin)
             ballSpin.angle += ballSpin.rate * dt
         }
-        ballNode.texture = sprites.basketballFrames[ballSpin.frame]
+        ballNode.texture = (ball.frozen > 0 ? sprites.basketballIceFrames : sprites.basketballFrames)[ballSpin.frame]
         ballNode.zRotation = ballSpin.angle
     }
 
@@ -4487,34 +4487,32 @@ final class GameScene: SKScene {
                 let jumpSheets: [Animation] = [owner.hasBall ? .airBall : .air, .doubleJump]
                 let frame = owner.grounded ? owner.animationFrame
                     : jumpSheets.flatMap { sheet in (0..<sheet.frameCount).map { AnimationFrame(sheet, $0) } }.randomElement()!
-                let node = SKSpriteNode(texture: sprites.texture(frame, player: clone.owner))
+                // Drawn in the ice look.
+                let ice = SpriteLibrary.icePlayer
+                let node = SKSpriteNode(texture: sprites.texture(frame, player: ice))
                 node.size = node.texture!.size()
-                if let outline = sprites.outlineTexture(frame, player: clone.owner) {
-                    // Its line too, in ice like the rest of it.
+                if let outline = sprites.outlineTexture(frame, player: ice) {
+                    // Its line too, in the ice look's.
                     let line = SKSpriteNode(texture: outline)
                     line.size = node.size
                     line.anchorPoint = sprites.anchor(for: frame.animation)
-                    line.color = GameScene.ice
+                    line.color = SKColor(rgb: Look.ice.outline)
                     line.colorBlendFactor = 1
                     line.zPosition = 0.1
                     node.addChild(line)
                 }
                 node.anchorPoint = sprites.anchor(for: frame.animation)
                 node.xScale = CGFloat(owner.facing.sign)
-                node.color = GameScene.ice
-                node.colorBlendFactor = 0.75
                 node.alpha = 0.8
                 node.position = SpriteLibrary.point(Vec2(x: clone.box.center.x, y: clone.box.min.y))
                 node.zPosition = 6
                 // Its head, where the body's sat that frame; the body's space is already flipped.
                 if let head = sprites.landmark(.head, in: frame, player: clone.owner),
-                   let headTexture = sprites.headTexture(frame, player: clone.owner),
-                   let anchor = sprites.headAnchor(frame, player: clone.owner) {
+                   let headTexture = sprites.headTexture(frame, player: ice),
+                   let anchor = sprites.headAnchor(frame, player: ice) {
                     let headNode = SKSpriteNode(texture: headTexture)
                     headNode.size = CGSize(width: headTexture.size().width * GameScene.headScale, height: headTexture.size().height * GameScene.headScale)
                     headNode.anchorPoint = anchor
-                    headNode.color = GameScene.ice
-                    headNode.colorBlendFactor = 0.75
                     headNode.position = CGPoint(x: head.x, y: head.y + GameScene.headLift)
                     headNode.zPosition = 1
                     node.addChild(headNode)
@@ -4591,7 +4589,9 @@ final class GameScene: SKScene {
             section("sounds")
             // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
-            node.texture = sprites.texture(frame, player: index, ballAsEnergy: wholeSheet)
+            // Frozen, the body is drawn in the ice look.
+            let drawnAs = player.frozen > 0 ? SpriteLibrary.icePlayer : index
+            node.texture = sprites.texture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
             // Titan Tea's size, grown into after its port-in.
             if titanGrowDelay[index] > 0 {
                 titanGrowDelay[index] -= 1
@@ -4619,9 +4619,9 @@ final class GameScene: SKScene {
                 node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y) * drawScale
             }
             node.xScale = CGFloat(player.facing.sign)
-            // Frozen, the body goes ice; in the throw stance's parry frames, and growing, white.
-            let tint: SKColor = player.throwParrying || growing ? .white : GameScene.ice
-            let tintShare: CGFloat = growing ? 1 : (player.throwParrying ? 0.85 : (player.frozen > 0 ? 0.6 : 0))
+            // In the throw stance's parry frames, and growing, white.
+            let tint: SKColor = .white
+            let tintShare: CGFloat = growing ? 1 : (player.throwParrying ? 0.85 : 0)
             node.color = tint
             node.colorBlendFactor = tintShare
             headNodes[index].color = tint
@@ -4667,7 +4667,7 @@ final class GameScene: SKScene {
 
             // The line round the body, in the look's outline or cycling through the zone's.
             let outlineNode = outlineNodes[index]
-            if let outline = sprites.outlineTexture(frame, player: index, ballAsEnergy: wholeSheet) {
+            if let outline = sprites.outlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) {
                 outlineNode.isHidden = false
                 outlineNode.texture = outline
                 outlineNode.size = node.size
@@ -4677,18 +4677,18 @@ final class GameScene: SKScene {
                 // In the parry frames the line goes the bright version of the body's colour.
                 outlineNode.color = growing ? .white
                     : player.throwParrying ? SKColor(rgb: sprites.look(for: index).bright)
-                    : (player.frozen > 0 ? GameScene.ice : lineColour)
+                    : (player.frozen > 0 ? SKColor(rgb: Look.ice.outline) : lineColour)
             } else {
                 outlineNode.isHidden = true
             }
 
             // The frame's energy rides exactly where the body is drawn.
             let energyNode = energyNodes[index]
-            if let energy = sprites.energyTexture(frame, player: index, ballAsEnergy: wholeSheet) {
+            if let energy = sprites.energyTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) {
                 energyNode.isHidden = false
                 energyNode.texture = energy
                 // In the zone the energy (the slash's blade among it) runs the zone's colours.
-                setGlow(energyNode, ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).glow))
+                setGlow(energyNode, ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: drawnAs).glow))
                 energyNode.size = node.size
                 energyNode.anchorPoint = node.anchorPoint
                 energyNode.position = node.position
@@ -4724,7 +4724,7 @@ final class GameScene: SKScene {
                 halo.position = at
                 handBall.isHidden = false
                 handBall.position = at
-                handBall.texture = sprites.basketballFrames[dribbling ? Int(CACurrentMediaTime() / GameScene.dribbleFrameSeconds) % SpriteLibrary.basketballFrameCount : 0]
+                handBall.texture = (player.frozen > 0 ? sprites.basketballIceFrames : sprites.basketballFrames)[dribbling ? Int(CACurrentMediaTime() / GameScene.dribbleFrameSeconds) % SpriteLibrary.basketballFrameCount : 0]
             } else {
                 halo.isHidden = true
                 handBall.isHidden = true
@@ -4794,8 +4794,8 @@ final class GameScene: SKScene {
             // The head follows its place on the body loosely and bobs, as if it only just belonged.
             let headNode = headNodes[index]
             if let landmark = sprites.landmark(.head, in: frame, player: index),
-               let headTexture = sprites.headTexture(frame, player: index),
-               let anchor = sprites.headAnchor(frame, player: index) {
+               let headTexture = sprites.headTexture(frame, player: drawnAs),
+               let anchor = sprites.headAnchor(frame, player: drawnAs) {
                 let head = landmark * drawScale
                 let target = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                 if headShown[index] == .zero { headShown[index] = target }

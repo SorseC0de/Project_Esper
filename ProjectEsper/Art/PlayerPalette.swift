@@ -167,6 +167,15 @@ struct Look: Hashable {
     static let playerOne = team(orange, body: lightOrange)
     static let playerTwo = team(teal, body: lightTeal)
     static let byPlayer = [playerOne, playerTwo]
+
+    /// Frozen bodies and Frost Tea's ice clones: the front parts, the head and the clothes'
+    /// light in palette 57, the back parts and the clothes' shadow in 48, outlined in 22.
+    static let ice: Look = {
+        let front = PixelPalette.colours[57], back = PixelPalette.colours[48]
+        var colours: [BodyPart: RGB] = [:]
+        for part in BodyPart.allCases { colours[part] = part.isBack ? back : front }
+        return Look(colours: colours, glow: front, outline: PixelPalette.colours[22], strokedGroups: Look.strokedGroups)
+    }()
 }
 
 /// The energy colours a player can pick on the title, each paired with its opposite: when

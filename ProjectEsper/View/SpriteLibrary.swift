@@ -15,7 +15,10 @@ final class SpriteLibrary {
     private var cache: [String: SKTexture] = [:]
     /// Where the glowing parts sit in each player frame, in art pixels from the feet.
     private var landmarks: [String: [BodyPart: CGPoint]] = [:]
-    private var looks = Look.byPlayer
+    /// The two players' looks, then the ice look frozen bodies and ice clones are drawn in,
+    /// asked for as the player `icePlayer`.
+    private var looks = Look.byPlayer + [Look.ice]
+    static let icePlayer = Look.byPlayer.count
 
     func look(for player: Int) -> Look {
         looks[min(player, looks.count - 1)]
@@ -103,18 +106,22 @@ final class SpriteLibrary {
         return texture
     }
 
-    /// The ball's three frames, cut from the 24x8 picture in the catalog's root.
+    /// The ball's three frames, cut from the 24x8 picture in the catalog's root, and the
+    /// frozen ball's from its own.
     static let basketballFrameCount = 3
-    private(set) lazy var basketballFrames: [SKTexture] = {
-        let sheet = SKTexture(imageNamed: "Basketball")
+    private(set) lazy var basketballFrames: [SKTexture] = SpriteLibrary.cutBall("Basketball")
+    private(set) lazy var basketballIceFrames: [SKTexture] = SpriteLibrary.cutBall("BasketballIce")
+
+    private static func cutBall(_ name: String) -> [SKTexture] {
+        let sheet = SKTexture(imageNamed: name)
         sheet.filteringMode = .nearest
-        let share = 1 / CGFloat(SpriteLibrary.basketballFrameCount)
-        return (0..<SpriteLibrary.basketballFrameCount).map { index in
+        let share = 1 / CGFloat(basketballFrameCount)
+        return (0..<basketballFrameCount).map { index in
             let frame = SKTexture(rect: CGRect(x: CGFloat(index) * share, y: 0, width: share, height: 1), in: sheet)
             frame.filteringMode = .nearest
             return frame
         }
-    }()
+    }
 
     /// A player frame in that player's look, without its head or its energy.
     /// With `ballAsEnergy`, a sheet that draws the ball has its whites taken as energy,
@@ -324,6 +331,12 @@ final class SpriteLibrary {
     /// Builds every frame of every player up front and sends them to the GPU, so nothing
     /// is made mid-draw.
     func warmUp(players: Int, completion: @escaping () -> Void) {
+        // The ice look's frames as well, so a freeze never makes them mid-match.
+        for animation in Animation.allCases {
+            for frame in 0..<animation.frameCount {
+                _ = texture(AnimationFrame(animation, frame), player: SpriteLibrary.icePlayer)
+            }
+        }
         for player in 0..<players {
             for animation in Animation.allCases {
                 for frame in 0..<animation.frameCount {

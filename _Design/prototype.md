@@ -738,6 +738,43 @@ differently, and it holds its jumps through the squat so its hops are full.
   own shot alone while it's on its way and waits under the rim for the miss, and goes up
   for one over its head, both jumps if it's high.
 
+### Off the court
+
+Everywhere but the court it was first taught on (`Opponent.readsStage`), it plays by a reading of
+the stage (`OpponentTerrain.swift`, `OpponentStages.swift`):
+
+- The stage read: every height a body stands at, by the stage's own collision, run together
+  into surfaces (slopes stepping along them), and each tornado's middle; nothing under the lava
+  counts. Then the moves between them (`Terrain.Link`): the full hop with the second jump at its
+  top if short, walking off an edge (the second jump once it's fallen a way, or none), or down
+  through a one-way; each tried with a copy of its body on the stage, and from 3 units either
+  side of the takeoff, and kept only if all three land where they're for. Its jump is measured
+  the same way, under water too. Read 1500 body frames at a time, over the countdown.
+- Getting about (`go`): along a surface, or across the cheapest way of moves, walking to each
+  takeoff and playing the move as it was tried; a move that fails 150 frames past what it
+  should need is given up on for ten seconds. A tornado is only taken if it's up and holds 45
+  frames more; it's left from its middle, waiting for the pull there, a second before it lets go,
+  sinks or turns fire.
+- The lava (`keepOffTheLava`): every input it sends is first played out with a copy of the body,
+  the tornados holding and bursting as they will; one that ends in the lava is swapped for the
+  nearest that doesn't, a jump or the stick another way. Stunned in a tornado it holds still,
+  since the stick would drift it out. Over lava it doesn't lob.
+- Hazards (`dodgeHazards`): on the ground it steps out from under the lightning's line in its
+  last 45 frames, and from under an icicle falling toward it or about to drop.
+- Shots: a still rim's shot spots are found by trying shots, one place a frame, on the surfaces 25
+  to 140 in front of it; a spot is a jump shot's if a shot off the floor won't go in. Every shot's
+  flick is found by playing the shot out (a copy of the body through the rest of the stance, the
+  jump, the release) and then the ball's own flight, the middle of the angles that go in.
+- A rim that moves, Wetshot Wake's, is followed ahead by stepping a copy of the Hooperfish: it
+  shoots at where the rim will be, from under where it'll be in a second and a half; dunks it
+  only when it's there and in jumping reach; keeps the ball away from the other while it's off
+  screen. The ball on the antenna is met where the fish will carry it, jumping in time.
+- A loose ball is met where its stepped-ahead flight first comes in reach.
+- Its plays that rush at the rim on the court (the dart, the jump over, being blocked) go by the
+  next step of its way instead, which on the Elements can run away from the rim first.
+- Longball's helmets: one coming from where it's headed it goes over, held still on the rise
+  and across once clear of the top, rather than riding it back; one going its way it rides.
+
 ## Look
 
 `Art/PlayerPalette.swift` names the figure's eleven parts and the flat colour each is

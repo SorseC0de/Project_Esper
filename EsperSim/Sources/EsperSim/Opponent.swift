@@ -32,7 +32,7 @@ public struct Opponent: Equatable {
     private var spot: Spot?
     private var jumpShot = false
     /// The jump's button held through the squat, so the hop is full.
-    private var wantsFullHop = false
+    var wantsFullHop = false
     private var humanStill = 0
     /// How long the other charged the throw they last let go: a long charge is telegraphed.
     /// Whether it will go for the throw in the air is decided once per throw.
@@ -40,11 +40,21 @@ public struct Opponent: Equatable {
     private var lastThrowCharge = 0
     private var throwRead: Bool?
     /// Last frame's output, to make a press an edge.
-    private var pressed = PlayerInput.idle
+    var pressed = PlayerInput.idle
     /// The frames the other's last slashes started on, to tell spam from a one-off, and
     /// whether the throw stance it's in is a parry, to be cancelled once it's done.
     private var slashStarts: [Int] = []
     private var parrying = false
+    /// Off the court: the stage as read, the link being taken, links given up on a while, the
+    /// search for a still rim's shot spots, and the spot it's making for.
+    var terrain: Terrain?
+    /// The helmet it last stood on, so stepping off its back isn't taken for it coming.
+    private var riddenHelmet: Int?
+    var journey: Journey?
+    var givenUp: [GivenUp] = []
+    var spotSearch: SpotSearch?
+    private var readSpot: ShotSpot?
+    private var readSpotFrames = 0
 
     /// What it's up to.
     public enum Plan: Equatable {
@@ -62,7 +72,7 @@ public struct Opponent: Equatable {
 
     /// Where it likes to shoot from: two distances on the floor in front of the rim, and
     /// the end of the ledge nearest it.
-    public enum Spot: Equatable { case nearFloor, farFloor, ledge }
+    public enum Spot: Equatable { case nearFloor, farFloor, ledge, read }
 
     public init(index: Int, seed: UInt32 = 7) {
         self.index = index
@@ -97,10 +107,18 @@ public struct Opponent: Equatable {
         } else {
             humanThrowCharge = 0
         }
-        if me.state == .jumpSquat {
+        let readsStage = Opponent.readsStage(match)
+        if readsStage {
+            readStage(match, me: me)
+            let scoringHoop = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
+            if match.hooperfish == nil, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
+        }
+        if readsStage, leaveTornado(match, me: me, toward: me.hasBall ? hoop(scoredOnBy: index, in: match).position : match.ball.position, into: &input) {
+            // Out of a tornado before it lets go.
+        } else if me.state == .jumpSquat {
             // Through the squat the button stays down for a full hop, or up for a short one.
             input.jump = wantsFullHop
-        } else if clearHelmet(match, me: me, into: &input) {
+        } else if clearHelmet(match, me: me, heading: heading(match, me: me, human: human), into: &input) {
             // A helmet bearing down: up and onto it, whatever else it was doing.
         } else if me.hasBall {
             offence(match, me: me, human: human, into: &input)
@@ -108,6 +126,13 @@ public struct Opponent: Equatable {
             defence(match, me: me, human: human, into: &input)
         } else {
             neutral(match, me: me, human: human, into: &input)
+        }
+        if readsStage, me.state == .suspended, me.hitStun > 0 {
+            // Stunned in a tornado the jump won't answer but the stick still drifts it: held still, the pull keeps it in.
+            input = PlayerInput()
+        } else if readsStage, me.state != .jumpSquat {
+            if journey?.started != true { dodgeHazards(match, me: me, into: &input) }
+            keepOffTheLava(match, me: me, into: &input)
         }
         pressed = input
         return input
@@ -125,9 +150,24 @@ public struct Opponent: Equatable {
     /// still until clear of its top, then over. True while it's doing either.
     private static let helmetLeadFrames = 20.0
 
-    private mutating func clearHelmet(_ match: Match, me: Player, into input: inout PlayerInput) -> Bool {
+    /// Which way it's going about its business: to the rim it scores on with the ball, the one it
+    /// guards without, the ball when it's loose.
+    private func heading(_ match: Match, me: Player, human: Player) -> Double {
+        let x = me.hasBall ? hoop(scoredOnBy: index, in: match).position.x
+            : human.hasBall ? hoop(scoredOnBy: human.index, in: match).position.x : match.ball.position.x
+        return x >= me.position.x ? 1 : -1
+    }
+
+    private mutating func clearHelmet(_ match: Match, me: Player, heading: Double, into input: inout PlayerInput) -> Bool {
         guard !Opponent.committedStates.contains(me.state) || me.state == .slide else { return false }
         let feet = me.position.y
+        // Stood on its top: the body's grounded flag can lag a frame behind one that moves.
+        if let standing = match.helmets.first(where: { abs($0.box.max.y - feet) < 0.5 && me.velocity.y <= 0
+            && me.position.x >= $0.box.min.x && me.position.x <= $0.box.max.x }) {
+            riddenHelmet = standing.id
+        } else if me.grounded {
+            riddenHelmet = nil
+        }
         let standingTop = feet + me.spec.bodyHeight
         let crouchedTop = feet + me.spec.bodyHeight / 2
         let halfWidth = me.spec.bodyWidth / 2
@@ -139,7 +179,9 @@ public struct Opponent: Equatable {
             let level = (helmet.box.min.y < standingTop + 4 && helmet.box.max.y > feet) || above
             // Close by time, not distance: the frames to meet it at the speed they're closing.
             let closing = max(abs(helmet.speed) - me.velocity.x * (helmet.speed > 0 ? 1 : -1), 1)
-            return ahead > -helmet.box.width && gap < closing * Opponent.helmetLeadFrames && level
+            // Ridden, and stepped off its back: let it go on and come down behind it.
+            let leaving = above && ahead < 0 && riddenHelmet == helmet.id
+            return ahead > -helmet.box.width && gap < closing * Opponent.helmetLeadFrames && level && !leaving
         }
         guard let helmet = coming else { return false }
         if me.grounded, !me.holding, helmet.box.min.y > crouchedTop + 1 {
@@ -148,6 +190,18 @@ public struct Opponent: Equatable {
             return true
         }
         guard me.state != .slide else { return true }
+        if (helmet.speed > 0 ? 1.0 : -1.0) != heading {
+            // Coming from where it's headed: riding it would carry it back the way it came. Over it
+            // and on, both jumps if it needs them: held still on the way up so it comes on slower,
+            // across once the feet are over its top.
+            input.stick = me.grounded || me.position.y > helmet.box.max.y + 1 ? Vec2(x: heading, y: 0) : .zero
+            if me.grounded {
+                fullHop(&input)
+            } else if me.velocity.y < 0.5, me.jumpsLeft > 0, me.position.y < helmet.box.max.y + 2 {
+                tapJump(&input)
+            }
+            return true
+        }
         // In the air the stick lets go, and the air's brake holds it, until the feet clear the
         // top; then into it, and let go again once over it, so it sets down there.
         let over = abs(helmet.box.center.x - me.position.x) < helmet.box.width / 4
@@ -164,21 +218,21 @@ public struct Opponent: Equatable {
 
     // MARK: Chance and presses
 
-    private mutating func roll(_ sides: UInt32) -> UInt32 {
+    mutating func roll(_ sides: UInt32) -> UInt32 {
         random = random &* 1664525 &+ 1013904223
         return (random >> 16) % sides
     }
 
-    private mutating func chance(_ percent: UInt32) -> Bool {
+    mutating func chance(_ percent: UInt32) -> Bool {
         roll(100) < percent
     }
 
     /// A press is an edge: down this frame only if it was up last frame.
-    private func tapJump(_ input: inout PlayerInput) { input.jump = !pressed.jump }
-    private func tapShoot(_ input: inout PlayerInput) { input.shoot = !pressed.shoot }
-    private func tapThrow(_ input: inout PlayerInput) { input.throwBall = !pressed.throwBall }
+    func tapJump(_ input: inout PlayerInput) { input.jump = !pressed.jump }
+    func tapShoot(_ input: inout PlayerInput) { input.shoot = !pressed.shoot }
+    func tapThrow(_ input: inout PlayerInput) { input.throwBall = !pressed.throwBall }
 
-    private mutating func fullHop(_ input: inout PlayerInput) {
+    mutating func fullHop(_ input: inout PlayerInput) {
         wantsFullHop = true
         input.jump = true
     }
@@ -218,7 +272,7 @@ public struct Opponent: Equatable {
     private func place(of spot: Spot, for hoop: Hoop, in stage: Stage) -> Vec2 {
         let inward = -hoop.backboard.sign
         switch spot {
-        case .nearFloor: return Vec2(x: hoop.position.x + inward * 45, y: Stage.tileSize)
+        case .nearFloor, .read: return Vec2(x: hoop.position.x + inward * 45, y: Stage.tileSize)
         case .farFloor: return Vec2(x: hoop.position.x + inward * 70, y: Stage.tileSize)
         case .ledge:
             // The court's one-way ledge: its end nearest the rim, a little in from the edge.
@@ -232,7 +286,27 @@ public struct Opponent: Equatable {
     }
 
     private mutating func offence(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) {
-        let hoop = hoop(scoredOnBy: index, in: match)
+        var hoop = hoop(scoredOnBy: index, in: match)
+        let readsStage = Opponent.readsStage(match)
+        let hoopIndex = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
+        let rimPath = readsStage ? hoopPath(match) : nil
+        if let rimPath {
+            // A rim on the move is played where it'll be in a moment, or where it comes back in.
+            guard let coming = rimPath.prefix(20).last(where: { $0 != HighwayRules.parked }) ?? rimPath.first(where: { $0 != HighwayRules.parked }) else {
+                // None for a while: the ball kept, away from them.
+                readSpot = nil
+                if !Opponent.committedStates.contains(me.state), me.state != .shootStance, me.state != .throwStance {
+                    let away: Double = me.position.x >= human.position.x ? 1 : -1
+                    go(to: Vec2(x: me.position.x + away * 40, y: me.position.y), match: match, me: me, into: &input)
+                } else if me.state == .shootStance {
+                    input.stick = Vec2(x: 0, y: -1)
+                }
+                return
+            }
+            hoop.position = coming
+        }
+        // A rim that's coming but not here yet can't be dunked on.
+        let rimOut = rimPath != nil && match.stage.hoops[hoopIndex].position == HighwayRules.parked
         let inward = -hoop.backboard.sign
         let toHoop = hoop.position.x - me.position.x
         let gap = human.position.x - me.position.x
@@ -262,7 +336,7 @@ public struct Opponent: Equatable {
             return
         }
         // In the air by the rim: the dunk, whatever the plan was.
-        if !me.grounded, me.state == .air, hoop.position.distance(to: me.chest) < 60, me.chest.y > hoop.position.y - 40 {
+        if !rimOut, !me.grounded, me.state == .air, hoop.position.distance(to: me.chest) < 60, me.chest.y > hoop.position.y - 40 {
             plan = .dunk
             planFrames = max(planFrames, 20)
         }
@@ -270,7 +344,7 @@ public struct Opponent: Equatable {
         let open = Opponent.open(human) && abs(gap) < 60 && level
         let committed = dangerous || open
         // Behind the block: on the backboard's side of the rim, past the block's face.
-        let behind = (me.position.x - hoop.position.x) * hoop.backboard.sign > 5 && me.position.y < 100
+        let behind = !readsStage && (me.position.x - hoop.position.x) * hoop.backboard.sign > 5 && me.position.y < 100
 
         // In the stance: a fake lets go with down on the ground; a shot holds through the
         // windup with the aim on the rim, then lets go, sooner if they're closing in; a
@@ -293,13 +367,14 @@ public struct Opponent: Equatable {
                     input.shoot = true
                     if stanceFrames > BallRules.shotWindupFrames { fullHop(&input) }
                 } else {
-                    let aim = shotAim(match, from: me.position, lift: max(me.velocity.y, 0), to: hoop) ?? shotAim(match, from: me.position, lift: 0, to: hoop)
+                    let aim = aimShot(match, me: me, lift: max(me.velocity.y, 0), hoop: hoop, index: hoopIndex, path: rimPath)
+                        ?? (readsStage ? nil : aimShot(match, me: me, lift: 0, hoop: hoop, index: hoopIndex, path: rimPath))
                     input.aim = aim ?? Vec2(x: Trig.cos(BallRules.shotAngleDefault) * inward, y: Trig.sin(BallRules.shotAngleDefault))
-                    input.shoot = me.velocity.y > 2.4
+                    input.shoot = me.velocity.y > Opponent.jumpShotLetGo
                 }
                 return
             }
-            if let aim = shotAim(match, from: me.position, lift: 0, to: hoop) {
+            if let aim = aimShot(match, me: me, lift: 0, hoop: hoop, index: hoopIndex, path: rimPath) {
                 input.aim = aim
                 input.shoot = stanceFrames <= BallRules.shotWindupFrames + 1 && !(inReach && !committed)
             } else {
@@ -324,16 +399,34 @@ public struct Opponent: Equatable {
         } else if plan != .none {
             plan = .none
         }
-        if spot == nil || (spot == .ledge && human.position.y > 35) {
+        if readsStage {
+            if readSpot == nil || readSpotFrames <= 0 {
+                readSpot = rimPath.flatMap { spotUnderMovingRim(match, me: me, path: $0) } ?? pickReadSpot(match, me: me, human: human, hoop: hoop)
+                    ?? terrain?.standing(nearest: Vec2(x: hoop.position.x + inward * 50, y: hoop.position.y - 60)).map { stand in
+                        ShotSpot(feet: Vec2(x: stand.x, y: terrain!.surfaces[stand.surface].height(at: stand.x)), jumpShot: true)
+                    }
+                readSpotFrames = rimPath != nil ? 45 : 240
+            } else {
+                readSpotFrames -= 1
+            }
+            spot = .read
+        } else if spot == nil || spot == .read || (spot == .ledge && human.position.y > 35) {
             spot = pickSpot(match, me: me, human: human, hoop: hoop)
         }
         guard let spot else { return }
-        let target = place(of: spot, for: hoop, in: match.stage)
+        let target = spot == .read ? readSpot?.feet ?? me.position : place(of: spot, for: hoop, in: match.stage)
         let atSpot = abs(target.x - me.position.x) < 6 && abs(target.y - me.position.y) < 4 && me.grounded
-        let blocked = (gap > 0) == (target.x - me.position.x > 0) && abs(gap) < abs(target.x - me.position.x) + 10 && near
+        // Off the court the way there may not run straight at the spot: what's in the way is what's on the next step of it.
+        let toWay = (readsStage ? nextStepX(toward: target, match: match, me: me) : target.x) - me.position.x
+        let blocked = abs(toWay) >= 1 && (gap > 0) == (toWay > 0) && abs(gap) < abs(toWay) + 10 && near
+        // The dash and the jump over go that way too; on the court, at the rim.
+        let toRush = readsStage ? toWay : toHoop
+        // Over lava a lob is the ball thrown away to chase where it can burn.
+        let lobs = match.stage.features.lavaSurface == nil
 
         // Near enough the rim and level with its floor: the dunk, up and onto it.
-        let rimClose = abs(toHoop) < 55 && me.position.y < hoop.position.y && hoop.position.y - me.position.y < 60
+        let rimClose = readsStage ? !rimOut && abs(toHoop) < 55 && dunkReach(match, rim: hoop.position)
+            : abs(toHoop) < 55 && me.position.y < hoop.position.y && hoop.position.y - me.position.y < 60
         if behind, plan != .dunk {
             plan = .climb
             planFrames = 1
@@ -355,7 +448,7 @@ public struct Opponent: Equatable {
                 plan = .shoot
                 planFrames = 90
                 // A rim too high for a shot off the floor always takes the jump shot.
-                let outOfReach = hoop.position.y - target.y > 90
+                let outOfReach = readsStage ? readSpot?.jumpShot ?? true : hoop.position.y - target.y > 90
                 jumpShot = outOfReach || (spot != .ledge && chance(50))
                 dances = 0
             } else if blocked, !committed {
@@ -365,9 +458,13 @@ public struct Opponent: Equatable {
                     dances = 0
                     switch roll(3) {
                     case 0: plan = .over; planFrames = 45
-                    case 1: plan = .lob; planFrames = 60
+                    case 1: plan = lobs ? .lob : .over; planFrames = 60
                     default:
-                        self.spot = spot == .ledge ? .farFloor : .ledge
+                        if readsStage {
+                            readSpot = nil
+                        } else {
+                            self.spot = spot == .ledge ? .farFloor : .ledge
+                        }
                         plan = .travel; planFrames = 30
                     }
                 } else {
@@ -384,7 +481,7 @@ public struct Opponent: Equatable {
                         fakeHold = 8 + Int(roll(8))
                         planFrames = 30
                     case 8:
-                        plan = .lob
+                        plan = lobs ? .lob : .over
                         planFrames = 60
                     case 9:
                         plan = .over
@@ -416,7 +513,7 @@ public struct Opponent: Equatable {
             switch roll(10) {
             case 0...3: plan = .dart
             case 4...6: plan = .retreat
-            default: plan = .lob
+            default: plan = lobs ? .lob : .over
             }
             planFrames = 30
         }
@@ -432,9 +529,9 @@ public struct Opponent: Equatable {
             input.shoot = true
         case .dart:
             // A frame with the stick centred first, so the push reads as a smash.
-            if planFrames >= 39 { break }
-            input.stick = Vec2(x: toHoop > 0 ? 1 : -1, y: 0)
-            let between = (gap > 0) == (toHoop > 0) && abs(gap) < abs(toHoop)
+            if planFrames >= 39 || abs(toRush) < 1 { break }
+            input.stick = Vec2(x: toRush > 0 ? 1 : -1, y: 0)
+            let between = (gap > 0) == (toRush > 0) && abs(gap) < abs(toRush)
             if between, abs(gap) < 30, me.grounded {
                 fullHop(&input)
             } else if !me.grounded, me.velocity.y < 0.5, me.jumpsLeft > 0, between, abs(gap) < 20 {
@@ -443,7 +540,11 @@ public struct Opponent: Equatable {
         case .retreat:
             input.stick = Vec2(x: gap > 0 ? -0.5 : 0.5, y: 0)
         case .travel:
-            travel(to: target, me: me, human: human, into: &input)
+            if readsStage {
+                go(to: target, match: match, me: me, into: &input)
+            } else {
+                travel(to: target, me: me, human: human, into: &input)
+            }
         case .shoot:
             if !atSpot, me.grounded {
                 plan = .none
@@ -456,7 +557,8 @@ public struct Opponent: Equatable {
             input.throwBall = true
         case .over:
             // Up and over toward the rim: a full hop, the double jump at the top.
-            input.stick = Vec2(x: toHoop > 0 ? 1 : -1, y: 0)
+            if abs(toRush) < 1 { break }
+            input.stick = Vec2(x: toRush > 0 ? 1 : -1, y: 0)
             if me.grounded {
                 fullHop(&input)
             } else if me.velocity.y < 0.5, me.jumpsLeft > 0 {
@@ -466,7 +568,12 @@ public struct Opponent: Equatable {
             climbOut(me: me, hoop: hoop, into: &input)
         case .dunk:
             // In under the rim, a full hop when it's close, and the throw held in the air
-            // so the stance carries it onto the rim.
+            // so the stance carries it onto the rim. Off the court, the way to under it first.
+            if readsStage, me.grounded, abs(toHoop) >= 34 {
+                go(to: Vec2(x: hoop.position.x, y: hoop.position.y - 30), match: match, me: me, into: &input)
+                if planFrames == 0 { plan = .none }
+                break
+            }
             input.stick = Vec2(x: toHoop > 0 ? 1 : -1, y: 0)
             if me.grounded, abs(toHoop) < 34 {
                 fullHop(&input)
@@ -526,6 +633,13 @@ public struct Opponent: Equatable {
         input.stick = Vec2(x: -hoop.backboard.sign, y: 0)
     }
 
+    /// The flick for the shot from where it is: on the court the arc worked out, off it the
+    /// ball's own flight tried, the rim followed where it moves.
+    private func aimShot(_ match: Match, me: Player, lift: Double, hoop: Hoop, index hoopIndex: Int, path: [Vec2]?) -> Vec2? {
+        Opponent.readsStage(match) ? aimByFlight(match, me: me, jumpShot: jumpShot, stanceSoFar: stanceFrames - 1, hoop: hoopIndex, path: path)
+            : shotAim(match, from: me.position, lift: lift, to: hoop)
+    }
+
     /// The flick that lands a shot from here nearest the rim, with `lift` added to its
     /// rise, in five-degree steps through the shot's range, or nil when none comes within
     /// twenty units of it.
@@ -561,7 +675,10 @@ public struct Opponent: Equatable {
     // MARK: The other with the ball
 
     private mutating func defence(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) {
-        let hoop = hoop(scoredOnBy: human.index, in: match)
+        var hoop = hoop(scoredOnBy: human.index, in: match)
+        let readsStage = Opponent.readsStage(match)
+        // A rim out of play, off with the Hooperfish: on them instead.
+        if readsStage, hoop.position == HighwayRules.parked { hoop.position = human.position + Vec2(x: 0, y: 40) }
         let side: Double = human.position.x >= hoop.position.x ? 1 : -1
         let guardX = hoop.position.x + side * 25
         let toGuard = guardX - me.position.x
@@ -598,6 +715,11 @@ public struct Opponent: Equatable {
             // they're above. In reach, the slash, or the snatch up close.
             plan = .strike
             planFrames = 30
+            if readsStage, abs(rise) >= 24 || abs(gap) > 60 {
+                // On another surface: the way there first.
+                go(to: human.position, match: match, me: me, into: &input)
+                return
+            }
             if abs(gap) <= 24, rise < 24, rise > -20 {
                 if rise > 8, me.grounded {
                     fullHop(&input)
@@ -625,6 +747,13 @@ public struct Opponent: Equatable {
             planFrames = 120
         }
         if plan == .pressure {
+            if readsStage {
+                if go(to: human.position, match: match, me: me, into: &input, near: 32) || (abs(gap) <= 32 && level) {
+                    plan = .strike
+                    planFrames = 30
+                }
+                return
+            }
             if abs(gap) > 32 {
                 input.stick = Vec2(x: gap > 0 ? (abs(gap) > 70 ? 1 : 0.5) : (abs(gap) > 70 ? -1 : -0.5), y: 0)
             } else {
@@ -646,10 +775,16 @@ public struct Opponent: Equatable {
         if plan == .hover {
             let hoverX = hoop.position.x + side * (55 + Double(roll(2)) * 10)
             let toHover = hoverX - me.position.x
+            if readsStage {
+                go(to: Vec2(x: hoverX, y: hoop.position.y - 40), match: match, me: me, into: &input, near: 8)
+                return
+            }
             if abs(toHover) > 8 { input.stick = Vec2(x: toHover > 0 ? 0.5 : -0.5, y: 0) }
             return
         }
-        if abs(toGuard) > 6 {
+        if readsStage, !go(to: Vec2(x: guardX, y: hoop.position.y - 40), match: match, me: me, into: &input, near: 6) {
+            return
+        } else if !readsStage, abs(toGuard) > 6 {
             let speed = abs(toGuard) > 50 ? 1.0 : 0.5
             input.stick = Vec2(x: toGuard > 0 ? speed : -speed, y: 0)
         } else if me.facing != (gap > 0 ? .right : .left) {
@@ -672,6 +807,10 @@ public struct Opponent: Equatable {
         // Its own shot, still on its way: let it go in, and wait under the rim for a miss.
         if ball.shotInFlight, ball.lastTouched == index {
             let hoop = hoop(scoredOnBy: index, in: match)
+            if Opponent.readsStage(match) {
+                go(to: Vec2(x: hoop.position.x - (hoop.shared ? 0 : hoop.backboard.sign * 30), y: hoop.position.y - 40), match: match, me: me, into: &input)
+                return
+            }
             let spot = hoop.position.x - hoop.backboard.sign * 30
             let toSpot = spot - me.position.x
             if abs(toSpot) > 6 { input.stick = Vec2(x: toSpot > 0 ? 0.5 : -0.5, y: 0) }
@@ -701,23 +840,14 @@ public struct Opponent: Equatable {
             return
         }
         throwRead = nil
+        if Opponent.readsStage(match) {
+            if !snatchOrSpike(ball, me: me, into: &input) { chaseReadBall(match, me: me, into: &input) }
+            return
+        }
         let target = landing(of: ball, in: match.stage)
         let toBall = target - me.position.x
         let above = ball.position.y - me.position.y
-        // A ball in flight about to be in reach: the snatch to take it, timed for the hand,
-        // or the slash to spike it, by chance.
-        if ball.velocity.length > 2 {
-            let soon = ballPosition(ball, after: 6)
-            let inHand = soon.distance(to: me.handCatchPoint) <= BallRules.handCatchRadius || soon.distance(to: me.chest) <= BallRules.catchRadius
-            let inBlade = abs(soon.x - me.bladeCentre.x) <= SlashRules.reach && abs(soon.y - me.bladeCentre.y) <= SlashRules.reach
-            if inHand, me.snatchCooldown == 0, chance(70) {
-                tapThrow(&input)
-                return
-            } else if inBlade, chance(50) {
-                tapShoot(&input)
-                return
-            }
-        }
+        if snatchOrSpike(ball, me: me, into: &input) { return }
         if abs(toBall) > 30 {
             input.stick = Vec2(x: toBall > 0 ? 1 : -1, y: 0)
         } else if abs(toBall) > 5 {
@@ -735,6 +865,23 @@ public struct Opponent: Equatable {
                 tapJump(&input)
             }
         }
+    }
+
+    /// A ball in flight about to be in reach: the snatch to take it, timed for the hand, or the
+    /// slash to spike it, by chance.
+    private mutating func snatchOrSpike(_ ball: Ball, me: Player, into input: inout PlayerInput) -> Bool {
+        guard ball.velocity.length > 2 else { return false }
+        let soon = ballPosition(ball, after: 6)
+        let inHand = soon.distance(to: me.handCatchPoint) <= BallRules.handCatchRadius || soon.distance(to: me.chest) <= BallRules.catchRadius
+        let inBlade = abs(soon.x - me.bladeCentre.x) <= SlashRules.reach && abs(soon.y - me.bladeCentre.y) <= SlashRules.reach
+        if inHand, me.snatchCooldown == 0, chance(70) {
+            tapThrow(&input)
+            return true
+        } else if inBlade, chance(50) {
+            tapShoot(&input)
+            return true
+        }
+        return false
     }
 
     /// Where the ball will be this many frames on, falling as it does.

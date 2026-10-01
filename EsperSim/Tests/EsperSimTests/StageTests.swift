@@ -163,7 +163,7 @@ final class StageTests: XCTestCase {
         XCTAssertLessThan(match.ball.position.y, height - 5, "gravity takes it once pushed")
     }
 
-    func testTheComputerGetsOnTopOfAHelmetComingAtIt() {
+    func testTheComputerGoesOverAHelmetComingAtIt() {
         var match = field()
         var brain = Opponent(index: 1)
         match.players[0].hasBall = false
@@ -177,12 +177,13 @@ final class StageTests: XCTestCase {
         // One at its height: none spawn this low, but one met in the air is the same.
         let bottom = 10.0
         match.helmets = [Helmet(id: 5, box: Box(min: Vec2(x: 780, y: bottom), max: Vec2(x: 820, y: bottom + 40)), speed: 2, owner: 0, variant: 0)]
-        var rode = false
-        for _ in 0..<120 where !rode {
+        // Its way lies past the helmet, which comes at it: over it, not ridden back the way it came.
+        var past = false
+        for _ in 0..<120 where !past {
             match.advance(inputs: [.idle, brain.decide(match)])
-            if let helmet = match.helmets.first, match.players[1].grounded, abs(match.players[1].position.y - helmet.box.max.y) < 0.01 { rode = true }
+            if let helmet = match.helmets.first, match.players[1].position.x < helmet.box.min.x, match.players[1].grounded { past = true }
         }
-        XCTAssertTrue(rode, "up and riding it rather than pushed along")
+        XCTAssertTrue(past, "over it and down behind it rather than pushed along")
     }
 
     func testTheBallBouncesOffABackboard() {

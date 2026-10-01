@@ -3227,7 +3227,7 @@ final class GameScene: SKScene {
     /// far as the ball did and never past the cap, one of the four bolts each time, at the
     /// sheet's own width and stretched tall enough to run past the top of the screen at
     /// that lean. On the sheet's two full-frame flash frames the whole screen flashes in
-    /// the same tone and the floor and walls go white, fading back. The crown erupts off
+    /// the same tone and the floor and walls go white, fading back. `score_strike` erupts off
     /// the rim with it.
     private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
         // A shot goes in with the net's swish; a dunk's sound is the announcer's.
@@ -3256,7 +3256,7 @@ final class GameScene: SKScene {
                              .wait(forDuration: Double(EnergyEffect.strikeFlashFrames.count) * frame), .removeFromParent()]))
         courtWhiteIn = Int((Double(EnergyEffect.strikeFlashFrames.lowerBound) * frame * 60).rounded())
 
-        let crown = EnergyEffect.spark3.node(sprites, player: scorer, at: rim)
+        let crown = EnergyEffect.scoreStrike.node(sprites, player: scorer, at: rim)
         crown.zPosition = 46
         glowers.addChild(crown)
     }

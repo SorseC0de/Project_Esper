@@ -10,6 +10,8 @@ enum WetshotArt {
     /// The water's top colour and its floor's, for a taller or wider screen's spare.
     static let waterTop: RGB = PixelPalette.colours[19]
     static let floorColour: RGB = PixelPalette.colours[16]
+    /// Rows of the floor's colour under the background.
+    static let floorRows = 1
 
     private static func picture(_ name: String) -> SKTexture {
         let texture = SKTexture(imageNamed: name)
@@ -99,22 +101,24 @@ enum WetshotArt {
     }
 
     static func build(stage: Stage, map: StageMap, into parent: SKNode) -> Handles {
-        let width = CGFloat(stage.columns) * tileSide, height = CGFloat(stage.rows) * tileSide
+        let width = CGFloat(stage.columns) * tileSide
+        // The background a row up off the floor's row, at its own size; the row of water over
+        // it is the scene's background, the water's top colour.
         let back = SKSpriteNode(texture: background)
         back.anchorPoint = .zero
-        back.size = CGSize(width: width, height: height)
+        back.size = background.size()
+        back.position = CGPoint(x: 0, y: tileSide * CGFloat(WetshotArt.floorRows))
         back.zPosition = -20
         parent.addChild(back)
-        // A taller or wider screen's spare: the floor's colour on down below, the water's top
-        // colour everywhere else behind (the scene's background).
+        // The floor's row under it, and a bigger screen's spare below that, in the floor's colour.
         let spare = tileSide * 16
-        let below = SKSpriteNode(color: SKColor(rgb: floorColour), size: CGSize(width: width + spare * 2, height: spare))
+        let below = SKSpriteNode(color: SKColor(rgb: floorColour), size: CGSize(width: width + spare * 2, height: spare + tileSide * CGFloat(WetshotArt.floorRows)))
         below.anchorPoint = .zero
         below.position = CGPoint(x: -spare, y: -spare)
         below.zPosition = -20
         parent.addChild(below)
         var handles = Handles(parent: parent)
-        handles.backdrop = [back]
+        handles.backdrop = [back, below]
         handles.setProps(map.props)
         return handles
     }

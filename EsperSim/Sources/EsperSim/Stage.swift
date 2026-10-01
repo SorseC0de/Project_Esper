@@ -647,7 +647,7 @@ public struct Stage: Equatable {
         }
     }
 
-    /// Wetshot Wake: 37 by 17, under water, laid out in the map maker; its one rim,
+    /// Wetshot Wake: 37 by 19, under water, laid out in the map maker; its one rim,
     /// both players' to score on, rides the Hooperfish.
     public static var wetshot: Stage {
         let map = StageMap.current[.wetshot]

@@ -169,4 +169,57 @@ final class DeciderTests: XCTestCase {
         XCTAssertNil(match.ball.holder)
         XCTAssertEqual(match.ball.position, match.hooperfish!.ballPoint)
     }
+
+    private func jump(on stage: Stage) -> (height: Double, frames: Int) {
+        var match = Match(stage: stage)
+        match.countdown = 0
+        for _ in 0..<30 { match.advance(inputs: [.idle, .idle]) }
+        let start = match.players[0].position.y
+        var top = start, topFrame = 0
+        for frame in 0..<600 {
+            match.advance(inputs: [PlayerInput(jump: true), .idle])
+            if match.players[0].position.y > top { top = match.players[0].position.y; topFrame = frame }
+        }
+        return (top - start, topFrame)
+    }
+
+    func testUnderWaterAJumpGoesTwiceAsHighButRisesSlower() {
+        let dry = jump(on: .court), wet = jump(on: .wetshot)
+        XCTAssertEqual(wet.height / dry.height, 2, accuracy: 0.25)
+        XCTAssertGreaterThan(Double(wet.frames), Double(dry.frames) * 3, "slow to the top")
+    }
+
+    func testARimSwimmingOffLetsGoOfWhoeverHangsOnIt() {
+        var match = Match(stage: .wetshot)
+        match.hooperfish!.carrying = .hoop
+        // Swum off, the rim gone with it.
+        match.hooperfish!.age = match.hooperfish!.swimFrames + 1
+        match.players[0].state = .dunking
+        match.players[0].dunkHoop = 0
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertNotEqual(match.players[0].state, .dunking)
+    }
+
+    func testNoSecondPointRightAfterOne() {
+        var match = Match(stage: .wetshot, mode: .fortySeven)
+        match.countdown = 0
+        match.hooperfish = nil
+        match.stage.hoops[0].position = Stage.wetshot.hoops[0].position
+        let rim = match.stage.hoops[0].position
+        match.ball.respawn(at: rim + Vec2(x: 0, y: 6))
+        match.ball.velocity = Vec2(x: 0, y: -2)
+        match.ball.scoring = true
+        match.ball.lastTouched = 0
+        var points = 0
+        for frame in 0..<12 {
+            match.advance(inputs: [.idle, .idle])
+            if match.events.contains(where: { if case .scored = $0 { return true }; return false }) { points += 1 }
+            if frame == 6 {
+                // Straight back up through it and down again, as a rim on the move can do.
+                match.ball.position = rim + Vec2(x: 0, y: 6)
+                match.ball.velocity = Vec2(x: 0, y: -2)
+            }
+        }
+        XCTAssertEqual(points, 1)
+    }
 }

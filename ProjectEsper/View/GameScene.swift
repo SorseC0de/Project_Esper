@@ -393,10 +393,12 @@ final class GameScene: SKScene {
 
     /// Wetshot Wake's sway over the whole screen, but not in the map maker: its reach in the
     /// drawable's pixels, how many waves down the screen, and where it is in them.
-    var screenWave: (reach: Double, waves: Double, phase: Double)? {
+    /// The score's band across the top doesn't sway: how far down the screen it reaches, as a share.
+    var screenWave: (reach: Double, waves: Double, phase: Double, calmTop: Double)? {
         guard match.stage.features.look == .wetshot, !wholeStageView else { return nil }
         let pixelsPerGamePixel = Double(displayScale / cameraNode.xScale)
-        return (WaterTuning.swayPixels * pixelsPerGamePixel, WaterTuning.swayWaves, CACurrentMediaTime() * WaterTuning.swaySpeed)
+        let calm = (safeInsets.top / hudScale + 40) * hudScale / max(size.height, 1)
+        return (WaterTuning.swayPixels * pixelsPerGamePixel, WaterTuning.swayWaves, CACurrentMediaTime() * WaterTuning.swaySpeed, Double(calm))
     }
 
     /// The Elements' flat background, which never glows; nil elsewhere.

@@ -45,6 +45,8 @@ public struct Match: Equatable {
     /// and whose hands the ball then goes to, nobody's for a decider, in neutral.
     public var restartIn = 0
     public var restartBallTo: Int? = 0
+    /// Frames left in which no point counts, after one has.
+    public var scoreLockout = 0
     /// Frames left of hit-stop: while it runs the match is held, nothing moves or counts down.
     public var hitStop = 0
     /// What happened on the last `advance`.
@@ -91,6 +93,7 @@ public struct Match: Equatable {
     public mutating func advance(inputs given: [PlayerInput]) {
         frame += 1
         events = []
+        if scoreLockout > 0 { scoreLockout -= 1 }
         if hitStop > 0 {
             hitStop -= 1
             return
@@ -155,7 +158,10 @@ public struct Match: Equatable {
             // The ball sees the stage's ball-only solids as well.
             var ballStage = stage
             ballStage.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
-            if let hoop = ball.step(stage: ballStage, events: &events) {
+            if let hoop = ball.step(stage: ballStage, events: &events), scoreLockout == 0 {
+                // A few frames after a point no other counts: a rim on the move can take the
+                // same ball through twice.
+                scoreLockout = BallRules.scoreLockoutFrames
                 // A shared rim's point goes to whoever put the ball through.
                 let owner = stage.hoops[hoop].shared ? (ball.lastTouched ?? stage.hoops[hoop].owner) : stage.hoops[hoop].owner
                 if mode == .fortySeven {
@@ -512,6 +518,13 @@ public struct Match: Equatable {
         fish.step(on: stage)
         hooperfish = fish
         placeHooperfishLoad()
+        // A rim swimming off the stage, or gone, lets go of whoever's hanging on it.
+        let rim = stage.hoops[0].position
+        if rim == HighwayRules.parked || rim.x < 0 || rim.x > stage.width {
+            for index in players.indices where players[index].state == .dunking && players[index].dunkHoop == 0 {
+                players[index].enter(players[index].grounded ? .idle : .air)
+            }
+        }
     }
 
     private mutating func placeHooperfishLoad() {

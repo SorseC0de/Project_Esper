@@ -341,7 +341,9 @@ public struct Player: Equatable {
     public var underwater = false
     var waterTicks = 0
     var waterShare: Double { underwater ? 0.5 : 1 }
-    var gravity: Double { spec.gravity * waterShare }
+    /// Under water a jump rises at half its push but to twice its height: the pull on the way up
+    /// an eighth, on the way down a half.
+    var gravity: Double { spec.gravity * (underwater ? (velocity.y > 0 ? 1.0 / 8 : 0.5) : 1) }
     var fallSpeed: Double { spec.fallSpeed * waterShare }
     /// The jumps' push, and off a wall, at half under water.
     var fullHopVelocity: Double { spec.fullHopVelocity * waterShare }

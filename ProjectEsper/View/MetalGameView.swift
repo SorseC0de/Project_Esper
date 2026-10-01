@@ -364,7 +364,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         lap("cam")
         if let wave = scene.screenWave {
             // A share of a screen pixel's width per game pixel of reach.
-            uniforms.wave = SIMD4(Float(wave.reach) / Float(max(view.drawableSize.width, 1)), Float(wave.waves), Float(wave.phase), 0)
+            uniforms.wave = SIMD4(Float(wave.reach) / Float(max(view.drawableSize.width, 1)), Float(wave.waves), Float(wave.phase), Float(wave.calmTop))
         }
         pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA], uniforms: uniforms,
              then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)

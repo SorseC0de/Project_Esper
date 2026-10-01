@@ -1141,12 +1141,14 @@ The ball hangs on the antenna at its own point, 24 across and 24 up (`WetshotRul
 on BALL X and BALL Y offline); a stage's decider puts it back there. As drawn: the body breathing between 0.9 and 1.1 over two seconds, the fins swinging
 out to 10 degrees and back over a second and a half (the top one clockwise, the tail one
 counter-clockwise), the front one the whole arc, 15 either way, the antenna, and the rim, net and ball on it, nodding 0 to 5
-degrees counter-clockwise over two seconds, still while someone dunks; each turning where it meets the
+degrees counter-clockwise over two seconds, still while someone dunks (and a rim swimming off the stage,
+or gone, lets go of whoever hangs on it); each turning where it meets the
 body (`WetshotArt.hooperfishParts`). Its rim glows, and so do its red rings and eye (left out of the
 body's mask, `WetshotArt.bodyGlowMask`); the rest of it doesn't. No chevrons point at the ball off
 screen here: off screen it's only ever on the antenna. The plants sway 5 degrees either way over four
 seconds, each on its own beat, from their bottom middle. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
-to whoever put the ball through (`ball.lastTouched`), protocol 48. Its centre is 15 pixels across
+to whoever put the ball through (`ball.lastTouched`), protocol 48. For 20 frames after any point no
+other counts (`BallRules.scoreLockoutFrames`): a rim on the move can take the same ball through twice. Its centre is 15 pixels across
 (mirrored when it faces right) and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`), across on the
 HOOP X debug slider offline, a whole pixel at a time, rim, art and net together; there's no
 backboard. There's only ever one Hooperfish. Each of its parts will be animated, to be detailed.
@@ -1162,14 +1164,15 @@ rest together), wobbling a pixel or three side to side and fading over two to fo
 One group at a time, six to twelve seconds after the last has gone, one to three jellyfish (cell 5) drift across from one side of the
 screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds, turned to face the way they drift.
 
-Under water (`StageFeatures.underwater`, protocol 57): gravity and the fall speeds are halved for
-bodies and the ball, the jumps, the ground's and the air's speeds and every change of speed (the
+Under water (`StageFeatures.underwater`, protocol 58): gravity and the fall speeds are halved for
+bodies and the ball, but a body rising pulls at an eighth, so a jump at half its push goes twice
+as high, slowly; the jumps, the ground's and the air's speeds and every change of speed (the
 pick-ups, the brakes, the frictions, the ball's roll) halved too, the ball's turning in the view halved, and every state's clock holds every other frame,
 so each state, and its sheet with it, runs at half speed; the walk and run cycles too.
 Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
 at its top, at 66% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
 game pixel and a half side to side in three waves down the screen (WATER SWAY), in the glow's composite
-(`GameScene.screenWave`), but not in the map maker. The floor's fill doesn't glow either.
+(`GameScene.screenWave`), but not in the map maker, nor across the score's band at the top. The floor's fill doesn't glow either.
 
 ## Sky Net
 

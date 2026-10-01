@@ -251,6 +251,8 @@ public enum DefenceRules {
 
 /// Everything about the ball, the hoops and the plays on them. Units and frames.
 public enum BallRules {
+    /// After a point, frames in which no other counts.
+    public static let scoreLockoutFrames = 20
     public static let gravity = 0.15
     public static let fallSpeed = 6.0
     public static let radius = 2.5

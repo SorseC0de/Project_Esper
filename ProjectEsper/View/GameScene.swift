@@ -3954,6 +3954,15 @@ final class GameScene: SKScene {
                     stageGround.addChild(node)
                     wheels = node
                 }
+                // Each part lined round, the line just under its own part.
+                for (part, node) in [("body", body), ("wheels", wheels)] {
+                    guard let node, let line = HighwayArt.outline("vehicle_\(art)_\(part)", art: art, size: size) else { continue }
+                    let outline = SKSpriteNode(texture: line)
+                    outline.size = CGSize(width: line.size().width, height: line.size().height)
+                    outline.anchorPoint = CGPoint(x: 0.5, y: 1 / line.size().height)
+                    outline.zPosition = -0.05
+                    node.addChild(outline)
+                }
                 // The drawings face right; the sim says which way this one faces.
                 if car.facesLeft {
                     body.xScale = -1
@@ -4002,7 +4011,8 @@ final class GameScene: SKScene {
     /// flipped end over end every other frame so it reads as turning.
     private func makeHelicopter(for flying: Helicopter) -> SKNode {
         let node = SKNode()
-        node.zPosition = 6
+        // Under the backboard, the net and the rim it carries.
+        node.zPosition = 4.5
         node.xScale = flying.speed > 0 ? 1 : -1
         let hoop = match.stage.hoops[flying.hoop]
         let width = 96 * CGFloat(TrafficTuning.helicopterScale)

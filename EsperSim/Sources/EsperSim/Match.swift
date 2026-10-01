@@ -65,7 +65,10 @@ public struct Match: Equatable {
         countdownLength = countdown
         self.countdown = countdown
         fieldDice = Dice(seed: seed)
-        if stage.features.traffic { fillTraffic() }
+        if stage.features.traffic {
+            fillTraffic()
+            for index in players.indices { players[index].position = spawnPoint(index) }
+        }
         if stage.features.startsHeld, !players.isEmpty {
             let holder = fieldDice.roll(players.count)
             players[holder].hasBall = true
@@ -198,7 +201,7 @@ public struct Match: Equatable {
     public mutating func restart(ballTo holder: Int) {
         for index in players.indices {
             let was = players[index]
-            players[index] = Player(spec: was.spec, index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
+            players[index] = Player(spec: was.spec, index: index, position: spawnPoint(index), facing: stage.playerFacings[index])
             players[index].power = was.power
             players[index].powerLevel = was.powerLevel
         }
@@ -481,10 +484,22 @@ public struct Match: Equatable {
         }
     }
 
+    /// Where a player starts: the stage's spot, lifted onto whatever stands there, such as a car.
+    func spawnPoint(_ index: Int) -> Vec2 {
+        var at = stage.playerSpawns[index]
+        let spec = players[index].spec
+        for _ in 0..<8 {
+            let body = Box(min: Vec2(x: at.x - spec.bodyWidth / 2, y: at.y), max: Vec2(x: at.x + spec.bodyWidth / 2, y: at.y + spec.bodyHeight))
+            guard let top = stage.extras.filter({ $0.overlaps(body) }).map(\.max.y).max() else { break }
+            at.y = top
+        }
+        return at
+    }
+
     /// Burned, by the lava or a fire tornado: back to the start, the ball it held back to its own.
     private mutating func burn(_ index: Int) {
         let was = players[index]
-        players[index] = Player(spec: was.spec, index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
+        players[index] = Player(spec: was.spec, index: index, position: spawnPoint(index), facing: stage.playerFacings[index])
         players[index].power = was.power
         players[index].powerLevel = was.powerLevel
         events.append(.lavaBurned(player: index))

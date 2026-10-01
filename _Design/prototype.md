@@ -811,7 +811,10 @@ centre.
   7.5 up. Each slot is each wide enough for the longest
   vehicle, a car standing in each; the near lane's are solid and rideable and face right,
   the far lane's face left. Which of the 23 vehicles stands where
-  comes off the match's dice, a different set each match, so both phones agree with nothing sent. Each has its own
+  comes off the match's dice, a different set each match, so both phones agree with nothing sent.
+  A player whose start is inside a car starts on its roof instead (`Match.spawnPoint`), at the
+  match's start, after a point and after a burn. The road's side walls aren't drawn, so they're
+  nothing to land on (`tileWallsHold` off; protocol 47). Each has its own
   length in tiles and its height the drawing's own; it's solid in blocks of eight art
   pixels (`Vehicle.blocks`), each column's unbroken runs one box, mirrored when it faces
   left. The blocks are set by hand in the bounds gallery (the BOUNDS picker, offline): the
@@ -836,7 +839,11 @@ centre.
   top rotor and tail rotor, each plain and its three reds, as imagesets in the catalog's
   Traffic folder; every vehicle's wheels now come apart.
   A body shivers a pixel under wheels drawn over it that stay put, each on its own beat, dips three
-  pixels on its springs when someone lands on it.
+  pixels on its springs when someone lands on it. Each part is lined round a game pixel thick in
+  the palette's outline (`HighwayArt.outline`), the line just under its own part.
+- The helicopter draws under the backboard, net and rim it carries. A net whose rim jumps
+  (more than 40 pixels in a frame, as one does coming on from where it was parked) comes with it
+  whole rather than stretching after it.
 - The rim: one at a time, carried under a helicopter flying from one wall to the other at
   1 a frame, 140 up, swaying 6 either way every two seconds, the rim 22 ahead of it and
   18 under, its backboard toward the helicopter; the rim player one guards flies left to

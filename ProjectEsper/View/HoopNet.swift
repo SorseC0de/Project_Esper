@@ -123,6 +123,8 @@ enum NetTuning {
 /// and speed, not by the ball the sim then bounces off the back of the rim. In the energy
 /// of the side guarding the rim. At rest with nothing near, it sleeps. The view's alone.
 final class HoopNet {
+    /// Further than this in a frame, the rim jumped.
+    private static let jumpDistance: CGFloat = 40
     private struct Knot {
         var at: CGPoint
         var was: CGPoint
@@ -256,6 +258,17 @@ final class HoopNet {
     /// One frame: the rim where it is now, the ball where it is (nil while it's nowhere to
     /// be hit), and the chests of the bodies.
     func step(rim: CGPoint, ball: CGPoint?, ballRadius: CGFloat, bodies: [CGPoint]) {
+        // A rim that jumped rather than moved, coming on from where it was parked, takes its
+        // net with it whole rather than dragging it there.
+        if HoopNet.distance(rim, self.rim) > HoopNet.jumpDistance {
+            for index in knots.indices {
+                let home = CGPoint(x: rim.x + knots[index].home.x, y: rim.y + knots[index].home.y)
+                knots[index].at = home
+                knots[index].was = home
+            }
+            self.rim = rim
+            awake = true
+        }
         let rimMoved = HoopNet.distance(rim, self.rim) > 0.01
         self.rim = rim
         if builtSpacing != NetTuning.meshValues { buildMesh() }

@@ -496,4 +496,18 @@ final class CarBoundsTests: XCTestCase {
             }
         }
     }
+
+    func testNobodyStartsInsideACar() {
+        for seed in 1...30 {
+            var match = Match(stage: .highway, seed: UInt32(seed))
+            for player in match.players { XCTAssertFalse(match.stage.overlapsSolid(player.body), "seed \(seed)") }
+            match.restart(ballTo: 0)
+            for player in match.players { XCTAssertFalse(match.stage.overlapsSolid(player.body), "seed \(seed), after a point") }
+        }
+    }
+
+    func testTheRoadsUndrawnSideWallsAreNothingToLandOn() {
+        let stage = Stage.highway
+        XCTAssertNil(stage.wall(beside: Box(min: Vec2(x: Stage.tileSize, y: 60), max: Vec2(x: Stage.tileSize + 10, y: 77.5))))
+    }
 }

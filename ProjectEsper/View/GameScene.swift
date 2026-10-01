@@ -4720,7 +4720,8 @@ final class GameScene: SKScene {
                 let phase = min(max(inHand.y / (CGFloat(BallRules.dribbleHandHeight) * drawScale), 0), 1)
                 let y = inHand.y - CGFloat(drop) * (1 - phase)
                 let at = node.position + leaned(CGPoint(x: inHand.x * CGFloat(player.facing.sign), y: y.rounded()))
-                halo.isHidden = false
+                // A frozen ball takes no glow: it washes it out.
+                halo.isHidden = player.frozen > 0
                 halo.position = at
                 handBall.isHidden = false
                 handBall.position = at
@@ -4935,6 +4936,8 @@ final class GameScene: SKScene {
         // Frozen it goes ice; burning it goes fire.
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
         ballHalo.color = colour
+        // A frozen ball takes no glow: it washes it out.
+        ballHalo.isHidden = ball.frozen > 0
         spinBall(ball)
         // The camera on a scrolling stage: level, gliding after the local player and leading them.
         if !wholeStageView, [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }

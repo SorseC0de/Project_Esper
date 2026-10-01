@@ -168,12 +168,12 @@ struct Look: Hashable {
     static let playerTwo = team(teal, body: lightTeal)
     static let byPlayer = [playerOne, playerTwo]
 
-    /// Frozen bodies and Frost Tea's ice clones: the front parts, the head and the clothes'
-    /// light in palette 57, the back parts and the clothes' shadow in 48, outlined in 22.
+    /// Frozen bodies and Frost Tea's ice clones: the front parts, the head and the torso's
+    /// light in palette 57, the back parts and the torso's shadow (the pelvis) in 49, outlined in 22.
     static let ice: Look = {
-        let front = PixelPalette.colours[57], back = PixelPalette.colours[48]
+        let front = PixelPalette.colours[57], back = PixelPalette.colours[49]
         var colours: [BodyPart: RGB] = [:]
-        for part in BodyPart.allCases { colours[part] = part.isBack ? back : front }
+        for part in BodyPart.allCases { colours[part] = part.isBack || part == .pelvis ? back : front }
         return Look(colours: colours, glow: front, outline: PixelPalette.colours[22], strokedGroups: Look.strokedGroups)
     }()
 }

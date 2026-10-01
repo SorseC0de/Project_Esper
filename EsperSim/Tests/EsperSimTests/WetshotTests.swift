@@ -222,4 +222,25 @@ final class DeciderTests: XCTestCase {
         }
         XCTAssertEqual(points, 1)
     }
+
+    func testNoDunkInTheFirstOrLastColumnAndOneThereIsLetGo() {
+        let stage = Stage.wetshot
+        var hoop = stage.hoops[0]
+        hoop.position.x = 5
+        XCTAssertFalse(stage.dunkable(hoop))
+        hoop.position.x = stage.width - 5
+        XCTAssertFalse(stage.dunkable(hoop))
+        hoop.position.x = stage.width / 2
+        XCTAssertTrue(stage.dunkable(hoop))
+        var match = Match(stage: .wetshot)
+        match.hooperfish!.carrying = .hoop
+        match.hooperfish!.from = Vec2(x: -5, y: 100)
+        match.hooperfish!.to = Vec2(x: -HooperfishRules.size.x, y: 100)
+        match.hooperfish!.swimFrames = 600
+        match.hooperfish!.age = 0
+        match.players[0].state = .dunking
+        match.players[0].dunkHoop = 0
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertNotEqual(match.players[0].state, .dunking, "the rim in the first column lets go")
+    }
 }

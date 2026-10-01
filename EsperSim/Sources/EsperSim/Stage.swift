@@ -133,6 +133,12 @@ public struct Stage: Equatable {
     public var fixedExtras: [Box] = []
     /// Where each tornado stands when it's up, its whole square.
     public var tornados: [Box] = []
+    /// Whether a rim can be dunked on where it is: not in the stage's first or last column, which
+    /// a swimming one passes through on its way off.
+    public func dunkable(_ hoop: Hoop) -> Bool {
+        hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
+    }
+
     /// Where Wetshot Wake's Hooperfish starts, its picture's bottom left.
     public var hooperfishStart: Vec2?
     /// Where each icicle socket's grown icicle hangs its tip, along the ceiling.

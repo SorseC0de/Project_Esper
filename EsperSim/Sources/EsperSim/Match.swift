@@ -518,9 +518,8 @@ public struct Match: Equatable {
         fish.step(on: stage)
         hooperfish = fish
         placeHooperfishLoad()
-        // A rim swimming off the stage, or gone, lets go of whoever's hanging on it.
-        let rim = stage.hoops[0].position
-        if rim == HighwayRules.parked || rim.x < 0 || rim.x > stage.width {
+        // A rim swimming into the stage's first or last column, or gone, lets go of whoever's hanging on it.
+        if !stage.dunkable(stage.hoops[0]) {
             for index in players.indices where players[index].state == .dunking && players[index].dunkHoop == 0 {
                 players[index].enter(players[index].grounded ? .idle : .air)
             }

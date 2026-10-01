@@ -38,6 +38,9 @@ public struct StageFeatures: Equatable {
     public var tileWallsHold = true
     /// The height of lava along the bottom: feet under it burn, and go back to where they started.
     public var lavaSurface: Double?
+    /// Under water: gravity halved, for bodies and the ball; the ground's speeds halved but not
+    /// the air's; the bodies' sheets played at half their rate.
+    public var underwater = false
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets

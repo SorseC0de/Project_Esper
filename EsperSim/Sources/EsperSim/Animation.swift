@@ -124,7 +124,8 @@ extension Player {
     /// Which sprite and frame shows this player right now. Nothing here feeds back into
     /// the sim, so the drawing can never change the game.
     public var animationFrame: AnimationFrame {
-        let t = stateTimer
+        // Under water the sheets play at half their rate.
+        let t = underwater ? stateTimer / 2 : stateTimer
         if boltPose > 0, state != .webSwing, state != .webPull, state != .webbed {
             // Zeus Juice's bolt: the whole throw sheet at 15 a second, ground or air.
             return AnimationFrame(grounded ? .throwForward : .throwAir, (ZeusRules.boltPoseFrames - boltPose) * 15 / 60)

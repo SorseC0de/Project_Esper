@@ -251,7 +251,8 @@ final class MapEditor: SKNode {
         if wallsMode {
             let kinds: [(String, StageMap.Kind?)] = [("SOLID", .solid), ("\u{25E2}", .lowerRight), ("\u{25E3}", .lowerLeft),
                                                        ("\u{25E5}", .upperRight), ("\u{25E4}", .upperLeft),
-                                                       ("SLIDE \u{25E2}", .slideLowerRight), ("SLIDE \u{25E3}", .slideLowerLeft), ("OPEN", nil)]
+                                                       ("SLIDE \u{25E2}", .slideLowerRight), ("SLIDE \u{25E3}", .slideLowerLeft),
+                                                       ("ONE-WAY", .oneWay), ("OPEN", nil)]
             tools = kinds.map { ($0.0, .wall($0.1)) }
         } else {
             tools = (stage == .elements ? [("ERASE", .erase), ("TORNADO", .tornado)] : [("ERASE", .erase)])
@@ -474,6 +475,8 @@ final class MapEditor: SKNode {
             case .lowerLeft, .slideLowerLeft: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: side, y: 0), CGPoint(x: 0, y: side)])
             case .upperRight: path.addLines(between: [CGPoint(x: 0, y: side), CGPoint(x: side, y: side), CGPoint(x: side, y: 0)])
             case .upperLeft: path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: 0, y: side), CGPoint(x: side, y: side)])
+            // A one-way as a bar along the cell's top, what's stood on.
+            case .oneWay: path.addRect(CGRect(x: 0, y: side * 0.75, width: side, height: side * 0.25))
             }
             path.closeSubpath()
             let node = SKShapeNode(path: path)

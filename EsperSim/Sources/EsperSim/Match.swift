@@ -30,6 +30,8 @@ public struct Match: Equatable {
     /// Highway Traffic's cars and helicopter, and which rim the last one carried.
     public var cars: [Car] = []
     public var helicopter: Helicopter?
+    /// Wetshot Wake's Hooperfish, swimming across with the ball or the rim on its antenna.
+    public var hooperfish: Hooperfish?
     public var lastHelicopterHoop: Int?
     public var scores: [Int]
     /// Rounds reset on a point; 47 plays on through its baskets.
@@ -65,6 +67,10 @@ public struct Match: Equatable {
         countdownLength = countdown
         self.countdown = countdown
         fieldDice = Dice(seed: seed)
+        if let fish = stage.hooperfishStart {
+            hooperfish = Hooperfish.starting(at: fish, on: stage)
+            placeHooperfishLoad()
+        }
         if stage.features.traffic {
             fillTraffic()
             for index in players.indices { players[index].position = spawnPoint(index) }
@@ -105,6 +111,7 @@ public struct Match: Equatable {
         if portalCooldown > 0 { portalCooldown -= 1 }
         stepField()
         stepTornados()
+        stepHooperfish()
         stepStageFireball()
         stepLightning()
         stepIcicles()
@@ -140,6 +147,10 @@ public struct Match: Equatable {
             // Frost Tea: the ball hangs where it is, but a hand can still take it.
             ball.frozen -= 1
             if ball.isLive { tryCatch() }
+        } else if hooperfish?.carrying == .ball, ball.isLive {
+            // On the Hooperfish's antenna, where a hand can take it off.
+            tryCatch()
+            if ball.holder != nil { hooperfish?.carrying = .nothing }
         } else if ball.isLive, ball.tether == nil {
             // The ball sees the stage's ball-only solids as well.
             var ballStage = stage
@@ -482,6 +493,31 @@ public struct Match: Equatable {
         if ball.holder == nil, ball.isLive, ball.position.y < surface {
             events.append(.lavaSplashed(at: Vec2(x: ball.position.x, y: surface), ball: true))
             ball.respawn(at: stage.ballSpawn)
+        }
+    }
+
+    /// The Hooperfish a frame on, and its load with it: the rim where its antenna is, or parked
+    /// when it isn't carrying it; the ball held there, or, still on it when it's swum off,
+    /// back to where the ball starts.
+    private mutating func stepHooperfish() {
+        guard var fish = hooperfish else { return }
+        let wasAway = fish.away
+        fish.step(on: stage)
+        if fish.away, !wasAway, fish.carrying == .ball, ball.holder == nil {
+            ball.respawn(at: stage.ballSpawn)
+            fish.carrying = .nothing
+        }
+        hooperfish = fish
+        placeHooperfishLoad()
+    }
+
+    private mutating func placeHooperfishLoad() {
+        guard let fish = hooperfish, !stage.hoops.isEmpty else { return }
+        stage.hoops[0].position = fish.carrying == .hoop && !fish.away ? fish.antenna : HighwayRules.parked
+        stage.hoops[0].backboard = fish.facesRight ? .left : .right
+        if fish.carrying == .ball, ball.holder == nil {
+            ball.position = fish.antenna
+            ball.velocity = .zero
         }
     }
 

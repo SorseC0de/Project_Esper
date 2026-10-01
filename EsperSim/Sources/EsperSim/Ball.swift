@@ -64,6 +64,9 @@ public struct Ball: Equatable {
         previousY = position.y
     }
 
+    /// Under water the ball falls at half the pull.
+    static func gravityShare(_ stage: Stage) -> Double { stage.features.underwater ? 0.5 : 1 }
+
     public var box: Box { Box(center: position, width: BallRules.radius * 2, height: BallRules.radius * 2) }
 
     public var isLive: Bool { holder == nil && respawnTimer == 0 }
@@ -74,7 +77,7 @@ public struct Ball: Equatable {
         var scoredHoop: Int?
 
         for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y {
-            steer(toward: hoop)
+            steer(toward: hoop, gravityShare: Ball.gravityShare(stage))
         }
 
         if let centre = tornadoCentre {
@@ -83,7 +86,7 @@ public struct Ball: Equatable {
         } else if floater > 0 {
             floater -= 1
         } else if !straight {
-            velocity.y = max(velocity.y - BallRules.gravity * pace * pace, -BallRules.fallSpeed * pace)
+            velocity.y = max(velocity.y - BallRules.gravity * Ball.gravityShare(stage) * pace * pace, -BallRules.fallSpeed * pace)
         }
 
         // The way it came in, for a slope to turn: a block's flat top under the slope may
@@ -128,7 +131,7 @@ public struct Ball: Equatable {
         if onFloor, velocity.y == 0, let slope = stage.slopes.first(where: {
             $0.box.min.x <= position.x && position.x <= $0.box.max.x && abs($0.surface(at: position.x) - (position.y - BallRules.radius)) <= BallRules.radius
         }) {
-            velocity.x += slope.downhill.sign * BallRules.gravity * SlopeRules.diagonal
+            velocity.x += slope.downhill.sign * BallRules.gravity * Ball.gravityShare(stage) * SlopeRules.diagonal
         } else if onFloor, velocity.y == 0 {
             let slowed = abs(velocity.x) * (1 - BallRules.rollingFriction) - BallRules.rollingDrag
             velocity.x = slowed > 0 ? (velocity.x < 0 ? -slowed : slowed) : 0
@@ -140,12 +143,12 @@ public struct Ball: Equatable {
     /// Bends a falling ball's path so it arrives over the rim: the sideways speed it would
     /// need to reach the rim's centre in the time it will take to fall to the rim's height,
     /// approached a share at a time.
-    private mutating func steer(toward hoop: Hoop) {
+    private mutating func steer(toward hoop: Hoop, gravityShare: Double) {
         let across = hoop.position.x - position.x
         let above = position.y - hoop.position.y
         guard abs(across) <= BallRules.hoopReach, above <= BallRules.hoopReach else { return }
         let down = -velocity.y
-        let g = BallRules.gravity * pace * pace
+        let g = BallRules.gravity * gravityShare * pace * pace
         let frames = (-down + (down * down + 2 * g * above).squareRoot()) / g
         guard frames > 0 else { return }
         let needed = across / frames

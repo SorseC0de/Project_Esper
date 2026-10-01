@@ -1122,23 +1122,35 @@ two halves of `Rocks.png` (the top one first), and the Hooperfish, assembled bac
 up. None of it glows, nor the background colour. The props come in through the importer's
 `ROOT_IMAGES`.
 
-The Hooperfish carries the stage's one rim (`Hoop.shared`): both players score on it, the point
-to whoever put the ball through (`ball.lastTouched`), protocol 48. Its centre is 19 pixels across
-and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`), across on the
+The Hooperfish (`Hooperfish.swift`, `HooperfishRules`, `Match.hooperfish`) swims. It starts where
+the map puts it with the ball on its antenna, no rim out, and swims off the side it faces (left) at
+its crossing speed; a hand can take the ball off it, and if none has by the time it's off screen,
+the ball goes back to where it starts. Two seconds off screen, it comes back from that side turned
+round, from a height to a height off the count (the same on both phones), five seconds across from
+wholly off one side to wholly off the other, swaying 14 units up and down two and a half times as
+it goes, over and over. What's on its antenna changes only off screen: from the second crossing on
+it's the stage's rim, turned with it. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
+to whoever put the ball through (`ball.lastTouched`), protocol 48. Its centre is 15 pixels across
+(mirrored when it faces right) and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`), across on the
 HOOP X debug slider offline, a whole pixel at a time, rim, art and net together; there's no
 backboard. There's only ever one Hooperfish. Each of its parts will be animated, to be detailed.
 
 The map maker here has the props in its panel in place of a tileset: pick one and press a cell
 to place it, or drag it on; press a placed one to pick it up, drop it on the panel to take it
-away, or ERASE it. The markers are P1, P2 and BALL. Walls are painted as on the Elements.
+away, or ERASE it. The markers are P1, P2 and BALL. Walls are painted as on the Elements, with one-ways too (`Kind.oneWay`, a bar along the cell's top), on any map.
 
-Bubbles rise around the screen, eight a second, a quarter of the time three to six together,
+Bubbles rise around the screen, eight a second (three in ten over the players and the props, twice
+the size), and off the feet of whoever's coming down, twelve a second, a quarter of the time three to six together,
 each one of the first five cells of `bubbles_jellyfish` (cell 0 about as often as two of the
 rest together), wobbling a pixel or three side to side and fading over two to four seconds.
 One group at a time, six to twelve seconds after the last has gone, one to three jellyfish (cell 5) drift across from one side of the
-screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds.
+screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds, turned to face the way they drift.
+
+Under water (`StageFeatures.underwater`, protocol 52): gravity is halved for bodies and the ball,
+the ground's speeds (the walk, the run and its dash, the crouch walk) halved but not the air's,
+and the bodies' sheets play at half their rate.
 Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
-at its top, at 25% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
+at its top, at 50% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
 game pixel side to side in three waves down the screen (WATER SWAY), in the glow's composite
 (`GameScene.screenWave`), but not in the map maker. The floor's fill doesn't glow either.
 

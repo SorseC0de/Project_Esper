@@ -58,6 +58,8 @@ enum WetshotArt {
     /// What's drawn for the map's props, to be redrawn when the map maker moves them.
     struct Handles {
         var props: [SKNode] = []
+        /// The Hooperfish as placed; in play it swims where the sim has it.
+        var hooperfish: SKNode?
         /// The background and the spare under it, drawn once.
         var backdrop: [SKSpriteNode] = []
         let parent: SKNode
@@ -79,6 +81,7 @@ enum WetshotArt {
 
         mutating func setProps(_ placed: [StageMap.Prop]) {
             props.forEach { $0.removeFromParent() }
+            hooperfish = nil
             props = placed.map { prop in
                 let origin = CGPoint(x: CGFloat(prop.cell.column) * WetshotArt.tileSide, y: CGFloat(prop.cell.row) * WetshotArt.tileSide)
                 let size = CGSize(width: prop.kind.pixelSize.width, height: prop.kind.pixelSize.height)
@@ -95,6 +98,7 @@ enum WetshotArt {
                         fish.addChild(node)
                     }
                     parent.addChild(fish)
+                    hooperfish = fish
                     return fish
                 }
                 let node = SKSpriteNode(texture: WetshotArt.texture(prop.kind))
@@ -107,6 +111,20 @@ enum WetshotArt {
                 return node
             }
         }
+    }
+
+    /// The Hooperfish where it swims: its picture's bottom left, turned to face right by
+    /// flipping about its middle; or, with nothing from the sim (the map maker), where it's placed.
+    static func place(_ node: SKNode?, as fish: Hooperfish?, placed: StageMap.Prop?) {
+        guard let node else { return }
+        guard let fish else {
+            if let placed { node.position = CGPoint(x: CGFloat(placed.cell.column) * tileSide, y: CGFloat(placed.cell.row) * tileSide) }
+            node.xScale = 1
+            return
+        }
+        let at = SpriteLibrary.point(fish.position)
+        node.xScale = fish.facesRight ? -1 : 1
+        node.position = CGPoint(x: (at.x + (fish.facesRight ? CGFloat(HooperfishRules.pixelWidth) : 0)).rounded(), y: at.y.rounded())
     }
 
     static func build(stage: Stage, map: StageMap, into parent: SKNode) -> Handles {

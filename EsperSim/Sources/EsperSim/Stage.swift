@@ -133,6 +133,8 @@ public struct Stage: Equatable {
     public var fixedExtras: [Box] = []
     /// Where each tornado stands when it's up, its whole square.
     public var tornados: [Box] = []
+    /// Where Wetshot Wake's Hooperfish starts, its picture's bottom left.
+    public var hooperfishStart: Vec2?
     /// Where each icicle socket's grown icicle hangs its tip, along the ceiling.
     public var icicleSockets: [Vec2] = []
     /// The middles of the open tops of rock lightning can strike: under no ceiling, nothing on them.
@@ -643,6 +645,7 @@ public struct Stage: Equatable {
             case .upperRight: ceilingSlopes.append(Slope(box: square, rising: false))
             case .slideLowerRight: fixedSlopes.append(Slope(box: square, rising: true, slides: true))
             case .slideLowerLeft: fixedSlopes.append(Slope(box: square, rising: false, slides: true))
+            case .oneWay: set(.oneWay, column: cell.column, row: cell.row)
             }
         }
     }
@@ -663,7 +666,9 @@ public struct Stage: Equatable {
         )
         stage.lay(map.walls)
         stage.slopes = stage.fixedSlopes
+        stage.hooperfishStart = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize)
         stage.features = StageFeatures(look: .wetshot)
+        stage.features.underwater = true
         return stage
     }
 

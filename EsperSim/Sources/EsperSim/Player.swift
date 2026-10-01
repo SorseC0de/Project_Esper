@@ -335,13 +335,18 @@ public struct Player: Equatable {
     /// Defending, the body moves this much faster than the one with the ball; the match
     /// sets it each frame from who holds the ball.
     public var speedShare = 1.0
-    var runSpeed: Double { spec.runSpeed * speedShare }
-    var walkMaxSpeed: Double { spec.walkMaxSpeed * speedShare }
+    /// Under water (`StageFeatures.underwater`), set from the stage each step: gravity and the
+    /// ground's speeds at half, and the sheets at half their rate.
+    public var underwater = false
+    var waterShare: Double { underwater ? 0.5 : 1 }
+    var gravity: Double { spec.gravity * waterShare }
+    var runSpeed: Double { spec.runSpeed * speedShare * waterShare }
+    var walkMaxSpeed: Double { spec.walkMaxSpeed * speedShare * waterShare }
     var dashInitialVelocity: Double { runSpeed + (spec.dashInitialVelocity - spec.runSpeed) }
     /// The air moves as the ground does: the run's speed, which the jumps set off at too, and
     /// the ground's traction to brake when the stick lets go. Moves that don't steer coast
     /// on the spec's light air friction instead, so their momentum carries.
-    var airSpeedMax: Double { runSpeed }
+    var airSpeedMax: Double { spec.runSpeed * speedShare }
     var airBrake: Double { spec.traction }
 
     /// Crouched or sliding, the body is half as tall, so it fits under what a standing
@@ -446,6 +451,7 @@ public struct Player: Equatable {
     public mutating func step(input given: PlayerInput, stage sharedStage: Stage, opponentX: Double? = nil,
                               ballHolder: Int? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         var input = given
+        underwater = sharedStage.features.underwater
         // Surf Soda rides the lava as ground.
         var stage = sharedStage
         if power == .surfSoda, let lava = stage.features.lavaSurface {
@@ -646,7 +652,7 @@ public struct Player: Equatable {
                         velocity.x = approach(velocity.x, target, braking ? spec.traction : spec.walkAcceleration)
                         // The cycle runs 15 frames a second at full walk and never under 10, so the ball
                         // can't hang on a tween, at the nearest steady rate.
-                        animationPhase += Player.steady(max(abs(velocity.x) / walkMaxSpeed * 15, 10)) / 60
+                        animationPhase += (Player.steady(max(abs(velocity.x) / walkMaxSpeed * 15, 10)) / 60) * waterShare
                     }
                 } else {
                     enter(.idle)
@@ -661,7 +667,7 @@ public struct Player: Equatable {
                     startDash(events: &events)
                 } else {
                     velocity.x = dashInitialVelocity * facing.sign
-                    animationPhase += runCycleStep
+                    animationPhase += (runCycleStep) * waterShare
                     if stateTimer >= spec.dashFrames {
                         enter(abs(input.stick.x) >= 0.5 && stickForward(input) ? .run : .idle)
                     }
@@ -677,7 +683,7 @@ public struct Player: Equatable {
                 } else if downHeldFrames >= spec.runBrakeHoldFrames {
                     // Held down: the run brakes, and at walking speed it becomes a walk.
                     velocity.x = approach(velocity.x, 0, spec.traction)
-                    animationPhase += runCycleStep
+                    animationPhase += (runCycleStep) * waterShare
                     if abs(velocity.x) <= walkMaxSpeed {
                         enter(stickFacing(input) == nil ? .idle : .walk)
                     }
@@ -688,7 +694,7 @@ public struct Player: Equatable {
                     } else {
                         velocity.x = runSpeed * facing.sign
                         runMomentum = runSpeed
-                        animationPhase += runCycleStep
+                        animationPhase += (runCycleStep) * waterShare
                     }
                 } else {
                     enter(.idle)
@@ -1073,8 +1079,8 @@ public struct Player: Equatable {
             // Down with no ball. The crouch walk is slow, and the stick turns the body.
             if let direction = stickFacing(input) { facing = direction }
             if state == .crouchWalk {
-                velocity.x = approach(velocity.x, spec.crouchWalkSpeed * input.stick.x, spec.walkAcceleration)
-                animationPhase += Player.steady(max(abs(velocity.x) / spec.crouchWalkSpeed * 15, 10)) / 60
+                velocity.x = approach(velocity.x, spec.crouchWalkSpeed * waterShare * input.stick.x, spec.walkAcceleration)
+                animationPhase += (Player.steady(max(abs(velocity.x) / spec.crouchWalkSpeed * 15, 10)) / 60) * waterShare
             } else {
                 velocity.x = approach(velocity.x, 0, spec.traction)
             }
@@ -1156,7 +1162,7 @@ public struct Player: Equatable {
                 velocity.x = approach(velocity.x, 0, spec.attackBrake)
             } else {
                 velocity.x = approach(velocity.x, 0, airBrake)
-                velocity.y = max(velocity.y - spec.gravity * SlashRules.gravityShare, -spec.fallSpeed)
+                velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -spec.fallSpeed)
             }
             if stateTimer >= SlashRules.frames {
                 endSlash()
@@ -1831,9 +1837,9 @@ public struct Player: Equatable {
             velocity.y = -spec.fastFallSpeed
         }
         if fastFalling {
-            velocity.y = max(velocity.y - spec.gravity, -spec.fastFallSpeed)
+            velocity.y = max(velocity.y - gravity, -spec.fastFallSpeed)
         } else {
-            velocity.y = max(velocity.y - spec.gravity * SurfRules.gravityShare, -spec.fallSpeed * SurfRules.fallShare)
+            velocity.y = max(velocity.y - gravity * SurfRules.gravityShare, -spec.fallSpeed * SurfRules.fallShare)
         }
     }
 
@@ -1936,7 +1942,7 @@ public struct Player: Equatable {
         }
         let floor = fastFalling ? -fastFall : -spec.fallSpeed
         // Feather Fresca floats down; a fast fall doesn't.
-        let gravity = velocity.y <= 0 && !fastFalling ? spec.gravity * spec.fallGravityShare : spec.gravity
+        let gravity = velocity.y <= 0 && !fastFalling ? gravity * spec.fallGravityShare : gravity
         velocity.y = max(velocity.y - gravity, floor)
     }
 
@@ -1950,7 +1956,7 @@ public struct Player: Equatable {
             if velocity.y <= 0 {
                 velocity.y = -BallRules.stanceFallSpeed
             } else {
-                velocity.y -= spec.gravity
+                velocity.y -= gravity
             }
         }
     }

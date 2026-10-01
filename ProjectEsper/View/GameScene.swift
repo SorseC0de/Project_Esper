@@ -1527,6 +1527,9 @@ final class GameScene: SKScene {
     private var bubbles: [Bubble] = []
     private static let bubblesPerSecond = 8.0
     private static let bubbleClusterChance = 0.25
+    private static let frontBubbleShare = 0.3
+    /// Bubbles off a body's feet as it comes down, a second's worth.
+    private static let footBubblesPerSecond = 12.0
     /// The bubble cells' weights: the first as likely as near half the others together.
     private static let bubbleCellWeights = [0.4, 0.15, 0.15, 0.15, 0.15]
 
@@ -1582,19 +1585,45 @@ final class GameScene: SKScene {
                 let node = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", cell))
                 let x = at.x + (many > 1 ? .random(in: -8...8) : 0)
                 node.position = CGPoint(x: x, y: at.y + (many > 1 ? .random(in: -8...8) : 0))
-                node.zPosition = 4.5
-                stageGround.addChild(node)
+                // A share in a layer over the players and the props, twice the size.
+                if Double.random(in: 0..<1) < GameScene.frontBubbleShare {
+                    node.setScale(2)
+                    node.zPosition = 24
+                    world.addChild(node)
+                } else {
+                    node.zPosition = 4.5
+                    stageGround.addChild(node)
+                }
                 bubbles.append(Bubble(node: node, baseX: x, age: 0, life: .random(in: 2...4), rise: .random(in: 12...24),
                                       wobble: .random(in: 1...3), wobbleRate: .random(in: 0.5...1)))
             }
         }
+        // Off the feet of whoever's coming down.
+        if wet, !wholeStageView {
+            for player in match.players where !player.grounded && player.velocity.y < 0
+                && Double.random(in: 0..<1) < GameScene.footBubblesPerSecond * step {
+                let node = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", Int.random(in: 0...4)))
+                let feet = SpriteLibrary.point(player.position)
+                let x = feet.x + .random(in: -4...4)
+                node.position = CGPoint(x: x, y: feet.y)
+                node.zPosition = 21
+                world.addChild(node)
+                bubbles.append(Bubble(node: node, baseX: x, age: 0, life: .random(in: 1...2), rise: .random(in: 8...16),
+                                      wobble: .random(in: 1...2), wobbleRate: .random(in: 0.5...1)))
+            }
+        }
+        // The Hooperfish where the sim has it; in the map maker, where it's placed.
+        WetshotArt.place(wetshotArt?.hooperfish, as: wholeStageView ? nil : match.hooperfish, placed: StageMap.current[.wetshot].hooperfish)
         jellyfish = jellyfish.compactMap { fish in
             var fish = fish
             fish.age += step
             let x = fish.node.position.x + fish.speed * CGFloat(step)
             guard fish.node.parent != nil, abs(x - cameraNode.position.x) < halfWidth + 80 else { fish.node.removeFromParent(); return nil }
             fish.node.position = CGPoint(x: x, y: fish.baseY + fish.bob * CGFloat(sin(fish.age * fish.bobRate * 2 * .pi)))
-            fish.node.setScale(CGFloat(1 + 0.1 * sin((fish.age + fish.breathOffset) / GameScene.breathSeconds * 2 * .pi)))
+            // Breathing, and turned to face the way it drifts.
+            let breath = CGFloat(1 + 0.1 * sin((fish.age + fish.breathOffset) / GameScene.breathSeconds * 2 * .pi))
+            fish.node.xScale = breath * (fish.speed < 0 ? -1 : 1)
+            fish.node.yScale = breath
             return fish
         }
         guard wet, EffectSheets.frames["bubbles_jellyfish"] != nil else { return }

@@ -164,6 +164,9 @@ final class HoopNet {
     private var builtSpacing: [CGFloat] = []
     private var drawnScales: [CGFloat] = []
 
+    /// The strands as drawn this frame, in the parent's space; nil while hidden.
+    var drawnPath: CGPath? { shape.isHidden ? nil : shape.path }
+
     init(at rim: CGPoint, mirrored: Bool, colour: SKColor, into parent: SKNode, depth: CGFloat = 4) {
         self.rim = rim
         facing = mirrored ? -1 : 1

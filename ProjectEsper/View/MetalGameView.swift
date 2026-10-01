@@ -69,10 +69,16 @@ struct GlowUniforms {
     var tint: SIMD4<Float>
     var unglowed: SIMD4<Float> = .zero
     var wave: SIMD4<Float> = .zero
+    var waterTop: SIMD4<Float> = .zero
+    var waterBottom: SIMD4<Float> = .zero
 }
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.
 final class GlowRenderer: NSObject, MTKViewDelegate {
+    private static func channels(_ colour: RGB) -> SIMD3<Float> {
+        SIMD3(Float((colour >> 16) & 0xFF), Float((colour >> 8) & 0xFF), Float(colour & 0xFF)) / 255
+    }
+
     private let scene: GameScene
     private let device: MTLDevice
     private let queue: MTLCommandQueue
@@ -318,7 +324,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.syncStatic(scene.staticFlats, version: scene.staticFlatsVersion)
-        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
+        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
         maskRenderer.update(atTime: now)
         let maskPass = MTLRenderPassDescriptor()
         maskPass.colorAttachments[0].texture = bodyMask
@@ -348,6 +354,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
             background.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
             uniforms.unglowed = SIMD4(Float(red), Float(green), Float(blue), 1)
+        }
+        if let water = scene.waterTint {
+            uniforms.waterTop = SIMD4(GlowRenderer.channels(water.top), Float(water.alpha))
+            uniforms.waterBottom = SIMD4(GlowRenderer.channels(water.bottom), 0)
         }
 
         pass(glowCommands, pipeline: bright, into: glowA, sources: [sceneTexture, bodyMask], uniforms: uniforms)
@@ -422,6 +432,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             SIMD4<Float>(0, 0, -0.001, 0),
             SIMD4<Float>(-2 * Float(camera.x) / viewWidth, -2 * Float(camera.y) / viewHeight, 0.5, 1)))
         var uniforms = CubeUniforms(viewProjection: projection, light: SIMD4<Float>(-0.4, 0.7, 0.6, 0))
+        if let water = scene.waterTint {
+            uniforms.waterTop = SIMD4(GlowRenderer.channels(water.top), Float(water.alpha))
+            uniforms.waterBottom = SIMD4(GlowRenderer.channels(water.bottom), Float(target.height))
+        }
         encoder.setRenderPipelineState(cubePipeline)
         encoder.setDepthStencilState(cubeDepth)
         encoder.setCullMode(.back)

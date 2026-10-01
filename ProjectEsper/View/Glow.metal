@@ -17,6 +17,10 @@ struct GlowUniforms {
     // The screen's sway: x its reach across in uv, y waves down the screen, z its phase, none at 0;
     // w how far down the screen the HUD's top band reaches, which doesn't sway.
     float4 wave;
+    // The water's tint over the scene, top and bottom of the screen, its alpha in waterTop.a;
+    // none at 0.
+    float4 waterTop;
+    float4 waterBottom;
 };
 
 struct FullScreen {
@@ -46,7 +50,13 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
     float3 mask = bodies.sample(linear, in.uv).rgb;
     float body = dot(mask, float3(0.2126, 0.7152, 0.0722));
     float flat = step(0.5, mask.g) * step(mask.r, 0.05) * step(mask.b, 0.05);
-    float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body));
+    // Pure blue glows through the flats under it, from its colour before the water's tint.
+    float through = step(0.5, mask.b) * step(mask.r, 0.05) * step(mask.g, 0.05);
+    float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body) * (1 - through));
+    if (through > 0 && u.waterTop.a > 0 && u.waterTop.a < 1) {
+        float3 water = mix(u.waterTop.rgb, u.waterBottom.rgb, in.uv.y);
+        color.rgb = saturate((color.rgb - water * u.waterTop.a) / (1 - u.waterTop.a));
+    }
     float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
     float background = u.unglowed.a * step(distance(color.rgb, u.unglowed.rgb), 0.01);
     float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance) * (1 - flat) * (1 - background);
@@ -131,6 +141,9 @@ struct CubeInstance {
 struct CubeUniforms {
     float4x4 viewProjection;
     float4 light;
+    // The water's tint: top and bottom colours, its strength in top's a, the height in bottom's a.
+    float4 waterTop;
+    float4 waterBottom;
 };
 
 struct CubeFragment {
@@ -167,5 +180,10 @@ fragment float4 cube_fragment(CubeFragment in [[stage_in]],
     // white, so the turn reads while the whole cube glows in its colour.
     float lit = max(dot(normalize(in.normal), normalize(uniforms.light.xyz)), 0.0);
     float3 colour = mix(in.color.rgb * (0.85 + 0.15 * lit), float3(1.0), 0.35 * lit * lit);
+    // Under water, tinted as the rest of the scene is.
+    if (uniforms.waterTop.a > 0.0) {
+        float down = clamp(in.position.y / max(uniforms.waterBottom.a, 1.0), 0.0, 1.0);
+        colour = mix(colour, mix(uniforms.waterTop.rgb, uniforms.waterBottom.rgb, down), uniforms.waterTop.a);
+    }
     return float4(colour, in.color.a);
 }

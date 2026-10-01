@@ -404,6 +404,31 @@ final class GameScene: SKScene {
     /// The Elements' flat background, which never glows; nil elsewhere.
     var unglowedBackground: SKColor? { [StageLook.elements, .wetshot].contains(match.stage.features.look) ? backgroundColor : nil }
 
+    /// The water's tint over the world, for what's drawn apart from the scene (the cubes); nil off Wetshot Wake.
+    var waterTint: (top: RGB, bottom: RGB, alpha: CGFloat)? {
+        match.stage.features.look == .wetshot ? (PixelPalette.colours[19], PixelPalette.colours[18], WaterTuning.overlayAlpha) : nil
+    }
+
+    /// What glows on Wetshot Wake over its background, which doesn't: the Hooperfish's rings and eye.
+    var glowThroughSnapshots: [BodySnapshot] {
+        guard let art = wetshotArt else { return [] }
+        return art.fishGlowParts
+    }
+
+    /// Wetshot Wake's rims, in front of the Hooperfish, glowing through its mask.
+    var glowThroughFrontSnapshots: [BodySnapshot] {
+        guard wetshotArt != nil else { return [] }
+        return rimNodes.filter { !$0.isHidden }.compactMap { rim in
+            rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
+        }
+    }
+
+    /// Wetshot Wake's nets' strands, glowing through its mask.
+    var glowThroughNets: [CGPath] {
+        guard wetshotArt != nil else { return [] }
+        return nets.compactMap(\.drawnPath)
+    }
+
     /// The tornados as they look this frame, green under the bodies: they animate, so they can't
     /// live in the static layer.
     var tornadoSnapshots: [BodySnapshot] {

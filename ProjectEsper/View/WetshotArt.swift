@@ -85,8 +85,12 @@ enum WetshotArt {
         }
     }
 
-    /// The Hooperfish's body without its red rings and its eye, for the glow's mask: those glow.
-    static let bodyGlowMask: SKTexture = {
+    /// The Hooperfish's body without its red rings and its eye, for the glow's mask: those glow;
+    /// and the rings and eye alone, to let the glow through the background's mask there.
+    static let bodyGlowMask: SKTexture = bodySplit(keepingGlow: false)
+    static let bodyGlowParts: SKTexture = bodySplit(keepingGlow: true)
+
+    private static func bodySplit(keepingGlow: Bool) -> SKTexture {
         let glowing: Set<RGB> = [0xDF3E23, 0x8E5252, 0xDBA463, 0xBB7547]
         guard let image = UIImage(named: "HooperfishBody")?.cgImage else { return picture("HooperfishBody") }
         let width = image.width, height = image.height
@@ -99,13 +103,13 @@ enum WetshotArt {
             let close = glowing.contains { colour in
                 (0..<3).allSatisfy { channel in abs(Int(data[pixel * 4 + channel]) - Int((colour >> RGB(16 - channel * 8)) & 0xFF)) <= 6 }
             }
-            if close { for channel in 0..<4 { data[pixel * 4 + channel] = 0 } }
+            if close != keepingGlow { for channel in 0..<4 { data[pixel * 4 + channel] = 0 } }
         }
         guard let masked = context.makeImage() else { return picture("HooperfishBody") }
         let texture = SKTexture(cgImage: masked)
         texture.filteringMode = .nearest
         return texture
-    }()
+    }
 
     static func animate(_ fish: SKNode?, at time: Double, dunkedOn: Bool) {
         guard let fish else { return }
@@ -142,6 +146,14 @@ enum WetshotArt {
             return sprites.compactMap { sprite, at in
                 sprite.texture.map { BodySnapshot(texture: $0, position: at, anchor: sprite.anchorPoint, xScale: 1, size: sprite.size) }
             }
+        }
+
+        /// The Hooperfish's rings and eye where they're drawn this frame, which glow over the background.
+        var fishGlowParts: [BodySnapshot] {
+            guard let fish = hooperfish, let body = fish.children.first(where: { $0.name == "HooperfishBody" }) as? SKSpriteNode else { return [] }
+            let at = CGPoint(x: fish.position.x + body.position.x * fish.xScale, y: fish.position.y + body.position.y)
+            return [BodySnapshot(texture: WetshotArt.bodyGlowParts, position: at, anchor: body.anchorPoint, xScale: fish.xScale,
+                                 size: CGSize(width: body.size.width * body.yScale, height: body.size.height * body.yScale), zRotation: body.zRotation * fish.xScale)]
         }
 
         /// The plants as they sway, and the Hooperfish's parts as drawn this frame, turned,

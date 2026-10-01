@@ -18,6 +18,10 @@ struct CubeInstance {
 struct CubeUniforms {
     var viewProjection: simd_float4x4
     var light: SIMD4<Float>
+    /// Under water the cubes take the water's tint as the scene under them does: its top and
+    /// bottom colours, how strongly (top's a), and the target's height in pixels (bottom's a).
+    var waterTop: SIMD4<Float> = .zero
+    var waterBottom: SIMD4<Float> = .zero
 }
 
 enum CubeMesh {

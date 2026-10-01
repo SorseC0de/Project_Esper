@@ -19,6 +19,13 @@ final class MaskScene: SKScene {
     private var bodies: [SKSpriteNode] = []
     private var flats: [SKSpriteNode] = []
     private var underFlats: [SKSpriteNode] = []
+    /// What glows though it's over something that doesn't, as the Hooperfish's rings over Wetshot
+    /// Wake's background: drawn blue over the still layer, so the plain threshold holds there
+    /// again, and the glow takes its colour from under the water's tint.
+    private var glowingThrough: [SKSpriteNode] = []
+    /// The same for what's drawn in front of the Hooperfish: the rims, and the nets' strands.
+    private var glowingThroughFront: [SKSpriteNode] = []
+    private var netStrands: [SKShapeNode] = []
     /// The bodies drawn in plain white rather than as they are, for the cubes' occluder.
     private let whiteBodies: Bool
     /// What the stage keeps still and must not glow, drawn once under the bodies; rebuilt
@@ -52,6 +59,7 @@ final class MaskScene: SKScene {
     }
     private static let flatWhite = flat(SIMD4<Float>(1, 1, 1, 1))
     private static let flatGreen = flat(SIMD4<Float>(0, 1, 0, 1))
+    private static let flatBlue = flat(SIMD4<Float>(0, 0, 1, 1))
 
     /// The stage's still, non-glowing art in green, redone when `version` changes.
     func syncStatic(_ flats: [BodySnapshot], version: Int) {
@@ -69,19 +77,40 @@ final class MaskScene: SKScene {
     }
 
     /// Copies the game's bodies and camera, and the flat things in green.
-    func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], under: [BodySnapshot] = [], size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat) {
+    func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], under: [BodySnapshot] = [], through: [BodySnapshot] = [],
+                throughFront: [BodySnapshot] = [], throughNets: [CGPath] = [],
+                size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat) {
         if self.size != size { self.size = size }
         cameraNode.position = cameraPosition
         cameraNode.setScale(cameraScale)
         place(snapshots, in: &bodies, green: false)
         place(flat, in: &flats, green: true)
         place(under, in: &underFlats, green: true, depth: -0.5)
+        place(through, in: &glowingThrough, green: false, depth: -0.75, shader: MaskScene.flatBlue)
+        place(throughFront, in: &glowingThroughFront, green: false, depth: -0.25, shader: MaskScene.flatBlue)
+        while netStrands.count < throughNets.count {
+            let strands = SKShapeNode()
+            strands.strokeColor = SKColor(red: 0, green: 0, blue: 1, alpha: 1)
+            strands.lineWidth = NetTuning.lineWidth
+            strands.lineCap = .square
+            strands.isAntialiased = false
+            strands.zPosition = -0.25
+            addChild(strands)
+            netStrands.append(strands)
+        }
+        for (index, strands) in netStrands.enumerated() {
+            strands.isHidden = index >= throughNets.count
+            if index < throughNets.count { strands.path = throughNets[index] }
+        }
     }
 
-    private func place(_ snapshots: [BodySnapshot], in nodes: inout [SKSpriteNode], green: Bool, depth: CGFloat? = nil) {
+    private func place(_ snapshots: [BodySnapshot], in nodes: inout [SKSpriteNode], green: Bool, depth: CGFloat? = nil, shader: SKShader? = nil) {
         while nodes.count < snapshots.count {
             let node = SKSpriteNode()
-            if whiteBodies {
+            if let shader { node.shader = shader }
+            if shader != nil {
+                // Its own colour, whatever the art's.
+            } else if whiteBodies {
                 // Flat through the art's alpha: a tint multiplies the art's own colours, so a
                 // dark rim or body tinted would come out too dark to read.
                 node.shader = green ? MaskScene.flatGreen : MaskScene.flatWhite

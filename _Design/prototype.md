@@ -1143,8 +1143,13 @@ out to 10 degrees and back over a second and a half (the top one clockwise, the 
 counter-clockwise), the front one the whole arc, 15 either way, the antenna, and the rim, net and ball on it, nodding 0 to 5
 degrees counter-clockwise over two seconds, still while someone dunks (and a rim swimming off the stage,
 or gone, lets go of whoever hangs on it); each turning where it meets the
-body (`WetshotArt.hooperfishParts`). Its rim glows, and so do its red rings and eye (left out of the
-body's mask, `WetshotArt.bodyGlowMask`); the rest of it doesn't. No chevrons point at the ball off
+body (`WetshotArt.hooperfishParts`). Its rim and net glow, and so do its red rings and eye (left out of the
+body's mask, `WetshotArt.bodyGlowMask`), the background's no-glow under them let through: drawn
+pure blue in the mask over it (`MaskScene`'s `through`, under the fish's flats, and `throughFront`
+and the net strands over them; `GameScene.glowThroughSnapshots`, `glowThroughFrontSnapshots`,
+`glowThroughNets`), where the bright pass undoes the water's tint, so they glow in their own colours,
+not the tinted ones. The rest of it doesn't. A rim can't be dunked on in the stage's first or last column, and one swimming into either
+lets go of whoever hangs on it (`Stage.dunkable`, protocol 59). No chevrons point at the ball off
 screen here: off screen it's only ever on the antenna. The plants sway 5 degrees either way over four
 seconds, each on its own beat, from their bottom middle. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
 to whoever put the ball through (`ball.lastTouched`), protocol 48. For 20 frames after any point no
@@ -1170,7 +1175,7 @@ as high, slowly; the jumps, the ground's and the air's speeds and every change o
 pick-ups, the brakes, the frictions, the ball's roll) halved too, the ball's turning in the view halved, and every state's clock holds every other frame,
 so each state, and its sheet with it, runs at half speed; the walk and run cycles too.
 Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
-at its top, at 66% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
+at its top (the energy cubes, drawn apart, tinted to match in their shader), at 66% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
 game pixel and a half side to side in three waves down the screen (WATER SWAY), in the glow's composite
 (`GameScene.screenWave`), but not in the map maker, nor across the score's band at the top. The floor's fill doesn't glow either.
 

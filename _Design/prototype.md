@@ -1164,12 +1164,12 @@ Hoopfish over the middle). Its first name, Wetshot Wake, and Hoopfish Harbor are
 off the floor's row, which is the outline colour as is everything below it, everything over it the
 water's top colour (palette 19), neither glowing; over the background the pile of backboards and
 hoops the Hoopfish has collected (`StageMap.pile`, `WetshotArt.pilePicture`), drawn as one picture
-at 90%, then `Foreground.png` (`WetshotForeground`) in the background's place, both behind
+at 75%, then `Foreground.png` (`WetshotForeground`) in the background's place, both behind
 everything that moves and neither glowing. The pile's pieces, the three frames each of
 `Backboards.png` and `hoops.png` (48 pixel cells, stage strips), are put down in the map maker anywhere, on the nearest whole art pixel
 rather than the grid, picked up and moved with the piece tool in hand, erased with ERASE; two
 TURN sliders under the props turn the newest piece and the one before it, whole degrees either
-way to 180; COPY, for now, puts each piece's kind, x, y and turn on the pasteboard instead of the
+way to 180; the pile as laid out is baked into the stage's map; COPY, for now, puts each piece's kind, x, y and turn on the pasteboard instead of the
 map's source;
 then the map's props (`StageMap.Prop`, placed by their bottom left cell): `Plant 1` to `5`, the
 two halves of `Rocks.png` (the top one first), and the Hoopfish, assembled back to front from

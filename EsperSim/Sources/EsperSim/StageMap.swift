@@ -721,17 +721,29 @@ extension StageMap {
 }
 
 extension StageMap {
-    /// Wetshot Wake's map, laid out in the map maker: the floor along the bottom row, under the
-    /// background, a one-way ledge either side, the plants and rocks, and where the Hoopfish starts.
+    /// Hoopfish Hideaway's map, laid out in the map maker: the floor along the bottom row, under the
+    /// background, a one-way ledge either side, the plants and rocks, where the Hoopfish starts, and
+    /// the pile of backboards and hoops behind it all, in the order they were put down.
     private static func wetshotDefaultMap() -> StageMap {
         let props: [Prop] = [
             Prop(.rock1, at: Cell(0, 1)), Prop(.plant3, at: Cell(4, 1)), Prop(.plant1, at: Cell(5, 1)),
             Prop(.plant1, at: Cell(13, 1)), Prop(.plant2, at: Cell(14, 1)), Prop(.plant5, at: Cell(25, 1)),
             Prop(.rock2, at: Cell(30, 1)), Prop(.plant4, at: Cell(34, 1)), Prop(.hoopfish, at: Cell(17, 11)),
         ]
+        let pile: [PilePiece] = [
+            .init(.backboard2, x: 340, y: 42, rotation: -115), .init(.backboard1, x: 320, y: 45, rotation: 22),
+            .init(.hoop2, x: 356, y: 55, rotation: 0), .init(.backboard2, x: 174, y: 52, rotation: -68),
+            .init(.backboard3, x: 122, y: 115, rotation: -108), .init(.backboard2, x: 198, y: 42, rotation: 66),
+            .init(.backboard2, x: 149, y: 45, rotation: 45), .init(.hoop2, x: 266, y: 91, rotation: -63),
+            .init(.backboard1, x: 267, y: 44, rotation: 0), .init(.hoop3, x: 278, y: 45, rotation: -126),
+            .init(.backboard2, x: 259, y: 42, rotation: 0), .init(.hoop2, x: 176, y: 56, rotation: 0),
+            .init(.hoop2, x: 549, y: 134, rotation: 26), .init(.backboard2, x: 564, y: 132, rotation: -70),
+            .init(.hoop3, x: 254, y: 75, rotation: -135), .init(.backboard1, x: 215, y: 51, rotation: 25),
+            .init(.backboard2, x: 118, y: 48, rotation: 26), .init(.backboard1, x: 440, y: 49, rotation: 0),
+        ]
         let walls: [Wall] = (0..<WetshotRules.columns).map { Wall(Cell($0, 0), .solid) }
             + ((1...5).map { $0 } + (31...35).map { $0 }).map { Wall(Cell($0, 4), .oneWay) }
-        return StageMap(props: props, leftRim: Cell(0, 0), rightRim: Cell(0, 0),
+        return StageMap(props: props, pile: pile, leftRim: Cell(0, 0), rightRim: Cell(0, 0),
                         spawns: [Cell(3, 5), Cell(33, 5)], ball: Cell(18, 12), walls: walls)
     }
 }

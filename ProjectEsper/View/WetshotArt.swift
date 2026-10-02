@@ -22,7 +22,7 @@ enum WetshotArt {
     /// The background's foreground: over the pile, still behind the players.
     static let foreground = picture("WetshotForeground")
     /// The pile drawn as one picture at this opacity, so where its pieces overlap reads as one layer.
-    static let pileOpacity: CGFloat = 0.9
+    static let pileOpacity: CGFloat = 0.75
     /// Room round the stage for pieces hanging off it, and the pile's picture's pixels to an art pixel.
     private static let pileMargin: CGFloat = 48
     private static let pileScale: CGFloat = 3

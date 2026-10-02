@@ -665,7 +665,7 @@ holds the variants; A is always the baseline as tuned. POWER's fourteen sit in t
 - HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white (10 × 17.5 units, 16 × 28 art pixels), the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
-- SFX: the sound words' face, CHERRY, DOT, CHOKO, DARUMA or DELA, or EN DEX, EN CHERRY, EN DARUMA or EN DELA (see Sound words).
+- SFX: the sound words' face, CHERRY, DARUMA or DELA, or EN DEX, EN CHERRY, EN DARUMA or EN DELA (see Sound words).
 - AI, beside that: the computer plays the other side, whatever pads are in. Off, the second
   pad or nothing does. The title's VS CPU / VS HUMAN toggle is the same switch, kept between launches;
   clicking a pad's right stick (R3) switches it too.
@@ -887,16 +887,16 @@ its length.
 ### Sound words
 
 Manga sound effects over the action, Jump Ultimate Stars style (`View/Onomatopoeia.swift`), all
-katakana or all English by the SFX picker, never mixed, its nine options in a row of five and
-a row of four: the kana faces CHERRY (Cherry Bomb One, the default, for its weight), DOT
-(DotGothic16), CHOKO (Chokokutai), DARUMA (Darumadrop One, which has only the plain "!") and DELA
-(Dela Gothic One), and the English EN DEX (Bigdex), EN CHERRY, EN DARUMA and EN DELA, the same
-faces' Latin; kept between launches, and a pick pops a sample in the middle of the screen. The
+katakana or all English by the SFX picker, never mixed, its seven options in rows of four: the
+kana faces CHERRY (Cherry Bomb One, the default, for its weight), DARUMA (Darumadrop One, which
+has only the plain "!") and DELA (Dela Gothic One), and the English EN DEX (Bigdex, with no kana),
+EN CHERRY, EN DARUMA and EN DELA, the same faces' Latin; kept between launches, and a pick pops a sample in the middle of the screen. The
 fonts are bundled in `Art/Fonts/` and registered with the process on first use; each face is
 centred and sized by its own ド or D, Dela at 0.85 as it runs wide, and drawn at 3 pixels a point
 so it stays crisp in the world. Every word is drawn ahead in the picked face, with the stage's
-other drawn art and again on a pick. (Dirty Brush was tried and dropped: its broken strokes
-wouldn't read under the outline.) Each letter
+other drawn art and again on a pick. (Dirty Brush, DotGothic16, Chokokutai, Reggae One and
+Yusei Magic were tried and dropped: too light beside the bold faces, or Dirty Brush's broken
+strokes wouldn't read under the outline.) Each letter
 grows along the word to 1.35x, rocks ±7° and bobs in turn, outlined in palette 29 and dropped
 south-east, its fill split at its own middle. The word pops from 0.3 through 1.15 to 1 while a
 warp grid flares it (near end squeezed, far end spread, middle arched), holds 0.5s, then rises

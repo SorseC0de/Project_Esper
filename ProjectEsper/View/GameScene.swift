@@ -2039,7 +2039,7 @@ final class GameScene: SKScene {
         controls.addPicker(title: "COUNT", options: ["A", "B"], selected: UserDefaults.standard.integer(forKey: SoundBoard.countSetKey)) { index in
             UserDefaults.standard.set(index, forKey: SoundBoard.countSetKey)
         }
-        controls.addPicker(title: "SFX", options: Onomatopoeia.Lettering.allCases.map(\.label), selected: Onomatopoeia.lettering.rawValue, perRow: 5) { [weak self] index in
+        controls.addPicker(title: "SFX", options: Onomatopoeia.Lettering.allCases.map(\.label), selected: Onomatopoeia.lettering.rawValue, perRow: 4) { [weak self] index in
             Onomatopoeia.lettering = Onomatopoeia.Lettering(rawValue: index) ?? .cherryBomb
             SKTexture.preload(Onomatopoeia.warmed()) {}
             self?.previewSoundWord()

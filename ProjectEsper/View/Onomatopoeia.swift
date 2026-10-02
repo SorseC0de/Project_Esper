@@ -7,16 +7,14 @@ import UIKit
 /// word and rocking in turn, outlined and dropped like the title lettering, and the sprite
 /// warped into a flare that snaps in and settles.
 enum Onomatopoeia {
-    /// The SFX picker's options: katakana in one of five faces, or English in one of five.
+    /// The SFX picker's options: katakana in one of three faces, or English in one of four.
     enum Lettering: Int, CaseIterable {
-        case cherryBomb, dotGothic, chokokutai, darumadrop, delaGothic
+        case cherryBomb, darumadrop, delaGothic
         case englishDex, englishCherry, englishDarumadrop, englishDela
 
         var label: String {
             switch self {
             case .cherryBomb: "CHERRY"
-            case .dotGothic: "DOT"
-            case .chokokutai: "CHOKO"
             case .darumadrop: "DARUMA"
             case .delaGothic: "DELA"
             case .englishDex: "EN DEX"
@@ -28,8 +26,6 @@ enum Onomatopoeia {
         var fontName: String {
             switch self {
             case .cherryBomb, .englishCherry: "CherryBombOne-Regular"
-            case .dotGothic: "DotGothic16-Regular"
-            case .chokokutai: "Chokokutai-Regular"
             case .darumadrop, .englishDarumadrop: "DarumadropOne-Regular"
             case .delaGothic, .englishDela: "DelaGothicOne-Regular"
             case .englishDex: "Bigdex"
@@ -104,8 +100,7 @@ enum Onomatopoeia {
 
     /// Bundled, and registered with the process on first use.
     private static let registered: Void = {
-        for name in ["Bigdex", "CherryBombOne-Regular", "DotGothic16-Regular", "Chokokutai-Regular",
-                     "DarumadropOne-Regular", "DelaGothicOne-Regular"] {
+        for name in ["Bigdex", "CherryBombOne-Regular", "DarumadropOne-Regular", "DelaGothicOne-Regular"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
                 CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
             }

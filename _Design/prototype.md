@@ -702,7 +702,7 @@ front: the torso over the legs, the head over all but the arms (the head apart f
 with the human look off, is its own sprite over everything). Each figure is one layer, the body, its line, head, energy,
 cape, ball in hand and flashes, their depths packed under a tenth, so a whole body is in
 front of or behind the other: in front, the one with the ball, else the last to touch it. An experiment, on (`HumanLook.enabled`; off puts it all back): the players drawn as
-people, skin on the head, the arms and hands, the front in palette 24 #FAD6B8 and the back in 25 #F5A097 (trying them; they were 35 and 34),
+people, skin on the head, the arms and hands, the front in palette 24 #FAD6B8 and the back in 25 #F5A097 (trying them; they were 35 and 34), never glowing (green in the body's glow mask),
 the torso, pelvis and front thigh palette 41 #4A5462 for everyone (`HumanLook.clothes`), the back thigh 42 #333941, the
 lower legs and feet the energy's own colour, as the crown's grade is, the back ones at two
 thirds of its brightness (`HumanLook.backLegShare`, 0.66; greyed, they barely glowed), and glowing as energy does

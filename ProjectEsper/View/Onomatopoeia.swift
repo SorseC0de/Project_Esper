@@ -8,15 +8,17 @@ import UIKit
 /// word and rocking in turn, outlined and dropped like the title lettering, and the sprite
 /// warped into a flare that snaps in and settles.
 enum Onomatopoeia {
-    /// The SFX picker's options: katakana in one of three faces, or English in one of three.
+    /// The SFX picker's options: katakana in one of five faces, or English in one of three.
     enum Lettering: Int, CaseIterable {
-        case cherryBomb, dotGothic, chokokutai, englishBrush, englishDex, englishCherry
+        case cherryBomb, dotGothic, chokokutai, darumadrop, delaGothic, englishBrush, englishDex, englishCherry
 
         var label: String {
             switch self {
             case .cherryBomb: "CHERRY"
             case .dotGothic: "DOT"
             case .chokokutai: "CHOKO"
+            case .darumadrop: "DARUMA"
+            case .delaGothic: "DELA"
             case .englishBrush: "EN BRUSH"
             case .englishDex: "EN DEX"
             case .englishCherry: "EN CHERRY"
@@ -27,11 +29,15 @@ enum Onomatopoeia {
             case .cherryBomb, .englishCherry: "CherryBombOne-Regular"
             case .dotGothic: "DotGothic16-Regular"
             case .chokokutai: "Chokokutai-Regular"
+            case .darumadrop: "DarumadropOne-Regular"
+            case .delaGothic: "DelaGothicOne-Regular"
             case .englishBrush: "DirtyBrush-Regular"
             case .englishDex: "Bigdex"
             }
         }
-        var japanese: Bool { self == .cherryBomb || self == .dotGothic || self == .chokokutai }
+        var japanese: Bool { rawValue < Lettering.englishBrush.rawValue }
+        /// Darumadrop has no full-width "!", only the plain one.
+        var plainBangs: Bool { self == .darumadrop }
         /// Dirty Brush: broken strokes, closed up under the fill, and no "!", so it's brushed.
         var brush: Bool { self == .englishBrush }
         /// The letter the faces are centred and sized by.
@@ -82,7 +88,8 @@ enum Onomatopoeia {
         var word: Word {
             let spelling = spelling
             let lettering = Onomatopoeia.lettering
-            return Word(text: lettering.japanese ? spelling.japanese : spelling.english, lettering: lettering,
+            let japanese = lettering.plainBangs ? spelling.japanese.replacingOccurrences(of: "！", with: "!") : spelling.japanese
+            return Word(text: lettering.japanese ? japanese : spelling.english, lettering: lettering,
                         upper: spelling.upper, lower: spelling.lower, height: spelling.height)
         }
     }
@@ -98,7 +105,8 @@ enum Onomatopoeia {
 
     /// Bundled, and registered with the process on first use.
     private static let registered: Void = {
-        for name in ["DirtyBrush", "Bigdex", "CherryBombOne-Regular", "DotGothic16-Regular", "Chokokutai-Regular"] {
+        for name in ["DirtyBrush", "Bigdex", "CherryBombOne-Regular", "DotGothic16-Regular", "Chokokutai-Regular",
+                     "DarumadropOne-Regular", "DelaGothicOne-Regular"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
                 CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
             }

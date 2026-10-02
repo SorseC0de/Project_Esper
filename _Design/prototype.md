@@ -665,7 +665,7 @@ holds the variants; A is always the baseline as tuned. POWER's fourteen sit in t
 - HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white (10 × 17.5 units, 16 × 28 art pixels), the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
-- SFX: the sound words' face, CHERRY, DOT or CHOKO, or EN BRUSH, EN DEX or EN CHERRY (see Sound words).
+- SFX: the sound words' face, CHERRY, DOT, CHOKO, DARUMA or DELA, or EN BRUSH, EN DEX or EN CHERRY (see Sound words).
 - AI, beside that: the computer plays the other side, whatever pads are in. Off, the second
   pad or nothing does. The title's VS CPU / VS HUMAN toggle is the same switch, kept between launches;
   clicking a pad's right stick (R3) switches it too.
@@ -887,10 +887,10 @@ its length.
 ### Sound words
 
 Manga sound effects over the action, Jump Ultimate Stars style (`View/Onomatopoeia.swift`), all
-katakana or all English by the SFX picker, never mixed, its six options in two rows of three:
-the kana faces CHERRY (Cherry Bomb One, the default, for its weight), DOT (DotGothic16) and CHOKO
-(Chokokutai), and the English EN BRUSH (Dirty Brush), EN DEX (Bigdex) and EN CHERRY (Cherry Bomb
-One's Latin); kept between launches, and a pick pops a sample in the middle of the screen. The
+katakana or all English by the SFX picker, never mixed, its eight options in two rows of four:
+the kana faces CHERRY (Cherry Bomb One, the default, for its weight), DOT (DotGothic16), CHOKO
+(Chokokutai), DARUMA (Darumadrop One, which has only the plain "!") and DELA (Dela Gothic One),
+and the English EN BRUSH (Dirty Brush), EN DEX (Bigdex) and EN CHERRY (Cherry Bomb One's Latin); kept between launches, and a pick pops a sample in the middle of the screen. The
 fonts are bundled in `Art/Fonts/` and registered with the process on first use; each face is
 centred and sized by its own ド or D, and drawn at 3 pixels a point so it stays crisp in the
 world. Dirty Brush has no "!", so its marks are brushed wedges; the other faces use their own.

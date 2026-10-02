@@ -675,6 +675,7 @@ public struct Stage: Equatable {
         stage.hooperfishStart = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize)
         stage.features = StageFeatures(look: .wetshot)
         stage.features.underwater = true
+        stage.features.doublePoints = true
         return stage
     }
 

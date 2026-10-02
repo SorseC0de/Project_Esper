@@ -13,6 +13,34 @@ final class WetshotTests: XCTestCase {
         XCTAssertEqual(stage.hoops[0].position, Vec2(x: Double(fish.column) * Stage.tileSize, y: Double(fish.row) * Stage.tileSize) + WetshotRules.rimFromHooperfish)
     }
 
+    func testADunkOnTheHooperfishSpinsItAndScoresNothing() {
+        var match = wetshot()
+        match.hooperfish!.carrying = .hoop
+        // Mid-crossing, the rim well inside the stage.
+        match.hooperfish!.swimFrames = 100_000
+        match.hooperfish!.from = Vec2(x: 160, y: 90)
+        match.hooperfish!.to = Vec2(x: 161, y: 90)
+        match.advance(inputs: [.idle, .idle])
+        let rim = match.stage.hoops[0].position
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[0].position = rim - Vec2(x: 12, y: 20)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.players[0].velocity = .zero
+        var spun = false, sawRimOut = false
+        for _ in 0..<150 {
+            match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+            if match.events.contains(.hooperfishSpun) { spun = true }
+            if spun, match.hooperfish!.spin > 0, match.stage.hoops[0].position == HighwayRules.parked { sawRimOut = true }
+        }
+        XCTAssertTrue(spun, "the dunk got as far as the slam")
+        XCTAssertTrue(sawRimOut, "the rim out of play through the spin")
+        XCTAssertEqual(match.scores, [0, 0])
+        XCTAssertNotEqual(match.players[0].state, .dunking)
+        XCTAssertNotEqual(match.stage.hoops[0].position, HighwayRules.parked, "back once it's spun")
+    }
+
     func testWhoeverPutsTheBallThroughTheSharedRimScores() {
         for scorer in 0...1 {
             var match = Match(stage: .wetshot)

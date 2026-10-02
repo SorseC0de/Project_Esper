@@ -167,7 +167,7 @@ public struct Match: Equatable {
                 if mode == .fortySeven {
                     // 47: the points by where the ball left a hand, and play on, the scorer
                     // kept off the ball a while.
-                    let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage)
+                    let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage) * pointValue
                     scores[owner] += points
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points, floater: ball.floaterShot))
                     holdHitStop(HitStopRules.shotFrames)
@@ -300,6 +300,16 @@ public struct Match: Equatable {
             pulse(by: index, pull: pull)
         case .snipe(let at, let pull):
             snipe(by: index, at: at, pull: pull)
+        case .dunk(let hoop) where hooperfish != nil:
+            // No dunking the Hooperfish: at the slam it spins, rim and all, and the ball drops
+            // out through where the rim was, no point, the dunker let go.
+            hooperfish?.spin = HooperfishRules.spinFrames
+            placeHooperfishLoad()
+            ball.release(from: player.heldBallPoint, velocity: Vec2(x: 0, y: -1), by: index, straight: false)
+            ball.steers = false
+            players[index].grounded = false
+            players[index].enter(.air)
+            events.append(.hooperfishSpun)
         case .dunk(let hoop):
             // Its bottom just over the rim, so it comes down through it.
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: BallRules.radius + 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
@@ -528,13 +538,17 @@ public struct Match: Equatable {
 
     private mutating func placeHooperfishLoad() {
         guard let fish = hooperfish, !stage.hoops.isEmpty else { return }
-        stage.hoops[0].position = fish.carrying == .hoop && !fish.away ? fish.antenna : HighwayRules.parked
+        // Spinning, the rim spins with it, out of play.
+        stage.hoops[0].position = fish.carrying == .hoop && !fish.away && fish.spin == 0 ? fish.antenna : HighwayRules.parked
         stage.hoops[0].backboard = fish.facesRight ? .left : .right
         if fish.carrying == .ball, ball.holder == nil {
             ball.position = fish.ballPoint
             ball.velocity = .zero
         }
     }
+
+    /// What a 47 basket's points are multiplied by on this stage.
+    var pointValue: Int { stage.features.doublePoints ? 2 : 1 }
 
     /// Where a player starts: the stage's spot, lifted onto whatever stands there, such as a car.
     func spawnPoint(_ index: Int) -> Vec2 {

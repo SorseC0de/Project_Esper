@@ -41,6 +41,8 @@ public struct StageFeatures: Equatable {
     /// Under water: gravity halved, for bodies and the ball; the ground's speeds halved but not
     /// the air's; the bodies' sheets played at half their rate.
     public var underwater = false
+    /// In 47, a basket's points doubled; a round is a round either way.
+    public var doublePoints = false
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets

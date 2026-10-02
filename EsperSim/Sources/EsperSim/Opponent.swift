@@ -305,8 +305,8 @@ public struct Opponent: Equatable {
             }
             hoop.position = coming
         }
-        // A rim that's coming but not here yet can't be dunked on.
-        let rimOut = rimPath != nil && match.stage.hoops[hoopIndex].position == HighwayRules.parked
+        // The Hooperfish's rim is never dunked on: it spins the dunk away.
+        let rimOut = rimPath != nil
         let inward = -hoop.backboard.sign
         let toHoop = hoop.position.x - me.position.x
         let gap = human.position.x - me.position.x
@@ -369,6 +369,11 @@ public struct Opponent: Equatable {
                 } else {
                     let aim = aimShot(match, me: me, lift: max(me.velocity.y, 0), hoop: hoop, index: hoopIndex, path: rimPath)
                         ?? (readsStage ? nil : aimShot(match, me: me, lift: 0, hoop: hoop, index: hoopIndex, path: rimPath))
+                    if readsStage, aim == nil {
+                        // Nothing goes in from here: the stance called off, the ball kept.
+                        tapThrow(&input)
+                        return
+                    }
                     input.aim = aim ?? Vec2(x: Trig.cos(BallRules.shotAngleDefault) * inward, y: Trig.sin(BallRules.shotAngleDefault))
                     input.shoot = me.velocity.y > Opponent.jumpShotLetGo
                 }
@@ -398,6 +403,18 @@ public struct Opponent: Equatable {
             planFrames -= 1
         } else if plan != .none {
             plan = .none
+        }
+        // A rim on the move: wherever it is, a shot that goes in from right here is taken now.
+        if let rimPath, plan != .shoot, me.grounded, [.idle, .walk, .run, .dash].contains(me.state), match.frame % 3 == 0 {
+            let standing = !scoringAngles(match, body: me, jumpShot: false, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
+            let jumping = !standing && !scoringAngles(match, body: me, jumpShot: true, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
+            if standing || jumping {
+                readSpot = ShotSpot(feet: me.position, jumpShot: jumping)
+                readSpotFrames = 90
+                plan = .shoot
+                planFrames = 90
+                jumpShot = jumping
+            }
         }
         if readsStage {
             if readSpot == nil || readSpotFrames <= 0 {
@@ -444,6 +461,20 @@ public struct Opponent: Equatable {
             } else if dangerous, near {
                 plan = .hold
                 planFrames = 6
+            } else if atSpot, let rimPath {
+                // A rim on the move: only the shot that, played out, goes in from here and now;
+                // none does, and it waits for the rim to come round.
+                let standing = !scoringAngles(match, body: me, jumpShot: false, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
+                let jumping = !standing && !scoringAngles(match, body: me, jumpShot: true, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
+                if standing || jumping {
+                    plan = .shoot
+                    planFrames = 90
+                    jumpShot = jumping
+                    dances = 0
+                } else {
+                    plan = .hold
+                    planFrames = 4
+                }
             } else if atSpot {
                 plan = .shoot
                 planFrames = 90

@@ -42,6 +42,33 @@ enum TitleText {
         let key = "\(size)|\(italic)|\(renderScale)|\(lit)|\(text)"
         if let image = images[key] { return image }
         let font = font(size: size, italic: italic)
+        // The fill splits at the middle of the capitals.
+        let image = render(text, font: font, size: size, upper: .white, lower: lowerColour(lit: lit), outline: .black) { $0 + font.ascender - font.capHeight / 2 }
+        images[key] = image
+        return image
+    }
+
+    /// CardCourt's 2X mark as it is there, Avenir Next Condensed Heavy split at the middle of
+    /// its line, in palette colours by index.
+    static func markTexture(_ text: String, size: CGFloat, upper: Int, lower: Int, outline: Int) -> SKTexture {
+        let key = "mark|\(size)|\(renderScale)|\(upper)|\(lower)|\(outline)|\(text)"
+        if let texture = cache[key] { return texture }
+        let font = UIFont(name: "AvenirNextCondensed-Heavy", size: size) ?? font(size: size, italic: false)
+        func colour(_ index: Int) -> UIColor {
+            let rgb = PixelPalette.colours[index]
+            return UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255, blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
+        }
+        let line = (text as NSString).size(withAttributes: [.font: font]).height
+        let image = render(text, font: font, size: size, upper: colour(upper), lower: colour(lower), outline: colour(outline)) { $0 + line / 2 }
+        let texture = SKTexture(image: image)
+        cache[key] = texture
+        return texture
+    }
+
+    /// The lettering drawn: the outline walked round a ring, again dropped to the south-east,
+    /// and the fill, `upper` over `lower` split at `middle` of the line's top.
+    private static func render(_ text: String, font: UIFont, size: CGFloat, upper: UIColor, lower: UIColor, outline: UIColor,
+                               middle: (CGFloat) -> CGFloat) -> UIImage {
         let measured = (text as NSString).size(withAttributes: [.font: font])
         let ring = size * stroke
         let shadow = size * drop
@@ -49,7 +76,7 @@ enum TitleText {
         let canvas = CGSize(width: ceil(measured.width + pad * 2), height: ceil(measured.height + pad * 2))
         let format = UIGraphicsImageRendererFormat()
         format.scale = UIScreen.main.scale * renderScale
-        let image = UIGraphicsImageRenderer(size: canvas, format: format).image { context in
+        return UIGraphicsImageRenderer(size: canvas, format: format).image { context in
             let origin = CGPoint(x: pad, y: pad)
             func draw(_ colour: UIColor, offset: CGPoint) {
                 (text as NSString).draw(at: CGPoint(x: origin.x + offset.x, y: origin.y + offset.y),
@@ -58,23 +85,20 @@ enum TitleText {
             for centre in [CGPoint(x: shadow, y: shadow), .zero] {
                 for step in 0..<steps {
                     let angle = Double(step) * 2 * .pi / Double(steps)
-                    draw(.black, offset: CGPoint(x: centre.x + cos(angle) * ring, y: centre.y + sin(angle) * ring))
+                    draw(outline, offset: CGPoint(x: centre.x + cos(angle) * ring, y: centre.y + sin(angle) * ring))
                 }
             }
-            // The fill splits at the middle of the capitals.
-            let middle = origin.y + font.ascender - font.capHeight / 2
+            let middle = middle(origin.y)
             let cg = context.cgContext
             cg.saveGState()
             cg.clip(to: CGRect(x: 0, y: 0, width: canvas.width, height: middle))
-            draw(.white, offset: .zero)
+            draw(upper, offset: .zero)
             cg.restoreGState()
             cg.saveGState()
             cg.clip(to: CGRect(x: 0, y: middle, width: canvas.width, height: canvas.height - middle))
-            draw(lowerColour(lit: lit), offset: .zero)
+            draw(lower, offset: .zero)
             cg.restoreGState()
         }
-        images[key] = image
-        return image
     }
 
     /// How far lettering of `size` reads off its middle, its black drop falling to the

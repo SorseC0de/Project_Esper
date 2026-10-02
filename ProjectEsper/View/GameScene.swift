@@ -1622,6 +1622,9 @@ final class GameScene: SKScene {
     private static let frontBubbleShare = 0.3
     /// Bubbles off a body's feet as it comes down, a second's worth.
     private static let footBubblesPerSecond = 12.0
+    /// Off the Hooperfish's tail as it swims, and all round it while it spins.
+    private static let trailBubblesPerSecond = 10.0
+    private static let spinBubblesPerFrame = 3
     /// The bubble cells' weights: the first as likely as near half the others together.
     private static let bubbleCellWeights = [0.4, 0.15, 0.15, 0.15, 0.15]
 
@@ -1708,6 +1711,32 @@ final class GameScene: SKScene {
         }
         // The Hooperfish where the sim has it, swimming; in the map maker, where it's placed.
         WetshotArt.place(wetshotArt?.hooperfish, as: wholeStageView ? nil : match.hooperfish, placed: StageMap.current[.wetshot].hooperfish)
+        let spin = wholeStageView ? 0 : match.hooperfish?.spin ?? 0
+        let spinCount = EffectSheets.frames["hooperfish_spin"] ?? 0
+        WetshotArt.spin(wetshotArt?.hooperfish, showing: spin > 0 && spinCount > 0
+            ? sprites.texture("hooperfish_spin", min((HooperfishRules.spinFrames - spin) * spinCount / HooperfishRules.spinFrames, spinCount - 1)) : nil)
+        if wet, !wholeStageView, let fish = match.hooperfish, !fish.away, let node = wetshotArt?.hooperfish {
+            func bubble(at point: CGPoint, front: Bool, cells: ClosedRange<Int>, rise: ClosedRange<CGFloat>, life: ClosedRange<Double>) {
+                let bubble = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", Int.random(in: cells)))
+                bubble.position = point
+                bubble.zPosition = front ? 5.6 : 5.05
+                node.parent?.addChild(bubble)
+                bubbles.append(Bubble(node: bubble, baseX: point.x, age: 0, life: .random(in: life), rise: .random(in: rise),
+                                      wobble: .random(in: 1...2), wobbleRate: .random(in: 0.5...1)))
+            }
+            // A trail off the tail, behind it.
+            if Double.random(in: 0..<1) < GameScene.trailBubblesPerSecond * step {
+                bubble(at: CGPoint(x: node.position.x + (WetshotArt.tailTip.x + .random(in: -2...2)) * node.xScale, y: node.position.y + WetshotArt.tailTip.y + .random(in: -4...4)),
+                       front: false, cells: 0...2, rise: 10...18, life: 1.5...3)
+            }
+            // Spinning: a burst all round it, some over it.
+            if spin > 0 {
+                for _ in 0..<GameScene.spinBubblesPerFrame {
+                    bubble(at: CGPoint(x: node.position.x + .random(in: 0...CGFloat(HooperfishRules.pixelWidth)) * node.xScale, y: node.position.y + .random(in: 0...48)),
+                           front: Bool.random(), cells: 0...4, rise: 14...30, life: 1...2.5)
+                }
+            }
+        }
         WetshotArt.animate(wetshotArt?.hooperfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
         WetshotArt.sway(wetshotArt?.props ?? [], at: CACurrentMediaTime())
         jellyfish = jellyfish.compactMap { fish in
@@ -2311,6 +2340,7 @@ final class GameScene: SKScene {
         series = Series(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
         series.stage = firstStage
         startRound()
+        announceDoublePoints()
         enter(.playing)
     }
 
@@ -2464,7 +2494,14 @@ final class GameScene: SKScene {
             bannerQueue.append((heldBanner, 26))
             self.heldBanner = nil
         }
+        announceDoublePoints()
         enter(.playing)
+    }
+
+    /// In 47 on a stage where points are worth double, it says so as play starts there.
+    private func announceDoublePoints() {
+        guard gameMode == .fortySeven, series.stage.stage.features.doublePoints else { return }
+        bannerQueue.append(("Points Are Worth Double!", 26))
     }
 
     /// The drinks onto the bodies as they stand, for the round about to count. The POWER
@@ -2581,6 +2618,27 @@ final class GameScene: SKScene {
         }
         if online != nil, pendingFlow != nil { session.stopAt = pendingFlowFrame }
     }
+
+    /// "2X" over the rim a basket went through, where points are worth double: from a tenth of
+    /// its size up, fading as it grows.
+    private func showDoubleMark(at hoop: Int) {
+        guard hoop < rimNodes.count, let parent = rimNodes[hoop].parent else { return }
+        let texture = TitleText.markTexture("2X", size: 48, upper: 7, lower: 20, outline: 29)
+        let mark = SKSpriteNode(texture: texture)
+        let height = GameScene.doubleMarkHeight
+        mark.size = CGSize(width: height * texture.size().width / max(texture.size().height, 1), height: height)
+        mark.position = rimNodes[hoop].position + CGPoint(x: 0, y: GameScene.doubleMarkLift)
+        // Over the water's tint.
+        mark.zPosition = 97
+        mark.setScale(0.1)
+        let grow = SKAction.scale(to: 1.2, duration: 0.8)
+        grow.timingMode = .easeOut
+        mark.run(.sequence([.group([grow, .sequence([.wait(forDuration: 0.3), .fadeOut(withDuration: 0.5)])]), .removeFromParent()]))
+        parent.addChild(mark)
+    }
+    /// The 2X mark's height, and how far over the rim it stands, in art pixels.
+    private static let doubleMarkHeight: CGFloat = 20
+    private static let doubleMarkLift: CGFloat = 20
 
     /// 47's basket, confirmed on both sides: the tally, and the win at 47, the sim stopped on
     /// the same frame online for the screen. Nothing else stops play.
@@ -3163,15 +3221,18 @@ final class GameScene: SKScene {
             for case .scored(let scorer, let hoop, let entry, let points, let floater) in frameEvents.events {
                 rimFlash[hoop] = 8
                 let dunk = dunkScoring
+                // A three is a three before any doubling.
+                let shotPoints = gameMode == .fortySeven && match.stage.features.doublePoints ? points / 2 : points
                 strike(hoop: hoop, by: scorer, entry: entry)
                 if gameMode == .fortySeven {
-                    showBanner(points >= 3 ? "THREE!!" : "BUCKET!!", size: 48)
+                    showBanner(shotPoints >= 3 ? "THREE!!" : "BUCKET!!", size: 48)
                     fortySevenScored(by: scorer, points: points, at: frameEvents.frame)
                 } else {
                     showBanner("BUCKET!!", size: 48)
                     pointScored(by: scorer, at: frameEvents.frame)
                 }
-                announce(dunk: dunk, three: gameMode == .fortySeven && points >= 3, floater: floater, winning: pendingFlow == .won)
+                if gameMode == .fortySeven, match.stage.features.doublePoints { showDoubleMark(at: hoop) }
+                announce(dunk: dunk, three: gameMode == .fortySeven && shotPoints >= 3, floater: floater, winning: pendingFlow == .won)
             }
         }
     }
@@ -5453,6 +5514,10 @@ final class GameScene: SKScene {
                 rimNodes[index].zRotation += nod.angle
                 backboardNodes[index].position = artPoint
                 backboardNodes[index].xScale = rimNodes[index].xScale
+                // The Hooperfish's spin has the rim in it: its own art and net out of sight meanwhile.
+                let spinning = index == 0 && (match.hooperfish?.spin ?? 0) > 0
+                rimNodes[index].isHidden = spinning
+                if index < nets.count { nets[index].hidden = spinning }
                 if index < nets.count {
                     // The Elements' wind blows the nets leftward, in gusts.
                     let gust = 0.7 + 0.3 * sin(CACurrentMediaTime() * GameScene.netGustRate)

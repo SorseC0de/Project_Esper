@@ -766,9 +766,11 @@ the stage (`OpponentTerrain.swift`, `OpponentStages.swift`):
   flick is found by playing the shot out (a copy of the body through the rest of the stance, the
   jump, the release) and then the ball's own flight, the middle of the angles that go in.
 - A rim that moves, Wetshot Wake's, is followed ahead by stepping a copy of the Hooperfish: it
-  shoots at where the rim will be, from under where it'll be in a second and a half; dunks it
-  only when it's there and in jumping reach; keeps the ball away from the other while it's off
-  screen. The ball on the antenna is met where the fish will carry it, jumping in time.
+  shoots at where the rim will be, from under where it'll be in a second and a half, and only
+  once a shot played out from there goes in (waiting for the rim to come round if none does,
+  calling off a stance it can't finish), and from wherever it stands, checked every third frame,
+  the moment one would; never dunks it; keeps the ball away from the other
+  while it's off screen. The ball on the antenna is met where the fish will carry it, jumping in time.
 - A loose ball is met where its stepped-ahead flight first comes in reach.
 - Its plays that rush at the rim on the court (the dart, the jump over, being blocked) go by the
   next step of its way instead, which on the Elements can run away from the rim first.
@@ -1187,7 +1189,19 @@ pure blue in the mask over it (`MaskScene`'s `through`, under the fish's flats, 
 and the net strands over them; `GameScene.glowThroughSnapshots`, `glowThroughFrontSnapshots`,
 `glowThroughNets`), where the bright pass undoes the water's tint, so they glow in their own colours,
 not the tinted ones. The rings are a single art pixel wide: any blue in the half-size mask counts,
-and the brightest of the four full-size pixels under it is taken. The rest of it doesn't. A rim can't be dunked on in the stage's first or last column, and one swimming into either
+and the brightest of the four full-size pixels under it is taken. The rest of it doesn't.
+
+No dunking the Hooperfish (protocol 61): a dunk on it plays to its slam, the dunk sheet's third
+frame, then the fish spins, `Hooperfish_spin` (eight 96 by 48 frames at 15 a second,
+`HooperfishRules.spinFrames` 32, imported as a stage strip), its parts hidden and the rim's own
+art and net with them, the rim out of play throughout (`Hooperfish.spin`), and the ball drops
+from the dunker's hands, no point, the dunker let go into the air (`MatchEvent.hooperfishSpun`).
+Bubbles burst all round it as it spins, some over it, and trail off its tail as it swims
+(`WetshotArt.tailTip`, 10 a second). In 47, points here are worth double (`StageFeatures.doublePoints`),
+a basket's points doubled; a best of seven's rounds stay one a basket. In 47, play on the stage starts with "Points Are Worth Double!" in the drink banner's
+lettering, and each basket throws "2X" over the rim in CardCourt's 2X lettering (Avenir Next
+Condensed Heavy, `TitleText.markTexture`) in palette 7 over 20, outlined 29, from a tenth of its
+size up to 1.2 over 0.8 seconds, fading from 0.3. A rim can't be dunked on in the stage's first or last column, and one swimming into either
 lets go of whoever hangs on it (`Stage.dunkable`, protocol 59). A body bouncing off the rim's top
 rises half as high as it would under water elsewhere (`RimRules.underwaterBounceShare`, the push
 at the square root of a half; protocol 60). The ball's and the hoop's chevrons and the swimming

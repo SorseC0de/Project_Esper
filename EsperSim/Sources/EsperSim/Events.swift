@@ -12,6 +12,8 @@ public enum MatchEvent: Equatable {
     case shot(player: Int)
     case thrown(player: Int)
     case dunked(player: Int)
+    /// A dunk on the Hooperfish, which spins it off.
+    case hooperfishSpun
     case swatted(player: Int, hit: Bool)
     /// `entry` is the ball's velocity as it went through; `points` what it was worth.
     /// `floater`: the ball went in as a floater, for the announcer.

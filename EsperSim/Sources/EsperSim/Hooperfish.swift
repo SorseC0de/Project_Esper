@@ -18,6 +18,8 @@ public struct Hooperfish: Equatable {
     public var to: Vec2
     /// This crossing's swim, in frames: the first, from where it's placed, only as long as its way off.
     public var swimFrames: Int
+    /// Frames left of the spin a dunk sets off, the rim out of play through it.
+    public var spin = 0
 
     /// Where the rim, or the ball, rides on its antenna: whole art pixels from its bottom left.
     public var antenna: Vec2 {
@@ -44,6 +46,7 @@ public struct Hooperfish: Equatable {
 
     /// A frame on: swimming, swaying, then waiting off screen, then the next crossing back.
     mutating func step(on stage: Stage) {
+        if spin > 0 { spin -= 1 }
         age += 1
         if age < swimFrames {
             let share = Double(age) / Double(swimFrames)
@@ -74,6 +77,8 @@ public enum HooperfishRules {
     /// Ten seconds across the screen, two waiting off it.
     public static let swimFrames = 600
     public static let waitFrames = 120
+    /// The spin: its eight frames at fifteen a second.
+    public static let spinFrames = 32
     /// It sways this far up and down, this many times a crossing, kept between its lowest and highest.
     public static let swayHeight = 30.0
     public static let swaysPerCrossing = 1.25

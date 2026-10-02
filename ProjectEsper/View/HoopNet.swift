@@ -166,6 +166,8 @@ final class HoopNet {
 
     /// The strands as drawn this frame, in the parent's space; nil while hidden.
     var drawnPath: CGPath? { shape.isHidden ? nil : shape.path }
+    /// Out of sight a while, as the Hooperfish spins the rim.
+    var hidden = false { didSet { shape.isHidden = hidden || NetTuning.cylinder } }
 
     init(at rim: CGPoint, mirrored: Bool, colour: SKColor, into parent: SKNode, depth: CGFloat = 4) {
         self.rim = rim

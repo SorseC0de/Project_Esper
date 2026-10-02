@@ -431,7 +431,8 @@ extension Opponent {
                         if scored == index { angles.append(angle) }
                         break
                     }
-                    if ball.resting || ball.position.y < stage.hoops[index].position.y - 60 { break }
+                    // Done once it's come down well under the rim; still rising to it from below, not yet.
+                    if ball.resting || (ball.velocity.y < 0 && ball.position.y < stage.hoops[index].position.y - 60) { break }
                 }
                 if stopAtFirst, !angles.isEmpty { return angles }
             }
@@ -448,7 +449,8 @@ extension Opponent {
         var body = start
         var stance = stanceSoFar
         var events: [MatchEvent] = []
-        for frame in 0..<90 {
+        // Under water every state runs at half speed, the windup with them.
+        for frame in 0..<200 {
             var input = PlayerInput(aim: aim)
             if body.state == .shootStance {
                 stance += 1

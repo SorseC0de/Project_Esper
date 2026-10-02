@@ -113,6 +113,23 @@ enum WetshotArt {
         return texture
     }
 
+    /// The end of the tail fin, in art pixels from the picture's bottom left, where its trail of bubbles comes off.
+    static let tailTip = CGPoint(x: 92, y: 19)
+
+    /// The Hooperfish's spin: its own frame over the parts, or the parts again with none.
+    static func spin(_ fish: SKNode?, showing frame: SKTexture?) {
+        guard let fish else { return }
+        for case let part as SKSpriteNode in fish.children {
+            if part.name == spinName {
+                part.isHidden = frame == nil
+                if let frame { part.texture = frame }
+            } else {
+                part.isHidden = frame != nil
+            }
+        }
+    }
+    static let spinName = "HooperfishSpin"
+
     static func animate(_ fish: SKNode?, at time: Double, dunkedOn: Bool) {
         guard let fish else { return }
         let fin = finSwing * CGFloat(sin(time / finSeconds * 2 * .pi))
@@ -154,7 +171,7 @@ enum WetshotArt {
 
         /// The Hooperfish's rings and eye where they're drawn this frame, which glow over the background.
         var fishGlowParts: [BodySnapshot] {
-            guard let fish = hooperfish, let body = fish.children.first(where: { $0.name == "HooperfishBody" }) as? SKSpriteNode else { return [] }
+            guard let fish = hooperfish, let body = fish.children.first(where: { $0.name == "HooperfishBody" }) as? SKSpriteNode, !body.isHidden else { return [] }
             let at = CGPoint(x: fish.position.x + body.position.x * fish.xScale, y: fish.position.y + body.position.y)
             return [BodySnapshot(texture: WetshotArt.bodyGlowParts, position: at, anchor: body.anchorPoint, xScale: fish.xScale,
                                  size: CGSize(width: body.size.width * body.yScale, height: body.size.height * body.yScale), zRotation: body.zRotation * fish.xScale)]
@@ -169,7 +186,7 @@ enum WetshotArt {
             }
             guard let fish = hooperfish else { return plants }
             return plants + fish.children.compactMap { child in
-                guard let part = child as? SKSpriteNode, let drawn = part.texture else { return nil }
+                guard let part = child as? SKSpriteNode, !part.isHidden, let drawn = part.texture else { return nil }
                 let texture = part.name == "HooperfishBody" ? WetshotArt.bodyGlowMask : drawn
                 let at = CGPoint(x: fish.position.x + part.position.x * fish.xScale, y: fish.position.y + part.position.y)
                 return BodySnapshot(texture: texture, position: at, anchor: part.anchorPoint, xScale: fish.xScale,
@@ -198,6 +215,14 @@ enum WetshotArt {
                         node.name = part.name
                         fish.addChild(node)
                     }
+                    // The spin a dunk sets off, whole: the picture's own size, from its bottom left.
+                    let spin = SKSpriteNode()
+                    spin.name = WetshotArt.spinName
+                    spin.anchorPoint = .zero
+                    spin.size = size
+                    spin.zPosition = 5.5
+                    spin.isHidden = true
+                    fish.addChild(spin)
                     parent.addChild(fish)
                     hooperfish = fish
                     return fish

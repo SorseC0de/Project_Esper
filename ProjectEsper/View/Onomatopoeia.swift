@@ -3,32 +3,37 @@ import CoreText
 import SpriteKit
 import UIKit
 
-/// Manga sound effects over the action, Jump Ultimate Stars style: a word in English in Dirty
-/// Brush or in katakana in one of the kana faces, never a mix, its letters growing along the
+/// Manga sound effects over the action, Jump Ultimate Stars style: a word in English or in
+/// katakana, each in one of three faces, never a mix, its letters growing along the
 /// word and rocking in turn, outlined and dropped like the title lettering, and the sprite
 /// warped into a flare that snaps in and settles.
 enum Onomatopoeia {
-    /// The SFX picker's options: katakana in one of three faces, or English.
+    /// The SFX picker's options: katakana in one of three faces, or English in one of three.
     enum Lettering: Int, CaseIterable {
-        case cherryBomb, dotGothic, chokokutai, english
+        case cherryBomb, dotGothic, chokokutai, englishBrush, englishDex, englishCherry
 
         var label: String {
             switch self {
             case .cherryBomb: "CHERRY"
             case .dotGothic: "DOT"
             case .chokokutai: "CHOKO"
-            case .english: "EN"
+            case .englishBrush: "EN BRUSH"
+            case .englishDex: "EN DEX"
+            case .englishCherry: "EN CHERRY"
             }
         }
         var fontName: String {
             switch self {
-            case .cherryBomb: "CherryBombOne-Regular"
+            case .cherryBomb, .englishCherry: "CherryBombOne-Regular"
             case .dotGothic: "DotGothic16-Regular"
             case .chokokutai: "Chokokutai-Regular"
-            case .english: "DirtyBrush-Regular"
+            case .englishBrush: "DirtyBrush-Regular"
+            case .englishDex: "Bigdex"
             }
         }
-        var japanese: Bool { self != .english }
+        var japanese: Bool { self == .cherryBomb || self == .dotGothic || self == .chokokutai }
+        /// Dirty Brush: broken strokes, closed up under the fill, and no "!", so it's brushed.
+        var brush: Bool { self == .englishBrush }
         /// The letter the faces are centred and sized by.
         var reference: String { japanese ? "ド" : "D" }
     }
@@ -93,7 +98,7 @@ enum Onomatopoeia {
 
     /// Bundled, and registered with the process on first use.
     private static let registered: Void = {
-        for name in ["DirtyBrush"] + Lettering.allCases.filter(\.japanese).map(\.fontName) {
+        for name in ["DirtyBrush", "Bigdex", "CherryBombOne-Regular", "DotGothic16-Regular", "Chokokutai-Regular"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
                 CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
             }
@@ -122,8 +127,10 @@ enum Onomatopoeia {
     private static let stroke: CGFloat = 0.1
     private static let drop: CGFloat = 0.12
     private static let steps = 16
-    /// The widest break in Dirty Brush's strokes closed in the outline colour, half of it, a share of the size.
+    /// The widest break in Dirty Brush's strokes closed in its fill, half of it, a share of the size.
     private static let gapClosing: CGFloat = 0.06
+    /// Pixels a point the lettering is drawn at, so it stays crisp scaled up into the world.
+    private static let renderScale: CGFloat = 3
     nonisolated(unsafe) private static var cache: [Word: (texture: SKTexture, capShare: CGFloat)] = [:]
 
     /// The word's sprite, sized for the world, warped flat; `show` brings it on.
@@ -202,7 +209,7 @@ enum Onomatopoeia {
             let size = drawSize * (1 + growth * share)
             let letterFont = font(size)
             let text = characters[index]
-            let width = text == "!" ? size * 0.36 : (text as NSString).size(withAttributes: [.font: letterFont]).width
+            let width = text == "!" && word.lettering.brush ? size * 0.36 : (text as NSString).size(withAttributes: [.font: letterFont]).width
             let sign: CGFloat = index.isMultiple(of: 2) ? -1 : 1
             letters.append(Letter(text: text, font: letterFont, centre: CGPoint(x: x + width / 2, y: sign * bob * size), angle: sign * rock))
             x += width * (1 - tuck)
@@ -216,7 +223,7 @@ enum Onomatopoeia {
         let height = top * 2 + pad * 2
         let canvas = CGSize(width: ceil(width), height: ceil(height))
         let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
+        format.scale = renderScale
         let lineY = canvas.height / 2
         let outline = colour(29), upper = colour(word.upper), lower = colour(word.lower)
         /// Each letter turned and set on the line, `shift` off it, for `draw` to put down with
@@ -236,24 +243,42 @@ enum Onomatopoeia {
         func text(_ letter: Letter, _ colour: UIColor, at point: CGPoint) {
             (letter.text as NSString).draw(at: point, withAttributes: [.font: letter.font, .foregroundColor: colour])
         }
-        // Dirty Brush's strokes are broken; under the fill, the letters closed up in the outline colour.
-        let backing = word.lettering.japanese ? nil : closed(canvas: canvas, radius: largest * gapClosing) { cg in
+        let brush = word.lettering.brush
+        func bang(_ letter: Letter) -> Bool { brush && letter.text == "!" }
+        /// The fill, each letter `upper` over `lower` split at its middle.
+        func fill(_ cg: CGContext) {
             eachLetter(cg, shift: 0) { letter, size, origin in
-                if letter.text == "!" {
-                    cg.addPath(bangPath(size: size))
-                    cg.setFillColor(outline.cgColor)
-                    cg.fillPath()
-                } else {
-                    text(letter, outline, at: origin)
+                split(cg, size: size, upper: upper, lower: lower) { colour in
+                    if bang(letter) {
+                        cg.addPath(bangPath(size: size))
+                        cg.setFillColor(colour.cgColor)
+                        cg.fillPath()
+                    } else {
+                        text(letter, colour, at: origin)
+                    }
                 }
             }
         }
+        // Dirty Brush's strokes are broken: its fill closed up, each letter's colours laid
+        // over the closed shape, so it reads solid.
+        let solidFill: UIImage? = brush ? closed(canvas: canvas, radius: largest * gapClosing, draw: fill).map { shape in
+            UIGraphicsImageRenderer(size: canvas, format: format).image { context in
+                let cg = context.cgContext
+                eachLetter(cg, shift: 0) { letter, size, _ in
+                    split(cg, size: size, upper: upper, lower: lower) { colour in
+                        cg.setFillColor(colour.cgColor)
+                        cg.fill(CGRect(x: -size, y: -size * 2, width: size * 2, height: size * 4))
+                    }
+                }
+                shape.draw(in: CGRect(origin: .zero, size: canvas), blendMode: .destinationIn, alpha: 1)
+            }
+        } : nil
         let image = UIGraphicsImageRenderer(size: canvas, format: format).image { context in
             let cg = context.cgContext
             // The drop, then the outline, each a ring round every letter.
             for shift in [shadow, 0] {
                 eachLetter(cg, shift: shift) { letter, size, origin in
-                    if letter.text == "!" {
+                    if bang(letter) {
                         cg.addPath(bangPath(size: size))
                         cg.setStrokeColor(outline.cgColor)
                         cg.setFillColor(outline.cgColor)
@@ -269,17 +294,10 @@ enum Onomatopoeia {
                     }
                 }
             }
-            backing?.draw(in: CGRect(origin: .zero, size: canvas))
-            eachLetter(cg, shift: 0) { letter, size, origin in
-                split(cg, size: size, upper: upper, lower: lower) { colour in
-                    if letter.text == "!" {
-                        cg.addPath(bangPath(size: size))
-                        cg.setFillColor(colour.cgColor)
-                        cg.fillPath()
-                    } else {
-                        text(letter, colour, at: origin)
-                    }
-                }
+            if let solidFill {
+                solidFill.draw(in: CGRect(origin: .zero, size: canvas))
+            } else {
+                fill(cg)
             }
         }
         let capShare = ink(reference, in: font(drawSize)).height / canvas.height
@@ -292,14 +310,15 @@ enum Onomatopoeia {
     /// shrunk back, so the outside keeps its shape.
     private static func closed(canvas: CGSize, radius: CGFloat, draw: (CGContext) -> Void) -> UIImage? {
         let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
+        format.scale = renderScale
         let shape = UIGraphicsImageRenderer(size: canvas, format: format).image { draw($0.cgContext) }
         guard let input = CIImage(image: shape) else { return nil }
         let extent = input.extent
-        let grown = input.clampedToExtent().applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: radius])
-        let closed = grown.applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: radius]).cropped(to: extent)
+        let pixels = radius * renderScale
+        let grown = input.clampedToExtent().applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: pixels])
+        let closed = grown.applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: pixels]).cropped(to: extent)
         guard let image = CIContext().createCGImage(closed, from: extent) else { return nil }
-        return UIImage(cgImage: image)
+        return UIImage(cgImage: image, scale: renderScale, orientation: .up)
     }
 
     /// The fill drawn twice, `upper` above the letter's middle and `lower` under it.

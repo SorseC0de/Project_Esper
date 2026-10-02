@@ -438,7 +438,10 @@ final class GameScene: SKScene {
         if let wet = wetshotArt { return wet.fishFlats }
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
-        return windSnapshots(windPuffs.back + rainSizzles + art.icicles + Array(fallingIcicles.values) + shatteringIcicles) + (art.tornados + art.tornadoOverlays).compactMap { GameScene.snapshot($0, above: ElementsArt.lavaTop) }
+        let hanging = hangingIcicles.values.compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size, zRotation: node.zRotation) }
+        }
+        return hanging + windSnapshots(windPuffs.back + rainSizzles + art.icicles + Array(fallingIcicles.values) + shatteringIcicles) + (art.tornados + art.tornadoOverlays).compactMap { GameScene.snapshot($0, above: ElementsArt.lavaTop) }
     }
 
     /// A node anchored at its lower left as the mask should draw it: only what's above `line`.
@@ -1032,6 +1035,7 @@ final class GameScene: SKScene {
         elementsArt = nil
         wetshotArt = nil
         fallingIcicles = [:]
+        hangingIcicles = [:]
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
         tornadoOverlays.removeAllChildren()
         if isWetshot {
@@ -1225,6 +1229,7 @@ final class GameScene: SKScene {
         elementsArt = nil
         wetshotArt = nil
         fallingIcicles = [:]
+        hangingIcicles = [:]
         fieldBlooms = []
         lightPanels = []
         yardNumbers = []
@@ -1516,10 +1521,16 @@ final class GameScene: SKScene {
         lightningBolts.append(bolt)
     }
 
-    /// The Elements' icicles as the sim has them: each socket empty or growing (`icicle_form`,
-    /// holding its last frame), each dropped one falling (`icicle`'s first frame), and where one
+    /// The Elements' icicles as the sim has them: each socket empty or growing (`icicle_form`),
+    /// then, grown, the empty socket with `icicle`'s first frame hanging behind it, wiggling about
+    /// its top middle for a moment before it drops; each dropped one falling, and where one
     /// shatters the rest of `icicle` plays.
     private var fallingIcicles: [Int: SKSpriteNode] = [:]
+    private var hangingIcicles: [Int: SKSpriteNode] = [:]
+    /// The wiggle before the drop: how long, how far either way, and how quick.
+    private static let icicleWiggleFrames = 40
+    private static let icicleWiggleDegrees: CGFloat = 6
+    private static let icicleWiggleSwingFrames = 6.0
     private var shatteringIcicles: [SKSpriteNode] = []
     private static let icicleFramesPerSecond = 15
 
@@ -1529,7 +1540,27 @@ final class GameScene: SKScene {
         let empty = sprites.texture("icicle_empty", 0)
         for (index, socket) in art.icicles.enumerated() where index < match.icicles.count {
             let icicle = match.icicles[index]
-            socket.texture = icicle.formedAt.map { sprites.texture("icicle_form", min((match.frame - $0) * GameScene.icicleFramesPerSecond / 60, formCount - 1)) } ?? empty
+            let formFrame = icicle.formedAt.map { (match.frame - $0) * GameScene.icicleFramesPerSecond / 60 }
+            let grown = formFrame.map { $0 >= formCount - 1 } ?? false
+            socket.texture = formFrame.map { grown ? empty : sprites.texture("icicle_form", $0) } ?? empty
+            if grown, let tip = match.stage.icicleSockets.indices.contains(index) ? match.stage.icicleSockets[index] : nil {
+                let hanging = hangingIcicles[index] ?? {
+                    let made = SKSpriteNode(texture: sprites.texture("icicle", 0))
+                    // Turned about its top middle, where it hangs from.
+                    made.anchorPoint = CGPoint(x: 0.5, y: 1)
+                    made.zPosition = socket.zPosition - 0.1
+                    stageGround.addChild(made)
+                    hangingIcicles[index] = made
+                    return made
+                }()
+                let top = SpriteLibrary.point(tip)
+                hanging.position = CGPoint(x: top.x, y: top.y + hanging.size.height)
+                let left = icicle.dropAt - match.frame
+                hanging.zRotation = left <= GameScene.icicleWiggleFrames
+                    ? GameScene.icicleWiggleDegrees * .pi / 180 * CGFloat(sin(Double(match.frame) / GameScene.icicleWiggleSwingFrames * 2 * .pi)) : 0
+            } else if let node = hangingIcicles.removeValue(forKey: index) {
+                node.removeFromParent()
+            }
             if let tip = icicle.falling {
                 let node = fallingIcicles[index] ?? {
                     let made = SKSpriteNode(texture: sprites.texture("icicle", 0))

@@ -1046,7 +1046,9 @@ changes; the flat background colour still lifts a little. The tornados and their
 The ceiling's icicles (`Stage.icicleSockets`, `IcicleRules`, `Match.icicles`) leave out columns 16
 and under and their mirror, 50 and over. Every two seconds a socket picked by the count, the same on
 both phones, grows an icicle if it's empty (`icicle_form`, six 32 by 48 frames at 15 a second),
-holds its last frame two to five seconds, then drops it: `icicle`'s first frame (four 32 pixel
+then, grown, holds two to five seconds as the empty socket with `icicle`'s first frame hanging
+behind it, which wiggles 6 degrees either way, a swing every 6 frames, about its top middle for the
+last 40 frames before the drop; then drops it: `icicle`'s first frame (four 32 pixel
 frames) falls as the ball does, from rest, and shatters on the first ground under it, rock, a
 slope or the lava, or on whoever it meets, the other three frames playing there. Whoever it meets is
 stripped and frozen; Frost Tea it only shatters on. Protocol 43.

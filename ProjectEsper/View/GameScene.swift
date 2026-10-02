@@ -2229,6 +2229,9 @@ final class GameScene: SKScene {
         if ChevronTuning.slider {
             controls.addSlider(title: "BASKET CHEVRON Y", range: 0...60, notch: 1, value: Float(ChevronTuning.basketLift)) { ChevronTuning.basketLift = CGFloat($0) }
         }
+        if ParticleLook.cubes, HumanLook.enabled {
+            controls.addSlider(title: "LEG CUBE RISE", range: 0...24, notch: 1, value: ParticleLook.legCubeRise) { ParticleLook.legCubeRise = $0 }
+        }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
@@ -4188,7 +4191,7 @@ final class GameScene: SKScene {
                 }
                 let heading = trailing.map { atan2(Double($0.dy), Double($0.dx)) } ?? Double.pi / 2
                 let angle = heading + Double.random(in: -Double.pi / 28...Double.pi / 28)
-                let speed = 24 + Double.random(in: -2...2)
+                let speed = (stream.legs ? Double(ParticleLook.legCubeRise) : 24) + Double.random(in: -2...2)
                 // The sheet's flame points up; turned so it points the way it goes.
                 if trailing != nil { node.zRotation = CGFloat(heading - Double.pi / 2) }
                 // A sheet plays through once over the life; a single frame, or a cube, lives 0.6 s

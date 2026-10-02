@@ -94,6 +94,8 @@ enum ParticleLook {
     /// them; this many a second off each leg, cubes only.
     nonisolated(unsafe) static var legCubeSize: Float = 2
     nonisolated(unsafe) static var legCubeSpread: Float = 1
+    /// How fast a leg's cubes rise, art pixels a second: how high their trail goes over its life.
+    nonisolated(unsafe) static var legCubeRise: Float = 12
     static let legCubeRate: Float = 12
     nonisolated(unsafe) static var cubeSpread: Float = 5
     static let cubeSpin: Float = 6

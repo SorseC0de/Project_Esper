@@ -55,9 +55,18 @@ public struct StageMap: Equatable, Codable {
     }
 
     /// A whole picture placed with its bottom left on a cell: Wetshot Wake's plants, rocks and
-    /// its Hooperfish, which carries the stage's one rim.
+    /// its Hoopfish, which carries the stage's one rim.
     public enum PropKind: String, Codable, CaseIterable {
-        case plant1, plant2, plant3, plant4, plant5, rock1, rock2, hooperfish
+        case plant1, plant2, plant3, plant4, plant5, rock1, rock2, hoopfish
+
+        /// Maps saved before the Hoopfish was renamed call it the hooperfish.
+        public init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            guard let kind = PropKind(rawValue: raw == "hooperfish" ? "hoopfish" : raw) else {
+                throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "No prop \(raw)"))
+            }
+            self = kind
+        }
 
         public var isPlant: Bool { [.plant1, .plant2, .plant3, .plant4, .plant5].contains(self) }
 
@@ -70,7 +79,7 @@ public struct StageMap: Equatable, Codable {
             case .plant4: (42, 61)
             case .plant5: (80, 64)
             case .rock1, .rock2: (112, 112)
-            case .hooperfish: (96, 48)
+            case .hoopfish: (96, 48)
             }
         }
     }
@@ -81,8 +90,47 @@ public struct StageMap: Equatable, Codable {
         public init(_ kind: PropKind, at cell: Cell) { self.kind = kind; self.cell = cell }
     }
 
+    /// A piece of Hoopfish Hideaway's pile of backboards and hoops in the background, the ones
+    /// it's collected: placed anywhere, not on the grid, by its middle in art pixels, turned in degrees.
+    public struct PilePiece: Equatable, Hashable, Codable {
+        public enum Kind: String, Codable, CaseIterable {
+            case backboard1, backboard2, backboard3, hoop1, hoop2, hoop3
+            /// The atlas strip it's drawn from, and its frame there.
+            public var sheet: String { [.backboard1, .backboard2, .backboard3].contains(self) ? "backboards" : "hoops" }
+            public var frame: Int {
+                switch self {
+                case .backboard1, .hoop1: 0
+                case .backboard2, .hoop2: 1
+                case .backboard3, .hoop3: 2
+                }
+            }
+
+            /// Pieces put down before the pile had its own sheets read as the nearest of these.
+            public init(from decoder: Decoder) throws {
+                let raw = try decoder.singleValueContainer().decode(String.self)
+                let older = ["backboard": "backboard1", "backboardStraight": "backboard2", "hoop": "hoop1", "hoopStraight": "hoop2"]
+                guard let kind = Kind(rawValue: older[raw] ?? raw) else {
+                    throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "No pile piece \(raw)"))
+                }
+                self = kind
+            }
+        }
+        public var kind: Kind
+        public var x: Double
+        public var y: Double
+        public var rotation: Double
+        public init(_ kind: Kind, x: Double, y: Double, rotation: Double = 0) {
+            self.kind = kind
+            self.x = x
+            self.y = y
+            self.rotation = rotation
+        }
+    }
+
     public var tiles: [Placed]
     public var props: [Prop]
+    /// The background pile, drawn between the background and its foreground.
+    public var pile: [PilePiece]
     /// The rim with its backboard on the left, and the one with it on the right.
     public var leftRim: Cell
     public var rightRim: Cell
@@ -95,9 +143,11 @@ public struct StageMap: Equatable, Codable {
     /// The walls, painted in the map maker's walls mode; by default a block under every solid tile.
     public var walls: [Wall]
 
-    public init(tiles: [Placed] = [], props: [Prop] = [], leftRim: Cell, rightRim: Cell, spawns: [Cell], ball: Cell, tornados: [Cell] = [], walls: [Wall]? = nil) {
+    public init(tiles: [Placed] = [], props: [Prop] = [], pile: [PilePiece] = [], leftRim: Cell, rightRim: Cell, spawns: [Cell], ball: Cell,
+                tornados: [Cell] = [], walls: [Wall]? = nil) {
         self.tiles = tiles
         self.props = props
+        self.pile = pile
         self.leftRim = leftRim
         self.rightRim = rightRim
         self.spawns = spawns
@@ -111,13 +161,14 @@ public struct StageMap: Equatable, Codable {
         tiles.filter { !decoration.contains($0.art) }.map { Wall($0.cell, .solid) }
     }
 
-    private enum CodingKeys: String, CodingKey { case tiles, props, leftRim, rightRim, spawns, ball, tornados, walls }
+    private enum CodingKeys: String, CodingKey { case tiles, props, pile, leftRim, rightRim, spawns, ball, tornados, walls }
 
     /// A map kept before tornados were in it reads as having none.
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         tiles = try values.decode([Placed].self, forKey: .tiles)
         props = try values.decodeIfPresent([Prop].self, forKey: .props) ?? []
+        pile = try values.decodeIfPresent([PilePiece].self, forKey: .pile) ?? []
         leftRim = try values.decode(Cell.self, forKey: .leftRim)
         rightRim = try values.decode(Cell.self, forKey: .rightRim)
         spawns = try values.decode([Cell].self, forKey: .spawns)
@@ -136,8 +187,8 @@ public struct StageMap: Equatable, Codable {
         Cell(min(max(cell.column, 1), ElementsRules.columns - 2), min(max(cell.row, 0), ElementsRules.rows - 3))
     }
 
-    /// The Hooperfish, if it's placed: the stage's one rim rides it.
-    public var hooperfish: Prop? { props.first { $0.kind == .hooperfish } }
+    /// The Hoopfish, if it's placed: the stage's one rim rides it.
+    public var hoopfish: Prop? { props.first { $0.kind == .hoopfish } }
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
     /// would stand in for it offline, is put aside and the baked one shows.
@@ -208,6 +259,11 @@ public struct StageMap: Equatable, Codable {
         lines.append("                           tornados: [\(tornados.map(cell).joined(separator: ", "))]\(ownWalls ? ", walls: walls)" : ")")")
         lines.append("    }")
         return lines.joined(separator: "\n")
+    }
+
+    /// The pile's pieces, one a line: kind, middle's x and y in art pixels, turn in degrees.
+    public var pileSource: String {
+        pile.map { "\($0.kind.rawValue) x \(Int($0.x.rounded())) y \(Int($0.y.rounded())) rot \(Int($0.rotation.rounded()))" }.joined(separator: "\n")
     }
 }
 
@@ -308,22 +364,22 @@ public enum IcicleRules {
 
 }
 
-/// Wetshot Wake: 37 by 19, under water, its one rim on the Hooperfish: the background's 17 rows a
+/// Wetshot Wake: 37 by 19, under water, its one rim on the Hoopfish: the background's 17 rows a
 /// row up off the floor's, with one of water over them.
 public enum WetshotRules {
     public static let columns = 37
     public static let rows = 19
-    /// The rim's centre from the Hooperfish's bottom left, in whole art pixels: `hoop_straight`
+    /// The rim's centre from the Hoopfish's bottom left, in whole art pixels: `hoop_straight`
     /// sits on its leftmost 48 pixels, 10 up, and the rim is 5 left and 10 down of that art's
     /// middle (`HoopTuning.courtOffset`); 15 across, as tuned, and 24 up. Across is on the HOOP X slider
     /// while it's tuned, offline.
     nonisolated(unsafe) public static var rimPixelsAcross = 15
     public static let rimPixelsUp = 24
     /// Where the ball hangs on the antenna before it's taken, the same way, whole art pixels from
-    /// the Hooperfish's bottom left: on the BALL X and BALL Y sliders while it's tuned, offline.
+    /// the Hoopfish's bottom left: on the BALL X and BALL Y sliders while it's tuned, offline.
     nonisolated(unsafe) public static var ballPixelsAcross = 24
     nonisolated(unsafe) public static var ballPixelsUp = 24
-    public static var rimFromHooperfish: Vec2 { Vec2(x: Double(rimPixelsAcross) / 1.6, y: Double(rimPixelsUp) / 1.6) }
+    public static var rimFromHoopfish: Vec2 { Vec2(x: Double(rimPixelsAcross) / 1.6, y: Double(rimPixelsUp) / 1.6) }
 }
 
 public enum ElementsRules {
@@ -666,12 +722,12 @@ extension StageMap {
 
 extension StageMap {
     /// Wetshot Wake's map, laid out in the map maker: the floor along the bottom row, under the
-    /// background, a one-way ledge either side, the plants and rocks, and where the Hooperfish starts.
+    /// background, a one-way ledge either side, the plants and rocks, and where the Hoopfish starts.
     private static func wetshotDefaultMap() -> StageMap {
         let props: [Prop] = [
             Prop(.rock1, at: Cell(0, 1)), Prop(.plant3, at: Cell(4, 1)), Prop(.plant1, at: Cell(5, 1)),
             Prop(.plant1, at: Cell(13, 1)), Prop(.plant2, at: Cell(14, 1)), Prop(.plant5, at: Cell(25, 1)),
-            Prop(.rock2, at: Cell(30, 1)), Prop(.plant4, at: Cell(34, 1)), Prop(.hooperfish, at: Cell(17, 11)),
+            Prop(.rock2, at: Cell(30, 1)), Prop(.plant4, at: Cell(34, 1)), Prop(.hoopfish, at: Cell(17, 11)),
         ]
         let walls: [Wall] = (0..<WetshotRules.columns).map { Wall(Cell($0, 0), .solid) }
             + ((1...5).map { $0 } + (31...35).map { $0 }).map { Wall(Cell($0, 4), .oneWay) }

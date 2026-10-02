@@ -2,7 +2,7 @@ import XCTest
 @testable import EsperSim
 
 /// The computer off the court: it gets about the Elements without burning, takes the ball off the
-/// Hooperfish, and scores on each stage it reads.
+/// Hoopfish, and scores on each stage it reads.
 final class OpponentStageTests: XCTestCase {
     private struct Outcome {
         var frames: Int
@@ -86,7 +86,7 @@ final class OpponentStageTests: XCTestCase {
         XCTAssertLessThan(outcome.frames, 4800)
     }
 
-    func testOnWetshotItTakesTheBallOffTheHooperfishThenScores() {
+    func testOnWetshotItTakesTheBallOffTheHoopfishThenScores() {
         var match = Match(stage: .wetshot, specs: [.starting, .starting])
         match.countdown = 0
         var brain = Opponent(index: 1)

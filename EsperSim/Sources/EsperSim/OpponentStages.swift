@@ -355,11 +355,11 @@ extension Opponent {
 
     // MARK: Following things ahead
 
-    /// The loose ball's way from here, a frame at a time: on the Hooperfish's antenna where the
+    /// The loose ball's way from here, a frame at a time: on the Hoopfish's antenna where the
     /// fish swims it, held in a tornado where it is, otherwise as the stage moves it; ending if
     /// it's caught, burnt or comes to rest.
     func ballPath(_ match: Match, frames: Int = Opponent.lookAheadFrames) -> [Vec2] {
-        if match.hooperfish?.carrying == .ball, match.ball.holder == nil, var fish = match.hooperfish {
+        if match.hoopfish?.carrying == .ball, match.ball.holder == nil, var fish = match.hoopfish {
             return (0..<frames).map { _ in
                 fish.step(on: match.stage)
                 return fish.ballPoint
@@ -381,10 +381,10 @@ extension Opponent {
         return path
     }
 
-    /// Where a rim that moves will be, a frame at a time: Wetshot Wake's on the Hooperfish,
+    /// Where a rim that moves will be, a frame at a time: Wetshot Wake's on the Hoopfish,
     /// parked off the stage while it isn't carrying it.
     func hoopPath(_ match: Match, frames: Int = Opponent.lookAheadFrames) -> [Vec2]? {
-        guard var fish = match.hooperfish else { return nil }
+        guard var fish = match.hoopfish else { return nil }
         return (0..<frames).map { _ in
             fish.step(on: match.stage)
             return fish.carrying == .hoop && !fish.away ? fish.antenna : HighwayRules.parked

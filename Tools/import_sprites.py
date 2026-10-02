@@ -30,25 +30,26 @@ import zlib
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
 STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
-STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/tornado_burst", "Elements/fire_tornado_burst", "Elements/fireball", "Elements/sizzle1", "Elements/sizzle2", "Elements/lava_splash", "Elements/wind", "Elements/splash", "Elements/small_lightning", "Elements/icicle_empty", "Elements/icicle_form", "Elements/icicle", "Wetshot Wake/bubbles_jellyfish", "Wetshot Wake/Hooperfish/Hooperfish_spin"]
+STAGE_ART = ["Backboard", "Hoop", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/tornado_burst", "Elements/fire_tornado_burst", "Elements/fireball", "Elements/sizzle1", "Elements/sizzle2", "Elements/lava_splash", "Elements/wind", "Elements/splash", "Elements/small_lightning", "Elements/icicle_empty", "Elements/icicle_form", "Elements/icicle", "Wetshot Wake/bubbles_jellyfish", "Wetshot Wake/Hoopfish/Hoopfish_spin", "Wetshot Wake/Backboards", "Wetshot Wake/hoops"]
 # Whole pictures, not strips: into the catalog's root as an image of this name.
 # A list of places a picture may have been saved: the newest is taken.
 ROOT_IMAGES = {
     "ElementsTileset": ["Stages/Elements/tileset_elements.png", "Stages/tileset_elements.png"],
     "Basketball": ["basketball.png"],
     "BasketballIce": ["basketball_ice.png"],
-    "WetshotBackground": ["Stages/Wetshot Wake/Background.png"],
+    "WetshotBackground": ["Stages/Wetshot Wake/Background_v2.png"],
+    "WetshotForeground": ["Stages/Wetshot Wake/Foreground.png"],
     "WetshotPlant1": ["Stages/Wetshot Wake/Plant 1.png"],
     "WetshotPlant2": ["Stages/Wetshot Wake/Plant 2.png"],
     "WetshotPlant3": ["Stages/Wetshot Wake/Plant 3.png"],
     "WetshotPlant4": ["Stages/Wetshot Wake/Plant 4.png"],
     "WetshotPlant5": ["Stages/Wetshot Wake/Plant 5.png"],
     "WetshotRocks": ["Stages/Wetshot Wake/Rocks.png"],
-    "HooperfishBody": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_body.png"],
-    "HooperfishFrontfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_frontfin.png"],
-    "HooperfishAntenna": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_antenna.png"],
-    "HooperfishTailfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_tailfin.png"],
-    "HooperfishTopfin": ["Stages/Wetshot Wake/Hooperfish/Hooperfish_topfin.png"],
+    "HoopfishBody": ["Stages/Wetshot Wake/Hoopfish/Hoopfish_body.png"],
+    "HoopfishFrontfin": ["Stages/Wetshot Wake/Hoopfish/Hoopfish_frontfin.png"],
+    "HoopfishAntenna": ["Stages/Wetshot Wake/Hoopfish/Hoopfish_antenna.png"],
+    "HoopfishTailfin": ["Stages/Wetshot Wake/Hoopfish/Hoopfish_tailfin.png"],
+    "HoopfishTopfin": ["Stages/Wetshot Wake/Hoopfish/Hoopfish_topfin.png"],
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")
@@ -62,7 +63,7 @@ BALL_MIN_PIXELS = 12
 REDUCE = {"esper_charge": 4, "flashspark": 4, "gemini_rift_v1": 4, "gemini_rift_v2": 4}
 # Strips whose frames aren't square: their frame height, after any reduction. The
 # flash's 256x144 frames come down to 64x36.
-FRAME_HEIGHT = {"flashspark": 36, "hooperfish_spin": 48, "icicle_empty": 48, "small_lightning": 96, "icicle_form": 48}
+FRAME_HEIGHT = {"flashspark": 36, "hoopfish_spin": 48, "icicle_empty": 48, "small_lightning": 96, "icicle_form": 48}
 # Sheets that come out grey but are drawn as painted, never toned: the strike bolts, which
 # the palette's recolour took to pure white.
 NOT_TONED = {"lightning1", "lightning2", "lightning3", "lightning4"}

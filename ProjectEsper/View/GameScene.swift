@@ -381,10 +381,10 @@ final class GameScene: SKScene {
         }
     }
 
-    /// How the Hooperfish's antenna nods this frame, as a turn of a world point about where it
+    /// How the Hoopfish's antenna nods this frame, as a turn of a world point about where it
     /// meets the body, mirrored as the fish faces; none off Wetshot Wake or with no fish.
-    private func hooperfishNod(_ hoop: Int) -> (angle: CGFloat, turn: (CGPoint) -> CGPoint) {
-        guard hoop == 0, let fish = match.hooperfish, let node = wetshotArt?.hooperfish, !wholeStageView else { return (0, { $0 }) }
+    private func hoopfishNod(_ hoop: Int) -> (angle: CGFloat, turn: (CGPoint) -> CGPoint) {
+        guard hoop == 0, let fish = match.hoopfish, let node = wetshotArt?.hoopfish, !wholeStageView else { return (0, { $0 }) }
         let dunkedOn = match.players.contains { $0.state == .dunking }
         let angle = WetshotArt.antennaTurn(at: CACurrentMediaTime(), dunkedOn: dunkedOn) * (fish.facesRight ? -1 : 1)
         let pivot = CGPoint(x: node.position.x + WetshotArt.antennaPivot.x * node.xScale, y: node.position.y + WetshotArt.antennaPivot.y)
@@ -412,13 +412,13 @@ final class GameScene: SKScene {
         match.stage.features.look == .wetshot ? (PixelPalette.colours[19], PixelPalette.colours[18], WaterTuning.overlayAlpha) : nil
     }
 
-    /// What glows on Wetshot Wake over its background, which doesn't: the Hooperfish's rings and eye.
+    /// What glows on Wetshot Wake over its background, which doesn't: the Hoopfish's rings and eye.
     var glowThroughSnapshots: [BodySnapshot] {
         guard let art = wetshotArt else { return [] }
         return art.fishGlowParts
     }
 
-    /// Wetshot Wake's rims, in front of the Hooperfish, glowing through its mask.
+    /// Wetshot Wake's rims, in front of the Hoopfish, glowing through its mask.
     var glowThroughFrontSnapshots: [BodySnapshot] {
         guard wetshotArt != nil else { return [] }
         return rimNodes.filter { !$0.isHidden }.compactMap { rim in
@@ -462,7 +462,7 @@ final class GameScene: SKScene {
     /// What's drawn in the world but must not glow, for the mask to mark: the hoops and the banner.
     var flatSnapshots: [BodySnapshot] {
         // The hoops: their backboards read too hot with the glow on them.
-        // Wetshot Wake's rim glows, as the Hooperfish's rings and eyes do.
+        // Wetshot Wake's rim glows, as the Hoopfish's rings and eyes do.
         let unglowedRims = match.stage.features.look == .wetshot ? [] : rimNodes
         var flat = (backboardNodes + unglowedRims).filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
@@ -1183,7 +1183,7 @@ final class GameScene: SKScene {
             backboard.position = GameScene.hoopArtPoint(for: hoop, on: stage.features.look)
             backboard.zPosition = 5
             backboard.xScale = hoop.backboard == .left ? -1 : 1
-            // Wetshot Wake's rim rides the Hooperfish, with no backboard.
+            // Wetshot Wake's rim rides the Hoopfish, with no backboard.
             backboard.isHidden = stage.features.look == .wetshot
             stageGround.addChild(backboard)
             backboardNodes.append(backboard)
@@ -1622,7 +1622,7 @@ final class GameScene: SKScene {
     private static let frontBubbleShare = 0.3
     /// Bubbles off a body's feet as it comes down, a second's worth.
     private static let footBubblesPerSecond = 12.0
-    /// Off the Hooperfish's tail as it swims, and all round it while it spins.
+    /// Off the Hoopfish's tail as it swims, and all round it while it spins.
     private static let trailBubblesPerSecond = 10.0
     private static let spinBubblesPerFrame = 3
     /// The bubble cells' weights: the first as likely as near half the others together.
@@ -1709,13 +1709,13 @@ final class GameScene: SKScene {
                                       wobble: .random(in: 1...2), wobbleRate: .random(in: 0.5...1)))
             }
         }
-        // The Hooperfish where the sim has it, swimming; in the map maker, where it's placed.
-        WetshotArt.place(wetshotArt?.hooperfish, as: wholeStageView ? nil : match.hooperfish, placed: StageMap.current[.wetshot].hooperfish)
-        let spin = wholeStageView ? 0 : match.hooperfish?.spin ?? 0
-        let spinCount = EffectSheets.frames["hooperfish_spin"] ?? 0
-        WetshotArt.spin(wetshotArt?.hooperfish, showing: spin > 0 && spinCount > 0
-            ? sprites.texture("hooperfish_spin", min((HooperfishRules.spinFrames - spin) * spinCount / HooperfishRules.spinFrames, spinCount - 1)) : nil)
-        if wet, !wholeStageView, let fish = match.hooperfish, !fish.away, let node = wetshotArt?.hooperfish {
+        // The Hoopfish where the sim has it, swimming; in the map maker, where it's placed.
+        WetshotArt.place(wetshotArt?.hoopfish, as: wholeStageView ? nil : match.hoopfish, placed: StageMap.current[.wetshot].hoopfish)
+        let spin = wholeStageView ? 0 : match.hoopfish?.spin ?? 0
+        let spinCount = EffectSheets.frames["hoopfish_spin"] ?? 0
+        WetshotArt.spin(wetshotArt?.hoopfish, showing: spin > 0 && spinCount > 0
+            ? sprites.texture("hoopfish_spin", min((HoopfishRules.spinFrames - spin) * spinCount / HoopfishRules.spinFrames, spinCount - 1)) : nil)
+        if wet, !wholeStageView, let fish = match.hoopfish, !fish.away, let node = wetshotArt?.hoopfish {
             func bubble(at point: CGPoint, front: Bool, cells: ClosedRange<Int>, rise: ClosedRange<CGFloat>, life: ClosedRange<Double>) {
                 let bubble = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", Int.random(in: cells)))
                 bubble.position = point
@@ -1732,12 +1732,12 @@ final class GameScene: SKScene {
             // Spinning: a burst all round it, some over it.
             if spin > 0 {
                 for _ in 0..<GameScene.spinBubblesPerFrame {
-                    bubble(at: CGPoint(x: node.position.x + .random(in: 0...CGFloat(HooperfishRules.pixelWidth)) * node.xScale, y: node.position.y + .random(in: 0...48)),
+                    bubble(at: CGPoint(x: node.position.x + .random(in: 0...CGFloat(HoopfishRules.pixelWidth)) * node.xScale, y: node.position.y + .random(in: 0...48)),
                            front: Bool.random(), cells: 0...4, rise: 14...30, life: 1...2.5)
                 }
             }
         }
-        WetshotArt.animate(wetshotArt?.hooperfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
+        WetshotArt.animate(wetshotArt?.hoopfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
         WetshotArt.sway(wetshotArt?.props ?? [], at: CACurrentMediaTime())
         jellyfish = jellyfish.compactMap { fish in
             var fish = fish
@@ -1800,12 +1800,17 @@ final class GameScene: SKScene {
         ballNode.zRotation = ballSpin.angle
     }
 
+    /// The ball's glow, and on the Hoopfish's antenna the most of its pulse and the pulse's length.
+    private static let ballGlow: CGFloat = 0.5
+    private static let antennaBallGlow: CGFloat = 0.9
+    private static let antennaBallGlowSeconds = 2.0
+
     private func makeHalo(_ colour: SKColor) -> SKSpriteNode {
         let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
         halo.size = CGSize(width: 18, height: 18)
         halo.color = colour
         halo.colorBlendFactor = 1
-        halo.alpha = 0.5
+        halo.alpha = GameScene.ballGlow
         halo.blendMode = .add
         return halo
     }
@@ -2028,7 +2033,7 @@ final class GameScene: SKScene {
         if series.stage.stage.features.look == .wetshot, online == nil {
             controls.addSlider(title: "WATER TINT", range: 0...1, notch: 0.01, value: Float(WaterTuning.overlayAlpha)) { WaterTuning.overlayAlpha = CGFloat($0) }
             controls.addSlider(title: "WATER SWAY", range: 0...4, notch: 0.25, value: Float(WaterTuning.swayPixels)) { WaterTuning.swayPixels = Double($0) }
-            // The rim's place across the Hooperfish, a whole art pixel at a time.
+            // The rim's place across the Hoopfish, a whole art pixel at a time.
             // Where the ball hangs on the antenna, a whole art pixel at a time.
             controls.addSlider(title: "BALL X", range: 0...96, notch: 1, value: Float(WetshotRules.ballPixelsAcross)) { value in
                 WetshotRules.ballPixelsAcross = Int(value.rounded())
@@ -4194,8 +4199,9 @@ final class GameScene: SKScene {
                 self?.session.mutate { $0.stage = rebuilt(); $0.refreshExtras() }
             },
             onProps: { [weak self] in
-                // The Hooperfish carries the rim: the stage again, for where it now is.
+                // The Hoopfish carries the rim: the stage again, for where it now is.
                 self?.wetshotArt?.setProps(StageMap.current[.wetshot].props)
+                self?.wetshotArt?.setPile(StageMap.current[.wetshot].pile)
                 self?.refreshStaticFlats()
                 self?.session.mutate { $0.stage = rebuilt(); $0.refreshExtras() }
             },
@@ -5377,13 +5383,16 @@ final class GameScene: SKScene {
         let ball = match.ball
         ballNode.isHidden = ball.holder != nil
         ballNode.position = SpriteLibrary.point(ball.position)
-        // On the Hooperfish's antenna it nods with it.
-        if match.hooperfish?.carrying == .ball, ball.holder == nil { ballNode.position = hooperfishNod(0).turn(ballNode.position) }
+        // On the Hoopfish's antenna it nods with it.
+        if match.hoopfish?.carrying == .ball, ball.holder == nil { ballNode.position = hoopfishNod(0).turn(ballNode.position) }
         // Frozen it goes ice; burning it goes fire.
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
         ballHalo.color = colour
         // A frozen ball takes no glow: it washes it out.
         ballHalo.isHidden = ball.frozen > 0
+        // Hung on the Hoopfish's antenna its glow comes and goes, none to most of it.
+        let onAntenna = match.hoopfish?.carrying == .ball && ball.holder == nil
+        ballHalo.alpha = onAntenna ? GameScene.antennaBallGlow * CGFloat(0.5 - 0.5 * cos(CACurrentMediaTime() / GameScene.antennaBallGlowSeconds * 2 * .pi)) : GameScene.ballGlow
         spinBall(ball)
         // The camera on a scrolling stage: level, gliding after the local player and leading them.
         if !wholeStageView, [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }
@@ -5419,6 +5428,11 @@ final class GameScene: SKScene {
                 let ballAt = finishTarget ?? cameraBase
                 cameraNode.position = cameraBase + (ballAt - cameraBase) * eased
                 cameraNode.setScale(cameraBaseScale * (1 - (1 - GameScene.finishZoom) * eased))
+                if match.stage.features.look == .wetshot {
+                    // Hoopfish Hideaway fills the screen's width: closing in, the view stays inside its sides.
+                    let halfSeen = size.width * cameraNode.xScale / 2, stageWidth = SpriteLibrary.point(Vec2(x: match.stage.width, y: 0)).x
+                    cameraNode.position.x = min(max(cameraNode.position.x, halfSeen), max(stageWidth - halfSeen, halfSeen))
+                }
             } else {
                 finishFrames = 0
                 finishTarget = nil
@@ -5444,7 +5458,7 @@ final class GameScene: SKScene {
         // Off the screen sideways, the chevrons sit at its edge at the ball's height, pointing at it.
         let halfView = size.width * cameraNode.xScale / 2
         let ballAt = SpriteLibrary.point(ball.position)
-        // Not on Wetshot Wake, where the ball off screen is only ever on the Hooperfish's antenna.
+        // Not on Wetshot Wake, where the ball off screen is only ever on the Hoopfish's antenna.
         let offSide: CGFloat? = match.stage.features.look == .wetshot ? nil
             : (ballAt.x > cameraNode.position.x + halfView ? 1 : (ballAt.x < cameraNode.position.x - halfView ? -1 : nil))
         for (index, chevron) in chevrons.enumerated() {
@@ -5508,14 +5522,14 @@ final class GameScene: SKScene {
                 rimNodes[index].anchorPoint = pivot
                 rimNodes[index].position = rimPivot(index)
                 rimNodes[index].zRotation = rimTurn(index)
-                // Wetshot Wake's rim nods with the Hooperfish's antenna, about where it meets the body.
-                let nod = hooperfishNod(index)
+                // Wetshot Wake's rim nods with the Hoopfish's antenna, about where it meets the body.
+                let nod = hoopfishNod(index)
                 rimNodes[index].position = nod.turn(rimNodes[index].position)
                 rimNodes[index].zRotation += nod.angle
                 backboardNodes[index].position = artPoint
                 backboardNodes[index].xScale = rimNodes[index].xScale
-                // The Hooperfish's spin has the rim in it: its own art and net out of sight meanwhile.
-                let spinning = index == 0 && (match.hooperfish?.spin ?? 0) > 0
+                // The Hoopfish's spin has the rim in it: its own art and net out of sight meanwhile.
+                let spinning = index == 0 && (match.hoopfish?.spin ?? 0) > 0
                 rimNodes[index].isHidden = spinning
                 if index < nets.count { nets[index].hidden = spinning }
                 if index < nets.count {

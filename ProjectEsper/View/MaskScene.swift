@@ -19,11 +19,11 @@ final class MaskScene: SKScene {
     private var bodies: [SKSpriteNode] = []
     private var flats: [SKSpriteNode] = []
     private var underFlats: [SKSpriteNode] = []
-    /// What glows though it's over something that doesn't, as the Hooperfish's rings over Wetshot
+    /// What glows though it's over something that doesn't, as the Hoopfish's rings over Wetshot
     /// Wake's background: drawn blue over the still layer, so the plain threshold holds there
     /// again, and the glow takes its colour from under the water's tint.
     private var glowingThrough: [SKSpriteNode] = []
-    /// The same for what's drawn in front of the Hooperfish: the rims, and the nets' strands.
+    /// The same for what's drawn in front of the Hoopfish: the rims, and the nets' strands.
     private var glowingThroughFront: [SKSpriteNode] = []
     private var netStrands: [SKShapeNode] = []
     /// The bodies drawn in plain white rather than as they are, for the cubes' occluder.

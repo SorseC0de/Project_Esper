@@ -111,7 +111,7 @@ public struct Opponent: Equatable {
         if readsStage {
             readStage(match, me: me)
             let scoringHoop = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
-            if match.hooperfish == nil, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
+            if match.hoopfish == nil, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
         }
         if readsStage, leaveTornado(match, me: me, toward: me.hasBall ? hoop(scoredOnBy: index, in: match).position : match.ball.position, into: &input) {
             // Out of a tornado before it lets go.
@@ -305,7 +305,7 @@ public struct Opponent: Equatable {
             }
             hoop.position = coming
         }
-        // The Hooperfish's rim is never dunked on: it spins the dunk away.
+        // The Hoopfish's rim is never dunked on: it spins the dunk away.
         let rimOut = rimPath != nil
         let inward = -hoop.backboard.sign
         let toHoop = hoop.position.x - me.position.x
@@ -708,7 +708,7 @@ public struct Opponent: Equatable {
     private mutating func defence(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) {
         var hoop = hoop(scoredOnBy: human.index, in: match)
         let readsStage = Opponent.readsStage(match)
-        // A rim out of play, off with the Hooperfish: on them instead.
+        // A rim out of play, off with the Hoopfish: on them instead.
         if readsStage, hoop.position == HighwayRules.parked { hoop.position = human.position + Vec2(x: 0, y: 40) }
         let side: Double = human.position.x >= hoop.position.x ? 1 : -1
         let guardX = hoop.position.x + side * 25

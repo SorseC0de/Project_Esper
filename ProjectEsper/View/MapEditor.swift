@@ -38,12 +38,12 @@ enum SavedStageMap {
 import UIKit
 
 /// The map maker, for a mouse, for the Elements and Wetshot Wake: the stage under a grid, and
-/// a panel to pick from: the Elements' tileset, or Wetshot Wake's plants, rocks and Hooperfish.
+/// a panel to pick from: the Elements' tileset, or Wetshot Wake's plants, rocks and Hoopfish.
 /// Drag a tile or a prop from the panel onto the stage to drop it; press one on the stage to
 /// pick it up and move it, dropping it back on the panel to take it away; press an empty cell
 /// with a tile or a prop chosen to place it (tiles paint as the pointer drags). The markers
 /// (the Elements' two rims, the two starts and the ball) are chosen and dropped the same way;
-/// Wetshot Wake's one rim rides the Hooperfish, and there's only ever one. UNDO steps back,
+/// Wetshot Wake's one rim rides the Hoopfish, and there's only ever one. UNDO steps back,
 /// COPY puts the map on the clipboard as Swift for the stage's baked map. The map is kept
 /// between launches and stands in for the baked one offline.
 final class MapEditor: SKNode {
@@ -57,12 +57,14 @@ final class MapEditor: SKNode {
         case wall(StageMap.Kind?)
         /// Wetshot Wake's: a prop to place whole.
         case prop(StageMap.PropKind)
+        /// A piece of the background pile, put down anywhere.
+        case pile(StageMap.PilePiece.Kind)
     }
 
     private enum Marker: Equatable, CaseIterable {
         case leftRim, rightRim, firstStart, secondStart, ball
 
-        /// The markers a stage has: Wetshot Wake's one rim rides the Hooperfish, so no rims.
+        /// The markers a stage has: Wetshot Wake's one rim rides the Hoopfish, so no rims.
         static func on(_ stage: MapStage) -> [Marker] { stage == .elements ? allCases : [.firstStart, .secondStart, .ball] }
 
         var label: String {
@@ -90,6 +92,7 @@ final class MapEditor: SKNode {
         case marker(Marker, from: StageMap.Cell)
         case tornado(from: StageMap.Cell)
         case prop(StageMap.PropKind, taken: Bool)
+        case pile(StageMap.PilePiece.Kind, rotation: Double, taken: Bool)
     }
 
     /// Which hand-laid stage this is the map of.
@@ -134,6 +137,12 @@ final class MapEditor: SKNode {
     private var paletteRect = CGRect.zero
     /// Wetshot Wake's props laid out in the panel in place of a tileset, each where it's drawn.
     private var propButtons: [(rect: CGRect, kind: StageMap.PropKind)] = []
+    private var pileButtons: [(rect: CGRect, kind: StageMap.PilePiece.Kind)] = []
+    /// The two turn sliders, for the newest pile piece and the one before it, and the one being dragged.
+    private var turnSliders: [(track: CGRect, piece: Int)] = []
+    private var turning: Int?
+    /// A slider's travel either way, in degrees.
+    private static let turnRange = 180.0
     private var panelRect = CGRect.zero
     private var paletteShown = true
     /// Screen points to a tileset pixel: small, in the corner, or less if the sheet is big for the screen.
@@ -237,7 +246,9 @@ final class MapEditor: SKNode {
             let fit = min(propHeight / CGFloat(pixels.height), 48 / CGFloat(pixels.width))
             return CGSize(width: CGFloat(pixels.width) * fit, height: CGFloat(pixels.height) * fit)
         }
-        let propsWidth = propSizes.reduce(CGFloat(0)) { $0 + $1.width } + 3 * CGFloat(propSizes.count - 1)
+        let pileSide = propHeight
+        let pileWidth = (pileSide + 3) * CGFloat(StageMap.PilePiece.Kind.allCases.count)
+        let propsWidth = propSizes.reduce(CGFloat(0)) { $0 + $1.width } + 3 * CGFloat(propSizes.count - 1) + 6 + pileWidth
         let paletteSize = showsSheet ? CGSize(width: sheetSize.width * scale, height: sheetSize.height * scale)
             : (showsProps ? CGSize(width: propsWidth, height: propHeight) : .zero)
         let margin: CGFloat = 5, rowHeight: CGFloat = 15, gap: CGFloat = 3, fontSize: CGFloat = 7
@@ -269,7 +280,9 @@ final class MapEditor: SKNode {
         let rows = [actionRow, toolRow]
         let rowWidths = rows.map { row in row.reduce(CGFloat(0)) { $0 + labelWidth($1.0) } + gap * CGFloat(max(row.count - 1, 0)) }
         let contentWidth = max(rowWidths.max() ?? 0, paletteSize.width)
-        let contentHeight = rowHeight * CGFloat(rows.count) + (showsSheet || showsProps ? paletteSize.height + margin : 0)
+        // Under the props, a slider each for the newest two pile pieces' turns.
+        let sliderRows = showsProps ? 2 : 0
+        let contentHeight = rowHeight * CGFloat(rows.count + sliderRows) + (showsSheet || showsProps ? paletteSize.height + margin : 0)
         let right = halfWidth - margin, top = halfHeight - margin
         let left = right - contentWidth
         panelRect = CGRect(x: left - 4, y: top - contentHeight - 4, width: contentWidth + 8, height: contentHeight + 8)
@@ -341,6 +354,60 @@ final class MapEditor: SKNode {
                 propButtons.append((rect, kind))
                 x += size.width + 3
             }
+            // The pile's pieces after them.
+            x += 6
+            pileButtons = []
+            for kind in StageMap.PilePiece.Kind.allCases {
+                let rect = CGRect(x: x, y: bottom, width: pileSide, height: pileSide)
+                let sprite = SKSpriteNode(texture: WetshotArt.pileTexture(kind))
+                sprite.anchorPoint = .zero
+                sprite.size = rect.size
+                sprite.position = rect.origin
+                sprite.zPosition = 1
+                panel.addChild(sprite)
+                if case .pile(let held) = tool, held == kind {
+                    let ring = SKShapeNode(rect: rect.insetBy(dx: -1, dy: -1))
+                    ring.strokeColor = SKColor(red: 1, green: 0.9, blue: 0.2, alpha: 1)
+                    ring.lineWidth = 1
+                    ring.zPosition = 2
+                    panel.addChild(ring)
+                }
+                pileButtons.append((rect, kind))
+                x += pileSide + 3
+            }
+            // The turn sliders, newest piece first.
+            turnSliders = []
+            for row in 0..<2 {
+                let index = map.pile.count - 1 - row
+                let y = top - rowHeight * CGFloat(rows.count + row + 1)
+                let label = SKLabelNode(text: index >= 0 ? "TURN \(row == 0 ? "LAST" : "2ND") \(Int(map.pile[index].rotation.rounded()))\u{00B0}" : "TURN —")
+                label.fontName = "Menlo-Bold"
+                label.fontSize = fontSize
+                label.fontColor = .white
+                label.horizontalAlignmentMode = .left
+                label.verticalAlignmentMode = .center
+                label.position = CGPoint(x: left, y: y + rowHeight / 2)
+                label.zPosition = 2
+                panel.addChild(label)
+                let track = CGRect(x: left + 78, y: y + 2, width: contentWidth - 78, height: rowHeight - 4)
+                let bar = SKShapeNode(rect: CGRect(x: track.minX, y: track.midY - 1, width: track.width, height: 2))
+                bar.fillColor = SKColor(white: 0.5, alpha: 1)
+                bar.strokeColor = .clear
+                bar.zPosition = 1
+                panel.addChild(bar)
+                guard index >= 0 else { continue }
+                let share = (map.pile[index].rotation + MapEditor.turnRange) / (MapEditor.turnRange * 2)
+                let knob = SKShapeNode(circleOfRadius: 4)
+                knob.fillColor = SKColor(red: 1, green: 0.9, blue: 0.2, alpha: 1)
+                knob.strokeColor = .clear
+                knob.position = CGPoint(x: track.minX + track.width * CGFloat(share), y: track.midY)
+                knob.zPosition = 2
+                panel.addChild(knob)
+                turnSliders.append((track, index))
+            }
+        } else {
+            pileButtons = []
+            turnSliders = []
         }
         showSelection()
     }
@@ -411,9 +478,31 @@ final class MapEditor: SKNode {
         }
     }
 
-    /// A prop put down with its bottom left on the cell; there's only ever one Hooperfish.
+    /// The newest pile piece under a point in the stage, within its picture's middle.
+    private func pilePiece(at worldPoint: CGPoint) -> Int? {
+        map.pile.lastIndex { abs(CGFloat($0.x) - worldPoint.x) <= 16 && abs(CGFloat($0.y) - worldPoint.y) <= 16 }
+    }
+
+    /// A pile piece put down by its middle on the nearest whole art pixel.
+    private func placePile(_ kind: StageMap.PilePiece.Kind, rotation: Double, at hudPoint: CGPoint) {
+        let point = world(hudPoint)
+        map.pile.append(.init(kind, x: Double(point.x.rounded()), y: Double(point.y.rounded()), rotation: rotation))
+        propsDirty = true
+    }
+
+    /// A turn slider dragged: its piece turned to the whole degree under the finger.
+    private func turn(_ slider: (track: CGRect, piece: Int), to point: CGPoint) {
+        guard map.pile.indices.contains(slider.piece) else { return }
+        let share = min(max((point.x - slider.track.minX) / slider.track.width, 0), 1)
+        map.pile[slider.piece].rotation = (Double(share) * MapEditor.turnRange * 2 - MapEditor.turnRange).rounded()
+        propsDirty = true
+        commit()
+        buildPanel()
+    }
+
+    /// A prop put down with its bottom left on the cell; there's only ever one Hoopfish.
     private func place(_ kind: StageMap.PropKind, at cell: StageMap.Cell) {
-        if kind == .hooperfish { map.props.removeAll { $0.kind == .hooperfish } }
+        if kind == .hoopfish { map.props.removeAll { $0.kind == .hoopfish } }
         map.props.append(.init(kind, at: cell))
         propsDirty = true
     }
@@ -529,16 +618,18 @@ final class MapEditor: SKNode {
         let changed = Set(map.tiles.map(\.cell)).symmetricDifference(Set(next.tiles.map(\.cell)))
             .union(Set(map.tiles).symmetricDifference(Set(next.tiles)).map(\.cell))
         tornadosDirty = tornadosDirty || next.tornados != map.tornados
-        propsDirty = propsDirty || next.props != map.props
+        propsDirty = propsDirty || next.props != map.props || next.pile != map.pile
         wallsDirty = wallsDirty || next.walls != map.walls
         map = next
         dirty.formUnion(changed)
         commit()
         onMarkers()
+        buildPanel()
     }
 
     private func copy() {
-        UIPasteboard.general.string = map.swiftSource(stage)
+        // For now, on Hoopfish Hideaway, the pile: each piece's place and turn.
+        UIPasteboard.general.string = stage == .wetshot ? map.pileSource : map.swiftSource(stage)
     }
 
     /// Where each marker sits, as a coloured square with its letters.
@@ -582,6 +673,19 @@ final class MapEditor: SKNode {
             button.action()
             return
         }
+        if let slider = turnSliders.first(where: { $0.track.insetBy(dx: -4, dy: -3).contains(point) }) {
+            remember()
+            turning = turnSliders.firstIndex { $0.track == slider.track }
+            turn(slider, to: point)
+            return
+        }
+        if let button = pileButtons.first(where: { $0.rect.contains(point) }) {
+            tool = .pile(button.kind)
+            buildPanel()
+            carried = .pile(button.kind, rotation: 0, taken: false)
+            showGhost(at: point)
+            return
+        }
         if let button = propButtons.first(where: { $0.rect.contains(point) }) {
             tool = .prop(button.kind)
             buildPanel()
@@ -598,6 +702,24 @@ final class MapEditor: SKNode {
         }
         guard !over(point), let cell = cell(at: point) else { return }
         lastCell = cell
+        if stage == .wetshot, !wallsMode, case .pile = tool, let index = pilePiece(at: world(point)) {
+            // Picked up whole, to be moved, keeping its turn.
+            remember()
+            let picked = map.pile.remove(at: index)
+            propsDirty = true
+            commit()
+            carried = .pile(picked.kind, rotation: picked.rotation, taken: true)
+            showGhost(at: point)
+            return
+        }
+        if stage == .wetshot, !wallsMode, tool == .erase, let index = pilePiece(at: world(point)) {
+            remember()
+            map.pile.remove(at: index)
+            propsDirty = true
+            commit()
+            buildPanel()
+            return
+        }
         if wallsMode {
             // Walls mode: lay the chosen kind, or open a cell that already has it; a stroke goes on doing the same.
             guard case .wall(let kind) = tool else { return }
@@ -646,6 +768,11 @@ final class MapEditor: SKNode {
             return
         }
         switch tool {
+        case .pile(let kind):
+            remember()
+            placePile(kind, rotation: 0, at: point)
+            commit()
+            buildPanel()
         case .prop(let kind):
             remember()
             place(kind, at: cell)
@@ -686,6 +813,10 @@ final class MapEditor: SKNode {
     }
 
     func moved(to point: CGPoint) {
+        if let turning, turnSliders.indices.contains(turning) {
+            turn(turnSliders[turning], to: point)
+            return
+        }
         let under = over(point) ? nil : cell(at: point)
         if let under {
             let rect = hudRect(of: under)
@@ -695,7 +826,9 @@ final class MapEditor: SKNode {
         } else {
             hover.isHidden = true
         }
-        if case .prop = carried {
+        if case .pile = carried {
+            ghost?.position = point
+        } else if case .prop = carried {
             ghost?.position = CGPoint(x: point.x - cellSide / 2, y: point.y - cellSide / 2)
         } else {
             ghost?.position = point
@@ -716,12 +849,13 @@ final class MapEditor: SKNode {
             }
         case .brush(let art): place(art, at: under)
         case .wall: setWall(strokeKind, at: under)
-        case .marker, .tornado, .prop: break
+        case .marker, .tornado, .prop, .pile: break
         }
         commit()
     }
 
     func ended(at point: CGPoint) {
+        turning = nil
         defer {
             carried = nil
             painting = false
@@ -761,6 +895,14 @@ final class MapEditor: SKNode {
                 tornadosDirty = true
             }
             commit()
+        case .pile(let kind, let rotation, let taken):
+            // Dropped on the stage it lies there, anywhere; on the panel or off the stage it's taken away.
+            if target != nil {
+                if !taken { remember() }
+                placePile(kind, rotation: rotation, at: point)
+            }
+            commit()
+            buildPanel()
         }
         showMarkers()
     }
@@ -783,6 +925,16 @@ final class MapEditor: SKNode {
             let sprite = SKSpriteNode(texture: ElementsArt.tornadoPreview)
             sprite.anchorPoint = CGPoint(x: 0.5, y: 0)
             sprite.size = CGSize(width: cellSide * 3, height: cellSide * 3)
+            sprite.alpha = 0.8
+            sprite.zPosition = 10
+            sprite.position = point
+            addChild(sprite)
+            ghost = sprite
+        case .pile(let kind, let rotation, _):
+            // Held by its middle, as it's put down.
+            let sprite = SKSpriteNode(texture: WetshotArt.pileTexture(kind))
+            sprite.size = CGSize(width: 48 * cellSide / ElementsArt.tileSide, height: 48 * cellSide / ElementsArt.tileSide)
+            sprite.zRotation = CGFloat(rotation) * .pi / 180
             sprite.alpha = 0.8
             sprite.zPosition = 10
             sprite.position = point

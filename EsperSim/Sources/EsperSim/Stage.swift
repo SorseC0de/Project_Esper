@@ -139,8 +139,8 @@ public struct Stage: Equatable {
         hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
     }
 
-    /// Where Wetshot Wake's Hooperfish starts, its picture's bottom left.
-    public var hooperfishStart: Vec2?
+    /// Where Wetshot Wake's Hoopfish starts, its picture's bottom left.
+    public var hoopfishStart: Vec2?
     /// Where each icicle socket's grown icicle hangs its tip, along the ceiling.
     public var icicleSockets: [Vec2] = []
     /// The middles of the open tops of rock lightning can strike: under no ceiling, nothing on them.
@@ -657,12 +657,12 @@ public struct Stage: Equatable {
     }
 
     /// Wetshot Wake: 37 by 19, under water, laid out in the map maker; its one rim,
-    /// both players' to score on, rides the Hooperfish.
+    /// both players' to score on, rides the Hoopfish.
     public static var wetshot: Stage {
         let map = StageMap.current[.wetshot]
         let columns = WetshotRules.columns, rows = WetshotRules.rows
-        let fish = map.hooperfish?.cell ?? StageMap.Cell(15, 8)
-        let rim = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize) + WetshotRules.rimFromHooperfish
+        let fish = map.hoopfish?.cell ?? StageMap.Cell(15, 8)
+        let rim = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize) + WetshotRules.rimFromHoopfish
         var stage = Stage(
             columns: columns, rows: rows,
             hoops: [Hoop(position: rim, owner: 0, backboard: .right, shared: true)],
@@ -672,7 +672,7 @@ public struct Stage: Equatable {
         )
         stage.lay(map.walls)
         stage.slopes = stage.fixedSlopes
-        stage.hooperfishStart = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize)
+        stage.hoopfishStart = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize)
         stage.features = StageFeatures(look: .wetshot)
         stage.features.underwater = true
         stage.features.doublePoints = true
@@ -778,7 +778,7 @@ public enum StageChoice: Int, CaseIterable {
         case .slamstillTraffic: "Slamstill Traffic"
         case .theElements: "The Elements"
         case .skyNet: "Sky Net"
-        case .wetshotWake: "Wetshot Wake"
+        case .wetshotWake: "Hoopfish Hideaway"
         }
     }
 

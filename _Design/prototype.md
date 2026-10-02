@@ -528,7 +528,7 @@ series is over both go to the select before the drink. A stage that goes to its 
 starts that decider with the ball in neutral, loose where it starts, rather than in the hands of
 whoever was just scored on (`Match.restartBallTo` nil when a point levels it, protocol 55).
 Rectangles in a row, the stages not parked (`StageChoice.selectable`: The Wreck Center, Longball
-Stadium, The Elements, Sky Net and Wetshot Wake), the one under a cursor
+Stadium, The Elements, Sky Net and Hoopfish Hideaway), the one under a cursor
 grown, and in its bottom-right corner a circle in the voter's colour, a ring while they
 look and filled once they've picked. Two picks the same go there; two different flip a
 coin on the series' dice, the light going back and forth for a second and a half before
@@ -549,8 +549,8 @@ walked round a ring, a black drop to the south-east, drawn into a texture per st
 
 ## 47
 
-A second mode (`GameMode.fortySeven`), on The Wreck Center or Wetshot Wake (`StageChoice.fortySeven`,
-picked on the stage select; on Wetshot Wake, whose rim swims, the three-point radius is the plain
+A second mode (`GameMode.fortySeven`), on The Wreck Center or Hoopfish Hideaway (`StageChoice.fortySeven`,
+picked on the stage select; on Hoopfish Hideaway, whose rim swims, the three-point radius is the plain
 90 units round wherever it is, and its line isn't drawn: while the local player aims a shot, a
 stretch of it 5 tiles long and 2 pixels thick shows round the rim toward them, clear at both ends
 and their energy's colour in the middle, `drawSwimmingThreeLine`), no stage
@@ -765,7 +765,7 @@ the stage (`OpponentTerrain.swift`, `OpponentStages.swift`):
   to 140 in front of it; a spot is a jump shot's if a shot off the floor won't go in. Every shot's
   flick is found by playing the shot out (a copy of the body through the rest of the stance, the
   jump, the release) and then the ball's own flight, the middle of the angles that go in.
-- A rim that moves, Wetshot Wake's, is followed ahead by stepping a copy of the Hooperfish: it
+- A rim that moves, Hoopfish Hideaway's, is followed ahead by stepping a copy of the Hoopfish: it
   shoots at where the rim will be, from under where it'll be in a second and a half, and only
   once a shot played out from there goes in (waiting for the rim to come round if none does,
   calling off a stance it can't finish), and from wherever it stands, checked every third frame,
@@ -1152,23 +1152,32 @@ cell that already has it opens it, and the stroke opens cells instead. In the ti
 placed brings a solid wall with it where there's none, and one taken off takes a solid wall,
 never a painted slope.
 
-## Wetshot Wake
+## Hoopfish Hideaway
 
 `Stage.wetshot`, `StageChoice.wetshotWake`: 37 by 19 tiles, under water, zoomed to the screen's width (not by
 whole pixels), its bottom on the screen's: a phone crops blank water off the top (about two rows),
 a squarer screen shows more water over it,
 laid out in the map maker like the Elements (`MapStage.wetshot`, `StageMap.current[.wetshot]`,
 kept offline under `esper.wetshotMap`; its first map a floor along the bottom row, the
-Hooperfish over the middle). Drawn: `Background.png` (592 by 272, `WetshotBackground`) a row up
+Hoopfish over the middle). Its first name, Wetshot Wake, and Hoopfish Harbor are kept for later
+(`_Design/notes.md`). Drawn: `Background_v2.png` (592 by 272, `WetshotBackground`) a row up
 off the floor's row, which is the outline colour as is everything below it, everything over it the
-water's top colour (palette 19), neither glowing;
+water's top colour (palette 19), neither glowing; over the background the pile of backboards and
+hoops the Hoopfish has collected (`StageMap.pile`, `WetshotArt.pilePicture`), drawn as one picture
+at 90%, then `Foreground.png` (`WetshotForeground`) in the background's place, both behind
+everything that moves and neither glowing. The pile's pieces, the three frames each of
+`Backboards.png` and `hoops.png` (48 pixel cells, stage strips), are put down in the map maker anywhere, on the nearest whole art pixel
+rather than the grid, picked up and moved with the piece tool in hand, erased with ERASE; two
+TURN sliders under the props turn the newest piece and the one before it, whole degrees either
+way to 180; COPY, for now, puts each piece's kind, x, y and turn on the pasteboard instead of the
+map's source;
 then the map's props (`StageMap.Prop`, placed by their bottom left cell): `Plant 1` to `5`, the
-two halves of `Rocks.png` (the top one first), and the Hooperfish, assembled back to front from
+two halves of `Rocks.png` (the top one first), and the Hoopfish, assembled back to front from
 `topfin`, `tailfin`, `body`, `antenna` and `frontfin` with `hoop_straight` over its leftmost 48 pixels, 10
 up. None of it glows, nor the background colour. The props come in through the importer's
 `ROOT_IMAGES`.
 
-The Hooperfish (`Hooperfish.swift`, `HooperfishRules`, `Match.hooperfish`) swims. It starts where
+The Hoopfish (`Hoopfish.swift`, `HoopfishRules`, `Match.hoopfish`) swims. It starts where
 the map puts it with the ball on its antenna, no rim out, and swims off the side it faces (left) at
 its crossing speed. The ball stays on it, crossing after crossing, until a hand takes it off. Two
 seconds off screen, it comes back from that side turned round, from a height to a height off the
@@ -1178,12 +1187,13 @@ twelfth row from the top and as high as its three rows fit, over and over. What'
 changes only off screen: once the ball's been taken, the stage's rim from then on, turned with it.
 The ball hangs on the antenna at its own point, 24 across and 24 up (`WetshotRules.ballPixelsAcross`/`Up`,
 on BALL X and BALL Y offline); a stage's decider puts it back there. As drawn: the body breathing between 0.9 and 1.1 over two seconds, the fins swinging
-out to 10 degrees and back over a second and a half (the top one clockwise, the tail one
-counter-clockwise), the front one the whole arc, 15 either way, rising as it swings away from
-level to 2 whole pixels at either end (`WetshotArt.frontFinLift`), the antenna, and the rim, net and ball on it, nodding 0 to 5
-degrees counter-clockwise over two seconds, still while someone dunks (and a rim swimming off the stage,
+out to 10 degrees and back over a second and a half (the top one clockwise), the tail one the
+whole arc, 10 either way, the front one the whole arc, 15 either way, rising as it swings away from
+level to 2 whole pixels at either end (`WetshotArt.frontFinLift`), the antenna, and the rim, net and ball on it, nodding 5
+degrees either way over two seconds, the ball's glow there coming and going between none and 90%
+over two seconds, still while someone dunks (and a rim swimming off the stage,
 or gone, lets go of whoever hangs on it); each turning where it meets the
-body (`WetshotArt.hooperfishParts`). Its rim and net glow, and so do its red rings and eye (left out of the
+body (`WetshotArt.hoopfishParts`). Its rim and net glow, and so do its red rings and eye (left out of the
 body's mask, `WetshotArt.bodyGlowMask`), the background's no-glow under them let through: drawn
 pure blue in the mask over it (`MaskScene`'s `through`, under the fish's flats, and `throughFront`
 and the net strands over them; `GameScene.glowThroughSnapshots`, `glowThroughFrontSnapshots`,
@@ -1191,11 +1201,11 @@ and the net strands over them; `GameScene.glowThroughSnapshots`, `glowThroughFro
 not the tinted ones. The rings are a single art pixel wide: any blue in the half-size mask counts,
 and the brightest of the four full-size pixels under it is taken. The rest of it doesn't.
 
-No dunking the Hooperfish (protocol 61): a dunk on it plays to its slam, the dunk sheet's third
-frame, then the fish spins, `Hooperfish_spin` (eight 96 by 48 frames at 15 a second,
-`HooperfishRules.spinFrames` 32, imported as a stage strip), its parts hidden and the rim's own
-art and net with them, the rim out of play throughout (`Hooperfish.spin`), and the ball drops
-from the dunker's hands, no point, the dunker let go into the air (`MatchEvent.hooperfishSpun`).
+No dunking the Hoopfish (protocol 61): a dunk on it plays to its slam, the dunk sheet's third
+frame, then the fish spins, `Hoopfish_spin` (eight 96 by 48 frames at 15 a second,
+`HoopfishRules.spinFrames` 32, imported as a stage strip), its parts hidden and the rim's own
+art and net with them, the rim out of play throughout (`Hoopfish.spin`), and the ball drops
+from the dunker's hands, no point, the dunker let go into the air (`MatchEvent.hoopfishSpun`).
 Bubbles burst all round it as it spins, some over it, and trail off its tail as it swims
 (`WetshotArt.tailTip`, 10 a second). In 47, points here are worth double (`StageFeatures.doublePoints`),
 a basket's points doubled; a best of seven's rounds stay one a basket. In 47, play on the stage starts with "Points Are Worth Double!" in the drink banner's
@@ -1210,9 +1220,9 @@ screen here: off screen it's only ever on the antenna. The plants sway 5 degrees
 seconds, each on its own beat, from their bottom middle. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
 to whoever put the ball through (`ball.lastTouched`), protocol 48. For 20 frames after any point no
 other counts (`BallRules.scoreLockoutFrames`): a rim on the move can take the same ball through twice. Its centre is 15 pixels across
-(mirrored when it faces right) and 24 up from the Hooperfish's bottom left (`WetshotRules.rimFromHooperfish`), across on the
+(mirrored when it faces right) and 24 up from the Hoopfish's bottom left (`WetshotRules.rimFromHoopfish`), across on the
 HOOP X debug slider offline, a whole pixel at a time, rim, art and net together; there's no
-backboard. There's only ever one Hooperfish. Each of its parts will be animated, to be detailed.
+backboard. There's only ever one Hoopfish. Each of its parts will be animated, to be detailed.
 
 The map maker here has the props in its panel in place of a tileset: pick one and press a cell
 to place it, or drag it on; press a placed one to pick it up, drop it on the panel to take it
@@ -1231,7 +1241,7 @@ as high, slowly; the jumps, the ground's and the air's speeds and every change o
 pick-ups, the brakes, the frictions, the ball's roll) halved too, the ball's turning in the view halved, and every state's clock holds every other frame,
 so each state, and its sheet with it, runs at half speed; the walk and run cycles too.
 Over everything in the world, under the HUD, the water: palette 18 at the screen's bottom to 19
-at its top (the energy cubes, drawn apart, tinted to match in their shader), at 66% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
+at its top (the energy cubes, drawn apart, tinted to match in their shader), at 33% (WATER TINT on the debug panel offline). And the whole screen sways, each row a
 game pixel and a half side to side in three waves down the screen (WATER SWAY), in the glow's composite
 (`GameScene.screenWave`), but not in the map maker, nor across the score's band at the top. The floor's fill doesn't glow either.
 
@@ -1364,7 +1374,8 @@ shown, once, like the effects.
 - crowd_cheer, behind the rest, on every basket, and with it the announcer: on the game's last,
   thatlldoit, thatlldoit-2 or thatdecidesit, the finish slowing to 0.35 (offline) and the camera
   easing in on the ball to 0.55 of its view over 40 frames and then staying on it, in a hand or
-  loose (where it was last seen while it's drawn nowhere), the HUD keeping its size, until
+  loose (where it was last seen while it's drawn nowhere), on Hoopfish Hideaway kept inside the
+  stage's sides, the HUD keeping its size, until
   the win screen; from the winning bucket nobody moves or catches (`Match.finished`: no inputs,
   the computer's among them, and no catches); otherwise a line drawn by weight: the generic score (score, -2, -3,
   whatascore) always in at 4, a dunk's (slamdunk, -2, -3, dunk) at 2 on a dunk, the wrist work

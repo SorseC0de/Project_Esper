@@ -30,8 +30,8 @@ public struct Match: Equatable {
     /// Highway Traffic's cars and helicopter, and which rim the last one carried.
     public var cars: [Car] = []
     public var helicopter: Helicopter?
-    /// Wetshot Wake's Hooperfish, swimming across with the ball or the rim on its antenna.
-    public var hooperfish: Hooperfish?
+    /// Wetshot Wake's Hoopfish, swimming across with the ball or the rim on its antenna.
+    public var hoopfish: Hoopfish?
     public var lastHelicopterHoop: Int?
     public var scores: [Int]
     /// Rounds reset on a point; 47 plays on through its baskets.
@@ -69,9 +69,9 @@ public struct Match: Equatable {
         countdownLength = countdown
         self.countdown = countdown
         fieldDice = Dice(seed: seed)
-        if let fish = stage.hooperfishStart {
-            hooperfish = Hooperfish.starting(at: fish, on: stage)
-            placeHooperfishLoad()
+        if let fish = stage.hoopfishStart {
+            hoopfish = Hoopfish.starting(at: fish, on: stage)
+            placeHoopfishLoad()
         }
         if stage.features.traffic {
             fillTraffic()
@@ -114,7 +114,7 @@ public struct Match: Equatable {
         if portalCooldown > 0 { portalCooldown -= 1 }
         stepField()
         stepTornados()
-        stepHooperfish()
+        stepHoopfish()
         stepStageFireball()
         stepLightning()
         stepIcicles()
@@ -150,10 +150,10 @@ public struct Match: Equatable {
             // Frost Tea: the ball hangs where it is, but a hand can still take it.
             ball.frozen -= 1
             if ball.isLive { tryCatch() }
-        } else if hooperfish?.carrying == .ball, ball.isLive {
-            // On the Hooperfish's antenna, where a hand can take it off.
+        } else if hoopfish?.carrying == .ball, ball.isLive {
+            // On the Hoopfish's antenna, where a hand can take it off.
             tryCatch()
-            if ball.holder != nil { hooperfish?.carrying = .nothing }
+            if ball.holder != nil { hoopfish?.carrying = .nothing }
         } else if ball.isLive, ball.tether == nil {
             // The ball sees the stage's ball-only solids as well.
             var ballStage = stage
@@ -239,10 +239,10 @@ public struct Match: Equatable {
             players[holder].hasBall = true
             ball.holder = holder
             ball.position = players[holder].heldBallPoint
-        } else if hooperfish != nil {
-            // In neutral on Wetshot Wake is back on the Hooperfish's antenna.
-            hooperfish?.carrying = .ball
-            placeHooperfishLoad()
+        } else if hoopfish != nil {
+            // In neutral on Wetshot Wake is back on the Hoopfish's antenna.
+            hoopfish?.carrying = .ball
+            placeHoopfishLoad()
         }
         countdown = countdownLength
     }
@@ -300,16 +300,16 @@ public struct Match: Equatable {
             pulse(by: index, pull: pull)
         case .snipe(let at, let pull):
             snipe(by: index, at: at, pull: pull)
-        case .dunk(let hoop) where hooperfish != nil:
-            // No dunking the Hooperfish: at the slam it spins, rim and all, and the ball drops
+        case .dunk(let hoop) where hoopfish != nil:
+            // No dunking the Hoopfish: at the slam it spins, rim and all, and the ball drops
             // out through where the rim was, no point, the dunker let go.
-            hooperfish?.spin = HooperfishRules.spinFrames
-            placeHooperfishLoad()
+            hoopfish?.spin = HoopfishRules.spinFrames
+            placeHoopfishLoad()
             ball.release(from: player.heldBallPoint, velocity: Vec2(x: 0, y: -1), by: index, straight: false)
             ball.steers = false
             players[index].grounded = false
             players[index].enter(.air)
-            events.append(.hooperfishSpun)
+            events.append(.hoopfishSpun)
         case .dunk(let hoop):
             // Its bottom just over the rim, so it comes down through it.
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: BallRules.radius + 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
@@ -521,13 +521,13 @@ public struct Match: Equatable {
         }
     }
 
-    /// The Hooperfish a frame on, and its load with it: the rim where its antenna is, or parked
+    /// The Hoopfish a frame on, and its load with it: the rim where its antenna is, or parked
     /// when it isn't carrying it; the ball held there until a hand takes it.
-    private mutating func stepHooperfish() {
-        guard var fish = hooperfish else { return }
+    private mutating func stepHoopfish() {
+        guard var fish = hoopfish else { return }
         fish.step(on: stage)
-        hooperfish = fish
-        placeHooperfishLoad()
+        hoopfish = fish
+        placeHoopfishLoad()
         // A rim swimming into the stage's first or last column, or gone, lets go of whoever's hanging on it.
         if !stage.dunkable(stage.hoops[0]) {
             for index in players.indices where players[index].state == .dunking && players[index].dunkHoop == 0 {
@@ -536,8 +536,8 @@ public struct Match: Equatable {
         }
     }
 
-    private mutating func placeHooperfishLoad() {
-        guard let fish = hooperfish, !stage.hoops.isEmpty else { return }
+    private mutating func placeHoopfishLoad() {
+        guard let fish = hoopfish, !stage.hoops.isEmpty else { return }
         // Spinning, the rim spins with it, out of play.
         stage.hoops[0].position = fish.carrying == .hoop && !fish.away && fish.spin == 0 ? fish.antenna : HighwayRules.parked
         stage.hoops[0].backboard = fish.facesRight ? .left : .right

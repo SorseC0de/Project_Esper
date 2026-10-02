@@ -1,25 +1,25 @@
 import XCTest
 @testable import EsperSim
 
-/// Wetshot Wake: laid out in the map maker, its one rim on the Hooperfish, both players'.
+/// Wetshot Wake: laid out in the map maker, its one rim on the Hoopfish, both players'.
 final class WetshotTests: XCTestCase {
-    func testTheOneRimRidesTheHooperfish() {
+    func testTheOneRimRidesTheHoopfish() {
         let stage = Stage.wetshot
         XCTAssertEqual(stage.columns, 37)
         XCTAssertEqual(stage.rows, 19)
         XCTAssertEqual(stage.hoops.count, 1)
         XCTAssertTrue(stage.hoops[0].shared)
-        let fish = StageMap.baked(.wetshot).hooperfish!.cell
-        XCTAssertEqual(stage.hoops[0].position, Vec2(x: Double(fish.column) * Stage.tileSize, y: Double(fish.row) * Stage.tileSize) + WetshotRules.rimFromHooperfish)
+        let fish = StageMap.baked(.wetshot).hoopfish!.cell
+        XCTAssertEqual(stage.hoops[0].position, Vec2(x: Double(fish.column) * Stage.tileSize, y: Double(fish.row) * Stage.tileSize) + WetshotRules.rimFromHoopfish)
     }
 
-    func testADunkOnTheHooperfishSpinsItAndScoresNothing() {
+    func testADunkOnTheHoopfishSpinsItAndScoresNothing() {
         var match = wetshot()
-        match.hooperfish!.carrying = .hoop
+        match.hoopfish!.carrying = .hoop
         // Mid-crossing, the rim well inside the stage.
-        match.hooperfish!.swimFrames = 100_000
-        match.hooperfish!.from = Vec2(x: 160, y: 90)
-        match.hooperfish!.to = Vec2(x: 161, y: 90)
+        match.hoopfish!.swimFrames = 100_000
+        match.hoopfish!.from = Vec2(x: 160, y: 90)
+        match.hoopfish!.to = Vec2(x: 161, y: 90)
         match.advance(inputs: [.idle, .idle])
         let rim = match.stage.hoops[0].position
         match.players[0].hasBall = true
@@ -31,8 +31,8 @@ final class WetshotTests: XCTestCase {
         var spun = false, sawRimOut = false
         for _ in 0..<150 {
             match.advance(inputs: [PlayerInput(throwBall: true), .idle])
-            if match.events.contains(.hooperfishSpun) { spun = true }
-            if spun, match.hooperfish!.spin > 0, match.stage.hoops[0].position == HighwayRules.parked { sawRimOut = true }
+            if match.events.contains(.hoopfishSpun) { spun = true }
+            if spun, match.hoopfish!.spin > 0, match.stage.hoops[0].position == HighwayRules.parked { sawRimOut = true }
         }
         XCTAssertTrue(spun, "the dunk got as far as the slam")
         XCTAssertTrue(sawRimOut, "the rim out of play through the spin")
@@ -45,8 +45,8 @@ final class WetshotTests: XCTestCase {
         for scorer in 0...1 {
             var match = Match(stage: .wetshot)
             match.countdown = 0
-            // The rim held still where the map puts it, the Hooperfish out of it.
-            match.hooperfish = nil
+            // The rim held still where the map puts it, the Hoopfish out of it.
+            match.hoopfish = nil
             match.stage.hoops[0].position = Stage.wetshot.hoops[0].position
             let rim = match.stage.hoops[0].position
             match.ball.respawn(at: rim + Vec2(x: 0, y: 6))
@@ -74,6 +74,16 @@ final class WetshotTests: XCTestCase {
         XCTAssertTrue(map.swiftSource(.wetshot).contains("wetshotDefaultMap"))
     }
 
+    func testAMapSavedBeforeTheRenameStillReadsItsHoopfish() throws {
+        var map = StageMap.baked(.wetshot)
+        map.pile = [.init(.hoop3, x: 120, y: 64, rotation: -30)]
+        let data = try JSONEncoder().encode(map)
+        let old = String(data: data, encoding: .utf8)!.replacingOccurrences(of: "\"hoopfish\"", with: "\"hooperfish\"")
+        let read = try JSONDecoder().decode(StageMap.self, from: Data(old.utf8))
+        XCTAssertEqual(read, map, "the pile kept and the old name read as the Hoopfish")
+        XCTAssertEqual(read.pileSource, "hoop3 x 120 y 64 rot -30")
+    }
+
     private func wetshot() -> Match {
         var match = Match(stage: .wetshot)
         match.countdown = 0
@@ -82,51 +92,51 @@ final class WetshotTests: XCTestCase {
         return match
     }
 
-    func testTheHooperfishStartsWithTheBallOnItsAntennaAndNoRimOut() {
+    func testTheHoopfishStartsWithTheBallOnItsAntennaAndNoRimOut() {
         var match = wetshot()
-        let fish = match.hooperfish!
+        let fish = match.hoopfish!
         XCTAssertEqual(fish.carrying, .ball)
-        XCTAssertEqual(fish.position, match.stage.hooperfishStart)
+        XCTAssertEqual(fish.position, match.stage.hoopfishStart)
         XCTAssertEqual(match.ball.position, fish.ballPoint)
         XCTAssertEqual(match.stage.hoops[0].position, HighwayRules.parked)
         for _ in 0..<30 { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertLessThan(match.hooperfish!.position.x, fish.position.x, "swimming off the way it faces")
-        XCTAssertEqual(match.ball.position, match.hooperfish!.ballPoint, "the ball rides along")
+        XCTAssertLessThan(match.hoopfish!.position.x, fish.position.x, "swimming off the way it faces")
+        XCTAssertEqual(match.ball.position, match.hoopfish!.ballPoint, "the ball rides along")
     }
 
     func testAHandTakesTheBallOffTheAntenna() {
         var match = wetshot()
-        match.players[0].position = match.hooperfish!.ballPoint - Vec2(x: 0, y: 10)
+        match.players[0].position = match.hoopfish!.ballPoint - Vec2(x: 0, y: 10)
         // Facing the way it swims, so the ball comes to the hands.
         match.players[0].facing = .left
         match.players[0].grounded = false
         match.players[0].enter(.air)
         for _ in 0..<5 where match.ball.holder == nil { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.ball.holder, 0)
-        XCTAssertEqual(match.hooperfish?.carrying, Hooperfish.Carrying.nothing)
+        XCTAssertEqual(match.hoopfish?.carrying, Hoopfish.Carrying.nothing)
     }
 
     private func throughCrossing(_ match: inout Match) {
-        let fish = match.hooperfish!
-        for _ in 0..<(fish.swimFrames - fish.age + HooperfishRules.waitFrames) { match.advance(inputs: [.idle, .idle]) }
+        let fish = match.hoopfish!
+        for _ in 0..<(fish.swimFrames - fish.age + HoopfishRules.waitFrames) { match.advance(inputs: [.idle, .idle]) }
     }
 
     func testUntakenTheBallComesBackOnItsAntennaTurnedRoundFromAHeightToAHeight() {
         var match = wetshot()
-        let first = match.hooperfish!
+        let first = match.hoopfish!
         for _ in 0..<first.swimFrames { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertTrue(match.hooperfish!.away)
-        XCTAssertEqual(match.hooperfish!.position.x, -HooperfishRules.size.x, accuracy: 0.001, "wholly off the left")
-        XCTAssertEqual(match.ball.position, match.hooperfish!.ballPoint, "the ball still on it")
-        for _ in 0..<HooperfishRules.waitFrames { match.advance(inputs: [.idle, .idle]) }
-        let back = match.hooperfish!
+        XCTAssertTrue(match.hoopfish!.away)
+        XCTAssertEqual(match.hoopfish!.position.x, -HoopfishRules.size.x, accuracy: 0.001, "wholly off the left")
+        XCTAssertEqual(match.ball.position, match.hoopfish!.ballPoint, "the ball still on it")
+        for _ in 0..<HoopfishRules.waitFrames { match.advance(inputs: [.idle, .idle]) }
+        let back = match.hoopfish!
         XCTAssertFalse(back.away)
         XCTAssertTrue(back.facesRight, "turned round")
         XCTAssertEqual(back.carrying, .ball, "back with the ball, not yet taken")
-        XCTAssertEqual(back.swimFrames, HooperfishRules.swimFrames, "ten seconds across")
+        XCTAssertEqual(back.swimFrames, HoopfishRules.swimFrames, "ten seconds across")
         XCTAssertNotEqual(back.from.y, back.to.y, "a height to a height")
         for y in [back.from.y, back.to.y] {
-            XCTAssertGreaterThanOrEqual(y, HooperfishRules.lowest)
+            XCTAssertGreaterThanOrEqual(y, HoopfishRules.lowest)
             XCTAssertLessThanOrEqual(y, match.stage.height - 3 * Stage.tileSize)
         }
     }
@@ -135,14 +145,14 @@ final class WetshotTests: XCTestCase {
         var match = wetshot()
         match.ball.holder = 0
         match.players[0].hasBall = true
-        match.hooperfish!.carrying = .nothing
+        match.hoopfish!.carrying = .nothing
         throughCrossing(&match)
         match.advance(inputs: [.idle, .idle])
-        XCTAssertEqual(match.hooperfish!.carrying, .hoop)
-        XCTAssertEqual(match.stage.hoops[0].position, match.hooperfish!.antenna, "the rim on its antenna")
+        XCTAssertEqual(match.hoopfish!.carrying, .hoop)
+        XCTAssertEqual(match.stage.hoops[0].position, match.hoopfish!.antenna, "the rim on its antenna")
         XCTAssertEqual(match.stage.hoops[0].backboard, .left, "turned with it")
         throughCrossing(&match)
-        XCTAssertEqual(match.hooperfish!.carrying, .hoop, "from then on")
+        XCTAssertEqual(match.hoopfish!.carrying, .hoop, "from then on")
     }
 
     func testUnderWaterGravityTheJumpsAndEverySpeedAreHalved() {
@@ -188,14 +198,14 @@ final class DeciderTests: XCTestCase {
         XCTAssertEqual(match.ball.position.x, match.stage.ballSpawn.x, "loose where it starts")
     }
 
-    func testOnWetshotWakeTheDecidersBallGoesBackOnTheHooperfish() {
+    func testOnWetshotWakeTheDecidersBallGoesBackOnTheHoopfish() {
         var match = Match(stage: .wetshot)
-        match.hooperfish!.carrying = .hoop
+        match.hoopfish!.carrying = .hoop
         match.scores = [1, 1]
         match.restart(ballTo: nil)
-        XCTAssertEqual(match.hooperfish!.carrying, .ball)
+        XCTAssertEqual(match.hoopfish!.carrying, .ball)
         XCTAssertNil(match.ball.holder)
-        XCTAssertEqual(match.ball.position, match.hooperfish!.ballPoint)
+        XCTAssertEqual(match.ball.position, match.hoopfish!.ballPoint)
     }
 
     private func jump(on stage: Stage) -> (height: Double, frames: Int) {
@@ -219,9 +229,9 @@ final class DeciderTests: XCTestCase {
 
     func testARimSwimmingOffLetsGoOfWhoeverHangsOnIt() {
         var match = Match(stage: .wetshot)
-        match.hooperfish!.carrying = .hoop
+        match.hoopfish!.carrying = .hoop
         // Swum off, the rim gone with it.
-        match.hooperfish!.age = match.hooperfish!.swimFrames + 1
+        match.hoopfish!.age = match.hoopfish!.swimFrames + 1
         match.players[0].state = .dunking
         match.players[0].dunkHoop = 0
         match.advance(inputs: [.idle, .idle])
@@ -231,7 +241,7 @@ final class DeciderTests: XCTestCase {
     func testNoSecondPointRightAfterOne() {
         var match = Match(stage: .wetshot, mode: .fortySeven)
         match.countdown = 0
-        match.hooperfish = nil
+        match.hoopfish = nil
         match.stage.hoops[0].position = Stage.wetshot.hoops[0].position
         let rim = match.stage.hoops[0].position
         match.ball.respawn(at: rim + Vec2(x: 0, y: 6))
@@ -261,11 +271,11 @@ final class DeciderTests: XCTestCase {
         hoop.position.x = stage.width / 2
         XCTAssertTrue(stage.dunkable(hoop))
         var match = Match(stage: .wetshot)
-        match.hooperfish!.carrying = .hoop
-        match.hooperfish!.from = Vec2(x: -5, y: 100)
-        match.hooperfish!.to = Vec2(x: -HooperfishRules.size.x, y: 100)
-        match.hooperfish!.swimFrames = 600
-        match.hooperfish!.age = 0
+        match.hoopfish!.carrying = .hoop
+        match.hoopfish!.from = Vec2(x: -5, y: 100)
+        match.hoopfish!.to = Vec2(x: -HoopfishRules.size.x, y: 100)
+        match.hoopfish!.swimFrames = 600
+        match.hoopfish!.age = 0
         match.players[0].state = .dunking
         match.players[0].dunkHoop = 0
         match.advance(inputs: [.idle, .idle])

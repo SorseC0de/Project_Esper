@@ -97,6 +97,78 @@ final class OpponentStageTests: XCTestCase {
     }
 }
 
+/// The Wreck Center: its own play, with the reading for what that can't reach.
+final class OpponentCourtTests: XCTestCase {
+    private func court() -> Match {
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        match.countdown = 0
+        return match
+    }
+
+    private func frames(_ match: inout Match, _ brain: inout Opponent, upTo limit: Int, until stop: (Match) -> Bool) -> Int {
+        for frame in 0..<limit {
+            match.advance(inputs: [.idle, brain.decide(match)])
+            if stop(match) { return frame }
+        }
+        return limit
+    }
+
+    func testTheTerrainFindsTheWallUpOntoEachBlock() {
+        let match = court()
+        let terrain = Terrain(stage: match.stage, player: match.players[1])
+        while !terrain.ready { terrain.prepare(budget: Opponent.readingBudget) }
+        let floor = terrain.surface(under: Vec2(x: 170, y: 10))!
+        for blockTop in [Vec2(x: 40, y: 100), Vec2(x: 300, y: 100)] {
+            let block = terrain.surface(under: blockTop)!
+            XCTAssertTrue(terrain.links(from: floor).contains { $0.to == block && $0.kind == .wallClimb }, "\(blockTop)")
+        }
+    }
+
+    func testABallOnABlockIsFetchedUpTheWall() {
+        for spot in [Vec2(x: 40, y: 100), Vec2(x: 300, y: 100)] {
+            var match = court()
+            match.ball.position = spot
+            match.ball.velocity = .zero
+            var brain = Opponent(index: 1)
+            XCTAssertLessThan(frames(&match, &brain, upTo: 600) { $0.ball.holder == 1 }, 600, "\(spot)")
+        }
+    }
+
+    func testOnDefenceItClimbsToABodyWaitingOnABlock() {
+        var match = court()
+        match.players[0].position = Vec2(x: 40, y: 100)
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        var brain = Opponent(index: 1)
+        XCTAssertLessThan(frames(&match, &brain, upTo: 1200) { $0.ball.holder != 0 }, 1200)
+    }
+
+    func testAnUncontestedLooseBallComesToItRatherThanBeingSpikedAway() {
+        var match = court()
+        match.ball.position = Vec2(x: 170, y: 80)
+        match.ball.velocity = .zero
+        var brain = Opponent(index: 1)
+        XCTAssertLessThan(frames(&match, &brain, upTo: 300) { $0.ball.holder == 1 }, 100)
+    }
+
+    func testAFakeThatRunsOutNeverTurnsIntoAShot() {
+        // From the far side with them in the way it fakes; the stance is called off, not let go.
+        var match = court()
+        match.players[1].position = Vec2(x: 230, y: 10)
+        match.players[0].position = Vec2(x: 170, y: 10)
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        var brain = Opponent(index: 1)
+        for _ in 0..<600 {
+            match.advance(inputs: [.idle, brain.decide(match)])
+            if match.events.contains(.shot(player: 1)) {
+                XCTAssertLessThan(abs(match.players[1].position.x - match.stage.hoops[0].position.x), 150, "a heave from the far side")
+                break
+            }
+        }
+    }
+}
+
 final class OpponentDuelTests: XCTestCase {
     /// Two computers against each other on each stage it reads, three pairings: points go in, and
     /// the lava takes nobody who wasn't knocked into it.

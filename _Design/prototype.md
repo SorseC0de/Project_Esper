@@ -745,7 +745,9 @@ differently, and it holds its jumps through the squat so its hops are full.
   go on the rise with the flick solved for the lift; the flick is the one that lands
   nearest the rim, tried in five-degree steps. When the other is within 50 and in the
   way and hasn't committed it picks, by chance, to stand, to walk back and forth
-  dribbling with the odd hop, to pump fake, to lob the ball straight up and run under
+  dribbling with the odd hop, to pump fake (called off with the throw: letting go of shoot
+  always shoots and down is the stepback, so a stance whose plan has run out is called off the
+  same way, never let go as a shot it didn't pick), to lob the ball straight up and run under
   it, or to go over them on two jumps; after three such waits it stops waiting and goes
   over, lobs, or switches spot. While the other's swing or reach is live it steps back
   out of reach and waits; the moment it's spent, the recovery of a slash or a snatch,
@@ -763,16 +765,26 @@ differently, and it holds its jumps through the squat so its hops are full.
   they wind up a shot within reach, when they're spent within 45, or by chance when
   they stand about within 45; up close the swing is sometimes the snatch. After a swing
   it rests 40 frames. When they stand still for a second far from the rim it walks up
-  to them and strikes.
+  to them and strikes; standing on a block's top, out of its jumps' reach, it climbs to
+  them by the reading's wall climb.
 - With the ball loose it goes to where the ball will come down, running if it's far,
-  slides for it when it's a race, times a snatch or a slash for one in flight, leaves its
+  slides for it when it's a race, times a snatch for one in flight, or a slash to spike it
+  only when the other's within 60 of it and about as near as it is (an uncontested ball is let
+  come, not knocked away to chase), fetches one resting on a block's top by the reading's wall
+  climb (the court is read too, for this; a climb under way is played out), leaves its
   own shot alone while it's on its way and waits under the rim for the miss, and goes up
   for one over its head, both jumps if it's high.
 
 ### Off the court
 
 Everywhere but the court it was first taught on (`Opponent.readsStage`), it plays by a reading of
-the stage (`OpponentTerrain.swift`, `OpponentStages.swift`):
+the stage (`OpponentTerrain.swift`, `OpponentStages.swift`). The reading's moves include the wall
+climb (protocol 65), for a surface higher than the jumps go with a wall beside it and room for a
+body between: from under that room the full hop and the second jump at its top into the wall,
+the cling, off it at once, and steered back over onto the surface, held off its edge until over
+it, the second jump again if short (the wall jump gives it back). The court's blocks are climbed
+from the floor that way. With the ball, a way down that walks off an end is taken over dropping
+through a one-way, if there is one: down with the ball standing is the taunt.
 
 - The stage read: every height a body stands at, by the stage's own collision, run together
   into surfaces (slopes stepping along them), and each tornado's middle; nothing under the lava

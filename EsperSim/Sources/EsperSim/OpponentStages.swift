@@ -83,11 +83,16 @@ extension Opponent {
         return stride(from: lands, through: lands + Opponent.tornadoHeldSafeFrames + 10, by: 5).allSatisfy { up(match.frame + $0) }
     }
 
-    /// The way from a surface to another, timed from where it stands.
+    /// The way from a surface to another, timed from where it stands. With the ball, a way
+    /// that doesn't drop through a one-way if there is one: down with the ball standing is the
+    /// taunt, so the drop comes only after it.
     func route(from here: Int, to goal: Int, match: Match, me: Player) -> [Terrain.Link]? {
-        terrain?.route(from: here, to: goal, at: me.position.x, speed: max(me.spec.runSpeed * me.waterShare, 0.5)) { from, link, leaves, lands in
-            usable(from, link, match, leaves: leaves, lands: lands, ballInHand: me.hasBall)
+        func way(dropping: Bool) -> [Terrain.Link]? {
+            terrain?.route(from: here, to: goal, at: me.position.x, speed: max(me.spec.runSpeed * me.waterShare, 0.5)) { from, link, leaves, lands in
+                (dropping || link.kind != .dropThrough) && usable(from, link, match, leaves: leaves, lands: lands, ballInHand: me.hasBall)
+            }
         }
+        return (me.hasBall ? way(dropping: false) : nil) ?? way(dropping: true)
     }
 
     /// Which tornado holds it, by the middle it's drawn to.
@@ -629,9 +634,11 @@ extension Opponent {
         }
         guard let meet = meeting(match, me: me) else { return }
         if !me.grounded, me.state != .suspended {
-            // Up at it: under it, and the second jump while it's still above.
+            // Up at it: under it, and the second jump while it's still above; but a wall climb
+            // under way is played out, the ball being over the surface it climbs to.
             let dx = meet.ball.x - me.position.x
-            if journey == nil || abs(dx) < 30 {
+            let climbing = journey?.started == true && journey?.link.kind == .wallClimb
+            if journey == nil || (abs(dx) < 30 && !climbing) {
                 input.stick = Vec2(x: abs(dx) > 3 ? (dx > 0 ? 1 : -1) : 0, y: 0)
                 if meet.ball.y - me.chest.y > 10, me.jumpsLeft > 0, me.velocity.y < 0.5 { tapJump(&input) }
                 rescueFromLava(match: match, me: me, into: &input)

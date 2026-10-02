@@ -108,8 +108,9 @@ public struct Opponent: Equatable {
             humanThrowCharge = 0
         }
         let readsStage = Opponent.readsStage(match)
+        // Every stage is read, the court too, for what its own play can't reach.
+        readStage(match, me: me)
         if readsStage {
-            readStage(match, me: me)
             let scoringHoop = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
             if match.hoopfish == nil, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
         }
@@ -347,19 +348,25 @@ public struct Opponent: Equatable {
         // Behind the block: on the backboard's side of the rim, past the block's face.
         let behind = !readsStage && (me.position.x - hoop.position.x) * hoop.backboard.sign > 5 && me.position.y < 100
 
-        // In the stance: a fake lets go with down on the ground; a shot holds through the
-        // windup with the aim on the rim, then lets go, sooner if they're closing in; a
-        // jump shot hops out of the stance after the windup and lets go on the rise with
-        // the aim solved for the lift.
+        // In the stance: a fake is called off with the throw (letting go of shoot always shoots,
+        // and down is the stepback); a shot holds through the windup with the aim on the rim,
+        // then lets go, sooner if they're closing in; a jump shot hops out of the stance after
+        // the windup and lets go on the rise with the aim solved for the lift.
         if me.state == .shootStance {
             stanceFrames += 1
+            // A stance outliving its plan, a fake's run out before it was called off, is called
+            // off now: never a shot it didn't pick.
+            if plan != .fake, plan != .shoot {
+                input.shoot = true
+                tapThrow(&input)
+                return
+            }
             if plan == .fake {
+                input.shoot = true
                 if stanceFrames >= fakeHold {
-                    input.stick = Vec2(x: 0, y: -1)
+                    tapThrow(&input)
                     plan = .none
                     planFrames = 0
-                } else {
-                    input.shoot = true
                 }
                 return
             }
@@ -384,7 +391,9 @@ public struct Opponent: Equatable {
                 input.aim = aim
                 input.shoot = stanceFrames <= BallRules.shotWindupFrames + 1 && !(inReach && !committed)
             } else {
-                input.stick = Vec2(x: 0, y: -1)
+                // Nothing goes in from here: the stance called off, the ball kept.
+                input.shoot = true
+                tapThrow(&input)
                 plan = .none
                 planFrames = 0
                 spot = nil
@@ -749,8 +758,9 @@ public struct Opponent: Equatable {
             // they're above. In reach, the slash, or the snatch up close.
             plan = .strike
             planFrames = 30
-            if readsStage, abs(rise) >= 24 || abs(gap) > 60 {
-                // On another surface: the way there first.
+            // On another surface: the way there first; on the court, up a block's wall to them.
+            let climbing = journey?.started == true || (human.grounded && outOfJumpingReach(human.position, me: me))
+            if (readsStage && (abs(rise) >= 24 || abs(gap) > 60)) || climbing {
                 go(to: human.position, match: match, me: me, into: &input)
                 return
             }
@@ -874,14 +884,17 @@ public struct Opponent: Equatable {
             return
         }
         throwRead = nil
-        if Opponent.readsStage(match) {
-            if !snatchOrSpike(ball, me: me, into: &input) { chaseReadBall(match, me: me, into: &input) }
+        // On the court, a ball up where no jump from here reaches, the blocks' tops, is gone after
+        // by the reading: up the wall beside it; a climb under way is played out.
+        if Opponent.readsStage(match) || outOfJumpingReach(ball, me: me) || journey?.started == true {
+            if !snatchOrSpike(ball, me: me, human: human, into: &input) { chaseReadBall(match, me: me, into: &input) }
             return
         }
+        journey = nil
         let target = landing(of: ball, in: match.stage)
         let toBall = target - me.position.x
         let above = ball.position.y - me.position.y
-        if snatchOrSpike(ball, me: me, into: &input) { return }
+        if snatchOrSpike(ball, me: me, human: human, into: &input) { return }
         if abs(toBall) > 30 {
             input.stick = Vec2(x: toBall > 0 ? 1 : -1, y: 0)
         } else if abs(toBall) > 5 {
@@ -901,17 +914,34 @@ public struct Opponent: Equatable {
         }
     }
 
+    /// How near the other must be to a loose ball for it to be worth spiking away from them.
+    static let contestReach = 60.0
+
+    /// Whether the ball rests on a surface higher over the feet than the jumps go.
+    private func outOfJumpingReach(_ ball: Ball, me: Player) -> Bool {
+        ball.velocity.length < 1 && outOfJumpingReach(ball.position, me: me)
+    }
+
+    /// Whether a point is over a surface higher over the feet than the jumps go: a block's top.
+    private func outOfJumpingReach(_ point: Vec2, me: Player) -> Bool {
+        guard let terrain, terrain.ready, let under = terrain.standing(nearest: point) else { return false }
+        let height = terrain.surfaces[under.surface].height(at: under.x)
+        return abs(under.x - point.x) < 10 && height - me.position.y > terrain.rise + 8
+    }
+
     /// A ball in flight about to be in reach: the snatch to take it, timed for the hand, or the
-    /// slash to spike it, by chance.
-    private mutating func snatchOrSpike(_ ball: Ball, me: Player, into input: inout PlayerInput) -> Bool {
+    /// slash to spike it, by chance, but only out of the other's reach: an uncontested ball is
+    /// let come to it, not knocked away to chase.
+    private mutating func snatchOrSpike(_ ball: Ball, me: Player, human: Player, into input: inout PlayerInput) -> Bool {
         guard ball.velocity.length > 2 else { return false }
         let soon = ballPosition(ball, after: 6)
         let inHand = soon.distance(to: me.handCatchPoint) <= BallRules.handCatchRadius || soon.distance(to: me.chest) <= BallRules.catchRadius
         let inBlade = abs(soon.x - me.bladeCentre.x) <= SlashRules.reach && abs(soon.y - me.bladeCentre.y) <= SlashRules.reach
+        let contested = soon.distance(to: human.chest) < min(soon.distance(to: me.chest) + 20, Opponent.contestReach)
         if inHand, me.snatchCooldown == 0, chance(70) {
             tapThrow(&input)
             return true
-        } else if inBlade, chance(50) {
+        } else if inBlade, contested, chance(50) {
             tapShoot(&input)
             return true
         }

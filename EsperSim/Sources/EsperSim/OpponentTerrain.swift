@@ -24,8 +24,10 @@ final class Terrain: Equatable {
 
     /// How a link is played from its takeoff: the full hop, the second jump at its top if it's
     /// short; walking off the edge (or drifting out of a tornado), the second jump once it's
-    /// fallen `jumpBelow` if that's set; or down through a one-way.
-    enum Kind: Equatable { case hop, walkOff, dropThrough }
+    /// fallen `jumpBelow` if that's set; down through a one-way; or up a wall too high for the
+    /// jumps alone: the hop and the second jump into the wall beside the surface, clinging, and
+    /// off it back over onto the surface.
+    enum Kind: Equatable { case hop, walkOff, dropThrough, wallClimb }
 
     /// From one surface onto another: stand at `takeoff`, then play `kind` for `landing`. Found
     /// by playing it, on the stage, with a copy of the body, so it's known to make it.
@@ -42,6 +44,8 @@ final class Terrain: Equatable {
         var steerAfter = 0
         /// Frames from setting off to coming down, the longest of its tries.
         var frames = 0
+        /// A wall climb's wall: -1 to the left of the surface, 1 to the right.
+        var wallSide = 0.0
     }
 
     /// What the reading was made from, to tell when the stage or the body has changed.
@@ -82,7 +86,10 @@ final class Terrain: Equatable {
     private var nextTarget = 0
     private var found: [Link] = []
 
-    static func == (left: Terrain, right: Terrain) -> Bool { left === right }
+    /// Two readings of the same stage and body, as far along, are the same reading.
+    static func == (left: Terrain, right: Terrain) -> Bool {
+        left === right || (left.signature == right.signature && left.nextSource == right.nextSource && left.nextTarget == right.nextTarget)
+    }
 
     static func signature(of stage: Stage, for player: Player) -> Signature {
         Signature(columns: stage.columns, rows: stage.rows, tiles: stage.tiles, slopes: stage.fixedSlopes + stage.ceilingSlopes,
@@ -307,8 +314,10 @@ final class Terrain: Equatable {
         let fromY = from.tornado != nil ? from.heights[0] : from.height(at: from.clamp(to.middle))
         let toY = to.tornado != nil ? to.heights[0] : to.height(at: to.clamp(from.middle))
         let gap = max(to.left - from.right, from.left - to.right, 0)
-        // Too high, or too far for any jump to cross.
-        if toY - fromY > rise + 8 || gap > Terrain.farthest { return [] }
+        // Too high for the jumps alone: up the wall beside it if there's one.
+        if toY - fromY > rise + 8 { return wallClimbs(from: start, to: end, fromY: fromY, toY: toY, steps: &steps) }
+        // Too far for any jump to cross.
+        if gap > Terrain.farthest { return [] }
         var options: [(Kind, Double, Double)] = []
         let overlapLeft = max(from.left, to.left), overlapRight = min(from.right, to.right)
         if from.tornado != nil {
@@ -401,6 +410,37 @@ final class Terrain: Equatable {
         }
         return found
     }
+
+    /// Up a wall onto a surface too high to jump to: where there's a wall beside the surface with
+    /// room for a body between, and the surface it's taken from runs under that room. Played
+    /// like the rest, with a copy of the body; the first that makes it.
+    private func wallClimbs(from start: Int, to end: Int, fromY: Double, toY: Double, steps: inout Int) -> [Link] {
+        let from = surfaces[start], to = surfaces[end]
+        guard from.tornado == nil, to.tornado == nil, !to.passable, toY - fromY <= rise + Terrain.wallClimbReach else { return [] }
+        for side in [-1.0, 1.0] {
+            // The surface's solid edge is half a step past its end sample; the wall the first solid out from it, over the top.
+            let edge = (side < 0 ? to.left : to.right) + side * Terrain.sampleStep / 2
+            guard let wallFace = stride(from: 1.0, through: Terrain.wallSearch, by: 1).first(where: { distance in
+                stage.overlapsSolid(Box(min: Vec2(x: edge + side * distance - 0.5, y: toY + 5), max: Vec2(x: edge + side * distance + 0.5, y: toY + 25)))
+            }).map({ edge + side * ($0 - 0.5) }) else { continue }
+            guard abs(wallFace - edge) >= halfWidth * 2 + 2 else { continue }
+            let room = (edge + wallFace) / 2
+            let takeoff = from.clamp(room)
+            guard abs(takeoff - room) <= 2 else { continue }
+            var link = Link(to: end, kind: .wallClimb, takeoff: takeoff, landing: edge - side * Terrain.sampleStep,
+                            cost: Terrain.jumpCost * 3 + abs(toY - fromY) * 0.5, ballSafe: false)
+            link.wallSide = side
+            let tries = [0.0, -Terrain.takeoffSlack, Terrain.takeoffSlack].map { plays(link, from: start, offset: $0, steps: &steps) }
+            if tries.allSatisfy({ $0 != nil }) {
+                link.frames = tries.compactMap { $0 }.max() ?? 0
+                return [link]
+            }
+        }
+        return []
+    }
+    /// How much higher than the jumps a wall climb is tried for, and how far out a wall is looked for.
+    static let wallClimbReach = 60.0
+    static let wallSearch = 40.0
 
     /// What a held-back hop costs on top, so a way of plain hops is taken whenever there is one:
     /// those ways out are fussier, and the body's never quite where its try was.
@@ -500,6 +540,24 @@ final class Terrain: Equatable {
             }
         case .dropThrough:
             input.stick = leftGround ? Vec2(x: steer, y: 0) : Vec2(x: 0, y: -1)
+        case .wallClimb:
+            let wall = link.wallSide
+            if !leftGround {
+                input.jump = true
+                input.stick = Vec2(x: wall, y: 0)
+            } else if body.state == .wallLand {
+                // Clung: straight off it again.
+                input.stick = Vec2(x: wall, y: 0)
+                input.jump = press && body.stateTimer >= 1
+            } else if body.velocity.x * wall < -0.1 || body.position.y > targetY {
+                // Off the wall: back over onto the surface, the second jump if it's short.
+                input.stick = Vec2(x: steer, y: 0)
+                if body.position.y < targetY + 12, body.velocity.y < 0.5, body.jumpsLeft > 0 { input.jump = press }
+            } else {
+                // Up into the wall, the second jump at the top of the hop.
+                input.stick = Vec2(x: wall, y: 0)
+                if body.velocity.y <= 0.5, body.jumpsLeft > 0 { input.jump = press }
+            }
         }
         return input
     }

@@ -1705,22 +1705,65 @@ final class GameScene: SKScene {
     /// The bubble cells' weights: the first as likely as near half the others together.
     private static let bubbleCellWeights = [0.4, 0.15, 0.15, 0.15, 0.15]
 
-    /// Jellyfish drifting lazily across from one side to the other, one to three together,
-    /// bobbing as they go and breathing between 0.9 and 1.1.
-    private struct Jellyfish {
+    /// The sea life swimming across behind the Hoopfish, from one side to the other: jellyfish
+    /// drifting lazily, one to three together, breathing between 0.9 and 1.1; fish in schools,
+    /// commoner, either colour; and now and then a lone shark. Each kind keeps its own clock,
+    /// one group of it across at a time, and a group sometimes swims behind the foreground.
+    private enum SeaLife: CaseIterable {
+        case jellyfish, fish, shark
+
+        /// Seconds between groups, how many to a group, and art pixels a second.
+        var secondsBetween: ClosedRange<Double> {
+            switch self {
+            case .jellyfish: 6...12
+            case .fish: 3...7
+            case .shark: 40...80
+            }
+        }
+        var groupSize: ClosedRange<Int> {
+            switch self {
+            case .jellyfish: 1...3
+            case .fish: 2...5
+            case .shark: 1...1
+            }
+        }
+        var speed: ClosedRange<CGFloat> {
+            switch self {
+            case .jellyfish: 8...14
+            case .fish: 20...30
+            case .shark: 24...32
+            }
+        }
+        /// How far a group's members trail one another, and spread up and down.
+        var spacing: CGFloat { self == .shark ? 0 : self == .fish ? 14 : 20 }
+        var spread: CGFloat { self == .fish ? 10 : 14 }
+        /// How much it bobs, and how often, a second.
+        var bob: ClosedRange<CGFloat> { self == .jellyfish ? 6...12 : 2...4 }
+        var bobRate: ClosedRange<Double> { self == .jellyfish ? 0.08...0.15 : 0.2...0.4 }
+        /// Its sheet's frames a second; jellyfish breathe instead.
+        var framesPerSecond: Double { self == .shark ? 6 : 8 }
+        /// The way its art faces: the shark's left.
+        var facesRight: Bool { self != .shark }
+    }
+    private struct Swimmer {
+        var kind: SeaLife
         var node: SKSpriteNode
+        var frames: [SKTexture]
         var baseY: CGFloat
         var age: Double
         var speed: CGFloat
         var bob: CGFloat
         var bobRate: Double
-        var breathOffset: Double
+        var phase: Double
     }
-    private var jellyfish: [Jellyfish] = []
-    private var jellyfishClock = 0.0
-    private static let jellyfishSecondsBetween: ClosedRange<Double> = 6...12
-    private var nextJellyfish = 3.0
+    private var swimmers: [Swimmer] = []
+    private var seaLifeClocks: [SeaLife: Double] = [:]
+    private var nextSeaLife: [SeaLife: Double] = [.jellyfish: 3, .fish: 1, .shark: 25]
     private static let breathSeconds = 2.5
+    /// The share of groups behind the background's foreground, and the layers either side of it.
+    private static let seaLifeBehindForegroundShare = 0.3
+    private static let seaLifeBehindForegroundZ: CGFloat = -18.5
+    private static let seaLifeZ: CGFloat = -10
 
     private func stepWater() {
         let wet = match.stage.features.look == .wetshot
@@ -1816,35 +1859,69 @@ final class GameScene: SKScene {
         }
         WetshotArt.animate(wetshotArt?.hoopfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
         WetshotArt.sway(wetshotArt?.props ?? [], at: CACurrentMediaTime())
-        jellyfish = jellyfish.compactMap { fish in
-            var fish = fish
-            fish.age += step
-            let x = fish.node.position.x + fish.speed * CGFloat(step)
-            guard fish.node.parent != nil, abs(x - cameraNode.position.x) < halfWidth + 80 else { fish.node.removeFromParent(); return nil }
-            fish.node.position = CGPoint(x: x, y: fish.baseY + fish.bob * CGFloat(sin(fish.age * fish.bobRate * 2 * .pi)))
-            // Breathing, and turned to face the way it drifts.
-            let breath = CGFloat(1 + 0.1 * sin((fish.age + fish.breathOffset) / GameScene.breathSeconds * 2 * .pi))
-            fish.node.xScale = breath * (fish.speed < 0 ? -1 : 1)
-            fish.node.yScale = breath
-            return fish
+        swimmers = swimmers.compactMap { swimmer in
+            var swimmer = swimmer
+            swimmer.age += step
+            let x = swimmer.node.position.x + swimmer.speed * CGFloat(step)
+            guard swimmer.node.parent != nil, abs(x - cameraNode.position.x) < halfWidth + 80 else { swimmer.node.removeFromParent(); return nil }
+            swimmer.node.position = CGPoint(x: x, y: swimmer.baseY + swimmer.bob * CGFloat(sin(swimmer.age * swimmer.bobRate * 2 * .pi)))
+            // Turned to face the way it swims; a jellyfish breathing, the rest swimming through their sheets.
+            let facing: CGFloat = (swimmer.speed > 0) == swimmer.kind.facesRight ? 1 : -1
+            if swimmer.kind == .jellyfish {
+                let breath = CGFloat(1 + 0.1 * sin((swimmer.age + swimmer.phase) / GameScene.breathSeconds * 2 * .pi))
+                swimmer.node.xScale = breath * facing
+                swimmer.node.yScale = breath
+            } else {
+                swimmer.node.xScale = facing
+                let frame = Int((swimmer.age + swimmer.phase) * swimmer.kind.framesPerSecond) % swimmer.frames.count
+                swimmer.node.texture = swimmer.frames[frame]
+            }
+            return swimmer
         }
-        guard wet, EffectSheets.frames["bubbles_jellyfish"] != nil else { return }
-        // One group across at a time.
-        guard jellyfish.isEmpty else { jellyfishClock = 0; return }
-        jellyfishClock += step
-        guard jellyfishClock >= nextJellyfish else { return }
-        jellyfishClock = 0
-        nextJellyfish = .random(in: GameScene.jellyfishSecondsBetween)
-        let fromLeft = Bool.random()
-        let baseY = cameraNode.position.y + .random(in: -halfHeight * 0.5...halfHeight * 0.8)
-        for member in 0..<Int.random(in: 1...3) {
-            let node = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", 5))
-            let startX = cameraNode.position.x + (fromLeft ? -1 : 1) * (halfWidth + 16 + CGFloat(member) * 20)
-            node.position = CGPoint(x: startX, y: baseY + CGFloat(member) * .random(in: -14...14))
-            node.zPosition = -10
-            stageGround.addChild(node)
-            jellyfish.append(Jellyfish(node: node, baseY: node.position.y, age: 0, speed: (fromLeft ? 1 : -1) * .random(in: 8...14),
-                                       bob: .random(in: 6...12), bobRate: .random(in: 0.08...0.15), breathOffset: .random(in: 0...GameScene.breathSeconds)))
+        guard wet else { return }
+        for kind in SeaLife.allCases {
+            // One group of each kind across at a time.
+            guard !swimmers.contains(where: { $0.kind == kind }) else { seaLifeClocks[kind] = 0; continue }
+            seaLifeClocks[kind, default: 0] += step
+            guard seaLifeClocks[kind, default: 0] >= nextSeaLife[kind, default: 0] else { continue }
+            seaLifeClocks[kind] = 0
+            nextSeaLife[kind] = .random(in: kind.secondsBetween)
+            let frames = seaLifeFrames(kind)
+            guard !frames.isEmpty else { continue }
+            let fromLeft = Bool.random()
+            let baseY = cameraNode.position.y + .random(in: -halfHeight * 0.5...halfHeight * 0.8)
+            let z = Double.random(in: 0..<1) < GameScene.seaLifeBehindForegroundShare ? GameScene.seaLifeBehindForegroundZ : GameScene.seaLifeZ
+            let speed = (fromLeft ? 1 : -1) * CGFloat.random(in: kind.speed)
+            // A school keeps one colour.
+            let colour = Int.random(in: 0..<2)
+            for member in 0..<Int.random(in: kind.groupSize) {
+                let memberFrames = kind == .fish ? frames.map { frame in
+                    let half = SKTexture(rect: CGRect(x: CGFloat(colour) * 0.5, y: 0, width: 0.5, height: 1), in: frame)
+                    half.filteringMode = .nearest
+                    return half
+                } : frames
+                let node = SKSpriteNode(texture: memberFrames[0])
+                let startX = cameraNode.position.x + (fromLeft ? -1 : 1) * (halfWidth + 40 + CGFloat(member) * kind.spacing)
+                node.position = CGPoint(x: startX, y: baseY + (member == 0 ? 0 : CGFloat.random(in: -kind.spread...kind.spread)))
+                node.zPosition = z
+                stageGround.addChild(node)
+                // Schoolmates keep nearly the leader's pace.
+                swimmers.append(Swimmer(kind: kind, node: node, frames: memberFrames, baseY: node.position.y, age: 0,
+                                        speed: speed * .random(in: 0.95...1.05), bob: .random(in: kind.bob),
+                                        bobRate: .random(in: kind.bobRate), phase: .random(in: 0...GameScene.breathSeconds)))
+            }
+        }
+    }
+
+    /// A sea creature's sheet: the jellyfish's one cell of the bubbles sheet, the fish's
+    /// frames (both colours side by side), the shark's.
+    private func seaLifeFrames(_ kind: SeaLife) -> [SKTexture] {
+        switch kind {
+        case .jellyfish:
+            return EffectSheets.frames["bubbles_jellyfish"] != nil ? [sprites.texture("bubbles_jellyfish", 5)] : []
+        case .fish, .shark:
+            let name = kind == .fish ? "fish" : "shark"
+            return (0..<(EffectSheets.frames[name] ?? 0)).map { sprites.texture(name, $0) }
         }
     }
 

@@ -1320,8 +1320,16 @@ Bubbles rise around the screen, eight a second (three in ten over the players an
 the size), and off the feet of whoever's coming down, twelve a second, a quarter of the time three to six together,
 each one of the first five cells of `bubbles_jellyfish` (cell 0 about as often as two of the
 rest together), wobbling a pixel or three side to side and fading over two to four seconds.
-One group at a time, six to twelve seconds after the last has gone, one to three jellyfish (cell 5) drift across from one side of the
-screen to the other, bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds, turned to face the way they drift.
+Sea life swims across from one side of the screen to the other, always behind the Hoopfish (`SeaLife`),
+each kind one group at a time on its own clock after the last has gone, turned to face the way it swims, and
+three groups in ten behind the background's foreground (-18.5; the rest at -10):
+- jellyfish (`bubbles_jellyfish` cell 5), six to twelve seconds apart, one to three, drifting 8 to 14 a second,
+  bobbing slowly, breathing between 0.9 and 1.1 over two and a half seconds;
+- fish (`fish`, 32 × 16, three frames at 8 a second, two colours side by side on the sheet), commoner: three to
+  seven seconds apart, a school of two to five in one colour, 20 to 30 a second;
+- a shark (`shark`, 64 × 32, four frames at 6 a second), rare: forty to eighty seconds apart, alone, 24 to 32 a second.
+
+The stage's art is in `_Graphic Assets/Pixel Art/Stages/Hoopfish Hideaway/`.
 
 Under water (`StageFeatures.underwater`, protocol 58): gravity and the fall speeds are halved for
 bodies and the ball, but a body rising pulls at an eighth, so a jump at half its push goes twice

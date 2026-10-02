@@ -21,13 +21,13 @@ public struct Dice: Equatable {
 public enum Greateraid: CaseIterable, Equatable, Hashable {
     case hastyHorchata, jumperJuice, lungeLemonade, cannonCola, slideCider, featherFresca
     case webWater, superSmoothie, flashFizz, platformShake
-    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle
+    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
 
     public enum Kind: Equatable { case booster, biomorph }
 
     public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .lungeLemonade, .cannonCola, .slideCider, .featherFresca]
     public static let biomorphs: [Greateraid] = [.webWater, .superSmoothie, .flashFizz, .platformShake,
-                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle]
+                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle, .zTea]
 
     public var kind: Kind {
         Greateraid.boosters.contains(self) ? .booster : .biomorph
@@ -53,6 +53,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .surfSoda: "Surf Soda"
         case .titanTea: "Titan Tea"
         case .galeAle: "Gale Ale"
+        case .zTea: "Z Tea"
         }
     }
 
@@ -71,6 +72,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .surfSoda: .surfSoda
         case .titanTea: .titanTea
         case .galeAle: .galeAle
+        case .zTea: .zTea
         default: nil
         }
     }
@@ -96,6 +98,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .featherFresca: "..."
         case .titanTea: "..."
         case .galeAle: "..."
+        case .zTea: "..."
         }
     }
 
@@ -121,6 +124,8 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .titanTea: ("Twice the size and heavier: you can't be stunned, and your landings quake the floor. Slower, and no double jump or crouch.",
                          "Full speed, and running into them strips them.")
         case .galeAle: ("Your double jump leaves a tornado.", "Snatch sends a tornado that strips them and carries the ball off.")
+        case .zTea: ("Slash on the ground charges a beam across the screen; in the air, a burst that blasts everything away.",
+                     "Aim the beam, and the burst comes out quicker.")
         }
     }
 }

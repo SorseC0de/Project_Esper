@@ -747,6 +747,8 @@ extension SKColor {
 enum EnergyEffect: CaseIterable {
     case spark, spark2, spark3, lightning1, lightning2, lightning3, lightning4, charge, lightningJump, lightningCharge
     case lightningSpark, lightningSpark2, flashSpark2, scoreStrike
+    /// Z Tea's beam's three pieces, and its burst.
+    case beam, burst
 
     /// The two sparks a hit ball throws, one or the other each time, and the four bolts.
     static let hitSparks: [EnergyEffect] = [.spark, .spark2]
@@ -780,6 +782,8 @@ enum EnergyEffect: CaseIterable {
         case .lightningJump: "lightning_jump"
         case .lightningCharge: "lightning_charge"
         case .scoreStrike: "score_strike"
+        case .beam: "beam"
+        case .burst: "burst"
         }
     }
 

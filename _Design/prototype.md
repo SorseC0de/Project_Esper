@@ -428,6 +428,24 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   strips the first other body it meets, takes the ball, theirs or loose, and carries it inside,
   and bursts on anything solid, the stage's invisible walls and the ball's own blockers included,
   or the world's edge, letting the ball go where it is.
+- Z Tea (N, a biomorph; protocol 64). Its slash, with nothing in hand: on the ground, the beam's
+  charge, a second (`ZRules.chargeFrames`, 60), committed: nothing but the jump calls it off
+  (into the jump) and a hit stops it; then the beam fires half a second (30) from the hand, 400
+  units along, 5 either side, and strips and knocks along it (5, lifted 1.5) the first other body
+  it meets, sending the ball along it at 7, theirs or loose. Firing, it can't be stunned or knocked
+  (`Player.knock`, `hitStun`). At level two up and down on the stick turn it, 2 degrees a frame at full
+  tilt (`aimRate`), any angle up to 45 off level, through the charge and while it fires, the beam
+  turning with it. The throw's charge swirl (`esper_charge`) plays at the hand through the
+  charge and on, looping, while the beam fires, its tail as it ends. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
+  firing, 3 to 7 round and round with `player_blast_arms` over them, turned with the aim about where the
+  arms meet the body (31.5, 33.5 up on its canvas, 17.5 over the feet), aligned on 3 and a pixel
+  right and two down on the even frames, 4 and 6; after, 8 and 9 (`recoveryFrames`), no beam,
+  no armour; the beam from the arms'
+  reach (17 art pixels from the shoulder, 18 over the feet), `beam`'s tail, its middle stretched
+  and its head, 16 pixels thick, in the energy colour. In the air, the burst: its momentum braked, a 0.85 share kept
+  a frame (`burstBrake`), not stopped, through `player_transform` at 10 a second, frame 2 held 24 frames more at level one, and on
+  frame 3 everything within 64 art pixels (40) is pushed away, the other without a stun (5.5
+  and a lift of 1) and the ball at 7; `burst` plays there in the energy colour at the reach's size.
 
 Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
 too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is
@@ -624,17 +642,18 @@ placeholder for one not written yet.
 - Pulsepistol Punch: the pulse; level two shoots on the run and adds the pull.
 - Titan Tea: the size and weight, slowed; level two at full speed, with the trample.
 - Gale Ale: the double jump's still tornado; level two adds the snatch's tornado that carries the ball off.
+- Z Tea: the slash's beam on the ground and burst in the air; level two aims the beam and quickens the burst.
 
 ## Tuning pickers
 
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
-holds the variants; A is always the baseline as tuned. POWER's thirteen sit in two rows, seven and six.
+holds the variants; A is always the baseline as tuned. POWER's fourteen sit in two rows of seven.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
-  Punch, K Surf Soda, L Titan Tea, M Gale Ale, at the level LEVEL picks, on this phone's player only, the
+  Punch, K Surf Soda, L Titan Tea, M Gale Ale, N Z Tea, at the level LEVEL picks, on this phone's player only, the
   other side keeping its drinks, with the body the power brings; A by default. The left bumper always steps POWER; the local side's power
   and level are lettered under the pickers.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts

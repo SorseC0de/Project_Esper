@@ -16,6 +16,7 @@ public enum Power: Equatable, Hashable {
     case surfSoda
     case titanTea
     case galeAle
+    case zTea
 
     /// Powers whose shoot button, without the ball, is something other than the slash.
     public var takesShoot: Bool {
@@ -68,12 +69,14 @@ public enum PlayerState: Equatable, Hashable {
     case suspended
     /// Changing from the human form into the energy form, held still in the air.
     case transforming
+    /// Z Tea: charging the beam on the ground and firing it; the burst in the air.
+    case beamCharging, beamFiring, zBurst
 
     /// The actions Titan Tea does slower.
     public var isAction: Bool {
         switch self {
         case .shootStance, .shooting, .throwStance, .throwing, .dunking, .catching, .slide, .slashing, .rolling, .snatching,
-             .walling, .gunShoot: true
+             .walling, .gunShoot, .beamCharging, .beamFiring, .zBurst: true
         default: false
         }
     }
@@ -223,7 +226,8 @@ public struct Player: Equatable {
     /// was knocked or taken out of the hands; the stick still works.
     public var hitStun = 0 {
         // Titan Tea is stripped but never stunned.
-        didSet { if power == .titanTea, hitStun > 0 { hitStun = 0 } }
+        // Titan Tea is never stunned; nor is Z Tea while its beam fires.
+        didSet { if power == .titanTea || firingBeam, hitStun > 0 { hitStun = 0 } }
     }
     public var snatchCooldown = 0
     /// The corner being hung from, and frames after walking off an edge before a corner
@@ -1348,6 +1352,37 @@ public struct Player: Equatable {
                 enter(grounded ? .idle : .air)
             }
 
+        case .beamCharging:
+            // Committed: the charge runs its length, the stick only aiming it at level two, and
+            // only the jump calls it off. A hit stops it.
+            velocity.x = approach(velocity.x, 0, traction)
+            if hitStun > 0 || !grounded {
+                enter(grounded ? .idle : .air)
+                break
+            }
+            if jumpPressed {
+                enter(.jumpSquat)
+                break
+            }
+            if powerLevel >= 2, abs(input.stick.x) >= 0.3, abs(input.stick.x) > abs(input.stick.y) { facing = input.stick.x > 0 ? .right : .left }
+            turnBeam(input)
+            if stateTimer >= ZRules.chargeFrames {
+                enter(.beamFiring)
+                wanted = .fireBeam
+            }
+
+        case .beamFiring:
+            velocity = .zero
+            if firingBeam { turnBeam(input) }
+            if stateTimer >= ZRules.fireFrames + ZRules.recoveryFrames { enter(.idle) }
+
+        case .zBurst:
+            // Through the transform's sheet its momentum braked, not stopped; the burst on its
+            // fourth frame, after the third is held a while at level one.
+            velocity = velocity * ZRules.burstBrake
+            if reached(ZRules.burstFrame(level: powerLevel)) { wanted = .zBurst }
+            if stateTimer >= ZRules.burstFrame(level: powerLevel) + ZRules.afterBurstFrames { enter(.air) }
+
         case .suspended:
             // Held in a tornado: the body's middle drawn to its middle, a share of the way a
             // frame, gravity off. Jump leaves it with a jump; the rest is as in flight.
@@ -1510,6 +1545,8 @@ public struct Player: Equatable {
     /// Hit: whatever the body was doing is over and it's sent this way through the air.
     /// The ball, if held, is the match's to pop.
     public mutating func knock(_ push: Vec2) {
+        // Firing Z Tea's beam it stands its ground.
+        guard !firingBeam else { return }
         webAnchor = nil
         pullTarget = nil
         ledge = nil
@@ -1585,6 +1622,13 @@ public struct Player: Equatable {
 
     /// The Esper Slash. In the air the body rises at least the lift, so it floats.
     private mutating func startSlash(events: inout [MatchEvent]) {
+        // Z Tea's slash is the beam's charge on the ground, the burst in the air.
+        if power == .zTea {
+            fastFalling = false
+            beamAim = 0
+            enter(grounded ? .beamCharging : .zBurst)
+            return
+        }
         slashHit = false
         fastFalling = false
         if !grounded { velocity.y = max(velocity.y, SlashRules.lift) }
@@ -1601,6 +1645,23 @@ public struct Player: Equatable {
         fastFalling = false
         enter(.snatching)
     }
+
+    /// At level two, up and down on the stick turn the beam, any angle within its range.
+    private mutating func turnBeam(_ input: PlayerInput) {
+        guard powerLevel >= 2, abs(input.stick.y) >= 0.2 else { return }
+        beamAim = min(max(beamAim + input.stick.y * ZRules.aimRate, -ZRules.aimRange), ZRules.aimRange)
+    }
+
+    /// Firing Z Tea's beam: not its recovery after.
+    public var firingBeam: Bool { state == .beamFiring && stateTimer < ZRules.fireFrames }
+
+    /// Z Tea's beam's aim, off straight ahead the way it faces, up positive.
+    public var beamAim = 0.0
+    /// Where the beam leaves from and which way it goes.
+    public var beamOrigin: Vec2 {
+        Vec2(x: position.x, y: position.y + ZRules.shoulderHeight / 1.6 * spec.scale) + beamDirection * (ZRules.armReach / 1.6 * spec.scale)
+    }
+    public var beamDirection: Vec2 { Vec2(x: Trig.cos(beamAim) * facing.sign, y: Trig.sin(beamAim)) }
 
     /// Platform Protein Shake's wall, on the snatch's reach.
     private mutating func startWall() {

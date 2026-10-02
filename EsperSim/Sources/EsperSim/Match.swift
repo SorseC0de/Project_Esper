@@ -18,6 +18,8 @@ public struct Match: Equatable {
     public var clones: [IceClone] = []
     /// Gale Ale's tornados.
     public var gales: [Gale] = []
+    /// Z Tea's beams while they fire.
+    public var beams: [Beam] = []
     public var flames: [Flame] = []
     public var fireballs: [Fireball] = []
     /// The next id for anything the powers leave, so the screen can follow each one.
@@ -140,6 +142,7 @@ public struct Match: Equatable {
         stepBolts()
         stepClones()
         stepGales()
+        stepBeams()
         stepFlames()
         stepFireballs()
 
@@ -292,6 +295,23 @@ public struct Match: Equatable {
             events.append(.boltFired(player: index))
         case .strikeBolt(let x, let bottom):
             strike(x: x, bottom: bottom, by: index)
+        case .fireBeam:
+            beams.append(Beam(id: stamp(), owner: index, origin: player.beamOrigin, direction: player.beamDirection, framesLeft: ZRules.fireFrames))
+            events.append(.beamFired(player: index, from: player.beamOrigin, direction: player.beamDirection))
+        case .zBurst:
+            let centre = player.body.center
+            for other in players.indices where other != index && players[other].body.distance(to: centre) <= ZRules.burstRadius {
+                let away = players[other].body.center - centre
+                let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: player.facing.sign, y: 0)
+                strip(other, by: index, knock: direction * ZRules.burstBodyPush + Vec2(x: 0, y: 1), stun: false)
+            }
+            if ball.isLive, ball.position.distance(to: centre) <= ZRules.burstRadius + BallRules.radius {
+                let away = ball.position - centre
+                let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: player.facing.sign, y: 0)
+                ball.tornadoCentre = nil
+                ball.release(from: ball.position, velocity: direction * ZRules.burstBallPush, by: index, straight: false)
+            }
+            events.append(.zBurst(player: index, at: centre))
         case .makeGale:
             // Under the feet it jumped from, the jumper let rise clear before it can hold them.
             let size = GaleRules.size
@@ -652,6 +672,46 @@ public struct Match: Equatable {
                 players[index].tornadoCentre = boxes[hit].center
             }
         }
+    }
+
+    /// Z Tea's beams a frame on: whoever and whatever is along one met once, stripped and sent
+    /// along it; gone when the firing ends.
+    private mutating func stepBeams() {
+        guard !beams.isEmpty else { return }
+        var kept: [Beam] = []
+        for var beam in beams {
+            beam.framesLeft -= 1
+            guard beam.framesLeft > 0, players.indices.contains(beam.owner), players[beam.owner].firingBeam else { continue }
+            // Turned as the firer turns it.
+            beam.origin = players[beam.owner].beamOrigin
+            beam.direction = players[beam.owner].beamDirection
+            func along(_ box: Box) -> Bool {
+                let reach = Box(min: box.min - Vec2(x: ZRules.halfThickness, y: ZRules.halfThickness),
+                                max: box.max + Vec2(x: ZRules.halfThickness, y: ZRules.halfThickness))
+                var travelled = 0.0
+                while travelled <= ZRules.length {
+                    if reach.contains(beam.origin + beam.direction * travelled) { return true }
+                    travelled += 4
+                }
+                return false
+            }
+            if !beam.hitPlayer, let victim = players.indices.first(where: { $0 != beam.owner && along(players[$0].body) }) {
+                beam.hitPlayer = true
+                let held = players[victim].hasBall
+                strip(victim, by: beam.owner, knock: beam.direction * ZRules.bodyKnock + Vec2(x: 0, y: ZRules.bodyLift))
+                if held, ball.holder == nil {
+                    beam.hitBall = true
+                    ball.release(from: ball.position, velocity: beam.direction * ZRules.ballSpeed, by: beam.owner, straight: false)
+                }
+            }
+            if !beam.hitBall, ball.isLive, along(ball.box) {
+                beam.hitBall = true
+                ball.tornadoCentre = nil
+                ball.release(from: ball.position, velocity: beam.direction * ZRules.ballSpeed, by: beam.owner, straight: false)
+            }
+            kept.append(beam)
+        }
+        beams = kept
     }
 
     /// Gale Ale's tornados a frame on: the still ones running down; the snatch's on its way,

@@ -42,12 +42,17 @@ public enum Animation: String, CaseIterable {
     case gunRunShoot = "player_gun_run_shoot"
     case hurt = "player_hurt"
     case transform = "player_transform"
+    /// Z Tea's beam: the body, and its arms drawn over it apart so they turn with the aim.
+    case blast = "player_blast"
+    case blastArms = "player_blast_arms"
 
     public var frameCount: Int {
         switch self {
         case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir, .gunSnipe: 10
         case .hurt: 4
         case .transform: 9
+        case .blast: 10
+        case .blastArms: 1
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall: 3
         case .jumpSquat: 4
@@ -76,7 +81,7 @@ public enum Animation: String, CaseIterable {
     }
 
     public var pixelSize: Double {
-        self == .throwForward || self == .throwAir || self == .esperSlash ? 64 : 48
+        [.throwForward, .throwAir, .esperSlash, .blast, .blastArms].contains(self) ? 64 : 48
     }
 }
 
@@ -222,6 +227,17 @@ extension Player {
             return AnimationFrame(hasBall ? .airBall : .air, 1)
         case .transforming:
             return AnimationFrame(.transform, min(t * TransformRules.sheetFramesPerSecond / 60, Animation.transform.frameCount - 1))
+        case .beamCharging:
+            // Its first frame, then the second held through the charge, the third as it ends.
+            let each = ZRules.blastSheetFrameLength
+            return AnimationFrame(.blast, t < each ? 0 : (t < ZRules.chargeFrames - each ? 1 : 2))
+        case .beamFiring:
+            // Firing, frames 3 to 7 round and round under the arms; then the last two.
+            let each = ZRules.blastSheetFrameLength
+            if t < ZRules.fireFrames { return AnimationFrame(.blast, 3 + (t / each) % 5) }
+            return AnimationFrame(.blast, min(8 + (t - ZRules.fireFrames) / each, 9))
+        case .zBurst:
+            return AnimationFrame(.transform, ZRules.sheetFrame(at: t, level: powerLevel))
         case .suspended:
             // Falling, as it hangs.
             return AnimationFrame(hasBall ? .airBall : .air, 2)

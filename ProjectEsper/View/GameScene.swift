@@ -194,6 +194,28 @@ final class GameScene: SKScene {
     private var cloneNodes: [Int: SKSpriteNode] = [:]
     /// Gale Ale's tornados as drawn, by id, and their bursts playing out.
     private var galeNodes: [Int: SKSpriteNode] = [:]
+    private var beamNodes: [Int: SKNode] = [:]
+    /// The beam's sheet's pieces, 16 pixels square.
+    private static let beamPieceSide: CGFloat = 16
+    /// Z Tea's burst drawn at its reach, 64 art pixels each way.
+    private static let zBurstDiameter: CGFloat = 128
+    /// Z Tea's blast arms over each body, turned about the shoulder: where the arms meet the body
+    /// on their canvas, and that point from the feet, in art pixels.
+    private var blastArmNodes: [Int: SKSpriteNode] = [:]
+    private static let blastArmsAnchor = CGPoint(x: 31.5 / 64, y: 33.5 / 64)
+    private static let blastShoulder = CGSize(width: -0.5, height: 17.5)
+    /// The firing loop's even frames, 4 and 6, have the body a pixel right and two down.
+    private static let blastEvenFrameShift = CGPoint(x: 1, y: -2)
+    private func blastArms(_ index: Int, on body: SKSpriteNode) -> SKSpriteNode {
+        if let arms = blastArmNodes[index], arms.parent === body { return arms }
+        let arms = SKSpriteNode()
+        arms.anchorPoint = GameScene.blastArmsAnchor
+        arms.zPosition = 0.2
+        arms.isHidden = true
+        body.addChild(arms)
+        blastArmNodes[index] = arms
+        return arms
+    }
     /// The tornado's sheet squeezed to the gale's shape: two thirds as high, a third wider.
     private static let galeScale = CGSize(width: 4.0 / 3, height: 2.0 / 3)
     private var flameNodes: [Int: SKSpriteNode] = [:]
@@ -3283,6 +3305,10 @@ final class GameScene: SKScene {
         playSounds(events)
         for event in events {
             switch event {
+            case .zBurst(let player, let at):
+                let burst = EnergyEffect.burst.node(sprites, player: player, at: SpriteLibrary.point(at))
+                burst.setScale(GameScene.zBurstDiameter / max(burst.size.width, 1))
+                glowers.addChild(burst)
             case .galeBurst(let at):
                 // The burst's sheet once, twice the tornado's size, squeezed as the gale was.
                 let frames = (0..<ElementsArt.burstFrames).map { sprites.texture("tornado_burst", $0) }
@@ -5010,6 +5036,41 @@ final class GameScene: SKScene {
             galeNodes[id] = nil
         }
 
+        // Z Tea's beams: the tail at the hand, the middle stretched along, the head at the end,
+        // in the firer's energy colour.
+        seen = []
+        for beam in match.beams {
+            seen.insert(beam.id)
+            let holder = beamNodes[beam.id] ?? {
+                let made = SKNode()
+                made.zPosition = 8
+                for piece in 0..<3 {
+                    let sprite = SKSpriteNode(texture: sprites.effectTexture(EnergyEffect.beam.name, piece, player: beam.owner))
+                    sprite.anchorPoint = CGPoint(x: 0, y: 0.5)
+                    made.addChild(sprite)
+                }
+                glowers.addChild(made)
+                beamNodes[beam.id] = made
+                return made
+            }()
+            let length = CGFloat(ZRules.length) * SpriteLibrary.pixelsPerUnit
+            let side = GameScene.beamPieceSide
+            if let pieces = holder.children as? [SKSpriteNode], pieces.count == 3 {
+                pieces[0].size = CGSize(width: side, height: side)
+                pieces[0].position = .zero
+                pieces[1].size = CGSize(width: max(length - side * 2, 0), height: side)
+                pieces[1].position = CGPoint(x: side, y: 0)
+                pieces[2].size = CGSize(width: side, height: side)
+                pieces[2].position = CGPoint(x: length - side, y: 0)
+            }
+            holder.position = SpriteLibrary.point(beam.origin)
+            holder.zRotation = CGFloat(Trig.atan2(beam.direction.y, beam.direction.x))
+        }
+        for (id, node) in beamNodes where !seen.contains(id) {
+            node.removeFromParent()
+            beamNodes[id] = nil
+        }
+
         seen = []
         for flame in match.flames {
             seen.insert(flame.id)
@@ -5106,6 +5167,17 @@ final class GameScene: SKScene {
                 node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y) * drawScale
             }
             node.xScale = CGFloat(player.facing.sign)
+            // Firing Z Tea's beam, its arms over the body, turned with the aim about the shoulder.
+            let arms = blastArms(index, on: node)
+            arms.isHidden = !player.firingBeam
+            if !arms.isHidden {
+                arms.texture = sprites.texture(AnimationFrame(.blastArms, 0), player: drawnAs)
+                arms.size = arms.texture!.size().scaled(by: drawScale)
+                // On the firing loop's even frames the body's shifted: the arms with it.
+                let shift = frame.frame % 2 == 0 ? GameScene.blastEvenFrameShift : .zero
+                arms.position = CGPoint(x: (GameScene.blastShoulder.width + shift.x) * drawScale, y: (GameScene.blastShoulder.height + shift.y) * drawScale)
+                arms.zRotation = CGFloat(player.beamAim)
+            }
             // In the throw stance's parry frames, and growing, white.
             let tint: SKColor = .white
             // And all white, glowing, on the change's fifth frame.
@@ -5226,27 +5298,31 @@ final class GameScene: SKScene {
             // then round the loop for as long as the throw is held. Let go into the throw,
             // the rest of the sheet plays out where the ball was.
             let charge = chargeNodes[index]
-            let chargingNow = player.state == .throwStance && !handBall.isHidden
+            // Z Tea's beam charges at the hand the throw's way, and keeps the glow there while it fires.
+            let beaming = player.power == .zTea && (player.state == .beamCharging || player.firingBeam)
+            let chargingNow = (player.state == .throwStance && !handBall.isHidden) || beaming
             if chargingNow {
                 // A sprite's size is set in its parent's units, so it's divided by whatever
                 // scale the node has on: back to 1 first, or the scale below does nothing.
                 charge.setScale(1)
                 switch player.power {
-                case .blazingBoba:
+                case .blazingBoba where !beaming:
                     // Fire round the ball, the sheet looped, as painted.
                     let frame = player.stateTimer * Int(Effect.fireCharge.fps) / 60 % Effect.fireCharge.frameCount
                     charge.texture = sprites.texture(Effect.fireCharge.name, frame)
                     charge.size = charge.texture!.size()
                     charge.anchorPoint = Effect.fireCharge.anchor
                     charge.setScale(Effect.fireCharge.scale)
-                case .zeusJuice:
+                case .zeusJuice where !beaming:
                     let frame = player.stateTimer * Int(EnergyEffect.lightningCharge.fps) / 60 % EnergyEffect.lightningCharge.frameCount
                     charge.texture = sprites.effectTexture(EnergyEffect.lightningCharge.name, frame, player: index)
                     charge.size = charge.texture!.size()
                     charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                     charge.setScale(CGFloat(ZeusTuning.chargeScale))
                 default:
-                    let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
+                    // Firing, the swirl runs on from where the charge left it.
+                    let held = player.state == .beamFiring ? player.stateTimer + ZRules.chargeFrames : player.stateTimer
+                    let played = held * Int(EnergyEffect.charge.fps) / 60
                     let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
                     let frame = played <= loopEnd ? played : loopStart + (played - loopStart) % (loopEnd - loopStart + 1)
                     charge.texture = sprites.effectTexture(EnergyEffect.charge.name, frame, player: index)
@@ -5254,7 +5330,7 @@ final class GameScene: SKScene {
                     charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                     charge.setScale(EnergyEffect.chargeScale)
                 }
-                charge.position = handBall.position
+                charge.position = beaming ? SpriteLibrary.point(player.beamOrigin) : handBall.position
                 charge.isHidden = false
                 let overlay = chargeOverlays[index]
                 if player.power == .blazingBoba {
@@ -5273,7 +5349,7 @@ final class GameScene: SKScene {
                 charge.isHidden = true
                 chargeOverlays[index].isHidden = true
                 if charging[index], player.power != .blazingBoba, player.power != .zeusJuice,
-                   player.state == .throwing || player.state == .dunking {
+                   player.state == .throwing || player.state == .dunking || player.state == .beamFiring {
                     let tail = EnergyEffect.charge.node(sprites, player: index, at: charge.position,
                                                         frames: (EnergyEffect.chargeLoopEnd + 1)..<EnergyEffect.charge.frameCount,
                                                         scale: EnergyEffect.chargeScale)

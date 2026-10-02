@@ -17,6 +17,9 @@ public enum MatchEvent: Equatable {
     /// A Gale Ale tornado made, and one bursting where it is.
     case galeMade(at: Vec2, snatching: Bool)
     case galeBurst(at: Vec2)
+    /// Z Tea's beam fired from here this way, and its burst going off.
+    case beamFired(player: Int, from: Vec2, direction: Vec2)
+    case zBurst(player: Int, at: Vec2)
     case swatted(player: Int, hit: Bool)
     /// `entry` is the ball's velocity as it went through; `points` what it was worth.
     /// `floater`: the ball went in as a floater, for the announcer.
@@ -108,6 +111,9 @@ public enum PlayerAction: Equatable {
     case leaveClone
     /// Gale Ale: a still tornado where the double jump left from; at level two the snatch's, sent off.
     case makeGale
+    /// Z Tea: the beam leaves, and the burst goes off.
+    case fireBeam
+    case zBurst
     case sendGale(at: Vec2, heading: Facing)
     case leaveFlame
     case releaseFireball(velocity: Vec2, straight: Bool, ballArc: Bool)

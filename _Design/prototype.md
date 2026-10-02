@@ -702,9 +702,9 @@ front: the torso over the legs, the head over all but the arms (the head apart f
 with the human look off, is its own sprite over everything). Each figure is one layer, the body, its line, head, energy,
 cape, ball in hand and flashes, their depths packed under a tenth, so a whole body is in
 front of or behind the other: in front, the one with the ball, else the last to touch it. An experiment, on (`HumanLook.enabled`; off puts it all back): the players drawn as
-people, skin on the head, the back arm and the hands, the front in palette 35 #DBA463 and the back in 34
-#BB7547, the torso, pelvis and front thigh palette 22, white, for everyone (`HumanLook.clothes`; trying white suits, they were 41 #4A5462 and 42), the back thigh 38 #B3B9D1, green in the glow's mask so a suit never glows, the
-lower legs and feet the energy's own colour, and the front arm too, its hand still skin, as a shooting sleeve, as the crown's grade is, the back ones at two
+people, skin on the head, the arms and hands, the front in palette 35 #DBA463 and the back in 34
+#BB7547, the torso, pelvis and front thigh palette 41 #4A5462 for everyone (`HumanLook.clothes`), the back thigh 42 #333941, the
+lower legs and feet the energy's own colour, as the crown's grade is, the back ones at two
 thirds of its brightness (`HumanLook.backLegShare`, 0.66; greyed, they barely glowed), and glowing as energy does
 (`HumanLook.glowingParts`, left out of the glow's body mask with a per-frame glow mask, so
 they take the plain threshold), as does the crown's grade where it's mostly energy; the head
@@ -1561,3 +1561,6 @@ answer, the app record in App Store Connect with Game Center turned on.
   side, its peak touching the edge of the middle platform; a shot begun from behind
   the arc counts three. Not built; the note is the whole of it so far.
 - Power-ups, including throw-button overrides.
+- Customisation: armbands, the front arm (not the hand) in the energy's colour and glowing as
+  the lower legs are, a shooting sleeve. Tried and parked until customisation lands: add
+  `.frontArm` to `HumanLook.glowingParts` and take it out of `HumanLook.skin`.

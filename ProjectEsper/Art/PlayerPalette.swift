@@ -286,9 +286,9 @@ enum CourtLook {
     static let strikeFadeFrames = 20
 }
 
-/// An experiment: the players drawn as people. Skin on the head, the back arm and the hands,
+/// An experiment: the players drawn as people. Skin on the head, the arms and the hands,
 /// front in palette 35 and back in 34; the torso, pelvis and thighs in palette 41 for
-/// everyone; the lower legs, feet and front arm (a shooting sleeve) in the energy's colours, glowing; the head drawn as
+/// everyone; the lower legs and feet in the energy's colours, glowing; the head drawn as
 /// part of the body, not apart, and not glowing. `enabled` off puts everything back as it was.
 enum HumanLook {
     static let enabled = true
@@ -296,17 +296,16 @@ enum HumanLook {
     /// the skin; on a debug slider beside the cubes'.
     nonisolated(unsafe) static var headEnergyShare = 0.66
     /// The parts still in the energy's colours, which glow as energy does.
-    /// The front arm is a shooting sleeve, its hand still skin.
-    static let glowingParts: Set<BodyPart> = [.frontLeg, .backLeg, .frontFoot, .backFoot, .frontArm]
+    static let glowingParts: Set<BodyPart> = [.frontLeg, .backLeg, .frontFoot, .backFoot]
     static let skin: [BodyPart: RGB] = {
         let front = PixelPalette.colours[35], back = PixelPalette.colours[34]
-        return [.head: front, .frontHand: front,
+        return [.head: front, .frontArm: front, .frontHand: front,
                 .backArm: back, .backHand: back]
     }()
     /// The back leg and foot's share of the energy colour's brightness.
     static let backLegShare = 0.66
-    /// The torso, pelvis and thighs, the same for every player: palette 22, white, the back
-    /// thigh 38. (Trying white suits; they were 41 and 42.)
+    /// The torso, pelvis and thighs, the same for every player: palette 41, the back thigh
+    /// the next down its ramp, 42.
     static let clothed: Set<BodyPart> = [.torso, .pelvis, .frontThigh, .backThigh]
-    static let clothes = PixelPalette.colours[22], backClothes = PixelPalette.colours[38]
+    static let clothes = PixelPalette.colours[41], backClothes = PixelPalette.colours[42]
 }

@@ -914,21 +914,23 @@ south-east, its fill split at its own middle. The word pops from 0.3 through 1.1
 warp grid flares it (near end squeezed, far end spread, middle arched), holds 0.5s, then rises
 and fades. The words never glow: the mask draws them flat, warp and all.
 
-A word comes from where its sound is made and stays off the action as JUS's do: of a list of
-spots round that place, it takes the first that covers least of the bodies, the loose ball and
-the other words, kept on screen. In the air the list runs off to the side it flares and up (10 art
-pixels clear), straight up, the other side and up, level either side, higher, then below. What
-the feet or the floor make is said low, standing on the feet's line 10 pixels out from their
-middle, the flaring side first, then the other, then a little up: the wall jump's squeak at the
-feet (9 high, now), the quake, a lava burn, and the footsteps. A slash on a wall says it where the
-blade meets the wall, 8 units ahead of the chest. For a basket the list runs beside the net
-courtward, then up or down that side, leaving the rim's top to the 2X. A word flares and tilts
-away from whoever caused it.
+A word comes out of where its sound is made, as JUS's do: small at the source, 2 art pixels off
+it, its letters growing away from whoever made it (the growth runs right to left for a word
+going left), turned up as it goes, popped out from that small end, and drawn behind the bodies
+and the effects (19), so it can sit that close without hiding them; turned the other way when
+there's less than 70 of screen on its side. In the glow's mask it's drawn under the bodies.
+From: a hit, the parry and the steal from the chest or the ball, away from the striker (25°,
+20°); the spike from the ball, angled down (-15°); a slash on a wall where the blade meets it, back
+off it (30°); the wall jump's squeak out of the wall spark at the shoe, away from the wall (15°);
+footsteps out of the dust, back the way the runner came (10°); the beam along it (15° over its
+aim); the burst, the quake and the freeze the way the player faces; a lava burn back off the
+feet; the rest at their point (20° to 30°); a basket out of the net, 10 under the rim and 8 off
+it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
 Footfalls: on the frames of the walk (2 and 6) and run (1 and 5, the dash's too) cycles a foot
 comes down, `dust_walk` or `dust_run` puffs up 2 units behind the feet, bottom-aligned, at 12 a
 second in the energy colour as the dash's smoke is (not under water); every fourth footfall,
-from the first, says TAP / テク walking or THUMP / ダッ running, 8 and 9 high, by the feet.
+from the first, says TAP / テク walking or THUMP / ダッ running, 8 and 9 high, out of the dust.
 
 | | JP | EN |
 |---|---|---|

@@ -84,12 +84,13 @@ enum Onomatopoeia {
             }
         }
 
-        var word: Word {
+        /// The word in the picked face, its letters growing to the right, or to the left.
+        func word(growsLeft: Bool) -> Word {
             let spelling = spelling
             let lettering = Onomatopoeia.lettering
             let japanese = lettering.plainBangs ? spelling.japanese.replacingOccurrences(of: "！", with: "!") : spelling.japanese
             return Word(text: lettering.japanese ? japanese : spelling.english, lettering: lettering,
-                        upper: spelling.upper, lower: spelling.lower, height: spelling.height)
+                        upper: spelling.upper, lower: spelling.lower, height: spelling.height, growsLeft: growsLeft)
         }
     }
 
@@ -99,6 +100,8 @@ enum Onomatopoeia {
         let upper: Int
         let lower: Int
         let height: CGFloat
+        /// Its letters grow to the left, the small end on the right.
+        var growsLeft = false
     }
 
     /// Bundled, and registered with the process on first use.
@@ -138,7 +141,7 @@ enum Onomatopoeia {
 
     /// Every word drawn ahead in the picked face, so none is first drawn mid-match.
     static func warmed() -> [SKTexture] {
-        Sound.allCases.map { rendered($0.word).texture }
+        Sound.allCases.flatMap { sound in [false, true].map { rendered(sound.word(growsLeft: $0)).texture } }
     }
 
     /// The word's sprite, sized for the world, warped flat; `show` brings it on.
@@ -150,27 +153,34 @@ enum Onomatopoeia {
         return node
     }
 
-    /// The word on at `point` in `parent`: in on a hard flare, settling to a softer one, held,
-    /// then up and out. `flipped` flares it to the left. A sprite in a holder: the holder moves,
-    /// turns, scales and fades, the sprite warps.
-    /// `place` picks the spot from the word's size.
+    /// The word out of where its sound is made, as Jump Ultimate Stars has them: small at
+    /// `source`, `gap` off it, growing away to the `away` side (1 right, -1 left) and turned up
+    /// `rise` radians as it goes; in on a hard flare from its small end, settling to a softer
+    /// one, held, then on out a little as it fades. A sprite in a holder at the source: the
+    /// holder turns, scales and fades, the sprite warps. `z` in `parent`.
     @discardableResult
-    static func show(_ sound: Sound, in parent: SKNode, flipped: Bool, tilt: CGFloat = 0, place: (CGSize) -> CGPoint) -> SKNode {
-        let word = sound.word
+    static func show(_ sound: Sound, from source: CGPoint, away: CGFloat, rise: CGFloat, gap: CGFloat,
+                     in parent: SKNode, z: CGFloat) -> SKNode {
+        let left = away < 0
+        let word = sound.word(growsLeft: left)
         let sprite = node(word)
         sprite.warpGeometry = flare(0)
+        // Hung by its small end, the source side.
+        sprite.anchorPoint = CGPoint(x: left ? 1 : 0, y: 0.5)
+        sprite.position = CGPoint(x: away * gap, y: 0)
         let node = SKNode()
         node.addChild(sprite)
-        node.position = place(sprite.size)
-        node.zPosition = 97
-        node.zRotation = tilt
+        node.position = source
+        node.zPosition = z
+        node.zRotation = away * rise
         node.setScale(0.3)
-        let warp = SKAction.animate(withWarps: [flare(flipped ? -1.4 : 1.4), flare(flipped ? -1 : 1)], times: [0.08, 0.24]) ?? .wait(forDuration: 0.24)
+        let warp = SKAction.animate(withWarps: [flare(left ? -1.4 : 1.4), flare(left ? -1 : 1)], times: [0.08, 0.24]) ?? .wait(forDuration: 0.24)
         let punch = SKAction.scale(to: 1.15, duration: 0.08)
         punch.timingMode = .easeOut
         let settle = SKAction.scale(to: 1, duration: 0.16)
         settle.timingMode = .easeInEaseOut
-        let leave = SKAction.group([.moveBy(x: 0, y: word.height * 0.6, duration: 0.3), .fadeOut(withDuration: 0.3)])
+        let drift = CGVector(dx: away * cos(rise) * word.height * 0.4, dy: sin(rise) * word.height * 0.4)
+        let leave = SKAction.group([.move(by: drift, duration: 0.3), .fadeOut(withDuration: 0.3)])
         sprite.run(warp)
         node.run(.sequence([punch, settle, .wait(forDuration: holdSeconds), leave, .removeFromParent()]))
         parent.addChild(node)
@@ -213,7 +223,8 @@ enum Onomatopoeia {
         var x: CGFloat = 0
         var top: CGFloat = 0
         for index in 0..<count {
-            let share = count > 1 ? CGFloat(index) / CGFloat(count - 1) : 0
+            let along = count > 1 ? CGFloat(index) / CGFloat(count - 1) : 0
+            let share = word.growsLeft ? 1 - along : along
             let size = drawSize * (1 + growth * share)
             let letterFont = font(size)
             let text = characters[index]

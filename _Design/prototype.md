@@ -1369,15 +1369,18 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 
 The Wreck Center's hoops stand on supports (`View/HoopSupport.swift`): `hoop_support` pieces (a
 32 × 32 rod, from `_Graphic Assets/Pixel Art/Stages/Hoop_support.png`), each as painted or dark
-(palette 40 and 41 ramped down to 41 and 42, made at load), laid out free round the right hoop's
+(palette 40 and 41 ramped down to 41 and 42, made at load), whole or half as long (its first and
+last quarters, end caps and all), laid out free round the right hoop's
 art point in whole art pixels and whole degrees, and drawn as one picture at each hoop behind
 the backboard (4.9), the left one mirrored, following the rim; never glowing (in the mask under
 the bodies). The layout is kept between launches and stands in for `HoopSupport.baked`.
 
 The SUPPORT picker (Wreck Center, offline, not on the TV) opens the builder, centred under the
-sliders across the top, the match held still: LIGHT or DARK picks the kind; press where nothing is to put one down, press a piece to
-pick it and drag it; the arrows nudge the picked one a pixel; TURN turns it (-180 to 180); DEL
-takes it away; RIM DROP and RIM DEPTH move the whole hoop, backboard, net and supports;
+sliders across the top, the match held still: LIGHT, DARK, LIGHT ½ or DARK ½ picks the kind; press where nothing is to put one down,
+press a piece to pick it and drag it; the arrows nudge the picked one a pixel; TURN turns it (-180
+to 180); FWD and BACK move it a step up or down the layering; DEL takes it away; UNDO steps back
+a change; RIM DROP and RIM DEPTH move the whole hoop, backboard, net and supports; BLOCK X and
+BLOCK Y move the backboard blocks by whole tiles, toward the wall and up, mirrored (protocol 66);
 COPY puts the layout on the clipboard as Swift for `HoopSupport.baked`; DONE closes it.
 
 ## Sky Net

@@ -568,6 +568,8 @@ public struct Stage: Equatable {
     nonisolated(unsafe) public static var courtRimDrop = 6.0
     public static let courtRimInset = 58.0
     nonisolated(unsafe) public static var courtRimDepth = 0.0
+    /// The backboard blocks moved, whole tiles: toward their wall, and up. Mirrored either side.
+    nonisolated(unsafe) public static var courtBlockShift = (toWall: 0, up: 0)
 
     public static var court: Stage {
         let rim = courtRimHeight - courtRimDrop
@@ -585,8 +587,9 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...33, rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...15)
         stage.fill(.solid, columns: 33...33, rows: 0...15)
-        stage.fill(.solid, columns: 3...4, rows: 8...9)
-        stage.fill(.solid, columns: 29...30, rows: 8...9)
+        let shift = courtBlockShift
+        stage.fill(.solid, columns: (3 - shift.toWall)...(4 - shift.toWall), rows: (8 + shift.up)...(9 + shift.up))
+        stage.fill(.solid, columns: (29 + shift.toWall)...(30 + shift.toWall), rows: (8 + shift.up)...(9 + shift.up))
         stage.fill(.oneWay, columns: 15...18, rows: 3...3)
         return stage
     }

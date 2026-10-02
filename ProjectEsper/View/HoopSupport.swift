@@ -9,10 +9,29 @@ import UIKit
 enum HoopSupport {
     struct Piece: Codable, Equatable {
         var dark: Bool
+        /// The half-length rod: the end caps with the middle 16 pixels taken out.
+        var half = false
         /// Its middle from the hoop's art point, in whole art pixels, and its turn in degrees.
         var x: Int
         var y: Int
         var rotation: Int
+
+        init(dark: Bool, half: Bool = false, x: Int, y: Int, rotation: Int) {
+            self.dark = dark
+            self.half = half
+            self.x = x
+            self.y = y
+            self.rotation = rotation
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            dark = try values.decode(Bool.self, forKey: .dark)
+            half = try values.decodeIfPresent(Bool.self, forKey: .half) ?? false
+            x = try values.decode(Int.self, forKey: .x)
+            y = try values.decode(Int.self, forKey: .y)
+            rotation = try values.decode(Int.self, forKey: .rotation)
+        }
     }
 
     /// The layout baked in, from the builder's COPY.
@@ -31,20 +50,35 @@ enum HoopSupport {
 
     /// The layout as Swift, for `baked`.
     static func source(_ pieces: [Piece]) -> String {
-        let lines = pieces.map { "        .init(dark: \($0.dark), x: \($0.x), y: \($0.y), rotation: \($0.rotation)),"}
+        let lines = pieces.map { "        .init(dark: \($0.dark), half: \($0.half), x: \($0.x), y: \($0.y), rotation: \($0.rotation)),"}
         return (["    static let baked: [Piece] = ["] + lines + ["    ]"]).joined(separator: "\n")
     }
 
-    /// A piece's picture, as painted or ramped down.
-    static func picture(dark: Bool) -> CGImage? {
-        if let made = pictures[dark] { return made }
+    /// A piece's picture, as painted or ramped down, whole or half.
+    static func picture(dark: Bool, half: Bool = false) -> CGImage? {
+        let key = (dark ? 1 : 0) + (half ? 2 : 0)
+        if let made = pictures[key] { return made }
         let texture = SKTextureAtlas(named: "Sprites").textureNamed("hoop_support_0")
         let painted = texture.cgImage()
-        let made = dark ? rampedDown(painted) : painted
-        pictures[dark] = made
+        let coloured = dark ? rampedDown(painted) : painted
+        let made = half ? coloured.flatMap(halved) : coloured
+        pictures[key] = made
         return made
     }
-    nonisolated(unsafe) private static var pictures: [Bool: CGImage] = [:]
+    nonisolated(unsafe) private static var pictures: [Int: CGImage] = [:]
+
+    /// The rod half as long: its first and last quarters side by side, end caps and all.
+    private static func halved(_ image: CGImage) -> CGImage? {
+        let quarter = image.width / 4
+        guard let left = image.cropping(to: CGRect(x: 0, y: 0, width: quarter, height: image.height)),
+              let right = image.cropping(to: CGRect(x: image.width - quarter, y: 0, width: quarter, height: image.height)),
+              let context = CGContext(data: nil, width: quarter * 2, height: image.height, bitsPerComponent: 8, bytesPerRow: quarter * 8,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.interpolationQuality = .none
+        context.draw(left, in: CGRect(x: 0, y: 0, width: quarter, height: image.height))
+        context.draw(right, in: CGRect(x: quarter, y: 0, width: quarter, height: image.height))
+        return context.makeImage()
+    }
 
     /// Palette 40 to 41 and 41 to 42, the rest as it is.
     private static func rampedDown(_ image: CGImage) -> CGImage? {
@@ -80,7 +114,7 @@ enum HoopSupport {
             let cg = context.cgContext
             cg.interpolationQuality = .none
             for piece in pieces {
-                guard let picture = picture(dark: piece.dark) else { continue }
+                guard let picture = picture(dark: piece.dark, half: piece.half) else { continue }
                 cg.saveGState()
                 // The picture's y runs down: the hoop's up is its down.
                 cg.translateBy(x: CGFloat(piece.x) - left, y: top - CGFloat(piece.y))

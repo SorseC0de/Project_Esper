@@ -2503,6 +2503,15 @@ final class GameScene: SKScene {
     }
 
     /// The court's rims to where the RIM sliders have them, in the match as it stands.
+    /// The backboard blocks where the sliders have them, and the court drawn again round them.
+    private func moveCourtBlocks() {
+        session.mutate { match in
+            guard match.stage.features.look == Stage.court.features.look, match.stage.columns == Stage.court.columns else { return }
+            match.stage.tiles = Stage.court.tiles
+        }
+        redrawStage()
+    }
+
     private func moveCourtRims() {
         session.mutate { match in
             guard match.stage.features.look == Stage.court.features.look, match.stage.columns == Stage.court.columns else { return }
@@ -4576,7 +4585,7 @@ final class GameScene: SKScene {
         }
         let builder = SupportBuilder(
             top: controls?.slidersBottom ?? size.height / 2 / hudScale - 40, artPixelsPerHud: scale,
-            rimDrop: Stage.courtRimDrop, rimDepth: Stage.courtRimDepth,
+            rimDrop: Stage.courtRimDrop, rimDepth: Stage.courtRimDepth, blockShift: Stage.courtBlockShift,
             fromHud: { [weak self] point in
                 guard let self else { return .zero }
                 return CGPoint(x: self.cameraNode.position.x + point.x * scale, y: self.cameraNode.position.y + point.y * scale) - artPoint()
@@ -4591,6 +4600,11 @@ final class GameScene: SKScene {
                 if let drop { Stage.courtRimDrop = drop }
                 if let depth { Stage.courtRimDepth = depth }
                 self?.moveCourtRims()
+            },
+            onMoveBlocks: { [weak self] toWall, up in
+                if let toWall { Stage.courtBlockShift.toWall = toWall }
+                if let up { Stage.courtBlockShift.up = up }
+                self?.moveCourtBlocks()
             },
             onClose: { [weak self] in self?.closeSupportBuilder() })
         hud.addChild(builder)

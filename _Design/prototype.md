@@ -1274,7 +1274,7 @@ other, swaying 30 units up and down one and a quarter times as it goes, slowly, 
 twelfth row from the top and as high as its three rows fit, over and over. What's on its antenna
 changes only off screen: once the ball's been taken, the stage's rim from then on, turned with it.
 The ball hangs on the antenna at its own point, 24 across and 24 up (`WetshotRules.ballPixelsAcross`/`Up`,
-on BALL X and BALL Y offline); a stage's decider puts it back there. As drawn: the body breathing between 0.9 and 1.1 over two seconds, the fins swinging
+on BALL X and BALL Y offline); a stage's decider puts it back there. Hung there, its halo is twice its size, half way to white, and swells from its usual 0.5 to 0.9 and back over two seconds. As drawn: the body breathing between 0.9 and 1.1 over two seconds, the fins swinging
 out to 10 degrees and back over a second and a half (the top one clockwise), the tail one the
 whole arc, 10 either way, the front one the whole arc, 15 either way, rising as it swings away from
 level to 2 whole pixels at either end (`WetshotArt.frontFinLift`), the antenna, and the rim, net and ball on it, nodding 5

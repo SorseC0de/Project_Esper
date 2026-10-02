@@ -1958,6 +1958,9 @@ final class GameScene: SKScene {
     private static let ballGlow: CGFloat = 0.5
     private static let antennaBallGlow: CGFloat = 0.9
     private static let antennaBallGlowSeconds = 2.0
+    /// On the antenna, the halo's size over its usual and its share of the way to white.
+    private static let antennaBallHaloScale: CGFloat = 2
+    private static let antennaBallLighten: CGFloat = 0.5
 
     private func makeHalo(_ colour: SKColor) -> SKSpriteNode {
         let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
@@ -5749,12 +5752,22 @@ final class GameScene: SKScene {
         if match.hoopfish?.carrying == .ball, ball.holder == nil { ballNode.position = hoopfishNod(0).turn(ballNode.position) }
         // Frozen it goes ice; burning it goes fire.
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
-        ballHalo.color = colour
         // A frozen ball takes no glow: it washes it out.
         ballHalo.isHidden = ball.frozen > 0
-        // Hung on the Hoopfish's antenna its glow comes and goes, none to most of it.
+        // Hung on the Hoopfish's antenna its glow swells from its usual strength to most of it and
+        // back, bigger and lighter, so it reads over the bright water.
         let onAntenna = match.hoopfish?.carrying == .ball && ball.holder == nil
-        ballHalo.alpha = onAntenna ? GameScene.antennaBallGlow * CGFloat(0.5 - 0.5 * cos(CACurrentMediaTime() / GameScene.antennaBallGlowSeconds * 2 * .pi)) : GameScene.ballGlow
+        let swell = CGFloat(0.5 - 0.5 * cos(CACurrentMediaTime() / GameScene.antennaBallGlowSeconds * 2 * .pi))
+        if onAntenna {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            colour.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            let lighten = GameScene.antennaBallLighten
+            ballHalo.color = SKColor(red: red + (1 - red) * lighten, green: green + (1 - green) * lighten, blue: blue + (1 - blue) * lighten, alpha: 1)
+        } else {
+            ballHalo.color = colour
+        }
+        ballHalo.alpha = onAntenna ? GameScene.ballGlow + (GameScene.antennaBallGlow - GameScene.ballGlow) * swell : GameScene.ballGlow
+        ballHalo.setScale(onAntenna ? GameScene.antennaBallHaloScale : 1)
         spinBall(ball)
         // The camera on a scrolling stage: level, gliding after the local player and leading them.
         if !wholeStageView, [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }

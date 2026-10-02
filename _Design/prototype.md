@@ -1161,7 +1161,7 @@ laid out in the map maker like the Elements (`MapStage.wetshot`, `StageMap.curre
 kept offline under `esper.wetshotMap`; its first map a floor along the bottom row, the
 Hoopfish over the middle). Its first name, Wetshot Wake, and Hoopfish Harbor are kept for later
 (`_Design/notes.md`). Drawn: `Background_v2.png` (592 by 272, `WetshotBackground`) a row up
-off the floor's row, which is the outline colour as is everything below it, everything over it the
+off the floor's row, which is palette 1 as is everything below it, everything over it the
 water's top colour (palette 19), neither glowing; over the background the pile of backboards and
 hoops the Hoopfish has collected (`StageMap.pile`, `WetshotArt.pilePicture`), drawn as one picture
 at 75%, then `Foreground.png` (`WetshotForeground`) in the background's place, both behind

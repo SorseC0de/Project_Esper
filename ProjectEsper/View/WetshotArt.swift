@@ -7,7 +7,7 @@ import SpriteKit
 enum WetshotArt {
     /// A tile's side in art pixels, as the Elements' and the court's.
     static let tileSide: CGFloat = 16
-    /// The water's top colour, over the background and behind; under it all, the outline colour.
+    /// The water's top colour, over the background and behind; under it all, palette 1.
     static let waterTop: RGB = PixelPalette.colours[19]
     /// Rows of the floor under the background.
     static let floorRows = 1
@@ -327,7 +327,7 @@ enum WetshotArt {
         let spare = tileSide * 16
         // Textured, so the glow's mask can mark it as not glowing.
         let below = SKSpriteNode(texture: flat)
-        below.color = SKColor(rgb: PixelPalette.outline)
+        below.color = SKColor(rgb: PixelPalette.colours[1])
         below.colorBlendFactor = 1
         below.size = CGSize(width: width + spare * 2, height: spare + tileSide * CGFloat(WetshotArt.floorRows))
         below.anchorPoint = .zero

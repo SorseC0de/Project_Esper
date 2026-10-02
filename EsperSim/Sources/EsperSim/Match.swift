@@ -16,6 +16,8 @@ public struct Match: Equatable {
     /// What the powers leave in the world.
     public var bolts: [Bolt] = []
     public var clones: [IceClone] = []
+    /// Gale Ale's tornados.
+    public var gales: [Gale] = []
     public var flames: [Flame] = []
     public var fireballs: [Fireball] = []
     /// The next id for anything the powers leave, so the screen can follow each one.
@@ -137,6 +139,7 @@ public struct Match: Equatable {
         }
         stepBolts()
         stepClones()
+        stepGales()
         stepFlames()
         stepFireballs()
 
@@ -289,6 +292,19 @@ public struct Match: Equatable {
             events.append(.boltFired(player: index))
         case .strikeBolt(let x, let bottom):
             strike(x: x, bottom: bottom, by: index)
+        case .makeGale:
+            // Under the feet it jumped from, the jumper let rise clear before it can hold them.
+            let size = GaleRules.size
+            let box = Box(center: player.position - Vec2(x: 0, y: size.y / 2), width: size.x, height: size.y)
+            gales.append(Gale(id: stamp(), owner: index, box: box, velocity: .zero, framesLeft: GaleRules.stillFrames, snatching: false))
+            players[index].tornadoCooldown = TornadoRules.jumpOutCooldownFrames
+            events.append(.galeMade(at: box.center, snatching: false))
+        case .sendGale(let hand, let heading):
+            let size = GaleRules.size
+            let box = Box(center: hand, width: size.x, height: size.y)
+            gales.append(Gale(id: stamp(), owner: index, box: box, velocity: Vec2(x: heading.sign * GaleRules.snatchSpeed, y: 0),
+                              framesLeft: GaleRules.snatchFrames, snatching: true))
+            events.append(.galeMade(at: box.center, snatching: true))
         case .leaveClone:
             clones.append(IceClone(id: stamp(), owner: index, box: player.body, framesLeft: FrostRules.cloneFrames))
             events.append(.cloneMade(player: index, at: player.position))
@@ -604,15 +620,18 @@ public struct Match: Equatable {
     /// A regular tornado that's up or rising takes whoever comes into it out of the air, and
     /// the loose ball, and holds them; bursting, it lets them go. A fire one burns whoever it touches.
     private mutating func stepTornados() {
-        guard !stage.tornados.isEmpty else { return }
-        let holds = TornadoRules.holds(at: frame), fire = TornadoRules.isFire(at: frame)
-        // Bursting or gone, none has anything to hold or burn with.
-        let boxes = holds ? tornadoBoxes : []
+        // The Elements' tornados while they hold, then Gale Ale's still ones, which never burn.
+        let stageBoxes = !stage.tornados.isEmpty && TornadoRules.holds(at: frame) ? tornadoBoxes : []
+        let fire = !stage.tornados.isEmpty && TornadoRules.isFire(at: frame)
+        let boxes = stageBoxes + gales.filter { !$0.snatching }.map(\.box)
+        guard !boxes.isEmpty || players.contains(where: { $0.state == .suspended }) || ball.tornadoCentre != nil else { return }
+        func burns(_ box: Int) -> Bool { fire && box < stageBoxes.count }
         // The ball is taken coming in from outside, not let go of inside one, as a shot from a
         // body held there is.
         let ballFree = ball.isLive && ball.tether == nil && ball.frozen == 0
-        let ballIn = ballFree ? boxes.first(where: { $0.overlaps(ball.box) })?.center : nil
-        ball.tornadoCentre = fire || (ball.tornadoCentre == nil && !ball.outsideTornados) ? nil : ballIn
+        let ballBox = ballFree ? boxes.firstIndex(where: { $0.overlaps(ball.box) }) : nil
+        let ballIn = ballBox.map { boxes[$0].center }
+        ball.tornadoCentre = ballBox.map(burns) == true || (ball.tornadoCentre == nil && !ball.outsideTornados) ? nil : ballIn
         ball.outsideTornados = ballFree && ballIn == nil
         for index in players.indices {
             let body = players[index].body
@@ -621,7 +640,7 @@ public struct Match: Equatable {
                 continue
             }
             // Blazing Boba is at home in a fire one.
-            if fire, players[index].power != .blazingBoba {
+            if burns(hit), players[index].power != .blazingBoba {
                 events.append(.tornadoBurned(at: players[index].body.center))
                 burn(index)
             } else if players[index].state == .suspended {
@@ -633,6 +652,53 @@ public struct Match: Equatable {
                 players[index].tornadoCentre = boxes[hit].center
             }
         }
+    }
+
+    /// Gale Ale's tornados a frame on: the still ones running down; the snatch's on its way,
+    /// stripping whoever it meets once and taking the ball, theirs or loose, until it meets
+    /// anything solid, or its time's up, and bursts, letting the ball go where it is.
+    private mutating func stepGales() {
+        guard !gales.isEmpty else { return }
+        var solid = stage
+        solid.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
+        var kept: [Gale] = []
+        for var gale in gales {
+            gale.framesLeft -= 1
+            var bursts = gale.framesLeft <= 0
+            if gale.snatching, !bursts {
+                gale.box = Box(center: gale.box.center + gale.velocity, width: gale.box.width, height: gale.box.height)
+                let outside = gale.box.min.x < 0 || gale.box.max.x > stage.width
+                if outside || solid.overlapsSolid(gale.box) {
+                    bursts = true
+                } else {
+                    if !gale.struck, let victim = players.indices.first(where: { $0 != gale.owner && players[$0].body.overlaps(gale.box) }) {
+                        gale.struck = true
+                        let held = players[victim].hasBall
+                        strip(victim, by: gale.owner, knock: nil)
+                        if held, ball.holder == nil { gale.carrying = true }
+                    }
+                    if !gale.carrying, ball.isLive, ball.tether == nil, ball.box.overlaps(gale.box), !gales.contains(where: { $0.carrying }) {
+                        gale.carrying = true
+                    }
+                    if gale.carrying, ball.isLive {
+                        ball.position = gale.box.center
+                        ball.velocity = .zero
+                        ball.tornadoCentre = gale.box.center
+                        ball.outsideTornados = false
+                        ball.lastTouched = gale.owner
+                    } else {
+                        gale.carrying = false
+                    }
+                }
+            }
+            if bursts {
+                if gale.carrying, ball.isLive { ball.tornadoCentre = nil }
+                events.append(.galeBurst(at: gale.box.center))
+            } else {
+                kept.append(gale)
+            }
+        }
+        gales = kept
     }
 
     /// The pass the Elements' fireball last burst on, so it's gone for the rest of that pass.

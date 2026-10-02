@@ -193,3 +193,30 @@ public enum PulseRules {
     public static let runShotFrames = 32
     public static let cooldownFrames = 20
 }
+
+/// Gale Ale's tornados, two thirds the height of the Elements' and a third wider. A double
+/// jump leaves a still one where it jumped from, holding whoever comes into it out of the air
+/// and the loose ball as the Elements' do, for a while. At level two the snatch sends one off
+/// from its spark the way it faces, which strips whoever it meets, takes the ball, theirs or
+/// loose, and carries it inside until it meets a wall or anything solid, the invisible ones too,
+/// where it bursts and lets the ball go.
+public struct Gale: Equatable {
+    public var id: Int
+    public var owner: Int
+    public var box: Box
+    public var velocity: Vec2
+    public var framesLeft: Int
+    public var snatching: Bool
+    /// The ball inside, carried along.
+    public var carrying = false
+    /// Whoever it has already stripped, once each.
+    public var struck = false
+}
+
+public enum GaleRules {
+    /// The Elements' tornado is three tiles square: two thirds of that high, a third more wide.
+    public static let size = Vec2(x: 40, y: 20)
+    public static let stillFrames = 120
+    public static let snatchFrames = 240
+    public static let snatchSpeed = 3.0
+}

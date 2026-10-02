@@ -192,6 +192,10 @@ final class GameScene: SKScene {
     /// fireballs; each player's cape, segment by segment, and the points it trails.
     private var boltNodes: [Int: SKSpriteNode] = [:]
     private var cloneNodes: [Int: SKSpriteNode] = [:]
+    /// Gale Ale's tornados as drawn, by id, and their bursts playing out.
+    private var galeNodes: [Int: SKSpriteNode] = [:]
+    /// The tornado's sheet squeezed to the gale's shape: two thirds as high, a third wider.
+    private static let galeScale = CGSize(width: 4.0 / 3, height: 2.0 / 3)
     private var flameNodes: [Int: SKSpriteNode] = [:]
     private var fireballNodes: [Int: SKSpriteNode] = [:]
     private var capes: [[SKSpriteNode]] = []
@@ -435,6 +439,14 @@ final class GameScene: SKScene {
     /// The tornados as they look this frame, green under the bodies: they animate, so they can't
     /// live in the static layer.
     var tornadoSnapshots: [BodySnapshot] {
+        // Gale Ale's tornados don't glow, as the Elements' don't, on any stage.
+        let gales = galeNodes.values.compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
+        }
+        return gales + stageTornadoSnapshots
+    }
+
+    private var stageTornadoSnapshots: [BodySnapshot] {
         if let wet = wetshotArt { return wet.fishFlats }
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
@@ -1986,7 +1998,7 @@ final class GameScene: SKScene {
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
             self?.headVariant = HeadVariant(rawValue: index)!
         }
-        controls.addPicker(title: "POWER", options: PowerVariant.allCases.map(\.label), selected: powerVariant.rawValue, perRow: 6) { [weak self] index in
+        controls.addPicker(title: "POWER", options: PowerVariant.allCases.map(\.label), selected: powerVariant.rawValue, perRow: 7) { [weak self] index in
             self?.powerVariant = PowerVariant(rawValue: index)!
             self?.applyPower()
         }
@@ -3271,6 +3283,15 @@ final class GameScene: SKScene {
         playSounds(events)
         for event in events {
             switch event {
+            case .galeBurst(let at):
+                // The burst's sheet once, twice the tornado's size, squeezed as the gale was.
+                let frames = (0..<ElementsArt.burstFrames).map { sprites.texture("tornado_burst", $0) }
+                let burst = SKSpriteNode(texture: frames[0])
+                burst.size = CGSize(width: ElementsArt.burstSide * GameScene.galeScale.width, height: ElementsArt.burstSide * GameScene.galeScale.height)
+                burst.position = SpriteLibrary.point(at)
+                burst.zPosition = -1
+                burst.run(.sequence([.animate(with: frames, timePerFrame: 1 / Double(TornadoRules.burstSheetFramesPerSecond)), .removeFromParent()]))
+                glowers.addChild(burst)
             case .jumped(let index):
                 let player = match.players[index]
                 switch player.power {
@@ -4967,6 +4988,26 @@ final class GameScene: SKScene {
         for (id, node) in cloneNodes where !seen.contains(id) {
             node.removeFromParent()
             cloneNodes[id] = nil
+        }
+
+        seen = []
+        let galeFrame = Int(CACurrentMediaTime() / ElementsArt.tornadoFrameSeconds)
+        for gale in match.gales {
+            seen.insert(gale.id)
+            let node = galeNodes[gale.id] ?? {
+                let made = SKSpriteNode(texture: sprites.texture("tornado", 0))
+                made.size = CGSize(width: ElementsArt.tornadoSide * GameScene.galeScale.width, height: ElementsArt.tornadoSide * GameScene.galeScale.height)
+                made.zPosition = -1
+                glowers.addChild(made)
+                galeNodes[gale.id] = made
+                return made
+            }()
+            node.texture = sprites.texture("tornado", (galeFrame + gale.id) % ElementsArt.tornadoFrames)
+            node.position = SpriteLibrary.point(gale.box.center)
+        }
+        for (id, node) in galeNodes where !seen.contains(id) {
+            node.removeFromParent()
+            galeNodes[id] = nil
         }
 
         seen = []

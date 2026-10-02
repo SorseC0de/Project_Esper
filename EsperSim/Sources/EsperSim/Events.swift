@@ -14,6 +14,9 @@ public enum MatchEvent: Equatable {
     case dunked(player: Int)
     /// A dunk on the Hoopfish, which spins it off.
     case hoopfishSpun
+    /// A Gale Ale tornado made, and one bursting where it is.
+    case galeMade(at: Vec2, snatching: Bool)
+    case galeBurst(at: Vec2)
     case swatted(player: Int, hit: Bool)
     /// `entry` is the ball's velocity as it went through; `points` what it was worth.
     /// `floater`: the ball went in as a floater, for the announcer.
@@ -103,6 +106,9 @@ public enum PlayerAction: Equatable {
     case fireBolt(direction: Vec2)
     case strikeBolt(x: Double, bottom: Double)
     case leaveClone
+    /// Gale Ale: a still tornado where the double jump left from; at level two the snatch's, sent off.
+    case makeGale
+    case sendGale(at: Vec2, heading: Facing)
     case leaveFlame
     case releaseFireball(velocity: Vec2, straight: Bool, ballArc: Bool)
     case pulse(pull: Bool)

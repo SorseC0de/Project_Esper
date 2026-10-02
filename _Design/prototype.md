@@ -418,6 +418,16 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   sparks, the double jump's rings, the head's and legs' cubes (`GameScene.bodyScale`). Its dunk
   is moved as a whole by `DunkArt.titanOffset`, (−5, −11), on top of each frame's, on TITAN DUNK X and Y with
   `DunkTuning` on.
+- Gale Ale (M, a biomorph; protocol 63). Its tornados (`Gale`, `GaleRules`, `Match.gales`) are two
+  thirds the Elements' tornado's height and a third wider, 40 by 20, drawn as its sheet squeezed
+  the same way, and burst on its burst sheet at twice that; they don't glow. A double jump leaves
+  a still one under the feet it jumped from, for two seconds (`stillFrames`, 120), that holds whoever
+  comes into it out of the air and the loose ball as the Elements' do (the jumper let rise clear
+  of it first, the tornado's jump-out cooldown); it never burns. Level two: the snatch, on its spark
+  frame, sends one off from the spark the way it faces at 3 a frame, for four seconds at most; it
+  strips the first other body it meets, takes the ball, theirs or loose, and carries it inside,
+  and bursts on anything solid, the stage's invisible walls and the ball's own blockers included,
+  or the world's edge, letting the ball go where it is.
 
 Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
 too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is
@@ -613,17 +623,18 @@ placeholder for one not written yet.
 - Blazing Boba: the flames and the burning ball; level two adds the fireball.
 - Pulsepistol Punch: the pulse; level two shoots on the run and adds the pull.
 - Titan Tea: the size and weight, slowed; level two at full speed, with the trample.
+- Gale Ale: the double jump's still tornado; level two adds the snatch's tornado that carries the ball off.
 
 ## Tuning pickers
 
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
-holds the variants; A is always the baseline as tuned. POWER's twelve sit in two rows of six.
+holds the variants; A is always the baseline as tuned. POWER's thirteen sit in two rows, seven and six.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
   Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
-  Punch, K Surf Soda, L Titan Tea, at the level LEVEL picks, on this phone's player only, the
+  Punch, K Surf Soda, L Titan Tea, M Gale Ale, at the level LEVEL picks, on this phone's player only, the
   other side keeping its drinks, with the body the power brings; A by default. The left bumper always steps POWER; the local side's power
   and level are lettered under the pickers.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts

@@ -15,6 +15,7 @@ public enum Power: Equatable, Hashable {
     case pulsepistol
     case surfSoda
     case titanTea
+    case galeAle
 
     /// Powers whose shoot button, without the ball, is something other than the slash.
     public var takesShoot: Bool {
@@ -1215,6 +1216,8 @@ public struct Player: Equatable {
                     strikeCooldown = ZeusRules.strikeCooldownFrames
                     wanted = .strikeBolt(x: handCatchPoint.x, bottom: handCatchPoint.y)
                 }
+                // Gale Ale at level two: a tornado off the snatch's spark, the way it faces.
+                if power == .galeAle, powerLevel >= 2 { wanted = .sendGale(at: handCatchPoint, heading: facing) }
             }
             if stateTimer >= SnatchRules.frames {
                 snatchCooldown = SnatchRules.cooldownFrames
@@ -1921,6 +1924,7 @@ public struct Player: Equatable {
         // Jumper Juice's third jump is the last one left of three, lower.
         velocity.y = spec.jumps >= 3 && jumpsLeft == 1 ? thirdJumpVelocity : doubleJumpVelocity
         if power == .frostTea, powerLevel >= 2 { wanted = .leaveClone }
+        if power == .galeAle { wanted = .makeGale }
         if input.stick.x != 0 {
             velocity.x = input.stick.x * airSpeedMax
         }

@@ -21,13 +21,13 @@ public struct Dice: Equatable {
 public enum Greateraid: CaseIterable, Equatable, Hashable {
     case hastyHorchata, jumperJuice, lungeLemonade, cannonCola, slideCider, featherFresca
     case webWater, superSmoothie, flashFizz, platformShake
-    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea
+    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle
 
     public enum Kind: Equatable { case booster, biomorph }
 
     public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .lungeLemonade, .cannonCola, .slideCider, .featherFresca]
     public static let biomorphs: [Greateraid] = [.webWater, .superSmoothie, .flashFizz, .platformShake,
-                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea]
+                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle]
 
     public var kind: Kind {
         Greateraid.boosters.contains(self) ? .booster : .biomorph
@@ -52,6 +52,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .pulsepistol: "Pulsepistol Punch"
         case .surfSoda: "Surf Soda"
         case .titanTea: "Titan Tea"
+        case .galeAle: "Gale Ale"
         }
     }
 
@@ -69,6 +70,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .pulsepistol: .pulsepistol
         case .surfSoda: .surfSoda
         case .titanTea: .titanTea
+        case .galeAle: .galeAle
         default: nil
         }
     }
@@ -93,6 +95,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .surfSoda: "..."
         case .featherFresca: "..."
         case .titanTea: "..."
+        case .galeAle: "..."
         }
     }
 
@@ -117,6 +120,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .featherFresca: ("You fall slower. A fast fall still lands quick.", "Floatier still.")
         case .titanTea: ("Twice the size and heavier: you can't be stunned, and your landings quake the floor. Slower, and no double jump or crouch.",
                          "Full speed, and running into them strips them.")
+        case .galeAle: ("Your double jump leaves a tornado.", "Snatch sends a tornado that strips them and carries the ball off.")
         }
     }
 }

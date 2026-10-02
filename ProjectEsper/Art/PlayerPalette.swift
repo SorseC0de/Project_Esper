@@ -287,7 +287,7 @@ enum CourtLook {
 }
 
 /// An experiment: the players drawn as people. Skin on the head, the arms and the hands,
-/// front in palette 35 and back in 34; the torso, pelvis and thighs in palette 41 for
+/// front in palette 24 and back in 25 (trying them); the torso, pelvis and thighs in palette 41 for
 /// everyone; the lower legs and feet in the energy's colours, glowing; the head drawn as
 /// part of the body, not apart, and not glowing. `enabled` off puts everything back as it was.
 enum HumanLook {
@@ -298,7 +298,8 @@ enum HumanLook {
     /// The parts still in the energy's colours, which glow as energy does.
     static let glowingParts: Set<BodyPart> = [.frontLeg, .backLeg, .frontFoot, .backFoot]
     static let skin: [BodyPart: RGB] = {
-        let front = PixelPalette.colours[35], back = PixelPalette.colours[34]
+        // Trying 24 and 25; they were 35 and 34.
+        let front = PixelPalette.colours[24], back = PixelPalette.colours[25]
         return [.head: front, .frontArm: front, .frontHand: front,
                 .backArm: back, .backHand: back]
     }()

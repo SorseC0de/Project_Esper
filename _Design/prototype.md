@@ -436,13 +436,13 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   (`Player.knock`, `hitStun`). At level two up and down on the stick turn it, 2 degrees a frame at full
   tilt (`aimRate`), any angle up to 45 off level, through the charge and while it fires, the beam
   turning with it. The throw's charge swirl (`esper_charge`) plays at the hand through the
-  charge and on, looping, while the beam fires, its tail as it ends. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
+  charge, its tail as the beam fires. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
   firing, 3 to 7 round and round with `player_blast_arms` over them, turned with the aim about where the
   arms meet the body (31.5, 33.5 up on its canvas, 17.5 over the feet), aligned on 3 and a pixel
   right and two down on the even frames, 4 and 6; after, 8 and 9 (`recoveryFrames`), no beam,
   no armour; the beam from the arms'
   reach (17 art pixels from the shoulder, 18 over the feet), `beam`'s tail, its middle stretched
-  and its head, 16 pixels thick, in the energy colour. In the air, the burst: its momentum braked, a 0.85 share kept
+  and its head, 16 pixels thick, in the energy colour, over a soft halo in the glow colour three times as thick at 0.5. In the air, the burst: its momentum braked, a 0.85 share kept
   a frame (`burstBrake`), not stopped, through `player_transform` at 10 a second, frame 2 held 24 frames more at level one, and on
   frame 3 everything within 64 art pixels (40) is pushed away, the other without a stun (5.5
   and a lift of 1) and the ball at 7; `burst` plays there in the energy colour at the reach's size.

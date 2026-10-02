@@ -199,6 +199,9 @@ final class GameScene: SKScene {
     private var beamNodes: [Int: SKNode] = [:]
     /// The beam's sheet's pieces, 16 pixels square.
     private static let beamPieceSide: CGFloat = 16
+    /// The beam's halo: its strength, and its thickness over the beam's.
+    private static let beamGlow: CGFloat = 0.5
+    private static let beamGlowWidth: CGFloat = 3
     /// Z Tea's burst drawn at its reach, 64 art pixels each way.
     private static let zBurstDiameter: CGFloat = 128
     /// Z Tea's blast arms over each body, turned about the shoulder: where the arms meet the body
@@ -5154,13 +5157,26 @@ final class GameScene: SKScene {
         }
 
         // Z Tea's beams: the tail at the hand, the middle stretched along, the head at the end,
-        // in the firer's energy colour.
+        // in the firer's energy colour, over a soft halo in their glow colour.
         seen = []
         for beam in match.beams {
             seen.insert(beam.id)
             let holder = beamNodes[beam.id] ?? {
                 let made = SKNode()
                 made.zPosition = 8
+                // The halo's ends are a soft glow's halves, its middle the glow's centre column stretched.
+                let glow = sprites.softGlow(diameter: 32)
+                for rect in [CGRect(x: 0, y: 0, width: 0.5, height: 1), CGRect(x: 0.5, y: 0, width: 1.0 / 32, height: 1),
+                             CGRect(x: 0.5, y: 0, width: 0.5, height: 1)] {
+                    let halo = SKSpriteNode(texture: SKTexture(rect: rect, in: glow))
+                    halo.anchorPoint = CGPoint(x: 0, y: 0.5)
+                    halo.color = SKColor(rgb: sprites.look(for: beam.owner).glow)
+                    halo.colorBlendFactor = 1
+                    halo.alpha = GameScene.beamGlow
+                    halo.blendMode = .add
+                    halo.zPosition = -0.1
+                    made.addChild(halo)
+                }
                 for piece in 0..<3 {
                     let sprite = SKSpriteNode(texture: sprites.effectTexture(EnergyEffect.beam.name, piece, player: beam.owner))
                     sprite.anchorPoint = CGPoint(x: 0, y: 0.5)
@@ -5172,13 +5188,24 @@ final class GameScene: SKScene {
             }()
             let length = CGFloat(ZRules.length) * SpriteLibrary.pixelsPerUnit
             let side = GameScene.beamPieceSide
-            if let pieces = holder.children as? [SKSpriteNode], pieces.count == 3 {
-                pieces[0].size = CGSize(width: side, height: side)
-                pieces[0].position = .zero
-                pieces[1].size = CGSize(width: max(length - side * 2, 0), height: side)
-                pieces[1].position = CGPoint(x: side, y: 0)
-                pieces[2].size = CGSize(width: side, height: side)
-                pieces[2].position = CGPoint(x: length - side, y: 0)
+            if let nodes = holder.children as? [SKSpriteNode], nodes.count == 6 {
+                let halos = nodes[0..<3], pieces = nodes[3..<6]
+                let haloSide = side * GameScene.beamGlowWidth
+                let haloStart = -(haloSide - side) / 2
+                let haloMiddle = max(CGFloat(length) - side, 0)
+                let spans: [(x: CGFloat, width: CGFloat)] = [(haloStart, haloSide / 2), (haloStart + haloSide / 2, haloMiddle),
+                                                             (haloStart + haloSide / 2 + haloMiddle, haloSide / 2)]
+                for (halo, (x, width)) in zip(halos, spans) {
+                    halo.size = CGSize(width: width, height: haloSide)
+                    halo.position = CGPoint(x: x, y: 0)
+                }
+                let piece = Array(pieces)
+                piece[0].size = CGSize(width: side, height: side)
+                piece[0].position = .zero
+                piece[1].size = CGSize(width: max(length - side * 2, 0), height: side)
+                piece[1].position = CGPoint(x: side, y: 0)
+                piece[2].size = CGSize(width: side, height: side)
+                piece[2].position = CGPoint(x: length - side, y: 0)
             }
             holder.position = SpriteLibrary.point(beam.origin)
             holder.zRotation = CGFloat(Trig.atan2(beam.direction.y, beam.direction.x))
@@ -5415,8 +5442,8 @@ final class GameScene: SKScene {
             // then round the loop for as long as the throw is held. Let go into the throw,
             // the rest of the sheet plays out where the ball was.
             let charge = chargeNodes[index]
-            // Z Tea's beam charges at the hand the throw's way, and keeps the glow there while it fires.
-            let beaming = player.power == .zTea && (player.state == .beamCharging || player.firingBeam)
+            // Z Tea's beam charges at the hand the throw's way; once it fires the swirl plays out.
+            let beaming = player.power == .zTea && player.state == .beamCharging
             let chargingNow = (player.state == .throwStance && !handBall.isHidden) || beaming
             if chargingNow {
                 // A sprite's size is set in its parent's units, so it's divided by whatever
@@ -5437,9 +5464,7 @@ final class GameScene: SKScene {
                     charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                     charge.setScale(CGFloat(ZeusTuning.chargeScale))
                 default:
-                    // Firing, the swirl runs on from where the charge left it.
-                    let held = player.state == .beamFiring ? player.stateTimer + ZRules.chargeFrames : player.stateTimer
-                    let played = held * Int(EnergyEffect.charge.fps) / 60
+                    let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
                     let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
                     let frame = played <= loopEnd ? played : loopStart + (played - loopStart) % (loopEnd - loopStart + 1)
                     charge.texture = sprites.effectTexture(EnergyEffect.charge.name, frame, player: index)

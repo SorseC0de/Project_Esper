@@ -2040,7 +2040,7 @@ final class GameScene: SKScene {
             UserDefaults.standard.set(index, forKey: SoundBoard.countSetKey)
         }
         controls.addPicker(title: "SFX", options: Onomatopoeia.Lettering.allCases.map(\.label), selected: Onomatopoeia.lettering.rawValue) { [weak self] index in
-            Onomatopoeia.lettering = Onomatopoeia.Lettering(rawValue: index) ?? .dotGothic
+            Onomatopoeia.lettering = Onomatopoeia.Lettering(rawValue: index) ?? .cherryBomb
             self?.previewSoundWord()
         }
         controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in

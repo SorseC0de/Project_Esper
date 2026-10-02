@@ -752,13 +752,22 @@ the stage (`OpponentTerrain.swift`, `OpponentStages.swift`):
   the same way, under water too. Read 1500 body frames at a time, over the countdown.
 - Getting about (`go`): along a surface, or across the cheapest way of moves, walking to each
   takeoff and playing the move as it was tried; a move that fails 150 frames past what it
-  should need is given up on for ten seconds. A tornado is only taken if it's up and holds 45
-  frames more; it's left from its middle, waiting for the pull there, a second before it lets go,
-  sinks or turns fire.
+  should need is given up on for two seconds. The way is timed (`Terrain.route`, each move's
+  frames from its try): a tornado on it only if it's up when it gets there, not sinking, rising or
+  fire, and holds 30 frames more, so the chain through the Elements' tornados is set off on only
+  when it can be finished; it's left from its middle, waiting for the pull there, 40 frames before
+  it lets go. A move through another tornado on the way fails its try, as that one would catch it;
+  drifting out of one isn't a way out, its edge only takes the body back. Out of a tornado into
+  another with no plain hop, it also tries the stick held still a while before steering and the
+  second jump held till it's dropped a little, those at a heavy cost so plain ways come first.
+  With the ball over lava it only takes moves from a body's length in off an edge (`ballSafe`),
+  each hop tried from there too, and backs off an edge it's dribbling at, the bounce would burn.
 - The lava (`keepOffTheLava`): every input it sends is first played out with a copy of the body,
   the tornados holding and bursting as they will; one that ends in the lava is swapped for the
   nearest that doesn't, a jump or the stick another way. Stunned in a tornado it holds still,
-  since the stick would drift it out. Over lava it doesn't lob.
+  since the stick would drift it out. Over lava it doesn't lob. On the ground a walk is played
+  out only a step, then let go, as it decides again every frame. Being crowded counts only when
+  the other is on the side it's headed.
 - Hazards (`dodgeHazards`): on the ground it steps out from under the lightning's line in its
   last 45 frames, and from under an icicle falling toward it or about to drop.
 - Shots: a still rim's shot spots are found by trying shots, one place a frame, on the surfaces 25
@@ -1128,7 +1137,9 @@ takes a ceiling slope as its whole square.
 
 The lava: whoever's feet go under its surface (`ElementsRules.lavaSurface`, 25 units) is put
 back where they started, any ball they held back at the ball's start, and a loose ball in it
-too. For now (protocol 27).
+too. For now (protocol 27). A dribble that bounces down off a ledge into the lava, on the
+dribble's bounce frame with the ball hanging past the edge over it, loses the ball to it the same
+way (`Match.burnDribbles`, protocol 62).
 
 The map is `StageMap`: the placed tiles by cell, the two rims (backboard on the left and on
 the right; build a rock block behind each), the two starts (the cell their feet stand at the
@@ -1211,7 +1222,7 @@ Bubbles burst all round it as it spins, some over it, and trail off its tail as 
 a basket's points doubled; a best of seven's rounds stay one a basket. In 47, play on the stage starts with "Points Are Worth Double!" in the drink banner's
 lettering, and each basket throws "2X" over the rim in CardCourt's 2X lettering (Avenir Next
 Condensed Heavy, `TitleText.markTexture`) in palette 7 over 20, outlined 29, from a tenth of its
-size up to 1.2 over 0.8 seconds, fading from 0.3. A rim can't be dunked on in the stage's first or last column, and one swimming into either
+size up to its own over 0.3 seconds, held 1.2, then out to 1.2 as it fades over 0.5. A rim can't be dunked on in the stage's first or last column, and one swimming into either
 lets go of whoever hangs on it (`Stage.dunkable`, protocol 59). A body bouncing off the rim's top
 rises half as high as it would under water elsewhere (`RimRules.underwaterBounceShare`, the push
 at the square root of a half; protocol 60). The ball's and the hoop's chevrons and the swimming
@@ -1374,7 +1385,7 @@ shown, once, like the effects.
 - crowd_cheer, behind the rest, on every basket, and with it the announcer: on the game's last,
   thatlldoit, thatlldoit-2 or thatdecidesit, the finish slowing to 0.35 (offline) and the camera
   easing in on the ball to 0.55 of its view over 40 frames and then staying on it, in a hand or
-  loose (where it was last seen while it's drawn nowhere), on Hoopfish Hideaway kept inside the
+  loose (where it was last seen while it's drawn nowhere), on Hoopfish Hideaway and the Elements kept inside the
   stage's sides, the HUD keeping its size, until
   the win screen; from the winning bucket nobody moves or catches (`Match.finished`: no inputs,
   the computer's among them, and no catches); otherwise a line drawn by weight: the generic score (score, -2, -3,

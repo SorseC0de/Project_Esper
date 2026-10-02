@@ -130,6 +130,7 @@ public struct Match: Equatable {
             perform(action, by: index)
         }
         burnInLava()
+        burnDribbles()
         resolveParries()
         for index in players.indices {
             resolveHits(by: index)
@@ -519,6 +520,22 @@ public struct Match: Equatable {
             events.append(.lavaSplashed(at: Vec2(x: ball.position.x, y: surface), ball: true))
             ball.respawn(at: stage.ballSpawn)
         }
+    }
+
+    /// On a lava stage, a dribble bouncing down off a ledge into the lava loses the ball to it,
+    /// back to where it starts, as a loose ball falling in does.
+    private mutating func burnDribbles() {
+        guard let lava = stage.features.lavaSurface, let holder = ball.holder else { return }
+        let player = players[holder]
+        let frame = player.animationFrame
+        guard player.grounded, Animation.dribbles.contains(frame.animation), frame.animation.dribbleBounceFrames().contains(frame.frame),
+              let offset = BallLandmarks.offset(frame) else { return }
+        let ballX = player.position.x + offset.x / 1.6 * player.spec.scale * player.facing.sign
+        guard player.position.y - stage.drop(fromX: ballX, y: player.position.y) < lava else { return }
+        players[holder].loseBall()
+        ball.holder = nil
+        events.append(.lavaSplashed(at: Vec2(x: ballX, y: lava), ball: true))
+        ball.respawn(at: stage.ballSpawn)
     }
 
     /// The Hoopfish a frame on, and its load with it: the rim where its antenna is, or parked

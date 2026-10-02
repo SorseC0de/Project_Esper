@@ -36,6 +36,12 @@ final class Terrain: Equatable {
         var landing: Double
         var jumpBelow: Double?
         var cost: Double
+        /// Taken from far enough in off the edge that a dribbled ball never hangs over it.
+        var ballSafe = true
+        /// A hop's stick held still this many frames before it steers, to rise clear of what's over the way.
+        var steerAfter = 0
+        /// Frames from setting off to coming down, the longest of its tries.
+        var frames = 0
     }
 
     /// What the reading was made from, to tell when the stage or the body has changed.
@@ -226,8 +232,17 @@ final class Terrain: Equatable {
     /// The cheapest way from one surface to another, as the links to take in turn; empty when
     /// they're the same, nil when there's none. `usable` rules a link out for now.
     func route(from start: Int, to goal: Int, usable: (Int, Link) -> Bool) -> [Link]? {
+        route(from: start, to: goal, at: nil, speed: 1) { from, link, _, _ in usable(from, link) }
+    }
+
+    /// The cheapest way, timed: setting off from `x` (or the surface's middle) walking at `speed`,
+    /// each link asked whether it can be taken leaving and landing so many frames from now.
+    func route(from start: Int, to goal: Int, at x: Double?, speed: Double, usable: (Int, Link, Int, Int) -> Bool) -> [Link]? {
         if start == goal { return [] }
         var cost = Array(repeating: Double.infinity, count: surfaces.count)
+        var time = Array(repeating: 0, count: surfaces.count)
+        var entry = surfaces.map(\.middle)
+        entry[start] = x ?? surfaces[start].middle
         var via: [Int: (from: Int, link: Link)] = [:]
         var done = Array(repeating: false, count: surfaces.count)
         cost[start] = 0
@@ -239,10 +254,15 @@ final class Terrain: Equatable {
             guard let here = current else { return nil }
             if here == goal { break }
             done[here] = true
-            for link in links(from: here) where !done[link.to] && usable(here, link) {
+            for link in links(from: here) where !done[link.to] {
+                let leaves = time[here] + Int(abs(link.takeoff - entry[here]) / max(speed, 0.1))
+                let lands = leaves + link.frames
+                guard usable(here, link, leaves, lands) else { continue }
                 let total = cost[here] + link.cost
                 if total < cost[link.to] {
                     cost[link.to] = total
+                    time[link.to] = lands
+                    entry[link.to] = link.landing
                     via[link.to] = (here, link)
                 }
             }
@@ -267,7 +287,7 @@ final class Terrain: Equatable {
         var steps = 0
         while steps < budget, nextSource < surfaces.count {
             if nextTarget < surfaces.count {
-                if let link = link(from: nextSource, to: nextTarget, steps: &steps) { found.append(link) }
+                found += links(from: nextSource, to: nextTarget, steps: &steps)
                 nextTarget += 1
             } else {
                 links[nextSource] = found
@@ -280,19 +300,19 @@ final class Terrain: Equatable {
 
     /// The cheapest move from one surface onto another that makes it, if any does: each way of
     /// going played with a copy of the body.
-    private func link(from start: Int, to end: Int, steps: inout Int) -> Link? {
-        guard start != end else { return nil }
+    private func links(from start: Int, to end: Int, steps: inout Int) -> [Link] {
+        guard start != end else { return [] }
         let from = surfaces[start], to = surfaces[end]
-        if from.tornado != nil, to.tornado == from.tornado { return nil }
+        if from.tornado != nil, to.tornado == from.tornado { return [] }
         let fromY = from.tornado != nil ? from.heights[0] : from.height(at: from.clamp(to.middle))
         let toY = to.tornado != nil ? to.heights[0] : to.height(at: to.clamp(from.middle))
         let gap = max(to.left - from.right, from.left - to.right, 0)
         // Too high, or too far for any jump to cross.
-        if toY - fromY > rise + 8 || gap > Terrain.farthest { return nil }
+        if toY - fromY > rise + 8 || gap > Terrain.farthest { return [] }
         var options: [(Kind, Double, Double)] = []
         let overlapLeft = max(from.left, to.left), overlapRight = min(from.right, to.right)
         if from.tornado != nil {
-            // Out of a tornado by the jump: drifting out is too slow to trust before it lets go.
+            // Out of a tornado by the jump: drifting out, its edge only takes the body back.
             let landing = to.tornado != nil ? to.middle : to.clamp(from.middle)
             options.append((.hop, from.middle, landing))
         } else if to.tornado != nil {
@@ -327,17 +347,67 @@ final class Terrain: Equatable {
             options.append((.hop, from.left + 2, to.right - 5))
             options.append((.walkOff, from.left, to.right - 5))
         }
+        // The same hops again from a body's length in off the edge, so a ball being dribbled
+        // doesn't hang out over it first.
+        if from.tornado == nil {
+            for (kind, takeoff, landing) in options where kind == .hop {
+                let toward: Double = landing >= takeoff ? 1 : -1
+                let inset = toward > 0 ? min(takeoff, from.right - Terrain.dribbleInset) : max(takeoff, from.left + Terrain.dribbleInset)
+                if inset != takeoff, inset >= from.left, inset <= from.right { options.append((.hop, inset, landing)) }
+            }
+        }
+        var found: [Link] = []
         for (kind, takeoff, landing) in options {
+            let toward: Double = landing >= takeoff ? 1 : -1
+            let fromEdge = from.tornado != nil ? Double.infinity : (toward > 0 ? from.right - takeoff : takeoff - from.left)
+            // Out of a tornado there's no dribble to hang over anything.
+            let ballSafe = from.tornado != nil || (kind != .walkOff && fromEdge >= Terrain.dribbleInset - 1)
+            // One of each: the cheapest that makes it, and the cheapest that does with a ball in hand.
+            if found.contains(where: { !$0.ballSafe }) && !ballSafe { continue }
+            if found.contains(where: { $0.ballSafe }) && ballSafe { continue }
             let falls: [Double?] = kind == .walkOff ? [nil, 10, 30] : [nil]
             for jumpBelow in falls {
                 let link = Link(to: end, kind: kind, takeoff: takeoff, landing: landing, jumpBelow: jumpBelow,
-                                cost: abs(landing - takeoff) + (kind == .hop || jumpBelow != nil ? Terrain.jumpCost : 0) + abs(toY - fromY) * 0.5)
+                                cost: abs(landing - takeoff) + (kind == .hop || jumpBelow != nil ? Terrain.jumpCost : 0) + abs(toY - fromY) * 0.5,
+                                ballSafe: ballSafe)
                 // Made from a little either side of the takeoff too: the body's never quite on it.
-                if [0.0, -Terrain.takeoffSlack, Terrain.takeoffSlack].allSatisfy({ plays(link, from: start, offset: $0, steps: &steps) }) { return link }
+                let tries = [0.0, -Terrain.takeoffSlack, Terrain.takeoffSlack].map { plays(link, from: start, offset: $0, steps: &steps) }
+                if tries.allSatisfy({ $0 != nil }) {
+                    var made = link
+                    made.frames = tries.compactMap { $0 }.max() ?? 0
+                    found.append(made)
+                    break
+                }
             }
         }
-        return nil
+        // Out of a tornado with nothing found: up first and across after, or the second jump held
+        // back till it's dropped a little, for a way across under something.
+        // Only from one tornado to another: onto solid ground these come down against walls in play.
+        if found.isEmpty, from.tornado != nil, to.tornado != nil {
+            let landing = to.tornado != nil ? to.middle : to.clamp(from.middle)
+            variants: for steerAfter in [0, 15, 30] {
+                for jumpBelow in [nil, 5.0, 20.0] where steerAfter > 0 || jumpBelow != nil {
+                    var link = Link(to: end, kind: .hop, takeoff: from.middle, landing: landing, jumpBelow: jumpBelow,
+                                    cost: abs(landing - from.middle) + Terrain.jumpCost + Terrain.variantCost + abs(toY - fromY) * 0.5)
+                    link.steerAfter = steerAfter
+                    let tries = [0.0, -Terrain.takeoffSlack, Terrain.takeoffSlack].map { plays(link, from: start, offset: $0, steps: &steps) }
+                    if tries.allSatisfy({ $0 != nil }) {
+                        link.frames = tries.compactMap { $0 }.max() ?? 0
+                        found.append(link)
+                        break variants
+                    }
+                }
+            }
+        }
+        return found
     }
+
+    /// What a held-back hop costs on top, so a way of plain hops is taken whenever there is one:
+    /// those ways out are fussier, and the body's never quite where its try was.
+    static let variantCost = 200.0
+
+    /// How far in off an edge a hop is also tried from, so a dribbled ball stays over ground.
+    static let dribbleInset = 10.0
 
     /// How far off its takeoff a move is also tried from, either side.
     static let takeoffSlack = 3.0
@@ -348,7 +418,8 @@ final class Terrain: Equatable {
 
     /// Plays the link with a copy of the body from standing at its takeoff, or held in its
     /// tornado: whether it comes down on the surface it's for.
-    private func plays(_ link: Link, from start: Int, offset: Double, steps: inout Int) -> Bool {
+    /// The frames it took to come down where it's for, or nil if it didn't.
+    private func plays(_ link: Link, from start: Int, offset: Double, steps: inout Int) -> Int? {
         let from = surfaces[start], to = surfaces[link.to]
         let takeoff = from.tornado != nil ? link.takeoff + offset : from.clamp(link.takeoff + offset)
         let startY = from.tornado != nil ? from.heights[0] : from.height(at: takeoff)
@@ -364,29 +435,35 @@ final class Terrain: Equatable {
         var leftGround = false
         var jumpWasDown = false
         for frame in 0..<Terrain.moveFrames {
-            let input = Terrain.input(for: link, body: body, startY: startY, target: to, leftGround: leftGround, jumpWasDown: jumpWasDown, halfWidth: halfWidth)
+            let input = Terrain.input(for: link, body: body, startY: startY, target: to, leftGround: leftGround, jumpWasDown: jumpWasDown, halfWidth: halfWidth,
+                                      framesIn: frame)
             jumpWasDown = input.jump
             _ = body.step(input: input, stage: stage, events: &events)
             steps += 1
             // As the match does: out of the tornado's box, out of its hold.
             if body.state == .suspended, let tornado = from.tornado, !body.body.overlaps(stage.tornados[tornado]) { body.enter(.air) }
             if !body.grounded, body.state != .suspended, body.state != .jumpSquat { leftGround = true }
-            if let lava, body.position.y < lava { return false }
-            if body.position.y < 0 { return false }
-            if let tornado = to.tornado {
-                if leftGround, body.body.overlaps(stage.tornados[tornado]) { return true }
-            } else if leftGround, body.grounded {
-                return surface(under: body.position) == link.to
+            if let lava, body.position.y < lava { return nil }
+            if body.position.y < 0 { return nil }
+            // Through another tornado on the way it would be caught there, if it's up.
+            if leftGround, body.state == .air, stage.tornados.indices.contains(where: { $0 != from.tornado && $0 != to.tornado && stage.tornados[$0].overlaps(body.body) }) {
+                return nil
             }
-            if !leftGround, frame > 60 { return false }
+            if let tornado = to.tornado {
+                if leftGround, body.body.overlaps(stage.tornados[tornado]) { return frame + 1 }
+            } else if leftGround, body.grounded {
+                return surface(under: body.position) == link.to ? frame + 1 : nil
+            }
+            if !leftGround, frame > 60 { return nil }
         }
-        return false
+        return nil
     }
 
     /// One frame of a link being played, the same for the copy that tried it and the body taking
     /// it: the hop held full and the stick let go through the squat, then steered for the landing,
     /// held off a solid surface's near end until over its height; the second jump when it's short.
-    static func input(for link: Link, body: Player, startY: Double, target: Surface, leftGround: Bool, jumpWasDown: Bool, halfWidth: Double) -> PlayerInput {
+    static func input(for link: Link, body: Player, startY: Double, target: Surface, leftGround: Bool, jumpWasDown: Bool, halfWidth: Double,
+                      framesIn: Int) -> PlayerInput {
         var input = PlayerInput()
         let direction: Double = link.landing >= link.takeoff ? 1 : -1
         let targetY = target.tornado != nil ? target.heights[0] : target.height(at: link.landing)
@@ -404,13 +481,15 @@ final class Terrain: Equatable {
         case .hop:
             if body.state == .suspended {
                 input.jump = press
-                input.stick = Vec2(x: direction, y: 0)
+                input.stick = Vec2(x: link.steerAfter > 0 ? 0 : direction, y: 0)
             } else if !leftGround {
                 input.jump = true
             } else {
-                input.stick = Vec2(x: steer, y: 0)
-                let short = body.position.y < targetY - 2 || (targetY > startY && body.position.y < targetY + 12)
-                if short, body.jumpsLeft > 0, body.velocity.y < 0.5 { input.jump = press }
+                input.stick = Vec2(x: framesIn < link.steerAfter ? 0 : steer, y: 0)
+                // The second jump when it's short, or, given a depth, once it's fallen that far below where it set off.
+                let due = link.jumpBelow.map { body.velocity.y < 0 && body.position.y < startY - $0 }
+                    ?? (body.position.y < targetY - 2 || (targetY > startY && body.position.y < targetY + 12)) && body.velocity.y < 0.5
+                if due, body.jumpsLeft > 0 { input.jump = press }
             }
         case .walkOff:
             if !leftGround {

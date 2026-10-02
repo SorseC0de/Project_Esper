@@ -42,14 +42,11 @@ extension Opponent {
     /// first taught on.
     static func readsStage(_ match: Match) -> Bool { match.stage.features.look != .court }
 
-    /// The rim, ball and frames a link may take a tornado for: one that's up, not fire, and
-    /// staying up a while.
-    private static let tornadoTrustFrames = 45
     /// A move that hasn't left the ground this long after it began was interrupted: dropped.
     static let takeoffFrames = 10
     /// A link taken this long past what its walk and jump should need is given up on a while.
     private static let journeySpareFrames = 150
-    private static let givenUpFrames = 600
+    private static let givenUpFrames = 120
     /// Frames ahead the ball and a moving rim are followed.
     static let lookAheadFrames = 240
 
@@ -68,16 +65,28 @@ extension Opponent {
     }
 
     /// Frames of a body stepped each frame finding the stage's links, until they're all found.
-    static let readingBudget = 1500
+    static let readingBudget = 2000
 
-    private func usable(_ from: Int, _ link: Terrain.Link, _ match: Match) -> Bool {
+    /// Whether a link can be taken leaving and landing so many frames from now: not given up on;
+    /// out of a tornado only while it's up, not sinking or rising; into one only if it's up when
+    /// it gets there and holds long enough to jump out of again.
+    private func usable(_ from: Int, _ link: Terrain.Link, _ match: Match, leaves: Int = 0, lands: Int = 0, ballInHand: Bool = false) -> Bool {
         if givenUp.contains(where: { $0.from == from && $0.to == link.to }) { return false }
         guard let terrain else { return true }
-        // Out of a tornado only from where the move was tried: up, not sinking or rising.
-        if terrain.surfaces[from].tornado != nil, TornadoRules.sunkShare(at: match.frame) != 0 { return false }
+        // Dribbling over lava, a ball hung off an edge burns: only the moves that never do.
+        if ballInHand, match.stage.features.lavaSurface != nil, !link.ballSafe { return false }
+        func up(_ frame: Int) -> Bool {
+            TornadoRules.holds(at: frame) && !TornadoRules.isFire(at: frame) && TornadoRules.sunkShare(at: frame) == 0
+        }
+        if terrain.surfaces[from].tornado != nil, !up(match.frame + leaves) { return false }
         guard terrain.surfaces[link.to].tornado != nil else { return true }
-        return stride(from: 0, through: Opponent.tornadoTrustFrames, by: 15).allSatisfy { ahead in
-            TornadoRules.holds(at: match.frame + ahead) && !TornadoRules.isFire(at: match.frame + ahead)
+        return stride(from: lands, through: lands + Opponent.tornadoHeldSafeFrames + 10, by: 5).allSatisfy { up(match.frame + $0) }
+    }
+
+    /// The way from a surface to another, timed from where it stands.
+    func route(from here: Int, to goal: Int, match: Match, me: Player) -> [Terrain.Link]? {
+        terrain?.route(from: here, to: goal, at: me.position.x, speed: max(me.spec.runSpeed * me.waterShare, 0.5)) { from, link, leaves, lands in
+            usable(from, link, match, leaves: leaves, lands: lands, ballInHand: me.hasBall)
         }
     }
 
@@ -110,7 +119,7 @@ extension Opponent {
             } else {
                 if !me.grounded, me.state != .suspended, me.state != .jumpSquat { journey.leftGround = true }
                 self.journey = journey
-                play(journey, me: me, into: &input)
+                play(journey, me: me, frame: match.frame, into: &input)
                 rescueFromLava(match: match, me: me, into: &input)
                 return false
             }
@@ -127,7 +136,7 @@ extension Opponent {
             if terrain.surfaces[here].tornado != nil { return true }
             return walk(to: goal.x, me: me, into: &input, near: near)
         }
-        guard let link = terrain.route(from: here, to: goal.surface, usable: { usable($0, $1, match) })?.first else {
+        guard let link = route(from: here, to: goal.surface, match: match, me: me)?.first else {
             // No way there now, a tornado down or fire: wait where it's safe, as near as this surface goes.
             journey = nil
             if terrain.surfaces[here].tornado == nil { walk(to: terrain.surfaces[here].clamp(goal.x), me: me, into: &input, near: near) }
@@ -144,25 +153,25 @@ extension Opponent {
         // To the takeoff, still, then the move.
         let dx = link.takeoff - me.position.x
         // In a tornado, its pull brings it to the middle the move was tried from.
-        let atTakeoff = link.kind == .walkOff ? abs(dx) <= 6 : abs(dx) <= 2 && abs(me.velocity.x) < 0.3
+        let atTakeoff = link.kind == .walkOff ? abs(dx) <= 8 : abs(dx) <= 2 && abs(me.velocity.x) < 0.3
         if !atTakeoff {
             // In a tornado its pull is what brings it to the middle; the stick only fights it.
-            input.stick = abs(dx) <= 2 || me.state == .suspended ? .zero : Vec2(x: (dx > 0 ? 1 : -1) * (abs(dx) > 20 ? 1 : 0.4), y: 0)
+            input.stick = abs(dx) <= 2 || me.state == .suspended ? .zero : Vec2(x: (dx > 0 ? 1 : -1) * (abs(dx) > 20 ? 1 : 0.5), y: 0)
             return false
         }
         journey?.started = true
         journey?.startedAt = match.frame
         journey?.deadline = match.frame + Opponent.journeySpareFrames * 3
         journey?.startY = me.position.y
-        if let journey { play(journey, me: me, into: &input) }
+        if let journey { play(journey, me: me, frame: match.frame, into: &input) }
         return false
     }
 
     /// This frame of the move under way.
-    private mutating func play(_ journey: Journey, me: Player, into input: inout PlayerInput) {
+    private mutating func play(_ journey: Journey, me: Player, frame: Int, into input: inout PlayerInput) {
         guard let terrain else { return }
         input = Terrain.input(for: journey.link, body: me, startY: journey.startY, target: terrain.surfaces[journey.link.to],
-                              leftGround: journey.leftGround, jumpWasDown: pressed.jump, halfWidth: terrain.halfWidth)
+                              leftGround: journey.leftGround, jumpWasDown: pressed.jump, halfWidth: terrain.halfWidth, framesIn: frame - journey.startedAt)
         if input.jump, !journey.leftGround, me.state != .suspended { wantsFullHop = true }
     }
 
@@ -174,7 +183,7 @@ extension Opponent {
         guard let here = surface(of: me, in: match) else { return journey?.started == true ? journey!.link.landing : me.position.x }
         if here == goal.surface { return point.x }
         // No way now, a tornado down: nowhere to go but here.
-        guard let link = terrain.route(from: here, to: goal.surface, usable: { usable($0, $1, match) })?.first else { return me.position.x }
+        guard let link = route(from: here, to: goal.surface, match: match, me: me)?.first else { return me.position.x }
         return abs(link.takeoff - me.position.x) > 3 ? link.takeoff : link.landing
     }
 
@@ -203,7 +212,9 @@ extension Opponent {
     }
 
     /// Held in a tornado that lets go within this many frames, it's time to be out of it.
-    static let tornadoLeaveFrames = 60
+    static let tornadoLeaveFrames = 40
+    /// Held in one that holds this much longer, there's time to jump out before it lets go.
+    static let tornadoHeldSafeFrames = 30
 
     /// Held in a tornado about to burst, sink or go fire: out of it now, onto solid ground, the
     /// way toward where it's headed if there's a choice. True while it's doing that.
@@ -211,8 +222,11 @@ extension Opponent {
         guard let terrain, me.state == .suspended, let here = surface(of: me, in: match),
               !(0...Opponent.tornadoLeaveFrames).allSatisfy({ TornadoRules.holds(at: match.frame + $0) && !TornadoRules.isFire(at: match.frame + $0) })
         else { return false }
-        let ways = terrain.links(from: here).filter { terrain.surfaces[$0.to].tornado == nil }
-        guard let way = ways.min(by: { abs(terrain.surfaces[$0.to].clamp(goal.x) - goal.x) + $0.cost < abs(terrain.surfaces[$1.to].clamp(goal.x) - goal.x) + $1.cost })
+        // On the way to where it's headed if that's open now, onto solid ground otherwise.
+        let onward = terrain.standing(nearest: goal).flatMap { route(from: here, to: $0.surface, match: match, me: me)?.first }
+        // Short of time, only the jump: drifting out is too slow.
+        let ways = terrain.links(from: here).filter { terrain.surfaces[$0.to].tornado == nil && $0.kind == .hop }
+        guard let way = onward ?? ways.min(by: { abs(terrain.surfaces[$0.to].clamp(goal.x) - goal.x) + $0.cost < abs(terrain.surfaces[$1.to].clamp(goal.x) - goal.x) + $1.cost })
         else { return false }
         if abs(me.position.x - way.takeoff) > 2 {
             // Let the pull bring it to the middle the jump was tried from.
@@ -221,7 +235,7 @@ extension Opponent {
             return true
         }
         journey = Journey(from: here, link: way, deadline: match.frame + Opponent.journeySpareFrames * 3, started: true, startedAt: match.frame, startY: me.position.y)
-        play(journey!, me: me, into: &input)
+        play(journey!, me: me, frame: match.frame, into: &input)
         return true
     }
 
@@ -264,6 +278,22 @@ extension Opponent {
         }
     }
 
+    /// Dribbling at a ledge over the lava, the ball's bounce would land in it: back a step from the
+    /// edge, unless a move off it is about to be taken from there.
+    func keepTheDribbleOffTheLava(_ match: Match, me: Player, into input: inout PlayerInput) {
+        guard let lava = match.stage.features.lavaSurface, me.hasBall, me.grounded, !input.jump,
+              Animation.dribbles.contains(me.animationFrame.animation), let offset = BallLandmarks.offset(me.animationFrame) else { return }
+        if let journey, abs(journey.link.takeoff - me.position.x) <= 10 { return }
+        let ahead = offset.x / 1.6 * me.spec.scale * me.facing.sign
+        // Where the ball would be the next few frames, the stick carrying it on.
+        let ballX = me.position.x + ahead + input.stick.x * 4
+        guard me.position.y - match.stage.drop(fromX: ballX, y: me.position.y) < lava else { return }
+        input.stick = Vec2(x: me.facing == .right ? -0.6 : 0.6, y: 0)
+    }
+
+    /// A step's worth of frames: how far ahead a walk is played before it's let go.
+    static let safetyStepFrames = 6
+
     /// Where a body ends up playing an input out.
     enum Fate: Equatable { case ground, tornado, lava, unknown }
 
@@ -274,14 +304,23 @@ extension Opponent {
         let follow: (Player, Bool, Bool) -> PlayerInput
         if let journey, journey.started {
             let target = terrain.surfaces[journey.link.to]
+            var framesIn = match.frame - journey.startedAt
             follow = { body, left, jumpWasDown in
-                Terrain.input(for: journey.link, body: body, startY: journey.startY, target: target, leftGround: left || journey.leftGround,
-                              jumpWasDown: jumpWasDown, halfWidth: terrain.halfWidth)
+                framesIn += 1
+                return Terrain.input(for: journey.link, body: body, startY: journey.startY, target: target, leftGround: left || journey.leftGround,
+                                     jumpWasDown: jumpWasDown, halfWidth: terrain.halfWidth, framesIn: framesIn)
             }
         } else {
+            // On the ground the stick for a step, then let go: it decides again every frame, and
+            // stops at an edge it means to stop at. In the air, held, as it falls.
             let stick = input.stick
             let holdJump = input.jump
-            follow = { body, _, _ in PlayerInput(stick: stick, jump: holdJump && body.state == .jumpSquat) }
+            let stepFrames = me.grounded && !input.jump ? Opponent.safetyStepFrames : Int.max
+            var frames = 0
+            follow = { body, _, _ in
+                frames += 1
+                return PlayerInput(stick: frames < stepFrames ? stick : .zero, jump: holdJump && body.state == .jumpSquat)
+            }
         }
         if fate(of: input, then: follow, me: me, match: match) != .lava { return }
         var best: (input: PlayerInput, score: Double)?
@@ -327,7 +366,7 @@ extension Opponent {
             if body.state == .suspended {
                 if inside == nil {
                     body.enter(.air)
-                } else if TornadoRules.sunkShare(at: at) == 0, (0...Opponent.tornadoLeaveFrames + 15).allSatisfy({ TornadoRules.holds(at: at + $0) && !TornadoRules.isFire(at: at + $0) }) {
+                } else if TornadoRules.sunkShare(at: at) == 0, (0...Opponent.tornadoHeldSafeFrames).allSatisfy({ TornadoRules.holds(at: at + $0) && !TornadoRules.isFire(at: at + $0) }) {
                     // Held, and held a while yet: time to get out when it's due.
                     return .tornado
                 }
@@ -335,7 +374,7 @@ extension Opponent {
                 body.enter(.suspended)
                 body.tornadoCentre = inside.center
                 // Held: safe as long as it's up, not rising out of the lava, and holds a while yet.
-                if TornadoRules.sunkShare(at: at) == 0, (0...Opponent.tornadoLeaveFrames + 30).allSatisfy({ TornadoRules.holds(at: at + $0) && !TornadoRules.isFire(at: at + $0) }) { return .tornado }
+                if TornadoRules.sunkShare(at: at) == 0, (0...Opponent.tornadoHeldSafeFrames).allSatisfy({ TornadoRules.holds(at: at + $0) && !TornadoRules.isFire(at: at + $0) }) { return .tornado }
             }
             if !body.grounded, body.state != .suspended, body.state != .jumpSquat { leftGround = true }
             if leftGround, body.grounded { return .ground }
@@ -521,7 +560,7 @@ extension Opponent {
         var scored: [(spot: ShotSpot, score: Double)] = []
         for spot in search.found {
             guard let goal = terrain.standing(nearest: spot.feet),
-                  let way = terrain.route(from: here, to: goal.surface, usable: { usable($0, $1, match) }) else { continue }
+                  let way = route(from: here, to: goal.surface, match: match, me: me) else { continue }
             var score = way.reduce(0) { $0 + $1.cost } + abs(spot.feet.x - me.position.x) * 0.5
             let between = (human.position.x - me.position.x) * (spot.feet.x - human.position.x) > 0
             if between, abs(human.position.y - spot.feet.y) < 30 { score += 80 }

@@ -132,6 +132,7 @@ public struct Opponent: Equatable {
             input = PlayerInput()
         } else if readsStage, me.state != .jumpSquat {
             if journey?.started != true { dodgeHazards(match, me: me, into: &input) }
+            if journey?.started != true { keepTheDribbleOffTheLava(match, me: me, into: &input) }
             keepOffTheLava(match, me: me, into: &input)
         }
         pressed = input
@@ -540,7 +541,9 @@ public struct Opponent: Equatable {
             planFrames = 40
         }
         // They crowd it: away, straight past, or the floater up and over them.
-        if abs(gap) < 16, level, !committed, ![.dart, .retreat, .over, .lob, .dunk].contains(plan) {
+        // Off the court only when they're on the side it's going.
+        let crowding = !readsStage || (abs(toWay) >= 1 && (gap > 0) == (toWay > 0))
+        if crowding, abs(gap) < 16, level, !committed, ![.dart, .retreat, .over, .lob, .dunk].contains(plan) {
             switch roll(10) {
             case 0...3: plan = .dart
             case 4...6: plan = .retreat

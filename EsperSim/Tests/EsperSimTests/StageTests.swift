@@ -512,3 +512,35 @@ final class CarBoundsTests: XCTestCase {
         XCTAssertNil(stage.wall(beside: Box(min: Vec2(x: Stage.tileSize, y: 60), max: Vec2(x: Stage.tileSize + 10, y: 77.5))))
     }
 }
+
+/// The Elements: a dribble bouncing off a ledge down into the lava loses the ball to it.
+final class LavaDribbleTests: XCTestCase {
+    private func dribbling(at x: Double) -> Match {
+        var match = Match(stage: .elements, specs: [.starting, .starting])
+        match.countdown = 0
+        match.players[0].position = Vec2(x: x, y: 100)
+        match.players[0].facing = .right
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        match.players[1].position = Vec2(x: 600, y: 100)
+        return match
+    }
+
+    func testADribbleOverTheLavaLosesTheBall() {
+        var match = dribbling(at: 155)
+        var splashed = false
+        for _ in 0..<120 where !splashed {
+            match.advance(inputs: [.idle, .idle])
+            splashed = match.events.contains { if case .lavaSplashed(_, true) = $0 { return true } else { return false } }
+        }
+        XCTAssertTrue(splashed)
+        XCTAssertNil(match.ball.holder)
+        XCTAssertFalse(match.players[0].hasBall)
+    }
+
+    func testADribbleOverTheRockKeepsIt() {
+        var match = dribbling(at: 90)
+        for _ in 0..<240 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.ball.holder, 0)
+    }
+}

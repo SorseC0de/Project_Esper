@@ -2636,14 +2636,17 @@ final class GameScene: SKScene {
         // Over the water's tint.
         mark.zPosition = 97
         mark.setScale(0.1)
-        let grow = SKAction.scale(to: 1.2, duration: 0.8)
+        let grow = SKAction.scale(to: 1, duration: 0.3)
         grow.timingMode = .easeOut
-        mark.run(.sequence([.group([grow, .sequence([.wait(forDuration: 0.3), .fadeOut(withDuration: 0.5)])]), .removeFromParent()]))
+        // Up to size, held there a while, then on out a little more as it fades.
+        mark.run(.sequence([grow, .wait(forDuration: GameScene.doubleMarkHoldSeconds),
+                            .group([.scale(to: 1.2, duration: 0.5), .fadeOut(withDuration: 0.5)]), .removeFromParent()]))
         parent.addChild(mark)
     }
     /// The 2X mark's height, and how far over the rim it stands, in art pixels.
     private static let doubleMarkHeight: CGFloat = 20
     private static let doubleMarkLift: CGFloat = 20
+    private static let doubleMarkHoldSeconds = 1.2
 
     /// 47's basket, confirmed on both sides: the tally, and the win at 47, the sim stopped on
     /// the same frame online for the screen. Nothing else stops play.
@@ -3201,21 +3204,12 @@ final class GameScene: SKScene {
         if GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) { play(.ballBounce, at: feet, volume: GameScene.dribbleVolume) }
     }
 
-    /// The frames of a sheet where the ball in hand is at its lowest, under five art pixels
-    /// off the floor and no higher than the frames either side: where it meets the floor.
-    /// The dribble's bounce at this share of a loose ball's.
+    /// The dribble's bounce at this share of a loose ball's, on the frames it meets the floor.
     private static let dribbleVolume: Float = 0.5
     private static var bounceFramesCache: [Animation: Set<Int>] = [:]
     private static func dribbleBounceFrames(of animation: Animation) -> Set<Int> {
         if let cached = bounceFramesCache[animation] { return cached }
-        let count = animation.frameCount
-        let heights = (0..<count).map { BallLandmarks.offset(AnimationFrame(animation, $0))?.y }
-        var frames = Set<Int>()
-        for index in 0..<count {
-            guard let height = heights[index], height < 5 else { continue }
-            let neighbours = [heights[(index + count - 1) % count], heights[(index + 1) % count]].compactMap { $0 }
-            if neighbours.allSatisfy({ height <= $0 }) { frames.insert(index) }
-        }
+        let frames = animation.dribbleBounceFrames()
         bounceFramesCache[animation] = frames
         return frames
     }
@@ -5140,7 +5134,7 @@ final class GameScene: SKScene {
             if player.holding, let landmark = sprites.landmark(.ball, in: frame, player: index) {
                 let inHand = landmark * drawScale
                 let ballX = player.position.x + Double(inHand.x) * player.facing.sign / SpriteLibrary.pixelsPerUnit
-                let dribbling = [Animation.dribbleIdle, .dribbleWalk, .dribbleRun].contains(frame.animation)
+                let dribbling = Animation.dribbles.contains(frame.animation)
                 let drop = player.grounded && dribbling ? match.stage.drop(fromX: ballX, y: player.position.y) * SpriteLibrary.pixelsPerUnit : 0
                 let phase = min(max(inHand.y / (CGFloat(BallRules.dribbleHandHeight) * drawScale), 0), 1)
                 let y = inHand.y - CGFloat(drop) * (1 - phase)
@@ -5428,8 +5422,8 @@ final class GameScene: SKScene {
                 let ballAt = finishTarget ?? cameraBase
                 cameraNode.position = cameraBase + (ballAt - cameraBase) * eased
                 cameraNode.setScale(cameraBaseScale * (1 - (1 - GameScene.finishZoom) * eased))
-                if match.stage.features.look == .wetshot {
-                    // Hoopfish Hideaway fills the screen's width: closing in, the view stays inside its sides.
+                if [StageLook.wetshot, .elements].contains(match.stage.features.look) {
+                    // Closing in, the view stays inside the stage's sides.
                     let halfSeen = size.width * cameraNode.xScale / 2, stageWidth = SpriteLibrary.point(Vec2(x: match.stage.width, y: 0)).x
                     cameraNode.position.x = min(max(cameraNode.position.x, halfSeen), max(stageWidth - halfSeen, halfSeen))
                 }

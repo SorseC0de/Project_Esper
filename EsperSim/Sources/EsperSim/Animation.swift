@@ -230,3 +230,22 @@ extension Player {
         }
     }
 }
+
+extension Animation {
+    /// The frames of a sheet where the ball in hand is at its lowest, under five art pixels off
+    /// the floor and no higher than the frames either side: where a dribble meets the floor.
+    public func dribbleBounceFrames() -> Set<Int> {
+        let count = frameCount
+        let heights = (0..<count).map { BallLandmarks.offset(AnimationFrame(self, $0))?.y }
+        var frames = Set<Int>()
+        for index in 0..<count {
+            guard let height = heights[index], height < 5 else { continue }
+            let neighbours = [heights[(index + count - 1) % count], heights[(index + 1) % count]].compactMap { $0 }
+            if neighbours.allSatisfy({ height <= $0 }) { frames.insert(index) }
+        }
+        return frames
+    }
+
+    /// The dribble's sheets, whose ball reaches down off a ledge to the floor under it.
+    public static let dribbles: [Animation] = [.dribbleIdle, .dribbleWalk, .dribbleRun]
+}

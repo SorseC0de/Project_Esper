@@ -98,24 +98,32 @@ final class OpponentStageTests: XCTestCase {
 }
 
 final class OpponentDuelTests: XCTestCase {
-    /// Two computers against each other a minute and a half on each stage it reads: points go in,
-    /// and the lava takes hardly anyone.
+    /// Two computers against each other on each stage it reads, three pairings: points go in, and
+    /// the lava takes nobody who wasn't knocked into it.
     func testTwoComputersPlayEachStage() {
         // Longball's field takes a few minutes a point; its attack is tested on its own.
         for stage in [Stage.elements, .wetshot] {
-            var match = Match(stage: stage, specs: [.starting, .starting])
-            match.countdown = 0
-            var brains = [Opponent(index: 0, seed: 3), Opponent(index: 1, seed: 7)]
-            var burns = [0, 0]
-            for _ in 0..<5400 {
-                let inputs = [brains[0].decide(match), brains[1].decide(match)]
-                match.advance(inputs: inputs)
-                for event in match.events { if case .lavaBurned(let player) = event { burns[player] += 1 } }
-                if match.finished { break }
+            var points = 0, unforced = 0
+            for pairing in 0..<3 {
+                var match = Match(stage: stage, specs: [.starting, .starting])
+                match.countdown = 0
+                var brains = [Opponent(index: 0, seed: UInt32(3 + pairing * 4)), Opponent(index: 1, seed: UInt32(7 + pairing * 4))]
+                var knocked = [false, false]
+                for _ in 0..<5400 {
+                    let inputs = [brains[0].decide(match), brains[1].decide(match)]
+                    // Hit lately, it's flying where the hit sent it: a burn from that is the other's doing.
+                    for player in 0..<2 {
+                        if match.players[player].hitStun > 0 || match.players[player].knockedAloft { knocked[player] = true }
+                        if match.players[player].grounded { knocked[player] = false }
+                    }
+                    match.advance(inputs: inputs)
+                    for event in match.events { if case .lavaBurned(let player) = event, !knocked[player] { unforced += 1 } }
+                    if match.finished { break }
+                }
+                points += match.scores.reduce(0, +)
             }
-            XCTAssertGreaterThan(match.scores.reduce(0, +), 0, "\(stage.features.look)")
-            // Knocked off a tornado by the other's swing is fair; walking or jumping into the lava isn't.
-            XCTAssertLessThanOrEqual(burns.reduce(0, +), 2, "\(stage.features.look)")
+            XCTAssertGreaterThan(points, 0, "\(stage.features.look)")
+            XCTAssertLessThanOrEqual(unforced, 2, "\(stage.features.look)")
         }
     }
 }

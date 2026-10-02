@@ -1895,11 +1895,7 @@ final class GameScene: SKScene {
             // A school keeps one colour.
             let colour = Int.random(in: 0..<2)
             for member in 0..<Int.random(in: kind.groupSize) {
-                let memberFrames = kind == .fish ? frames.map { frame in
-                    let half = SKTexture(rect: CGRect(x: CGFloat(colour) * 0.5, y: 0, width: 0.5, height: 1), in: frame)
-                    half.filteringMode = .nearest
-                    return half
-                } : frames
+                let memberFrames = kind == .fish ? fishFrames(colour: colour, sheet: frames) : frames
                 let node = SKSpriteNode(texture: memberFrames[0])
                 let startX = cameraNode.position.x + (fromLeft ? -1 : 1) * (halfWidth + 40 + CGFloat(member) * kind.spacing)
                 node.position = CGPoint(x: startX, y: baseY + (member == 0 ? 0 : CGFloat.random(in: -kind.spread...kind.spread)))
@@ -1911,6 +1907,26 @@ final class GameScene: SKScene {
                                         bobRate: .random(in: kind.bobRate), phase: .random(in: 0...GameScene.breathSeconds)))
             }
         }
+    }
+
+    /// One colour of fish, its half of each frame, cut from the frame's own picture: a rect
+    /// of an atlas texture is read against the whole atlas page, not the frame. Cut once.
+    private var fishColours: [[SKTexture]] = []
+    private func fishFrames(colour: Int, sheet: [SKTexture]) -> [SKTexture] {
+        if fishColours.isEmpty {
+            fishColours = (0..<2).map { side in
+                sheet.compactMap { frame -> SKTexture? in
+                    let picture = frame.cgImage()
+                    let half = picture.width / 2
+                    guard let cut = picture.cropping(to: CGRect(x: side * half, y: 0, width: half, height: picture.height)) else { return nil }
+                    let texture = SKTexture(cgImage: cut)
+                    texture.filteringMode = .nearest
+                    return texture
+                }
+            }
+        }
+        let frames = fishColours[min(colour, fishColours.count - 1)]
+        return frames.isEmpty ? sheet : frames
     }
 
     /// A sea creature's sheet: the jellyfish's one cell of the bubbles sheet, the fish's

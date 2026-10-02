@@ -902,12 +902,21 @@ south-east, its fill split at its own middle. The word pops from 0.3 through 1.1
 warp grid flares it (near end squeezed, far end spread, middle arched), holds 0.5s, then rises
 and fades. The words never glow: the mask draws them flat, warp and all.
 
-A word stays off the action as JUS's do: of a list of spots round what made it, 10 art pixels
-clear, it takes the first that covers least of the bodies, the loose ball and the other words,
-kept on screen. For an event the list runs off to the side it flares and up, straight up, the
-other side and up, level either side, higher, then below; for a basket, beside the net
+A word comes from where its sound is made and stays off the action as JUS's do: of a list of
+spots round that place, it takes the first that covers least of the bodies, the loose ball and
+the other words, kept on screen. In the air the list runs off to the side it flares and up (10 art
+pixels clear), straight up, the other side and up, level either side, higher, then below. What
+the feet or the floor make is said low, standing on the feet's line 10 pixels out from their
+middle, the flaring side first, then the other, then a little up: the wall jump's squeak at the
+feet (9 high, now), the quake, a lava burn, and the footsteps. A slash on a wall says it where the
+blade meets the wall, 8 units ahead of the chest. For a basket the list runs beside the net
 courtward, then up or down that side, leaving the rim's top to the 2X. A word flares and tilts
 away from whoever caused it.
+
+Footfalls: on the frames of the walk (2 and 6) and run (1 and 5, the dash's too) cycles a foot
+comes down, `dust_walk` or `dust_run` puffs up 2 units behind the feet, bottom-aligned, at 12 a
+second in the energy colour as the dash's smoke is (not under water); every fourth footfall,
+from the first, says TAP / テク walking or THUMP / ダッ running, 8 and 9 high, by the feet.
 
 | | JP | EN |
 |---|---|---|
@@ -920,6 +929,7 @@ away from whoever caused it.
 | Parry | キィン！ | TING! |
 | Slash on a wall | ガキン | CLANG |
 | Wall jump | キュッ | SQUEAK |
+| Footsteps, walking / running | テク / ダッ | TAP / THUMP |
 | Z Tea's beam / burst | ズドドドド / ドオォン！ | VWOOOM / BOOOM! |
 | Quake | ゴゴゴゴ | RUMBLE |
 | Freeze | ピキッ！ | CRACK! |

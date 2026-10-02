@@ -815,11 +815,12 @@ enum Effect {
     case smoke, jumpSpark, catchSpark, wallJumpSpark
     case fireJump, fireDash, fireWallSpark, fireSkid, fireTrail, fireCharge, fireCharge2, fireExplosion, fireballSummon
     case flashSpark, flashSpark2
+    case dustWalk, dustRun
 
-    static let inEnergyColour: [Effect] = [.smoke, .jumpSpark, .catchSpark]
-    /// Toned no lighter than the energy colour itself: the jump spark, and the smoke of the
-    /// dash and slide. The catch spark keeps the paler ramp.
-    static let sparkNames: Set<String> = [Effect.smoke.name, Effect.jumpSpark.name]
+    static let inEnergyColour: [Effect] = [.smoke, .jumpSpark, .catchSpark, .dustWalk, .dustRun]
+    /// Toned no lighter than the energy colour itself: the jump spark, the smoke of the
+    /// dash and slide, and the footfalls' dust. The catch spark keeps the paler ramp.
+    static let sparkNames: Set<String> = [Effect.smoke.name, Effect.jumpSpark.name, Effect.dustWalk.name, Effect.dustRun.name]
 
     var name: String {
         switch self {
@@ -838,6 +839,8 @@ enum Effect {
         case .fireballSummon: "fireball_summon"
         case .flashSpark: "flashspark"
         case .flashSpark2: "flashspark2"
+        case .dustWalk: "dust_walk"
+        case .dustRun: "dust_run"
         }
     }
 
@@ -857,7 +860,7 @@ enum Effect {
     var fps: Double {
         switch self {
         case .catchSpark: 15
-        case .smoke, .wallJumpSpark: 12
+        case .smoke, .wallJumpSpark, .dustWalk, .dustRun: 12
         default: 24
         }
     }

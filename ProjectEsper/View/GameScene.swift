@@ -2822,6 +2822,44 @@ final class GameScene: SKScene {
     private static let wordTilt: CGFloat = 8 * .pi / 180
     /// The space a word keeps from what it's about, in art pixels.
     private static let wordGap: CGFloat = 10
+    /// How far from the feet's middle a low word starts: past the body's half width, in art pixels.
+    private static let besideFeet: CGFloat = 10
+    /// How far ahead of the chest a slash's blade meets a wall, in units.
+    private static let bladeReach = 8.0
+
+    /// Footfalls: on the frames of the walk and run cycles a foot comes down, a puff of dust
+    /// off it in the player's energy colour (not under water), and every other cycle a
+    /// footstep word beside the feet.
+    private var footPhases: [Int: Int] = [:]
+    private var footfallCounts: [Int: Int] = [:]
+    private static let walkFootfalls: Set<Int> = [2, 6]
+    private static let runFootfalls: Set<Int> = [1, 5]
+    /// Footfalls to a footstep word.
+    private static let footfallsPerWord = 4
+    private func stepFootfalls() {
+        guard !wholeStageView else { return }
+        for (index, player) in match.players.enumerated() {
+            let running = player.state == .run || player.state == .dash
+            guard player.grounded, running || player.state == .walk else { footPhases[index] = nil; footfallCounts[index] = 0; continue }
+            let frame = Int(player.animationPhase) % 8
+            defer { footPhases[index] = frame }
+            guard footPhases[index] != frame, (running ? GameScene.runFootfalls : GameScene.walkFootfalls).contains(frame) else { continue }
+            let dust: Effect = running ? .dustRun : .dustWalk
+            if dust.available, !match.stage.features.underwater {
+                // Kicked up behind the feet.
+                spawn(dust, at: player.position + Vec2(x: -player.facing.sign * GameScene.dustBehind, y: 0),
+                      flipped: player.facing == .left, player: index, scale: bodyScale(index))
+            }
+            let count = footfallCounts[index, default: 0]
+            footfallCounts[index] = count + 1
+            if count % GameScene.footfallsPerWord == 0 {
+                soundWords.removeAll { $0.parent == nil }
+                say(running ? .run : .walk, at: player.position, from: player.position + Vec2(x: player.facing.sign, y: 0), low: true)
+            }
+        }
+    }
+    /// How far behind the feet the dust starts, in units.
+    private static let dustBehind = 2.0
 
     /// A sound word near `anchor`, kept off the action as Jump Ultimate Stars does: of the spots
     /// `spots` offers for a word that size, the first that covers least of the bodies, the
@@ -2859,24 +2897,31 @@ final class GameScene: SKScene {
         })
     }
 
+    /// A sound word where its sound is made, flaring away from `from` when there is one. In
+    /// the air: off to that side and up first, then straight up, the other side, level,
+    /// higher, and below. `low`, for what the feet or the floor make: standing on that
+    /// line beside it, that side first, then the other, then a little up.
+    private func say(_ sound: Onomatopoeia.Sound, at: Vec2, from: Vec2? = nil, low: Bool = false) {
+        let away: CGFloat = from.map { at.x >= $0.x ? 1 : -1 } ?? 1
+        let gap = GameScene.wordGap
+        sayClear(sound, near: SpriteLibrary.point(at), away: away) { width, height in
+            low ? [CGPoint(x: away * (width / 2 + GameScene.besideFeet), y: height / 2),
+                   CGPoint(x: -away * (width / 2 + GameScene.besideFeet), y: height / 2),
+                   CGPoint(x: away * (width / 2 + GameScene.besideFeet), y: height / 2 + gap * 2),
+                   CGPoint(x: -away * (width / 2 + GameScene.besideFeet), y: height / 2 + gap * 2)]
+                : [CGPoint(x: away * (width / 2 + gap), y: height / 2 + gap),
+                   CGPoint(x: 0, y: height / 2 + gap * 2),
+                   CGPoint(x: -away * (width / 2 + gap), y: height / 2 + gap),
+                   CGPoint(x: away * (width / 2 + gap * 2), y: 0),
+                   CGPoint(x: -away * (width / 2 + gap * 2), y: 0),
+                   CGPoint(x: 0, y: height + gap * 4),
+                   CGPoint(x: away * (width / 2 + gap), y: -(height / 2 + gap * 2))]
+        }
+    }
+
     /// The manga sounds for a frame's events, shown once like the effects.
     private func exclaim(_ events: [MatchEvent]) {
         soundWords.removeAll { $0.parent == nil }
-        /// Near `at`, flaring away from `from` when there is one: off to that side and up
-        /// first, then straight up, the other side, level, higher, and below.
-        func say(_ sound: Onomatopoeia.Sound, at: Vec2, from: Vec2? = nil) {
-            let away: CGFloat = from.map { at.x >= $0.x ? 1 : -1 } ?? 1
-            let gap = GameScene.wordGap
-            sayClear(sound, near: SpriteLibrary.point(at), away: away) { width, height in
-                [CGPoint(x: away * (width / 2 + gap), y: height / 2 + gap * 2),
-                 CGPoint(x: 0, y: height / 2 + gap * 3),
-                 CGPoint(x: -away * (width / 2 + gap), y: height / 2 + gap * 2),
-                 CGPoint(x: away * (width / 2 + gap * 2), y: 0),
-                 CGPoint(x: -away * (width / 2 + gap * 2), y: 0),
-                 CGPoint(x: 0, y: height + gap * 5),
-                 CGPoint(x: away * (width / 2 + gap), y: -(height / 2 + gap * 2))]
-            }
-        }
         let players = match.players
         for event in events {
             switch event {
@@ -2884,14 +2929,20 @@ final class GameScene: SKScene {
             case .popped(let victim, let popper): say(.steal, at: players[victim].heldBallPoint, from: players[popper].chest)
             case .swatted(let index, hit: true): say(.spike, at: match.ball.position, from: players[index].chest)
             case .parried(let victim, let by): say(.parry, at: players[victim].chest, from: players[by].chest)
-            case .slashClanked(let index): say(.clang, at: players[index].chest)
-            case .wallJumped(let index, let wall): say(.squeak, at: players[index].position, from: players[index].position + Vec2(x: wall.sign, y: 0))
+            case .slashClanked(let index):
+                // Where the blade meets the wall.
+                let player = players[index]
+                say(.clang, at: player.chest + Vec2(x: player.facing.sign * GameScene.bladeReach, y: 0), from: player.chest)
+            case .wallJumped(let index, let wall):
+                // The shoe on the wall: at the feet, off away from it.
+                let feet = players[index].position
+                say(.squeak, at: feet, from: feet + Vec2(x: wall.sign, y: 0), low: true)
             case .beamFired(_, let from, let direction): say(.beam, at: from, from: from - direction)
             case .zBurst(_, let at): say(.burst, at: at)
-            case .quaked(let index): say(.quake, at: players[index].position)
+            case .quaked(let index): say(.quake, at: players[index].position, low: true)
             case .frozen(let index): say(.freeze, at: players[index].chest)
             case .fireballBurst(let at), .stageFireballBurst(let at): say(.explosion, at: at)
-            case .lavaBurned(let index): say(.sizzle, at: players[index].position)
+            case .lavaBurned(let index): say(.sizzle, at: players[index].position, low: true)
             case .lavaSplashed(let at, true): say(.sizzle, at: at)
             case .icicleShattered(let at): say(.shatter, at: at)
             case .lightningStruck(let at): say(.thunder, at: at)
@@ -5735,6 +5786,7 @@ final class GameScene: SKScene {
         placeStageFireball()
         blowWind()
         stepWater()
+        stepFootfalls()
         splashRain()
         sizzleRain()
         riseLightningDots()

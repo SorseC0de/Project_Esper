@@ -8,6 +8,7 @@ struct BodySnapshot {
     var xScale: CGFloat
     var size: CGSize
     var zRotation: CGFloat = 0
+    var warp: SKWarpGeometry? = nil
 }
 
 /// The bodies alone on black, drawn by its own renderer for the glow's mask, and in pure
@@ -134,6 +135,7 @@ final class MaskScene: SKScene {
             node.position = snapshot.position
             node.xScale = snapshot.xScale
             node.zRotation = snapshot.zRotation
+            node.warpGeometry = snapshot.warp
         }
     }
 }

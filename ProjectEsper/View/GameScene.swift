@@ -143,6 +143,8 @@ final class GameScene: SKScene {
     private let ground = SKNode()
     private let bodies = SKNode()
     private let glowers = SKNode()
+    /// The manga sound words on screen, kept out of the glow.
+    private var soundWords: [SKNode] = []
     /// The sim's boxes drawn over the world while the HITBOX toggle is on: bodies, the
     /// loose ball, the catch reach round each chest, and any live leg, blade or reach.
     private let hitboxLayer = SKNode()
@@ -517,6 +519,13 @@ final class GameScene: SKScene {
         // And its rain, over everything.
         if !rainLayer.isHidden {
             flat += rainTiles.joined().filter { !$0.isHidden }.compactMap { GameScene.snapshot($0, above: ElementsArt.lavaSurfaceLine) }
+        }
+        // The sound words, drawn as they are to stay readable.
+        for holder in soundWords where holder.parent != nil {
+            guard let sprite = holder.children.first as? SKSpriteNode, let texture = sprite.texture else { continue }
+            flat.append(BodySnapshot(texture: texture, position: holder.position, anchor: sprite.anchorPoint, xScale: 1,
+                                     size: CGSize(width: sprite.size.width * holder.xScale, height: sprite.size.height * holder.yScale),
+                                     zRotation: holder.zRotation, warp: sprite.warpGeometry))
         }
         // The snipe's cursors, drawn as they are.
         for cursor in snipeCursors where !cursor.isHidden {
@@ -2027,6 +2036,10 @@ final class GameScene: SKScene {
         controls.addPicker(title: "COUNT", options: ["A", "B"], selected: UserDefaults.standard.integer(forKey: SoundBoard.countSetKey)) { index in
             UserDefaults.standard.set(index, forKey: SoundBoard.countSetKey)
         }
+        controls.addPicker(title: "SFX", options: Onomatopoeia.Lettering.allCases.map(\.label), selected: Onomatopoeia.lettering.rawValue) { [weak self] index in
+            Onomatopoeia.lettering = Onomatopoeia.Lettering(rawValue: index) ?? .dotGothic
+            self?.previewSoundWord()
+        }
         controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
@@ -2708,6 +2721,108 @@ final class GameScene: SKScene {
                             .group([.scale(to: 1.2, duration: 0.5), .fadeOut(withDuration: 0.5)]), .removeFromParent()]))
         parent.addChild(mark)
     }
+    /// The made basket's sound beside its net, flaring out toward the court.
+    private func exclaimBasket(at hoop: Int, dunk: Bool, three: Bool) {
+        guard hoop < rimNodes.count else { return }
+        let rim = rimNodes[hoop].position
+        let courtward: CGFloat = rim.x < SpriteLibrary.point(Vec2(x: match.stage.width / 2, y: 0)).x ? 1 : -1
+        let sound: Onomatopoeia.Sound = dunk ? .dunk : three ? .three : .swish
+        // Beside the net first, then up or down the court side; the 2X takes the spot over the rim.
+        sayClear(sound, near: rim, away: courtward) { width, height in
+            [CGPoint(x: courtward * (width / 2 + GameScene.wordGap * 2), y: GameScene.basketWordDrop),
+             CGPoint(x: courtward * (width / 2 + GameScene.wordGap), y: height / 2 + GameScene.wordGap),
+             CGPoint(x: courtward * (width / 2 + GameScene.wordGap), y: -(height / 2 + GameScene.wordGap * 2))]
+        }
+    }
+    private static let basketWordDrop: CGFloat = -12
+    private static let wordTilt: CGFloat = 8 * .pi / 180
+    /// The space a word keeps from what it's about, in art pixels.
+    private static let wordGap: CGFloat = 10
+
+    /// A sound word near `anchor`, kept off the action as Jump Ultimate Stars does: of the spots
+    /// `spots` offers for a word that size, the first that covers least of the bodies, the
+    /// ball and the other words, on the screen. It flares and tilts to the `away` side.
+    private func sayClear(_ sound: Onomatopoeia.Sound, near anchor: CGPoint, away: CGFloat,
+                          spots: (CGFloat, CGFloat) -> [CGPoint]) {
+        func rect(_ box: Box, grow: CGFloat) -> CGRect {
+            let low = SpriteLibrary.point(box.min), high = SpriteLibrary.point(box.max)
+            return CGRect(x: low.x, y: low.y, width: high.x - low.x, height: high.y - low.y).insetBy(dx: -grow, dy: -grow)
+        }
+        var action = match.players.map { rect($0.body, grow: 4) }
+        if match.ball.isLive { action.append(rect(match.ball.box, grow: 6)) }
+        for holder in soundWords where holder.parent != nil {
+            guard let sprite = holder.children.first as? SKSpriteNode else { continue }
+            action.append(CGRect(x: holder.position.x - sprite.size.width / 2, y: holder.position.y - sprite.size.height / 2,
+                                 width: sprite.size.width, height: sprite.size.height))
+        }
+        let viewWidth = size.width * cameraNode.xScale, viewHeight = size.height * cameraNode.yScale
+        let view = CGRect(x: cameraNode.position.x - viewWidth / 2, y: cameraNode.position.y - viewHeight / 2,
+                          width: viewWidth, height: viewHeight).insetBy(dx: GameScene.wordGap, dy: GameScene.wordGap)
+        func area(_ rect: CGRect) -> CGFloat { rect.isNull ? 0 : rect.width * rect.height }
+        soundWords.append(Onomatopoeia.show(sound, in: world, flipped: away < 0, tilt: away * GameScene.wordTilt) { wordSize in
+            // At its punch's size.
+            let width = wordSize.width * 1.15, height = wordSize.height * 1.15
+            var best = anchor, bestCost = CGFloat.infinity
+            for (order, offset) in spots(width, height).enumerated() {
+                var centre = anchor + offset
+                centre.x = min(max(centre.x, view.minX + width / 2), max(view.maxX - width / 2, view.minX + width / 2))
+                centre.y = min(max(centre.y, view.minY + height / 2), max(view.maxY - height / 2, view.minY + height / 2))
+                let word = CGRect(x: centre.x - width / 2, y: centre.y - height / 2, width: width, height: height)
+                let cost = action.reduce(0) { $0 + area($1.intersection(word)) } + CGFloat(order)
+                if cost < bestCost { best = centre; bestCost = cost }
+            }
+            return best
+        })
+    }
+
+    /// The manga sounds for a frame's events, shown once like the effects.
+    private func exclaim(_ events: [MatchEvent]) {
+        soundWords.removeAll { $0.parent == nil }
+        /// Near `at`, flaring away from `from` when there is one: off to that side and up
+        /// first, then straight up, the other side, level, higher, and below.
+        func say(_ sound: Onomatopoeia.Sound, at: Vec2, from: Vec2? = nil) {
+            let away: CGFloat = from.map { at.x >= $0.x ? 1 : -1 } ?? 1
+            let gap = GameScene.wordGap
+            sayClear(sound, near: SpriteLibrary.point(at), away: away) { width, height in
+                [CGPoint(x: away * (width / 2 + gap), y: height / 2 + gap * 2),
+                 CGPoint(x: 0, y: height / 2 + gap * 3),
+                 CGPoint(x: -away * (width / 2 + gap), y: height / 2 + gap * 2),
+                 CGPoint(x: away * (width / 2 + gap * 2), y: 0),
+                 CGPoint(x: -away * (width / 2 + gap * 2), y: 0),
+                 CGPoint(x: 0, y: height + gap * 5),
+                 CGPoint(x: away * (width / 2 + gap), y: -(height / 2 + gap * 2))]
+            }
+        }
+        let players = match.players
+        for event in events {
+            switch event {
+            case .struck(let victim, let striker): say(.hit, at: players[victim].chest, from: players[striker].chest)
+            case .popped(let victim, let popper): say(.steal, at: players[victim].heldBallPoint, from: players[popper].chest)
+            case .swatted(let index, hit: true): say(.spike, at: match.ball.position, from: players[index].chest)
+            case .parried(let victim, let by): say(.parry, at: players[victim].chest, from: players[by].chest)
+            case .slashClanked(let index): say(.clang, at: players[index].chest)
+            case .wallJumped(let index, let wall): say(.squeak, at: players[index].position, from: players[index].position + Vec2(x: wall.sign, y: 0))
+            case .beamFired(_, let from, let direction): say(.beam, at: from, from: from - direction)
+            case .zBurst(_, let at): say(.burst, at: at)
+            case .quaked(let index): say(.quake, at: players[index].position)
+            case .frozen(let index): say(.freeze, at: players[index].chest)
+            case .fireballBurst(let at), .stageFireballBurst(let at): say(.explosion, at: at)
+            case .lavaBurned(let index): say(.sizzle, at: players[index].position)
+            case .lavaSplashed(let at, true): say(.sizzle, at: at)
+            case .icicleShattered(let at): say(.shatter, at: at)
+            case .lightningStruck(let at): say(.thunder, at: at)
+            default: break
+            }
+        }
+    }
+
+    /// A sample word in the middle of the screen, for trying the SFX picker's faces.
+    private func previewSoundWord() {
+        soundWords.removeAll { $0.parent == nil }
+        let centre = cameraNode.position
+        sayClear(.three, near: centre, away: 1) { _, _ in [.zero] }
+    }
+
     /// The 2X mark's height, and how far over the rim it stands, in art pixels.
     private static let doubleMarkHeight: CGFloat = 20
     private static let doubleMarkLift: CGFloat = 20
@@ -3296,6 +3411,7 @@ final class GameScene: SKScene {
                     pointScored(by: scorer, at: frameEvents.frame)
                 }
                 if gameMode == .fortySeven, match.stage.features.doublePoints { showDoubleMark(at: hoop) }
+                exclaimBasket(at: hoop, dunk: dunk, three: shotPoints >= 3)
                 announce(dunk: dunk, three: gameMode == .fortySeven && shotPoints >= 3, floater: floater, winning: pendingFlow == .won)
             }
         }
@@ -3303,6 +3419,7 @@ final class GameScene: SKScene {
 
     private func show(_ events: [MatchEvent]) {
         playSounds(events)
+        exclaim(events)
         for event in events {
             switch event {
             case .zBurst(let player, let at):

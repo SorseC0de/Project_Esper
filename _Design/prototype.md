@@ -665,6 +665,7 @@ holds the variants; A is always the baseline as tuned. POWER's fourteen sit in t
 - HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white (10 × 17.5 units, 16 × 28 art pixels), the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
+- SFX: the sound words' face, DOT, CHERRY, CHOKO, REGGAE, YUSEI or EN (see Sound words).
 - AI, beside that: the computer plays the other side, whatever pads are in. Off, the second
   pad or nothing does. The title's VS CPU / VS HUMAN toggle is the same switch, kept between launches;
   clicking a pad's right stick (R3) switches it too.
@@ -882,6 +883,46 @@ drawn in the ice look (`Look.ice`: the front parts, the head and the torso's lig
 the back parts and the torso's shadow, the pelvis, in 49, outlined in 22; `SpriteLibrary.icePlayer`, warmed
 with the rest), the clones at 0.8; a frozen ball, loose or in hand, is `basketball_ice`, with no halo, so no glow, and holds its turn; the cape is seven short rectangles chained along the glide's trail with a wave down
 its length.
+
+### Sound words
+
+Manga sound effects over the action, Jump Ultimate Stars style (`View/Onomatopoeia.swift`), all
+katakana or all English by the SFX picker, never mixed. Its options are the kana faces DOT
+(DotGothic16, the default), CHERRY (Cherry Bomb One), CHOKO (Chokokutai), REGGAE (Reggae One)
+and YUSEI (Yusei Magic), and EN (Dirty Brush); kept between launches, and a pick pops a sample
+in the middle of the screen. The fonts are bundled in `Art/Fonts/` and registered with the
+process on first use; each face is centred and sized by its own ド or D. Dirty Brush has no "!",
+so English marks are brushed wedges; the Japanese are the faces' full-width ones. Each letter
+grows along the word to 1.35x, rocks ±7° and bobs in turn, outlined in palette 29 and dropped
+south-east, its fill split at its own middle. The word pops from 0.3 through 1.15 to 1 while a
+warp grid flares it (near end squeezed, far end spread, middle arched), holds 0.5s, then rises
+and fades. The words never glow: the mask draws them flat, warp and all.
+
+A word stays off the action as JUS's do: of a list of spots round what made it, 10 art pixels
+clear, it takes the first that covers least of the bodies, the loose ball and the other words,
+kept on screen. For an event the list runs off to the side it flares and up, straight up, the
+other side and up, level either side, higher, then below; for a basket, beside the net
+courtward, then up or down that side, leaving the rim's top to the 2X. A word flares and tilts
+away from whoever caused it.
+
+| | JP | EN |
+|---|---|---|
+| Basket, confirmed, beside the net toward the court | パサッ！ | SWISH! |
+| Three | ザシュッ！！ | SWOOSH!! |
+| Dunk | ドガァン！！ | SLAM!! |
+| Body hit | ドゴッ！ | WHAM! |
+| Ball knocked loose | バシッ！ | SMACK! |
+| Ball slashed | バチィン！ | THWACK! |
+| Parry | キィン！ | TING! |
+| Slash on a wall | ガキン | CLANG |
+| Wall jump | キュッ | SQUEAK |
+| Z Tea's beam / burst | ズドドドド / ドオォン！ | VWOOOM / BOOOM! |
+| Quake | ゴゴゴゴ | RUMBLE |
+| Freeze | ピキッ！ | CRACK! |
+| Fireball bursts | ドカーン！ | KABOOM! |
+| Lava burns, balls in lava | ジュウゥ | SIZZLE |
+| Icicles | パリーン | CRASH |
+| Lightning | バリバリッ | KRAKOOM! |
 
 ## Highway Traffic
 

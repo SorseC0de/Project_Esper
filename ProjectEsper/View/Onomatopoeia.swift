@@ -45,7 +45,7 @@ enum Onomatopoeia {
     }
 
     /// What made the sound, spelled per language.
-    enum Sound {
+    enum Sound: CaseIterable {
         case swish, three, dunk
         case hit, steal, spike, parry, clang, squeak
         case beam, burst, quake, freeze, explosion
@@ -132,6 +132,11 @@ enum Onomatopoeia {
     /// Pixels a point the lettering is drawn at, so it stays crisp scaled up into the world.
     private static let renderScale: CGFloat = 3
     nonisolated(unsafe) private static var cache: [Word: (texture: SKTexture, capShare: CGFloat)] = [:]
+
+    /// Every word drawn ahead in the picked face, so none is first drawn mid-match.
+    static func warmed() -> [SKTexture] {
+        Sound.allCases.map { rendered($0.word).texture }
+    }
 
     /// The word's sprite, sized for the world, warped flat; `show` brings it on.
     static func node(_ word: Word) -> SKSpriteNode {
@@ -228,8 +233,8 @@ enum Onomatopoeia {
         let outline = colour(29), upper = colour(word.upper), lower = colour(word.lower)
         /// Each letter turned and set on the line, `shift` off it, for `draw` to put down with
         /// its size and where its glyph is drawn from.
-        func eachLetter(_ cg: CGContext, shift: CGFloat, draw: (Letter, CGFloat, CGPoint) -> Void) {
-            for letter in letters {
+        func eachLetter(_ cg: CGContext, shift: CGFloat, only: Int? = nil, draw: (Letter, CGFloat, CGPoint) -> Void) {
+            for (index, letter) in letters.enumerated() where only == nil || only == index {
                 cg.saveGState()
                 cg.translateBy(x: pad + letter.centre.x + shift, y: lineY + letter.centre.y + shift)
                 cg.rotate(by: letter.angle)
@@ -246,8 +251,8 @@ enum Onomatopoeia {
         let brush = word.lettering.brush
         func bang(_ letter: Letter) -> Bool { brush && letter.text == "!" }
         /// The fill, each letter `upper` over `lower` split at its middle.
-        func fill(_ cg: CGContext) {
-            eachLetter(cg, shift: 0) { letter, size, origin in
+        func fill(_ cg: CGContext, only: Int? = nil) {
+            eachLetter(cg, shift: 0, only: only) { letter, size, origin in
                 split(cg, size: size, upper: upper, lower: lower) { colour in
                     if bang(letter) {
                         cg.addPath(bangPath(size: size))
@@ -259,18 +264,21 @@ enum Onomatopoeia {
                 }
             }
         }
-        // Dirty Brush's strokes are broken: its fill closed up, each letter's colours laid
-        // over the closed shape, so it reads solid.
-        let solidFill: UIImage? = brush ? closed(canvas: canvas, radius: largest * gapClosing, draw: fill).map { shape in
-            UIGraphicsImageRenderer(size: canvas, format: format).image { context in
-                let cg = context.cgContext
-                eachLetter(cg, shift: 0) { letter, size, _ in
-                    split(cg, size: size, upper: upper, lower: lower) { colour in
-                        cg.setFillColor(colour.cgColor)
-                        cg.fill(CGRect(x: -size, y: -size * 2, width: size * 2, height: size * 4))
+        // Dirty Brush's strokes are broken: each letter's fill closed up on its own, so
+        // neighbours don't fuse, and its colours laid over that shape, so it reads solid.
+        let solidFill: UIImage? = brush ? UIGraphicsImageRenderer(size: canvas, format: format).image { _ in
+            for index in letters.indices {
+                guard let shape = closed(canvas: canvas, radius: largest * gapClosing, draw: { fill($0, only: index) }) else { continue }
+                UIGraphicsImageRenderer(size: canvas, format: format).image { letterContext in
+                    let cg = letterContext.cgContext
+                    eachLetter(cg, shift: 0, only: index) { _, size, _ in
+                        split(cg, size: size, upper: upper, lower: lower) { colour in
+                            cg.setFillColor(colour.cgColor)
+                            cg.fill(CGRect(x: -size, y: -size * 2, width: size * 2, height: size * 4))
+                        }
                     }
-                }
-                shape.draw(in: CGRect(origin: .zero, size: canvas), blendMode: .destinationIn, alpha: 1)
+                    shape.draw(in: CGRect(origin: .zero, size: canvas), blendMode: .destinationIn, alpha: 1)
+                }.draw(in: CGRect(origin: .zero, size: canvas))
             }
         } : nil
         let image = UIGraphicsImageRenderer(size: canvas, format: format).image { context in

@@ -894,9 +894,11 @@ One's Latin); kept between launches, and a pick pops a sample in the middle of t
 fonts are bundled in `Art/Fonts/` and registered with the process on first use; each face is
 centred and sized by its own ド or D, and drawn at 3 pixels a point so it stays crisp in the
 world. Dirty Brush has no "!", so its marks are brushed wedges; the other faces use their own.
-Dirty Brush's strokes are broken, so its fill is closed up (grown 6% of the size, then shrunk
-back, `CIMorphologyMaximum` then `Minimum`) and each letter's colours laid over that shape: it
-reads solid, as at the font's size in a preview. Each letter
+Dirty Brush's strokes are broken, so each letter's fill is closed up on its own (grown 6% of
+the size, then shrunk back, `CIMorphologyMaximum` then `Minimum`; closed together, neighbours
+fused over the outline between them) and its colours laid over that shape: it reads solid, as at
+the font's size in a preview. Every word is drawn ahead in the picked face, with the stage's other
+drawn art and again on a pick. Each letter
 grows along the word to 1.35x, rocks ±7° and bobs in turn, outlined in palette 29 and dropped
 south-east, its fill split at its own middle. The word pops from 0.3 through 1.15 to 1 while a
 warp grid flares it (near end squeezed, far end spread, middle arched), holds 0.5s, then rises

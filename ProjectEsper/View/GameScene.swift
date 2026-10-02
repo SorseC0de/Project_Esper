@@ -2041,6 +2041,7 @@ final class GameScene: SKScene {
         }
         controls.addPicker(title: "SFX", options: Onomatopoeia.Lettering.allCases.map(\.label), selected: Onomatopoeia.lettering.rawValue, perRow: 3) { [weak self] index in
             Onomatopoeia.lettering = Onomatopoeia.Lettering(rawValue: index) ?? .cherryBomb
+            SKTexture.preload(Onomatopoeia.warmed()) {}
             self?.previewSoundWord()
         }
         controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in
@@ -4454,11 +4455,11 @@ final class GameScene: SKScene {
     }
     private static let helicopterParts = ["hull", "propeller", "spin_me"]
 
-    /// The art drawn from vectors made now, before play, and sent to the GPU: the board,
-    /// the helmets in both colours, and on the highway every vehicle and the helicopter in
-    /// its rims' colours. Each is drawn once and kept, not on its first appearance.
+    /// The art drawn from vectors made now, before play, and sent to the GPU: the sound words,
+    /// the board, the helmets in both colours, and on the highway every vehicle and the
+    /// helicopter in its rims' colours. Each is drawn once and kept, not on its first appearance.
     private func warmDrawnArt() {
-        var made: [SKTexture] = []
+        var made: [SKTexture] = Onomatopoeia.warmed()
         if let board = boardTexture(for: 0) { made.append(board) }
         made += snipeCursors.compactMap(\.texture)
         for index in match.players.indices {

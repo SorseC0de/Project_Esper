@@ -210,6 +210,11 @@ final class TouchControls: SKNode {
         pickers.first { $0.title == title }?.selectNext()
     }
 
+    /// Under the sliders across the top, or under the score with none.
+    var slidersBottom: CGFloat {
+        topCentre.y - 30 - CGFloat(max(min(sliders.count, 8) - 1, 0)) * 16 - 10
+    }
+
     /// Where the next picker would go, so other corner text can sit under them.
     var pickerBottom: CGFloat {
         pickerOrigin.y - pickers.reduce(0) { $0 + $1.height + 4 }

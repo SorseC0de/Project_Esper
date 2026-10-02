@@ -18,7 +18,8 @@ enum HoopSupport {
     /// The layout baked in, from the builder's COPY.
     static let baked: [Piece] = []
 
-    private static let savedKey = "esper.hoopSupport"
+    /// v2: the first layouts were made with the pieces drawn a third of their size.
+    private static let savedKey = "esper.hoopSupport.v2"
     static var pieces: [Piece] {
         get {
             guard let data = UserDefaults.standard.data(forKey: savedKey),
@@ -66,7 +67,7 @@ enum HoopSupport {
 
     /// The whole layout as one picture, each piece turned about its middle without smoothing;
     /// where the hoop's art point sits in it, as an anchor. Nil with nothing laid out.
-    static func assembled(_ pieces: [Piece]) -> (texture: SKTexture, anchor: CGPoint)? {
+    static func assembled(_ pieces: [Piece]) -> (texture: SKTexture, size: CGSize, anchor: CGPoint)? {
         guard !pieces.isEmpty, let side = picture(dark: false).map({ CGFloat(max($0.width, $0.height)) }) else { return nil }
         // Room for any turn of a piece round its middle.
         let reach = (side * 0.75).rounded(.up)
@@ -93,8 +94,8 @@ enum HoopSupport {
         }
         let texture = SKTexture(image: image)
         texture.filteringMode = .nearest
-        return (texture, CGPoint(x: -left / size.width, y: -bottom / size.height))
+        return (texture, size, CGPoint(x: -left / size.width, y: -bottom / size.height))
     }
     /// The assembled picture's pixels to an art pixel, so a turned piece keeps its steps.
-    static let pictureScale: CGFloat = 3
+    private static let pictureScale: CGFloat = 3
 }

@@ -15,7 +15,6 @@ final class SupportBuilder: SKNode {
     /// The piece being dragged and how far the press was from its middle, in art pixels.
     private var dragging: (index: Int, offset: CGPoint)?
     private var draggedSlider: Slider?
-    private let halfWidth: CGFloat, halfHeight: CGFloat
     /// A HUD point as art pixels from the right hoop's art point, and back.
     private let fromHud: (CGPoint) -> CGPoint
     private let toHud: (CGPoint) -> CGPoint
@@ -29,12 +28,11 @@ final class SupportBuilder: SKNode {
     private var turnSlider: Slider?
     private let outline = SKShapeNode()
 
-    init(halfWidth: CGFloat, halfHeight: CGFloat, artPixelsPerHud: CGFloat, rimDrop: Double, rimDepth: Double,
+    /// Laid out about the middle from `top` down: the kinds and buttons, then the sliders.
+    init(top: CGFloat, artPixelsPerHud: CGFloat, rimDrop: Double, rimDepth: Double,
          fromHud: @escaping (CGPoint) -> CGPoint, toHud: @escaping (CGPoint) -> CGPoint,
          onChange: @escaping ([HoopSupport.Piece]) -> Void, onMoveRims: @escaping (Double?, Double?) -> Void, onClose: @escaping () -> Void) {
         pieces = HoopSupport.pieces
-        self.halfWidth = halfWidth
-        self.halfHeight = halfHeight
         self.artPixelsPerHud = artPixelsPerHud
         self.fromHud = fromHud
         self.toHud = toHud
@@ -48,22 +46,20 @@ final class SupportBuilder: SKNode {
         outline.fillColor = .clear
         addChild(outline)
 
-        // Along the top: the two kinds, then the nudges and the rest.
-        let top = halfHeight - 18
-        var x = -halfWidth + 30
+        // A row of the two kinds, the nudges and the rest, centred.
+        let rowY = top - 16
+        var row: [(node: SKNode, width: CGFloat)] = []
         for kindIsDark in [false, true] {
             let swatch = SKSpriteNode(texture: HoopSupport.picture(dark: kindIsDark).map { SKTexture(cgImage: $0) })
             swatch.texture?.filteringMode = .nearest
-            swatch.size = CGSize(width: 28, height: 28)
-            swatch.position = CGPoint(x: x, y: top)
+            swatch.size = CGSize(width: 24, height: 24)
+            let label = TitleText.node(kindIsDark ? "DARK" : "LIGHT", size: 7)
+            label.position = CGPoint(x: 0, y: -14)
+            swatch.addChild(label)
             addChild(swatch)
             kindButtons.append((swatch, kindIsDark))
-            let label = TitleText.node(kindIsDark ? "DARK" : "LIGHT", size: 8)
-            label.position = CGPoint(x: x, y: top - 18)
-            addChild(label)
-            x += 36
+            row.append((swatch, 28))
         }
-        x += 10
         let labels: [(String, () -> Void)] = [
             ("\u{25C0}", { [weak self] in self?.nudge(-1, 0) }), ("\u{25B2}", { [weak self] in self?.nudge(0, 1) }),
             ("\u{25BC}", { [weak self] in self?.nudge(0, -1) }), ("\u{25B6}", { [weak self] in self?.nudge(1, 0) }),
@@ -71,18 +67,29 @@ final class SupportBuilder: SKNode {
             ("DONE", { [weak self] in self?.onClose() }),
         ]
         for (title, action) in labels {
-            let button = TitleText.node(title, size: 14)
-            button.position = CGPoint(x: x + button.size.width / 2, y: top)
+            let button = TitleText.node(title, size: 12)
             addChild(button)
             buttons.append((button, action))
-            x += button.size.width + 14
+            row.append((button, button.size.width))
         }
-        // Down the right: the turn, and the hoop's place.
+        let gap: CGFloat = 10
+        var x = -(row.reduce(0) { $0 + $1.width } + gap * CGFloat(row.count - 1)) / 2
+        for item in row {
+            item.node.position = CGPoint(x: x + item.width / 2, y: rowY)
+            x += item.width + gap
+        }
+        // Under it, the turn and the hoop's place, side by side about the middle.
         let turn = Slider(title: "TURN", range: -180...180, notch: 1, value: 0) { [weak self] value in self?.turnPicked(to: Int(value)) }
-        let drop = Slider(title: "RIM DROP", range: 0...40, notch: 1, value: Float(rimDrop)) { [weak self] in self?.onMoveRims(Double($0), nil) }
-        let depth = Slider(title: "RIM DEPTH", range: -20...20, notch: 1, value: Float(rimDepth)) { [weak self] in self?.onMoveRims(nil, Double($0)) }
-        for (row, slider) in [turn, drop, depth].enumerated() {
-            slider.position = CGPoint(x: halfWidth - Slider.size.width / 2 - 20, y: top - 40 - CGFloat(row) * 24)
+        let drop = Slider(title: "RIM DROP", range: 0...40, notch: 1, value: Float(rimDrop)) { [weak self] in
+            self?.onMoveRims(Double($0), nil)
+            self?.show()
+        }
+        let depth = Slider(title: "RIM DEPTH", range: -20...20, notch: 1, value: Float(rimDepth)) { [weak self] in
+            self?.onMoveRims(nil, Double($0))
+            self?.show()
+        }
+        for (column, slider) in [turn, drop, depth].enumerated() {
+            slider.position = CGPoint(x: (CGFloat(column) - 1) * (Slider.size.width + 14), y: rowY - 38)
             addChild(slider)
             sliders.append(slider)
         }

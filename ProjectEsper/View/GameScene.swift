@@ -1281,8 +1281,7 @@ final class GameScene: SKScene {
             guard let assembled else { continue }
             node.texture = assembled.texture
             node.xScale = 1
-            node.size = CGSize(width: assembled.texture.size().width / HoopSupport.pictureScale,
-                               height: assembled.texture.size().height / HoopSupport.pictureScale)
+            node.size = assembled.size
             node.anchorPoint = assembled.anchor
         }
     }
@@ -2274,8 +2273,8 @@ final class GameScene: SKScene {
         if ChevronTuning.slider {
             controls.addSlider(title: "BASKET CHEVRON Y", range: 0...60, notch: 1, value: Float(ChevronTuning.basketLift)) { ChevronTuning.basketLift = CGFloat($0) }
         }
-        if ParticleLook.cubes, HumanLook.enabled {
-            controls.addSlider(title: "LEG CUBE RISE", range: 0...24, notch: 1, value: ParticleLook.legCubeRise) { ParticleLook.legCubeRise = $0 }
+        if ParticleLook.cubes {
+            controls.addSlider(title: "CUBE TRAIL", range: 2...30, notch: 1, value: ParticleLook.cubeTrail) { ParticleLook.cubeTrail = $0 }
         }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
@@ -4201,13 +4200,14 @@ final class GameScene: SKScene {
                 }
                 let heading = trailing.map { atan2(Double($0.dy), Double($0.dx)) } ?? Double.pi / 2
                 let angle = heading + Double.random(in: -Double.pi / 28...Double.pi / 28)
-                let speed = (stream.legs ? Double(ParticleLook.legCubeRise) : 24) + Double.random(in: -2...2)
+                let speed = 24 + Double.random(in: -2...2)
                 // The sheet's flame points up; turned so it points the way it goes.
                 if trailing != nil { node.zRotation = CGFloat(heading - Double.pi / 2) }
                 // A sheet plays through once over the life; a single frame, or a cube, lives 0.6 s
                 // and steps down in size.
                 let frames = cube != nil ? [stream.frames[0]] : stream.frames
-                let life = frames.count > 1 ? Double(frames.count) / 24 : 0.6 + Double.random(in: -0.05...0.05)
+                let life = frames.count > 1 ? Double(frames.count) / 24
+                    : (cube != nil ? Double(ParticleLook.cubeTrail) / speed : 0.6) + Double.random(in: -0.05...0.05)
                 // While its body changes, it rises in a helix rather than straight.
                 var helix: (centreX: CGFloat, radius: CGFloat, angle: Double, rise: CGFloat)?
                 if trailing == nil, match.players.indices.contains(index), match.players[index].state == .transforming,
@@ -4575,7 +4575,7 @@ final class GameScene: SKScene {
             GameScene.hoopArtPoint(for: self?.match.stage.hoops.first { $0.backboard == .right } ?? right, on: .court)
         }
         let builder = SupportBuilder(
-            halfWidth: size.width / 2 / hudScale, halfHeight: size.height / 2 / hudScale, artPixelsPerHud: scale,
+            top: controls?.slidersBottom ?? size.height / 2 / hudScale - 40, artPixelsPerHud: scale,
             rimDrop: Stage.courtRimDrop, rimDepth: Stage.courtRimDepth,
             fromHud: { [weak self] point in
                 guard let self else { return .zero }

@@ -305,8 +305,8 @@ enum HumanLook {
     }()
     /// The back leg and foot's share of the energy colour's brightness.
     static let backLegShare = 0.66
-    /// The torso, pelvis and thighs, the same for every player: palette 41, the back thigh
-    /// the next down its ramp, 42.
+    /// The torso, pelvis and thighs, the same for every player: palette 22, white, the back
+    /// thigh 38. (Trying white suits; they were 41 and 42.)
     static let clothed: Set<BodyPart> = [.torso, .pelvis, .frontThigh, .backThigh]
-    static let clothes = PixelPalette.colours[41], backClothes = PixelPalette.colours[42]
+    static let clothes = PixelPalette.colours[22], backClothes = PixelPalette.colours[38]
 }

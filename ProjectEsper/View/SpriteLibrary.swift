@@ -550,14 +550,16 @@ final class SpriteLibrary {
         }
 
         // The body as the glow's mask sees it, in white, the glowing pixels left out so they
-        // take the glow's plain threshold rather than the body's.
+        // take the glow's plain threshold rather than the body's. A human's suit is green, so
+        // it never glows however light it is.
         var glowMask: SKTexture?
         if detach, glowing.contains(true), let (maskContext, maskPixels) = makeCanvas(width: width, height: height) {
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
                 let index = pixel * 4
-                maskPixels[index] = 255
+                let suit = look.human && !lined[pixel] && parts[pixel].map(HumanLook.clothed.contains) == true
+                maskPixels[index] = suit ? 0 : 255
                 maskPixels[index + 1] = 255
-                maskPixels[index + 2] = 255
+                maskPixels[index + 2] = suit ? 0 : 255
                 maskPixels[index + 3] = 255
             }
             glowMask = maskContext.makeImage().map { SKTexture(cgImage: $0) }

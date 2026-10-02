@@ -304,6 +304,8 @@ final class GameScene: SKScene {
     private var courtWhite: CGFloat = 0
     /// Each hoop in two layers under the bodies: its backboard, then the net, then its rim.
     private var backboardNodes: [SKSpriteNode] = []
+    /// The Wreck Center's hoop supports, one picture a hoop, behind the backboard.
+    private var supportNodes: [SKSpriteNode] = []
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
     /// Each rim's dip in degrees, down at the front, and how fast it's turning.
@@ -501,10 +503,12 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The sound words, drawn as they are to stay readable: for the mask under the bodies, as
-    /// they're drawn behind them.
+    /// The hoop supports and the sound words, drawn as they are: for the mask under the bodies,
+    /// as they're drawn behind them.
     var soundWordSnapshots: [BodySnapshot] {
-        var flat: [BodySnapshot] = []
+        var flat: [BodySnapshot] = supportNodes.filter { !$0.isHidden }.compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
+        }
         for holder in soundWords where holder.parent != nil {
             guard let sprite = holder.children.first as? SKSpriteNode, let texture = sprite.texture else { continue }
             // The sprite sits out along the holder's turn, at the holder's scale.
@@ -1247,6 +1251,12 @@ final class GameScene: SKScene {
             backboard.isHidden = stage.features.look == .wetshot
             stageGround.addChild(backboard)
             backboardNodes.append(backboard)
+            if stage.features.look == .court {
+                let support = SKSpriteNode()
+                support.zPosition = 4.9
+                stageGround.addChild(support)
+                supportNodes.append(support)
+            }
             let rim = SKSpriteNode(texture: sprites.texture(art.rim, 0))
             rim.position = GameScene.hoopArtPoint(for: hoop, on: stage.features.look)
             rim.xScale = hoop.backboard == .left ? -1 : 1
@@ -1259,13 +1269,29 @@ final class GameScene: SKScene {
             nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
                                 into: stageGround, depth: 5.5))
         }
+        refreshSupports(HoopSupport.pieces)
         warmDrawnArt()
+    }
+
+    /// The supports' picture again, for a layout.
+    private func refreshSupports(_ pieces: [HoopSupport.Piece]) {
+        let assembled = HoopSupport.assembled(pieces)
+        for node in supportNodes {
+            node.isHidden = assembled == nil
+            guard let assembled else { continue }
+            node.texture = assembled.texture
+            node.xScale = 1
+            node.size = CGSize(width: assembled.texture.size().width / HoopSupport.pictureScale,
+                               height: assembled.texture.size().height / HoopSupport.pictureScale)
+            node.anchorPoint = assembled.anchor
+        }
     }
 
     /// The world redrawn for the series' stage, if it isn't the one drawn.
     private func showStage() {
         guard built, series.stage != builtStage else { return }
         closeMapEditor()
+        closeSupportBuilder()
         redrawStage()
     }
 
@@ -1277,6 +1303,7 @@ final class GameScene: SKScene {
         blockTiles = []
         threePointArcSides = []
         backboardNodes = []
+        supportNodes = []
         rimNodes = []
         rimFlash = []
         rimDip = []
@@ -2162,6 +2189,14 @@ final class GameScene: SKScene {
             }
         }
         #endif
+        // The hoop support builder, on the Wreck Center.
+        #if !os(tvOS)
+        if match.stage.features.look == .court, online == nil {
+            controls.addPicker(title: "SUPPORT", options: ["OFF", "ON"], selected: supportBuilder == nil ? 0 : 1) { [weak self] index in
+                index == 1 ? self?.openSupportBuilder() : self?.closeSupportBuilder()
+            }
+        }
+        #endif
         // The bounds gallery only means anything on the highway.
         if match.stage.features.traffic {
             controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
@@ -2323,8 +2358,8 @@ final class GameScene: SKScene {
         }
         guard let last = lastTime else { return }
         #if !os(tvOS)
-        if mapEditor != nil {
-            // The match held still while the map's being laid out.
+        if mapEditor != nil || supportBuilder != nil {
+            // The match held still while the map or the supports are being laid out.
             render()
             return
         }
@@ -4529,6 +4564,44 @@ final class GameScene: SKScene {
         mapEditor = editor
     }
 
+    /// The hoop support builder, while it's open.
+    private var supportBuilder: SupportBuilder?
+
+    private func openSupportBuilder() {
+        guard supportBuilder == nil, online == nil, match.stage.features.look == .court,
+              let right = match.stage.hoops.first(where: { $0.backboard == .right }) else { return }
+        let scale = hudScale * cameraNode.xScale
+        let artPoint = { [weak self] in
+            GameScene.hoopArtPoint(for: self?.match.stage.hoops.first { $0.backboard == .right } ?? right, on: .court)
+        }
+        let builder = SupportBuilder(
+            halfWidth: size.width / 2 / hudScale, halfHeight: size.height / 2 / hudScale, artPixelsPerHud: scale,
+            rimDrop: Stage.courtRimDrop, rimDepth: Stage.courtRimDepth,
+            fromHud: { [weak self] point in
+                guard let self else { return .zero }
+                return CGPoint(x: self.cameraNode.position.x + point.x * scale, y: self.cameraNode.position.y + point.y * scale) - artPoint()
+            },
+            toHud: { [weak self] art in
+                guard let self else { return .zero }
+                let world = art + artPoint()
+                return CGPoint(x: (world.x - self.cameraNode.position.x) / scale, y: (world.y - self.cameraNode.position.y) / scale)
+            },
+            onChange: { [weak self] pieces in self?.refreshSupports(pieces) },
+            onMoveRims: { [weak self] drop, depth in
+                if let drop { Stage.courtRimDrop = drop }
+                if let depth { Stage.courtRimDepth = depth }
+                self?.moveCourtRims()
+            },
+            onClose: { [weak self] in self?.closeSupportBuilder() })
+        hud.addChild(builder)
+        supportBuilder = builder
+    }
+
+    private func closeSupportBuilder() {
+        supportBuilder?.removeFromParent()
+        supportBuilder = nil
+    }
+
     private func closeMapEditor(restart: Bool = false) {
         guard mapEditor != nil else { return }
         mapEditor?.removeFromParent()
@@ -4541,6 +4614,7 @@ final class GameScene: SKScene {
     }
     #else
     private func closeMapEditor(restart: Bool = false) {}
+    private func closeSupportBuilder() {}
     #endif
 
     /// The bounds gallery, while it's open.
@@ -5949,6 +6023,11 @@ final class GameScene: SKScene {
                 rimNodes[index].zRotation += nod.angle
                 backboardNodes[index].position = artPoint
                 backboardNodes[index].xScale = rimNodes[index].xScale
+                // Laid out round the right hoop, mirrored at the left.
+                if index < supportNodes.count {
+                    supportNodes[index].position = artPoint
+                    supportNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
+                }
                 // The Hoopfish's spin has the rim in it: its own art and net out of sight meanwhile.
                 let spinning = index == 0 && (match.hoopfish?.spin ?? 0) > 0
                 rimNodes[index].isHidden = spinning
@@ -6150,6 +6229,10 @@ final class GameScene: SKScene {
             editor.began(at: hudPoint(point, viewSize: viewSize))
             return
         }
+        if let builder = supportBuilder {
+            builder.began(at: hudPoint(point, viewSize: viewSize))
+            return
+        }
         #endif
         if let gallery = boundsGallery {
             _ = gallery.tap(at: hudPoint(point, viewSize: viewSize))
@@ -6168,6 +6251,10 @@ final class GameScene: SKScene {
             editor.moved(to: hudPoint(point, viewSize: viewSize))
             return
         }
+        if let builder = supportBuilder {
+            builder.moved(to: hudPoint(point, viewSize: viewSize))
+            return
+        }
         #endif
         controls?.moved(touch, to: hudPoint(point, viewSize: viewSize))
     }
@@ -6176,6 +6263,10 @@ final class GameScene: SKScene {
         #if !os(tvOS)
         if let editor = mapEditor {
             editor.ended(at: point.map { hudPoint($0, viewSize: viewSize) } ?? lastEditorPoint)
+            return
+        }
+        if let builder = supportBuilder {
+            builder.ended(at: point.map { hudPoint($0, viewSize: viewSize) } ?? .zero)
             return
         }
         #endif

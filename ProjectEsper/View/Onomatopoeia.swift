@@ -1,16 +1,16 @@
-import CoreImage
 import CoreText
 import SpriteKit
 import UIKit
 
 /// Manga sound effects over the action, Jump Ultimate Stars style: a word in English or in
-/// katakana, each in one of three faces, never a mix, its letters growing along the
+/// katakana, each in one of several faces, never a mix, its letters growing along the
 /// word and rocking in turn, outlined and dropped like the title lettering, and the sprite
 /// warped into a flare that snaps in and settles.
 enum Onomatopoeia {
-    /// The SFX picker's options: katakana in one of five faces, or English in one of three.
+    /// The SFX picker's options: katakana in one of five faces, or English in one of five.
     enum Lettering: Int, CaseIterable {
-        case cherryBomb, dotGothic, chokokutai, darumadrop, delaGothic, englishBrush, englishDex, englishCherry
+        case cherryBomb, dotGothic, chokokutai, darumadrop, delaGothic
+        case englishDex, englishCherry, englishDarumadrop, englishDela
 
         var label: String {
             switch self {
@@ -19,9 +19,10 @@ enum Onomatopoeia {
             case .chokokutai: "CHOKO"
             case .darumadrop: "DARUMA"
             case .delaGothic: "DELA"
-            case .englishBrush: "EN BRUSH"
             case .englishDex: "EN DEX"
             case .englishCherry: "EN CHERRY"
+            case .englishDarumadrop: "EN DARUMA"
+            case .englishDela: "EN DELA"
             }
         }
         var fontName: String {
@@ -29,19 +30,18 @@ enum Onomatopoeia {
             case .cherryBomb, .englishCherry: "CherryBombOne-Regular"
             case .dotGothic: "DotGothic16-Regular"
             case .chokokutai: "Chokokutai-Regular"
-            case .darumadrop: "DarumadropOne-Regular"
-            case .delaGothic: "DelaGothicOne-Regular"
-            case .englishBrush: "DirtyBrush-Regular"
+            case .darumadrop, .englishDarumadrop: "DarumadropOne-Regular"
+            case .delaGothic, .englishDela: "DelaGothicOne-Regular"
             case .englishDex: "Bigdex"
             }
         }
-        var japanese: Bool { rawValue < Lettering.englishBrush.rawValue }
+        var japanese: Bool { rawValue < Lettering.englishDex.rawValue }
         /// Darumadrop has no full-width "!", only the plain one.
         var plainBangs: Bool { self == .darumadrop }
-        /// Dirty Brush: broken strokes, closed up under the fill, and no "!", so it's brushed.
-        var brush: Bool { self == .englishBrush }
         /// The letter the faces are centred and sized by.
         var reference: String { japanese ? "ド" : "D" }
+        /// Dela Gothic's letters run wide for their height, so it's drawn smaller to sit with the rest.
+        var scale: CGFloat { self == .delaGothic || self == .englishDela ? 0.85 : 1 }
     }
     private static let letteringKey = "soundWordFace"
     /// The SFX picker's choice, kept between launches.
@@ -95,7 +95,6 @@ enum Onomatopoeia {
     }
 
     struct Word: Hashable {
-        /// An ASCII "!" is brushed, Dirty Brush having none; a full-width one is the font's.
         let text: String
         let lettering: Lettering
         let upper: Int
@@ -105,7 +104,7 @@ enum Onomatopoeia {
 
     /// Bundled, and registered with the process on first use.
     private static let registered: Void = {
-        for name in ["DirtyBrush", "Bigdex", "CherryBombOne-Regular", "DotGothic16-Regular", "Chokokutai-Regular",
+        for name in ["Bigdex", "CherryBombOne-Regular", "DotGothic16-Regular", "Chokokutai-Regular",
                      "DarumadropOne-Regular", "DelaGothicOne-Regular"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
                 CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
@@ -135,8 +134,6 @@ enum Onomatopoeia {
     private static let stroke: CGFloat = 0.1
     private static let drop: CGFloat = 0.12
     private static let steps = 16
-    /// The widest break in Dirty Brush's strokes closed in its fill, half of it, a share of the size.
-    private static let gapClosing: CGFloat = 0.06
     /// Pixels a point the lettering is drawn at, so it stays crisp scaled up into the world.
     private static let renderScale: CGFloat = 3
     nonisolated(unsafe) private static var cache: [Word: (texture: SKTexture, capShare: CGFloat)] = [:]
@@ -150,7 +147,7 @@ enum Onomatopoeia {
     static func node(_ word: Word) -> SKSpriteNode {
         let (texture, capShare) = rendered(word)
         let node = SKSpriteNode(texture: texture)
-        let height = word.height / capShare
+        let height = word.height * word.lettering.scale / capShare
         node.size = CGSize(width: height * texture.size().width / max(texture.size().height, 1), height: height)
         return node
     }
@@ -222,7 +219,7 @@ enum Onomatopoeia {
             let size = drawSize * (1 + growth * share)
             let letterFont = font(size)
             let text = characters[index]
-            let width = text == "!" && word.lettering.brush ? size * 0.36 : (text as NSString).size(withAttributes: [.font: letterFont]).width
+            let width = (text as NSString).size(withAttributes: [.font: letterFont]).width
             let sign: CGFloat = index.isMultiple(of: 2) ? -1 : 1
             letters.append(Letter(text: text, font: letterFont, centre: CGPoint(x: x + width / 2, y: sign * bob * size), angle: sign * rock))
             x += width * (1 - tuck)
@@ -241,8 +238,8 @@ enum Onomatopoeia {
         let outline = colour(29), upper = colour(word.upper), lower = colour(word.lower)
         /// Each letter turned and set on the line, `shift` off it, for `draw` to put down with
         /// its size and where its glyph is drawn from.
-        func eachLetter(_ cg: CGContext, shift: CGFloat, only: Int? = nil, draw: (Letter, CGFloat, CGPoint) -> Void) {
-            for (index, letter) in letters.enumerated() where only == nil || only == index {
+        func eachLetter(_ cg: CGContext, shift: CGFloat, draw: (Letter, CGFloat, CGPoint) -> Void) {
+            for letter in letters {
                 cg.saveGState()
                 cg.translateBy(x: pad + letter.centre.x + shift, y: lineY + letter.centre.y + shift)
                 cg.rotate(by: letter.angle)
@@ -256,85 +253,27 @@ enum Onomatopoeia {
         func text(_ letter: Letter, _ colour: UIColor, at point: CGPoint) {
             (letter.text as NSString).draw(at: point, withAttributes: [.font: letter.font, .foregroundColor: colour])
         }
-        let brush = word.lettering.brush
-        func bang(_ letter: Letter) -> Bool { brush && letter.text == "!" }
-        /// The fill, each letter `upper` over `lower` split at its middle.
-        func fill(_ cg: CGContext, only: Int? = nil) {
-            eachLetter(cg, shift: 0, only: only) { letter, size, origin in
-                split(cg, size: size, upper: upper, lower: lower) { colour in
-                    if bang(letter) {
-                        cg.addPath(bangPath(size: size))
-                        cg.setFillColor(colour.cgColor)
-                        cg.fillPath()
-                    } else {
-                        text(letter, colour, at: origin)
-                    }
-                }
-            }
-        }
-        // Dirty Brush's strokes are broken: each letter's fill closed up on its own, so
-        // neighbours don't fuse, and its colours laid over that shape, so it reads solid.
-        let solidFill: UIImage? = brush ? UIGraphicsImageRenderer(size: canvas, format: format).image { _ in
-            for index in letters.indices {
-                guard let shape = closed(canvas: canvas, radius: largest * gapClosing, draw: { fill($0, only: index) }) else { continue }
-                UIGraphicsImageRenderer(size: canvas, format: format).image { letterContext in
-                    let cg = letterContext.cgContext
-                    eachLetter(cg, shift: 0, only: index) { _, size, _ in
-                        split(cg, size: size, upper: upper, lower: lower) { colour in
-                            cg.setFillColor(colour.cgColor)
-                            cg.fill(CGRect(x: -size, y: -size * 2, width: size * 2, height: size * 4))
-                        }
-                    }
-                    shape.draw(in: CGRect(origin: .zero, size: canvas), blendMode: .destinationIn, alpha: 1)
-                }.draw(in: CGRect(origin: .zero, size: canvas))
-            }
-        } : nil
         let image = UIGraphicsImageRenderer(size: canvas, format: format).image { context in
             let cg = context.cgContext
             // The drop, then the outline, each a ring round every letter.
             for shift in [shadow, 0] {
                 eachLetter(cg, shift: shift) { letter, size, origin in
-                    if bang(letter) {
-                        cg.addPath(bangPath(size: size))
-                        cg.setStrokeColor(outline.cgColor)
-                        cg.setFillColor(outline.cgColor)
-                        cg.setLineWidth(ring * 2 * size / largest)
-                        cg.setLineJoin(.round)
-                        cg.drawPath(using: .fillStroke)
-                    } else {
-                        let letterRing = ring * size / largest
-                        for step in 0..<steps {
-                            let angle = CGFloat(step) * 2 * .pi / CGFloat(steps)
-                            text(letter, outline, at: CGPoint(x: origin.x + cos(angle) * letterRing, y: origin.y + sin(angle) * letterRing))
-                        }
+                    let letterRing = ring * size / largest
+                    for step in 0..<steps {
+                        let angle = CGFloat(step) * 2 * .pi / CGFloat(steps)
+                        text(letter, outline, at: CGPoint(x: origin.x + cos(angle) * letterRing, y: origin.y + sin(angle) * letterRing))
                     }
                 }
             }
-            if let solidFill {
-                solidFill.draw(in: CGRect(origin: .zero, size: canvas))
-            } else {
-                fill(cg)
+            // The fill, each letter `upper` over `lower` split at its middle.
+            eachLetter(cg, shift: 0) { letter, size, origin in
+                split(cg, size: size, upper: upper, lower: lower) { text(letter, $0, at: origin) }
             }
         }
         let capShare = ink(reference, in: font(drawSize)).height / canvas.height
         let result = (SKTexture(image: image), capShare)
         cache[word] = result
         return result
-    }
-
-    /// What `draw` puts down, its gaps narrower than twice `radius` closed: grown by it, then
-    /// shrunk back, so the outside keeps its shape.
-    private static func closed(canvas: CGSize, radius: CGFloat, draw: (CGContext) -> Void) -> UIImage? {
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = renderScale
-        let shape = UIGraphicsImageRenderer(size: canvas, format: format).image { draw($0.cgContext) }
-        guard let input = CIImage(image: shape) else { return nil }
-        let extent = input.extent
-        let pixels = radius * renderScale
-        let grown = input.clampedToExtent().applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: pixels])
-        let closed = grown.applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: pixels]).cropped(to: extent)
-        guard let image = CIContext().createCGImage(closed, from: extent) else { return nil }
-        return UIImage(cgImage: image, scale: renderScale, orientation: .up)
     }
 
     /// The fill drawn twice, `upper` above the letter's middle and `lower` under it.
@@ -346,20 +285,6 @@ enum Onomatopoeia {
             draw(colour)
             cg.restoreGState()
         }
-    }
-
-    /// A brushed exclamation mark round its middle: a wedge thinning to the bottom, and a dot.
-    private static func bangPath(size: CGFloat) -> CGPath {
-        let path = CGMutablePath()
-        let top = -size * 0.42, bottom = size * 0.14
-        path.move(to: CGPoint(x: -size * 0.13, y: top))
-        path.addLine(to: CGPoint(x: size * 0.13, y: top))
-        path.addLine(to: CGPoint(x: size * 0.035, y: bottom))
-        path.addLine(to: CGPoint(x: -size * 0.035, y: bottom))
-        path.closeSubpath()
-        let dot = size * 0.075
-        path.addEllipse(in: CGRect(x: -dot, y: size * 0.27 - dot, width: dot * 2, height: dot * 2))
-        return path
     }
 
     private static func colour(_ index: Int) -> UIColor {

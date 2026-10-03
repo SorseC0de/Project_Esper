@@ -795,7 +795,7 @@ enum EnergyEffect: CaseIterable {
     var fps: Double {
         switch self {
         case .charge: 30
-        case .scoreStrike: 20
+        case .scoreStrike: 15
         default: 24
         }
     }

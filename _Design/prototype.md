@@ -608,10 +608,16 @@ its effects. `Player.flo`, 0 empty to 1 full, is there (protocol 72); nothing fi
 yet. The meters are in the HUD along the bottom, the first player's left of the middle and the
 second's right of it, shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames, the
 first shown for now) a point an art pixel, and over each bar's left end the word FLO in Bigdex,
-lettered as the sound words are (white over palette 19, outlined, dropped), its letters big to
-small, 14 high, skewed (`Onomatopoeia.still`): its left end drawn 1.18 and its right 0.82 times its
-middle's height, the middle arched. On sliders while it's settled (`FloTuning`): FLO SCALE, the
-whole meter's; FLO LEFT SKEW and FLO RIGHT SKEW; FLO OFFSET X and Y, the word moved, in points.
+lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
+its left end drawn 1.18 and its right 0.82 times its middle's height, the middle arched, moved 10
+right and 2 down from its place. On sliders while it's settled (`FloTuning`): FLO METER SCALE, the
+whole meter's; FLO BAR SCALE and FLO WORD SCALE, each its own; FLO LEFT SKEW and FLO RIGHT SKEW;
+FLO OFFSET X and Y, the word moved, in points. Its four colours, the fill's top and bottom and the
+outline and drop's top and bottom, two-toned at each letter's middle (the sound words' outline is
+two-toned the same way, both halves palette 29), are picked on a grid in the match's bottom leading
+corner, offline (`FloColourPicker`): FILL TOP, FILL BTM, LINE TOP or LINE BTM, then a swatch of the
+UI palette as the title's grids lay it out; the picked one again takes the pick back. Unpicked:
+white over palette 19, outlined in 29. Kept between launches.
 
 ## Greateraid
 
@@ -678,7 +684,7 @@ holds the variants; A is always the baseline as tuned. POWER's fourteen sit in t
 - HITBOX, beside RESET, or a pad's left trigger (L2): draws the sim's boxes over the world. Bodies white (10 × 17.5 units, 16 × 28 art pixels), the loose
   ball purple, the two catch rings faint, the slide's leg and the slash's blade red, the
   snatch's reach green with the hand's ring while it's out, a flash's tear cyan.
-- SFX: the sound words' face, CHERRY, DARUMA or DELA, or EN DEX, EN CHERRY, EN DARUMA or EN DELA (see Sound words).
+- SFX: the sound words' face, CHERRY, DARUMA or DELA, or EN CHERRY, EN DARUMA or EN DELA (see Sound words).
 - AI, beside that: the computer plays the other side, whatever pads are in. Off, the second
   pad or nothing does. The title's VS CPU / VS HUMAN toggle is the same switch, kept between launches;
   clicking a pad's right stick (R3) switches it too.
@@ -913,10 +919,10 @@ its length.
 ### Sound words
 
 Manga sound effects over the action, Jump Ultimate Stars style (`View/Onomatopoeia.swift`), all
-katakana or all English by the SFX picker, never mixed, its seven options in rows of four: the
+katakana or all English by the SFX picker, never mixed, its six options in rows of three: the
 kana faces CHERRY (Cherry Bomb One, the default, for its weight), DARUMA (Darumadrop One, which
-has only the plain "!") and DELA (Dela Gothic One), and the English EN DEX (Bigdex, with no kana),
-EN CHERRY, EN DARUMA and EN DELA, the same faces' Latin; kept between launches, and a pick pops a sample in the middle of the screen. The
+has only the plain "!") and DELA (Dela Gothic One), and EN CHERRY, EN DARUMA and EN DELA, the same
+faces' Latin. Bigdex is the UI's, the FLO meter's word, not the sound words'; kept between launches, and a pick pops a sample in the middle of the screen. The
 fonts are bundled in `Art/Fonts/` and registered with the process on first use; each face is
 centred and sized by its own ド or D, Dela at 0.85 as it runs wide, and drawn at 3 pixels a point
 so it stays crisp in the world. Every word is drawn ahead in the picked face, with the stage's

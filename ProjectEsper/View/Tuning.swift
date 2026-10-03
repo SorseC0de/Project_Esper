@@ -272,14 +272,56 @@ enum GoalpostTuning {
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the
 /// right rim in the dunk, on the sequence frame the DUNK FRAME slider picks, and the
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
-/// The FLO meters' look, on sliders while it's settled: the whole meter's scale, the word's
-/// left and right ends' heights over its middle's, and the word moved from its place, in points.
+/// The FLO meters' look, on sliders while it's settled: the whole meter's scale, the bar's and
+/// the word's own, the word's left and right ends' heights over its middle's, and the word moved
+/// from its place, in points; and the word's four colours, picked on the grid in the match's
+/// bottom corner, kept between launches.
 enum FloTuning {
-    nonisolated(unsafe) static var scale: CGFloat = 1
+    nonisolated(unsafe) static var meterScale: CGFloat = 1
+    nonisolated(unsafe) static var barScale: CGFloat = 1
+    nonisolated(unsafe) static var wordScale: CGFloat = 1
     nonisolated(unsafe) static var leftSkew: CGFloat = 1.18
     nonisolated(unsafe) static var rightSkew: CGFloat = 0.82
-    nonisolated(unsafe) static var offsetX: CGFloat = 0
-    nonisolated(unsafe) static var offsetY: CGFloat = 0
+    nonisolated(unsafe) static var offsetX: CGFloat = 10
+    nonisolated(unsafe) static var offsetY: CGFloat = -2
+
+    /// The word's four colours: its fill's top and bottom, its outline and drop's top and bottom.
+    enum Tone: Int, CaseIterable {
+        case fillTop, fillBottom, lineTop, lineBottom
+        var label: String {
+            switch self {
+            case .fillTop: "FILL TOP"
+            case .fillBottom: "FILL BTM"
+            case .lineTop: "LINE TOP"
+            case .lineBottom: "LINE BTM"
+            }
+        }
+        /// Unpicked: white over the sky blue, as the sound words, outlined in their line colour.
+        var standard: RGB {
+            switch self {
+            case .fillTop: PixelPalette.colours[22]
+            case .fillBottom: PixelPalette.colours[19]
+            case .lineTop, .lineBottom: PixelPalette.colours[Onomatopoeia.lineIndex]
+            }
+        }
+    }
+    private static func key(_ tone: Tone) -> String { "flo.pick.\(tone)" }
+    /// The swatch of `EsperPalette.swatches` picked for a tone, if one is.
+    static func index(_ tone: Tone) -> Int? {
+        (UserDefaults.standard.object(forKey: key(tone)) as? Int).flatMap { EsperPalette.swatches.indices.contains($0) ? $0 : nil }
+    }
+    static func colour(_ tone: Tone) -> RGB { index(tone).map { EsperPalette.swatches[$0] } ?? tone.standard }
+    /// Picks `index`, or takes the pick back when it's the one picked.
+    static func toggle(_ tone: Tone, _ index: Int) {
+        if self.index(tone) == index {
+            UserDefaults.standard.removeObject(forKey: key(tone))
+        } else {
+            UserDefaults.standard.set(index, forKey: key(tone))
+        }
+    }
+    static var colours: Onomatopoeia.Colours {
+        Onomatopoeia.Colours(upper: colour(.fillTop), lower: colour(.fillBottom), lineUpper: colour(.lineTop), lineLower: colour(.lineBottom))
+    }
 }
 
 enum DunkTuning {

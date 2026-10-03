@@ -1079,26 +1079,36 @@ final class GameScene: SKScene {
             let bar = SKSpriteNode(texture: sprites.texture("flo_meter", 0))
             bar.texture?.filteringMode = .nearest
             bar.size = CGSize(width: bar.size.width * GameScene.floPointsPerPixel, height: bar.size.height * GameScene.floPointsPerPixel)
+            // The meter: a holder at the whole meter's scale, the bar and the word each at their own.
             let side: CGFloat = index == 0 ? -1 : 1
-            let scale = FloTuning.scale
-            bar.position = CGPoint(x: side * (bar.size.width * scale / 2 + GameScene.floGap / 2), y: bottom + bar.size.height * scale / 2 + 6)
-            bar.zPosition = 6
-            let word = Onomatopoeia.still("FLO", face: .englishDex, upper: 22, lower: 19, height: GameScene.floWordHeight, growsLeft: true,
+            let meter = SKSpriteNode()
+            let barWidth = bar.size.width * FloTuning.barScale, barHeight = bar.size.height * FloTuning.barScale
+            meter.position = CGPoint(x: side * (barWidth * FloTuning.meterScale / 2 + GameScene.floGap / 2),
+                                     y: bottom + barHeight * FloTuning.meterScale / 2 + 6)
+            meter.zPosition = 6
+            bar.setScale(FloTuning.barScale)
+            meter.addChild(bar)
+            let word = Onomatopoeia.still("FLO", face: .englishDex, colours: FloTuning.colours, height: GameScene.floWordHeight, growsLeft: true,
                                           left: FloTuning.leftSkew, right: FloTuning.rightSkew)
             // Its small end on the bar's left end, then where the sliders move it.
             word.anchorPoint = CGPoint(x: 1, y: 0.5)
-            word.position = CGPoint(x: -bar.size.width / 2 + GameScene.floWordOverlap + FloTuning.offsetX, y: GameScene.floWordLift + FloTuning.offsetY)
+            word.position = CGPoint(x: -barWidth / 2 + GameScene.floWordOverlap + FloTuning.offsetX, y: GameScene.floWordLift + FloTuning.offsetY)
+            word.setScale(FloTuning.wordScale)
             word.zPosition = 1
-            bar.addChild(word)
-            bar.setScale(scale)
-            hud.addChild(bar)
-            floMeters.append(bar)
+            meter.addChild(word)
+            meter.setScale(FloTuning.meterScale)
+            hud.addChild(meter)
+            floMeters.append(meter)
         }
         showFloMeters()
     }
 
+    /// The FLO word's colour picker, in the match's bottom leading corner.
+    private var floPicker: FloColourPicker?
+
     private func showFloMeters() {
         for meter in floMeters { meter.isHidden = flow != .playing }
+        floPicker?.isHidden = flow != .playing || online != nil
     }
 
     // MARK: The stage
@@ -2271,8 +2281,8 @@ final class GameScene: SKScene {
         controls.addPicker(title: "COUNT", options: ["A", "B"], selected: UserDefaults.standard.integer(forKey: SoundBoard.countSetKey)) { index in
             UserDefaults.standard.set(index, forKey: SoundBoard.countSetKey)
         }
-        controls.addPicker(title: "SFX", options: Onomatopoeia.Lettering.allCases.map(\.label), selected: Onomatopoeia.lettering.rawValue, perRow: 4) { [weak self] index in
-            Onomatopoeia.lettering = Onomatopoeia.Lettering(rawValue: index) ?? .cherryBomb
+        controls.addPicker(title: "SFX", options: Onomatopoeia.pickable.map(\.label), selected: Onomatopoeia.pickable.firstIndex(of: Onomatopoeia.lettering) ?? 0, perRow: 3) { [weak self] index in
+            Onomatopoeia.lettering = Onomatopoeia.pickable[index]
             SKTexture.preload(Onomatopoeia.warmed()) {}
             self?.previewSoundWord()
         }
@@ -2375,7 +2385,9 @@ final class GameScene: SKScene {
         }
         // The FLO meters' look, while it's settled.
         let relayoutFlo: () -> Void = { [weak self] in self.map { $0.layoutFloMeters(bottom: $0.floBottom) } }
-        controls.addSlider(title: "FLO SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.scale)) { FloTuning.scale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO BAR SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.barScale)) { FloTuning.barScale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO WORD SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.wordScale)) { FloTuning.wordScale = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO LEFT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.leftSkew)) { FloTuning.leftSkew = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO RIGHT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.rightSkew)) { FloTuning.rightSkew = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO OFFSET X", range: -60...60, notch: 1, value: Float(FloTuning.offsetX)) { FloTuning.offsetX = CGFloat($0); relayoutFlo() }
@@ -2445,6 +2457,13 @@ final class GameScene: SKScene {
         drawSeries()
         presentScreen()
         layoutFloMeters(bottom: -halfHeight + insets.bottom + TouchControls.padding)
+        floPicker?.removeFromParent()
+        let picker = FloColourPicker(origin: CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)) { [weak self] in
+            self.map { $0.layoutFloMeters(bottom: $0.floBottom) }
+        }
+        hud.addChild(picker)
+        floPicker = picker
+        showFloMeters()
         powerLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 4)
         debugLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 26)
         fpsLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)
@@ -6422,6 +6441,7 @@ final class GameScene: SKScene {
             _ = screen.tap(at: hudPoint(point, viewSize: viewSize))
             return
         }
+        if let picker = floPicker, !picker.isHidden, picker.tap(at: hudPoint(point, viewSize: viewSize)) { return }
         controls?.began(touch, at: hudPoint(point, viewSize: viewSize))
     }
 

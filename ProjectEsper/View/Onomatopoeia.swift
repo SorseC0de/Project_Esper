@@ -42,9 +42,15 @@ enum Onomatopoeia {
     private static let letteringKey = "soundWordFace"
     /// The SFX picker's choice, kept between launches.
     static var lettering: Lettering {
-        get { Lettering(rawValue: UserDefaults.standard.integer(forKey: letteringKey)) ?? .cherryBomb }
+        get {
+            let saved = Lettering(rawValue: UserDefaults.standard.integer(forKey: letteringKey)) ?? .cherryBomb
+            return pickable.contains(saved) ? saved : .cherryBomb
+        }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: letteringKey) }
     }
+    /// The SFX picker's faces: Cherry Bomb, Darumadrop and Dela, in kana or English. Bigdex is
+    /// the UI's, the FLO meter's word.
+    static let pickable = Lettering.allCases.filter { $0 != .englishDex }
 
     /// What made the sound, spelled per language.
     enum Sound: CaseIterable {
@@ -91,16 +97,29 @@ enum Onomatopoeia {
             let spelling = spelling
             let lettering = Onomatopoeia.lettering
             let japanese = lettering.plainBangs ? spelling.japanese.replacingOccurrences(of: "！", with: "!") : spelling.japanese
+            let line = PixelPalette.colours[Onomatopoeia.lineIndex]
             return Word(text: lettering.japanese ? japanese : spelling.english, lettering: lettering,
-                        upper: spelling.upper, lower: spelling.lower, height: spelling.height, growsLeft: growsLeft)
+                        colours: Colours(upper: PixelPalette.colours[spelling.upper], lower: PixelPalette.colours[spelling.lower],
+                                         lineUpper: line, lineLower: line),
+                        height: spelling.height, growsLeft: growsLeft)
         }
     }
+
+    /// A word's four colours: the fill over and under each letter's middle, and the outline and
+    /// drop, two-toned the same way.
+    struct Colours: Hashable {
+        var upper: RGB
+        var lower: RGB
+        var lineUpper: RGB
+        var lineLower: RGB
+    }
+    /// The sound words' outline and drop: palette 29.
+    static let lineIndex = 29
 
     struct Word: Hashable {
         let text: String
         let lettering: Lettering
-        let upper: Int
-        let lower: Int
+        let colours: Colours
         let height: CGFloat
         /// Its letters grow to the left, the small end on the right.
         var growsLeft = false
@@ -193,9 +212,9 @@ enum Onomatopoeia {
     /// Lettering in a face, as the words are drawn, held still: its letters growing to the left or
     /// the right, and skewed, its left and right ends drawn `left` and `right` times its middle's
     /// height, the middle arched as a word's is. `height` is its cap height in points.
-    static func still(_ text: String, face: Lettering, upper: Int, lower: Int, height: CGFloat, growsLeft: Bool,
+    static func still(_ text: String, face: Lettering, colours: Colours, height: CGFloat, growsLeft: Bool,
                       left: CGFloat, right: CGFloat) -> SKSpriteNode {
-        let sprite = node(Word(text: text, lettering: face, upper: upper, lower: lower, height: height, growsLeft: growsLeft))
+        let sprite = node(Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft))
         let columns = 3
         let source = (0...1).flatMap { row in (0...columns).map { SIMD2<Float>(Float($0) / Float(columns), Float(row)) } }
         let destination = source.map { vertex -> SIMD2<Float> in
@@ -262,7 +281,8 @@ enum Onomatopoeia {
         let format = UIGraphicsImageRendererFormat()
         format.scale = renderScale
         let lineY = canvas.height / 2
-        let outline = colour(29), upper = colour(word.upper), lower = colour(word.lower)
+        let upper = colour(word.colours.upper), lower = colour(word.colours.lower)
+        let lineUpper = colour(word.colours.lineUpper), lineLower = colour(word.colours.lineLower)
         /// Each letter turned and set on the line, `shift` off it, for `draw` to put down with
         /// its size and where its glyph is drawn from.
         func eachLetter(_ cg: CGContext, shift: CGFloat, draw: (Letter, CGFloat, CGPoint) -> Void) {
@@ -282,13 +302,15 @@ enum Onomatopoeia {
         }
         let image = UIGraphicsImageRenderer(size: canvas, format: format).image { context in
             let cg = context.cgContext
-            // The drop, then the outline, each a ring round every letter.
+            // The drop, then the outline, each a ring round every letter, split at its middle as the fill is.
             for shift in [shadow, 0] {
                 eachLetter(cg, shift: shift) { letter, size, origin in
                     let letterRing = ring * size / largest
-                    for step in 0..<steps {
-                        let angle = CGFloat(step) * 2 * .pi / CGFloat(steps)
-                        text(letter, outline, at: CGPoint(x: origin.x + cos(angle) * letterRing, y: origin.y + sin(angle) * letterRing))
+                    split(cg, size: size, upper: lineUpper, lower: lineLower) { colour in
+                        for step in 0..<steps {
+                            let angle = CGFloat(step) * 2 * .pi / CGFloat(steps)
+                            text(letter, colour, at: CGPoint(x: origin.x + cos(angle) * letterRing, y: origin.y + sin(angle) * letterRing))
+                        }
                     }
                 }
             }
@@ -314,8 +336,7 @@ enum Onomatopoeia {
         }
     }
 
-    private static func colour(_ index: Int) -> UIColor {
-        let rgb = PixelPalette.colours[index]
+    private static func colour(_ rgb: RGB) -> UIColor {
         return UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255, blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
     }
 }

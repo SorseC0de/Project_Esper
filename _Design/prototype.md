@@ -1357,6 +1357,10 @@ three groups in ten behind the background's foreground (-18.5; the rest at -10):
   seven seconds apart, a school of two to five in one colour, 20 to 30 a second;
 - a shark (`shark`, 64 × 32, four frames at 6 a second), rare: forty to eighty seconds apart, alone, 24 to 32 a second.
 
+A crab (`crab`, 32 × 16, three frames at 6 a second) walks the sea floor, in front of the rocks and
+behind the players (4.2): one crossing at a time, 16 art pixels a second, right to left first and
+then the other way each time, twenty seconds after the last has gone.
+
 The stage's art is in `_Graphic Assets/Pixel Art/Stages/Hoopfish Hideaway/`.
 
 Under water (`StageFeatures.underwater`, protocol 58): gravity and the fall speeds are halved for

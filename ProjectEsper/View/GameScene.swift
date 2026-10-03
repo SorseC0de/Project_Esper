@@ -1921,6 +1921,7 @@ final class GameScene: SKScene {
             }
             return swimmer
         }
+        stepCrab(wet: wet)
         guard wet else { return }
         for kind in SeaLife.allCases {
             // One group of each kind across at a time.
@@ -1950,6 +1951,50 @@ final class GameScene: SKScene {
                                         bobRate: .random(in: kind.bobRate), phase: .random(in: 0...GameScene.breathSeconds)))
             }
         }
+    }
+
+    /// The crab along the sea floor, in front of the rocks and behind the players: one crossing
+    /// at a time, slowly, right to left first and then the other way each time, a while apart.
+    private var crab: SKSpriteNode?
+    private var crabLeftward = true
+    private var crabClock = 0.0
+    private static let crabSpeed: CGFloat = 16
+    private static let crabSecondsBetween = 20.0
+    private static let crabFramesPerSecond = 6.0
+    private static let crabZ: CGFloat = 4.2
+
+    private func stepCrab(wet: Bool) {
+        let frameCount = EffectSheets.frames["crab"] ?? 0
+        guard wet, frameCount > 0, !wholeStageView else {
+            crab?.removeFromParent()
+            crab = nil
+            return
+        }
+        let width = CGFloat(match.stage.columns) * WetshotArt.tileSide
+        if let node = crab, node.parent != nil {
+            let x = node.position.x + (crabLeftward ? -1 : 1) * GameScene.crabSpeed * CGFloat(GameScene.stepSeconds)
+            node.position.x = x
+            crabClock += GameScene.stepSeconds
+            node.texture = sprites.texture("crab", Int(crabClock * GameScene.crabFramesPerSecond) % frameCount)
+            // Off the far side: done, and the next goes the other way.
+            if x < -node.size.width || x > width + node.size.width {
+                node.removeFromParent()
+                crab = nil
+                crabLeftward.toggle()
+                crabClock = 0
+            }
+            return
+        }
+        crabClock += GameScene.stepSeconds
+        guard crabClock >= GameScene.crabSecondsBetween else { return }
+        crabClock = 0
+        let node = SKSpriteNode(texture: sprites.texture("crab", 0))
+        node.anchorPoint = CGPoint(x: 0.5, y: 0)
+        node.position = CGPoint(x: crabLeftward ? width + node.size.width / 2 : -node.size.width / 2,
+                                y: WetshotArt.tileSide * CGFloat(WetshotArt.floorRows))
+        node.zPosition = GameScene.crabZ
+        stageGround.addChild(node)
+        crab = node
     }
 
     /// One colour of fish, its half of each frame, cut from the frame's own picture: a rect

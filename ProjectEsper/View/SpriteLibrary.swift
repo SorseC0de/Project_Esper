@@ -792,7 +792,13 @@ enum EnergyEffect: CaseIterable {
     /// Frames and the anchor come from the importer's measurements of the sheet.
     var frameCount: Int { EffectSheets.frames[name] ?? 1 }
 
-    var fps: Double { self == .charge ? 30 : 24 }
+    var fps: Double {
+        switch self {
+        case .charge: 30
+        case .scoreStrike: 20
+        default: 24
+        }
+    }
 
     var anchor: CGPoint { CGPoint(x: 0.5, y: EffectSheets.anchorY[name] ?? 0.5) }
 

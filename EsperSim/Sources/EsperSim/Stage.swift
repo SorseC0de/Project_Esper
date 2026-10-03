@@ -563,13 +563,13 @@ public struct Stage: Equatable {
     /// cells wide from the wall and two high, its top 140 up, with its rim on the inward face,
     /// and a one-way ledge in the middle. Player 0 starts left and scores on the right rim.
     /// The court's rims: their height, 90 and the blocks' rise, lowered by RIM DROP's 35, and
-    /// how far in from each wall, 58 moved toward its block by RIM DEPTH's 3 and the blocks'
-    /// shift. The rims hang off the blocks and go where they go; the dunk's hang, the hoop's
+    /// how far in from each wall, 58 moved toward its block by RIM DEPTH's 5, the backboard flush
+    /// with the block's face, and the blocks' shift. The rims hang off the blocks and go where they go; the dunk's hang, the hoop's
     /// art and the backboard's box are measured from the rim, so they come with it.
     public static let courtRimHeight = 90.0
     nonisolated(unsafe) public static var courtRimDrop = 35.0
     public static let courtRimInset = 58.0
-    nonisolated(unsafe) public static var courtRimDepth = 3.0
+    nonisolated(unsafe) public static var courtRimDepth = 5.0
     /// The backboard blocks moved, whole tiles: toward their wall, and up. Mirrored either side;
     /// the rims ride them.
     nonisolated(unsafe) public static var courtBlockShift = (toWall: 0, up: 4)

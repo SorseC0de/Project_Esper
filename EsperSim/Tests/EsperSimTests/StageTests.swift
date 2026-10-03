@@ -448,7 +448,7 @@ final class HighwayTests: XCTestCase {
     func testFortySevensLineReachesTheMiddlePlatform() {
         let stage = Stage.court
         for hoop in stage.hoops {
-            XCTAssertEqual(FortySevenRules.threePointRadius(for: hoop, on: stage), 95, accuracy: 0.001)
+            XCTAssertEqual(FortySevenRules.threePointRadius(for: hoop, on: stage), 97, accuracy: 0.001)
         }
         let left = stage.hoops.first { $0.backboard == .left }!
         XCTAssertEqual(FortySevenRules.points(from: left.position + Vec2(x: 60, y: -30), through: left, on: stage), 2)

@@ -600,6 +600,17 @@ circles. The first to 47 wins, on the same win screen. RESET, and RESTART MATCH,
 it again from nothing. Online, the host's mode is played: MULTIPLAYER has BEST OF 7 and
 47 under it, the pick kept between launches and sent in hello.
 
+## FLO
+
+FLO, the Functional Limit Overload, is to be the energy, the super meter, for the modes past the
+plain game, 47 among them: before the match each player picks a Greateraid, and in FLO they get
+its effects. `Player.flo`, 0 empty to 1 full, is there (protocol 72); nothing fills or spends it
+yet. The meters are in the HUD along the bottom, the first player's left of the middle and the
+second's right of it, shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames, the
+first shown for now) a point an art pixel, and over each bar's left end the word FLO in Bigdex,
+lettered as the sound words are (white over palette 19, outlined, dropped), its letters big to
+small and flared that way (`Onomatopoeia.still`), 14 high.
+
 ## Greateraid
 
 The drinks between rounds, in `Greateraid.swift`. Three bottles an offer, the user's

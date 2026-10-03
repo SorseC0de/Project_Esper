@@ -166,6 +166,10 @@ public struct Player: Equatable {
     public var power = Power.none
     /// One, or two after Bio-Boba.
     public var powerLevel = 1
+    /// FLO, the Functional Limit Overload: the super meter for the modes past the plain game,
+    /// 47's among them, 0 empty to 1 full. In FLO a player gets their Greateraid's effects.
+    /// Nothing fills or spends it yet.
+    public var flo = 0.0
     /// The swing's web, while swinging: where it's anchored, and the arc.
     public var webAnchor: Vec2?
     private var swingLength = 0.0

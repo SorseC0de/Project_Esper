@@ -190,6 +190,14 @@ enum Onomatopoeia {
     }
     static let holdSeconds = 0.5
 
+    /// Lettering in a face, as the words are drawn, held still: its letters growing to the left or
+    /// the right, and flared that way, settled. `height` is its cap height in points.
+    static func still(_ text: String, face: Lettering, upper: Int, lower: Int, height: CGFloat, growsLeft: Bool) -> SKSpriteNode {
+        let sprite = node(Word(text: text, lettering: face, upper: upper, lower: lower, height: height, growsLeft: growsLeft))
+        sprite.warpGeometry = flare(growsLeft ? -1 : 1)
+        return sprite
+    }
+
     /// A perspective flare along the word, `amount` 1 to the right and -1 to the left: the
     /// near end squeezed, the far end spread, the middle arched up.
     private static func flare(_ amount: Float) -> SKWarpGeometryGrid {

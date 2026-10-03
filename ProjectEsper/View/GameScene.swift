@@ -1055,6 +1055,47 @@ final class GameScene: SKScene {
         hud.addChild(fpsLabel)
     }
 
+    // MARK: FLO
+
+    /// The FLO meters along the bottom, the first player's left of the middle and the second's
+    /// right of it: `FLO_meter` a point an art pixel, and over each bar's left end the word, in
+    /// Bigdex as the sound words are drawn, big to small and flared. Shown in play; what fills
+    /// and empties them is to come, and the bar shows its first frame meanwhile.
+    private var floMeters: [SKSpriteNode] = []
+    private static let floPointsPerPixel: CGFloat = 1
+    private static let floGap: CGFloat = 40
+    private static let floWordHeight: CGFloat = 14
+    /// How far onto the bar the word reaches, and how far above its middle it sits, in points.
+    private static let floWordOverlap: CGFloat = 6
+    private static let floWordLift: CGFloat = 3
+
+    private func layoutFloMeters(bottom: CGFloat) {
+        floMeters.forEach { $0.removeFromParent() }
+        floMeters = []
+        guard (EffectSheets.frames["flo_meter"] ?? 0) > 0 else { return }
+        for index in 0..<2 {
+            let bar = SKSpriteNode(texture: sprites.texture("flo_meter", 0))
+            bar.texture?.filteringMode = .nearest
+            bar.size = CGSize(width: bar.size.width * GameScene.floPointsPerPixel, height: bar.size.height * GameScene.floPointsPerPixel)
+            let side: CGFloat = index == 0 ? -1 : 1
+            bar.position = CGPoint(x: side * (bar.size.width / 2 + GameScene.floGap / 2), y: bottom + bar.size.height / 2 + 6)
+            bar.zPosition = 6
+            let word = Onomatopoeia.still("FLO", face: .englishDex, upper: 22, lower: 19, height: GameScene.floWordHeight, growsLeft: true)
+            // Its small end on the bar's left end.
+            word.anchorPoint = CGPoint(x: 1, y: 0.5)
+            word.position = CGPoint(x: -bar.size.width / 2 + GameScene.floWordOverlap, y: GameScene.floWordLift)
+            word.zPosition = 1
+            bar.addChild(word)
+            hud.addChild(bar)
+            floMeters.append(bar)
+        }
+        showFloMeters()
+    }
+
+    private func showFloMeters() {
+        for meter in floMeters { meter.isHidden = flow != .playing }
+    }
+
     // MARK: The stage
 
     /// Everything drawn for one stage, in its own layers so a stage change can take it all
@@ -2391,6 +2432,7 @@ final class GameScene: SKScene {
         circlesOverCam.position = circles.position
         drawSeries()
         presentScreen()
+        layoutFloMeters(bottom: -halfHeight + insets.bottom + TouchControls.padding)
         powerLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 4)
         debugLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 26)
         fpsLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)
@@ -3089,6 +3131,7 @@ final class GameScene: SKScene {
         // The winner's line once, as the win screen goes up, not each time it's redrawn.
         if next == .won, flow != .won { SoundBoard.shared.play(SoundBoard.winners.randomElement()!) }
         flow = next
+        showFloMeters()
         if next == .stageSelect { openStageSelect() }
         if next == .picking {
             // Both phones roll the same offers off the shared dice.

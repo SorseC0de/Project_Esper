@@ -1069,7 +1069,9 @@ final class GameScene: SKScene {
     private static let floWordOverlap: CGFloat = 6
     private static let floWordLift: CGFloat = 3
 
+    private var floBottom: CGFloat = 0
     private func layoutFloMeters(bottom: CGFloat) {
+        floBottom = bottom
         floMeters.forEach { $0.removeFromParent() }
         floMeters = []
         guard (EffectSheets.frames["flo_meter"] ?? 0) > 0 else { return }
@@ -1078,14 +1080,17 @@ final class GameScene: SKScene {
             bar.texture?.filteringMode = .nearest
             bar.size = CGSize(width: bar.size.width * GameScene.floPointsPerPixel, height: bar.size.height * GameScene.floPointsPerPixel)
             let side: CGFloat = index == 0 ? -1 : 1
-            bar.position = CGPoint(x: side * (bar.size.width / 2 + GameScene.floGap / 2), y: bottom + bar.size.height / 2 + 6)
+            let scale = FloTuning.scale
+            bar.position = CGPoint(x: side * (bar.size.width * scale / 2 + GameScene.floGap / 2), y: bottom + bar.size.height * scale / 2 + 6)
             bar.zPosition = 6
-            let word = Onomatopoeia.still("FLO", face: .englishDex, upper: 22, lower: 19, height: GameScene.floWordHeight, growsLeft: true)
-            // Its small end on the bar's left end.
+            let word = Onomatopoeia.still("FLO", face: .englishDex, upper: 22, lower: 19, height: GameScene.floWordHeight, growsLeft: true,
+                                          left: FloTuning.leftSkew, right: FloTuning.rightSkew)
+            // Its small end on the bar's left end, then where the sliders move it.
             word.anchorPoint = CGPoint(x: 1, y: 0.5)
-            word.position = CGPoint(x: -bar.size.width / 2 + GameScene.floWordOverlap, y: GameScene.floWordLift)
+            word.position = CGPoint(x: -bar.size.width / 2 + GameScene.floWordOverlap + FloTuning.offsetX, y: GameScene.floWordLift + FloTuning.offsetY)
             word.zPosition = 1
             bar.addChild(word)
+            bar.setScale(scale)
             hud.addChild(bar)
             floMeters.append(bar)
         }
@@ -2368,6 +2373,13 @@ final class GameScene: SKScene {
         if ChevronTuning.slider {
             controls.addSlider(title: "BASKET CHEVRON Y", range: 0...60, notch: 1, value: Float(ChevronTuning.basketLift)) { ChevronTuning.basketLift = CGFloat($0) }
         }
+        // The FLO meters' look, while it's settled.
+        let relayoutFlo: () -> Void = { [weak self] in self.map { $0.layoutFloMeters(bottom: $0.floBottom) } }
+        controls.addSlider(title: "FLO SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.scale)) { FloTuning.scale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO LEFT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.leftSkew)) { FloTuning.leftSkew = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO RIGHT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.rightSkew)) { FloTuning.rightSkew = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO OFFSET X", range: -60...60, notch: 1, value: Float(FloTuning.offsetX)) { FloTuning.offsetX = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO OFFSET Y", range: -30...30, notch: 1, value: Float(FloTuning.offsetY)) { FloTuning.offsetY = CGFloat($0); relayoutFlo() }
         if ParticleLook.cubes {
             controls.addSlider(title: "CUBE TRAIL", range: 2...30, notch: 1, value: ParticleLook.cubeTrail) { ParticleLook.cubeTrail = $0 }
         }
@@ -3662,8 +3674,16 @@ final class GameScene: SKScene {
                 shake = max(shake, GameScene.titanStepShake)
             }
         }
-        // The dribble's bounce, under a loose ball's.
-        if GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) { play(.ballBounce, at: feet, volume: GameScene.dribbleVolume) }
+        // The dribble's bounce, under a loose ball's, and its word out of the floor under the ball.
+        if GameScene.dribbleBounceFrames(of: frame.animation).contains(frame.frame) {
+            play(.ballBounce, at: feet, volume: GameScene.dribbleVolume)
+            if match.players.indices.contains(index), let offset = BallLandmarks.offset(frame) {
+                let player = match.players[index]
+                let ahead = Double(offset.x) / SpriteLibrary.pixelsPerUnit * player.spec.scale * player.facing.sign
+                soundWords.removeAll { $0.parent == nil }
+                say(.bounce, at: Vec2(x: feet.x + ahead, y: feet.y), away: player.facing.sign, rise: 20)
+            }
+        }
     }
 
     /// The dribble's bounce at this share of a loose ball's, on the frames it meets the floor.

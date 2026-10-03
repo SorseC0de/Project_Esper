@@ -609,7 +609,9 @@ yet. The meters are in the HUD along the bottom, the first player's left of the 
 second's right of it, shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames, the
 first shown for now) a point an art pixel, and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are (white over palette 19, outlined, dropped), its letters big to
-small and flared that way (`Onomatopoeia.still`), 14 high.
+small, 14 high, skewed (`Onomatopoeia.still`): its left end drawn 1.18 and its right 0.82 times its
+middle's height, the middle arched. On sliders while it's settled (`FloTuning`): FLO SCALE, the
+whole meter's; FLO LEFT SKEW and FLO RIGHT SKEW; FLO OFFSET X and Y, the word moved, in points.
 
 ## Greateraid
 
@@ -939,7 +941,8 @@ aim); the burst, the quake and the freeze the way the player faces; a lava burn 
 feet; the rest at their point (20° to 30°); a basket out of the net, 10 under the rim and 8 off
 it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
-A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going.
+A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going;
+so does a dribble's, with its sound, out of the floor under the ball, the way the dribbler faces.
 
 Footfalls: on the frames of the walk (2 and 6) and run (1 and 5, the dash's too) cycles a foot
 comes down, `dust_walk` or `dust_run` puffs up 2 units behind the feet, bottom-aligned, at 12 a

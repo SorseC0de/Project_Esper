@@ -191,10 +191,18 @@ enum Onomatopoeia {
     static let holdSeconds = 0.5
 
     /// Lettering in a face, as the words are drawn, held still: its letters growing to the left or
-    /// the right, and flared that way, settled. `height` is its cap height in points.
-    static func still(_ text: String, face: Lettering, upper: Int, lower: Int, height: CGFloat, growsLeft: Bool) -> SKSpriteNode {
+    /// the right, and skewed, its left and right ends drawn `left` and `right` times its middle's
+    /// height, the middle arched as a word's is. `height` is its cap height in points.
+    static func still(_ text: String, face: Lettering, upper: Int, lower: Int, height: CGFloat, growsLeft: Bool,
+                      left: CGFloat, right: CGFloat) -> SKSpriteNode {
         let sprite = node(Word(text: text, lettering: face, upper: upper, lower: lower, height: height, growsLeft: growsLeft))
-        sprite.warpGeometry = flare(growsLeft ? -1 : 1)
+        let columns = 3
+        let source = (0...1).flatMap { row in (0...columns).map { SIMD2<Float>(Float($0) / Float(columns), Float(row)) } }
+        let destination = source.map { vertex -> SIMD2<Float> in
+            let stretch = Float(left) + (Float(right) - Float(left)) * vertex.x
+            return SIMD2(vertex.x, 0.5 + (vertex.y - 0.5) * stretch + sin(vertex.x * .pi) * 0.08)
+        }
+        sprite.warpGeometry = SKWarpGeometryGrid(columns: columns, rows: 1, sourcePositions: source, destinationPositions: destination)
         return sprite
     }
 

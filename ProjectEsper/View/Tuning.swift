@@ -272,6 +272,16 @@ enum GoalpostTuning {
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the
 /// right rim in the dunk, on the sequence frame the DUNK FRAME slider picks, and the
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
+/// The FLO meters' look, on sliders while it's settled: the whole meter's scale, the word's
+/// left and right ends' heights over its middle's, and the word moved from its place, in points.
+enum FloTuning {
+    nonisolated(unsafe) static var scale: CGFloat = 1
+    nonisolated(unsafe) static var leftSkew: CGFloat = 1.18
+    nonisolated(unsafe) static var rightSkew: CGFloat = 0.82
+    nonisolated(unsafe) static var offsetX: CGFloat = 0
+    nonisolated(unsafe) static var offsetY: CGFloat = 0
+}
+
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
     static let enabled = false

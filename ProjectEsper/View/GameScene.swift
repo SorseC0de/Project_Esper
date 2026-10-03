@@ -1090,15 +1090,13 @@ final class GameScene: SKScene {
             "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
         ]).applyingFilter("CIPremultiply")
-        // Grown round, not square, so a slanted edge comes out smooth rather than stepped, and
-        // its edge softened a pixel, drawn smoothed.
+        // Grown round, not square, so a slanted edge comes out smooth rather than stepped.
         let grown = white.composited(over: CIImage(color: .clear).cropped(to: padded))
             .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: width * pixels])
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 0.6])
             .cropped(to: padded)
         guard let outline = ciContext.createCGImage(grown, from: padded) else { return nil }
         let texture = SKTexture(cgImage: outline)
-        texture.filteringMode = .linear
+        texture.filteringMode = .nearest
         let node = SKSpriteNode(texture: texture)
         node.size = CGSize(width: frame.width + reach * 2 / pixels, height: frame.height + reach * 2 / pixels)
         node.position = CGPoint(x: frame.midX, y: frame.midY)
@@ -1130,11 +1128,12 @@ final class GameScene: SKScene {
             // The meter: a holder at the whole meter's scale, the bar and the word each at their own.
             let side: CGFloat = index == 0 ? -1 : 1
             let meter = SKSpriteNode()
-            let barWidth = bar.size.width * FloTuning.barScale, barHeight = bar.size.height * FloTuning.barScale
+            let barWidth = bar.size.width * FloTuning.barScale * FloTuning.xScale, barHeight = bar.size.height * FloTuning.barScale * FloTuning.yScale
             meter.position = CGPoint(x: side * (barWidth * FloTuning.meterScale / 2 + GameScene.floGap / 2),
                                      y: bottom + barHeight * FloTuning.meterScale / 2 + 6)
             meter.zPosition = 6
-            bar.setScale(FloTuning.barScale)
+            bar.xScale = FloTuning.barScale * FloTuning.xScale
+            bar.yScale = FloTuning.barScale * FloTuning.yScale
             bar.warpGeometry = Onomatopoeia.skew(left: FloTuning.barFront, right: FloTuning.barBack, bend: FloTuning.barBend, columns: 16)
             meter.addChild(bar)
             let word = Onomatopoeia.still("FLO", face: .englishDex, colours: FloTuning.colours, height: GameScene.floWordHeight, growsLeft: true,
@@ -1145,8 +1144,7 @@ final class GameScene: SKScene {
             word.setScale(FloTuning.wordScale)
             word.zPosition = 1
             meter.addChild(word)
-            meter.xScale = FloTuning.meterScale * FloTuning.xScale
-            meter.yScale = FloTuning.meterScale * FloTuning.yScale
+            meter.setScale(FloTuning.meterScale)
             hud.addChild(meter)
             floMeters.append(meter)
         }

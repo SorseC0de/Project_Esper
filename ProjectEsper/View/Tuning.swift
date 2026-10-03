@@ -284,7 +284,7 @@ enum FloTuning {
     nonisolated(unsafe) static var rightSkew: CGFloat = 0.5
     nonisolated(unsafe) static var offsetX: CGFloat = 15
     nonisolated(unsafe) static var offsetY: CGFloat = -6
-    /// The whole meter squeezed across and down, over its scale.
+    /// The bar squeezed across and down, over its scale; the word keeps its own.
     nonisolated(unsafe) static var xScale: CGFloat = 1
     nonisolated(unsafe) static var yScale: CGFloat = 1
     /// The bar's warp: its front (left) and back (right) ends' heights over its middle's, and its

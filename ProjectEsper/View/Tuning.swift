@@ -284,6 +284,8 @@ enum FloTuning {
     nonisolated(unsafe) static var rightSkew: CGFloat = 0.5
     nonisolated(unsafe) static var offsetX: CGFloat = 15
     nonisolated(unsafe) static var offsetY: CGFloat = -5
+    /// The white stroke round the bar and the word together, in points.
+    nonisolated(unsafe) static var stroke: CGFloat = 0.75
 
     /// The word's four colours: its fill's top and bottom, its outline and drop's top and bottom.
     enum Tone: Int, CaseIterable {

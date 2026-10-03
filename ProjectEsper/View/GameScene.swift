@@ -1,5 +1,6 @@
 import EsperSim
 import SpriteKit
+import CoreImage
 import simd
 
 extension CGPoint {
@@ -1070,8 +1071,52 @@ final class GameScene: SKScene {
     private static let floWordLift: CGFloat = 3
 
     private var floBottom: CGFloat = 0
+    private var floStrokes: [SKSpriteNode] = []
+    private let ciContext = CIContext()
+
+    /// The white stroke round a meter, the bar and the word as one shape: the meter drawn as it
+    /// is, warp and all, made white, grown square by the stroke and set behind it.
+    private func floStroke(round meter: SKNode) -> SKSpriteNode? {
+        let width = FloTuning.stroke
+        guard width > 0, let view = hudScene.view, let drawn = view.texture(from: meter) else { return nil }
+        let frame = meter.calculateAccumulatedFrame()
+        let picture = drawn.cgImage()
+        let pixels = CGFloat(picture.width) / max(frame.width, 1)
+        let reach = (width * pixels).rounded(.up)
+        let input = CIImage(cgImage: picture)
+        let padded = input.extent.insetBy(dx: -reach, dy: -reach)
+        // White wherever it's drawn, then grown.
+        let white = input.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
+        ]).applyingFilter("CIPremultiply")
+        let grown = white.composited(over: CIImage(color: .clear).cropped(to: padded))
+            .applyingFilter("CIMorphologyRectangleMaximum", parameters: ["inputWidth": reach * 2 + 1, "inputHeight": reach * 2 + 1])
+            .cropped(to: padded)
+        guard let outline = ciContext.createCGImage(grown, from: padded) else { return nil }
+        let texture = SKTexture(cgImage: outline)
+        texture.filteringMode = .nearest
+        let node = SKSpriteNode(texture: texture)
+        node.size = CGSize(width: frame.width + reach * 2 / pixels, height: frame.height + reach * 2 / pixels)
+        node.position = CGPoint(x: frame.midX, y: frame.midY)
+        node.zPosition = meter.zPosition - 0.1
+        return node
+    }
+
+    /// The strokes made once the meters are up and the HUD's view is there to draw them.
+    private func strokeFloMeters() {
+        guard floStrokes.isEmpty, FloTuning.stroke > 0, hudScene.view != nil, let first = floMeters.first, !first.isHidden else { return }
+        for meter in floMeters {
+            guard let stroke = floStroke(round: meter) else { continue }
+            hud.addChild(stroke)
+            floStrokes.append(stroke)
+        }
+    }
+
     private func layoutFloMeters(bottom: CGFloat) {
         floBottom = bottom
+        floStrokes.forEach { $0.removeFromParent() }
+        floStrokes = []
         floMeters.forEach { $0.removeFromParent() }
         floMeters = []
         guard (EffectSheets.frames["flo_meter"] ?? 0) > 0 else { return }
@@ -1107,7 +1152,7 @@ final class GameScene: SKScene {
     private var floPicker: FloColourPicker?
 
     private func showFloMeters() {
-        for meter in floMeters { meter.isHidden = flow != .playing }
+        for meter in floMeters + floStrokes { meter.isHidden = flow != .playing }
         floPicker?.isHidden = flow != .playing || online != nil
     }
 
@@ -2391,6 +2436,7 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO LEFT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.leftSkew)) { FloTuning.leftSkew = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO RIGHT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.rightSkew)) { FloTuning.rightSkew = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO OFFSET X", range: -60...60, notch: 1, value: Float(FloTuning.offsetX)) { FloTuning.offsetX = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO STROKE", range: 0...4, notch: 0.25, value: Float(FloTuning.stroke)) { FloTuning.stroke = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO OFFSET Y", range: -30...30, notch: 1, value: Float(FloTuning.offsetY)) { FloTuning.offsetY = CGFloat($0); relayoutFlo() }
         if ParticleLook.cubes {
             controls.addSlider(title: "CUBE TRAIL", range: 2...30, notch: 1, value: ParticleLook.cubeTrail) { ParticleLook.cubeTrail = $0 }
@@ -5626,6 +5672,7 @@ final class GameScene: SKScene {
 
     private func render() {
         sectionMark = CACurrentMediaTime()
+        strokeFloMeters()
         stepHeadParticles()
         section("particles")
         // The figure in front: the one with the ball, else the last to touch it.

@@ -64,9 +64,9 @@ enum Onomatopoeia {
         private var spelling: (english: String, japanese: String, upper: Int, lower: Int, height: CGFloat) {
             switch self {
             // Baskets: the net, and the rim taking a dunk.
-            case .swish: ("SWISH!", "パサッ！", 22, 19, 22)
-            case .three: ("SWOOSH!!", "ザシュッ！！", 22, 19, 24)
-            case .dunk: ("SLAM!!", "ドガァン！！", 8, 6, 28)
+            case .swish: ("SWISH!", "パサッ！", 22, 19, 18)
+            case .three: ("SWOOSH!!", "ザシュッ！！", 22, 19, 18)
+            case .dunk: ("SLAM!!", "ドガァン！！", 8, 6, 18)
             // Bodies and the ball.
             case .hit: ("WHAM!", "ドゴッ！", 22, 5, 18)
             case .steal: ("SMACK!", "バシッ！", 22, 26, 16)
@@ -191,9 +191,10 @@ enum Onomatopoeia {
         sprite.position = CGPoint(x: away * gap, y: 0)
         let node = SKNode()
         node.addChild(sprite)
-        node.position = source
+        // A little off and turned at random, about its small end, so no two land the same.
+        node.position = CGPoint(x: source.x + .random(in: -scatter...scatter), y: source.y + .random(in: -scatter...scatter))
         node.zPosition = z
-        node.zRotation = away * rise
+        node.zRotation = away * rise + .random(in: -wobble...wobble)
         node.setScale(0.3)
         let warp = SKAction.animate(withWarps: [flare(left ? -1.4 : 1.4), flare(left ? -1 : 1)], times: [0.08, 0.24]) ?? .wait(forDuration: 0.24)
         let punch = SKAction.scale(to: 1.15, duration: 0.08)
@@ -208,6 +209,9 @@ enum Onomatopoeia {
         return node
     }
     static let holdSeconds = 0.5
+    /// The random turn either way, and the random step off the source each way, in art pixels.
+    static let wobble: CGFloat = 5 * .pi / 180
+    static let scatter: CGFloat = 4
 
     /// Lettering in a face, as the words are drawn, held still: its letters growing to the left or
     /// the right, and skewed, its left and right ends drawn `left` and `right` times its middle's

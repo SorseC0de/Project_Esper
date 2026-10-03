@@ -610,13 +610,14 @@ second's right of it, shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 1
 first shown for now) a point an art pixel, and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
 its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
-moved 15 right and 5 down from its place, the whole meter at 0.75. On sliders while it's settled (`FloTuning`): FLO METER SCALE, the
+moved 15 right and 6 down from its place, the whole meter at 0.75. On sliders while it's settled (`FloTuning`): FLO METER SCALE, the
 whole meter's; FLO BAR SCALE and FLO WORD SCALE, each its own; FLO LEFT SKEW and FLO RIGHT SKEW;
-FLO OFFSET X and Y, the word moved, in points; FLO BAR FRONT and FLO BAR BACK, the bar's left and
-right ends' heights over its middle's (1), and FLO BAR BEND, its middle raised by that share of its
-height (0, under 0 lowered), a warp of 16 columns (`Onomatopoeia.skew`, the word's own too); FLO STROKE, the white stroke round the bar and the
-word together (0.75 points; the bar's art has none of its own), traced off the meter as drawn,
-warp and all, grown square and set behind it. Its four colours, the fill's top and bottom and the
+FLO OFFSET X and Y, the word moved, in points; FLO X SCALE and FLO Y SCALE, the whole meter squeezed
+across and down; FLO BAR FRONT and FLO BAR BACK, the bar's left and right ends' heights over its
+middle's (1.5 and 0.5), and FLO BAR BEND, its middle raised by that share of its height (0.5, under
+0 lowered), a warp of 16 columns (`Onomatopoeia.skew`, the word's own too); FLO STROKE, the white stroke round the bar and the
+word together (0.5 points; the bar's art has none of its own), traced off the meter as drawn,
+warp and all, grown round, its edge softened, drawn smoothed, and set behind it. Its four colours, the fill's top and bottom and the
 outline and drop's top and bottom, two-toned at each letter's middle (the sound words' outline is
 two-toned the same way, both halves palette 29), are picked on a grid in the match's bottom leading
 corner, offline (`FloColourPicker`): FILL TOP, FILL BTM, LINE TOP or LINE BTM, then a swatch of the
@@ -939,7 +940,7 @@ warp grid flares it (near end squeezed, far end spread, middle arched), holds 0.
 and fades. The words never glow: the mask draws them flat, warp and all.
 
 A word comes out of where its sound is made, as JUS's do: small at the source, 2 art pixels off
-it, its letters growing away from whoever made it (the growth runs right to left for a word
+it (and up to 4 either way more, and turned up to 5° either way about that end, at random), its letters growing away from whoever made it (the growth runs right to left for a word
 going left), turned up as it goes, popped out from that small end, and drawn behind the bodies
 and the effects (19), so it can sit that close without hiding them; turned the other way when
 there's less than 70 of screen on its side. In the glow's mask it's drawn under the bodies.
@@ -952,7 +953,8 @@ feet; the rest at their point (20° to 30°); a basket out of the net, 10 under 
 it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
 A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going;
-so does a dribble's, with its sound, out of the floor under the ball, the way the dribbler faces.
+so does a dribble's, with its sound, out of the floor under the ball (off a ledge, the floor below it,
+where the ball's drawn reaching down to), the way the dribbler faces.
 
 Footfalls: on the frames of the walk (2 and 6) and run (1 and 5, the dash's too) cycles a foot
 comes down, `dust_walk` or `dust_run` puffs up 2 units behind the feet, bottom-aligned, at 12 a
@@ -961,7 +963,7 @@ from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 4.5 h
 
 | | JP | EN |
 |---|---|---|
-| Basket, confirmed, beside the net toward the court | パサッ！ | SWISH! |
+| Basket, confirmed, beside the net toward the court (a basket's words 18 high, as a hit's) | パサッ！ | SWISH! |
 | Three | ザシュッ！！ | SWOOSH!! |
 | Dunk | ドガァン！！ | SLAM!! |
 | Body hit | ドゴッ！ | WHAM! |

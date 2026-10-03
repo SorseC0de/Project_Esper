@@ -283,14 +283,17 @@ enum FloTuning {
     nonisolated(unsafe) static var leftSkew: CGFloat = 1.5
     nonisolated(unsafe) static var rightSkew: CGFloat = 0.5
     nonisolated(unsafe) static var offsetX: CGFloat = 15
-    nonisolated(unsafe) static var offsetY: CGFloat = -5
+    nonisolated(unsafe) static var offsetY: CGFloat = -6
+    /// The whole meter squeezed across and down, over its scale.
+    nonisolated(unsafe) static var xScale: CGFloat = 1
+    nonisolated(unsafe) static var yScale: CGFloat = 1
     /// The bar's warp: its front (left) and back (right) ends' heights over its middle's, and its
     /// middle raised by this share of its height.
-    nonisolated(unsafe) static var barFront: CGFloat = 1
-    nonisolated(unsafe) static var barBack: CGFloat = 1
-    nonisolated(unsafe) static var barBend: CGFloat = 0
+    nonisolated(unsafe) static var barFront: CGFloat = 1.5
+    nonisolated(unsafe) static var barBack: CGFloat = 0.5
+    nonisolated(unsafe) static var barBend: CGFloat = 0.5
     /// The white stroke round the bar and the word together, in points.
-    nonisolated(unsafe) static var stroke: CGFloat = 0.75
+    nonisolated(unsafe) static var stroke: CGFloat = 0.5
 
     /// The word's four colours: its fill's top and bottom, its outline and drop's top and bottom.
     enum Tone: Int, CaseIterable {

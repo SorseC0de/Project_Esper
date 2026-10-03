@@ -1075,7 +1075,7 @@ final class GameScene: SKScene {
     private let ciContext = CIContext()
 
     /// The white stroke round a meter, the bar and the word as one shape: the meter drawn as it
-    /// is, warp and all, made white, grown square by the stroke and set behind it.
+    /// is, warp and all, made white, grown round by the stroke and set behind it.
     private func floStroke(round meter: SKNode) -> SKSpriteNode? {
         let width = FloTuning.stroke
         guard width > 0, let view = hudScene.view, let drawn = view.texture(from: meter) else { return nil }
@@ -1090,12 +1090,15 @@ final class GameScene: SKScene {
             "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
         ]).applyingFilter("CIPremultiply")
+        // Grown round, not square, so a slanted edge comes out smooth rather than stepped, and
+        // its edge softened a pixel, drawn smoothed.
         let grown = white.composited(over: CIImage(color: .clear).cropped(to: padded))
-            .applyingFilter("CIMorphologyRectangleMaximum", parameters: ["inputWidth": reach * 2 + 1, "inputHeight": reach * 2 + 1])
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: width * pixels])
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 0.6])
             .cropped(to: padded)
         guard let outline = ciContext.createCGImage(grown, from: padded) else { return nil }
         let texture = SKTexture(cgImage: outline)
-        texture.filteringMode = .nearest
+        texture.filteringMode = .linear
         let node = SKSpriteNode(texture: texture)
         node.size = CGSize(width: frame.width + reach * 2 / pixels, height: frame.height + reach * 2 / pixels)
         node.position = CGPoint(x: frame.midX, y: frame.midY)
@@ -1142,7 +1145,8 @@ final class GameScene: SKScene {
             word.setScale(FloTuning.wordScale)
             word.zPosition = 1
             meter.addChild(word)
-            meter.setScale(FloTuning.meterScale)
+            meter.xScale = FloTuning.meterScale * FloTuning.xScale
+            meter.yScale = FloTuning.meterScale * FloTuning.yScale
             hud.addChild(meter)
             floMeters.append(meter)
         }
@@ -2432,6 +2436,8 @@ final class GameScene: SKScene {
         // The FLO meters' look, while it's settled.
         let relayoutFlo: () -> Void = { [weak self] in self.map { $0.layoutFloMeters(bottom: $0.floBottom) } }
         controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO X SCALE", range: 0.25...2, notch: 0.01, value: Float(FloTuning.xScale)) { FloTuning.xScale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO Y SCALE", range: 0.25...2, notch: 0.01, value: Float(FloTuning.yScale)) { FloTuning.yScale = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO BAR SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.barScale)) { FloTuning.barScale = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO WORD SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.wordScale)) { FloTuning.wordScale = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO LEFT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.leftSkew)) { FloTuning.leftSkew = CGFloat($0); relayoutFlo() }
@@ -3749,8 +3755,11 @@ final class GameScene: SKScene {
             if match.players.indices.contains(index), let offset = BallLandmarks.offset(frame) {
                 let player = match.players[index]
                 let ahead = Double(offset.x) / SpriteLibrary.pixelsPerUnit * player.spec.scale * player.facing.sign
+                // Off a ledge it bounces on the floor below, where the ball's drawn reaching down to.
+                let contact = player.overhangBall(in: match.stage).map { Vec2(x: $0.x, y: $0.y - BallRules.radius) }
+                    ?? Vec2(x: feet.x + ahead, y: feet.y)
                 soundWords.removeAll { $0.parent == nil }
-                say(.bounce, at: Vec2(x: feet.x + ahead, y: feet.y), away: player.facing.sign, rise: 20)
+                say(.bounce, at: contact, away: player.facing.sign, rise: 20)
             }
         }
     }

@@ -400,13 +400,14 @@ public struct Opponent: Equatable {
                 jumpShot = jumping
             }
         }
-        // A spot among those its shots were found to go in from, picked afresh now and then.
+        // A spot among those its shots were found to go in from, picked afresh now and then; a
+        // guess while the search has found none is tried again as soon as it has.
         if readSpot == nil || readSpotFrames <= 0 {
-            readSpot = rimPath.flatMap { spotUnderMovingRim(match, me: me, path: $0) } ?? pickReadSpot(match, me: me, human: human, hoop: hoop)
-                ?? terrain?.standing(nearest: Vec2(x: hoop.position.x + inward * 50, y: hoop.position.y - 60)).map { stand in
-                    ShotSpot(feet: Vec2(x: stand.x, y: terrain!.surfaces[stand.surface].height(at: stand.x)), jumpShot: true)
-                }
-            readSpotFrames = rimPath != nil ? 45 : 240
+            let found = rimPath.flatMap { spotUnderMovingRim(match, me: me, path: $0) } ?? pickReadSpot(match, me: me, human: human, hoop: hoop)
+            readSpot = found ?? terrain?.standing(nearest: Vec2(x: hoop.position.x + inward * 50, y: hoop.position.y - 60)).map { stand in
+                ShotSpot(feet: Vec2(x: stand.x, y: terrain!.surfaces[stand.surface].height(at: stand.x)), jumpShot: true)
+            }
+            readSpotFrames = rimPath != nil ? 45 : (found == nil ? Opponent.guessedSpotFrames : 240)
         } else {
             readSpotFrames -= 1
         }
@@ -830,6 +831,9 @@ public struct Opponent: Equatable {
             }
         }
     }
+
+    /// How long a guessed spot is kept before the search's spots are looked at again.
+    static let guessedSpotFrames = 10
 
     /// How near the other must be to a loose ball for it to be worth spiking away from them.
     static let contestReach = 60.0

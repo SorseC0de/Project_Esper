@@ -31,6 +31,7 @@ final class TouchControls: SKNode {
     private let resetButton = TouchControls.cornerButton("RESET")
     private let hitboxButton = TouchControls.cornerButton("HITBOX")
     private let aiButton = TouchControls.cornerButton("AI")
+    private let wallsButton = TouchControls.cornerButton("WALLS")
     private let pauseButton = TouchControls.cornerButton("PAUSE")
 
     private static let cornerSize = CGSize(width: 50, height: 22)
@@ -61,6 +62,9 @@ final class TouchControls: SKNode {
     var onReset: (() -> Void)?
     /// The HITBOX toggle beside it: whether the sim's boxes are drawn, and who to tell.
     var showHitboxes = false { didSet { TouchControls.light(hitboxButton, on: showHitboxes) } }
+    /// The WALLS toggle under it: the stage's solids drawn over the world.
+    var showWalls = false { didSet { TouchControls.light(wallsButton, on: showWalls) } }
+    var onToggleWalls: ((Bool) -> Void)?
     var onToggleHitboxes: ((Bool) -> Void)?
     /// The AI switch beside that: whether the computer plays the other side.
     var aiOn = true { didSet { TouchControls.light(aiButton, on: aiOn) } }
@@ -122,6 +126,9 @@ final class TouchControls: SKNode {
             addChild(button)
         }
         TouchControls.light(aiButton, on: aiOn)
+        // WALLS under HITBOX.
+        wallsButton.position = CGPoint(x: hitboxButton.position.x, y: hitboxButton.position.y - (TouchControls.cornerSize.height + 6) * k)
+        addChild(wallsButton)
     }
 
     /// Online there's no reset, no pause, no computer and no tuning: only the pad and HITBOX.
@@ -234,6 +241,11 @@ final class TouchControls: SKNode {
         if hitboxButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             showHitboxes.toggle()
             onToggleHitboxes?(showHitboxes)
+            return
+        }
+        if wallsButton.frame.insetBy(dx: -8, dy: -3).contains(point) {
+            showWalls.toggle()
+            onToggleWalls?(showWalls)
             return
         }
         if !aiButton.isHidden, aiButton.frame.insetBy(dx: -8, dy: -8).contains(point) {

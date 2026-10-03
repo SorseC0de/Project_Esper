@@ -928,10 +928,12 @@ aim); the burst, the quake and the freeze the way the player faces; a lava burn 
 feet; the rest at their point (20° to 30°); a basket out of the net, 10 under the rim and 8 off
 it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
+A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going.
+
 Footfalls: on the frames of the walk (2 and 6) and run (1 and 5, the dash's too) cycles a foot
 comes down, `dust_walk` or `dust_run` puffs up 2 units behind the feet, bottom-aligned, at 12 a
-second in the energy colour as the dash's smoke is (not under water); every fourth footfall,
-from the first, says TAP / テク walking or THUMP / ダッ running, 8 and 9 high, out of the dust.
+second in the energy colour as the dash's smoke is (not under water); every second footfall,
+from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 4.5 high, out of the dust.
 
 | | JP | EN |
 |---|---|---|
@@ -945,6 +947,7 @@ from the first, says TAP / テク walking or THUMP / ダッ running, 8 and 9 hig
 | Slash on a wall | ガキン | CLANG |
 | Wall jump | キュッ | SQUEAK |
 | Footsteps, walking / running | テク / ダッ | TAP / THUMP |
+| A loose ball's bounce | ダム | BOMP |
 | Z Tea's beam / burst | ズドドドド / ドオォン！ | VWOOOM / BOOOM! |
 | Quake | ゴゴゴゴ | RUMBLE |
 | Freeze | ピキッ！ | CRACK! |
@@ -1393,15 +1396,15 @@ COPY puts the layout on the clipboard as Swift for `HoopSupport.baked`; DONE clo
 The Wreck Center on the stage select, and the default. Its backboard blocks are rows 12 and 13,
 four tiles up from where they were (`Stage.courtBlockShift`, (0, 4), BLOCK X and Y in the support
 builder), each four cells wide from its wall: the block and one more behind it (protocol 67). The
-rims ride the blocks, 90 and the blocks' rise, lowered 5, at 125 (`Stage.courtRimDrop`), and 58 in
-from each wall less RIM DEPTH's 3 (`Stage.courtRimDepth`) and the blocks' shift, the hang and the
-hoop's art coming with them. Each backboard is a box solid to bodies and the ball, 16 by 32 art
-pixels (10 by 20 units, `Stage.backboardFace` and the rest), its front edge on the art's board,
-3.125 units behind the rim's centre, centred on the board: the rim's back third is the board's,
+rims ride the blocks, 90 and the blocks' rise, lowered 35, at 95 (`Stage.courtRimDrop`; protocol 68),
+and 58 in from each wall less RIM DEPTH's 3 (`Stage.courtRimDepth`) and the blocks' shift, the hang and the
+hoop's art coming with them. Each backboard is a box solid to bodies and the ball, 16 art pixels
+deep (10 units, `Stage.backboardFace` and the rest), its front edge on the art's board,
+3.125 units behind the rim's centre, its bottom 16 art pixels under the board's middle and its
+top up to the block's underside, closing the gap between them (protocol 69): the rim's back third is the board's,
 and a shot there comes off it. The blocks' tops are out of every jump's reach; a ball that settles
-on one goes back to its spawn (`Stage.outOfReach`, by the out-of-the-world rule). From the floor no
-jump reaches a rim for a dunk, and only jump shots go in: from 40 to 110 out on the floor, and from
-the ledge. Below
+on one goes back to its spawn (`Stage.outOfReach`, by the out-of-the-world rule). The WALLS button, under HITBOX, draws the stage's solids over the world: tiles red,
+one-ways yellow, solid boxes cyan, where a ball goes back magenta. Below
 the floor's row everything is the outline black, #242234. Every stage's hoops are two layers on one 48-pixel canvas,
 drawn to the players' scale and kept together as drawn, all under the bodies: `backboard`, then
 the net, then `hoop`, the rim (`Pixel Art/Stages`, the importer's `STAGE_ART`, over the old

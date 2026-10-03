@@ -149,6 +149,11 @@ final class GameScene: SKScene {
     /// loose ball, the catch reach round each chest, and any live leg, blade or reach.
     private let hitboxLayer = SKNode()
     private var showHitboxes = false
+    /// The stage's solids over the world while the WALLS toggle is on: tiles red, one-ways
+    /// yellow, the solid boxes (the backboards) cyan, where a ball goes back from magenta.
+    private let wallsLayer = SKNode()
+    private var showWalls = false
+    private var drawnWalls: (tiles: [Tile], boxes: [Box], outOfReach: [Box])?
     /// The HUD lives in its own scene, drawn over the Metal view by a plain SpriteKit view
     /// so none of it glows; its children are laid out in screen points from the centre
     /// and a touch maps onto them with no arithmetic. What should glow, the round circles
@@ -734,6 +739,8 @@ final class GameScene: SKScene {
         world.addChild(glowers)
         hitboxLayer.zPosition = 30
         world.addChild(hitboxLayer)
+        wallsLayer.zPosition = 31
+        world.addChild(wallsLayer)
         // The Elements' tornados again over the players, only above the lava.
         let overLava = SKSpriteNode(color: .white, size: CGSize(width: 100_000, height: 100_000))
         overLava.anchorPoint = CGPoint(x: 0.5, y: 0)
@@ -2159,6 +2166,8 @@ final class GameScene: SKScene {
         }
         controls.showHitboxes = showHitboxes
         controls.onToggleHitboxes = { [weak self] on in self?.showHitboxes = on }
+        controls.showWalls = showWalls
+        controls.onToggleWalls = { [weak self] on in self?.showWalls = on }
         controls.aiOn = aiOn
         controls.onToggleAI = { [weak self] on in self?.aiOn = on }
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
@@ -2911,7 +2920,7 @@ final class GameScene: SKScene {
     private static let walkFootfalls: Set<Int> = [2, 6]
     private static let runFootfalls: Set<Int> = [1, 5]
     /// Footfalls to a footstep word.
-    private static let footfallsPerWord = 4
+    private static let footfallsPerWord = 2
     private func stepFootfalls() {
         guard !wholeStageView else { return }
         for (index, player) in match.players.enumerated() {
@@ -2951,6 +2960,8 @@ final class GameScene: SKScene {
         if (source.x - cameraNode.position.x) * away > halfWidth - GameScene.wordRoom { away = -away }
         soundWords.append(Onomatopoeia.show(sound, from: source, away: away, rise: degrees * .pi / 180, gap: gap, in: world, z: GameScene.wordZ))
     }
+    /// How fast a bounce has to be to be said: not the settling ones.
+    private static let bounceWordFloor = 1.5
     /// The room a word wants on its side before the screen's edge, in art pixels.
     private static let wordRoom: CGFloat = 70
 
@@ -2992,6 +3003,9 @@ final class GameScene: SKScene {
             case .lavaSplashed(let at, true): say(.sizzle, at: at, away: 1, rise: 20)
             case .icicleShattered(let at): say(.shatter, at: at, away: 1, rise: 20)
             case .lightningStruck(let at): say(.thunder, at: at, away: 1, rise: 30)
+            case .ballBounced(let position, let speed) where speed > GameScene.bounceWordFloor:
+                // Out of where it hit, the way it's going.
+                say(.bounce, at: position, away: match.ball.velocity.x < 0 ? -1 : 1, rise: 20)
             default: break
             }
         }
@@ -6097,6 +6111,7 @@ final class GameScene: SKScene {
         section("ball")
 
         drawHitboxes()
+        drawWalls()
         section("hitbox")
         // The count in title lettering, BALL OUT as it ends, and any other banner for its frames.
         // With a screen up or on its way, the count waits: it starts again as play comes back.
@@ -6196,6 +6211,41 @@ final class GameScene: SKScene {
     /// The sim's boxes, rebuilt each frame while the toggle is on: bodies white, the loose
     /// ball purple, the catch reach a faint ring, the slide's leg and the slash's blade
     /// red, the snatch's reach green.
+    /// The walls overlay, redrawn only when the stage's solids change.
+    private func drawWalls() {
+        guard showWalls else {
+            if drawnWalls != nil { wallsLayer.removeAllChildren(); drawnWalls = nil }
+            return
+        }
+        let stage = match.stage
+        if let drawn = drawnWalls, drawn.tiles == stage.tiles, drawn.boxes == stage.extras, drawn.outOfReach == stage.outOfReach { return }
+        drawnWalls = (stage.tiles, stage.extras, stage.outOfReach)
+        wallsLayer.removeAllChildren()
+        func fill(_ rect: CGRect, _ colour: SKColor) {
+            let node = SKShapeNode(rect: rect)
+            node.fillColor = colour.withAlphaComponent(0.3)
+            node.strokeColor = colour.withAlphaComponent(0.8)
+            node.lineWidth = 1
+            wallsLayer.addChild(node)
+        }
+        func rect(_ box: Box) -> CGRect {
+            let low = SpriteLibrary.point(box.min), high = SpriteLibrary.point(box.max)
+            return CGRect(x: low.x, y: low.y, width: high.x - low.x, height: high.y - low.y)
+        }
+        let side = GameScene.pixelsPerTile
+        for row in 0..<stage.rows {
+            for column in 0..<stage.columns {
+                switch stage.tile(column: column, row: row) {
+                case .solid: fill(CGRect(x: CGFloat(column) * side, y: CGFloat(row) * side, width: side, height: side), .red)
+                case .oneWay: fill(CGRect(x: CGFloat(column) * side, y: CGFloat(row + 1) * side - 2, width: side, height: 2), .yellow)
+                case .empty: break
+                }
+            }
+        }
+        for box in stage.extras { fill(rect(box), .cyan) }
+        for box in stage.outOfReach { fill(rect(box), .magenta) }
+    }
+
     private func drawHitboxes() {
         hitboxLayer.removeAllChildren()
         guard showHitboxes else { return }

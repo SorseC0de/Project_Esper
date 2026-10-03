@@ -609,15 +609,15 @@ yet. The meters are in the HUD along the bottom, the first player's left of the 
 second's right of it, shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames, the
 first shown for now) a point an art pixel, and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
-its left end drawn 1.18 and its right 0.82 times its middle's height, the middle arched, moved 10
-right and 2 down from its place. On sliders while it's settled (`FloTuning`): FLO METER SCALE, the
+its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
+moved 15 right and 5 down from its place, the whole meter at 0.75. On sliders while it's settled (`FloTuning`): FLO METER SCALE, the
 whole meter's; FLO BAR SCALE and FLO WORD SCALE, each its own; FLO LEFT SKEW and FLO RIGHT SKEW;
 FLO OFFSET X and Y, the word moved, in points. Its four colours, the fill's top and bottom and the
 outline and drop's top and bottom, two-toned at each letter's middle (the sound words' outline is
 two-toned the same way, both halves palette 29), are picked on a grid in the match's bottom leading
 corner, offline (`FloColourPicker`): FILL TOP, FILL BTM, LINE TOP or LINE BTM, then a swatch of the
 UI palette as the title's grids lay it out; the picked one again takes the pick back. Unpicked:
-white over palette 19, outlined in 29. Kept between launches.
+gold's first over blue's (the cyan), outlined plum's second over purple's last. Kept between launches.
 
 ## Greateraid
 

@@ -277,13 +277,13 @@ enum GoalpostTuning {
 /// from its place, in points; and the word's four colours, picked on the grid in the match's
 /// bottom corner, kept between launches.
 enum FloTuning {
-    nonisolated(unsafe) static var meterScale: CGFloat = 1
+    nonisolated(unsafe) static var meterScale: CGFloat = 0.75
     nonisolated(unsafe) static var barScale: CGFloat = 1
-    nonisolated(unsafe) static var wordScale: CGFloat = 1
-    nonisolated(unsafe) static var leftSkew: CGFloat = 1.18
-    nonisolated(unsafe) static var rightSkew: CGFloat = 0.82
-    nonisolated(unsafe) static var offsetX: CGFloat = 10
-    nonisolated(unsafe) static var offsetY: CGFloat = -2
+    nonisolated(unsafe) static var wordScale: CGFloat = 1.25
+    nonisolated(unsafe) static var leftSkew: CGFloat = 1.5
+    nonisolated(unsafe) static var rightSkew: CGFloat = 0.5
+    nonisolated(unsafe) static var offsetX: CGFloat = 15
+    nonisolated(unsafe) static var offsetY: CGFloat = -5
 
     /// The word's four colours: its fill's top and bottom, its outline and drop's top and bottom.
     enum Tone: Int, CaseIterable {
@@ -296,12 +296,13 @@ enum FloTuning {
             case .lineBottom: "LINE BTM"
             }
         }
-        /// Unpicked: white over the sky blue, as the sound words, outlined in their line colour.
+        /// Unpicked: gold's first over blue's (the cyan), outlined plum's second over purple's last.
         var standard: RGB {
             switch self {
-            case .fillTop: PixelPalette.colours[22]
-            case .fillBottom: PixelPalette.colours[19]
-            case .lineTop, .lineBottom: PixelPalette.colours[Onomatopoeia.lineIndex]
+            case .fillTop: EsperPalette.gold.highlight
+            case .fillBottom: EsperPalette.blue.highlight
+            case .lineTop: EsperPalette.plum.light
+            case .lineBottom: EsperPalette.purple.shadow
             }
         }
     }

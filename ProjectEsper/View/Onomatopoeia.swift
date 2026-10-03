@@ -215,14 +215,20 @@ enum Onomatopoeia {
     static func still(_ text: String, face: Lettering, colours: Colours, height: CGFloat, growsLeft: Bool,
                       left: CGFloat, right: CGFloat) -> SKSpriteNode {
         let sprite = node(Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft))
-        let columns = 3
+        sprite.warpGeometry = skew(left: left, right: right, bend: 0.08, columns: 3)
+        return sprite
+    }
+
+    /// A sprite's warp: its left and right ends `left` and `right` times its middle's height,
+    /// the height between running straight from one to the other, and its middle raised `bend`
+    /// of its height (lowered, under 0), easing to nothing at the ends.
+    static func skew(left: CGFloat, right: CGFloat, bend: CGFloat, columns: Int) -> SKWarpGeometryGrid {
         let source = (0...1).flatMap { row in (0...columns).map { SIMD2<Float>(Float($0) / Float(columns), Float(row)) } }
         let destination = source.map { vertex -> SIMD2<Float> in
             let stretch = Float(left) + (Float(right) - Float(left)) * vertex.x
-            return SIMD2(vertex.x, 0.5 + (vertex.y - 0.5) * stretch + sin(vertex.x * .pi) * 0.08)
+            return SIMD2(vertex.x, 0.5 + (vertex.y - 0.5) * stretch + sin(vertex.x * .pi) * Float(bend))
         }
-        sprite.warpGeometry = SKWarpGeometryGrid(columns: columns, rows: 1, sourcePositions: source, destinationPositions: destination)
-        return sprite
+        return SKWarpGeometryGrid(columns: columns, rows: 1, sourcePositions: source, destinationPositions: destination)
     }
 
     /// A perspective flare along the word, `amount` 1 to the right and -1 to the left: the

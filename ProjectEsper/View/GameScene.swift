@@ -1132,6 +1132,7 @@ final class GameScene: SKScene {
                                      y: bottom + barHeight * FloTuning.meterScale / 2 + 6)
             meter.zPosition = 6
             bar.setScale(FloTuning.barScale)
+            bar.warpGeometry = Onomatopoeia.skew(left: FloTuning.barFront, right: FloTuning.barBack, bend: FloTuning.barBend, columns: 16)
             meter.addChild(bar)
             let word = Onomatopoeia.still("FLO", face: .englishDex, colours: FloTuning.colours, height: GameScene.floWordHeight, growsLeft: true,
                                           left: FloTuning.leftSkew, right: FloTuning.rightSkew)
@@ -2436,6 +2437,9 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO LEFT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.leftSkew)) { FloTuning.leftSkew = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO RIGHT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.rightSkew)) { FloTuning.rightSkew = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO OFFSET X", range: -60...60, notch: 1, value: Float(FloTuning.offsetX)) { FloTuning.offsetX = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO BAR FRONT", range: 0.25...2, notch: 0.01, value: Float(FloTuning.barFront)) { FloTuning.barFront = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO BAR BACK", range: 0.25...2, notch: 0.01, value: Float(FloTuning.barBack)) { FloTuning.barBack = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO BAR BEND", range: -1...1, notch: 0.01, value: Float(FloTuning.barBend)) { FloTuning.barBend = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO STROKE", range: 0...4, notch: 0.25, value: Float(FloTuning.stroke)) { FloTuning.stroke = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO OFFSET Y", range: -30...30, notch: 1, value: Float(FloTuning.offsetY)) { FloTuning.offsetY = CGFloat($0); relayoutFlo() }
         if ParticleLook.cubes {

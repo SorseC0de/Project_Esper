@@ -1390,7 +1390,8 @@ final class SodaAndFizzTests: XCTestCase {
 
     func testOverhangDribbleCanBeWarpedDownTo() {
         var match = with(.flashFizz)
-        // On the right backboard block, feet at its left edge, facing left, dribbling.
+        // On the court as it was, the right backboard block's top, feet at its left edge, facing left, dribbling.
+        match.stage = .formerCourt
         match.players[0].position = Vec2(x: 290.5, y: 90)
         match.players[0].facing = .left
         match.players[0].hasBall = true
@@ -1933,7 +1934,9 @@ final class FootsiesTests: XCTestCase {
     // MARK: Ledge
 
     func testFallingPastABlockCornerGrabsTheLedgeAndClimbsUp() {
-        var match = neutral()
+        // The court as it was: on today's, the backboard stands over the block's corner.
+        var match = Match(stage: .formerCourt)
+        match.ball.respawn(at: Vec2(x: 300, y: 30))
         // Dropped just left of the right backboard block, whose top-left corner is (290, 100).
         match.players[0].position = Vec2(x: 282, y: 130)
         match.players[0].grounded = false
@@ -1952,7 +1955,7 @@ final class FootsiesTests: XCTestCase {
     }
 
     func testNoLedgeGrabWithTheBall() {
-        var match = Match()
+        var match = Match(stage: .formerCourt)
         match.players[0].hasBall = true
         match.ball.holder = 0
         match.players[0].position = Vec2(x: 282, y: 130)
@@ -2104,7 +2107,8 @@ final class OpponentTests: XCTestCase {
     }
 
     func testInTheAirByTheRimItDunks() {
-        var match = Match(stage: .court, specs: [.starting, .starting])
+        // The court as it was: today's rims are out of a dunk's reach from the floor.
+        var match = Match(stage: .formerCourt, specs: [.starting, .starting])
         var brain = Opponent(index: 1)
         match.players[1].hasBall = true
         match.ball.holder = 1

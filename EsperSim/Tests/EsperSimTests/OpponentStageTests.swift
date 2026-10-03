@@ -97,10 +97,11 @@ final class OpponentStageTests: XCTestCase {
     }
 }
 
-/// The Wreck Center: its own play, with the reading for what that can't reach.
+/// The Wreck Center: its own play, with the reading for what that can't reach, on the court as it
+/// was, its blocks floating clear of the wall: today's are out of every reach.
 final class OpponentCourtTests: XCTestCase {
     private func court() -> Match {
-        var match = Match(stage: .court, specs: [.starting, .starting])
+        var match = Match(stage: .formerCourt, specs: [.starting, .starting])
         match.countdown = 0
         return match
     }
@@ -165,6 +166,27 @@ final class OpponentCourtTests: XCTestCase {
                 XCTAssertLessThan(abs(match.players[1].position.x - match.stage.hoops[0].position.x), 150, "a heave from the far side")
                 break
             }
+        }
+    }
+}
+
+/// Today's Wreck Center: its rims high on blocks out of reach, only jump shots going in.
+final class OpponentTodaysCourtTests: XCTestCase {
+    func testWithTheBallItScoresFromAcrossTheCourt() {
+        for x in stride(from: 30.0, through: 310.0, by: 70) {
+            var match = Match(stage: .court, specs: [.starting, .starting])
+            match.countdown = 0
+            match.players[1].position = Vec2(x: x, y: 10)
+            match.players[0].position = Vec2(x: 170, y: 10)
+            match.players[1].hasBall = true
+            match.ball.holder = 1
+            var brain = Opponent(index: 1)
+            var scored = false
+            for _ in 0..<900 where !scored {
+                match.advance(inputs: [.idle, brain.decide(match)])
+                scored = match.scores[1] > 0
+            }
+            XCTAssertTrue(scored, "from \(x)")
         }
     }
 }

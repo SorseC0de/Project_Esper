@@ -29,7 +29,6 @@ public struct Opponent: Equatable {
     private var stepFrames = 0
     /// Dances in a row without getting anywhere, so it doesn't wait forever.
     private var dances = 0
-    private var spot: Spot?
     private var jumpShot = false
     /// The jump's button held through the squat, so the hop is full.
     var wantsFullHop = false
@@ -70,10 +69,6 @@ public struct Opponent: Equatable {
         case dunk
     }
 
-    /// Where it likes to shoot from: two distances on the floor in front of the rim, and
-    /// the end of the ledge nearest it.
-    public enum Spot: Equatable { case nearFloor, farFloor, ledge, read }
-
     public init(index: Int, seed: UInt32 = 7) {
         self.index = index
         random = seed
@@ -93,7 +88,6 @@ public struct Opponent: Equatable {
             stanceFrames = 0
             rest = 0
             dances = 0
-            spot = nil
             pressed = .idle
             return .idle
         }
@@ -110,10 +104,9 @@ public struct Opponent: Equatable {
         let readsStage = Opponent.readsStage(match)
         // Every stage is read, the court too, for what its own play can't reach.
         readStage(match, me: me)
-        if readsStage {
-            let scoringHoop = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
-            if match.hoopfish == nil, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
-        }
+        // Its rim's shot spots, found by trying shots, on every stage.
+        let scoringHoop = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
+        if match.hoopfish == nil, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
         if readsStage, leaveTornado(match, me: me, toward: me.hasBall ? hoop(scoredOnBy: index, in: match).position : match.ball.position, into: &input) {
             // Out of a tornado before it lets go.
         } else if me.state == .jumpSquat {
@@ -270,23 +263,6 @@ public struct Opponent: Equatable {
 
     // MARK: With the ball
 
-    /// Where a spot is for this rim: the inside is the court's side of it.
-    private func place(of spot: Spot, for hoop: Hoop, in stage: Stage) -> Vec2 {
-        let inward = -hoop.backboard.sign
-        switch spot {
-        case .nearFloor, .read: return Vec2(x: hoop.position.x + inward * 45, y: Stage.tileSize)
-        case .farFloor: return Vec2(x: hoop.position.x + inward * 70, y: Stage.tileSize)
-        case .ledge:
-            // The court's one-way ledge: its end nearest the rim, a little in from the edge.
-            let ledgeRow = 3
-            var columns: [Int] = []
-            for column in 0..<stage.columns where stage.tile(column: column, row: ledgeRow) == .oneWay { columns.append(column) }
-            guard let low = columns.min(), let high = columns.max() else { return Vec2(x: hoop.position.x + inward * 70, y: Stage.tileSize) }
-            let x = inward > 0 ? Double(low) * Stage.tileSize + 8 : Double(high + 1) * Stage.tileSize - 8
-            return Vec2(x: x, y: Double(ledgeRow + 1) * Stage.tileSize)
-        }
-    }
-
     private mutating func offence(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) {
         var hoop = hoop(scoredOnBy: index, in: match)
         let readsStage = Opponent.readsStage(match)
@@ -375,19 +351,18 @@ public struct Opponent: Equatable {
                     input.shoot = true
                     if stanceFrames > BallRules.shotWindupFrames { fullHop(&input) }
                 } else {
-                    let aim = aimShot(match, me: me, lift: max(me.velocity.y, 0), hoop: hoop, index: hoopIndex, path: rimPath)
-                        ?? (readsStage ? nil : aimShot(match, me: me, lift: 0, hoop: hoop, index: hoopIndex, path: rimPath))
-                    if readsStage, aim == nil {
+                    guard let aim = aimShot(match, me: me, hoop: hoopIndex, path: rimPath) else {
                         // Nothing goes in from here: the stance called off, the ball kept.
+                        input.shoot = true
                         tapThrow(&input)
                         return
                     }
-                    input.aim = aim ?? Vec2(x: Trig.cos(BallRules.shotAngleDefault) * inward, y: Trig.sin(BallRules.shotAngleDefault))
+                    input.aim = aim
                     input.shoot = me.velocity.y > Opponent.jumpShotLetGo
                 }
                 return
             }
-            if let aim = aimShot(match, me: me, lift: 0, hoop: hoop, index: hoopIndex, path: rimPath) {
+            if let aim = aimShot(match, me: me, hoop: hoopIndex, path: rimPath) {
                 input.aim = aim
                 input.shoot = stanceFrames <= BallRules.shotWindupFrames + 1 && !(inReach && !committed)
             } else {
@@ -396,8 +371,7 @@ public struct Opponent: Equatable {
                 tapThrow(&input)
                 plan = .none
                 planFrames = 0
-                spot = nil
-            }
+                }
             return
         }
         stanceFrames = 0
@@ -426,22 +400,17 @@ public struct Opponent: Equatable {
                 jumpShot = jumping
             }
         }
-        if readsStage {
-            if readSpot == nil || readSpotFrames <= 0 {
-                readSpot = rimPath.flatMap { spotUnderMovingRim(match, me: me, path: $0) } ?? pickReadSpot(match, me: me, human: human, hoop: hoop)
-                    ?? terrain?.standing(nearest: Vec2(x: hoop.position.x + inward * 50, y: hoop.position.y - 60)).map { stand in
-                        ShotSpot(feet: Vec2(x: stand.x, y: terrain!.surfaces[stand.surface].height(at: stand.x)), jumpShot: true)
-                    }
-                readSpotFrames = rimPath != nil ? 45 : 240
-            } else {
-                readSpotFrames -= 1
-            }
-            spot = .read
-        } else if spot == nil || spot == .read || (spot == .ledge && human.position.y > 35) {
-            spot = pickSpot(match, me: me, human: human, hoop: hoop)
+        // A spot among those its shots were found to go in from, picked afresh now and then.
+        if readSpot == nil || readSpotFrames <= 0 {
+            readSpot = rimPath.flatMap { spotUnderMovingRim(match, me: me, path: $0) } ?? pickReadSpot(match, me: me, human: human, hoop: hoop)
+                ?? terrain?.standing(nearest: Vec2(x: hoop.position.x + inward * 50, y: hoop.position.y - 60)).map { stand in
+                    ShotSpot(feet: Vec2(x: stand.x, y: terrain!.surfaces[stand.surface].height(at: stand.x)), jumpShot: true)
+                }
+            readSpotFrames = rimPath != nil ? 45 : 240
+        } else {
+            readSpotFrames -= 1
         }
-        guard let spot else { return }
-        let target = spot == .read ? readSpot?.feet ?? me.position : place(of: spot, for: hoop, in: match.stage)
+        let target = readSpot?.feet ?? me.position
         let atSpot = abs(target.x - me.position.x) < 6 && abs(target.y - me.position.y) < 4 && me.grounded
         // Off the court the way there may not run straight at the spot: what's in the way is what's on the next step of it.
         let toWay = (readsStage ? nextStepX(toward: target, match: match, me: me) : target.x) - me.position.x
@@ -488,9 +457,7 @@ public struct Opponent: Equatable {
             } else if atSpot {
                 plan = .shoot
                 planFrames = 90
-                // A rim too high for a shot off the floor always takes the jump shot.
-                let outOfReach = readsStage ? readSpot?.jumpShot ?? true : hoop.position.y - target.y > 90
-                jumpShot = outOfReach || (spot != .ledge && chance(50))
+                jumpShot = readSpot?.jumpShot ?? true
                 dances = 0
             } else if blocked, !committed {
                 dances += 1
@@ -501,11 +468,7 @@ public struct Opponent: Equatable {
                     case 0: plan = .over; planFrames = 45
                     case 1: plan = lobs ? .lob : .over; planFrames = 60
                     default:
-                        if readsStage {
-                            readSpot = nil
-                        } else {
-                            self.spot = spot == .ledge ? .farFloor : .ledge
-                        }
+                        readSpot = nil
                         plan = .travel; planFrames = 30
                     }
                 } else {
@@ -589,10 +552,11 @@ public struct Opponent: Equatable {
                 travel(to: target, me: me, human: human, into: &input)
             }
         case .shoot:
+            // Pressed afresh: a stance only starts on a press.
             if !atSpot, me.grounded {
                 plan = .none
             } else if me.grounded {
-                input.shoot = true
+                tapShoot(&input)
             }
         case .lob:
             // The throw stance with up; the stance handler lets it go.
@@ -631,20 +595,6 @@ public struct Opponent: Equatable {
         }
     }
 
-    /// A spot for this attack: the ledge when the way along the floor is blocked or by
-    /// chance, the far floor spot most of the rest of the time, the near one otherwise.
-    private mutating func pickSpot(_ match: Match, me: Player, human: Player, hoop: Hoop) -> Spot {
-        let gap = human.position.x - me.position.x
-        let toHoop = hoop.position.x - me.position.x
-        let humanBetween = (gap > 0) == (toHoop > 0) && abs(gap) < abs(toHoop)
-        if human.position.y < 35, humanBetween, chance(50) { return .ledge }
-        switch roll(10) {
-        case 0...2: return .ledge
-        case 3...6: return .farFloor
-        default: return .nearFloor
-        }
-    }
-
     /// Along the floor to under the target, then up onto it if it's the ledge: a full hop
     /// and the double jump at the top when it's still short.
     private mutating func travel(to target: Vec2, me: Player, human: Player, into input: inout PlayerInput) {
@@ -676,43 +626,10 @@ public struct Opponent: Equatable {
         input.stick = Vec2(x: -hoop.backboard.sign, y: 0)
     }
 
-    /// The flick for the shot from where it is: on the court the arc worked out, off it the
-    /// ball's own flight tried, the rim followed where it moves.
-    private func aimShot(_ match: Match, me: Player, lift: Double, hoop: Hoop, index hoopIndex: Int, path: [Vec2]?) -> Vec2? {
-        Opponent.readsStage(match) ? aimByFlight(match, me: me, jumpShot: jumpShot, stanceSoFar: stanceFrames - 1, hoop: hoopIndex, path: path)
-            : shotAim(match, from: me.position, lift: lift, to: hoop)
-    }
-
-    /// The flick that lands a shot from here nearest the rim, with `lift` added to its
-    /// rise, in five-degree steps through the shot's range, or nil when none comes within
-    /// twenty units of it.
-    private func shotAim(_ match: Match, from feet: Vec2, lift: Double, to hoop: Hoop) -> Vec2? {
-        let sign: Double = hoop.position.x > feet.x ? 1 : -1
-        var best: (angle: Double, error: Double)?
-        var angle = BallRules.shotAngleMin
-        while angle <= BallRules.shotAngleMax + 0.001 {
-            var position = feet + Vec2(x: 0, y: BallRules.shotReleaseHeight * match.players[index].spec.scale)
-            var velocity = Vec2(x: Trig.cos(angle) * sign, y: Trig.sin(angle)) * match.players[index].spec.shotSpeed + Vec2(x: 0, y: lift)
-            var error: Double?
-            for _ in 0..<200 {
-                let before = position
-                velocity.y = max(velocity.y - BallRules.gravity, -BallRules.fallSpeed)
-                position += velocity
-                if before.y >= hoop.position.y, position.y < hoop.position.y {
-                    error = abs(position.x - hoop.position.x)
-                    break
-                }
-                if match.stage.overlapsSolid(Box(center: position, width: BallRules.radius * 2, height: BallRules.radius * 2)) {
-                    break
-                }
-            }
-            if let error, error <= 20, best == nil || error < best!.error {
-                best = (angle, error)
-            }
-            angle += degrees(5)
-        }
-        guard let best else { return nil }
-        return Vec2(x: Trig.cos(best.angle) * sign, y: Trig.sin(best.angle))
+    /// The flick for the shot from where it is: the ball's own flight tried, the rim followed
+    /// where it moves, on every stage.
+    private func aimShot(_ match: Match, me: Player, hoop hoopIndex: Int, path: [Vec2]?) -> Vec2? {
+        aimByFlight(match, me: me, jumpShot: jumpShot, stanceSoFar: stanceFrames - 1, hoop: hoopIndex, path: path)
     }
 
     // MARK: The other with the ball

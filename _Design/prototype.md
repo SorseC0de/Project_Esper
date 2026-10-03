@@ -738,12 +738,13 @@ different colours can meet.
 throws and catches. It reads which of the three states the match is in and plays each
 differently, and it holds its jumps through the squat so its hops are full.
 
-- With the ball it works toward one of three shot spots, picked afresh each possession:
-  two on the floor in front of its rim, 45 and 70 out, and the end of the ledge nearest
-  the rim, which it climbs with a full hop and the double jump. At a floor spot it
-  shoots standing or, half the time, off a jump: the stance, a hop after the windup, let
-  go on the rise with the flick solved for the lift; the flick is the one that lands
-  nearest the rim, tried in five-degree steps. When the other is within 50 and in the
+- With the ball it works toward a shot spot, as off the court: its rim's spots found by trying
+  shots, every five units across each surface, standing and off a jump, and one picked away from
+  the other, picked afresh every four seconds (the three fixed spots, two on the floor and the
+  ledge's end, went with the court's rims going up, where they no longer scored). It shoots as
+  the spot was found to go in: standing, or the stance, a hop after the windup, let go on the
+  rise; the flick is the ball's own flight tried in five-degree steps, the one that goes in, and
+  with none the stance is called off. When the other is within 50 and in the
   way and hasn't committed it picks, by chance, to stand, to walk back and forth
   dribbling with the odd hop, to pump fake (called off with the throw: letting go of shoot
   always shoots and down is the stepback, so a stance whose plan has run out is called off the
@@ -1389,11 +1390,18 @@ COPY puts the layout on the clipboard as Swift for `HoopSupport.baked`; DONE clo
 
 ## Court
 
-The Wreck Center on the stage select, and the default. Its backboard blocks are rows 8 and 9, and
-the rims hang off them a tile under their top, lowered 6, at 84 (`Stage.courtRimDrop`; protocol 19);
-RIM DEPTH (`Stage.courtRimDepth`, 0; protocol 23; no more than 5, as near as the rim can sit
-and a ball at its centre still clear the block, a ball's radius off its face) slides each toward its block while `DunkTuning` holds a
-body hung on the right rim, the hang and the hoop's art coming with them. Below
+The Wreck Center on the stage select, and the default. Its backboard blocks are rows 12 and 13,
+four tiles up from where they were (`Stage.courtBlockShift`, (0, 4), BLOCK X and Y in the support
+builder), each four cells wide from its wall: the block and one more behind it (protocol 67). The
+rims ride the blocks, 90 and the blocks' rise, lowered 5, at 125 (`Stage.courtRimDrop`), and 58 in
+from each wall less RIM DEPTH's 3 (`Stage.courtRimDepth`) and the blocks' shift, the hang and the
+hoop's art coming with them. Each backboard is a box solid to bodies and the ball, 16 by 32 art
+pixels (10 by 20 units, `Stage.backboardFace` and the rest), its front edge on the art's board,
+3.125 units behind the rim's centre, centred on the board: the rim's back third is the board's,
+and a shot there comes off it. The blocks' tops are out of every jump's reach; a ball that settles
+on one goes back to its spawn (`Stage.outOfReach`, by the out-of-the-world rule). From the floor no
+jump reaches a rim for a dunk, and only jump shots go in: from 40 to 110 out on the floor, and from
+the ledge. Below
 the floor's row everything is the outline black, #242234. Every stage's hoops are two layers on one 48-pixel canvas,
 drawn to the players' scale and kept together as drawn, all under the bodies: `backboard`, then
 the net, then `hoop`, the rim (`Pixel Art/Stages`, the importer's `STAGE_ART`, over the old

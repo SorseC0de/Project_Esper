@@ -246,6 +246,8 @@ extension Match {
         guard ball.holder == nil, ball.isLive else { return }
         let outside = ball.position.y < -Stage.tileSize || ball.position.x < 0 || ball.position.x > stage.width
             || ball.position.y > Double(stage.rows + Stage.skyRows) * Stage.tileSize
+            || (ball.resting && stage.outOfReach.contains { $0.min.x <= ball.position.x && ball.position.x <= $0.max.x
+                && $0.min.y <= ball.position.y && ball.position.y <= $0.max.y })
         if outside {
             ball.respawn(at: stage.ballSpawn)
             events.append(.ballRespawned)

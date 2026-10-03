@@ -2507,7 +2507,12 @@ final class GameScene: SKScene {
     private func moveCourtBlocks() {
         session.mutate { match in
             guard match.stage.features.look == Stage.court.features.look, match.stage.columns == Stage.court.columns else { return }
-            match.stage.tiles = Stage.court.tiles
+            let court = Stage.court
+            match.stage.tiles = court.tiles
+            match.stage.hoops = court.hoops
+            match.stage.fixedExtras = court.fixedExtras
+            match.stage.outOfReach = court.outOfReach
+            match.refreshExtras()
         }
         redrawStage()
     }
@@ -2515,7 +2520,10 @@ final class GameScene: SKScene {
     private func moveCourtRims() {
         session.mutate { match in
             guard match.stage.features.look == Stage.court.features.look, match.stage.columns == Stage.court.columns else { return }
-            match.stage.hoops = Stage.court.hoops
+            let court = Stage.court
+            match.stage.hoops = court.hoops
+            match.stage.fixedExtras = court.fixedExtras
+            match.refreshExtras()
         }
     }
 

@@ -131,6 +131,8 @@ public struct Stage: Equatable {
     public var extras: [Box] = []
     /// Extras that are part of the stage, under whatever comes and goes.
     public var fixedExtras: [Box] = []
+    /// Where a ball can come to rest that no body reaches: settled there, it goes back.
+    public var outOfReach: [Box] = []
     /// Where each tornado stands when it's up, its whole square.
     public var tornados: [Box] = []
     /// Whether a rim can be dunked on where it is: not in the stage's first or last column, which
@@ -557,23 +559,32 @@ public struct Stage: Equatable {
 
     // MARK: The court
 
-    /// 34 by 16 tiles with no ceiling: floor and walls, a backboard block each side, two cells
-    /// in from the wall, with its rim on the inward face 70 units above the floor, and a
-    /// one-way ledge in the middle. Player 0 starts left and scores on the right rim.
-    /// The court's rims: their height, a tile under their block's top lowered by the RIM
-    /// DROP slider's 6, and how far in from each wall, 58 moved toward its block by RIM
-    /// DEPTH, while they're tuned. The rims hang off the blocks and go where they go; the
-    /// dunk's hang and the hoop's art are measured from the rim, so they come with it.
+    /// 34 by 16 tiles with no ceiling: floor and walls, a backboard block each side, four
+    /// cells wide from the wall and two high, its top 140 up, with its rim on the inward face,
+    /// and a one-way ledge in the middle. Player 0 starts left and scores on the right rim.
+    /// The court's rims: their height, 90 and the blocks' rise, lowered by RIM DROP's 5, and
+    /// how far in from each wall, 58 moved toward its block by RIM DEPTH's 3 and the blocks'
+    /// shift. The rims hang off the blocks and go where they go; the dunk's hang, the hoop's
+    /// art and the backboard's box are measured from the rim, so they come with it.
     public static let courtRimHeight = 90.0
-    nonisolated(unsafe) public static var courtRimDrop = 6.0
+    nonisolated(unsafe) public static var courtRimDrop = 5.0
     public static let courtRimInset = 58.0
-    nonisolated(unsafe) public static var courtRimDepth = 0.0
-    /// The backboard blocks moved, whole tiles: toward their wall, and up. Mirrored either side.
-    nonisolated(unsafe) public static var courtBlockShift = (toWall: 0, up: 0)
+    nonisolated(unsafe) public static var courtRimDepth = 3.0
+    /// The backboard blocks moved, whole tiles: toward their wall, and up. Mirrored either side;
+    /// the rims ride them.
+    nonisolated(unsafe) public static var courtBlockShift = (toWall: 0, up: 4)
+    /// The backboard's box, solid to bodies and the ball, in units from the rim: its face
+    /// behind the rim, how far back it runs, and its bottom and top. The art's: 16 by 32 art
+    /// pixels, the board's front edge on its left, centred on the board.
+    public static let backboardFace = 3.125
+    public static let backboardDepth = 10.0
+    public static let backboardBottom = -3.75
+    public static let backboardTop = 16.25
 
     public static var court: Stage {
-        let rim = courtRimHeight - courtRimDrop
-        let inset = courtRimInset - courtRimDepth
+        let shift = courtBlockShift
+        let rim = courtRimHeight + Double(shift.up) * tileSize - courtRimDrop
+        let inset = courtRimInset - courtRimDepth - Double(shift.toWall) * tileSize
         var stage = Stage(
             columns: 34, rows: 16,
             hoops: [
@@ -587,10 +598,22 @@ public struct Stage: Equatable {
         stage.fill(.solid, columns: 0...33, rows: 0...0)
         stage.fill(.solid, columns: 0...0, rows: 0...15)
         stage.fill(.solid, columns: 33...33, rows: 0...15)
-        let shift = courtBlockShift
-        stage.fill(.solid, columns: (3 - shift.toWall)...(4 - shift.toWall), rows: (8 + shift.up)...(9 + shift.up))
-        stage.fill(.solid, columns: (29 + shift.toWall)...(30 + shift.toWall), rows: (8 + shift.up)...(9 + shift.up))
+        // Each block and one more behind it, toward the wall.
+        let rows = (8 + shift.up)...(9 + shift.up)
+        stage.fill(.solid, columns: max(1 - shift.toWall, 1)...(4 - shift.toWall), rows: rows)
+        stage.fill(.solid, columns: (29 + shift.toWall)...min(32 + shift.toWall, 32), rows: rows)
         stage.fill(.oneWay, columns: 15...18, rows: 3...3)
+        for hoop in stage.hoops {
+            let side = hoop.backboard.sign
+            let face = hoop.position.x + side * backboardFace, back = face + side * backboardDepth
+            stage.fixedExtras.append(Box(min: Vec2(x: min(face, back), y: hoop.position.y + backboardBottom),
+                                         max: Vec2(x: max(face, back), y: hoop.position.y + backboardTop)))
+        }
+        stage.extras = stage.fixedExtras
+        // The blocks' tops are out of every jump's reach: a ball that settles there goes back.
+        let top = Double(rows.upperBound + 1) * tileSize
+        stage.outOfReach = [Box(min: Vec2(x: tileSize, y: top), max: Vec2(x: Double(5 - shift.toWall) * tileSize, y: top + tileSize)),
+                            Box(min: Vec2(x: Double(29 + shift.toWall) * tileSize, y: top), max: Vec2(x: 33 * tileSize, y: top + tileSize))]
         return stage
     }
 

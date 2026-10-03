@@ -346,7 +346,9 @@ final class PowerTests: XCTestCase {
     }
 
     func testQuakeAtLevelOneLeavesAHigherFloorAlone() {
+        // The court as it was, its blocks a higher floor in reach.
         var match = with(.quakeUp)
+        match.stage = .formerCourt
         match.players[1].position = Vec2(x: 250, y: 90)
         match.players[1].hasBall = true
         match.ball.holder = 1
@@ -355,6 +357,7 @@ final class PowerTests: XCTestCase {
         run(&match, frames: 90, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.events.contains(.quaked(player: 0)) }
         XCTAssertTrue(match.players[1].hasBall || !match.players[1].grounded)
         var whole = with(.quakeUp, level: 2)
+        whole.stage = .formerCourt
         whole.players[1].position = Vec2(x: 290, y: 90)
         whole.players[1].hasBall = true
         whole.ball.holder = 1

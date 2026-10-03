@@ -53,6 +53,7 @@ final class Terrain: Equatable {
         var columns: Int
         var rows: Int
         var tiles: [Tile]
+        var extras: [Box]
         var slopes: [Slope]
         var tornados: [Box]
         var underwater: Bool
@@ -92,7 +93,7 @@ final class Terrain: Equatable {
     }
 
     static func signature(of stage: Stage, for player: Player) -> Signature {
-        Signature(columns: stage.columns, rows: stage.rows, tiles: stage.tiles, slopes: stage.fixedSlopes + stage.ceilingSlopes,
+        Signature(columns: stage.columns, rows: stage.rows, tiles: stage.tiles, extras: stage.fixedExtras, slopes: stage.fixedSlopes + stage.ceilingSlopes,
                   tornados: stage.tornados, underwater: stage.features.underwater,
                   bodyWidth: player.spec.bodyWidth, bodyHeight: player.spec.bodyHeight,
                   hop: player.spec.fullHopVelocity, doubleJump: player.spec.doubleJumpVelocity)

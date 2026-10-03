@@ -420,10 +420,35 @@ final class HighwayTests: XCTestCase {
         XCTAssertTrue(Stage.court.ballBlockers.isEmpty, "the court's backboards are its blocks")
     }
 
+    func testABallSettledOnABackboardBlockGoesBack() {
+        var match = Match(stage: .court)
+        match.countdown = 0
+        let top = match.stage.outOfReach[0]
+        match.ball.respawn(at: Vec2(x: (top.min.x + top.max.x) / 2, y: top.min.y + BallRules.radius + 4))
+        match.ball.velocity = .zero
+        var back = false
+        for _ in 0..<240 where !back {
+            match.advance(inputs: [.idle, .idle])
+            back = match.events.contains(.ballRespawned)
+        }
+        XCTAssertTrue(back, "settled up there, it goes back")
+    }
+
+    func testTheBackboardIsSolid() {
+        var match = Match(stage: .court)
+        match.countdown = 0
+        let right = match.stage.hoops.first { $0.backboard == .right }!
+        // Thrown flat at the board from in front of it, under the rim's height: it comes back off it.
+        match.ball.respawn(at: right.position + Vec2(x: -10, y: 8))
+        match.ball.velocity = Vec2(x: 4, y: 0)
+        for _ in 0..<10 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertLessThan(match.ball.position.x, right.position.x + Stage.backboardFace)
+    }
+
     func testFortySevensLineReachesTheMiddlePlatform() {
         let stage = Stage.court
         for hoop in stage.hoops {
-            XCTAssertEqual(FortySevenRules.threePointRadius(for: hoop, on: stage), 92, accuracy: 0.001)
+            XCTAssertEqual(FortySevenRules.threePointRadius(for: hoop, on: stage), 95, accuracy: 0.001)
         }
         let left = stage.hoops.first { $0.backboard == .left }!
         XCTAssertEqual(FortySevenRules.points(from: left.position + Vec2(x: 60, y: -30), through: left, on: stage), 2)

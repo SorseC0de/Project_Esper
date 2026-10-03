@@ -34,8 +34,19 @@ enum HoopSupport {
         }
     }
 
-    /// The layout baked in, from the builder's COPY.
-    static let baked: [Piece] = []
+    /// The layout baked in, from the builder's COPY. Only the Wreck Center has supports, for now.
+    static let baked: [Piece] = [
+        .init(dark: true, half: false, x: 28, y: 15, rotation: 90),
+        .init(dark: true, half: false, x: 20, y: 1, rotation: -25),
+        .init(dark: true, half: false, x: 5, y: 15, rotation: 90),
+        .init(dark: true, half: false, x: 20, y: 11, rotation: 0),
+        .init(dark: false, half: true, x: 11, y: 23, rotation: 90),
+        .init(dark: false, half: false, x: 34, y: 9, rotation: 90),
+        .init(dark: false, half: true, x: 34, y: 23, rotation: 90),
+        .init(dark: false, half: false, x: 21, y: -8, rotation: 20),
+        .init(dark: false, half: false, x: 21, y: 16, rotation: 0),
+        .init(dark: false, half: false, x: 23, y: 5, rotation: -25),
+    ]
 
     /// v2: the first layouts were made with the pieces drawn a third of their size.
     private static let savedKey = "esper.hoopSupport.v2"

@@ -1,5 +1,5 @@
-/// Wetshot Wake's Hoopfish: it starts where the map puts it with the ball on its antenna and
-/// swims off the side it faces; then, two seconds off screen, it comes back from that side,
+/// Wetshot Wake's Hoopfish: it starts at the map's height with the ball on its antenna, far
+/// enough right that the ball's over the centre column as play starts, and swims off the side it faces; then, two seconds off screen, it comes back from that side,
 /// turned round, from a height off the count, swimming ten seconds across to a height off the
 /// count on the far side, swaying up and down as it goes, over and over. The ball stays on its
 /// antenna until a hand takes it, crossing after crossing; what's on the antenna changes only
@@ -36,11 +36,18 @@ public struct Hoopfish: Equatable {
     /// Off screen, between crossings.
     public var away: Bool { age >= swimFrames }
 
-    static func starting(at cell: Vec2, on stage: Stage) -> Hoopfish {
+    /// At the map's height, and far enough right that, swimming through the count, the ball on
+    /// its antenna is over the middle of the stage's centre column the moment play starts.
+    static func starting(at cell: Vec2, on stage: Stage, countdown: Int) -> Hoopfish {
         let offLeft = -HoopfishRules.size.x
-        let distance = cell.x - offLeft
-        let frames = max(Int((distance / HoopfishRules.crossing(stage) * Double(HoopfishRules.swimFrames)).rounded()), 1)
-        return Hoopfish(position: cell, carrying: .ball, from: cell, to: Vec2(x: offLeft, y: HoopfishRules.height(1, on: stage)),
+        let speed = HoopfishRules.crossing(stage) / Double(HoopfishRules.swimFrames)
+        let centre = (Double(stage.columns / 2) + 0.5) * Stage.tileSize
+        let goal = centre - Double(WetshotRules.ballPixelsAcross) / 1.6
+        // Its swim to off the side in whole frames, and from where that brings it to the goal on the count's last frame.
+        let frames = max(Int(((goal + speed * Double(countdown) - offLeft) / speed).rounded()), 1)
+        let share = Double(min(countdown, frames - 1)) / Double(frames)
+        let start = Vec2(x: (goal - offLeft * share) / (1 - share), y: cell.y)
+        return Hoopfish(position: start, carrying: .ball, from: start, to: Vec2(x: offLeft, y: HoopfishRules.height(1, on: stage)),
                           swimFrames: frames)
     }
 

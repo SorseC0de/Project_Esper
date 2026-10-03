@@ -74,7 +74,7 @@ public struct Match: Equatable {
         self.countdown = countdown
         fieldDice = Dice(seed: seed)
         if let fish = stage.hoopfishStart {
-            hoopfish = Hoopfish.starting(at: fish, on: stage)
+            hoopfish = Hoopfish.starting(at: fish, on: stage, countdown: countdown)
             placeHoopfishLoad()
         }
         if stage.features.traffic {

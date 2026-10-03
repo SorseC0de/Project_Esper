@@ -1293,9 +1293,10 @@ two halves of `Rocks.png` (the top one first), and the Hoopfish, assembled back 
 up. None of it glows, nor the background colour. The props come in through the importer's
 `ROOT_IMAGES`.
 
-The Hoopfish (`Hoopfish.swift`, `HoopfishRules`, `Match.hoopfish`) swims. It starts where
-the map puts it with the ball on its antenna, no rim out, and swims off the side it faces (left) at
-its crossing speed. The ball stays on it, crossing after crossing, until a hand takes it off. Two
+The Hoopfish (`Hoopfish.swift`, `HoopfishRules`, `Match.hoopfish`) swims. It starts at the
+map's height with the ball on its antenna, no rim out, far enough right that, swimming through the
+count, the ball is over the middle of the stage's centre column the moment play starts (protocol
+71), and swims off the side it faces (left) at its crossing speed. The ball stays on it, crossing after crossing, until a hand takes it off. Two
 seconds off screen, it comes back from that side turned round, from a height to a height off the
 count (the same on both phones), ten seconds across from wholly off one side to wholly off the
 other, swaying 30 units up and down one and a quarter times as it goes, slowly, its bottom kept between the

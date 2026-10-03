@@ -3,6 +3,16 @@ import XCTest
 
 /// Wetshot Wake: laid out in the map maker, its one rim on the Hoopfish, both players'.
 final class WetshotTests: XCTestCase {
+    func testTheBallIsOverTheCentreColumnAsPlayStarts() {
+        for count in [0, 120, 180] {
+            var match = Match(stage: .wetshot, countdown: count)
+            for _ in 0..<count { match.advance(inputs: [.idle, .idle]) }
+            XCTAssertEqual(match.countdown, 0)
+            let centre = (Double(match.stage.columns / 2) + 0.5) * Stage.tileSize
+            XCTAssertEqual(match.hoopfish!.ballPoint.x, centre, accuracy: 0.001, "a count of \(count)")
+        }
+    }
+
     func testTheOneRimRidesTheHoopfish() {
         let stage = Stage.wetshot
         XCTAssertEqual(stage.columns, 37)

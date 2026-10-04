@@ -2695,9 +2695,6 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.maxY)) { FloTuning.maxY = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO STROKE", range: 0...4, notch: 0.25, value: Float(FloTuning.stroke)) { FloTuning.stroke = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO OFFSET Y", range: -30...30, notch: 1, value: Float(FloTuning.offsetY)) { FloTuning.offsetY = CGFloat($0); relayoutFlo() }
-        if ParticleLook.cubes {
-            controls.addSlider(title: "CUBE TRAIL", range: 2...30, notch: 1, value: ParticleLook.cubeTrail) { ParticleLook.cubeTrail = $0 }
-        }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
@@ -4177,12 +4174,11 @@ final class GameScene: SKScene {
                 let player = match.players[index]
                 spawnJumpRings(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow), scale: bodyScale(index))
             case .warped(let flasher, let from, let to), .flashed(let flasher, let from, let to):
-                // The flash's spark at both ends, the sheet at half size.
-                // The flash sheet at both ends, in the energy colour, at half size.
+                // The flash sheet at both ends, in the energy colour, at its own size.
                 // Drawn over rather than added, or the white saturates past the tone.
                 for end in [from, to] {
                     let point = SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight))
-                    let flash = EnergyEffect.flashSpark2.node(sprites, player: flasher, at: point, scale: 0.66)
+                    let flash = EnergyEffect.flashSpark3.node(sprites, player: flasher, at: point)
                     glowers.addChild(flash)
                     if showHitboxes {
                         // The tear's reach at each end, where a held ball is popped.

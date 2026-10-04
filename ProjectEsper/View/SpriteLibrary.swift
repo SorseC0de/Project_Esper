@@ -773,7 +773,7 @@ extension SKColor {
 /// round a held throw.
 enum EnergyEffect: CaseIterable {
     case spark, spark2, spark3, lightning1, lightning2, lightning3, lightning4, charge, lightningJump, lightningCharge
-    case lightningSpark, lightningSpark2, flashSpark2, scoreStrike, floAbsorb
+    case lightningSpark, lightningSpark2, flashSpark2, flashSpark3, scoreStrike, floAbsorb
     /// Z Tea's beam's three pieces, and its burst.
     case beam, burst
 
@@ -801,6 +801,7 @@ enum EnergyEffect: CaseIterable {
         case .lightningSpark: "lightning_spark"
         case .lightningSpark2: "lightning_spark2"
         case .flashSpark2: "flashspark2"
+        case .flashSpark3: "flashspark3"
         case .lightning1: "lightning1"
         case .lightning2: "lightning2"
         case .lightning3: "lightning3"

@@ -97,7 +97,7 @@ enum ParticleLook {
     /// How far a cube trail runs, head's and legs' alike, art pixels: a cube lives as long as it
     /// takes to rise this far. It was 14, the head's speed over 0.6 seconds. A point longer for
     /// each 10 FLO, to 14 at most.
-    nonisolated(unsafe) static var cubeTrail: Float = 4
+    static let cubeTrail: Float = 4
     static let cubeTrailMost = 14.0
     static let legCubeRate: Float = 12
     nonisolated(unsafe) static var cubeSpread: Float = 5

@@ -915,7 +915,7 @@ full-frame flash frames the whole screen flashes in the same tone and the floor 
 walls go white, fading back over 20 frames, and `score_strike` (thirteen 64 pixel frames at 15 a second, toned in the scorer's energy) erupts off the rim with it. Sparks and bolts play at 24 a second. Every sheet plays at a steady rate, sixty split evenly (7.5, 10, 12, 15, 20, 24, 30 or 60 a second), nothing between: the walk, run and crouch walk's speed-led cycles snap to the nearest (`Player.steady`; the run and dash at 24 at most), the throw's release and windup at 15, the air shot's release at 30, the dunk's slam frames 8 sim frames each (7.5), the double jump's rings aren't a sheet, Surf Soda's bubbles at 30. Stunned, the body and head flicker a dark shade of the energy colour. `ParticleLook.cubes` draws the head's fire as small 3D cubes, each tumbling on its own random axis (`cubeSpin` radians a second, `cubeSize` art pixels, 3, `cubeRate` a second off a head, half with a power's own, let go within `cubeSpread`
 (5) art pixels of the crown's middle either way so they don't rise in one tail; the size and spread
 on debug sliders with `cubeSliders`; stepping down with the squares' sizes), shaded as energy
-in its colour, no face dark, the face to the light running toward white: one instanced Metal draw into the scene after SpriteKit, before the glow (borrowed from Project RingOut). The `esper_spark` frames (`ParticleLook.sprites`) are parked under it. A human's lower legs give off cubes of their own, in each leg's colour, from the leg's middle, the back leg's drawn behind the players (a silhouette of the bodies and their lines, drawn only on a frame with such a cube, keeps them out of wherever a body is): `legCubeSize` (2) and `legCubeSpread` (1) on the LEG CUBE sliders, `legCubeRate` (12) a second a leg. Every cube trail, the head's and the legs', runs `cubeTrail` (4 art pixels; it was 14, 24 a second over 0.6 s) on the CUBE TRAIL slider, and a point longer for each 10 FLO the player has, to 14 at most (`cubeTrailMost`): a cube lives as long as it takes to rise that far. The jump spark and the dash's and slide's smoke, near-white on
+in its colour, no face dark, the face to the light running toward white: one instanced Metal draw into the scene after SpriteKit, before the glow (borrowed from Project RingOut). The `esper_spark` frames (`ParticleLook.sprites`) are parked under it. A human's lower legs give off cubes of their own, in each leg's colour, from the leg's middle, the back leg's drawn behind the players (a silhouette of the bodies and their lines, drawn only on a frame with such a cube, keeps them out of wherever a body is): `legCubeSize` (2) and `legCubeSpread` (1) on the LEG CUBE sliders, `legCubeRate` (12) a second a leg. Every cube trail, the head's and the legs', runs `cubeTrail` (4 art pixels; it was 14, 24 a second over 0.6 s), and a point longer for each 10 FLO the player has, to 14 at most (`cubeTrailMost`): a cube lives as long as it takes to rise that far. The jump spark and the dash's and slide's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour, but stop at the colour itself,
 never lighter (`Look.sparkTone`), as the legs and the crown do; so do the wall spark and the
 sheets' own energy, the skid's puffs, the slide's lines, the slash's blade. The catch spark,
@@ -994,13 +994,13 @@ feet; the rest at their point (20° to 30°); a basket out of the net, 10 under 
 it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
 A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going;
-so does a dribble's, with its sound, as small as a footstep (4.5), out of the floor under the ball
+so does a dribble's, with its sound, as small as a footstep run's (5), out of the floor under the ball
 (off a ledge, the floor below it, where the ball's drawn reaching down to), the way the dribbler faces.
 
 Footfalls: on the frames of the walk (2 and 6) and run (1 and 5, the dash's too) cycles a foot
 comes down, `dust_walk` or `dust_run` puffs up 2 units behind the feet, bottom-aligned, at 12 a
 second in the energy colour as the dash's smoke is (not under water); every second footfall,
-from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 4.5 high, out of the dust.
+from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 5 high, out of the dust.
 
 | | JP | EN |
 |---|---|---|
@@ -1544,7 +1544,7 @@ twice its size on a wall. Blazing Boba's hits spark with `fire_spark`, `fire_spa
 `fire_spark3`, painted, at half size, centred. The flash sheet is drawn over, not added, so its tone shows,
 and with the hitboxes on its tear's reach rings both ends. Head particles each start on
 a random frame of their sheet, so a stream never plays in step. The wall jump spark is `fire_wallspark` as a
-silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark2` at 0.66 in the energy colour at both
+silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark3` at its own 48 pixels in the energy colour at both
 ends; the jump spark draws at three quarters, the ice one at 0.625 (half, and a quarter more);
 Zeus Juice's, bottom-aligned, twelve pixels under the feet. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.

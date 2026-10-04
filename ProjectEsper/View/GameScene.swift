@@ -5920,9 +5920,7 @@ final class GameScene: SKScene {
         for fireball in match.fireballs {
             seen.insert(fireball.id)
             let node = fireballNodes[fireball.id] ?? {
-                let node = SKSpriteNode(texture: sprites.texture("ball", 0))
-                node.color = GameScene.fireballColour
-                node.colorBlendFactor = 1
+                let node = SKSpriteNode(texture: sprites.basketballFireFrames[0])
                 node.zPosition = 7
                 let halo = makeHalo(GameScene.fireballColour)
                 halo.zPosition = -1
@@ -6120,7 +6118,8 @@ final class GameScene: SKScene {
                 halo.position = at
                 handBall.isHidden = false
                 handBall.position = at
-                handBall.texture = (player.frozen > 0 ? sprites.basketballIceFrames : sprites.basketballFrames)[dribbling ? Int(CACurrentMediaTime() / GameScene.dribbleFrameSeconds) % SpriteLibrary.basketballFrameCount : 0]
+                let look = player.frozen > 0 ? sprites.basketballIceFrames : (player.hasFireball ? sprites.basketballFireFrames : sprites.basketballFrames)
+                handBall.texture = look[dribbling ? Int(CACurrentMediaTime() / GameScene.dribbleFrameSeconds) % SpriteLibrary.basketballFrameCount : 0]
             } else {
                 halo.isHidden = true
                 handBall.isHidden = true

@@ -116,6 +116,31 @@ final class SpriteLibrary {
     static let basketballFrameCount = 3
     private(set) lazy var basketballFrames: [SKTexture] = SpriteLibrary.cutBall("Basketball")
     private(set) lazy var basketballIceFrames: [SKTexture] = SpriteLibrary.cutBall("BasketballIce")
+    /// Blazing Boba's fireball: the basketball's every shade a step up the fire ramp, its seams
+    /// red and its outline deep red, so it reads hot rather than as the ball.
+    private(set) lazy var basketballFireFrames: [SKTexture] = basketballFrames.map { frame in
+        let swaps: [RGB: RGB] = [PixelPalette.colours[7]: PixelPalette.colours[9], PixelPalette.colours[6]: PixelPalette.colours[8],
+                                 PixelPalette.colours[5]: PixelPalette.colours[7], PixelPalette.colours[33]: PixelPalette.colours[5],
+                                 PixelPalette.colours[43]: PixelPalette.colours[4]]
+        let picture = frame.cgImage()
+        let width = picture.width, height = picture.height
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let pixels = context.data?.bindMemory(to: UInt8.self, capacity: width * height * 4) else { return frame }
+        context.draw(picture, in: CGRect(x: 0, y: 0, width: width, height: height))
+        for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] == 255 {
+            let index = pixel * 4
+            let rgb = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
+            guard let swap = swaps[rgb] else { continue }
+            pixels[index] = UInt8((swap >> 16) & 0xFF)
+            pixels[index + 1] = UInt8((swap >> 8) & 0xFF)
+            pixels[index + 2] = UInt8(swap & 0xFF)
+        }
+        guard let made = context.makeImage() else { return frame }
+        let texture = SKTexture(cgImage: made)
+        texture.filteringMode = .nearest
+        return texture
+    }
 
     private static func cutBall(_ name: String) -> [SKTexture] {
         let sheet = SKTexture(imageNamed: name)

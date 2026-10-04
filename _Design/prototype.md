@@ -361,7 +361,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the other body away without stunning, a held ball popping free; standing it's the
   gun sheet, its ten frames at 15 a second with the pulse on the third, one every 20,
   and nothing to see unless the hitboxes are on: a kinetic pulse, no spark. Level two fires in
-  stride on the run, and throw is the pull, the same pulse bringing everything toward
+  stride on the run (`player_gun_run_shoot` on the run's own cycle, its legs the run's frame for
+  frame, so the stride carries on through the shot), and throw is the pull, the same pulse bringing everything toward
   the body. Numbers in `PulseRules`.
 
   Level two also snipes: with nothing in hand, down held in a crouch 30 frames (the crouch's

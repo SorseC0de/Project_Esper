@@ -156,7 +156,9 @@ extension Player {
             // Riding the board: the skid's first frame, still.
             return AnimationFrame(holding ? .skidBall : .skid, 0)
         case .dash, .run:
-            if gunRunTimer > 0 { return AnimationFrame(.gunRunShoot, (PulseRules.runShotFrames - gunRunTimer) * 15 / 60) }
+            // Firing on the run: the shooting sheet, whose legs are the run's frame for frame, on
+            // the run's own cycle, so the stride carries on through the shot rather than restarting.
+            if gunRunTimer > 0 { return AnimationFrame(.gunRunShoot, Int(animationPhase) % 8) }
             return AnimationFrame(holding ? .dribbleRun : .run, Int(animationPhase) % 8)
         case .crouch:
             // Pulsepistol Punch at level two holds the crouch's first frame on the way into the snipe.

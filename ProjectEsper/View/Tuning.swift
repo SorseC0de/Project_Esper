@@ -274,8 +274,7 @@ enum GoalpostTuning {
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
 /// The FLO meters' look, on sliders while it's settled: the whole meter's scale, the bar's and
 /// the word's own, the word's left and right ends' heights over its middle's, and the word moved
-/// from its place, in points; and the word's four colours, picked on the grid in the match's
-/// bottom corner, kept between launches.
+/// from its place, in points.
 enum FloTuning {
     nonisolated(unsafe) static var meterScale: CGFloat = 0.75
     nonisolated(unsafe) static var barScale: CGFloat = 1
@@ -299,44 +298,10 @@ enum FloTuning {
     /// The stroke round the bar and the word together, in the player's glow, in points.
     nonisolated(unsafe) static var stroke: CGFloat = 1.5
 
-    /// The word's four colours: its fill's top and bottom, its outline and drop's top and bottom.
-    enum Tone: Int, CaseIterable {
-        case fillTop, fillBottom, lineTop, lineBottom
-        var label: String {
-            switch self {
-            case .fillTop: "FILL TOP"
-            case .fillBottom: "FILL BTM"
-            case .lineTop: "LINE TOP"
-            case .lineBottom: "LINE BTM"
-            }
-        }
-        /// Unpicked: gold's first over blue's (the cyan), outlined plum's second over purple's last.
-        var standard: RGB {
-            switch self {
-            case .fillTop: EsperPalette.gold.highlight
-            case .fillBottom: EsperPalette.blue.highlight
-            case .lineTop: EsperPalette.plum.light
-            case .lineBottom: EsperPalette.purple.shadow
-            }
-        }
-    }
-    private static func key(_ tone: Tone) -> String { "flo.pick.\(tone)" }
-    /// The swatch of `EsperPalette.swatches` picked for a tone, if one is.
-    static func index(_ tone: Tone) -> Int? {
-        (UserDefaults.standard.object(forKey: key(tone)) as? Int).flatMap { EsperPalette.swatches.indices.contains($0) ? $0 : nil }
-    }
-    static func colour(_ tone: Tone) -> RGB { index(tone).map { EsperPalette.swatches[$0] } ?? tone.standard }
-    /// Picks `index`, or takes the pick back when it's the one picked.
-    static func toggle(_ tone: Tone, _ index: Int) {
-        if self.index(tone) == index {
-            UserDefaults.standard.removeObject(forKey: key(tone))
-        } else {
-            UserDefaults.standard.set(index, forKey: key(tone))
-        }
-    }
-    static var colours: Onomatopoeia.Colours {
-        Onomatopoeia.Colours(upper: colour(.fillTop), lower: colour(.fillBottom), lineUpper: colour(.lineTop), lineLower: colour(.lineBottom))
-    }
+    /// The word's and MAX's four colours: gold's first over blue's (the cyan), outlined plum's
+    /// second over purple's last.
+    static let colours = Onomatopoeia.Colours(upper: EsperPalette.gold.highlight, lower: EsperPalette.blue.highlight,
+                                              lineUpper: EsperPalette.plum.light, lineLower: EsperPalette.purple.shadow)
 }
 
 enum DunkTuning {

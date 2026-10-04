@@ -1378,13 +1378,9 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The FLO word's colour picker, in the match's bottom leading corner.
-    private var floPicker: FloColourPicker?
-
     private func showFloMeters() {
         for meter in floMeters + floStrokes { meter.isHidden = flow != .playing }
         floShown = floShown.map { _ in (-1, -1) }
-        floPicker?.isHidden = flow != .playing || online != nil
     }
 
     // MARK: The stage
@@ -2742,13 +2738,6 @@ final class GameScene: SKScene {
         drawSeries()
         presentScreen()
         layoutFloMeters()
-        floPicker?.removeFromParent()
-        let picker = FloColourPicker(origin: CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)) { [weak self] in
-            self?.layoutFloMeters()
-        }
-        hud.addChild(picker)
-        floPicker = picker
-        showFloMeters()
         powerLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 4)
         debugLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 26)
         fpsLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)
@@ -6765,7 +6754,6 @@ final class GameScene: SKScene {
             _ = screen.tap(at: hudPoint(point, viewSize: viewSize))
             return
         }
-        if let picker = floPicker, !picker.isHidden, picker.tap(at: hudPoint(point, viewSize: viewSize)) { return }
         controls?.began(touch, at: hudPoint(point, viewSize: viewSize))
     }
 

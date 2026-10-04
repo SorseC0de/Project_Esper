@@ -642,14 +642,13 @@ whole meter's; FLO BAR SCALE and FLO WORD SCALE, each its own; FLO LEFT SKEW and
 FLO OFFSET X and Y, the word moved, in points; FLO X SCALE and FLO Y SCALE, the bar squeezed across and
 down, the word keeping its own; FLO BAR FRONT and FLO BAR BACK, the bar's left and right ends' heights over its
 middle's (1.5 and 0.5), and FLO BAR BEND, its middle raised by that share of its height (0.5, under
-0 lowered), a warp of 16 columns (`Onomatopoeia.skew`, the word's own too); FLO STROKE, the white stroke round the bar and the
+0 lowered), a warp of 16 columns (`Onomatopoeia.skew`, the word's own too); FLO STROKE, the stroke round the bar and the
 word together, in the player's glow (1.5 points; the bar's art has none of its own), traced off the meter as drawn,
 warp and all, MAX left out, grown round and set behind it. Its four colours, the fill's top and bottom and the
 outline and drop's top and bottom, two-toned at each letter's middle (the sound words' outline is
-two-toned the same way, both halves palette 29), are picked on a grid in the match's bottom leading
-corner, offline (`FloColourPicker`): FILL TOP, FILL BTM, LINE TOP or LINE BTM, then a swatch of the
-UI palette as the title's grids lay it out; the picked one again takes the pick back. Unpicked:
-gold's first over blue's (the cyan), outlined plum's second over purple's last. Kept between launches.
+two-toned the same way, both halves palette 29), are gold's first over blue's (the cyan),
+outlined plum's second over purple's last (`FloTuning.colours`; picked once on a grid, since taken
+out).
 
 ## Greateraid
 

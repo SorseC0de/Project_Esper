@@ -77,7 +77,10 @@ public struct Ball: Equatable {
         previousY = position.y
         var scoredHoop: Int?
 
-        for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y {
+        // Only the rim it's meant for pulls it in: the one whoever last touched it scores on. An
+        // own basket can still drop, but nothing draws it there.
+        for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y
+            && (hoop.shared || lastTouched == nil || hoop.owner == lastTouched) {
             steer(toward: hoop, gravityShare: Ball.gravityShare(stage))
         }
 

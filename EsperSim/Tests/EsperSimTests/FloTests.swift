@@ -27,6 +27,7 @@ final class FloTests: XCTestCase {
         match.ball.respawn(at: match.stage.hoops[1].position + Vec2(x: 0, y: 12))
         match.ball.velocity = .zero
         match.ball.scoring = true
+        match.ball.lastTouched = 0
         var earned = 0
         for _ in 0..<60 where match.scores[0] == 0 {
             match.advance(inputs: [.idle, .idle])
@@ -36,6 +37,18 @@ final class FloTests: XCTestCase {
         XCTAssertEqual(earned, FloRules.madeShot)
         match.restart(ballTo: 1)
         XCTAssertEqual(match.players[0].flo, FloRules.madeShot, "kept through the restart")
+    }
+
+    func testAnOwnBasketEarnsTheOtherNothing() {
+        var match = Match()
+        match.countdown = 0
+        match.ball.respawn(at: match.stage.hoops[1].position + Vec2(x: 0, y: 12))
+        match.ball.velocity = .zero
+        match.ball.scoring = true
+        match.ball.lastTouched = 1
+        for _ in 0..<60 where match.scores[0] == 0 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.scores[0], 1, "the point still counts")
+        XCTAssertEqual(match.players[0].flo, 0, "but only your own baskets earn FLO")
     }
 
     func testFloStopsAtFull() {

@@ -180,7 +180,7 @@ public struct Match: Equatable {
                     let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage) * pointValue
                     scores[owner] += points
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points, floater: ball.floaterShot))
-                    earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position)
+                    if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position) }
                     holdHitStop(HitStopRules.shotFrames)
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
                     ball.launchPoint = nil
@@ -193,7 +193,7 @@ public struct Match: Equatable {
                     // neutral rather than in the hands of whoever was just scored on.
                     let tiedDecider = scores[0] == scores[1]
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1, floater: ball.floaterShot))
-                    earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position)
+                    if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position) }
                     holdHitStop(HitStopRules.shotFrames)
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking }) {

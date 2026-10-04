@@ -244,7 +244,9 @@ whatever lands on it came at, held down 12° while someone
   go at the ball.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
   would carry it through the rim, a share a frame, never snapped. Only a shot's or a
-  floater's ball, and only until its first bounce off anything; a throw's never. Down
+  floater's ball, and only until its first bounce off anything; a throw's never. Only the rim
+  it's meant for, the one whoever last touched it scores on (a shared rim for anyone, an
+  untouched ball any): an own basket can still drop, but nothing draws it there (protocol 77). Down
   through a rim scores, whatever the ball did before: a floater that rose up through it
   from under counts once it falls back in. Going up through a rim never scores. It's the
   ball's bottom that has to come down through, so all of it was above the rim first: one thrown
@@ -605,12 +607,17 @@ circles. The first to 47 wins, on the same win screen. RESET, and RESTART MATCH,
 it again from nothing. Online, the host's mode is played: MULTIPLAYER has BEST OF 7 and
 47 under it, the pick kept between launches and sent in hello.
 
+The score on the plate: each side's points either side of its middle in CardCourt's seven-segment
+digits (`SegmentDigits`), always two, 10 by 20 points, the lit segments in the side's colour with a
+core and a halo of glow round them, the unlit faint.
+
 ## FLO
 
 FLO, the Functional Limit Overload, is to be the energy, the super meter, for the modes past the
 plain game, 47 among them: before the match each player picks a Greateraid, and in FLO they get
 its effects. `Player.flo`, 0 to 100 (`FloRules.full`), is earned by plays (protocol 74), in the
-order of what they're worth: a made shot 20 (out of the rim), a counter, a parry, 10 (out of the
+order of what they're worth: a made shot 20 (out of the rim; only your own: a ball the other put
+through your hoop scores you the point but earns nothing; protocol 77), a counter, a parry, 10 (out of the
 slasher's chest), a snatch that steals the ball from a holder 7 (where the hand met it), a hit, any
 blow that stuns, ball or not (not a parry's, not the stage's lightning or icicles), 5 (out of the
 victim's chest, or where the ball was held), and a taunt 3 (as and where its ball first meets the
@@ -623,7 +630,8 @@ comes within 64 art pixels (40 units) takes it, as orbs out of it, as much as th
 
 FLO comes as orbs, as silk does off Silksong's Reaper crest (`FloOrb` in `GameScene`): one for
 each FLO earned, gliding out of where it was earned to a place 12 to 24 art pixels
-round it over 0.3 seconds, slowing, and hanging there bobbing; then they leave one by one, the
+round it over 0.3 seconds, slowing, and hovering there round a tight circle, 2 across, a lap in
+0.8 seconds, either way; then they leave one by one, the
 first at 0.45 seconds, each next 0.12 to 0.17 after the one before, and after any of that
 player's still waiting, each zipping to the player's chest over 0.3 to 0.45 seconds on a path
 bowed 20 to 50 either side, quickening, trailing eight smaller, fading copies. Spheres, lit, drawn
@@ -634,12 +642,14 @@ the meter shows what they have less what's still on its way, so it never runs ah
 A gain is shown once, a rolled-back frame run again bringing no second set; a new round clears them.
  The meters are in the HUD either side of the scoreboard, level with it, the first player's on its
 left, the word outside and the bar against the plate, the second's on its right, the bar mirrored
-against the plate and the word outside it, shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames) a point
+against the plate and the word outside it, skewed as the first's is, 20 points off the plate,
+shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames) a point
 an art pixel. Its inside is 100 columns from its sixth, five rows tall from its fifth, the last
 three shorter as its end slants (4, 3 and 2). The FLO missing is drawn over it, before its warp, a
 column of the plum ramp's last for each from its first column on; full, none, and MAX, in Bigdex
 in the word's four colours, 6 high at 1.5, stands on the bar's top trailing corner, the scoreboard's
-end, 5 in from it and 15 down (FLO MAX SCALE, FLO MAX X and Y on sliders); burning, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
+end, 5 in from it and 15 down (FLO MAX SCALE, FLO MAX X and Y on sliders), flashing on and off 7.5
+times a second; burning, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
 its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
 moved 15 right and 6 down from its place, the whole meter at 0.75. On sliders while it's settled (`FloTuning`): FLO METER SCALE, the
@@ -905,7 +915,7 @@ full-frame flash frames the whole screen flashes in the same tone and the floor 
 walls go white, fading back over 20 frames, and `score_strike` (thirteen 64 pixel frames at 15 a second, toned in the scorer's energy) erupts off the rim with it. Sparks and bolts play at 24 a second. Every sheet plays at a steady rate, sixty split evenly (7.5, 10, 12, 15, 20, 24, 30 or 60 a second), nothing between: the walk, run and crouch walk's speed-led cycles snap to the nearest (`Player.steady`; the run and dash at 24 at most), the throw's release and windup at 15, the air shot's release at 30, the dunk's slam frames 8 sim frames each (7.5), the double jump's rings aren't a sheet, Surf Soda's bubbles at 30. Stunned, the body and head flicker a dark shade of the energy colour. `ParticleLook.cubes` draws the head's fire as small 3D cubes, each tumbling on its own random axis (`cubeSpin` radians a second, `cubeSize` art pixels, 3, `cubeRate` a second off a head, half with a power's own, let go within `cubeSpread`
 (5) art pixels of the crown's middle either way so they don't rise in one tail; the size and spread
 on debug sliders with `cubeSliders`; stepping down with the squares' sizes), shaded as energy
-in its colour, no face dark, the face to the light running toward white: one instanced Metal draw into the scene after SpriteKit, before the glow (borrowed from Project RingOut). The `esper_spark` frames (`ParticleLook.sprites`) are parked under it. A human's lower legs give off cubes of their own, in each leg's colour, from the leg's middle, the back leg's drawn behind the players (a silhouette of the bodies and their lines, drawn only on a frame with such a cube, keeps them out of wherever a body is): `legCubeSize` (2) and `legCubeSpread` (1) on the LEG CUBE sliders, `legCubeRate` (12) a second a leg. Every cube trail, the head's and the legs', runs `cubeTrail` (4 art pixels; it was 14, 24 a second over 0.6 s, and 14 is to be the most an upcoming feature takes it to) on the CUBE TRAIL slider: a cube lives as long as it takes to rise that far. The jump spark and the dash's and slide's smoke, near-white on
+in its colour, no face dark, the face to the light running toward white: one instanced Metal draw into the scene after SpriteKit, before the glow (borrowed from Project RingOut). The `esper_spark` frames (`ParticleLook.sprites`) are parked under it. A human's lower legs give off cubes of their own, in each leg's colour, from the leg's middle, the back leg's drawn behind the players (a silhouette of the bodies and their lines, drawn only on a frame with such a cube, keeps them out of wherever a body is): `legCubeSize` (2) and `legCubeSpread` (1) on the LEG CUBE sliders, `legCubeRate` (12) a second a leg. Every cube trail, the head's and the legs', runs `cubeTrail` (4 art pixels; it was 14, 24 a second over 0.6 s) on the CUBE TRAIL slider, and a point longer for each 10 FLO the player has, to 14 at most (`cubeTrailMost`): a cube lives as long as it takes to rise that far. The jump spark and the dash's and slide's smoke, near-white on
 their sheets, go through the ramp too, in the player's colour, but stop at the colour itself,
 never lighter (`Look.sparkTone`), as the legs and the crown do; so do the wall spark and the
 sheets' own energy, the skid's puffs, the slide's lines, the slash's blade. The catch spark,
@@ -984,8 +994,8 @@ feet; the rest at their point (20° to 30°); a basket out of the net, 10 under 
 it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
 A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going;
-so does a dribble's, with its sound, out of the floor under the ball (off a ledge, the floor below it,
-where the ball's drawn reaching down to), the way the dribbler faces.
+so does a dribble's, with its sound, as small as a footstep (4.5), out of the floor under the ball
+(off a ledge, the floor below it, where the ball's drawn reaching down to), the way the dribbler faces.
 
 Footfalls: on the frames of the walk (2 and 6) and run (1 and 5, the dash's too) cycles a foot
 comes down, `dust_walk` or `dust_run` puffs up 2 units behind the feet, bottom-aligned, at 12 a

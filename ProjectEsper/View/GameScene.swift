@@ -1068,7 +1068,7 @@ final class GameScene: SKScene {
     /// What each bar shows now, its frame and FLO, so it's drawn again only when they change.
     private var floShown: [(frame: Int, flo: Int)] = []
     private static let floPointsPerPixel: CGFloat = 1
-    private static let floGap: CGFloat = 40
+    private static let floGap: CGFloat = 20
     private static let floWordHeight: CGFloat = 14
     /// How far onto the bar the word reaches, and how far above its middle it sits, in points.
     private static let floWordOverlap: CGFloat = 6
@@ -1080,8 +1080,9 @@ final class GameScene: SKScene {
     private static let floLineHeights = [98: 4, 99: 3, 100: 2]
     /// The burn's frames a second.
     private static let floBurnFramesPerSecond = 12.0
-    /// MAX: its cap height in points, before its slider's scale.
+    /// MAX: its cap height in points, before its slider's scale, and how often it flashes.
     private static let floMaxHeight: CGFloat = 6
+    private static let floMaxFlashesPerSecond = 7.5
 
     private var floStrokes: [SKSpriteNode] = []
     private let ciContext = CIContext()
@@ -1138,10 +1139,12 @@ final class GameScene: SKScene {
             let flo = shownFlo(index)
             let frame = match.players[index].floBurning
                 ? Int(CACurrentMediaTime() * GameScene.floBurnFramesPerSecond) % max(EffectSheets.frames["flo_meter"] ?? 1, 1) : 0
+            // MAX flashes, on and off quickly, while it's full.
+            let flashOn = Int(CACurrentMediaTime() * GameScene.floMaxFlashesPerSecond * 2) % 2 == 0
+            floMaxWords[index].isHidden = flo < FloRules.full || floMeters[index].isHidden || !flashOn
             guard floShown.indices.contains(index), floShown[index].frame != frame || floShown[index].flo != flo else { continue }
             floShown[index] = (frame, flo)
             floBars[index].texture = floBarTexture(frame: frame, flo: flo)
-            floMaxWords[index].isHidden = flo < FloRules.full || floMeters[index].isHidden
         }
     }
 
@@ -1216,8 +1219,9 @@ final class GameScene: SKScene {
             bar.yScale = FloTuning.barScale * FloTuning.yScale
             bar.warpGeometry = Onomatopoeia.skew(left: FloTuning.barFront, right: FloTuning.barBack, bend: FloTuning.barBend, columns: 16)
             meter.addChild(bar)
-            let word = Onomatopoeia.still("FLO", face: .englishDex, colours: FloTuning.colours, height: GameScene.floWordHeight, growsLeft: !mirrored,
-                                          left: mirrored ? FloTuning.rightSkew : FloTuning.leftSkew, right: mirrored ? FloTuning.leftSkew : FloTuning.rightSkew)
+            // The word skewed the same on both: only its place mirrors.
+            let word = Onomatopoeia.still("FLO", face: .englishDex, colours: FloTuning.colours, height: GameScene.floWordHeight, growsLeft: true,
+                                          left: FloTuning.leftSkew, right: FloTuning.rightSkew)
             // Its small end on the bar's outer end, then where the sliders move it, mirrored for the second.
             word.anchorPoint = CGPoint(x: mirrored ? 0 : 1, y: 0.5)
             word.position = CGPoint(x: side * (barWidth / 2 - GameScene.floWordOverlap - FloTuning.offsetX), y: GameScene.floWordLift + FloTuning.offsetY)
@@ -1264,6 +1268,9 @@ final class GameScene: SKScene {
         var zipSeconds: Double
         /// How far the zip's path bows out, and which way.
         var bend: CGFloat
+        /// Where round its circle it starts hovering, and which way it goes round.
+        var spin: Double = .random(in: 0..<(2 * .pi))
+        var turn: Double = Bool.random() ? 1 : -1
         var trail: [CGPoint] = []
     }
     private var floOrbs: [FloOrb] = []
@@ -1284,6 +1291,9 @@ final class GameScene: SKScene {
     private static let floOrbSize: Float = 5
     private static let floTrailLength = 8
     private static let floFlashFrames = 8
+    /// Hovering, a circle this wide, round in this long.
+    private static let floCircleRadius: CGFloat = 2
+    private static let floCircleSeconds = 0.8
 
     private func spawnFloOrbs(for player: Int, amount: Int, at source: Vec2) {
         let count = max(Int((Double(amount) / GameScene.floPerOrb).rounded(.up)), 1)
@@ -1316,7 +1326,10 @@ final class GameScene: SKScene {
                 let t = 1 - pow(1 - orb.age / GameScene.floGlideSeconds, 3)
                 orb.position = CGPoint(x: orb.source.x + (orb.hang.x - orb.source.x) * t, y: orb.source.y + (orb.hang.y - orb.source.y) * t)
             } else if orb.age < orb.hangSeconds {
-                orb.position = CGPoint(x: orb.hang.x, y: orb.hang.y + 1.5 * sin((orb.age - GameScene.floGlideSeconds) * 2 * .pi * 1.2))
+                // Round and round a tight circle on its place.
+                let angle = orb.spin + orb.turn * (orb.age - GameScene.floGlideSeconds) * 2 * .pi / GameScene.floCircleSeconds
+                orb.position = CGPoint(x: orb.hang.x + GameScene.floCircleRadius * CGFloat(cos(angle)) - GameScene.floCircleRadius * CGFloat(cos(orb.spin)),
+                                       y: orb.hang.y + GameScene.floCircleRadius * CGFloat(sin(angle)) - GameScene.floCircleRadius * CGFloat(sin(orb.spin)))
             } else {
                 // The zip: a bowed path to the player as they are now, quickening.
                 let from = orb.zipFrom ?? orb.position
@@ -3629,6 +3642,8 @@ final class GameScene: SKScene {
 
     /// The black plate under the round circles or 47's score, as dark as it is so the glow
     /// passes it by; at the HUD's panels scale.
+    /// A score digit's size in points, before the HUD's text scale.
+    private static let scoreDigit = CGSize(width: 10, height: 20)
     /// Half the scoreboard plate's width, for the FLO meters either side of it.
     private var scorePlateHalfWidth: CGFloat = 60
     private func addHUDPlate(width: CGFloat, height: CGFloat) {
@@ -3657,15 +3672,16 @@ final class GameScene: SKScene {
             for label in drinkLabels { label.text = "" }
             circles.removeAllChildren()
             circlesOverCam.removeAllChildren()
+            // Each side's points in CardCourt's seven-segment digits, lit in its colour.
+            let text = UITuning.shared.scale(.hud, .text)
             for (index, score) in fortySevenScores.enumerated() {
-                let label = SKLabelNode(text: "\(score)")
-                label.fontName = "Menlo-Bold"
-                label.fontSize = 18 * UITuning.shared.scale(.hud, .text)
-                label.fontColor = SKColor(rgb: sprites.look(for: index).glow)
-                label.verticalAlignmentMode = .center
-                label.horizontalAlignmentMode = index == 0 ? .right : .left
-                label.position = CGPoint(x: index == 0 ? -12 : 12, y: 0)
-                circles.addChild(label)
+                let digits = SegmentDigits.texture(score, lit: sprites.look(for: index).glow,
+                                                   digitSize: CGSize(width: GameScene.scoreDigit.width * text, height: GameScene.scoreDigit.height * text))
+                let number = SKSpriteNode(texture: digits.texture, size: digits.size)
+                // Its digits' near edge 12 off the middle, the glow's room past it.
+                number.anchorPoint = CGPoint(x: index == 0 ? (digits.size.width - digits.pad) / digits.size.width : digits.pad / digits.size.width, y: 0.5)
+                number.position = CGPoint(x: index == 0 ? -12 : 12, y: 0)
+                circles.addChild(number)
             }
             addHUDPlate(width: 120, height: 34)
             let target = SKLabelNode(text: "\(FortySevenRules.target)")
@@ -4015,7 +4031,7 @@ final class GameScene: SKScene {
                 let contact = player.overhangBall(in: match.stage).map { Vec2(x: $0.x, y: $0.y - BallRules.radius) }
                     ?? Vec2(x: feet.x + ahead, y: feet.y)
                 soundWords.removeAll { $0.parent == nil }
-                say(.bounce, at: contact, away: player.facing.sign, rise: 20)
+                say(.dribble, at: contact, away: player.facing.sign, rise: 20)
             }
         }
     }
@@ -4680,7 +4696,7 @@ final class GameScene: SKScene {
                 // and steps down in size.
                 let frames = cube != nil ? [stream.frames[0]] : stream.frames
                 let life = frames.count > 1 ? Double(frames.count) / 24
-                    : (cube != nil ? Double(ParticleLook.cubeTrail) / speed : 0.6) + Double.random(in: -0.05...0.05)
+                    : (cube != nil ? cubeTrail(index) / speed : 0.6) + Double.random(in: -0.05...0.05)
                 // While its body changes, it rises in a helix rather than straight.
                 var helix: (centreX: CGFloat, radius: CGFloat, angle: Double, rise: CGFloat)?
                 if trailing == nil, match.players.indices.contains(index), match.players[index].state == .transforming,
@@ -4695,6 +4711,13 @@ final class GameScene: SKScene {
             }
         }
         headCredit[creditKey] = credit
+    }
+
+    /// How far a player's cube trails run: the slider's base, and a point more for each 10 FLO
+    /// they have, to 14 at full.
+    private func cubeTrail(_ index: Int) -> Double {
+        let flo = match.players.indices.contains(index) ? match.players[index].flo : 0
+        return min(Double(ParticleLook.cubeTrail) + Double(flo / 10), ParticleLook.cubeTrailMost)
     }
 
     /// Every head particle a frame on: the sheet's frame for its age, the rise, the wind, a

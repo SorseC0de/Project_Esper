@@ -55,7 +55,7 @@ enum Onomatopoeia {
     /// What made the sound, spelled per language.
     enum Sound: CaseIterable {
         case swish, three, dunk
-        case hit, steal, spike, parry, clang, squeak, walk, run, bounce
+        case hit, steal, spike, parry, clang, squeak, walk, run, bounce, dribble
         case beam, burst, quake, freeze, explosion
         case sizzle, shatter, thunder
 
@@ -73,12 +73,14 @@ enum Onomatopoeia {
             case .spike: ("THWACK!", "バチィン！", 9, 5, 18)
             case .parry: ("TING!", "キィン！", 22, 39, 16)
             case .clang: ("CLANG", "ガキン", 39, 41, 14)
-            case .squeak: ("SQUEAK", "キュッ", 22, 37, 9)
+            case .squeak: ("SQUEAK", "キュッ", 22, 37, 4.5)
             // Footsteps, small by the feet.
             case .walk: ("TAP", "テク", 22, 37, 4)
             case .run: ("THUMP", "ダッ", 22, 37, 4.5)
             // The loose ball off the floor or a wall.
             case .bounce: ("BOMP", "ダム", 22, 6, 8)
+            // A dribble's, as small as a footstep.
+            case .dribble: ("BOMP", "ダム", 22, 6, 4.5)
             // Powers.
             case .beam: ("VWOOOM", "ズドドドド", 9, 7, 18)
             case .burst: ("BOOOM!", "ドオォン！", 9, 6, 18)

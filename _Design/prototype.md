@@ -989,7 +989,7 @@ from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 4.5 h
 
 | | JP | EN |
 |---|---|---|
-| Basket, confirmed, beside the net toward the court (a basket's words 18 high, as a hit's) | パサッ！ | SWISH! |
+| Basket, confirmed, beside the net toward the court (no word over 18 high: a basket's, a hit's, an explosion's, the powers' all 18) | パサッ！ | SWISH! |
 | Three | ザシュッ！！ | SWOOSH!! |
 | Dunk | ドガァン！！ | SLAM!! |
 | Body hit | ドゴッ！ | WHAM! |

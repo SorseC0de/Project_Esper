@@ -70,7 +70,7 @@ enum Onomatopoeia {
             // Bodies and the ball.
             case .hit: ("WHAM!", "ドゴッ！", 22, 5, 18)
             case .steal: ("SMACK!", "バシッ！", 22, 26, 16)
-            case .spike: ("THWACK!", "バチィン！", 9, 5, 20)
+            case .spike: ("THWACK!", "バチィン！", 9, 5, 18)
             case .parry: ("TING!", "キィン！", 22, 39, 16)
             case .clang: ("CLANG", "ガキン", 39, 41, 14)
             case .squeak: ("SQUEAK", "キュッ", 22, 37, 9)
@@ -80,15 +80,15 @@ enum Onomatopoeia {
             // The loose ball off the floor or a wall.
             case .bounce: ("BOMP", "ダム", 22, 6, 8)
             // Powers.
-            case .beam: ("VWOOOM", "ズドドドド", 9, 7, 20)
-            case .burst: ("BOOOM!", "ドオォン！", 9, 6, 26)
-            case .quake: ("RUMBLE", "ゴゴゴゴ", 36, 34, 20)
+            case .beam: ("VWOOOM", "ズドドドド", 9, 7, 18)
+            case .burst: ("BOOOM!", "ドオォン！", 9, 6, 18)
+            case .quake: ("RUMBLE", "ゴゴゴゴ", 36, 34, 18)
             case .freeze: ("CRACK!", "ピキッ！", 22, 21, 16)
-            case .explosion: ("KABOOM!", "ドカーン！", 8, 5, 22)
+            case .explosion: ("KABOOM!", "ドカーン！", 8, 5, 18)
             // The stages.
             case .sizzle: ("SIZZLE", "ジュウゥ", 7, 5, 18)
             case .shatter: ("CRASH", "パリーン", 22, 19, 16)
-            case .thunder: ("KRAKOOM!", "バリバリッ", 9, 8, 20)
+            case .thunder: ("KRAKOOM!", "バリバリッ", 9, 8, 18)
             }
         }
 

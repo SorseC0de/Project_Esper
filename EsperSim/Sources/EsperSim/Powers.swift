@@ -234,6 +234,8 @@ public struct Beam: Equatable {
     public var origin: Vec2
     public var direction: Vec2
     public var framesLeft: Int
+    /// How far out of the hands it's reached: it grows to its length rather than being there at once.
+    public var reach = 0.0
     /// Who and what it has already met, once each.
     public var hitPlayer = false
     public var hitBall = false
@@ -243,6 +245,8 @@ public enum ZRules {
     public static let chargeFrames = 60
     public static let fireFrames = 30
     public static let length = 400.0
+    /// How fast it grows out to that, a frame: the whole of it in ten.
+    public static let growth = 40.0
     /// The beam's sheet is 16 pixels thick.
     public static let halfThickness = 5.0
     public static let aimRange = degrees(45)

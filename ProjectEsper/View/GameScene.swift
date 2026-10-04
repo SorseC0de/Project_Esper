@@ -208,8 +208,6 @@ final class GameScene: SKScene {
     /// The beam's halo: its strength, and its thickness over the beam's.
     private static let beamGlow: CGFloat = 0.5
     private static let beamGlowWidth: CGFloat = 3
-    /// Z Tea's burst drawn at its reach, 64 art pixels each way.
-    private static let zBurstDiameter: CGFloat = 128
     /// Z Tea's blast arms over each body, turned about the shoulder: where the arms meet the body
     /// on their canvas, and that point from the feet, in art pixels.
     private var blastArmNodes: [Int: SKSpriteNode] = [:]
@@ -1115,6 +1113,17 @@ final class GameScene: SKScene {
         texture.filteringMode = .nearest
         floBarTextures[key] = texture
         return texture
+    }
+
+    /// Where Z Tea's beam charges: between the hands as the charge's sheet draws them, or the
+    /// one hand it shows, as the ball in hand is placed.
+    private func chargeHands(_ frame: AnimationFrame, player index: Int, body: CGPoint, drawScale: CGFloat,
+                             leaned: (CGPoint) -> CGPoint) -> CGPoint? {
+        let hands = [BodyPart.frontHand, .backHand].compactMap { sprites.landmark($0, in: frame, player: index) }
+        guard !hands.isEmpty else { return nil }
+        let middle = CGPoint(x: hands.map(\.x).reduce(0, +) / CGFloat(hands.count), y: hands.map(\.y).reduce(0, +) / CGFloat(hands.count))
+        let sign = CGFloat(match.players[index].facing.sign)
+        return body + leaned(CGPoint(x: middle.x * drawScale * sign, y: middle.y * drawScale))
     }
 
     /// The FLO a meter shows: what the player has, less what's still on its way to them.
@@ -4051,7 +4060,7 @@ final class GameScene: SKScene {
             switch event {
             case .zBurst(let player, let at):
                 let burst = EnergyEffect.burst.node(sprites, player: player, at: SpriteLibrary.point(at))
-                burst.setScale(GameScene.zBurstDiameter / max(burst.size.width, 1))
+                // At its sheet's own size: stretched to the push's reach it scaled by a third, unevenly.
                 glowers.addChild(burst)
             case .galeBurst(let at):
                 // The burst's sheet once at its own size, not squeezed as the gale is.
@@ -5855,7 +5864,7 @@ final class GameScene: SKScene {
                 beamNodes[beam.id] = made
                 return made
             }()
-            let length = CGFloat(ZRules.length) * SpriteLibrary.pixelsPerUnit
+            let length = CGFloat(beam.reach) * SpriteLibrary.pixelsPerUnit
             let side = GameScene.beamPieceSide
             if let nodes = holder.children as? [SKSpriteNode], nodes.count == 6 {
                 let halos = nodes[0..<3], pieces = nodes[3..<6]
@@ -6148,7 +6157,8 @@ final class GameScene: SKScene {
                     charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                     charge.setScale(EnergyEffect.chargeScale)
                 }
-                charge.position = beaming ? SpriteLibrary.point(player.beamOrigin) : handBall.position
+                charge.position = beaming ? chargeHands(frame, player: index, body: node.position, drawScale: drawScale, leaned: leaned)
+                    ?? SpriteLibrary.point(player.beamOrigin) : handBall.position
                 charge.isHidden = false
                 let overlay = chargeOverlays[index]
                 if player.power == .blazingBoba {

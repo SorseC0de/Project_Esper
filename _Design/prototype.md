@@ -434,13 +434,14 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   or the world's edge, letting the ball go where it is.
 - Z Tea (N, a biomorph; protocol 64). Its slash, with nothing in hand: on the ground, the beam's
   charge, a second (`ZRules.chargeFrames`, 60), committed: nothing but the jump calls it off
-  (into the jump) and a hit stops it; then the beam fires half a second (30) from the hand, 400
+  (into the jump) and a hit stops it; then the beam fires half a second (30) from the hand, growing out 40 a frame
+  (`ZRules.growth`, the whole of it in ten; it meets only what it's reached; protocol 76) to 400
   units along, 5 either side, and strips and knocks along it (5, lifted 1.5) the first other body
   it meets, sending the ball along it at 7, theirs or loose. Firing, it can't be stunned or knocked
   (`Player.knock`, `hitStun`). At level two up and down on the stick turn it, 2 degrees a frame at full
   tilt (`aimRate`), any angle up to 45 off level, through the charge and while it fires, the beam
-  turning with it. The throw's charge swirl (`esper_charge`) plays at the hand through the
-  charge, its tail as the beam fires. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
+  turning with it. The throw's charge swirl (`esper_charge`) plays through the charge between the
+  hands as the blast sheet draws them (their parts' middles), its tail as the beam fires. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
   firing, 3 to 7 round and round with `player_blast_arms` over them, turned with the aim about where the
   arms meet the body (31.5, 33.5 up on its canvas, 17.5 over the feet), aligned on 3 and a pixel
   right and two down on the even frames, 4 and 6; after, 8 and 9 (`recoveryFrames`), no beam,
@@ -449,7 +450,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   and its head, 16 pixels thick, in the energy colour, over a soft halo in the glow colour three times as thick at 0.5. In the air, the burst: its momentum braked, a 0.85 share kept
   a frame (`burstBrake`), not stopped, through `player_transform` at 10 a second, frame 2 held 24 frames more at level one, and on
   frame 3 everything within 64 art pixels (40) is pushed away, the other without a stun (5.5
-  and a lift of 1) and the ball at 7; `burst` plays there in the energy colour at the reach's size.
+  and a lift of 1) and the ball at 7; `burst` plays there in the energy colour at its sheet's own size, 96 square.
 
 Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
 too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is

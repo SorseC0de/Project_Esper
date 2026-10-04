@@ -696,14 +696,15 @@ public struct Match: Equatable {
         for var beam in beams {
             beam.framesLeft -= 1
             guard beam.framesLeft > 0, players.indices.contains(beam.owner), players[beam.owner].firingBeam else { continue }
-            // Turned as the firer turns it.
+            // Turned as the firer turns it, and grown out a way further.
             beam.origin = players[beam.owner].beamOrigin
             beam.direction = players[beam.owner].beamDirection
+            beam.reach = min(beam.reach + ZRules.growth, ZRules.length)
             func along(_ box: Box) -> Bool {
                 let reach = Box(min: box.min - Vec2(x: ZRules.halfThickness, y: ZRules.halfThickness),
                                 max: box.max + Vec2(x: ZRules.halfThickness, y: ZRules.halfThickness))
                 var travelled = 0.0
-                while travelled <= ZRules.length {
+                while travelled <= beam.reach {
                     if reach.contains(beam.origin + beam.direction * travelled) { return true }
                     travelled += 4
                 }

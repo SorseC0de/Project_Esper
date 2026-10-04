@@ -1085,7 +1085,6 @@ final class GameScene: SKScene {
     /// MAX: its cap height in points, before its slider's scale.
     private static let floMaxHeight: CGFloat = 6
 
-    private var floBottom: CGFloat = 0
     private var floStrokes: [SKSpriteNode] = []
     private let ciContext = CIContext()
     private var floBarTextures: [Int: SKTexture] = [:]
@@ -1137,9 +1136,9 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The white stroke round a meter, the bar and the word as one shape: the meter drawn as it
-    /// is, warp and all, made white, grown round by the stroke and set behind it. MAX has its own.
-    private func floStroke(round meter: SKNode) -> SKSpriteNode? {
+    /// The stroke round a meter, the bar and the word as one shape: the meter drawn as it
+    /// is, warp and all, made the player's glow, grown round by the stroke and set behind it. MAX has its own.
+    private func floStroke(round meter: SKNode, colour rgb: RGB) -> SKSpriteNode? {
         let width = FloTuning.stroke
         guard width > 0, let view = hudScene.view else { return nil }
         let maxShown = floMaxWords.map(\.isHidden)
@@ -1152,10 +1151,11 @@ final class GameScene: SKScene {
         let reach = (width * pixels).rounded(.up)
         let input = CIImage(cgImage: picture)
         let padded = input.extent.insetBy(dx: -reach, dy: -reach)
-        // White wherever it's drawn, then grown.
+        // The player's glow wherever it's drawn, then grown.
         let white = input.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBiasVector": CIVector(x: CGFloat((rgb >> 16) & 0xFF) / 255, y: CGFloat((rgb >> 8) & 0xFF) / 255, z: CGFloat(rgb & 0xFF) / 255, w: 0),
         ]).applyingFilter("CIPremultiply")
         // Grown round, not square, so a slanted edge comes out smooth rather than stepped.
         let grown = white.composited(over: CIImage(color: .clear).cropped(to: padded))
@@ -1174,15 +1174,14 @@ final class GameScene: SKScene {
     /// The strokes made once the meters are up and the HUD's view is there to draw them.
     private func strokeFloMeters() {
         guard floStrokes.isEmpty, FloTuning.stroke > 0, hudScene.view != nil, let first = floMeters.first, !first.isHidden else { return }
-        for meter in floMeters {
-            guard let stroke = floStroke(round: meter) else { continue }
+        for (index, meter) in floMeters.enumerated() {
+            guard let stroke = floStroke(round: meter, colour: sprites.look(for: index).glow) else { continue }
             hud.addChild(stroke)
             floStrokes.append(stroke)
         }
     }
 
-    private func layoutFloMeters(bottom: CGFloat) {
-        floBottom = bottom
+    private func layoutFloMeters() {
         floStrokes.forEach { $0.removeFromParent() }
         floStrokes = []
         floMeters.forEach { $0.removeFromParent() }
@@ -1192,32 +1191,36 @@ final class GameScene: SKScene {
         floShown = []
         guard (EffectSheets.frames["flo_meter"] ?? 0) > 0 else { return }
         for index in 0..<2 {
+            // The second player's mirrored: the bar against the scoreboard, the word outside it.
+            let mirrored = index == 1
             let bar = SKSpriteNode(texture: floBarTexture(frame: 0, flo: shownFlo(index)))
             bar.size = CGSize(width: bar.size.width * GameScene.floPointsPerPixel, height: bar.size.height * GameScene.floPointsPerPixel)
             // The meter: a holder at the whole meter's scale, the bar and the word each at their own.
             let side: CGFloat = index == 0 ? -1 : 1
             let meter = SKSpriteNode()
             let barWidth = bar.size.width * FloTuning.barScale * FloTuning.xScale, barHeight = bar.size.height * FloTuning.barScale * FloTuning.yScale
-            meter.position = CGPoint(x: side * (barWidth * FloTuning.meterScale / 2 + GameScene.floGap / 2),
-                                     y: bottom + barHeight * FloTuning.meterScale / 2 + 6)
+            // Either side of the scoreboard, level with it.
+            meter.position = CGPoint(x: side * (scorePlateHalfWidth + GameScene.floGap + barWidth * FloTuning.meterScale / 2),
+                                     y: circles.position.y - UIPiece.plateBlack.faceRise * UITuning.shared.scale(.hud, .panels) * 0.5)
             meter.zPosition = 6
-            bar.xScale = FloTuning.barScale * FloTuning.xScale
+            bar.xScale = FloTuning.barScale * FloTuning.xScale * (mirrored ? -1 : 1)
             bar.yScale = FloTuning.barScale * FloTuning.yScale
             bar.warpGeometry = Onomatopoeia.skew(left: FloTuning.barFront, right: FloTuning.barBack, bend: FloTuning.barBend, columns: 16)
             meter.addChild(bar)
-            let word = Onomatopoeia.still("FLO", face: .englishDex, colours: FloTuning.colours, height: GameScene.floWordHeight, growsLeft: true,
-                                          left: FloTuning.leftSkew, right: FloTuning.rightSkew)
-            // Its small end on the bar's left end, then where the sliders move it.
-            word.anchorPoint = CGPoint(x: 1, y: 0.5)
-            word.position = CGPoint(x: -barWidth / 2 + GameScene.floWordOverlap + FloTuning.offsetX, y: GameScene.floWordLift + FloTuning.offsetY)
+            let word = Onomatopoeia.still("FLO", face: .englishDex, colours: FloTuning.colours, height: GameScene.floWordHeight, growsLeft: !mirrored,
+                                          left: mirrored ? FloTuning.rightSkew : FloTuning.leftSkew, right: mirrored ? FloTuning.leftSkew : FloTuning.rightSkew)
+            // Its small end on the bar's outer end, then where the sliders move it, mirrored for the second.
+            word.anchorPoint = CGPoint(x: mirrored ? 0 : 1, y: 0.5)
+            word.position = CGPoint(x: side * (barWidth / 2 - GameScene.floWordOverlap - FloTuning.offsetX), y: GameScene.floWordLift + FloTuning.offsetY)
             word.setScale(FloTuning.wordScale)
             word.zPosition = 1
             meter.addChild(word)
             // MAX, lettered as a footstep is, in Bigdex, on the bar's top trailing corner.
-            let full = Onomatopoeia.still("MAX", face: .englishDex, colours: FloTuning.maxColours, height: GameScene.floMaxHeight, growsLeft: false,
+            let full = Onomatopoeia.still("MAX", face: .englishDex, colours: FloTuning.colours, height: GameScene.floMaxHeight, growsLeft: false,
                                           left: 1, right: 1)
             full.anchorPoint = CGPoint(x: 0.5, y: 0)
-            full.position = CGPoint(x: barWidth / 2 + FloTuning.maxX, y: barHeight / 2 + FloTuning.maxY)
+            // The bar's trailing end, against the scoreboard.
+            full.position = CGPoint(x: -side * (barWidth / 2 + FloTuning.maxX), y: barHeight / 2 + FloTuning.maxY)
             full.setScale(FloTuning.maxScale)
             full.zPosition = 2
             full.isHidden = shownFlo(index) < FloRules.full
@@ -1257,10 +1260,9 @@ final class GameScene: SKScene {
     private var floOrbs: [FloOrb] = []
     /// FLO still on its way to each player in orbs, kept off their meter till it lands.
     private var floOnTheWay: [Int: Double] = [:]
-    /// Frames left of each player's flash on taking an orb, and the absorb playing on them.
+    /// Frames left of each player's flash on taking an orb.
     private var floFlash: [Int] = [0, 0]
-    private var floAbsorbing: [Int: SKNode] = [:]
-    private static let floPerOrb = 4.0
+    private static let floPerOrb = 1.0
     private static let floGlideSeconds = 0.3
     /// How long the first of a gain's orbs hangs, and how long after the one before each next
     /// one leaves, give or take a little: one by one, never together, after any still waiting.
@@ -1334,14 +1336,26 @@ final class GameScene: SKScene {
     private func takeFloOrb(_ orb: FloOrb) {
         floOnTheWay[orb.owner] = max(floOnTheWay[orb.owner, default: 0] - orb.value, 0)
         if floFlash.indices.contains(orb.owner) { floFlash[orb.owner] = GameScene.floFlashFrames }
-        // The absorb once at a time on a body, following it.
-        if floAbsorbing[orb.owner]?.parent == nil, EnergyEffect.floAbsorb.frameCount > 0 {
-            let player = match.players[orb.owner]
-            let absorb = EnergyEffect.floAbsorb.node(sprites, player: orb.owner, at: SpriteLibrary.point(player.chest))
-            absorb.zPosition = 31
-            glowers.addChild(absorb)
-            riders.append((absorb, orb.owner, player.chest - player.position))
-            floAbsorbing[orb.owner] = absorb
+    }
+
+    /// Dropped FLO where a body burned, hovering: `flo_absorb` round and round on it, in the
+    /// colour of whoever dropped it, till someone takes it.
+    private var floBundleNodes: [Int: SKSpriteNode] = [:]
+    private func drawFloBundles() {
+        let bundles = match.floBundles
+        for (id, node) in floBundleNodes where !bundles.contains(where: { $0.id == id }) {
+            node.removeFromParent()
+            floBundleNodes[id] = nil
+        }
+        guard EnergyEffect.floAbsorb.frameCount > 0 else { return }
+        for bundle in bundles where floBundleNodes[bundle.id] == nil {
+            let frames = sprites.effectFrames(.floAbsorb, player: bundle.owner)
+            let node = SKSpriteNode(texture: frames[0])
+            node.position = SpriteLibrary.point(bundle.position)
+            node.zPosition = 30
+            node.run(.repeatForever(.animate(with: frames, timePerFrame: 1 / EnergyEffect.floAbsorb.fps)))
+            glowers.addChild(node)
+            floBundleNodes[bundle.id] = node
         }
     }
 
@@ -2646,7 +2660,7 @@ final class GameScene: SKScene {
             controls.addSlider(title: "BASKET CHEVRON Y", range: 0...60, notch: 1, value: Float(ChevronTuning.basketLift)) { ChevronTuning.basketLift = CGFloat($0) }
         }
         // The FLO meters' look, while it's settled.
-        let relayoutFlo: () -> Void = { [weak self] in self.map { $0.layoutFloMeters(bottom: $0.floBottom) } }
+        let relayoutFlo: () -> Void = { [weak self] in self?.layoutFloMeters() }
         controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO X SCALE", range: 0.25...2, notch: 0.01, value: Float(FloTuning.xScale)) { FloTuning.xScale = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO Y SCALE", range: 0.25...2, notch: 0.01, value: Float(FloTuning.yScale)) { FloTuning.yScale = CGFloat($0); relayoutFlo() }
@@ -2727,10 +2741,10 @@ final class GameScene: SKScene {
         circlesOverCam.position = circles.position
         drawSeries()
         presentScreen()
-        layoutFloMeters(bottom: -halfHeight + insets.bottom + TouchControls.padding)
+        layoutFloMeters()
         floPicker?.removeFromParent()
         let picker = FloColourPicker(origin: CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)) { [weak self] in
-            self.map { $0.layoutFloMeters(bottom: $0.floBottom) }
+            self?.layoutFloMeters()
         }
         hud.addChild(picker)
         floPicker = picker
@@ -2998,6 +3012,8 @@ final class GameScene: SKScene {
         floOrbs = []
         floOnTheWay = [:]
         floGainsShown = []
+        floBundleNodes.values.forEach { $0.removeFromParent() }
+        floBundleNodes = [:]
         showStage()
         controls?.setOnline(online != nil)
         freshRoundView()
@@ -3615,8 +3631,16 @@ final class GameScene: SKScene {
 
     /// The black plate under the round circles or 47's score, as dark as it is so the glow
     /// passes it by; at the HUD's panels scale.
+    /// Half the scoreboard plate's width, for the FLO meters either side of it.
+    private var scorePlateHalfWidth: CGFloat = 60
     private func addHUDPlate(width: CGFloat, height: CGFloat) {
         let panels = UITuning.shared.scale(.hud, .panels)
+        // A wider or narrower plate moves the meters out or in with it.
+        let halfWidth = width * panels / 2
+        if halfWidth != scorePlateHalfWidth {
+            scorePlateHalfWidth = halfWidth
+            if !floMeters.isEmpty { layoutFloMeters() }
+        }
         let plate = UIPiece.plateBlack.node(size: CGSize(width: width, height: height).scaled(by: panels), corners: panels * 0.5)
         plate.position = CGPoint(x: 0, y: -UIPiece.plateBlack.faceRise * panels * 0.5)
         plate.zPosition = -1
@@ -5922,6 +5946,7 @@ final class GameScene: SKScene {
         strokeFloMeters()
         stepFloOrbs()
         updateFloMeters()
+        drawFloBundles()
         for index in floFlash.indices where floFlash[index] > 0 { floFlash[index] -= 1 }
         stepHeadParticles()
         section("particles")

@@ -18,6 +18,8 @@ public struct Match: Equatable {
     public var clones: [IceClone] = []
     /// Gale Ale's tornados.
     public var gales: [Gale] = []
+    /// FLO dropped where a body burned, hovering till any player comes for it.
+    public var floBundles: [FloBundle] = []
     /// Z Tea's beams while they fire.
     public var beams: [Beam] = []
     public var flames: [Flame] = []
@@ -119,6 +121,7 @@ public struct Match: Equatable {
         stepField()
         stepTornados()
         stepHoopfish()
+        gatherFloBundles()
         stepStageFireball()
         stepLightning()
         stepIcicles()
@@ -177,7 +180,7 @@ public struct Match: Equatable {
                     let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage) * pointValue
                     scores[owner] += points
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points, floater: ball.floaterShot))
-                    players[owner].gainFlo(FloRules.madeShot, at: stage.hoops[hoop].position, events: &events)
+                    earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position)
                     holdHitStop(HitStopRules.shotFrames)
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
                     ball.launchPoint = nil
@@ -190,7 +193,7 @@ public struct Match: Equatable {
                     // neutral rather than in the hands of whoever was just scored on.
                     let tiedDecider = scores[0] == scores[1]
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1, floater: ball.floaterShot))
-                    players[owner].gainFlo(FloRules.madeShot, at: stage.hoops[hoop].position, events: &events)
+                    earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position)
                     holdHitStop(HitStopRules.shotFrames)
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking }) {
@@ -497,8 +500,8 @@ public struct Match: Equatable {
                 freeze(other)
             } else if facingIt, allowed, player.snatchReaches(ballAt: at) || (held.map { player.snatchReaches(box: players[$0].body) } ?? false),
                       held != nil || ball.isLive {
-                players[index].gainFlo(FloRules.snatch, at: at, events: &events)
                 if let held {
+                    earnFlo(FloRules.snatch, by: index, off: held, at: at)
                     players[held].loseBall()
                     players[held].hitStun = BallRules.hitStunFrames
                     holdHitStop(HitStopRules.hitFrames)
@@ -529,9 +532,9 @@ public struct Match: Equatable {
             guard reaches else { continue }
             players[other].slashHit = true
             let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
-            strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y))
+            strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), earns: false)
             events.append(.parried(player: other, by: index))
-            players[index].gainFlo(FloRules.counter, at: players[other].chest, events: &events)
+            earnFlo(FloRules.counter, by: index, off: other, at: players[other].chest)
             holdHitStop(HitStopRules.counterFrames)
         }
     }
@@ -539,14 +542,14 @@ public struct Match: Equatable {
     /// The ball knocked out of `victim`'s hands: it pops straight up, nobody's, and the
     /// victim is stunned, so the popper has first go at it.
     /// `carry`: sideways speed for the ball: a slash sends it back toward the slasher.
-    private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0) {
+    private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0, earns: Bool = true) {
         let from = players[victim].heldBallPoint
         players[victim].loseBall()
         players[victim].hitStun = BallRules.hitStunFrames
         ball.pop(from: from)
         ball.velocity.x = carry
         events.append(.popped(player: victim, by: popper))
-        players[popper].gainFlo(FloRules.pop, at: from, events: &events)
+        if earns { earnFlo(FloRules.hit, by: popper, off: victim, at: from) }
         holdHitStop(HitStopRules.hitFrames)
     }
 
@@ -627,7 +630,11 @@ public struct Match: Equatable {
         players[index] = Player(spec: was.spec, index: index, position: spawnPoint(index), facing: stage.playerFacings[index])
         players[index].power = was.power
         players[index].powerLevel = was.powerLevel
-        players[index].flo = was.flo
+        // Its FLO left behind where it went down, hovering clear of the lava.
+        if was.flo > 0 {
+            let lift = stage.features.lavaSurface.map { $0 + FloRules.bundleLift } ?? -Double.infinity
+            floBundles.append(FloBundle(id: stamp(), owner: index, amount: was.flo, position: Vec2(x: was.chest.x, y: max(was.chest.y, lift))))
+        }
         events.append(.lavaBurned(player: index))
         if ball.holder == index {
             ball.holder = nil
@@ -858,7 +865,7 @@ public struct Match: Equatable {
             let now = Box(min: Vec2(x: tip.x - IcicleRules.width / 2, y: tip.y), max: Vec2(x: tip.x + IcicleRules.width / 2, y: tip.y + IcicleRules.length))
             if let victim = players.indices.first(where: { players[$0].body.overlaps(now) }) {
                 if players[victim].power != .frostTea {
-                    strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil)
+                    strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil, earns: false)
                     freeze(victim)
                 }
             } else if !swept.landed, stage.features.lavaSurface.map({ tip.y > $0 }) ?? true {
@@ -896,7 +903,7 @@ public struct Match: Equatable {
         let line = Box(min: Vec2(x: target.x - LightningRules.halfWidth, y: target.y),
                        max: Vec2(x: target.x + LightningRules.halfWidth, y: Double(stage.rows) * Stage.tileSize))
         for victim in players.indices where players[victim].power != .zeusJuice && players[victim].frozen == 0 && players[victim].body.overlaps(line) {
-            strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil)
+            strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil, earns: false)
         }
     }
 
@@ -907,7 +914,8 @@ public struct Match: Equatable {
 
     /// The strip: the victim stunned, any ball they hold popped free, and knocked away if
     /// `knock` is given. Without stunning, only the ball pops and the knock lands.
-    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0) {
+    /// `earns`: the hit earns its striker FLO, as every hit does but a parry's and the stage's.
+    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, earns: Bool = true) {
         if !stun {
             // A push, not a hit: no stun and no spark, the ball let go of if held.
             let held = players[victim].hasBall
@@ -918,13 +926,36 @@ public struct Match: Equatable {
             }
             events.append(.pushed(player: victim, by: striker, ball: held))
         } else if players[victim].hasBall {
-            pop(from: victim, by: striker, carry: carry)
+            pop(from: victim, by: striker, carry: carry, earns: earns)
         } else {
             events.append(.struck(player: victim, by: striker))
+            if earns { earnFlo(FloRules.hit, by: striker, off: victim, at: players[victim].chest) }
             holdHitStop(HitStopRules.hitFrames)
         }
         if stun { players[victim].hitStun = BallRules.hitStunFrames }
         if let knock { players[victim].knock(knock) }
+    }
+
+    /// FLO earned by `earner`, off `victim` when it was a play on them: with
+    /// `FloRules.takesFromTheOther`, out of their pool, what they have of it.
+    private mutating func earnFlo(_ amount: Int, by earner: Int, off victim: Int?, at source: Vec2) {
+        if FloRules.takesFromTheOther, let victim, victim != earner, players.indices.contains(victim) {
+            players[victim].flo -= min(amount, players[victim].flo)
+        }
+        players[earner].gainFlo(amount, at: source, events: &events)
+    }
+
+    /// Dropped FLO taken by the nearest body in reach, as much as it has room for.
+    private mutating func gatherFloBundles() {
+        floBundles = floBundles.compactMap { bundle in
+            var bundle = bundle
+            let reaching = players.indices.filter { players[$0].chest.distance(to: bundle.position) <= FloRules.bundleReach }
+            guard let taker = reaching.min(by: { players[$0].chest.distance(to: bundle.position) < players[$1].chest.distance(to: bundle.position) }) else { return bundle }
+            let before = players[taker].flo
+            players[taker].gainFlo(bundle.amount, at: bundle.position, events: &events)
+            bundle.amount -= players[taker].flo - before
+            return bundle.amount > 0 ? bundle : nil
+        }
     }
 
     private mutating func freeze(_ index: Int) {

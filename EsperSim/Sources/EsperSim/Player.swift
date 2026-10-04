@@ -2268,12 +2268,28 @@ extension Player {
     }
 }
 
-/// FLO's amounts: full, and what each play earns.
+/// FLO's amounts: full, and what each play earns: a made shot, a counter, a snatch that steals,
+/// a hit (ball or not), a taunt.
 public enum FloRules {
     public static let full = 100
     public static let madeShot = 20
     public static let counter = 10
     public static let snatch = 7
-    public static let pop = 5
+    public static let hit = 5
     public static let taunt = 3
+    /// An experiment, to be undone with this: FLO earned off another player comes out of their
+    /// pool, what they have of it, the earner getting it all either way.
+    public static let takesFromTheOther = true
+    /// A burned body's FLO hovers where it went down, this far over the lava at least, and is
+    /// taken by any body whose chest comes within this of it (64 art pixels).
+    public static let bundleLift = 15.0
+    public static let bundleReach = 40.0
+}
+
+/// FLO dropped by a burned body, hovering where it went down till someone comes for it.
+public struct FloBundle: Equatable {
+    public var id: Int
+    public var owner: Int
+    public var amount: Int
+    public var position: Vec2
 }

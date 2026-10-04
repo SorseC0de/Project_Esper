@@ -293,16 +293,11 @@ enum FloTuning {
     nonisolated(unsafe) static var barBack: CGFloat = 0.5
     nonisolated(unsafe) static var barBend: CGFloat = 0.5
     /// MAX on the bar's top trailing corner when it's full: its scale, and moved, in points.
-    nonisolated(unsafe) static var maxScale: CGFloat = 1
-    nonisolated(unsafe) static var maxX: CGFloat = 0
-    nonisolated(unsafe) static var maxY: CGFloat = 0
-    /// MAX's colours, a footstep's: white over palette 37, outlined in the sound words' line.
-    static var maxColours: Onomatopoeia.Colours {
-        let line = PixelPalette.colours[Onomatopoeia.lineIndex]
-        return Onomatopoeia.Colours(upper: PixelPalette.colours[22], lower: PixelPalette.colours[37], lineUpper: line, lineLower: line)
-    }
-    /// The white stroke round the bar and the word together, in points.
-    nonisolated(unsafe) static var stroke: CGFloat = 0.5
+    nonisolated(unsafe) static var maxScale: CGFloat = 1.5
+    nonisolated(unsafe) static var maxX: CGFloat = -5
+    nonisolated(unsafe) static var maxY: CGFloat = -15
+    /// The stroke round the bar and the word together, in the player's glow, in points.
+    nonisolated(unsafe) static var stroke: CGFloat = 1.5
 
     /// The word's four colours: its fill's top and bottom, its outline and drop's top and bottom.
     enum Tone: Int, CaseIterable {

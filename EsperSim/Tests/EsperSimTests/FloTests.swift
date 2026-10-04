@@ -45,7 +45,44 @@ final class FloTests: XCTestCase {
         player.gainFlo(FloRules.madeShot, at: .zero, events: &events)
         XCTAssertEqual(player.flo, FloRules.full)
         XCTAssertEqual(events, [.floGained(player: 0, amount: 2, at: .zero)])
-        player.gainFlo(FloRules.pop, at: .zero, events: &events)
+        player.gainFlo(FloRules.hit, at: .zero, events: &events)
         XCTAssertEqual(events.count, 1, "nothing more at full")
+    }
+}
+
+final class FloDropTests: XCTestCase {
+    func testAHitEarnsFiveOffTheOther() {
+        var match = Match()
+        match.countdown = 0
+        match.players[1].flo = 12
+        match.players[0].position = Vec2(x: 150, y: 10)
+        match.players[1].position = Vec2(x: 160, y: 10)
+        match.players[0].facing = .right
+        var earned = 0
+        for frame in 0..<40 {
+            match.advance(inputs: [PlayerInput(shoot: frame == 0), .idle])
+            for case .floGained(0, let amount, _) in match.events { earned += amount }
+        }
+        XCTAssertEqual(earned, FloRules.hit, "a hit, no ball")
+        XCTAssertEqual(match.players[1].flo, FloRules.takesFromTheOther ? 12 - FloRules.hit : 12)
+    }
+
+    func testABurnLeavesTheFloHoveringForAnyoneToTake() {
+        var match = Match(stage: .elements, specs: [.starting, .starting])
+        match.countdown = 0
+        match.players[0].flo = 30
+        let lava = match.stage.features.lavaSurface!
+        match.players[0].position = Vec2(x: 200, y: lava - 5)
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].flo, 0)
+        XCTAssertEqual(match.floBundles.count, 1)
+        let bundle = match.floBundles[0]
+        XCTAssertEqual(bundle.amount, 30)
+        XCTAssertGreaterThanOrEqual(bundle.position.y, lava + FloRules.bundleLift)
+        // The other player, standing in reach of it, takes it.
+        match.players[1].position = bundle.position - Vec2(x: 0, y: match.players[1].chest.y - match.players[1].position.y)
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertTrue(match.floBundles.isEmpty)
+        XCTAssertEqual(match.players[1].flo, 30)
     }
 }

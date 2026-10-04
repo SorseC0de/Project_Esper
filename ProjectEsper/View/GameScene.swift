@@ -4762,6 +4762,16 @@ final class GameScene: SKScene {
     private static let transformEnergyFrame = 5
     private static let transformCreditKey = 2000
     private static let transformSpiralRate = 30.0
+    /// Into or out of FloState, how many frames the cubes swirl round the body.
+    private static let floSwirlFrames = 30
+    private var wasInFloState: [Int: Bool] = [:]
+    private var floSwirlFrames: [Int: Int] = [:]
+    /// Rising round the body in a helix: while it changes, up to the energy form, and while it swirls.
+    private func spiralling(_ index: Int) -> Bool {
+        guard match.players.indices.contains(index) else { return false }
+        let player = match.players[index]
+        return (player.state == .transforming && player.animationFrame.frame < GameScene.transformEnergyFrame) || floSwirlFrames[index, default: 0] > 0
+    }
     private static let transformSpiralRadius: CGFloat = 10
     private static let transformHelixRadius: CGFloat = 3
     private static let helixTurnsPerSecond = 2.0
@@ -4870,8 +4880,7 @@ final class GameScene: SKScene {
                     : (cube != nil ? cubeTrail(index) / speed : 0.6) + Double.random(in: -0.05...0.05)
                 // While its body changes, it rises in a helix rather than straight.
                 var helix: (centreX: CGFloat, radius: CGFloat, angle: Double, rise: CGFloat)?
-                if trailing == nil, match.players.indices.contains(index), match.players[index].state == .transforming,
-                   match.players[index].animationFrame.frame < GameScene.transformEnergyFrame {
+                if trailing == nil, spiralling(index) {
                     let radius = stream.helixRadius ?? GameScene.transformHelixRadius
                     helix = (point.x, radius, Double.random(in: 0..<(2 * .pi)), stream.helixRadius == nil ? CGFloat(speed) : GameScene.spiralRise)
                 }
@@ -4910,8 +4919,11 @@ final class GameScene: SKScene {
                 return nil
             }
             if var helix = particle.helix {
-                let owner = match.players.indices.contains(particle.owner) ? match.players[particle.owner] : nil
-                if let owner, owner.state == .transforming, owner.animationFrame.frame < GameScene.transformEnergyFrame {
+                if spiralling(particle.owner) {
+                    // Swirling, it goes round the body wherever the body goes.
+                    if floSwirlFrames[particle.owner, default: 0] > 0 {
+                        helix.centreX = SpriteLibrary.point(match.players[particle.owner].position).x
+                    }
                     helix.angle += 2 * .pi * GameScene.helixTurnsPerSecond * step
                     particle.node.position = CGPoint(x: helix.centreX + CGFloat(cos(helix.angle)) * helix.radius,
                                                      y: particle.node.position.y + helix.rise * CGFloat(step))
@@ -6452,8 +6464,15 @@ final class GameScene: SKScene {
                                       streams: [legStream(index, part: part, energyColour: energyForm)])
                 }
             }
-            // Changing, up to the white frame cubes spiral up round the whole body.
-            if changing, frame.frame <= GameScene.transformWhiteFrame, ParticleLook.cubes {
+            // Into or out of FloState: a burst in the energy's colour, and cubes swirling round a while.
+            if wasInFloState[index, default: player.inFloState] != player.inFloState {
+                glowers.addChild(EnergyEffect.burst.node(sprites, player: index, at: SpriteLibrary.point(player.chest)))
+                floSwirlFrames[index] = GameScene.floSwirlFrames
+            }
+            wasInFloState[index] = player.inFloState
+            if floSwirlFrames[index, default: 0] > 0 { floSwirlFrames[index, default: 0] -= 1 }
+            // Changing, up to the white frame cubes spiral up round the whole body; and swirling.
+            if (changing && frame.frame <= GameScene.transformWhiteFrame || floSwirlFrames[index, default: 0] > 0), ParticleLook.cubes {
                 var spiral = legStream(index, part: .frontLeg, energyColour: true)
                 spiral.rate = GameScene.transformSpiralRate
                 spiral.helixRadius = GameScene.transformSpiralRadius

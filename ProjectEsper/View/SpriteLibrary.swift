@@ -554,7 +554,8 @@ final class SpriteLibrary {
         // The line there stays on the body in its grade rather than lifting off with the rest.
         // A human's energy-coloured parts glow; so does the crown's grade where it's mostly energy.
         // The energy form glows all over, as its head does.
-        var glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true : parts[$0] != nil }
+        var glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true
+            : parts[$0].map { !HumanLook.energyFormSkin.contains($0) } == true }
         if look.human {
             let isHead = (0..<count).map { parts[$0] == .head }
             let crown = (0..<count).map { isHead[$0] || (lined[$0] && neighbours($0, { isHead[$0] })) }
@@ -614,7 +615,7 @@ final class SpriteLibrary {
         if detach, glowing.contains(true), let (maskContext, maskPixels) = makeCanvas(width: width, height: height) {
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
                 let index = pixel * 4
-                let skin = look.human && parts[pixel].map { HumanLook.skin[$0] != nil } == true
+                let skin = parts[pixel].map { look.human ? HumanLook.skin[$0] != nil : HumanLook.energyFormSkin.contains($0) } == true
                 maskPixels[index] = skin ? 0 : 255
                 maskPixels[index + 1] = 255
                 maskPixels[index + 2] = skin ? 0 : 255

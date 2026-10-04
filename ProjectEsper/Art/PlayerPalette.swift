@@ -107,10 +107,12 @@ struct Look: Hashable {
             for part in HumanLook.glowingParts { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         } else {
             // The energy form: the body in the lighter colour of the earlier builds, the back
-            // parts down its ramp as a human's back leg is; the head in the energy's own.
-            for part in BodyPart.allCases where !part.isEnergy && !part.glows(human: false) {
+            // parts down its ramp as a human's back leg is, the head in it too; the arms and
+            // hands in skin.
+            for part in BodyPart.allCases where !part.isEnergy && part != .ball {
                 colours[part] = part.isBack ? Look.scaled(body, HumanLook.backLegShare) : body
             }
+            for part in HumanLook.energyFormSkin { colours[part] = HumanLook.skin[part] }
         }
         return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body)
     }
@@ -308,5 +310,7 @@ enum HumanLook {
     /// The torso, pelvis and thighs, the same for every player: palette 41, the back thigh
     /// the next down its ramp, 42.
     static let clothed: Set<BodyPart> = [.torso, .pelvis, .frontThigh, .backThigh]
+    /// The energy form's arms and hands in skin, which doesn't glow.
+    static let energyFormSkin: Set<BodyPart> = [.frontArm, .frontHand, .backArm, .backHand]
     static let clothes = PixelPalette.colours[41], backClothes = PixelPalette.colours[42]
 }

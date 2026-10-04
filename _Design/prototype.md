@@ -141,7 +141,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   frames meanwhile (`SpriteLibrary.skinTexture`); FloState and the lockout are kept through a point.
   In FloState the cube trails run their longest (14), the head's and legs' cubes come out in the
   zone's colours, the body is drawn in the lighter colour of the earlier builds (the glow lifted two
-  fifths to white, `EnergyColour.body`, the back parts at two thirds of it; the head in the glow), and each of the slash's
+  fifths to white, `EnergyColour.body`, the back parts at two thirds of it), the head in it too, the
+  arms and hands in skin, unglowing (`HumanLook.energyFormSkin`). Going in or out, `burst` plays at
+  the chest in the energy's colour and the cubes swirl up round the body for half a second, following
+  it, as they do through the change. Each of the slash's
   afterimages the next of them; the line round the body cycles the zone's colours at half its
   thickness (`SpriteLibrary.thinOutlineTexture`: on a canvas twice as fine, each line pixel's
   quarters against the body). As drawn: seven pixels up off the

@@ -177,6 +177,7 @@ public struct Match: Equatable {
                     let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage) * pointValue
                     scores[owner] += points
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points, floater: ball.floaterShot))
+                    players[owner].gainFlo(FloRules.madeShot, at: stage.hoops[hoop].position, events: &events)
                     holdHitStop(HitStopRules.shotFrames)
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
                     ball.launchPoint = nil
@@ -189,6 +190,7 @@ public struct Match: Equatable {
                     // neutral rather than in the hands of whoever was just scored on.
                     let tiedDecider = scores[0] == scores[1]
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1, floater: ball.floaterShot))
+                    players[owner].gainFlo(FloRules.madeShot, at: stage.hoops[hoop].position, events: &events)
                     holdHitStop(HitStopRules.shotFrames)
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking }) {
@@ -232,6 +234,7 @@ public struct Match: Equatable {
             players[index] = Player(spec: was.spec, index: index, position: spawnPoint(index), facing: stage.playerFacings[index])
             players[index].power = was.power
             players[index].powerLevel = was.powerLevel
+            players[index].flo = was.flo
         }
         platforms = []
         refreshExtras()
@@ -494,6 +497,7 @@ public struct Match: Equatable {
                 freeze(other)
             } else if facingIt, allowed, player.snatchReaches(ballAt: at) || (held.map { player.snatchReaches(box: players[$0].body) } ?? false),
                       held != nil || ball.isLive {
+                players[index].gainFlo(FloRules.snatch, at: at, events: &events)
                 if let held {
                     players[held].loseBall()
                     players[held].hitStun = BallRules.hitStunFrames
@@ -527,6 +531,7 @@ public struct Match: Equatable {
             let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
             strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y))
             events.append(.parried(player: other, by: index))
+            players[index].gainFlo(FloRules.counter, at: players[other].chest, events: &events)
             holdHitStop(HitStopRules.counterFrames)
         }
     }
@@ -541,6 +546,7 @@ public struct Match: Equatable {
         ball.pop(from: from)
         ball.velocity.x = carry
         events.append(.popped(player: victim, by: popper))
+        players[popper].gainFlo(FloRules.pop, at: from, events: &events)
         holdHitStop(HitStopRules.hitFrames)
     }
 
@@ -621,6 +627,7 @@ public struct Match: Equatable {
         players[index] = Player(spec: was.spec, index: index, position: spawnPoint(index), facing: stage.playerFacings[index])
         players[index].power = was.power
         players[index].powerLevel = was.powerLevel
+        players[index].flo = was.flo
         events.append(.lavaBurned(player: index))
         if ball.holder == index {
             ball.holder = nil

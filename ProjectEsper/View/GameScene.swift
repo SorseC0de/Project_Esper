@@ -1060,25 +1060,92 @@ final class GameScene: SKScene {
 
     /// The FLO meters along the bottom, the first player's left of the middle and the second's
     /// right of it: `FLO_meter` a point an art pixel, and over each bar's left end the word, in
-    /// Bigdex as the sound words are drawn, big to small and flared. Shown in play; what fills
-    /// and empties them is to come, and the bar shows its first frame meanwhile.
+    /// Bigdex as the sound words are drawn, big to small and flared. Shown in play. The bar
+    /// shows what's been gathered: its empty share drawn over it, before its warp, as lines of
+    /// the plum ramp's last, one a FLO; full, none and MAX on its top trailing corner; burning,
+    /// its eight frames playing.
     private var floMeters: [SKSpriteNode] = []
+    private var floBars: [SKSpriteNode] = []
+    private var floMaxWords: [SKSpriteNode] = []
+    /// What each bar shows now, its frame and FLO, so it's drawn again only when they change.
+    private var floShown: [(frame: Int, flo: Int)] = []
     private static let floPointsPerPixel: CGFloat = 1
     private static let floGap: CGFloat = 40
     private static let floWordHeight: CGFloat = 14
     /// How far onto the bar the word reaches, and how far above its middle it sits, in points.
     private static let floWordOverlap: CGFloat = 6
     private static let floWordLift: CGFloat = 3
+    /// The bar's inside, on its sheet: its first column, its top row, how tall; the last three
+    /// columns shorter, as its end slants.
+    private static let floFirstColumn = 6
+    private static let floTopRow = 5
+    private static let floLineHeights = [98: 4, 99: 3, 100: 2]
+    /// The burn's frames a second.
+    private static let floBurnFramesPerSecond = 12.0
+    /// MAX: its cap height in points, before its slider's scale.
+    private static let floMaxHeight: CGFloat = 6
 
     private var floBottom: CGFloat = 0
     private var floStrokes: [SKSpriteNode] = []
     private let ciContext = CIContext()
+    private var floBarTextures: [Int: SKTexture] = [:]
+
+    /// A frame of the bar with `flo` gathered: one line over it for each FLO missing, from its
+    /// first column on.
+    private func floBarTexture(frame: Int, flo: Int) -> SKTexture {
+        let key = frame * 1000 + flo
+        if let made = floBarTextures[key] { return made }
+        let sheet = sprites.texture("flo_meter", frame).cgImage()
+        let width = sheet.width, height = sheet.height
+        let empty = FloRules.full - min(max(flo, 0), FloRules.full)
+        let texture: SKTexture
+        if empty > 0, let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+            context.interpolationQuality = .none
+            context.draw(sheet, in: CGRect(x: 0, y: 0, width: width, height: height))
+            context.setFillColor(SKColor(rgb: EsperPalette.plum.shadow).cgColor)
+            for line in 1...empty {
+                let tall = GameScene.floLineHeights[line] ?? 5
+                // The picture's rows run up from its bottom: the inside's top row, down `tall`.
+                context.fill(CGRect(x: GameScene.floFirstColumn + line - 1, y: height - GameScene.floTopRow - tall, width: 1, height: tall))
+            }
+            texture = context.makeImage().map { SKTexture(cgImage: $0) } ?? SKTexture(cgImage: sheet)
+        } else {
+            texture = SKTexture(cgImage: sheet)
+        }
+        texture.filteringMode = .nearest
+        floBarTextures[key] = texture
+        return texture
+    }
+
+    /// The FLO a meter shows: what the player has, less what's still on its way to them.
+    private func shownFlo(_ index: Int) -> Int {
+        guard match.players.indices.contains(index) else { return 0 }
+        return max(match.players[index].flo - Int(floOnTheWay[index, default: 0].rounded()), 0)
+    }
+
+    /// Each bar drawn for what it shows now, and MAX up when it's full.
+    private func updateFloMeters() {
+        for index in floBars.indices where match.players.indices.contains(index) {
+            let flo = shownFlo(index)
+            let frame = match.players[index].floBurning
+                ? Int(CACurrentMediaTime() * GameScene.floBurnFramesPerSecond) % max(EffectSheets.frames["flo_meter"] ?? 1, 1) : 0
+            guard floShown.indices.contains(index), floShown[index].frame != frame || floShown[index].flo != flo else { continue }
+            floShown[index] = (frame, flo)
+            floBars[index].texture = floBarTexture(frame: frame, flo: flo)
+            floMaxWords[index].isHidden = flo < FloRules.full || floMeters[index].isHidden
+        }
+    }
 
     /// The white stroke round a meter, the bar and the word as one shape: the meter drawn as it
-    /// is, warp and all, made white, grown round by the stroke and set behind it.
+    /// is, warp and all, made white, grown round by the stroke and set behind it. MAX has its own.
     private func floStroke(round meter: SKNode) -> SKSpriteNode? {
         let width = FloTuning.stroke
-        guard width > 0, let view = hudScene.view, let drawn = view.texture(from: meter) else { return nil }
+        guard width > 0, let view = hudScene.view else { return nil }
+        let maxShown = floMaxWords.map(\.isHidden)
+        floMaxWords.forEach { $0.isHidden = true }
+        defer { for (word, hidden) in zip(floMaxWords, maxShown) { word.isHidden = hidden } }
+        guard let drawn = view.texture(from: meter) else { return nil }
         let frame = meter.calculateAccumulatedFrame()
         let picture = drawn.cgImage()
         let pixels = CGFloat(picture.width) / max(frame.width, 1)
@@ -1120,10 +1187,12 @@ final class GameScene: SKScene {
         floStrokes = []
         floMeters.forEach { $0.removeFromParent() }
         floMeters = []
+        floBars = []
+        floMaxWords = []
+        floShown = []
         guard (EffectSheets.frames["flo_meter"] ?? 0) > 0 else { return }
         for index in 0..<2 {
-            let bar = SKSpriteNode(texture: sprites.texture("flo_meter", 0))
-            bar.texture?.filteringMode = .nearest
+            let bar = SKSpriteNode(texture: floBarTexture(frame: 0, flo: shownFlo(index)))
             bar.size = CGSize(width: bar.size.width * GameScene.floPointsPerPixel, height: bar.size.height * GameScene.floPointsPerPixel)
             // The meter: a holder at the whole meter's scale, the bar and the word each at their own.
             let side: CGFloat = index == 0 ? -1 : 1
@@ -1144,11 +1213,155 @@ final class GameScene: SKScene {
             word.setScale(FloTuning.wordScale)
             word.zPosition = 1
             meter.addChild(word)
+            // MAX, lettered as a footstep is, in Bigdex, on the bar's top trailing corner.
+            let full = Onomatopoeia.still("MAX", face: .englishDex, colours: FloTuning.maxColours, height: GameScene.floMaxHeight, growsLeft: false,
+                                          left: 1, right: 1)
+            full.anchorPoint = CGPoint(x: 0.5, y: 0)
+            full.position = CGPoint(x: barWidth / 2 + FloTuning.maxX, y: barHeight / 2 + FloTuning.maxY)
+            full.setScale(FloTuning.maxScale)
+            full.zPosition = 2
+            full.isHidden = shownFlo(index) < FloRules.full
+            meter.addChild(full)
             meter.setScale(FloTuning.meterScale)
             hud.addChild(meter)
             floMeters.append(meter)
+            floBars.append(bar)
+            floMaxWords.append(full)
+            floShown.append((0, shownFlo(index)))
         }
         showFloMeters()
+    }
+
+    // MARK: FLO's orbs
+
+    /// FLO earned comes as orbs, as silk does off the Reaper crest: out of where it was earned
+    /// they glide to a place round it and hang there a moment, bobbing, then zip to the player on
+    /// a bent path, faster as they go, trailing; each one landing flashes the player their
+    /// energy's colour, plays `flo_absorb` on them, and puts its share on their meter. Spheres,
+    /// lit, drawn by the Metal layer and glowing.
+    private struct FloOrb {
+        var owner: Int
+        var value: Double
+        var source: CGPoint
+        var hang: CGPoint
+        var position: CGPoint
+        var age = 0.0
+        var hangSeconds: Double
+        var zipFrom: CGPoint?
+        var zipAge = 0.0
+        var zipSeconds: Double
+        /// How far the zip's path bows out, and which way.
+        var bend: CGFloat
+        var trail: [CGPoint] = []
+    }
+    private var floOrbs: [FloOrb] = []
+    /// FLO still on its way to each player in orbs, kept off their meter till it lands.
+    private var floOnTheWay: [Int: Double] = [:]
+    /// Frames left of each player's flash on taking an orb, and the absorb playing on them.
+    private var floFlash: [Int] = [0, 0]
+    private var floAbsorbing: [Int: SKNode] = [:]
+    private static let floPerOrb = 4.0
+    private static let floGlideSeconds = 0.3
+    /// How long the first of a gain's orbs hangs, and how long after the one before each next
+    /// one leaves, give or take a little: one by one, never together, after any still waiting.
+    private static let floHangSeconds = 0.45
+    private static let floZipGap = 0.12
+    private static let floZipJitter = 0.05
+    private static let floZipSeconds: ClosedRange<Double> = 0.3...0.45
+    private static let floHangRadius: ClosedRange<CGFloat> = 12...24
+    private static let floBend: ClosedRange<CGFloat> = 20...50
+    private static let floOrbSize: Float = 5
+    private static let floTrailLength = 8
+    private static let floFlashFrames = 8
+
+    private func spawnFloOrbs(for player: Int, amount: Int, at source: Vec2) {
+        let count = max(Int((Double(amount) / GameScene.floPerOrb).rounded(.up)), 1)
+        let from = SpriteLibrary.point(source)
+        // After the last of this player's orbs still waiting to leave.
+        let waiting = floOrbs.filter { $0.owner == player && $0.zipFrom == nil }.map { $0.hangSeconds - $0.age }.max()
+        var leaves = max(GameScene.floHangSeconds, (waiting ?? 0) + GameScene.floZipGap)
+        for _ in 0..<count {
+            let angle = CGFloat.random(in: 0..<(2 * .pi)), reach = CGFloat.random(in: GameScene.floHangRadius)
+            floOrbs.append(FloOrb(owner: player, value: Double(amount) / Double(count), source: from,
+                                  hang: CGPoint(x: from.x + cos(angle) * reach, y: from.y + sin(angle) * reach), position: from,
+                                  hangSeconds: leaves, zipSeconds: .random(in: GameScene.floZipSeconds),
+                                  bend: (Bool.random() ? 1 : -1) * .random(in: GameScene.floBend)))
+            leaves += GameScene.floZipGap + .random(in: 0...GameScene.floZipJitter)
+        }
+        floOnTheWay[player, default: 0] += Double(amount)
+    }
+
+    /// The orbs a frame on, and those that have landed taken in.
+    private func stepFloOrbs() {
+        let step = GameScene.stepSeconds
+        floOrbs = floOrbs.compactMap { orb in
+            var orb = orb
+            guard match.players.indices.contains(orb.owner) else { return nil }
+            orb.age += step
+            orb.trail.insert(orb.position, at: 0)
+            if orb.trail.count > GameScene.floTrailLength { orb.trail.removeLast() }
+            if orb.age < GameScene.floGlideSeconds {
+                // Out to its place, slowing as it gets there.
+                let t = 1 - pow(1 - orb.age / GameScene.floGlideSeconds, 3)
+                orb.position = CGPoint(x: orb.source.x + (orb.hang.x - orb.source.x) * t, y: orb.source.y + (orb.hang.y - orb.source.y) * t)
+            } else if orb.age < orb.hangSeconds {
+                orb.position = CGPoint(x: orb.hang.x, y: orb.hang.y + 1.5 * sin((orb.age - GameScene.floGlideSeconds) * 2 * .pi * 1.2))
+            } else {
+                // The zip: a bowed path to the player as they are now, quickening.
+                let from = orb.zipFrom ?? orb.position
+                orb.zipFrom = from
+                orb.zipAge += step
+                let target = SpriteLibrary.point(match.players[orb.owner].chest)
+                let t = min(orb.zipAge / orb.zipSeconds, 1)
+                let eased = CGFloat(t * t)
+                let middle = CGPoint(x: (from.x + target.x) / 2, y: (from.y + target.y) / 2)
+                let across = CGPoint(x: target.x - from.x, y: target.y - from.y)
+                let length = max(hypot(across.x, across.y), 1)
+                let control = CGPoint(x: middle.x - across.y / length * orb.bend, y: middle.y + across.x / length * orb.bend)
+                func mix(_ a: CGFloat, _ b: CGFloat, _ c: CGFloat) -> CGFloat {
+                    (1 - eased) * (1 - eased) * a + 2 * (1 - eased) * eased * b + eased * eased * c
+                }
+                orb.position = CGPoint(x: mix(from.x, control.x, target.x), y: mix(from.y, control.y, target.y))
+                if t >= 1 {
+                    takeFloOrb(orb)
+                    return nil
+                }
+            }
+            return orb
+        }
+    }
+
+    private func takeFloOrb(_ orb: FloOrb) {
+        floOnTheWay[orb.owner] = max(floOnTheWay[orb.owner, default: 0] - orb.value, 0)
+        if floFlash.indices.contains(orb.owner) { floFlash[orb.owner] = GameScene.floFlashFrames }
+        // The absorb once at a time on a body, following it.
+        if floAbsorbing[orb.owner]?.parent == nil, EnergyEffect.floAbsorb.frameCount > 0 {
+            let player = match.players[orb.owner]
+            let absorb = EnergyEffect.floAbsorb.node(sprites, player: orb.owner, at: SpriteLibrary.point(player.chest))
+            absorb.zPosition = 31
+            glowers.addChild(absorb)
+            riders.append((absorb, orb.owner, player.chest - player.position))
+            floAbsorbing[orb.owner] = absorb
+        }
+    }
+
+    /// The orbs and their trails as spheres, in their player's glow lightened a little.
+    var sphereInstances: [CubeInstance] {
+        floOrbs.flatMap { orb -> [CubeInstance] in
+            let glow = sprites.look(for: orb.owner).glow
+            let colour = SIMD4<Float>(Float((glow >> 16) & 0xFF) / 255, Float((glow >> 8) & 0xFF) / 255, Float(glow & 0xFF) / 255, 1)
+            let bright = colour + (SIMD4<Float>(1, 1, 1, 1) - colour) * 0.35
+            func sphere(_ at: CGPoint, size: Float, alpha: Float) -> CubeInstance {
+                var shade = bright
+                shade.w = alpha
+                return CubeInstance(model: .translation(SIMD3<Float>(Float(at.x), Float(at.y), 0)) * .scale(SIMD3<Float>(repeating: size)), color: shade)
+            }
+            let trail = orb.trail.enumerated().map { index, at in
+                let share = 1 - Float(index + 1) / Float(GameScene.floTrailLength + 1)
+                return sphere(at, size: GameScene.floOrbSize * (0.3 + 0.6 * share), alpha: 0.75 * share)
+            }
+            return trail.reversed() + [sphere(orb.position, size: GameScene.floOrbSize, alpha: 1)]
+        }
     }
 
     /// The FLO word's colour picker, in the match's bottom leading corner.
@@ -1156,6 +1369,7 @@ final class GameScene: SKScene {
 
     private func showFloMeters() {
         for meter in floMeters + floStrokes { meter.isHidden = flow != .playing }
+        floShown = floShown.map { _ in (-1, -1) }
         floPicker?.isHidden = flow != .playing || online != nil
     }
 
@@ -2444,6 +2658,9 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO BAR FRONT", range: 0.25...2, notch: 0.01, value: Float(FloTuning.barFront)) { FloTuning.barFront = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO BAR BACK", range: 0.25...2, notch: 0.01, value: Float(FloTuning.barBack)) { FloTuning.barBack = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO BAR BEND", range: -1...1, notch: 0.01, value: Float(FloTuning.barBend)) { FloTuning.barBend = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.maxScale)) { FloTuning.maxScale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.maxX)) { FloTuning.maxX = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.maxY)) { FloTuning.maxY = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO STROKE", range: 0...4, notch: 0.25, value: Float(FloTuning.stroke)) { FloTuning.stroke = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO OFFSET Y", range: -30...30, notch: 1, value: Float(FloTuning.offsetY)) { FloTuning.offsetY = CGFloat($0); relayoutFlo() }
         if ParticleLook.cubes {
@@ -2777,6 +2994,10 @@ final class GameScene: SKScene {
     private func startRound(portingIn: Bool = true) {
         fortySevenScores = [0, 0]
         session = RollbackSession(match: freshMatch(), localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
+        // A fresh round's meters start from nothing on the way.
+        floOrbs = []
+        floOnTheWay = [:]
+        floGainsShown = []
         showStage()
         controls?.setOnline(online != nil)
         freshRoundView()
@@ -3642,8 +3863,23 @@ final class GameScene: SKScene {
     /// The events of frames just run, first time or run again with something new: the
     /// effects. A point isn't among them; that waits for both sides' inputs.
     private func show(_ frames: [FrameEvents]) {
-        for frameEvents in frames { show(frameEvents.events) }
+        for frameEvents in frames {
+            show(frameEvents.events)
+            // FLO's orbs once a gain, a frame run again after a rollback bringing none more.
+            for case .floGained(let player, let amount, let at) in frameEvents.events
+                where floGainsShown.insert(FloGain(frame: frameEvents.frame, player: player)).inserted {
+                spawnFloOrbs(for: player, amount: amount, at: at)
+            }
+            // Kept a while, and only from this match's run: a new one counts its frames from 0 again.
+            floGainsShown = floGainsShown.filter { (0..<GameScene.floGainsKeptFrames).contains(frameEvents.frame - $0.frame) }
+        }
     }
+    private struct FloGain: Hashable {
+        var frame: Int
+        var player: Int
+    }
+    private var floGainsShown: Set<FloGain> = []
+    private static let floGainsKeptFrames = 600
 
     // MARK: Sound
 
@@ -5684,6 +5920,9 @@ final class GameScene: SKScene {
     private func render() {
         sectionMark = CACurrentMediaTime()
         strokeFloMeters()
+        stepFloOrbs()
+        updateFloMeters()
+        for index in floFlash.indices where floFlash[index] > 0 { floFlash[index] -= 1 }
         stepHeadParticles()
         section("particles")
         // The figure in front: the one with the ball, else the last to touch it.
@@ -5773,10 +6012,13 @@ final class GameScene: SKScene {
             // other pair of frames; locked out after a 47 basket, black, every other four.
             let stunned = player.hitStun > 0 && (player.hitStun / 2) % 2 == 0
             let lockedOut = player.hitStun == 0 && player.pickupLockout > 0 && (player.pickupLockout / 4) % 2 == 0
-            let flashColour = lockedOut ? SKColor(rgb: PixelPalette.outline) : SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
+            // Taking a FLO orb, the whole body flashes its energy's own colour.
+            let absorbing = floFlash.indices.contains(index) && floFlash[index] > 0
+            let flashColour = absorbing ? SKColor(rgb: sprites.look(for: index).glow)
+                : lockedOut ? SKColor(rgb: PixelPalette.outline) : SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
             for (flash, source) in [(stunBodies[index], node), (stunHeads[index], headNodes[index])] {
-                flash.isHidden = !(stunned || lockedOut) || source.isHidden
-                guard stunned || lockedOut else { continue }
+                flash.isHidden = !(stunned || lockedOut || absorbing) || source.isHidden
+                guard stunned || lockedOut || absorbing else { continue }
                 flash.color = flashColour
                 flash.texture = source.texture
                 flash.size = source.size

@@ -604,10 +604,32 @@ it again from nothing. Online, the host's mode is played: MULTIPLAYER has BEST O
 
 FLO, the Functional Limit Overload, is to be the energy, the super meter, for the modes past the
 plain game, 47 among them: before the match each player picks a Greateraid, and in FLO they get
-its effects. `Player.flo`, 0 empty to 1 full, is there (protocol 72); nothing fills or spends it
-yet. The meters are in the HUD along the bottom, the first player's left of the middle and the
-second's right of it, shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames, the
-first shown for now) a point an art pixel, and over each bar's left end the word FLO in Bigdex,
+its effects. `Player.flo`, 0 to 100 (`FloRules.full`), is earned by plays (protocol 73), in the
+order of what they're worth: a made shot 20 (out of the rim), a counter, a parry, 10 (out of the
+slasher's chest), a snatch that takes the ball, held or loose, 7 (where the hand met it), a pop, the
+ball knocked loose by a blade or a strike (not the swing itself), 5 (out of where it was held), and a
+taunt 3 (as and where its ball first meets the floor); none past full. It's kept through a point
+and a burn. `Player.floBurning`, burning it, is parked: nothing sets it yet, nor spends FLO.
+
+FLO comes as orbs, as silk does off Silksong's Reaper crest (`FloOrb` in `GameScene`): one for
+each 4 earned, at least one, gliding out of where it was earned to a place 12 to 24 art pixels
+round it over 0.3 seconds, slowing, and hanging there bobbing; then they leave one by one, the
+first at 0.45 seconds, each next 0.12 to 0.17 after the one before, and after any of that
+player's still waiting, each zipping to the player's chest over 0.3 to 0.45 seconds on a path
+bowed 20 to 50 either side, quickening, trailing eight smaller, fading copies. Spheres, lit, drawn
+by the cubes' Metal pipeline (`SphereMesh`, twelve slices by eight stacks), in the player's glow
+lightened a third of the way to white, glowing. Each landing flashes the player's body and head
+their glow's own colour for 8 frames, plays `flo_absorb` (six 96-pixel frames, toned, at 15 a
+second) on their chest, riding them, one at a time, and only then puts its share on their meter:
+the meter shows what they have less what's still on its way, so it never runs ahead of the orbs.
+A gain is shown once, a rolled-back frame run again bringing no second set; a new round clears them.
+ The meters are in the HUD along the bottom, the first player's left of the middle and the
+second's right of it, shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames) a point
+an art pixel. Its inside is 100 columns from its sixth, five rows tall from its fifth, the last
+three shorter as its end slants (4, 3 and 2). The FLO missing is drawn over it, before its warp, a
+column of the plum ramp's last for each from its first column on; full, none, and MAX, lettered
+as a footstep is (white over palette 37) in Bigdex, 6 high, stands on the bar's top trailing
+corner (FLO MAX SCALE, FLO MAX X and Y on sliders); burning, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
 its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
 moved 15 right and 6 down from its place, the whole meter at 0.75. On sliders while it's settled (`FloTuning`): FLO METER SCALE, the
@@ -617,7 +639,7 @@ down, the word keeping its own; FLO BAR FRONT and FLO BAR BACK, the bar's left a
 middle's (1.5 and 0.5), and FLO BAR BEND, its middle raised by that share of its height (0.5, under
 0 lowered), a warp of 16 columns (`Onomatopoeia.skew`, the word's own too); FLO STROKE, the white stroke round the bar and the
 word together (0.5 points; the bar's art has none of its own), traced off the meter as drawn,
-warp and all, grown round and set behind it. Its four colours, the fill's top and bottom and the
+warp and all, MAX left out, grown round and set behind it. Its four colours, the fill's top and bottom and the
 outline and drop's top and bottom, two-toned at each letter's middle (the sound words' outline is
 two-toned the same way, both halves palette 29), are picked on a grid in the match's bottom leading
 corner, offline (`FloColourPicker`): FILL TOP, FILL BTM, LINE TOP or LINE BTM, then a swatch of the

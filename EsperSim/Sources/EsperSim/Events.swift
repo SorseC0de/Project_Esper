@@ -53,6 +53,9 @@ public enum MatchEvent: Equatable {
     case slashClanked(player: Int)
     /// The snatch's hand is at full stretch.
     case snatchReached(player: Int)
+    /// FLO earned, this much, from a play there: the rim of a basket, a counter, a snatch, a
+    /// pop, a taunt's ball on the floor.
+    case floGained(player: Int, amount: Int, at: Vec2)
     /// The ball knocked out of `player`'s hands by `by`.
     case popped(player: Int, by: Int)
     case ledgeGrabbed(player: Int)

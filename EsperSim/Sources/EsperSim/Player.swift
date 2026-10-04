@@ -167,9 +167,13 @@ public struct Player: Equatable {
     /// One, or two after Bio-Boba.
     public var powerLevel = 1
     /// FLO, the Functional Limit Overload: the super meter for the modes past the plain game,
-    /// 47's among them, 0 empty to 1 full. In FLO a player gets their Greateraid's effects.
-    /// Nothing fills or spends it yet.
-    public var flo = 0.0
+    /// 47's among them, 0 empty to `FloRules.full`. Earned by plays (`FloRules`); burning it,
+    /// a player gets their Greateraid's effects, to come.
+    public var flo = 0
+    /// Burning FLO: to come; nothing sets it yet.
+    public var floBurning = false
+    /// This taunt's FLO paid, at the ball's first touch of the floor.
+    var tauntPaid = false
     /// The swing's web, while swinging: where it's anchored, and the arc.
     public var webAnchor: Vec2?
     private var swingLength = 0.0
@@ -419,6 +423,7 @@ public struct Player: Equatable {
         previousState = state
         state = next
         stateTimer = 0
+        if next == .taunt { tauntPaid = false }
         if next != .slide { forcedSlide = false }
         if next != .suspended { tornadoCentre = nil }
         // A fresh stance has its stepback; coming back out of one doesn't.
@@ -1282,8 +1287,13 @@ public struct Player: Equatable {
             }
 
         case .taunt:
-            // The sauce is only for show: anything cancels it, the stick walks out of it.
+            // The sauce is only for show: anything cancels it, the stick walks out of it. Its
+            // FLO comes as the ball first meets the floor, there.
             velocity.x = 0
+            if !tauntPaid, Player.tauntBounces.contains(animationFrame.frame), let offset = BallLandmarks.offset(animationFrame) {
+                tauntPaid = true
+                gainFlo(FloRules.taunt, at: Vec2(x: position.x + offset.x / 1.6 * spec.scale * facing.sign, y: position.y), events: &events)
+            }
             if groundActions(input, jumpPressed: jumpPressed, shootPressed: shootPressed, throwPressed: throwPressed,
                              tauntPressed: false, onDefence: onDefence, events: &events) {
                 break
@@ -1786,6 +1796,16 @@ public struct Player: Equatable {
 
     /// Where the dribbled ball is when it's hanging past a ledge by more than a tile: down
     /// on the floor under it. Nil when it isn't.
+    /// FLO earned, up to full, its event with where it came from.
+    mutating func gainFlo(_ amount: Int, at source: Vec2, events: inout [MatchEvent]) {
+        let gained = min(amount, FloRules.full - flo)
+        guard gained > 0 else { return }
+        flo += gained
+        events.append(.floGained(player: index, amount: gained, at: source))
+    }
+    /// The taunt's frames the ball meets the floor on.
+    static let tauntBounces = Animation.taunt.dribbleBounceFrames()
+
     public func overhangBall(in stage: Stage) -> Vec2? {
         guard hasBall, grounded, state.isGroundState, let offset = BallLandmarks.offset(animationFrame) else { return nil }
         let ballX = position.x + offset.x / 1.6 * spec.scale * facing.sign
@@ -2246,4 +2266,14 @@ extension Player {
         }
         return travelled
     }
+}
+
+/// FLO's amounts: full, and what each play earns.
+public enum FloRules {
+    public static let full = 100
+    public static let madeShot = 20
+    public static let counter = 10
+    public static let snatch = 7
+    public static let pop = 5
+    public static let taunt = 3
 }

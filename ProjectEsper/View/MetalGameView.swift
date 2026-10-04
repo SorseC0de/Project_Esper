@@ -112,6 +112,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let cubeDepth: MTLDepthStencilState?
     private let cubeVertices: MTLBuffer?
     private var cubeInstanceBuffers: [MTLBuffer] = []
+    /// FLO's orbs, spheres drawn by the cubes' pipeline.
+    private let sphereVertices: MTLBuffer?
+    private var sphereInstanceBuffers: [MTLBuffer] = []
+    private static let sphereCapacity = 512
     private static let cubeCapacity = 2048
     /// The players' bodies and lines in white and the rims' art in green, on black, by a
     /// renderer of their own, drawn only on a frame with cubes behind them: a back leg's
@@ -210,6 +214,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         depth.isDepthWriteEnabled = true
         cubeDepth = device.makeDepthStencilState(descriptor: depth)
         cubeVertices = device.makeBuffer(bytes: CubeMesh.unit, length: CubeMesh.unit.count * MemoryLayout<CubeVertex>.stride)
+        sphereVertices = device.makeBuffer(bytes: SphereMesh.unit, length: SphereMesh.unit.count * MemoryLayout<CubeVertex>.stride)
+        sphereInstanceBuffers = (0..<3).compactMap { _ in
+            device.makeBuffer(length: GlowRenderer.sphereCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
+        }
         cubeInstanceBuffers = (0..<3).compactMap { _ in
             device.makeBuffer(length: GlowRenderer.cubeCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
         }
@@ -388,7 +396,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     /// art pixel to the scene's, depth only sorting a cube's own faces; lit from above left.
     private func drawCubes(_ commands: MTLCommandBuffer, into target: MTLTexture, depth: MTLTexture, frame: Int, now: CFTimeInterval) {
         let cubes = Array(scene.cubeInstances.prefix(GlowRenderer.cubeCapacity))
-        guard !cubes.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
+        let spheres = Array(scene.sphereInstances.prefix(GlowRenderer.sphereCapacity))
+        guard !cubes.isEmpty || !spheres.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
               let occluderTexture else { return }
         if cubes.contains(where: { $0.flags.x > 0.5 }) {
             // The bodies as they stand, for the cubes behind them to keep out of.
@@ -444,7 +453,18 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<CubeUniforms>.stride, index: 2)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<CubeUniforms>.stride, index: 2)
         encoder.setFragmentTexture(occluderTexture, index: 0)
-        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: CubeMesh.unit.count, instanceCount: cubes.count)
+        if !cubes.isEmpty {
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: CubeMesh.unit.count, instanceCount: cubes.count)
+        }
+        if !spheres.isEmpty, let sphereVertices, !sphereInstanceBuffers.isEmpty {
+            let sphereBuffer = sphereInstanceBuffers[frame % sphereInstanceBuffers.count]
+            sphereBuffer.contents().copyMemory(from: spheres, byteCount: spheres.count * MemoryLayout<CubeInstance>.stride)
+            // No culling: the depth test keeps the near half, whichever way the mesh winds.
+            encoder.setCullMode(.none)
+            encoder.setVertexBuffer(sphereVertices, offset: 0, index: 0)
+            encoder.setVertexBuffer(sphereBuffer, offset: 0, index: 1)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: SphereMesh.unit.count, instanceCount: spheres.count)
+        }
         encoder.endEncoding()
     }
 

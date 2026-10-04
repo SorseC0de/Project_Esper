@@ -46,6 +46,28 @@ enum CubeMesh {
     }()
 }
 
+enum SphereMesh {
+    /// A unit sphere round its middle, twelve slices round and eight stacks up, its corners'
+    /// normals pointing out of it so it shades round, drawn by the cubes' own pipeline.
+    static let unit: [CubeVertex] = {
+        let slices = 12, stacks = 8
+        func corner(_ slice: Int, _ stack: Int) -> CubeVertex {
+            let theta = Float(slice) / Float(slices) * 2 * .pi
+            let phi = Float(stack) / Float(stacks) * .pi
+            let normal = SIMD3<Float>(sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta))
+            return CubeVertex(position: SIMD4<Float>(normal * 0.5, 1), normal: SIMD4<Float>(normal, 0))
+        }
+        var out: [CubeVertex] = []
+        for stack in 0..<stacks {
+            for slice in 0..<slices {
+                let a = corner(slice, stack), b = corner(slice + 1, stack), c = corner(slice + 1, stack + 1), d = corner(slice, stack + 1)
+                out += [a, c, b, a, d, c]
+            }
+        }
+        return out
+    }()
+}
+
 extension simd_float4x4 {
     static func translation(_ t: SIMD3<Float>) -> simd_float4x4 {
         var m = matrix_identity_float4x4

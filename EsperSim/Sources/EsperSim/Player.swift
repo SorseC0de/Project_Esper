@@ -1566,6 +1566,9 @@ public struct Player: Equatable {
         ledge = nil
         wantsPlatform = false
         velocity = push * spec.knockbackShare
+        // It coasts on the push a moment: steered at once, the air's brake took it all off in a
+        // frame, so a push with no stun, a pulse's, barely moved the body.
+        airControlLock = max(airControlLock, spec.knockCoastFrames)
         // Knocked out of a tornado, it doesn't take the body straight back.
         if state == .suspended { tornadoCooldown = TornadoRules.jumpOutCooldownFrames }
         knockedAloft = true

@@ -60,7 +60,9 @@ drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with
 traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air in lockstep with the ground: air speed is the run's, and letting go of the stick
 in the air brakes at the ground's traction; moves that don't steer (a wall jump's lockout,
-the shot's release, the throw, the Pulsepistol shot, a stance's first frame) coast on
+a knock's first 12 frames (`FighterSpec.knockCoastFrames`; a push with no stun, a pulse's, was
+braked off the body in a frame; protocol 75), the shot's release, the throw, the Pulsepistol
+shot, a stance's first frame) coast on
 Fox's light air friction instead. Air acceleration 0.02 + 0.24; a jump with the stick held
 starts at air speed, and a double jump with the stick held sets the sideways speed, so it
 turns around. A walk speeds up gently to walking speed, but past it, or against the

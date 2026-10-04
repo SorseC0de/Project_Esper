@@ -760,3 +760,20 @@ final class PowerTests: XCTestCase {
         XCTAssertNil(match.ball.holder)
     }
 }
+
+final class KnockCoastTests: XCTestCase {
+    func testAPulseCarriesTheBodyItPushes() {
+        var match = Match()
+        match.countdown = 0
+        match.players[0].power = .pulsepistol
+        match.players[0].position = Vec2(x: 120, y: 10)
+        match.players[0].facing = .right
+        match.players[1].position = Vec2(x: 150, y: 10)
+        var most = 0.0
+        for frame in 0..<120 {
+            match.advance(inputs: [PlayerInput(shoot: frame < 2), .idle])
+            most = max(most, match.players[1].position.x - 150)
+        }
+        XCTAssertGreaterThan(most, 20, "coasting on the push, not braked off it in a frame")
+    }
+}

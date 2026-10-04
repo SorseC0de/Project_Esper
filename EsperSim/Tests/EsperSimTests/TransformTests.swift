@@ -9,7 +9,7 @@ final class TransformTests: XCTestCase {
         match.countdown = 0
         match.players[0].position = Vec2(x: 100, y: 10)
         match.players[0].grounded = true
-        match.players[0].flo = 50
+        match.players[0].flo = FloRules.full
         return match
     }
 
@@ -68,14 +68,14 @@ final class TransformTests: XCTestCase {
         XCTAssertFalse(match.players[0].inFloState, "back, the snatch just started given way")
     }
 
-    func testNoFloNoChange() {
+    func testShortOfFullNoChange() {
         var match = standing()
-        match.players[0].flo = 0
+        match.players[0].flo = FloRules.full - 1
         match.advance(inputs: [both, .idle])
         XCTAssertNotEqual(match.players[0].state, .transforming)
     }
 
-    func testLeavingLocksItOutForTenSeconds() {
+    func testLeavingLocksItOutForASecond() {
         var match = standing()
         match.players[0].inFloState = true
         match.advance(inputs: [both, .idle])
@@ -88,24 +88,17 @@ final class TransformTests: XCTestCase {
         XCTAssertTrue(match.players[0].floStateReady)
     }
 
-    func testStandingStillSpendsNothingAndRunningSpendsAStep() {
+    func testAFloEverySixTenthsOfASecondAndAFullMeterLastsAMinute() {
         var match = standing()
         match.players[0].inFloState = true
-        for _ in 0..<120 { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertEqual(match.players[0].flo, 50, "still, nothing spent")
-        let from = match.players[0].position.x
-        for _ in 0..<60 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
-        let travelled = match.players[0].position.x - from
-        XCTAssertEqual(50 - match.players[0].flo, Int(travelled / FloStateRules.stepLength), "a FLO a step")
-    }
-
-    func testRunningOutLeavesIt() {
-        var match = standing()
-        match.players[0].inFloState = true
-        match.players[0].flo = 1
-        for _ in 0..<60 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
-        XCTAssertFalse(match.players[0].inFloState)
-        XCTAssertEqual(match.players[0].floStateLockout > 0, true)
+        for _ in 0..<FloStateRules.spendFrames { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.players[0].flo, FloRules.full - 1, "standing still spends too")
+        match.players[0].flo = FloRules.full
+        for _ in 0..<(60 * 60 - 1) { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.players[0].inFloState)
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertFalse(match.players[0].inFloState, "out at a minute")
+        XCTAssertGreaterThan(match.players[0].floStateLockout, 0)
     }
 
     func testItRunsATenthFaster() {

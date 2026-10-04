@@ -131,16 +131,20 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   into the energy form; the same again in it changes straight back. The change holds the body still where it
   is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
   from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
-  it's in FloState (`Player.inFloState`, protocol 79): with any FLO at all (`floStateReady`), any time.
+  it's in FloState (`Player.inFloState`, protocol 79): only with a full meter (`floStateReady`, protocol 81), left any time.
   In it the body moves, and is hurried through its actions, a tenth faster (`FloStateRules`: the
   speed share 1.1, and one action frame in ten the clock moves two, `reached` firing for a frame
-  passed over), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent for each 15
-  units (24 art pixels) the body goes on its own, standing still spending nothing, and with none
-  left it's out. Out, by the same press or the FLO running out (a burn too), it can't go back for
-  ten seconds (`floStateLockout`, 600 frames), its skin alone flashing palette 17 every other four
+  passed over), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent every 0.6 seconds
+  (`spendFrames`, 36), so a full meter lasts a minute, and with none left it's out (protocol 80).
+  Out, by the same press or the FLO running out (a burn too), it can't go back for
+  a second (`floStateLockout`, 60 frames), its skin alone flashing palette 17 every other four
   frames meanwhile (`SpriteLibrary.skinTexture`); FloState and the lockout are kept through a point.
-  In FloState the head's and legs' cubes come out in the zone's colours, and each of the slash's
-  afterimages the next of them; the zone's cycling line round the body is parked. As drawn: seven pixels up off the
+  In FloState the cube trails run their longest (14), the head's and legs' cubes come out in the
+  zone's colours, the body is drawn in the lighter colour of the earlier builds (the glow lifted two
+  fifths to white, `EnergyColour.body`, the back parts at two thirds of it; the head in the glow), and each of the slash's
+  afterimages the next of them; the line round the body cycles the zone's colours at half its
+  thickness (`SpriteLibrary.thinOutlineTexture`: on a canvas twice as fine, each line pixel's
+  quarters against the body). As drawn: seven pixels up off the
   ground the whole change, the eyes over the body in the energy's colour, all white and glowing on
   frame 4 and the energy form from frame 5 (0-based); up to frame 4 cubes spiral up round the
   body (30 a second, 10 pixels out, at the head's cube size) and the head's and legs' cubes rise in a helix. The energy form
@@ -168,7 +172,7 @@ whatever lands on it came at, held down 12° while someone
   dunks on it with the dunker turning with it, and the net's top hanging from it and turning too.
   After Tiny Toon Adventures: ACME All-Stars (1994). A ball off the rim's top shakes it, and one
   off the backboard shakes the board with the rim riding it: a whole art pixel either way for
-  8 frames (`RimLook.jitterFrames`).
+  8 frames (`RimLook.jitterFrames`); a dunk's slam shakes the backboard while the rim's held down, and 8 frames after.
 - Hit-stop: the whole match held, nothing moving or counting down, 4 frames when a hit lands
   (a strip, a pop, a snatch off a holder), 6 when a shot goes in, 10 on a counter
   (`HitStopRules`); a made point restarts after it, so the ball's held in the net. Protocol 22.
@@ -638,7 +642,8 @@ tornado's, drops it all where the body went down, hovering at least 15 over the 
 comes within 64 art pixels (40 units) takes it, as orbs out of it, as much as they have room for. FloState spends it (above): the bar's eight frames play at twelve a second meanwhile, its stroke
 cycles palette 6 to 8, 18 to 20 and 26 to 28 a tenth of a second each (`FloTuning.floStateStroke`;
 the stroke is drawn white and coloured on its node), and for 0.3 seconds after each FLO goes tiny
-plus-shaped sparkles in the energy's colour twinkle on the fill's end, thirty a second, each popping
+plus-shaped sparkles in the energy's colour twinkle on the fill's end, laid in the bar's own pixels
+inside its warped holder (an `SKEffectNode` carrying the warp) so the warp takes them as it takes the bar, thirty a second, each popping
 up and away over 0.4 seconds (`FloTuning.sparkle…`). Only the meter's scale is on a slider.
 
 FLO comes as orbs, as silk does off Silksong's Reaper crest (`FloOrb` in `GameScene`): one for
@@ -661,11 +666,15 @@ an art pixel. Its inside is 100 columns from its sixth, five rows tall from its 
 three shorter as its end slants (4, 3 and 2). The FLO missing is drawn over it, before its warp, a
 column of the plum ramp's last for each from its first column on; full, none, and MAX, in Bigdex
 in the word's four colours, 6 high at 1.5, stands on the bar's top trailing corner, the scoreboard's
-end, 5 in from it and 15 down, flashing on and off 10
-times a second; in FloState, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
+end, 5 in from it and 15 down, steady. An A/B test on the FLO BAR picker (`FloTuning.variant`, kept between launches):
+A, as above, the missing FLO from the word's end on, the fill shrinking toward the scoreboard, MAX
+instead centred on the word's top outer corner, kept under the screen's top edge (FLO MAX SCALE, 1.5,
+and FLO MAX X and Y on sliders), and the word in palette 34 over 51 until full or in FloState; B, the missing from the scoreboard's end back, the fill
+growing out of the word, MAX on the bar's corner as above, the word in its own colours throughout; in FloState, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
 its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
-moved 15 right and 6 down from its place, the whole meter at 0.75, on the FLO METER SCALE slider
+moved 15 right and 6 down from its place, the whole meter at 0.75, on the FLO METER SCALE slider,
+and moved up or down on FLO METER Y (0, points)
 (`FloTuning`, its other numbers baked): the bar and the word each at 1 and 1.25 of it; the bar
 squeezed to 0.75 across and 1.5 down, the word keeping its own; the bar's left and right ends' heights over its
 middle's (1.5 and 0.5), and its middle raised by half its height,
@@ -1487,8 +1496,8 @@ hoop's art coming with them. Each backboard is a box solid to bodies and the bal
 deep (10 units, `Stage.backboardFace` and the rest), its front edge on the art's board,
 3.125 units behind the rim's centre, its bottom 16 art pixels under the board's middle and its
 top up to the block's underside, closing the gap between them (protocol 69): the rim's back third is the board's,
-and a shot there comes off it. The blocks' tops are out of every jump's reach; a ball that settles
-on one goes back to its spawn (`Stage.outOfReach`, by the out-of-the-world rule). The WALLS button, under HITBOX, draws the stage's solids over the world: tiles red,
+and a shot there comes off it. The blocks' tops send nothing back: the court has no
+`Stage.outOfReach` (protocol 80). The WALLS button, under HITBOX, draws the stage's solids over the world: tiles red,
 one-ways yellow, solid boxes cyan, where a ball goes back magenta. Below
 the floor's row everything is the outline black, #242234. Every stage's hoops are two layers on one 48-pixel canvas,
 drawn to the players' scale and kept together as drawn, all under the bodies: `backboard`, then

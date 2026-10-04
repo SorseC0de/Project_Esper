@@ -174,14 +174,14 @@ public struct Player: Equatable {
     /// FloState, the energy form.
     public var flo = 0
     /// In FloState: changed into the energy form with throw and shoot together, faster, quicker
-    /// and higher (`FloStateRules`), a FLO spent a step; left the same way, or when it runs out.
+    /// and higher (`FloStateRules`), a FLO spent every 0.6 seconds; left the same way, or when it runs out.
     public var inFloState = false
     /// Frames before FloState can be entered again, from when it was left.
     public var floStateLockout = 0
-    /// How far the body has gone in FloState since its last FLO spent, and where it was last frame.
-    var floStateTravel = 0.0
-    var floStateLastPosition: Vec2?
-    public var floStateReady: Bool { flo > 0 && floStateLockout == 0 }
+    /// Frames in FloState since its last FLO spent.
+    var floStateClock = 0
+    /// Entered only at full; left any time.
+    public var floStateReady: Bool { flo >= FloRules.full && floStateLockout == 0 }
     /// This taunt's FLO paid, at the ball's first touch of the floor.
     var tauntPaid = false
     /// The swing's web, while swinging: where it's anchored, and the arc.
@@ -1377,8 +1377,7 @@ public struct Player: Equatable {
             velocity = .zero
             if stateTimer >= TransformRules.frames {
                 inFloState = true
-                floStateTravel = 0
-                floStateLastPosition = position
+                floStateClock = 0
                 enter(grounded ? .idle : .air)
             }
 
@@ -1818,17 +1817,14 @@ public struct Player: Equatable {
     /// Where the dribbled ball is when it's hanging past a ledge by more than a tile: down
     /// on the floor under it. Nil when it isn't.
     /// FLO earned, up to full, its event with where it came from.
-    /// FloState a frame on: a FLO spent for each step's length gone, the way the body's own
-    /// moves took it, a knock's not counted; left when there's none to spend. The lockout counting down.
+    /// FloState a frame on: a FLO spent every `spendFrames`; left when there's none to spend.
+    /// The lockout counting down.
     private mutating func stepFloState() {
         if floStateLockout > 0 { floStateLockout -= 1 }
         guard inFloState else { return }
-        if let last = floStateLastPosition, hitStun == 0 {
-            floStateTravel += min(position.distance(to: last), FloStateRules.mostTravelAFrame)
-        }
-        floStateLastPosition = position
-        while floStateTravel >= FloStateRules.stepLength, flo > 0 {
-            floStateTravel -= FloStateRules.stepLength
+        floStateClock += 1
+        if floStateClock >= FloStateRules.spendFrames {
+            floStateClock = 0
             flo -= 1
         }
         if flo <= 0 { leaveFloState() }
@@ -1837,8 +1833,7 @@ public struct Player: Equatable {
     mutating func leaveFloState() {
         inFloState = false
         floStateLockout = FloStateRules.lockoutFrames
-        floStateTravel = 0
-        floStateLastPosition = nil
+        floStateClock = 0
     }
 
     mutating func gainFlo(_ amount: Int, at source: Vec2, events: inout [MatchEvent]) {
@@ -2315,18 +2310,16 @@ extension Player {
 }
 
 /// FloState: a tenth faster on the move and through actions, a tenth higher off every jump; a
-/// FLO spent for each step's length gone (24 art pixels); ten seconds before it can be entered
-/// again once left.
+/// FLO spent every 0.6 seconds, so a full meter lasts a minute; entered only at full, and not
+/// for a second once left.
 public enum FloStateRules {
     public static let speedShare = 1.1
     /// The push for a tenth more height, which goes as the push squared.
     public static let jumpPush = 1.1.squareRoot()
     /// One frame in this many, an action's clock moves two.
     public static let actionHurryInterval = 10
-    public static let stepLength = 15.0
-    /// A frame's travel counted at most this far, so a respawn or a warp isn't a hundred steps.
-    public static let mostTravelAFrame = 4.0
-    public static let lockoutFrames = 600
+    public static let spendFrames = 36
+    public static let lockoutFrames = 60
 }
 
 /// FLO's amounts: full, and what each play earns: a made shot, a counter, a snatch that steals,

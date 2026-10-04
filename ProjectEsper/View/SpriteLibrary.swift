@@ -178,6 +178,7 @@ final class SpriteLibrary {
         if let outline = result.outline { textures["_outline"] = outline }
         if let glowMask = result.glowMask { textures["_glowmask"] = glowMask }
         if let skin = result.skin { textures["_skin"] = skin }
+        if let thinOutline = result.thinOutline { textures["_thinoutline"] = thinOutline }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize
         let landmarks = result.centres.mapValues { centre in
@@ -216,6 +217,12 @@ final class SpriteLibrary {
     func outlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
         _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_outline"]
+    }
+
+    /// The line round a player frame at half its thickness, in white, on a canvas twice as fine.
+    func thinOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
+        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_thinoutline"]
     }
 
     /// A human's skin alone from a player frame, in white, on the same canvas as the body. Nil
@@ -426,10 +433,10 @@ final class SpriteLibrary {
     /// centre of each glowing part found. The ball is looked for only where the sheet
     /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
     /// with no line, and the body is drawn and lined without them.
-    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, centres: [BodyPart: CGPoint]) {
+    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
         // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
@@ -564,6 +571,24 @@ final class SpriteLibrary {
             }
         }
 
+        // The line at half its thickness, on a canvas twice as fine: of each line pixel only the
+        // quarters against the body, so it hugs it. FloState's rainbow line.
+        var thinOutline: SKTexture?
+        if detach, lined.contains(true), let (thinContext, thinPixels) = makeCanvas(width: width * 2, height: height * 2) {
+            let body = (0..<count).map { pixels[$0 * 4 + 3] != 0 && !lined[$0] }
+            func isBody(_ x: Int, _ y: Int) -> Bool { x >= 0 && y >= 0 && x < width && y < height && body[y * width + x] }
+            for pixel in 0..<count where lined[pixel] {
+                let x = pixel % width, y = pixel / width
+                for half in 0..<4 {
+                    let dx = half % 2 == 0 ? -1 : 1, dy = half / 2 == 0 ? -1 : 1
+                    guard isBody(x + dx, y) || isBody(x, y + dy) || isBody(x + dx, y + dy) else { continue }
+                    let index = ((y * 2 + half / 2) * width * 2 + x * 2 + half % 2) * 4
+                    for channel in 0..<4 { thinPixels[index + channel] = 255 }
+                }
+            }
+            thinOutline = thinContext.makeImage().map { SKTexture(cgImage: $0) }
+        }
+
         // With `detach`, the line comes off onto its own canvas in white, so the view can
         // draw it in any colour, frame by frame.
         var outline: SKTexture?
@@ -612,9 +637,9 @@ final class SpriteLibrary {
             if any { skin = skinContext.makeImage().map { SKTexture(cgImage: $0) } }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, [:]) }
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, centres)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres)
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

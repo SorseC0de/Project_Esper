@@ -106,10 +106,10 @@ struct Look: Hashable {
             for part in HumanLook.clothed { colours[part] = part.isBack ? HumanLook.backClothes : HumanLook.clothes }
             for part in HumanLook.glowingParts { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         } else {
-            // The energy form: the whole body in the energy's colour as the head is, the back
-            // parts down its ramp as a human's back leg is.
-            for part in BodyPart.allCases where !part.isEnergy {
-                colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow
+            // The energy form: the body in the lighter colour of the earlier builds, the back
+            // parts down its ramp as a human's back leg is; the head in the energy's own.
+            for part in BodyPart.allCases where !part.isEnergy && !part.glows(human: false) {
+                colours[part] = part.isBack ? Look.scaled(body, HumanLook.backLegShare) : body
             }
         }
         return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body)

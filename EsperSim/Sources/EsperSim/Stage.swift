@@ -611,10 +611,6 @@ public struct Stage: Equatable {
                                          max: Vec2(x: max(face, back), y: underside)))
         }
         stage.extras = stage.fixedExtras
-        // The blocks' tops are out of every jump's reach: a ball that settles there goes back.
-        let top = Double(rows.upperBound + 1) * tileSize
-        stage.outOfReach = [Box(min: Vec2(x: tileSize, y: top), max: Vec2(x: Double(5 - shift.toWall) * tileSize, y: top + tileSize)),
-                            Box(min: Vec2(x: Double(29 + shift.toWall) * tileSize, y: top), max: Vec2(x: 33 * tileSize, y: top + tileSize))]
         return stage
     }
 

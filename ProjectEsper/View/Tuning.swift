@@ -286,6 +286,8 @@ enum GoalpostTuning {
 /// from its place, in points.
 enum FloTuning {
     nonisolated(unsafe) static var meterScale: CGFloat = 0.75
+    /// The whole meter moved up from level with the scoreboard, in points.
+    nonisolated(unsafe) static var meterY: CGFloat = 0
     static let barScale: CGFloat = 1
     static let wordScale: CGFloat = 1.25
     static let leftSkew: CGFloat = 1.5
@@ -311,6 +313,21 @@ enum FloTuning {
     /// second over purple's last.
     static let colours = Onomatopoeia.Colours(upper: EsperPalette.gold.highlight, lower: EsperPalette.blue.highlight,
                                               lineUpper: EsperPalette.plum.light, lineLower: EsperPalette.purple.shadow)
+    /// Bar A's word short of full: palette 34 over 51, outlined as ever.
+    static let shortColours = Onomatopoeia.Colours(upper: PixelPalette.colours[34], lower: PixelPalette.colours[51],
+                                                   lineUpper: EsperPalette.plum.light, lineLower: EsperPalette.purple.shadow)
+    /// The A/B test of the bar: A's missing FLO from the word's end on, MAX on the word's top
+    /// outer corner, moved and sized on its sliders; B's missing from the far end back. Kept
+    /// between launches.
+    enum BarVariant: Int { case emptiesFromWord, fillsFromWord }
+    private static let variantKey = "esper.floBarVariant"
+    static var variant: BarVariant {
+        get { BarVariant(rawValue: UserDefaults.standard.integer(forKey: variantKey)) ?? .emptiesFromWord }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: variantKey) }
+    }
+    nonisolated(unsafe) static var cornerMaxScale: CGFloat = 1.5
+    nonisolated(unsafe) static var cornerMaxX: CGFloat = 0
+    nonisolated(unsafe) static var cornerMaxY: CGFloat = 0
     /// In FloState the stroke cycles these, a tenth of a second each.
     static let floStateStroke: [RGB] = [6, 7, 8, 18, 19, 20, 26, 27, 28].map { PixelPalette.colours[$0] }
     static let floStateStrokeStepSeconds = 0.1

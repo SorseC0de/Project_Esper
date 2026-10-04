@@ -1078,11 +1078,18 @@ final class GameScene: SKScene {
     /// its eight frames playing.
     private var floMeters: [SKSpriteNode] = []
     private var floBars: [SKSpriteNode] = []
+    /// Each bar's holder, warped, its sparkles inside it with the bar so the warp takes them too.
+    private var floBarHolders: [SKEffectNode] = []
     private var floMaxWords: [SKSpriteNode] = []
+    /// Bar A's word, short of full and at it.
+    private var floWordsShort: [SKSpriteNode] = []
+    private var floWordsFull: [SKSpriteNode] = []
     /// What each bar shows now, its frame and FLO, so it's drawn again only when they change.
     private var floShown: [(frame: Int, flo: Int)] = []
     private static let floPointsPerPixel: CGFloat = 1
     private static let floGap: CGFloat = 20
+    /// The scoreboard's middle under the screen's top edge (past its insets), in points.
+    private static let scoreboardBelowTop: CGFloat = 16
     private static let floWordHeight: CGFloat = 14
     /// How far onto the bar the word reaches, and how far above its middle it sits, in points.
     private static let floWordOverlap: CGFloat = 6
@@ -1094,9 +1101,8 @@ final class GameScene: SKScene {
     private static let floLineHeights = [98: 4, 99: 3, 100: 2]
     /// The burn's frames a second.
     private static let floBurnFramesPerSecond = 12.0
-    /// MAX: its cap height in points, before its slider's scale, and how often it flashes.
+    /// MAX: its cap height in points, before its slider's scale.
     private static let floMaxHeight: CGFloat = 6
-    private static let floMaxFlashesPerSecond = 10.0
 
     private var floStrokes: [SKSpriteNode] = []
     private let ciContext = CIContext()
@@ -1105,7 +1111,8 @@ final class GameScene: SKScene {
     /// A frame of the bar with `flo` gathered: one line over it for each FLO missing, from its
     /// first column on.
     private func floBarTexture(frame: Int, flo: Int) -> SKTexture {
-        let key = frame * 1000 + flo
+        let variant = FloTuning.variant
+        let key = (variant == .fillsFromWord ? 100_000 : 0) + frame * 1000 + flo
         if let made = floBarTextures[key] { return made }
         let sheet = sprites.texture("flo_meter", frame).cgImage()
         let width = sheet.width, height = sheet.height
@@ -1116,10 +1123,12 @@ final class GameScene: SKScene {
             context.interpolationQuality = .none
             context.draw(sheet, in: CGRect(x: 0, y: 0, width: width, height: height))
             context.setFillColor(SKColor(rgb: EsperPalette.plum.shadow).cgColor)
-            for line in 1...empty {
-                let tall = GameScene.floLineHeights[line] ?? 5
+            // A: the missing from the first column on; B: from the last back.
+            let columns = variant == .fillsFromWord ? (FloRules.full - empty + 1)...FloRules.full : 1...empty
+            for column in columns {
+                let tall = GameScene.floLineHeights[column] ?? 5
                 // The picture's rows run up from its bottom: the inside's top row, down `tall`.
-                context.fill(CGRect(x: GameScene.floFirstColumn + line - 1, y: height - GameScene.floTopRow - tall, width: 1, height: tall))
+                context.fill(CGRect(x: GameScene.floFirstColumn + column - 1, y: height - GameScene.floTopRow - tall, width: 1, height: tall))
             }
             texture = context.makeImage().map { SKTexture(cgImage: $0) } ?? SKTexture(cgImage: sheet)
         } else {
@@ -1167,9 +1176,14 @@ final class GameScene: SKScene {
             if now < floSpendingUntil[index, default: 0], Double.random(in: 0..<1) < FloTuning.sparklesPerSecond * GameScene.stepSeconds {
                 sparkleFloBar(index, flo: flo)
             }
-            // MAX flashes, on and off quickly, while it's full.
-            let flashOn = Int(CACurrentMediaTime() * GameScene.floMaxFlashesPerSecond * 2) % 2 == 0
-            floMaxWords[index].isHidden = flo < FloRules.full || floMeters[index].isHidden || !flashOn
+            // MAX, steady, while it's full.
+            floMaxWords[index].isHidden = flo < FloRules.full || floMeters[index].isHidden
+            // Bar A's word goes from its short colours to its own at full, and is lit throughout FloState.
+            if floWordsShort.indices.contains(index) {
+                let lit = flo >= FloRules.full || player.inFloState
+                floWordsShort[index].isHidden = lit
+                floWordsFull[index].isHidden = !lit
+            }
             guard floShown.indices.contains(index), floShown[index].frame != frame || floShown[index].flo != flo else { continue }
             floShown[index] = (frame, flo)
             floBars[index].texture = floBarTexture(frame: frame, flo: flo)
@@ -1197,27 +1211,28 @@ final class GameScene: SKScene {
         return texture
     }()
 
-    /// A sparkle where the bar's fill ends: its column on the sheet, through the bar's warp, in the meter.
+    /// A sparkle where the bar's fill ends, in the bar's own pixels before its warp: the warp
+    /// takes it as it takes the bar.
     private func sparkleFloBar(_ index: Int, flo: Int) {
-        guard floBars.indices.contains(index), floMeters.indices.contains(index), flo > 0 else { return }
-        let bar = floBars[index]
+        guard floBars.indices.contains(index), floBarHolders.indices.contains(index), flo > 0 else { return }
+        let bar = floBars[index], holder = floBarHolders[index]
         let width = bar.size.width / GameScene.floPointsPerPixel, height = bar.size.height / GameScene.floPointsPerPixel
-        let empty = FloRules.full - min(flo, FloRules.full)
-        let across = (CGFloat(GameScene.floFirstColumn + empty) + CGFloat.random(in: -1...1)) / width
-        let up = 1 - (CGFloat(GameScene.floTopRow) + CGFloat.random(in: 0...5)) / height
-        // The warp, as `Onomatopoeia.skew` lays it: each column stretched about the middle, the middle raised.
-        let stretch = FloTuning.barFront + (FloTuning.barBack - FloTuning.barFront) * across
-        let warped = 0.5 + (up - 0.5) * stretch + sin(across * .pi) * FloTuning.barBend
+        let filled = min(flo, FloRules.full)
+        // A's fill ends at its first filled column, B's after its last.
+        let column = CGFloat(GameScene.floFirstColumn) + CGFloat(FloTuning.variant == .fillsFromWord ? filled : FloRules.full - filled)
+        let row = CGFloat(GameScene.floTopRow) + CGFloat.random(in: 0...5)
         let node = SKSpriteNode(texture: floSparkleTexture)
         node.size = CGSize(width: FloTuning.sparkleSize, height: FloTuning.sparkleSize)
         node.color = SKColor(rgb: sprites.look(for: index).glow)
         node.colorBlendFactor = 1
         node.blendMode = .add
-        node.position = CGPoint(x: bar.position.x + (across - 0.5) * bar.size.width * bar.xScale,
-                                y: bar.position.y + (warped - 0.5) * bar.size.height * bar.yScale)
-        node.zPosition = 3
+        node.position = CGPoint(x: (column + CGFloat.random(in: -1...1) - width / 2) * GameScene.floPointsPerPixel,
+                                y: (height / 2 - row) * GameScene.floPointsPerPixel)
+        node.zPosition = 1
         node.setScale(0)
-        floMeters[index].addChild(node)
+        // Square before the warp, against the holder's squeeze.
+        node.userData = ["xScale": 1 / holder.xScale, "yScale": 1 / holder.yScale]
+        holder.addChild(node)
         floSparkles.append(FloSparkle(node: node))
     }
 
@@ -1227,7 +1242,9 @@ final class GameScene: SKScene {
             var sparkle = sparkle
             sparkle.age += GameScene.stepSeconds
             guard sparkle.age < FloTuning.sparkleSeconds, sparkle.node.parent != nil else { sparkle.node.removeFromParent(); return nil }
-            sparkle.node.setScale(CGFloat(sin(sparkle.age / FloTuning.sparkleSeconds * .pi)))
+            let pop = CGFloat(sin(sparkle.age / FloTuning.sparkleSeconds * .pi))
+            sparkle.node.xScale = pop * (sparkle.node.userData?["xScale"] as? CGFloat ?? 1)
+            sparkle.node.yScale = pop * (sparkle.node.userData?["yScale"] as? CGFloat ?? 1)
             sparkle.node.position.y += 0.1
             return sparkle
         }
@@ -1288,9 +1305,13 @@ final class GameScene: SKScene {
         floMeters.forEach { $0.removeFromParent() }
         floMeters = []
         floBars = []
+        floBarHolders = []
         floMaxWords = []
+        floWordsShort = []
+        floWordsFull = []
         floShown = []
         guard (EffectSheets.frames["flo_meter"] ?? 0) > 0 else { return }
+        let barA = FloTuning.variant == .emptiesFromWord
         for index in 0..<2 {
             // The second player's mirrored: the bar against the scoreboard, the word outside it.
             let mirrored = index == 1
@@ -1302,28 +1323,52 @@ final class GameScene: SKScene {
             let barWidth = bar.size.width * FloTuning.barScale * FloTuning.xScale, barHeight = bar.size.height * FloTuning.barScale * FloTuning.yScale
             // Either side of the scoreboard, level with it.
             meter.position = CGPoint(x: side * (scorePlateHalfWidth + GameScene.floGap + barWidth * FloTuning.meterScale / 2),
-                                     y: circles.position.y - UIPiece.plateBlack.faceRise * UITuning.shared.scale(.hud, .panels) * 0.5)
+                                     y: circles.position.y - UIPiece.plateBlack.faceRise * UITuning.shared.scale(.hud, .panels) * 0.5 + FloTuning.meterY)
             meter.zPosition = 6
-            bar.xScale = FloTuning.barScale * FloTuning.xScale * (mirrored ? -1 : 1)
-            bar.yScale = FloTuning.barScale * FloTuning.yScale
-            bar.warpGeometry = Onomatopoeia.skew(left: FloTuning.barFront, right: FloTuning.barBack, bend: FloTuning.barBend, columns: 16)
-            meter.addChild(bar)
-            // The word skewed the same on both: only its place mirrors.
-            let word = Onomatopoeia.still("FLO", face: .englishDex, colours: FloTuning.colours, height: GameScene.floWordHeight, growsLeft: true,
-                                          left: FloTuning.leftSkew, right: FloTuning.rightSkew)
-            // Its small end on the bar's outer end, then where the sliders move it, mirrored for the second.
-            word.anchorPoint = CGPoint(x: mirrored ? 0 : 1, y: 0.5)
-            word.position = CGPoint(x: side * (barWidth / 2 - GameScene.floWordOverlap - FloTuning.offsetX), y: GameScene.floWordLift + FloTuning.offsetY)
-            word.setScale(FloTuning.wordScale)
-            word.zPosition = 1
-            meter.addChild(word)
-            // MAX, lettered as a footstep is, in Bigdex, on the bar's top trailing corner.
+            // The bar in a warped holder, squeezed and mirrored there, so its sparkles warp with it.
+            let holder = SKEffectNode()
+            holder.shouldEnableEffects = true
+            holder.xScale = FloTuning.barScale * FloTuning.xScale * (mirrored ? -1 : 1)
+            holder.yScale = FloTuning.barScale * FloTuning.yScale
+            holder.warpGeometry = Onomatopoeia.skew(left: FloTuning.barFront, right: FloTuning.barBack, bend: FloTuning.barBend, columns: 16)
+            holder.addChild(bar)
+            meter.addChild(holder)
+            // The word skewed the same on both: only its place mirrors. Bar A's is in its short
+            // colours until full.
+            var words: [SKSpriteNode] = []
+            for colours in barA ? [FloTuning.shortColours, FloTuning.colours] : [FloTuning.colours] {
+                let word = Onomatopoeia.still("FLO", face: .englishDex, colours: colours, height: GameScene.floWordHeight, growsLeft: true,
+                                              left: FloTuning.leftSkew, right: FloTuning.rightSkew)
+                // Its small end on the bar's outer end, then moved, mirrored for the second.
+                word.anchorPoint = CGPoint(x: mirrored ? 0 : 1, y: 0.5)
+                word.position = CGPoint(x: side * (barWidth / 2 - GameScene.floWordOverlap - FloTuning.offsetX), y: GameScene.floWordLift + FloTuning.offsetY)
+                word.setScale(FloTuning.wordScale)
+                word.zPosition = 1
+                meter.addChild(word)
+                words.append(word)
+            }
+            if barA {
+                floWordsShort.append(words[0])
+                floWordsFull.append(words[1])
+            }
+            // MAX, lettered as a footstep is, in Bigdex: bar A's on the word's top outer corner,
+            // on its sliders; bar B's on the bar's top trailing corner, against the scoreboard.
             let full = Onomatopoeia.still("MAX", face: .englishDex, colours: FloTuning.colours, height: GameScene.floMaxHeight, growsLeft: false,
                                           left: 1, right: 1)
             full.anchorPoint = CGPoint(x: 0.5, y: 0)
-            // The bar's trailing end, against the scoreboard.
-            full.position = CGPoint(x: -side * (barWidth / 2 + FloTuning.maxX), y: barHeight / 2 + FloTuning.maxY)
-            full.setScale(FloTuning.maxScale)
+            if barA {
+                // Centred on the corner, kept under the screen's top edge, which the meters sit just
+                // below; then moved by the sliders, unclamped.
+                full.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+                full.setScale(FloTuning.cornerMaxScale)
+                let wordFrame = words[0].frame
+                let screenTop = (circles.position.y + GameScene.scoreboardBelowTop - meter.position.y) / FloTuning.meterScale
+                full.position = CGPoint(x: (mirrored ? wordFrame.maxX : wordFrame.minX) - side * FloTuning.cornerMaxX,
+                                        y: min(wordFrame.maxY, screenTop - full.frame.height / 2) + FloTuning.cornerMaxY)
+            } else {
+                full.position = CGPoint(x: -side * (barWidth / 2 + FloTuning.maxX), y: barHeight / 2 + FloTuning.maxY)
+                full.setScale(FloTuning.maxScale)
+            }
             full.zPosition = 2
             full.isHidden = shownFlo(index) < FloRules.full
             meter.addChild(full)
@@ -1331,6 +1376,7 @@ final class GameScene: SKScene {
             hud.addChild(meter)
             floMeters.append(meter)
             floBars.append(bar)
+            floBarHolders.append(holder)
             floMaxWords.append(full)
             floShown.append((0, shownFlo(index)))
         }
@@ -2793,6 +2839,15 @@ final class GameScene: SKScene {
         // The FLO meters' look, while it's settled.
         let relayoutFlo: () -> Void = { [weak self] in self?.layoutFloMeters() }
         controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO METER Y", range: -60...60, notch: 1, value: Float(FloTuning.meterY)) { FloTuning.meterY = CGFloat($0); relayoutFlo() }
+        // The A/B test: A empties from the word's end, MAX on the word; B fills from it.
+        controls.addPicker(title: "FLO BAR", options: ["A", "B"], selected: FloTuning.variant == .emptiesFromWord ? 0 : 1) { index in
+            FloTuning.variant = index == 0 ? .emptiesFromWord : .fillsFromWord
+            relayoutFlo()
+        }
+        controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.cornerMaxY)) { FloTuning.cornerMaxY = CGFloat($0); relayoutFlo() }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
@@ -2850,7 +2905,7 @@ final class GameScene: SKScene {
         hud.addChild(controls)
         self.controls = controls
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - insets.top - 8)
-        circles.position = CGPoint(x: 0, y: halfHeight - insets.top - 16)
+        circles.position = CGPoint(x: 0, y: halfHeight - insets.top - GameScene.scoreboardBelowTop)
         circlesOverCam.position = circles.position
         drawSeries()
         presentScreen()
@@ -4833,6 +4888,8 @@ final class GameScene: SKScene {
     /// they have, to 14 at full.
     private func cubeTrail(_ index: Int) -> Double {
         let flo = match.players.indices.contains(index) ? match.players[index].flo : 0
+        // In FloState, always the longest.
+        if match.players.indices.contains(index), match.players[index].inFloState { return ParticleLook.cubeTrailMost }
         return min(Double(ParticleLook.cubeTrail) + Double(flo / 10), ParticleLook.cubeTrailMost)
     }
 
@@ -6213,14 +6270,17 @@ final class GameScene: SKScene {
 
             // The line round the body, in the look's outline or cycling through the zone's.
             let outlineNode = outlineNodes[index]
-            if let outline = sprites.outlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) {
+            // In FloState, half as thick, in the zone's colours.
+            let floStateLine = player.inFloState && player.frozen == 0
+            if let outline = floStateLine ? sprites.thinOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
+                : sprites.outlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) {
                 outlineNode.isHidden = false
                 outlineNode.texture = outline
                 outlineNode.size = node.size
                 outlineNode.anchorPoint = node.anchorPoint
                 // White as the body is, growing or parrying; ice, frozen; else the look's or the zone's.
-                // The zone's colours cycle round it in the zone; FloState's turn of it is parked.
-                let cycling = ZoneTuning.inTheZone
+                // The zone's colours cycle round it in the zone and in FloState.
+                let cycling = ZoneTuning.inTheZone || floStateLine
                 let lineColour = cycling ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
                 // In the parry frames the line goes the bright version of the body's colour.
                 outlineNode.color = growing ? .white
@@ -6657,6 +6717,8 @@ final class GameScene: SKScene {
                 // The rim gives only for the dunk's last two frames.
                 let dunkedOn = match.players.contains { $0.state == .dunking && $0.dunkHoop == index && Animation.dunkEntry(at: $0.stateTimer).index >= Animation.dunkSequence.count - 2 }
                 rimSpin[index] += ((dunkedOn ? RimLook.dunkDip : 0) - rimDip[index]) * RimLook.stiffness - rimSpin[index] * RimLook.damping
+                // The slam shakes the backboard too, the rim riding it.
+                if dunkedOn { boardJitter[index] = RimLook.jitterFrames }
                 rimDip[index] += rimSpin[index]
                 let artPoint = GameScene.hoopArtPoint(for: match.stage.hoops[index], on: match.stage.features.look)
                 let pivot = HoopTuning.pivot(for: match.stage.features.look)

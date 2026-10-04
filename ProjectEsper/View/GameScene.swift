@@ -4054,10 +4054,10 @@ final class GameScene: SKScene {
                 burst.setScale(GameScene.zBurstDiameter / max(burst.size.width, 1))
                 glowers.addChild(burst)
             case .galeBurst(let at):
-                // The burst's sheet once, twice the tornado's size, squeezed as the gale was.
+                // The burst's sheet once at its own size, not squeezed as the gale is.
                 let frames = (0..<ElementsArt.burstFrames).map { sprites.texture("tornado_burst", $0) }
                 let burst = SKSpriteNode(texture: frames[0])
-                burst.size = CGSize(width: ElementsArt.burstSide * GameScene.galeScale.width, height: ElementsArt.burstSide * GameScene.galeScale.height)
+                burst.size = CGSize(width: ElementsArt.burstSide, height: ElementsArt.burstSide)
                 burst.position = SpriteLibrary.point(at)
                 burst.zPosition = -1
                 burst.run(.sequence([.animate(with: frames, timePerFrame: 1 / Double(TornadoRules.burstSheetFramesPerSecond)), .removeFromParent()]))

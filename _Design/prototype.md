@@ -423,7 +423,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   `DunkTuning` on.
 - Gale Ale (M, a biomorph; protocol 63). Its tornados (`Gale`, `GaleRules`, `Match.gales`) are two
   thirds the Elements' tornado's height and a third wider, 40 by 20, drawn as its sheet squeezed
-  the same way, and burst on its burst sheet at twice that; they don't glow. A double jump leaves
+  the same way, and burst on its burst sheet at the sheet's own size, 96 square, not squeezed;
+  they don't glow. A double jump leaves
   a still one under the feet it jumped from, for two seconds (`stillFrames`, 120), that holds whoever
   comes into it out of the air and the loose ball as the Elements' do (the jumper let rise clear
   of it first, the tornado's jump-out cooldown); it never burns. Level two: the snatch, on its spark

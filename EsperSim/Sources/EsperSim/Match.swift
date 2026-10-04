@@ -130,6 +130,7 @@ public struct Match: Equatable {
             let input = index < inputs.count ? inputs[index] : .idle
             players[index].speedShare = (ball.holder != nil && ball.holder != index ? DefenceRules.speedShare : 1)
                 * (players[index].power == .surfSoda ? SurfRules.speedShare : 1)
+                * (players[index].inFloState ? FloStateRules.speedShare : 1)
             let opponentX = players.indices.first { $0 != index }.map { players[$0].position.x }
             guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX,
                                                    ballHolder: ball.holder, ballOwner: ball.isLive ? ball.owner : nil,
@@ -238,6 +239,9 @@ public struct Match: Equatable {
             players[index].power = was.power
             players[index].powerLevel = was.powerLevel
             players[index].flo = was.flo
+            // FloState and its lockout are kept through a point, as FLO is.
+            players[index].inFloState = was.inFloState
+            players[index].floStateLockout = was.floStateLockout
         }
         platforms = []
         refreshExtras()
@@ -632,6 +636,8 @@ public struct Match: Equatable {
         players[index] = Player(spec: was.spec, index: index, position: spawnPoint(index), facing: stage.playerFacings[index])
         players[index].power = was.power
         players[index].powerLevel = was.powerLevel
+        // Its FLO left behind, FloState left with it.
+        players[index].floStateLockout = was.inFloState ? FloStateRules.lockoutFrames : was.floStateLockout
         // Its FLO left behind where it went down, hovering clear of the lava.
         if was.flo > 0 {
             let lift = stage.features.lavaSurface.map { $0 + FloRules.bundleLift } ?? -Double.infinity

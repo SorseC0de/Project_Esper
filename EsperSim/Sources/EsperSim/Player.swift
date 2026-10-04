@@ -122,9 +122,12 @@ public struct Player: Equatable {
     public var stateTimer = 0
     /// The clock held this frame, so a check for reaching a frame doesn't fire twice.
     public private(set) var timerHeld = false
+    /// How far the clock moved this step: none held, two when FloState hurries an action.
+    private var timerStep = 1
     private var actionTicks = 0
-    /// The state's clock on `frame` this step, and not held on it from the last.
-    public func reached(_ frame: Int) -> Bool { stateTimer == frame && !timerHeld }
+    private var floStateActionTicks = 0
+    /// The state's clock came to `frame` this step, or past it in the one step it moved.
+    public func reached(_ frame: Int) -> Bool { stateTimer >= frame && stateTimer - timerStep < frame }
     public var grounded = true
     public var wallSide: Facing?
     /// The wall beside, if the board can ride it: not a car.
@@ -167,11 +170,18 @@ public struct Player: Equatable {
     /// One, or two after Bio-Boba.
     public var powerLevel = 1
     /// FLO, the Functional Limit Overload: the super meter for the modes past the plain game,
-    /// 47's among them, 0 empty to `FloRules.full`. Earned by plays (`FloRules`); burning it,
-    /// a player gets their Greateraid's effects, to come.
+    /// 47's among them, 0 empty to `FloRules.full`. Earned by plays (`FloRules`); spent in
+    /// FloState, the energy form.
     public var flo = 0
-    /// Burning FLO: to come; nothing sets it yet.
-    public var floBurning = false
+    /// In FloState: changed into the energy form with throw and shoot together, faster, quicker
+    /// and higher (`FloStateRules`), a FLO spent a step; left the same way, or when it runs out.
+    public var inFloState = false
+    /// Frames before FloState can be entered again, from when it was left.
+    public var floStateLockout = 0
+    /// How far the body has gone in FloState since its last FLO spent, and where it was last frame.
+    var floStateTravel = 0.0
+    var floStateLastPosition: Vec2?
+    public var floStateReady: Bool { flo > 0 && floStateLockout == 0 }
     /// This taunt's FLO paid, at the ball's first touch of the floor.
     var tauntPaid = false
     /// The swing's web, while swinging: where it's anchored, and the arc.
@@ -214,9 +224,6 @@ public struct Player: Equatable {
     /// A slide on a slope going down the way it faces: the body rides it on its own, and only a
     /// jump gets out, until flat ground or open air.
     public var forcedSlide = false
-    /// In the energy form; and whether the change is there to be made (parked: never, for now).
-    public var transformed = false
-    public var transformReady = false
     /// Held in a tornado: where its middle is, for the body's middle to be drawn to; and
     /// frames left before a tornado can take the body again after it jumped out.
     public var tornadoCentre: Vec2?
@@ -359,12 +366,14 @@ public struct Player: Equatable {
     var gravity: Double { spec.gravity * (underwater ? (velocity.y > 0 ? 1.0 / 8 : 0.5) : 1) }
     var fallSpeed: Double { spec.fallSpeed * waterShare }
     /// The jumps' push, and off a wall, at half under water.
-    var fullHopVelocity: Double { spec.fullHopVelocity * waterShare }
-    var shortHopVelocity: Double { spec.shortHopVelocity * waterShare }
-    var doubleJumpVelocity: Double { spec.doubleJumpVelocity * waterShare }
-    var thirdJumpVelocity: Double { spec.thirdJumpVelocity * waterShare }
+    /// FloState's jumps rise a tenth higher.
+    var jumpShare: Double { waterShare * (inFloState ? FloStateRules.jumpPush : 1) }
+    var fullHopVelocity: Double { spec.fullHopVelocity * jumpShare }
+    var shortHopVelocity: Double { spec.shortHopVelocity * jumpShare }
+    var doubleJumpVelocity: Double { spec.doubleJumpVelocity * jumpShare }
+    var thirdJumpVelocity: Double { spec.thirdJumpVelocity * jumpShare }
     var wallJumpHorizontal: Double { spec.wallJumpHorizontal * waterShare }
-    var wallJumpVertical: Double { spec.wallJumpVertical * waterShare }
+    var wallJumpVertical: Double { spec.wallJumpVertical * jumpShare }
     /// Every change of speed a frame, picking up and braking, at half under water.
     var traction: Double { spec.traction * waterShare }
     var walkAcceleration: Double { spec.walkAcceleration * waterShare }
@@ -510,7 +519,14 @@ public struct Player: Equatable {
             waterTicks += 1
             if waterTicks % 2 == 0 { timerHeld = true }
         }
-        if !timerHeld { stateTimer += 1 }
+        // FloState hurries an action: one frame in `actionHurryInterval` the clock moves two.
+        timerStep = timerHeld ? 0 : 1
+        if inFloState, state.isAction, !timerHeld {
+            floStateActionTicks += 1
+            if floStateActionTicks % FloStateRules.actionHurryInterval == 0 { timerStep = 2 }
+        }
+        stateTimer += timerStep
+        stepFloState()
         if boltCooldown > 0 { boltCooldown -= 1 }
         if strikeCooldown > 0 { strikeCooldown -= 1 }
         if pulseCooldown > 0 { pulseCooldown -= 1 }
@@ -616,10 +632,10 @@ public struct Player: Equatable {
             throwPressed = false
             input.shootButtons = 0
             input.throwBall = false
-            if transformed {
-                transformed = false
+            if inFloState {
+                leaveFloState()
                 if ![.idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .air].contains(state) { enter(grounded ? .idle : .air) }
-            } else if transformReady {
+            } else if floStateReady {
                 velocity = .zero
                 enter(.transforming)
             }
@@ -1360,7 +1376,9 @@ public struct Player: Equatable {
             // Held still where it started, off the ground, until the sheet's played through.
             velocity = .zero
             if stateTimer >= TransformRules.frames {
-                transformed = true
+                inFloState = true
+                floStateTravel = 0
+                floStateLastPosition = position
                 enter(grounded ? .idle : .air)
             }
 
@@ -1800,6 +1818,29 @@ public struct Player: Equatable {
     /// Where the dribbled ball is when it's hanging past a ledge by more than a tile: down
     /// on the floor under it. Nil when it isn't.
     /// FLO earned, up to full, its event with where it came from.
+    /// FloState a frame on: a FLO spent for each step's length gone, the way the body's own
+    /// moves took it, a knock's not counted; left when there's none to spend. The lockout counting down.
+    private mutating func stepFloState() {
+        if floStateLockout > 0 { floStateLockout -= 1 }
+        guard inFloState else { return }
+        if let last = floStateLastPosition, hitStun == 0 {
+            floStateTravel += min(position.distance(to: last), FloStateRules.mostTravelAFrame)
+        }
+        floStateLastPosition = position
+        while floStateTravel >= FloStateRules.stepLength, flo > 0 {
+            floStateTravel -= FloStateRules.stepLength
+            flo -= 1
+        }
+        if flo <= 0 { leaveFloState() }
+    }
+
+    mutating func leaveFloState() {
+        inFloState = false
+        floStateLockout = FloStateRules.lockoutFrames
+        floStateTravel = 0
+        floStateLastPosition = nil
+    }
+
     mutating func gainFlo(_ amount: Int, at source: Vec2, events: inout [MatchEvent]) {
         let gained = min(amount, FloRules.full - flo)
         guard gained > 0 else { return }
@@ -2271,6 +2312,21 @@ extension Player {
         }
         return travelled
     }
+}
+
+/// FloState: a tenth faster on the move and through actions, a tenth higher off every jump; a
+/// FLO spent for each step's length gone (24 art pixels); ten seconds before it can be entered
+/// again once left.
+public enum FloStateRules {
+    public static let speedShare = 1.1
+    /// The push for a tenth more height, which goes as the push squared.
+    public static let jumpPush = 1.1.squareRoot()
+    /// One frame in this many, an action's clock moves two.
+    public static let actionHurryInterval = 10
+    public static let stepLength = 15.0
+    /// A frame's travel counted at most this far, so a respawn or a warp isn't a hundred steps.
+    public static let mostTravelAFrame = 4.0
+    public static let lockoutFrames = 600
 }
 
 /// FLO's amounts: full, and what each play earns: a made shot, a counter, a snatch that steals,

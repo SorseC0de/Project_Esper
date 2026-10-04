@@ -197,7 +197,10 @@ enum ZoneTuning {
     static let stepSeconds = 0.25
 
     /// The outline's colour at `time`.
-    static func outline(at time: Double) -> SKColor {
+    static func outline(at time: Double) -> SKColor { cycle(colours, at: time, stepSeconds: stepSeconds) }
+
+    /// `colours` eased through in turn, `stepSeconds` each, at `time`.
+    static func cycle(_ colours: [RGB], at time: Double, stepSeconds: Double) -> SKColor {
         let phase = time / stepSeconds
         let index = Int(phase.rounded(.down)) % colours.count
         let share = CGFloat(phase - phase.rounded(.down))
@@ -308,6 +311,15 @@ enum FloTuning {
     /// second over purple's last.
     static let colours = Onomatopoeia.Colours(upper: EsperPalette.gold.highlight, lower: EsperPalette.blue.highlight,
                                               lineUpper: EsperPalette.plum.light, lineLower: EsperPalette.purple.shadow)
+    /// In FloState the stroke cycles these, a tenth of a second each.
+    static let floStateStroke: [RGB] = [6, 7, 8, 18, 19, 20, 26, 27, 28].map { PixelPalette.colours[$0] }
+    static let floStateStrokeStepSeconds = 0.1
+    /// Spending FLO, sparkles at the fill's end: this many a second, each this long, in points across.
+    static let sparklesPerSecond = 30.0
+    static let sparkleSeconds = 0.4
+    static let sparkleSize: CGFloat = 3
+    /// How long after a FLO is spent the sparkles keep coming.
+    static let sparkleAfterSpendSeconds = 0.3
 }
 
 enum DunkTuning {

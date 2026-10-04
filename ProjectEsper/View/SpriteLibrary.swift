@@ -177,6 +177,7 @@ final class SpriteLibrary {
         if let energy = result.energy { textures["_energy"] = energy }
         if let outline = result.outline { textures["_outline"] = outline }
         if let glowMask = result.glowMask { textures["_glowmask"] = glowMask }
+        if let skin = result.skin { textures["_skin"] = skin }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize
         let landmarks = result.centres.mapValues { centre in
@@ -215,6 +216,13 @@ final class SpriteLibrary {
     func outlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
         _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_outline"]
+    }
+
+    /// A human's skin alone from a player frame, in white, on the same canvas as the body. Nil
+    /// when the frame shows none.
+    func skinTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
+        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_skin"]
     }
 
     /// A strip's frame as a silhouette in the player's energy: every painted pixel white,
@@ -418,10 +426,10 @@ final class SpriteLibrary {
     /// centre of each glowing part found. The ball is looked for only where the sheet
     /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
     /// with no line, and the body is drawn and lined without them.
-    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, centres: [BodyPart: CGPoint]) {
+    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, [:]) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
         // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
@@ -590,9 +598,23 @@ final class SpriteLibrary {
             glowMask = maskContext.makeImage().map { SKTexture(cgImage: $0) }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, [:]) }
+        // A human's skin alone in white, as it's drawn, the crown's grade left out: for the
+        // FloState lockout's flash.
+        var skin: SKTexture?
+        if detach, look.human, let (skinContext, skinPixels) = makeCanvas(width: width, height: height) {
+            var any = false
+            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] && !lined[pixel]
+                && parts[pixel].map({ HumanLook.skin[$0] != nil }) == true {
+                let index = pixel * 4
+                for channel in 0..<4 { skinPixels[index + channel] = 255 }
+                any = true
+            }
+            if any { skin = skinContext.makeImage().map { SKTexture(cgImage: $0) } }
+        }
+
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, [:]) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, centres)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, centres)
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

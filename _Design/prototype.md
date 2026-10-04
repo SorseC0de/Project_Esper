@@ -131,9 +131,16 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   into the energy form; the same again in it changes straight back. The change holds the body still where it
   is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
   from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
-  it's `transformed`. Parked: nobody has the change there to make (`transformReady` off, protocol 49); given it, it's shown by
-  the zone's cycling colours round the line, and the head's and legs' cubes in the zone's colours,
-  until it's made. As drawn: seven pixels up off the
+  it's in FloState (`Player.inFloState`, protocol 79): with any FLO at all (`floStateReady`), any time.
+  In it the body moves, and is hurried through its actions, a tenth faster (`FloStateRules`: the
+  speed share 1.1, and one action frame in ten the clock moves two, `reached` firing for a frame
+  passed over), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent for each 15
+  units (24 art pixels) the body goes on its own, standing still spending nothing, and with none
+  left it's out. Out, by the same press or the FLO running out (a burn too), it can't go back for
+  ten seconds (`floStateLockout`, 600 frames), its skin alone flashing palette 17 every other four
+  frames meanwhile (`SpriteLibrary.skinTexture`); FloState and the lockout are kept through a point.
+  In FloState the head's and legs' cubes come out in the zone's colours, and each of the slash's
+  afterimages the next of them; the zone's cycling line round the body is parked. As drawn: seven pixels up off the
   ground the whole change, the eyes over the body in the energy's colour, all white and glowing on
   frame 4 and the energy form from frame 5 (0-based); up to frame 4 cubes spiral up round the
   body (30 a second, 10 pixels out, at the head's cube size) and the head's and legs' cubes rise in a helix. The energy form
@@ -628,7 +635,11 @@ off another player, the counter, the steal and the hit, comes out of their pool,
 it, the earner getting it all either way. It's kept through a point. A burn, the lava's or a fire
 tornado's, drops it all where the body went down, hovering at least 15 over the lava
 (`Match.floBundles`), `flo_absorb` looping on it in the dropper's colour; any player whose chest
-comes within 64 art pixels (40 units) takes it, as orbs out of it, as much as they have room for. `Player.floBurning`, burning it, is parked: nothing sets it yet, nor spends FLO.
+comes within 64 art pixels (40 units) takes it, as orbs out of it, as much as they have room for. FloState spends it (above): the bar's eight frames play at twelve a second meanwhile, its stroke
+cycles palette 6 to 8, 18 to 20 and 26 to 28 a tenth of a second each (`FloTuning.floStateStroke`;
+the stroke is drawn white and coloured on its node), and for 0.3 seconds after each FLO goes tiny
+plus-shaped sparkles in the energy's colour twinkle on the fill's end, thirty a second, each popping
+up and away over 0.4 seconds (`FloTuning.sparkle…`). Only the meter's scale is on a slider.
 
 FLO comes as orbs, as silk does off Silksong's Reaper crest (`FloOrb` in `GameScene`): one for
 each FLO earned, gliding out of where it was earned to a place 12 to 24 art pixels
@@ -650,16 +661,15 @@ an art pixel. Its inside is 100 columns from its sixth, five rows tall from its 
 three shorter as its end slants (4, 3 and 2). The FLO missing is drawn over it, before its warp, a
 column of the plum ramp's last for each from its first column on; full, none, and MAX, in Bigdex
 in the word's four colours, 6 high at 1.5, stands on the bar's top trailing corner, the scoreboard's
-end, 5 in from it and 15 down (FLO MAX SCALE, FLO MAX X and Y on sliders), flashing on and off 7.5
-times a second; burning, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
+end, 5 in from it and 15 down, flashing on and off 10
+times a second; in FloState, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
 its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
-moved 15 right and 6 down from its place, the whole meter at 0.75. On sliders while it's settled (`FloTuning`): FLO METER SCALE, the
-whole meter's; FLO BAR SCALE and FLO WORD SCALE, each its own; FLO LEFT SKEW and FLO RIGHT SKEW;
-FLO OFFSET X and Y, the word moved, in points; FLO X SCALE and FLO Y SCALE, the bar squeezed across and
-down, the word keeping its own; FLO BAR FRONT and FLO BAR BACK, the bar's left and right ends' heights over its
-middle's (1.5 and 0.5), and FLO BAR BEND, its middle raised by that share of its height (0.5, under
-0 lowered), a warp of 16 columns (`Onomatopoeia.skew`, the word's own too); FLO STROKE, the stroke round the bar and the
+moved 15 right and 6 down from its place, the whole meter at 0.75, on the FLO METER SCALE slider
+(`FloTuning`, its other numbers baked): the bar and the word each at 1 and 1.25 of it; the bar
+squeezed to 0.75 across and 1.5 down, the word keeping its own; the bar's left and right ends' heights over its
+middle's (1.5 and 0.5), and its middle raised by half its height,
+a warp of 16 columns (`Onomatopoeia.skew`, the word's own too); the stroke round the bar and the
 word together, in the player's glow (1.5 points; the bar's art has none of its own), traced off the meter as drawn,
 warp and all, MAX left out, grown round and set behind it. Its four colours, the fill's top and bottom and the
 outline and drop's top and bottom, two-toned at each letter's middle (the sound words' outline is
@@ -1006,7 +1016,7 @@ from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 5 hig
 
 | | JP | EN |
 |---|---|---|
-| Basket, confirmed, beside the net toward the court (no word over 18 high: a basket's, a hit's, an explosion's, the powers' all 18) | パサッ！ | SWISH! |
+| Basket, confirmed, beside the net toward the court (no word over 16 high: a basket's, a hit's, an explosion's, the powers' all 16) | パサッ！ | SWISH! |
 | Three | ザシュッ！！ | SWOOSH!! |
 | Dunk | ドガァン！！ | SLAM!! |
 | Body hit | ドゴッ！ | WHAM! |

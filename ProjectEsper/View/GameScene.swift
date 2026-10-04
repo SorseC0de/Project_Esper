@@ -191,6 +191,9 @@ final class GameScene: SKScene {
     /// stunned by the blade.
     private var stunBodies: [SKSpriteNode] = []
     private var stunHeads: [SKSpriteNode] = []
+    /// The skin alone over each body, flashing palette 17 while FloState is locked out.
+    private var lockoutSkins: [SKSpriteNode] = []
+    private static let lockoutSkinColour = PixelPalette.colours[17]
     private var headShown: [CGPoint] = []
     /// Each body's lean in flight, radians, eased toward where it's going, and how much of
     /// the hover it's showing.
@@ -896,6 +899,13 @@ final class GameScene: SKScene {
                 figure.addChild(flash)
                 self[keyPath: flashes].append(flash)
             }
+            let skin = SKSpriteNode()
+            skin.color = SKColor(rgb: GameScene.lockoutSkinColour)
+            skin.colorBlendFactor = 1
+            skin.zPosition = 0.09
+            skin.isHidden = true
+            figure.addChild(skin)
+            lockoutSkins.append(skin)
             headShown.append(.zero)
             bodyTilt.append(0)
             hover.append(0)
@@ -1141,8 +1151,22 @@ final class GameScene: SKScene {
     private func updateFloMeters() {
         for index in floBars.indices where match.players.indices.contains(index) {
             let flo = shownFlo(index)
-            let frame = match.players[index].floBurning
-                ? Int(CACurrentMediaTime() * GameScene.floBurnFramesPerSecond) % max(EffectSheets.frames["flo_meter"] ?? 1, 1) : 0
+            let player = match.players[index]
+            let now = CACurrentMediaTime()
+            let frame = player.inFloState
+                ? Int(now * GameScene.floBurnFramesPerSecond) % max(EffectSheets.frames["flo_meter"] ?? 1, 1) : 0
+            // In FloState the stroke cycles its colours; else it's the player's glow.
+            if floStrokes.indices.contains(index) {
+                floStrokes[index].color = player.inFloState
+                    ? ZoneTuning.cycle(FloTuning.floStateStroke, at: now, stepSeconds: FloTuning.floStateStrokeStepSeconds)
+                    : SKColor(rgb: sprites.look(for: index).glow)
+            }
+            // Spending it, sparkles at the fill's end a moment after each FLO goes.
+            if player.inFloState, let last = floLastSeen[index], player.flo < last { floSpendingUntil[index] = now + FloTuning.sparkleAfterSpendSeconds }
+            floLastSeen[index] = player.flo
+            if now < floSpendingUntil[index, default: 0], Double.random(in: 0..<1) < FloTuning.sparklesPerSecond * GameScene.stepSeconds {
+                sparkleFloBar(index, flo: flo)
+            }
             // MAX flashes, on and off quickly, while it's full.
             let flashOn = Int(CACurrentMediaTime() * GameScene.floMaxFlashesPerSecond * 2) % 2 == 0
             floMaxWords[index].isHidden = flo < FloRules.full || floMeters[index].isHidden || !flashOn
@@ -1152,8 +1176,66 @@ final class GameScene: SKScene {
         }
     }
 
+    /// FLO spent in FloState: tiny sparkles in the energy's colour, twinkling on the fill's end.
+    private struct FloSparkle {
+        var node: SKSpriteNode
+        var age = 0.0
+    }
+    private var floSparkles: [FloSparkle] = []
+    private var floLastSeen: [Int: Int] = [:]
+    private var floSpendingUntil: [Int: Double] = [:]
+    /// A five-pixel plus, its middle the brightest.
+    private lazy var floSparkleTexture: SKTexture = {
+        let side = 5
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        for pixel in 0..<(side * side) where pixel % side == 2 || pixel / side == 2 {
+            let level: UInt8 = pixel == 12 ? 255 : 170
+            for channel in 0..<4 { pixels[pixel * 4 + channel] = level }
+        }
+        let texture = SKTexture(data: Data(pixels), size: CGSize(width: side, height: side))
+        texture.filteringMode = .nearest
+        return texture
+    }()
+
+    /// A sparkle where the bar's fill ends: its column on the sheet, through the bar's warp, in the meter.
+    private func sparkleFloBar(_ index: Int, flo: Int) {
+        guard floBars.indices.contains(index), floMeters.indices.contains(index), flo > 0 else { return }
+        let bar = floBars[index]
+        let width = bar.size.width / GameScene.floPointsPerPixel, height = bar.size.height / GameScene.floPointsPerPixel
+        let empty = FloRules.full - min(flo, FloRules.full)
+        let across = (CGFloat(GameScene.floFirstColumn + empty) + CGFloat.random(in: -1...1)) / width
+        let up = 1 - (CGFloat(GameScene.floTopRow) + CGFloat.random(in: 0...5)) / height
+        // The warp, as `Onomatopoeia.skew` lays it: each column stretched about the middle, the middle raised.
+        let stretch = FloTuning.barFront + (FloTuning.barBack - FloTuning.barFront) * across
+        let warped = 0.5 + (up - 0.5) * stretch + sin(across * .pi) * FloTuning.barBend
+        let node = SKSpriteNode(texture: floSparkleTexture)
+        node.size = CGSize(width: FloTuning.sparkleSize, height: FloTuning.sparkleSize)
+        node.color = SKColor(rgb: sprites.look(for: index).glow)
+        node.colorBlendFactor = 1
+        node.blendMode = .add
+        node.position = CGPoint(x: bar.position.x + (across - 0.5) * bar.size.width * bar.xScale,
+                                y: bar.position.y + (warped - 0.5) * bar.size.height * bar.yScale)
+        node.zPosition = 3
+        node.setScale(0)
+        floMeters[index].addChild(node)
+        floSparkles.append(FloSparkle(node: node))
+    }
+
+    /// Each sparkle a frame on: popping up and back to nothing as it rises a little.
+    private func stepFloSparkles() {
+        floSparkles = floSparkles.compactMap { sparkle in
+            var sparkle = sparkle
+            sparkle.age += GameScene.stepSeconds
+            guard sparkle.age < FloTuning.sparkleSeconds, sparkle.node.parent != nil else { sparkle.node.removeFromParent(); return nil }
+            sparkle.node.setScale(CGFloat(sin(sparkle.age / FloTuning.sparkleSeconds * .pi)))
+            sparkle.node.position.y += 0.1
+            return sparkle
+        }
+    }
+
     /// The stroke round a meter, the bar and the word as one shape: the meter drawn as it
-    /// is, warp and all, made the player's glow, grown round by the stroke and set behind it. MAX has its own.
+    /// is, warp and all, made white, grown round by the stroke, set behind it and coloured the
+    /// player's glow, or cycling in FloState. MAX has its own.
     private func floStroke(round meter: SKNode, colour rgb: RGB) -> SKSpriteNode? {
         let width = FloTuning.stroke
         guard width > 0, let view = hudScene.view else { return nil }
@@ -1167,11 +1249,11 @@ final class GameScene: SKScene {
         let reach = (width * pixels).rounded(.up)
         let input = CIImage(cgImage: picture)
         let padded = input.extent.insetBy(dx: -reach, dy: -reach)
-        // The player's glow wherever it's drawn, then grown.
+        // White wherever it's drawn, then grown.
         let white = input.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputBiasVector": CIVector(x: CGFloat((rgb >> 16) & 0xFF) / 255, y: CGFloat((rgb >> 8) & 0xFF) / 255, z: CGFloat(rgb & 0xFF) / 255, w: 0),
+            "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
         ]).applyingFilter("CIPremultiply")
         // Grown round, not square, so a slanted edge comes out smooth rather than stepped.
         let grown = white.composited(over: CIImage(color: .clear).cropped(to: padded))
@@ -1180,7 +1262,10 @@ final class GameScene: SKScene {
         guard let outline = ciContext.createCGImage(grown, from: padded) else { return nil }
         let texture = SKTexture(cgImage: outline)
         texture.filteringMode = .nearest
+        // Drawn white and coloured on the node, so FloState can cycle it.
         let node = SKSpriteNode(texture: texture)
+        node.color = SKColor(rgb: rgb)
+        node.colorBlendFactor = 1
         node.size = CGSize(width: frame.width + reach * 2 / pixels, height: frame.height + reach * 2 / pixels)
         node.position = CGPoint(x: frame.midX, y: frame.midY)
         node.zPosition = meter.zPosition - 0.1
@@ -4503,9 +4588,10 @@ final class GameScene: SKScene {
     /// The body where it is, in its colour's bright version, held a moment then fading behind
     /// it: the stepback's trail (and the jump shot's, the throw's, the slash's), as Zeus Juice's bolt leaves one.
     private static let afterimageAlpha: CGFloat = 0.9
+    private var slashAfterimages: [Int: Int] = [:]
     private static let afterimageHold = 0.1
     private static let afterimageFade = 0.3
-    private func spawnAfterimage(of body: SKSpriteNode, player index: Int) {
+    private func spawnAfterimage(of body: SKSpriteNode, player index: Int, colour: SKColor? = nil) {
         guard let texture = body.texture else { return }
         let ghost = SKSpriteNode(texture: texture)
         ghost.size = CGSize(width: abs(body.size.width), height: abs(body.size.height))
@@ -4513,7 +4599,7 @@ final class GameScene: SKScene {
         ghost.position = body.position
         ghost.xScale = body.xScale
         ghost.zRotation = body.zRotation
-        ghost.color = SKColor(rgb: sprites.look(for: index).bright)
+        ghost.color = colour ?? SKColor(rgb: sprites.look(for: index).bright)
         ghost.colorBlendFactor = 1
         ghost.alpha = GameScene.afterimageAlpha
         ghost.zPosition = -1
@@ -4691,11 +4777,9 @@ final class GameScene: SKScene {
                 credit[slot] -= 1
                 let node = SKSpriteNode(texture: stream.frames[0])
                 node.size = CGSize(width: stream.size, height: stream.size)
-                // In the zone a head's particles come out in the zone's colours.
-                // And while the change is there to be made.
-                let changeReady = match.players.indices.contains(index) && match.players[index].transformReady
-                    && !match.players[index].transformed && match.players[index].state != .transforming
-                let zoneTint = (ZoneTuning.inTheZone || changeReady) && stream.zoneTinted && trailing == nil ? ZoneTuning.colours.randomElement().map { SKColor(rgb: $0) } : nil
+                // In the zone a head's particles come out in the zone's colours, and in FloState.
+                let inFloState = match.players.indices.contains(index) && match.players[index].inFloState
+                let zoneTint = (ZoneTuning.inTheZone || inFloState) && stream.zoneTinted && trailing == nil ? ZoneTuning.colours.randomElement().map { SKColor(rgb: $0) } : nil
                 if let tint = zoneTint ?? stream.tints.randomElement() ?? stream.tint {
                     node.color = tint
                     node.colorBlendFactor = 1
@@ -5997,6 +6081,7 @@ final class GameScene: SKScene {
     private func render() {
         sectionMark = CACurrentMediaTime()
         strokeFloMeters()
+        stepFloSparkles()
         stepFloOrbs()
         updateFloMeters()
         drawFloBundles()
@@ -6017,7 +6102,7 @@ final class GameScene: SKScene {
             // Frozen, the body is drawn in the ice look.
             // Changing, the energy form from the sheet's sixth frame on.
             let changing = player.state == .transforming
-            let energyForm = player.transformed || (changing && frame.frame >= GameScene.transformEnergyFrame)
+            let energyForm = player.inFloState || (changing && frame.frame >= GameScene.transformEnergyFrame)
             let drawnAs = player.frozen > 0 ? SpriteLibrary.icePlayer : (energyForm ? SpriteLibrary.transformedPlayer(index) : index)
             node.texture = sprites.texture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
             // Titan Tea's size, grown into after its port-in.
@@ -6107,6 +6192,21 @@ final class GameScene: SKScene {
                 flash.zRotation = source.zRotation
             }
 
+            // Locked out of FloState, the skin alone flashes palette 17, every other four frames.
+            let skinFlash = lockoutSkins[index]
+            let lockoutOn = player.floStateLockout > 0 && !player.inFloState && (player.floStateLockout / 4) % 2 == 0
+            let skinTexture = lockoutOn ? sprites.skinTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) : nil
+            skinFlash.isHidden = skinTexture == nil || node.isHidden
+            if let skinTexture {
+                skinFlash.texture = skinTexture
+                skinFlash.size = node.size
+                skinFlash.anchorPoint = node.anchorPoint
+                skinFlash.position = node.position
+                skinFlash.xScale = node.xScale
+                skinFlash.yScale = node.yScale
+                skinFlash.zRotation = node.zRotation
+            }
+
             // Prone in the snipe, the cursor where it's aimed.
             snipeCursors[index].isHidden = player.state != .gunSnipe
             if player.state == .gunSnipe { snipeCursors[index].position = SpriteLibrary.point(player.snipeCursor) }
@@ -6119,8 +6219,8 @@ final class GameScene: SKScene {
                 outlineNode.size = node.size
                 outlineNode.anchorPoint = node.anchorPoint
                 // White as the body is, growing or parrying; ice, frozen; else the look's or the zone's.
-                // The zone's colours cycle round it in the zone, and while the change is there to be made.
-                let cycling = ZoneTuning.inTheZone || (player.transformReady && !player.transformed && !changing)
+                // The zone's colours cycle round it in the zone; FloState's turn of it is parked.
+                let cycling = ZoneTuning.inTheZone
                 let lineColour = cycling ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
                 // In the parry frames the line goes the bright version of the body's colour.
                 outlineNode.color = growing ? .white
@@ -6327,8 +6427,12 @@ final class GameScene: SKScene {
             // The stepback, a jump out of the shooting stance, the throw and the slash leave the trail.
             let trailing = player.state == .stepback || player.state == .throwing || (player.state == .shootStance && !player.grounded)
             if trailing, match.frame % 2 == 0 { spawnAfterimage(of: node, player: index) }
-            // The slash's trail is its blade, not the body.
-            if player.state == .slashing, match.frame % 2 == 0, !energyNodes[index].isHidden { spawnAfterimage(of: energyNodes[index], player: index) }
+            // The slash's trail is its blade, not the body; in FloState each one the next of the zone's colours.
+            if player.state == .slashing, match.frame % 2 == 0, !energyNodes[index].isHidden {
+                slashAfterimages[index, default: 0] += 1
+                let rainbow = player.inFloState ? ZoneTuning.colours[slashAfterimages[index, default: 0] % ZoneTuning.colours.count] : nil
+                spawnAfterimage(of: energyNodes[index], player: index, colour: rainbow.map { SKColor(rgb: $0) })
+            }
             if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {
                 spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: -player.facing.sign * 4, y: 2)), count: 2, spread: 6)
             }

@@ -529,14 +529,14 @@ final class PowerTests: XCTestCase {
         XCTAssertNil(match.ball.holder)
     }
 
-    func testLevelTwoShootAndThrowTogetherMakeAFireballThatBursts() {
+    func testLevelTwoDownAndThrowMakeAFireballThatBursts() {
         var match = with(.blazingBoba, level: 2)
         match.players[1].position.x = 60
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .slashing, "shoot alone is still the slash")
         var summon = with(.blazingBoba, level: 2)
         summon.players[1].position.x = 60
-        summon.advance(inputs: [PlayerInput(shoot: true, throwBall: true), .idle])
+        summon.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
         XCTAssertTrue(summon.players[0].hasFireball)
         XCTAssertTrue(summon.events.contains(.fireballMade(player: 0)))
         match = summon

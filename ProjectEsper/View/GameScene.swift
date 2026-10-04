@@ -312,6 +312,10 @@ final class GameScene: SKScene {
     private var supportNodes: [SKSpriteNode] = []
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
+    /// Frames left of a hoop's shake: the rim's, off the ball on it, and the backboard's,
+    /// off the ball against it, the rim riding it.
+    private var rimJitter: [Int] = []
+    private var boardJitter: [Int] = []
     /// Each rim's dip in degrees, down at the front, and how fast it's turning.
     private var rimDip: [CGFloat] = []
     private var rimSpin: [CGFloat] = []
@@ -1082,7 +1086,7 @@ final class GameScene: SKScene {
     private static let floBurnFramesPerSecond = 12.0
     /// MAX: its cap height in points, before its slider's scale, and how often it flashes.
     private static let floMaxHeight: CGFloat = 6
-    private static let floMaxFlashesPerSecond = 7.5
+    private static let floMaxFlashesPerSecond = 10.0
 
     private var floStrokes: [SKSpriteNode] = []
     private let ciContext = CIContext()
@@ -1621,6 +1625,8 @@ final class GameScene: SKScene {
             stageGround.addChild(rim)
             rimNodes.append(rim)
             rimFlash.append(0)
+            rimJitter.append(0)
+            boardJitter.append(0)
             rimDip.append(0)
             rimSpin.append(0)
             nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
@@ -1662,6 +1668,8 @@ final class GameScene: SKScene {
         supportNodes = []
         rimNodes = []
         rimFlash = []
+        rimJitter = []
+        boardJitter = []
         rimDip = []
         rimSpin = []
         nets = []
@@ -2137,6 +2145,22 @@ final class GameScene: SKScene {
         var framesPerSecond: Double { self == .shark ? 6 : 8 }
         /// The way its art faces: the shark's left.
         var facesRight: Bool { self != .shark }
+        /// Bubbles off its tail a second, each.
+        var trailBubblesPerSecond: Double { self == .shark ? 6 : 3 }
+    }
+
+    /// Now and then, by `perSecond`, a small bubble off the back of `node`, the end away from
+    /// `heading` (1 right, -1 left), in its layer.
+    private func trailBubble(behind node: SKSpriteNode, heading: CGFloat, perSecond: Double, lift: CGFloat = 0) {
+        guard let parent = node.parent, Double.random(in: 0..<1) < perSecond * GameScene.stepSeconds else { return }
+        let back = node.frame.midX - heading * node.frame.width / 2
+        let point = CGPoint(x: back + .random(in: -2...2), y: node.position.y + lift + .random(in: -3...3))
+        let bubble = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", Int.random(in: 0...2)))
+        bubble.position = point
+        bubble.zPosition = node.zPosition + 0.01
+        parent.addChild(bubble)
+        bubbles.append(Bubble(node: bubble, baseX: point.x, age: 0, life: .random(in: 1...2), rise: .random(in: 8...16),
+                              wobble: .random(in: 1...2), wobbleRate: .random(in: 0.5...1)))
     }
     private struct Swimmer {
         var kind: SeaLife
@@ -2268,6 +2292,8 @@ final class GameScene: SKScene {
                 swimmer.node.xScale = facing
                 let frame = Int((swimmer.age + swimmer.phase) * swimmer.kind.framesPerSecond) % swimmer.frames.count
                 swimmer.node.texture = swimmer.frames[frame]
+                // A trail of bubbles off the tail, behind the way it swims.
+                trailBubble(behind: swimmer.node, heading: swimmer.speed > 0 ? 1 : -1, perSecond: swimmer.kind.trailBubblesPerSecond)
             }
             return swimmer
         }
@@ -2312,6 +2338,7 @@ final class GameScene: SKScene {
     private static let crabSecondsBetween = 20.0
     private static let crabFramesPerSecond = 6.0
     private static let crabZ: CGFloat = 4.2
+    private static let crabBubblesPerSecond = 3.0
 
     private func stepCrab(wet: Bool) {
         let frameCount = EffectSheets.frames["crab"] ?? 0
@@ -2326,6 +2353,7 @@ final class GameScene: SKScene {
             node.position.x = x
             crabClock += GameScene.stepSeconds
             node.texture = sprites.texture("crab", Int(crabClock * GameScene.crabFramesPerSecond) % frameCount)
+            trailBubble(behind: node, heading: crabLeftward ? -1 : 1, perSecond: GameScene.crabBubblesPerSecond, lift: node.size.height / 2)
             // Off the far side: done, and the next goes the other way.
             if x < -node.size.width || x > width + node.size.width {
                 node.removeFromParent()
@@ -2680,21 +2708,6 @@ final class GameScene: SKScene {
         // The FLO meters' look, while it's settled.
         let relayoutFlo: () -> Void = { [weak self] in self?.layoutFloMeters() }
         controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO X SCALE", range: 0.25...2, notch: 0.01, value: Float(FloTuning.xScale)) { FloTuning.xScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO Y SCALE", range: 0.25...2, notch: 0.01, value: Float(FloTuning.yScale)) { FloTuning.yScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO BAR SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.barScale)) { FloTuning.barScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO WORD SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.wordScale)) { FloTuning.wordScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO LEFT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.leftSkew)) { FloTuning.leftSkew = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO RIGHT SKEW", range: 0.5...2, notch: 0.01, value: Float(FloTuning.rightSkew)) { FloTuning.rightSkew = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO OFFSET X", range: -60...60, notch: 1, value: Float(FloTuning.offsetX)) { FloTuning.offsetX = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO BAR FRONT", range: 0.25...2, notch: 0.01, value: Float(FloTuning.barFront)) { FloTuning.barFront = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO BAR BACK", range: 0.25...2, notch: 0.01, value: Float(FloTuning.barBack)) { FloTuning.barBack = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO BAR BEND", range: -1...1, notch: 0.01, value: Float(FloTuning.barBend)) { FloTuning.barBend = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.maxScale)) { FloTuning.maxScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.maxX)) { FloTuning.maxX = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.maxY)) { FloTuning.maxY = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO STROKE", range: 0...4, notch: 0.25, value: Float(FloTuning.stroke)) { FloTuning.stroke = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO OFFSET Y", range: -30...30, notch: 1, value: Float(FloTuning.offsetY)) { FloTuning.offsetY = CGFloat($0); relayoutFlo() }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
@@ -3347,7 +3360,8 @@ final class GameScene: SKScene {
             defer { footPhases[index] = frame }
             guard footPhases[index] != frame, (running ? GameScene.runFootfalls : GameScene.walkFootfalls).contains(frame) else { continue }
             let dust: Effect = running ? .dustRun : .dustWalk
-            if dust.available, !match.stage.features.underwater {
+            // A power's own trail, Blazing Boba's flames, stands in for the dust.
+            if dust.available, !match.stage.features.underwater, !player.layingFlames {
                 // Kicked up behind the feet.
                 spawn(dust, at: player.position + Vec2(x: -player.facing.sign * GameScene.dustBehind, y: 0),
                       flipped: player.facing == .left, player: index, scale: bodyScale(index))
@@ -4168,8 +4182,11 @@ final class GameScene: SKScene {
             case .caught(let index):
                 let player = match.players[index]
                 spawn(.catchSpark, at: player.position + Vec2(x: player.facing.sign * 2, y: 0), flipped: player.facing == .left, player: index)
-            case .rimBounced(let hoop, let speed):
+            case .rimBounced(let hoop, let speed, let ball):
                 if hoop < rimSpin.count { rimSpin[hoop] += CGFloat(speed) * RimLook.kickPerSpeed }
+                if ball, hoop < rimJitter.count { rimJitter[hoop] = RimLook.jitterFrames }
+            case .ballBounced(let position, let speed) where speed > GameScene.bounceSoundFloor:
+                if let hoop = backboard(at: position), hoop < boardJitter.count { boardJitter[hoop] = RimLook.jitterFrames }
             case .doubleJumped(let index):
                 let player = match.players[index]
                 spawnJumpRings(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow), scale: bodyScale(index))
@@ -4321,6 +4338,23 @@ final class GameScene: SKScene {
     private static let jumpRingSeconds = 0.3
     private static let jumpRingStagger = 0.06
     /// A rim's turn as drawn, in radians: its dip, down at the front, whichever side its backboard is.
+    /// A shake's offset with this many frames left: a pixel one way, then the other, none at the end.
+    private static func shake(_ framesLeft: Int) -> CGFloat {
+        framesLeft == 0 ? 0 : (framesLeft % 4 < 2 ? 1 : -1)
+    }
+
+    /// The hoop whose backboard a ball bounced against here: on its backboard side, from the
+    /// board's face out past its back, from under its bottom up the board's height.
+    private func backboard(at position: Vec2) -> Int? {
+        match.stage.hoops.indices.first { index in
+            let hoop = match.stage.hoops[index]
+            let out = (position.x - hoop.position.x) * hoop.backboard.sign
+            let up = position.y - hoop.position.y
+            return out >= Stage.backboardFace - BallRules.radius - 1 && out <= Stage.backboardFace + Stage.backboardDepth + BallRules.radius + 1
+                && up >= Stage.backboardBottom - BallRules.radius - 1 && up <= RimLook.boardHeight
+        }
+    }
+
     private func rimTurn(_ index: Int) -> CGFloat {
         guard index < rimDip.count, index < match.stage.hoops.count else { return 0 }
         return rimDip[index] * .pi / 180 * CGFloat(match.stage.hoops[index].backboard.sign)
@@ -4593,6 +4627,8 @@ final class GameScene: SKScene {
     /// The Elements' wind on the nets: the push at their bottom, and how fast it gusts.
     private static let netWind: CGFloat = 0.4
     private static let netGustRate = 1.3
+    /// Every other stage's breeze: the push at the nets' bottom, either way.
+    private static let netBreeze: CGFloat = 0.1
     private static let spiralRise: CGFloat = 50
 
     /// The ball's fire trail: its credit apart from the heads', at twice a head's rate.
@@ -4745,12 +4781,14 @@ final class GameScene: SKScene {
                     particle.velocity = CGVector(dx: 0, dy: helix.rise)
                 }
             } else if particle.drifts {
-                // Flowing toward the ball along x, always: a steady push, easing off as the
-                // body and the ball come level, as with the ball in hand.
+                // Flowing toward the ball along x: a steady push, easing off as the body and the
+                // ball come level. With the ball in hand, one swinging wind instead.
                 var flow = 0.0
                 if match.stage.features.look == .elements {
                     // The Elements' wind blows it all leftward.
                     flow = -Double(ParticleLook.flowSpeed)
+                } else if match.players.indices.contains(particle.owner), match.players[particle.owner].hasBall {
+                    flow = sin(Double(match.frame) / 60 * 2 * .pi * ParticleLook.swayPerSecond + Double(particle.owner) * 2) * Double(ParticleLook.flowSpeed)
                 } else if match.players.indices.contains(particle.owner) {
                     let gap = Double(SpriteLibrary.point(match.ball.position).x - SpriteLibrary.point(match.players[particle.owner].position).x)
                     flow = min(max(gap / Double(ParticleLook.flowEaseDistance), -1), 1) * Double(ParticleLook.flowSpeed)
@@ -6520,13 +6558,18 @@ final class GameScene: SKScene {
                 let pivot = HoopTuning.pivot(for: match.stage.features.look)
                 rimNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
                 rimNodes[index].anchorPoint = pivot
-                rimNodes[index].position = rimPivot(index)
+                // A shake: a whole art pixel either way, every other frame, while it lasts.
+                if rimJitter[index] > 0 { rimJitter[index] -= 1 }
+                if boardJitter[index] > 0 { boardJitter[index] -= 1 }
+                let boardShake = CGPoint(x: GameScene.shake(boardJitter[index]), y: 0)
+                let rimShake = CGPoint(x: GameScene.shake(rimJitter[index]), y: 0) + boardShake
+                rimNodes[index].position = rimPivot(index) + rimShake
                 rimNodes[index].zRotation = rimTurn(index)
                 // Wetshot Wake's rim nods with the Hoopfish's antenna, about where it meets the body.
                 let nod = hoopfishNod(index)
                 rimNodes[index].position = nod.turn(rimNodes[index].position)
                 rimNodes[index].zRotation += nod.angle
-                backboardNodes[index].position = artPoint
+                backboardNodes[index].position = artPoint + boardShake
                 backboardNodes[index].xScale = rimNodes[index].xScale
                 // Laid out round the right hoop, mirrored at the left.
                 if index < supportNodes.count {
@@ -6538,9 +6581,11 @@ final class GameScene: SKScene {
                 rimNodes[index].isHidden = spinning
                 if index < nets.count { nets[index].hidden = spinning }
                 if index < nets.count {
-                    // The Elements' wind blows the nets leftward, in gusts.
-                    let gust = 0.7 + 0.3 * sin(CACurrentMediaTime() * GameScene.netGustRate)
-                    nets[index].wind = match.stage.features.look == .elements ? -GameScene.netWind * CGFloat(gust) : 0
+                    // The Elements' wind blows the nets leftward, in gusts; elsewhere a light breeze sways them.
+                    let time = CACurrentMediaTime() * GameScene.netGustRate
+                    let gust = 0.7 + 0.3 * sin(time)
+                    nets[index].wind = match.stage.features.look == .elements ? -GameScene.netWind * CGFloat(gust)
+                        : GameScene.netBreeze * CGFloat(sin(time + Double(index)))
                     nets[index].step(rim: nod.turn(GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look)), ball: ballNode.isHidden ? nil : ballNode.position,
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
                                      bodies: match.players.map { SpriteLibrary.point($0.chest) })

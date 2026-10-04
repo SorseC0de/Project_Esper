@@ -512,6 +512,8 @@ public enum StepbackRules {
 /// drops through it.
 public enum RimRules {
     public static let bodyBounce = 3.5
+    /// With jump held as the body meets the rim.
+    public static let jumpBounce = 4.5
     /// Under water a bounce off a rim rises half as high: the push at the square root of a half.
     public static let underwaterBounceShare = 0.5.squareRoot()
 }

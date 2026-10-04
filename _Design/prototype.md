@@ -128,8 +128,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
 - The change (`PlayerState.transforming`, `TransformRules`, protocol 44): throw and shoot together,
   from anything free, or within four frames of the stance, slash or snatch the first of them
   started (so the two a frame apart still do it), change the human form
-  into the energy form; the same again in it changes straight back. Blazing Boba's level-two
-  fireball keeps the two together where it's asked for. The change holds the body still where it
+  into the energy form; the same again in it changes straight back. The change holds the body still where it
   is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
   from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
   it's `transformed`. Parked: nobody has the change there to make (`transformReady` off, protocol 49); given it, it's shown by
@@ -152,7 +151,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   either. Then back in the stance at its hold, buttons kept, the aim cleared: the stick still down from the stepback aims nothing until it's let go and pressed again, so a quick shot or throw out of it goes off the preset, not down (`stepbackAimLocked`, protocol 33). Down never cancels a stance: the
   shot and the throw cancel each other (protocol 24); off an edge, it's the air, the stance gone.
 - The rim's top is a thin platform that can't be stood on (`RimRules`): a body coming down on it
-  from above is sent back up at 3.5 a frame, and a ball that isn't scoring bounces off it; nothing
+  from above is sent back up at 3.5 a frame, 4.5 with jump held as it lands, as off a spring (the press spent on it, not on a double jump), and a ball that isn't scoring bounces off it; nothing
   climbs it or drops through it, and a dunk hangs on it. A ball scores only if it was let go as a
   shot, a floater or a dunk (`Ball.scoring`), kept through its bounces off the board and walls,
   so a bank still drops; one thrown or knocked loose bounces off the top (protocol 25). The rim's
@@ -160,7 +159,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   spring, loose so it rings (stiffness 0.2, damping 0.08), kicked down 4° for every unit a frame
 whatever lands on it came at, held down 12° while someone
   dunks on it with the dunker turning with it, and the net's top hanging from it and turning too.
-  After Tiny Toon Adventures: ACME All-Stars (1994).
+  After Tiny Toon Adventures: ACME All-Stars (1994). A ball off the rim's top shakes it, and one
+  off the backboard shakes the board with the rim riding it: a whole art pixel either way for
+  8 frames (`RimLook.jitterFrames`).
 - Hit-stop: the whole match held, nothing moving or counting down, 4 frames when a hit lands
   (a strip, a pop, a snatch off a holder), 6 when a shot goes in, 10 on a counter
   (`HitStopRules`); a made point restarts after it, so the ball's held in the net. Protocol 22.
@@ -251,7 +252,8 @@ whatever lands on it came at, held down 12° while someone
   from under counts once it falls back in. Going up through a rim never scores. It's the
   ball's bottom that has to come down through, so all of it was above the rim first: one thrown
   flat at the rim's height, off the backboard, drops out under it (protocol 18). The dunk lets
-  go of it with its bottom just over the rim.
+  go of it with its bottom just over the rim. On Hoopfish Hideaway a throw down goes through the
+  rim and scores, as a shot does, where anywhere else it bounces off the top.
 
 Out of a run or its pivot with the stick slammed the other way, the jump turns the new way
 (Mario 64's) with the run's whole speed, as it stood before the pivot.
@@ -353,8 +355,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   port-in's cluster. A run at full speed or a slide leaves a flame every 4 frames, six
   wide and four tall at the feet, for 45 frames; the other body in one is stripped and
   the flame is spent. Shots and throws set the ball alight until its first bounce, and
-  nobody but the thrower can catch or snatch it; the slash still can. Level two: shoot
-  and throw together with nothing in hand makes a fireball in hand, fire swirling into
+  nobody but the thrower can catch or snatch it; the slash still can. Level two: throw
+  with down held and nothing in hand makes a fireball in hand, fire swirling into
   it; it leaves at one and a half times the ball's speed; shot it arcs under half the ball's gravity with the aiming dots, but a quick shot's takes the quick shot's preset arc, at the ball's speed and gravity, from where the ball leaves; thrown it flies
   dead straight, and it bursts on the first thing it meets and strips and knocks
   whatever's within 15 of the burst. Numbers in `BlazeRules`.
@@ -937,7 +939,7 @@ yellow chevrons stack over a resting ball and light one after another from the t
 basket the holder scores on, the top one `ChevronTuning.basketLift` (18) art pixels over the rim, on
 the BASKET CHEVRON Y debug slider. A
 double jump leaves a short platform of loose digital squares under the feet where it was
-taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that a steady push bends toward the ball along x, as a whole (`ParticleLook.flowSpeed`, 140, easing off within 6 pixels of level with it, as with the ball in hand); the legs' cubes go the same way.
+taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that a steady push bends toward the ball along x, as a whole (`ParticleLook.flowSpeed`, 140, easing off within 6 pixels of level with it); with the ball in hand, one wind swings it side to side instead, as hard, 1.1 times a second (`ParticleLook.swayPerSecond`), a scarf; the legs' cubes go the same way.
 The ball in hand is its own sprite on the frame's ball, and when a dribble's ball hangs
 off a ledge it reaches down to the real floor under it over the same frames; only the
 dribble sheets do that, so a stance's ball never sags off the edge of a slab. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
@@ -956,7 +958,7 @@ vector, a sphere of them for the snatch; Quake-Up's quake shakes the camera a pi
 two for eight frames and throws rock squares up; bolts are the SF bolt in the energy
 colour with fading afterimages; the strike reuses a scoring bolt down to the point;
 the pulse is a bar from the hand to the edge; ice clones are the body's frame in ice, one left in the air any frame of the jump or double jump at random;
-flames loop `fire_trail`; fireballs are the ball in fire, in hand and thrown, the basketball recoloured a step up the fire ramp (gold to yellow, orange to light gold, red to gold, its seams red, its outline deep red; `SpriteLibrary.basketballFireFrames`); frozen bodies and ice clones are
+flames loop `fire_trail`; fireballs are the ball in fire, in hand and thrown, the basketball recoloured a step up the fire ramp (gold to yellow, orange to light gold, red to gold, its seams gold, its outline orange; `SpriteLibrary.basketballFireFrames`); frozen bodies and ice clones are
 drawn in the ice look (`Look.ice`: the front parts, the head and the torso's light in palette 57,
 the back parts and the torso's shadow, the pelvis, in 49, outlined in 22; `SpriteLibrary.icePlayer`, warmed
 with the rest), the clones at 0.8; a frozen ball, loose or in hand, is `basketball_ice`, with no halo, so no glow, and holds its turn; the cape is seven short rectangles chained along the glide's trail with a wave down
@@ -1269,7 +1271,7 @@ its crests), and coming out of it and going under it plays `lava_splash` there. 
 knocked out of a tornado, by anything, isn't taken straight back.
 
 The nets flow leftward in the wind, in gusts (`HoopNet.wind`: 0.4 pixels a frame at the bottom,
-easing to none at the rim, 70 to 100% as it gusts). The wind (`wind`, nine 32 pixel frames at ten a second): a puff about every third of a second in each
+easing to none at the rim, 70 to 100% as it gusts). Every other stage's nets sway lightly in a breeze, 0.1 either way (`GameScene.netBreeze`). The wind (`wind`, nine 32 pixel frames at ten a second): a puff about every third of a second in each
 of two layers, behind the rock and in front of everything, each at 1, 0.75 or 0.5, starting
 anywhere on screen and blowing 64 to 160 pixels leftward as it plays through, fading out; none of it
 glows. On this stage the head's and legs' particles blow leftward rather than toward the ball.
@@ -1427,7 +1429,7 @@ three groups in ten behind the background's foreground (-18.5; the rest at -10):
 
 A crab (`crab`, 32 × 16, three frames at 6 a second) walks the sea floor, in front of the rocks and
 behind the players (4.2): one crossing at a time, 16 art pixels a second, right to left first and
-then the other way each time, twenty seconds after the last has gone.
+then the other way each time, twenty seconds after the last has gone. Fish, sharks and the crab trail small bubbles off their backs (cells 0 to 2): three a second each, a shark six.
 
 The stage's art is in `_Graphic Assets/Pixel Art/Stages/Hoopfish Hideaway/`.
 

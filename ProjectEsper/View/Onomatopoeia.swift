@@ -64,13 +64,13 @@ enum Onomatopoeia {
         private var spelling: (english: String, japanese: String, upper: Int, lower: Int, height: CGFloat) {
             switch self {
             // Baskets: the net, and the rim taking a dunk.
-            case .swish: ("SWISH!", "パサッ！", 22, 19, 18)
-            case .three: ("SWOOSH!!", "ザシュッ！！", 22, 19, 18)
-            case .dunk: ("SLAM!!", "ドガァン！！", 8, 6, 18)
+            case .swish: ("SWISH!", "パサッ！", 22, 19, 16)
+            case .three: ("SWOOSH!!", "ザシュッ！！", 22, 19, 16)
+            case .dunk: ("SLAM!!", "ドガァン！！", 8, 6, 16)
             // Bodies and the ball.
-            case .hit: ("WHAM!", "ドゴッ！", 22, 5, 18)
+            case .hit: ("WHAM!", "ドゴッ！", 22, 5, 16)
             case .steal: ("SMACK!", "バシッ！", 22, 26, 16)
-            case .spike: ("THWACK!", "バチィン！", 9, 5, 18)
+            case .spike: ("THWACK!", "バチィン！", 9, 5, 16)
             case .parry: ("TING!", "キィン！", 22, 39, 16)
             case .clang: ("CLANG", "ガキン", 39, 41, 14)
             case .squeak: ("SQUEAK", "キュッ", 22, 37, 5)
@@ -82,15 +82,15 @@ enum Onomatopoeia {
             // A dribble's, as small as a footstep.
             case .dribble: ("BOMP", "ダム", 22, 6, 5)
             // Powers.
-            case .beam: ("VWOOOM", "ズドドドド", 9, 7, 18)
-            case .burst: ("BOOOM!", "ドオォン！", 9, 6, 18)
-            case .quake: ("RUMBLE", "ゴゴゴゴ", 36, 34, 18)
+            case .beam: ("VWOOOM", "ズドドドド", 9, 7, 16)
+            case .burst: ("BOOOM!", "ドオォン！", 9, 6, 16)
+            case .quake: ("RUMBLE", "ゴゴゴゴ", 36, 34, 16)
             case .freeze: ("CRACK!", "ピキッ！", 22, 21, 16)
-            case .explosion: ("KABOOM!", "ドカーン！", 8, 5, 18)
+            case .explosion: ("KABOOM!", "ドカーン！", 8, 5, 16)
             // The stages.
-            case .sizzle: ("SIZZLE", "ジュウゥ", 7, 5, 18)
+            case .sizzle: ("SIZZLE", "ジュウゥ", 7, 5, 16)
             case .shatter: ("CRASH", "パリーン", 22, 19, 16)
-            case .thunder: ("KRAKOOM!", "バリバリッ", 9, 8, 18)
+            case .thunder: ("KRAKOOM!", "バリバリッ", 9, 8, 16)
             }
         }
 

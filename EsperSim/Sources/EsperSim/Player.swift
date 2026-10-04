@@ -611,9 +611,7 @@ public struct Player: Equatable {
         // first of them just started: the change into the energy form, or, in it, straight back out.
         let changeFrom = [.idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .air].contains(state)
             || ([.shootStance, .throwStance, .slashing, .snatching].contains(state) && stateTimer <= TransformRules.pressWindowFrames)
-        // Blazing Boba's fireball keeps the two together for now, where it's asked for.
-        if input.shoot, input.throwBall, shootPressed || throwPressed, changeFrom, hitStun == 0,
-           !fireballAsked(input, shootPressed: shootPressed, throwPressed: throwPressed) {
+        if input.shoot, input.throwBall, shootPressed || throwPressed, changeFrom, hitStun == 0 {
             shootPressed = false
             throwPressed = false
             input.shootButtons = 0
@@ -893,7 +891,7 @@ public struct Player: Equatable {
                 fastFalling = false
                 throwStanceEntrySpeed = velocity.x
                 enter(.throwStance)
-            } else if !holding, fireballAsked(input, shootPressed: shootPressed, throwPressed: throwPressed) {
+            } else if !holding, fireballAsked(input, throwPressed: throwPressed) {
                 summonFireball(events: &events)
             } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
                 startSnatch()
@@ -1471,7 +1469,7 @@ public struct Player: Equatable {
         wantsPlatform = false
         let feetBefore = position.y
         move(in: stage)
-        bounceOffRims(in: stage, feetBefore: feetBefore, events: &events)
+        bounceOffRims(in: stage, feetBefore: feetBefore, jumpHeld: input.jump, events: &events)
         // Surf Soda: running into a wall with the stick held toward it takes the board up it.
         if power == .surfSoda, powerLevel >= 2, grounded, state == .run || state == .dash || state == .walk, let wall = ridableWallSide, stickFacing(input) == wall {
             startWallRide(wall)
@@ -1491,8 +1489,7 @@ public struct Player: Equatable {
         }
         settle(input, events: &events)
         grabLedgeIfThere(in: stage, events: &events)
-        // Blazing Boba: a flame every few frames of a full run or a slide.
-        if power == .blazingBoba, grounded, state == .slide || (state == .run && abs(velocity.x) >= runSpeed - 0.01) {
+        if layingFlames {
             flameTimer += 1
             if flameTimer % BlazeRules.flameEveryFrames == 0, wanted == nil { wanted = .leaveFlame }
         } else {
@@ -1518,11 +1515,14 @@ public struct Player: Equatable {
         !(power == .webWater && powerLevel >= 2) && !(power == .pulsepistol && powerLevel >= 2)
     }
 
-    /// Blazing Boba at level two: shoot and throw together, one pressed with the other
-    /// down, with nothing in hand.
-    private func fireballAsked(_ input: PlayerInput, shootPressed: Bool, throwPressed: Bool) -> Bool {
-        power == .blazingBoba && powerLevel >= 2 && !holding
-            && ((shootPressed && input.throwBall) || (throwPressed && input.shoot))
+    /// Blazing Boba: a flame every few frames of a full run or a slide.
+    public var layingFlames: Bool {
+        power == .blazingBoba && grounded && (state == .slide || (state == .run && abs(velocity.x) >= runSpeed - 0.01))
+    }
+
+    /// Blazing Boba at level two: throw pressed with down held, with nothing in hand.
+    private func fireballAsked(_ input: PlayerInput, throwPressed: Bool) -> Bool {
+        power == .blazingBoba && powerLevel >= 2 && !holding && throwPressed && input.stick.y < -0.65
     }
 
     private mutating func summonFireball(events: inout [MatchEvent]) {
@@ -1588,7 +1588,7 @@ public struct Player: Equatable {
             if !holding, shootPressed, slashAllowed { pendingAerial = .slash }
             if !holding, throwPressed, throwIsSnatch { pendingAerial = .snatch }
             enter(.jumpSquat)
-        } else if !holding, fireballAsked(input, shootPressed: shootPressed, throwPressed: throwPressed) {
+        } else if !holding, fireballAsked(input, throwPressed: throwPressed) {
             summonFireball(events: &events)
         } else if holding, input.shoot, shootReady {
             enterShootStance()
@@ -2088,16 +2088,18 @@ public struct Player: Equatable {
         return Vec2(x: Trig.cos(angle) * facing.sign, y: Trig.sin(angle)) * spec.shotSpeed
     }
 
-    /// Coming down onto a rim's top from above: straight back up, never standing on it. Not
-    /// while dunking, which hangs on it.
-    private mutating func bounceOffRims(in stage: Stage, feetBefore: Double, events: inout [MatchEvent]) {
+    /// Coming down onto a rim's top from above: straight back up, never standing on it, higher
+    /// with jump held, as off a spring. Not while dunking, which hangs on it.
+    private mutating func bounceOffRims(in stage: Stage, feetBefore: Double, jumpHeld: Bool, events: inout [MatchEvent]) {
         guard state != .dunking, feetBefore > position.y else { return }
         for (index, hoop) in stage.hoops.enumerated()
         where feetBefore >= hoop.position.y && position.y < hoop.position.y
             && body.max.x > hoop.position.x - BallRules.rimHalfWidth && body.min.x < hoop.position.x + BallRules.rimHalfWidth {
-            events.append(.rimBounced(hoop: index, speed: feetBefore - position.y))
+            events.append(.rimBounced(hoop: index, speed: feetBefore - position.y, ball: false))
             position.y = hoop.position.y
-            velocity.y = RimRules.bodyBounce * (underwater ? RimRules.underwaterBounceShare : 1)
+            velocity.y = (jumpHeld ? RimRules.jumpBounce : RimRules.bodyBounce) * (underwater ? RimRules.underwaterBounceShare : 1)
+            // The press spent on the bounce, not on a double jump straight after.
+            if jumpHeld { jumpBuffer = 0 }
             grounded = false
             if state.isGroundState || state == .land { enter(.air) }
             return
@@ -2279,6 +2281,8 @@ public enum FloRules {
     public static let counter = 10
     public static let snatch = 7
     public static let hit = 5
+    /// A thrown ball's hit and Blazing Boba's fireball's.
+    public static let siphon = 10
     public static let taunt = 3
     /// An experiment, to be undone with this: FLO earned off another player comes out of their
     /// pool, what they have of it, the earner getting it all either way.

@@ -280,6 +280,8 @@ public struct Match: Equatable {
             } else {
                 ball.release(from: hand, velocity: velocity, by: index, straight: true)
                 ball.strikes = true
+                // On the Hoopfish, a throw down at the rim goes through it as a shot does.
+                if hoopfish != nil, velocity.y < 0 { ball.scoring = true }
             }
             ball.burning = player.power == .blazingBoba
         case .releaseFireball(let velocity, let straight, let ballArc):
@@ -532,7 +534,7 @@ public struct Match: Equatable {
             guard reaches else { continue }
             players[other].slashHit = true
             let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
-            strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), earns: false)
+            strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), flo: 0)
             events.append(.parried(player: other, by: index))
             earnFlo(FloRules.counter, by: index, off: other, at: players[other].chest)
             holdHitStop(HitStopRules.counterFrames)
@@ -542,14 +544,14 @@ public struct Match: Equatable {
     /// The ball knocked out of `victim`'s hands: it pops straight up, nobody's, and the
     /// victim is stunned, so the popper has first go at it.
     /// `carry`: sideways speed for the ball: a slash sends it back toward the slasher.
-    private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0, earns: Bool = true) {
+    private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0, flo: Int = FloRules.hit) {
         let from = players[victim].heldBallPoint
         players[victim].loseBall()
         players[victim].hitStun = BallRules.hitStunFrames
         ball.pop(from: from)
         ball.velocity.x = carry
         events.append(.popped(player: victim, by: popper))
-        if earns { earnFlo(FloRules.hit, by: popper, off: victim, at: from) }
+        if flo > 0 { earnFlo(flo, by: popper, off: victim, at: from) }
         holdHitStop(HitStopRules.hitFrames)
     }
 
@@ -866,7 +868,7 @@ public struct Match: Equatable {
             let now = Box(min: Vec2(x: tip.x - IcicleRules.width / 2, y: tip.y), max: Vec2(x: tip.x + IcicleRules.width / 2, y: tip.y + IcicleRules.length))
             if let victim = players.indices.first(where: { players[$0].body.overlaps(now) }) {
                 if players[victim].power != .frostTea {
-                    strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil, earns: false)
+                    strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil, flo: 0)
                     freeze(victim)
                 }
             } else if !swept.landed, stage.features.lavaSurface.map({ tip.y > $0 }) ?? true {
@@ -904,7 +906,7 @@ public struct Match: Equatable {
         let line = Box(min: Vec2(x: target.x - LightningRules.halfWidth, y: target.y),
                        max: Vec2(x: target.x + LightningRules.halfWidth, y: Double(stage.rows) * Stage.tileSize))
         for victim in players.indices where players[victim].power != .zeusJuice && players[victim].frozen == 0 && players[victim].body.overlaps(line) {
-            strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil, earns: false)
+            strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil, flo: 0)
         }
     }
 
@@ -915,8 +917,8 @@ public struct Match: Equatable {
 
     /// The strip: the victim stunned, any ball they hold popped free, and knocked away if
     /// `knock` is given. Without stunning, only the ball pops and the knock lands.
-    /// `earns`: the hit earns its striker FLO, as every hit does but a parry's and the stage's.
-    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, earns: Bool = true) {
+    /// `flo`: what the hit earns its striker, as every hit does but a parry's and the stage's.
+    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, flo: Int = FloRules.hit) {
         if !stun {
             // A push, not a hit: no stun and no spark, the ball let go of if held.
             let held = players[victim].hasBall
@@ -927,10 +929,10 @@ public struct Match: Equatable {
             }
             events.append(.pushed(player: victim, by: striker, ball: held))
         } else if players[victim].hasBall {
-            pop(from: victim, by: striker, carry: carry, earns: earns)
+            pop(from: victim, by: striker, carry: carry, flo: flo)
         } else {
             events.append(.struck(player: victim, by: striker))
-            if earns { earnFlo(FloRules.hit, by: striker, off: victim, at: players[victim].chest) }
+            if flo > 0 { earnFlo(flo, by: striker, off: victim, at: players[victim].chest) }
             holdHitStop(HitStopRules.hitFrames)
         }
         if stun { players[victim].hitStun = BallRules.hitStunFrames }
@@ -1178,7 +1180,7 @@ public struct Match: Equatable {
                 events.append(.fireballBurst(at: fireball.position))
                 if let other, players[other].body.distance(to: fireball.position) <= BlazeRules.burstReach, players[other].frozen == 0 {
                     let sign = players[other].position.x >= fireball.position.x ? 1.0 : -1.0
-                    strip(other, by: fireball.owner, knock: Vec2(x: BlazeRules.burstKnock.x * sign, y: BlazeRules.burstKnock.y))
+                    strip(other, by: fireball.owner, knock: Vec2(x: BlazeRules.burstKnock.x * sign, y: BlazeRules.burstKnock.y), flo: FloRules.siphon)
                 }
                 if ball.isLive, ball.frozen == 0, ball.position.distance(to: fireball.position) <= BlazeRules.burstReach {
                     let sign = ball.position.x >= fireball.position.x ? 1.0 : -1.0
@@ -1331,7 +1333,7 @@ public struct Match: Equatable {
         let victim = players[other]
         guard victim.frozen == 0, victim.snatchHitbox == nil, victim.body.overlaps(ball.box) else { return }
         let back = ball.velocity.x >= 0 ? -1.0 : 1.0
-        strip(other, by: thrower, knock: Vec2(x: SlashRules.knock.x * -back, y: SlashRules.knock.y))
+        strip(other, by: thrower, knock: Vec2(x: SlashRules.knock.x * -back, y: SlashRules.knock.y), flo: FloRules.siphon)
         // Straight back at the thrower's chest, so it arrives wherever they were; it's
         // theirs to catch until it first hits something.
         let speed = max(abs(ball.velocity.x), 2) * BallRules.bounce

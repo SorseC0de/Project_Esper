@@ -120,7 +120,7 @@ public struct Ball: Equatable {
                 if scoring {
                     scoredHoop = index
                 } else {
-                    events.append(.rimBounced(hoop: index, speed: abs(velocity.y)))
+                    events.append(.rimBounced(hoop: index, speed: abs(velocity.y), ball: true))
                     position.y = hoop.position.y + BallRules.radius
                     bounceY(events: &events)
                 }

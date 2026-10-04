@@ -90,6 +90,8 @@ enum ParticleLook {
     /// art pixels a second each second, easing off inside this many art pixels of level with it.
     static let flowSpeed: CGFloat = 140
     static let flowEaseDistance: CGFloat = 6
+    /// With the ball in hand, it sways side to side instead, this many times a second, as hard.
+    static let swayPerSecond = 1.1
     /// A human's legs' own cubes, smaller: size and spread as the head's, on sliders beside
     /// them; this many a second off each leg, cubes only.
     nonisolated(unsafe) static var legCubeSize: Float = 2
@@ -218,6 +220,9 @@ enum RimLook {
     static let dunkDip: CGFloat = 12
     static let kickPerSpeed: CGFloat = 4
     static let stiffness: CGFloat = 0.2
+    /// A shake off the ball: how many frames, and how far up the backboard counts from the rim, in units.
+    static let jitterFrames = 8
+    static let boardHeight = 20.0
     static let damping: CGFloat = 0.08
 }
 
@@ -273,31 +278,31 @@ enum GoalpostTuning {
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the
 /// right rim in the dunk, on the sequence frame the DUNK FRAME slider picks, and the
 /// DUNK X and DUNK Y sliders nudge that frame's art. The corner readout prints the table.
-/// The FLO meters' look, on sliders while it's settled: the whole meter's scale, the bar's and
+/// The FLO meters' look, the whole meter's scale on a slider: the whole meter's scale, the bar's and
 /// the word's own, the word's left and right ends' heights over its middle's, and the word moved
 /// from its place, in points.
 enum FloTuning {
     nonisolated(unsafe) static var meterScale: CGFloat = 0.75
-    nonisolated(unsafe) static var barScale: CGFloat = 1
-    nonisolated(unsafe) static var wordScale: CGFloat = 1.25
-    nonisolated(unsafe) static var leftSkew: CGFloat = 1.5
-    nonisolated(unsafe) static var rightSkew: CGFloat = 0.5
-    nonisolated(unsafe) static var offsetX: CGFloat = 15
-    nonisolated(unsafe) static var offsetY: CGFloat = -6
+    static let barScale: CGFloat = 1
+    static let wordScale: CGFloat = 1.25
+    static let leftSkew: CGFloat = 1.5
+    static let rightSkew: CGFloat = 0.5
+    static let offsetX: CGFloat = 15
+    static let offsetY: CGFloat = -6
     /// The bar squeezed across and down, over its scale; the word keeps its own.
-    nonisolated(unsafe) static var xScale: CGFloat = 0.75
-    nonisolated(unsafe) static var yScale: CGFloat = 1.5
+    static let xScale: CGFloat = 0.75
+    static let yScale: CGFloat = 1.5
     /// The bar's warp: its front (left) and back (right) ends' heights over its middle's, and its
     /// middle raised by this share of its height.
-    nonisolated(unsafe) static var barFront: CGFloat = 1.5
-    nonisolated(unsafe) static var barBack: CGFloat = 0.5
-    nonisolated(unsafe) static var barBend: CGFloat = 0.5
+    static let barFront: CGFloat = 1.5
+    static let barBack: CGFloat = 0.5
+    static let barBend: CGFloat = 0.5
     /// MAX on the bar's top trailing corner when it's full: its scale, and moved, in points.
-    nonisolated(unsafe) static var maxScale: CGFloat = 1.5
-    nonisolated(unsafe) static var maxX: CGFloat = -5
-    nonisolated(unsafe) static var maxY: CGFloat = -15
+    static let maxScale: CGFloat = 1.5
+    static let maxX: CGFloat = -5
+    static let maxY: CGFloat = -15
     /// The stroke round the bar and the word together, in the player's glow, in points.
-    nonisolated(unsafe) static var stroke: CGFloat = 1.5
+    static let stroke: CGFloat = 1.5
 
     /// The word's and MAX's four colours: gold's first over blue's (the cyan), outlined plum's
     /// second over purple's last.

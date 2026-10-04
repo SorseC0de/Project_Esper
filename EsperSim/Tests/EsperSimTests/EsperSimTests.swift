@@ -732,7 +732,7 @@ final class BallTests: XCTestCase {
         var bounces = 0
         for _ in 0..<120 {
             match.advance(inputs: [.idle, .idle])
-            bounces += match.events.filter { if case .rimBounced(hoop: 1, _) = $0 { return true } else { return false } }.count
+            bounces += match.events.filter { if case .rimBounced(hoop: 1, _, _) = $0 { return true } else { return false } }.count
             XCTAssertFalse(match.players[0].grounded && abs(match.players[0].position.y - rim.y) < 0.01, "never standing on it")
         }
         // Once at least: the bounce sends it up to the block's corner over it, which it takes.

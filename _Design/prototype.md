@@ -1487,7 +1487,10 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 
 A hand-laid stage, for now called Flight (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`,
 protocol 83), on the select after Hoopfish Hideaway. 26 by 12 (`FlightRules`, protocol 86), drawn for
-6x: on a 2532 by 1170 phone it fits whole at 6x. Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
+6x: on a 2532 by 1170 phone it fits whole at 6x. The bodies were drawn into its art at 8 of its pixels an art pixel, so
+on it every body is 8 / 6 its size (`StageFeatures.bodyScale`, `Stage.sized`, protocol 88): its
+scale, its box, and the reaches and heights that go with them grown as Titan Tea's are, its moves as
+they are (a Titan on it 2 times that). Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
 (`FlightTiles0` to `11` at the catalog's root, from `_Graphic Assets/Pixel Art/Stages/Flight`): the
 A2 floors, the A4 walls, the five B sheets and the five numbered ones, 48-pixel cells but the A4 walls'
 and "2"'s 32-pixel ones (the walls' 720 pixels high make 22 rows, the half row under them left off), each drawn as one 16-pixel tile, painted rather than pixel art, so smoothed (at 3x a cell is its own 48 screen

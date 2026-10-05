@@ -68,7 +68,7 @@ public struct Match: Equatable {
         self.stage = stage
         self.mode = mode
         players = specs.indices.map { index in
-            Player(spec: specs[index], index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
+            Player(spec: stage.sized(specs[index]), index: index, position: stage.playerSpawns[index], facing: stage.playerFacings[index])
         }
         ball = Ball(position: stage.ballSpawn)
         scores = Array(repeating: 0, count: specs.count)

@@ -20,5 +20,7 @@ final class FlightTests: XCTestCase {
         for _ in 0..<60 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(match.players.allSatisfy(\.grounded))
         XCTAssertEqual(match.stage.hoops.count, 2)
+        XCTAssertEqual(match.players[0].spec.scale, FlightRules.bodyScale, accuracy: 1e-9, "the bodies drawn a third bigger")
+        XCTAssertEqual(match.players[0].spec.bodyHeight, FighterSpec.baseline.bodyHeight * FlightRules.bodyScale, accuracy: 1e-9)
     }
 }

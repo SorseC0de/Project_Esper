@@ -43,6 +43,9 @@ public struct StageFeatures: Equatable {
     public var underwater = false
     /// In 47, a basket's points doubled; a round is a round either way.
     public var doublePoints = false
+    /// Every body this many times its size, as Titan Tea grows one: on a stage drawn bigger than
+    /// the bodies' own art, Flight's.
+    public var bodyScale = 1.0
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets

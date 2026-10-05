@@ -3393,7 +3393,7 @@ final class GameScene: SKScene {
         let drinks = series.drinks.indices.map { drinksInPlay($0, pickerOn: pickerOn) }
         session.mutate { match in
             for index in match.players.indices {
-                match.players[index].spec = drinks[index].spec()
+                match.players[index].spec = match.stage.sized(drinks[index].spec())
                 match.players[index].power = drinks[index].power
                 match.players[index].powerLevel = drinks[index].powerLevel
             }

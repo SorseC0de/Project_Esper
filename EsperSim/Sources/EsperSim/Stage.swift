@@ -658,6 +658,17 @@ public struct Stage: Equatable {
         return stage
     }
 
+    /// A body's numbers on this stage: its size and the reaches and heights that go with it
+    /// grown by `bodyScale`, as Titan Tea's are; its moves as they are.
+    public func sized(_ spec: FighterSpec) -> FighterSpec {
+        guard features.bodyScale != 1 else { return spec }
+        var sized = spec
+        sized.scale *= features.bodyScale
+        sized.bodyWidth *= features.bodyScale
+        sized.bodyHeight *= features.bodyScale
+        return sized
+    }
+
     /// A hand-laid map's walls: blocks in the grid, slopes each in their own square.
     mutating func lay(_ walls: [StageMap.Wall]) {
         for wall in walls {
@@ -701,6 +712,7 @@ public struct Stage: Equatable {
         stage.lay(map.walls)
         stage.slopes = stage.fixedSlopes
         stage.features = StageFeatures(look: .flight)
+        stage.features.bodyScale = FlightRules.bodyScale
         return stage
     }
 

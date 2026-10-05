@@ -2900,6 +2900,7 @@ final class GameScene: SKScene {
         // The FLO meters' look, while it's settled.
         let relayoutFlo: () -> Void = { [weak self] in self?.layoutFloMeters() }
         controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "STRING Y", range: -16...16, notch: 1, value: Float(HoodStrings.downLift)) { HoodStrings.downLift = Int($0) }
         controls.addSlider(title: "FLO METER Y", range: -60...60, notch: 1, value: Float(FloTuning.meterY)) { FloTuning.meterY = CGFloat($0); relayoutFlo() }
         // The A/B test: A empties from the word's end, MAX on the word; B fills from it.
         controls.addPicker(title: "FLO BAR", options: ["A", "B"], selected: FloTuning.variant == .emptiesFromWord ? 0 : 1) { index in

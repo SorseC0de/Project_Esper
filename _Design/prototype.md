@@ -835,7 +835,7 @@ Its two strings are drawn rather than painted (`HoodStrings`): chains of whole a
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; down, off FloState's hood
-behind the body (the strings themselves over it), twenty each from columns 23 and 27 of row 24, drawn over the energy form's head (0.045) and cut
+behind the body (the strings themselves over it), twenty each from columns 23 and 27 of row 24 (moved up or down whole pixels on the STRING Y slider, `HoodStrings.downLift`), drawn over the energy form's head (0.045) and cut
 out of the glow's mask as the hooded head's are (over skin, which never glows, they were swallowed), floating as if held up (Shenron's
 whiskers): drawn each frame toward a line straight back from the hood, level with where they start, so they
 stream out past the back with their ends as high as their roots (shorter and steeper, they settled over the torso

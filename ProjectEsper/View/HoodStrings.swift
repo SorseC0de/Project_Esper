@@ -16,10 +16,10 @@ final class HoodStrings {
         var carry: CGFloat
     }
 
-    /// Up: five pixels, hanging. Down: thirteen, floating, long enough to clear the body: shorter,
+    /// Up: five pixels, hanging. Down: fifteen, floating, long enough to clear the body: shorter,
     /// they settled over the torso and were lost in its glow.
     static let up = Style(length: 5, gravity: 0.25, floatPull: 0, carry: 0.85)
-    static let down = Style(length: 13, gravity: 0, floatPull: 0.08, carry: 0.9)
+    static let down = Style(length: 15, gravity: 0, floatPull: 0.08, carry: 0.9)
     /// Where each string starts on the hood's 48-pixel canvas, column and row from the top left:
     /// the hooded head's, and the hood down's.
     static let upAnchors = [CGPoint(x: 23, y: 23), CGPoint(x: 26, y: 23)]

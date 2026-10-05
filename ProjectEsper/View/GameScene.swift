@@ -184,6 +184,8 @@ final class GameScene: SKScene {
     private static let hoodDownZ: CGFloat = -0.005
     /// Over the body's flash (0.09).
     private static let hoodFlashZ: CGFloat = 0.091
+    /// FloState's floating strings over the energy form's own head (0.04), so nothing of the body covers them.
+    private static let floatingStringZ: CGFloat = 0.045
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
     /// and coloured each frame: the look's outline, or the zone's.
     private var outlineNodes: [SKSpriteNode] = []
@@ -6260,13 +6262,17 @@ final class GameScene: SKScene {
 
     private func render() {
         sectionMark = CACurrentMediaTime()
+        // Hit-stop holds the world's look with the match: every effect's action, the orbs, the
+        // cubes, the strings and the water's life, not only the bodies.
+        let held = match.hitStop > 0
+        world.speed = held ? 0 : 1
         strokeFloMeters()
         stepFloSparkles()
-        stepFloOrbs()
+        if !held { stepFloOrbs() }
         updateFloMeters()
         drawFloBundles()
         for index in floFlash.indices where floFlash[index] > 0 { floFlash[index] -= 1 }
-        stepHeadParticles()
+        if !held { stepHeadParticles() }
         section("particles")
         // The figure in front: the one with the ball, else the last to touch it.
         if let front = match.ball.holder ?? match.ball.lastTouched { frontFigure = front }
@@ -6470,13 +6476,13 @@ final class GameScene: SKScene {
             // the torso. Toned as the hood's white and its palette 37 are.
             if hood.isHidden {
                 hoodStrings[index].hide()
-            } else {
+            } else if !held {
                 let look = sprites.look(for: index)
                 hoodStrings[index].step(anchors: HoodStrings.anchors(on: hood, down: energyForm, scale: drawScale), down: energyForm,
                                         facing: CGFloat(player.facing.sign), scale: drawScale, time: CACurrentMediaTime(),
                                         plain: SKColor(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel)),
                                         accent: SKColor(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel)),
-                                        z: GameScene.hoodUpZ + 0.0005)
+                                        z: energyForm ? GameScene.floatingStringZ : GameScene.hoodUpZ + 0.0005)
             }
             // The hood flashes with the body, part of its silhouette: over the body's flash when
             // it's up, over the hood itself when it's down behind.
@@ -6756,7 +6762,7 @@ final class GameScene: SKScene {
         drawPlatforms()
         placeStageFireball()
         blowWind()
-        stepWater()
+        if !held { stepWater() }
         stepFootfalls()
         splashRain()
         sizzleRain()

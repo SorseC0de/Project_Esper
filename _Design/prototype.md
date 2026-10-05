@@ -179,6 +179,8 @@ whatever lands on it came at, held down 12° while someone
 - Hit-stop: the whole match held, nothing moving or counting down, 4 frames when a hit lands
   (a strip, a pop, a snatch off a holder), 6 when a shot goes in, 10 on a counter
   (`HitStopRules`); a made point restarts after it, so the ball's held in the net. Protocol 22.
+  The view holds with it: the world's actions (every effect's sheet, the sound words), the FLO orbs,
+  the head's and legs' cubes, the hood's strings and the water's life all wait out the stop.
 - Throw (without ball, in neutral or on defence): the snatch. The sheet's ten frames at
   15 a second, 40 sim frames, the hand out over sheet frames 2 and 3
   (`SnatchRules.activeSheetFrames`), the third sheet frame held twice as long, when its
@@ -559,8 +561,12 @@ pause), kept between launches (`GameSettings`). Each row its name and its choice
 plum, gold on the cursor's row; up and down a row, left and right its choice (jump steps it on), B,
 start or BACK to shut them; a tap picks a choice outright.
 
-- SOUND WORDS: ON, SOME (only the biggest, the 16-high ones, `Sound.isBiggest`), OFF.
-- WORD STYLE: the sound words' face, as the SFX debug picker.
+- SFX: the sound words ON, SOME (only the biggest, the 16-high ones, `Sound.isBiggest`), OFF.
+- SFX STYLE: their face, CHERRY, DARUMA or DELA (`Onomatopoeia.style`).
+- SFX LANGUAGE: ENG, JPN or SPA (`Onomatopoeia.language`); Spanish in the English faces, spelled
+  ¡SHUAS!, ¡¡SHUAAAS!!, ¡¡CATAPUM!!, ¡ZAS!, ¡PAF!, ¡ZASCA!, ¡CLING!, CLANC, ÑIC, TAC, PUM, POM, POM,
+  ZUUUUM, ¡BUUUM!, BRRRUM, ¡CRAC!, ¡CABUM!, CHSSS, ¡CRAS! and ¡CATACRAC! in the table's order. A face
+  picked before the two were apart sets both; the SFX debug picker still sets the face, keeping Spanish.
 - WALK TRAILS: the dust off a walk or a run.
 - SOUND: the effects' loudness, OFF, LOW, MID, FULL (the mixer at 0, 0.33, 0.66, 1).
 - AMBIENCE: a stage's background sound, the Elements' storm.
@@ -828,7 +834,7 @@ Its two strings are drawn rather than painted (`HoodStrings`): chains of whole a
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; down, off FloState's hood
-behind the body (the strings themselves over it), thirteen each from columns 23 and 27 of row 24, floating as if held up (Shenron's
+behind the body (the strings themselves over it), fifteen each from columns 23 and 27 of row 24, drawn over the energy form's head (0.045), floating as if held up (Shenron's
 whiskers): drawn each frame toward a line straight back from the hood and a little down, so they stream
 out past the back, some 10 pixels behind the collar (shorter and steeper, they settled over the torso
 and were lost in its glow), that waves along its length,

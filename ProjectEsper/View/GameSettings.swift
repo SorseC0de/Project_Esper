@@ -1,7 +1,7 @@
 import Foundation
 
 /// The player's settings, kept between launches, each a row of the settings screen: what it's
-/// called, its choices, and which is picked. The sound words' face is `Onomatopoeia.lettering`.
+/// called, its choices, and which is picked. The sound words' face and language are `Onomatopoeia`'s.
 enum GameSettings {
     /// How many sound words show: all, only the biggest (`Onomatopoeia.Sound.biggest`), or none.
     enum Words: Int, CaseIterable { case on, some, off }
@@ -35,12 +35,13 @@ enum GameSettings {
     /// The screen's rows, top to bottom.
     @MainActor
     enum Row: CaseIterable {
-        case words, wordStyle, walkTrails, sound, ambience, screenShake
+        case words, wordStyle, wordLanguage, walkTrails, sound, ambience, screenShake
 
         var title: String {
             switch self {
-            case .words: "SOUND WORDS"
-            case .wordStyle: "WORD STYLE"
+            case .words: "SFX"
+            case .wordStyle: "SFX STYLE"
+            case .wordLanguage: "SFX LANGUAGE"
             case .walkTrails: "WALK TRAILS"
             case .sound: "SOUND"
             case .ambience: "AMBIENCE"
@@ -51,7 +52,8 @@ enum GameSettings {
         var options: [String] {
             switch self {
             case .words: ["ON", "SOME", "OFF"]
-            case .wordStyle: Onomatopoeia.pickable.map(\.label)
+            case .wordStyle: Onomatopoeia.Style.allCases.map(\.label)
+            case .wordLanguage: Onomatopoeia.Language.allCases.map(\.label)
             case .walkTrails, .ambience, .screenShake: ["ON", "OFF"]
             case .sound: ["OFF", "LOW", "MID", "FULL"]
             }
@@ -62,7 +64,8 @@ enum GameSettings {
             get {
                 switch self {
                 case .words: GameSettings.words.rawValue
-                case .wordStyle: Onomatopoeia.pickable.firstIndex(of: Onomatopoeia.lettering) ?? 0
+                case .wordStyle: Onomatopoeia.style.rawValue
+                case .wordLanguage: Onomatopoeia.language.rawValue
                 case .walkTrails: GameSettings.walkTrails ? 0 : 1
                 case .sound: GameSettings.soundLevel
                 case .ambience: GameSettings.ambience ? 0 : 1
@@ -73,7 +76,8 @@ enum GameSettings {
                 let index = min(max(newValue, 0), options.count - 1)
                 switch self {
                 case .words: GameSettings.words = Words(rawValue: index) ?? .on
-                case .wordStyle: Onomatopoeia.lettering = Onomatopoeia.pickable[index]
+                case .wordStyle: Onomatopoeia.style = Onomatopoeia.Style(rawValue: index) ?? .cherry
+                case .wordLanguage: Onomatopoeia.language = Onomatopoeia.Language(rawValue: index) ?? .english
                 case .walkTrails: GameSettings.walkTrails = index == 0
                 case .sound:
                     GameSettings.soundLevel = index

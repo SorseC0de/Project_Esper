@@ -294,9 +294,6 @@ enum CourtLook {
 /// part of the body, not apart, and not glowing. `enabled` off puts everything back as it was.
 enum HumanLook {
     static let enabled = true
-    /// The head's top share, its line included, in the energy's colour, grading down into
-    /// the skin; on a debug slider beside the cubes'.
-    nonisolated(unsafe) static var headEnergyShare = 0.66
     /// The parts still in the energy's colours, which glow as energy does.
     static let glowingParts: Set<BodyPart> = [.frontLeg, .backLeg, .frontFoot, .backFoot]
     static let skin: [BodyPart: RGB] = {

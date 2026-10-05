@@ -170,6 +170,9 @@ final class GameScene: SKScene {
     /// Each body's energy, the slash's blade and the sheets' puffs and streaks, drawn over
     /// the body among the glowers so it blooms.
     private var energyNodes: [SKSpriteNode] = []
+    /// Each human's hood over its head, and the frame it was drawn for.
+    private var hoodNodes: [SKSpriteNode] = []
+    private static let hoodDrawnFor = AnimationFrame(.idle, 2)
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
     /// and coloured each frame: the look's outline, or the zone's.
     private var outlineNodes: [SKSpriteNode] = []
@@ -869,6 +872,12 @@ final class GameScene: SKScene {
             energy.shader = energyToneShader
             figure.addChild(energy)
             energyNodes.append(energy)
+            let hood = SKSpriteNode()
+            hood.zPosition = 0.038
+            hood.isHidden = true
+            hood.shader = energyToneShader
+            figure.addChild(hood)
+            hoodNodes.append(hood)
             let eyes = SKSpriteNode()
             eyes.zPosition = 0.035
             eyes.isHidden = true
@@ -2853,14 +2862,6 @@ final class GameScene: SKScene {
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
             controls.addSlider(title: "LEG CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.legCubeSize) { ParticleLook.legCubeSize = $0 }
             controls.addSlider(title: "LEG CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.legCubeSpread) { ParticleLook.legCubeSpread = $0 }
-            if HumanLook.enabled {
-                // How far down the head the energy's grade reaches; every frame redrawn to it.
-                controls.addSlider(title: "HEAD GRADIENT", range: 0...1, notch: 0.01, value: Float(HumanLook.headEnergyShare)) { [weak self] value in
-                    guard Double(value) != HumanLook.headEnergyShare else { return }
-                    HumanLook.headEnergyShare = Double(value)
-                    self?.sprites.redrawPlayers()
-                }
-            }
         }
         if DunkTuning.enabled {
             // The court's rims lowered, the hanging body and the hoop's art with them.
@@ -6320,6 +6321,25 @@ final class GameScene: SKScene {
             let tilt = bodyTilt[index]
             func leaned(_ offset: CGPoint) -> CGPoint {
                 CGPoint(x: offset.x * cos(tilt) - offset.y * sin(tilt), y: offset.x * sin(tilt) + offset.y * cos(tilt))
+            }
+
+            // A human's hood, toned in the energy as the energy is, so it glows the same: drawn
+            // for the idle's third frame, moved each frame by how far the head is from it there.
+            let hood = hoodNodes[index]
+            let headNow = sprites.landmark(.head, in: frame, player: index)
+            let headDrawnFor = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index)
+            if sprites.look(for: drawnAs).human, player.frozen == 0, !node.isHidden, let headNow, let headDrawnFor {
+                hood.isHidden = false
+                hood.texture = sprites.texture("player_hood", 0)
+                setGlow(hood, SKColor(rgb: sprites.look(for: index).glow))
+                hood.size = hood.texture!.size().scaled(by: drawScale)
+                hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
+                let moved = (headNow - headDrawnFor) * drawScale
+                hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
+                hood.xScale = node.xScale
+                hood.zRotation = node.zRotation
+            } else {
+                hood.isHidden = true
             }
 
             // The ball in hand rides the frame's ball, and when a dribble's ball hangs off a

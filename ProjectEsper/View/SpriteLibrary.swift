@@ -549,28 +549,10 @@ final class SpriteLibrary {
             }
         }
 
-        // A human's head tops out in the energy: its top third, line and all, grades from the
-        // look's colour at the crown down into the skin, leading into the particles off it.
-        // The line there stays on the body in its grade rather than lifting off with the rest.
-        // A human's energy-coloured parts glow; so does the crown's grade where it's mostly energy.
-        // The energy form glows all over, as its head does.
-        var glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true
+        // A human's energy-coloured parts glow (its hood is the view's, `player_hood`); the
+        // energy form glows all over but its skin.
+        let glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true
             : parts[$0].map { !HumanLook.energyFormSkin.contains($0) } == true }
-        if look.human {
-            let isHead = (0..<count).map { parts[$0] == .head }
-            let crown = (0..<count).map { isHead[$0] || (lined[$0] && neighbours($0, { isHead[$0] })) }
-            if let top = crown.firstIndex(of: true).map({ $0 / width }), let bottom = crown.lastIndex(of: true).map({ $0 / width }) {
-                let band = Int((Double(bottom - top + 1) * HumanLook.headEnergyShare).rounded())
-                for pixel in (top * width)..<(min(top + band, height) * width) where band > 0 && crown[pixel] {
-                    let share = 1 - Double(pixel / width - top) / Double(band)
-                    let index = pixel * 4
-                    let under = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
-                    paint(pixels, index, mix(under, look.glow, share))
-                    lined[pixel] = false
-                    if share >= 0.5 { glowing[pixel] = true }
-                }
-            }
-        }
 
         // The line at half its thickness, on a canvas twice as fine: of each line pixel only the
         // quarters against the body, so it hugs it. FloState's rainbow line.
@@ -624,7 +606,7 @@ final class SpriteLibrary {
             glowMask = maskContext.makeImage().map { SKTexture(cgImage: $0) }
         }
 
-        // A human's skin alone in white, as it's drawn, the crown's grade left out: for the
+        // A human's skin alone in white, as it's drawn: for the
         // FloState lockout's flash.
         var skin: SKTexture?
         if detach, look.human, let (skinContext, skinPixels) = makeCanvas(width: width, height: height) {
@@ -679,14 +661,6 @@ final class SpriteLibrary {
         let ball = sizes[biggest] >= SpriteLibrary.ballMinPixels ? biggest : 0
         for pixel in parts.indices where parts[pixel] == .ball && label[pixel] != ball {
             parts[pixel] = .energy
-        }
-    }
-
-    /// `from` moved `share` of the way to `to`, channel by channel.
-    private func mix(_ from: RGB, _ to: RGB, _ share: Double) -> RGB {
-        [16, 8, 0].reduce(RGB(0)) { result, shift in
-            let a = Double((from >> RGB(shift)) & 0xFF), b = Double((to >> RGB(shift)) & 0xFF)
-            return result | RGB((a + (b - a) * share).rounded()) << RGB(shift)
         }
     }
 

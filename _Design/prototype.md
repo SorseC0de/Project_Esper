@@ -793,15 +793,15 @@ cape, ball in hand and flashes, their depths packed under a tenth, so a whole bo
 front of or behind the other: in front, the one with the ball, else the last to touch it. An experiment, on (`HumanLook.enabled`; off puts it all back): the players drawn as
 people, skin on the head, the arms and hands, the front in palette 35 #DBA463 and the back in 34 #BB7547 (24 and 25 were tried and are kept for later), never glowing (green in the body's glow mask),
 the torso, pelvis and front thigh palette 41 #4A5462 for everyone (`HumanLook.clothes`), the back thigh 42 #333941, the
-lower legs and feet the energy's own colour, as the crown's grade is, the back ones at two
+lower legs and feet the energy's own colour, the back ones at two
 thirds of its brightness (`HumanLook.backLegShare`, 0.66; greyed, they barely glowed), and glowing as energy does
 (`HumanLook.glowingParts`, left out of the glow's body mask with a per-frame glow mask, so
-they take the plain threshold), as does the crown's grade where it's mostly energy; the head
+they take the plain threshold); the head
 drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not
-glowing, its particles still rising off it; its top two thirds (`HumanLook.headEnergyShare`, on the HEAD GRADIENT debug
-slider, every frame redrawn as it moves),
-its line included, grades from the energy's colour at the crown down into the skin, leading
-into them; the line there stays on the body in its grade. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
+glowing, its particles still rising off it; over it the hood (`player_hood`, its own node), toned
+through the energy ramp as the energy on the body is so it glows the same, drawn for `player_idle`'s
+third frame and moved every frame by how far the head's middle (its landmark) is from there, turned
+and flipped with the body; not on the energy form or a frozen body. It replaces the crown's grade. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
 drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
 In the zone (`ZoneTuning.inTheZone`, a placeholder, off
 until something puts a player in it, for now nothing) the outline eases through 7 #F9A31B, 11 #9CDB43, 19 #249FDE, 20 #20D6C7, 27 #BC4A9B a quarter second each, and so do the

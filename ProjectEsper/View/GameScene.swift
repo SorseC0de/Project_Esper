@@ -1621,7 +1621,7 @@ final class GameScene: SKScene {
         if let art = wetshotArt { flats += art.flats }
         // Flight's tiles are painted, not lit: none of them glows.
         if let art = flightArt {
-            flats += art.tiles.values.compactMap { node in
+            flats += (Array(art.tiles.values) + [art.backdrop].compactMap { $0 }).compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
         }

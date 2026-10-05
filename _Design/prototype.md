@@ -1505,6 +1505,10 @@ then work on that layer alone. Tiles kept before layers are on the ground. The a
 a cell is placed as it's painted. The tiles never glow (they're the glow mask's flats). The baked map is
 the user's first layout (baked version 2), cut to 39 by 18, the right rim mirrored to column 33.
 
+Being tried: the stage drawn whole in Aseprite instead (`FlightBackdrop`, from `Flight/test.png`,
+2496 by 1152: 64 of its pixels a tile, so one to a screen pixel at 4x), over the tiles and covering
+them; the walls still the map's.
+
 Planned, not built: the ball starts in an open overhead compartment in the middle; the stage pitches
 at random, bending the shots' angles, and a serving cart rolls up and down the aisle with the pitch,
 popping the ball from whoever it runs into.

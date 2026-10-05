@@ -176,8 +176,9 @@ whatever lands on it came at, held down 12° while someone
   After Tiny Toon Adventures: ACME All-Stars (1994). A ball off the rim's top shakes it, and one
   off the backboard shakes the board with the rim riding it: a whole art pixel either way for
   8 frames (`RimLook.jitterFrames`); a dunk's slam shakes the backboard while the rim's held down, and 8 frames after; so does a slash's blade meeting it, and a wall jump off it.
-- Hit-stop: the whole match held, nothing moving or counting down, 4 frames when a hit lands
-  (a strip, a pop, a snatch off a holder), 6 when a shot goes in, 10 on a counter
+- Hit-stop: the whole match held, nothing moving or counting down, 8 frames when a hit lands
+  (a strip, a pop, a snatch off a holder), 12 when a shot goes in, 16 on a counter (protocol 91; it
+  was 4, 6 and 10, too short to read)
   (`HitStopRules`); a made point restarts after it, so the ball's held in the net. Protocol 22.
   The view holds with it: the world's actions (every effect's sheet, the sound words), the FLO orbs,
   the head's and legs' cubes, the hood's strings and the water's life all wait out the stop.
@@ -834,9 +835,10 @@ Its two strings are drawn rather than painted (`HoodStrings`): chains of whole a
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; down, off FloState's hood
-behind the body (the strings themselves over it), fifteen each from columns 23 and 27 of row 24, drawn over the energy form's head (0.045), floating as if held up (Shenron's
-whiskers): drawn each frame toward a line straight back from the hood and a little down, so they stream
-out past the back, some 10 pixels behind the collar (shorter and steeper, they settled over the torso
+behind the body (the strings themselves over it), twenty each from columns 23 and 27 of row 24, drawn over the energy form's head (0.045) and cut
+out of the glow's mask as the hooded head's are (over skin, which never glows, they were swallowed), floating as if held up (Shenron's
+whiskers): drawn each frame toward a line straight back from the hood, level with where they start, so they
+stream out past the back with their ends as high as their roots (shorter and steeper, they settled over the torso
 and were lost in its glow), that waves along its length,
 growing to 2.5 pixels at the tip, 0.6 times a second, so they trail when the body moves and wave when
 it's still. The hooded head's are cut out of the glow's mask with the hood. The six skins of

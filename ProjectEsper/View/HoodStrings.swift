@@ -16,18 +16,18 @@ final class HoodStrings {
         var carry: CGFloat
     }
 
-    /// Up: five pixels, hanging. Down: fifteen, floating, long enough to clear the body: shorter,
+    /// Up: five pixels, hanging. Down: twenty, floating, long enough to clear the body: shorter,
     /// they settled over the torso and were lost in its glow.
     static let up = Style(length: 5, gravity: 0.25, floatPull: 0, carry: 0.85)
-    static let down = Style(length: 15, gravity: 0, floatPull: 0.08, carry: 0.9)
+    static let down = Style(length: 20, gravity: 0, floatPull: 0.08, carry: 0.9)
     /// Where each string starts on the hood's 48-pixel canvas, column and row from the top left:
     /// the hooded head's, and the hood down's.
     static let upAnchors = [CGPoint(x: 23, y: 23), CGPoint(x: 26, y: 23)]
     static let downAnchors = [CGPoint(x: 23, y: 24), CGPoint(x: 27, y: 24)]
-    /// The floating strings' line: straight back from the body, a little down, so they stream out
-    /// past it (the tips some 10 pixels behind the collar); its wave growing to this many pixels
-    /// at the tip, this many times a second, this far apart along it (radians a pixel).
-    static let floatDirection = CGVector(dx: -0.97, dy: -0.24)
+    /// The floating strings' line: straight back from the body, level with where they start, so
+    /// they stream out past it and their ends rest as high as their roots; its wave growing to
+    /// this many pixels at the tip, this many times a second, this far apart along it (radians a pixel).
+    static let floatDirection = CGVector(dx: -1, dy: 0)
     static let floatWave: CGFloat = 2.5
     static let floatWavesPerSecond = 0.6
     static let floatWaveStep = 0.7

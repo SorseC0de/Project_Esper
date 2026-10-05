@@ -521,9 +521,9 @@ public enum RimRules {
 /// Hit-stop: the whole match held this many frames after a hit lands, a shot goes in, or a
 /// counter, the longest.
 public enum HitStopRules {
-    public static let hitFrames = 4
-    public static let shotFrames = 6
-    public static let counterFrames = 10
+    public static let hitFrames = 8
+    public static let shotFrames = 12
+    public static let counterFrames = 16
 }
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many

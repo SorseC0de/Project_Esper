@@ -379,8 +379,8 @@ final class GameScene: SKScene {
     /// The hooded heads' hoods, cut out of the glow's body mask in black so they glow as the
     /// energy does; and their faces, shielded in red, so no glow lands on them.
     var hoodSnapshots: [BodySnapshot] {
-        // The hooded head's strings with it; the hood down's glow as the energy form round them does.
-        hoodMaskSnapshots(\.hood) + hoodStrings.indices.filter { hoodMasks[$0] != nil }.flatMap { hoodStrings[$0].snapshots }
+        // Every string with it, up or down: over skin, which never glows, they were swallowed.
+        hoodMaskSnapshots(\.hood) + hoodStrings.flatMap(\.snapshots)
     }
     var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
     private func hoodMaskSnapshots(_ part: KeyPath<(hood: SKTexture, face: SKTexture), SKTexture>) -> [BodySnapshot] {

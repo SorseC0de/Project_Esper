@@ -1,7 +1,7 @@
 import XCTest
 @testable import EsperSim
 
-/// Flight: a hand-laid stage drawn for 8x.
+/// Flight: a hand-laid stage drawn for 6x.
 final class FlightTests: XCTestCase {
     func testFlightIsOnTheSelectAtItsSize() {
         XCTAssertTrue(StageChoice.selectable.contains(.flight))
@@ -9,9 +9,9 @@ final class FlightTests: XCTestCase {
         XCTAssertEqual(stage.features.look, .flight)
         XCTAssertEqual(stage.columns, FlightRules.columns)
         XCTAssertEqual(stage.rows, FlightRules.rows)
-        // At 8x, 16 art pixels a tile, its 2496-pixel-wide backdrop fits in it, and its height in a 1170-pixel phone.
-        XCTAssertGreaterThanOrEqual(FlightRules.columns * 16 * 8, 2496)
-        XCTAssertLessThanOrEqual(FlightRules.rows * 16 * 8, 1170)
+        // At 6x, 16 art pixels a tile, it's its 2496 by 1152 backdrop, and fits a 2532 by 1170 phone.
+        XCTAssertEqual(FlightRules.columns * 16 * 6, 2496)
+        XCTAssertEqual(FlightRules.rows * 16 * 6, 1152)
     }
 
     func testTheBakedMapStandsEveryoneOnItsFloor() {

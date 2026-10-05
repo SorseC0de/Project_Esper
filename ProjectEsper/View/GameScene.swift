@@ -2745,9 +2745,7 @@ final class GameScene: SKScene {
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
-        // Flight is drawn for its height at 8x, its ends a little cut.
-        let fitsHeight = scrolls || match.stage.features.look == .flight
-        let screenPixelsPerGamePixel = max(1, fitsHeight ? fitHeight : min(fitHeight, fitWidth))
+        let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
         // The map maker sees the whole stage at once, as big as it fits, not by whole pixels.
         // Wetshot Wake fills the screen's width, its bottom on the screen's: a phone crops blank
         // water off the top, a squarer screen shows more of it.

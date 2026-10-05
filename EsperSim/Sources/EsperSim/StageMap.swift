@@ -217,7 +217,7 @@ public struct StageMap: Equatable, Codable {
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
     /// would stand in for it offline, is put aside and the baked one shows.
-    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .flight ? 3 : 5 }
+    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .flight ? 4 : 5 }
 
     /// The map every phone plays; the map maker's edits stand in for it offline only.
     public static func baked(_ stage: MapStage) -> StageMap {
@@ -231,12 +231,13 @@ public struct StageMap: Equatable, Codable {
     private static let wetshotBaked: StageMap = StageMap.wetshotDefaultMap()
     private static let flightBaked: StageMap = StageMap.flightDefaultMap()
 
-    /// Flight, to start at 8x: a floor along the bottom, the rims five rows up near each end, the
+    /// Flight, to start at 6x: a floor along the bottom, the rims seven rows up near each end, the
     /// starts either side of the middle, the ball over it; no tiles, the backdrop being the art.
     private static func flightDefaultMap() -> StageMap {
         let floor = (0..<FlightRules.columns).map { Wall(Cell($0, 0), .solid) }
-        return StageMap(leftRim: Cell(2, 5), rightRim: Cell(FlightRules.columns - 3, 5),
-                        spawns: [Cell(7, 1), Cell(12, 1)], ball: Cell(10, 5), walls: floor)
+        let middle = FlightRules.columns / 2
+        return StageMap(leftRim: Cell(2, 7), rightRim: Cell(FlightRules.columns - 3, 7),
+                        spawns: [Cell(middle - 4, 1), Cell(middle + 3, 1)], ball: Cell(middle, 6), walls: floor)
     }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.
@@ -409,12 +410,11 @@ public enum IcicleRules {
 
 }
 
-/// Flight: drawn for 8x, its backdrop 2496 by 1152 screen pixels, 312 by 144 art pixels: 19 and a
-/// half tiles across, so 20 with a quarter either side of it, and 9 high. At 8x a 2532-pixel screen
-/// shows all but a pixel and three quarters at each end.
+/// Flight: drawn for 6x, its backdrop 2496 by 1152 screen pixels, 416 by 192 art pixels: 26 tiles
+/// by 12, all of it on a 2532 by 1170 screen at 6x.
 public enum FlightRules {
-    public static let columns = 20
-    public static let rows = 9
+    public static let columns = 26
+    public static let rows = 12
 }
 
 /// Wetshot Wake: 37 by 19, under water, its one rim on the Hoopfish: the background's 17 rows a

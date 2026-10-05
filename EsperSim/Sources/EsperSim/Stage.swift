@@ -679,7 +679,7 @@ public struct Stage: Equatable {
         }
     }
 
-    /// Flight: 20 by 9, laid out in the map maker over its backdrop; two rims, as the Elements.
+    /// Flight: 26 by 12, laid out in the map maker over its backdrop; two rims, as the Elements.
     public static var flight: Stage {
         let map = StageMap.current[.flight]
         let columns = FlightRules.columns, rows = FlightRules.rows

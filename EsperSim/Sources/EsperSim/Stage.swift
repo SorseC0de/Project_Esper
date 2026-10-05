@@ -826,8 +826,8 @@ public struct Stage: Equatable {
 public enum StageChoice: Int, CaseIterable {
     case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, wetshotWake, flight
 
-    /// The stages on the select, in its order: Slamstill Traffic parked off it.
-    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .wetshotWake, .flight]
+    /// The stages on the select, in its order: Slamstill Traffic and Flight parked off it.
+    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .wetshotWake]
     /// The stages 47 plays on.
     public static let fortySeven: [StageChoice] = [.wreckCenter, .wetshotWake]
 

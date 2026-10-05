@@ -812,8 +812,10 @@ Its two strings are drawn rather than painted (`HoodStrings`): chains of whole a
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; down, off FloState's hood
-behind the body (the strings themselves over it, or the torso hides them), nine each from columns 23 and 27 of row 24, floating as if held up (Shenron's
-whiskers): drawn each frame toward a line back and down from the hood that waves along its length,
+behind the body (the strings themselves over it), thirteen each from columns 23 and 27 of row 24, floating as if held up (Shenron's
+whiskers): drawn each frame toward a line straight back from the hood and a little down, so they stream
+out past the back, some 10 pixels behind the collar (shorter and steeper, they settled over the torso
+and were lost in its glow), that waves along its length,
 growing to 2.5 pixels at the tip, 0.6 times a second, so they trail when the body moves and wave when
 it's still. The hooded head's are cut out of the glow's mask with the hood. The six skins of
 `player_hoodheads` are logged in `_Design/skin-tones.md`, the arms to follow them.
@@ -1486,7 +1488,7 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 ## Flight
 
 A hand-laid stage, for now called Flight (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`,
-protocol 83), on the select after Hoopfish Hideaway. 26 by 12 (`FlightRules`, protocol 86), drawn for
+protocol 83), parked off the select for now (`StageChoice.selectable`), its code kept. 26 by 12 (`FlightRules`, protocol 86), drawn for
 6x: on a 2532 by 1170 phone it fits whole at 6x. The bodies were drawn into its art at 8 of its pixels an art pixel (a
 48-pixel sheet 192 on the half-size 1248 by 576 canvas), so on it every body is 8 / 6 its size
 (`StageFeatures.bodyScale`, `Stage.sized`, protocol 90): its

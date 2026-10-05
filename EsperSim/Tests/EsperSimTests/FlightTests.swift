@@ -3,8 +3,8 @@ import XCTest
 
 /// Flight: a hand-laid stage drawn for 6x.
 final class FlightTests: XCTestCase {
-    func testFlightIsOnTheSelectAtItsSize() {
-        XCTAssertTrue(StageChoice.selectable.contains(.flight))
+    func testFlightIsParkedAtItsSize() {
+        XCTAssertFalse(StageChoice.selectable.contains(.flight), "parked off the select")
         let stage = StageChoice.flight.stage
         XCTAssertEqual(stage.features.look, .flight)
         XCTAssertEqual(stage.columns, FlightRules.columns)

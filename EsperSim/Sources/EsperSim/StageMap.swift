@@ -204,7 +204,7 @@ public struct StageMap: Equatable, Codable {
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
     /// would stand in for it offline, is put aside and the baked one shows.
-    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .flight ? 1 : 5 }
+    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .flight ? 2 : 5 }
 
     /// The map every phone plays; the map maker's edits stand in for it offline only.
     public static func baked(_ stage: MapStage) -> StageMap {
@@ -218,13 +218,117 @@ public struct StageMap: Equatable, Codable {
     private static let wetshotBaked: StageMap = StageMap.wetshotDefaultMap()
     private static let flightBaked: StageMap = StageMap.flightDefaultMap()
 
-    /// Flight, to start: a floor along the bottom in the floors sheet's first tile, the rims a
-    /// court's height in from each end, the starts either side of the middle, the ball over it.
+    /// Flight as laid out in the map maker, kept to its 39 by 18.
     private static func flightDefaultMap() -> StageMap {
-        let floor = (0..<FlightRules.columns).map { Placed(Cell($0, 0), art: Cell(0, 0)) }
-        let middle = FlightRules.columns / 2
-        return StageMap(tiles: floor, leftRim: Cell(5, 9), rightRim: Cell(FlightRules.columns - 6, 9),
-                        spawns: [Cell(middle - 6, 1), Cell(middle + 5, 1)], ball: Cell(middle, 8))
+        let tiles: [Placed] = [
+            Placed(Cell(0, 0), art: Cell(0, 0)), Placed(Cell(1, 0), art: Cell(0, 0)),
+            Placed(Cell(2, 0), art: Cell(0, 0)), Placed(Cell(3, 0), art: Cell(0, 0)),
+            Placed(Cell(4, 0), art: Cell(0, 0)), Placed(Cell(5, 0), art: Cell(0, 0)),
+            Placed(Cell(6, 0), art: Cell(0, 0)), Placed(Cell(7, 0), art: Cell(0, 0)),
+            Placed(Cell(8, 0), art: Cell(0, 0)), Placed(Cell(9, 0), art: Cell(0, 0)),
+            Placed(Cell(10, 0), art: Cell(0, 0)), Placed(Cell(11, 0), art: Cell(0, 0)),
+            Placed(Cell(12, 0), art: Cell(0, 0)), Placed(Cell(13, 0), art: Cell(0, 0)),
+            Placed(Cell(14, 0), art: Cell(0, 0)), Placed(Cell(15, 0), art: Cell(0, 0)),
+            Placed(Cell(16, 0), art: Cell(0, 0)), Placed(Cell(17, 0), art: Cell(0, 0)),
+            Placed(Cell(18, 0), art: Cell(0, 0)), Placed(Cell(19, 0), art: Cell(0, 0)),
+            Placed(Cell(20, 0), art: Cell(0, 0)), Placed(Cell(21, 0), art: Cell(0, 0)),
+            Placed(Cell(22, 0), art: Cell(0, 0)), Placed(Cell(23, 0), art: Cell(0, 0)),
+            Placed(Cell(24, 0), art: Cell(0, 0)), Placed(Cell(25, 0), art: Cell(0, 0)),
+            Placed(Cell(26, 0), art: Cell(0, 0)), Placed(Cell(27, 0), art: Cell(0, 0)),
+            Placed(Cell(28, 0), art: Cell(0, 0)), Placed(Cell(29, 0), art: Cell(0, 0)),
+            Placed(Cell(30, 0), art: Cell(0, 0)), Placed(Cell(31, 0), art: Cell(0, 0)),
+            Placed(Cell(32, 0), art: Cell(0, 0)), Placed(Cell(33, 0), art: Cell(0, 0)),
+            Placed(Cell(34, 0), art: Cell(0, 0)), Placed(Cell(35, 0), art: Cell(0, 0)),
+            Placed(Cell(36, 0), art: Cell(0, 0)), Placed(Cell(37, 0), art: Cell(0, 0)),
+            Placed(Cell(38, 0), art: Cell(0, 0)), Placed(Cell(1, 1), art: Cell(145, 11)),
+            Placed(Cell(2, 1), art: Cell(145, 11)), Placed(Cell(3, 1), art: Cell(145, 11)),
+            Placed(Cell(4, 1), art: Cell(145, 11)), Placed(Cell(5, 1), art: Cell(145, 11)),
+            Placed(Cell(6, 1), art: Cell(145, 11)), Placed(Cell(7, 1), art: Cell(145, 11)),
+            Placed(Cell(8, 1), art: Cell(145, 11)), Placed(Cell(9, 1), art: Cell(145, 11)),
+            Placed(Cell(10, 1), art: Cell(145, 11)), Placed(Cell(11, 1), art: Cell(145, 11)),
+            Placed(Cell(12, 1), art: Cell(145, 11)), Placed(Cell(13, 1), art: Cell(145, 11)),
+            Placed(Cell(14, 1), art: Cell(145, 11)), Placed(Cell(15, 1), art: Cell(145, 11)),
+            Placed(Cell(16, 1), art: Cell(145, 11)), Placed(Cell(17, 1), art: Cell(145, 11)),
+            Placed(Cell(18, 1), art: Cell(145, 11)), Placed(Cell(19, 1), art: Cell(145, 11)),
+            Placed(Cell(20, 1), art: Cell(145, 11)), Placed(Cell(21, 1), art: Cell(145, 11)),
+            Placed(Cell(22, 1), art: Cell(145, 11)), Placed(Cell(23, 1), art: Cell(145, 11)),
+            Placed(Cell(24, 1), art: Cell(145, 11)), Placed(Cell(1, 2), art: Cell(145, 11)),
+            Placed(Cell(2, 2), art: Cell(145, 11)), Placed(Cell(3, 2), art: Cell(145, 11)),
+            Placed(Cell(4, 2), art: Cell(145, 11)), Placed(Cell(5, 2), art: Cell(145, 11)),
+            Placed(Cell(6, 2), art: Cell(145, 11)), Placed(Cell(7, 2), art: Cell(145, 11)),
+            Placed(Cell(8, 2), art: Cell(145, 11)), Placed(Cell(9, 2), art: Cell(145, 11)),
+            Placed(Cell(10, 2), art: Cell(145, 11)), Placed(Cell(11, 2), art: Cell(145, 11)),
+            Placed(Cell(12, 2), art: Cell(145, 11)), Placed(Cell(13, 2), art: Cell(145, 11)),
+            Placed(Cell(14, 2), art: Cell(145, 11)), Placed(Cell(15, 2), art: Cell(145, 11)),
+            Placed(Cell(16, 2), art: Cell(145, 11)), Placed(Cell(17, 2), art: Cell(145, 11)),
+            Placed(Cell(18, 2), art: Cell(145, 11)), Placed(Cell(19, 2), art: Cell(145, 11)),
+            Placed(Cell(20, 2), art: Cell(145, 11)), Placed(Cell(21, 2), art: Cell(145, 11)),
+            Placed(Cell(22, 2), art: Cell(145, 11)), Placed(Cell(23, 2), art: Cell(145, 11)),
+            Placed(Cell(24, 2), art: Cell(145, 11)), Placed(Cell(1, 3), art: Cell(145, 11)),
+            Placed(Cell(2, 3), art: Cell(145, 11)), Placed(Cell(3, 3), art: Cell(145, 11)),
+            Placed(Cell(4, 3), art: Cell(145, 11)), Placed(Cell(5, 3), art: Cell(145, 11)),
+            Placed(Cell(6, 3), art: Cell(145, 11)), Placed(Cell(7, 3), art: Cell(145, 11)),
+            Placed(Cell(8, 3), art: Cell(145, 11)), Placed(Cell(9, 3), art: Cell(145, 11)),
+            Placed(Cell(10, 3), art: Cell(145, 11)), Placed(Cell(11, 3), art: Cell(145, 11)),
+            Placed(Cell(12, 3), art: Cell(145, 11)), Placed(Cell(13, 3), art: Cell(145, 11)),
+            Placed(Cell(14, 3), art: Cell(145, 11)), Placed(Cell(15, 3), art: Cell(145, 11)),
+            Placed(Cell(16, 3), art: Cell(145, 11)), Placed(Cell(17, 3), art: Cell(145, 11)),
+            Placed(Cell(18, 3), art: Cell(145, 11)), Placed(Cell(19, 3), art: Cell(145, 11)),
+            Placed(Cell(20, 3), art: Cell(145, 11)), Placed(Cell(21, 3), art: Cell(145, 11)),
+            Placed(Cell(22, 3), art: Cell(145, 11)), Placed(Cell(23, 3), art: Cell(145, 11)),
+            Placed(Cell(0, 4), art: Cell(144, 11)), Placed(Cell(1, 4), art: Cell(145, 11)),
+            Placed(Cell(2, 4), art: Cell(145, 11)), Placed(Cell(3, 4), art: Cell(145, 11)),
+            Placed(Cell(4, 4), art: Cell(145, 11)), Placed(Cell(5, 4), art: Cell(145, 11)),
+            Placed(Cell(6, 4), art: Cell(145, 11)), Placed(Cell(7, 4), art: Cell(145, 11)),
+            Placed(Cell(8, 4), art: Cell(145, 11)), Placed(Cell(9, 4), art: Cell(145, 11)),
+            Placed(Cell(10, 4), art: Cell(145, 11)), Placed(Cell(11, 4), art: Cell(145, 11)),
+            Placed(Cell(12, 4), art: Cell(145, 11)), Placed(Cell(13, 4), art: Cell(145, 11)),
+            Placed(Cell(14, 4), art: Cell(145, 11)), Placed(Cell(15, 4), art: Cell(145, 11)),
+            Placed(Cell(16, 4), art: Cell(145, 11)), Placed(Cell(17, 4), art: Cell(145, 11)),
+            Placed(Cell(18, 4), art: Cell(145, 11)), Placed(Cell(19, 4), art: Cell(145, 11)),
+            Placed(Cell(20, 4), art: Cell(145, 11)), Placed(Cell(21, 4), art: Cell(145, 11)),
+            Placed(Cell(22, 4), art: Cell(145, 11)), Placed(Cell(23, 4), art: Cell(145, 11)),
+            Placed(Cell(24, 4), art: Cell(145, 11)), Placed(Cell(0, 5), art: Cell(144, 10)),
+            Placed(Cell(1, 5), art: Cell(145, 10)), Placed(Cell(2, 5), art: Cell(144, 0)),
+            Placed(Cell(3, 5), art: Cell(144, 0)), Placed(Cell(4, 5), art: Cell(144, 0)),
+            Placed(Cell(5, 5), art: Cell(144, 0)), Placed(Cell(6, 5), art: Cell(144, 0)),
+            Placed(Cell(7, 5), art: Cell(146, 0)), Placed(Cell(8, 5), art: Cell(146, 0)),
+            Placed(Cell(9, 5), art: Cell(146, 0)), Placed(Cell(10, 5), art: Cell(146, 0)),
+            Placed(Cell(11, 5), art: Cell(146, 0)), Placed(Cell(12, 5), art: Cell(146, 0)),
+            Placed(Cell(13, 5), art: Cell(146, 0)), Placed(Cell(14, 5), art: Cell(146, 0)),
+            Placed(Cell(15, 5), art: Cell(146, 0)), Placed(Cell(16, 5), art: Cell(146, 0)),
+            Placed(Cell(17, 5), art: Cell(146, 0)), Placed(Cell(18, 5), art: Cell(146, 0)),
+            Placed(Cell(19, 5), art: Cell(146, 0)), Placed(Cell(20, 5), art: Cell(146, 0)),
+        ]
+        let walls: [Wall] = [
+            Wall(Cell(0, 0), .solid), Wall(Cell(1, 0), .solid), Wall(Cell(2, 0), .solid), Wall(Cell(3, 0), .solid),
+            Wall(Cell(4, 0), .solid), Wall(Cell(5, 0), .solid), Wall(Cell(6, 0), .solid), Wall(Cell(7, 0), .solid),
+            Wall(Cell(8, 0), .solid), Wall(Cell(9, 0), .solid), Wall(Cell(10, 0), .solid), Wall(Cell(11, 0), .solid),
+            Wall(Cell(12, 0), .solid), Wall(Cell(13, 0), .solid), Wall(Cell(14, 0), .solid),
+            Wall(Cell(15, 0), .solid), Wall(Cell(16, 0), .solid), Wall(Cell(17, 0), .solid),
+            Wall(Cell(18, 0), .solid), Wall(Cell(19, 0), .solid), Wall(Cell(20, 0), .solid),
+            Wall(Cell(21, 0), .solid), Wall(Cell(22, 0), .solid), Wall(Cell(23, 0), .solid),
+            Wall(Cell(24, 0), .solid), Wall(Cell(25, 0), .solid), Wall(Cell(26, 0), .solid),
+            Wall(Cell(27, 0), .solid), Wall(Cell(28, 0), .solid), Wall(Cell(29, 0), .solid),
+            Wall(Cell(30, 0), .solid), Wall(Cell(31, 0), .solid), Wall(Cell(32, 0), .solid),
+            Wall(Cell(33, 0), .solid), Wall(Cell(34, 0), .solid), Wall(Cell(35, 0), .solid),
+            Wall(Cell(36, 0), .solid), Wall(Cell(37, 0), .solid), Wall(Cell(38, 0), .solid), Wall(Cell(2, 2), .solid),
+            Wall(Cell(3, 2), .solid), Wall(Cell(4, 2), .solid), Wall(Cell(5, 2), .solid), Wall(Cell(6, 2), .solid),
+            Wall(Cell(7, 2), .solid), Wall(Cell(8, 2), .solid), Wall(Cell(9, 2), .solid), Wall(Cell(10, 2), .solid),
+            Wall(Cell(11, 2), .solid), Wall(Cell(12, 2), .solid), Wall(Cell(13, 2), .solid),
+            Wall(Cell(14, 2), .solid), Wall(Cell(15, 2), .solid), Wall(Cell(16, 2), .solid),
+            Wall(Cell(17, 2), .solid), Wall(Cell(18, 2), .solid), Wall(Cell(19, 2), .solid),
+            Wall(Cell(20, 2), .solid), Wall(Cell(21, 2), .solid), Wall(Cell(22, 2), .solid),
+            Wall(Cell(23, 2), .solid), Wall(Cell(24, 2), .solid), Wall(Cell(0, 4), .solid), Wall(Cell(0, 5), .solid),
+            Wall(Cell(1, 5), .solid), Wall(Cell(2, 5), .solid), Wall(Cell(3, 5), .solid), Wall(Cell(4, 5), .solid),
+            Wall(Cell(5, 5), .solid), Wall(Cell(6, 5), .solid), Wall(Cell(7, 5), .solid), Wall(Cell(8, 5), .solid),
+            Wall(Cell(9, 5), .solid), Wall(Cell(10, 5), .solid), Wall(Cell(11, 5), .solid), Wall(Cell(12, 5), .solid),
+            Wall(Cell(13, 5), .solid), Wall(Cell(14, 5), .solid), Wall(Cell(15, 5), .solid),
+            Wall(Cell(16, 5), .solid), Wall(Cell(17, 5), .solid), Wall(Cell(18, 5), .solid),
+            Wall(Cell(19, 5), .solid), Wall(Cell(20, 5), .solid),
+        ]
+        return StageMap(tiles: tiles, leftRim: Cell(5, 9), rightRim: Cell(FlightRules.columns - 6, 9),
+                        spawns: [Cell(10, 3), Cell(18, 3)], ball: Cell(14, 3), walls: walls)
     }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.
@@ -397,11 +501,11 @@ public enum IcicleRules {
 
 }
 
-/// Flight: as long as a phone shows whole at 3x, 52 tiles (832 art pixels, 2496 of a 2532-pixel
-/// screen), and as tall as the Elements.
+/// Flight: as big as a phone shows whole at 4x: 39 tiles across (624 art pixels, 2496 of a
+/// 2532-pixel screen) and 18 high (1152 of 1170).
 public enum FlightRules {
-    public static let columns = 52
-    public static let rows = 24
+    public static let columns = 39
+    public static let rows = 18
 }
 
 /// Wetshot Wake: 37 by 19, under water, its one rim on the Hoopfish: the background's 17 rows a

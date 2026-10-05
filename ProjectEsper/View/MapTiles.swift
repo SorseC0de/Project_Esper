@@ -80,7 +80,8 @@ enum FlightArt {
         mutating func set(_ placed: StageMap.Placed?, at cell: StageMap.Cell) {
             tiles[cell]?.removeFromParent()
             tiles[cell] = nil
-            guard let placed else { return }
+            // Only on the stage: a map kept from when it was bigger may have tiles past its edges.
+            guard let placed, (0..<FlightRules.columns).contains(cell.column), (0..<FlightRules.rows).contains(cell.row) else { return }
             let node = SKSpriteNode(texture: MapTiles.flight.tile(placed.art))
             node.size = CGSize(width: ElementsArt.tileSide, height: ElementsArt.tileSide)
             node.anchorPoint = .zero

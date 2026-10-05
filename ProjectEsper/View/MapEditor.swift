@@ -98,7 +98,11 @@ final class MapEditor: SKNode {
     /// Which hand-laid stage this is the map of, its tiles, and which of their sheets the panel shows.
     private let stage: MapStage
     private let tiles: MapTiles
-    private var sheetIndex = 0
+    /// The sheet the panel shows, kept between openings and launches.
+    private var sheetIndex: Int {
+        didSet { UserDefaults.standard.set(sheetIndex, forKey: MapEditor.sheetKey(stage)) }
+    }
+    private static func sheetKey(_ stage: MapStage) -> String { "esper.\(stage.rawValue)Map.sheet" }
     private(set) var map: StageMap
     private var history: [StageMap] = []
     private var tool: Tool
@@ -161,6 +165,7 @@ final class MapEditor: SKNode {
          onClose: @escaping () -> Void) {
         self.stage = stage
         tiles = MapTiles.of(stage)
+        sheetIndex = min(max(UserDefaults.standard.integer(forKey: MapEditor.sheetKey(stage)), 0), tiles.sheets.count - 1)
         self.map = map
         self.halfWidth = halfWidth
         self.halfHeight = halfHeight

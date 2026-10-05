@@ -1486,18 +1486,18 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 ## Flight
 
 A hand-laid stage, for now called Flight (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`,
-protocol 83), on the select after Hoopfish Hideaway. 52 by 24 (`FlightRules`): as long as a phone
-shows whole at 3x, 52 tiles of 16 art pixels being 2496 of a 2532-pixel-wide screen; as tall as
-the Elements. Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
+protocol 83), on the select after Hoopfish Hideaway. 39 by 18 (`FlightRules`, protocol 84): as big
+as a phone shows whole at 4x, 39 tiles of 16 art pixels being 2496 of a 2532-pixel-wide screen and 18
+being 1152 of 1170. Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
 (`FlightTiles0` to `11` at the catalog's root, from `_Graphic Assets/Pixel Art/Stages/Flight`): the
 A2 floors, the A4 walls, the five B sheets and the five numbered ones, 48-pixel cells each drawn as
 one 16-pixel tile, painted rather than pixel art, so smoothed (at 3x a cell is its own 48 screen
 pixels). `MapTiles` holds a stage's sheets for the art and the map maker: a placed tile's art cell
 counts across the sheets side by side, 16 columns to a sheet, and the map maker pages through them
-(◀ SHEET n/12 ▶) with more of the screen's height for the palette. The autotiles aren't joined up:
-a cell is placed as it's painted. The tiles never glow (they're the glow mask's flats). To start:
-a floor of the floors sheet's first tile, two rims a court's height in from each end, the starts
-either side of the middle, the ball over it.
+(◀ SHEET n/12 ▶) with more of the screen's height for the palette, the sheet last shown kept
+between openings and launches. The autotiles aren't joined up:
+a cell is placed as it's painted. The tiles never glow (they're the glow mask's flats). The baked map is
+the user's first layout (baked version 2), cut to 39 by 18, the right rim mirrored to column 33.
 
 Planned, not built: the ball starts in an open overhead compartment in the middle; the stage pitches
 at random, bending the shots' angles, and a serving cart rolls up and down the aisle with the pitch,

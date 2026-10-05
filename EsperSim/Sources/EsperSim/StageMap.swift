@@ -217,7 +217,12 @@ public struct StageMap: Equatable, Codable {
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
     /// would stand in for it offline, is put aside and the baked one shows.
-    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .flight ? 4 : 5 }
+    public static func bakedVersion(_ stage: MapStage) -> Int {
+        switch stage {
+        case .elements, .wetshot: 5
+        case .flight: 5
+        }
+    }
 
     /// The map every phone plays; the map maker's edits stand in for it offline only.
     public static func baked(_ stage: MapStage) -> StageMap {
@@ -231,13 +236,35 @@ public struct StageMap: Equatable, Codable {
     private static let wetshotBaked: StageMap = StageMap.wetshotDefaultMap()
     private static let flightBaked: StageMap = StageMap.flightDefaultMap()
 
-    /// Flight, to start at 6x: a floor along the bottom, the rims seven rows up near each end, the
-    /// starts either side of the middle, the ball over it; no tiles, the backdrop being the art.
+    /// Flight as laid out in the map maker: three rows of floor, the rims at the ends eight rows up,
+    /// the starts near the ends, the ball between the middle two columns at the top.
     private static func flightDefaultMap() -> StageMap {
-        let floor = (0..<FlightRules.columns).map { Wall(Cell($0, 0), .solid) }
-        let middle = FlightRules.columns / 2
-        return StageMap(leftRim: Cell(2, 7), rightRim: Cell(FlightRules.columns - 3, 7),
-                        spawns: [Cell(middle - 4, 1), Cell(middle + 3, 1)], ball: Cell(middle, 6), walls: floor)
+        let walls: [Wall] = [
+            Wall(Cell(0, 0), .solid), Wall(Cell(1, 0), .solid), Wall(Cell(2, 0), .solid), Wall(Cell(3, 0), .solid),
+            Wall(Cell(4, 0), .solid), Wall(Cell(5, 0), .solid), Wall(Cell(6, 0), .solid), Wall(Cell(7, 0), .solid),
+            Wall(Cell(8, 0), .solid), Wall(Cell(9, 0), .solid), Wall(Cell(10, 0), .solid), Wall(Cell(11, 0), .solid),
+            Wall(Cell(12, 0), .solid), Wall(Cell(13, 0), .solid), Wall(Cell(14, 0), .solid),
+            Wall(Cell(15, 0), .solid), Wall(Cell(16, 0), .solid), Wall(Cell(17, 0), .solid),
+            Wall(Cell(18, 0), .solid), Wall(Cell(19, 0), .solid), Wall(Cell(20, 0), .solid),
+            Wall(Cell(21, 0), .solid), Wall(Cell(22, 0), .solid), Wall(Cell(23, 0), .solid),
+            Wall(Cell(24, 0), .solid), Wall(Cell(25, 0), .solid), Wall(Cell(0, 1), .solid), Wall(Cell(1, 1), .solid),
+            Wall(Cell(2, 1), .solid), Wall(Cell(3, 1), .solid), Wall(Cell(4, 1), .solid), Wall(Cell(5, 1), .solid),
+            Wall(Cell(6, 1), .solid), Wall(Cell(7, 1), .solid), Wall(Cell(8, 1), .solid), Wall(Cell(9, 1), .solid),
+            Wall(Cell(10, 1), .solid), Wall(Cell(11, 1), .solid), Wall(Cell(12, 1), .solid),
+            Wall(Cell(13, 1), .solid), Wall(Cell(14, 1), .solid), Wall(Cell(15, 1), .solid),
+            Wall(Cell(16, 1), .solid), Wall(Cell(17, 1), .solid), Wall(Cell(18, 1), .solid),
+            Wall(Cell(19, 1), .solid), Wall(Cell(20, 1), .solid), Wall(Cell(21, 1), .solid),
+            Wall(Cell(22, 1), .solid), Wall(Cell(23, 1), .solid), Wall(Cell(24, 1), .solid),
+            Wall(Cell(25, 1), .solid), Wall(Cell(0, 2), .solid), Wall(Cell(1, 2), .solid), Wall(Cell(2, 2), .solid),
+            Wall(Cell(3, 2), .solid), Wall(Cell(4, 2), .solid), Wall(Cell(5, 2), .solid), Wall(Cell(6, 2), .solid),
+            Wall(Cell(7, 2), .solid), Wall(Cell(8, 2), .solid), Wall(Cell(9, 2), .solid), Wall(Cell(10, 2), .solid),
+            Wall(Cell(11, 2), .solid), Wall(Cell(12, 2), .solid), Wall(Cell(13, 2), .solid),
+            Wall(Cell(14, 2), .solid), Wall(Cell(15, 2), .solid), Wall(Cell(16, 2), .solid),
+            Wall(Cell(17, 2), .solid), Wall(Cell(18, 2), .solid), Wall(Cell(19, 2), .solid),
+            Wall(Cell(20, 2), .solid), Wall(Cell(21, 2), .solid), Wall(Cell(22, 2), .solid),
+            Wall(Cell(23, 2), .solid), Wall(Cell(24, 2), .solid), Wall(Cell(25, 2), .solid),
+        ]
+        return StageMap(leftRim: Cell(0, 8), rightRim: Cell(25, 8), spawns: [Cell(2, 3), Cell(23, 3)], ball: Cell(13, 11), walls: walls)
     }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.

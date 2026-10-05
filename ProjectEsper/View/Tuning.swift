@@ -63,12 +63,12 @@ enum DunkArt {
         CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -2, y: 16), CGPoint(x: 2, y: 1),
         CGPoint(x: -3, y: 3), CGPoint(x: -1, y: -1), CGPoint(x: -1, y: -1),
     ]
-    static func offsets(for look: StageLook) -> [CGPoint] { look == .footballField ? stadiumOffsets : courtOffsets }
+    static func offsets(for look: StageLook) -> [CGPoint] { look.tiltedHoop ? stadiumOffsets : courtOffsets }
     /// Titan Tea's whole dunk moved by this on top of each frame's, on every stage; on
     /// TITAN DUNK X and Y with `DunkTuning` on.
     nonisolated(unsafe) static var titanOffset = CGPoint(x: -5, y: -11)
     static func set(_ offset: CGPoint, frame: Int, for look: StageLook) {
-        if look == .footballField { stadiumOffsets[frame] = offset } else { courtOffsets[frame] = offset }
+        if look.tiltedHoop { stadiumOffsets[frame] = offset } else { courtOffsets[frame] = offset }
     }
 }
 
@@ -229,24 +229,30 @@ enum RimLook {
     static let damping: CGFloat = 0.08
 }
 
+extension StageLook {
+    /// The hoop tilted down, its rim seen from above, with Longball Stadium's hoop, net and dunk
+    /// placing; else straight on.
+    var tiltedHoop: Bool { self == .footballField || self == .flight }
+}
+
 enum HoopTuning {
     /// Where the rim turns, on its art's canvas (0 to 1, from the bottom left): the back edge
     /// of its ellipse, where it meets the backboard.
     static func pivot(for look: StageLook) -> CGPoint {
-        [StageLook.court, .elements, .wetshot, .flight].contains(look) ? CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48) : CGPoint(x: 27.5 / 48, y: 1 - 34 / 48)
+        look.tiltedHoop ? CGPoint(x: 27.5 / 48, y: 1 - 34 / 48) : CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48)
     }
-    /// The hoop's two pieces for a stage: Wreck Center's straight on, the rest turned.
+    /// The hoop's two pieces for a stage: straight on, or tilted down (`StageLook.tiltedHoop`).
     static func art(for look: StageLook) -> (backboard: String, rim: String) {
-        [StageLook.court, .elements, .wetshot, .flight].contains(look) ? ("backboard_straight", "hoop_straight") : ("backboard", "hoop")
+        look.tiltedHoop ? ("backboard", "hoop") : ("backboard_straight", "hoop_straight")
     }
     nonisolated(unsafe) static var courtOffset = CGPoint(x: 5, y: 10)
     /// The hoop offset the nets' NET X and Y were first set against: a net goes as far
     /// from there as its stage's hoop art does.
     static let netReference = CGPoint(x: 5, y: 10)
     nonisolated(unsafe) static var stadiumOffset = CGPoint(x: 0, y: 10)
-    static func offset(for look: StageLook) -> CGPoint { look == .footballField ? stadiumOffset : courtOffset }
+    static func offset(for look: StageLook) -> CGPoint { look.tiltedHoop ? stadiumOffset : courtOffset }
     static func set(_ offset: CGPoint, for look: StageLook) {
-        if look == .footballField { stadiumOffset = offset } else { courtOffset = offset }
+        if look.tiltedHoop { stadiumOffset = offset } else { courtOffset = offset }
     }
 }
 

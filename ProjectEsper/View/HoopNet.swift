@@ -50,11 +50,11 @@ enum NetTuning {
     static var offset: CGPoint { CGPoint(x: stored(offsetXKey) ?? 0, y: stored(offsetYKey) ?? -5) }
     /// NET X and NET Y for a stage: Longball Stadium's kept apart, the court's until set;
     /// the net goes where the stage's hoop art does against the court's too.
-    static func offsetXKey(for look: StageLook) -> String { look == .footballField ? offsetXKey + ".stadium" : offsetXKey }
-    static func offsetYKey(for look: StageLook) -> String { look == .footballField ? offsetYKey + ".stadium" : offsetYKey }
+    static func offsetXKey(for look: StageLook) -> String { look.tiltedHoop ? offsetXKey + ".stadium" : offsetXKey }
+    static func offsetYKey(for look: StageLook) -> String { look.tiltedHoop ? offsetYKey + ".stadium" : offsetYKey }
     /// What NET X and NET Y are set to on a stage: Longball Stadium's (-1, -5) as tuned.
     static func setting(for look: StageLook) -> CGPoint {
-        let placed = look == .footballField ? CGPoint(x: -1, y: -5) : offset
+        let placed = look.tiltedHoop ? CGPoint(x: -1, y: -5) : offset
         return CGPoint(x: stored(offsetXKey(for: look)) ?? placed.x, y: stored(offsetYKey(for: look)) ?? placed.y)
     }
     /// Where the net hangs against the rim: the setting, moved as far as the stage's hoop art is from `HoopTuning.netReference`.

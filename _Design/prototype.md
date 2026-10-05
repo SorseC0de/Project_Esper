@@ -1502,8 +1502,11 @@ the block's size. OVER: tiles go on the layer over the ground (`StageMap.Placed.
 tenth above it, `TileSpot`), such as a window on a wall, bringing no wall; erasing and picking up
 then work on that layer alone. Tiles kept before layers are on the ground. The autotiles aren't joined up:
 a cell is placed as it's painted. The tiles never glow (they're the glow mask's flats). The baked map
-(version 4): a floor along the bottom, the rims seven rows up two in from each end, the starts either
-side of the middle, the ball over it, no tiles.
+(version 5) is the user's: three rows of floor, the rims at the very ends eight rows up, the starts
+two in from each end, the ball at the top. With an even number of columns the ball starts on the line
+between the middle two, the left edge of the cell it's marked in (column 13), as the court's does.
+Its hoops are tilted down, as Longball Stadium's, with that stage's hoop, net and dunk placing
+(`StageLook.tiltedHoop`); outside the stage is black (palette 0).
 
 Being tried: the stage drawn whole in Aseprite instead (`FlightBackdrop`, from `Flight/test.png`,
 2496 by 1152: six of its pixels an art pixel, so one to a screen pixel at 6x, the whole 26 by 12), over the tiles and covering them; the walls still the map's.

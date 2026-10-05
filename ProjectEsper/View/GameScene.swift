@@ -1636,7 +1636,8 @@ final class GameScene: SKScene {
         let isElements = stage.features.look == .elements
         Ambience.shared.play(isElements ? "thunderstorm" : nil)
         let isWetshot = stage.features.look == .wetshot
-        backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : (isWetshot ? SKColor(rgb: WetshotArt.waterTop) : GameScene.background)
+        backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : (isWetshot ? SKColor(rgb: WetshotArt.waterTop)
+            : (stage.features.look == .flight ? SKColor(rgb: PixelPalette.colours[0]) : GameScene.background))
         elementsArt = nil
         wetshotArt = nil
         flightArt = nil

@@ -694,7 +694,9 @@ public struct Stage: Equatable {
             ],
             playerSpawns: map.spawns.map { Vec2(x: (Double($0.column) + 0.5) * tileSize, y: Double($0.row) * tileSize) },
             playerFacings: map.spawns.map { Double($0.column) * tileSize < Double(columns) * tileSize / 2 ? .right : .left },
-            ballSpawn: centre(map.ball)
+            // An even number of columns: the ball starts on the line between the middle two, the
+            // left edge of the cell it's marked in, as the court's does.
+            ballSpawn: Vec2(x: Double(map.ball.column) * tileSize, y: (Double(map.ball.row) + 0.5) * tileSize)
         )
         stage.lay(map.walls)
         stage.slopes = stage.fixedSlopes

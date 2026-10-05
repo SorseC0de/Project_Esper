@@ -142,12 +142,14 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   strings), unglowing while grey (`SpriteLibrary.clothesTexture`, their snapshots the glow mask's
   flats), and no cubes off the head or the shoes the whole lockout; FloState and the lockout are kept
   through a point. Through the lockout small sizzles (`sizzle1`, `sizzle2`, at a tenth and two
-  thirds seen, twelve a second) go off the head and the arms. Changing, the hood down swings down into place from turned up a quarter turn, about
-  where it meets the body (column 23, row 24), eased over the energy form's frames.
+  thirds seen, twelve a second) go off the head and the arms, children of the body so they go where it goes.
   In FloState the cube trails run their longest (14), the head's and legs' cubes come out in the
-  zone's colours, the body is drawn in the lighter colour of the earlier builds (the glow lifted two
-  fifths to white, `EnergyColour.body`, the back parts at two thirds of it), the head in it too, the
-  arms and hands in skin, unglowing (`HumanLook.energyFormSkin`). Going in or out, `burst` plays at
+  zone's colours, and the change leaves near-white clothes and energy skin: whatever a human wears
+  (the clothes, the shoes, the hood and its strings) in the glow lifted a third to white
+  (`EnergyColour.body`, the back parts at two thirds of it), whatever a human shows bare (what
+  `HumanLook.skin` names: the arms, the hands, the lower legs, and the hooded head's face) in the
+  regular energy colour (`HumanLook.energyFormBare`), all of it glowing; so clothes picked later
+  follow on their own. Going in or out, `burst` plays at
   the chest in the energy's colour and the cubes swirl up round the body for half a second, following
   it, as they do through the change. Each of the slash's
   afterimages the next of them; the line round the body cycles the zone's colours at half its
@@ -838,8 +840,10 @@ six skins as a strip, the bodies' own in its fourth frame, `GameScene.hoodHeadSk
 its hood, the white and the cool greys, toned ahead of time through the energy ramp at nine
 tenths of their level, nearer the legs' plain colour (`SpriteLibrary.hoodHead`, `hoodLevel`), the skin as drawn, opaque. The sheet's own head is taken out of the body,
 its line left round where it was. Drawn for `player_idle`'s third frame and moved every frame by how
-far the head's middle (its landmark) is from there, turned and flipped with the body; in FloState's
-energy form `player_hood_down` instead, behind the body, following the torso's middle the same way; not
+far the head's middle (its landmark) is from there, turned and flipped with the body; in FloState
+the same hooded head (`hoodHead(energy:)`), its hood in the near-white clothes colour shaded by its
+greys and its face in the energy colour, the lighter skin tone the colour itself and the darker in
+proportion, cut out of the glow's mask whole (`player_hood_down` is no longer drawn); not
 on a frozen body. In the glow's mask the hood is cut out in black so it glows as energy
 (`hoodSnapshots`, `MaskScene`'s `cutOut`) and the face drawn pure red (`shieldedSnapshots`, `shield`),
 which the bright pass treats as flat and the composite leaves without bloom, so none spreads onto it.
@@ -848,8 +852,8 @@ energy. Its two strings are drawn rather than painted (`HoodStrings`): chains of
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; Super Smoothie flying,
-twenty each streaming straight back as FloState's near one does (`HoodStrings.streaming`); down, off FloState's hood
-behind the body (the strings themselves over it), twenty each from columns 23 and 27 of row 24 (moved up or down whole pixels on the STRING Y slider, `HoodStrings.downLift`, 2 up), the near one
+twenty each streaming straight back as FloState's near one does (`HoodStrings.streaming`); in FloState,
+in the hood's near-white, from the same two places, the near one
 back, the far one forward, twelve long, its wave twice as tight and growing to 4 (`HoodStrings.floState`), drawn over the energy form's head (0.045) and cut
 out of the glow's mask as the hooded head's are (over skin, which never glows, they were swallowed), floating as if held up (Shenron's
 whiskers): drawn each frame toward a line straight back from the hood, level with where they start, so they

@@ -279,8 +279,11 @@ final class SpriteLibrary {
     /// The hooded head, a frame of `player_hoodheads` for one skin: its hood, the white and the
     /// cool greys, toned through the player's energy ramp, the skin left as drawn; and the hood
     /// and the face each alone in white, for the glow's mask.
-    func hoodHead(skin: Int, player: Int) -> (drawn: SKTexture, hood: SKTexture, face: SKTexture) {
-        let key = "p\(player)_hoodhead_\(skin)"
+    /// In FloState (`energy`), the hood is the energy form's near-white clothes colour
+    /// (`EnergyColour.body`), shaded by its greys, and the face the regular energy colour, its
+    /// lighter skin tone the colour itself and the darker in proportion.
+    func hoodHead(skin: Int, player: Int, energy: Bool = false) -> (drawn: SKTexture, hood: SKTexture, face: SKTexture) {
+        let key = "p\(player)_hoodhead_\(skin)" + (energy ? "_energy" : "")
         if let drawn = cache[key], let hood = cache[key + "_hood"], let face = cache[key + "_face"] { return (drawn, hood, face) }
         let source = texture("player_hoodheads", skin)
         let image = source.cgImage()
@@ -290,6 +293,12 @@ final class SpriteLibrary {
               let (hoodContext, hoodPixels) = makeCanvas(width: width, height: height),
               let (faceContext, facePixels) = makeCanvas(width: width, height: height) else { return (source, source, source) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        func level(_ index: Int) -> Double {
+            (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / 255
+        }
+        // The face's lightest tone, which the energy colour stands for.
+        let faceLightest = (0..<(width * height)).filter { pixels[$0 * 4 + 3] != 0 && pixels[$0 * 4 + 2] < pixels[$0 * 4] }
+            .map { level($0 * 4) }.max() ?? 1
         for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] != 0 {
             let index = pixel * 4
             let red = Double(pixels[index]), green = Double(pixels[index + 1]), blue = Double(pixels[index + 2])
@@ -297,9 +306,16 @@ final class SpriteLibrary {
             let isHood = blue >= red
             let mask = isHood ? hoodPixels : facePixels
             for channel in 0..<4 { mask[index + channel] = 255 }
-            guard isHood else { continue }
+            guard isHood else {
+                if energy { paint(pixels, index, Look.scaled(look.glow, min(level(index) / max(faceLightest, 0.01), 1))) }
+                continue
+            }
             let grey = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
-            paint(pixels, index, look.energyTone(luminance: min(grey * SpriteLibrary.hoodLevel, 1)))
+            if energy, let body = look.body {
+                paint(pixels, index, Look.scaled(body, min(grey, 1)))
+            } else {
+                paint(pixels, index, look.energyTone(luminance: min(grey * SpriteLibrary.hoodLevel, 1)))
+            }
         }
         let made = [context, hoodContext, faceContext].map { context -> SKTexture in
             let texture = context.makeImage().map { SKTexture(cgImage: $0) } ?? source
@@ -598,8 +614,7 @@ final class SpriteLibrary {
 
         // A human's energy-coloured parts glow; the
         // energy form glows all over but its skin.
-        let glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true
-            : parts[$0].map { !HumanLook.energyFormSkin.contains($0) } == true }
+        let glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true : parts[$0] != nil }
 
         // The line at half its thickness, on a canvas twice as fine: of each line pixel only the
         // quarters against the body, so it hugs it. FloState's rainbow line.
@@ -644,7 +659,7 @@ final class SpriteLibrary {
         if detach, glowing.contains(true), let (maskContext, maskPixels) = makeCanvas(width: width, height: height) {
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
                 let index = pixel * 4
-                let skin = parts[pixel].map { look.human ? HumanLook.skin[$0] != nil : HumanLook.energyFormSkin.contains($0) } == true
+                let skin = look.human && parts[pixel].map { HumanLook.skin[$0] != nil } == true
                 maskPixels[index] = skin ? 0 : 255
                 maskPixels[index + 1] = 255
                 maskPixels[index + 2] = skin ? 0 : 255

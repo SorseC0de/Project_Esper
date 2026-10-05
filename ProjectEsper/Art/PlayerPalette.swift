@@ -111,12 +111,12 @@ struct Look: Hashable {
             for part in HumanLook.glowingParts { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         } else {
             // The energy form: the body in the lighter colour of the earlier builds, the back
-            // parts down its ramp as a human's back leg is, the head in it too; the arms and
-            // hands in skin.
+            // parts down its ramp as a human's back leg is; what a human shows bare in the regular
+            // energy colour.
             for part in BodyPart.allCases where !part.isEnergy && part != .ball {
                 colours[part] = part.isBack ? Look.scaled(body, HumanLook.backLegShare) : body
             }
-            for part in HumanLook.energyFormSkin { colours[part] = HumanLook.skin[part] }
+            for part in HumanLook.energyFormBare { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         }
         return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body)
     }
@@ -227,7 +227,7 @@ enum EnergyColour: String, CaseIterable {
     }
 
     /// The body: the glow lifted two fifths of the way to white.
-    var body: RGB { Look.lightened(glow, 0.4) }
+    var body: RGB { Look.lightened(glow, 0.33) }
 
     var opposite: EnergyColour {
         switch self {
@@ -311,7 +311,8 @@ enum HumanLook {
     /// The torso, pelvis and thighs, the same for every player: palette 41, the back thigh
     /// the next down its ramp, 42.
     static let clothed: Set<BodyPart> = [.torso, .pelvis, .frontThigh, .backThigh]
-    /// The energy form's arms and hands in skin, which doesn't glow.
-    static let energyFormSkin: Set<BodyPart> = [.frontArm, .frontHand, .backArm, .backHand]
+    /// What a human shows bare, but the head (the hooded head's own): in the energy form, the
+    /// regular energy colour rather than the energy form's lighter one, glowing.
+    static let energyFormBare = Set(skin.keys).subtracting([.head])
     static let clothes = PixelPalette.colours[41], backClothes = PixelPalette.colours[42]
 }

@@ -34,12 +34,8 @@ final class HoodStrings {
     static let streaming = Style(strands: [Strand(length: 20), Strand(length: 20)], gravity: 0, floatPull: 0.08, carry: 0.9)
     static let floState = Style(strands: [Strand(length: 20), Strand(length: 12, direction: CGVector(dx: 1, dy: 0), wave: 4, waveStep: 1.4)],
                                 gravity: 0, floatPull: 0.08, carry: 0.9)
-    /// Where each string starts on the hood's 48-pixel canvas, column and row from the top left:
-    /// the hooded head's, and the hood down's.
-    static let upAnchors = [CGPoint(x: 23, y: 23), CGPoint(x: 26, y: 23)]
-    static let downAnchors = [CGPoint(x: 23, y: 24), CGPoint(x: 27, y: 24)]
-    /// The floating strings moved up (or down, under 0) from there, whole pixels: STRING Y.
-    nonisolated(unsafe) static var downLift = 2
+    /// Where each string starts on the hooded head's 48-pixel canvas, column and row from the top left.
+    static let anchorPixels = [CGPoint(x: 23, y: 23), CGPoint(x: 26, y: 23)]
     /// The floating strings' waves a second.
     static let floatWavesPerSecond = 0.6
     /// The pixel second from the tip is palette 37, as the hood's shading is.
@@ -57,12 +53,11 @@ final class HoodStrings {
     }
 
     /// Where each string's first pixel sits, through the hood's own placing.
-    static func anchors(on hood: SKSpriteNode, down: Bool, scale: CGFloat) -> [CGPoint] {
+    static func anchors(on hood: SKSpriteNode, scale: CGFloat) -> [CGPoint] {
         let canvas: CGFloat = 48
-        let lift = down ? CGFloat(downLift) : 0
-        return (down ? downAnchors : upAnchors).map { pixel in
+        return anchorPixels.map { pixel in
             let local = CGPoint(x: (pixel.x + 0.5 - canvas * hood.anchorPoint.x) * scale * (hood.xScale < 0 ? -1 : 1),
-                                y: (canvas - pixel.y - 0.5 + lift - canvas * hood.anchorPoint.y) * scale)
+                                y: (canvas - pixel.y - 0.5 - canvas * hood.anchorPoint.y) * scale)
             let turn = hood.zRotation
             return CGPoint(x: hood.position.x + local.x * cos(turn) - local.y * sin(turn),
                            y: hood.position.y + local.x * sin(turn) + local.y * cos(turn))

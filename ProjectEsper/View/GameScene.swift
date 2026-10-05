@@ -183,7 +183,6 @@ final class GameScene: SKScene {
     private static let stringAccentLuminance = 0.876
     /// Over the body and under the head's own node, or behind the body.
     private static let hoodUpZ: CGFloat = 0.038
-    private static let hoodDownZ: CGFloat = -0.005
     /// Over the body's flash (0.09).
     private static let hoodFlashZ: CGFloat = 0.091
     /// Super Smoothie's head tipped flying up or down: radians, eased in a share a frame, and how
@@ -192,10 +191,6 @@ final class GameScene: SKScene {
     private static let headTipEase: CGFloat = 0.2
     private static let flightHeadDrop: CGFloat = 2
     private var headTip: [Int: CGFloat] = [:]
-    /// Changing, the hood down starts this far turned up (radians, the body facing right) and
-    /// swings down to rest, about this point on its canvas, column and row: where it meets the body.
-    private static let hoodSwingStart: CGFloat = -.pi / 2
-    private static let hoodSwingPivot = CGPoint(x: 23, y: 24)
 
     /// A hood turned `angle` about `pivot` on its 48-pixel canvas, where it stays put.
     private func turn(_ hood: SKSpriteNode, about pivot: CGPoint, by angle: CGFloat, scale: CGFloat) {
@@ -403,12 +398,16 @@ final class GameScene: SKScene {
     /// The hooded heads' hoods, cut out of the glow's body mask in black so they glow as the
     /// energy does; and their faces, shielded in red, so no glow lands on them.
     var hoodSnapshots: [BodySnapshot] {
-        // Every string with it, up or down: over skin, which never glows, they were swallowed.
-        hoodMaskSnapshots(\.hood) + hoodStrings.indices.filter { !greyedOut.contains($0) }.flatMap { hoodStrings[$0].snapshots }
+        // Every string with it, up or down: over skin, which never glows, they were swallowed. In
+        // FloState the face is energy and glows with the hood.
+        hoodMaskSnapshots(\.hood) + hoodMaskSnapshots(\.face, only: energyHoods)
+            + hoodStrings.indices.filter { !greyedOut.contains($0) }.flatMap { hoodStrings[$0].snapshots }
     }
-    var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
-    private func hoodMaskSnapshots(_ part: KeyPath<(hood: SKTexture, face: SKTexture), SKTexture>) -> [BodySnapshot] {
-        hoodNodes.indices.compactMap { index in
+    var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face, only: Set(hoodNodes.indices).subtracting(energyHoods)) }
+    /// The players whose hooded head is FloState's, its face energy.
+    private var energyHoods: Set<Int> = []
+    private func hoodMaskSnapshots(_ part: KeyPath<(hood: SKTexture, face: SKTexture), SKTexture>, only: Set<Int>? = nil) -> [BodySnapshot] {
+        hoodNodes.indices.filter { only?.contains($0) ?? true }.compactMap { index in
             let node = hoodNodes[index]
             // Only the hooded head has masks; the hood down behind has none. Greyed out, it glows not at all.
             guard !node.isHidden, !greyedOut.contains(index), let masks = hoodMasks[index] else { return nil }
@@ -2109,7 +2108,7 @@ final class GameScene: SKScene {
     private static let lockoutSizzlesPerSecond = 12.0
     private static let lockoutSizzleScale: CGFloat = 0.1
     private static let lockoutSizzleAlpha: CGFloat = 0.66
-    private func sizzle(at point: CGPoint, in figure: SKNode) {
+    private func sizzle(at point: CGPoint, on body: SKNode) {
         let sheet = Bool.random() ? "sizzle1" : "sizzle2"
         guard let count = EffectSheets.frames[sheet] else { return }
         let frames = (0..<count).map { sprites.texture(sheet, $0) }
@@ -2120,7 +2119,7 @@ final class GameScene: SKScene {
         sizzle.alpha = GameScene.lockoutSizzleAlpha
         sizzle.zPosition = 0.095
         sizzle.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 15), .removeFromParent()]))
-        figure.addChild(sizzle)
+        body.addChild(sizzle)
     }
 
     private func sizzleRain() {
@@ -2938,7 +2937,6 @@ final class GameScene: SKScene {
         // The FLO meters' look, while it's settled.
         let relayoutFlo: () -> Void = { [weak self] in self?.layoutFloMeters() }
         controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "STRING Y", range: -16...16, notch: 1, value: Float(HoodStrings.downLift)) { HoodStrings.downLift = Int($0) }
         controls.addSlider(title: "FLO METER Y", range: -60...60, notch: 1, value: Float(FloTuning.meterY)) { FloTuning.meterY = CGFloat($0); relayoutFlo() }
         // The A/B test: A empties from the word's end, MAX on the word; B fills from it.
         controls.addPicker(title: "FLO BAR", options: ["A", "B"], selected: FloTuning.variant == .emptiesFromWord ? 0 : 1) { index in
@@ -6426,8 +6424,8 @@ final class GameScene: SKScene {
             if lockedOutOfFloState, !held, Double.random(in: 0..<1) < GameScene.lockoutSizzlesPerSecond * GameScene.stepSeconds,
                let part = [BodyPart.head, .frontArm, .backArm].randomElement(),
                let landmark = sprites.landmark(part, in: frame, player: index) {
-                let spot = landmark * drawScale
-                sizzle(at: node.position + CGPoint(x: spot.x * CGFloat(player.facing.sign), y: spot.y), in: figureLayers[index])
+                // On the body itself, so they go where it goes.
+                sizzle(at: landmark * drawScale, on: node)
             }
 
             // Prone in the snipe, the cursor where it's aimed.
@@ -6480,23 +6478,19 @@ final class GameScene: SKScene {
             // lighter: up over the human's head, down behind the energy form's. Drawn for the
             // idle's third frame, moved each frame by how far the head is from it there.
             let hood = hoodNodes[index]
-            // Up, it follows the head; down behind, the torso.
-            let followed: BodyPart = energyForm ? .torso : .head
-            let partNow = sprites.landmark(followed, in: frame, player: index)
-            let partDrawnFor = sprites.landmark(followed, in: GameScene.hoodDrawnFor, player: index)
+            // It follows the head, the human's and FloState's alike.
+            let partNow = sprites.landmark(.head, in: frame, player: index)
+            let partDrawnFor = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index)
             if player.frozen == 0, !node.isHidden, let partNow, let partDrawnFor {
                 hood.isHidden = false
                 // Toned ahead of time through the energy's ramp, opaque, rather than by a shader:
                 // up, the whole hooded head in the skin it's drawn for, its hood alone toned.
-                if energyForm {
-                    hood.texture = sprites.effectTexture("player_hood_down", 0, player: index)
-                    hoodMasks[index] = nil
-                } else {
-                    let hoodHead = sprites.hoodHead(skin: GameScene.hoodHeadSkin, player: index)
-                    hood.texture = hoodHead.drawn
-                    hoodMasks[index] = (hoodHead.hood, hoodHead.face)
-                }
-                hood.zPosition = energyForm ? GameScene.hoodDownZ : GameScene.hoodUpZ
+                // In FloState the same hooded head, its hood in the energy form's colour.
+                let hoodHead = sprites.hoodHead(skin: GameScene.hoodHeadSkin, player: index, energy: energyForm)
+                if energyForm { energyHoods.insert(index) } else { energyHoods.remove(index) }
+                hood.texture = hoodHead.drawn
+                hoodMasks[index] = (hoodHead.hood, hoodHead.face)
+                hood.zPosition = GameScene.hoodUpZ
                 // Sized unflipped, then flipped: a sprite's size is taken against its scale.
                 hood.xScale = 1
                 hood.size = hood.texture!.size().scaled(by: drawScale)
@@ -6510,7 +6504,7 @@ final class GameScene: SKScene {
                 let ahead = player.velocity.x * player.facing.sign
                 let diving = player.velocity.y < -FlightSheet.still && -player.velocity.y > ahead
                 let rising = player.velocity.y > FlightSheet.still || ahead > FlightSheet.still
-                let wantedTip: CGFloat = player.state != .flying || energyForm ? 0
+                let wantedTip: CGFloat = player.state != .flying ? 0
                     : (diving ? -GameScene.flightHeadTip : (rising ? GameScene.flightHeadTip : 0))
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
                 if abs(headTip[index, default: 0]) > 0.001, let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
@@ -6519,13 +6513,6 @@ final class GameScene: SKScene {
                     let tip = headTip[index, default: 0]
                     turn(hood, about: middle, by: tip * CGFloat(player.facing.sign), scale: drawScale)
                     hood.position.y -= GameScene.flightHeadDrop * abs(tip) / GameScene.flightHeadTip * drawScale
-                }
-                // Changing, the hood down swings down from up, about where it meets the body.
-                if energyForm, changing {
-                    let start = GameScene.transformEnergyFrame * 60 / TransformRules.sheetFramesPerSecond
-                    let share = min(max(Double(player.stateTimer - start) / Double(TransformRules.frames - start), 0), 1)
-                    let eased = CGFloat(0.5 - 0.5 * cos(share * .pi))
-                    turn(hood, about: GameScene.hoodSwingPivot, by: GameScene.hoodSwingStart * (1 - eased) * CGFloat(player.facing.sign), scale: drawScale)
                 }
             } else {
                 hood.isHidden = true
@@ -6552,11 +6539,15 @@ final class GameScene: SKScene {
                 // FloState's float, one each way; Super Smoothie flying, both stream behind; else they hang.
                 let style = energyForm ? HoodStrings.floState
                     : (player.power == .superSmoothie && player.state == .flying ? HoodStrings.streaming : HoodStrings.hanging)
+                // In the hood's colours: in FloState the energy form's, as its hood is.
                 let grey = SKColor(rgb: GameScene.lockoutGrey)
-                hoodStrings[index].step(anchors: HoodStrings.anchors(on: hood, down: energyForm, scale: drawScale), style: style,
+                let plain = energyForm ? (look.body ?? look.glow) : look.energyTone(luminance: SpriteLibrary.hoodLevel)
+                let accent = energyForm ? Look.scaled(look.body ?? look.glow, GameScene.stringAccentLuminance)
+                    : look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel)
+                hoodStrings[index].step(anchors: HoodStrings.anchors(on: hood, scale: drawScale), style: style,
                                         facing: CGFloat(player.facing.sign), scale: drawScale, time: CACurrentMediaTime(),
-                                        plain: lockoutOn ? grey : SKColor(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel)),
-                                        accent: lockoutOn ? grey : SKColor(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel)),
+                                        plain: lockoutOn ? grey : SKColor(rgb: plain),
+                                        accent: lockoutOn ? grey : SKColor(rgb: accent),
                                         z: energyForm ? GameScene.floatingStringZ : GameScene.hoodUpZ + 0.0005)
             }
             // The hood flashes with the body, part of its silhouette: over the body's flash when
@@ -6572,7 +6563,7 @@ final class GameScene: SKScene {
                 hoodFlash.position = hood.position
                 hoodFlash.xScale = hood.xScale
                 hoodFlash.zRotation = hood.zRotation
-                hoodFlash.zPosition = energyForm ? GameScene.hoodDownZ + 0.001 : GameScene.hoodFlashZ
+                hoodFlash.zPosition = GameScene.hoodFlashZ
             }
 
             // The ball in hand rides the frame's ball, and when a dribble's ball hangs off a
@@ -6671,7 +6662,8 @@ final class GameScene: SKScene {
 
             // The head follows its place on the body loosely and bobs, as if it only just belonged.
             let headNode = headNodes[index]
-            if let landmark = sprites.landmark(.head, in: frame, player: index),
+            // A head drawn apart, unless the hooded head stands in for it.
+            if hood.isHidden, let landmark = sprites.landmark(.head, in: frame, player: index),
                let headTexture = sprites.headTexture(frame, player: drawnAs),
                let anchor = sprites.headAnchor(frame, player: drawnAs) {
                 let head = landmark * drawScale
@@ -6703,7 +6695,7 @@ final class GameScene: SKScene {
                 headEsperMixes[index].particleBirthRate = 0
                 // A human's head is on the body: its particles still rise off it.
                 // None while locked out of FloState.
-                if !sprites.look(for: drawnAs).headApart, !lockedOutOfFloState, let landmark = sprites.landmark(.head, in: frame, player: drawnAs) {
+                if !sprites.look(for: drawnAs).headApart || !hood.isHidden, !lockedOutOfFloState, let landmark = sprites.landmark(.head, in: frame, player: drawnAs) {
                     let head = landmark * drawScale
                     let at = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                     emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + GameScene.crownLift * drawScale))

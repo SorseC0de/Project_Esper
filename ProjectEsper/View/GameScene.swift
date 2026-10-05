@@ -3004,9 +3004,11 @@ final class GameScene: SKScene {
         let inputs = hub.frames(players: match.players.count)
         lastLocalInput = inputs.first ?? .idle
         tickOnline()
-        // Start or delete pauses a match offline, and again resumes it.
+        // Start or delete pauses a match offline, and again resumes it; over the settings, it shuts them.
         if hub.consumePause(), online == nil {
-            if flow == .playing {
+            if let flowState, flowState.settingsOpen {
+                flowState.closeSettings()
+            } else if flow == .playing {
                 menuLast = inputs.first ?? .idle
                 enter(.paused)
             } else if flow == .paused {
@@ -3027,7 +3029,21 @@ final class GameScene: SKScene {
             let backed = backDown && !backWasDown && !menuNeedsRelease
             let right = pad.stick.x >= 0.5 && menuLast.stick.x < 0.5, left = pad.stick.x <= -0.5 && menuLast.stick.x > -0.5
             let down = pad.stick.y <= -0.5 && menuLast.stick.y > -0.5, up = pad.stick.y >= 0.5 && menuLast.stick.y < 0.5
-            if let screen {
+            if let flowState, flowState.settingsOpen {
+                // The settings, over the title or the pause: up and down a row, left and right
+                // its choice, jump on BACK or B to shut them.
+                if down { flowState.moveSettingsCursor(1) }
+                if up { flowState.moveSettingsCursor(-1) }
+                if right { flowState.stepSetting(1) }
+                if left { flowState.stepSetting(-1) }
+                if picked {
+                    menuNeedsRelease = true
+                    if flowState.settingsCursor >= GameSettings.Row.allCases.count { flowState.closeSettings() } else { flowState.stepSetting(1) }
+                } else if backed {
+                    menuNeedsRelease = true
+                    flowState.closeSettings()
+                }
+            } else if let screen {
                 if right || down { screen.move(1) }
                 if left || up { screen.move(-1) }
                 if picked {
@@ -3557,7 +3573,7 @@ final class GameScene: SKScene {
             guard footPhases[index] != frame, (running ? GameScene.runFootfalls : GameScene.walkFootfalls).contains(frame) else { continue }
             let dust: Effect = running ? .dustRun : .dustWalk
             // A power's own trail, Blazing Boba's flames, stands in for the dust.
-            if dust.available, !match.stage.features.underwater, !player.layingFlames {
+            if dust.available, GameSettings.walkTrails, !match.stage.features.underwater, !player.layingFlames {
                 // Kicked up behind the feet.
                 spawn(dust, at: player.position + Vec2(x: -player.facing.sign * GameScene.dustBehind, y: 0),
                       flipped: player.facing == .left, player: index, scale: bodyScale(index))
@@ -3582,6 +3598,12 @@ final class GameScene: SKScene {
         say(sound, from: SpriteLibrary.point(source), away: given, rise: degrees, gap: gap)
     }
     private func say(_ sound: Onomatopoeia.Sound, from source: CGPoint, away given: CGFloat, rise degrees: CGFloat, gap: CGFloat = GameScene.wordGap) {
+        // As many as the settings want: all, the biggest only, or none.
+        switch GameSettings.words {
+        case .on: break
+        case .some: guard sound.isBiggest else { return }
+        case .off: return
+        }
         let halfWidth = size.width * cameraNode.xScale / 2
         var away: CGFloat = given < 0 ? -1 : 1
         if (source.x - cameraNode.position.x) * away > halfWidth - GameScene.wordRoom { away = -away }
@@ -3775,7 +3797,7 @@ final class GameScene: SKScene {
             screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: Array(Greateraid.boosters.prefix(3)), drinks: .none,
                                 colour: SKColor(rgb: sprites.look(for: 0).glow), timed: true) { _ in }
         case .pause:
-            screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, onRestart: {}, onTitle: {}, onResume: {})
+            screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
         case .win:
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(1), score: [1, 4], again: "NEW MATCH",
                                onAgain: {}, onTitle: {})
@@ -3825,6 +3847,7 @@ final class GameScene: SKScene {
         case .paused:
             let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight,
                                     onRestart: { [weak self] in self?.restartMatch() },
+                                    onSettings: { [weak self] in self?.flowState?.openSettings() },
                                     onTitle: { [weak self] in self?.enter(.title) },
                                     onResume: { [weak self] in self?.enter(.playing) })
             pause.back = { [weak self] in self?.enter(.playing) }
@@ -6779,7 +6802,8 @@ final class GameScene: SKScene {
             let breath = CGFloat(0.5 - 0.5 * cos(CACurrentMediaTime() / ThreePointTuning.breathSeconds * 2 * .pi))
             for arc in threePointArcSides { arc.node.alpha = ThreePointTuning.breathMax * breath }
         }
-        // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames.
+        // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames; none with it set off.
+        if shake > 0, !GameSettings.screenShake { shake = 0 }
         if shake > 0 {
             shake -= 1
             let wobble = CGFloat(shake % 2 == 0 ? 1 : -1) * CGFloat(min(shake, 4))

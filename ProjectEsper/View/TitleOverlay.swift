@@ -32,6 +32,50 @@ final class FlowState: ObservableObject {
         net.onInviteAccepted = { [weak self] in self?.multiplayerOpen = true }
     }
 
+    // MARK: The settings
+
+    /// The settings screen, over the title or the pause; its cursor's row (the last past the
+    /// rows is BACK), and a count bumped when a choice changes, so the screen redraws.
+    @Published var settingsOpen = false
+    @Published var settingsCursor = 0
+    @Published var settingsVersion = 0
+
+    func openSettings() {
+        settingsOpen = true
+        settingsCursor = 0
+    }
+
+    func closeSettings() {
+        SoundBoard.shared.play(.menuBack)
+        settingsOpen = false
+    }
+
+    /// Up or down a row, BACK under the last.
+    func moveSettingsCursor(_ step: Int) {
+        let next = min(max(settingsCursor + step, 0), GameSettings.Row.allCases.count)
+        guard next != settingsCursor else { return }
+        settingsCursor = next
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
+    /// The cursor's row on to its next choice, or back, round the ends.
+    func stepSetting(_ step: Int) {
+        let rows = GameSettings.Row.allCases
+        guard rows.indices.contains(settingsCursor) else { return }
+        let row = rows[settingsCursor]
+        pickSetting(row: settingsCursor, option: (row.picked + step + row.options.count) % row.options.count)
+    }
+
+    /// A choice picked, by a tap or the pad.
+    func pickSetting(row index: Int, option: Int) {
+        let rows = GameSettings.Row.allCases
+        guard rows.indices.contains(index) else { return }
+        settingsCursor = index
+        rows[index].picked = option
+        settingsVersion += 1
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
     // MARK: The multiplayer screen
 
     /// The game's own multiplayer screen, over the title: play now, invite a friend, and
@@ -173,6 +217,9 @@ final class FlowState: ObservableObject {
             scene.applySavedColours()
         case .tuning:
             tuningOpen.toggle()
+        case .settings:
+            SoundBoard.shared.play(SoundBoard.confirm)
+            openSettings()
         case .toneTab(let grid, let tone):
             tones[grid] = tone
             SoundBoard.shared.play(SoundBoard.navigate)
@@ -191,6 +238,8 @@ enum TitleItem: Hashable {
     case bestOfSeven, fortySeven, vsCPU, vsHuman, multiplayer, onlineRounds, onlineFortySeven
     case colour(EnergyColour)
     case tuning
+    /// The gear in the upper right corner, opening the settings.
+    case settings
     /// A swatch on one of the grids, by its index in `EsperPalette.swatches`, and the tabs
     /// that say which tone each grid picks.
     case swatch(UIColourPicks.Grid, Int)
@@ -200,6 +249,7 @@ enum TitleItem: Hashable {
     static let swatchesPerRow = 8
 
     static let rows: [[TitleItem]] = [
+        [.settings],
         [.bestOfSeven, .fortySeven],
         [.vsCPU, .vsHuman],
         [.multiplayer],
@@ -247,6 +297,12 @@ struct TitleOverlay: View {
                     colourPicker
                     .padding(.bottom, 12)
                     .padding(.trailing, 8)
+                }
+                // The settings' gear in the upper right corner.
+                .overlay(alignment: .topTrailing) {
+                    SettingsGear(lit: flow.titleCursor == .settings) { flow.activate(.settings) }
+                        .padding(.top, 14)
+                        .padding(.trailing, 18)
                 }
                 .overlay(alignment: .bottomLeading) {
                     VStack(alignment: .leading, spacing: 10) {

@@ -550,6 +550,22 @@ starting from the pause's and the win's sizes on each platform, the HUD and the 
 1 (the iPad's pad at buttons 0.75 and text 1.5, as tuned); the HUD and the pad are previewed over the court, as in play. The debug pickers and
 sliders keep their plain look.
 
+## Settings
+
+A gear in the title's upper right corner (the dobo pack's `settings_icon_128px` on a round blue
+plate, `ui_icon_settings`, the first of the title cursor's rows) and SETTINGS on the pause open the
+settings (`SettingsScreen`, SwiftUI, full screen on the screens' ground, over the title or the
+pause), kept between launches (`GameSettings`). Each row its name and its choices, the picked one
+plum, gold on the cursor's row; up and down a row, left and right its choice (jump steps it on), B,
+start or BACK to shut them; a tap picks a choice outright.
+
+- SOUND WORDS: ON, SOME (only the biggest, the 16-high ones, `Sound.isBiggest`), OFF.
+- WORD STYLE: the sound words' face, as the SFX debug picker.
+- WALK TRAILS: the dust off a walk or a run.
+- SOUND: the effects' loudness, OFF, LOW, MID, FULL (the mixer at 0, 0.33, 0.66, 1).
+- AMBIENCE: a stage's background sound, the Elements' storm.
+- SCREEN SHAKE: Quake-Up Coffee's and Titan Tea's.
+
 ## The game loop
 
 A best of seven, first to four points, in `Series`. The title screen, drawn by the

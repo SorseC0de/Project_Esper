@@ -65,6 +65,12 @@ final class SoundBoard {
 
     private init() {}
 
+    /// The effects' loudness as the settings have it.
+    func applyVolume() {
+        let levels = GameSettings.soundLevels
+        engine.mainMixerNode.outputVolume = levels[min(max(GameSettings.soundLevel, 0), levels.count - 1)]
+    }
+
     /// Everything read into memory and mixed off the main thread, at launch, and the
     /// engine started when it's done; nothing is loaded the first time a sound plays.
     /// A sound asked for before then is skipped.
@@ -73,6 +79,7 @@ final class SoundBoard {
         // Ambient: under the silent switch, and mixed with whatever else is playing.
         try? AVAudioSession.sharedInstance().setCategory(.ambient)
         try? AVAudioSession.sharedInstance().setActive(true)
+        applyVolume()
         for _ in 0..<SoundBoard.voiceCount {
             let voice = AVAudioPlayerNode()
             engine.attach(voice)

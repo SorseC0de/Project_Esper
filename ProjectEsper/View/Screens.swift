@@ -543,19 +543,21 @@ final class StageSelectScreen: Screen {
     }
 }
 
-/// The pause, against the computer: start the match over, go to the title, or play on.
+/// The pause, against the computer: start the match over, the settings, go to the title, or play on.
 final class PauseScreen: Screen {
-    init(halfWidth: CGFloat, halfHeight: CGFloat, onRestart: @escaping () -> Void, onTitle: @escaping () -> Void, onResume: @escaping () -> Void) {
+    init(halfWidth: CGFloat, halfHeight: CGFloat, onRestart: @escaping () -> Void, onSettings: @escaping () -> Void,
+         onTitle: @escaping () -> Void, onResume: @escaping () -> Void) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pause)
         let width: CGFloat = 230
         // The card as wide as the header over it, so their edges line up.
         let headerWidth = addHeader("PAUSED", at: CGPoint(x: 0, y: halfHeight * 0.62), width: width + 90)
         addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12), piece: .cardPurple)
-        addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.25), width: width, action: onRestart)
-        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.1), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
+        addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.3), width: width, action: onRestart)
+        addButton("SETTINGS", at: CGPoint(x: 0, y: halfHeight * 0.05), width: width, action: onSettings)
+        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.2), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
         addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.45), sound: .menuBack, piece: .buttonPlum, width: width, action: onResume)
         // On RESUME, so a press of jump straight after pausing plays on.
-        place(cursor: 2)
+        place(cursor: 3)
     }
 
     required init?(coder: NSCoder) { fatalError() }

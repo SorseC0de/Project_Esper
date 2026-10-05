@@ -44,6 +44,10 @@ struct GameView: View {
                 MultiplayerScreen(flow: flow, net: flow.net)
                     .transition(.opacity)
             }
+            if flow.settingsOpen {
+                SettingsScreen(flow: flow)
+                    .transition(.opacity)
+            }
             if flow.tuningOpen {
                 UITuningPanel(flow: flow)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -53,6 +57,7 @@ struct GameView: View {
         .animation(.easeOut(duration: 0.25), value: flow.showsTitle)
         .animation(.easeOut(duration: 0.25), value: flow.veiled)
         .animation(.easeOut(duration: 0.2), value: flow.multiplayerOpen)
+        .animation(.easeOut(duration: 0.2), value: flow.settingsOpen)
     }
 }
 

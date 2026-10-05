@@ -94,6 +94,9 @@ enum Onomatopoeia {
             }
         }
 
+        /// One of the biggest words, which the SOME setting still shows.
+        var isBiggest: Bool { spelling.height >= Sound.allCases.map(\.spelling.height).max() ?? 0 }
+
         /// The word in the picked face, its letters growing to the right, or to the left.
         func word(growsLeft: Bool) -> Word {
             let spelling = spelling

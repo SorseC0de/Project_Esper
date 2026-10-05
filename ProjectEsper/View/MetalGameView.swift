@@ -332,7 +332,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.syncStatic(scene.staticFlats, version: scene.staticFlatsVersion)
-        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.hoodSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
+        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.hoodSnapshots, shield: scene.shieldedSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
         maskRenderer.update(atTime: now)
         let maskPass = MTLRenderPassDescriptor()
         maskPass.colorAttachments[0].texture = bodyMask
@@ -384,7 +384,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             // A share of a screen pixel's width per game pixel of reach.
             uniforms.wave = SIMD4(Float(wave.reach) / Float(max(view.drawableSize.width, 1)), Float(wave.waves), Float(wave.phase), Float(wave.calmTop))
         }
-        pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA], uniforms: uniforms,
+        pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms,
              then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)
 
         commands.present(drawable)

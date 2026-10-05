@@ -806,7 +806,9 @@ instead, behind the body, following the body rather than the head; not on a froz
 over the head is cut out of the glow's body mask in black (`hoodSnapshots`, `MaskScene`'s `cutOut`),
 or the skin under it, which never glows, kept it from glowing there and it read darker. It replaces
 the crown's grade. It flashes with the body (a stun, a lockout, an orb taken) as part of its
-silhouette, and the FloState lockout's skin flash is drawn under it. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
+silhouette, and the FloState lockout's skin flash is drawn under it. The face in its opening takes no glow, its own or any spread onto
+it from the hood: the head's skin under the hood is drawn pure red in the glow's mask (`shieldedSnapshots`,
+`MaskScene`'s `shield`), which the bright pass treats as flat and the composite leaves without bloom. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
 Going into FloState the burst and the swirl start as the change does, not when it ends. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
 drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
 In the zone (`ZoneTuning.inTheZone`, a placeholder, off

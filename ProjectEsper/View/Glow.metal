@@ -49,7 +49,9 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
     // marks what must not glow at all.
     float3 mask = bodies.sample(linear, in.uv).rgb;
     float body = dot(mask, float3(0.2126, 0.7152, 0.0722));
-    float flat = step(0.5, mask.g) * step(mask.r, 0.05) * step(mask.b, 0.05);
+    // Pure red, shielded, as the face in a hood's opening: it doesn't glow either.
+    float shielded = step(0.9, mask.r) * step(mask.g, 0.05) * step(mask.b, 0.05);
+    float flat = max(step(0.5, mask.g) * step(mask.r, 0.05) * step(mask.b, 0.05), shielded);
     // Blue glows through the flats under it, from its colour before the water's tint. It can be
     // a single art pixel wide, so any blue at all counts, and the brightest of the full-size
     // pixels under this half-size one is taken rather than their blend with the flats.
@@ -94,6 +96,7 @@ fragment float4 glowBlur(FullScreen in [[stage_in]],
 fragment float4 glowComposite(FullScreen in [[stage_in]],
                               texture2d<float> scene [[texture(0)]],
                               texture2d<float> glow [[texture(1)]],
+                              texture2d<float> bodies [[texture(2)]],
                               sampler linear [[sampler(0)]],
                               constant GlowUniforms &u [[buffer(0)]]) {
     // Under water each row sways a little side to side.
@@ -101,7 +104,10 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
     uv.x += u.wave.x * sin(uv.y * u.wave.y * 6.2831853 + u.wave.z) * smoothstep(u.wave.w, u.wave.w + 0.04, uv.y);
     float4 color = scene.sample(linear, uv);
     float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
-    return float4(color.rgb + bloom, 1);
+    // None spreads onto what's shielded: the face in a hood's opening.
+    float3 mask = bodies.sample(linear, uv).rgb;
+    float shielded = step(0.9, mask.r) * step(mask.g, 0.05) * step(mask.b, 0.05);
+    return float4(color.rgb + bloom * (1 - shielded), 1);
 }
 
 // The ball cam: its texture on a trapezoid over the screen, wider at the top. Each corner

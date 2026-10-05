@@ -178,6 +178,7 @@ final class SpriteLibrary {
         if let outline = result.outline { textures["_outline"] = outline }
         if let glowMask = result.glowMask { textures["_glowmask"] = glowMask }
         if let skin = result.skin { textures["_skin"] = skin }
+        if let headSkin = result.headSkin { textures["_headskin"] = headSkin }
         if let thinOutline = result.thinOutline { textures["_thinoutline"] = thinOutline }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize
@@ -223,6 +224,12 @@ final class SpriteLibrary {
     func thinOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
         _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_thinoutline"]
+    }
+
+    /// A human's head's skin alone from a player frame, in white. Nil when the frame shows none.
+    func headSkinTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
+        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_headskin"]
     }
 
     /// A human's skin alone from a player frame, in white, on the same canvas as the body. Nil
@@ -433,10 +440,10 @@ final class SpriteLibrary {
     /// centre of each glowing part found. The ball is looked for only where the sheet
     /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
     /// with no line, and the body is drawn and lined without them.
-    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
+    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, headSkin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, nil, [:]) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
         // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
@@ -619,10 +626,20 @@ final class SpriteLibrary {
             }
             if any { skin = skinContext.makeImage().map { SKTexture(cgImage: $0) } }
         }
+        // The head's skin alone, for the glow's mask: what shows through the hood's face.
+        var headSkin: SKTexture?
+        if detach, look.human, let (headContext, headPixels) = makeCanvas(width: width, height: height) {
+            var any = false
+            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !lined[pixel] && parts[pixel] == .head {
+                for channel in 0..<4 { headPixels[pixel * 4 + channel] = 255 }
+                any = true
+            }
+            if any { headSkin = headContext.makeImage().map { SKTexture(cgImage: $0) } }
+        }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, nil, [:]) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, headSkin, thinOutline, centres)
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

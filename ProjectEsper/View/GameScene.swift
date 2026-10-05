@@ -377,6 +377,17 @@ final class GameScene: SKScene {
         }
     }
 
+    /// Under the hood, the head's skin, in the glow's mask as shielded: no glow lands on the face
+    /// in the hood's opening.
+    var shieldedSnapshots: [BodySnapshot] {
+        zip(playerNodes, hoodNodes).compactMap { body, hood in
+            guard !hood.isHidden, hood.zPosition == GameScene.hoodUpZ, let texture = headSkins[ObjectIdentifier(body)] else { return nil }
+            return BodySnapshot(texture: texture, position: body.position, anchor: body.anchorPoint, xScale: body.xScale, size: body.size, zRotation: body.zRotation)
+        }
+    }
+    /// Each body's head skin this frame, by its node.
+    private var headSkins: [ObjectIdentifier: SKTexture] = [:]
+
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
         playerNodes.filter { !$0.isHidden }.compactMap { node in
@@ -6367,6 +6378,7 @@ final class GameScene: SKScene {
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
                 hood.zRotation = node.zRotation
+                headSkins[ObjectIdentifier(node)] = energyForm ? nil : sprites.headSkinTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
             } else {
                 hood.isHidden = true
             }

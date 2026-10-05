@@ -19,6 +19,7 @@ final class MaskScene: SKScene {
     private let cameraNode = SKCameraNode()
     private var bodies: [SKSpriteNode] = []
     private var cutOuts: [SKSpriteNode] = []
+    private var shielded: [SKSpriteNode] = []
     private var flats: [SKSpriteNode] = []
     private var underFlats: [SKSpriteNode] = []
     /// What glows though it's over something that doesn't, as the Hoopfish's rings over Wetshot
@@ -63,6 +64,7 @@ final class MaskScene: SKScene {
     private static let flatGreen = flat(SIMD4<Float>(0, 1, 0, 1))
     private static let flatBlue = flat(SIMD4<Float>(0, 0, 1, 1))
     private static let flatBlack = flat(SIMD4<Float>(0, 0, 0, 1))
+    private static let flatRed = flat(SIMD4<Float>(1, 0, 0, 1))
 
     /// The stage's still, non-glowing art in green, redone when `version` changes.
     func syncStatic(_ flats: [BodySnapshot], version: Int) {
@@ -81,13 +83,15 @@ final class MaskScene: SKScene {
 
     /// Copies the game's bodies and camera, and the flat things in green.
     /// `cutOut`: drawn black over the bodies, so what's there takes the plain threshold.
+    /// `shield`: drawn red under the cut-outs: no glow, its own or any spread onto it.
     func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], under: [BodySnapshot] = [], through: [BodySnapshot] = [],
-                throughFront: [BodySnapshot] = [], throughNets: [CGPath] = [], cutOut: [BodySnapshot] = [],
+                throughFront: [BodySnapshot] = [], throughNets: [CGPath] = [], cutOut: [BodySnapshot] = [], shield: [BodySnapshot] = [],
                 size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat) {
         if self.size != size { self.size = size }
         cameraNode.position = cameraPosition
         cameraNode.setScale(cameraScale)
         place(snapshots, in: &bodies, green: false)
+        place(shield, in: &shielded, green: false, depth: 2.5, shader: MaskScene.flatRed)
         place(cutOut, in: &cutOuts, green: false, depth: 3, shader: MaskScene.flatBlack)
         place(flat, in: &flats, green: true)
         place(under, in: &underFlats, green: true, depth: -0.5)

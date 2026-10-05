@@ -278,7 +278,11 @@ whatever lands on it came at, held down 12° while someone
   ball's bottom that has to come down through, so all of it was above the rim first: one thrown
   flat at the rim's height, off the backboard, drops out under it (protocol 18). The point counts
   once its middle is through as well, the ball in the net, not as it first meets the rim; out of
-  the rim sideways or back up before then, it doesn't (`Ball.enteringHoop`, protocol 94). A straight
+  the rim sideways or back up before then, it doesn't (`Ball.enteringHoop`, protocol 94). Coming down
+  into the rim it slides to the rim's middle (a third of the way a frame, the rest as it scores, so
+  the point is held with the ball dead centre), its sideways speed kept aside (`Ball.throughNet`,
+  protocol 95): the net swishes the way it really came in (`entryVelocity`), and out of the net's
+  bottom (12.5 under the rim) or back out of the rim it gets that speed back to bounce on with. A straight
   rim's front lip, its lower half, is drawn again over the ball, so the ball goes down through the
   ring (`GameScene.rimFronts`). The dunk lets
   go of it with its bottom just over the rim. On Hoopfish Hideaway a throw down goes through the

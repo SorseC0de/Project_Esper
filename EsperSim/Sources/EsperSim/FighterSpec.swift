@@ -253,6 +253,10 @@ public enum DefenceRules {
 
 /// Everything about the ball, the hoops and the plays on them. Units and frames.
 public enum BallRules {
+    /// A made basket down the net: how far under the rim the net's bottom is, in units (20 art
+    /// pixels), and the share of the way to the rim's middle it's drawn a frame.
+    public static let netDepth = 12.5
+    public static let netCentring = 0.35
     /// After a point, frames in which no other counts.
     public static let scoreLockoutFrames = 20
     public static let gravity = 0.15

@@ -62,11 +62,21 @@ public struct Ball: Equatable {
     /// once its middle is through too, so the basket counts as the ball sits in the net, not as
     /// it touches the rim. Out of it sideways or back up, it's lost.
     var enteringHoop: Int?
+    /// A made basket going down the net: drawn to the rim's middle, its sideways speed kept aside
+    /// and given back once it's out of the net's bottom, or out of the rim, to bounce on with.
+    var throughNet: NetDrop?
+    struct NetDrop: Equatable {
+        var hoop: Int
+        var carriedX: Double
+    }
+    /// What it came into the rim with, for the net's swish: its kept sideways speed while it's in the net.
+    public var entryVelocity: Vec2 { throughNet.map { Vec2(x: $0.carriedX, y: velocity.y) } ?? velocity }
 
     public init(position: Vec2) {
         self.position = position
         previousY = position.y
         enteringHoop = nil
+        throughNet = nil
     }
 
     /// Under water the ball falls at half the pull, no faster than half the speed, and rolls to a
@@ -124,6 +134,7 @@ public struct Ball: Equatable {
             if previousY - BallRules.radius >= hoop.position.y, position.y - BallRules.radius < hoop.position.y {
                 if scoring {
                     enteringHoop = index
+                    if throughNet == nil { throughNet = NetDrop(hoop: index, carriedX: velocity.x) }
                 } else {
                     events.append(.rimBounced(hoop: index, speed: abs(velocity.y), ball: true))
                     position.y = hoop.position.y + BallRules.radius
@@ -138,11 +149,29 @@ public struct Ball: Equatable {
             if position.y < hoop.position.y {
                 scoredHoop = entering
                 enteringHoop = nil
+                // Through: at the rim's middle as the point is held, the slide done.
+                if throughNet != nil {
+                    position.x = hoop.position.x
+                    velocity.x = 0
+                }
             } else if velocity.y > 0 || abs(position.x - hoop.position.x) > BallRules.rimHalfWidth + BallRules.radius {
                 enteringHoop = nil
+                leaveNet()
             }
         } else {
             enteringHoop = nil
+        }
+        // Down the net: drawn to the rim's middle, till it's out of the bottom or going back up.
+        if let through = throughNet, stage.hoops.indices.contains(through.hoop) {
+            let hoop = stage.hoops[through.hoop]
+            if position.y < hoop.position.y - BallRules.netDepth || velocity.y > 0 {
+                leaveNet()
+            } else {
+                position.x += (hoop.position.x - position.x) * BallRules.netCentring
+                velocity.x = 0
+            }
+        } else {
+            throughNet = nil
         }
 
         rollOffSlopes(stage, incoming: incoming, events: &events)
@@ -161,6 +190,12 @@ public struct Ball: Equatable {
         }
         resting = onFloor && velocity == .zero
         return scoredHoop
+    }
+
+    /// Out of the net: its sideways speed back, to go on with.
+    private mutating func leaveNet() {
+        if let through = throughNet { velocity.x = through.carriedX }
+        throughNet = nil
     }
 
     /// Bends a falling ball's path so it arrives over the rim: the sideways speed it would
@@ -239,6 +274,7 @@ public struct Ball: Equatable {
         self.position = position
         previousY = position.y
         enteringHoop = nil
+        throughNet = nil
         self.velocity = velocity
         self.pace = pace
         self.straight = straight
@@ -274,6 +310,7 @@ public struct Ball: Equatable {
         self.position = position
         previousY = position.y
         enteringHoop = nil
+        throughNet = nil
         velocity = Vec2(x: 0, y: BallRules.floaterSpeed)
         pace = 1
         burning = false
@@ -310,6 +347,7 @@ public struct Ball: Equatable {
         position = spawn
         previousY = spawn.y
         enteringHoop = nil
+        throughNet = nil
         velocity = .zero
         pace = 1
         burning = false

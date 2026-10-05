@@ -180,7 +180,7 @@ public struct Match: Equatable {
                     // kept off the ball a while.
                     let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage) * pointValue
                     scores[owner] += points
-                    events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: points, floater: ball.floaterShot))
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: points, floater: ball.floaterShot))
                     if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position) }
                     holdHitStop(HitStopRules.shotFrames)
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
@@ -193,7 +193,7 @@ public struct Match: Equatable {
                     // Level after a point, the next is the stage's decider: it starts from the ball in
                     // neutral rather than in the hands of whoever was just scored on.
                     let tiedDecider = scores[0] == scores[1]
-                    events.append(.scored(player: owner, hoop: hoop, entry: ball.velocity, points: 1, floater: ball.floaterShot))
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot))
                     if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position) }
                     holdHitStop(HitStopRules.shotFrames)
                     if let other = players.indices.first(where: { $0 != owner }) {

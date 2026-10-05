@@ -99,3 +99,24 @@ final class FloDropTests: XCTestCase {
         XCTAssertEqual(match.players[1].flo, 30)
     }
 }
+
+/// A made basket goes down the net through the rim's middle, and keeps its way for after.
+final class NetDropTests: XCTestCase {
+    func testAMadeBasketIsHeldAtTheRimsMiddleWithItsWayKeptForTheNet() {
+        var match = Match()
+        match.countdown = 0
+        let hoop = match.stage.hoops[1]
+        match.ball.respawn(at: hoop.position + Vec2(x: -2, y: 8))
+        match.ball.velocity = Vec2(x: 0.6, y: -2)
+        match.ball.scoring = true
+        match.ball.lastTouched = 0
+        var entry: Vec2?
+        for _ in 0..<20 where entry == nil {
+            match.advance(inputs: [.idle, .idle])
+            for case .scored(_, _, let came, _, _) in match.events { entry = came }
+        }
+        XCTAssertEqual(match.scores[0], 1)
+        XCTAssertEqual(match.ball.position.x, hoop.position.x, accuracy: 1e-9, "held at the rim's middle")
+        XCTAssertEqual(entry?.x ?? 0, 0.6, accuracy: 1e-9, "the net swishes the way it came in")
+    }
+}

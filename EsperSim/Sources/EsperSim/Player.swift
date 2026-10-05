@@ -174,7 +174,7 @@ public struct Player: Equatable {
     /// FloState, the energy form.
     public var flo = 0
     /// In FloState: changed into the energy form with throw and shoot together, faster, quicker
-    /// and higher (`FloStateRules`), a FLO spent every 0.6 seconds; left the same way, or when it runs out.
+    /// and higher (`FloStateRules`), a FLO spent every 0.3 seconds; left the same way, or when it runs out.
     public var inFloState = false
     /// Frames before FloState can be entered again, from when it was left.
     public var floStateLockout = 0
@@ -2310,7 +2310,7 @@ extension Player {
 }
 
 /// FloState: a tenth faster on the move and through actions, a tenth higher off every jump; a
-/// FLO spent every 0.6 seconds, so a full meter lasts a minute; entered only at full, and not
+/// FLO spent every 0.3 seconds, so a full meter lasts half a minute; entered only at full, and not
 /// for a second once left.
 public enum FloStateRules {
     public static let speedShare = 1.1
@@ -2318,7 +2318,7 @@ public enum FloStateRules {
     public static let jumpPush = 1.1.squareRoot()
     /// One frame in this many, an action's clock moves two.
     public static let actionHurryInterval = 10
-    public static let spendFrames = 36
+    public static let spendFrames = 18
     public static let lockoutFrames = 60
 }
 

@@ -173,6 +173,10 @@ final class GameScene: SKScene {
     /// Each human's hood over its head, and the frame it was drawn for.
     private var hoodNodes: [SKSpriteNode] = []
     private static let hoodDrawnFor = AnimationFrame(.idle, 2)
+    /// Over the body and under the head's own node, or behind the body; and how much lighter than the energy.
+    private static let hoodUpZ: CGFloat = 0.038
+    private static let hoodDownZ: CGFloat = -0.005
+    private static let hoodLightening = 0.2
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
     /// and coloured each frame: the look's outline, or the zone's.
     private var outlineNodes: [SKSpriteNode] = []
@@ -873,7 +877,7 @@ final class GameScene: SKScene {
             figure.addChild(energy)
             energyNodes.append(energy)
             let hood = SKSpriteNode()
-            hood.zPosition = 0.038
+            hood.zPosition = GameScene.hoodUpZ
             hood.isHidden = true
             hood.shader = energyToneShader
             figure.addChild(hood)
@@ -4766,6 +4770,7 @@ final class GameScene: SKScene {
     /// Into or out of FloState, how many frames the cubes swirl round the body.
     private static let floSwirlFrames = 30
     private var wasInFloState: [Int: Bool] = [:]
+    private var lastChanging: [Int: Bool] = [:]
     private var floSwirlFrames: [Int: Int] = [:]
     /// Rising round the body in a helix: while it changes, up to the energy form, and while it swirls.
     private func spiralling(_ index: Int) -> Bool {
@@ -6323,15 +6328,17 @@ final class GameScene: SKScene {
                 CGPoint(x: offset.x * cos(tilt) - offset.y * sin(tilt), y: offset.x * sin(tilt) + offset.y * cos(tilt))
             }
 
-            // A human's hood, toned in the energy as the energy is, so it glows the same: drawn
-            // for the idle's third frame, moved each frame by how far the head is from it there.
+            // The hood, toned in the energy as the energy is, so it glows the same, a little
+            // lighter: up over the human's head, down behind the energy form's. Drawn for the
+            // idle's third frame, moved each frame by how far the head is from it there.
             let hood = hoodNodes[index]
             let headNow = sprites.landmark(.head, in: frame, player: index)
             let headDrawnFor = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index)
-            if sprites.look(for: drawnAs).human, player.frozen == 0, !node.isHidden, let headNow, let headDrawnFor {
+            if player.frozen == 0, !node.isHidden, let headNow, let headDrawnFor {
                 hood.isHidden = false
-                hood.texture = sprites.texture("player_hood", 0)
-                setGlow(hood, SKColor(rgb: sprites.look(for: index).glow))
+                hood.texture = sprites.texture(energyForm ? "player_hood_down" : "player_hood", 0)
+                hood.zPosition = energyForm ? GameScene.hoodDownZ : GameScene.hoodUpZ
+                setGlow(hood, SKColor(rgb: Look.lightened(sprites.look(for: index).glow, GameScene.hoodLightening)))
                 hood.size = hood.texture!.size().scaled(by: drawScale)
                 hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
                 let moved = (headNow - headDrawnFor) * drawScale
@@ -6484,12 +6491,16 @@ final class GameScene: SKScene {
                                       streams: [legStream(index, part: part, energyColour: energyForm)])
                 }
             }
-            // Into or out of FloState: a burst in the energy's colour, and cubes swirling round a while.
-            if wasInFloState[index, default: player.inFloState] != player.inFloState {
+            // Into FloState, as the change starts, or out of it: a burst in the energy's colour, and
+            // cubes swirling round a while (going in, the change's own spiral as well).
+            let goingIn = changing && lastChanging[index] != true
+            let goingOut = wasInFloState[index] == true && !player.inFloState
+            if goingIn || goingOut {
                 glowers.addChild(EnergyEffect.burst.node(sprites, player: index, at: SpriteLibrary.point(player.chest)))
                 floSwirlFrames[index] = GameScene.floSwirlFrames
             }
             wasInFloState[index] = player.inFloState
+            lastChanging[index] = changing
             if floSwirlFrames[index, default: 0] > 0 { floSwirlFrames[index, default: 0] -= 1 }
             // Changing, up to the white frame cubes spiral up round the whole body; and swirling.
             if (changing && frame.frame <= GameScene.transformWhiteFrame || floSwirlFrames[index, default: 0] > 0), ParticleLook.cubes {

@@ -134,8 +134,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   it's in FloState (`Player.inFloState`, protocol 79): only with a full meter (`floStateReady`, protocol 81), left any time.
   In it the body moves, and is hurried through its actions, a tenth faster (`FloStateRules`: the
   speed share 1.1, and one action frame in ten the clock moves two, `reached` firing for a frame
-  passed over), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent every 0.6 seconds
-  (`spendFrames`, 36), so a full meter lasts a minute, and with none left it's out (protocol 80).
+  passed over), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent every 0.3 seconds
+  (`spendFrames`, 18), so a full meter lasts half a minute, and with none left it's out (protocol 82).
   Out, by the same press or the FLO running out (a burn too), it can't go back for
   a second (`floStateLockout`, 60 frames), its skin alone flashing palette 17 every other four
   frames meanwhile (`SpriteLibrary.skinTexture`); FloState and the lockout are kept through a point.
@@ -801,7 +801,9 @@ drawn on the body rather than apart (no lag, no bob, no enlarging), outlined wit
 glowing, its particles still rising off it; over it the hood (`player_hood`, its own node), toned
 through the energy ramp as the energy on the body is so it glows the same, drawn for `player_idle`'s
 third frame and moved every frame by how far the head's middle (its landmark) is from there, turned
-and flipped with the body; not on the energy form or a frozen body. It replaces the crown's grade. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
+and flipped with the body, the energy a fifth lighter for it; in FloState's energy form `player_hood_down`
+instead, behind the body, placed the same way; not on a frozen body. It replaces the crown's grade.
+Going into FloState the burst and the swirl start as the change does, not when it ends. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
 drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
 In the zone (`ZoneTuning.inTheZone`, a placeholder, off
 until something puts a player in it, for now nothing) the outline eases through 7 #F9A31B, 11 #9CDB43, 19 #249FDE, 20 #20D6C7, 27 #BC4A9B a quarter second each, and so do the

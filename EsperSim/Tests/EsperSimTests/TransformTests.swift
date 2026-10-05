@@ -88,16 +88,16 @@ final class TransformTests: XCTestCase {
         XCTAssertTrue(match.players[0].floStateReady)
     }
 
-    func testAFloEverySixTenthsOfASecondAndAFullMeterLastsAMinute() {
+    func testAFloEveryThreeTenthsOfASecondAndAFullMeterLastsHalfAMinute() {
         var match = standing()
         match.players[0].inFloState = true
         for _ in 0..<FloStateRules.spendFrames { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.players[0].flo, FloRules.full - 1, "standing still spends too")
         match.players[0].flo = FloRules.full
-        for _ in 0..<(60 * 60 - 1) { match.advance(inputs: [.idle, .idle]) }
+        for _ in 0..<(30 * 60 - 1) { match.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(match.players[0].inFloState)
         match.advance(inputs: [.idle, .idle])
-        XCTAssertFalse(match.players[0].inFloState, "out at a minute")
+        XCTAssertFalse(match.players[0].inFloState, "out at half a minute")
         XCTAssertGreaterThan(match.players[0].floStateLockout, 0)
     }
 

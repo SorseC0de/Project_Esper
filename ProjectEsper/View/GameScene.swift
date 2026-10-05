@@ -5304,9 +5304,11 @@ final class GameScene: SKScene {
                 guard let self else { return }
                 let map = StageMap.current[mapStage]
                 for cell in cells {
-                    let placed = map.tiles.first { $0.cell == cell }
-                    self.elementsArt?.set(placed, at: cell)
-                    self.flightArt?.set(placed, at: cell)
+                    for layer in StageMap.layers {
+                        let placed = map.tiles.first { $0.cell == cell && $0.layer == layer }
+                        self.elementsArt?.set(placed, at: cell, layer: layer)
+                        self.flightArt?.set(placed, at: cell, layer: layer)
+                    }
                 }
                 self.refreshStaticFlats()
                 self.session.mutate { match in

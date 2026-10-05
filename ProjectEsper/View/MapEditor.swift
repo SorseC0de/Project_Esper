@@ -49,6 +49,8 @@ import UIKit
 final class MapEditor: SKNode {
     private enum Tool: Equatable {
         case brush(StageMap.Cell)
+        /// A block of the sheet, its top left and bottom right art cells, put down whole.
+        case stamp(StageMap.Cell, StageMap.Cell)
         case erase
         case marker(Marker)
         /// A whole tornado, placed by the cell its base's middle is in.
@@ -109,6 +111,15 @@ final class MapEditor: SKNode {
     private var carried: Carried?
     private var painting = false
     private var lastCell: StageMap.Cell?
+    /// MULTI: a drag on the sheet picks a block of it, put down whole. OVER: tiles go on the
+    /// layer over the ground, drawn on top of what's there, and bring no wall.
+    private var multiSelect = false
+    private var overlaying = false
+    private var layer: Int { overlaying ? 1 : 0 }
+    /// Where a drag across the sheet started, while picking a block.
+    private var blockStart: StageMap.Cell?
+    /// Where a stroke of stamps started, so it lays them side by side.
+    private var stampOrigin: StageMap.Cell?
     /// Cells whose tile changed since the game was last told, and whether the tornados did.
     private var dirty: Set<StageMap.Cell> = []
     private var tornadosDirty = false
@@ -284,11 +295,14 @@ final class MapEditor: SKNode {
                 + Marker.on(stage).map { ($0.label, .marker($0)) }
         }
         let toolRow: [(String, () -> Void)] = tools.map { title, picked in (title, { [weak self] in self?.tool = picked; self?.buildPanel() }) }
-        // More than one sheet: a row to page through them.
-        let sheetRow: [(String, () -> Void)] = showsSheet && tiles.sheets.count > 1 ? [
+        // With a sheet: MULTI and OVER, and with more than one sheet, paging through them.
+        let sheetRow: [(String, () -> Void)] = !showsSheet ? [] : [
+            ("MULTI \(multiSelect ? "ON" : "OFF")", { [weak self] in self?.multiSelect.toggle(); self?.buildPanel() }),
+            ("OVER \(overlaying ? "ON" : "OFF")", { [weak self] in self?.overlaying.toggle(); self?.buildPanel() }),
+        ] + (tiles.sheets.count > 1 ? [
             ("\u{25C0}", { [weak self] in self?.turnSheet(-1) }), ("SHEET \(sheetIndex + 1)/\(tiles.sheets.count)", {}),
             ("\u{25B6}", { [weak self] in self?.turnSheet(1) }),
-        ] : []
+        ] : [])
         let lit = Set(tools.filter { $0.1 == tool }.map(\.0))
         func labelWidth(_ title: String) -> CGFloat {
             let label = SKLabelNode(text: title)
@@ -456,12 +470,32 @@ final class MapEditor: SKNode {
 
     /// The chosen tile ringed in the panel.
     private func showSelection() {
-        guard paletteShown, case .brush(let art) = tool, tiles.sheet(of: art) == sheetIndex else { selection.isHidden = true; return }
+        let block: (StageMap.Cell, StageMap.Cell)
+        switch tool {
+        case .brush(let art): block = (art, art)
+        case .stamp(let first, let last): block = (first, last)
+        default: selection.isHidden = true; return
+        }
+        guard paletteShown, tiles.sheet(of: block.0) == sheetIndex else { selection.isHidden = true; return }
         selection.isHidden = false
         let side = tiles.cellPixels * paletteScale
-        let column = art.column - sheetIndex * tiles.columnsPerSheet
+        let column = block.0.column - sheetIndex * tiles.columnsPerSheet
+        let across = CGFloat(block.1.column - block.0.column + 1), down = CGFloat(block.1.row - block.0.row + 1)
         selection.path = CGPath(rect: CGRect(x: paletteRect.minX + CGFloat(column) * side,
-                                             y: paletteRect.maxY - CGFloat(art.row + 1) * side, width: side, height: side), transform: nil)
+                                             y: paletteRect.maxY - (CGFloat(block.0.row) + down) * side, width: side * across, height: side * down), transform: nil)
+    }
+
+    /// The sheet's cell under a point, drawn in or not, held to the sheet: for a block's corner.
+    private func sheetCell(at point: CGPoint) -> StageMap.Cell {
+        let side = tiles.cellPixels * paletteScale
+        let column = min(max(Int((point.x - paletteRect.minX) / side), 0), tiles.columnsPerSheet - 1)
+        let row = min(max(Int((paletteRect.maxY - point.y) / side), 0), tiles.rows(of: sheetIndex) - 1)
+        return StageMap.Cell(sheetIndex * tiles.columnsPerSheet + column, row)
+    }
+
+    /// A block's two corners as its top left and bottom right.
+    private static func block(_ a: StageMap.Cell, _ b: StageMap.Cell) -> Tool {
+        .stamp(StageMap.Cell(min(a.column, b.column), min(a.row, b.row)), StageMap.Cell(max(a.column, b.column), max(a.row, b.row)))
     }
 
     private func paletteCell(at point: CGPoint) -> StageMap.Cell? {
@@ -473,7 +507,8 @@ final class MapEditor: SKNode {
 
     // MARK: The map
 
-    private func tile(at cell: StageMap.Cell) -> StageMap.Placed? { map.tiles.first { $0.cell == cell } }
+    /// The tile on the layer being worked, at a cell.
+    private func tile(at cell: StageMap.Cell) -> StageMap.Placed? { map.tiles.first { $0.cell == cell && $0.layer == layer } }
 
     private func markerCell(_ marker: Marker) -> StageMap.Cell {
         switch marker {
@@ -544,18 +579,34 @@ final class MapEditor: SKNode {
     }
 
     private func place(_ art: StageMap.Cell, at cell: StageMap.Cell) {
-        map.tiles.removeAll { $0.cell == cell }
-        map.tiles.append(.init(cell, art: art))
+        let layer = layer
+        map.tiles.removeAll { $0.cell == cell && $0.layer == layer }
+        map.tiles.append(.init(cell, art: art, layer: layer))
         dirty.insert(cell)
-        // A tile brings a block with it where there's no wall yet, the Elements' decoration excepted.
-        if !(stage == .elements && StageMap.decoration.contains(art)), map.wall(at: cell) == nil { setWall(.solid, at: cell) }
+        // A ground tile brings a block with it where there's no wall yet, the Elements' decoration excepted.
+        if layer == 0, !(stage == .elements && StageMap.decoration.contains(art)), map.wall(at: cell) == nil { setWall(.solid, at: cell) }
+    }
+
+    /// The block in hand put down with its top left at `cell`, its empty cells leaving what's under them.
+    private func stamp(at cell: StageMap.Cell) {
+        guard case .stamp(let first, let last) = tool else { return }
+        let drawn = Set(tiles.filled(sheet: tiles.sheet(of: first)))
+        for down in 0...(last.row - first.row) {
+            for across in 0...(last.column - first.column) {
+                let art = StageMap.Cell(first.column + across, first.row + down)
+                let target = StageMap.Cell(cell.column + across, cell.row - down)
+                guard drawn.contains(art), (0..<stage.columns).contains(target.column), (0..<stage.rows).contains(target.row) else { continue }
+                place(art, at: target)
+            }
+        }
     }
 
     /// A tile taken off its cell takes a block with it; a slope painted there stays.
     private func takeAwayTile(at cell: StageMap.Cell) {
-        map.tiles.removeAll { $0.cell == cell }
+        let layer = layer
+        map.tiles.removeAll { $0.cell == cell && $0.layer == layer }
         dirty.insert(cell)
-        if map.wall(at: cell) == .solid { setWall(nil, at: cell) }
+        if layer == 0, map.wall(at: cell) == .solid { setWall(nil, at: cell) }
     }
 
     private func erase(at cell: StageMap.Cell) {
@@ -719,6 +770,14 @@ final class MapEditor: SKNode {
             showGhost(at: point)
             return
         }
+        if multiSelect, paletteShown, !wallsMode, stage != .wetshot, paletteRect.contains(point) {
+            // MULTI: a block of the sheet, from here to where the drag lets go.
+            let corner = sheetCell(at: point)
+            blockStart = corner
+            tool = MapEditor.block(corner, corner)
+            showSelection()
+            return
+        }
         if let art = paletteCell(at: point) {
             tool = .brush(art)
             showSelection()
@@ -832,6 +891,13 @@ final class MapEditor: SKNode {
                 place(art, at: cell)
                 commit()
             }
+        case .stamp:
+            // The block put down here, and on along the stroke side by side.
+            remember()
+            painting = true
+            stampOrigin = cell
+            stamp(at: cell)
+            commit()
         case .wall:
             // Only in walls mode, handled above.
             break
@@ -843,10 +909,20 @@ final class MapEditor: SKNode {
             turn(turnSliders[turning], to: point)
             return
         }
+        if let blockStart {
+            // Picking a block: from where the drag started to here.
+            tool = MapEditor.block(blockStart, sheetCell(at: point))
+            showSelection()
+            return
+        }
         let under = over(point) ? nil : cell(at: point)
         if let under {
+            // A block shows its whole size, hanging down and right from the cell.
+            var size = (across: 1, down: 1)
+            if case .stamp(let first, let last) = tool, !wallsMode { size = (last.column - first.column + 1, last.row - first.row + 1) }
             let rect = hudRect(of: under)
-            hover.path = CGPath(rect: CGRect(origin: .zero, size: rect.size), transform: nil)
+            hover.path = CGPath(rect: CGRect(x: 0, y: -CGFloat(size.down - 1) * cellSide, width: cellSide * CGFloat(size.across),
+                                             height: cellSide * CGFloat(size.down)), transform: nil)
             hover.position = rect.origin
             hover.isHidden = false
         } else {
@@ -874,6 +950,12 @@ final class MapEditor: SKNode {
                 propsDirty = true
             }
         case .brush(let art): place(art, at: under)
+        case .stamp(let first, let last):
+            // Only where a whole block lies beside the last, so they tile.
+            if let origin = stampOrigin, (under.column - origin.column) % (last.column - first.column + 1) == 0,
+               (origin.row - under.row) % (last.row - first.row + 1) == 0 {
+                stamp(at: under)
+            }
         case .wall: setWall(strokeKind, at: under)
         case .marker, .tornado, .prop, .pile: break
         }
@@ -882,6 +964,12 @@ final class MapEditor: SKNode {
 
     func ended(at point: CGPoint) {
         turning = nil
+        stampOrigin = nil
+        if blockStart != nil {
+            blockStart = nil
+            buildPanel()
+            return
+        }
         defer {
             carried = nil
             painting = false

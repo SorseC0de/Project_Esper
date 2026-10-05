@@ -70,31 +70,40 @@ final class MapTiles {
     }
 }
 
+/// Where a placed tile's sprite is: its cell and its layer.
+struct TileSpot: Hashable {
+    var cell: StageMap.Cell
+    var layer: Int
+    /// The ground layer under everything on the stage but the backdrop, the layer over it just above.
+    static func z(_ layer: Int) -> CGFloat { -8 + CGFloat(layer) * 0.1 }
+}
+
 /// Flight's scenery: a sprite for every tile the map has placed, cut from its sheets.
 enum FlightArt {
     /// What the stage's art gives back: each placed tile's sprite by its cell, to be changed by the map maker.
     struct Handles {
-        var tiles: [StageMap.Cell: SKSpriteNode] = [:]
+        var tiles: [TileSpot: SKSpriteNode] = [:]
         let parent: SKNode
 
-        mutating func set(_ placed: StageMap.Placed?, at cell: StageMap.Cell) {
-            tiles[cell]?.removeFromParent()
-            tiles[cell] = nil
+        mutating func set(_ placed: StageMap.Placed?, at cell: StageMap.Cell, layer: Int) {
+            let spot = TileSpot(cell: cell, layer: layer)
+            tiles[spot]?.removeFromParent()
+            tiles[spot] = nil
             // Only on the stage: a map kept from when it was bigger may have tiles past its edges.
             guard let placed, (0..<FlightRules.columns).contains(cell.column), (0..<FlightRules.rows).contains(cell.row) else { return }
             let node = SKSpriteNode(texture: MapTiles.flight.tile(placed.art))
             node.size = CGSize(width: ElementsArt.tileSide, height: ElementsArt.tileSide)
             node.anchorPoint = .zero
             node.position = CGPoint(x: CGFloat(cell.column) * ElementsArt.tileSide, y: CGFloat(cell.row) * ElementsArt.tileSide)
-            node.zPosition = -8
+            node.zPosition = TileSpot.z(layer)
             parent.addChild(node)
-            tiles[cell] = node
+            tiles[spot] = node
         }
     }
 
     static func build(map: StageMap, into parent: SKNode) -> Handles {
         var handles = Handles(parent: parent)
-        for placed in map.tiles { handles.set(placed, at: placed.cell) }
+        for placed in map.tiles { handles.set(placed, at: placed.cell, layer: placed.layer) }
         return handles
     }
 }

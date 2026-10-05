@@ -85,7 +85,7 @@ enum ElementsArt {
 
     /// What the stage's art gives back: each placed tile's sprite by its cell, to be changed by the map maker.
     struct Handles {
-        var tiles: [StageMap.Cell: SKSpriteNode] = [:]
+        var tiles: [TileSpot: SKSpriteNode] = [:]
         var tornados: [SKSpriteNode] = []
         var tornadoOverlays: [SKSpriteNode] = []
         /// The stage's fixed art, for the glow's mask to leave out: the mountains, the icicles.
@@ -139,17 +139,18 @@ enum ElementsArt {
             }
         }
 
-        mutating func set(_ placed: StageMap.Placed?, at cell: StageMap.Cell) {
-            tiles[cell]?.removeFromParent()
-            tiles[cell] = nil
+        mutating func set(_ placed: StageMap.Placed?, at cell: StageMap.Cell, layer: Int) {
+            let spot = TileSpot(cell: cell, layer: layer)
+            tiles[spot]?.removeFromParent()
+            tiles[spot] = nil
             guard let placed else { return }
             let node = SKSpriteNode(texture: ElementsArt.tile(placed.art))
             node.size = CGSize(width: ElementsArt.tileSide, height: ElementsArt.tileSide)
             node.anchorPoint = .zero
             node.position = CGPoint(x: CGFloat(cell.column) * ElementsArt.tileSide, y: CGFloat(cell.row) * ElementsArt.tileSide)
-            node.zPosition = -8
+            node.zPosition = TileSpot.z(layer)
             parent.addChild(node)
-            tiles[cell] = node
+            tiles[spot] = node
         }
     }
 
@@ -245,7 +246,7 @@ enum ElementsArt {
         handles.shaftWalls = shaftWalls
         handles.mountains = range
         handles.icicles = icicles
-        for placed in map.tiles { handles.set(placed, at: placed.cell) }
+        for placed in map.tiles { handles.set(placed, at: placed.cell, layer: placed.layer) }
         handles.setTornados(map.tornados)
         return handles
     }

@@ -59,12 +59,25 @@ public struct StageMap: Equatable, Codable {
         public init(_ cell: Cell, _ kind: Kind) { self.cell = cell; self.kind = kind }
     }
 
-    /// A tile placed on the stage's grid, drawn as the tileset's cell `art`.
+    /// A tile placed on the stage's grid, drawn as the tileset's cell `art`, on `layer`: 0 the
+    /// ground, one to a cell, and 1 over it, drawn on top, such as a window on a wall.
     public struct Placed: Equatable, Hashable, Codable {
         public var cell: Cell
         public var art: Cell
-        public init(_ cell: Cell, art: Cell) { self.cell = cell; self.art = art }
+        public var layer: Int
+        public init(_ cell: Cell, art: Cell, layer: Int = 0) { self.cell = cell; self.art = art; self.layer = layer }
+
+        private enum CodingKeys: String, CodingKey { case cell, art, layer }
+        /// Tiles kept before there were layers are on the ground.
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            cell = try values.decode(Cell.self, forKey: .cell)
+            art = try values.decode(Cell.self, forKey: .art)
+            layer = try values.decodeIfPresent(Int.self, forKey: .layer) ?? 0
+        }
     }
+    /// The layers a cell can hold.
+    public static let layers = 0...1
 
     /// A whole picture placed with its bottom left on a cell: Wetshot Wake's plants, rocks and
     /// its Hoopfish, which carries the stage's one rim.
@@ -170,7 +183,7 @@ public struct StageMap: Equatable, Codable {
 
     /// A block under every tile that isn't decoration, for a map with no walls of its own.
     public static func derivedWalls(from tiles: [Placed]) -> [Wall] {
-        tiles.filter { !decoration.contains($0.art) }.map { Wall($0.cell, .solid) }
+        tiles.filter { $0.layer == 0 && !decoration.contains($0.art) }.map { Wall($0.cell, .solid) }
     }
 
     private enum CodingKeys: String, CodingKey { case tiles, props, pile, leftRim, rightRim, spawns, ball, tornados, walls }
@@ -360,10 +373,10 @@ public struct StageMap: Equatable, Codable {
         }
         var lines = ["    private static func \(name)() -> StageMap {",
                      "        let tiles: [Placed] = ["]
-        let ordered = tiles.sorted { ($0.cell.row, $0.cell.column) < ($1.cell.row, $1.cell.column) }
+        let ordered = tiles.sorted { ($0.layer, $0.cell.row, $0.cell.column) < ($1.layer, $1.cell.row, $1.cell.column) }
         var line = "           "
         for tile in ordered {
-            let next = " Placed(\(cell(tile.cell)), art: \(cell(tile.art))),"
+            let next = " Placed(\(cell(tile.cell)), art: \(cell(tile.art))\(tile.layer == 0 ? "" : ", layer: \(tile.layer)")),"
             if line.count + next.count > 118 { lines.append(line); line = "           " }
             line += next
         }

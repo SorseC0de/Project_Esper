@@ -1495,7 +1495,12 @@ one 16-pixel tile, painted rather than pixel art, so smoothed (at 3x a cell is i
 pixels). `MapTiles` holds a stage's sheets for the art and the map maker: a placed tile's art cell
 counts across the sheets side by side, 16 columns to a sheet, and the map maker pages through them
 (◀ SHEET n/12 ▶) with more of the screen's height for the palette, the sheet last shown kept
-between openings and launches. The autotiles aren't joined up:
+between openings and launches. With a sheet the panel has MULTI and OVER. MULTI: a drag across the sheet
+picks a block of it (ringed), put down whole with its top left on the cell pressed, its empty cells
+leaving what's under them, and a stroke laying more side by side, the stage's cell outline showing
+the block's size. OVER: tiles go on the layer over the ground (`StageMap.Placed.layer` 1, drawn a
+tenth above it, `TileSpot`), such as a window on a wall, bringing no wall; erasing and picking up
+then work on that layer alone. Tiles kept before layers are on the ground. The autotiles aren't joined up:
 a cell is placed as it's painted. The tiles never glow (they're the glow mask's flats). The baked map is
 the user's first layout (baked version 2), cut to 39 by 18, the right rim mirrored to column 33.
 

@@ -276,7 +276,11 @@ whatever lands on it came at, held down 12° while someone
   through a rim scores, whatever the ball did before: a floater that rose up through it
   from under counts once it falls back in. Going up through a rim never scores. It's the
   ball's bottom that has to come down through, so all of it was above the rim first: one thrown
-  flat at the rim's height, off the backboard, drops out under it (protocol 18). The dunk lets
+  flat at the rim's height, off the backboard, drops out under it (protocol 18). The point counts
+  once its middle is through as well, the ball in the net, not as it first meets the rim; out of
+  the rim sideways or back up before then, it doesn't (`Ball.enteringHoop`, protocol 94). A straight
+  rim's front lip, its lower half, is drawn again over the ball, so the ball goes down through the
+  ring (`GameScene.rimFronts`). The dunk lets
   go of it with its bottom just over the rim. On Hoopfish Hideaway a throw down goes through the
   rim and scores, as a shot does, where anywhere else it bounces off the top.
 
@@ -666,7 +670,7 @@ core and a halo of glow round them, the unlit faint.
 
 ## FLO
 
-FLO, the Functional Limit Overload, is to be the energy, the super meter, for the modes past the
+FLO, Fuel-Laden Osmoles (drawn in through the sweat by the H.O.O.D.), is to be the energy, the super meter, for the modes past the
 plain game, 47 among them: before the match each player picks a Greateraid, and in FLO they get
 its effects. `Player.flo`, 0 to 100 (`FloRules.full`), is earned by plays (protocol 74), in the
 order of what they're worth: a made shot 20 (out of the rim; only your own: a ball the other put

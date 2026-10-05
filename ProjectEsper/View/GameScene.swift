@@ -350,6 +350,34 @@ final class GameScene: SKScene {
     private var supportNodes: [SKSpriteNode] = []
     private var rimNodes: [SKSpriteNode] = []
     private var rimFlash: [Int] = []
+    /// Each straight rim's front lip, drawn over the ball (in its layer, the glowers', past the
+    /// ball's depth) while the rim itself is under it.
+    private var rimFronts: [SKSpriteNode] = []
+    private static let rimFrontZ: CGFloat = 6.5
+
+    /// The rim's art with only its front lip left: the ring's lower half, the rows under its middle.
+    private func frontLip(of rim: SKTexture) -> SKTexture? {
+        let image = rim.cgImage()
+        let width = image.width, height = image.height
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let data = context.data else { return nil }
+        context.clear(CGRect(x: 0, y: 0, width: width, height: height))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        // Rows run down from the top in memory.
+        let rows = (0..<height).filter { row in (0..<width).contains { pixels[(row * width + $0) * 4 + 3] != 0 } }
+        guard let top = rows.first, let bottom = rows.last else { return nil }
+        let middle = (top + bottom) / 2
+        for row in 0...middle {
+            for column in 0..<width { for channel in 0..<4 { pixels[(row * width + column) * 4 + channel] = 0 } }
+        }
+        guard let made = context.makeImage() else { return nil }
+        let texture = SKTexture(cgImage: made)
+        texture.filteringMode = .nearest
+        return texture
+    }
     /// Frames left of a hoop's shake: the rim's, off the ball on it, and the backboard's,
     /// off the ball against it, the rim riding it.
     private var rimJitter: [Int] = []
@@ -605,7 +633,7 @@ final class GameScene: SKScene {
     private var flatSnapshotsLit: [BodySnapshot] {
         // The hoops: their backboards read too hot with the glow on them.
         // Wetshot Wake's rim glows, as the Hoopfish's rings and eyes do.
-        let unglowedRims = match.stage.features.look == .wetshot ? [] : rimNodes
+        let unglowedRims = match.stage.features.look == .wetshot ? [] : rimNodes + rimFronts
         var flat = (backboardNodes + unglowedRims).filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
         }
@@ -1834,6 +1862,12 @@ final class GameScene: SKScene {
             rim.zPosition = 6
             stageGround.addChild(rim)
             rimNodes.append(rim)
+            // A straight rim's front lip again over the ball, so the ball goes down through it.
+            let front = SKSpriteNode(texture: art.rim == "hoop_straight" ? frontLip(of: sprites.texture(art.rim, 0)) : nil)
+            front.zPosition = GameScene.rimFrontZ
+            front.isHidden = front.texture == nil
+            glowers.addChild(front)
+            rimFronts.append(front)
             rimFlash.append(0)
             rimJitter.append(0)
             boardJitter.append(0)
@@ -1877,6 +1911,8 @@ final class GameScene: SKScene {
         backboardNodes = []
         supportNodes = []
         rimNodes = []
+        rimFronts.forEach { $0.removeFromParent() }
+        rimFronts = []
         rimFlash = []
         rimJitter = []
         boardJitter = []
@@ -7033,6 +7069,18 @@ final class GameScene: SKScene {
                 // The Hoopfish's spin has the rim in it: its own art and net out of sight meanwhile.
                 let spinning = index == 0 && (match.hoopfish?.spin ?? 0) > 0
                 rimNodes[index].isHidden = spinning
+                // The front lip over the ball, wherever and however the rim is.
+                if index < rimFronts.count, rimFronts[index].texture != nil {
+                    let front = rimFronts[index], rim = rimNodes[index]
+                    front.isHidden = rim.isHidden
+                    front.size = rim.size
+                    front.anchorPoint = rim.anchorPoint
+                    front.position = rim.position
+                    front.xScale = rim.xScale
+                    front.zRotation = rim.zRotation
+                    front.color = rim.color
+                    front.colorBlendFactor = rim.colorBlendFactor
+                }
                 if index < nets.count { nets[index].hidden = spinning }
                 if index < nets.count {
                     // The Elements' wind blows the nets leftward, in gusts; elsewhere a light breeze sways them.

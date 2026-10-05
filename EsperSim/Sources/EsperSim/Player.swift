@@ -169,7 +169,7 @@ public struct Player: Equatable {
     public var power = Power.none
     /// One, or two after Bio-Boba.
     public var powerLevel = 1
-    /// FLO, the Functional Limit Overload: the super meter for the modes past the plain game,
+    /// FLO, Fuel-Laden Osmoles, drawn in by the H.O.O.D.: the super meter for the modes past the plain game,
     /// 47's among them, 0 empty to `FloRules.full`. Earned by plays (`FloRules`); spent in
     /// FloState, the energy form.
     public var flo = 0

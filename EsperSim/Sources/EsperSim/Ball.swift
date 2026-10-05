@@ -58,10 +58,15 @@ public struct Ball: Equatable {
     /// reads it.
     public var launchPoint: Vec2?
     var previousY: Double
+    /// The rim a scoring ball came down into from above, its bottom through: the point is scored
+    /// once its middle is through too, so the basket counts as the ball sits in the net, not as
+    /// it touches the rim. Out of it sideways or back up, it's lost.
+    var enteringHoop: Int?
 
     public init(position: Vec2) {
         self.position = position
         previousY = position.y
+        enteringHoop = nil
     }
 
     /// Under water the ball falls at half the pull, no faster than half the speed, and rolls to a
@@ -118,13 +123,26 @@ public struct Ball: Equatable {
         for (index, hoop) in stage.hoops.enumerated() where abs(position.x - hoop.position.x) <= BallRules.rimHalfWidth {
             if previousY - BallRules.radius >= hoop.position.y, position.y - BallRules.radius < hoop.position.y {
                 if scoring {
-                    scoredHoop = index
+                    enteringHoop = index
                 } else {
                     events.append(.rimBounced(hoop: index, speed: abs(velocity.y), ball: true))
                     position.y = hoop.position.y + BallRules.radius
                     bounceY(events: &events)
                 }
             }
+        }
+
+        // In the rim it came down into: scored as its middle goes through, or lost if it leaves.
+        if let entering = enteringHoop, stage.hoops.indices.contains(entering) {
+            let hoop = stage.hoops[entering]
+            if position.y < hoop.position.y {
+                scoredHoop = entering
+                enteringHoop = nil
+            } else if velocity.y > 0 || abs(position.x - hoop.position.x) > BallRules.rimHalfWidth + BallRules.radius {
+                enteringHoop = nil
+            }
+        } else {
+            enteringHoop = nil
         }
 
         rollOffSlopes(stage, incoming: incoming, events: &events)
@@ -220,6 +238,7 @@ public struct Ball: Equatable {
         holder = nil
         self.position = position
         previousY = position.y
+        enteringHoop = nil
         self.velocity = velocity
         self.pace = pace
         self.straight = straight
@@ -254,6 +273,7 @@ public struct Ball: Equatable {
         launchPoint = position
         self.position = position
         previousY = position.y
+        enteringHoop = nil
         velocity = Vec2(x: 0, y: BallRules.floaterSpeed)
         pace = 1
         burning = false
@@ -289,6 +309,7 @@ public struct Ball: Equatable {
         launchPoint = nil
         position = spawn
         previousY = spawn.y
+        enteringHoop = nil
         velocity = .zero
         pace = 1
         burning = false

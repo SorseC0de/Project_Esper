@@ -21,7 +21,24 @@ enum SavedStageMap {
 
     static func value(_ stage: MapStage) -> StageMap? {
         putAsideIfStale(stage)
-        return UserDefaults.standard.data(forKey: key(stage)).flatMap { try? JSONDecoder().decode(StageMap.self, from: $0) }
+        let map = UserDefaults.standard.data(forKey: key(stage)).flatMap { try? JSONDecoder().decode(StageMap.self, from: $0) }
+        return stage == .flight ? movedToFlightStride(map) : map
+    }
+
+    /// A Flight map kept when each sheet had 16 columns, its art cells moved to `MapTiles.flightStride`, once.
+    private static let flightStrideKey = "esper.flightMap.artStride"
+    private static func movedToFlightStride(_ kept: StageMap?) -> StageMap? {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: flightStrideKey) != MapTiles.flightStride else { return kept }
+        defaults.set(MapTiles.flightStride, forKey: flightStrideKey)
+        guard var map = kept else { return nil }
+        map.tiles = map.tiles.map { tile in
+            var moved = tile
+            moved.art.column = tile.art.column / 16 * MapTiles.flightStride + tile.art.column % 16
+            return moved
+        }
+        store(map, for: .flight)
+        return map
     }
 
     static func store(_ map: StageMap?, for stage: MapStage) {
@@ -478,8 +495,8 @@ final class MapEditor: SKNode {
         }
         guard paletteShown, tiles.sheet(of: block.0) == sheetIndex else { selection.isHidden = true; return }
         selection.isHidden = false
-        let side = tiles.cellPixels * paletteScale
-        let column = block.0.column - sheetIndex * tiles.columnsPerSheet
+        let side = tiles.cellPixels(of: sheetIndex) * paletteScale
+        let column = block.0.column - sheetIndex * tiles.stride
         let across = CGFloat(block.1.column - block.0.column + 1), down = CGFloat(block.1.row - block.0.row + 1)
         selection.path = CGPath(rect: CGRect(x: paletteRect.minX + CGFloat(column) * side,
                                              y: paletteRect.maxY - (CGFloat(block.0.row) + down) * side, width: side * across, height: side * down), transform: nil)
@@ -487,10 +504,10 @@ final class MapEditor: SKNode {
 
     /// The sheet's cell under a point, drawn in or not, held to the sheet: for a block's corner.
     private func sheetCell(at point: CGPoint) -> StageMap.Cell {
-        let side = tiles.cellPixels * paletteScale
-        let column = min(max(Int((point.x - paletteRect.minX) / side), 0), tiles.columnsPerSheet - 1)
+        let side = tiles.cellPixels(of: sheetIndex) * paletteScale
+        let column = min(max(Int((point.x - paletteRect.minX) / side), 0), tiles.columns(of: sheetIndex) - 1)
         let row = min(max(Int((paletteRect.maxY - point.y) / side), 0), tiles.rows(of: sheetIndex) - 1)
-        return StageMap.Cell(sheetIndex * tiles.columnsPerSheet + column, row)
+        return StageMap.Cell(sheetIndex * tiles.stride + column, row)
     }
 
     /// A block's two corners as its top left and bottom right.
@@ -500,8 +517,8 @@ final class MapEditor: SKNode {
 
     private func paletteCell(at point: CGPoint) -> StageMap.Cell? {
         guard paletteShown, !wallsMode, stage != .wetshot, paletteRect.contains(point) else { return nil }
-        let side = tiles.cellPixels * paletteScale
-        let cell = StageMap.Cell(sheetIndex * tiles.columnsPerSheet + Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
+        let side = tiles.cellPixels(of: sheetIndex) * paletteScale
+        let cell = StageMap.Cell(sheetIndex * tiles.stride + Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
         return tiles.filled(sheet: sheetIndex).contains(cell) ? cell : nil
     }
 

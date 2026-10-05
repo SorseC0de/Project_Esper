@@ -1490,10 +1490,11 @@ protocol 83), on the select after Hoopfish Hideaway. 39 by 18 (`FlightRules`, pr
 as a phone shows whole at 4x, 39 tiles of 16 art pixels being 2496 of a 2532-pixel-wide screen and 18
 being 1152 of 1170. Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
 (`FlightTiles0` to `11` at the catalog's root, from `_Graphic Assets/Pixel Art/Stages/Flight`): the
-A2 floors, the A4 walls, the five B sheets and the five numbered ones, 48-pixel cells each drawn as
-one 16-pixel tile, painted rather than pixel art, so smoothed (at 3x a cell is its own 48 screen
+A2 floors, the A4 walls, the five B sheets and the five numbered ones, 48-pixel cells but the A4 walls'
+and "2"'s 32-pixel ones (the walls' 720 pixels high make 22 rows, the half row under them left off), each drawn as one 16-pixel tile, painted rather than pixel art, so smoothed (at 3x a cell is its own 48 screen
 pixels). `MapTiles` holds a stage's sheets for the art and the map maker: a placed tile's art cell
-counts across the sheets side by side, 16 columns to a sheet, and the map maker pages through them
+counts across the sheets side by side, 32 columns kept for each (`MapTiles.flightStride`; maps kept
+from when it was 16 are moved over once, `SavedStageMap`), and the map maker pages through them
 (◀ SHEET n/12 ▶) with more of the screen's height for the palette, the sheet last shown kept
 between openings and launches. With a sheet the panel has MULTI and OVER. MULTI: a drag across the sheet
 picks a block of it (ringed), put down whole with its top left on the cell pressed, its empty cells

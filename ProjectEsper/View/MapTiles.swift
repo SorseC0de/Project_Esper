@@ -2,43 +2,48 @@ import EsperSim
 import SpriteKit
 
 /// A hand-laid stage's tiles, for drawing it and for the map maker: its sheets, each cut into
-/// square cells `cellPixels` across, a placed tile's art cell counting across the sheets side by
-/// side, `columnsPerSheet` to a sheet. Every cell is drawn one tile, 16 art pixels, whatever its size.
+/// square cells of its own size, a placed tile's art cell counting across the sheets side by
+/// side, `stride` columns kept for each. Every cell is drawn one tile, 16 art pixels, whatever its size.
 final class MapTiles {
     let sheets: [SKTexture]
-    let cellPixels: CGFloat
-    let columnsPerSheet: Int
+    private let cellSizes: [CGFloat]
+    let stride: Int
     private var cut: [StageMap.Cell: SKTexture] = [:]
     private var filledBySheet: [Int: [StageMap.Cell]] = [:]
 
-    private init(sheets: [SKTexture], cellPixels: CGFloat) {
+    private init(sheets: [SKTexture], cellSizes: [CGFloat], stride: Int? = nil) {
         self.sheets = sheets
-        self.cellPixels = cellPixels
-        columnsPerSheet = max(Int((sheets.first?.size().width ?? cellPixels) / cellPixels), 1)
+        self.cellSizes = cellSizes
+        self.stride = stride ?? max(Int((sheets.first?.size().width ?? cellSizes[0]) / cellSizes[0]), 1)
     }
 
-    /// The Elements' one 16-pixel sheet, and Flight's twelve of 48-pixel cells: floors, walls,
-    /// then the B sheets and the five more.
-    static let elements = MapTiles(sheets: [ElementsArt.tileset], cellPixels: ElementsArt.tileSide)
+    /// The Elements' one 16-pixel sheet, and Flight's twelve: the floors, the walls, the B sheets
+    /// and the five more, all of 48-pixel cells but the walls' and "2"'s, of 32.
+    static let elements = MapTiles(sheets: [ElementsArt.tileset], cellSizes: [ElementsArt.tileSide])
     static let flight = MapTiles(sheets: (0..<12).map { index in
         let texture = SKTexture(imageNamed: "FlightTiles\(index)")
         // Painted, not pixel art: smoothed when it's drawn smaller than its own pixels.
         texture.filteringMode = .linear
         return texture
-    }, cellPixels: 48)
+    }, cellSizes: (0..<12).map { [1, 8].contains($0) ? 32 : 48 }, stride: flightStride)
+    /// Flight's columns kept for each sheet: room for a 32-pixel sheet's 24. Maps kept when each
+    /// sheet had 16 are moved over once (`SavedStageMap`).
+    static let flightStride = 32
 
     static func of(_ stage: MapStage) -> MapTiles { stage == .flight ? flight : elements }
 
-    func sheet(of art: StageMap.Cell) -> Int { art.column / columnsPerSheet }
-    func rows(of sheet: Int) -> Int { max(Int(sheets[sheet].size().height / cellPixels), 1) }
+    func cellPixels(of sheet: Int) -> CGFloat { cellSizes[sheet] }
+    func sheet(of art: StageMap.Cell) -> Int { art.column / stride }
+    func columns(of sheet: Int) -> Int { max(Int(sheets[sheet].size().width / cellSizes[sheet]), 1) }
+    func rows(of sheet: Int) -> Int { max(Int(sheets[sheet].size().height / cellSizes[sheet]), 1) }
 
     /// One cell, by its art cell across all the sheets.
     func tile(_ art: StageMap.Cell) -> SKTexture {
         if let made = cut[art] { return made }
         let index = min(sheet(of: art), sheets.count - 1)
         let sheet = sheets[index]
-        let columns = CGFloat(columnsPerSheet), rows = CGFloat(self.rows(of: index))
-        let column = CGFloat(art.column - index * columnsPerSheet)
+        let columns = CGFloat(self.columns(of: index)), rows = CGFloat(self.rows(of: index))
+        let column = CGFloat(art.column - index * stride)
         let rect = CGRect(x: column / columns, y: (rows - 1 - CGFloat(art.row)) / rows, width: 1 / columns, height: 1 / rows)
         let texture = SKTexture(rect: rect, in: sheet)
         texture.filteringMode = sheet.filteringMode
@@ -57,11 +62,11 @@ final class MapTiles {
            let data = context.data {
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
             let pixels = data.bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)
-            let side = Int(cellPixels)
+            let side = Int(cellSizes[index])
             for row in 0..<(image.height / side) {
                 for column in 0..<(image.width / side) {
                     let drawn = (0..<side).contains { y in (0..<side).contains { x in pixels[((row * side + y) * image.width + column * side + x) * 4 + 3] > 0 } }
-                    if drawn { cells.append(StageMap.Cell(index * columnsPerSheet + column, row)) }
+                    if drawn { cells.append(StageMap.Cell(index * stride + column, row)) }
                 }
             }
         }

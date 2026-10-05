@@ -330,10 +330,23 @@ final class SpriteLibrary {
 
     /// A one-frame figure, the customize screen's, in a player's look and lined, with the
     /// hooded head over its head where the game would put it: moved from where it's drawn for
-    /// (the idle's third frame) by how far this figure's head is from that one's.
-    func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame) -> CGImage? {
+    /// (the idle's third frame) by how far this figure's head is from that one's, then by
+    /// `portraitHoodNudge`. With where the hood went and where the figure's parts are, in its
+    /// pixels from the top left.
+    struct Portrait {
+        let image: CGImage
+        let hoodOffset: CGPoint
+        let centres: [BodyPart: CGPoint]
+    }
+    /// The hood's place on the customize figure, put right by eye: a pixel right and a pixel up.
+    static let portraitHoodNudge = CGPoint(x: 1, y: -1)
+    private var portraitFacts: [String: (hoodOffset: CGPoint, centres: [BodyPart: CGPoint])] = [:]
+
+    func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame) -> Portrait? {
         let key = "p\(player)_portrait_\(name)"
-        if let made = cache[key] { return made.cgImage() }
+        if let made = cache[key], let facts = portraitFacts[key] {
+            return Portrait(image: made.cgImage(), hoodOffset: facts.hoodOffset, centres: facts.centres)
+        }
         let look = look(for: player)
         let figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: false)
         let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
@@ -341,15 +354,18 @@ final class SpriteLibrary {
         let width = body.width, height = body.height
         guard let (context, _) = makeCanvas(width: width, height: height) else { return nil }
         context.draw(body, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var offset = CGPoint.zero
         if look.human, let here = figure.centres[.head], let there = drawnFor.centres[.head] {
             let hood = hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage()
-            // The centres count rows down; the context's run up.
-            let shift = CGPoint(x: (here.x - there.x).rounded(), y: -(here.y - there.y).rounded())
-            context.draw(hood, in: CGRect(x: shift.x, y: shift.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
+            offset = CGPoint(x: (here.x - there.x).rounded() + SpriteLibrary.portraitHoodNudge.x,
+                             y: (here.y - there.y).rounded() + SpriteLibrary.portraitHoodNudge.y)
+            // The offset counts rows down; the context's run up.
+            context.draw(hood, in: CGRect(x: offset.x, y: -offset.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
         }
         guard let made = context.makeImage() else { return nil }
         cache[key] = SKTexture(cgImage: made)
-        return made
+        portraitFacts[key] = (offset, figure.centres)
+        return Portrait(image: made, hoodOffset: offset, centres: figure.centres)
     }
 
     /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which

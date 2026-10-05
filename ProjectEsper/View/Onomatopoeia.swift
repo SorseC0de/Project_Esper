@@ -276,6 +276,14 @@ enum Onomatopoeia {
         return sprite
     }
 
+    /// Lettering as the words are drawn, for SwiftUI: the picture, and how tall to show it for
+    /// a cap height of `height` points.
+    static func picture(_ text: String, face: Lettering, colours: Colours, growsLeft: Bool, height: CGFloat) -> (image: UIImage, height: CGFloat) {
+        let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft)
+        let (texture, capShare) = rendered(word)
+        return (UIImage(cgImage: texture.cgImage()), height * face.scale / capShare)
+    }
+
     /// A sprite's warp: its left and right ends `left` and `right` times its middle's height,
     /// the height between running straight from one to the other, and its middle raised `bend`
     /// of its height (lowered, under 0), easing to nothing at the ends.

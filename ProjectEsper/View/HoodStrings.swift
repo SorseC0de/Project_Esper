@@ -41,8 +41,7 @@ final class HoodStrings {
     /// The pixel second from the tip is palette 37, as the hood's shading is.
     static let accentFromTip = 2
 
-    private var points: [[CGPoint]] = [[], []]
-    private var previous: [[CGPoint]] = [[], []]
+    private let motion = Motion()
     private var pixels: [SKSpriteNode] = []
     private let parent: SKNode
     private let square: SKTexture
@@ -68,54 +67,8 @@ final class HoodStrings {
     /// second from the tip, at `z`.
     func step(anchors: [CGPoint], style: Style, facing: CGFloat, scale: CGFloat, time: Double,
               plain: SKColor, accent: SKColor, z: CGFloat) {
+        let shown = motion.step(anchors: anchors, style: style, facing: facing, scale: scale, time: time)
         let segment = scale
-        var shown: [(CGPoint, Bool)] = []
-        for (string, anchor) in anchors.enumerated() where string < style.strands.count {
-            let strand = style.strands[string]
-            // New, a different length, or the anchor gone too far at once: laid straight down.
-            if points[string].count != strand.length || HoodStrings.gap(points[string][0], anchor) > 24 * scale {
-                points[string] = (0..<strand.length).map { CGPoint(x: anchor.x, y: anchor.y - CGFloat($0) * segment) }
-                previous[string] = points[string]
-            }
-            var chain = points[string]
-            let was = previous[string]
-            previous[string] = chain
-            chain[0] = anchor
-            let direction = CGVector(dx: strand.direction.dx * facing, dy: strand.direction.dy)
-            let across = CGVector(dx: -direction.dy, dy: direction.dx)
-            for index in 1..<chain.count {
-                var point = chain[index]
-                point.x += (point.x - was[index].x) * style.carry
-                point.y += (point.y - was[index].y) * style.carry - style.gravity * scale
-                if style.floatPull > 0 {
-                    // Toward a waving line out of the hood, the wave growing to the tip.
-                    let along = CGFloat(index) * segment
-                    let share = CGFloat(index) / CGFloat(chain.count - 1)
-                    let wave = CGFloat(sin(time * 2 * .pi * HoodStrings.floatWavesPerSecond - Double(index) * strand.waveStep + Double(string) * .pi / 2))
-                        * strand.wave * scale * share
-                    let target = CGPoint(x: anchor.x + direction.dx * along + across.dx * wave,
-                                         y: anchor.y + direction.dy * along + across.dy * wave)
-                    point.x += (target.x - point.x) * style.floatPull
-                    point.y += (target.y - point.y) * style.floatPull
-                }
-                chain[index] = point
-            }
-            // Each pixel a pixel from the last, out from the pinned one.
-            for index in 1..<chain.count {
-                let from = chain[index - 1]
-                let gap = HoodStrings.gap(chain[index], from)
-                guard gap > 0 else { chain[index] = CGPoint(x: from.x, y: from.y - segment); continue }
-                chain[index] = CGPoint(x: from.x + (chain[index].x - from.x) / gap * segment,
-                                       y: from.y + (chain[index].y - from.y) / gap * segment)
-            }
-            points[string] = chain
-            // Snapped to the hood's grid: whole pixels from the pinned one.
-            for (index, point) in chain.enumerated() {
-                let snapped = CGPoint(x: anchor.x + ((point.x - anchor.x) / segment).rounded() * segment,
-                                      y: anchor.y + ((point.y - anchor.y) / segment).rounded() * segment)
-                shown.append((snapped, index == chain.count - HoodStrings.accentFromTip))
-            }
-        }
         while pixels.count < shown.count {
             let pixel = SKSpriteNode(texture: square)
             pixel.colorBlendFactor = 1
@@ -125,18 +78,81 @@ final class HoodStrings {
         for (index, pixel) in pixels.enumerated() {
             guard index < shown.count else { pixel.isHidden = true; continue }
             pixel.isHidden = false
-            pixel.position = shown[index].0
+            pixel.position = shown[index].point
             pixel.size = CGSize(width: segment, height: segment)
-            pixel.color = shown[index].1 ? accent : plain
+            pixel.color = shown[index].accent ? accent : plain
             pixel.zPosition = z
         }
     }
 
-    private static func gap(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
+    /// The strings as cords, apart from how they're drawn: each a chain of points a pixel
+    /// apart off its anchor, y up, for the game's sprites or the customize screen's canvas.
+    final class Motion {
+        private var points: [[CGPoint]] = [[], []]
+        private var previous: [[CGPoint]] = [[], []]
+
+        /// A frame on: where each string's pixels are drawn, snapped to the hood's grid, and
+        /// which is the accent, second from the tip.
+        func step(anchors: [CGPoint], style: Style, facing: CGFloat, scale: CGFloat, time: Double) -> [(point: CGPoint, accent: Bool)] {
+            let segment = scale
+            var shown: [(point: CGPoint, accent: Bool)] = []
+            for (string, anchor) in anchors.enumerated() where string < style.strands.count {
+                let strand = style.strands[string]
+                // New, a different length, or the anchor gone too far at once: laid straight down.
+                if points[string].count != strand.length || HoodStrings.gap(points[string][0], anchor) > 24 * scale {
+                    points[string] = (0..<strand.length).map { CGPoint(x: anchor.x, y: anchor.y - CGFloat($0) * segment) }
+                    previous[string] = points[string]
+                }
+                var chain = points[string]
+                let was = previous[string]
+                previous[string] = chain
+                chain[0] = anchor
+                let direction = CGVector(dx: strand.direction.dx * facing, dy: strand.direction.dy)
+                let across = CGVector(dx: -direction.dy, dy: direction.dx)
+                for index in 1..<chain.count {
+                    var point = chain[index]
+                    point.x += (point.x - was[index].x) * style.carry
+                    point.y += (point.y - was[index].y) * style.carry - style.gravity * scale
+                    if style.floatPull > 0 {
+                        // Toward a waving line out of the hood, the wave growing to the tip.
+                        let along = CGFloat(index) * segment
+                        let share = CGFloat(index) / CGFloat(chain.count - 1)
+                        let wave = CGFloat(sin(time * 2 * .pi * HoodStrings.floatWavesPerSecond - Double(index) * strand.waveStep + Double(string) * .pi / 2))
+                            * strand.wave * scale * share
+                        let target = CGPoint(x: anchor.x + direction.dx * along + across.dx * wave,
+                                             y: anchor.y + direction.dy * along + across.dy * wave)
+                        point.x += (target.x - point.x) * style.floatPull
+                        point.y += (target.y - point.y) * style.floatPull
+                    }
+                    chain[index] = point
+                }
+                // Each pixel a pixel from the last, out from the pinned one.
+                for index in 1..<chain.count {
+                    let from = chain[index - 1]
+                    let gap = HoodStrings.gap(chain[index], from)
+                    guard gap > 0 else { chain[index] = CGPoint(x: from.x, y: from.y - segment); continue }
+                    chain[index] = CGPoint(x: from.x + (chain[index].x - from.x) / gap * segment,
+                                           y: from.y + (chain[index].y - from.y) / gap * segment)
+                }
+                points[string] = chain
+                // Snapped to the hood's grid: whole pixels from the pinned one.
+                for (index, point) in chain.enumerated() {
+                    let snapped = CGPoint(x: anchor.x + ((point.x - anchor.x) / segment).rounded() * segment,
+                                          y: anchor.y + ((point.y - anchor.y) / segment).rounded() * segment)
+                    shown.append((snapped, index == chain.count - HoodStrings.accentFromTip))
+                }
+            }
+            return shown
+        }
+
+        func reset() { points = [[], []] }
+    }
+
+    fileprivate static func gap(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
 
     func hide() {
         pixels.forEach { $0.isHidden = true }
-        points = [[], []]
+        motion.reset()
     }
 
     /// The strings' pixels as drawn, for the glow's mask.

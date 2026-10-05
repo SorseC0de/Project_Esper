@@ -38,10 +38,17 @@ MENU = {
     "#1b364d": "#262634", "#041121": "#0b0b12",          # black light, shadow
 }
 
+# Taken as they are: the top line in gold's second (the menus' orange), the bottom in blue's
+# second (the cyan), RETURN's lettering and frame in blue's first.
+TOP_LINE, BOTTOM_LINE, RETURN_CYAN = "#f5bb45", "#45bcf5", "#6bd0ff"
+KEPT = {TOP_LINE, BOTTOM_LINE, RETURN_CYAN}
+# RETURN's own: its cyan to blue's first, the rest as the menus'.
+RETURN = {"#00ffff": RETURN_CYAN}
+
 # name: (groups kept, recolour). A player's groups end in "" for P1 and "1" for P2.
 LAYERS = {
     "customize_ground": (["Bg", "Lines", "Heading"], "menu"),
-    "customize_return": (["Return-Button"], "menu"),
+    "customize_return": (["Return-Button"], "return"),
     "customize_start": (["Start-Button"], "menu"),
     "customize_spin_ccw": (["RotateMeCCW"], "menu"),
     "customize_spin_cw": (["RotateMeCW"], "menu"),
@@ -66,6 +73,8 @@ def expand(colour):
 
 def menu(colour):
     colour = expand(colour)
+    if colour in KEPT:
+        return colour
     if colour not in MENU:
         raise SystemExit(f"{colour} has no menu colour: add it to MENU")
     return MENU[colour]
@@ -79,8 +88,21 @@ def grey(colour):
 
 
 def recolour(text, mode):
-    change = menu if mode == "menu" else grey
+    change = {"menu": menu, "energy": grey, "return": lambda colour: RETURN.get(expand(colour)) or menu(colour)}[mode]
     return re.sub(r"((?:fill|stroke|stop-color):)(#[0-9a-fA-F]{3,6})\b", lambda m: m.group(1) + change(m.group(2)), text)
+
+
+def colour_lines(root):
+    """The lines' top half, over the middle of the screen, and their bottom half, each its own colour."""
+    for lines in root.iter(f"{{{SVG}}}g"):
+        if lines.get("id") != "Lines":
+            continue
+        for piece in lines:
+            down = float(re.findall(r"[-\d.e]+", piece.get("transform", "matrix(1,0,0,1,0,0)"))[-1])
+            colour = TOP_LINE if down < 1080 else BOTTOM_LINE
+            for shape in piece.iter():
+                if shape.get("style"):
+                    shape.set("style", re.sub(r"fill:#[0-9a-fA-F]{3,6}", f"fill:{colour}", shape.get("style")))
 
 
 def contains(element, keep):
@@ -113,6 +135,7 @@ def main():
         for name, (keep, mode) in LAYERS.items():
             tree = ET.ElementTree(ET.fromstring(source))
             prune(tree.getroot(), set(keep), False)
+            colour_lines(tree.getroot())
             path = pathlib.Path(scratch) / f"{name}.svg"
             path.write_text(recolour(ET.tostring(tree.getroot(), encoding="unicode"), mode))
             crop = subprocess.run([str(renderer), str(path), str(OUT / f"{name}.png"), str(WIDTH), str(HEIGHT)],

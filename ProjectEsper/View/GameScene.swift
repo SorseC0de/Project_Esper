@@ -178,7 +178,7 @@ final class GameScene: SKScene {
     private var hoodStrings: [HoodStrings] = []
     static let hoodDrawnFor = AnimationFrame(.idle, 2)
     /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
-    private static let stringAccentLuminance = 0.876
+    static let stringAccentLuminance = 0.876
     /// Over the body and under the head's own node, or behind the body.
     private static let hoodUpZ: CGFloat = 0.038
     /// Over the body's flash (0.09).
@@ -4160,7 +4160,7 @@ final class GameScene: SKScene {
     }
 
     /// The customize screen's player, in a side's look with its hooded head.
-    func customizePortrait(player: Int) -> CGImage? {
+    func customizePortrait(player: Int) -> SpriteLibrary.Portrait? {
         sprites.portrait("player_customize", player: player, headDrawnFor: GameScene.hoodDrawnFor)
     }
 
@@ -4944,7 +4944,7 @@ final class GameScene: SKScene {
     /// credit apart from the head's.
     private static let legCreditKey = 1000
     /// From the head's middle up to its crown, where its particles leave, in art pixels at a plain body's size.
-    private static let crownLift: CGFloat = 4
+    static let crownLift: CGFloat = 4
     private func legStream(_ index: Int, part: BodyPart, energyColour: Bool = false) -> HeadStream {
         let look = sprites.look(for: index)
         return HeadStream(frames: [sprites.flatSquare(size: 4, alpha: 1)], size: ParticleLook.energySize,

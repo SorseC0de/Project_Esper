@@ -79,11 +79,10 @@ final class FlowState: ObservableObject {
     // MARK: The customize screen
 
     /// The customize screen, between the title and the stage select: each side's cursor and
-    /// picks, the swatch column each cursor last stood on, and the mode it starts.
+    /// picks, and the mode it starts.
     @Published var customizeOpen = false
     @Published var customizeCursors: [CustomizeSpot] = [.skin, .skin]
     @Published var customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
-    var customizeColumns = [0, 0]
     var customizeMode = GameMode.rounds
 
     // MARK: The multiplayer screen
@@ -225,7 +224,6 @@ final class FlowState: ObservableObject {
             // The first side's pick on the customize screen, its wheel colour.
             var first = PlayerCustomization.saved(0)
             first.energy = colour
-            first.deep = false
             first.save(as: 0)
             customizations[0] = first
             SoundBoard.shared.play(SoundBoard.navigate)

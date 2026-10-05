@@ -229,10 +229,11 @@ extension Player {
         case .webbed:
             return AnimationFrame(hasBall ? .airBall : .air, 2)
         case .flying:
-            // Going down more than forward, frame 2; forward or up, frame 1; hovering or going back, frame 0.
+            // Going down more than forward, frame 2; going back, up or not, frame 0; forward or up,
+            // frame 1; hovering, frame 0.
             let forward = velocity.x * facing.sign
             let sheetFrame = velocity.y < -FlightSheet.still && -velocity.y > forward ? 2
-                : (forward > FlightSheet.still || velocity.y > FlightSheet.still ? 1 : 0)
+                : (forward < -FlightSheet.still ? 0 : (forward > FlightSheet.still || velocity.y > FlightSheet.still ? 1 : 0))
             return AnimationFrame(hasBall ? .flyBall : .fly, sheetFrame)
         case .transforming:
             return AnimationFrame(.transform, min(t * TransformRules.sheetFramesPerSecond / 60, Animation.transform.frameCount - 1))

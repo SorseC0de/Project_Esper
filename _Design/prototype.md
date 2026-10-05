@@ -348,11 +348,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   slab still works. The stage carries standing slabs as `extras`, which every collision
   query sees. Numbers in `ShakeRules`.
   Super Smoothie's flight is drawn on its own sheets, `player_fly` and `player_fly_ball` (frame 0
-  hovering or going back, 1 going forward or up, 2 going down more than forward; under 0.3 a frame
+  hovering or going back, up or not, 1 going forward or up, 2 going down more than forward; under 0.3 a frame
   counts as still, `FlightSheet`, protocol 92), streams its hood's strings out behind, and hovering
-  still throws a vortex of cubes up off the foot that hangs lowest; flying up the hooded head tips back
-  12° and flying down forward, about its middle, eased, let down up to 2 pixels to sit on the neck; round the body, widening from 2 to
-  14 pixels as they rise (30 a second). At level two the stick forward
+  still throws a vortex of cubes up off the foot that hangs lowest; flying up or forward the hooded
+  head tips back 12° and flying down forward, about its middle, eased, let down up to 2 pixels to sit on the neck; round the body, bellying out from 2
+  pixels at the foot to 18 halfway up and back in at the top (30 a second). At level two the stick forward
   is the glide: 3.5 forward (2.5 with the ball), sinking 0.8 a frame unless up is held,
   which rises at the flight speed, and diving at 3 on down; the stick backward is the
   drift at the flight speed, and centred it levitates. Level one is the plain flight.

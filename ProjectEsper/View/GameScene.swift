@@ -4916,10 +4916,9 @@ final class GameScene: SKScene {
     }
     private static let hoverStill = 0.2
     private static let vortexRate = 30.0
+    /// The vortex's width at the foot and the top, and halfway up, where it's widest.
     private static let vortexStartRadius: CGFloat = 2
-    private static let vortexWidestRadius: CGFloat = 14
-    /// Art pixels the vortex widens a second as a cube rises.
-    private static let vortexWidening: CGFloat = 16
+    private static let vortexWidestRadius: CGFloat = 18
     private static let transformSpiralRadius: CGFloat = 10
     private static let transformHelixRadius: CGFloat = 3
     private static let helixTurnsPerSecond = 2.0
@@ -5074,7 +5073,11 @@ final class GameScene: SKScene {
                     if floSwirlFrames[particle.owner, default: 0] > 0 || vortex {
                         helix.centreX = SpriteLibrary.point(match.players[particle.owner].position).x
                     }
-                    if vortex { helix.radius = min(helix.radius + GameScene.vortexWidening * CGFloat(step), GameScene.vortexWidestRadius) }
+                    // The vortex bellies out: narrow at the foot, widest halfway up, narrowing to the top.
+                    if vortex {
+                        let share = min(particle.age / max(particle.life, 0.001), 1)
+                        helix.radius = GameScene.vortexStartRadius + (GameScene.vortexWidestRadius - GameScene.vortexStartRadius) * CGFloat(sin(share * .pi))
+                    }
                     helix.angle += 2 * .pi * GameScene.helixTurnsPerSecond * step
                     particle.node.position = CGPoint(x: helix.centreX + CGFloat(cos(helix.angle)) * helix.radius,
                                                      y: particle.node.position.y + helix.rise * CGFloat(step))
@@ -6502,10 +6505,13 @@ final class GameScene: SKScene {
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
                 hood.zRotation = node.zRotation
-                // Super Smoothie flying up, the hooded head tips back; flying down, forward; eased,
-                // about the head's middle, and let down a little to sit on the neck turned.
+                // Super Smoothie flying down, the hooded head tips forward; flying up or forward, back;
+                // eased, about the head's middle, and let down a little to sit on the neck turned.
+                let ahead = player.velocity.x * player.facing.sign
+                let diving = player.velocity.y < -FlightSheet.still && -player.velocity.y > ahead
+                let rising = player.velocity.y > FlightSheet.still || ahead > FlightSheet.still
                 let wantedTip: CGFloat = player.state != .flying || energyForm ? 0
-                    : (player.velocity.y > FlightSheet.still ? GameScene.flightHeadTip : (player.velocity.y < -FlightSheet.still ? -GameScene.flightHeadTip : 0))
+                    : (diving ? -GameScene.flightHeadTip : (rising ? GameScene.flightHeadTip : 0))
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
                 if abs(headTip[index, default: 0]) > 0.001, let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
                     let anim = GameScene.hoodDrawnFor.animation

@@ -294,13 +294,13 @@ enum CourtLook {
 /// part of the body, not apart, and not glowing. `enabled` off puts everything back as it was.
 enum HumanLook {
     static let enabled = true
-    /// The parts still in the energy's colours, which glow as energy does.
-    static let glowingParts: Set<BodyPart> = [.frontLeg, .backLeg, .frontFoot, .backFoot]
+    /// The parts still in the energy's colours, which glow as energy does: the shoes.
+    static let glowingParts: Set<BodyPart> = [.frontFoot, .backFoot]
     static let skin: [BodyPart: RGB] = {
-        // 24 and 25, tried, are kept for later.
+        // 24 and 25, tried, are kept for later. The lower legs bare too, tried.
         let front = PixelPalette.colours[35], back = PixelPalette.colours[34]
-        return [.head: front, .frontArm: front, .frontHand: front,
-                .backArm: back, .backHand: back]
+        return [.head: front, .frontArm: front, .frontHand: front, .frontLeg: front,
+                .backArm: back, .backHand: back, .backLeg: back]
     }()
     /// The back leg and foot's share of the energy colour's brightness.
     static let backLegShare = 0.66

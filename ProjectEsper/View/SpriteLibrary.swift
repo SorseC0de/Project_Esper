@@ -500,7 +500,7 @@ final class SpriteLibrary {
             // The glowing parts' middles, and the head's however it's drawn: where the head
             // and its particles go.
             // And the limbs' ends, where cubes come off them; and the torso, for the hood down behind it.
-            if part.glows(human: look.human) || part == .head || [.frontLeg, .backLeg, .frontHand, .backHand, .torso].contains(part) {
+            if part.glows(human: look.human) || part == .head || [.frontLeg, .backLeg, .frontFoot, .backFoot, .frontHand, .backHand, .torso].contains(part) {
                 var sum = sums[part] ?? (0, 0, 0)
                 sum.x += CGFloat(pixel % width) + 0.5
                 sum.y += CGFloat(pixel / width) + 0.5

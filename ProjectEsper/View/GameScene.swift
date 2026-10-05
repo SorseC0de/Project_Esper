@@ -6633,7 +6633,8 @@ final class GameScene: SKScene {
             // A human's legs, in the energy's colours, give off smaller cubes of their own; in
             // the energy form, the hands too.
             if HumanLook.enabled, ParticleLook.cubes {
-                let limbs: [BodyPart] = energyForm ? [.frontLeg, .backLeg, .frontHand, .backHand] : [.frontLeg, .backLeg]
+                // A human's off the shoes, the legs being bare; the energy form's off its legs and hands.
+                let limbs: [BodyPart] = energyForm ? [.frontLeg, .backLeg, .frontHand, .backHand] : [.frontFoot, .backFoot]
                 for (slot, part) in limbs.enumerated() {
                     guard let landmark = sprites.landmark(part, in: frame, player: drawnAs) else { continue }
                     let leg = landmark * drawScale

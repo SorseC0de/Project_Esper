@@ -233,11 +233,11 @@ enum HoopTuning {
     /// Where the rim turns, on its art's canvas (0 to 1, from the bottom left): the back edge
     /// of its ellipse, where it meets the backboard.
     static func pivot(for look: StageLook) -> CGPoint {
-        [StageLook.court, .elements, .wetshot].contains(look) ? CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48) : CGPoint(x: 27.5 / 48, y: 1 - 34 / 48)
+        [StageLook.court, .elements, .wetshot, .flight].contains(look) ? CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48) : CGPoint(x: 27.5 / 48, y: 1 - 34 / 48)
     }
     /// The hoop's two pieces for a stage: Wreck Center's straight on, the rest turned.
     static func art(for look: StageLook) -> (backboard: String, rim: String) {
-        [StageLook.court, .elements, .wetshot].contains(look) ? ("backboard_straight", "hoop_straight") : ("backboard", "hoop")
+        [StageLook.court, .elements, .wetshot, .flight].contains(look) ? ("backboard_straight", "hoop_straight") : ("backboard", "hoop")
     }
     nonisolated(unsafe) static var courtOffset = CGPoint(x: 5, y: 10)
     /// The hoop offset the nets' NET X and Y were first set against: a net goes as far

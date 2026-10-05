@@ -1,10 +1,22 @@
 /// The stages laid out by hand in the map maker.
 public enum MapStage: String, CaseIterable, Codable {
-    case elements, wetshot
+    case elements, wetshot, flight
 
     /// Its size in tiles.
-    public var columns: Int { self == .elements ? ElementsRules.columns : WetshotRules.columns }
-    public var rows: Int { self == .elements ? ElementsRules.rows : WetshotRules.rows }
+    public var columns: Int {
+        switch self {
+        case .elements: ElementsRules.columns
+        case .wetshot: WetshotRules.columns
+        case .flight: FlightRules.columns
+        }
+    }
+    public var rows: Int {
+        switch self {
+        case .elements: ElementsRules.rows
+        case .wetshot: WetshotRules.rows
+        case .flight: FlightRules.rows
+        }
+    }
 }
 
 /// A stage's map, laid out by hand: tiles from a tileset dropped on a grid, props placed
@@ -192,12 +204,28 @@ public struct StageMap: Equatable, Codable {
 
     /// Up by one whenever a new map is baked in below, so a map kept from before it, which
     /// would stand in for it offline, is put aside and the baked one shows.
-    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .elements ? 5 : 5 }
+    public static func bakedVersion(_ stage: MapStage) -> Int { stage == .flight ? 1 : 5 }
 
     /// The map every phone plays; the map maker's edits stand in for it offline only.
-    public static func baked(_ stage: MapStage) -> StageMap { stage == .elements ? elementsBaked : wetshotBaked }
+    public static func baked(_ stage: MapStage) -> StageMap {
+        switch stage {
+        case .elements: elementsBaked
+        case .wetshot: wetshotBaked
+        case .flight: flightBaked
+        }
+    }
     private static let elementsBaked: StageMap = StageMap.defaultMap()
     private static let wetshotBaked: StageMap = StageMap.wetshotDefaultMap()
+    private static let flightBaked: StageMap = StageMap.flightDefaultMap()
+
+    /// Flight, to start: a floor along the bottom in the floors sheet's first tile, the rims a
+    /// court's height in from each end, the starts either side of the middle, the ball over it.
+    private static func flightDefaultMap() -> StageMap {
+        let floor = (0..<FlightRules.columns).map { Placed(Cell($0, 0), art: Cell(0, 0)) }
+        let middle = FlightRules.columns / 2
+        return StageMap(tiles: floor, leftRim: Cell(5, 9), rightRim: Cell(FlightRules.columns - 6, 9),
+                        spawns: [Cell(middle - 6, 1), Cell(middle + 5, 1)], ball: Cell(middle, 8))
+    }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.
     public struct Store {
@@ -221,7 +249,12 @@ public struct StageMap: Equatable, Codable {
     /// The map as Swift, for a stage's baked map to be pasted over.
     public func swiftSource(_ stage: MapStage) -> String {
         func cell(_ value: Cell) -> String { "Cell(\(value.column), \(value.row))" }
-        var lines = ["    private static func \(stage == .elements ? "defaultMap" : "wetshotDefaultMap")() -> StageMap {",
+        let name = switch stage {
+        case .elements: "defaultMap"
+        case .wetshot: "wetshotDefaultMap"
+        case .flight: "flightDefaultMap"
+        }
+        var lines = ["    private static func \(name)() -> StageMap {",
                      "        let tiles: [Placed] = ["]
         let ordered = tiles.sorted { ($0.cell.row, $0.cell.column) < ($1.cell.row, $1.cell.column) }
         var line = "           "
@@ -362,6 +395,13 @@ public enum IcicleRules {
     public static let width = 5.0
     public static let length = 13.0
 
+}
+
+/// Flight: as long as a phone shows whole at 3x, 52 tiles (832 art pixels, 2496 of a 2532-pixel
+/// screen), and as tall as the Elements.
+public enum FlightRules {
+    public static let columns = 52
+    public static let rows = 24
 }
 
 /// Wetshot Wake: 37 by 19, under water, its one rim on the Hoopfish: the background's 17 rows a

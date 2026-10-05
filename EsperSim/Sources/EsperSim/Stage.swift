@@ -679,6 +679,29 @@ public struct Stage: Equatable {
         }
     }
 
+    /// Flight: 52 by 24, laid out in the map maker on its own tilesets; two rims, as the Elements.
+    public static var flight: Stage {
+        let map = StageMap.current[.flight]
+        let columns = FlightRules.columns, rows = FlightRules.rows
+        func centre(_ cell: StageMap.Cell) -> Vec2 {
+            Vec2(x: (Double(cell.column) + 0.5) * tileSize, y: (Double(cell.row) + 0.5) * tileSize)
+        }
+        var stage = Stage(
+            columns: columns, rows: rows,
+            hoops: [
+                Hoop(position: centre(map.leftRim), owner: 1, backboard: .left),
+                Hoop(position: centre(map.rightRim), owner: 0, backboard: .right),
+            ],
+            playerSpawns: map.spawns.map { Vec2(x: (Double($0.column) + 0.5) * tileSize, y: Double($0.row) * tileSize) },
+            playerFacings: map.spawns.map { Double($0.column) * tileSize < Double(columns) * tileSize / 2 ? .right : .left },
+            ballSpawn: centre(map.ball)
+        )
+        stage.lay(map.walls)
+        stage.slopes = stage.fixedSlopes
+        stage.features = StageFeatures(look: .flight)
+        return stage
+    }
+
     /// Wetshot Wake: 37 by 19, under water, laid out in the map maker; its one rim,
     /// both players' to score on, rides the Hoopfish.
     public static var wetshot: Stage {
@@ -787,10 +810,10 @@ public struct Stage: Equatable {
 /// The stages to pick from, in the order the select screen shows them; the wire carries
 /// the raw value.
 public enum StageChoice: Int, CaseIterable {
-    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, wetshotWake
+    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, wetshotWake, flight
 
     /// The stages on the select, in its order: Slamstill Traffic parked off it.
-    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .wetshotWake]
+    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .wetshotWake, .flight]
     /// The stages 47 plays on.
     public static let fortySeven: [StageChoice] = [.wreckCenter, .wetshotWake]
 
@@ -802,6 +825,7 @@ public enum StageChoice: Int, CaseIterable {
         case .theElements: "The Elements"
         case .skyNet: "Sky Net"
         case .wetshotWake: "Hoopfish Hideaway"
+        case .flight: "Flight"
         }
     }
 
@@ -814,6 +838,7 @@ public enum StageChoice: Int, CaseIterable {
         // To be detailed: the court for now.
         case .skyNet: .court
         case .wetshotWake: .wetshot
+        case .flight: .flight
         }
     }
 }

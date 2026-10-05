@@ -482,7 +482,7 @@ final class GameScene: SKScene {
     }
 
     /// The Elements' flat background, which never glows; nil elsewhere.
-    var unglowedBackground: SKColor? { [StageLook.elements, .wetshot].contains(match.stage.features.look) ? backgroundColor : nil }
+    var unglowedBackground: SKColor? { [StageLook.elements, .wetshot, .flight].contains(match.stage.features.look) ? backgroundColor : nil }
 
     /// The water's tint over the world, for what's drawn apart from the scene (the cubes); nil off Wetshot Wake.
     var waterTint: (top: RGB, bottom: RGB, alpha: CGFloat)? {
@@ -1601,6 +1601,7 @@ final class GameScene: SKScene {
 
     /// The Elements' placed tiles, while it's the stage drawn; Wetshot Wake's props likewise.
     private var elementsArt: ElementsArt.Handles?
+    private var flightArt: FlightArt.Handles?
     private var wetshotArt: WetshotArt.Handles?
     private let tornadoOverlays = SKCropNode()
 
@@ -1618,6 +1619,12 @@ final class GameScene: SKScene {
             }
         }
         if let art = wetshotArt { flats += art.flats }
+        // Flight's tiles are painted, not lit: none of them glows.
+        if let art = flightArt {
+            flats += art.tiles.values.compactMap { node in
+                node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
+            }
+        }
         staticFlats = flats
         staticFlatsVersion += 1
     }
@@ -1632,12 +1639,16 @@ final class GameScene: SKScene {
         backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : (isWetshot ? SKColor(rgb: WetshotArt.waterTop) : GameScene.background)
         elementsArt = nil
         wetshotArt = nil
+        flightArt = nil
         fallingIcicles = [:]
         hangingIcicles = [:]
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
         tornadoOverlays.removeAllChildren()
         if isWetshot {
             wetshotArt = WetshotArt.build(stage: stage, map: StageMap.current[.wetshot], into: stageGround)
+        }
+        if stage.features.look == .flight {
+            flightArt = FlightArt.build(map: StageMap.current[.flight], into: stageGround)
         }
         if isElements {
             elementsArt = ElementsArt.build(stage: stage, map: StageMap.current[.elements], into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
@@ -1852,6 +1863,7 @@ final class GameScene: SKScene {
         nets = []
         elementsArt = nil
         wetshotArt = nil
+        flightArt = nil
         fallingIcicles = [:]
         hangingIcicles = [:]
         fieldBlooms = []
@@ -2729,7 +2741,7 @@ final class GameScene: SKScene {
         // The field and the Elements scroll sideways, so only its height is fitted; a scenic stage counts the
         // ground below the floor in, so the players stand in the middle of it; not the Elements,
         // whose floor is the lava at the screen's bottom.
-        let below = match.stage.features.scenic && ![StageLook.elements, .wetshot].contains(match.stage.features.look) ? FieldArt.viewBelowFloor : 0
+        let below = match.stage.features.scenic && ![StageLook.elements, .wetshot, .flight].contains(match.stage.features.look) ? FieldArt.viewBelowFloor : 0
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
@@ -2791,7 +2803,7 @@ final class GameScene: SKScene {
         }
         // The map maker only means anything on a hand-laid stage, offline, with a mouse.
         #if !os(tvOS)
-        if [StageLook.elements, .wetshot].contains(match.stage.features.look), online == nil {
+        if [StageLook.elements, .wetshot, .flight].contains(match.stage.features.look), online == nil {
             controls.addPicker(title: "MAP", options: ["OFF", "ON"], selected: mapEditor == nil ? 0 : 1) { [weak self] index in
                 index == 1 ? self?.openMapEditor() : self?.closeMapEditor(restart: true)
             }
@@ -5260,9 +5272,21 @@ final class GameScene: SKScene {
 
     private func openMapEditor() {
         let look = match.stage.features.look
-        guard mapEditor == nil, online == nil, look == .elements || look == .wetshot else { return }
-        let mapStage: MapStage = look == .elements ? .elements : .wetshot
-        let rebuilt: () -> Stage = { mapStage == .elements ? .elements : .wetshot }
+        let mapStage: MapStage
+        switch look {
+        case .elements: mapStage = .elements
+        case .wetshot: mapStage = .wetshot
+        case .flight: mapStage = .flight
+        default: return
+        }
+        guard mapEditor == nil, online == nil else { return }
+        let rebuilt: () -> Stage = {
+            switch mapStage {
+            case .elements: .elements
+            case .wetshot: .wetshot
+            case .flight: .flight
+            }
+        }
         wholeStageView = true
         layout(displayScale: displayScale)
         let scale = hudScale * cameraNode.xScale
@@ -5278,8 +5302,12 @@ final class GameScene: SKScene {
             },
             onTiles: { [weak self] cells in
                 guard let self else { return }
-                let map = StageMap.current[.elements]
-                for cell in cells { self.elementsArt?.set(map.tiles.first { $0.cell == cell }, at: cell) }
+                let map = StageMap.current[mapStage]
+                for cell in cells {
+                    let placed = map.tiles.first { $0.cell == cell }
+                    self.elementsArt?.set(placed, at: cell)
+                    self.flightArt?.set(placed, at: cell)
+                }
                 self.refreshStaticFlats()
                 self.session.mutate { match in
                     match.stage = rebuilt()
@@ -6772,7 +6800,7 @@ final class GameScene: SKScene {
                 let ballAt = finishTarget ?? cameraBase
                 cameraNode.position = cameraBase + (ballAt - cameraBase) * eased
                 cameraNode.setScale(cameraBaseScale * (1 - (1 - GameScene.finishZoom) * eased))
-                if [StageLook.wetshot, .elements].contains(match.stage.features.look) {
+                if [StageLook.wetshot, .elements, .flight].contains(match.stage.features.look) {
                     // Closing in, the view stays inside the stage's sides.
                     let halfSeen = size.width * cameraNode.xScale / 2, stageWidth = SpriteLibrary.point(Vec2(x: match.stage.width, y: 0)).x
                     cameraNode.position.x = min(max(cameraNode.position.x, halfSeen), max(stageWidth - halfSeen, halfSeen))

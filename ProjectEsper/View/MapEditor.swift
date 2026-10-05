@@ -65,7 +65,7 @@ final class MapEditor: SKNode {
         case leftRim, rightRim, firstStart, secondStart, ball
 
         /// The markers a stage has: Wetshot Wake's one rim rides the Hoopfish, so no rims.
-        static func on(_ stage: MapStage) -> [Marker] { stage == .elements ? allCases : [.firstStart, .secondStart, .ball] }
+        static func on(_ stage: MapStage) -> [Marker] { stage == .wetshot ? [.firstStart, .secondStart, .ball] : allCases }
 
         var label: String {
             switch self {
@@ -95,8 +95,10 @@ final class MapEditor: SKNode {
         case pile(StageMap.PilePiece.Kind, rotation: Double, taken: Bool)
     }
 
-    /// Which hand-laid stage this is the map of.
+    /// Which hand-laid stage this is the map of, its tiles, and which of their sheets the panel shows.
     private let stage: MapStage
+    private let tiles: MapTiles
+    private var sheetIndex = 0
     private(set) var map: StageMap
     private var history: [StageMap] = []
     private var tool: Tool
@@ -147,8 +149,10 @@ final class MapEditor: SKNode {
     private var paletteShown = true
     /// Screen points to a tileset pixel: small, in the corner, or less if the sheet is big for the screen.
     private var paletteScale: CGFloat {
-        let sheet = ElementsArt.tileset.size()
-        return min(0.85, halfWidth * 0.6 / max(sheet.width, 1), halfHeight * 0.5 / max(sheet.height, 1))
+        let sheet = tiles.sheets[sheetIndex].size()
+        // Flight's big sheets get more of the screen's height, or their cells are too small to pick.
+        let heightShare: CGFloat = tiles.sheets.count > 1 ? 0.8 : 0.5
+        return min(0.85, halfWidth * 0.6 / max(sheet.width, 1), halfHeight * heightShare / max(sheet.height, 1))
     }
 
     init(stage: MapStage, map: StageMap, halfWidth: CGFloat, halfHeight: CGFloat, unitsPerHud: CGFloat, world: @escaping (CGPoint) -> CGPoint,
@@ -156,6 +160,7 @@ final class MapEditor: SKNode {
          onMarkers: @escaping () -> Void, onTornados: @escaping () -> Void, onProps: @escaping () -> Void, onWalls: @escaping () -> Void,
          onClose: @escaping () -> Void) {
         self.stage = stage
+        tiles = MapTiles.of(stage)
         self.map = map
         self.halfWidth = halfWidth
         self.halfHeight = halfHeight
@@ -191,7 +196,11 @@ final class MapEditor: SKNode {
 
     /// What's in hand to start with, and back from walls mode: a tile, or Wetshot Wake's first plant.
     private static func firstTool(for stage: MapStage) -> Tool {
-        stage == .wetshot ? .prop(.plant1) : .brush(ElementsArt.filled.first { $0 == StageMap.Cell(3, 3) } ?? ElementsArt.filled[0])
+        switch stage {
+        case .wetshot: .prop(.plant1)
+        case .elements: .brush(ElementsArt.filled.first { $0 == StageMap.Cell(3, 3) } ?? ElementsArt.filled[0])
+        case .flight: .brush(MapTiles.flight.filled(sheet: 0).first ?? StageMap.Cell(0, 0))
+        }
     }
 
     // MARK: Geometry
@@ -236,8 +245,8 @@ final class MapEditor: SKNode {
         panel.removeAllChildren()
         buttons = []
         let scale = paletteScale
-        let sheetSize = ElementsArt.tileset.size()
-        let showsSheet = paletteShown && !wallsMode && stage == .elements
+        let sheetSize = tiles.sheets[sheetIndex].size()
+        let showsSheet = paletteShown && !wallsMode && stage != .wetshot
         let showsProps = paletteShown && !wallsMode && stage == .wetshot
         // The props in a row, each scaled to the row's height but no wider than it allows.
         let propHeight: CGFloat = 28
@@ -270,6 +279,11 @@ final class MapEditor: SKNode {
                 + Marker.on(stage).map { ($0.label, .marker($0)) }
         }
         let toolRow: [(String, () -> Void)] = tools.map { title, picked in (title, { [weak self] in self?.tool = picked; self?.buildPanel() }) }
+        // More than one sheet: a row to page through them.
+        let sheetRow: [(String, () -> Void)] = showsSheet && tiles.sheets.count > 1 ? [
+            ("\u{25C0}", { [weak self] in self?.turnSheet(-1) }), ("SHEET \(sheetIndex + 1)/\(tiles.sheets.count)", {}),
+            ("\u{25B6}", { [weak self] in self?.turnSheet(1) }),
+        ] : []
         let lit = Set(tools.filter { $0.1 == tool }.map(\.0))
         func labelWidth(_ title: String) -> CGFloat {
             let label = SKLabelNode(text: title)
@@ -277,7 +291,7 @@ final class MapEditor: SKNode {
             label.fontSize = fontSize
             return label.frame.width + 8
         }
-        let rows = [actionRow, toolRow]
+        let rows = [actionRow, toolRow] + (sheetRow.isEmpty ? [] : [sheetRow])
         let rowWidths = rows.map { row in row.reduce(CGFloat(0)) { $0 + labelWidth($1.0) } + gap * CGFloat(max(row.count - 1, 0)) }
         let contentWidth = max(rowWidths.max() ?? 0, paletteSize.width)
         // Under the props, a slider each for the newest two pile pieces' turns.
@@ -318,7 +332,7 @@ final class MapEditor: SKNode {
         }
         if showsSheet {
             paletteRect = CGRect(x: left, y: top - contentHeight, width: paletteSize.width, height: paletteSize.height)
-            let sheet = SKSpriteNode(texture: ElementsArt.tileset)
+            let sheet = SKSpriteNode(texture: tiles.sheets[sheetIndex])
             sheet.anchorPoint = .zero
             sheet.size = paletteSize
             sheet.position = paletteRect.origin
@@ -412,6 +426,12 @@ final class MapEditor: SKNode {
         showSelection()
     }
 
+    /// The panel on to the next sheet, or back.
+    private func turnSheet(_ by: Int) {
+        sheetIndex = (sheetIndex + by + tiles.sheets.count) % tiles.sheets.count
+        buildPanel()
+    }
+
     private func togglePalette() {
         paletteShown.toggle()
         buildPanel()
@@ -431,18 +451,19 @@ final class MapEditor: SKNode {
 
     /// The chosen tile ringed in the panel.
     private func showSelection() {
-        guard paletteShown, case .brush(let art) = tool else { selection.isHidden = true; return }
+        guard paletteShown, case .brush(let art) = tool, tiles.sheet(of: art) == sheetIndex else { selection.isHidden = true; return }
         selection.isHidden = false
-        let side = 16 * paletteScale
-        selection.path = CGPath(rect: CGRect(x: paletteRect.minX + CGFloat(art.column) * side,
+        let side = tiles.cellPixels * paletteScale
+        let column = art.column - sheetIndex * tiles.columnsPerSheet
+        selection.path = CGPath(rect: CGRect(x: paletteRect.minX + CGFloat(column) * side,
                                              y: paletteRect.maxY - CGFloat(art.row + 1) * side, width: side, height: side), transform: nil)
     }
 
     private func paletteCell(at point: CGPoint) -> StageMap.Cell? {
-        guard paletteShown, !wallsMode, stage == .elements, paletteRect.contains(point) else { return nil }
-        let side = 16 * paletteScale
-        let cell = StageMap.Cell(Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
-        return ElementsArt.filled.contains(cell) ? cell : nil
+        guard paletteShown, !wallsMode, stage != .wetshot, paletteRect.contains(point) else { return nil }
+        let side = tiles.cellPixels * paletteScale
+        let cell = StageMap.Cell(sheetIndex * tiles.columnsPerSheet + Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
+        return tiles.filled(sheet: sheetIndex).contains(cell) ? cell : nil
     }
 
     // MARK: The map
@@ -521,8 +542,8 @@ final class MapEditor: SKNode {
         map.tiles.removeAll { $0.cell == cell }
         map.tiles.append(.init(cell, art: art))
         dirty.insert(cell)
-        // A tile brings a block with it where there's no wall yet, decoration excepted.
-        if !StageMap.decoration.contains(art), map.wall(at: cell) == nil { setWall(.solid, at: cell) }
+        // A tile brings a block with it where there's no wall yet, the Elements' decoration excepted.
+        if !(stage == .elements && StageMap.decoration.contains(art)), map.wall(at: cell) == nil { setWall(.solid, at: cell) }
     }
 
     /// A tile taken off its cell takes a block with it; a slope painted there stays.
@@ -914,7 +935,7 @@ final class MapEditor: SKNode {
         ghostMarker = nil
         switch carried {
         case .tile(let art, _):
-            let sprite = SKSpriteNode(texture: ElementsArt.tile(art))
+            let sprite = SKSpriteNode(texture: tiles.tile(art))
             sprite.size = CGSize(width: cellSide, height: cellSide)
             sprite.alpha = 0.8
             sprite.zPosition = 10

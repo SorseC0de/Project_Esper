@@ -178,7 +178,6 @@ final class SpriteLibrary {
         if let outline = result.outline { textures["_outline"] = outline }
         if let glowMask = result.glowMask { textures["_glowmask"] = glowMask }
         if let skin = result.skin { textures["_skin"] = skin }
-        if let headSkin = result.headSkin { textures["_headskin"] = headSkin }
         if let thinOutline = result.thinOutline { textures["_thinoutline"] = thinOutline }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize
@@ -224,12 +223,6 @@ final class SpriteLibrary {
     func thinOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
         _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_thinoutline"]
-    }
-
-    /// A human's head's skin alone from a player frame, in white. Nil when the frame shows none.
-    func headSkinTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
-        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_headskin"]
     }
 
     /// A human's skin alone from a player frame, in white, on the same canvas as the body. Nil
@@ -278,6 +271,42 @@ final class SpriteLibrary {
         let result = makeToned(texture(name, frame), look: look(for: player), capped: Effect.sparkNames.contains(name))
         cache[key] = result
         return result
+    }
+
+    /// The hooded head, a frame of `player_hoodheads` for one skin: its hood, the white and the
+    /// cool greys, toned through the player's energy ramp, the skin left as drawn; and the hood
+    /// and the face each alone in white, for the glow's mask.
+    func hoodHead(skin: Int, player: Int) -> (drawn: SKTexture, hood: SKTexture, face: SKTexture) {
+        let key = "p\(player)_hoodhead_\(skin)"
+        if let drawn = cache[key], let hood = cache[key + "_hood"], let face = cache[key + "_face"] { return (drawn, hood, face) }
+        let source = texture("player_hoodheads", skin)
+        let image = source.cgImage()
+        let width = image.width, height = image.height
+        let look = look(for: player)
+        guard let (context, pixels) = makeCanvas(width: width, height: height),
+              let (hoodContext, hoodPixels) = makeCanvas(width: width, height: height),
+              let (faceContext, facePixels) = makeCanvas(width: width, height: height) else { return (source, source, source) }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] != 0 {
+            let index = pixel * 4
+            let red = Double(pixels[index]), green = Double(pixels[index + 1]), blue = Double(pixels[index + 2])
+            // The hood is white and cool greys, blue at least as strong as red; skin is warm.
+            let isHood = blue >= red
+            let mask = isHood ? hoodPixels : facePixels
+            for channel in 0..<4 { mask[index + channel] = 255 }
+            guard isHood else { continue }
+            let grey = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
+            paint(pixels, index, look.energyTone(luminance: min(grey, 1)))
+        }
+        let made = [context, hoodContext, faceContext].map { context -> SKTexture in
+            let texture = context.makeImage().map { SKTexture(cgImage: $0) } ?? source
+            texture.filteringMode = .nearest
+            return texture
+        }
+        cache[key] = made[0]
+        cache[key + "_hood"] = made[1]
+        cache[key + "_face"] = made[2]
+        return (made[0], made[1], made[2])
     }
 
     /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which
@@ -440,10 +469,10 @@ final class SpriteLibrary {
     /// centre of each glowing part found. The ball is looked for only where the sheet
     /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
     /// with no line, and the body is drawn and lined without them.
-    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, headSkin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
+    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, nil, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
         // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
@@ -556,7 +585,15 @@ final class SpriteLibrary {
             }
         }
 
-        // A human's energy-coloured parts glow (its hood is the view's, `player_hood`); the
+        // A human's head is the view's, `player_hoodheads` over it: the sheet's own is taken
+        // out, its line left round where it was.
+        if look.human {
+            for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
+                for channel in 0..<4 { pixels[pixel * 4 + channel] = 0 }
+            }
+        }
+
+        // A human's energy-coloured parts glow; the
         // energy form glows all over but its skin.
         let glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true
             : parts[$0].map { !HumanLook.energyFormSkin.contains($0) } == true }
@@ -626,20 +663,10 @@ final class SpriteLibrary {
             }
             if any { skin = skinContext.makeImage().map { SKTexture(cgImage: $0) } }
         }
-        // The head's skin alone, for the glow's mask: what shows through the hood's face.
-        var headSkin: SKTexture?
-        if detach, look.human, let (headContext, headPixels) = makeCanvas(width: width, height: height) {
-            var any = false
-            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !lined[pixel] && parts[pixel] == .head {
-                for channel in 0..<4 { headPixels[pixel * 4 + channel] = 255 }
-                any = true
-            }
-            if any { headSkin = headContext.makeImage().map { SKTexture(cgImage: $0) } }
-        }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, nil, [:]) }
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, headSkin, thinOutline, centres)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres)
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

@@ -174,6 +174,8 @@ final class GameScene: SKScene {
     private var hoodNodes: [SKSpriteNode] = []
     private var hoodFlashes: [SKSpriteNode] = []
     private static let hoodDrawnFor = AnimationFrame(.idle, 2)
+    /// `player_hoodheads`' frame in the skin the bodies are drawn in (palette 34 and 35).
+    private static let hoodHeadSkin = 3
     /// Over the body and under the head's own node, or behind the body.
     private static let hoodUpZ: CGFloat = 0.038
     private static let hoodDownZ: CGFloat = -0.005
@@ -369,24 +371,21 @@ final class GameScene: SKScene {
         return sectionTimes
     }
 
-    /// The hoods over the heads, cut out of the glow's body mask in black so they glow as
-    /// the energy does rather than as the skin under them, which doesn't.
-    var hoodSnapshots: [BodySnapshot] {
-        hoodNodes.filter { !$0.isHidden && $0.zPosition == GameScene.hoodUpZ }.compactMap { node in
-            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size, zRotation: node.zRotation) }
+    /// The hooded heads' hoods, cut out of the glow's body mask in black so they glow as the
+    /// energy does; and their faces, shielded in red, so no glow lands on them.
+    var hoodSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.hood) }
+    var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
+    private func hoodMaskSnapshots(_ part: KeyPath<(hood: SKTexture, face: SKTexture), SKTexture>) -> [BodySnapshot] {
+        hoodNodes.indices.compactMap { index in
+            let node = hoodNodes[index]
+            // Only the hooded head has masks; the hood down behind has none.
+            guard !node.isHidden, let masks = hoodMasks[index] else { return nil }
+            return BodySnapshot(texture: masks[keyPath: part], position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
+                                size: node.size, zRotation: node.zRotation)
         }
     }
-
-    /// Under the hood, the head's skin, in the glow's mask as shielded: no glow lands on the face
-    /// in the hood's opening.
-    var shieldedSnapshots: [BodySnapshot] {
-        zip(playerNodes, hoodNodes).compactMap { body, hood in
-            guard !hood.isHidden, hood.zPosition == GameScene.hoodUpZ, let texture = headSkins[ObjectIdentifier(body)] else { return nil }
-            return BodySnapshot(texture: texture, position: body.position, anchor: body.anchorPoint, xScale: body.xScale, size: body.size, zRotation: body.zRotation)
-        }
-    }
-    /// Each body's head skin this frame, by its node.
-    private var headSkins: [ObjectIdentifier: SKTexture] = [:]
+    /// Each hooded head's hood and face alone this frame, by player.
+    private var hoodMasks: [Int: (hood: SKTexture, face: SKTexture)] = [:]
 
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
@@ -6368,8 +6367,16 @@ final class GameScene: SKScene {
             let headDrawnFor = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index)
             if player.frozen == 0, !node.isHidden, let headNow, let headDrawnFor {
                 hood.isHidden = false
-                // Toned ahead of time through the energy's ramp, opaque, rather than by a shader.
-                hood.texture = sprites.effectTexture(energyForm ? "player_hood_down" : "player_hood", 0, player: index)
+                // Toned ahead of time through the energy's ramp, opaque, rather than by a shader:
+                // up, the whole hooded head in the skin it's drawn for, its hood alone toned.
+                if energyForm {
+                    hood.texture = sprites.effectTexture("player_hood_down", 0, player: index)
+                    hoodMasks[index] = nil
+                } else {
+                    let hoodHead = sprites.hoodHead(skin: GameScene.hoodHeadSkin, player: index)
+                    hood.texture = hoodHead.drawn
+                    hoodMasks[index] = (hoodHead.hood, hoodHead.face)
+                }
                 hood.zPosition = energyForm ? GameScene.hoodDownZ : GameScene.hoodUpZ
                 hood.size = hood.texture!.size().scaled(by: drawScale)
                 hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
@@ -6378,9 +6385,9 @@ final class GameScene: SKScene {
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
                 hood.zRotation = node.zRotation
-                headSkins[ObjectIdentifier(node)] = energyForm ? nil : sprites.headSkinTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
             } else {
                 hood.isHidden = true
+                hoodMasks[index] = nil
             }
             // The hood flashes with the body, part of its silhouette: over the body's flash when
             // it's up, over the hood itself when it's down behind.

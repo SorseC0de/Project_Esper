@@ -798,17 +798,18 @@ thirds of its brightness (`HumanLook.backLegShare`, 0.66; greyed, they barely gl
 (`HumanLook.glowingParts`, left out of the glow's body mask with a per-frame glow mask, so
 they take the plain threshold); the head
 drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not
-glowing, its particles still rising off it; over it the hood (`player_hood`, its own node), toned
-ahead of time through the energy ramp as the effect sheets are (`effectTexture`), opaque, its white the ramp's lightest, drawn for `player_idle`'s
-third frame and moved every frame by how far the head's middle (its landmark) is from there, turned
-and flipped with the body; in FloState's energy form `player_hood_down`
-instead, behind the body, following the body rather than the head; not on a frozen body. The hood
-over the head is cut out of the glow's body mask in black (`hoodSnapshots`, `MaskScene`'s `cutOut`),
-or the skin under it, which never glows, kept it from glowing there and it read darker. It replaces
-the crown's grade. It flashes with the body (a stun, a lockout, an orb taken) as part of its
-silhouette, and the FloState lockout's skin flash is drawn under it. The face in its opening takes no glow, its own or any spread onto
-it from the hood: the head's skin under the hood is drawn pure red in the glow's mask (`shieldedSnapshots`,
-`MaskScene`'s `shield`), which the bright pass treats as flat and the composite leaves without bloom. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
+glowing, its particles still rising off it. The head itself is the hooded head (`player_hoodheads`,
+six skins as a strip, the bodies' own in its fourth frame, `GameScene.hoodHeadSkin`), its own node:
+its hood, the white and the cool greys, toned ahead of time through the energy ramp
+(`SpriteLibrary.hoodHead`), the skin as drawn, opaque. The sheet's own head is taken out of the body,
+its line left round where it was. Drawn for `player_idle`'s third frame and moved every frame by how
+far the head's middle (its landmark) is from there, turned and flipped with the body; in FloState's
+energy form `player_hood_down` instead, behind the body, following the body rather than the head; not
+on a frozen body. In the glow's mask the hood is cut out in black so it glows as energy
+(`hoodSnapshots`, `MaskScene`'s `cutOut`) and the face drawn pure red (`shieldedSnapshots`, `shield`),
+which the bright pass treats as flat and the composite leaves without bloom, so none spreads onto it.
+It replaces the crown's grade. It flashes with the body (a stun, a lockout, an orb taken) as part of
+its silhouette, and the FloState lockout's skin flash is drawn under it. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
 Going into FloState the burst and the swirl start as the change does, not when it ends. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
 drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
 In the zone (`ZoneTuning.inTheZone`, a placeholder, off

@@ -225,9 +225,9 @@ final class SpriteLibrary {
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_thinoutline"]
     }
 
-    /// A human's skin alone from a player frame, in white, on the same canvas as the body. Nil
-    /// when the frame shows none.
-    func skinTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
+    /// A human's clothes alone from a player frame, the dark ones and the energy's (the shoes), in
+    /// white, on the same canvas as the body: the FloState lockout's flash. Nil when the frame shows none.
+    func clothesTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
         _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_skin"]
     }
@@ -655,11 +655,13 @@ final class SpriteLibrary {
 
         // A human's skin alone in white, as it's drawn: for the
         // FloState lockout's flash.
+        // A human's clothes alone in white, the dark ones and the energy's, as drawn: for the
+        // FloState lockout's flash.
         var skin: SKTexture?
         if detach, look.human, let (skinContext, skinPixels) = makeCanvas(width: width, height: height) {
             var any = false
-            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] && !lined[pixel]
-                && parts[pixel].map({ HumanLook.skin[$0] != nil }) == true {
+            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !lined[pixel]
+                && parts[pixel].map({ HumanLook.clothed.contains($0) || HumanLook.glowingParts.contains($0) }) == true {
                 let index = pixel * 4
                 for channel in 0..<4 { skinPixels[index + channel] = 255 }
                 any = true

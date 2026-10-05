@@ -137,8 +137,12 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   passed over), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent every 0.3 seconds
   (`spendFrames`, 18), so a full meter lasts half a minute, and with none left it's out (protocol 82).
   Out, by the same press or the FLO running out (a burn too), it can't go back for
-  a second (`floStateLockout`, 60 frames), its skin alone flashing palette 17 every other four
-  frames meanwhile (`SpriteLibrary.skinTexture`); FloState and the lockout are kept through a point.
+  a second (`floStateLockout`, 60 frames), its clothes flashing palette 39's grey every other four
+  frames meanwhile: the dark ones and those in the energy's colour (the shoes, and the hood and its
+  strings), unglowing while grey (`SpriteLibrary.clothesTexture`, their snapshots the glow mask's
+  flats), and no cubes off the head or the shoes the whole lockout; FloState and the lockout are kept
+  through a point. Changing, the hood down swings down into place from turned up a quarter turn, about
+  where it meets the body (column 23, row 24), eased over the energy form's frames.
   In FloState the cube trails run their longest (14), the head's and legs' cubes come out in the
   zone's colours, the body is drawn in the lighter colour of the earlier builds (the glow lifted two
   fifths to white, `EnergyColour.body`, the back parts at two thirds of it), the head in it too, the
@@ -341,7 +345,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   and only after a jump, a double jump, a wall jump or a wall land since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
   slab still works. The stage carries standing slabs as `extras`, which every collision
   query sees. Numbers in `ShakeRules`.
-  Super Smoothie's flight is on a cape of energy, and at level two the stick forward
+  Super Smoothie's flight streams its hood's strings out behind, and at level two the stick forward
   is the glide: 3.5 forward (2.5 with the ball), sinking 0.8 a frame unless up is held,
   which rises at the flight speed, and diving at 3 on down; the stick backward is the
   drift at the flight speed, and centred it levitates. Level one is the plain flight.
@@ -831,11 +835,14 @@ energy form `player_hood_down` instead, behind the body, following the torso's m
 on a frozen body. In the glow's mask the hood is cut out in black so it glows as energy
 (`hoodSnapshots`, `MaskScene`'s `cutOut`) and the face drawn pure red (`shieldedSnapshots`, `shield`),
 which the bright pass treats as flat and the composite leaves without bloom, so none spreads onto it.
-Its two strings are drawn rather than painted (`HoodStrings`): chains of whole art pixels, each pixel
+The hood is the H.O.O.D., the Hyper-Osmotic Output Driver: it draws in sweat and drives out
+energy. Its two strings are drawn rather than painted (`HoodStrings`): chains of whole art pixels, each pixel
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
-each from columns 23 and 26 of row 23, hanging under gravity and swinging; down, off FloState's hood
-behind the body (the strings themselves over it), twenty each from columns 23 and 27 of row 24 (moved up or down whole pixels on the STRING Y slider, `HoodStrings.downLift`), drawn over the energy form's head (0.045) and cut
+each from columns 23 and 26 of row 23, hanging under gravity and swinging; Super Smoothie flying,
+twenty each streaming straight back as FloState's near one does (`HoodStrings.streaming`); down, off FloState's hood
+behind the body (the strings themselves over it), twenty each from columns 23 and 27 of row 24 (moved up or down whole pixels on the STRING Y slider, `HoodStrings.downLift`, 2 up), the near one
+back, the far one forward, twelve long, its wave twice as tight and growing to 4 (`HoodStrings.floState`), drawn over the energy form's head (0.045) and cut
 out of the glow's mask as the hooded head's are (over skin, which never glows, they were swallowed), floating as if held up (Shenron's
 whiskers): drawn each frame toward a line straight back from the hood, level with where they start, so they
 stream out past the back with their ends as high as their roots (shorter and steeper, they settled over the torso
@@ -1027,8 +1034,7 @@ the pulse is a bar from the hand to the edge; ice clones are the body's frame in
 flames loop `fire_trail`; fireballs are the ball in fire, in hand and thrown, the basketball recoloured a step up the fire ramp (gold to yellow, orange to light gold, red to gold, its seams gold, its outline orange; `SpriteLibrary.basketballFireFrames`); frozen bodies and ice clones are
 drawn in the ice look (`Look.ice`: the front parts, the head and the torso's light in palette 57,
 the back parts and the torso's shadow, the pelvis, in 49, outlined in 22; `SpriteLibrary.icePlayer`, warmed
-with the rest), the clones at 0.8; a frozen ball, loose or in hand, is `basketball_ice`, with no halo, so no glow, and holds its turn; the cape is seven short rectangles chained along the glide's trail with a wave down
-its length.
+with the rest), the clones at 0.8; a frozen ball, loose or in hand, is `basketball_ice`, with no halo, so no glow, and holds its turn. Super Smoothie's cape is gone: flying, its hood's strings stream out behind instead (below).
 
 ### Sound words
 

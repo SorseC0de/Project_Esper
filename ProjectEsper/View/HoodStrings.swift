@@ -2,37 +2,46 @@ import SpriteKit
 
 /// A hood's two strings, drawn here rather than on the sprite: chains of whole art pixels off
 /// the hood, each pixel a point that moves as a cord does and is drawn snapped to the hood's
-/// pixel grid, over the body. Up, on the hooded head, they hang and swing; down, off FloState's
-/// hood, they float as if held up, waving along their length, and trail when the body moves.
+/// pixel grid, over the body. On the hooded head they hang and swing, or, Super Smoothie flying,
+/// stream out behind; off FloState's hood they float as if held up (Shenron's whiskers), one
+/// back, the far one forward, shorter and curling more, waving along their length and trailing
+/// when the body moves.
 final class HoodStrings {
-    struct Style {
-        /// Pixels a string, the first pinned to the hood.
+    /// One string's floating line: which way out of the hood (back is -1 across), and its wave,
+    /// growing to `wave` pixels at the tip, `waveStep` radians a pixel apart along it.
+    struct Strand {
         var length: Int
+        var direction: CGVector = CGVector(dx: -1, dy: 0)
+        var wave: CGFloat = 2.5
+        var waveStep = 0.7
+    }
+
+    struct Style {
+        /// The two strings, the near one first.
+        var strands: [Strand]
         /// Pull down a frame, in art pixels.
         var gravity: CGFloat
-        /// Floating: drawn each frame toward a waving line out of the hood, this share of the way.
+        /// Floating: drawn each frame toward its waving line, this share of the way.
         var floatPull: CGFloat
         /// How much of last frame's motion carries on.
         var carry: CGFloat
     }
 
-    /// Up: five pixels, hanging. Down: twenty, floating, long enough to clear the body: shorter,
-    /// they settled over the torso and were lost in its glow.
-    static let up = Style(length: 5, gravity: 0.25, floatPull: 0, carry: 0.85)
-    static let down = Style(length: 20, gravity: 0, floatPull: 0.08, carry: 0.9)
+    /// Hanging: five pixels each. Streaming: twenty each, both straight back, level with where
+    /// they start (shorter, they settled over the torso and were lost in its glow). FloState: the
+    /// near one so, the far one forward, twelve, its wave twice as tight and bigger.
+    static let hanging = Style(strands: [Strand(length: 5), Strand(length: 5)], gravity: 0.25, floatPull: 0, carry: 0.85)
+    static let streaming = Style(strands: [Strand(length: 20), Strand(length: 20)], gravity: 0, floatPull: 0.08, carry: 0.9)
+    static let floState = Style(strands: [Strand(length: 20), Strand(length: 12, direction: CGVector(dx: 1, dy: 0), wave: 4, waveStep: 1.4)],
+                                gravity: 0, floatPull: 0.08, carry: 0.9)
     /// Where each string starts on the hood's 48-pixel canvas, column and row from the top left:
     /// the hooded head's, and the hood down's.
     static let upAnchors = [CGPoint(x: 23, y: 23), CGPoint(x: 26, y: 23)]
     static let downAnchors = [CGPoint(x: 23, y: 24), CGPoint(x: 27, y: 24)]
     /// The floating strings moved up (or down, under 0) from there, whole pixels: STRING Y.
-    nonisolated(unsafe) static var downLift = 0
-    /// The floating strings' line: straight back from the body, level with where they start, so
-    /// they stream out past it and their ends rest as high as their roots; its wave growing to
-    /// this many pixels at the tip, this many times a second, this far apart along it (radians a pixel).
-    static let floatDirection = CGVector(dx: -1, dy: 0)
-    static let floatWave: CGFloat = 2.5
+    nonisolated(unsafe) static var downLift = 2
+    /// The floating strings' waves a second.
     static let floatWavesPerSecond = 0.6
-    static let floatWaveStep = 0.7
     /// The pixel second from the tip is palette 37, as the hood's shading is.
     static let accentFromTip = 2
 
@@ -62,22 +71,22 @@ final class HoodStrings {
 
     /// A frame on: the strings follow their anchors and are drawn, in `plain` with `accent`
     /// second from the tip, at `z`.
-    func step(anchors: [CGPoint], down: Bool, facing: CGFloat, scale: CGFloat, time: Double,
+    func step(anchors: [CGPoint], style: Style, facing: CGFloat, scale: CGFloat, time: Double,
               plain: SKColor, accent: SKColor, z: CGFloat) {
-        let style = down ? HoodStrings.down : HoodStrings.up
         let segment = scale
         var shown: [(CGPoint, Bool)] = []
-        for (string, anchor) in anchors.enumerated() {
+        for (string, anchor) in anchors.enumerated() where string < style.strands.count {
+            let strand = style.strands[string]
             // New, a different length, or the anchor gone too far at once: laid straight down.
-            if points[string].count != style.length || HoodStrings.gap(points[string][0], anchor) > 24 * scale {
-                points[string] = (0..<style.length).map { CGPoint(x: anchor.x, y: anchor.y - CGFloat($0) * segment) }
+            if points[string].count != strand.length || HoodStrings.gap(points[string][0], anchor) > 24 * scale {
+                points[string] = (0..<strand.length).map { CGPoint(x: anchor.x, y: anchor.y - CGFloat($0) * segment) }
                 previous[string] = points[string]
             }
             var chain = points[string]
             let was = previous[string]
             previous[string] = chain
             chain[0] = anchor
-            let direction = CGVector(dx: HoodStrings.floatDirection.dx * facing, dy: HoodStrings.floatDirection.dy)
+            let direction = CGVector(dx: strand.direction.dx * facing, dy: strand.direction.dy)
             let across = CGVector(dx: -direction.dy, dy: direction.dx)
             for index in 1..<chain.count {
                 var point = chain[index]
@@ -87,8 +96,8 @@ final class HoodStrings {
                     // Toward a waving line out of the hood, the wave growing to the tip.
                     let along = CGFloat(index) * segment
                     let share = CGFloat(index) / CGFloat(chain.count - 1)
-                    let wave = CGFloat(sin(time * 2 * .pi * HoodStrings.floatWavesPerSecond - Double(index) * HoodStrings.floatWaveStep + Double(string) * .pi / 2))
-                        * HoodStrings.floatWave * scale * share
+                    let wave = CGFloat(sin(time * 2 * .pi * HoodStrings.floatWavesPerSecond - Double(index) * strand.waveStep + Double(string) * .pi / 2))
+                        * strand.wave * scale * share
                     let target = CGPoint(x: anchor.x + direction.dx * along + across.dx * wave,
                                          y: anchor.y + direction.dy * along + across.dy * wave)
                     point.x += (target.x - point.x) * style.floatPull

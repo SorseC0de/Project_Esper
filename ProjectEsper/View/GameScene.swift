@@ -184,6 +184,21 @@ final class GameScene: SKScene {
     private static let hoodDownZ: CGFloat = -0.005
     /// Over the body's flash (0.09).
     private static let hoodFlashZ: CGFloat = 0.091
+    /// Changing, the hood down starts this far turned up (radians, the body facing right) and
+    /// swings down to rest, about this point on its canvas, column and row: where it meets the body.
+    private static let hoodSwingStart: CGFloat = -.pi / 2
+    private static let hoodSwingPivot = CGPoint(x: 23, y: 24)
+
+    /// A hood turned `angle` about `pivot` on its 48-pixel canvas, where it stays put.
+    private func turn(_ hood: SKSpriteNode, about pivot: CGPoint, by angle: CGFloat, scale: CGFloat) {
+        let canvas: CGFloat = 48
+        let flip: CGFloat = hood.xScale < 0 ? -1 : 1
+        let offset = CGPoint(x: (pivot.x - canvas * hood.anchorPoint.x) * scale * flip, y: (canvas - pivot.y - canvas * hood.anchorPoint.y) * scale)
+        let base = hood.zRotation
+        hood.position = hood.position + CGPoint(x: offset.x * cos(base) - offset.y * sin(base), y: offset.x * sin(base) + offset.y * cos(base))
+        hood.anchorPoint = CGPoint(x: pivot.x / canvas, y: (canvas - pivot.y) / canvas)
+        hood.zRotation = base + angle
+    }
     /// FloState's floating strings over the energy form's own head (0.04), so nothing of the body covers them.
     private static let floatingStringZ: CGFloat = 0.045
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
@@ -208,15 +223,19 @@ final class GameScene: SKScene {
     private var stunBodies: [SKSpriteNode] = []
     private var stunHeads: [SKSpriteNode] = []
     /// The skin alone over each body, flashing palette 17 while FloState is locked out.
-    private var lockoutSkins: [SKSpriteNode] = []
-    private static let lockoutSkinColour = PixelPalette.colours[17]
+    /// Locked out of FloState, the clothes flash grey, the hood's among them: over the clothes, and
+    /// over the hood. Which players are grey this frame, for the glow's mask.
+    private var lockoutClothes: [SKSpriteNode] = []
+    private var lockoutHoods: [SKSpriteNode] = []
+    private var greyedOut: Set<Int> = []
+    private static let lockoutGrey = PixelPalette.colours[39]
     private var headShown: [CGPoint] = []
     /// Each body's lean in flight, radians, eased toward where it's going, and how much of
     /// the hover it's showing.
     private var bodyTilt: [CGFloat] = []
     private var hover: [CGFloat] = []
     /// What the powers leave in the world, by the sim's ids: bolts, ice clones, flames,
-    /// fireballs; each player's cape, segment by segment, and the points it trails.
+    /// fireballs.
     private var boltNodes: [Int: SKSpriteNode] = [:]
     private var cloneNodes: [Int: SKSpriteNode] = [:]
     /// Gale Ale's tornados as drawn, by id, and their bursts playing out.
@@ -248,9 +267,6 @@ final class GameScene: SKScene {
     private static let galeScale = CGSize(width: 4.0 / 3, height: 2.0 / 3)
     private var flameNodes: [Int: SKSpriteNode] = [:]
     private var fireballNodes: [Int: SKSpriteNode] = [:]
-    private var capes: [[SKSpriteNode]] = []
-    private var capeTrails: [[CGPoint]] = []
-    private static let capeSegments = 7
     /// Each body's state last frame, to catch the skid's start.
     private var lastStates: [PlayerState] = []
     /// Effects that ride a body while they play, at an offset from its feet: the snatch's
@@ -380,14 +396,14 @@ final class GameScene: SKScene {
     /// energy does; and their faces, shielded in red, so no glow lands on them.
     var hoodSnapshots: [BodySnapshot] {
         // Every string with it, up or down: over skin, which never glows, they were swallowed.
-        hoodMaskSnapshots(\.hood) + hoodStrings.flatMap(\.snapshots)
+        hoodMaskSnapshots(\.hood) + hoodStrings.indices.filter { !greyedOut.contains($0) }.flatMap { hoodStrings[$0].snapshots }
     }
     var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
     private func hoodMaskSnapshots(_ part: KeyPath<(hood: SKTexture, face: SKTexture), SKTexture>) -> [BodySnapshot] {
         hoodNodes.indices.compactMap { index in
             let node = hoodNodes[index]
-            // Only the hooded head has masks; the hood down behind has none.
-            guard !node.isHidden, let masks = hoodMasks[index] else { return nil }
+            // Only the hooded head has masks; the hood down behind has none. Greyed out, it glows not at all.
+            guard !node.isHidden, !greyedOut.contains(index), let masks = hoodMasks[index] else { return nil }
             return BodySnapshot(texture: masks[keyPath: part], position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
                                 size: node.size, zRotation: node.zRotation)
         }
@@ -570,6 +586,16 @@ final class GameScene: SKScene {
 
     /// What's drawn in the world but must not glow, for the mask to mark: the hoops and the banner.
     var flatSnapshots: [BodySnapshot] {
+        // Greyed out of FloState: the clothes, the hood and its strings, none glowing.
+        let greys = greyedOut.flatMap { index -> [BodySnapshot] in
+            let nodes = [lockoutClothes[index], lockoutHoods[index]].filter { !$0.isHidden }
+            return nodes.compactMap { node in
+                node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size, zRotation: node.zRotation) }
+            } + hoodStrings[index].snapshots
+        }
+        return greys + flatSnapshotsLit
+    }
+    private var flatSnapshotsLit: [BodySnapshot] {
         // The hoops: their backboards read too hot with the glow on them.
         // Wetshot Wake's rim glows, as the Hoopfish's rings and eyes do.
         let unglowedRims = match.stage.features.look == .wetshot ? [] : rimNodes
@@ -946,36 +972,22 @@ final class GameScene: SKScene {
                 figure.addChild(flash)
                 self[keyPath: flashes].append(flash)
             }
-            let skin = SKSpriteNode()
-            skin.color = SKColor(rgb: GameScene.lockoutSkinColour)
-            skin.colorBlendFactor = 1
-            // Under the hood, so the skin under it doesn't show through.
-            skin.zPosition = 0.037
-            skin.isHidden = true
-            figure.addChild(skin)
-            lockoutSkins.append(skin)
+            for (layer, z) in [(\GameScene.lockoutClothes, CGFloat(0.037)), (\GameScene.lockoutHoods, GameScene.hoodUpZ + 0.0002)] {
+                // The clothes under the hood, the hood's grey over it.
+                let grey = SKSpriteNode()
+                grey.color = SKColor(rgb: GameScene.lockoutGrey)
+                grey.colorBlendFactor = 1
+                grey.zPosition = z
+                grey.isHidden = true
+                figure.addChild(grey)
+                self[keyPath: layer].append(grey)
+            }
             headShown.append(.zero)
             bodyTilt.append(0)
             hover.append(0)
             titanGrowDelay.append(0)
             titanGrowth.append(1)
             lastStates.append(.idle)
-            // Super Smoothie's cape: short rectangles in the energy colour, chained.
-            var segments: [SKSpriteNode] = []
-            for step in 0..<GameScene.capeSegments {
-                let segment = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
-                segment.size = CGSize(width: 7, height: max(5 - CGFloat(step) / 2, 2))
-                segment.color = SKColor(rgb: sprites.look(for: player.index).glow)
-                segment.colorBlendFactor = 1
-                segment.blendMode = .add
-                segment.alpha = 0.9 - CGFloat(step) * 0.1
-                segment.zPosition = 0.02
-                segment.isHidden = true
-                figure.addChild(segment)
-                segments.append(segment)
-            }
-            capes.append(segments)
-            capeTrails.append([])
             let colour = SKColor(rgb: sprites.look(for: player.index).glow)
             let handBall = SKSpriteNode(texture: sprites.basketballFrames[0])
             handBall.size = GameScene.basketballSize
@@ -4071,9 +4083,6 @@ final class GameScene: SKScene {
             flashes.0.color = dark
             flashes.1.color = dark
         }
-        for (index, segments) in capes.enumerated() {
-            for segment in segments { segment.color = SKColor(rgb: sprites.look(for: index).glow) }
-        }
         for (index, web) in swingWebs.enumerated() { web.strokeColor = SKColor(rgb: sprites.look(for: index).glow) }
         for (index, web) in shotWebs.enumerated() { web.strokeColor = SKColor(rgb: sprites.look(for: index).glow) }
         for tile in blockTiles { tile.node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: tile.side).glow)) }
@@ -6018,38 +6027,6 @@ final class GameScene: SKScene {
         bar.run(.sequence([sweep, .fadeOut(withDuration: 0.12), .removeFromParent()]))
     }
 
-    /// The cape: its segments trail the body's last few positions while gliding, each a
-    /// little behind the one before, so it flows.
-    private func drawCape(_ index: Int, player: Player, behind body: CGPoint) {
-        let segments = capes[index]
-        guard player.power == .superSmoothie, player.state == .flying else {
-            for segment in segments { segment.isHidden = true }
-            capeTrails[index] = []
-            return
-        }
-        let back = -CGFloat(player.facing.sign)
-        let shoulder = CGPoint(x: body.x + back * 3, y: body.y + 22)
-        var trail = capeTrails[index]
-        trail.insert(shoulder, at: 0)
-        if trail.count > GameScene.capeSegments * 2 { trail.removeLast(trail.count - GameScene.capeSegments * 2) }
-        capeTrails[index] = trail
-        var previous = shoulder
-        for (step, segment) in segments.enumerated() {
-            let at = min(step * 2, trail.count - 1)
-            // Each segment hangs behind the shoulder and follows where the body has been,
-            // with a wave running down the length so it flows even hovering still.
-            let hang = CGPoint(x: shoulder.x + back * CGFloat(step) * 4, y: shoulder.y - CGFloat(step) * 0.8)
-            let followed = CGPoint(x: (trail[at].x - shoulder.x) * 0.6, y: (trail[at].y - shoulder.y) * 0.6)
-            let phase = Double(match.frame) / 5 - Double(step) * 0.8
-            let wave = CGPoint(x: CGFloat(cos(phase)) * CGFloat(step) * 0.4, y: CGFloat(sin(phase)) * (1 + CGFloat(step) * 0.5))
-            let here = CGPoint(x: hang.x + followed.x + wave.x, y: hang.y + followed.y + wave.y)
-            segment.isHidden = false
-            segment.position = here
-            segment.zRotation = atan2(here.y - previous.y, here.x - previous.x)
-            previous = here
-        }
-    }
-
     /// Bolts, ice clones, flames and fireballs, one node each by the sim's id, made when
     /// they appear and gone when they go.
     private func drawPowersLeavings() {
@@ -6379,20 +6356,23 @@ final class GameScene: SKScene {
                 flash.zRotation = source.zRotation
             }
 
-            // Locked out of FloState, the skin alone flashes palette 17, every other four frames.
-            let skinFlash = lockoutSkins[index]
-            let lockoutOn = player.floStateLockout > 0 && !player.inFloState && (player.floStateLockout / 4) % 2 == 0
-            let skinTexture = lockoutOn ? sprites.skinTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) : nil
-            skinFlash.isHidden = skinTexture == nil || node.isHidden
-            if let skinTexture {
-                skinFlash.texture = skinTexture
-                skinFlash.size = node.size
-                skinFlash.anchorPoint = node.anchorPoint
-                skinFlash.position = node.position
-                skinFlash.xScale = node.xScale
-                skinFlash.yScale = node.yScale
-                skinFlash.zRotation = node.zRotation
+            // Locked out of FloState, the clothes flash palette 39, every other four frames: the dark
+            // ones and the energy's, the hood (below) among them; unglowing meanwhile.
+            let lockedOutOfFloState = player.floStateLockout > 0 && !player.inFloState
+            let lockoutOn = lockedOutOfFloState && (player.floStateLockout / 4) % 2 == 0
+            let clothesFlash = lockoutClothes[index]
+            let clothesTexture = lockoutOn ? sprites.clothesTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) : nil
+            clothesFlash.isHidden = clothesTexture == nil || node.isHidden
+            if let clothesTexture {
+                clothesFlash.texture = clothesTexture
+                clothesFlash.size = node.size
+                clothesFlash.anchorPoint = node.anchorPoint
+                clothesFlash.position = node.position
+                clothesFlash.xScale = node.xScale
+                clothesFlash.yScale = node.yScale
+                clothesFlash.zRotation = node.zRotation
             }
+            if lockoutOn { greyedOut.insert(index) } else { greyedOut.remove(index) }
 
             // Prone in the snipe, the cursor where it's aimed.
             snipeCursors[index].isHidden = player.state != .gunSnipe
@@ -6469,9 +6449,28 @@ final class GameScene: SKScene {
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
                 hood.zRotation = node.zRotation
+                // Changing, the hood down swings down from up, about where it meets the body.
+                if energyForm, changing {
+                    let start = GameScene.transformEnergyFrame * 60 / TransformRules.sheetFramesPerSecond
+                    let share = min(max(Double(player.stateTimer - start) / Double(TransformRules.frames - start), 0), 1)
+                    let eased = CGFloat(0.5 - 0.5 * cos(share * .pi))
+                    turn(hood, about: GameScene.hoodSwingPivot, by: GameScene.hoodSwingStart * (1 - eased) * CGFloat(player.facing.sign), scale: drawScale)
+                }
             } else {
                 hood.isHidden = true
                 hoodMasks[index] = nil
+            }
+            // Greyed out of FloState, the hood's own grey over it.
+            let hoodGrey = lockoutHoods[index]
+            hoodGrey.isHidden = hood.isHidden || !lockoutOn || hoodMasks[index] == nil
+            if !hoodGrey.isHidden, let mask = hoodMasks[index]?.hood {
+                hoodGrey.texture = mask
+                hoodGrey.xScale = 1
+                hoodGrey.size = mask.size().scaled(by: drawScale)
+                hoodGrey.anchorPoint = hood.anchorPoint
+                hoodGrey.position = hood.position
+                hoodGrey.xScale = hood.xScale
+                hoodGrey.zRotation = hood.zRotation
             }
             // Its strings, off the hood, over the body: behind it, the hood down's were lost under
             // the torso. Toned as the hood's white and its palette 37 are.
@@ -6479,10 +6478,14 @@ final class GameScene: SKScene {
                 hoodStrings[index].hide()
             } else if !held {
                 let look = sprites.look(for: index)
-                hoodStrings[index].step(anchors: HoodStrings.anchors(on: hood, down: energyForm, scale: drawScale), down: energyForm,
+                // FloState's float, one each way; Super Smoothie flying, both stream behind; else they hang.
+                let style = energyForm ? HoodStrings.floState
+                    : (player.power == .superSmoothie && player.state == .flying ? HoodStrings.streaming : HoodStrings.hanging)
+                let grey = SKColor(rgb: GameScene.lockoutGrey)
+                hoodStrings[index].step(anchors: HoodStrings.anchors(on: hood, down: energyForm, scale: drawScale), style: style,
                                         facing: CGFloat(player.facing.sign), scale: drawScale, time: CACurrentMediaTime(),
-                                        plain: SKColor(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel)),
-                                        accent: SKColor(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel)),
+                                        plain: lockoutOn ? grey : SKColor(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel)),
+                                        accent: lockoutOn ? grey : SKColor(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel)),
                                         z: energyForm ? GameScene.floatingStringZ : GameScene.hoodUpZ + 0.0005)
             }
             // The hood flashes with the body, part of its silhouette: over the body's flash when
@@ -6619,13 +6622,14 @@ final class GameScene: SKScene {
                 headNode.yScale = 1
                 headNode.zRotation = tilt
                 headNode.position = shown
-                emitHeadParticles(index, power: player.power, at: CGPoint(x: shown.x, y: shown.y + GameScene.crownLift * drawScale))
+                if !lockedOutOfFloState { emitHeadParticles(index, power: player.power, at: CGPoint(x: shown.x, y: shown.y + GameScene.crownLift * drawScale)) }
             } else {
                 headNode.isHidden = true
                 headEspers[index].particleBirthRate = 0
                 headEsperMixes[index].particleBirthRate = 0
                 // A human's head is on the body: its particles still rise off it.
-                if sprites.look(for: drawnAs).human, let landmark = sprites.landmark(.head, in: frame, player: drawnAs) {
+                // None while locked out of FloState.
+                if sprites.look(for: drawnAs).human, !lockedOutOfFloState, let landmark = sprites.landmark(.head, in: frame, player: drawnAs) {
                     let head = landmark * drawScale
                     let at = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                     emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + GameScene.crownLift * drawScale))
@@ -6633,7 +6637,7 @@ final class GameScene: SKScene {
             }
             // A human's legs, in the energy's colours, give off smaller cubes of their own; in
             // the energy form, the hands too.
-            if HumanLook.enabled, ParticleLook.cubes {
+            if HumanLook.enabled, ParticleLook.cubes, !lockedOutOfFloState {
                 // A human's off the shoes, the legs being bare; the energy form's off its legs and hands.
                 let limbs: [BodyPart] = energyForm ? [.frontLeg, .backLeg, .frontHand, .backHand] : [.frontFoot, .backFoot]
                 for (slot, part) in limbs.enumerated() {
@@ -6687,7 +6691,6 @@ final class GameScene: SKScene {
                 castShadow(shadowBodies[index], of: node, anchorY: feet, facing: node.xScale, ground: feet - drop, rise: drop)
                 castShadow(shadowHeads[index], of: headNode, anchorY: feet, facing: headNode.xScale, ground: feet - drop, rise: drop)
             }
-            drawCape(index, player: player, behind: node.position)
             // The stepback, a jump out of the shooting stance, the throw and the slash leave the trail.
             let trailing = player.state == .stepback || player.state == .throwing || (player.state == .shootStance && !player.grounded)
             if trailing, match.frame % 2 == 0 { spawnAfterimage(of: node, player: index) }

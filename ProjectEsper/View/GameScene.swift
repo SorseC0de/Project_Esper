@@ -172,11 +172,13 @@ final class GameScene: SKScene {
     private var energyNodes: [SKSpriteNode] = []
     /// Each human's hood over its head, and the frame it was drawn for.
     private var hoodNodes: [SKSpriteNode] = []
+    private var hoodFlashes: [SKSpriteNode] = []
     private static let hoodDrawnFor = AnimationFrame(.idle, 2)
-    /// Over the body and under the head's own node, or behind the body; and how much lighter than the energy.
+    /// Over the body and under the head's own node, or behind the body.
     private static let hoodUpZ: CGFloat = 0.038
     private static let hoodDownZ: CGFloat = -0.005
-    private static let hoodLightening = 0.2
+    /// Over the body's flash (0.09).
+    private static let hoodFlashZ: CGFloat = 0.091
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
     /// and coloured each frame: the look's outline, or the zone's.
     private var outlineNodes: [SKSpriteNode] = []
@@ -887,9 +889,14 @@ final class GameScene: SKScene {
             let hood = SKSpriteNode()
             hood.zPosition = GameScene.hoodUpZ
             hood.isHidden = true
-            hood.shader = energyToneShader
             figure.addChild(hood)
             hoodNodes.append(hood)
+            let hoodFlash = SKSpriteNode()
+            hoodFlash.colorBlendFactor = 1
+            hoodFlash.alpha = 0.85
+            hoodFlash.isHidden = true
+            figure.addChild(hoodFlash)
+            hoodFlashes.append(hoodFlash)
             let eyes = SKSpriteNode()
             eyes.zPosition = 0.035
             eyes.isHidden = true
@@ -923,7 +930,8 @@ final class GameScene: SKScene {
             let skin = SKSpriteNode()
             skin.color = SKColor(rgb: GameScene.lockoutSkinColour)
             skin.colorBlendFactor = 1
-            skin.zPosition = 0.09
+            // Under the hood, so the skin under it doesn't show through.
+            skin.zPosition = 0.037
             skin.isHidden = true
             figure.addChild(skin)
             lockoutSkins.append(skin)
@@ -6349,9 +6357,9 @@ final class GameScene: SKScene {
             let headDrawnFor = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index)
             if player.frozen == 0, !node.isHidden, let headNow, let headDrawnFor {
                 hood.isHidden = false
-                hood.texture = sprites.texture(energyForm ? "player_hood_down" : "player_hood", 0)
+                // Toned ahead of time through the energy's ramp, opaque, rather than by a shader.
+                hood.texture = sprites.effectTexture(energyForm ? "player_hood_down" : "player_hood", 0, player: index)
                 hood.zPosition = energyForm ? GameScene.hoodDownZ : GameScene.hoodUpZ
-                setGlow(hood, SKColor(rgb: Look.lightened(sprites.look(for: index).glow, GameScene.hoodLightening)))
                 hood.size = hood.texture!.size().scaled(by: drawScale)
                 hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
                 // Up, it follows the head; down, the body.
@@ -6361,6 +6369,20 @@ final class GameScene: SKScene {
                 hood.zRotation = node.zRotation
             } else {
                 hood.isHidden = true
+            }
+            // The hood flashes with the body, part of its silhouette: over the body's flash when
+            // it's up, over the hood itself when it's down behind.
+            let hoodFlash = hoodFlashes[index]
+            hoodFlash.isHidden = hood.isHidden || !(stunned || lockedOut || absorbing)
+            if !hoodFlash.isHidden {
+                hoodFlash.color = flashColour
+                hoodFlash.texture = hood.texture
+                hoodFlash.size = hood.size
+                hoodFlash.anchorPoint = hood.anchorPoint
+                hoodFlash.position = hood.position
+                hoodFlash.xScale = hood.xScale
+                hoodFlash.zRotation = hood.zRotation
+                hoodFlash.zPosition = energyForm ? GameScene.hoodDownZ + 0.001 : GameScene.hoodFlashZ
             }
 
             // The ball in hand rides the frame's ball, and when a dribble's ball hangs off a

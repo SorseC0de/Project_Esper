@@ -671,13 +671,13 @@ column of the plum ramp's last for each from its first column on; full, none, an
 in the word's four colours, 6 high at 1.5, stands on the bar's top trailing corner, the scoreboard's
 end, 5 in from it and 15 down, steady. An A/B test on the FLO BAR picker (`FloTuning.variant`, kept between launches):
 A, as above, the missing FLO from the word's end on, the fill shrinking toward the scoreboard, MAX
-instead centred on the word's top outer corner, kept under the screen's top edge (FLO MAX SCALE, 1.5,
-and FLO MAX X and Y on sliders), and the word in palette 34 over 51 until full or in FloState; B, the missing from the scoreboard's end back, the fill
+instead centred on the word's top outer corner, kept under the screen's top edge, then moved in from
+it (FLO MAX SCALE 1.25, FLO MAX X 54 and Y 0 on sliders, mirrored for the second), and the word in palette 34 over 51 until full or in FloState; B, the missing from the scoreboard's end back, the fill
 growing out of the word, MAX on the bar's corner as above, the word in its own colours throughout; in FloState, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
 its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
 moved 15 right and 6 down from its place, the whole meter at 0.75, on the FLO METER SCALE slider,
-and moved up or down on FLO METER Y (0, points)
+and moved up or down on FLO METER Y (-2, points)
 (`FloTuning`, its other numbers baked): the bar and the word each at 1 and 1.25 of it; the bar
 squeezed to 0.75 across and 1.5 down, the word keeping its own; the bar's left and right ends' heights over its
 middle's (1.5 and 0.5), and its middle raised by half its height,
@@ -799,13 +799,14 @@ thirds of its brightness (`HumanLook.backLegShare`, 0.66; greyed, they barely gl
 they take the plain threshold); the head
 drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not
 glowing, its particles still rising off it; over it the hood (`player_hood`, its own node), toned
-through the energy ramp as the energy on the body is so it glows the same, drawn for `player_idle`'s
+ahead of time through the energy ramp as the effect sheets are (`effectTexture`), opaque, its white the ramp's lightest, drawn for `player_idle`'s
 third frame and moved every frame by how far the head's middle (its landmark) is from there, turned
-and flipped with the body, the energy a fifth lighter for it; in FloState's energy form `player_hood_down`
+and flipped with the body; in FloState's energy form `player_hood_down`
 instead, behind the body, following the body rather than the head; not on a frozen body. The hood
 over the head is cut out of the glow's body mask in black (`hoodSnapshots`, `MaskScene`'s `cutOut`),
 or the skin under it, which never glows, kept it from glowing there and it read darker. It replaces
-the crown's grade. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
+the crown's grade. It flashes with the body (a stun, a lockout, an orb taken) as part of its
+silhouette, and the FloState lockout's skin flash is drawn under it. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
 Going into FloState the burst and the swirl start as the change does, not when it ends. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
 drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
 In the zone (`ZoneTuning.inTheZone`, a placeholder, off

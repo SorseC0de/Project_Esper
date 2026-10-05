@@ -287,7 +287,7 @@ enum GoalpostTuning {
 enum FloTuning {
     nonisolated(unsafe) static var meterScale: CGFloat = 0.75
     /// The whole meter moved up from level with the scoreboard, in points.
-    nonisolated(unsafe) static var meterY: CGFloat = 0
+    nonisolated(unsafe) static var meterY: CGFloat = -2
     static let barScale: CGFloat = 1
     static let wordScale: CGFloat = 1.25
     static let leftSkew: CGFloat = 1.5
@@ -325,8 +325,8 @@ enum FloTuning {
         get { BarVariant(rawValue: UserDefaults.standard.integer(forKey: variantKey)) ?? .emptiesFromWord }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: variantKey) }
     }
-    nonisolated(unsafe) static var cornerMaxScale: CGFloat = 1.5
-    nonisolated(unsafe) static var cornerMaxX: CGFloat = 0
+    nonisolated(unsafe) static var cornerMaxScale: CGFloat = 1.25
+    nonisolated(unsafe) static var cornerMaxX: CGFloat = 54
     nonisolated(unsafe) static var cornerMaxY: CGFloat = 0
     /// In FloState the stroke cycles these, a tenth of a second each.
     static let floStateStroke: [RGB] = [6, 7, 8, 18, 19, 20, 26, 27, 28].map { PixelPalette.colours[$0] }

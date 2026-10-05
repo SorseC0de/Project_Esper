@@ -367,6 +367,14 @@ final class GameScene: SKScene {
         return sectionTimes
     }
 
+    /// The hoods over the heads, cut out of the glow's body mask in black so they glow as
+    /// the energy does rather than as the skin under them, which doesn't.
+    var hoodSnapshots: [BodySnapshot] {
+        hoodNodes.filter { !$0.isHidden && $0.zPosition == GameScene.hoodUpZ }.compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size, zRotation: node.zRotation) }
+        }
+    }
+
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
         playerNodes.filter { !$0.isHidden }.compactMap { node in
@@ -3029,6 +3037,11 @@ final class GameScene: SKScene {
         if online == nil, hub.consumeAIToggle() {
             aiOn.toggle()
             controls?.aiOn = aiOn
+        }
+        // Testing FLO, offline: the local player's set as the number key asks.
+        if let flo = hub.consumeFloSet(), online == nil {
+            let index = localIndex
+            session.mutate { $0.players[index].flo = flo }
         }
         if hub.consumeHitboxToggle() {
             showHitboxes.toggle()
@@ -6341,7 +6354,8 @@ final class GameScene: SKScene {
                 setGlow(hood, SKColor(rgb: Look.lightened(sprites.look(for: index).glow, GameScene.hoodLightening)))
                 hood.size = hood.texture!.size().scaled(by: drawScale)
                 hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
-                let moved = (headNow - headDrawnFor) * drawScale
+                // Up, it follows the head; down, the body.
+                let moved = energyForm ? .zero : (headNow - headDrawnFor) * drawScale
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
                 hood.zRotation = node.zRotation

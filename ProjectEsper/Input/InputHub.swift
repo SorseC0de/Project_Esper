@@ -28,6 +28,9 @@ final class InputHub {
     private var leftTriggerWasDown = false
     private var deleteWasDown = false
     private var hitboxKeyWasDown = false
+    /// Testing FLO: 1 fills it, 2 sets it to half, 3 empties it; what was asked since the last check.
+    private(set) var floSetPressed: Int?
+    private var floKeysWereDown: Set<Int> = []
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -99,6 +102,11 @@ final class InputHub {
         let hitboxKeyDown = keys?.button(forKeyCode: .keyM)?.isPressed ?? false
         if hitboxKeyDown, !hitboxKeyWasDown { hitboxTogglePressed = true }
         hitboxKeyWasDown = hitboxKeyDown
+        for (code, flo) in [(GCKeyCode.one, FloRules.full), (.two, FloRules.full / 2), (.three, 0)] {
+            let down = keys?.button(forKeyCode: code)?.isPressed ?? false
+            if down, !floKeysWereDown.contains(flo) { floSetPressed = flo }
+            if down { floKeysWereDown.insert(flo) } else { floKeysWereDown.remove(flo) }
+        }
         let leftTriggerDown = controllers.contains { $0.extendedGamepad?.leftTrigger.isPressed ?? false }
         if leftTriggerDown, !leftTriggerWasDown { hitboxTogglePressed = true }
         leftTriggerWasDown = leftTriggerDown
@@ -178,6 +186,12 @@ final class InputHub {
     func consumeAIToggle() -> Bool {
         defer { aiTogglePressed = false }
         return aiTogglePressed
+    }
+
+    /// The FLO a number key asked for, once per press.
+    func consumeFloSet() -> Int? {
+        defer { floSetPressed = nil }
+        return floSetPressed
     }
 
     /// True once per left trigger press.

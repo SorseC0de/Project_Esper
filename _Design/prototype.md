@@ -802,7 +802,10 @@ glowing, its particles still rising off it; over it the hood (`player_hood`, its
 through the energy ramp as the energy on the body is so it glows the same, drawn for `player_idle`'s
 third frame and moved every frame by how far the head's middle (its landmark) is from there, turned
 and flipped with the body, the energy a fifth lighter for it; in FloState's energy form `player_hood_down`
-instead, behind the body, placed the same way; not on a frozen body. It replaces the crown's grade.
+instead, behind the body, following the body rather than the head; not on a frozen body. The hood
+over the head is cut out of the glow's body mask in black (`hoodSnapshots`, `MaskScene`'s `cutOut`),
+or the skin under it, which never glows, kept it from glowing there and it read darker. It replaces
+the crown's grade. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
 Going into FloState the burst and the swirl start as the change does, not when it ends. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
 drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
 In the zone (`ZoneTuning.inTheZone`, a placeholder, off

@@ -567,7 +567,8 @@ sliders keep their plain look.
 ## Settings
 
 A gear in the title's upper right corner (the dobo pack's `settings_icon_128px` on a round blue
-plate, `ui_icon_settings`, the first of the title cursor's rows) and SETTINGS on the pause open the
+plate, `ui_icon_settings`, the first of the title cursor's rows) and the same small gear beside the
+pause's header, right of it, open the
 settings (`SettingsScreen`, SwiftUI, full screen on the screens' ground, over the title or the
 pause), kept between launches (`GameSettings`). Each row its name and its choices, the picked one
 plum, gold on the cursor's row; up and down a row, left and right its choice (jump steps it on), B,

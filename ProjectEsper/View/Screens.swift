@@ -552,12 +552,26 @@ final class PauseScreen: Screen {
         // The card as wide as the header over it, so their edges line up.
         let headerWidth = addHeader("PAUSED", at: CGPoint(x: 0, y: halfHeight * 0.62), width: width + 90)
         addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12), piece: .cardPurple)
-        addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.3), width: width, action: onRestart)
-        addButton("SETTINGS", at: CGPoint(x: 0, y: halfHeight * 0.05), width: width, action: onSettings)
-        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.2), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
+        addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.25), width: width, action: onRestart)
+        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.1), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
         addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.45), sound: .menuBack, piece: .buttonPlum, width: width, action: onResume)
+        // The settings on a small round gear, as on the title, beside the header on its right.
+        let gear = SKNode()
+        gear.position = CGPoint(x: headerWidth / 2 + 34, y: halfHeight * 0.62)
+        let plate = UIPiece.circleBlue.node(size: CGSize(width: 40, height: 42), corners: 0.55)
+        plate.zPosition = -1
+        gear.addChild(plate)
+        if let icon = UIImage(named: "ui_icon_settings") {
+            let mark = SKSpriteNode(texture: SKTexture(image: icon))
+            mark.size = CGSize(width: 21, height: 22)
+            mark.position = CGPoint(x: 0, y: 2)
+            gear.addChild(mark)
+        }
+        addChild(gear)
+        addChoice(gear, hit: CGRect(x: gear.position.x - 22, y: gear.position.y - 22, width: 44, height: 44),
+                  arrowAt: CGPoint(x: gear.position.x - 34, y: gear.position.y), arrowTurn: .pi / 2, action: onSettings)
         // On RESUME, so a press of jump straight after pausing plays on.
-        place(cursor: 3)
+        place(cursor: 2)
     }
 
     required init?(coder: NSCoder) { fatalError() }

@@ -273,6 +273,9 @@ final class SpriteLibrary {
         return result
     }
 
+    /// The hood's greys a touch down the ramp, nearer the legs' plain colour.
+    static let hoodLevel = 0.9
+
     /// The hooded head, a frame of `player_hoodheads` for one skin: its hood, the white and the
     /// cool greys, toned through the player's energy ramp, the skin left as drawn; and the hood
     /// and the face each alone in white, for the glow's mask.
@@ -296,7 +299,7 @@ final class SpriteLibrary {
             for channel in 0..<4 { mask[index + channel] = 255 }
             guard isHood else { continue }
             let grey = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
-            paint(pixels, index, look.energyTone(luminance: min(grey, 1)))
+            paint(pixels, index, look.energyTone(luminance: min(grey * SpriteLibrary.hoodLevel, 1)))
         }
         let made = [context, hoodContext, faceContext].map { context -> SKTexture in
             let texture = context.makeImage().map { SKTexture(cgImage: $0) } ?? source
@@ -496,8 +499,8 @@ final class SpriteLibrary {
             let index = pixel * 4
             // The glowing parts' middles, and the head's however it's drawn: where the head
             // and its particles go.
-            // And the limbs' ends, where cubes come off them.
-            if part.glows(human: look.human) || part == .head || [.frontLeg, .backLeg, .frontHand, .backHand].contains(part) {
+            // And the limbs' ends, where cubes come off them; and the torso, for the hood down behind it.
+            if part.glows(human: look.human) || part == .head || [.frontLeg, .backLeg, .frontHand, .backHand, .torso].contains(part) {
                 var sum = sums[part] ?? (0, 0, 0)
                 sum.x += CGFloat(pixel % width) + 0.5
                 sum.y += CGFloat(pixel / width) + 0.5

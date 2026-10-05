@@ -4335,8 +4335,14 @@ final class GameScene: SKScene {
                 spawnHitSpark(player: popper, at: match.players[victim].heldBallPoint)
             case .swatted(let index, hit: true):
                 spawnHitSpark(player: index, at: match.ball.position)
+            case .slashClanked(let index):
+                // The blade against a backboard shakes it.
+                let player = match.players[index]
+                shakeBackboard(at: player.chest + Vec2(x: player.facing.sign * GameScene.bladeReach, y: 0))
             case .wallJumped(let index, let wall):
                 let player = match.players[index]
+                // Off a backboard, it shakes.
+                shakeBackboard(at: Vec2(x: player.position.x + wall.sign * (player.spec.bodyWidth / 2 + 1), y: player.chest.y))
                 // The sheet's spark flies left, away from a wall on the right.
                 // Blazing Boba's is the fire skid sheet; everyone else's the fire wall spark as
                 // a silhouette in their energy. Both painted the other way round from the old spark.
@@ -4514,6 +4520,11 @@ final class GameScene: SKScene {
     private static let jumpRingSeconds = 0.3
     private static let jumpRingStagger = 0.06
     /// A rim's turn as drawn, in radians: its dip, down at the front, whichever side its backboard is.
+    /// The backboard at a point, if there is one there, shaken as a ball off it shakes it.
+    private func shakeBackboard(at point: Vec2) {
+        if let hoop = backboard(at: point), hoop < boardJitter.count { boardJitter[hoop] = RimLook.jitterFrames }
+    }
+
     /// A shake's offset with this many frames left: a pixel one way, then the other, none at the end.
     private static func shake(_ framesLeft: Int) -> CGFloat {
         framesLeft == 0 ? 0 : (framesLeft % 4 < 2 ? 1 : -1)
@@ -4801,7 +4812,9 @@ final class GameScene: SKScene {
     /// Into or out of FloState, how many frames the cubes swirl round the body.
     private static let floSwirlFrames = 30
     private var wasInFloState: [Int: Bool] = [:]
-    private var lastChanging: [Int: Bool] = [:]
+    private var lastChangeBurstDue: [Int: Bool] = [:]
+    /// The change's frame its burst starts on: its third (0-based 2).
+    private static let transformBurstFrame = 2
     private var floSwirlFrames: [Int: Int] = [:]
     /// Rising round the body in a helix: while it changes, up to the energy form, and while it swirls.
     private func spiralling(_ index: Int) -> Bool {
@@ -6363,9 +6376,11 @@ final class GameScene: SKScene {
             // lighter: up over the human's head, down behind the energy form's. Drawn for the
             // idle's third frame, moved each frame by how far the head is from it there.
             let hood = hoodNodes[index]
-            let headNow = sprites.landmark(.head, in: frame, player: index)
-            let headDrawnFor = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index)
-            if player.frozen == 0, !node.isHidden, let headNow, let headDrawnFor {
+            // Up, it follows the head; down behind, the torso.
+            let followed: BodyPart = energyForm ? .torso : .head
+            let partNow = sprites.landmark(followed, in: frame, player: index)
+            let partDrawnFor = sprites.landmark(followed, in: GameScene.hoodDrawnFor, player: index)
+            if player.frozen == 0, !node.isHidden, let partNow, let partDrawnFor {
                 hood.isHidden = false
                 // Toned ahead of time through the energy's ramp, opaque, rather than by a shader:
                 // up, the whole hooded head in the skin it's drawn for, its hood alone toned.
@@ -6378,10 +6393,11 @@ final class GameScene: SKScene {
                     hoodMasks[index] = (hoodHead.hood, hoodHead.face)
                 }
                 hood.zPosition = energyForm ? GameScene.hoodDownZ : GameScene.hoodUpZ
+                // Sized unflipped, then flipped: a sprite's size is taken against its scale.
+                hood.xScale = 1
                 hood.size = hood.texture!.size().scaled(by: drawScale)
                 hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
-                // Up, it follows the head; down, the body.
-                let moved = energyForm ? .zero : (headNow - headDrawnFor) * drawScale
+                let moved = (partNow - partDrawnFor) * drawScale
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
                 hood.zRotation = node.zRotation
@@ -6396,7 +6412,8 @@ final class GameScene: SKScene {
             if !hoodFlash.isHidden {
                 hoodFlash.color = flashColour
                 hoodFlash.texture = hood.texture
-                hoodFlash.size = hood.size
+                hoodFlash.xScale = 1
+                hoodFlash.size = hood.texture!.size().scaled(by: drawScale)
                 hoodFlash.anchorPoint = hood.anchorPoint
                 hoodFlash.position = hood.position
                 hoodFlash.xScale = hood.xScale
@@ -6546,16 +6563,17 @@ final class GameScene: SKScene {
                                       streams: [legStream(index, part: part, energyColour: energyForm)])
                 }
             }
-            // Into FloState, as the change starts, or out of it: a burst in the energy's colour, and
-            // cubes swirling round a while (going in, the change's own spiral as well).
-            let goingIn = changing && lastChanging[index] != true
+            // Into FloState, on the change's third frame, or out of it: a burst in the energy's
+            // colour, and cubes swirling round a while (going in, the change's own spiral as well).
+            let changeBurstDue = changing && frame.frame >= GameScene.transformBurstFrame
+            let goingIn = changeBurstDue && lastChangeBurstDue[index] != true
             let goingOut = wasInFloState[index] == true && !player.inFloState
             if goingIn || goingOut {
                 glowers.addChild(EnergyEffect.burst.node(sprites, player: index, at: SpriteLibrary.point(player.chest)))
                 floSwirlFrames[index] = GameScene.floSwirlFrames
             }
             wasInFloState[index] = player.inFloState
-            lastChanging[index] = changing
+            lastChangeBurstDue[index] = changeBurstDue
             if floSwirlFrames[index, default: 0] > 0 { floSwirlFrames[index, default: 0] -= 1 }
             // Changing, up to the white frame cubes spiral up round the whole body; and swirling.
             if (changing && frame.frame <= GameScene.transformWhiteFrame || floSwirlFrames[index, default: 0] > 0), ParticleLook.cubes {

@@ -241,9 +241,11 @@ enum HoopTuning {
     static func pivot(for look: StageLook) -> CGPoint {
         look.tiltedHoop ? CGPoint(x: 27.5 / 48, y: 1 - 34 / 48) : CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48)
     }
-    /// The hoop's two pieces for a stage: straight on, or tilted down (`StageLook.tiltedHoop`).
+    /// The hoop's two pieces for a stage: straight on, Longball Stadium's turned, or Flight's
+    /// tilted down, the first of the Hoopfish pile's sheets (`backboards`, `hoops`).
     static func art(for look: StageLook) -> (backboard: String, rim: String) {
-        look.tiltedHoop ? ("backboard", "hoop") : ("backboard_straight", "hoop_straight")
+        if look == .flight { return ("backboards", "hoops") }
+        return look.tiltedHoop ? ("backboard", "hoop") : ("backboard_straight", "hoop_straight")
     }
     nonisolated(unsafe) static var courtOffset = CGPoint(x: 5, y: 10)
     /// The hoop offset the nets' NET X and Y were first set against: a net goes as far

@@ -439,11 +439,11 @@ public enum IcicleRules {
 
 /// Flight: drawn for 6x, its backdrop 2496 by 1152 screen pixels, 416 by 192 art pixels: 26 tiles
 /// by 12, all of it on a 2532 by 1170 screen at 6x. The bodies were drawn into it at 8 of its
-/// pixels an art pixel, so on it they're 8 / 6 their size.
+/// pixels an art pixel, but on it they read right at a quarter bigger.
 public enum FlightRules {
     public static let columns = 26
     public static let rows = 12
-    public static let bodyScale = 8.0 / 6.0
+    public static let bodyScale = 1.25
 }
 
 /// Wetshot Wake: 37 by 19, under water, its one rim on the Hoopfish: the background's 17 rows a

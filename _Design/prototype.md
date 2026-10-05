@@ -1487,8 +1487,8 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 
 A hand-laid stage, for now called Flight (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`,
 protocol 83), on the select after Hoopfish Hideaway. 26 by 12 (`FlightRules`, protocol 86), drawn for
-6x: on a 2532 by 1170 phone it fits whole at 6x. The bodies were drawn into its art at 8 of its pixels an art pixel, so
-on it every body is 8 / 6 its size (`StageFeatures.bodyScale`, `Stage.sized`, protocol 88): its
+6x: on a 2532 by 1170 phone it fits whole at 6x. On it every body is a quarter bigger (`StageFeatures.bodyScale`, 1.25,
+`Stage.sized`, protocol 89): its
 scale, its box, and the reaches and heights that go with them grown as Titan Tea's are, its moves as
 they are (a Titan on it 2 times that). Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
 (`FlightTiles0` to `11` at the catalog's root, from `_Graphic Assets/Pixel Art/Stages/Flight`): the
@@ -1508,8 +1508,8 @@ a cell is placed as it's painted. The tiles never glow (they're the glow mask's 
 (version 5) is the user's: three rows of floor, the rims at the very ends eight rows up, the starts
 two in from each end, the ball at the top. With an even number of columns the ball starts on the line
 between the middle two, the left edge of the cell it's marked in (column 13), as the court's does.
-Its hoops are tilted down, as Longball Stadium's, with that stage's hoop, net and dunk placing
-(`StageLook.tiltedHoop`); outside the stage is black (palette 0).
+Its hoops are tilted down: the first frames of the Hoopfish pile's `backboards` and `hoops` sheets,
+placed with Longball Stadium's hoop, net and dunk numbers (`StageLook.tiltedHoop`); outside the stage is black (palette 0).
 
 Being tried: the stage drawn whole in Aseprite instead (`FlightBackdrop`, from `Flight/test.png`,
 2496 by 1152: six of its pixels an art pixel, so one to a screen pixel at 6x, the whole 26 by 12), over the tiles and covering them; the walls still the map's.

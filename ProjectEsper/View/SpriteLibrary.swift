@@ -285,7 +285,13 @@ final class SpriteLibrary {
     func hoodHead(skin: Int, player: Int, energy: Bool = false) -> (drawn: SKTexture, hood: SKTexture, face: SKTexture) {
         let key = "p\(player)_hoodhead_\(skin)" + (energy ? "_energy" : "")
         if let drawn = cache[key], let hood = cache[key + "_hood"], let face = cache[key + "_face"] { return (drawn, hood, face) }
-        let source = texture("player_hoodheads", skin)
+        let source = texture("player_hoodheads", HumanLook.hoodHeadFrame(skin))
+        // The robot's face: the frame it's drawn from with that frame's two tones in its own.
+        var faceSwaps: [RGB: RGB] = [:]
+        if skin == HumanLook.robotSkinTone {
+            let from = HumanLook.skinTones[HumanLook.robotDrawnFrom], to = HumanLook.skinTones[skin]
+            faceSwaps = [PixelPalette.colours[from.front]: PixelPalette.colours[to.front], PixelPalette.colours[from.back]: PixelPalette.colours[to.back]]
+        }
         let image = source.cgImage()
         let width = image.width, height = image.height
         let look = look(for: player)
@@ -307,7 +313,11 @@ final class SpriteLibrary {
             let mask = isHood ? hoodPixels : facePixels
             for channel in 0..<4 { mask[index + channel] = 255 }
             guard isHood else {
-                if energy { paint(pixels, index, Look.scaled(look.glow, min(level(index) / max(faceLightest, 0.01), 1))) }
+                if energy {
+                    paint(pixels, index, Look.scaled(look.glow, min(level(index) / max(faceLightest, 0.01), 1)))
+                } else if let swap = faceSwaps[RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])] {
+                    paint(pixels, index, swap)
+                }
                 continue
             }
             let grey = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
@@ -331,10 +341,11 @@ final class SpriteLibrary {
     /// A one-frame figure, the customize screen's, in a player's look and lined, with the
     /// hooded head over its head where the game would put it: moved from where it's drawn for
     /// (the idle's third frame) by how far this figure's head is from that one's, then by
-    /// `portraitHoodNudge`. With where the hood went and where the figure's parts are, in its
-    /// pixels from the top left.
+    /// `portraitHoodNudge`. With what of it glows (its sleeves, boots and shoes, and the hood),
+    /// where the hood went and where the figure's parts are, in its pixels from the top left.
     struct Portrait {
         let image: CGImage
+        let glowing: CGImage
         let hoodOffset: CGPoint
         let centres: [BodyPart: CGPoint]
     }
@@ -344,28 +355,54 @@ final class SpriteLibrary {
 
     func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame) -> Portrait? {
         let key = "p\(player)_portrait_\(name)"
-        if let made = cache[key], let facts = portraitFacts[key] {
-            return Portrait(image: made.cgImage(), hoodOffset: facts.hoodOffset, centres: facts.centres)
+        if let made = cache[key], let glowing = cache[key + "_glow"], let facts = portraitFacts[key] {
+            return Portrait(image: made.cgImage(), glowing: glowing.cgImage(), hoodOffset: facts.hoodOffset, centres: facts.centres)
         }
         let look = look(for: player)
         let figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: false)
         let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
         let body = figure.texture.cgImage()
         let width = body.width, height = body.height
-        guard let (context, _) = makeCanvas(width: width, height: height) else { return nil }
+        guard let (context, _) = makeCanvas(width: width, height: height),
+              let (glowContext, glowPixels) = makeCanvas(width: width, height: height),
+              let (sourceContext, sourcePixels) = makeCanvas(width: width, height: height) else { return nil }
         context.draw(body, in: CGRect(x: 0, y: 0, width: width, height: height))
+        // What glows: the figure's pixels of the parts that do, as drawn.
+        glowContext.draw(body, in: CGRect(x: 0, y: 0, width: width, height: height))
+        sourceContext.draw(texture(name, 0).cgImage(), in: CGRect(x: 0, y: 0, width: width, height: height))
+        for pixel in 0..<(width * height) {
+            let index = pixel * 4
+            let colour = RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2])
+            let glows = look.human && sourcePixels[index + 3] == 255 && BodyPart.owning(colour).map(look.dressing.glowing.contains) == true
+            if !glows { for channel in 0..<4 { glowPixels[index + channel] = 0 } }
+        }
         var offset = CGPoint.zero
         if look.human, let here = figure.centres[.head], let there = drawnFor.centres[.head] {
-            let hood = hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage()
+            let hoodHead = hoodHead(skin: look.dressing.skinTone, player: player)
+            let hood = hoodHead.drawn.cgImage()
             offset = CGPoint(x: (here.x - there.x).rounded() + SpriteLibrary.portraitHoodNudge.x,
                              y: (here.y - there.y).rounded() + SpriteLibrary.portraitHoodNudge.y)
             // The offset counts rows down; the context's run up.
             context.draw(hood, in: CGRect(x: offset.x, y: -offset.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
+            // The hood glows; its face doesn't.
+            if let (hoodContext, hoodPixels) = makeCanvas(width: hood.width, height: hood.height),
+               let (maskContext, maskPixels) = makeCanvas(width: hood.width, height: hood.height) {
+                hoodContext.draw(hood, in: CGRect(x: 0, y: 0, width: hood.width, height: hood.height))
+                maskContext.draw(hoodHead.hood.cgImage(), in: CGRect(x: 0, y: 0, width: hood.width, height: hood.height))
+                for y in 0..<hood.height {
+                    for x in 0..<hood.width where maskPixels[(y * hood.width + x) * 4 + 3] > 0 {
+                        let toX = x + Int(offset.x), toY = y + Int(offset.y)
+                        guard (0..<width).contains(toX), (0..<height).contains(toY) else { continue }
+                        for channel in 0..<4 { glowPixels[(toY * width + toX) * 4 + channel] = hoodPixels[(y * hood.width + x) * 4 + channel] }
+                    }
+                }
+            }
         }
-        guard let made = context.makeImage() else { return nil }
+        guard let made = context.makeImage(), let glowing = glowContext.makeImage() else { return nil }
         cache[key] = SKTexture(cgImage: made)
+        cache[key + "_glow"] = SKTexture(cgImage: glowing)
         portraitFacts[key] = (offset, figure.centres)
-        return Portrait(image: made, hoodOffset: offset, centres: figure.centres)
+        return Portrait(image: made, glowing: glowing, hoodOffset: offset, centres: figure.centres)
     }
 
     /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which
@@ -654,7 +691,7 @@ final class SpriteLibrary {
 
         // A human's energy-coloured parts glow; the
         // energy form glows all over but its skin.
-        let glowing = (0..<count).map { look.human ? parts[$0].map(HumanLook.glowingParts.contains) == true : parts[$0] != nil }
+        let glowing = (0..<count).map { look.human ? parts[$0].map(look.dressing.glowing.contains) == true : parts[$0] != nil }
 
         // The line at half its thickness, on a canvas twice as fine: of each line pixel only the
         // quarters against the body, so it hugs it. FloState's rainbow line.
@@ -716,7 +753,7 @@ final class SpriteLibrary {
         if detach, look.human, let (skinContext, skinPixels) = makeCanvas(width: width, height: height) {
             var any = false
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !lined[pixel]
-                && parts[pixel].map({ look.dressing.clothed.contains($0) || HumanLook.glowingParts.contains($0) }) == true {
+                && parts[pixel].map({ HumanLook.clothed.contains($0) || look.dressing.glowing.contains($0) }) == true {
                 let index = pixel * 4
                 for channel in 0..<4 { skinPixels[index + channel] = 255 }
                 any = true

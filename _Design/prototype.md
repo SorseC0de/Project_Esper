@@ -598,12 +598,12 @@ start or BACK to shut them; a tap picks a choice outright.
 ## Customize
 
 BEST OF 7 and 47 on the title open the customize screen (`CustomizeScreen`, SwiftUI, in
-`Customization.swift`) before the stage select; START (the middle emblem, or the pad's start) goes
-on to the stage select, RETURN or B back to the title. Each side's picks (`PlayerCustomization`) are
-kept between rounds and launches, under `esper.customize.p1`/`p2`; the first side's colour is also
-this phone's (`EnergyColour.storageKey`), so the title's colours and multiplayer's hello still
-read it. Offline both sides play in their picks; when the two pick the same colour, the second
-takes the opposite, as before. Online is still the colours alone.
+`Customization.swift`) before the stage select, both cursors on START; START (the middle emblem,
+or the pad's start) goes on to the stage select, RETURN or B back to the title. Each side's picks
+(`PlayerCustomization`) are kept between rounds and launches, under `esper.customize.p1`/`p2`;
+the first side's colour is also this phone's (`EnergyColour.storageKey`), so the title's colours
+and multiplayer's hello still read it. Offline both sides play in their picks; when the two pick
+the same colour, the second takes the opposite, as before. Online is still the colours alone.
 
 - The art: `_Graphic Assets/Vectors/Customize_Screen.svg`, cut into its groups by
   `Tools/import_customize.py` (rendered by macOS's own SVG renderer, `Tools/render_svg.swift`,
@@ -612,31 +612,45 @@ takes the opposite, as before. Online is still the colours alone.
   the deep blues to plum's, the near-black to black's (`MENU` in the tool); the top line gold's
   second (#F5BB45), the bottom line blue's second (#45BCF5), RETURN's lettering and frame blue's
   first (#6BD0FF). The halos go to greys, multiplied by the side's energy colour, the beam clear
-  at its top and whole three quarters down. The 16:9 is fitted to the screen, the ground's black
-  past it. RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second.
-- Over the middle: CUSTOMIZE on the heading's plate and START on the emblem, both lettered as the
-  lit FLO is (Bigdex, gold's first over the cyan, outlined plum and purple, growing to the left;
-  `Onomatopoeia.picture`), and the series' mode, BEST OF 7 or 47, large under CUSTOMIZE.
+  at its top and whole three quarters down. Each box comes as its fill, its line, and its line
+  thickened (a stroke 8 wide), the lines white to be coloured; the small boxes' fill is blue's
+  second out to its last, their line blue's second, the hood's line purple's first. The display
+  comes as its body and its bar. The 16:9 is fitted to the screen, the ground's black past it.
+  RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second.
+- Over the middle: CUSTOMIZE on the heading's plate (cap height 0.025 of the screen) and START on
+  the emblem (0.035), both lettered as the lit FLO is (Bigdex, gold's first over the cyan, outlined
+  plum and purple, growing to the left; `Onomatopoeia.picture`), and the series' mode, BEST OF 7 or
+  47, large under CUSTOMIZE.
 - Each side: `Holo-Projector_v2` (the catalog's `HoloProjector`) on the halo's ring, its white in
   the side's colour, and `player_customize` standing on its lens, in the side's look with its hooded
   head (`SpriteLibrary.portrait`; the hood a pixel right and up of where the idle's head puts it,
   `portraitHoodNudge`), the second side facing the first. An art pixel is 0.168/64 of the screen's
-  width; the projector is drawn at half that, the player at three times, each a whole number of
-  screen pixels. The player is drawn a frame at a time (`CustomizeFigure`): its strings float as
-  FloState's do (20 and 12), both swaying the same way from back over the top to forward, a
-  quarter turn a second; and cubes rise off the head's crown and the shoes at play's numbers with
-  no FLO, swaying in the wind, shaded as the Metal layer shades them, the back shoe's behind.
-- The boxes, each labelled under it in Bigdex: SKIN cycles `player_hoodheads`' six skins
-  (`HumanLook.skinTones`, `_Design/skin-tones.md`), ARMS bare or SLEEVES, LEGS SHORTS or PANTS;
-  sleeves and pants are the clothes' colours (41, back 42), the hands left bare (`Dressing`).
-  H.O.O.D. shows the side's hooded head and is the energy colour's picker: while it's chosen, the
-  colours show in the bottom display, H.O.O.D. and "Hyper-Osmotic Output Driver" over the halo's
-  upper outer corner, and across steps round the wheel (red, orange, gold, lime, teal, blue,
-  purple, pink). Each colour a leaning column, the colour over the shade down its AAP-64 ramp as an
-  accent (`EnergyColour.rampDown`), the two corner to corner; the picked column lined in white.
-- Each side its own cursor, ringed in its colour: the first pad the first side's, a second pad the
-  second's; taps work on both. Up and down: SKIN, ARMS, LEGS, H.O.O.D., START, RETURN; across
-  changes the box's pick; jump steps it on.
+  width; the projector is drawn at 0.5 of that, the player at 3, each a whole number of screen
+  pixels. The player is drawn a frame at a time (`CustomizeFigure`): its strings float as
+  FloState's do, the 20 back and the 12 forward; cubes rise off the head's crown (in the energy
+  colour) and the shoes at play's numbers with no FLO, swaying in the wind, shaded as the Metal
+  layer shades them, the back shoe's behind.
+- Tuning, low in the middle (HIDE/TUNE): PROJ Y and PLAYER Y in art pixels up, PROJ SCALE and
+  PLAYER SCALE in quarters (the art pixels each is drawn at), kept between launches. The player
+  stands on the lens wherever the projector goes, PLAYER Y on top of that.
+- Energy glows: the halos, the projector's lit parts, the player's shoes, sleeves, boots and hood,
+  its strings and cubes, the lit box lines and the display's bar; a blurred copy added over at 0.6.
+- The boxes, each labelled under it in Bigdex. SKIN and H.O.O.D. are pickers: while one is chosen
+  the bottom display shows (its bar in the side's colour) with its colours, a leaning column each,
+  the colour over an accent corner to corner; across steps round them, the picked column lined in
+  white. SKIN's are `player_hoodheads`' six skins and the robot's, 38 over 39, drawn from the fourth
+  frame with its tones swapped (`HumanLook.skinTones`, `_Design/skin-tones.md`); the accent is the
+  back tone. H.O.O.D.'s are the energy colours round the wheel (red, orange, gold, lime, teal,
+  blue, purple, pink), the accent the shade down the AAP-64 ramp (`EnergyColour.rampDown`); on it,
+  H.O.O.D. and "Hyper-Osmotic Output Driver" show over the halo's upper outer corner. The arm and
+  leg boxes are ticks, a sleeve or a boot each (`Dressing`): the inner ones, beside the middle, the
+  front limbs (the first side's right, the second's left), the outer ones, past the halo, the back.
+  Sleeves and boots are energy, in the energy's colour (the back ones at 0.66), glowing; the hands
+  stay bare. Boots are on and sleeves off to start.
+- Each side its own cursor, lighting its box's thick line in its colour: the first pad the first
+  side's, a second pad the second's; taps work on both. Up and down the inner column: SKIN, ARM,
+  LEG, H.O.O.D., START, RETURN; the outer ARM and LEG between SKIN and H.O.O.D.; across from the
+  inner ARM and LEG out to the outer and in to START. Jump ticks a box or steps a picker.
 
 ## The game loop
 

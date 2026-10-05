@@ -16,3 +16,6 @@ arms: the darker the back arm, the lighter the front, as frame 4 is today
 | 6 | 44 #5B3138 | 33 #71413B |
 
 Indexes are the AAP-64 pixel palette's (`PixelPalette.colours`).
+
+A seventh, the robot's, has no frame of its own: frame 4 drawn with its tones swapped, light 38
+#B3B9D1 (front arm) and dark 39 #8B93AF (back arm).

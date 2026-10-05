@@ -44,23 +44,32 @@ TOP_LINE, BOTTOM_LINE, RETURN_CYAN = "#f5bb45", "#45bcf5", "#6bd0ff"
 KEPT = {TOP_LINE, BOTTOM_LINE, RETURN_CYAN}
 # RETURN's own: its cyan to blue's first, the rest as the menus'.
 RETURN = {"#00ffff": RETURN_CYAN}
+# The small boxes' fill, the skin's, the arms' and the legs': blue's second (the cyan) in the
+# middle out to its last.
+SMALL_BOX = {"#307ac3": "#45bcf5", "#23549a": "#1468a3"}
+# A box's line, thickened for the cursor: a stroke this wide along it, in the vector's units.
+LIT_LINE_WIDTH = 8
 
-# name: (groups kept, recolour). A player's groups end in "" for P1 and "1" for P2.
+# name: (groups kept, recolour, part). A player's groups end in "" for P1 and "1" for P2. A box
+# and a display are a fill and a line over it: "fill" keeps the group's first shape, "line" its
+# second, "lit" its second thickened. Lines and the display's bar come out white, for the game
+# to multiply by a colour.
 LAYERS = {
-    "customize_ground": (["Bg", "Lines", "Heading"], "menu"),
-    "customize_return": (["Return-Button"], "return"),
-    "customize_start": (["Start-Button"], "menu"),
-    "customize_spin_ccw": (["RotateMeCCW"], "menu"),
-    "customize_spin_cw": (["RotateMeCW"], "menu"),
+    "customize_ground": (["Bg", "Lines", "Heading"], "menu", None),
+    "customize_return": (["Return-Button"], "return", None),
+    "customize_start": (["Start-Button"], "menu", None),
+    "customize_spin_ccw": (["RotateMeCCW"], "menu", None),
+    "customize_spin_cw": (["RotateMeCW"], "menu", None),
 }
 for player, suffix in ((1, ""), (2, "1")):
-    LAYERS[f"customize_p{player}_skin"] = ([f"Skin{suffix}"], "menu")
-    LAYERS[f"customize_p{player}_arms"] = ([f"Arms{suffix}"], "menu")
-    LAYERS[f"customize_p{player}_legs"] = ([f"Legs{suffix}"], "menu")
-    LAYERS[f"customize_p{player}_hood"] = ([f"HOOD{suffix}"], "menu")
-    LAYERS[f"customize_p{player}_halo"] = ([f"Halo{suffix}"], "energy")
-    LAYERS[f"customize_p{player}_display"] = ([f"Bottom-Display{suffix}"], "menu")
-LAYER_IDS = {group for groups, _ in LAYERS.values() for group in groups}
+    for box, group in (("skin", "Skin"), ("arms", "Arms"), ("legs", "Legs"), ("hood", "HOOD")):
+        LAYERS[f"customize_p{player}_{box}"] = ([group + suffix], "menu" if box == "hood" else "small", "fill")
+        LAYERS[f"customize_p{player}_{box}_line"] = ([group + suffix], "white", "line")
+        LAYERS[f"customize_p{player}_{box}_lit"] = ([group + suffix], "white", "lit")
+    LAYERS[f"customize_p{player}_halo"] = ([f"Halo{suffix}"], "energy", None)
+    LAYERS[f"customize_p{player}_display"] = ([f"Bottom-Display{suffix}"], "menu", "fill")
+    LAYERS[f"customize_p{player}_display_bar"] = ([f"Bottom-Display{suffix}"], "white", "line")
+LAYER_IDS = {group for groups, _, _ in LAYERS.values() for group in groups}
 DEFINITIONS = {f"{{{SVG}}}{tag}" for tag in ("defs", "linearGradient", "radialGradient")}
 
 
@@ -88,8 +97,24 @@ def grey(colour):
 
 
 def recolour(text, mode):
-    change = {"menu": menu, "energy": grey, "return": lambda colour: RETURN.get(expand(colour)) or menu(colour)}[mode]
+    change = {"menu": menu, "energy": grey, "white": lambda colour: "#ffffff",
+              "small": lambda colour: SMALL_BOX.get(expand(colour)) or menu(colour),
+              "return": lambda colour: RETURN.get(expand(colour)) or menu(colour)}[mode]
     return re.sub(r"((?:fill|stroke|stop-color):)(#[0-9a-fA-F]{3,6})\b", lambda m: m.group(1) + change(m.group(2)), text)
+
+
+def keep_part(root, group, part):
+    """A box's or display's fill alone, its line alone, or its line thickened."""
+    for element in root.iter(f"{{{SVG}}}g"):
+        if element.get("id") != group:
+            continue
+        shapes = list(element)
+        for index, shape in enumerate(shapes):
+            if index != (0 if part == "fill" else 1):
+                element.remove(shape)
+        if part == "lit":
+            for path in shapes[1].iter(f"{{{SVG}}}path"):
+                path.set("style", path.get("style") + f"stroke:#ffffff;stroke-width:{LIT_LINE_WIDTH};stroke-linejoin:round;")
 
 
 def colour_lines(root):
@@ -132,10 +157,12 @@ def main():
     with tempfile.TemporaryDirectory() as scratch:
         renderer = pathlib.Path(scratch) / "render_svg"
         subprocess.run(["swiftc", "-O", str(RENDERER), "-o", str(renderer)], check=True)
-        for name, (keep, mode) in LAYERS.items():
+        for name, (keep, mode, part) in LAYERS.items():
             tree = ET.ElementTree(ET.fromstring(source))
             prune(tree.getroot(), set(keep), False)
             colour_lines(tree.getroot())
+            if part:
+                keep_part(tree.getroot(), keep[0], part)
             path = pathlib.Path(scratch) / f"{name}.svg"
             path.write_text(recolour(ET.tostring(tree.getroot(), encoding="unicode"), mode))
             crop = subprocess.run([str(renderer), str(path), str(OUT / f"{name}.png"), str(WIDTH), str(HEIGHT)],

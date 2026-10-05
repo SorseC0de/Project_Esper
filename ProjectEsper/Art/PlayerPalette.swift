@@ -109,8 +109,8 @@ struct Look: Hashable {
             // Skin and clothes; the legs and feet in the energy's own colour, as the head's crown
             // is, the back ones at two thirds of it: darker but not greyed, so they glow too.
             for (part, skin) in dressing.skin { colours[part] = skin }
-            for part in dressing.clothed { colours[part] = part.isBack ? HumanLook.backClothes : HumanLook.clothes }
-            for part in HumanLook.glowingParts { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
+            for part in HumanLook.clothed { colours[part] = part.isBack ? HumanLook.backClothes : HumanLook.clothes }
+            for part in dressing.glowing { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         } else {
             // The energy form: the body in the lighter colour of the earlier builds, the back
             // parts down its ramp as a human's back leg is; what a human shows bare in the regular
@@ -322,7 +322,12 @@ enum HumanLook {
     static let glowingParts: Set<BodyPart> = [.frontFoot, .backFoot]
     /// The six skins of `player_hoodheads`, a frame each, as palette indexes: the lighter
     /// tone the front limbs', the darker the back's (`_Design/skin-tones.md`).
-    static let skinTones: [(front: Int, back: Int)] = [(36, 35), (24, 47), (47, 46), (35, 34), (34, 33), (33, 44)]
+    static let skinTones: [(front: Int, back: Int)] = [(36, 35), (24, 47), (47, 46), (35, 34), (34, 33), (33, 44), (38, 39)]
+    /// The robot's, the seventh: no frame of its own, drawn from the fourth's with its two tones swapped for greys.
+    static let robotSkinTone = 6
+    static let robotDrawnFrom = 3
+    /// The `player_hoodheads` frame a skin is drawn from.
+    static func hoodHeadFrame(_ tone: Int) -> Int { tone == robotSkinTone ? robotDrawnFrom : tone }
     /// The fourth, the bodies' before the customize screen.
     static let defaultSkinTone = 3
     /// What shows bare with nothing over it: the head, the arms and hands, the lower legs.
@@ -338,16 +343,33 @@ enum HumanLook {
 }
 
 /// What a player picked to wear on the customize screen: a skin tone, a frame of
-/// `player_hoodheads`; sleeves over the arms, the hands left bare; pants over the lower legs.
-/// Sleeves and pants are the clothes' colours.
+/// `player_hoodheads` (or the robot's, drawn from another); a sleeve over each arm, the hand
+/// left bare, and a boot over each lower leg. Sleeves and boots are energy: the energy's colour,
+/// the back ones down its ramp as the back shoe is, and they glow.
 struct Dressing: Hashable, Codable {
     var skinTone = HumanLook.defaultSkinTone
-    var sleeves = false
-    var pants = false
+    var frontSleeve = false
+    var backSleeve = false
+    var frontBoot = true
+    var backBoot = true
+
+    init() {}
+
+    /// Kept picks from before a field was added keep the rest, the new field its default.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fresh = Dressing()
+        skinTone = try container.decodeIfPresent(Int.self, forKey: .skinTone) ?? fresh.skinTone
+        frontSleeve = try container.decodeIfPresent(Bool.self, forKey: .frontSleeve) ?? fresh.frontSleeve
+        backSleeve = try container.decodeIfPresent(Bool.self, forKey: .backSleeve) ?? fresh.backSleeve
+        frontBoot = try container.decodeIfPresent(Bool.self, forKey: .frontBoot) ?? fresh.frontBoot
+        backBoot = try container.decodeIfPresent(Bool.self, forKey: .backBoot) ?? fresh.backBoot
+    }
+
+    var tone: (front: Int, back: Int) { HumanLook.skinTones[min(max(skinTone, 0), HumanLook.skinTones.count - 1)] }
 
     /// The parts in skin, by the tone's front and back.
     var skin: [BodyPart: RGB] {
-        let tone = HumanLook.skinTones[min(max(skinTone, 0), HumanLook.skinTones.count - 1)]
         var parts: [BodyPart: RGB] = [:]
         for part in HumanLook.bareParts.subtracting(covered) {
             parts[part] = PixelPalette.colours[part.isBack ? tone.back : tone.front]
@@ -356,14 +378,18 @@ struct Dressing: Hashable, Codable {
     }
 
     var covered: Set<BodyPart> {
-        let arms: Set<BodyPart> = sleeves ? [.frontArm, .backArm] : []
-        let legs: Set<BodyPart> = pants ? [.frontLeg, .backLeg] : []
-        return arms.union(legs)
+        var parts: Set<BodyPart> = []
+        if frontSleeve { parts.insert(.frontArm) }
+        if backSleeve { parts.insert(.backArm) }
+        if frontBoot { parts.insert(.frontLeg) }
+        if backBoot { parts.insert(.backLeg) }
+        return parts
     }
 
-    var clothed: Set<BodyPart> { HumanLook.clothed.union(covered) }
+    /// The parts in the energy's colours, glowing: the shoes, and the sleeves and boots.
+    var glowing: Set<BodyPart> { HumanLook.glowingParts.union(covered) }
 
-    /// What a human shows bare, but the head (the hooded head's own): in the energy form, the
-    /// regular energy colour rather than the energy form's lighter one, glowing.
-    var energyFormBare: Set<BodyPart> { HumanLook.bareParts.subtracting(covered).subtracting([.head]) }
+    /// What a human shows bare or in sleeves and boots, but the head (the hooded head's own):
+    /// in the energy form, the regular energy colour rather than the energy form's lighter one, glowing.
+    var energyFormBare: Set<BodyPart> { HumanLook.bareParts.subtracting([.head]) }
 }

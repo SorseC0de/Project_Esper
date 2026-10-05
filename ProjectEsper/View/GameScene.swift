@@ -173,9 +173,12 @@ final class GameScene: SKScene {
     /// Each human's hood over its head, and the frame it was drawn for.
     private var hoodNodes: [SKSpriteNode] = []
     private var hoodFlashes: [SKSpriteNode] = []
+    private var hoodStrings: [HoodStrings] = []
     private static let hoodDrawnFor = AnimationFrame(.idle, 2)
     /// `player_hoodheads`' frame in the skin the bodies are drawn in (palette 34 and 35).
     private static let hoodHeadSkin = 3
+    /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
+    private static let stringAccentLuminance = 0.876
     /// Over the body and under the head's own node, or behind the body.
     private static let hoodUpZ: CGFloat = 0.038
     private static let hoodDownZ: CGFloat = -0.005
@@ -373,7 +376,10 @@ final class GameScene: SKScene {
 
     /// The hooded heads' hoods, cut out of the glow's body mask in black so they glow as the
     /// energy does; and their faces, shielded in red, so no glow lands on them.
-    var hoodSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.hood) }
+    var hoodSnapshots: [BodySnapshot] {
+        // The hooded head's strings with it; the hood down's glow as the energy form round them does.
+        hoodMaskSnapshots(\.hood) + hoodStrings.indices.filter { hoodMasks[$0] != nil }.flatMap { hoodStrings[$0].snapshots }
+    }
     var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
     private func hoodMaskSnapshots(_ part: KeyPath<(hood: SKTexture, face: SKTexture), SKTexture>) -> [BodySnapshot] {
         hoodNodes.indices.compactMap { index in
@@ -907,6 +913,7 @@ final class GameScene: SKScene {
             hoodFlash.isHidden = true
             figure.addChild(hoodFlash)
             hoodFlashes.append(hoodFlash)
+            hoodStrings.append(HoodStrings(parent: figure, square: sprites.flatSquare(size: 1, alpha: 1)))
             let eyes = SKSpriteNode()
             eyes.zPosition = 0.035
             eyes.isHidden = true
@@ -6404,6 +6411,18 @@ final class GameScene: SKScene {
             } else {
                 hood.isHidden = true
                 hoodMasks[index] = nil
+            }
+            // Its strings, off the hood, over the body: behind it, the hood down's were lost under
+            // the torso. Toned as the hood's white and its palette 37 are.
+            if hood.isHidden {
+                hoodStrings[index].hide()
+            } else {
+                let look = sprites.look(for: index)
+                hoodStrings[index].step(anchors: HoodStrings.anchors(on: hood, down: energyForm, scale: drawScale), down: energyForm,
+                                        facing: CGFloat(player.facing.sign), scale: drawScale, time: CACurrentMediaTime(),
+                                        plain: SKColor(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel)),
+                                        accent: SKColor(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel)),
+                                        z: GameScene.hoodUpZ + 0.0005)
             }
             // The hood flashes with the body, part of its silhouette: over the body's flash when
             // it's up, over the hood itself when it's down behind.

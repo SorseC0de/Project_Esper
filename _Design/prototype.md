@@ -808,6 +808,15 @@ energy form `player_hood_down` instead, behind the body, following the torso's m
 on a frozen body. In the glow's mask the hood is cut out in black so it glows as energy
 (`hoodSnapshots`, `MaskScene`'s `cutOut`) and the face drawn pure red (`shieldedSnapshots`, `shield`),
 which the bright pass treats as flat and the composite leaves without bloom, so none spreads onto it.
+Its two strings are drawn rather than painted (`HoodStrings`): chains of whole art pixels, each pixel
+a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
+the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
+each from columns 23 and 26 of row 23, hanging under gravity and swinging; down, off FloState's hood
+behind the body (the strings themselves over it, or the torso hides them), nine each from columns 23 and 27 of row 24, floating as if held up (Shenron's
+whiskers): drawn each frame toward a line back and down from the hood that waves along its length,
+growing to 2.5 pixels at the tip, 0.6 times a second, so they trail when the body moves and wave when
+it's still. The hooded head's are cut out of the glow's mask with the hood. The six skins of
+`player_hoodheads` are logged in `_Design/skin-tones.md`, the arms to follow them.
 It replaces the crown's grade. It flashes with the body (a stun, a lockout, an orb taken) as part of
 its silhouette, and the FloState lockout's skin flash is drawn under it. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
 Going into FloState the burst and the swirl start on the change's third frame, not when it ends. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and

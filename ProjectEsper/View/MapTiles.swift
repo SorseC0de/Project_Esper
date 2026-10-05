@@ -83,9 +83,9 @@ struct TileSpot: Hashable {
     static func z(_ layer: Int) -> CGFloat { -8 + CGFloat(layer) * 0.1 }
 }
 
-/// Flight's scenery: the backdrop drawn whole in Aseprite (`FlightBackdrop`, 2496 by 1152, four of
-/// its pixels to an art pixel, so one to a screen pixel at 4x), over a sprite for every tile the map
-/// has placed, cut from its sheets, which it covers while it's tried.
+/// Flight's scenery: the backdrop drawn whole in Aseprite (`FlightBackdrop`, 2496 by 1152, eight of
+/// its pixels to an art pixel, so one to a screen pixel at 8x), centred on the stage, over a sprite
+/// for every tile the map has placed, cut from its sheets, which it covers while it's tried.
 enum FlightArt {
     /// What the stage's art gives back: each placed tile's sprite by its cell, to be changed by the map maker.
     struct Handles {
@@ -109,8 +109,9 @@ enum FlightArt {
         }
     }
 
-    /// Over the tiles' two layers, under everything else on the stage.
+    /// Over the tiles' two layers, under everything else on the stage; its pixels to an art pixel.
     static let backdropZ: CGFloat = -7.8
+    static let backdropScale: CGFloat = 8
 
     static func build(map: StageMap, into parent: SKNode) -> Handles {
         var handles = Handles(parent: parent)
@@ -118,7 +119,8 @@ enum FlightArt {
         texture.filteringMode = .linear
         let backdrop = SKSpriteNode(texture: texture)
         backdrop.anchorPoint = .zero
-        backdrop.size = CGSize(width: CGFloat(FlightRules.columns) * ElementsArt.tileSide, height: CGFloat(FlightRules.rows) * ElementsArt.tileSide)
+        backdrop.size = CGSize(width: texture.size().width / backdropScale, height: texture.size().height / backdropScale)
+        backdrop.position = CGPoint(x: ((CGFloat(FlightRules.columns) * ElementsArt.tileSide - backdrop.size.width) / 2).rounded(), y: 0)
         backdrop.zPosition = backdropZ
         parent.addChild(backdrop)
         handles.backdrop = backdrop

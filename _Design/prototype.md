@@ -1486,9 +1486,8 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 ## Flight
 
 A hand-laid stage, for now called Flight (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`,
-protocol 83), on the select after Hoopfish Hideaway. 39 by 18 (`FlightRules`, protocol 84): as big
-as a phone shows whole at 4x, 39 tiles of 16 art pixels being 2496 of a 2532-pixel-wide screen and 18
-being 1152 of 1170. Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
+protocol 83), on the select after Hoopfish Hideaway. 20 by 9 (`FlightRules`, protocol 85), drawn for
+8x: zoomed by whole pixels to fit its height (8x on a 1170-pixel phone), its ends a little cut. Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
 (`FlightTiles0` to `11` at the catalog's root, from `_Graphic Assets/Pixel Art/Stages/Flight`): the
 A2 floors, the A4 walls, the five B sheets and the five numbered ones, 48-pixel cells but the A4 walls'
 and "2"'s 32-pixel ones (the walls' 720 pixels high make 22 rows, the half row under them left off), each drawn as one 16-pixel tile, painted rather than pixel art, so smoothed (at 3x a cell is its own 48 screen
@@ -1502,12 +1501,13 @@ leaving what's under them, and a stroke laying more side by side, the stage's ce
 the block's size. OVER: tiles go on the layer over the ground (`StageMap.Placed.layer` 1, drawn a
 tenth above it, `TileSpot`), such as a window on a wall, bringing no wall; erasing and picking up
 then work on that layer alone. Tiles kept before layers are on the ground. The autotiles aren't joined up:
-a cell is placed as it's painted. The tiles never glow (they're the glow mask's flats). The baked map is
-the user's first layout (baked version 2), cut to 39 by 18, the right rim mirrored to column 33.
+a cell is placed as it's painted. The tiles never glow (they're the glow mask's flats). The baked map
+(version 3): a floor along the bottom, the rims five rows up two in from each end, the starts either
+side of the middle, the ball over it, no tiles.
 
 Being tried: the stage drawn whole in Aseprite instead (`FlightBackdrop`, from `Flight/test.png`,
-2496 by 1152: 64 of its pixels a tile, so one to a screen pixel at 4x), over the tiles and covering
-them; the walls still the map's.
+2496 by 1152: eight of its pixels an art pixel, so one to a screen pixel at 8x, 19 and a half tiles
+by 9, centred with a quarter tile either side), over the tiles and covering them; the walls still the map's.
 
 Planned, not built: the ball starts in an open overhead compartment in the middle; the stage pitches
 at random, bending the shots' angles, and a serving cart rolls up and down the aisle with the pitch,

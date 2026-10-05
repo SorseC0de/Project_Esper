@@ -107,7 +107,7 @@ final class GameScene: SKScene {
     /// What the computer drank at the end of a stage, lettered once play is back.
     private var heldBanner: String?
     /// Each side's energy colour, for the names on the screens.
-    private var sideColours = EnergyColour.pair(first: EnergyColour.saved, second: .teal)
+    private var sideColours = PlayerCustomization.sides.map(\.energy)
     private static let flowDelayFrames = 60
     /// Frames the bodies stay hidden while the bolts bring them in, and the count's last
     /// value, to catch it reaching zero.
@@ -176,9 +176,7 @@ final class GameScene: SKScene {
     private var hoodNodes: [SKSpriteNode] = []
     private var hoodFlashes: [SKSpriteNode] = []
     private var hoodStrings: [HoodStrings] = []
-    private static let hoodDrawnFor = AnimationFrame(.idle, 2)
-    /// `player_hoodheads`' frame in the skin the bodies are drawn in (palette 34 and 35).
-    private static let hoodHeadSkin = 3
+    static let hoodDrawnFor = AnimationFrame(.idle, 2)
     /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
     private static let stringAccentLuminance = 0.876
     /// Over the body and under the head's own node, or behind the body.
@@ -830,8 +828,8 @@ final class GameScene: SKScene {
         BoundsGallery.loadSaved()
         NetTuning.dropSavedIfStale()
         // The colours as last picked, before anything is drawn in them.
-        for (index, colour) in EnergyColour.pair(first: EnergyColour.saved, second: .teal).enumerated() {
-            sprites.setLook(colour.look, for: index)
+        for (index, side) in PlayerCustomization.sides.enumerated() {
+            sprites.setLook(side.look, for: index)
         }
         addChild(world)
         world.addChild(ground)
@@ -3081,7 +3079,9 @@ final class GameScene: SKScene {
         tickOnline()
         // Start or delete pauses a match offline, and again resumes it; over the settings, it shuts them.
         if hub.consumePause(), online == nil {
-            if let flowState, flowState.settingsOpen {
+            if let flowState, flowState.customizeOpen, !flowState.settingsOpen {
+                flowState.startFromCustomize()
+            } else if let flowState, flowState.settingsOpen {
                 flowState.closeSettings()
             } else if flow == .playing {
                 menuLast = inputs.first ?? .idle
@@ -3127,6 +3127,28 @@ final class GameScene: SKScene {
                 } else if backed, screen.back != nil {
                     menuNeedsRelease = true
                     screen.goBack()
+                }
+            } else if flow == .title, let flowState, flowState.customizeOpen {
+                // The customize screen: the first pad the first side's cursor, a second pad the second's.
+                if right { flowState.moveCustomize(0, across: 1, down: 0) }
+                if left { flowState.moveCustomize(0, across: -1, down: 0) }
+                if down { flowState.moveCustomize(0, across: 0, down: 1) }
+                if up { flowState.moveCustomize(0, across: 0, down: -1) }
+                if picked {
+                    menuNeedsRelease = true
+                    flowState.activateCustomize(0, flowState.customizeCursors[0])
+                } else if backed {
+                    menuNeedsRelease = true
+                    flowState.closeCustomize()
+                }
+                if inputs.count > 1, hub.playerTwoHasController {
+                    let second = inputs[1], last = secondMenuLast
+                    if second.stick.x >= 0.5, last.stick.x < 0.5 { flowState.moveCustomize(1, across: 1, down: 0) }
+                    if second.stick.x <= -0.5, last.stick.x > -0.5 { flowState.moveCustomize(1, across: -1, down: 0) }
+                    if second.stick.y <= -0.5, last.stick.y > -0.5 { flowState.moveCustomize(1, across: 0, down: 1) }
+                    if second.stick.y >= 0.5, last.stick.y < 0.5 { flowState.moveCustomize(1, across: 0, down: -1) }
+                    if second.jump, !last.jump { flowState.activateCustomize(1, flowState.customizeCursors[1]) }
+                    secondMenuLast = second
                 }
             } else if flow == .title, online == nil, let flowState, flowState.multiplayerOpen {
                 // The multiplayer screen over the title: its own column of choices, B back.
@@ -4131,13 +4153,25 @@ final class GameScene: SKScene {
 
     /// Offline: this phone's pick for player one, the computer or the second pad in teal,
     /// or the opposite if that's the pick.
+    /// Both sides as last picked on the customize screen.
     func applySavedColours() {
-        applyColours(EnergyColour.pair(first: EnergyColour.saved, second: .teal))
+        let sides = PlayerCustomization.sides
+        applyColours(sides.map(\.energy), looks: sides.map(\.look))
     }
 
-    /// Both sides' colours onto everything drawn in them.
-    func applyColours(_ colours: [EnergyColour]) {
-        for (index, colour) in colours.enumerated() { sprites.setLook(colour.look, for: index) }
+    /// The customize screen's player, in a side's look with its hooded head.
+    func customizePortrait(player: Int) -> CGImage? {
+        sprites.portrait("player_customize", player: player, headDrawnFor: GameScene.hoodDrawnFor)
+    }
+
+    /// A side's hooded head alone, cut to what's drawn, for the customize screen's hood box.
+    func customizeHood(player: Int) -> CGImage? {
+        CustomizeArt.trimmed(sprites.hoodHead(skin: sprites.look(for: player).dressing.skinTone, player: player).drawn.cgImage())
+    }
+
+    /// Both sides' colours onto everything drawn in them, in `looks` where given.
+    func applyColours(_ colours: [EnergyColour], looks: [Look]? = nil) {
+        for (index, colour) in colours.enumerated() { sprites.setLook(looks.map { $0[index] } ?? colour.look, for: index) }
         sideColours = colours
         headStreamsCache = [:]
         for (index, flashes) in zip(stunBodies.indices, zip(stunBodies, stunHeads)) {
@@ -6522,7 +6556,7 @@ final class GameScene: SKScene {
                 // Toned ahead of time through the energy's ramp, opaque, rather than by a shader:
                 // up, the whole hooded head in the skin it's drawn for, its hood alone toned.
                 // In FloState the same hooded head, its hood in the energy form's colour.
-                let hoodHead = sprites.hoodHead(skin: GameScene.hoodHeadSkin, player: index, energy: energyForm)
+                let hoodHead = sprites.hoodHead(skin: sprites.look(for: index).dressing.skinTone, player: index, energy: energyForm)
                 if energyForm { energyHoods.insert(index) } else { energyHoods.remove(index) }
                 hood.texture = hoodHead.drawn
                 hoodMasks[index] = (hoodHead.hood, hoodHead.face)

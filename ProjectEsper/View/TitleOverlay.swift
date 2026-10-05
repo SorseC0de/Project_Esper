@@ -76,6 +76,16 @@ final class FlowState: ObservableObject {
         SoundBoard.shared.play(SoundBoard.navigate)
     }
 
+    // MARK: The customize screen
+
+    /// The customize screen, between the title and the stage select: each side's cursor and
+    /// picks, the swatch column each cursor last stood on, and the mode it starts.
+    @Published var customizeOpen = false
+    @Published var customizeCursors: [CustomizeSpot] = [.skin, .skin]
+    @Published var customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
+    var customizeColumns = [0, 0]
+    var customizeMode = GameMode.rounds
+
     // MARK: The multiplayer screen
 
     /// The game's own multiplayer screen, over the title: play now, invite a friend, and
@@ -198,7 +208,7 @@ final class FlowState: ObservableObject {
         case .bestOfSeven, .fortySeven:
             guard !busy else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
-            startSeries?(item == .bestOfSeven ? .rounds : .fortySeven)
+            openCustomize(item == .bestOfSeven ? .rounds : .fortySeven)
         case .vsCPU, .vsHuman:
             guard !busy else { return }
             defaults.set(item == .vsCPU, forKey: GameScene.vsCPUKey)
@@ -212,7 +222,12 @@ final class FlowState: ObservableObject {
             defaults.set(Int((item == .onlineRounds ? GameMode.rounds : .fortySeven).rawValue), forKey: GameScene.onlineModeKey)
             SoundBoard.shared.play(SoundBoard.navigate)
         case .colour(let colour):
-            defaults.set(colour.rawValue, forKey: EnergyColour.storageKey)
+            // The first side's pick on the customize screen, its wheel colour.
+            var first = PlayerCustomization.saved(0)
+            first.energy = colour
+            first.deep = false
+            first.save(as: 0)
+            customizations[0] = first
             SoundBoard.shared.play(SoundBoard.navigate)
             scene.applySavedColours()
         case .tuning:

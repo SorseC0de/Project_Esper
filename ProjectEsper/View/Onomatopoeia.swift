@@ -179,7 +179,7 @@ enum Onomatopoeia {
     }
 
     /// Bundled, and registered with the process on first use.
-    private static let registered: Void = {
+    static let registered: Void = {
         for name in ["Bigdex", "CherryBombOne-Regular", "DarumadropOne-Regular", "DelaGothicOne-Regular"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
                 CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)

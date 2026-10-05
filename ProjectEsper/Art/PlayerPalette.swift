@@ -89,15 +89,17 @@ struct Look: Hashable {
     static let energyFormHeadApart = true
     /// The body colour the look was made from, for its other form.
     var body: RGB?
+    /// The skin tone, sleeves and pants picked on the customize screen.
+    var dressing = Dressing()
 
     /// The same player in the energy form.
-    var transformed: Look { Look.team(glow, body: body ?? glow, human: false) }
+    var transformed: Look { Look.team(glow, body: body ?? glow, human: false, dressing: dressing) }
 
     /// The body in its colour and the back limbs in a greyed, darker version of it, the head
     /// and the ball in the team colour, a black line round the body, and the front arm
     /// stroked on its own. The head is drawn apart from the body, with no line, and so is
     /// the energy, toned by `energyTone`.
-    static func team(_ glow: RGB, body: RGB, human: Bool = HumanLook.enabled) -> Look {
+    static func team(_ glow: RGB, body: RGB, human: Bool = HumanLook.enabled, dressing: Dressing = Dressing()) -> Look {
         var colours: [BodyPart: RGB] = [:]
         let back = greyedDarker(body)
         for part in BodyPart.allCases {
@@ -106,8 +108,8 @@ struct Look: Hashable {
         if human {
             // Skin and clothes; the legs and feet in the energy's own colour, as the head's crown
             // is, the back ones at two thirds of it: darker but not greyed, so they glow too.
-            for (part, skin) in HumanLook.skin { colours[part] = skin }
-            for part in HumanLook.clothed { colours[part] = part.isBack ? HumanLook.backClothes : HumanLook.clothes }
+            for (part, skin) in dressing.skin { colours[part] = skin }
+            for part in dressing.clothed { colours[part] = part.isBack ? HumanLook.backClothes : HumanLook.clothes }
             for part in HumanLook.glowingParts { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         } else {
             // The energy form: the body in the lighter colour of the earlier builds, the back
@@ -116,9 +118,9 @@ struct Look: Hashable {
             for part in BodyPart.allCases where !part.isEnergy && part != .ball {
                 colours[part] = part.isBack ? Look.scaled(body, HumanLook.backLegShare) : body
             }
-            for part in HumanLook.energyFormBare { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
+            for part in dressing.energyFormBare { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         }
-        return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body)
+        return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body, dressing: dressing)
     }
 
     /// Lined on their own, front to back: where two meet, the first's line sits on the
@@ -195,7 +197,7 @@ struct Look: Hashable {
 
 /// The energy colours a player can pick on the title, each paired with its opposite: when
 /// two sides pick the same, the one that gives way takes the opposite.
-enum EnergyColour: String, CaseIterable {
+enum EnergyColour: String, CaseIterable, Codable {
     case orange, teal, red, lime, pink, blue, gold, purple
 
     /// The glow, from `PixelPalette`.
@@ -226,8 +228,26 @@ enum EnergyColour: String, CaseIterable {
         }
     }
 
-    /// The body: the glow lifted two fifths of the way to white.
-    var body: RGB { Look.lightened(glow, 0.33) }
+    /// The body: the glow lifted a third of the way to white.
+    var body: RGB { Look.lightened(glow, EnergyColour.bodyLift) }
+    static let bodyLift = 0.33
+
+    /// The shade down its ramp in the pixel palette: the customize screen's second row.
+    var rampDown: RGB {
+        switch self {
+        case .red: PixelPalette.colours[4]
+        case .orange: PixelPalette.colours[5]
+        case .gold: PixelPalette.colours[6]
+        case .lime: PixelPalette.colours[12]
+        case .teal: PixelPalette.colours[19]
+        case .blue: PixelPalette.colours[17]
+        case .pink: PixelPalette.colours[28]
+        case .purple: PixelPalette.colours[29]
+        }
+    }
+
+    /// The customize screen's picker, round the colour wheel.
+    static let wheel: [EnergyColour] = [.red, .orange, .gold, .lime, .teal, .blue, .purple, .pink]
 
     var opposite: EnergyColour {
         switch self {
@@ -292,20 +312,21 @@ enum CourtLook {
     static let strikeFadeFrames = 20
 }
 
-/// An experiment: the players drawn as people. Skin on the head, the arms and the hands,
-/// front in palette 35 and back in 34; the torso, pelvis and thighs in palette 41 for
+/// An experiment: the players drawn as people. Skin on the head, the arms, the hands and the
+/// lower legs, in the side's skin tone (`Dressing`); the torso, pelvis and thighs in palette 41 for
 /// everyone; the lower legs and feet in the energy's colours, glowing; the head drawn as
 /// part of the body, not apart, and not glowing. `enabled` off puts everything back as it was.
 enum HumanLook {
     static let enabled = true
     /// The parts still in the energy's colours, which glow as energy does: the shoes.
     static let glowingParts: Set<BodyPart> = [.frontFoot, .backFoot]
-    static let skin: [BodyPart: RGB] = {
-        // 24 and 25, tried, are kept for later. The lower legs bare too, tried.
-        let front = PixelPalette.colours[35], back = PixelPalette.colours[34]
-        return [.head: front, .frontArm: front, .frontHand: front, .frontLeg: front,
-                .backArm: back, .backHand: back, .backLeg: back]
-    }()
+    /// The six skins of `player_hoodheads`, a frame each, as palette indexes: the lighter
+    /// tone the front limbs', the darker the back's (`_Design/skin-tones.md`).
+    static let skinTones: [(front: Int, back: Int)] = [(36, 35), (24, 47), (47, 46), (35, 34), (34, 33), (33, 44)]
+    /// The fourth, the bodies' before the customize screen.
+    static let defaultSkinTone = 3
+    /// What shows bare with nothing over it: the head, the arms and hands, the lower legs.
+    static let bareParts: Set<BodyPart> = [.head, .frontArm, .frontHand, .frontLeg, .backArm, .backHand, .backLeg]
     /// The back leg and foot's share of the energy colour's brightness.
     static let backLegShare = 0.66
     /// The torso, pelvis and thighs, the same for every player: palette 41, the back thigh
@@ -313,6 +334,36 @@ enum HumanLook {
     static let clothed: Set<BodyPart> = [.torso, .pelvis, .frontThigh, .backThigh]
     /// What a human shows bare, but the head (the hooded head's own): in the energy form, the
     /// regular energy colour rather than the energy form's lighter one, glowing.
-    static let energyFormBare = Set(skin.keys).subtracting([.head])
     static let clothes = PixelPalette.colours[41], backClothes = PixelPalette.colours[42]
+}
+
+/// What a player picked to wear on the customize screen: a skin tone, a frame of
+/// `player_hoodheads`; sleeves over the arms, the hands left bare; pants over the lower legs.
+/// Sleeves and pants are the clothes' colours.
+struct Dressing: Hashable, Codable {
+    var skinTone = HumanLook.defaultSkinTone
+    var sleeves = false
+    var pants = false
+
+    /// The parts in skin, by the tone's front and back.
+    var skin: [BodyPart: RGB] {
+        let tone = HumanLook.skinTones[min(max(skinTone, 0), HumanLook.skinTones.count - 1)]
+        var parts: [BodyPart: RGB] = [:]
+        for part in HumanLook.bareParts.subtracting(covered) {
+            parts[part] = PixelPalette.colours[part.isBack ? tone.back : tone.front]
+        }
+        return parts
+    }
+
+    var covered: Set<BodyPart> {
+        let arms: Set<BodyPart> = sleeves ? [.frontArm, .backArm] : []
+        let legs: Set<BodyPart> = pants ? [.frontLeg, .backLeg] : []
+        return arms.union(legs)
+    }
+
+    var clothed: Set<BodyPart> { HumanLook.clothed.union(covered) }
+
+    /// What a human shows bare, but the head (the hooded head's own): in the energy form, the
+    /// regular energy colour rather than the energy form's lighter one, glowing.
+    var energyFormBare: Set<BodyPart> { HumanLook.bareParts.subtracting(covered).subtracting([.head]) }
 }

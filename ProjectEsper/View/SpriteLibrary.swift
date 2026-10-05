@@ -328,6 +328,30 @@ final class SpriteLibrary {
         return (made[0], made[1], made[2])
     }
 
+    /// A one-frame figure, the customize screen's, in a player's look and lined, with the
+    /// hooded head over its head where the game would put it: moved from where it's drawn for
+    /// (the idle's third frame) by how far this figure's head is from that one's.
+    func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame) -> CGImage? {
+        let key = "p\(player)_portrait_\(name)"
+        if let made = cache[key] { return made.cgImage() }
+        let look = look(for: player)
+        let figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: false)
+        let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
+        let body = figure.texture.cgImage()
+        let width = body.width, height = body.height
+        guard let (context, _) = makeCanvas(width: width, height: height) else { return nil }
+        context.draw(body, in: CGRect(x: 0, y: 0, width: width, height: height))
+        if look.human, let here = figure.centres[.head], let there = drawnFor.centres[.head] {
+            let hood = hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage()
+            // The centres count rows down; the context's run up.
+            let shift = CGPoint(x: (here.x - there.x).rounded(), y: -(here.y - there.y).rounded())
+            context.draw(hood, in: CGRect(x: shift.x, y: shift.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
+        }
+        guard let made = context.makeImage() else { return nil }
+        cache[key] = SKTexture(cgImage: made)
+        return made
+    }
+
     /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which
     /// stops at the colour; touches nothing kept.
     private func makeToned(_ source: SKTexture, look: Look, capped: Bool = false) -> SKTexture {
@@ -659,7 +683,7 @@ final class SpriteLibrary {
         if detach, glowing.contains(true), let (maskContext, maskPixels) = makeCanvas(width: width, height: height) {
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
                 let index = pixel * 4
-                let skin = look.human && parts[pixel].map { HumanLook.skin[$0] != nil } == true
+                let skin = look.human && parts[pixel].map { look.dressing.skin[$0] != nil } == true
                 maskPixels[index] = skin ? 0 : 255
                 maskPixels[index + 1] = 255
                 maskPixels[index + 2] = skin ? 0 : 255
@@ -676,7 +700,7 @@ final class SpriteLibrary {
         if detach, look.human, let (skinContext, skinPixels) = makeCanvas(width: width, height: height) {
             var any = false
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !lined[pixel]
-                && parts[pixel].map({ HumanLook.clothed.contains($0) || HumanLook.glowingParts.contains($0) }) == true {
+                && parts[pixel].map({ look.dressing.clothed.contains($0) || HumanLook.glowingParts.contains($0) }) == true {
                 let index = pixel * 4
                 for channel in 0..<4 { skinPixels[index + channel] = 255 }
                 any = true

@@ -55,6 +55,7 @@ ROOT_IMAGES = {
     "HoopfishTailfin": ["Stages/Hoopfish Hideaway/Hoopfish/Hoopfish_tailfin.png"],
     "HoopfishTopfin": ["Stages/Hoopfish Hideaway/Hoopfish/Hoopfish_topfin.png"],
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
+    "HoloProjector": ["UI/Holo-Projector_v2.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")
 LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources", "EsperSim", "BallLandmarks.swift")

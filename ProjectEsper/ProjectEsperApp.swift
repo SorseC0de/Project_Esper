@@ -40,6 +40,10 @@ struct GameView: View {
                 TitleOverlay(flow: flow, net: flow.net)
                     .transition(.opacity)
             }
+            if flow.customizeOpen {
+                CustomizeScreen(flow: flow)
+                    .transition(.opacity)
+            }
             if flow.multiplayerOpen {
                 MultiplayerScreen(flow: flow, net: flow.net)
                     .transition(.opacity)
@@ -58,6 +62,7 @@ struct GameView: View {
         .animation(.easeOut(duration: 0.25), value: flow.veiled)
         .animation(.easeOut(duration: 0.2), value: flow.multiplayerOpen)
         .animation(.easeOut(duration: 0.2), value: flow.settingsOpen)
+        .animation(.easeOut(duration: 0.2), value: flow.customizeOpen)
     }
 }
 

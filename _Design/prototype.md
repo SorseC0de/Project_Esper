@@ -141,7 +141,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   frames meanwhile: the dark ones and those in the energy's colour (the shoes, and the hood and its
   strings), unglowing while grey (`SpriteLibrary.clothesTexture`, their snapshots the glow mask's
   flats), and no cubes off the head or the shoes the whole lockout; FloState and the lockout are kept
-  through a point. Changing, the hood down swings down into place from turned up a quarter turn, about
+  through a point. Through the lockout small sizzles (`sizzle1`, `sizzle2`, at a tenth and two
+  thirds seen, twelve a second) go off the head and the arms. Changing, the hood down swings down into place from turned up a quarter turn, about
   where it meets the body (column 23, row 24), eased over the energy form's frames.
   In FloState the cube trails run their longest (14), the head's and legs' cubes come out in the
   zone's colours, the body is drawn in the lighter colour of the earlier builds (the glow lifted two
@@ -155,7 +156,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   ground the whole change, the eyes over the body in the energy's colour, all white and glowing on
   frame 4 and the energy form from frame 5 (0-based); up to frame 4 cubes spiral up round the
   body (30 a second, 10 pixels out, at the head's cube size) and the head's and legs' cubes rise in a helix. The energy form
-  is the look from before the human one (`Look.transformed`, `human: false`), but all of it in the
+  is the look from before the human one (`Look.transformed`, `human: false`), its head drawn apart a quarter
+  bigger but riding its body exactly, without the lag and bob that read as detached (`GameScene.headsRide`), but all of it in the
   energy's colour as the head is, no shoes, the back parts down its ramp as a human's back leg
   (0.66), glowing all over as the head does; the head apart, and cubes off the hands as off the legs; drawn as a player of its own
   (`SpriteLibrary.transformedPlayer`), warmed with the rest.
@@ -163,7 +165,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   it and coming once it has reached its hold (`shotWindupFrames`, `throwWindupFrames`): the throw sheet's third frame, sliding
   straight back 48 art pixels over 12 frames (`StepbackRules`), the facing kept, trailing
   afterimages in the colour's bright version, at 0.9, held a tenth of a second and fading over
-  three, as Zeus Juice's bolt does (a jump out of the shooting stance and the throw leave the same; the slash leaves its blade's, not the body's), with the jump's sound; the whole way
+  three, as Zeus Juice's bolt does (a jump out of the shooting stance and the throw leave the same; the slash leaves the body's and its blade's), with the jump's sound; the whole way
   a counter, as the throw stance's parry frames are (out of a shot the air-with-ball sheet's last
   frame shows, out of a throw the throw sheet's third), and its ball can't be snatched, by Frost Tea's
   either. Then back in the stance at its hold, buttons kept, the aim cleared: the stick still down from the stepback aims nothing until it's let go and pressed again, so a quick shot or throw out of it goes off the preset, not down (`stepbackAimLocked`, protocol 33). Down never cancels a stance: the
@@ -345,7 +347,12 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   and only after a jump, a double jump, a wall jump or a wall land since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
   slab still works. The stage carries standing slabs as `extras`, which every collision
   query sees. Numbers in `ShakeRules`.
-  Super Smoothie's flight streams its hood's strings out behind, and at level two the stick forward
+  Super Smoothie's flight is drawn on its own sheets, `player_fly` and `player_fly_ball` (frame 0
+  hovering or going back, 1 going forward or up, 2 going down more than forward; under 0.3 a frame
+  counts as still, `FlightSheet`, protocol 92), streams its hood's strings out behind, and hovering
+  still throws a vortex of cubes up off the foot that hangs lowest; flying up the hooded head tips back
+  12° and flying down forward, about its middle, eased, let down up to 2 pixels to sit on the neck; round the body, widening from 2 to
+  14 pixels as they rise (30 a second). At level two the stick forward
   is the glide: 3.5 forward (2.5 with the ball), sinking 0.8 a frame unless up is held,
   which rises at the flight speed, and diving at 3 on down; the stick backward is the
   drift at the flight speed, and centred it levitates. Level one is the plain flight.
@@ -851,7 +858,8 @@ growing to 2.5 pixels at the tip, 0.6 times a second, so they trail when the bod
 it's still. The hooded head's are cut out of the glow's mask with the hood. The six skins of
 `player_hoodheads` are logged in `_Design/skin-tones.md`, the arms to follow them.
 It replaces the crown's grade. It flashes with the body (a stun, a lockout, an orb taken) as part of
-its silhouette, and the FloState lockout's skin flash is drawn under it. Testing, offline: the 1 key fills the local player's FLO, 2 sets it to half, 3 empties it.
+its silhouette, and the FloState lockout's skin flash is drawn under it. Testing, offline: the 1 key fills the first player's FLO, 2 sets it to half, 3 empties it; 4, 5
+and 6 the same for the second's.
 Going into FloState the burst and the swirl start on the change's third frame, not when it ends. The outline is drawn as it is and never glowing, lifted off each frame onto its own white texture and
 drawn as a child of the body, coloured each frame, so it can change without recolouring a frame.
 In the zone (`ZoneTuning.inTheZone`, a placeholder, off

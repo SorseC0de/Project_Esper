@@ -500,7 +500,7 @@ final class SpriteLibrary {
             // The glowing parts' middles, and the head's however it's drawn: where the head
             // and its particles go.
             // And the limbs' ends, where cubes come off them; and the torso, for the hood down behind it.
-            if part.glows(human: look.human) || part == .head || [.frontLeg, .backLeg, .frontFoot, .backFoot, .frontHand, .backHand, .torso].contains(part) {
+            if part.glows(human: look.human) || part == .head || [.frontLeg, .backLeg, .frontFoot, .backFoot, .frontHand, .backHand, .frontArm, .backArm, .torso].contains(part) {
                 var sum = sums[part] ?? (0, 0, 0)
                 sum.x += CGFloat(pixel % width) + 0.5
                 sum.y += CGFloat(pixel / width) + 0.5
@@ -521,11 +521,11 @@ final class SpriteLibrary {
         var head: SKTexture?
         var energy: SKTexture?
         if detach {
-            let headCanvas = sums[.head] != nil && !look.human ? makeCanvas(width: width, height: height) : nil
+            let headCanvas = sums[.head] != nil && look.headApart ? makeCanvas(width: width, height: height) : nil
             let energyCanvas = parts.contains { $0?.isEnergy == true } ? makeCanvas(width: width, height: height) : nil
             for pixel in 0..<count {
                 // A human's head stays on the body.
-                guard let part = parts[pixel], (part == .head && !look.human) || part == .ball || part.isEnergy else { continue }
+                guard let part = parts[pixel], (part == .head && look.headApart) || part == .ball || part.isEnergy else { continue }
                 let index = pixel * 4
                 if part == .head, let (_, headPixels) = headCanvas {
                     paint(headPixels, index, look.colours[.head] ?? look.glow)

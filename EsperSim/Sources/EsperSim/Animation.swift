@@ -42,6 +42,9 @@ public enum Animation: String, CaseIterable {
     case gunRunShoot = "player_gun_run_shoot"
     case hurt = "player_hurt"
     case transform = "player_transform"
+    /// Super Smoothie's flight: hovering or going back, going forward or up, going down.
+    case fly = "player_fly"
+    case flyBall = "player_fly_ball"
     /// Z Tea's beam: the body, and its arms drawn over it apart so they turn with the aim.
     case blast = "player_blast"
     case blastArms = "player_blast_arms"
@@ -54,7 +57,7 @@ public enum Animation: String, CaseIterable {
         case .blast: 10
         case .blastArms: 1
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
-        case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall: 3
+        case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall, .fly, .flyBall: 3
         case .jumpSquat: 4
         case .doubleJump, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
         case .land: 9
@@ -69,7 +72,7 @@ public enum Animation: String, CaseIterable {
     /// rest every white pixel is energy. The importer's `BALL_SHEETS` has to agree.
     public var holdsBall: Bool {
         switch self {
-        case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .wallLandBall, .shoot, .shootAir, .throwForward,
+        case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .flyBall, .wallLandBall, .shoot, .shootAir, .throwForward,
              .catchGround, .catchAir, .skidBall, .taunt: true
         default: false
         }
@@ -226,7 +229,11 @@ extension Player {
         case .webbed:
             return AnimationFrame(hasBall ? .airBall : .air, 2)
         case .flying:
-            return AnimationFrame(hasBall ? .airBall : .air, 1)
+            // Going down more than forward, frame 2; forward or up, frame 1; hovering or going back, frame 0.
+            let forward = velocity.x * facing.sign
+            let sheetFrame = velocity.y < -FlightSheet.still && -velocity.y > forward ? 2
+                : (forward > FlightSheet.still || velocity.y > FlightSheet.still ? 1 : 0)
+            return AnimationFrame(hasBall ? .flyBall : .fly, sheetFrame)
         case .transforming:
             return AnimationFrame(.transform, min(t * TransformRules.sheetFramesPerSecond / 60, Animation.transform.frameCount - 1))
         case .beamCharging:
@@ -266,4 +273,9 @@ extension Animation {
 
     /// The dribble's sheets, whose ball reaches down off a ledge to the floor under it.
     public static let dribbles: [Animation] = [.dribbleIdle, .dribbleWalk, .dribbleRun]
+}
+
+/// Super Smoothie's flight sheet: under this a frame, in units, the body counts as still that way.
+public enum FlightSheet {
+    public static let still = 0.3
 }

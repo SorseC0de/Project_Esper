@@ -20,6 +20,8 @@ final class GameScene: SKScene {
     /// the platform stops mattering.
     /// Pixels the head floats above its place on the body, so scaling it up doesn't sink it in.
     private static let headLift: CGFloat = 1
+    /// The energy form's head, drawn apart a quarter bigger, kept on its body without lag or bob.
+    private static let headsRide = true
     /// Where to put the catch spark's feet so its ring lands on the snatch's hand: the ring
     /// sits 7 art pixels ahead and 20 up on its own canvas, the hand 18 ahead and 19 up.
     private static let snatchSparkOffset = Vec2(x: 11, y: -1)
@@ -184,6 +186,12 @@ final class GameScene: SKScene {
     private static let hoodDownZ: CGFloat = -0.005
     /// Over the body's flash (0.09).
     private static let hoodFlashZ: CGFloat = 0.091
+    /// Super Smoothie's head tipped flying up or down: radians, eased in a share a frame, and how
+    /// many art pixels it's let down when tipped all the way.
+    private static let flightHeadTip: CGFloat = .pi / 15
+    private static let headTipEase: CGFloat = 0.2
+    private static let flightHeadDrop: CGFloat = 2
+    private var headTip: [Int: CGFloat] = [:]
     /// Changing, the hood down starts this far turned up (radians, the body facing right) and
     /// swings down to rest, about this point on its canvas, column and row: where it meets the body.
     private static let hoodSwingStart: CGFloat = -.pi / 2
@@ -2097,6 +2105,24 @@ final class GameScene: SKScene {
     private var rainSizzles: [SKSpriteNode] = []
     private static let rainSizzleScale: CGFloat = 0.25
     private static let rainSizzlesPerSecond = 20.0
+    /// The FloState lockout's sizzles off the body: way down in size, two thirds seen.
+    private static let lockoutSizzlesPerSecond = 12.0
+    private static let lockoutSizzleScale: CGFloat = 0.1
+    private static let lockoutSizzleAlpha: CGFloat = 0.66
+    private func sizzle(at point: CGPoint, in figure: SKNode) {
+        let sheet = Bool.random() ? "sizzle1" : "sizzle2"
+        guard let count = EffectSheets.frames[sheet] else { return }
+        let frames = (0..<count).map { sprites.texture(sheet, $0) }
+        let sizzle = SKSpriteNode(texture: frames[0])
+        sizzle.anchorPoint = CGPoint(x: 0.5, y: EffectSheets.anchorY[sheet] ?? 0.5)
+        sizzle.position = point
+        sizzle.setScale(GameScene.lockoutSizzleScale)
+        sizzle.alpha = GameScene.lockoutSizzleAlpha
+        sizzle.zPosition = 0.095
+        sizzle.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 15), .removeFromParent()]))
+        figure.addChild(sizzle)
+    }
+
     private func sizzleRain() {
         rainSizzles.removeAll { $0.parent == nil }
         guard match.stage.features.look == .elements, RainTuning.density > 0,
@@ -3107,10 +3133,12 @@ final class GameScene: SKScene {
             aiOn.toggle()
             controls?.aiOn = aiOn
         }
-        // Testing FLO, offline: the local player's set as the number key asks.
-        if let flo = hub.consumeFloSet(), online == nil {
-            let index = localIndex
-            session.mutate { $0.players[index].flo = flo }
+        // Testing FLO, offline: 1 to 3 the first player's, 4 to 6 the second's.
+        if let asked = hub.consumeFloSet(), online == nil {
+            session.mutate { match in
+                guard match.players.indices.contains(asked.player) else { return }
+                match.players[asked.player].flo = asked.flo
+            }
         }
         if hub.consumeHitboxToggle() {
             showHitboxes.toggle()
@@ -4863,6 +4891,7 @@ final class GameScene: SKScene {
     private static let transformWhiteFrame = 4
     private static let transformEnergyFrame = 5
     private static let transformCreditKey = 2000
+    private static let vortexCreditKey = 3000
     private static let transformSpiralRate = 30.0
     /// Into or out of FloState, how many frames the cubes swirl round the body.
     private static let floSwirlFrames = 30
@@ -4876,7 +4905,21 @@ final class GameScene: SKScene {
         guard match.players.indices.contains(index) else { return false }
         let player = match.players[index]
         return (player.state == .transforming && player.animationFrame.frame < GameScene.transformEnergyFrame) || floSwirlFrames[index, default: 0] > 0
+            || hoverVortex(index)
     }
+    /// Super Smoothie hovering still: cubes off the hanging foot in a vortex, widening round
+    /// the body as they rise.
+    private func hoverVortex(_ index: Int) -> Bool {
+        guard match.players.indices.contains(index) else { return false }
+        let player = match.players[index]
+        return player.power == .superSmoothie && player.state == .flying && player.velocity.length < GameScene.hoverStill
+    }
+    private static let hoverStill = 0.2
+    private static let vortexRate = 30.0
+    private static let vortexStartRadius: CGFloat = 2
+    private static let vortexWidestRadius: CGFloat = 14
+    /// Art pixels the vortex widens a second as a cube rises.
+    private static let vortexWidening: CGFloat = 16
     private static let transformSpiralRadius: CGFloat = 10
     private static let transformHelixRadius: CGFloat = 3
     private static let helixTurnsPerSecond = 2.0
@@ -5025,10 +5068,13 @@ final class GameScene: SKScene {
             }
             if var helix = particle.helix {
                 if spiralling(particle.owner) {
-                    // Swirling, it goes round the body wherever the body goes.
-                    if floSwirlFrames[particle.owner, default: 0] > 0 {
+                    // Swirling, it goes round the body wherever the body goes; in the hover's
+                    // vortex, widening as it rises.
+                    let vortex = hoverVortex(particle.owner)
+                    if floSwirlFrames[particle.owner, default: 0] > 0 || vortex {
                         helix.centreX = SpriteLibrary.point(match.players[particle.owner].position).x
                     }
+                    if vortex { helix.radius = min(helix.radius + GameScene.vortexWidening * CGFloat(step), GameScene.vortexWidestRadius) }
                     helix.angle += 2 * .pi * GameScene.helixTurnsPerSecond * step
                     particle.node.position = CGPoint(x: helix.centreX + CGFloat(cos(helix.angle)) * helix.radius,
                                                      y: particle.node.position.y + helix.rise * CGFloat(step))
@@ -6373,6 +6419,13 @@ final class GameScene: SKScene {
                 clothesFlash.zRotation = node.zRotation
             }
             if lockoutOn { greyedOut.insert(index) } else { greyedOut.remove(index) }
+            // The whole lockout, small sizzles off the arms and the head, faint.
+            if lockedOutOfFloState, !held, Double.random(in: 0..<1) < GameScene.lockoutSizzlesPerSecond * GameScene.stepSeconds,
+               let part = [BodyPart.head, .frontArm, .backArm].randomElement(),
+               let landmark = sprites.landmark(part, in: frame, player: index) {
+                let spot = landmark * drawScale
+                sizzle(at: node.position + CGPoint(x: spot.x * CGFloat(player.facing.sign), y: spot.y), in: figureLayers[index])
+            }
 
             // Prone in the snipe, the cursor where it's aimed.
             snipeCursors[index].isHidden = player.state != .gunSnipe
@@ -6449,6 +6502,18 @@ final class GameScene: SKScene {
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
                 hood.zRotation = node.zRotation
+                // Super Smoothie flying up, the hooded head tips back; flying down, forward; eased,
+                // about the head's middle, and let down a little to sit on the neck turned.
+                let wantedTip: CGFloat = player.state != .flying || energyForm ? 0
+                    : (player.velocity.y > FlightSheet.still ? GameScene.flightHeadTip : (player.velocity.y < -FlightSheet.still ? -GameScene.flightHeadTip : 0))
+                headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
+                if abs(headTip[index, default: 0]) > 0.001, let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
+                    let anim = GameScene.hoodDrawnFor.animation
+                    let middle = CGPoint(x: anim.pixelSize / 2 + head.x, y: anim.pixelSize - anim.feetFromBottom - head.y)
+                    let tip = headTip[index, default: 0]
+                    turn(hood, about: middle, by: tip * CGFloat(player.facing.sign), scale: drawScale)
+                    hood.position.y -= GameScene.flightHeadDrop * abs(tip) / GameScene.flightHeadTip * drawScale
+                }
                 // Changing, the hood down swings down from up, about where it meets the body.
                 if energyForm, changing {
                     let start = GameScene.transformEnergyFrame * 60 / TransformRules.sheetFramesPerSecond
@@ -6606,12 +6671,15 @@ final class GameScene: SKScene {
                 let head = landmark * drawScale
                 let target = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                 if headShown[index] == .zero { headShown[index] = target }
-                let lag = headVariant.lag
+                // The energy form's rides its body exactly; the lag and the bob, which read as
+                // detached, are kept for any other head drawn apart (`GameScene.headsRide`).
+                let rides = GameScene.headsRide && energyForm
+                let lag = rides ? 1 : headVariant.lag
                 headShown[index] = CGPoint(x: headShown[index].x + (target.x - headShown[index].x) * lag,
                                            y: headShown[index].y + (target.y - headShown[index].y) * lag)
                 var offset = headShown[index] - target
                 if headVariant.reversedAcross { offset.x = -offset.x }
-                let bob = (sin(Double(match.frame) / 60 * 2 * .pi * 1.2) * 1).rounded()
+                let bob = rides ? 0 : (sin(Double(match.frame) / 60 * 2 * .pi * 1.2) * 1).rounded()
                 let shown = CGPoint(x: (target.x + offset.x).rounded(), y: (target.y + offset.y).rounded() + (bob + GameScene.headLift) * drawScale)
                 headNode.isHidden = false
                 headNode.texture = headTexture
@@ -6629,7 +6697,7 @@ final class GameScene: SKScene {
                 headEsperMixes[index].particleBirthRate = 0
                 // A human's head is on the body: its particles still rise off it.
                 // None while locked out of FloState.
-                if sprites.look(for: drawnAs).human, !lockedOutOfFloState, let landmark = sprites.landmark(.head, in: frame, player: drawnAs) {
+                if !sprites.look(for: drawnAs).headApart, !lockedOutOfFloState, let landmark = sprites.landmark(.head, in: frame, player: drawnAs) {
                     let head = landmark * drawScale
                     let at = node.position + leaned(CGPoint(x: head.x * CGFloat(player.facing.sign), y: head.y))
                     emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + GameScene.crownLift * drawScale))
@@ -6670,6 +6738,19 @@ final class GameScene: SKScene {
                 emitHeadParticles(index, power: player.power, at: SpriteLibrary.point(player.position) + CGPoint(x: 0, y: GameScene.transformLift),
                                   creditKey: GameScene.transformCreditKey + index, streams: [spiral])
             }
+            // Super Smoothie hovering still: a vortex of cubes off the foot that hangs lowest.
+            if hoverVortex(index), ParticleLook.cubes, !lockedOutOfFloState {
+                let feet = [BodyPart.frontFoot, .backFoot].compactMap { sprites.landmark($0, in: frame, player: index) }
+                if let foot = feet.min(by: { $0.y < $1.y }) {
+                    var vortex = legStream(index, part: .frontFoot, energyColour: true)
+                    vortex.rate = GameScene.vortexRate
+                    vortex.helixRadius = GameScene.vortexStartRadius
+                    vortex.legs = false
+                    let spot = foot * drawScale
+                    emitHeadParticles(index, power: player.power, at: node.position + leaned(CGPoint(x: spot.x * CGFloat(player.facing.sign), y: spot.y)),
+                                      creditKey: GameScene.vortexCreditKey + index, streams: [vortex])
+                }
+            }
             // The change's eyes over the body, in the energy's colour.
             let eyes = eyesNodes[index]
             eyes.isHidden = !changing || EffectSheets.frames["transform_eyes"] == nil
@@ -6694,11 +6775,12 @@ final class GameScene: SKScene {
             // The stepback, a jump out of the shooting stance, the throw and the slash leave the trail.
             let trailing = player.state == .stepback || player.state == .throwing || (player.state == .shootStance && !player.grounded)
             if trailing, match.frame % 2 == 0 { spawnAfterimage(of: node, player: index) }
-            // The slash's trail is its blade, not the body; in FloState each one the next of the zone's colours.
-            if player.state == .slashing, match.frame % 2 == 0, !energyNodes[index].isHidden {
+            // The slash's trail is the body and its blade; in FloState each one the next of the zone's colours.
+            if player.state == .slashing, match.frame % 2 == 0 {
                 slashAfterimages[index, default: 0] += 1
                 let rainbow = player.inFloState ? ZoneTuning.colours[slashAfterimages[index, default: 0] % ZoneTuning.colours.count] : nil
-                spawnAfterimage(of: energyNodes[index], player: index, colour: rainbow.map { SKColor(rgb: $0) })
+                spawnAfterimage(of: node, player: index, colour: rainbow.map { SKColor(rgb: $0) })
+                if !energyNodes[index].isHidden { spawnAfterimage(of: energyNodes[index], player: index, colour: rainbow.map { SKColor(rgb: $0) }) }
             }
             if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {
                 spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: -player.facing.sign * 4, y: 2)), count: 2, spread: 6)

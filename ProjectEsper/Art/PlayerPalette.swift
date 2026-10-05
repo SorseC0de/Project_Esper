@@ -83,6 +83,10 @@ struct Look: Hashable {
     /// Drawn as a human, skin and clothes, the head on the body; else the energy form, the
     /// whole body in the energy's colours and the head apart.
     var human = HumanLook.enabled
+    /// The head drawn apart from the body, a quarter bigger: the energy form's. Off
+    /// (`energyFormHeadApart`), it's drawn on the body at its own size, as a human's is.
+    var headApart: Bool { !human && Look.energyFormHeadApart }
+    static let energyFormHeadApart = true
     /// The body colour the look was made from, for its other form.
     var body: RGB?
 

@@ -28,9 +28,10 @@ final class InputHub {
     private var leftTriggerWasDown = false
     private var deleteWasDown = false
     private var hitboxKeyWasDown = false
-    /// Testing FLO: 1 fills it, 2 sets it to half, 3 empties it; what was asked since the last check.
-    private(set) var floSetPressed: Int?
-    private var floKeysWereDown: Set<Int> = []
+    /// Testing FLO: 1 fills the first player's, 2 sets it to half, 3 empties it; 4, 5 and 6 the
+    /// same for the second's. What was asked since the last check: whose, and to what.
+    private(set) var floSetPressed: (player: Int, flo: Int)?
+    private var floKeysWereDown: Set<GCKeyCode> = []
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
@@ -102,10 +103,12 @@ final class InputHub {
         let hitboxKeyDown = keys?.button(forKeyCode: .keyM)?.isPressed ?? false
         if hitboxKeyDown, !hitboxKeyWasDown { hitboxTogglePressed = true }
         hitboxKeyWasDown = hitboxKeyDown
-        for (code, flo) in [(GCKeyCode.one, FloRules.full), (.two, FloRules.full / 2), (.three, 0)] {
+        let floKeys: [(GCKeyCode, Int, Int)] = [(.one, 0, FloRules.full), (.two, 0, FloRules.full / 2), (.three, 0, 0),
+                                                 (.four, 1, FloRules.full), (.five, 1, FloRules.full / 2), (.six, 1, 0)]
+        for (code, player, flo) in floKeys {
             let down = keys?.button(forKeyCode: code)?.isPressed ?? false
-            if down, !floKeysWereDown.contains(flo) { floSetPressed = flo }
-            if down { floKeysWereDown.insert(flo) } else { floKeysWereDown.remove(flo) }
+            if down, !floKeysWereDown.contains(code) { floSetPressed = (player, flo) }
+            if down { floKeysWereDown.insert(code) } else { floKeysWereDown.remove(code) }
         }
         let leftTriggerDown = controllers.contains { $0.extendedGamepad?.leftTrigger.isPressed ?? false }
         if leftTriggerDown, !leftTriggerWasDown { hitboxTogglePressed = true }
@@ -188,8 +191,8 @@ final class InputHub {
         return aiTogglePressed
     }
 
-    /// The FLO a number key asked for, once per press.
-    func consumeFloSet() -> Int? {
+    /// The FLO a number key asked for, and whose, once per press.
+    func consumeFloSet() -> (player: Int, flo: Int)? {
         defer { floSetPressed = nil }
         return floSetPressed
     }

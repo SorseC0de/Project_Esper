@@ -849,6 +849,59 @@ two-toned the same way, both halves palette 29), are gold's first over blue's (t
 outlined plum's second over purple's last (`FloTuning.colours`; picked once on a grid, since taken
 out).
 
+## ZONES
+
+HORSE on a grid (`GameMode.zones`; `Zones.swift` in the sim, `ZonesPlay.swift` in the view),
+turn by turn, meant above all for asynchronous online play, Words With Friends fashion, and built
+offline first: two people passing one device (VS HUMAN) or one playing both sides (VS CPU, for now:
+the computer leading and following is to come, its runs searched for on the sim). ZONES on the
+title opens the customize screen, then the stage select of 47's stages (`ZonesRules.stages`).
+
+- The stage divides into zones four tiles across and up (`ZoneGrid`), lettered A upward from the
+  left and numbered 1 upward from the floor; what doesn't divide goes to A1's column and row: the
+  Wreck Center A to H (A six tiles wide) and 1 to 4, Hoopfish Hideaway A to I (A five) and 1 to 4
+  (1 seven tall). Being anywhere in a zone counts. Dashed glowing lines mark them, 48 art pixels
+  up from the floor between columns and in from the walls between rows, each column's letter at
+  its foot and each row's number by the wall, in the leader's colour.
+- Each stage with one rim: the Wreck Center keeps its right rim and its left backboard stands with
+  no rim or net (`Hoop.rimless`: nothing scores, bounces or dunks on it); Hoopfish Hideaway's
+  Hoopfish swims in place on the right, its right edge two tiles off the wall, facing left, the rim
+  on its antenna (`Hoopfish.stationary`).
+- A run: one player alone on the stage, from the floor of A1 in from the left wall, the ball in
+  hand, FLO full and never spent (`Player.unlimitedFlo`; the lockout between activations still
+  runs), thirty seconds to shoot. Every move is logged as it starts, by its zone (`ZonesRecorder`,
+  `ZoneAction`): Walk, Run (the dash is the run's start), Jump, Double Jump, Wall Jump, Crouch,
+  Slide, Taunt, Throw, Catch, FloState and FloState Off, a power's move by its name (Bolt, Beam,
+  Burst, Gale, Fly, Web, Flash, Wall, Pulse, Fireball, Quake), and Shoot or Dunk, which end it: made
+  as the ball goes through; missed once it's falling wholly under the rim, or caught or gone; the
+  time up with no shot. A run is kept with the inputs that made it (`ZonesRun`), so it replays to
+  the frame anywhere.
+- Where each move started a phantom stays: the body as drawn, half seen, in the move's own colour
+  (`ZonesPlay.colour(of:)`: Walk 36, Run 5, Jump 19, Double Jump 20, Wall Jump 18, Crouch 34, Slide
+  7, Taunt 27, Throw 8, Catch 10, FloState 22, FloState Off 39, a power 28, Shoot 12, Dunk 13, all
+  AAP-64), its move named over it. Rewind clears them.
+- The turn (`ZonesGame`): the leader, loose on the stage first (the lobby, where they can move
+  about, shoot and pick their FloState power from the wheel), presses RECORD and is warped to A1
+  with the ball. They have three tries to record a run they like: a made run can be kept or
+  rewound while tries remain; a made run on the last try is kept outright; none made hands the
+  lead over, no letter given. Then three tries to do that run again, matching it move for move
+  and scoring, to set it; failing all three hands the lead over. The follower watches the run
+  play as a ghost of the leader (the crown on it), the phantoms dropping as it goes and staying,
+  then has three tries to follow it: a move that strays from the set's next ends the try on the
+  spot; all three failed earns a letter of Z-O-N-E-S, five to lose. The leader keeps leading
+  through a follower's success and failure, as in HORSE. Rewind mid-run gives the try up. The
+  follower goes into FloState with the leader's power.
+- The coin flip decides who leads first; between two people a hand-off screen comes before the
+  other side's turn (tap, or jump on the pad). The pause menu carries the turn's choices (BEGIN
+  RUN, REWIND, KEEP RUN) for the pad.
+- Over play (`ZonesOverlay`): each side's letters at the top with `crown.svg` by the leader's
+  (the crown also floats over the leader's head on the stage, in their colour, bobbing, glowing),
+  the turn and the seconds left in the middle, the run's log down the right (the set run's while
+  following, the matched moves lit), and RECORD, REWIND, SKIP and the power wheel at the bottom.
+  The win screen shows the letters each side has.
+- Online, when it comes: Game Center's turn-based matches, each turn the run's inputs and the
+  game's state, replayed on the other phone (protocol 100).
+
 ## Greateraid
 
 The drinks between rounds, in `Greateraid.swift`. Three bottles an offer, the user's

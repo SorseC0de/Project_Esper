@@ -420,7 +420,7 @@ struct CustomizeScreen: View {
     private func heading(_ size: CGSize) -> some View {
         litTitle("CUSTOMIZE", height: size.height * 0.025, spacing: CustomizeScreen.headingSpacing)
             .position(x: size.width / 2, y: size.height * 0.078)
-        title(flow.customizeMode == .rounds ? "ROUNDS" : "47", size: size.height * 0.08)
+        title(flow.customizeMode == .rounds ? "ROUNDS" : flow.customizeMode == .zones ? "ZONES" : "47", size: size.height * 0.08)
             .position(x: size.width / 2, y: size.height * 0.19)
     }
 

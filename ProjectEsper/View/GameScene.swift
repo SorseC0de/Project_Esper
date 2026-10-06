@@ -83,6 +83,9 @@ final class GameScene: SKScene {
     private var series = Series(seed: 1)
     /// What the match is played to; online, the host's.
     private var gameMode = GameMode.rounds
+    /// ZONES, while it's the game.
+    private var zones: ZonesPlay?
+    private var zonesLooksFor: Int?
     /// The mode multiplayer asks for, kept between launches.
     static let onlineModeKey = "esper.onlineMode"
     static var savedOnlineMode: GameMode {
@@ -1636,7 +1639,8 @@ final class GameScene: SKScene {
     }
 
     private func showFloMeters() {
-        for meter in floMeters + floStrokes { meter.isHidden = flow != .playing }
+        // ZONES: one player on the stage, one meter.
+        for (index, meter) in (floMeters + floStrokes).enumerated() { meter.isHidden = flow != .playing || (gameMode == .zones && index % 2 == 1) }
         floShown = floShown.map { _ in (-1, -1) }
     }
 
@@ -1865,12 +1869,14 @@ final class GameScene: SKScene {
             rim.position = GameScene.hoopArtPoint(for: hoop, on: stage.features.look)
             rim.xScale = hoop.backboard == .left ? -1 : 1
             rim.zPosition = 6
+            // ZONES: a rimless board has no rim drawn.
+            rim.isHidden = hoop.rimless
             stageGround.addChild(rim)
             rimNodes.append(rim)
             // A straight rim's front lip again over the ball, so the ball goes down through it.
             let front = SKSpriteNode(texture: art.rim == "hoop_straight" ? frontLip(of: sprites.texture(art.rim, 0)) : nil)
             front.zPosition = GameScene.rimFrontZ
-            front.isHidden = front.texture == nil
+            front.isHidden = front.texture == nil || hoop.rimless
             glowers.addChild(front)
             rimFronts.append(front)
             rimFlash.append(0)
@@ -1880,6 +1886,7 @@ final class GameScene: SKScene {
             rimSpin.append(0)
             nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
                                 into: stageGround, depth: 5.5))
+            nets[nets.count - 1].hidden = hoop.rimless
         }
         refreshSupports(HoopSupport.pieces)
         warmDrawnArt()
@@ -3090,7 +3097,8 @@ final class GameScene: SKScene {
         }
         if roundIntro > 0 { roundIntro -= 1 }
         hub.touch = flow == .playing ? controls?.sample() ?? .idle : .idle
-        let inputs = hub.frames(players: match.players.count)
+        // ZONES: one on the stage, but both pads read, the mover's taken.
+        let inputs = hub.frames(players: zones == nil ? match.players.count : 2)
         lastLocalInput = inputs.first ?? .idle
         tickOnline()
         // Start or delete pauses a match offline, and again resumes it; over the settings, it shuts them.
@@ -3219,6 +3227,11 @@ final class GameScene: SKScene {
             showHitboxes.toggle()
             controls?.showHitboxes = showHitboxes
         }
+        if zones != nil {
+            zonesTick(inputs)
+            render()
+            return
+        }
         var steps = 0
         sectionMark = CACurrentMediaTime()
         while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
@@ -3334,6 +3347,14 @@ final class GameScene: SKScene {
         pendingFlow = nil
         heldBanner = nil
         series = Series(seed: seed)
+        if gameMode == .zones {
+            // Who leads is the coin's; two people pass the device, or one plays both sides.
+            zones = ZonesPlay(leader: Int.random(in: 0...1), stage: series.stage,
+                              opponent: UserDefaults.standard.bool(forKey: GameScene.vsCPUKey) ? .practice : .passAndPlay)
+            zonesLooksFor = nil
+        } else {
+            zonesEnd()
+        }
         // The debug strip is built for the mode (47 has its sliders), so again for this one.
         if built { layout(displayScale: displayScale) }
         // The port-in waits for the stage select to close.
@@ -3341,6 +3362,136 @@ final class GameScene: SKScene {
         session.stopAt = session.frame
         pickAfterStage = false
         enter(.stageSelect)
+    }
+
+    // MARK: ZONES
+
+    private var zonesNames: [String] { PlayerCustomization.sides.map { $0.energy.rawValue.uppercased() } }
+    private var zonesColours: [RGB] { PlayerCustomization.sides.map(\.glow) }
+
+    /// The ZONES loop a frame: held while a screen's up (jump goes on from one), else the
+    /// mover's own input, or the set run's, replayed as a ghost, through the sim; the recorder
+    /// watching, phantoms dropped where moves start.
+    private func zonesTick(_ inputs: [PlayerInput]) {
+        guard let zones else { return }
+        let pad = hub.playerTwoHasController && inputs.count > 1 ? inputs[zones.mover] : (inputs.first ?? .idle)
+        if zones.holds {
+            accumulator = 0
+            if pad.jump, !zonesLastPad.jump { zonesRequest(.proceed) }
+            zonesLastPad = pad
+            zonesPublishHud()
+            return
+        }
+        zonesLastPad = pad
+        var steps = 0
+        while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
+            let step = zones.step()
+            let input: PlayerInput
+            switch step {
+            case .hold:
+                accumulator = 0
+                zonesPublishHud()
+                return
+            case .play: input = pad
+            case .replay(let recorded): input = recorded
+            }
+            let tick = session.tick(local: input, remote: .idle)
+            show(tick.shown)
+            confirm(tick.confirmed)
+            let logged = zones.observe(match, input: input)
+            if !playerNodes.isEmpty, !hoodNodes.isEmpty {
+                for action in logged {
+                    zones.dropPhantom(for: action, body: playerNodes[0], hood: hoodNodes[0], into: bodies, ghost: zones.isReplaying)
+                }
+            }
+            tickBallColour()
+            tickCourtColour()
+            accumulator -= GameScene.stepSeconds
+            steps += 1
+        }
+        if accumulator >= GameScene.stepSeconds { accumulator = 0 }
+        zonesPublishHud()
+    }
+    private var zonesLastPad = PlayerInput.idle
+
+    private func zonesPublishHud() {
+        guard let zones, let flowState else { return }
+        let hud = zones.hud(names: zonesNames, colours: zonesColours)
+        if flowState.zonesHud != hud { flowState.zonesHud = hud }
+        if !hoodNodes.isEmpty {
+            let shown = zones.isReplaying ? zones.game.leader : zones.mover
+            zones.placeCrown(over: hoodNodes[0], colour: zonesColours[zones.game.leader], into: hoodNodes[0].parent ?? glowers,
+                             shown: shown == zones.game.leader && flow == .playing, time: CACurrentMediaTime())
+        }
+    }
+
+    /// The screen's buttons and the pad, through the turn.
+    func zonesRequest(_ request: ZonesPlay.Request) {
+        guard let zones else { return }
+        switch zones.handle(request) {
+        case .none:
+            break
+        case .freshRun:
+            zonesFreshMatch()
+            zones.beginRun(on: match)
+        case .lobby:
+            zonesFreshMatch()
+            zones.beginLobby()
+        case .replay:
+            zonesFreshMatch()
+            zones.beginReplay()
+        case .won:
+            session.mutate { $0.finished = true }
+            enter(.won)
+        }
+        zonesGhost(zones.isReplaying)
+        zonesPublishHud()
+    }
+
+    /// A fresh match for the one on the stage now, in their look, ported in at A1.
+    private func zonesFreshMatch() {
+        zonesLooks()
+        session = RollbackSession(match: freshMatch(), localIndex: 0, delay: 0)
+        finishFrames = 0
+        finishTarget = nil
+        cameraNode.setScale(cameraBaseScale)
+        glowHud.setScale(cameraNode.xScale * hudScale)
+        floOrbs = []
+        floOnTheWay = [:]
+        freshRoundView()
+        bringPlayersIn()
+    }
+
+    /// The one on the stage in their own look: the mover's, or the leader's for the ghost.
+    private func zonesLooks() {
+        guard let zones else { return }
+        let shown = zones.isReplaying ? zones.game.leader : zones.mover
+        guard zonesLooksFor != shown else { return }
+        zonesLooksFor = shown
+        let sides = PlayerCustomization.sides
+        applyColours([sides[shown].energy, sides[1 - shown].energy], looks: [sides[shown].look, sides[1 - shown].look])
+    }
+
+    /// The ghost: the body half seen.
+    private func zonesGhost(_ ghost: Bool) {
+        bodies.alpha = ghost ? 0.5 : 1
+        for hood in hoodNodes { hood.alpha = ghost ? 0.5 : 1 }
+    }
+
+    /// The zone lines for the stage, in the leader's colour.
+    private func zonesRedraw() {
+        guard let zones else { return }
+        zones.drawLines(stage: match.stage, into: stageGlowers, colour: zonesColours[zones.game.leader])
+    }
+
+    private func zonesEnd() {
+        guard zones != nil else { return }
+        zones?.removeAll()
+        zones = nil
+        zonesLooksFor = nil
+        zonesGhost(false)
+        flowState?.zonesHud = nil
+        applySavedColours()
     }
 
     /// The pause's RESTART MATCH: a fresh best of seven on the stage this one started on.
@@ -3391,6 +3542,12 @@ final class GameScene: SKScene {
         // A hand-laid stage's map: the one every phone plays, but offline what the map maker last kept.
         for mapStage in MapStage.allCases {
             StageMap.current[mapStage] = online == nil ? (SavedStageMap.value(mapStage) ?? StageMap.baked(mapStage)) : StageMap.baked(mapStage)
+        }
+        if let zones {
+            // ZONES: the one on the stage alone, the ball in hand, their FloState power picked.
+            var fresh = Match(stage: .zones(series.stage), specs: [.starting], countdown: 0, seed: fieldSeed, mode: .zones)
+            fresh.players[0].floStatePower = zones.moverPower
+            return fresh
         }
         var fresh = Match(stage: series.stage.stage, specs: drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed,
                           mode: gameMode)
@@ -3474,7 +3631,13 @@ final class GameScene: SKScene {
     private var secondMenuLast = PlayerInput.idle
 
     /// The stages on the select: 47 plays on the Wreck Center or Hoopfish Hideaway.
-    private var stageList: [StageChoice] { gameMode == .fortySeven ? StageChoice.fortySeven : StageChoice.selectable }
+    private var stageList: [StageChoice] {
+        switch gameMode {
+        case .fortySeven: StageChoice.fortySeven
+        case .zones: ZonesRules.stages
+        case .rounds: StageChoice.selectable
+        }
+    }
 
     private func voteStage(_ choice: StageChoice, by voter: Int) {
         guard flow == .stageSelect, stageVoters.contains(voter), stageVotes[voter] == nil else { return }
@@ -3512,6 +3675,11 @@ final class GameScene: SKScene {
         }
         announceDoublePoints()
         enter(.playing)
+        if zones != nil {
+            zones?.game.stage = choice
+            zonesLooks()
+            zonesRedraw()
+        }
     }
 
     /// In 47 on a stage where points are worth double, it says so as play starts there.
@@ -3810,6 +3978,9 @@ final class GameScene: SKScene {
     private func enter(_ next: Flow) {
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
         ballCamFrame.isHidden = next != .playing
+        if next == .title { zonesEnd() }
+        // ZONES' screen only over play; the loop brings it back.
+        if next != .playing, zones != nil { flowState?.zonesHud = nil }
         // The winner's line once, as the win screen goes up, not each time it's redrawn.
         if next == .won, flow != .won { SoundBoard.shared.play(SoundBoard.winners.randomElement()!) }
         flow = next
@@ -3972,17 +4143,29 @@ final class GameScene: SKScene {
             if online == nil, series.stagesPlayed == 0 { select.back = { [weak self] in self?.enter(.title) } }
             screen = select
         case .paused:
+            // ZONES: the turn's own choices on the pause, for the pad.
+            var extras: [(String, () -> Void)] = []
+            if let hud = zones.map({ $0.hud(names: zonesNames, colours: zonesColours) }) {
+                if hud.canRecord { extras.append(("BEGIN RUN", { [weak self] in self?.enter(.playing); self?.zonesRequest(.record) })) }
+                if hud.canRewind { extras.append(("REWIND", { [weak self] in self?.enter(.playing); self?.zonesRequest(.rewind) })) }
+                if hud.pause == .choice {
+                    extras.append(("KEEP RUN", { [weak self] in self?.enter(.playing); self?.zonesRequest(.keep) }))
+                    extras.append(("REWIND", { [weak self] in self?.enter(.playing); self?.zonesRequest(.rewind) }))
+                }
+            }
             let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight,
                                     onRestart: { [weak self] in self?.restartMatch() },
                                     onSettings: { [weak self] in self?.flowState?.openSettings() },
                                     onTitle: { [weak self] in self?.enter(.title) },
-                                    onResume: { [weak self] in self?.enter(.playing) })
+                                    onResume: { [weak self] in self?.enter(.playing) }, extras: extras)
             pause.back = { [weak self] in self?.enter(.playing) }
             screen = pause
         case .won:
-            let winner = gameMode == .fortySeven ? (fortySevenScores.firstIndex { $0 >= FortySevenRules.target } ?? 0) : (series.winner ?? 0)
-            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(winner),
-                               score: gameMode == .fortySeven ? fortySevenScores : series.wins,
+            let winner = gameMode == .fortySeven ? (fortySevenScores.firstIndex { $0 >= FortySevenRules.target } ?? 0)
+                : (zones?.game.winner ?? series.winner ?? 0)
+            // ZONES: the letters each side has, fewer wins.
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: zones != nil ? zonesNames[winner] : sideName(winner),
+                               score: gameMode == .fortySeven ? fortySevenScores : (zones?.game.letters ?? series.wins),
                                again: online == nil ? "NEW MATCH" : "REMATCH",
                                onAgain: { [weak self] in self?.playAgain() },
                                onTitle: { [weak self] in self?.leaveToTitle() })
@@ -4024,6 +4207,13 @@ final class GameScene: SKScene {
     private func drawSeries() {
         threePointArcs.isHidden = (gameMode != .fortySeven && previewing != .hud) || match.stage.features.look == .hoopfishHideaway
         for arc in threePointArcSides { arc.node.lineWidth = ThreePointTuning.lineWidth }
+        if gameMode == .zones {
+            // ZONES: the letters are the SwiftUI layer's; nothing across the top.
+            for label in drinkLabels { label.text = "" }
+            circles.removeAllChildren()
+            circlesOverCam.removeAllChildren()
+            return
+        }
         if gameMode == .fortySeven {
             // 47: each side's points either side of the middle, in its colour, no circles, no drinks.
             for label in drinkLabels { label.text = "" }
@@ -4343,7 +4533,7 @@ final class GameScene: SKScene {
             return
         }
         // In Rounds every point ends on it too, the Greateraid pick after.
-        if gameMode == .rounds { startFinish() }
+        if gameMode == .rounds || gameMode == .zones { startFinish() }
         var pool: [(lines: [SoundBoard.Effect], weight: Int)] = [(SoundBoard.scores, GameScene.scoreWeight)]
         if dunk {
             pool.append((SoundBoard.dunks, GameScene.likelyWeight))
@@ -4428,6 +4618,8 @@ final class GameScene: SKScene {
                 if gameMode == .fortySeven {
                     showBanner(shotPoints >= 3 ? "THREE!!" : "BUCKET!!", size: 48)
                     fortySevenScored(by: scorer, points: points, at: frameEvents.frame)
+                } else if gameMode == .zones {
+                    showBanner("BUCKET!!", size: 48)
                 } else {
                     showBanner("BUCKET!!", size: 48)
                     pointScored(by: scorer, at: frameEvents.frame)

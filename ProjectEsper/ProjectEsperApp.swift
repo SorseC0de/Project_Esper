@@ -40,6 +40,9 @@ struct GameView: View {
                 TitleOverlay(flow: flow, net: flow.net)
                     .transition(.opacity)
             }
+            if flow.zonesHud != nil, !flow.showsTitle, !flow.settingsOpen {
+                ZonesOverlay(flow: flow)
+            }
             if flow.customizeOpen {
                 CustomizeScreen(flow: flow)
                     .transition(.opacity)

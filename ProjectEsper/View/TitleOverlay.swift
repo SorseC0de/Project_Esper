@@ -81,6 +81,8 @@ final class FlowState: ObservableObject {
     /// The customize screen, between the title and the stage select: each side's cursor and
     /// picks, and the mode it starts.
     @Published var customizeOpen = false
+    /// ZONES' screen over play, while a game's on.
+    @Published var zonesHud: ZonesHud?
     @Published var customizeCursors: [CustomizeSpot] = [.skin, .skin]
     @Published var customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
     var customizeMode = GameMode.rounds
@@ -204,10 +206,10 @@ final class FlowState: ObservableObject {
         }
         let defaults = UserDefaults.standard
         switch item {
-        case .bestOfSeven, .fortySeven:
+        case .bestOfSeven, .fortySeven, .zones:
             guard !busy else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
-            openCustomize(item == .bestOfSeven ? .rounds : .fortySeven)
+            openCustomize(item == .bestOfSeven ? .rounds : item == .fortySeven ? .fortySeven : .zones)
         case .vsCPU, .vsHuman:
             guard !busy else { return }
             defaults.set(item == .vsCPU, forKey: GameScene.vsCPUKey)
@@ -245,7 +247,7 @@ final class FlowState: ObservableObject {
 
 /// Everything on the title the cursor can land on, row by row as they're laid out.
 enum TitleItem: Hashable {
-    case bestOfSeven, fortySeven, vsCPU, vsHuman, multiplayer, onlineRounds, onlineFortySeven
+    case bestOfSeven, fortySeven, zones, vsCPU, vsHuman, multiplayer, onlineRounds, onlineFortySeven
     case tuning
     /// The A/B of the title's lettering: the rounded face or Bigdex.
     case titleFont
@@ -261,7 +263,7 @@ enum TitleItem: Hashable {
 
     static let rows: [[TitleItem]] = [
         [.settings],
-        [.bestOfSeven, .fortySeven],
+        [.bestOfSeven, .fortySeven, .zones],
         [.vsCPU, .vsHuman],
         [.multiplayer],
         [.onlineRounds, .onlineFortySeven],
@@ -331,8 +333,9 @@ struct TitleOverlay: View {
             VStack(spacing: 22 * scale(.buttons)) {
                 Image(uiImage: TitleText.image("PROJECT ESPER", size: 56 * scale(.titles)))
                 HStack(spacing: 24 * scale(.buttons)) {
-                    plated("ROUNDS", piece: .buttonBlue, width: 170, item: .bestOfSeven)
-                    plated("47", piece: .buttonBlue, width: 170, item: .fortySeven)
+                    plated("ROUNDS", piece: .buttonBlue, width: 150, item: .bestOfSeven)
+                    plated("47", piece: .buttonBlue, width: 110, item: .fortySeven)
+                    plated("ZONES", piece: .buttonBlue, width: 150, item: .zones)
                 }
                 HStack(spacing: 10) {
                     small("VS CPU", picked: vsCPU, item: .vsCPU)
@@ -342,7 +345,7 @@ struct TitleOverlay: View {
                     plated("MULTIPLAYER", piece: .buttonPlum, width: 240, item: .multiplayer)
                     .opacity(busy ? 0.5 : 1)
                     HStack(spacing: 10) {
-                        ForEach(GameMode.allCases, id: \.self) { mode in
+                        ForEach([GameMode.rounds, .fortySeven], id: \.self) { mode in
                             small(mode == .rounds ? "ROUNDS" : "47", picked: onlineMode == Int(mode.rawValue),
                                   item: mode == .rounds ? .onlineRounds : .onlineFortySeven)
                         }

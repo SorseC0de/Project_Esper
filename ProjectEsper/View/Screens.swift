@@ -562,15 +562,23 @@ final class StageSelectScreen: Screen {
 
 /// The pause, against the computer: start the match over, the settings, go to the title, or play on.
 final class PauseScreen: Screen {
+    /// `extras`: a game's own choices, ZONES' turn's, over the rest.
     init(halfWidth: CGFloat, halfHeight: CGFloat, onRestart: @escaping () -> Void, onSettings: @escaping () -> Void,
-         onTitle: @escaping () -> Void, onResume: @escaping () -> Void) {
+         onTitle: @escaping () -> Void, onResume: @escaping () -> Void, extras: [(String, () -> Void)] = []) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pause)
         let width: CGFloat = 230
         // The card as wide as the header over it, so their edges line up.
         let headerWidth = addHeader("PAUSED", at: CGPoint(x: 0, y: halfHeight * 0.62), width: width + 90)
         addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12), piece: .cardPurple)
-        addButton("RESTART MATCH", at: CGPoint(x: 0, y: halfHeight * 0.25), width: width, action: onRestart)
-        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: -halfHeight * 0.1), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
+        // With extras, everything packed closer to make room over RESTART.
+        let rows = 3 + extras.count
+        let top = halfHeight * 0.25 + CGFloat(extras.count) * halfHeight * 0.12
+        let gap = (top + halfHeight * 0.45) / CGFloat(max(rows - 1, 1))
+        for (index, extra) in extras.enumerated() {
+            addButton(extra.0, at: CGPoint(x: 0, y: top - gap * CGFloat(index)), width: width, action: extra.1)
+        }
+        addButton("RESTART MATCH", at: CGPoint(x: 0, y: top - gap * CGFloat(extras.count)), width: width, action: onRestart)
+        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: top - gap * CGFloat(extras.count + 1)), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
         addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.45), sound: .menuBack, piece: .buttonPlum, width: width, action: onResume)
         // The settings on a small round gear, as on the title, beside the header on its right.
         let gear = SKNode()
@@ -588,7 +596,7 @@ final class PauseScreen: Screen {
         addChoice(gear, hit: CGRect(x: gear.position.x - 22, y: gear.position.y - 22, width: 44, height: 44),
                   arrowAt: CGPoint(x: gear.position.x - 34, y: gear.position.y), arrowTurn: .pi / 2, action: onSettings)
         // On RESUME, so a press of jump straight after pausing plays on.
-        place(cursor: 2)
+        place(cursor: 2 + extras.count)
     }
 
     required init?(coder: NSCoder) { fatalError() }

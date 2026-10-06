@@ -1,4 +1,5 @@
 import SpriteKit
+import SwiftUI
 import UIKit
 
 /// Title lettering: the system's rounded face at its heaviest, white over the palette's
@@ -6,8 +7,15 @@ import UIKit
 /// a black drop to the south-east, CardCourt's styling in a rounder face. Drawn once per
 /// string and size into a texture, at the screen's scale.
 enum TitleText {
-    /// SF Pro Rounded Black, italic when asked.
+    /// The title's A/B, kept between launches: B letters it in Bigdex.
+    nonisolated(unsafe) static var bigdex = UserDefaults.standard.bool(forKey: bigdexKey) {
+        didSet { UserDefaults.standard.set(bigdex, forKey: bigdexKey) }
+    }
+    private static let bigdexKey = "esper.titleText.bigdex"
+
+    /// SF Pro Rounded Black, italic when asked; with `bigdex`, Bigdex.
     static func font(size: CGFloat, italic: Bool) -> UIFont {
+        if bigdex, let face = UIFont(name: "Bigdex", size: size) { return face }
         let base = UIFont.systemFont(ofSize: size, weight: .black)
         var descriptor = base.fontDescriptor.withDesign(.rounded) ?? base.fontDescriptor
         if italic { descriptor = descriptor.withSymbolicTraits(.traitItalic) ?? descriptor }
@@ -29,8 +37,13 @@ enum TitleText {
     nonisolated(unsafe) private static var cache: [String: SKTexture] = [:]
     nonisolated(unsafe) private static var images: [String: UIImage] = [:]
 
+    /// The title's small switches' face, as the lettering's A/B has it.
+    static func switchFont(size: CGFloat) -> Font {
+        bigdex ? .custom("Bigdex", size: size) : .system(size: size, weight: .heavy, design: .rounded)
+    }
+
     static func texture(_ text: String, size: CGFloat, italic: Bool = false, lit: Bool = false) -> SKTexture {
-        let key = "\(size)|\(italic)|\(renderScale)|\(lit)|\(text)"
+        let key = "\(size)|\(italic)|\(renderScale)|\(lit)|\(bigdex)|\(text)"
         if let texture = cache[key] { return texture }
         let texture = SKTexture(image: image(text, size: size, italic: italic, lit: lit))
         cache[key] = texture
@@ -39,7 +52,7 @@ enum TitleText {
 
     /// The lettering as an image, for the SwiftUI layer.
     static func image(_ text: String, size: CGFloat, italic: Bool = false, lit: Bool = false) -> UIImage {
-        let key = "\(size)|\(italic)|\(renderScale)|\(lit)|\(text)"
+        let key = "\(size)|\(italic)|\(renderScale)|\(lit)|\(bigdex)|\(text)"
         if let image = images[key] { return image }
         let font = font(size: size, italic: italic)
         // The fill splits at the middle of the capitals.

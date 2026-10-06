@@ -222,6 +222,11 @@ final class FlowState: ObservableObject {
             SoundBoard.shared.play(SoundBoard.navigate)
         case .tuning:
             tuningOpen.toggle()
+        case .titleFont:
+            // A/B: the lettering and the small switches in Bigdex or the rounded face.
+            TitleText.bigdex.toggle()
+            SoundBoard.shared.play(SoundBoard.navigate)
+            objectWillChange.send()
         case .settings:
             SoundBoard.shared.play(SoundBoard.confirm)
             openSettings()
@@ -242,6 +247,8 @@ final class FlowState: ObservableObject {
 enum TitleItem: Hashable {
     case bestOfSeven, fortySeven, vsCPU, vsHuman, multiplayer, onlineRounds, onlineFortySeven
     case tuning
+    /// The A/B of the title's lettering: the rounded face or Bigdex.
+    case titleFont
     /// The gear in the upper right corner, opening the settings.
     case settings
     /// A swatch on one of the grids, by its index in `EsperPalette.swatches`, and the tabs
@@ -263,12 +270,12 @@ enum TitleItem: Hashable {
         // The grids side by side, bottom left.
         UIColourPicks.Grid.allCases.flatMap { grid in (start..<start + swatchesPerRow).map { TitleItem.swatch(grid, $0) } }
     } + [
-        [.tuning],
+        [.tuning, .titleFont],
     ]
 }
 
 /// The title screen, on the royal blue ground with the court just showing through, in the
-/// dobo UI pack's pieces: the name; BEST OF 7 and 47 against the computer on royal blue
+/// dobo UI pack's pieces: the name; ROUNDS and 47 against the computer on royal blue
 /// plates, with the VS CPU / VS HUMAN switch under them; MULTIPLAYER on gold, which opens
 /// Game Center's matchmaker, with the mode it asks for under it and Game Center's word
 /// under that. The energy colour is the customize screen's (and the match's debug COLOUR).
@@ -313,7 +320,10 @@ struct TitleOverlay: View {
                                 }
                             }
                         }
-                        small("UI", picked: flow.tuningOpen, item: .tuning)
+                        HStack(spacing: 8) {
+                            small("UI", picked: flow.tuningOpen, item: .tuning)
+                            small(TitleText.bigdex ? "FONT B" : "FONT A", picked: TitleText.bigdex, item: .titleFont)
+                        }
                     }
                         .padding(.bottom, 20)
                         .padding(.leading, 24)
@@ -321,7 +331,7 @@ struct TitleOverlay: View {
             VStack(spacing: 22 * scale(.buttons)) {
                 Image(uiImage: TitleText.image("PROJECT ESPER", size: 56 * scale(.titles)))
                 HStack(spacing: 24 * scale(.buttons)) {
-                    plated("BEST OF 7", piece: .buttonBlue, width: 170, item: .bestOfSeven)
+                    plated("ROUNDS", piece: .buttonBlue, width: 170, item: .bestOfSeven)
                     plated("47", piece: .buttonBlue, width: 170, item: .fortySeven)
                 }
                 HStack(spacing: 10) {
@@ -333,7 +343,7 @@ struct TitleOverlay: View {
                     .opacity(busy ? 0.5 : 1)
                     HStack(spacing: 10) {
                         ForEach(GameMode.allCases, id: \.self) { mode in
-                            small(mode == .rounds ? "BEST OF 7" : "47", picked: onlineMode == Int(mode.rawValue),
+                            small(mode == .rounds ? "ROUNDS" : "47", picked: onlineMode == Int(mode.rawValue),
                                   item: mode == .rounds ? .onlineRounds : .onlineFortySeven)
                         }
                     }
@@ -377,7 +387,7 @@ struct TitleOverlay: View {
         let piece = flow.titleCursor == item ? UIPiece.buttonGold : (picked ? UIPiece.buttonPlum : UIPiece.buttonBlack)
         return Button { flow.activate(item) } label: {
             Text(text)
-                .font(.system(size: 12 * scale(.text), weight: .heavy, design: .rounded))
+                .font(TitleText.switchFont(size: 12 * scale(.text)))
                 .foregroundStyle(.white)
                 .shadow(color: .black, radius: 0, x: 1, y: 1)
                 .offset(y: -UIPiece.buttonPlum.faceRise * scale(.buttons) * tuning.textRise)
@@ -393,7 +403,7 @@ struct TitleOverlay: View {
 
     private func pickerLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .heavy, design: .rounded))
+            .font(TitleText.switchFont(size: 10))
             .foregroundStyle(.white)
             .shadow(color: .black, radius: 0, x: 1, y: 1)
     }
@@ -403,7 +413,7 @@ struct TitleOverlay: View {
         let piece = flow.titleCursor == .toneTab(grid, tone) ? UIPiece.buttonGold : (flow.tone(for: grid) == tone ? UIPiece.buttonPlum : UIPiece.buttonBlack)
         return Button { flow.activate(.toneTab(grid, tone)) } label: {
             Text(tone.label)
-                .font(.system(size: 9, weight: .heavy, design: .rounded))
+                .font(TitleText.switchFont(size: 9))
                 .foregroundStyle(.white)
                 .shadow(color: .black, radius: 0, x: 1, y: 1)
                 .padding(.horizontal, 8)

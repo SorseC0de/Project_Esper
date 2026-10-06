@@ -531,10 +531,12 @@ royal blue gradient over the world, in place of the old dark material; a dialog 
 black card under a royal blue header ribbon as wide as it; a choice is a royal blue plate, plum for a
 way back (RESUME, TITLE, TITLE SCREEN), and the cursor's plate turns gold and grows, in
 place of the arrow. A piece drawn bigger has its corners and rims scaled with it, so a big plate
-keeps the depth of a small one rather than flattening. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
+keeps the depth of a small one rather than flattening. The title: the name, ROUNDS and 47 on royal blue, VS CPU and VS
 HUMAN as small switches, plum when picked and black when not, MULTIPLAYER on plum with
 its two mode switches under it (the energy colours are the customize screen's now, and in a
-match the debug strip's COLOUR, the first side's, round the wheel), and UI, bottom left, the tuning panel, with over it two placeholder pickers of every
+match the debug strip's COLOUR, the first side's, round the wheel), and UI and FONT A/B, bottom
+left (B letters the title and its small switches in Bigdex, `TitleText.bigdex`, kept between
+launches), the tuning panel, with over it two placeholder pickers of every
 `EsperPalette` swatch (its twelve ramps two to a row, a black plate each; the pick ringed white,
 kept, picking it again takes the pack's own tone back; `UIColourPicks`), NON-SELECTED for the
 black buttons and BLUE for the light blue ones, each with MAIN, TOP and BOTTOM tabs over it (the
@@ -637,7 +639,7 @@ the same colour, the second takes the opposite, as before. Online is still the c
 - Over the middle: CUSTOMIZE on the heading's plate (cap height 0.025 of the screen, its letters
   spaced 0.08 of their size apart, `Word.spacing`) and START on
   the emblem (0.035), both lettered as the lit FLO is (Bigdex, gold's first over the cyan, outlined
-  plum and purple, growing to the left; `Onomatopoeia.picture`), and the series' mode, BEST OF 7 or
+  plum and purple, growing to the left; `Onomatopoeia.picture`), and the series' mode, ROUNDS or
   47, large under CUSTOMIZE.
 - Each side: `Holo-Projector_v2` (the catalog's `HoloProjector`) on the halo's ring, under the halo, its white in
   the side's colour, and `player_customize` standing on its lens, in the side's look with its hooded
@@ -664,12 +666,13 @@ the same colour, the second takes the opposite, as before. Online is still the c
   BM Army, Board of Directors, Kapel, Upheaval, Kapel to start), each sized so its capitals stand
   as Bigdex's would; LETTER GAP, the space between the side labels' stacked letters, in points of
   the screen at 1080 high (-15 to start); HOOD SPREAD, how much further from the screen's middle
-  each side's H.O.O.D. and its words sit, in the same points (0 to start).
+  each side's H.O.O.D. and its words sit, in the same points (112 to start).
 - Energy glows: the halos, the projector's lit parts, the player's shoes, sleeves, boots and hood,
   its strings and cubes, the lit box lines and the display's bar; a blurred copy added over at 0.6.
 - The boxes, each labelled under it in Bigdex. SKIN and H.O.O.D. are pickers: while one is chosen
   the bottom display shows (its bar in the side's colour) with its colours, a leaning column each,
-  the colour over an accent corner to corner, the picked column lined in white. Jump on the box, or
+  the colour over an accent corner to corner, the picked column lined in white; a touch picks
+  where it lands and as it slides along (`pickerTouches`). Jump on the box, or
   out from it, steps into its picker at the picked colour; across moves along it (the cursor's
   column lined in the side's colour, past the inner end back to the box), jump picks, up or B goes
   back to the box. SKIN's are `player_hoodheads`' six skins and the robot's, 38 over 39, drawn from the fourth
@@ -678,10 +681,9 @@ the same colour, the second takes the opposite, as before. Online is still the c
   blue, purple, pink), the accent the shade down the AAP-64 ramp (`EnergyColour.rampDown`); on it,
   H.O.O.D. shows large over the player, centred on it, two-toned (its lower half the energy
   ramp's lightest, `Look.bright`), each word of "Hyper- Osmotic Output Driver" small under its
-  letter; and over the player the colour's gem name lettered as CUSTOMIZE is, a period between its
-  letters (R.U.B.Y), after MODEL in the face and size of the words under H.O.O.D., centred
+  letter; and over the player the colour's gem name lettered as CUSTOMIZE is (RUBY), after MODEL in the face and size of the words under H.O.O.D., centred
   against it, a name wider than 0.35 of the halo scaled down to it; NAME Y art pixels over the
-  player's middle, only while the hood's colours are picked. The arm and leg boxes are ticks, a
+  player's middle, only while the hood's colours are picked. The arm and leg boxes are ticks (Bigdex's X, which has no check, in the box's line's colour, no drop), a
   sleeve or a boot each (`Dressing`), labelled SLEEVE or BRACER; those and SKIN have their letters
   stacked down the box's side away from the player, at 0.25 of its height (H.O.O.D.'s under its
   box, at 0.4). Each arm and leg box has a line from it to its limb's middle on the player, run as
@@ -757,7 +759,8 @@ stretch of it 5 tiles long and 2 pixels thick shows round the rim toward them, c
 and their energy's colour in the middle, `drawSwimmingThreeLine`), no stage
 select, no drinks and no powers. The title has 47 beside BEST OF 7. A basket doesn't
 reset anything: the points go up and play goes on, the scorer unable to take the ball,
-by hand or by snatch, for 120 frames (`pickupLockout`), flickering black (#242234)
+by hand or by snatch, or to slash (a slash knocking it loose bought the time to take it back;
+protocol 98), for 120 frames (`pickupLockout`), flickering black (#242234)
 every other four frames while it lasts, so it goes the other way;
 through the net the ball is nobody's shot any more, so the other can take it at once. A
 basket is three from outside the three-point line, two from inside it or off a dunk,

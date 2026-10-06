@@ -148,7 +148,7 @@ public struct Player: Equatable {
     /// The last cardinal recorded in the throwing stance; zero throws forward.
     public var throwDirection: Vec2 = .zero
     public var catchCooldown = 0
-    /// 47: the scorer can't take the ball, by hand or snatch, until this runs out.
+    /// 47: the scorer can't take the ball, by hand or snatch, nor slash, until this runs out.
     public var pickupLockout = 0
     public var wallLandCooldown = 0
     /// Frames left in which the stick doesn't steer, after a wall jump.
@@ -1371,7 +1371,7 @@ public struct Player: Equatable {
             } else if !holding, throwPressed, snatchCooldown == 0 {
                 // Flight cancels into the snatch or the slash as the air does.
                 startSnatch()
-            } else if !holding, shootPressed {
+            } else if !holding, shootPressed, pickupLockout == 0 {
                 startSlash(events: &events)
             } else if !input.jump || flightLeft <= 0 {
                 enter(.air)
@@ -1543,9 +1543,10 @@ public struct Player: Equatable {
     }
 
     /// Whether shoot without the ball is the slash: not for the powers that take the
-    /// button for their own thing.
+    /// button for their own thing, nor for 47's scorer while they're kept off the ball (a slash
+    /// knocking it loose bought the time to take it back).
     private var slashAllowed: Bool {
-        !power.takesShoot && !(power == .platformShake && powerLevel >= 2)
+        !power.takesShoot && !(power == .platformShake && powerLevel >= 2) && pickupLockout == 0
     }
 
     /// Whether throw without the ball is the snatch: Web Water's line and Pulsepistol's

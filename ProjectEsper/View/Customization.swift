@@ -207,7 +207,7 @@ struct CustomizeScreen: View {
     @AppStorage("esper.customize.letterGap.2") private var letterGap = -15.0
     /// How much further from the screen's middle each side's H.O.O.D. and its words sit, in
     /// points of the screen at 1080 high.
-    @AppStorage("esper.customize.hoodSpread") private var hoodSpread = 0.0
+    @AppStorage("esper.customize.hoodSpread.2") private var hoodSpread = 112.0
 
     init(flow: FlowState) {
         self.flow = flow
@@ -420,7 +420,7 @@ struct CustomizeScreen: View {
     private func heading(_ size: CGSize) -> some View {
         litTitle("CUSTOMIZE", height: size.height * 0.025, spacing: CustomizeScreen.headingSpacing)
             .position(x: size.width / 2, y: size.height * 0.078)
-        title(flow.customizeMode == .rounds ? "BEST OF 7" : "47", size: size.height * 0.08)
+        title(flow.customizeMode == .rounds ? "ROUNDS" : "47", size: size.height * 0.08)
             .position(x: size.width / 2, y: size.height * 0.19)
     }
 
@@ -496,7 +496,7 @@ struct CustomizeScreen: View {
             // MODEL, as the words under H.O.O.D. are, centred against it.
             HStack(alignment: .center, spacing: size.height * 0.01) {
                 subtitle("MODEL", size: size.height * CustomizeScreen.hoodWordShare)
-                litTitle(pick.energy.name.uppercased().map(String.init).joined(separator: "."), height: size.height * 0.025,
+                litTitle(pick.energy.name.uppercased(), height: size.height * 0.025,
                          spacing: CustomizeScreen.headingSpacing, maxWidth: halo.width * CustomizeScreen.nameMaxWidthShare)
             }
             .fixedSize()
@@ -513,16 +513,16 @@ struct CustomizeScreen: View {
             .clipShape(RoundedRectangle(cornerRadius: frame.width * 0.08))
         }
         box(player, .arms, tag + "arms", label: "SLEEVE", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) {
-            tick(flow.customizeTicked(player, .arms), $0)
+            tick(flow.customizeTicked(player, .arms), $0, lit: cursor == .arms, glow: glow)
         }
         box(player, .legs, tag + "legs", label: "BRACER", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) {
-            tick(flow.customizeTicked(player, .legs), $0)
+            tick(flow.customizeTicked(player, .legs), $0, lit: cursor == .legs, glow: glow)
         }
         box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "SLEEVE", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) {
-            tick(flow.customizeTicked(player, .outerArms), $0)
+            tick(flow.customizeTicked(player, .outerArms), $0, lit: cursor == .outerArms, glow: glow)
         }
         box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "BRACER", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) {
-            tick(flow.customizeTicked(player, .outerLegs), $0)
+            tick(flow.customizeTicked(player, .outerLegs), $0, lit: cursor == .outerLegs, glow: glow)
         }
         box(player, .hood, tag + "hood", label: "H.O.O.D", size: size, glow: glow, cursor: cursor) { frame in
             if let hood = flow.scene.customizeHood(player: player) {
@@ -552,12 +552,13 @@ struct CustomizeScreen: View {
 
     /// A box's tick: empty, or a check.
     @ViewBuilder
-    private func tick(_ on: Bool, _ frame: CGRect) -> some View {
+    /// Bigdex's X (it has no check), in its box's line's colour, the side's under the cursor.
+    private func tick(_ on: Bool, _ frame: CGRect, lit: Bool, glow: RGB) -> some View {
         if on {
-            Image(systemName: "checkmark")
-                .font(.system(size: frame.height * 0.5, weight: .black))
-                .foregroundStyle(.white)
-                .shadow(color: .black, radius: 0, x: 1, y: 2)
+            Text("X")
+                .font(.custom(CustomizeFont.bigdex.fontName, size: frame.height * 0.5))
+                .foregroundStyle(Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine))
+                .fixedSize()
         }
     }
 
@@ -678,11 +679,15 @@ struct CustomizeScreen: View {
                     LeaningBand(from: 0, to: 1).stroke(Color(rgb: glow), lineWidth: index == hovered ? 3 : 0).padding(-4)
                 }
                 .scaleEffect(index == hovered ? 1.15 : (index == picked ? 1.08 : 1))
-                .contentShape(Rectangle())
-                .onTapGesture { flow.activateCustomize(player, skin ? .skinPicker(index) : .hoodPicker(index)) }
             }
         }
         .frame(width: inner.width, height: inner.height)
+        .contentShape(Rectangle())
+        .pickerTouches(columns: columns.count, width: inner.width) { index in
+            // Tapped, or slid along: each column picked as the finger reaches it.
+            guard index != picked else { return }
+            flow.activateCustomize(player, skin ? .skinPicker(index) : .hoodPicker(index))
+        }
         .position(x: frame.midX, y: frame.midY - frame.height * 0.08)
     }
 
@@ -781,6 +786,19 @@ struct CustomizeScreen: View {
 }
 
 extension View {
+    /// A row of `columns` picked by a touch: where it lands, and where it slides to. The TV has
+    /// no touch; its remote's cursor does the picking.
+    @ViewBuilder
+    func pickerTouches(columns: Int, width: CGFloat, pick: @escaping (Int) -> Void) -> some View {
+        #if os(tvOS)
+        self
+        #else
+        gesture(DragGesture(minimumDistance: 0).onChanged { touch in
+            pick(min(max(Int(touch.location.x / width * CGFloat(columns)), 0), columns - 1))
+        })
+        #endif
+    }
+
     /// Energy's bloom: a blurred copy laid over it, added and dimmed, as the glow does in play.
     func energyGlow(radius: CGFloat) -> some View {
         overlay(blur(radius: radius).blendMode(.plusLighter).opacity(CustomizeArt.glowStrength))

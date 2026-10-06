@@ -466,6 +466,18 @@ final class HighwayTests: XCTestCase {
         XCTAssertTrue(match.players[1].canCatch(ballAt: match.players[1].chest, shotInFlight: match.ball.shotInFlight), "the other can take it")
     }
 
+    func testFortySevensScorerCantSlashWhileKeptOffTheBall() {
+        var match = Match(stage: .court, mode: .fortySeven)
+        match.countdown = 0
+        match.players[0].pickupLockout = FortySevenRules.scorerLockoutFrames
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertNotEqual(match.players[0].state, .slashing, "no slash to knock it loose")
+        match.players[0].pickupLockout = 0
+        for _ in 0..<2 { match.advance(inputs: [.idle, .idle]) }
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .slashing, "and back once it runs out")
+    }
+
     // MARK: Dropping through
 
     func testDownHeldOnAOneWayDropsThroughItButNotThroughTheFloor() {

@@ -20,6 +20,8 @@ public struct Hoopfish: Equatable {
     public var swimFrames: Int
     /// Frames left of the spin a dunk sets off, the rim out of play through it.
     public var spin = 0
+    /// ZONES: swimming in place, never crossing.
+    public var stationary = false
 
     /// Where the rim, or the ball, rides on its antenna: whole art pixels from its bottom left.
     public var antenna: Vec2 {
@@ -54,6 +56,7 @@ public struct Hoopfish: Equatable {
     /// A frame on: swimming, swaying, then waiting off screen, then the next crossing back.
     mutating func step(on stage: Stage) {
         if spin > 0 { spin -= 1 }
+        if stationary { return }
         age += 1
         if age < swimFrames {
             let share = Double(age) / Double(swimFrames)

@@ -14,6 +14,8 @@ public struct Hoop: Equatable {
     public var backboard: Facing
     /// Both players' to score on, the point to whoever put the ball through: a stage's only rim.
     public var shared: Bool
+    /// ZONES: the backboard alone, to jump off or throw at, no rim, no net, nothing to score on.
+    public var rimless = false
 
     public init(position: Vec2, owner: Int, backboard: Facing, shared: Bool = false) {
         self.position = position
@@ -143,6 +145,8 @@ public struct Stage: Equatable {
 
     /// Where Hoopfish Hideaway's Hoopfish starts, its picture's bottom left.
     public var hoopfishStart: Vec2?
+    /// ZONES: the Hoopfish swims in place where it starts, the rim on its antenna from the off.
+    public var hoopfishStationary = false
     /// Where each icicle socket's grown icicle hangs its tip, along the ceiling.
     public var icicleSockets: [Vec2] = []
     /// The middles of the open tops of rock lightning can strike: under no ceiling, nothing on them.
@@ -614,6 +618,31 @@ public struct Stage: Equatable {
         return stage
     }
 
+    /// ZONES' stages: 47's, one rim each. The Wreck Center keeps its right rim; its left
+    /// backboard stands with no rim. Hoopfish Hideaway's Hoopfish swims in place on the right,
+    /// its right edge two tiles off the wall, facing left, the rim on its antenna. Runs start
+    /// on the floor of A1, in from the left wall.
+    public static func zones(_ choice: StageChoice) -> Stage {
+        var stage: Stage
+        switch choice {
+        case .hoopfishHideaway:
+            stage = hoopfishHideaway
+            let map = StageMap.current[.hoopfishHideaway]
+            let row = map.hoopfish?.cell.row ?? 8
+            let column = HoopfishHideawayRules.columns - 2 - HoopfishRules.pixelWidth / 16
+            let fish = Vec2(x: Double(column) * tileSize, y: Double(row) * tileSize)
+            stage.hoopfishStart = fish
+            stage.hoopfishStationary = true
+            stage.hoops[0].position = fish + HoopfishHideawayRules.rimFromHoopfish
+        default:
+            stage = court
+            stage.hoops[0].rimless = true
+        }
+        stage.playerSpawns = stage.playerSpawns.map { _ in Vec2(x: ZonesRules.startX, y: tileSize) }
+        stage.playerFacings = stage.playerFacings.map { _ in .right }
+        return stage
+    }
+
     /// The football field: seven courts long and 20 rows high, flat and empty but for the
     /// floor and the end walls. The rims float between the goalposts' uprights, four tiles
     /// higher than the court's, six tiles in from each wall. Each player starts under the
@@ -823,7 +852,7 @@ public struct Stage: Equatable {
 
 /// The stages to pick from, in the order the select screen shows them; the wire carries
 /// the raw value.
-public enum StageChoice: Int, CaseIterable {
+public enum StageChoice: Int, CaseIterable, Codable {
     case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flight
 
     /// The stages on the select, in its order: Slamstill Traffic and Flight parked off it.

@@ -2,7 +2,7 @@ import Foundation
 
 /// A power. Each one takes over parts of the controls, and less of it is available with
 /// the ball in hand.
-public enum Power: Equatable, Hashable {
+public enum Power: Equatable, Hashable, Codable {
     case none
     case webWater
     case superSmoothie
@@ -178,6 +178,10 @@ public struct Player: Equatable {
     public var inFloState = false
     /// Frames before FloState can be entered again, from when it was left.
     public var floStateLockout = 0
+    /// ZONES: FLO never runs out, though the lockout between activations still runs.
+    public var unlimitedFlo = false
+    /// ZONES: the power picked for FloState, on while it's on and gone with it.
+    public var floStatePower = Power.none
     /// Frames in FloState since its last FLO spent.
     var floStateClock = 0
     /// Entered only at full; left any time.
@@ -1056,7 +1060,7 @@ public struct Player: Equatable {
                     ?? Vec2(x: chest.x - facing.sign * 5, y: chest.y + 3)
                 wanted = .strikeBolt(x: ball.x, bottom: ball.y)
             }
-            if hasBall, stateTimer >= BallRules.dunkStanceFrames, let hoop = stage.hoops.indices.first(where: { stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius * spec.scale && stage.dunkable(stage.hoops[$0]) }) {
+            if hasBall, stateTimer >= BallRules.dunkStanceFrames, let hoop = stage.hoops.indices.first(where: { !stage.hoops[$0].rimless && stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius * spec.scale && stage.dunkable(stage.hoops[$0]) }) {
                 // Onto the rim: the feet at the dunk's place on it, facing the backboard.
                 // Turned to the backboard; the body glides to its place on the rim through
                 // the wind-up, so it never jumps there.
@@ -1385,6 +1389,10 @@ public struct Player: Equatable {
             if stateTimer >= TransformRules.frames {
                 inFloState = true
                 floStateClock = 0
+                if floStatePower != .none {
+                    power = floStatePower
+                    powerLevel = ZonesRules.powerLevel
+                }
                 enter(grounded ? .idle : .air)
             }
 
@@ -1853,7 +1861,7 @@ public struct Player: Equatable {
     /// The lockout counting down.
     private mutating func stepFloState() {
         if floStateLockout > 0 { floStateLockout -= 1 }
-        guard inFloState else { return }
+        guard inFloState, !unlimitedFlo else { return }
         floStateClock += 1
         if floStateClock >= FloStateRules.spendFrames {
             floStateClock = 0
@@ -1866,6 +1874,10 @@ public struct Player: Equatable {
         inFloState = false
         floStateLockout = FloStateRules.lockoutFrames
         floStateClock = 0
+        if floStatePower != .none {
+            power = .none
+            powerLevel = 1
+        }
     }
 
     mutating func gainFlo(_ amount: Int, at source: Vec2, events: inout [MatchEvent]) {
@@ -2161,7 +2173,7 @@ public struct Player: Equatable {
     private mutating func bounceOffRims(in stage: Stage, feetBefore: Double, jumpHeld: Bool, events: inout [MatchEvent]) {
         guard state != .dunking, feetBefore > position.y else { return }
         for (index, hoop) in stage.hoops.enumerated()
-        where feetBefore >= hoop.position.y && position.y < hoop.position.y
+        where !hoop.rimless && feetBefore >= hoop.position.y && position.y < hoop.position.y
             && body.max.x > hoop.position.x - BallRules.rimHalfWidth && body.min.x < hoop.position.x + BallRules.rimHalfWidth {
             events.append(.rimBounced(hoop: index, speed: feetBefore - position.y, ball: false))
             position.y = hoop.position.y

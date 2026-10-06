@@ -3,7 +3,7 @@ import Foundation
 /// One player's controls for one frame. Only held states: the sim works out presses by
 /// comparing with the frame before, so a frame of input is a plain value that can be
 /// recorded, predicted, and replayed.
-public struct PlayerInput: Equatable, Hashable {
+public struct PlayerInput: Equatable, Hashable, Codable {
     /// Length 0 to 1, deadzone already removed. +y is up.
     public var stick: Vec2 = .zero
     /// The aim while a stance is held: the flick on the touch button, or the right stick,

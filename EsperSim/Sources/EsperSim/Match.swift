@@ -76,8 +76,25 @@ public struct Match: Equatable {
         self.countdown = countdown
         fieldDice = Dice(seed: seed)
         if let fish = stage.hoopfishStart {
-            hoopfish = Hoopfish.starting(at: fish, on: stage, countdown: countdown)
+            if stage.hoopfishStationary {
+                // ZONES: in place, facing left, the rim on its antenna.
+                hoopfish = Hoopfish(position: fish, carrying: .hoop, from: fish, to: fish, swimFrames: 1, stationary: true)
+            } else {
+                hoopfish = Hoopfish.starting(at: fish, on: stage, countdown: countdown)
+            }
             placeHoopfishLoad()
+        }
+        if mode == .zones {
+            // ZONES: one runner, the ball in hand from the start, FLO full and never spent.
+            for index in players.indices {
+                players[index].flo = FloRules.full
+                players[index].unlimitedFlo = true
+            }
+            if !players.isEmpty {
+                players[0].hasBall = true
+                ball.holder = 0
+                ball.position = players[0].heldBallPoint
+            }
         }
         if stage.features.traffic {
             fillTraffic()
@@ -188,6 +205,12 @@ public struct Match: Equatable {
                     // Through the net it's nobody's shot any more: anyone but the scorer can take it.
                     ball.shotInFlight = false
                     ball.owned = false
+                } else if mode == .zones {
+                    // ZONES: the shot's in; the run's done, nothing restarts.
+                    scores[owner] += 1
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot))
+                    holdHitStop(HitStopRules.shotFrames)
+                    ball.shotInFlight = false
                 } else {
                     scores[owner] += 1
                     // Level after a point, the next is the stage's decider: it starts from the ball in

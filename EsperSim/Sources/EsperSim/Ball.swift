@@ -94,7 +94,7 @@ public struct Ball: Equatable {
 
         // Only the rim it's meant for pulls it in: the one whoever last touched it scores on. An
         // own basket can still drop, but nothing draws it there.
-        for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y
+        for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y && !hoop.rimless
             && (hoop.shared || lastTouched == nil || hoop.owner == lastTouched) {
             steer(toward: hoop, gravityShare: Ball.gravityShare(stage))
         }
@@ -130,7 +130,7 @@ public struct Ball: Equatable {
         // it from under counts once it falls back in. Going up through one never does. The
         // ball's bottom has to come down through it, so all of it was above the rim: one
         // thrown flat at the rim's height, off the backboard, drops out under it.
-        for (index, hoop) in stage.hoops.enumerated() where abs(position.x - hoop.position.x) <= BallRules.rimHalfWidth {
+        for (index, hoop) in stage.hoops.enumerated() where abs(position.x - hoop.position.x) <= BallRules.rimHalfWidth && !hoop.rimless {
             if previousY - BallRules.radius >= hoop.position.y, position.y - BallRules.radius < hoop.position.y {
                 if scoring {
                     enteringHoop = index

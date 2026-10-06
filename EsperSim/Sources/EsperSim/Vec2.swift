@@ -1,7 +1,7 @@
 import Foundation
 
 /// Melee units. +x is screen right, +y is up, the same way SpriteKit points.
-public struct Vec2: Equatable, Hashable {
+public struct Vec2: Equatable, Hashable, Codable {
     public var x: Double
     public var y: Double
 

@@ -74,6 +74,8 @@ public struct Series: Equatable {
 /// between, or 47, played on through its baskets, two or three points each, to 47.
 public enum GameMode: UInt8, CaseIterable {
     case rounds, fortySeven
+    /// HORSE on a grid, turn by turn: `ZonesGame`.
+    case zones
 }
 
 /// 47's numbers. A basket from outside the three-point line, a circle round the rim out

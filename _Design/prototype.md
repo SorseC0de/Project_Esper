@@ -671,8 +671,11 @@ the same colour, the second takes the opposite, as before. Online is still the c
   H.O.O.D. shows large over the player, centred on it, each word of "Hyper- Osmotic Output Driver"
   small under its letter. Over the player always, the colour's gem name lettered as CUSTOMIZE
   is, a period between its letters (R.U.B.Y), 22 art pixels over the player's middle. The arm and
-  leg boxes are ticks, a sleeve or a boot each (`Dressing`), labelled by the screen's side they're on,
-  L or R: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
+  leg boxes are ticks, a sleeve or a boot each (`Dressing`), labelled ARM SLEEVE (two rows) or BOOT,
+  smaller than the others (0.22 of the box's height to their 0.4), each with a line from it to its
+  limb's middle on the player, run as the screen's top and bottom lines are (level out of the box,
+  then 45 degrees onto the limb, a dot there), in the boxes' cyan or, under the cursor, the side's
+  colour, glowing: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
   the middle, the back. Front and back are kept as the body faces right; facing left, in play and
   on the second side, the body is drawn turned round (`Look.turnedRound`, `SpriteLibrary.turnedPlayer`,
   `bodyPlayer`), front and back swapped, so a sleeve stays on its arm. Its frames are built ahead

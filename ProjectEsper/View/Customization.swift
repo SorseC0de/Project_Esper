@@ -218,6 +218,13 @@ struct CustomizeScreen: View {
     static let feetRow: CGFloat = 40
     /// The rings round START, in degrees a second.
     static let spinSpeeds: (ccw: Double, cw: Double) = (24, 36)
+    /// A box's label's size, a share of the box's height; the arm and leg boxes' smaller, two rows.
+    static let labelShare: CGFloat = 0.4
+    static let limbLabelShare: CGFloat = 0.22
+    /// The lines from the arm and leg boxes to the player: as thick as the screen's own lines,
+    /// their end dots as big as theirs, shares of the screen's height.
+    static let connectorWidthShare: CGFloat = 0.0032
+    static let connectorDotShare: CGFloat = 0.0041
     /// What H.O.O.D. stands for, a word a letter.
     static let hoodWords = ["Hyper-", "Osmotic", "Output", "Driver"]
     /// The colour's name's middle over the player's middle, in art pixels.
@@ -391,9 +398,6 @@ struct CustomizeScreen: View {
         let playerPixel = artPixel(size, times: playerScale)
         let projectorAt = CGPoint(x: ring.x, y: ring.y - projectorY * base)
         // The first side's front limbs are its right; the second, facing the other way, its left.
-        // Labelled by the screen's sides: the box on the left L, on the right R.
-        let inner = player == 0 ? "R" : "L", outer = player == 0 ? "L" : "R"
-
         // The projector under the halo.
         if let projector = CustomizeArt.projector(glow), let lit = CustomizeArt.projectorEnergy(glow) {
             ZStack {
@@ -425,6 +429,21 @@ struct CustomizeScreen: View {
                 .frame(width: side, height: side)
                 .allowsHitTesting(false)
                 .position(x: ring.x, y: figureMiddle)
+            // From each arm and leg box to its limb on the player: the outer boxes the shown
+            // front limbs', the inner the back's, as the boxes tick them.
+            let limbs: [(spot: CustomizeSpot, layer: String, mirrored: Bool, part: BodyPart)] = [
+                (.outerArms, tag + "arms_line", true, .frontArm), (.outerLegs, tag + "legs_line", true, .frontLeg),
+                (.arms, tag + "arms_line", false, .backArm), (.legs, tag + "legs_line", false, .backLeg),
+            ]
+            ForEach(Array(limbs.enumerated()), id: \.offset) { _, limb in
+                if let centre = portrait.centres[limb.part] {
+                    let box = rect(limb.layer, size, mirroredAbout: limb.mirrored ? halo.midX : nil)
+                    let across = (centre.x - 24) * playerPixel * (player == 1 ? -1 : 1)
+                    let target = CGPoint(x: ring.x + across, y: figureMiddle + (centre.y - 24) * playerPixel)
+                    let start = CGPoint(x: box.midX < target.x ? box.maxX : box.minX, y: box.midY)
+                    connector(from: start, to: target, size: size, lit: cursor == limb.spot, glow: glow)
+                }
+            }
         }
         // The colour's name over the player, lettered as CUSTOMIZE is, a period between its letters.
         litTitle(pick.energy.name.uppercased().map(String.init).joined(separator: "."), height: size.height * 0.025,
@@ -439,12 +458,17 @@ struct CustomizeScreen: View {
             .frame(width: frame.width * 0.5, height: frame.height * 0.5)
             .clipShape(RoundedRectangle(cornerRadius: frame.width * 0.08))
         }
-        box(player, .arms, tag + "arms", label: "\(inner) ARM", size: size, glow: glow, cursor: cursor) { tick(flow.customizeTicked(player, .arms), $0) }
-        box(player, .legs, tag + "legs", label: "\(inner) LEG", size: size, glow: glow, cursor: cursor) { tick(flow.customizeTicked(player, .legs), $0) }
-        box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "\(outer) ARM", size: size, glow: glow, cursor: cursor) {
+        let limbLabel = CustomizeScreen.limbLabelShare
+        box(player, .arms, tag + "arms", label: "ARM\nSLEEVE", labelShare: limbLabel, size: size, glow: glow, cursor: cursor) {
+            tick(flow.customizeTicked(player, .arms), $0)
+        }
+        box(player, .legs, tag + "legs", label: "BOOT", labelShare: limbLabel, size: size, glow: glow, cursor: cursor) {
+            tick(flow.customizeTicked(player, .legs), $0)
+        }
+        box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "ARM\nSLEEVE", labelShare: limbLabel, size: size, glow: glow, cursor: cursor) {
             tick(flow.customizeTicked(player, .outerArms), $0)
         }
-        box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "\(outer) LEG", size: size, glow: glow, cursor: cursor) {
+        box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "BOOT", labelShare: limbLabel, size: size, glow: glow, cursor: cursor) {
             tick(flow.customizeTicked(player, .outerLegs), $0)
         }
         box(player, .hood, tag + "hood", label: "H.O.O.D", size: size, glow: glow, cursor: cursor) { frame in
@@ -483,10 +507,37 @@ struct CustomizeScreen: View {
         }
     }
 
+    /// A line from a box to its spot on the player, as the screen's top and bottom lines run:
+    /// level out of the box, then turning 45 degrees down or up onto the spot, a dot there. In
+    /// the small boxes' cyan, or lit in the side's colour, glowing, with the box.
+    @ViewBuilder
+    private func connector(from start: CGPoint, to target: CGPoint, size: CGSize, lit: Bool, glow: RGB) -> some View {
+        let across = target.x - start.x, down = target.y - start.y
+        let slant = min(abs(across), abs(down))
+        let turn = CGPoint(x: target.x - slant * (across < 0 ? -1 : 1), y: start.y)
+        let slanted = CGPoint(x: target.x, y: start.y + slant * (down < 0 ? -1 : 1))
+        let colour = Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine)
+        let dot = size.height * CustomizeScreen.connectorDotShare
+        ZStack {
+            Path { path in
+                path.addLines([start, turn, slanted, target])
+            }
+            .stroke(colour, style: StrokeStyle(lineWidth: size.height * CustomizeScreen.connectorWidthShare, lineCap: .round, lineJoin: .round))
+            Circle().fill(colour)
+                .frame(width: dot * 2, height: dot * 2)
+                .position(target)
+        }
+        .frame(width: size.width, height: size.height)
+        .energyGlow(radius: lit ? dot * 2 : 0)
+        .allowsHitTesting(false)
+        .position(x: size.width / 2, y: size.height / 2)
+    }
+
     /// One of a side's boxes: its fill, what's in it, its line, and its label under it. Under
     /// its side's cursor the line thickens and lights in the side's colour, glowing.
     @ViewBuilder
     private func box(_ player: Int, _ spot: CustomizeSpot, _ name: String, mirroredAbout axis: CGFloat? = nil, label: String,
+                     labelShare: CGFloat = CustomizeScreen.labelShare,
                      size: CGSize, glow: RGB, cursor: CustomizeSpot, @ViewBuilder content: (CGRect) -> some View) -> some View {
         let flip: CGFloat = axis == nil ? 1 : -1
         let fill = rect(name, size, mirroredAbout: axis)
@@ -510,8 +561,11 @@ struct CustomizeScreen: View {
                 .frame(width: line.width, height: line.height)
                 .position(x: line.midX, y: line.midY)
         }
-        title(label, size: line.height * 0.4)
-            .position(x: line.midX, y: line.maxY + line.height * 0.26)
+        // Hung from just under the box, however many rows it runs to.
+        title(label, size: line.height * labelShare)
+            .multilineTextAlignment(.center)
+            .frame(width: line.width * 2, height: 1, alignment: .top)
+            .position(x: line.midX, y: line.maxY + line.height * 0.06)
         Color.clear
             .frame(width: line.width, height: line.height)
             .contentShape(Rectangle())

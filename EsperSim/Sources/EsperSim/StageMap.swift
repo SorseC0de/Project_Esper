@@ -408,7 +408,7 @@ public enum StageFireballRules {
 
 /// The Elements' lightning: every ten seconds the sky flashes, and two seconds later a small
 /// bolt strikes an open top of rock, picked by the flash's count, stripping whoever it
-/// touches; Zeus Juice it doesn't touch.
+/// touches; Volta Cola it doesn't touch.
 public enum LightningRules {
     public static let everyFrames = 600
     public static let warningFrames = 120

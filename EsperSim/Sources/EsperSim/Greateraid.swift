@@ -21,13 +21,13 @@ public struct Dice: Equatable {
 public enum Greateraid: CaseIterable, Equatable, Hashable {
     case hastyHorchata, jumperJuice, lungeLemonade, cannonCola, slideCider, featherFresca
     case webWater, superSmoothie, flashFizz, platformShake
-    case quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
+    case quakeUp, voltaCola, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
 
     public enum Kind: Equatable { case booster, biomorph }
 
     public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .lungeLemonade, .cannonCola, .slideCider, .featherFresca]
     public static let biomorphs: [Greateraid] = [.webWater, .superSmoothie, .flashFizz, .platformShake,
-                                                 .quakeUp, .zeusJuice, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle, .zTea]
+                                                 .quakeUp, .voltaCola, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle, .zTea]
 
     public var kind: Kind {
         Greateraid.boosters.contains(self) ? .booster : .biomorph
@@ -46,7 +46,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .flashFizz: "Flash Fizz"
         case .platformShake: "Platform Protein Shake"
         case .quakeUp: "Quake-Up Coffee"
-        case .zeusJuice: "Zeus Juice"
+        case .voltaCola: "Volta Cola"
         case .frostTea: "Frost Tea"
         case .blazingBoba: "Blazing Boba"
         case .pulsepistol: "Pulsepistol Punch"
@@ -65,7 +65,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .flashFizz: .flashFizz
         case .platformShake: .platformShake
         case .quakeUp: .quakeUp
-        case .zeusJuice: .zeusJuice
+        case .voltaCola: .voltaCola
         case .frostTea: .frostTea
         case .blazingBoba: .blazingBoba
         case .pulsepistol: .pulsepistol
@@ -90,7 +90,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .flashFizz: "Now you see me, now I dunk"
         case .platformShake: "From staring up to the basket to stairing up to the basket"
         case .quakeUp: "Suddenly everyone around you seems so grounded"
-        case .zeusJuice: "A shocking amount of flavor"
+        case .voltaCola: "A shocking amount of flavor"
         case .frostTea: "Not to be confused with the gas station beverage"
         case .blazingBoba: "...Wait are those fireballs?"
         case .pulsepistol: "For those gunning for first place"
@@ -115,7 +115,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .flashFizz: ("Jump in the air flashes you five tiles, a tear that pulls the ball in; shoot warps to your ball.", "Two flashes a cooldown.")
         case .platformShake: ("A fast fall makes a slab.", "Shoot makes a wall.")
         case .quakeUp: ("A fast fall's landing shakes the floor: the ball hops and whoever stands on it is stripped.", "The whole screen is the floor.")
-        case .zeusJuice: ("Shoot throws a bolt that strips whoever it hits and pops the ball back to you.", "Throw calls a strike down on the ball in hand, or on your snatch.")
+        case .voltaCola: ("Shoot throws a bolt that strips whoever it hits and pops the ball back to you.", "Throw calls a strike down on the ball in hand, or on your snatch.")
         case .frostTea: ("Snatch freezes what it reaches. Slides never stop until you say so.", "Double jumps and slides leave an ice clone that freezes on touch.")
         case .blazingBoba: ("Full runs and slides leave fire. Your shots burn: nobody else can catch them.", "Hold shoot through a slash for a fireball, shot or thrown, that bursts.")
         case .pulsepistol: ("Shoot fires a pulse across the screen that knocks the ball and them away.", "Shoot on the run, and throw pulls everything in.")

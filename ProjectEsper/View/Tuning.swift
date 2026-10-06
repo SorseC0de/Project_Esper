@@ -24,7 +24,7 @@ enum PowerLevelVariant: Int, CaseIterable {
 
 /// The powers on the picker. A is none.
 enum PowerVariant: Int, CaseIterable {
-    case none, webWater, superSmoothie, flashFizz, platformShake, quakeUp, zeusJuice, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
+    case none, webWater, superSmoothie, flashFizz, platformShake, quakeUp, voltaCola, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
 
     var label: String { ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N"][rawValue] }
 
@@ -36,7 +36,7 @@ enum PowerVariant: Int, CaseIterable {
         case .flashFizz: .flashFizz
         case .platformShake: .platformShake
         case .quakeUp: .quakeUp
-        case .zeusJuice: .zeusJuice
+        case .voltaCola: .voltaCola
         case .frostTea: .frostTea
         case .blazingBoba: .blazingBoba
         case .pulsepistol: .pulsepistol
@@ -117,9 +117,9 @@ enum ParticleLook {
     static let boardShadow: UInt32 = PixelPalette.plumDark
 }
 
-/// Zeus Juice's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel
+/// Volta Cola's charge swirl, `lightning_charge`, drawn at this share of its 240-pixel
 /// sheet round the ball in hand.
-enum ZeusTuning {
+enum VoltaTuning {
     nonisolated(unsafe) static var chargeScale: Float = 0.17
 }
 

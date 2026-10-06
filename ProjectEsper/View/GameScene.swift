@@ -298,7 +298,7 @@ final class GameScene: SKScene {
     private var handHalos: [SKSpriteNode] = []
     private var headEspers: [SKEmitterNode] = []
     /// A second stream off each head, for a power that mixes two particles: Frost Tea's
-    /// snowflakes among the energy, Zeus Juice's second bolt.
+    /// snowflakes among the energy, Volta Cola's second bolt.
     private var headEsperMixes: [SKEmitterNode] = []
     private var wings: [Wing] = []
     /// Each player's webs: the swing's and the shot's.
@@ -4465,7 +4465,7 @@ final class GameScene: SKScene {
                     let spark = Effect.fireJump.node(sprites, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: -3.75)), flipped: player.facing == .left)
                     spark.zPosition = 40
                     glowers.addChild(spark)
-                case .zeusJuice:
+                case .voltaCola:
                     // Bottom-aligned, twelve art pixels under the feet.
                     glowers.addChild(EnergyEffect.lightningJump.node(sprites, player: index, at: SpriteLibrary.point(player.position + Vec2(x: 0, y: -7.5)), scale: 0.42))
                 case .surfSoda:
@@ -4505,7 +4505,7 @@ final class GameScene: SKScene {
                 case .frostTea:
                     // A sphere of snowflakes off the hand.
                     spawnSnowflakes(at: SpriteLibrary.point(player.handCatchPoint), count: 14, spread: 20)
-                case .zeusJuice where player.powerLevel >= 2:
+                case .voltaCola where player.powerLevel >= 2:
                     spawnHitSpark(player: index, at: player.handCatchPoint)
                 default:
                     // On the hand, and riding the body from there.
@@ -4803,7 +4803,7 @@ final class GameScene: SKScene {
 
     /// One of the two sparks, either each time, on the ball in the hitter's colour.
     private func spawnHitSpark(player: Int, at position: Vec2, scale: CGFloat = 1) {
-        // Zeus Juice's hits spark in lightning; everyone else's in energy.
+        // Volta Cola's hits spark in lightning; everyone else's in energy.
         let power = match.players.indices.contains(player) ? match.players[player].power : .none
         if power == .blazingBoba, let name = ["fire_spark", "fire_spark2", "fire_spark3"].filter({ EffectSheets.frames[$0] != nil }).randomElement() {
             // Blazing Boba's hits spark in fire, painted as it is, and sound as fire.
@@ -4819,10 +4819,10 @@ final class GameScene: SKScene {
             glowers.addChild(node)
             return
         }
-        let zeus = power == .zeusJuice
-        if zeus, let crack = SoundBoard.lightning.randomElement() { play(crack, at: position) }
-        let spark = (zeus ? EnergyEffect.lightningSparks : EnergyEffect.hitSparks).randomElement()!
-        glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale * (zeus ? 0.5 : 1)))
+        let volta = power == .voltaCola
+        if volta, let crack = SoundBoard.lightning.randomElement() { play(crack, at: position) }
+        let spark = (volta ? EnergyEffect.lightningSparks : EnergyEffect.hitSparks).randomElement()!
+        glowers.addChild(spark.node(sprites, player: player, at: SpriteLibrary.point(position), scale: scale * (volta ? 0.5 : 1)))
     }
 
     /// A score: lightning strikes the rim from the way the ball came in, leaning half as
@@ -4871,7 +4871,7 @@ final class GameScene: SKScene {
     }
 
     /// The body where it is, in its colour's bright version, held a moment then fading behind
-    /// it: the stepback's trail (and the jump shot's, the throw's, the slash's), as Zeus Juice's bolt leaves one.
+    /// it: the stepback's trail (and the jump shot's, the throw's, the slash's), as Volta Cola's bolt leaves one.
     private static let afterimageAlpha: CGFloat = 0.9
     private var slashAfterimages: [Int: Int] = [:]
     private static let afterimageHold = 0.1
@@ -5058,7 +5058,7 @@ final class GameScene: SKScene {
             streams = [halfEnergy, HeadStream(frames: [sprites.snowflake], size: ParticleLook.snowflakeSize, tint: GameScene.ice, rate: 12)]
         case .surfSoda where EffectSheets.frames["bubble_particle"] != nil:
             streams = [halfEnergy, HeadStream(frames: sheetFrames("bubble_particle"), size: ParticleLook.bubbleSize, tint: nil, rate: 12, tints: ParticleLook.sodas)]
-        case .zeusJuice where EffectSheets.frames["lightning_particle"] != nil:
+        case .voltaCola where EffectSheets.frames["lightning_particle"] != nil:
             // The two bolts, a quarter each, toned in the energy colour.
             streams = [halfEnergy, HeadStream(frames: sheetFrames("lightning_particle", toned: index), size: ParticleLook.lightningSize, tint: nil, rate: 6)]
             if EffectSheets.frames["lightning_particle2"] != nil {
@@ -6144,7 +6144,7 @@ final class GameScene: SKScene {
         }
     }
 
-    /// Zeus Juice's strike: a bolt down from the top of the screen to the point, in the
+    /// Volta Cola's strike: a bolt down from the top of the screen to the point, in the
     /// player's colour, and a spark where it lands.
     private func strikeColumn(at point: CGPoint, by index: Int) {
         let bolt = EnergyEffect.strikes.randomElement()!
@@ -6415,7 +6415,7 @@ final class GameScene: SKScene {
             section("bodies")
             playFrameSounds(index, frame: frame, grounded: player.grounded, at: player.position)
             section("sounds")
-            // Zeus Juice's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
+            // Volta Cola's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
             // Frozen, the body is drawn in the ice look.
             // Changing, the energy form from the sheet's sixth frame on.
@@ -6733,12 +6733,12 @@ final class GameScene: SKScene {
                     charge.size = charge.texture!.size()
                     charge.anchorPoint = Effect.fireCharge.anchor
                     charge.setScale(Effect.fireCharge.scale)
-                case .zeusJuice where !beaming:
+                case .voltaCola where !beaming:
                     let frame = player.stateTimer * Int(EnergyEffect.lightningCharge.fps) / 60 % EnergyEffect.lightningCharge.frameCount
                     charge.texture = sprites.effectTexture(EnergyEffect.lightningCharge.name, frame, player: index)
                     charge.size = charge.texture!.size()
                     charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-                    charge.setScale(CGFloat(ZeusTuning.chargeScale))
+                    charge.setScale(CGFloat(VoltaTuning.chargeScale))
                 default:
                     let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
                     let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
@@ -6767,7 +6767,7 @@ final class GameScene: SKScene {
             } else {
                 charge.isHidden = true
                 chargeOverlays[index].isHidden = true
-                if charging[index], player.power != .blazingBoba, player.power != .zeusJuice,
+                if charging[index], player.power != .blazingBoba, player.power != .voltaCola,
                    player.state == .throwing || player.state == .dunking || player.state == .beamFiring {
                     let tail = EnergyEffect.charge.node(sprites, player: index, at: charge.position,
                                                         frames: (EnergyEffect.chargeLoopEnd + 1)..<EnergyEffect.charge.frameCount,
@@ -7290,7 +7290,7 @@ final class GameScene: SKScene {
             switch player.power {
             case .flashFizz where match.ball.owner == player.index: shoot = "WARP"
             case .platformShake where player.powerLevel >= 2: shoot = "WALL"
-            case .zeusJuice: shoot = "BOLT"
+            case .voltaCola: shoot = "BOLT"
             case .pulsepistol: shoot = "PULSE"
             default: shoot = "SLASH"
             }

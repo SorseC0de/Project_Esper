@@ -289,9 +289,9 @@ final class ShaftAndTornadoTests: XCTestCase {
         return match
     }
 
-    func testLightningStrikesItsSpotTwoSecondsAfterTheFlashAndStripsButNotZeusJuice() {
+    func testLightningStrikesItsSpotTwoSecondsAfterTheFlashAndStripsButNotVoltaCola() {
         XCTAssertGreaterThan(standingUnderLightning(.none).players[0].hitStun, 0)
-        XCTAssertEqual(standingUnderLightning(.zeusJuice).players[0].hitStun, 0)
+        XCTAssertEqual(standingUnderLightning(.voltaCola).players[0].hitStun, 0)
     }
 
     func testLightningPicksOpenRockTopsAndMovesAround() {

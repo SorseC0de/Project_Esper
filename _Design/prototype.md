@@ -173,7 +173,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   it and coming once it has reached its hold (`shotWindupFrames`, `throwWindupFrames`): the throw sheet's third frame, sliding
   straight back 48 art pixels over 12 frames (`StepbackRules`), the facing kept, trailing
   afterimages in the colour's bright version, at 0.9, held a tenth of a second and fading over
-  three, as Zeus Juice's bolt does (a jump out of the shooting stance and the throw leave the same; the slash leaves the body's and its blade's), with the jump's sound; the whole way
+  three, as Volta Cola's bolt does (a jump out of the shooting stance and the throw leave the same; the slash leaves the body's and its blade's), with the jump's sound; the whole way
   a counter, as the throw stance's parry frames are (out of a shot the air-with-ball sheet's last
   frame shows, out of a throw the throw sheet's third), and its ball can't be snatched, by Frost Tea's
   either. Then back in the stance at its hold, buttons kept, the aim cleared: the stick still down from the stepback aims nothing until it's let go and pressed again, so a quick shot or throw out of it goes off the preset, not down (`stepbackAimLocked`, protocol 33). Down never cancels a stance: the
@@ -376,7 +376,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 - Quake-Up Coffee (G). Its fast fall is 1.6 times anyone's, and the landing shakes the floor: the ball on it hops up
   3 and the other standing on the same floor, within a unit of the same height, is
   stripped; level two makes the whole screen the floor. Numbers in `QuakeRules`.
-- Zeus Juice (H). Shoot without the ball throws a bolt straight ahead at 6, tilted by
+- Volta Cola (H). Shoot without the ball throws a bolt straight ahead at 6, tilted by
   the stick up to 30°, for 60 frames, one every 24: a body it meets is stripped and
   knocked as the slash knocks; thrown on the ground it's committed as the slash is, the
   stick not walking and the run bleeding off at the slash's brake, and the ball it meets pops back toward the thrower. There's no slash.
@@ -387,7 +387,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   stripped, or the loose ball, popped, once every 40 frames. The bolt throw plays the
   whole throw sheet, ground or air, with the sheet's ball drawn as energy, and the bolt
   leaves on its release frame, sixteen frames in, the way the body faces then.
-  Numbers in `ZeusRules`.
+  Numbers in `VoltaRules`.
 - Frost Tea (I). The snatch freezes what it reaches, a body or the loose ball, for 60
   frames: held exactly where it is, nothing running, nothing caught, no hitbox live, though
   a frozen ball can still be picked up or snatched;
@@ -889,7 +889,7 @@ art pixel, 4 to start).
 - Flash Fizz: the flash on jump, five tiles, tearing; level two gives two a cooldown.
 - Platform Protein Shake: the slab; level two adds the wall.
 - Quake-Up Coffee: the quake on the same floor; level two the whole screen.
-- Zeus Juice: the bolt; level two adds the strike on throw.
+- Volta Cola: the bolt; level two adds the strike on throw.
 - Frost Tea: the freezing snatch and the endless slide; level two adds the ice clones.
 - Blazing Boba: the flames and the burning ball; level two adds the fireball.
 - Pulsepistol Punch: the pulse; level two shoots on the run and adds the pull.
@@ -905,7 +905,7 @@ holds the variants; A is always the baseline as tuned. POWER's fourteen sit in t
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
-  Shake, F Quake-Up Coffee, G Zeus Juice, H Frost Tea, I Blazing Boba, J Pulsepistol
+  Shake, F Quake-Up Coffee, G Volta Cola, H Frost Tea, I Blazing Boba, J Pulsepistol
   Punch, K Surf Soda, L Titan Tea, M Gale Ale, N Z Tea, at the level LEVEL picks, on this phone's player only, the
   other side keeping its drinks, with the body the power brings; A by default. The left bumper always steps POWER; the local side's power
   and level are lettered under the pickers.
@@ -1171,7 +1171,7 @@ knocked loose bursts like a wall jump's spark, away from the hitter.
 
 The powers' effects: Blazing Boba's jump, dash, wall spark, skid, charge, trail and
 burst are the painted `fire_*` sheets drawn as they are at a third, standing on the
-bottom of their frames; Zeus Juice's bolts are thrown from the throw's release pose; Zeus Juice's jump spark and
+bottom of their frames; Volta Cola's bolts are thrown from the throw's release pose; Volta Cola's jump spark and
 charge are grey sheets toned per player; Flash Fizz's flash is `flashspark`, its 256x144 frames boxed down by four, drawn added
 so it glows, at both ends, in place of the diamonds; Frost Tea's sparks are snowflakes off the
 vector, a sphere of them for the snatch; Quake-Up's quake shakes the camera a pixel or
@@ -1517,7 +1517,7 @@ white (0.6, fading over 0.3 seconds, over everything but the rain), a column of 
 floats slowly up from where it'll strike, and two seconds after the flash `small_lightning` (eight
 32 by 96 frames at 15 a second, standing on its frame's bottom) strikes there: an open top of rock under no ceiling, picked by the
 flash's count, the same on both phones. Whoever its line touches, up from the rock, is stripped,
-but Zeus Juice. None of it glows.
+but Volta Cola. None of it glows.
 
 Protocol 42.
 
@@ -1792,10 +1792,10 @@ through at 24 a second over its life (`esper_particle` by default), rising on on
 a steady push toward the ball along x; a single-frame one (a snowflake, or the squares with
 `ParticleLook.sprites` off) steps down in size instead. The double jump throws three oval rings of
 energy under the feet (14 by 4 art pixels, a line thick), one every 0.06 seconds, each widening
-to 2.5 times as it fades over 0.3; Blazing Boba's head burns `fire_particle`, Zeus Juice's sheds its bolts and Surf Soda's its bubbles, each half and half with the regular energy as Frost Tea's snowflakes are; and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, streaming back along the ball's path and turned to it, without the head's rise and wind, Frost Tea's sheds snowflakes among the energy,
-Zeus Juice's throws the two lightning particles, half each. Sizes per sprite in
+to 2.5 times as it fades over 0.3; Blazing Boba's head burns `fire_particle`, Volta Cola's sheds its bolts and Surf Soda's its bubbles, each half and half with the regular energy as Frost Tea's snowflakes are; and its burning ball, loose and flying, trails the same fire at twice a head's rate beside its usual trail, streaming back along the ball's path and turned to it, without the head's rise and wind, Frost Tea's sheds snowflakes among the energy,
+Volta Cola's throws the two lightning particles, half each. Sizes per sprite in
 `ParticleLook`: energy 10, snowflake 6, fire 12, lightning 8. Hits spark with
-`esper_spark` and `esper_spark2`, Zeus Juice's with `lightning_spark` and
+`esper_spark` and `esper_spark2`, Volta Cola's with `lightning_spark` and
 `lightning_spark2`, at half size, centred, twice that on a wall; a fireball's burst is
 twice its size on a wall. Blazing Boba's hits spark with `fire_spark`, `fire_spark2` or
 `fire_spark3`, painted, at half size, centred. The flash sheet is drawn over, not added, so its tone shows,
@@ -1803,7 +1803,7 @@ and with the hitboxes on its tear's reach rings both ends. Head particles each s
 a random frame of their sheet, so a stream never plays in step. The wall jump spark is `fire_wallspark` as a
 silhouette in the energy colour; Blazing Boba's is `fire_skid`. The flash is `flashspark3` at its own 48 pixels in the energy colour at both
 ends; the jump spark draws at three quarters, the ice one at 0.625 (half, and a quarter more);
-Zeus Juice's, bottom-aligned, twelve pixels under the feet. Frost Tea's jump spark is
+Volta Cola's, bottom-aligned, twelve pixels under the feet. Frost Tea's jump spark is
 `ice_jumpspark` toned in the snowflake's two blues.
 
 ## Sound
@@ -1832,7 +1832,7 @@ on the audio thread, which cost the TV 4 ms a frame of footsteps), ambient, so t
 shown, once, like the effects.
 
 - jump: the jump, the double jump, the wall jump.
-- shoot_v2: the shot, the throw, the fireball's throw and Zeus Juice's bolt (player_shoot
+- shoot_v2: the shot, the throw, the fireball's throw and Volta Cola's bolt (player_shoot
   is unused).
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`).
@@ -1866,7 +1866,7 @@ shown, once, like the effects.
   the folder left out, each levelled as it's converted: its loudness while sounding (the RMS
   of its 10 ms stretches above -40 dBFS) to -21 dB for the announcer, just under the swish
   (-20.5), and -27 for the crowd, its peak kept under -3.
-- lightning_hit1, 2, 3, one at random: with every lightning spark, Zeus Juice's hits.
+- lightning_hit1, 2, 3, one at random: with every lightning spark, Volta Cola's hits.
 - fire_hit: with every fire spark, Blazing Boba's hits.
 - menu_select: a cursor moving, a colour circle (menu_cursor, louder than the rest, is
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,

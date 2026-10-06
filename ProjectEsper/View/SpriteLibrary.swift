@@ -1130,7 +1130,7 @@ enum EnergyEffect: CaseIterable {
 
     /// The two sparks a hit ball throws, one or the other each time, and the four bolts.
     static let hitSparks: [EnergyEffect] = [.spark, .spark2]
-    /// Zeus Juice's hits spark with its own two sheets.
+    /// Volta Cola's hits spark with its own two sheets.
     static let lightningSparks: [EnergyEffect] = [.lightningSpark, .lightningSpark2]
     static let strikes: [EnergyEffect] = [.lightning1, .lightning2, .lightning3, .lightning4]
     /// The bolt sheets' frames that are a full-frame flash, and their one colour on the

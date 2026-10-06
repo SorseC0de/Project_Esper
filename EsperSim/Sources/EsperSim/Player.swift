@@ -9,7 +9,7 @@ public enum Power: Equatable, Hashable {
     case flashFizz
     case platformShake
     case quakeUp
-    case zeusJuice
+    case voltaCola
     case frostTea
     case blazingBoba
     case pulsepistol
@@ -20,7 +20,7 @@ public enum Power: Equatable, Hashable {
 
     /// Powers whose shoot button, without the ball, is something other than the slash.
     public var takesShoot: Bool {
-        self == .zeusJuice || self == .pulsepistol
+        self == .voltaCola || self == .pulsepistol
     }
 }
 
@@ -534,9 +534,9 @@ public struct Player: Equatable {
         if summonPose > 0 { summonPose -= 1 }
         if boltPose > 0 {
             boltPose -= 1
-            if ZeusRules.boltPoseFrames - boltPose == ZeusRules.boltReleaseFrame, wanted == nil {
+            if VoltaRules.boltPoseFrames - boltPose == VoltaRules.boltReleaseFrame, wanted == nil {
                 // The way the body faces now, and the stick's tilt now, on the release.
-                let tilt = min(max(input.stick.y, -1), 1) * ZeusRules.boltTilt
+                let tilt = min(max(input.stick.y, -1), 1) * VoltaRules.boltTilt
                 wanted = .fireBolt(direction: Vec2(x: Trig.cos(tilt) * facing.sign, y: Trig.sin(tilt)))
             }
         }
@@ -617,7 +617,7 @@ public struct Player: Equatable {
             input.shootButtons = 0
             input.stick = .zero
         }
-        // Zeus Juice's bolt throw on the ground is committed as the slash is: the stick
+        // Volta Cola's bolt throw on the ground is committed as the slash is: the stick
         // doesn't walk, and the run it came from bleeds off at the slash's brake.
         let throwingBolt = boltPose > 0 && grounded && state.isGroundState
         let boltCarry = velocity.x
@@ -915,7 +915,7 @@ public struct Player: Equatable {
                 startGunShot(pull: true)
             } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, wallCooldown == 0 {
                 startWall()
-            } else if !holding, shootPressed, power == .zeusJuice, boltCooldown == 0 {
+            } else if !holding, shootPressed, power == .voltaCola, boltCooldown == 0 {
                 fireBolt(input)
             } else if !holding, shootPressed, power == .pulsepistol, pulseCooldown == 0 {
                 startGunShot(pull: false)
@@ -1048,9 +1048,9 @@ public struct Player: Equatable {
                 throwDirection = abs(aim.x) >= abs(aim.y) ? Vec2(x: aim.x > 0 ? 1 : -1, y: 0) : Vec2(x: 0, y: aim.y > 0 ? 1 : -1)
                 if throwDirection.x != 0 { facing = throwDirection.x > 0 ? .right : .left }
             }
-            if stanceTimerJustEntered, hasBall, power == .zeusJuice, powerLevel >= 2, strikeCooldown == 0 {
-                // Zeus Juice: the charge calls a strike down onto the ball in hand.
-                strikeCooldown = ZeusRules.strikeCooldownFrames
+            if stanceTimerJustEntered, hasBall, power == .voltaCola, powerLevel >= 2, strikeCooldown == 0 {
+                // Volta Cola: the charge calls a strike down onto the ball in hand.
+                strikeCooldown = VoltaRules.strikeCooldownFrames
                 // Onto the ball where the stance's sheet draws it, a little behind the chest.
                 let ball = BallLandmarks.offset(animationFrame).map { position + Vec2(x: $0.x / 1.6 * spec.scale * facing.sign, y: $0.y / 1.6 * spec.scale) }
                     ?? Vec2(x: chest.x - facing.sign * 5, y: chest.y + 3)
@@ -1243,9 +1243,9 @@ public struct Player: Equatable {
             }
             if reached(SnatchRules.sparkFrame) {
                 events.append(.snatchReached(player: index))
-                if power == .zeusJuice, powerLevel >= 2, strikeCooldown == 0 {
-                    // Zeus Juice: the strike down onto the hand at full stretch.
-                    strikeCooldown = ZeusRules.strikeCooldownFrames
+                if power == .voltaCola, powerLevel >= 2, strikeCooldown == 0 {
+                    // Volta Cola: the strike down onto the hand at full stretch.
+                    strikeCooldown = VoltaRules.strikeCooldownFrames
                     wanted = .strikeBolt(x: handCatchPoint.x, bottom: handCatchPoint.y)
                 }
                 // Gale Ale at level two: a tornado off the snatch's spark, the way it faces.
@@ -1576,12 +1576,12 @@ public struct Player: Equatable {
         events.append(.fireballMade(player: index))
     }
 
-    /// Zeus Juice's bolt: straight ahead, tilted by the stick up to the limit.
+    /// Volta Cola's bolt: straight ahead, tilted by the stick up to the limit.
     private mutating func fireBolt(_ input: PlayerInput) {
-        boltCooldown = ZeusRules.boltCooldownFrames
+        boltCooldown = VoltaRules.boltCooldownFrames
         // Thrown: the whole throw sheet plays, and the bolt leaves on its release frame the
         // way the body faces then.
-        boltPose = ZeusRules.boltPoseFrames
+        boltPose = VoltaRules.boltPoseFrames
     }
 
     /// Pulsepistol Punch's shot: on the run at level two it fires in stride; otherwise the
@@ -1649,7 +1649,7 @@ public struct Player: Equatable {
             startGunShot(pull: true)
         } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, wallCooldown == 0 {
             startWall()
-        } else if !holding, shootPressed, power == .zeusJuice, boltCooldown == 0 {
+        } else if !holding, shootPressed, power == .voltaCola, boltCooldown == 0 {
             fireBolt(input)
         } else if !holding, shootPressed, power == .pulsepistol, pulseCooldown == 0 {
             startGunShot(pull: false)

@@ -311,7 +311,7 @@ final class PowerTests: XCTestCase {
     }
 
     func testTheBoardStopsTheOthersBolt() {
-        var match = with(.zeusJuice, other: .surfSoda)
+        var match = with(.voltaCola, other: .surfSoda)
         match.players[1].position = Vec2(x: match.players[0].position.x + 60, y: 10)
         match.players[1].surfing = true
         // Turned so the board stands on the side facing the bolt.
@@ -367,25 +367,25 @@ final class PowerTests: XCTestCase {
         XCTAssertFalse(whole.players[1].hasBall, "at level two the whole screen is the floor")
     }
 
-    // MARK: Zeus Juice
+    // MARK: Volta Cola
 
     func testABoltStripsTheBodyItMeets() {
-        var match = with(.zeusJuice)
+        var match = with(.voltaCola)
         match.players[1].position.x = match.players[0].position.x + 40
         match.players[1].hasBall = true
         match.ball.holder = 1
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        XCTAssertNotEqual(match.players[0].state, .slashing, "Zeus Juice's shoot is the bolt, not the slash")
+        XCTAssertNotEqual(match.players[0].state, .slashing, "Volta Cola's shoot is the bolt, not the slash")
         // The throw sheet plays, and the bolt leaves on its release frame.
-        let fired = run(&match, frames: ZeusRules.boltReleaseFrame + 1, input: { _ in .idle }) { $0.events.contains(.boltFired(player: 0)) }
-        XCTAssertEqual(fired + 1, ZeusRules.boltReleaseFrame)
+        let fired = run(&match, frames: VoltaRules.boltReleaseFrame + 1, input: { _ in .idle }) { $0.events.contains(.boltFired(player: 0)) }
+        XCTAssertEqual(fired + 1, VoltaRules.boltReleaseFrame)
         let hit = run(&match, frames: 30, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
         XCTAssertLessThan(hit, 30)
         XCTAssertTrue(match.bolts.isEmpty)
     }
 
     func testABoltThrowOnTheGroundBrakesAsTheSlashDoes() {
-        var match = with(.zeusJuice)
+        var match = with(.voltaCola)
         match.players[1].position.x = 300
         for _ in 0..<30 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
         let speed = match.players[0].velocity.x
@@ -394,28 +394,28 @@ final class PowerTests: XCTestCase {
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle])
         XCTAssertEqual(match.players[0].velocity.x, speed - match.players[0].spec.attackBrake, accuracy: 0.001, "the slash's brake from the frame after the press")
         // Held into the stick all the way, it never runs again until the throw's done.
-        for _ in 0..<(ZeusRules.boltPoseFrames - 2) { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
+        for _ in 0..<(VoltaRules.boltPoseFrames - 2) { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
         XCTAssertNotEqual(match.players[0].state, .run)
         XCTAssertLessThan(match.players[0].velocity.x, speed)
     }
 
     func testABoltGoesTheWayTheBodyFacesOnTheRelease() {
-        var match = with(.zeusJuice)
+        var match = with(.voltaCola)
         match.players[0].position.y = 60
         match.players[0].grounded = false
         match.players[0].state = .air
         match.players[1].position.x = 300
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         // Turned in the air before the release.
-        run(&match, frames: ZeusRules.boltReleaseFrame + 1, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { !$0.bolts.isEmpty }
+        run(&match, frames: VoltaRules.boltReleaseFrame + 1, input: { _ in PlayerInput(stick: Vec2(x: -1, y: 0)) }) { !$0.bolts.isEmpty }
         XCTAssertEqual(match.players[0].facing, .left)
         XCTAssertLessThan(match.bolts.first?.velocity.x ?? 0, 0, "thrown the way it faces as it lets go")
     }
 
     func testABoltPopsTheBallBackTowardTheThrower() {
-        var match = with(.zeusJuice)
+        var match = with(.voltaCola)
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        run(&match, frames: ZeusRules.boltReleaseFrame + 1, input: { _ in .idle }) { !$0.bolts.isEmpty }
+        run(&match, frames: VoltaRules.boltReleaseFrame + 1, input: { _ in .idle }) { !$0.bolts.isEmpty }
         match.ball.respawn(at: match.bolts[0].position + Vec2(x: 20, y: 0))
         let hit = run(&match, frames: 30, input: { _ in .idle }) { $0.events.contains { if case .boltLanded = $0 { return true } else { return false } } }
         XCTAssertLessThan(hit, 30)
@@ -423,11 +423,11 @@ final class PowerTests: XCTestCase {
     }
 
     func testLevelTwoThrowStrikesDownOnTheSnatchAndTheBallInHand() {
-        var match = with(.zeusJuice, level: 2)
+        var match = with(.voltaCola, level: 2)
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         let struck = run(&match, frames: 20, input: { _ in .idle }) { $0.events.contains { if case .boltStruck(player: 0, _, _) = $0 { return true } else { return false } } }
         XCTAssertLessThan(struck, 20)
-        var held = with(.zeusJuice, level: 2)
+        var held = with(.voltaCola, level: 2)
         held.players[0].hasBall = true
         held.ball.holder = 0
         held.advance(inputs: [PlayerInput(throwBall: true), .idle])

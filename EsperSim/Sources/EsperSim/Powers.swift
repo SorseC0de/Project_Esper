@@ -1,7 +1,7 @@
 import Foundation
 
 /// The things the newer powers leave in the world, each a value the match carries and
-/// steps: Zeus Juice's bolts, Frost Tea's ice clones, Blazing Boba's flames and
+/// steps: Volta Cola's bolts, Frost Tea's ice clones, Blazing Boba's flames and
 /// fireballs. A "strip" is the shared outcome of most hits: the victim is stunned and any
 /// ball they hold pops free; some strips knock the body away too.
 public struct Bolt: Equatable {
@@ -110,12 +110,12 @@ public enum QuakeRules {
     public static let sameFloorSlack = 1.0
 }
 
-/// Zeus Juice: shoot without the ball throws a bolt straight ahead at this speed, tilted
+/// Volta Cola: shoot without the ball throws a bolt straight ahead at this speed, tilted
 /// by the stick up to this far, for this long, this often. A body it meets is stripped and
 /// knocked on; the ball it meets pops back toward the thrower. Level two's throw calls a
 /// strike down from the top of the screen, this wide, at the ball in hand or at the
 /// snatch's hand.
-public enum ZeusRules {
+public enum VoltaRules {
     public static let boltSpeed = 6.0
     public static let boltTilt = degrees(30)
     public static let boltFrames = 60

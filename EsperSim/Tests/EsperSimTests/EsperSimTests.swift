@@ -1879,8 +1879,8 @@ final class FootsiesTests: XCTestCase {
 
     func testEverySnatchReachesAHoldersBodyWithTheHandsRing() {
         // The ring alone touches the holder's body, not the snatcher's own: every drink's
-        // snatch reaches them, Zeus Juice's and Frost Tea's as the plain one.
-        for power in [Power.none, .zeusJuice, .frostTea] {
+        // snatch reaches them, Volta Cola's and Frost Tea's as the plain one.
+        for power in [Power.none, .voltaCola, .frostTea] {
             var match = Match()
             match.players[0].position = Vec2(x: 150, y: match.players[0].position.y)
             match.players[0].facing = .right

@@ -303,8 +303,8 @@ public struct Match: Equatable {
         case .quake:
             quake(by: index)
         case .fireBolt(let direction):
-            bolts.append(Bolt(id: stamp(), owner: index, position: player.chest + direction * 6, velocity: direction * ZeusRules.boltSpeed,
-                              framesLeft: ZeusRules.boltFrames))
+            bolts.append(Bolt(id: stamp(), owner: index, position: player.chest + direction * 6, velocity: direction * VoltaRules.boltSpeed,
+                              framesLeft: VoltaRules.boltFrames))
             events.append(.boltFired(player: index))
         case .strikeBolt(let x, let bottom):
             strike(x: x, bottom: bottom, by: index)
@@ -933,7 +933,7 @@ public struct Match: Equatable {
     }
 
     /// The flash, then the strike: whoever the bolt's line touches, up from its spot, is
-    /// stripped, but Zeus Juice.
+    /// stripped, but Volta Cola.
     private mutating func stepLightning() {
         guard !stage.lightningSpots.isEmpty else { return }
         let time = frame % LightningRules.everyFrames
@@ -943,7 +943,7 @@ public struct Match: Equatable {
         events.append(.lightningStruck(at: target))
         let line = Box(min: Vec2(x: target.x - LightningRules.halfWidth, y: target.y),
                        max: Vec2(x: target.x + LightningRules.halfWidth, y: Double(stage.rows) * Stage.tileSize))
-        for victim in players.indices where players[victim].power != .zeusJuice && players[victim].frozen == 0 && players[victim].body.overlaps(line) {
+        for victim in players.indices where players[victim].power != .voltaCola && players[victim].frozen == 0 && players[victim].body.overlaps(line) {
             strip(victim, by: players.indices.first { $0 != victim } ?? victim, knock: nil, flo: 0)
         }
     }
@@ -1027,14 +1027,14 @@ public struct Match: Equatable {
         }
     }
 
-    /// Zeus Juice's strike: down from the top of the screen at `x` toward `bottom`, and it
+    /// Volta Cola's strike: down from the top of the screen at `x` toward `bottom`, and it
     /// stops on the first thing it meets: a solid, the other body, stripped, or the loose
     /// ball, popped up.
     private mutating func strike(x: Double, bottom: Double, by index: Int) {
         let other = players.indices.first { $0 != index }
         var y = Double(stage.rows + Stage.skyRows) * Stage.tileSize - 1
         while y > bottom {
-            let bit = Box(min: Vec2(x: x - ZeusRules.strikeHalfWidth, y: y - 2), max: Vec2(x: x + ZeusRules.strikeHalfWidth, y: y))
+            let bit = Box(min: Vec2(x: x - VoltaRules.strikeHalfWidth, y: y - 2), max: Vec2(x: x + VoltaRules.strikeHalfWidth, y: y))
             if let other, players[other].frozen == 0, players[other].body.overlaps(bit) {
                 events.append(.boltStruck(player: index, x: x, bottom: players[other].body.max.y))
                 strip(other, by: index, knock: Vec2(x: 0, y: 1))
@@ -1112,7 +1112,7 @@ public struct Match: Equatable {
         }
     }
 
-    /// Zeus Juice's bolts fly straight until they meet a wall, a body or the ball.
+    /// Volta Cola's bolts fly straight until they meet a wall, a body or the ball.
     private mutating func stepBolts() {
         var kept: [Bolt] = []
         for var bolt in bolts {
@@ -1134,7 +1134,7 @@ public struct Match: Equatable {
             }
             if let other = players.indices.first(where: { $0 != bolt.owner }), players[other].frozen == 0, players[other].body.overlaps(box) {
                 let sign = bolt.velocity.x >= 0 ? 1.0 : -1.0
-                strip(other, by: bolt.owner, knock: Vec2(x: ZeusRules.boltKnock.x * sign, y: ZeusRules.boltKnock.y))
+                strip(other, by: bolt.owner, knock: Vec2(x: VoltaRules.boltKnock.x * sign, y: VoltaRules.boltKnock.y))
                 events.append(.boltLanded(at: bolt.position))
                 continue
             }
@@ -1142,7 +1142,7 @@ public struct Match: Equatable {
                 // Back toward the thrower, a little.
                 let sign = bolt.velocity.x >= 0 ? 1.0 : -1.0
                 ball.pop(from: ball.position)
-                ball.velocity = Vec2(x: -ZeusRules.ballPop.x * sign, y: ZeusRules.ballPop.y)
+                ball.velocity = Vec2(x: -VoltaRules.ballPop.x * sign, y: VoltaRules.ballPop.y)
                 ball.lastTouched = bolt.owner
                 events.append(.boltLanded(at: bolt.position))
                 continue

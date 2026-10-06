@@ -1547,17 +1547,17 @@ never a painted slope.
 
 ## Hoopfish Hideaway
 
-`Stage.wetshot`, `StageChoice.wetshotWake`: 37 by 19 tiles, under water, zoomed to the screen's width (not by
+`Stage.hoopfishHideaway`, `StageChoice.hoopfishHideaway`: 37 by 19 tiles, under water, zoomed to the screen's width (not by
 whole pixels), its bottom on the screen's: a phone crops blank water off the top (about two rows),
 a squarer screen shows more water over it,
-laid out in the map maker like the Elements (`MapStage.wetshot`, `StageMap.current[.wetshot]`,
-kept offline under `esper.wetshotMap`; its first map a floor along the bottom row, the
-Hoopfish over the middle). Its first name, Wetshot Wake, and Hoopfish Harbor are kept for later
-(`_Design/notes.md`). Drawn: `Background_v2.png` (592 by 272, `WetshotBackground`) a row up
+laid out in the map maker like the Elements (`MapStage.hoopfishHideaway`, `StageMap.current[.hoopfishHideaway]`,
+kept offline under `esper.hoopfishHideawayMap`; its first map a floor along the bottom row, the
+Hoopfish over the middle). Its first name, Hoopfish Hideaway, and Hoopfish Harbor are kept for later
+(`_Design/notes.md`). Drawn: `Background_v2.png` (592 by 272, `HoopfishHideawayBackground`) a row up
 off the floor's row, which is palette 1 as is everything below it, everything over it the
 water's top colour (palette 19), neither glowing; over the background the pile of backboards and
-hoops the Hoopfish has collected (`StageMap.pile`, `WetshotArt.pilePicture`), drawn as one picture
-at 75%, then `Foreground.png` (`WetshotForeground`) in the background's place, both behind
+hoops the Hoopfish has collected (`StageMap.pile`, `HoopfishHideawayArt.pilePicture`), drawn as one picture
+at 75%, then `Foreground.png` (`HoopfishHideawayForeground`) in the background's place, both behind
 everything that moves and neither glowing. The pile's pieces, the three frames each of
 `Backboards.png` and `hoops.png` (48 pixel cells, stage strips), are put down in the map maker anywhere, on the nearest whole art pixel
 rather than the grid, picked up and moved with the piece tool in hand, erased with ERASE; two
@@ -1579,16 +1579,16 @@ count (the same on both phones), ten seconds across from wholly off one side to 
 other, swaying 30 units up and down one and a quarter times as it goes, slowly, its bottom kept between the
 twelfth row from the top and as high as its three rows fit, over and over. What's on its antenna
 changes only off screen: once the ball's been taken, the stage's rim from then on, turned with it.
-The ball hangs on the antenna at its own point, 24 across and 24 up (`WetshotRules.ballPixelsAcross`/`Up`,
+The ball hangs on the antenna at its own point, 24 across and 24 up (`HoopfishHideawayRules.ballPixelsAcross`/`Up`,
 on BALL X and BALL Y offline); a stage's decider puts it back there. Hung there, its halo is twice its size, half way to white, and swells from its usual 0.5 to 0.9 and back over two seconds. As drawn: the body breathing between 0.9 and 1.1 over two seconds, the fins swinging
 out to 10 degrees and back over a second and a half (the top one clockwise), the tail one the
 whole arc, 10 either way, the front one the whole arc, 15 either way, rising as it swings away from
-level to 2 whole pixels at either end (`WetshotArt.frontFinLift`), the antenna, and the rim, net and ball on it, nodding 5
+level to 2 whole pixels at either end (`HoopfishHideawayArt.frontFinLift`), the antenna, and the rim, net and ball on it, nodding 5
 degrees either way over two seconds, the ball's glow there coming and going between none and 90%
 over two seconds, still while someone dunks (and a rim swimming off the stage,
 or gone, lets go of whoever hangs on it); each turning where it meets the
-body (`WetshotArt.hoopfishParts`). Its rim and net glow, and so do its red rings and eye (left out of the
-body's mask, `WetshotArt.bodyGlowMask`), the background's no-glow under them let through: drawn
+body (`HoopfishHideawayArt.hoopfishParts`). Its rim and net glow, and so do its red rings and eye (left out of the
+body's mask, `HoopfishHideawayArt.bodyGlowMask`), the background's no-glow under them let through: drawn
 pure blue in the mask over it (`MaskScene`'s `through`, under the fish's flats, and `throughFront`
 and the net strands over them; `GameScene.glowThroughSnapshots`, `glowThroughFrontSnapshots`,
 `glowThroughNets`), where the bright pass undoes the water's tint, so they glow in their own colours,
@@ -1601,7 +1601,7 @@ frame, then the fish spins, `Hoopfish_spin` (eight 96 by 48 frames at 15 a secon
 art and net with them, the rim out of play throughout (`Hoopfish.spin`), and the ball drops
 from the dunker's hands, no point, the dunker let go into the air (`MatchEvent.hoopfishSpun`).
 Bubbles burst all round it as it spins, some over it, and trail off its tail as it swims
-(`WetshotArt.tailTip`, 10 a second). In 47, points here are worth double (`StageFeatures.doublePoints`),
+(`HoopfishHideawayArt.tailTip`, 10 a second). In 47, points here are worth double (`StageFeatures.doublePoints`),
 a basket's points doubled; a best of seven's rounds stay one a basket. In 47, play on the stage starts with "Points Are Worth Double!" in the drink banner's
 lettering, and each basket throws "2X" over the rim in CardCourt's 2X lettering (Avenir Next
 Condensed Heavy, `TitleText.markTexture`) in palette 7 over 20, outlined 29, from a tenth of its
@@ -1614,7 +1614,7 @@ screen here: off screen it's only ever on the antenna. The plants sway 5 degrees
 seconds, each on its own beat, from their bottom middle. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
 to whoever put the ball through (`ball.lastTouched`), protocol 48. For 20 frames after any point no
 other counts (`BallRules.scoreLockoutFrames`): a rim on the move can take the same ball through twice. Its centre is 15 pixels across
-(mirrored when it faces right) and 24 up from the Hoopfish's bottom left (`WetshotRules.rimFromHoopfish`), across on the
+(mirrored when it faces right) and 24 up from the Hoopfish's bottom left (`HoopfishHideawayRules.rimFromHoopfish`), across on the
 HOOP X debug slider offline, a whole pixel at a time, rim, art and net together; there's no
 backboard. There's only ever one Hoopfish. Each of its parts will be animated, to be detailed.
 

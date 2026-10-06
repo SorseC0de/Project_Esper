@@ -34,7 +34,7 @@ final class OpponentStageTests: XCTestCase {
     }
 
     func testTheTerrainReadsEachStage() {
-        for stage in [Stage.elements, .wetshot, .footballField] {
+        for stage in [Stage.elements, .hoopfishHideaway, .footballField] {
             let match = Match(stage: stage, specs: [.starting, .starting])
             let terrain = Terrain(stage: match.stage, player: match.players[1])
             var frames = 0
@@ -86,8 +86,8 @@ final class OpponentStageTests: XCTestCase {
         XCTAssertLessThan(outcome.frames, 4800)
     }
 
-    func testOnWetshotItTakesTheBallOffTheHoopfishThenScores() {
-        var match = Match(stage: .wetshot, specs: [.starting, .starting])
+    func testOnHoopfishHideawayItTakesTheBallOffTheHoopfishThenScores() {
+        var match = Match(stage: .hoopfishHideaway, specs: [.starting, .starting])
         match.countdown = 0
         var brain = Opponent(index: 1)
         let fetched = play(&match, &brain, frames: 3600) { $0.ball.holder == 1 }
@@ -196,7 +196,7 @@ final class OpponentDuelTests: XCTestCase {
     /// the lava takes nobody who wasn't knocked into it.
     func testTwoComputersPlayEachStage() {
         // Longball's field takes a few minutes a point; its attack is tested on its own.
-        for stage in [Stage.elements, .wetshot] {
+        for stage in [Stage.elements, .hoopfishHideaway] {
             var points = 0, unforced = 0
             for pairing in 0..<3 {
                 var match = Match(stage: stage, specs: [.starting, .starting])

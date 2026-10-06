@@ -1,4 +1,4 @@
-/// Wetshot Wake's Hoopfish: it starts at the map's height with the ball on its antenna, far
+/// Hoopfish Hideaway's Hoopfish: it starts at the map's height with the ball on its antenna, far
 /// enough right that the ball's over the centre column as play starts, and swims off the side it faces; then, two seconds off screen, it comes back from that side,
 /// turned round, from a height off the count, swimming ten seconds across to a height off the
 /// count on the far side, swaying up and down as it goes, over and over. The ball stays on its
@@ -23,14 +23,14 @@ public struct Hoopfish: Equatable {
 
     /// Where the rim, or the ball, rides on its antenna: whole art pixels from its bottom left.
     public var antenna: Vec2 {
-        let across = Double(facesRight ? HoopfishRules.pixelWidth - WetshotRules.rimPixelsAcross : WetshotRules.rimPixelsAcross)
-        return position + Vec2(x: across / 1.6, y: Double(WetshotRules.rimPixelsUp) / 1.6)
+        let across = Double(facesRight ? HoopfishRules.pixelWidth - HoopfishHideawayRules.rimPixelsAcross : HoopfishHideawayRules.rimPixelsAcross)
+        return position + Vec2(x: across / 1.6, y: Double(HoopfishHideawayRules.rimPixelsUp) / 1.6)
     }
 
     /// Where the ball hangs on its antenna until a hand takes it.
     public var ballPoint: Vec2 {
-        let across = Double(facesRight ? HoopfishRules.pixelWidth - WetshotRules.ballPixelsAcross : WetshotRules.ballPixelsAcross)
-        return position + Vec2(x: across / 1.6, y: Double(WetshotRules.ballPixelsUp) / 1.6)
+        let across = Double(facesRight ? HoopfishRules.pixelWidth - HoopfishHideawayRules.ballPixelsAcross : HoopfishHideawayRules.ballPixelsAcross)
+        return position + Vec2(x: across / 1.6, y: Double(HoopfishHideawayRules.ballPixelsUp) / 1.6)
     }
 
     /// Off screen, between crossings.
@@ -42,7 +42,7 @@ public struct Hoopfish: Equatable {
         let offLeft = -HoopfishRules.size.x
         let speed = HoopfishRules.crossing(stage) / Double(HoopfishRules.swimFrames)
         let centre = (Double(stage.columns / 2) + 0.5) * Stage.tileSize
-        let goal = centre - Double(WetshotRules.ballPixelsAcross) / 1.6
+        let goal = centre - Double(HoopfishHideawayRules.ballPixelsAcross) / 1.6
         // Its swim to off the side in whole frames, and from where that brings it to the goal on the count's last frame.
         let frames = max(Int(((goal + speed * Double(countdown) - offLeft) / speed).rounded()), 1)
         let share = Double(min(countdown, frames - 1)) / Double(frames)

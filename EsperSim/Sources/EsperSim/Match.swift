@@ -36,7 +36,7 @@ public struct Match: Equatable {
     /// Highway Traffic's cars and helicopter, and which rim the last one carried.
     public var cars: [Car] = []
     public var helicopter: Helicopter?
-    /// Wetshot Wake's Hoopfish, swimming across with the ball or the rim on its antenna.
+    /// Hoopfish Hideaway's Hoopfish, swimming across with the ball or the rim on its antenna.
     public var hoopfish: Hoopfish?
     public var lastHelicopterHoop: Int?
     public var scores: [Int]
@@ -258,7 +258,7 @@ public struct Match: Equatable {
             ball.holder = holder
             ball.position = players[holder].heldBallPoint
         } else if hoopfish != nil {
-            // In neutral on Wetshot Wake is back on the Hoopfish's antenna.
+            // In neutral on Hoopfish Hideaway is back on the Hoopfish's antenna.
             hoopfish?.carrying = .ball
             placeHoopfishLoad()
         }

@@ -1,19 +1,19 @@
 /// The stages laid out by hand in the map maker.
 public enum MapStage: String, CaseIterable, Codable {
-    case elements, wetshot, flight
+    case elements, hoopfishHideaway, flight
 
     /// Its size in tiles.
     public var columns: Int {
         switch self {
         case .elements: ElementsRules.columns
-        case .wetshot: WetshotRules.columns
+        case .hoopfishHideaway: HoopfishHideawayRules.columns
         case .flight: FlightRules.columns
         }
     }
     public var rows: Int {
         switch self {
         case .elements: ElementsRules.rows
-        case .wetshot: WetshotRules.rows
+        case .hoopfishHideaway: HoopfishHideawayRules.rows
         case .flight: FlightRules.rows
         }
     }
@@ -79,7 +79,7 @@ public struct StageMap: Equatable, Codable {
     /// The layers a cell can hold.
     public static let layers = 0...1
 
-    /// A whole picture placed with its bottom left on a cell: Wetshot Wake's plants, rocks and
+    /// A whole picture placed with its bottom left on a cell: Hoopfish Hideaway's plants, rocks and
     /// its Hoopfish, which carries the stage's one rim.
     public enum PropKind: String, Codable, CaseIterable {
         case plant1, plant2, plant3, plant4, plant5, rock1, rock2, hoopfish
@@ -219,7 +219,7 @@ public struct StageMap: Equatable, Codable {
     /// would stand in for it offline, is put aside and the baked one shows.
     public static func bakedVersion(_ stage: MapStage) -> Int {
         switch stage {
-        case .elements, .wetshot: 5
+        case .elements, .hoopfishHideaway: 5
         case .flight: 5
         }
     }
@@ -228,12 +228,12 @@ public struct StageMap: Equatable, Codable {
     public static func baked(_ stage: MapStage) -> StageMap {
         switch stage {
         case .elements: elementsBaked
-        case .wetshot: wetshotBaked
+        case .hoopfishHideaway: hoopfishHideawayBaked
         case .flight: flightBaked
         }
     }
     private static let elementsBaked: StageMap = StageMap.defaultMap()
-    private static let wetshotBaked: StageMap = StageMap.wetshotDefaultMap()
+    private static let hoopfishHideawayBaked: StageMap = StageMap.hoopfishHideawayDefaultMap()
     private static let flightBaked: StageMap = StageMap.flightDefaultMap()
 
     /// Flight as laid out in the map maker: three rows of floor, the rims at the ends eight rows up,
@@ -291,7 +291,7 @@ public struct StageMap: Equatable, Codable {
         func cell(_ value: Cell) -> String { "Cell(\(value.column), \(value.row))" }
         let name = switch stage {
         case .elements: "defaultMap"
-        case .wetshot: "wetshotDefaultMap"
+        case .hoopfishHideaway: "hoopfishHideawayDefaultMap"
         case .flight: "flightDefaultMap"
         }
         var lines = ["    private static func \(name)() -> StageMap {",
@@ -447,9 +447,9 @@ public enum FlightRules {
     public static let bodyScale = 8.0 / 6.0
 }
 
-/// Wetshot Wake: 37 by 19, under water, its one rim on the Hoopfish: the background's 17 rows a
+/// Hoopfish Hideaway: 37 by 19, under water, its one rim on the Hoopfish: the background's 17 rows a
 /// row up off the floor's, with one of water over them.
-public enum WetshotRules {
+public enum HoopfishHideawayRules {
     public static let columns = 37
     public static let rows = 19
     /// The rim's centre from the Hoopfish's bottom left, in whole art pixels: `hoop_straight`
@@ -807,7 +807,7 @@ extension StageMap {
     /// Hoopfish Hideaway's map, laid out in the map maker: the floor along the bottom row, under the
     /// background, a one-way ledge either side, the plants and rocks, where the Hoopfish starts, and
     /// the pile of backboards and hoops behind it all, in the order they were put down.
-    private static func wetshotDefaultMap() -> StageMap {
+    private static func hoopfishHideawayDefaultMap() -> StageMap {
         let props: [Prop] = [
             Prop(.rock1, at: Cell(0, 1)), Prop(.plant3, at: Cell(4, 1)), Prop(.plant1, at: Cell(5, 1)),
             Prop(.plant1, at: Cell(13, 1)), Prop(.plant2, at: Cell(14, 1)), Prop(.plant5, at: Cell(25, 1)),
@@ -824,7 +824,7 @@ extension StageMap {
             .init(.hoop3, x: 254, y: 75, rotation: -135), .init(.backboard1, x: 215, y: 51, rotation: 25),
             .init(.backboard2, x: 118, y: 48, rotation: 26), .init(.backboard1, x: 440, y: 49, rotation: 0),
         ]
-        let walls: [Wall] = (0..<WetshotRules.columns).map { Wall(Cell($0, 0), .solid) }
+        let walls: [Wall] = (0..<HoopfishHideawayRules.columns).map { Wall(Cell($0, 0), .solid) }
             + ((1...5).map { $0 } + (31...35).map { $0 }).map { Wall(Cell($0, 4), .oneWay) }
         return StageMap(props: props, pile: pile, leftRim: Cell(0, 0), rightRim: Cell(0, 0),
                         spawns: [Cell(3, 5), Cell(33, 5)], ball: Cell(18, 12), walls: walls)

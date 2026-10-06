@@ -425,7 +425,7 @@ extension Opponent {
         return path
     }
 
-    /// Where a rim that moves will be, a frame at a time: Wetshot Wake's on the Hoopfish,
+    /// Where a rim that moves will be, a frame at a time: Hoopfish Hideaway's on the Hoopfish,
     /// parked off the stage while it isn't carrying it.
     func hoopPath(_ match: Match, frames: Int = Opponent.lookAheadFrames) -> [Vec2]? {
         guard var fish = match.hoopfish else { return nil }

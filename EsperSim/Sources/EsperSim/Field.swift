@@ -61,7 +61,7 @@ public struct StageFeatures: Equatable {
 
 /// The scenery a stage is drawn with.
 public enum StageLook: Equatable {
-    case court, footballField, highway, elements, wetshot, flight
+    case court, footballField, highway, elements, hoopfishHideaway, flight
 }
 
 extension StageFeatures {

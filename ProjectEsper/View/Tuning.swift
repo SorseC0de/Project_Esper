@@ -160,7 +160,7 @@ enum ChevronTuning {
     static let slider = false
 }
 
-/// Wetshot Wake's water: the tint over everything (WATER TINT), and the screen's sway (WATER
+/// Hoopfish Hideaway's water: the tint over everything (WATER TINT), and the screen's sway (WATER
 /// SWAY), its reach in game pixels, waves down the screen and speed, on the debug panel there.
 enum WaterTuning {
     nonisolated(unsafe) static var overlayAlpha: CGFloat = 0.33

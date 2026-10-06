@@ -6,7 +6,21 @@ import SpriteKit
 /// used, and put aside (under its `beforeBake` key, not deleted) when a newer map has been
 /// baked since.
 enum SavedStageMap {
-    private static func key(_ stage: MapStage) -> String { stage == .elements ? "esper.elementsMap" : "esper.\(stage.rawValue)Map" }
+    private static func key(_ stage: MapStage) -> String {
+        _ = movedFromOldName
+        return stage == .elements ? "esper.elementsMap" : "esper.\(stage.rawValue)Map"
+    }
+
+    /// Hoopfish Hideaway's map and its sheet, kept under the stage's old name, moved to its own, once.
+    static let movedFromOldName: Void = {
+        let defaults = UserDefaults.standard
+        for suffix in ["", ".bakedVersion", ".beforeBake", ".sheet"] {
+            let old = "esper.wetshotMap" + suffix, new = "esper.\(MapStage.hoopfishHideaway.rawValue)Map" + suffix
+            guard let kept = defaults.object(forKey: old), defaults.object(forKey: new) == nil else { continue }
+            defaults.set(kept, forKey: new)
+            defaults.removeObject(forKey: old)
+        }
+    }()
     private static func versionKey(_ stage: MapStage) -> String { key(stage) + ".bakedVersion" }
     private static func beforeBakeKey(_ stage: MapStage) -> String { key(stage) + ".beforeBake" }
 
@@ -54,13 +68,13 @@ enum SavedStageMap {
 #if !os(tvOS)
 import UIKit
 
-/// The map maker, for a mouse, for the Elements and Wetshot Wake: the stage under a grid, and
-/// a panel to pick from: the Elements' tileset, or Wetshot Wake's plants, rocks and Hoopfish.
+/// The map maker, for a mouse, for the Elements and Hoopfish Hideaway: the stage under a grid, and
+/// a panel to pick from: the Elements' tileset, or Hoopfish Hideaway's plants, rocks and Hoopfish.
 /// Drag a tile or a prop from the panel onto the stage to drop it; press one on the stage to
 /// pick it up and move it, dropping it back on the panel to take it away; press an empty cell
 /// with a tile or a prop chosen to place it (tiles paint as the pointer drags). The markers
 /// (the Elements' two rims, the two starts and the ball) are chosen and dropped the same way;
-/// Wetshot Wake's one rim rides the Hoopfish, and there's only ever one. UNDO steps back,
+/// Hoopfish Hideaway's one rim rides the Hoopfish, and there's only ever one. UNDO steps back,
 /// COPY puts the map on the clipboard as Swift for the stage's baked map. The map is kept
 /// between launches and stands in for the baked one offline.
 final class MapEditor: SKNode {
@@ -74,7 +88,7 @@ final class MapEditor: SKNode {
         case tornado
         /// In walls mode: a wall kind, or nil to open a cell.
         case wall(StageMap.Kind?)
-        /// Wetshot Wake's: a prop to place whole.
+        /// Hoopfish Hideaway's: a prop to place whole.
         case prop(StageMap.PropKind)
         /// A piece of the background pile, put down anywhere.
         case pile(StageMap.PilePiece.Kind)
@@ -83,8 +97,8 @@ final class MapEditor: SKNode {
     private enum Marker: Equatable, CaseIterable {
         case leftRim, rightRim, firstStart, secondStart, ball
 
-        /// The markers a stage has: Wetshot Wake's one rim rides the Hoopfish, so no rims.
-        static func on(_ stage: MapStage) -> [Marker] { stage == .wetshot ? [.firstStart, .secondStart, .ball] : allCases }
+        /// The markers a stage has: Hoopfish Hideaway's one rim rides the Hoopfish, so no rims.
+        static func on(_ stage: MapStage) -> [Marker] { stage == .hoopfishHideaway ? [.firstStart, .secondStart, .ball] : allCases }
 
         var label: String {
             switch self {
@@ -121,7 +135,10 @@ final class MapEditor: SKNode {
     private var sheetIndex: Int {
         didSet { UserDefaults.standard.set(sheetIndex, forKey: MapEditor.sheetKey(stage)) }
     }
-    private static func sheetKey(_ stage: MapStage) -> String { "esper.\(stage.rawValue)Map.sheet" }
+    private static func sheetKey(_ stage: MapStage) -> String {
+        _ = SavedStageMap.movedFromOldName
+        return "esper.\(stage.rawValue)Map.sheet"
+    }
     private(set) var map: StageMap
     private var history: [StageMap] = []
     private var tool: Tool
@@ -169,7 +186,7 @@ final class MapEditor: SKNode {
     private var ghostMarker: SKNode?
     private var buttons: [(rect: CGRect, action: () -> Void)] = []
     private var paletteRect = CGRect.zero
-    /// Wetshot Wake's props laid out in the panel in place of a tileset, each where it's drawn.
+    /// Hoopfish Hideaway's props laid out in the panel in place of a tileset, each where it's drawn.
     private var propButtons: [(rect: CGRect, kind: StageMap.PropKind)] = []
     private var pileButtons: [(rect: CGRect, kind: StageMap.PilePiece.Kind)] = []
     /// The two turn sliders, for the newest pile piece and the one before it, and the one being dragged.
@@ -227,10 +244,10 @@ final class MapEditor: SKNode {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// What's in hand to start with, and back from walls mode: a tile, or Wetshot Wake's first plant.
+    /// What's in hand to start with, and back from walls mode: a tile, or Hoopfish Hideaway's first plant.
     private static func firstTool(for stage: MapStage) -> Tool {
         switch stage {
-        case .wetshot: .prop(.plant1)
+        case .hoopfishHideaway: .prop(.plant1)
         case .elements: .brush(ElementsArt.filled.first { $0 == StageMap.Cell(3, 3) } ?? ElementsArt.filled[0])
         case .flight: .brush(MapTiles.flight.filled(sheet: 0).first ?? StageMap.Cell(0, 0))
         }
@@ -279,8 +296,8 @@ final class MapEditor: SKNode {
         buttons = []
         let scale = paletteScale
         let sheetSize = tiles.sheets[sheetIndex].size()
-        let showsSheet = paletteShown && !wallsMode && stage != .wetshot
-        let showsProps = paletteShown && !wallsMode && stage == .wetshot
+        let showsSheet = paletteShown && !wallsMode && stage != .hoopfishHideaway
+        let showsProps = paletteShown && !wallsMode && stage == .hoopfishHideaway
         // The props in a row, each scaled to the row's height but no wider than it allows.
         let propHeight: CGFloat = 28
         let propSizes = StageMap.PropKind.allCases.map { kind -> CGSize in
@@ -388,7 +405,7 @@ final class MapEditor: SKNode {
             let bottom = top - contentHeight
             for (kind, size) in zip(StageMap.PropKind.allCases, propSizes) {
                 let rect = CGRect(x: x, y: bottom, width: size.width, height: size.height)
-                let sprite = SKSpriteNode(texture: WetshotArt.texture(kind))
+                let sprite = SKSpriteNode(texture: HoopfishHideawayArt.texture(kind))
                 sprite.anchorPoint = .zero
                 sprite.size = size
                 sprite.position = rect.origin
@@ -409,7 +426,7 @@ final class MapEditor: SKNode {
             pileButtons = []
             for kind in StageMap.PilePiece.Kind.allCases {
                 let rect = CGRect(x: x, y: bottom, width: pileSide, height: pileSide)
-                let sprite = SKSpriteNode(texture: WetshotArt.pileTexture(kind))
+                let sprite = SKSpriteNode(texture: HoopfishHideawayArt.pileTexture(kind))
                 sprite.anchorPoint = .zero
                 sprite.size = rect.size
                 sprite.position = rect.origin
@@ -516,7 +533,7 @@ final class MapEditor: SKNode {
     }
 
     private func paletteCell(at point: CGPoint) -> StageMap.Cell? {
-        guard paletteShown, !wallsMode, stage != .wetshot, paletteRect.contains(point) else { return nil }
+        guard paletteShown, !wallsMode, stage != .hoopfishHideaway, paletteRect.contains(point) else { return nil }
         let side = tiles.cellPixels(of: sheetIndex) * paletteScale
         let cell = StageMap.Cell(sheetIndex * tiles.stride + Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
         return tiles.filled(sheet: sheetIndex).contains(cell) ? cell : nil
@@ -723,7 +740,7 @@ final class MapEditor: SKNode {
 
     private func copy() {
         // For now, on Hoopfish Hideaway, the pile: each piece's place and turn.
-        UIPasteboard.general.string = stage == .wetshot ? map.pileSource : map.swiftSource(stage)
+        UIPasteboard.general.string = stage == .hoopfishHideaway ? map.pileSource : map.swiftSource(stage)
     }
 
     /// Where each marker sits, as a coloured square with its letters.
@@ -787,7 +804,7 @@ final class MapEditor: SKNode {
             showGhost(at: point)
             return
         }
-        if multiSelect, paletteShown, !wallsMode, stage != .wetshot, paletteRect.contains(point) {
+        if multiSelect, paletteShown, !wallsMode, stage != .hoopfishHideaway, paletteRect.contains(point) {
             // MULTI: a block of the sheet, from here to where the drag lets go.
             let corner = sheetCell(at: point)
             blockStart = corner
@@ -804,7 +821,7 @@ final class MapEditor: SKNode {
         }
         guard !over(point), let cell = cell(at: point) else { return }
         lastCell = cell
-        if stage == .wetshot, !wallsMode, case .pile = tool, let index = pilePiece(at: world(point)) {
+        if stage == .hoopfishHideaway, !wallsMode, case .pile = tool, let index = pilePiece(at: world(point)) {
             // Picked up whole, to be moved, keeping its turn.
             remember()
             let picked = map.pile.remove(at: index)
@@ -814,7 +831,7 @@ final class MapEditor: SKNode {
             showGhost(at: point)
             return
         }
-        if stage == .wetshot, !wallsMode, tool == .erase, let index = pilePiece(at: world(point)) {
+        if stage == .hoopfishHideaway, !wallsMode, tool == .erase, let index = pilePiece(at: world(point)) {
             remember()
             map.pile.remove(at: index)
             propsDirty = true
@@ -1063,7 +1080,7 @@ final class MapEditor: SKNode {
             ghost = sprite
         case .pile(let kind, let rotation, _):
             // Held by its middle, as it's put down.
-            let sprite = SKSpriteNode(texture: WetshotArt.pileTexture(kind))
+            let sprite = SKSpriteNode(texture: HoopfishHideawayArt.pileTexture(kind))
             sprite.size = CGSize(width: 48 * cellSide / ElementsArt.tileSide, height: 48 * cellSide / ElementsArt.tileSide)
             sprite.zRotation = CGFloat(rotation) * .pi / 180
             sprite.alpha = 0.8
@@ -1073,7 +1090,7 @@ final class MapEditor: SKNode {
             ghost = sprite
         case .prop(let kind, _):
             // Held by its bottom left cell's middle.
-            let sprite = SKSpriteNode(texture: WetshotArt.texture(kind))
+            let sprite = SKSpriteNode(texture: HoopfishHideawayArt.texture(kind))
             sprite.anchorPoint = .zero
             let pixels = kind.pixelSize
             sprite.size = CGSize(width: CGFloat(pixels.width) * cellSide / ElementsArt.tileSide, height: CGFloat(pixels.height) * cellSide / ElementsArt.tileSide)

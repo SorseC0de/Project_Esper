@@ -141,7 +141,7 @@ public struct Stage: Equatable {
         hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
     }
 
-    /// Where Wetshot Wake's Hoopfish starts, its picture's bottom left.
+    /// Where Hoopfish Hideaway's Hoopfish starts, its picture's bottom left.
     public var hoopfishStart: Vec2?
     /// Where each icicle socket's grown icicle hangs its tip, along the ceiling.
     public var icicleSockets: [Vec2] = []
@@ -716,13 +716,13 @@ public struct Stage: Equatable {
         return stage
     }
 
-    /// Wetshot Wake: 37 by 19, under water, laid out in the map maker; its one rim,
+    /// Hoopfish Hideaway: 37 by 19, under water, laid out in the map maker; its one rim,
     /// both players' to score on, rides the Hoopfish.
-    public static var wetshot: Stage {
-        let map = StageMap.current[.wetshot]
-        let columns = WetshotRules.columns, rows = WetshotRules.rows
+    public static var hoopfishHideaway: Stage {
+        let map = StageMap.current[.hoopfishHideaway]
+        let columns = HoopfishHideawayRules.columns, rows = HoopfishHideawayRules.rows
         let fish = map.hoopfish?.cell ?? StageMap.Cell(15, 8)
-        let rim = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize) + WetshotRules.rimFromHoopfish
+        let rim = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize) + HoopfishHideawayRules.rimFromHoopfish
         var stage = Stage(
             columns: columns, rows: rows,
             hoops: [Hoop(position: rim, owner: 0, backboard: .right, shared: true)],
@@ -733,7 +733,7 @@ public struct Stage: Equatable {
         stage.lay(map.walls)
         stage.slopes = stage.fixedSlopes
         stage.hoopfishStart = Vec2(x: Double(fish.column) * tileSize, y: Double(fish.row) * tileSize)
-        stage.features = StageFeatures(look: .wetshot)
+        stage.features = StageFeatures(look: .hoopfishHideaway)
         stage.features.underwater = true
         stage.features.doublePoints = true
         return stage
@@ -824,12 +824,12 @@ public struct Stage: Equatable {
 /// The stages to pick from, in the order the select screen shows them; the wire carries
 /// the raw value.
 public enum StageChoice: Int, CaseIterable {
-    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, wetshotWake, flight
+    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flight
 
     /// The stages on the select, in its order: Slamstill Traffic and Flight parked off it.
-    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .wetshotWake]
+    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .hoopfishHideaway]
     /// The stages 47 plays on.
-    public static let fortySeven: [StageChoice] = [.wreckCenter, .wetshotWake]
+    public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway]
 
     public var name: String {
         switch self {
@@ -838,7 +838,7 @@ public enum StageChoice: Int, CaseIterable {
         case .slamstillTraffic: "Slamstill Traffic"
         case .theElements: "The Elements"
         case .skyNet: "Sky Net"
-        case .wetshotWake: "Hoopfish Hideaway"
+        case .hoopfishHideaway: "Hoopfish Hideaway"
         case .flight: "Flight"
         }
     }
@@ -851,7 +851,7 @@ public enum StageChoice: Int, CaseIterable {
         case .theElements: .elements
         // To be detailed: the court for now.
         case .skyNet: .court
-        case .wetshotWake: .wetshot
+        case .hoopfishHideaway: .hoopfishHideaway
         case .flight: .flight
         }
     }

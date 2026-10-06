@@ -201,6 +201,8 @@ struct CustomizeScreen: View {
     @AppStorage("esper.customize.headX") private var headX = 1.0
     @AppStorage("esper.customize.headY") private var headY = 1.0
     @AppStorage("esper.customize.headScale") private var headScale = 1.0
+    /// The colour's name's middle over the player's middle, in art pixels.
+    @AppStorage("esper.customize.nameY") private var nameY = 22.0
 
     init(flow: FlowState) {
         self.flow = flow
@@ -218,17 +220,17 @@ struct CustomizeScreen: View {
     static let feetRow: CGFloat = 40
     /// The rings round START, in degrees a second.
     static let spinSpeeds: (ccw: Double, cw: Double) = (24, 36)
-    /// A box's label's size, a share of the box's height; the arm and leg boxes' smaller, two rows.
+    /// A box's label's size, a share of the box's height: H.O.O.D.'s; one four-letter word's,
+    /// SKIN's and BOOT's; ARM SLEEVE's, two rows.
     static let labelShare: CGFloat = 0.4
-    static let limbLabelShare: CGFloat = 0.22
+    static let wordLabelShare: CGFloat = 0.5
+    static let armLabelShare: CGFloat = 0.25
     /// The lines from the arm and leg boxes to the player: as thick as the screen's own lines,
     /// their end dots as big as theirs, shares of the screen's height.
     static let connectorWidthShare: CGFloat = 0.0032
     static let connectorDotShare: CGFloat = 0.0041
     /// What H.O.O.D. stands for, a word a letter.
     static let hoodWords = ["Hyper-", "Osmotic", "Output", "Driver"]
-    /// The colour's name's middle over the player's middle, in art pixels.
-    static let nameOverFigure: CGFloat = 22
     /// The space between CUSTOMIZE's letters, a share of each one's size.
     static let headingSpacing: CGFloat = 0.08
     /// The ground: the vector's gradient (in the menus' colours), out to the screen's edges, and
@@ -367,6 +369,21 @@ struct CustomizeScreen: View {
         return Image(uiImage: word.image).resizable().aspectRatio(contentMode: .fit).frame(height: word.height)
     }
 
+    /// Bigdex as `title`, its lower half in `lower`.
+    private func twoTone(_ text: String, size: CGFloat, lower: RGB) -> some View {
+        title(text, size: size)
+            .overlay {
+                Text(text)
+                    .font(.custom("Bigdex", size: size))
+                    .foregroundStyle(Color(rgb: lower))
+                    .fixedSize()
+                    .mask(VStack(spacing: 0) {
+                        Color.clear
+                        Color.black
+                    })
+            }
+    }
+
     private func subtitle(_ text: String, size: CGFloat) -> some View {
         Text(text)
             .font(.system(size: size, weight: .semibold))
@@ -445,12 +462,15 @@ struct CustomizeScreen: View {
                 }
             }
         }
-        // The colour's name over the player, lettered as CUSTOMIZE is, a period between its letters.
-        litTitle(pick.energy.name.uppercased().map(String.init).joined(separator: "."), height: size.height * 0.025,
-                 spacing: CustomizeScreen.headingSpacing)
-            .position(x: ring.x, y: figureMiddle - CustomizeScreen.nameOverFigure * playerPixel)
+        // The colour's name over the player, lettered as CUSTOMIZE is, a period between its letters,
+        // While the hood's colours are being picked.
+        if cursor.owner == .hood {
+            litTitle(pick.energy.name.uppercased().map(String.init).joined(separator: "."), height: size.height * 0.025,
+                     spacing: CustomizeScreen.headingSpacing)
+                .position(x: ring.x, y: figureMiddle - nameY * playerPixel)
+        }
 
-        box(player, .skin, tag + "skin", label: "SKIN", size: size, glow: glow, cursor: cursor) { frame in
+        box(player, .skin, tag + "skin", label: "SKIN", labelShare: CustomizeScreen.wordLabelShare, size: size, glow: glow, cursor: cursor) { frame in
             VStack(spacing: 0) {
                 Color(rgb: PixelPalette.colours[pick.dressing.tone.front])
                 Color(rgb: PixelPalette.colours[pick.dressing.tone.back])
@@ -458,17 +478,17 @@ struct CustomizeScreen: View {
             .frame(width: frame.width * 0.5, height: frame.height * 0.5)
             .clipShape(RoundedRectangle(cornerRadius: frame.width * 0.08))
         }
-        let limbLabel = CustomizeScreen.limbLabelShare
-        box(player, .arms, tag + "arms", label: "ARM\nSLEEVE", labelShare: limbLabel, size: size, glow: glow, cursor: cursor) {
+        let armLabel = CustomizeScreen.armLabelShare, bootLabel = CustomizeScreen.wordLabelShare
+        box(player, .arms, tag + "arms", label: "ARM\nSLEEVE", labelShare: armLabel, size: size, glow: glow, cursor: cursor) {
             tick(flow.customizeTicked(player, .arms), $0)
         }
-        box(player, .legs, tag + "legs", label: "BOOT", labelShare: limbLabel, size: size, glow: glow, cursor: cursor) {
+        box(player, .legs, tag + "legs", label: "BOOT", labelShare: bootLabel, size: size, glow: glow, cursor: cursor) {
             tick(flow.customizeTicked(player, .legs), $0)
         }
-        box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "ARM\nSLEEVE", labelShare: limbLabel, size: size, glow: glow, cursor: cursor) {
+        box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "ARM\nSLEEVE", labelShare: armLabel, size: size, glow: glow, cursor: cursor) {
             tick(flow.customizeTicked(player, .outerArms), $0)
         }
-        box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "BOOT", labelShare: limbLabel, size: size, glow: glow, cursor: cursor) {
+        box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "BOOT", labelShare: bootLabel, size: size, glow: glow, cursor: cursor) {
             tick(flow.customizeTicked(player, .outerLegs), $0)
         }
         box(player, .hood, tag + "hood", label: "H.O.O.D", size: size, glow: glow, cursor: cursor) { frame in
@@ -486,7 +506,8 @@ struct CustomizeScreen: View {
             HStack(alignment: .top, spacing: size.height * 0.012) {
                 ForEach(Array(CustomizeScreen.hoodWords.enumerated()), id: \.offset) { index, word in
                     VStack(spacing: size.height * 0.004) {
-                        title(String(word.prefix(1)) + (index < CustomizeScreen.hoodWords.count - 1 ? "." : ""), size: size.height * 0.08)
+                        twoTone(String(word.prefix(1)) + (index < CustomizeScreen.hoodWords.count - 1 ? "." : ""), size: size.height * 0.08,
+                                lower: pick.look.bright)
                         subtitle(word, size: size.height * 0.018)
                     }
                     .fixedSize()
@@ -677,6 +698,7 @@ struct CustomizeScreen: View {
                 tuningRow("HEAD X", value: $headX, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD Y", value: $headY, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD SCALE", value: $headScale, step: 0.1, range: 0.5...2, format: "×%.1f")
+                tuningRow("NAME Y", value: $nameY, step: 1, range: -64...64, format: "%.0f")
             }
         }
         .font(.system(size: 10, weight: .bold, design: .monospaced))

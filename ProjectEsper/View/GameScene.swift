@@ -176,7 +176,7 @@ final class GameScene: SKScene {
     private var hoodNodes: [SKSpriteNode] = []
     private var hoodFlashes: [SKSpriteNode] = []
     private var hoodStrings: [HoodStrings] = []
-    static let hoodDrawnFor = AnimationFrame(.idle, 2)
+    static let hoodDrawnFor = SpriteLibrary.hoodDrawnFor
     /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
     static let stringAccentLuminance = 0.876
     /// Over the body and under the head's own node, or behind the body.
@@ -6229,7 +6229,7 @@ final class GameScene: SKScene {
                     let hood = SKSpriteNode(texture: texture)
                     hood.size = texture.size()
                     hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
-                    hood.position = now - drawnFor
+                    hood.position = CGPoint(x: (now.x - drawnFor.x).rounded(), y: (now.y - drawnFor.y).rounded())
                     hood.zPosition = 1
                     node.addChild(hood)
                 }
@@ -6583,7 +6583,8 @@ final class GameScene: SKScene {
                 hood.xScale = 1
                 hood.size = hood.texture!.size().scaled(by: drawScale)
                 hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
-                let moved = (partNow - partDrawnFor) * drawScale
+                // In whole art pixels, as the frame's line round it was drawn.
+                let moved = CGPoint(x: (partNow.x - partDrawnFor.x).rounded(), y: (partNow.y - partDrawnFor.y).rounded()) * drawScale
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
                 hood.zRotation = node.zRotation

@@ -186,7 +186,9 @@ final class SpriteLibrary {
     /// where the frame has them; and where its glowing parts sit. Touches nothing kept, so
     /// it can be made off the main thread.
     private func makeFrame(_ frame: AnimationFrame, source: SKTexture, look: Look, ballAsEnergy: Bool) -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint]) {
-        let result = recolour(source, look: look, holdsBall: frame.animation.holdsBall && !ballAsEnergy, detach: true)
+        // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
+        let result = recolour(source, look: look, holdsBall: frame.animation.holdsBall && !ballAsEnergy, detach: true,
+                              hoodShape: look.human ? SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)] : nil)
         var textures = ["": result.texture]
         if let head = result.head { textures["_head"] = head }
         if let energy = result.energy { textures["_energy"] = energy }
@@ -510,6 +512,31 @@ final class SpriteLibrary {
     }
 
     /// Where a glowing part is drawn in a player frame, from the feet in art pixels, if it's there.
+    /// `player_hoodheads`' frames, each the hood's shape for its skin, and where the head sits on
+    /// the idle frame the hood is drawn for, in its pixels from the top left: the sheets' alone,
+    /// read once.
+    static let hoodDrawnFor = AnimationFrame(.idle, 2)
+    static let hoodShapes: [CGImage] = (0..<6).map { SKTextureAtlas(named: "Sprites").textureNamed("player_hoodheads_\($0)").cgImage() }
+    static let hoodDrawnForHead: CGPoint? = {
+        let image = SKTextureAtlas(named: "Sprites").textureNamed("\(hoodDrawnFor.animation.rawValue)_\(hoodDrawnFor.frame)").cgImage()
+        let width = image.width, height = image.height
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let data = context.data else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        var sum = CGPoint.zero, heads = 0
+        for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] == 255 {
+            let index = pixel * 4
+            guard BodyPart.owning(RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])) == .head else { continue }
+            sum.x += CGFloat(pixel % width) + 0.5
+            sum.y += CGFloat(pixel / width) + 0.5
+            heads += 1
+        }
+        return heads > 0 ? CGPoint(x: sum.x / CGFloat(heads), y: sum.y / CGFloat(heads)) : nil
+    }()
+
     /// Where a limb part starts at its top, the knee of a lower leg or the shoulder of an arm: the
     /// middle of its topmost row, in art pixels from the feet as landmarks are. The sheet's alone,
     /// the same in every look.
@@ -645,12 +672,13 @@ final class SpriteLibrary {
     /// centre of each glowing part found. The ball is looked for only where the sheet
     /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
     /// with no line, and the body is drawn and lined without them.
-    /// `hood`: the customize figure's hooded head, its shape (`player_hoodheads`' drawn pixels)
-    /// placed on the canvas: the sheet's head is kept, in skin, under it as its neck, and the
-    /// outside line runs round the body and the hood together, the hood's own pixels left clear
-    /// for it to be drawn in. In play the outline's own pass covers the neck.
+    /// `hood`: the hooded head, its shape (`player_hoodheads`' drawn pixels) placed on the
+    /// canvas, or with `hoodShape` placed as the game places it, moved from the idle frame it's
+    /// drawn for by how far this frame's head is from that one's: the sheet's head is kept under
+    /// it as its neck, in the skin's shadow tone, and the outside line runs round the body and
+    /// the hood together, the hood's own pixels left clear for it to be drawn in.
     private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool,
-                          hood: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
+                          hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
@@ -669,7 +697,19 @@ final class SpriteLibrary {
             parts[pixel] = BodyPart.owning(colour)
         }
         markEnergy(&parts, holdsBall: holdsBall, width: width, height: height)
-        // Where the hood will be drawn over this canvas, if it's given.
+        // Where the hood will be drawn over this canvas, if it's given or its shape is.
+        var hood = given
+        if hood == nil, look.human, let hoodShape, let there = SpriteLibrary.hoodDrawnForHead {
+            var sum = CGPoint.zero, heads = 0
+            for pixel in 0..<count where parts[pixel] == .head {
+                sum.x += CGFloat(pixel % width) + 0.5
+                sum.y += CGFloat(pixel / width) + 0.5
+                heads += 1
+            }
+            if heads > 0 {
+                hood = (hoodShape, CGPoint(x: (sum.x / CGFloat(heads) - there.x).rounded(), y: (sum.y / CGFloat(heads) - there.y).rounded()), 1)
+            }
+        }
         var hoodCover = [Bool](repeating: false, count: count)
         if let hood, let (shapeContext, shapePixels) = makeCanvas(width: hood.shape.width, height: hood.shape.height) {
             shapeContext.draw(hood.shape, in: CGRect(x: 0, y: 0, width: hood.shape.width, height: hood.shape.height))
@@ -780,10 +820,11 @@ final class SpriteLibrary {
 
         // A human's head is the view's, `player_hoodheads` over it: the sheet's own is taken
         // out, its line left round where it was.
-        // Under the customize figure's hood, the neck in the skin's shadow tone.
+        // Under the hood, the neck in the skin's shadow tone.
         if look.human, hood != nil {
             for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
-                paint(pixels, pixel * 4, PixelPalette.colours[look.dressing.tone.back])
+                // The back hand's colour: the skin's back tone, or the ice look's back colour.
+                paint(pixels, pixel * 4, look.colours[.backHand] ?? PixelPalette.colours[look.dressing.tone.back])
             }
         }
         if look.human, hood == nil {

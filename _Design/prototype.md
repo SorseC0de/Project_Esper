@@ -647,7 +647,9 @@ the same colour, the second takes the opposite, as before. Online is still the c
   coloured for where the hood goes: the sheet's head kept under it as its neck, in the skin's
   shadow (back) tone, and the
   outside line run round the body and the hood together (`recolour`'s `hood`), so nothing shows
-  through where they meet; in play the outline's own pass covers it. An art pixel is 0.168/64 of the screen's
+  through where they meet; every player frame in play is built the same way (`recolour`'s
+  `hoodShape`), the hood where the game puts it on that frame, its offset from the idle's head
+  rounded to whole art pixels, as the hood node's now is. An art pixel is 0.168/64 of the screen's
   width; the projector is drawn at 0.25 of that, 7 down, the player at 2, 6 up, each a whole number
   of screen pixels. The player is drawn a frame at a time (`CustomizeFigure`): its strings float as
   FloState's do, one back and one forward, but a human's length, five; cubes rise off the head's crown (in the energy
@@ -668,11 +670,13 @@ the same colour, the second takes the opposite, as before. Online is still the c
   frame with its tones swapped (`HumanLook.skinTones`, `_Design/skin-tones.md`); the accent is the
   back tone. H.O.O.D.'s are the energy colours round the wheel (red, orange, gold, lime, teal,
   blue, purple, pink), the accent the shade down the AAP-64 ramp (`EnergyColour.rampDown`); on it,
-  H.O.O.D. shows large over the player, centred on it, each word of "Hyper- Osmotic Output Driver"
-  small under its letter. Over the player always, the colour's gem name lettered as CUSTOMIZE
-  is, a period between its letters (R.U.B.Y), 22 art pixels over the player's middle. The arm and
+  H.O.O.D. shows large over the player, centred on it, two-toned (its lower half the energy
+  ramp's lightest, `Look.bright`), each word of "Hyper- Osmotic Output Driver" small under its
+  letter; and over the player the colour's gem name lettered as CUSTOMIZE is, a period between its
+  letters (R.U.B.Y), NAME Y art pixels over the player's middle (22 to start, on its slider). The arm and
   leg boxes are ticks, a sleeve or a boot each (`Dressing`), labelled ARM SLEEVE (two rows) or BOOT,
-  smaller than the others (0.22 of the box's height to their 0.4), each with a line from it to its
+  smaller than the others (ARM SLEEVE 0.25 of the box's height, BOOT and SKIN, one four-letter word,
+  0.5, H.O.O.D. 0.4), each with a line from it to its
   limb's middle on the player, run as the screen's top and bottom lines are (level out of the box,
   then 45 degrees onto the limb, a dot there), in the boxes' cyan or, under the cursor, the side's
   colour, glowing: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside

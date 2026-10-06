@@ -780,6 +780,12 @@ final class SpriteLibrary {
 
         // A human's head is the view's, `player_hoodheads` over it: the sheet's own is taken
         // out, its line left round where it was.
+        // Under the customize figure's hood, the neck in the skin's shadow tone.
+        if look.human, hood != nil {
+            for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
+                paint(pixels, pixel * 4, PixelPalette.colours[look.dressing.tone.back])
+            }
+        }
         if look.human, hood == nil {
             for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
                 for channel in 0..<4 { pixels[pixel * 4 + channel] = 0 }

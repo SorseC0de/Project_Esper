@@ -630,7 +630,9 @@ the same colour, the second takes the opposite, as before. Online is still the c
   the vector's gradient in the menus' colours (purple's body, plum's light at 0.42, black's last,
   out to 0.42 of the 16:9's width) and its grid (a cell 0.0139 of the width, plum's light at 0.4),
   bowed so its cells grow toward the corners (pushed out by 1 + 0.35 of the squared distance
-  over the corner's).
+  over the corner's). Under the grid, two glows a tenth of the width off the middle, gold's body up
+  and to the left and blue's down and to the right, fading to clear at three quarters of the
+  gradient's reach, half seen.
   RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second.
 - Over the middle: CUSTOMIZE on the heading's plate (cap height 0.025 of the screen, its letters
   spaced 0.08 of their size apart, `Word.spacing`) and START on
@@ -642,7 +644,8 @@ the same colour, the second takes the opposite, as before. Online is still the c
   head (`SpriteLibrary.portrait`: the body and the hooded head apart, the hood placed where the
   idle's head puts it, then by HEAD X and HEAD Y, in art pixels, and HEAD SCALE about the head's
   middle, the strings off it wherever it goes), the second side facing the first. The figure is
-  coloured for where the hood goes: the sheet's head kept in skin under it as its neck, and the
+  coloured for where the hood goes: the sheet's head kept under it as its neck, in the skin's
+  shadow (back) tone, and the
   outside line run round the body and the hood together (`recolour`'s `hood`), so nothing shows
   through where they meet; in play the outline's own pass covers it. An art pixel is 0.168/64 of the screen's
   width; the projector is drawn at 0.25 of that, 7 down, the player at 2, 6 up, each a whole number
@@ -665,7 +668,9 @@ the same colour, the second takes the opposite, as before. Online is still the c
   frame with its tones swapped (`HumanLook.skinTones`, `_Design/skin-tones.md`); the accent is the
   back tone. H.O.O.D.'s are the energy colours round the wheel (red, orange, gold, lime, teal,
   blue, purple, pink), the accent the shade down the AAP-64 ramp (`EnergyColour.rampDown`); on it,
-  H.O.O.D. and "Hyper-Osmotic Output Driver" show over the halo's upper outer corner. The arm and
+  H.O.O.D. shows large over the player, centred on it, each word of "Hyper- Osmotic Output Driver"
+  small under its letter. Over the player always, the colour's gem name lettered as CUSTOMIZE
+  is, a period between its letters (R.U.B.Y), 22 art pixels over the player's middle. The arm and
   leg boxes are ticks, a sleeve or a boot each (`Dressing`), labelled by the screen's side they're on,
   L or R: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
   the middle, the back. Front and back are kept as the body faces right; facing left, in play and

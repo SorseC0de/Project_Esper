@@ -218,6 +218,10 @@ struct CustomizeScreen: View {
     static let feetRow: CGFloat = 40
     /// The rings round START, in degrees a second.
     static let spinSpeeds: (ccw: Double, cw: Double) = (24, 36)
+    /// What H.O.O.D. stands for, a word a letter.
+    static let hoodWords = ["Hyper-", "Osmotic", "Output", "Driver"]
+    /// The colour's name's middle over the player's middle, in art pixels.
+    static let nameOverFigure: CGFloat = 22
     /// The space between CUSTOMIZE's letters, a share of each one's size.
     static let headingSpacing: CGFloat = 0.08
     /// The ground: the vector's gradient (in the menus' colours), out to the screen's edges, and
@@ -225,6 +229,14 @@ struct CustomizeScreen: View {
     static let groundStops: [Gradient.Stop] = [.init(color: Color(rgb: EsperPalette.purple.body), location: 0),
                                                 .init(color: Color(rgb: EsperPalette.plum.light), location: 0.42),
                                                 .init(color: Color(rgb: EsperPalette.black.shadow), location: 1)]
+    /// Two glows over it, gold up and to the left, blue down and to the right, each a tenth of the
+    /// width off the middle, at three quarters the ground's size and half seen.
+    static let ground2Stops: [Gradient.Stop] = [.init(color: Color(rgb: EsperPalette.gold.body), location: 0),
+                                                .init(color: Color(.clear), location: 1)]
+    static let ground3Stops: [Gradient.Stop] = [.init(color: Color(rgb: EsperPalette.blue.body), location: 0),
+                                                .init(color: Color(.clear), location: 1)]
+    static let glowSizeShare: CGFloat = 0.75
+    static let glowOpacity = 0.5
     static let groundRadiusShare: CGFloat = 0.42
     static let gridCellShare: CGFloat = 0.0139
     static let gridBow: CGFloat = 0.35
@@ -268,6 +280,14 @@ struct CustomizeScreen: View {
             Color(rgb: EsperPalette.black.shadow)
             RadialGradient(stops: CustomizeScreen.groundStops, center: .center, startRadius: 0,
                            endRadius: fitted.width * CustomizeScreen.groundRadiusShare)
+            RadialGradient(stops: CustomizeScreen.ground2Stops, center: .center, startRadius: 0,
+                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
+            .opacity(CustomizeScreen.glowOpacity)
+            .offset(x: -(fitted.width * 0.1), y: -(fitted.width * 0.1))
+            RadialGradient(stops: CustomizeScreen.ground3Stops, center: .center, startRadius: 0,
+                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
+            .opacity(CustomizeScreen.glowOpacity)
+            .offset(x: fitted.width * 0.1, y: fitted.width * 0.1)
             Canvas { context, size in
                 let centre = CGPoint(x: size.width / 2, y: size.height / 2)
                 let reach = hypot(centre.x, centre.y)
@@ -394,17 +414,22 @@ struct CustomizeScreen: View {
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: CustomizeScreen.haloFadeEnd)],
                                  startPoint: .top, endPoint: .bottom))
             .position(x: halo.midX, y: halo.midY)
+        // Standing on the lens, the second side facing the first.
+        let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
+        let figureMiddle = lens - (CustomizeScreen.feetRow - 24) * playerPixel - playerY * base
         if let portrait = flow.scene.customizePortrait(player: player, headNudge: CGPoint(x: headX, y: headY), headScale: headScale) {
-            // Standing on the lens, the second side facing the first.
-            let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
             let side = (48 + 2 * CustomizeFigure.margin) * playerPixel
             // The second side is shown turned round, its sleeves and boots swapped as drawn.
             CustomizeFigure(portrait: portrait, look: player == 1 ? pick.look.turnedRound : pick.look, pixel: playerPixel, mirrored: player == 1,
                             headNudge: CGPoint(x: headX, y: headY), headScale: headScale)
                 .frame(width: side, height: side)
                 .allowsHitTesting(false)
-                .position(x: ring.x, y: lens - (CustomizeScreen.feetRow - 24) * playerPixel - playerY * base)
+                .position(x: ring.x, y: figureMiddle)
         }
+        // The colour's name over the player, lettered as CUSTOMIZE is, a period between its letters.
+        litTitle(pick.energy.name.uppercased().map(String.init).joined(separator: "."), height: size.height * 0.025,
+                 spacing: CustomizeScreen.headingSpacing)
+            .position(x: ring.x, y: figureMiddle - CustomizeScreen.nameOverFigure * playerPixel)
 
         box(player, .skin, tag + "skin", label: "SKIN", size: size, glow: glow, cursor: cursor) { frame in
             VStack(spacing: 0) {
@@ -433,13 +458,17 @@ struct CustomizeScreen: View {
             picker(player, tag + "display", size: size, cursor: cursor, pick: pick, glow: glow)
         }
         if cursor.owner == .hood {
-            // What the H.O.O.D. is, over the halo's outer corner.
-            VStack(alignment: player == 0 ? .leading : .trailing, spacing: size.height * 0.004) {
-                title("H.O.O.D.", size: size.height * 0.05)
-                subtitle("Hyper-Osmotic Output Driver", size: size.height * 0.026)
+            // What the H.O.O.D. is, over the player: each word of it under its letter.
+            HStack(alignment: .top, spacing: size.height * 0.012) {
+                ForEach(Array(CustomizeScreen.hoodWords.enumerated()), id: \.offset) { index, word in
+                    VStack(spacing: size.height * 0.004) {
+                        title(String(word.prefix(1)) + (index < CustomizeScreen.hoodWords.count - 1 ? "." : ""), size: size.height * 0.08)
+                        subtitle(word, size: size.height * 0.018)
+                    }
+                    .fixedSize()
+                }
             }
-            .frame(width: halo.width, height: size.height * 0.13, alignment: player == 0 ? .bottomLeading : .bottomTrailing)
-            .position(x: halo.midX, y: halo.minY - size.height * 0.065)
+            .position(x: ring.x, y: halo.minY - size.height * 0.04)
         }
     }
 

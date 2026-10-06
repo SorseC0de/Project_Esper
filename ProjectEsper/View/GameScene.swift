@@ -4951,8 +4951,9 @@ final class GameScene: SKScene {
     private static let legCreditKey = 1000
     /// From the head's middle up to its crown, where its particles leave, in art pixels at a plain body's size.
     static let crownLift: CGFloat = 4
-    private func legStream(_ index: Int, part: BodyPart, energyColour: Bool = false) -> HeadStream {
-        let look = sprites.look(for: index)
+    /// In the colour of the part as the body is drawn (`drawnAs`, turned round or not).
+    private func legStream(_ index: Int, part: BodyPart, energyColour: Bool = false, drawnAs: Int? = nil) -> HeadStream {
+        let look = sprites.look(for: drawnAs ?? index)
         return HeadStream(frames: [sprites.flatSquare(size: 4, alpha: 1)], size: ParticleLook.energySize,
                           tint: SKColor(rgb: energyColour ? look.glow : (look.colours[part] ?? look.glow)), rate: Double(ParticleLook.legCubeRate),
                           zoneTinted: true, cubes: true, legs: true, behind: part.isBack)
@@ -6794,14 +6795,16 @@ final class GameScene: SKScene {
             // A human's legs, in the energy's colours, give off smaller cubes of their own; in
             // the energy form, the hands too.
             if HumanLook.enabled, ParticleLook.cubes, !lockedOutOfFloState {
-                // A human's off the shoes, the legs being bare; the energy form's off its legs and hands.
-                let limbs: [BodyPart] = energyForm ? [.frontLeg, .backLeg, .frontHand, .backHand] : [.frontFoot, .backFoot]
-                for (slot, part) in limbs.enumerated() {
-                    guard let landmark = sprites.landmark(part, in: frame, player: drawnAs) else { continue }
+                // A human's off whatever of the limbs is energy, as drawn (`Dressing.cubeSources`): a
+                // boot's or a sleeve's top, a shoe; the energy form's off its legs and hands.
+                let limbs: [(part: BodyPart, fromTop: Bool)] = energyForm ? [(.frontLeg, false), (.backLeg, false), (.frontHand, false), (.backHand, false)]
+                    : sprites.look(for: drawnAs).dressing.cubeSources
+                for (slot, limb) in limbs.enumerated() {
+                    guard let landmark = limb.fromTop ? sprites.top(limb.part, in: frame) : sprites.landmark(limb.part, in: frame, player: drawnAs) else { continue }
                     let leg = landmark * drawScale
                     let at = node.position + leaned(CGPoint(x: leg.x * CGFloat(player.facing.sign), y: leg.y))
                     emitHeadParticles(index, power: player.power, at: at, creditKey: GameScene.legCreditKey + index * 4 + slot,
-                                      streams: [legStream(index, part: part, energyColour: energyForm)])
+                                      streams: [legStream(index, part: limb.part, energyColour: energyForm, drawnAs: drawnAs)])
                 }
             }
             // Into FloState, on the change's third frame, or out of it: a burst in the energy's

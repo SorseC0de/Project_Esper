@@ -360,38 +360,37 @@ final class SpriteLibrary {
         return (made[0], made[1], made[2])
     }
 
-    /// A one-frame figure, the customize screen's, in a player's look and lined, with the
-    /// hooded head over its head where the game would put it: moved from where it's drawn for
-    /// (the idle's third frame) by how far this figure's head is from that one's, then by
-    /// `portraitHoodNudge`. With what of it glows (its sleeves, boots and shoes, and the hood),
-    /// where the hood went and where the figure's parts are, in its pixels from the top left.
+    /// A one-frame figure, the customize screen's, in a player's look and lined, without its
+    /// head: the hooded head comes apart, to be drawn over it where the game would put it, moved
+    /// from where it's drawn for (the idle's third frame) by how far this figure's head is from
+    /// that one's (`hoodOffset`). With what of each glows (the sleeves, boots and shoes; the
+    /// hood but not its face), and where the figure's parts and its limbs' tops are, all in its
+    /// pixels from the top left.
     struct Portrait {
         let image: CGImage
         let glowing: CGImage
+        let hood: CGImage?
+        let hoodGlowing: CGImage?
         let hoodOffset: CGPoint
         let centres: [BodyPart: CGPoint]
+        let tops: [BodyPart: CGPoint]
     }
-    /// The hood's place on the customize figure, put right by eye: a pixel right and a pixel up.
-    static let portraitHoodNudge = CGPoint(x: 1, y: -1)
-    private var portraitFacts: [String: (hoodOffset: CGPoint, centres: [BodyPart: CGPoint])] = [:]
+    private var portraits: [String: Portrait] = [:]
 
     func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame) -> Portrait? {
         let key = "p\(player)_portrait_\(name)"
-        if let made = cache[key], let glowing = cache[key + "_glow"], let facts = portraitFacts[key] {
-            return Portrait(image: made.cgImage(), glowing: glowing.cgImage(), hoodOffset: facts.hoodOffset, centres: facts.centres)
-        }
+        if cache[key] != nil, let made = portraits[key] { return made }
         let look = look(for: player)
         let figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: false)
         let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
         let body = figure.texture.cgImage()
         let width = body.width, height = body.height
-        guard let (context, _) = makeCanvas(width: width, height: height),
-              let (glowContext, glowPixels) = makeCanvas(width: width, height: height),
+        guard let (glowContext, glowPixels) = makeCanvas(width: width, height: height),
               let (sourceContext, sourcePixels) = makeCanvas(width: width, height: height) else { return nil }
-        context.draw(body, in: CGRect(x: 0, y: 0, width: width, height: height))
         // What glows: the figure's pixels of the parts that do, as drawn.
         glowContext.draw(body, in: CGRect(x: 0, y: 0, width: width, height: height))
-        sourceContext.draw(texture(name, 0).cgImage(), in: CGRect(x: 0, y: 0, width: width, height: height))
+        let source = texture(name, 0).cgImage()
+        sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
         for pixel in 0..<(width * height) {
             let index = pixel * 4
             let colour = RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2])
@@ -399,32 +398,30 @@ final class SpriteLibrary {
             if !glows { for channel in 0..<4 { glowPixels[index + channel] = 0 } }
         }
         var offset = CGPoint.zero
+        var hood: CGImage?, hoodGlowing: CGImage?
         if look.human, let here = figure.centres[.head], let there = drawnFor.centres[.head] {
             let hoodHead = hoodHead(skin: look.dressing.skinTone, player: player)
-            let hood = hoodHead.drawn.cgImage()
-            offset = CGPoint(x: (here.x - there.x).rounded() + SpriteLibrary.portraitHoodNudge.x,
-                             y: (here.y - there.y).rounded() + SpriteLibrary.portraitHoodNudge.y)
-            // The offset counts rows down; the context's run up.
-            context.draw(hood, in: CGRect(x: offset.x, y: -offset.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
+            let drawn = hoodHead.drawn.cgImage()
+            hood = drawn
+            offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             // The hood glows; its face doesn't.
-            if let (hoodContext, hoodPixels) = makeCanvas(width: hood.width, height: hood.height),
-               let (maskContext, maskPixels) = makeCanvas(width: hood.width, height: hood.height) {
-                hoodContext.draw(hood, in: CGRect(x: 0, y: 0, width: hood.width, height: hood.height))
-                maskContext.draw(hoodHead.hood.cgImage(), in: CGRect(x: 0, y: 0, width: hood.width, height: hood.height))
-                for y in 0..<hood.height {
-                    for x in 0..<hood.width where maskPixels[(y * hood.width + x) * 4 + 3] > 0 {
-                        let toX = x + Int(offset.x), toY = y + Int(offset.y)
-                        guard (0..<width).contains(toX), (0..<height).contains(toY) else { continue }
-                        for channel in 0..<4 { glowPixels[(toY * width + toX) * 4 + channel] = hoodPixels[(y * hood.width + x) * 4 + channel] }
-                    }
+            if let (hoodContext, hoodPixels) = makeCanvas(width: drawn.width, height: drawn.height),
+               let (maskContext, maskPixels) = makeCanvas(width: drawn.width, height: drawn.height) {
+                hoodContext.draw(drawn, in: CGRect(x: 0, y: 0, width: drawn.width, height: drawn.height))
+                maskContext.draw(hoodHead.hood.cgImage(), in: CGRect(x: 0, y: 0, width: drawn.width, height: drawn.height))
+                for pixel in 0..<(drawn.width * drawn.height) where maskPixels[pixel * 4 + 3] == 0 {
+                    for channel in 0..<4 { hoodPixels[pixel * 4 + channel] = 0 }
                 }
+                hoodGlowing = hoodContext.makeImage()
             }
         }
-        guard let made = context.makeImage(), let glowing = glowContext.makeImage() else { return nil }
-        cache[key] = SKTexture(cgImage: made)
-        cache[key + "_glow"] = SKTexture(cgImage: glowing)
-        portraitFacts[key] = (offset, figure.centres)
-        return Portrait(image: made, glowing: glowing, hoodOffset: offset, centres: figure.centres)
+        guard let glowing = glowContext.makeImage() else { return nil }
+        let made = Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
+                            centres: figure.centres, tops: SpriteLibrary.partTops(source))
+        // Kept in the cache too, so a new look drops it with the rest of the player's.
+        cache[key] = SKTexture(cgImage: body)
+        portraits[key] = made
+        return made
     }
 
     /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which
@@ -495,6 +492,44 @@ final class SpriteLibrary {
     }
 
     /// Where a glowing part is drawn in a player frame, from the feet in art pixels, if it's there.
+    /// Where a limb part starts at its top, the knee of a lower leg or the shoulder of an arm: the
+    /// middle of its topmost row, in art pixels from the feet as landmarks are. The sheet's alone,
+    /// the same in every look.
+    private var partTops: [String: [BodyPart: CGPoint]] = [:]
+    func top(_ part: BodyPart, in frame: AnimationFrame) -> CGPoint? {
+        let key = "\(frame.animation.rawValue)_\(frame.frame)"
+        if let found = partTops[key] { return found[part] }
+        let size = frame.animation.pixelSize
+        let tops = SpriteLibrary.partTops(atlas.textureNamed(key).cgImage()).mapValues { top in
+            CGPoint(x: top.x - size / 2, y: size - top.y - frame.animation.feetFromBottom)
+        }
+        partTops[key] = tops
+        return tops[part]
+    }
+
+    /// The limbs' tops on a sheet frame, in its pixels from the top left.
+    static func partTops(_ image: CGImage) -> [BodyPart: CGPoint] {
+        let width = image.width, height = image.height
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let data = context.data else { return [:] }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        let limbs: Set<BodyPart> = [.frontLeg, .backLeg, .frontArm, .backArm]
+        var found: [BodyPart: (row: Int, xs: [Int])] = [:]
+        for y in 0..<height {
+            for x in 0..<width where pixels[(y * width + x) * 4 + 3] == 255 {
+                let index = (y * width + x) * 4
+                guard let part = BodyPart.owning(RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])),
+                      limbs.contains(part) else { continue }
+                if found[part] == nil { found[part] = (y, []) }
+                if found[part]?.row == y { found[part]?.xs.append(x) }
+            }
+        }
+        return found.mapValues { CGPoint(x: CGFloat($0.xs.reduce(0, +)) / CGFloat($0.xs.count) + 0.5, y: CGFloat($0.row) + 0.5) }
+    }
+
     func landmark(_ part: BodyPart, in frame: AnimationFrame, player: Int) -> CGPoint? {
         _ = texture(frame, player: player)
         return landmarks["p\(player)_\(frame.animation.rawValue)_\(frame.frame)"]?[part]
@@ -539,6 +574,10 @@ final class SpriteLibrary {
                     _ = texture(AnimationFrame(animation, frame), player: drawn)
                 }
             }
+        }
+        // The limbs' tops, where boots' and sleeves' cubes come off.
+        for animation in Animation.allCases {
+            for frame in 0..<animation.frameCount { _ = top(.frontLeg, in: AnimationFrame(animation, frame)) }
         }
         for player in 0..<players {
             for animation in Animation.allCases {

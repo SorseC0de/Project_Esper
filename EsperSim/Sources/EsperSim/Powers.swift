@@ -236,14 +236,21 @@ public struct Beam: Equatable {
     public var framesLeft: Int
     /// How far out of the hands it's reached: it grows to its length rather than being there at once.
     public var reach = 0.0
-    /// Who and what it has already met, once each.
+    /// Who and what it has already met, once each while it fires its own time; held on, again
+    /// every `ZRules.holdRehitFrames`, counted here.
     public var hitPlayer = false
     public var hitBall = false
+    public var sinceHit = 0
 }
 
 public enum ZRules {
     public static let chargeFrames = 60
     public static let fireFrames = 30
+    /// On past that while FLO lasts, till the slash is pressed again: a FLO gone every three
+    /// frames (a full bar in five seconds), and whoever and whatever is along it hit again every
+    /// 15, those hits earning nothing and holding nothing still.
+    public static let holdDrainFrames = 3
+    public static let holdRehitFrames = 15
     public static let length = 400.0
     /// How fast it grows out to that, a frame: the whole of it in ten.
     public static let growth = 40.0

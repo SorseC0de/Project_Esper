@@ -50,6 +50,40 @@ final class ZTeaTests: XCTestCase {
         XCTAssertEqual(level.players[0].beamAim, 0)
     }
 
+    func testTheBeamFiresOnBurningFloAndHitsAgainTillItRunsOutOrIsStopped() {
+        var match = court(level: 1)
+        match.players[0].flo = 10
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        match.ball.position = Vec2(x: 20, y: 10)
+        // Clear of the court's ledge, which the knock would put them on.
+        match.players[0].position.x = 300
+        match.players[1].position.x = 360
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        var strikes = 0, held = 0
+        for _ in 0..<400 {
+            match.advance(inputs: [.idle, .idle])
+            strikes += match.events.filter { if case .struck = $0 { return true } else { return false } }.count
+            held = max(held, match.players[0].beamHeld)
+        }
+        XCTAssertEqual(match.players[0].flo, 0, "burned")
+        XCTAssertGreaterThan(held, 0, "fired on past its own time")
+        XCTAssertGreaterThan(strikes, 1, "hit again as it fired on")
+        XCTAssertFalse(match.players[0].firingBeam, "and done when it ran out")
+
+        // Pressed again while it fires, it stops at its own time with the FLO kept.
+        var stopped = court(level: 1)
+        stopped.players[0].flo = 50
+        stopped.players[1].position.x = 600
+        stopped.advance(inputs: [PlayerInput(shoot: true), .idle])
+        for _ in 0..<(ZRules.chargeFrames + 10) { stopped.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(stopped.players[0].firingBeam)
+        stopped.advance(inputs: [PlayerInput(shoot: true), .idle])
+        for _ in 0..<ZRules.fireFrames { stopped.advance(inputs: [.idle, .idle]) }
+        XCTAssertFalse(stopped.players[0].firingBeam)
+        XCTAssertEqual(stopped.players[0].flo, 50)
+    }
+
     func testTheJumpCallsTheChargeOff() {
         var match = court(level: 1)
         match.advance(inputs: [PlayerInput(shoot: true), .idle])

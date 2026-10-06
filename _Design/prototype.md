@@ -485,7 +485,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   (into the jump) and a hit stops it; then the beam fires half a second (30) from the hand, growing out 40 a frame
   (`ZRules.growth`, the whole of it in ten; it meets only what it's reached; protocol 76) to 400
   units along, 5 either side, and strips and knocks along it (5, lifted 1.5) the first other body
-  it meets, sending the ball along it at 7, theirs or loose. Firing, it can't be stunned or knocked
+  it meets, sending the ball along it at 7, theirs or loose. With FLO, it fires on past its half
+  second, a FLO gone every three frames (`holdDrainFrames`), until the FLO runs out or the slash is
+  pressed again (a press, not a hold, so lag can't make the two phones disagree; protocol 97),
+  hitting whoever and whatever is along it again every 15 (`holdRehitFrames`), pushed along it
+  without the lift so they stay in it, those hits earning no FLO and holding no hit-stop. Firing, it can't be stunned or knocked
   (`Player.knock`, `hitStun`). At level two up and down on the stick turn it, 2 degrees a frame at full
   tilt (`aimRate`), any angle up to 45 off level, through the charge and while it fires, the beam
   turning with it. The throw's charge swirl (`esper_charge`) plays through the charge between the
@@ -635,16 +639,17 @@ the same colour, the second takes the opposite, as before. Online is still the c
   47, large under CUSTOMIZE.
 - Each side: `Holo-Projector_v2` (the catalog's `HoloProjector`) on the halo's ring, under the halo, its white in
   the side's colour, and `player_customize` standing on its lens, in the side's look with its hooded
-  head (`SpriteLibrary.portrait`; the hood a pixel right and up of where the idle's head puts it,
-  `portraitHoodNudge`), the second side facing the first. An art pixel is 0.168/64 of the screen's
-  width; the projector is drawn at 0.25 of that, 4 down, the player at 2, 6 up, each a whole number
+  head (`SpriteLibrary.portrait`: the body and the hooded head apart, the hood placed where the
+  idle's head puts it, then by HEAD X and HEAD Y, in art pixels, and HEAD SCALE about the head's
+  middle, the strings off it wherever it goes), the second side facing the first. An art pixel is 0.168/64 of the screen's
+  width; the projector is drawn at 0.25 of that, 7 down, the player at 2, 6 up, each a whole number
   of screen pixels. The player is drawn a frame at a time (`CustomizeFigure`): its strings float as
   FloState's do, one back and one forward, but a human's length, five; cubes rise off the head's crown (in the energy
-  colour) and the shoes at play's numbers with no FLO, swaying in the wind, shaded as the Metal
-  layer shades them, the back shoe's behind.
+  colour) and whatever of the limbs is energy, as in play, at play's numbers with no FLO, swaying
+  in the wind, shaded as the Metal layer shades them, the back limb's behind.
 - Tuning, low in the middle (HIDE/TUNE): PROJ Y and PLAYER Y in art pixels up, PROJ SCALE and
-  PLAYER SCALE in quarters (the art pixels each is drawn at), kept between launches, starting at
-  -4, 0.25, 6 and 2. The player
+  PLAYER SCALE in quarters (the art pixels each is drawn at), HEAD X and HEAD Y in art pixels and
+  HEAD SCALE in tenths, kept between launches, starting at -7, 0.25, 6, 2, 1, 1 and 1. The player
   stands on the lens wherever the projector goes, PLAYER Y on top of that.
 - Energy glows: the halos, the projector's lit parts, the player's shoes, sleeves, boots and hood,
   its strings and cubes, the lit box lines and the display's bar; a blurred copy added over at 0.6.
@@ -932,7 +937,11 @@ proportion, cut out of the glow's mask whole (`player_hood_down` is no longer dr
 and on Frost Tea's ice clones, it's drawn as the ice player (`SpriteLibrary.icePlayer`): hood and
 face both toned in the ice look, no strings. Surf Soda's ride carries it, its strings and its
 flashes with the body (`placeSurf`). Z Tea's beam tips it as Super Smoothie's flight does: back
-aimed up, forward aimed down, to π/15 at the aim's 45°. In the glow's mask the hood is cut out in black so it glows as energy
+aimed up, forward aimed down, to π/15 at the aim's 45°. A human's limb cubes come off whatever of
+the limbs is energy (`Dressing.cubeSources`): a boot's top, the knee, rather than the shoe, a
+sleeve's, the shoulder, and a shoe where there's no boot; the tops are each part's topmost row's
+middle on the sheet (`SpriteLibrary.top`, the same in every look, warmed with the rest), and the
+cubes take the part's colour as drawn, turned round or not. In the glow's mask the hood is cut out in black so it glows as energy
 (`hoodSnapshots`, `MaskScene`'s `cutOut`) and the face drawn pure red (`shieldedSnapshots`, `shield`),
 which the bright pass treats as flat and the composite leaves without bloom, so none spreads onto it.
 The hood is the H.O.O.D., the Hyper-Osmotic Output Driver: it draws in sweat and drives out

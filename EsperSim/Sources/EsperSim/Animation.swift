@@ -244,8 +244,8 @@ extension Player {
         case .beamFiring:
             // Firing, frames 3 to 7 round and round under the arms; then the last two.
             let each = ZRules.blastSheetFrameLength
-            if t < ZRules.fireFrames { return AnimationFrame(.blast, 3 + (t / each) % 5) }
-            return AnimationFrame(.blast, min(8 + (t - ZRules.fireFrames) / each, 9))
+            if t < beamFiringFrames { return AnimationFrame(.blast, 3 + (t / each) % 5) }
+            return AnimationFrame(.blast, min(8 + (t - beamFiringFrames) / each, 9))
         case .zBurst:
             return AnimationFrame(.transform, ZRules.sheetFrame(at: t, level: powerLevel))
         case .suspended:

@@ -192,11 +192,15 @@ struct CustomizeScreen: View {
     @Environment(\.displayScale) private var displayScale
     /// The tuning sliders: the projector's and the player's height, in art pixels up, and the
     /// art pixels each is drawn at, in quarters.
-    @AppStorage("esper.customize.projectorY.2") private var projectorY = -4.0
+    @AppStorage("esper.customize.projectorY.3") private var projectorY = -7.0
     @AppStorage("esper.customize.projectorScale.2") private var projectorScale = 0.25
     @AppStorage("esper.customize.playerY.2") private var playerY = 6.0
     @AppStorage("esper.customize.playerScale.2") private var playerScale = 2.0
     @AppStorage("esper.customize.tuningShown") private var tuningShown = true
+    /// The hooded head on the figure: art pixels right and up, and its size in tenths.
+    @AppStorage("esper.customize.headX") private var headX = 1.0
+    @AppStorage("esper.customize.headY") private var headY = 1.0
+    @AppStorage("esper.customize.headScale") private var headScale = 1.0
 
     init(flow: FlowState) {
         self.flow = flow
@@ -394,7 +398,9 @@ struct CustomizeScreen: View {
             // Standing on the lens, the second side facing the first.
             let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
             let side = (48 + 2 * CustomizeFigure.margin) * playerPixel
-            CustomizeFigure(portrait: portrait, look: pick.look, pixel: playerPixel, mirrored: player == 1)
+            // The second side is shown turned round, its sleeves and boots swapped as drawn.
+            CustomizeFigure(portrait: portrait, look: player == 1 ? pick.look.turnedRound : pick.look, pixel: playerPixel, mirrored: player == 1,
+                            headNudge: CGPoint(x: headX, y: headY), headScale: headScale)
                 .frame(width: side, height: side)
                 .allowsHitTesting(false)
                 .position(x: ring.x, y: lens - (CustomizeScreen.feetRow - 24) * playerPixel - playerY * base)
@@ -585,6 +591,9 @@ struct CustomizeScreen: View {
                 tuningRow("PROJ SCALE", value: $projectorScale, step: 0.25, range: 0.25...8, format: "×%.2f")
                 tuningRow("PLAYER Y", value: $playerY, step: 1, range: -64...64, format: "%.0f")
                 tuningRow("PLAYER SCALE", value: $playerScale, step: 0.25, range: 0.25...8, format: "×%.2f")
+                tuningRow("HEAD X", value: $headX, step: 1, range: -16...16, format: "%.0f")
+                tuningRow("HEAD Y", value: $headY, step: 1, range: -16...16, format: "%.0f")
+                tuningRow("HEAD SCALE", value: $headScale, step: 0.1, range: 0.5...2, format: "×%.1f")
             }
         }
         .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -653,14 +662,27 @@ struct CustomizeFigure: View {
     /// Screen points an art pixel.
     let pixel: CGFloat
     let mirrored: Bool
+    /// The hooded head's place on the figure, put right on the sliders: art pixels right and up,
+    /// and its size, about the head's middle.
+    let headNudge: CGPoint
+    let headScale: CGFloat
     @State private var motion = CustomizeFigureMotion()
 
     static let margin: CGFloat = 24
 
+    /// Where the hooded head goes and how big: its canvas's top left on the figure's, in pixels
+    /// from the top left, and its scale. About the figure's head's middle, which the hood's
+    /// own sits on.
+    static func hoodPlace(_ portrait: SpriteLibrary.Portrait, nudge: CGPoint, scale: CGFloat) -> (origin: CGPoint, scale: CGFloat) {
+        let head = portrait.centres[.head] ?? CGPoint(x: 24, y: 24)
+        let own = CGPoint(x: head.x - portrait.hoodOffset.x, y: head.y - portrait.hoodOffset.y)
+        return (CGPoint(x: head.x - own.x * scale + nudge.x, y: head.y - own.y * scale - nudge.y), scale)
+    }
+
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                motion.advance(to: timeline.date.timeIntervalSinceReferenceDate, portrait: portrait, look: look)
+                motion.advance(to: timeline.date.timeIntervalSinceReferenceDate, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale)
                 var context = context
                 if mirrored {
                     context.translateBy(x: size.width, y: 0)
@@ -674,6 +696,10 @@ struct CustomizeFigure: View {
                 for cube in motion.cubes where cube.behind { draw(cube, in: context, at: spot(cube.position)) }
                 let figure = Image(decorative: portrait.image, scale: 1).interpolation(.none)
                 context.draw(figure, in: CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel))
+                let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: headScale)
+                let hoodRect = CGRect(x: (margin + place.origin.x) * pixel, y: (margin + place.origin.y) * pixel,
+                                      width: 48 * place.scale * pixel, height: 48 * place.scale * pixel)
+                if let hood = portrait.hood { context.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect) }
                 let plain = Color(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel))
                 let accent = Color(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel))
                 for string in motion.strings {
@@ -689,6 +715,7 @@ struct CustomizeFigure: View {
                     layer.addFilter(.blur(radius: pixel * CustomizeArt.glowPixels))
                     layer.draw(Image(decorative: portrait.glowing, scale: 1).interpolation(.none),
                                in: CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel))
+                    if let hood = portrait.hoodGlowing { layer.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect) }
                     for string in motion.strings {
                         let at = spot(string.point)
                         layer.fill(Path(CGRect(x: at.x - pixel / 2, y: at.y - pixel / 2, width: pixel, height: pixel)), with: .color(string.accent ? accent : plain))
@@ -759,37 +786,40 @@ final class CustomizeFigureMotion {
         for index in style.strands.indices { style.strands[index].length = HoodStrings.hanging.strands[index].length }
         return style
     }()
-    /// The head's cubes a second, the shoes' each; the game's at no FLO.
+    /// The head's cubes a second, each limb's; the game's at no FLO.
     static let headCubeRate = 24.0
     static let shoeCubeRate = Double(ParticleLook.legCubeRate)
 
-    func advance(to time: Double, portrait: SpriteLibrary.Portrait, look: Look) {
+    func advance(to time: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat) {
         let step = 1.0 / 60
         owed += last.map { min(time - $0, 0.1) } ?? step
         last = time
         while owed >= step {
             owed -= step
-            tick(time: time, step: step, portrait: portrait, look: look)
+            tick(time: time, step: step, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale)
         }
     }
 
-    private func tick(time: Double, step: Double, portrait: SpriteLibrary.Portrait, look: Look) {
-        // The strings off the hood's own anchors, wherever the hood went on the figure, floating
-        // as FloState's do: one back, the shorter forward.
+    private func tick(time: Double, step: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat) {
+        // The strings off the hood's own anchors, wherever the hood went on the figure and at its
+        // size, floating one back and one forward.
+        let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: headScale)
         let anchors = HoodStrings.anchorPixels.map { pixel in
-            CGPoint(x: pixel.x + 0.5 + portrait.hoodOffset.x, y: 48 - (pixel.y + 0.5 + portrait.hoodOffset.y))
+            CGPoint(x: place.origin.x + (pixel.x + 0.5) * place.scale, y: 48 - (place.origin.y + (pixel.y + 0.5) * place.scale))
         }
         strings = stringMotion.step(anchors: anchors, style: CustomizeFigureMotion.strings, facing: 1, scale: 1, time: time)
 
-        // Cubes off the head's crown and the shoes, as a human's are in play.
+        // Cubes off the head's crown, where the hood went, and off whatever of the limbs is
+        // energy (`Dressing.cubeSources`), as a human's are in play.
         let wind = sin(time * 2 * .pi * ParticleLook.swayPerSecond) * Double(ParticleLook.flowSpeed)
-        let sources: [(part: BodyPart, rate: Double, size: Float, spread: Float, lift: CGFloat)] = [
-            (.head, CustomizeFigureMotion.headCubeRate, ParticleLook.cubeSize, ParticleLook.cubeSpread, GameScene.crownLift),
-            (.frontFoot, CustomizeFigureMotion.shoeCubeRate, ParticleLook.legCubeSize, ParticleLook.legCubeSpread, 0),
-            (.backFoot, CustomizeFigureMotion.shoeCubeRate, ParticleLook.legCubeSize, ParticleLook.legCubeSpread, 0),
-        ]
+        let head = portrait.centres[.head].map { CGPoint(x: $0.x + headNudge.x, y: $0.y - headNudge.y) }
+        let limbs: [(part: BodyPart, rate: Double, size: Float, spread: Float, lift: CGFloat, at: CGPoint?)] = look.dressing.cubeSources.map { limb in
+            (limb.part, CustomizeFigureMotion.shoeCubeRate, ParticleLook.legCubeSize, ParticleLook.legCubeSpread, 0,
+             limb.fromTop ? portrait.tops[limb.part] : portrait.centres[limb.part])
+        }
+        let sources = [(BodyPart.head, CustomizeFigureMotion.headCubeRate, ParticleLook.cubeSize, ParticleLook.cubeSpread, GameScene.crownLift, head)] + limbs
         for source in sources {
-            guard let centre = portrait.centres[source.part] else { continue }
+            guard let centre = source.at else { continue }
             credit[source.part, default: 0] += source.rate * step
             while credit[source.part, default: 0] >= 1 {
                 credit[source.part, default: 0] -= 1
@@ -803,7 +833,7 @@ final class CustomizeFigureMotion {
                                   life: Double(ParticleLook.cubeTrail) / speed + .random(in: -0.05...0.05),
                                   orientation: simd_quatf(angle: .random(in: 0..<(2 * .pi)), axis: axis),
                                   spin: SIMD3<Float>.random(in: -ParticleLook.cubeSpin...ParticleLook.cubeSpin),
-                                  // The head's in the energy's colour; the shoes' in theirs.
+                                  // The head's in the energy's colour; the limbs' in theirs.
                                   size: CGFloat(source.size), colour: source.part == .head ? look.glow : (look.colours[source.part] ?? look.glow),
                                   behind: source.part.isBack))
             }

@@ -706,7 +706,18 @@ public struct Match: Equatable {
         var kept: [Beam] = []
         for var beam in beams {
             beam.framesLeft -= 1
-            guard beam.framesLeft > 0, players.indices.contains(beam.owner), players[beam.owner].firingBeam else { continue }
+            guard players.indices.contains(beam.owner), players[beam.owner].firingBeam,
+                  beam.framesLeft > 0 || players[beam.owner].beamHeld > 0 else { continue }
+            // Held on, it hits again.
+            let held = players[beam.owner].beamHeld > 0
+            if held {
+                beam.sinceHit += 1
+                if beam.sinceHit >= ZRules.holdRehitFrames {
+                    beam.sinceHit = 0
+                    beam.hitPlayer = false
+                    beam.hitBall = false
+                }
+            }
             // Turned as the firer turns it, and grown out a way further.
             beam.origin = players[beam.owner].beamOrigin
             beam.direction = players[beam.owner].beamDirection
@@ -723,9 +734,11 @@ public struct Match: Equatable {
             }
             if !beam.hitPlayer, let victim = players.indices.first(where: { $0 != beam.owner && along(players[$0].body) }) {
                 beam.hitPlayer = true
-                let held = players[victim].hasBall
-                strip(victim, by: beam.owner, knock: beam.direction * ZRules.bodyKnock + Vec2(x: 0, y: ZRules.bodyLift))
-                if held, ball.holder == nil {
+                let holding = players[victim].hasBall
+                // Fired on, it pushes along the beam without lifting, so whoever it holds stays in it.
+                strip(victim, by: beam.owner, knock: beam.direction * ZRules.bodyKnock + Vec2(x: 0, y: held ? 0 : ZRules.bodyLift),
+                      flo: held ? 0 : FloRules.hit, pause: !held)
+                if holding, ball.holder == nil {
                     beam.hitBall = true
                     ball.release(from: ball.position, velocity: beam.direction * ZRules.ballSpeed, by: beam.owner, straight: false)
                 }
@@ -928,7 +941,9 @@ public struct Match: Equatable {
     /// The strip: the victim stunned, any ball they hold popped free, and knocked away if
     /// `knock` is given. Without stunning, only the ball pops and the knock lands.
     /// `flo`: what the hit earns its striker, as every hit does but a parry's and the stage's.
-    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, flo: Int = FloRules.hit) {
+    /// `pause`: the hit holds the game still a moment, as a hit does but a held beam's.
+    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, flo: Int = FloRules.hit,
+                                pause: Bool = true) {
         if !stun {
             // A push, not a hit: no stun and no spark, the ball let go of if held.
             let held = players[victim].hasBall
@@ -943,7 +958,7 @@ public struct Match: Equatable {
         } else {
             events.append(.struck(player: victim, by: striker))
             if flo > 0 { earnFlo(flo, by: striker, off: victim, at: players[victim].chest) }
-            holdHitStop(HitStopRules.hitFrames)
+            if pause { holdHitStop(HitStopRules.hitFrames) }
         }
         if stun { players[victim].hitStun = BallRules.hitStunFrames }
         if let knock { players[victim].knock(knock) }

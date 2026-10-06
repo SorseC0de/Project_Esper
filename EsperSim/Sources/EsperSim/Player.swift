@@ -1401,14 +1401,31 @@ public struct Player: Equatable {
             if powerLevel >= 2, abs(input.stick.x) >= 0.3, abs(input.stick.x) > abs(input.stick.y) { facing = input.stick.x > 0 ? .right : .left }
             turnBeam(input)
             if stateTimer >= ZRules.chargeFrames {
+                beamHeld = 0
+                beamDrainClock = 0
+                beamStopped = false
                 enter(.beamFiring)
                 wanted = .fireBeam
             }
 
         case .beamFiring:
             velocity = .zero
-            if firingBeam { turnBeam(input) }
-            if stateTimer >= ZRules.fireFrames + ZRules.recoveryFrames { enter(.idle) }
+            if firingBeam {
+                turnBeam(input)
+                // It fires on past its time while there's FLO to burn, a FLO gone every
+                // `holdDrainFrames`, till the slash is pressed again: a press, not a hold, so
+                // it's the same on both phones whatever the lag.
+                if shootPressed { beamStopped = true }
+                if stateTimer == beamFiringFrames - 1, !beamStopped, flo > 0 {
+                    beamHeld += 1
+                    beamDrainClock += 1
+                    if beamDrainClock >= ZRules.holdDrainFrames {
+                        beamDrainClock = 0
+                        flo -= 1
+                    }
+                }
+            }
+            if stateTimer >= beamFiringFrames + ZRules.recoveryFrames { enter(.idle) }
 
         case .zBurst:
             // Through the transform's sheet its momentum braked, not stopped; the burst on its
@@ -1692,7 +1709,14 @@ public struct Player: Equatable {
     }
 
     /// Firing Z Tea's beam: not its recovery after.
-    public var firingBeam: Bool { state == .beamFiring && stateTimer < ZRules.fireFrames }
+    public var firingBeam: Bool { state == .beamFiring && stateTimer < beamFiringFrames }
+    /// How long the beam fires: its own half second and however long it's been held on.
+    public var beamFiringFrames: Int { ZRules.fireFrames + beamHeld }
+    /// Frames the beam has fired on past its own, burning FLO, the clock to the next FLO, and
+    /// whether the slash has been pressed to stop it.
+    public var beamHeld = 0
+    var beamDrainClock = 0
+    var beamStopped = false
 
     /// Z Tea's beam's aim, off straight ahead the way it faces, up positive.
     public var beamAim = 0.0

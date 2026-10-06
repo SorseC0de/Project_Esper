@@ -402,6 +402,13 @@ struct Dressing: Hashable, Codable {
         return parts
     }
 
+    /// Where a human's limb cubes come off: what of each limb is energy, from its top, the knee
+    /// of a boot or the shoulder of a sleeve, or a shoe from its middle where there's no boot.
+    var cubeSources: [(part: BodyPart, fromTop: Bool)] {
+        [frontBoot ? (.frontLeg, true) : (.frontFoot, false), backBoot ? (.backLeg, true) : (.backFoot, false)]
+            + (frontSleeve ? [(.frontArm, true)] : []) + (backSleeve ? [(.backArm, true)] : [])
+    }
+
     /// The parts in the energy's colours, glowing: the shoes, and the sleeves and boots.
     var glowing: Set<BodyPart> { HumanLook.glowingParts.union(covered) }
 

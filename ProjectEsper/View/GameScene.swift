@@ -3908,7 +3908,7 @@ final class GameScene: SKScene {
                                        heading: nil, start: 0) { _, _ in }
         case .pick:
             screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: Array(Greateraid.boosters.prefix(3)), drinks: .none,
-                                colour: SKColor(rgb: sprites.look(for: 0).glow), timed: true) { _ in }
+                                colour: SKColor(rgb: sprites.look(for: 0).glow), timed: true, drinker: drinkerFrames(0)) { _ in }
         case .pause:
             screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
         case .win:
@@ -3925,6 +3925,12 @@ final class GameScene: SKScene {
         flowState?.veiled = screen != nil
     }
 
+    /// `player_drinkchoice`'s frames in a player's look, for the Greateraid pick.
+    private func drinkerFrames(_ player: Int) -> [SKTexture] {
+        (0..<GameScene.drinkerFrameCount).map { sprites.standalone("player_drinkchoice", frame: $0, player: player) }
+    }
+    private static let drinkerFrameCount = 2
+
     /// The screen for the flow, built for the view's size.
     private func presentScreen() {
         screen?.removeFromParent()
@@ -3937,7 +3943,8 @@ final class GameScene: SKScene {
         case .picking:
             if picker == localIndex {
                 screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: pickOffers, drinks: series.drinks[picker],
-                                    colour: SKColor(rgb: sprites.look(for: picker).glow), timed: online != nil) { [weak self] drink in
+                                    colour: SKColor(rgb: sprites.look(for: picker).glow), timed: online != nil,
+                                    drinker: drinkerFrames(picker)) { [weak self] drink in
                     self?.choose(drink)
                 }
             } else {
@@ -4328,6 +4335,8 @@ final class GameScene: SKScene {
             startFinish()
             return
         }
+        // In Rounds every point ends on it too, the Greateraid pick after.
+        if gameMode == .rounds { startFinish() }
         var pool: [(lines: [SoundBoard.Effect], weight: Int)] = [(SoundBoard.scores, GameScene.scoreWeight)]
         if dunk {
             pool.append((SoundBoard.dunks, GameScene.likelyWeight))

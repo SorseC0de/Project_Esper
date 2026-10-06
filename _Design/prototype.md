@@ -855,7 +855,11 @@ to one over Biomorphs, which are the powers, one at a time. With a biomorph in h
 that one comes round again, lettered "(Second Sip)" under its name, and drinking it
 takes the power to level two. Drinks stack through the series and go with it. Every
 bottle carries its comment (`Greateraid.comment`), the user's line; "..." is the
-placeholder for one not written yet.
+placeholder for one not written yet. In the middle, standing on the blurb's banner, the one
+picking: `player_drinkchoice` in their look, with the hooded head and its neck as in play
+(`SpriteLibrary.standalone`), its towel (palette 22 and 37) kept as drawn, its two frames played
+very slowly, 1.5 seconds each; its size on the UI panel's PICK screen (DRINKER, the points to an
+art pixel, 4 to start).
 
 - Hasty Horchata: run, dash and air speed up by half a unit a drink. The body a match
   starts on is the baseline with half a unit less of each, the double jump kept, so one
@@ -1840,7 +1844,8 @@ shown, once, like the effects.
 - port_in: the port-in at a round's start.
 - swish: a point, with the strike on the rim; a dunk has none, the announcer's line instead.
 - crowd_cheer, behind the rest, on every basket, and with it the announcer: on the game's last,
-  thatlldoit, thatlldoit-2 or thatdecidesit, the finish slowing to 0.35 (offline) and the camera
+  thatlldoit, thatlldoit-2 or thatdecidesit, the finish (in Rounds, on every point too, before the
+  Greateraid pick, the announcer's line as usual) slowing to 0.35 (offline) and the camera
   easing in on the ball to 0.55 of its view over 40 frames and then staying on it, in a hand or
   loose (where it was last seen while it's drawn nowhere), on Hoopfish Hideaway and the Elements kept inside the
   stage's sides, the HUD keeping its size, until

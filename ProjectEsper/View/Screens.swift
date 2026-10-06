@@ -217,9 +217,17 @@ final class PickScreen: Screen {
     private var outlines: [SKNode] = []
     private let onDrink: (Greateraid) -> Void
 
-    /// `timed` shows the seconds left, for a networked pick.
+    /// `player_drinkchoice` in the picker's look, its frames played very slowly, standing on the
+    /// blurb's banner in the middle; its art pixels this many points, on the UI panel's slider.
+    static let drinkerScaleKey = "ui.pick.drinkerScale"
+    static var drinkerScale: CGFloat { UserDefaults.standard.object(forKey: drinkerScaleKey).map { CGFloat(($0 as? Double) ?? 4) } ?? 4 }
+    static let drinkerFrameSeconds = 1.5
+    /// The sheet's feet, eight pixels up its 48.
+    static let drinkerFeet: CGFloat = 8.0 / 48
+
+    /// `timed` shows the seconds left, for a networked pick; `drinker`, the frames of the one picking.
     init(halfWidth: CGFloat, halfHeight: CGFloat, offers: [Greateraid], drinks: Drinks, colour: SKColor, timed: Bool = false,
-         onDrink: @escaping (Greateraid) -> Void) {
+         drinker: [SKTexture] = [], onDrink: @escaping (Greateraid) -> Void) {
         self.offers = offers
         self.drinks = drinks
         self.onDrink = onDrink
@@ -247,6 +255,15 @@ final class PickScreen: Screen {
         plate.position = CGPoint(x: 0, y: -halfHeight * 0.05)
         plate.zPosition = 1
         addChild(plate)
+        if let first = drinker.first {
+            let figure = SKSpriteNode(texture: first)
+            figure.size = first.size().scaled(by: PickScreen.drinkerScale)
+            figure.anchorPoint = CGPoint(x: 0.5, y: PickScreen.drinkerFeet)
+            figure.position = CGPoint(x: 0, y: plate.position.y + plate.size.height / 2)
+            figure.zPosition = 0.5
+            figure.run(.repeatForever(.animate(with: drinker, timePerFrame: PickScreen.drinkerFrameSeconds)))
+            addChild(figure)
+        }
 
         let spacing = min(halfWidth * 0.55, 200)
         for (index, offer) in offers.enumerated() {

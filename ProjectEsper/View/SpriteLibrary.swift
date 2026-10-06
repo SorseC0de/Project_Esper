@@ -393,6 +393,45 @@ final class SpriteLibrary {
 
     /// With the hood placed by `headNudge` and `headScale`: the figure's neck filled and its
     /// line run round the hood there, so nothing shows through where they meet.
+    /// A frame of a sheet outside the game's animations (the Greateraid pick's drinker) in a
+    /// player's look, lined, its hooded head on it where the game would put it and its neck
+    /// filled, as a body is in play. Its towel, palette 22 and 37, isn't energy: kept as drawn.
+    func standalone(_ name: String, frame: Int, player: Int) -> SKTexture {
+        let key = "p\(player)_standalone_\(name)_\(frame)"
+        if let made = cache[key] { return made }
+        let look = look(for: player)
+        let source = texture(name, frame).cgImage()
+        let body = recolour(texture(name, frame), look: look, holdsBall: false, detach: false,
+                            hoodShape: look.human ? SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)] : nil)
+        var made = body.texture
+        let image = body.texture.cgImage()
+        if let (context, pixels) = makeCanvas(width: image.width, height: image.height),
+           let (sourceContext, sourcePixels) = makeCanvas(width: source.width, height: source.height) {
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: source.width, height: source.height))
+            let towel: Set<RGB> = [PixelPalette.colours[22], PixelPalette.colours[37]]
+            for pixel in 0..<(min(image.width, source.width) * min(image.height, source.height)) where sourcePixels[pixel * 4 + 3] == 255 {
+                let index = pixel * 4
+                let colour = RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2])
+                guard towel.contains(colour) else { continue }
+                for channel in 0..<4 { pixels[index + channel] = sourcePixels[index + channel] }
+            }
+            if let composed = context.makeImage() { made = SKTexture(cgImage: composed) }
+        }
+        if look.human, let here = body.centres[.head], let there = SpriteLibrary.hoodDrawnForHead,
+           let (context, _) = makeCanvas(width: image.width, height: image.height) {
+            context.draw(made.cgImage(), in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            let hood = hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage()
+            // The offset counts rows down; the context's run up.
+            let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
+            context.draw(hood, in: CGRect(x: offset.x, y: -offset.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
+            if let composed = context.makeImage() { made = SKTexture(cgImage: composed) }
+        }
+        made.filteringMode = .nearest
+        cache[key] = made
+        return made
+    }
+
     func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame, headNudge: CGPoint, headScale: CGFloat) -> Portrait? {
         let key = "p\(player)_portrait_\(name)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
         if cache[key] != nil, let made = portraits[key] { return made }

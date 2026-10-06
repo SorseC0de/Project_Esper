@@ -4165,9 +4165,10 @@ final class GameScene: SKScene {
     }
 
     /// The customize screen's player, in a side's look with its hooded head.
-    func customizePortrait(player: Int) -> SpriteLibrary.Portrait? {
+    func customizePortrait(player: Int, headNudge: CGPoint, headScale: CGFloat) -> SpriteLibrary.Portrait? {
         // The second side is shown facing left.
-        sprites.portrait("player_customize", player: sprites.bodyPlayer(player, facingLeft: player == 1), headDrawnFor: GameScene.hoodDrawnFor)
+        sprites.portrait("player_customize", player: sprites.bodyPlayer(player, facingLeft: player == 1), headDrawnFor: GameScene.hoodDrawnFor,
+                         headNudge: headNudge, headScale: headScale)
     }
 
     /// A side's hooded head alone, cut to what's drawn, for the customize screen's hood box.

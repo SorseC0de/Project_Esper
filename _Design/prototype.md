@@ -641,7 +641,10 @@ the same colour, the second takes the opposite, as before. Online is still the c
   the side's colour, and `player_customize` standing on its lens, in the side's look with its hooded
   head (`SpriteLibrary.portrait`: the body and the hooded head apart, the hood placed where the
   idle's head puts it, then by HEAD X and HEAD Y, in art pixels, and HEAD SCALE about the head's
-  middle, the strings off it wherever it goes), the second side facing the first. An art pixel is 0.168/64 of the screen's
+  middle, the strings off it wherever it goes), the second side facing the first. The figure is
+  coloured for where the hood goes: the sheet's head kept in skin under it as its neck, and the
+  outside line run round the body and the hood together (`recolour`'s `hood`), so nothing shows
+  through where they meet; in play the outline's own pass covers it. An art pixel is 0.168/64 of the screen's
   width; the projector is drawn at 0.25 of that, 7 down, the player at 2, 6 up, each a whole number
   of screen pixels. The player is drawn a frame at a time (`CustomizeFigure`): its strings float as
   FloState's do, one back and one forward, but a human's length, five; cubes rise off the head's crown (in the energy

@@ -377,12 +377,30 @@ final class SpriteLibrary {
     }
     private var portraits: [String: Portrait] = [:]
 
-    func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame) -> Portrait? {
-        let key = "p\(player)_portrait_\(name)"
+    /// Where the customize figure's hooded head goes and how big: its canvas's top left on the
+    /// figure's, in pixels from the top left, and its scale. Moved from where the game would put
+    /// it by `nudge` (art pixels right and up) and scaled about the head's middle, which the
+    /// hood's own sits on.
+    static func hoodPlace(head: CGPoint, offset: CGPoint, nudge: CGPoint, scale: CGFloat) -> (origin: CGPoint, scale: CGFloat) {
+        let own = CGPoint(x: head.x - offset.x, y: head.y - offset.y)
+        return (CGPoint(x: head.x - own.x * scale + nudge.x, y: head.y - own.y * scale - nudge.y), scale)
+    }
+
+    /// With the hood placed by `headNudge` and `headScale`: the figure's neck filled and its
+    /// line run round the hood there, so nothing shows through where they meet.
+    func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame, headNudge: CGPoint, headScale: CGFloat) -> Portrait? {
+        let key = "p\(player)_portrait_\(name)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
         if cache[key] != nil, let made = portraits[key] { return made }
         let look = look(for: player)
-        let figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: false)
+        let plain = recolour(texture(name, 0), look: look, holdsBall: false, detach: false)
         let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
+        var figure = plain
+        if look.human, let here = plain.centres[.head], let there = drawnFor.centres[.head] {
+            let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
+            let place = SpriteLibrary.hoodPlace(head: here, offset: offset, nudge: headNudge, scale: headScale)
+            figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: false,
+                              hood: (hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage(), place.origin, place.scale))
+        }
         let body = figure.texture.cgImage()
         let width = body.width, height = body.height
         guard let (glowContext, glowPixels) = makeCanvas(width: width, height: height),
@@ -627,7 +645,12 @@ final class SpriteLibrary {
     /// centre of each glowing part found. The ball is looked for only where the sheet
     /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
     /// with no line, and the body is drawn and lined without them.
-    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
+    /// `hood`: the customize figure's hooded head, its shape (`player_hoodheads`' drawn pixels)
+    /// placed on the canvas: the sheet's head is kept, in skin, under it as its neck, and the
+    /// outside line runs round the body and the hood together, the hood's own pixels left clear
+    /// for it to be drawn in. In play the outline's own pass covers the neck.
+    private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool,
+                          hood: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
@@ -646,6 +669,17 @@ final class SpriteLibrary {
             parts[pixel] = BodyPart.owning(colour)
         }
         markEnergy(&parts, holdsBall: holdsBall, width: width, height: height)
+        // Where the hood will be drawn over this canvas, if it's given.
+        var hoodCover = [Bool](repeating: false, count: count)
+        if let hood, let (shapeContext, shapePixels) = makeCanvas(width: hood.shape.width, height: hood.shape.height) {
+            shapeContext.draw(hood.shape, in: CGRect(x: 0, y: 0, width: hood.shape.width, height: hood.shape.height))
+            for pixel in 0..<count {
+                let x = Int(((CGFloat(pixel % width) + 0.5 - hood.origin.x) / hood.scale).rounded(.down))
+                let y = Int(((CGFloat(pixel / width) + 0.5 - hood.origin.y) / hood.scale).rounded(.down))
+                guard (0..<hood.shape.width).contains(x), (0..<hood.shape.height).contains(y) else { continue }
+                hoodCover[pixel] = shapePixels[(y * hood.shape.width + x) * 4 + 3] > 0
+            }
+        }
 
         // Each part to its colour; the energy to the tone of its own brightness.
         var sums: [BodyPart: (x: CGFloat, y: CGFloat, n: Int)] = [:]
@@ -717,7 +751,8 @@ final class SpriteLibrary {
         // Stroked groups: the body pixels next to one take the line, so it keeps its shape. A
         // pixel already lined is neither lined again nor counted as the group's, so where two
         // groups meet there's one line, not two.
-        for group in look.strokedGroups {
+        // With the hood given, the head is only its neck: no line of its own.
+        for group in look.strokedGroups where hood == nil || !group.contains(.head) {
             let stroked = (0..<count).map { parts[$0].map(group.contains) == true && !lined[$0] }
             for pixel in 0..<count where parts[pixel] != nil && !stroked[pixel] && !lined[pixel] && neighbours(pixel, { stroked[$0] }) {
                 paint(pixels, pixel * 4, look.outline)
@@ -728,10 +763,10 @@ final class SpriteLibrary {
         // The outside line, grown a pixel at a time round the body. The glowing parts get
         // none: a clear pixel next to nothing but the ball stays clear.
         if look.outlineWidth > 0 {
-            var body = (0..<count).map { pixels[$0 * 4 + 3] != 0 && parts[$0]?.glows(human: look.human) != true }
+            var body = (0..<count).map { (pixels[$0 * 4 + 3] != 0 && parts[$0]?.glows(human: look.human) != true) || hoodCover[$0] }
             for _ in 0..<look.outlineWidth {
                 var grown: [Int] = []
-                for pixel in 0..<count where pixels[pixel * 4 + 3] == 0 && neighbours(pixel, { body[$0] }) {
+                for pixel in 0..<count where pixels[pixel * 4 + 3] == 0 && !hoodCover[pixel] && neighbours(pixel, { body[$0] }) {
                     grown.append(pixel)
                 }
                 for pixel in grown {
@@ -745,7 +780,7 @@ final class SpriteLibrary {
 
         // A human's head is the view's, `player_hoodheads` over it: the sheet's own is taken
         // out, its line left round where it was.
-        if look.human {
+        if look.human, hood == nil {
             for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
                 for channel in 0..<4 { pixels[pixel * 4 + channel] = 0 }
             }

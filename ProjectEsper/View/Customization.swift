@@ -394,7 +394,7 @@ struct CustomizeScreen: View {
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: CustomizeScreen.haloFadeEnd)],
                                  startPoint: .top, endPoint: .bottom))
             .position(x: halo.midX, y: halo.midY)
-        if let portrait = flow.scene.customizePortrait(player: player) {
+        if let portrait = flow.scene.customizePortrait(player: player, headNudge: CGPoint(x: headX, y: headY), headScale: headScale) {
             // Standing on the lens, the second side facing the first.
             let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
             let side = (48 + 2 * CustomizeFigure.margin) * playerPixel
@@ -674,9 +674,7 @@ struct CustomizeFigure: View {
     /// from the top left, and its scale. About the figure's head's middle, which the hood's
     /// own sits on.
     static func hoodPlace(_ portrait: SpriteLibrary.Portrait, nudge: CGPoint, scale: CGFloat) -> (origin: CGPoint, scale: CGFloat) {
-        let head = portrait.centres[.head] ?? CGPoint(x: 24, y: 24)
-        let own = CGPoint(x: head.x - portrait.hoodOffset.x, y: head.y - portrait.hoodOffset.y)
-        return (CGPoint(x: head.x - own.x * scale + nudge.x, y: head.y - own.y * scale - nudge.y), scale)
+        SpriteLibrary.hoodPlace(head: portrait.centres[.head] ?? CGPoint(x: 24, y: 24), offset: portrait.hoodOffset, nudge: nudge, scale: scale)
     }
 
     var body: some View {

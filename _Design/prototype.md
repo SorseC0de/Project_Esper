@@ -661,9 +661,10 @@ the same colour, the second takes the opposite, as before. Online is still the c
 - Tuning, low in the middle (HIDE/TUNE), kept between launches: HEAD X and HEAD Y in art pixels
   and HEAD SCALE in tenths (1, 1, 1 to start); NAME Y (26); FONT, cycling the face of everything
   but START and the big H.O.O.D. between the finalists (`CustomizeFont.finalists`, alphabetically:
-  BM Army, Board of Directors, Kapel, Upheaval, BM Army to start), each sized so its capitals stand
+  BM Army, Board of Directors, Kapel, Upheaval, Kapel to start), each sized so its capitals stand
   as Bigdex's would; LETTER GAP, the space between the side labels' stacked letters, in points of
-  the screen at 1080 high (0 to start).
+  the screen at 1080 high (-15 to start); HOOD SPREAD, how much further from the screen's middle
+  each side's H.O.O.D. and its words sit, in the same points (0 to start).
 - Energy glows: the halos, the projector's lit parts, the player's shoes, sleeves, boots and hood,
   its strings and cubes, the lit box lines and the display's bar; a blurred copy added over at 0.6.
 - The boxes, each labelled under it in Bigdex. SKIN and H.O.O.D. are pickers: while one is chosen
@@ -685,8 +686,8 @@ the same colour, the second takes the opposite, as before. Online is still the c
   stacked down the box's side away from the player, at 0.25 of its height (H.O.O.D.'s under its
   box, at 0.4). Each arm and leg box has a line from it to its limb's middle on the player, run as
   the screen's top and bottom lines are, a dot at the end: a bracer's level out of the box's side
-  toward the player, then 45 degrees onto the limb; a sleeve's out of the box's bottom, 45 degrees
-  first, then level; in the boxes' cyan or, under the cursor, the side's colour, glowing: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
+  toward the player, then 45 degrees onto the limb; a sleeve's out of the box's bottom, a short way
+  straight down (0.2 of the box's height), then level, then 45 degrees onto the arm; in the boxes' cyan or, under the cursor, the side's colour, glowing: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
   the middle, the back. Front and back are kept as the body faces right; facing left, in play and
   on the second side, the body is drawn turned round (`Look.turnedRound`, `SpriteLibrary.turnedPlayer`,
   `bodyPlayer`), front and back swapped, so a sleeve stays on its arm. Its frames are built ahead

@@ -200,11 +200,14 @@ struct CustomizeScreen: View {
     /// The colour's name's middle over the player's middle, in art pixels.
     @AppStorage("esper.customize.nameY.2") private var nameY = 26.0
     /// The face of everything but START and the big H.O.O.D., one of the finalists (`CustomizeFont`).
-    @AppStorage("esper.customize.font.2") private var fontPick = CustomizeFont.bmArmy.rawValue
+    @AppStorage("esper.customize.font.3") private var fontPick = CustomizeFont.kapel.rawValue
     private var font: CustomizeFont { CustomizeFont(rawValue: fontPick).flatMap { CustomizeFont.finalists.contains($0) ? $0 : nil } ?? .bmArmy }
     /// The space between the side labels' letters, stacked one over the next, in points of the
     /// screen at 1080 high.
-    @AppStorage("esper.customize.letterGap") private var letterGap = 0.0
+    @AppStorage("esper.customize.letterGap.2") private var letterGap = -15.0
+    /// How much further from the screen's middle each side's H.O.O.D. and its words sit, in
+    /// points of the screen at 1080 high.
+    @AppStorage("esper.customize.hoodSpread") private var hoodSpread = 0.0
 
     init(flow: FlowState) {
         self.flow = flow
@@ -231,6 +234,8 @@ struct CustomizeScreen: View {
     /// SLEEVE's and BRACER's, their letters stacked down its outer side.
     static let labelShare: CGFloat = 0.4
     static let sideLabelShare: CGFloat = 0.25
+    /// A sleeve's line's drop out of the bottom of its box, a share of the box's height.
+    static let sleeveDropShare: CGFloat = 0.2
     /// The gap between a box and its side label, a share of the box's width.
     static let sideLabelGapShare: CGFloat = 0.08
     /// "MODEL" before the colour's name, and the widest the name may be, longer ones scaled down
@@ -467,8 +472,8 @@ struct CustomizeScreen: View {
                 .position(x: ring.x, y: figureMiddle)
             // From each arm and leg box to its limb on the player: the outer boxes the shown
             // front limbs', the inner the back's, as the boxes tick them. The bracers' leave the
-            // box's side toward the player, level, then turn; the sleeves' its bottom, turning
-            // first, then level.
+            // box's side toward the player, level, then turn; the sleeves' its bottom, a short
+            // way straight down first.
             let limbs: [(spot: CustomizeSpot, layer: String, mirrored: Bool, part: BodyPart)] = [
                 (.outerArms, tag + "arms_line", true, .frontArm), (.outerLegs, tag + "legs_line", true, .frontLeg),
                 (.arms, tag + "arms_line", false, .backArm), (.legs, tag + "legs_line", false, .backLeg),
@@ -480,7 +485,8 @@ struct CustomizeScreen: View {
                     let target = CGPoint(x: ring.x + across, y: figureMiddle + (centre.y - 24) * playerPixel)
                     let sleeve = limb.part == .frontArm || limb.part == .backArm
                     let start = sleeve ? CGPoint(x: box.midX, y: box.maxY) : CGPoint(x: box.midX < target.x ? box.maxX : box.minX, y: box.midY)
-                    connector(from: start, to: target, turningFirst: sleeve, size: size, lit: cursor == limb.spot, glow: glow)
+                    connector(from: start, to: target, drop: sleeve ? box.height * CustomizeScreen.sleeveDropShare : 0,
+                              size: size, lit: cursor == limb.spot, glow: glow)
                 }
             }
         }
@@ -540,7 +546,7 @@ struct CustomizeScreen: View {
                     .fixedSize()
                 }
             }
-            .position(x: ring.x, y: halo.minY - size.height * 0.04)
+            .position(x: ring.x + (player == 0 ? -1 : 1) * hoodSpread * size.height / 1080, y: halo.minY - size.height * 0.04)
         }
     }
 
@@ -556,18 +562,17 @@ struct CustomizeScreen: View {
     }
 
     /// A line from a box to its spot on the player, as the screen's top and bottom lines run:
-    /// level out of the box, then turning 45 degrees down or up onto the spot, or `turningFirst`
-    /// the other way about, a dot there. In
+    /// level out of the box, then turning 45 degrees down or up onto the spot, after a `drop`
+    /// straight down out of it first, a dot there. In
     /// the small boxes' cyan, or lit in the side's colour, glowing, with the box.
     @ViewBuilder
-    private func connector(from start: CGPoint, to target: CGPoint, turningFirst: Bool, size: CGSize, lit: Bool, glow: RGB) -> some View {
+    private func connector(from origin: CGPoint, to target: CGPoint, drop: CGFloat, size: CGSize, lit: Bool, glow: RGB) -> some View {
+        let start = CGPoint(x: origin.x, y: origin.y + drop)
         let across = target.x - start.x, down = target.y - start.y
         let slant = min(abs(across), abs(down))
         let sideways: CGFloat = across < 0 ? -1 : 1, downward: CGFloat = down < 0 ? -1 : 1
-        // Level then 45 degrees, or 45 degrees then level.
-        let points = turningFirst
-            ? [start, CGPoint(x: start.x + slant * sideways, y: start.y + slant * downward), target]
-            : [start, CGPoint(x: target.x - slant * sideways, y: start.y), CGPoint(x: target.x, y: start.y + slant * downward), target]
+        // Down, level, then 45 degrees.
+        let points = [origin, start, CGPoint(x: target.x - slant * sideways, y: start.y), CGPoint(x: target.x, y: start.y + slant * downward), target]
         let tip = target
         let colour = Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine)
         let dot = size.height * CustomizeScreen.connectorDotShare
@@ -740,6 +745,7 @@ struct CustomizeScreen: View {
                     tuningButton("▶") { fontPick = CustomizeFont.finalist(after: font, by: 1).rawValue }
                 }
                 tuningRow("LETTER GAP", value: $letterGap, step: 1, range: -20...20, format: "%.0f")
+                tuningRow("HOOD SPREAD", value: $hoodSpread, step: 1, range: -200...200, format: "%.0f")
                 tuningRow("HEAD X", value: $headX, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD Y", value: $headY, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD SCALE", value: $headScale, step: 0.1, range: 0.5...2, format: "×%.1f")

@@ -2871,6 +2871,15 @@ final class GameScene: SKScene {
             SKTexture.preload(Onomatopoeia.warmed()) {}
             self?.previewSoundWord()
         }
+        // The first side's energy colour, here rather than on the title: the customize screen picks it for play.
+        controls.addPicker(title: "COLOUR", options: EnergyColour.wheel.map { $0.rawValue.uppercased() },
+                           selected: EnergyColour.wheel.firstIndex(of: PlayerCustomization.saved(0).energy) ?? 0, perRow: 4) { [weak self] index in
+            var first = PlayerCustomization.saved(0)
+            first.energy = EnergyColour.wheel[index]
+            first.save(as: 0)
+            self?.flowState?.customizations[0] = first
+            self?.applySavedColours()
+        }
         controls.addPicker(title: "LEVEL", options: PowerLevelVariant.allCases.map(\.label), selected: powerLevelVariant.rawValue) { [weak self] index in
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()

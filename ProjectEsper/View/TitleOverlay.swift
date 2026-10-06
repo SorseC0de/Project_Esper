@@ -220,14 +220,6 @@ final class FlowState: ObservableObject {
             guard !busy else { return }
             defaults.set(Int((item == .onlineRounds ? GameMode.rounds : .fortySeven).rawValue), forKey: GameScene.onlineModeKey)
             SoundBoard.shared.play(SoundBoard.navigate)
-        case .colour(let colour):
-            // The first side's pick on the customize screen, its wheel colour.
-            var first = PlayerCustomization.saved(0)
-            first.energy = colour
-            first.save(as: 0)
-            customizations[0] = first
-            SoundBoard.shared.play(SoundBoard.navigate)
-            scene.applySavedColours()
         case .tuning:
             tuningOpen.toggle()
         case .settings:
@@ -249,7 +241,6 @@ final class FlowState: ObservableObject {
 /// Everything on the title the cursor can land on, row by row as they're laid out.
 enum TitleItem: Hashable {
     case bestOfSeven, fortySeven, vsCPU, vsHuman, multiplayer, onlineRounds, onlineFortySeven
-    case colour(EnergyColour)
     case tuning
     /// The gear in the upper right corner, opening the settings.
     case settings
@@ -272,7 +263,7 @@ enum TitleItem: Hashable {
         // The grids side by side, bottom left.
         UIColourPicks.Grid.allCases.flatMap { grid in (start..<start + swatchesPerRow).map { TitleItem.swatch(grid, $0) } }
     } + [
-        [.tuning] + EnergyColour.allCases.map { .colour($0) },
+        [.tuning],
     ]
 }
 
@@ -280,12 +271,10 @@ enum TitleItem: Hashable {
 /// dobo UI pack's pieces: the name; BEST OF 7 and 47 against the computer on royal blue
 /// plates, with the VS CPU / VS HUMAN switch under them; MULTIPLAYER on gold, which opens
 /// Game Center's matchmaker, with the mode it asks for under it and Game Center's word
-/// under that; and the energy colours on a black plate in the upper right corner.
+/// under that. The energy colour is the customize screen's (and the match's debug COLOUR).
 struct TitleOverlay: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
-    /// This phone's energy colour, kept between launches.
-    @AppStorage(EnergyColour.storageKey) private var colour = EnergyColour.orange.rawValue
     /// The mode multiplayer asks for; the host's is played.
     @AppStorage(GameScene.onlineModeKey) private var onlineMode = Int(GameMode.rounds.rawValue)
     /// Offline, whether the computer plays player 2 or a second pad does.
@@ -304,13 +293,7 @@ struct TitleOverlay: View {
         ZStack {
             Color(rgb: UIColourPicks.ground)
                 .ignoresSafeArea()
-                // The energy colours in the bottom right corner, the UI tuning in the bottom left.
-                .overlay(alignment: .bottomTrailing) {
-                    // Hard in the corner, clear of the buttons in the middle.
-                    colourPicker
-                    .padding(.bottom, 12)
-                    .padding(.trailing, 8)
-                }
+                // The UI tuning in the bottom left.
                 // The settings' gear in the upper right corner.
                 .overlay(alignment: .topTrailing) {
                     SettingsGear(lit: flow.titleCursor == .settings) { flow.activate(.settings) }
@@ -429,28 +412,6 @@ struct TitleOverlay: View {
         }
         .buttonStyle(.plain)
         .noSystemFocus()
-    }
-
-    /// The energy colours as a row of circles on a black plate, the picked one ringed.
-    private var colourPicker: some View {
-        HStack(spacing: 10) {
-            ForEach(EnergyColour.allCases, id: \.self) { choice in
-                Button { flow.activate(.colour(choice)) } label: {
-                    Circle()
-                        .fill(Color(rgb: choice.glow))
-                        .frame(width: 22, height: 22)
-                        .overlay(Circle().stroke(.white, lineWidth: choice.rawValue == colour ? 3 : 0).padding(-4))
-                        // Under the cursor, a gold ring outside the pick's.
-                        .overlay(Circle().stroke(Color(rgb: EsperPalette.gold.body), lineWidth: flow.titleCursor == .colour(choice) ? 3 : 0).padding(-8))
-                }
-                .buttonStyle(.plain)
-                .scaleEffect(flow.titleCursor == .colour(choice) ? 1.15 : 1)
-                .noSystemFocus()
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .background(UIPiece.buttonBlack.image)
     }
 }
 

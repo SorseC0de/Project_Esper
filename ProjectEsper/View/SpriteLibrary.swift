@@ -375,7 +375,12 @@ final class SpriteLibrary {
         let hoodGlowing: CGImage?
         let hoodOffset: CGPoint
         let centres: [BodyPart: CGPoint]
+        /// The limbs' tops, where a boot's or a sleeve's cubes come off.
         let tops: [BodyPart: CGPoint]
+        /// The figure's line apart from it, in white: a whole art pixel thick, and half of one
+        /// on a canvas twice as fine. Nil where the line's still on the figure.
+        let line: CGImage?
+        let thinLine: CGImage?
     }
     private var portraits: [String: Portrait] = [:]
 
@@ -400,7 +405,7 @@ final class SpriteLibrary {
         if look.human, let here = plain.centres[.head], let there = drawnFor.centres[.head] {
             let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             let place = SpriteLibrary.hoodPlace(head: here, offset: offset, nudge: headNudge, scale: headScale)
-            figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: false,
+            figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: true,
                               hood: (hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage(), place.origin, place.scale))
         }
         let body = figure.texture.cgImage()
@@ -437,7 +442,8 @@ final class SpriteLibrary {
         }
         guard let glowing = glowContext.makeImage() else { return nil }
         let made = Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
-                            centres: figure.centres, tops: SpriteLibrary.partTops(source))
+                            centres: figure.centres, tops: SpriteLibrary.partTops(source),
+                            line: figure.outline?.cgImage(), thinLine: figure.thinOutline?.cgImage())
         // Kept in the cache too, so a new look drops it with the rest of the player's.
         cache[key] = SKTexture(cgImage: body)
         portraits[key] = made
@@ -841,7 +847,8 @@ final class SpriteLibrary {
         // quarters against the body, so it hugs it. FloState's rainbow line.
         var thinOutline: SKTexture?
         if detach, lined.contains(true), let (thinContext, thinPixels) = makeCanvas(width: width * 2, height: height * 2) {
-            let body = (0..<count).map { pixels[$0 * 4 + 3] != 0 && !lined[$0] }
+            // The hood's place counts as body, so the line hugs it too.
+            let body = (0..<count).map { (pixels[$0 * 4 + 3] != 0 && !lined[$0]) || hoodCover[$0] }
             func isBody(_ x: Int, _ y: Int) -> Bool { x >= 0 && y >= 0 && x < width && y < height && body[y * width + x] }
             for pixel in 0..<count where lined[pixel] {
                 let x = pixel % width, y = pixel / width

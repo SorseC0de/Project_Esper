@@ -178,12 +178,17 @@ enum Onomatopoeia {
         var growsLeft = false
         /// Space between the letters, a share of each one's size.
         var spacing: CGFloat = 0
+        /// Another face than the lettering's, by its font name.
+        var face: String? = nil
     }
 
     /// Bundled, and registered with the process on first use.
     static let registered: Void = {
-        for name in ["Bigdex", "CherryBombOne-Regular", "DarumadropOne-Regular", "DelaGothicOne-Regular"] {
-            if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
+        // The words' faces, and the customize screen's to choose from (`CustomizeFont`).
+        for name in ["Bigdex", "CherryBombOne-Regular", "DarumadropOne-Regular", "DelaGothicOne-Regular",
+                     "AccidentalPresidency", "BMarmy", "BoardOfDirectors-Hv", "CashMarket-BoldRounded", "Kapel",
+                     "PlanetaryContact", "Quicksilver", "upheavtt"] {
+            if let url = Bundle.main.url(forResource: name, withExtension: "ttf") ?? Bundle.main.url(forResource: name, withExtension: "otf") {
                 CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
             }
         }
@@ -281,8 +286,8 @@ enum Onomatopoeia {
     /// Lettering as the words are drawn, for SwiftUI: the picture, and how tall to show it for
     /// a cap height of `height` points.
     static func picture(_ text: String, face: Lettering, colours: Colours, growsLeft: Bool, height: CGFloat,
-                        spacing: CGFloat = 0) -> (image: UIImage, height: CGFloat) {
-        let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft, spacing: spacing)
+                        spacing: CGFloat = 0, fontName: String? = nil) -> (image: UIImage, height: CGFloat) {
+        let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft, spacing: spacing, face: fontName)
         let (texture, capShare) = rendered(word)
         return (UIImage(cgImage: texture.cgImage()), height * face.scale / capShare)
     }
@@ -325,7 +330,7 @@ enum Onomatopoeia {
     private static func rendered(_ word: Word) -> (texture: SKTexture, capShare: CGFloat) {
         if let cached = cache[word] { return cached }
         _ = registered
-        func font(_ size: CGFloat) -> UIFont { UIFont(name: word.lettering.fontName, size: size) ?? TitleText.font(size: size, italic: true) }
+        func font(_ size: CGFloat) -> UIFont { UIFont(name: word.face ?? word.lettering.fontName, size: size) ?? TitleText.font(size: size, italic: true) }
         let reference = word.lettering.reference
         let characters = word.text.map(String.init)
         let count = characters.count

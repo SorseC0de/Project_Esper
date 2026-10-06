@@ -192,25 +192,33 @@ struct CustomizeScreen: View {
     @Environment(\.displayScale) private var displayScale
     /// The tuning sliders: the projector's and the player's height, in art pixels up, and the
     /// art pixels each is drawn at, in quarters.
-    @AppStorage("esper.customize.projectorY.3") private var projectorY = -7.0
-    @AppStorage("esper.customize.projectorScale.2") private var projectorScale = 0.25
-    @AppStorage("esper.customize.playerY.2") private var playerY = 6.0
-    @AppStorage("esper.customize.playerScale.2") private var playerScale = 2.0
     @AppStorage("esper.customize.tuningShown") private var tuningShown = true
     /// The hooded head on the figure: art pixels right and up, and its size in tenths.
     @AppStorage("esper.customize.headX") private var headX = 1.0
     @AppStorage("esper.customize.headY") private var headY = 1.0
     @AppStorage("esper.customize.headScale") private var headScale = 1.0
     /// The colour's name's middle over the player's middle, in art pixels.
-    @AppStorage("esper.customize.nameY") private var nameY = 22.0
+    @AppStorage("esper.customize.nameY.2") private var nameY = 26.0
+    /// The face of everything but START and the big H.O.O.D. (`CustomizeFont`).
+    @AppStorage("esper.customize.font") private var fontPick = CustomizeFont.bigdex.rawValue
+    private var font: CustomizeFont { CustomizeFont(rawValue: fontPick) ?? .bigdex }
+    /// The player's line: A half an art pixel thick, B a whole one.
+    @AppStorage("esper.customize.halfOutline") private var halfOutline = true
+    /// How far short of the limbs the lines from the arm and leg boxes stop, in art pixels.
+    @AppStorage("esper.customize.linePull") private var linePull = 0.0
 
     init(flow: FlowState) {
         self.flow = flow
         _ = Onomatopoeia.registered
     }
 
-    /// An art pixel as a share of the screen's width, before the sliders' scales.
+    /// An art pixel as a share of the screen's width; the projector is drawn at a quarter of it,
+    /// 7 down from the ring, and the player at twice it, 6 up from the lens.
     static let artPixelShare: CGFloat = 0.168 / 64
+    static let projectorScale: CGFloat = 0.25
+    static let projectorY: CGFloat = -7
+    static let playerScale: CGFloat = 2
+    static let playerY: CGFloat = 6
     /// The ring's middle down the halo's layer.
     static let ringShare: CGFloat = 0.9
     /// The halo's beam, clear at its top, whole this far down.
@@ -292,11 +300,11 @@ struct CustomizeScreen: View {
             RadialGradient(stops: CustomizeScreen.ground2Stops, center: .center, startRadius: 0,
                            endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
             .opacity(CustomizeScreen.glowOpacity)
-            .offset(x: -(fitted.width * 0.1), y: -(fitted.width * 0.1))
+            .offset(x: -(fitted.width * 0.2), y: -(fitted.width * 0.1))
             RadialGradient(stops: CustomizeScreen.ground3Stops, center: .center, startRadius: 0,
                            endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
             .opacity(CustomizeScreen.glowOpacity)
-            .offset(x: fitted.width * 0.1, y: fitted.width * 0.1)
+            .offset(x: fitted.width * 0.2, y: fitted.width * 0.1)
             Canvas { context, size in
                 let centre = CGPoint(x: size.width / 2, y: size.height / 2)
                 let reach = hypot(centre.x, centre.y)
@@ -354,27 +362,30 @@ struct CustomizeScreen: View {
         max((size.width * CustomizeScreen.artPixelShare * pixels * displayScale).rounded(), 1) / displayScale
     }
 
-    private func title(_ text: String, size: CGFloat) -> some View {
-        Text(text)
-            .font(.custom("Bigdex", size: size))
+    /// In the chosen face, or `face`, sized so its capitals stand as Bigdex's would at `size`.
+    private func title(_ text: String, size: CGFloat, face: CustomizeFont? = nil) -> some View {
+        let face = face ?? font
+        return Text(text)
+            .font(.custom(face.fontName, size: face.size(size)))
             .foregroundStyle(.white)
             .shadow(color: .black, radius: 0, x: 1, y: 2)
             .fixedSize()
     }
 
-    /// Lettered as FLO is when it's lit, in Bigdex: gold's first over the cyan, outlined in plum
-    /// and purple. `height` is its cap height.
-    private func litTitle(_ text: String, height: CGFloat, spacing: CGFloat = 0) -> some View {
-        let word = Onomatopoeia.picture(text, face: .englishDex, colours: FloTuning.colours, growsLeft: true, height: height, spacing: spacing)
+    /// Lettered as FLO is when it's lit: gold's first over the cyan, outlined in plum and purple,
+    /// in the chosen face or in Bigdex (`ownFace` off). `height` is its cap height, whatever the face.
+    private func litTitle(_ text: String, height: CGFloat, spacing: CGFloat = 0, ownFace: Bool = true) -> some View {
+        let word = Onomatopoeia.picture(text, face: .englishDex, colours: FloTuning.colours, growsLeft: true, height: height, spacing: spacing,
+                                        fontName: ownFace ? font.fontName : nil)
         return Image(uiImage: word.image).resizable().aspectRatio(contentMode: .fit).frame(height: word.height)
     }
 
     /// Bigdex as `title`, its lower half in `lower`.
     private func twoTone(_ text: String, size: CGFloat, lower: RGB) -> some View {
-        title(text, size: size)
+        title(text, size: size, face: .bigdex)
             .overlay {
                 Text(text)
-                    .font(.custom("Bigdex", size: size))
+                    .font(.custom(CustomizeFont.bigdex.fontName, size: size))
                     .foregroundStyle(Color(rgb: lower))
                     .fixedSize()
                     .mask(VStack(spacing: 0) {
@@ -386,7 +397,7 @@ struct CustomizeScreen: View {
 
     private func subtitle(_ text: String, size: CGFloat) -> some View {
         Text(text)
-            .font(.system(size: size, weight: .semibold))
+            .font(.custom(font.fontName, size: font.size(size)))
             .foregroundStyle(.white.opacity(0.9))
             .shadow(color: .black, radius: 0, x: 1, y: 1)
     }
@@ -411,9 +422,9 @@ struct CustomizeScreen: View {
         let halo = rect(tag + "halo", size)
         let ring = CGPoint(x: halo.midX, y: halo.minY + halo.height * CustomizeScreen.ringShare)
         let base = size.width * CustomizeScreen.artPixelShare
-        let projectorPixel = artPixel(size, times: projectorScale)
-        let playerPixel = artPixel(size, times: playerScale)
-        let projectorAt = CGPoint(x: ring.x, y: ring.y - projectorY * base)
+        let projectorPixel = artPixel(size, times: CustomizeScreen.projectorScale)
+        let playerPixel = artPixel(size, times: CustomizeScreen.playerScale)
+        let projectorAt = CGPoint(x: ring.x, y: ring.y - CustomizeScreen.projectorY * base)
         // The first side's front limbs are its right; the second, facing the other way, its left.
         // The projector under the halo.
         if let projector = CustomizeArt.projector(glow), let lit = CustomizeArt.projectorEnergy(glow) {
@@ -437,12 +448,12 @@ struct CustomizeScreen: View {
             .position(x: halo.midX, y: halo.midY)
         // Standing on the lens, the second side facing the first.
         let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
-        let figureMiddle = lens - (CustomizeScreen.feetRow - 24) * playerPixel - playerY * base
+        let figureMiddle = lens - (CustomizeScreen.feetRow - 24) * playerPixel - CustomizeScreen.playerY * base
         if let portrait = flow.scene.customizePortrait(player: player, headNudge: CGPoint(x: headX, y: headY), headScale: headScale) {
             let side = (48 + 2 * CustomizeFigure.margin) * playerPixel
             // The second side is shown turned round, its sleeves and boots swapped as drawn.
             CustomizeFigure(portrait: portrait, look: player == 1 ? pick.look.turnedRound : pick.look, pixel: playerPixel, mirrored: player == 1,
-                            headNudge: CGPoint(x: headX, y: headY), headScale: headScale)
+                            headNudge: CGPoint(x: headX, y: headY), headScale: headScale, halfOutline: halfOutline)
                 .frame(width: side, height: side)
                 .allowsHitTesting(false)
                 .position(x: ring.x, y: figureMiddle)
@@ -458,7 +469,7 @@ struct CustomizeScreen: View {
                     let across = (centre.x - 24) * playerPixel * (player == 1 ? -1 : 1)
                     let target = CGPoint(x: ring.x + across, y: figureMiddle + (centre.y - 24) * playerPixel)
                     let start = CGPoint(x: box.midX < target.x ? box.maxX : box.minX, y: box.midY)
-                    connector(from: start, to: target, size: size, lit: cursor == limb.spot, glow: glow)
+                    connector(from: start, to: target, pull: linePull * playerPixel, size: size, lit: cursor == limb.spot, glow: glow)
                 }
             }
         }
@@ -532,26 +543,48 @@ struct CustomizeScreen: View {
     /// level out of the box, then turning 45 degrees down or up onto the spot, a dot there. In
     /// the small boxes' cyan, or lit in the side's colour, glowing, with the box.
     @ViewBuilder
-    private func connector(from start: CGPoint, to target: CGPoint, size: CGSize, lit: Bool, glow: RGB) -> some View {
+    private func connector(from start: CGPoint, to target: CGPoint, pull: CGFloat, size: CGSize, lit: Bool, glow: RGB) -> some View {
         let across = target.x - start.x, down = target.y - start.y
         let slant = min(abs(across), abs(down))
         let turn = CGPoint(x: target.x - slant * (across < 0 ? -1 : 1), y: start.y)
         let slanted = CGPoint(x: target.x, y: start.y + slant * (down < 0 ? -1 : 1))
+        // Pulled back `pull` along it from the limb's end, the dot with it.
+        let points = CustomizeScreen.pulledBack([start, turn, slanted, target], by: pull)
+        let tip = points.last ?? start
         let colour = Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine)
         let dot = size.height * CustomizeScreen.connectorDotShare
         ZStack {
             Path { path in
-                path.addLines([start, turn, slanted, target])
+                path.addLines(points)
             }
             .stroke(colour, style: StrokeStyle(lineWidth: size.height * CustomizeScreen.connectorWidthShare, lineCap: .round, lineJoin: .round))
             Circle().fill(colour)
                 .frame(width: dot * 2, height: dot * 2)
-                .position(target)
+                .position(tip)
         }
         .frame(width: size.width, height: size.height)
         .energyGlow(radius: lit ? dot * 2 : 0)
         .allowsHitTesting(false)
         .position(x: size.width / 2, y: size.height / 2)
+    }
+
+    /// A line's points with `pull` taken off its far end, along it.
+    static func pulledBack(_ line: [CGPoint], by pull: CGFloat) -> [CGPoint] {
+        var points = line
+        var left = pull
+        while left > 0, points.count > 1 {
+            let end = points[points.count - 1], before = points[points.count - 2]
+            let length = hypot(end.x - before.x, end.y - before.y)
+            if length <= left {
+                points.removeLast()
+                left -= length
+            } else {
+                let share = left / length
+                points[points.count - 1] = CGPoint(x: end.x + (before.x - end.x) * share, y: end.y + (before.y - end.y) * share)
+                left = 0
+            }
+        }
+        return points
     }
 
     /// One of a side's boxes: its fill, what's in it, its line, and its label under it. Under
@@ -650,7 +683,7 @@ struct CustomizeScreen: View {
                 layer("customize_start", size)
                 spinning("customize_spin_ccw", size, about: start, degrees: -seconds * CustomizeScreen.spinSpeeds.ccw)
                 spinning("customize_spin_cw", size, about: start, degrees: seconds * CustomizeScreen.spinSpeeds.cw)
-                litTitle("START", height: size.height * 0.035)
+                litTitle("START", height: size.height * 0.035, ownFace: false)
                     .position(x: start.midX, y: start.midY)
             }
             .frame(width: size.width, height: size.height)
@@ -691,10 +724,17 @@ struct CustomizeScreen: View {
         VStack(alignment: .trailing, spacing: 3) {
             tuningButton(tuningShown ? "HIDE" : "TUNE") { tuningShown.toggle() }
             if tuningShown {
-                tuningRow("PROJ Y", value: $projectorY, step: 1, range: -64...64, format: "%.0f")
-                tuningRow("PROJ SCALE", value: $projectorScale, step: 0.25, range: 0.25...8, format: "×%.2f")
-                tuningRow("PLAYER Y", value: $playerY, step: 1, range: -64...64, format: "%.0f")
-                tuningRow("PLAYER SCALE", value: $playerScale, step: 0.25, range: 0.25...8, format: "×%.2f")
+                HStack(spacing: 4) {
+                    Text("FONT").frame(width: 84, alignment: .leading)
+                    tuningButton("◀") { fontPick = (font.rawValue + CustomizeFont.allCases.count - 1) % CustomizeFont.allCases.count }
+                    Text(font.label).frame(width: 140)
+                    tuningButton("▶") { fontPick = (font.rawValue + 1) % CustomizeFont.allCases.count }
+                }
+                HStack(spacing: 4) {
+                    Text("OUTLINE").frame(width: 84, alignment: .leading)
+                    tuningButton(halfOutline ? "A · 0.5" : "B · 1") { halfOutline.toggle() }
+                }
+                tuningRow("LINE PULL", value: $linePull, step: 1, range: 0...40, format: "%.0f")
                 tuningRow("HEAD X", value: $headX, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD Y", value: $headY, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD SCALE", value: $headScale, step: 0.1, range: 0.5...2, format: "×%.1f")
@@ -736,6 +776,50 @@ extension View {
     }
 }
 
+/// The customize screen's faces to try, everything on it but START and the big H.O.O.D.
+/// lettered in the one picked, alphabetically. Each is sized so its capitals stand as tall as
+/// Bigdex's would at the same size. Silom, an Apple system font, isn't bundled.
+enum CustomizeFont: Int, CaseIterable {
+    case accidentalPresidency, bigdex, bmArmy, boardOfDirectors, cashMarket, kapel, planetaryContact, quicksilver, upheaval
+
+    var label: String {
+        switch self {
+        case .accidentalPresidency: "ACCIDENTAL PRESIDENCY"
+        case .bigdex: "BIGDEX"
+        case .bmArmy: "BM ARMY"
+        case .boardOfDirectors: "BOARD OF DIRECTORS"
+        case .cashMarket: "CASHMARKET"
+        case .kapel: "KAPEL"
+        case .planetaryContact: "PLANETARYCONTACT"
+        case .quicksilver: "QUICKSILVER"
+        case .upheaval: "UPHEAVAL"
+        }
+    }
+
+    var fontName: String {
+        switch self {
+        case .accidentalPresidency: "AccidentalPresidency"
+        case .bigdex: "Bigdex"
+        case .bmArmy: "BMarmyA12"
+        case .boardOfDirectors: "BoardofDirectors-Heavy"
+        case .cashMarket: "CashMarket-BoldRounded"
+        case .kapel: "Kapel"
+        case .planetaryContact: "PlanetaryContact"
+        case .quicksilver: "Quicksilver"
+        case .upheaval: "UpheavalTT-BRK-"
+        }
+    }
+
+    /// Its capitals' height for a point of size.
+    private var capShare: CGFloat {
+        _ = Onomatopoeia.registered
+        return UIFont(name: fontName, size: 100).map { $0.capHeight / 100 } ?? 0.7
+    }
+
+    /// The point size whose capitals stand as Bigdex's do at `size`.
+    func size(_ size: CGFloat) -> CGFloat { size * CustomizeFont.bigdex.capShare / capShare }
+}
+
 /// A band across a column leaning right, a fifth of its width over its height, from `from` to
 /// `to` of the way down: bands of one column meet corner to corner.
 struct LeaningBand: Shape {
@@ -771,6 +855,8 @@ struct CustomizeFigure: View {
     /// and its size, about the head's middle.
     let headNudge: CGPoint
     let headScale: CGFloat
+    /// The line round it half an art pixel thick (A) or a whole one (B).
+    let halfOutline: Bool
     @State private var motion = CustomizeFigureMotion()
 
     static let margin: CGFloat = 24
@@ -797,8 +883,14 @@ struct CustomizeFigure: View {
                     CGPoint(x: (margin + point.x) * pixel, y: (margin + 48 - point.y) * pixel)
                 }
                 for cube in motion.cubes where cube.behind { draw(cube, in: context, at: spot(cube.position)) }
-                let figure = Image(decorative: portrait.image, scale: 1).interpolation(.none)
-                context.draw(figure, in: CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel))
+                let figureRect = CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel)
+                context.draw(Image(decorative: portrait.image, scale: 1).interpolation(.none), in: figureRect)
+                if let line = halfOutline ? portrait.thinLine : portrait.line {
+                    context.drawLayer { layer in
+                        layer.addFilter(.colorMultiply(Color(rgb: look.outline)))
+                        layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect)
+                    }
+                }
                 let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: headScale)
                 let hoodRect = CGRect(x: (margin + place.origin.x) * pixel, y: (margin + place.origin.y) * pixel,
                                       width: 48 * place.scale * pixel, height: 48 * place.scale * pixel)

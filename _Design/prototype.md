@@ -533,8 +533,8 @@ way back (RESUME, TITLE, TITLE SCREEN), and the cursor's plate turns gold and gr
 place of the arrow. A piece drawn bigger has its corners and rims scaled with it, so a big plate
 keeps the depth of a small one rather than flattening. The title: the name, BEST OF 7 and 47 on royal blue, VS CPU and VS
 HUMAN as small switches, plum when picked and black when not, MULTIPLAYER on plum with
-its two mode switches under it, the energy colours on a black plate in the bottom right,
-and UI, bottom left, the tuning panel, with over it two placeholder pickers of every
+its two mode switches under it (the energy colours are the customize screen's now, and in a
+match the debug strip's COLOUR, the first side's, round the wheel), and UI, bottom left, the tuning panel, with over it two placeholder pickers of every
 `EsperPalette` swatch (its twelve ramps two to a row, a black plate each; the pick ringed white,
 kept, picking it again takes the pack's own tone back; `UIColourPicks`), NON-SELECTED for the
 black buttons and BLUE for the light blue ones, each with MAIN, TOP and BOTTOM tabs over it (the
@@ -611,7 +611,7 @@ BEST OF 7 and 47 on the title open the customize screen (`CustomizeScreen`, Swif
 `Customization.swift`) before the stage select, both cursors on START; START (the middle emblem,
 or the pad's start) goes on to the stage select, RETURN or B back to the title. Each side's picks
 (`PlayerCustomization`) are kept between rounds and launches, under `esper.customize.p1`/`p2`;
-the first side's colour is also this phone's (`EnergyColour.storageKey`), so the title's colours
+the first side's colour is also this phone's (`EnergyColour.storageKey`), so the debug COLOUR
 and multiplayer's hello still read it. Offline both sides play in their picks; when the two pick
 the same colour, the second takes the opposite, as before. Online is still the colours alone.
 
@@ -655,10 +655,16 @@ the same colour, the second takes the opposite, as before. Online is still the c
   FloState's do, one back and one forward, but a human's length, five; cubes rise off the head's crown (in the energy
   colour) and whatever of the limbs is energy, as in play, at play's numbers with no FLO, swaying
   in the wind, shaded as the Metal layer shades them, the back limb's behind.
-- Tuning, low in the middle (HIDE/TUNE): PROJ Y and PLAYER Y in art pixels up, PROJ SCALE and
-  PLAYER SCALE in quarters (the art pixels each is drawn at), HEAD X and HEAD Y in art pixels and
-  HEAD SCALE in tenths, kept between launches, starting at -7, 0.25, 6, 2, 1, 1 and 1. The player
-  stands on the lens wherever the projector goes, PLAYER Y on top of that.
+- The projector at 0.25 of an art pixel, 7 down from the ring; the player at 2, standing on the
+  lens, 6 up from it (`CustomizeScreen.projectorScale` and the rest).
+- Tuning, low in the middle (HIDE/TUNE), kept between launches: HEAD X and HEAD Y in art pixels
+  and HEAD SCALE in tenths (1, 1, 1 to start); NAME Y (26); FONT, cycling the faces of everything
+  but START and the big H.O.O.D. (`CustomizeFont`, alphabetically: Accidental Presidency, Bigdex,
+  BM Army, Board of Directors, CashMarket, Kapel, PlanetaryContact, Quicksilver, Upheaval, each
+  sized so its capitals stand as Bigdex's would; Silom, an Apple system font, isn't bundled);
+  OUTLINE, the player's line half an art pixel thick (A, `thinLine`) or a whole one (B, `line`),
+  the figure built with its line apart; LINE PULL, how many art pixels short of the limbs the
+  arm and leg boxes' lines stop, the dot with them (0 to start).
 - Energy glows: the halos, the projector's lit parts, the player's shoes, sleeves, boots and hood,
   its strings and cubes, the lit box lines and the display's bar; a blurred copy added over at 0.6.
 - The boxes, each labelled under it in Bigdex. SKIN and H.O.O.D. are pickers: while one is chosen
@@ -673,7 +679,7 @@ the same colour, the second takes the opposite, as before. Online is still the c
   H.O.O.D. shows large over the player, centred on it, two-toned (its lower half the energy
   ramp's lightest, `Look.bright`), each word of "Hyper- Osmotic Output Driver" small under its
   letter; and over the player the colour's gem name lettered as CUSTOMIZE is, a period between its
-  letters (R.U.B.Y), NAME Y art pixels over the player's middle (22 to start, on its slider). The arm and
+  letters (R.U.B.Y), NAME Y art pixels over the player's middle, only while the hood's colours are picked. The arm and
   leg boxes are ticks, a sleeve or a boot each (`Dressing`), labelled ARM SLEEVE (two rows) or BOOT,
   smaller than the others (ARM SLEEVE 0.25 of the box's height, BOOT and SKIN, one four-letter word,
   0.5, H.O.O.D. 0.4), each with a line from it to its

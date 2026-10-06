@@ -1378,8 +1378,10 @@ public struct Player: Equatable {
             }
 
         case .transforming:
-            // Held still where it started, off the ground, until the sheet's played through.
+            // Held still where it started, off the ground, until the sheet's played through;
+            // the burst on its third frame.
             velocity = .zero
+            if reached(TransformRules.burstFrame) { wanted = .floBurst }
             if stateTimer >= TransformRules.frames {
                 inFloState = true
                 floStateClock = 0

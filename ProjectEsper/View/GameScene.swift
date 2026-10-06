@@ -1257,11 +1257,20 @@ final class GameScene: SKScene {
             let now = CACurrentMediaTime()
             let frame = player.inFloState
                 ? Int(now * GameScene.floBurnFramesPerSecond) % max(EffectSheets.frames["flo_meter"] ?? 1, 1) : 0
-            // In FloState the stroke cycles its colours; else it's the player's glow.
+            // The stroke: none short of full; full, cycling the FloState outline's colours; in
+            // FloState, the energy's colour breathing slowly in and out.
             if floStrokes.indices.contains(index) {
-                floStrokes[index].color = player.inFloState
-                    ? ZoneTuning.cycle(FloTuning.floStateStroke, at: now, stepSeconds: FloTuning.floStateStrokeStepSeconds)
-                    : SKColor(rgb: sprites.look(for: index).glow)
+                let stroke = floStrokes[index]
+                if player.inFloState {
+                    stroke.color = SKColor(rgb: sprites.look(for: index).glow)
+                    let breath = 0.5 - 0.5 * cos(now * 2 * .pi / FloTuning.strokeBreathSeconds)
+                    stroke.alpha = FloTuning.strokeBreathLeast + (1 - FloTuning.strokeBreathLeast) * CGFloat(breath)
+                } else if flo >= FloRules.full {
+                    stroke.color = ZoneTuning.outline(at: now)
+                    stroke.alpha = 1
+                } else {
+                    stroke.alpha = 0
+                }
             }
             // Spending it, sparkles at the fill's end a moment after each FLO goes.
             if player.inFloState, let last = floLastSeen[index], player.flo < last { floSpendingUntil[index] = now + FloTuning.sparkleAfterSpendSeconds }
@@ -1271,9 +1280,9 @@ final class GameScene: SKScene {
             }
             // MAX, steady, while it's full.
             floMaxWords[index].isHidden = flo < FloRules.full || floMeters[index].isHidden
-            // Bar A's word goes from its short colours to its own at full, and is lit throughout FloState.
+            // The word lit, but in its short colours while FloState's lockout runs.
             if floWordsShort.indices.contains(index) {
-                let lit = flo >= FloRules.full || player.inFloState
+                let lit = player.floStateLockout == 0
                 floWordsShort[index].isHidden = lit
                 floWordsFull[index].isHidden = !lit
             }
@@ -1426,10 +1435,10 @@ final class GameScene: SKScene {
             holder.warpGeometry = Onomatopoeia.skew(left: FloTuning.barFront, right: FloTuning.barBack, bend: FloTuning.barBend, columns: 16)
             holder.addChild(bar)
             meter.addChild(holder)
-            // The word skewed the same on both: only its place mirrors. Bar A's is in its short
-            // colours until full.
+            // The word skewed the same on both: only its place mirrors. Lit, and in its short
+            // colours through FloState's lockout.
             var words: [SKSpriteNode] = []
-            for colours in barA ? [FloTuning.shortColours, FloTuning.colours] : [FloTuning.colours] {
+            for colours in [FloTuning.shortColours, FloTuning.colours] {
                 let word = Onomatopoeia.still("FLO", face: .englishDex, colours: colours, height: GameScene.floWordHeight, growsLeft: true,
                                               left: FloTuning.leftSkew, right: FloTuning.rightSkew)
                 // Its small end on the bar's outer end, then moved, mirrored for the second.
@@ -1440,10 +1449,8 @@ final class GameScene: SKScene {
                 meter.addChild(word)
                 words.append(word)
             }
-            if barA {
-                floWordsShort.append(words[0])
-                floWordsFull.append(words[1])
-            }
+            floWordsShort.append(words[0])
+            floWordsFull.append(words[1])
             // MAX, lettered as a footstep is, in Bigdex: bar A's on the word's top outer corner,
             // on its sliders; bar B's on the bar's top trailing corner, against the scoreboard.
             let full = Onomatopoeia.still("MAX", face: .englishDex, colours: FloTuning.colours, height: GameScene.floMaxHeight, growsLeft: false,

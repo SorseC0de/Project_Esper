@@ -317,6 +317,9 @@ enum FloTuning {
     /// The stroke round the bar and the word together, in the player's glow, in points.
     static let stroke: CGFloat = 1.5
 
+    /// The stroke in FloState breathes from this much seen to all of it and back, over this long.
+    static let strokeBreathLeast: CGFloat = 0.1
+    static let strokeBreathSeconds = 3.0
     /// The word's and MAX's four colours: gold's first over blue's (the cyan), outlined plum's
     /// second over purple's last.
     static let colours = Onomatopoeia.Colours(upper: EsperPalette.gold.highlight, lower: EsperPalette.blue.highlight,
@@ -336,9 +339,6 @@ enum FloTuning {
     nonisolated(unsafe) static var cornerMaxScale: CGFloat = 1.25
     nonisolated(unsafe) static var cornerMaxX: CGFloat = 54
     nonisolated(unsafe) static var cornerMaxY: CGFloat = 0
-    /// In FloState the stroke cycles these, a tenth of a second each.
-    static let floStateStroke: [RGB] = [6, 7, 8, 18, 19, 20, 26, 27, 28].map { PixelPalette.colours[$0] }
-    static let floStateStrokeStepSeconds = 0.1
     /// Spending FLO, sparkles at the fill's end: this many a second, each this long, in points across.
     static let sparklesPerSecond = 30.0
     static let sparkleSeconds = 0.4

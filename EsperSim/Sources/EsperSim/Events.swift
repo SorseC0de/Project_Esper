@@ -117,6 +117,8 @@ public enum PlayerAction: Equatable {
     /// Z Tea: the beam leaves, and the burst goes off.
     case fireBeam
     case zBurst
+    /// The change into FloState's burst: pushes away as Z Tea's does, and parries.
+    case floBurst
     case sendGale(at: Vec2, heading: Facing)
     case leaveFlame
     case releaseFireball(velocity: Vec2, straight: Bool, ballArc: Bool)

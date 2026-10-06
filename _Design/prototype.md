@@ -151,7 +151,11 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   and boots or not) in the regular energy colour (`Dressing.energyFormBare`), all of it glowing; so
   clothes picked later follow on their own. The face's lightest tone is held to a grey level of 0.6
   (`SpriteLibrary.energyFaceLevel`): lime's, at 0.76, burned the features out in the glow (gold and
-  teal come down a touch). Going in or out, `burst` plays at
+  teal come down a touch). From the change's first frame to its burst on the sheet's third
+  (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`ZRules.burstRadius`) is
+  parried as a snatch parries one, before the blades are resolved; at the burst everything else
+  near is pushed away as Z Tea's burst pushes it, the other unstunned, the ball sent too (protocol
+  99). Going in or out, `burst` plays at
   the chest in the energy's colour and the cubes swirl up round the body for half a second, following
   it, as they do through the change. Each of the slash's
   afterimages the next of them; the line round the body cycles the zone's colours at half its
@@ -835,8 +839,11 @@ and moved up or down on FLO METER Y (-2, points)
 squeezed to 0.75 across and 1.5 down, the word keeping its own; the bar's left and right ends' heights over its
 middle's (1.5 and 0.5), and its middle raised by half its height,
 a warp of 16 columns (`Onomatopoeia.skew`, the word's own too); the stroke round the bar and the
-word together, in the player's glow (1.5 points; the bar's art has none of its own), traced off the meter as drawn,
-warp and all, MAX left out, grown round and set behind it. Its four colours, the fill's top and bottom and the
+word together (1.5 points; the bar's art has none of its own), traced off the meter as drawn,
+warp and all, MAX left out, grown round and set behind it: none short of full; at full, cycling
+the FloState outline's colours (`ZoneTuning.outline`); in FloState, the player's energy colour
+breathing from a tenth seen to all of it and back every three seconds (`FloTuning.strokeBreath*`).
+The word is always lit, in its short colours (palette 34 over 51) only while FloState's lockout runs. Its four colours, the fill's top and bottom and the
 outline and drop's top and bottom, two-toned at each letter's middle (the sound words' outline is
 two-toned the same way, both halves palette 29), are gold's first over blue's (the cyan),
 outlined plum's second over purple's last (`FloTuning.colours`; picked once on a grid, since taken

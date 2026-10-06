@@ -83,6 +83,10 @@ public enum TransformRules {
     public static let sheetFramesPerSecond = 10
     public static let frames = 54
     public static let pressWindowFrames = 4
+    /// Going in, the burst on the sheet's third frame, as it's drawn: everything near pushed away
+    /// as Z Tea's burst pushes it (`ZRules.burstRadius` and its pushes). From the change's first
+    /// frame to the burst, a blade in that reach is parried.
+    public static let burstFrame = 2 * 60 / sheetFramesPerSecond
 }
 
 public enum SlopeRules {

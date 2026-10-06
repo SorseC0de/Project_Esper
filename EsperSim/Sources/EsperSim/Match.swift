@@ -311,19 +311,14 @@ public struct Match: Equatable {
         case .fireBeam:
             beams.append(Beam(id: stamp(), owner: index, origin: player.beamOrigin, direction: player.beamDirection, framesLeft: ZRules.fireFrames))
             events.append(.beamFired(player: index, from: player.beamOrigin, direction: player.beamDirection))
+        case .floBurst:
+            // A blade in reach parried first, then everything near pushed away but the one parried.
+            resolveParries()
+            let parried = players.indices.first { other in events.contains(.parried(player: other, by: index)) }
+            burstAway(from: player.body.center, by: index, sparing: parried)
         case .zBurst:
             let centre = player.body.center
-            for other in players.indices where other != index && players[other].body.distance(to: centre) <= ZRules.burstRadius {
-                let away = players[other].body.center - centre
-                let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: player.facing.sign, y: 0)
-                strip(other, by: index, knock: direction * ZRules.burstBodyPush + Vec2(x: 0, y: 1), stun: false)
-            }
-            if ball.isLive, ball.position.distance(to: centre) <= ZRules.burstRadius + BallRules.radius {
-                let away = ball.position - centre
-                let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: player.facing.sign, y: 0)
-                ball.tornadoCentre = nil
-                ball.release(from: ball.position, velocity: direction * ZRules.burstBallPush, by: index, straight: false)
-            }
+            burstAway(from: centre, by: index)
             events.append(.zBurst(player: index, at: centre))
         case .makeGale:
             // Under the feet it jumped from, the jumper let rise clear before it can hold them.
@@ -528,13 +523,33 @@ public struct Match: Equatable {
         }
     }
 
-    /// A snatch's reach, or a throw stance in its opening frames, meeting a live blade: the
-    /// slasher is the one stripped and knocked back, and the blade is spent. Before the
-    /// blades are resolved, so it wins.
+    /// A burst at `centre`: every other body within `ZRules.burstRadius` pushed straight away
+    /// from it, unstunned, but `sparing`, and the ball within it sent away too.
+    private mutating func burstAway(from centre: Vec2, by index: Int, sparing spared: Int? = nil) {
+        let facing = players[index].facing.sign
+        for other in players.indices where other != index && other != spared && players[other].body.distance(to: centre) <= ZRules.burstRadius {
+            let away = players[other].body.center - centre
+            let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: facing, y: 0)
+            strip(other, by: index, knock: direction * ZRules.burstBodyPush + Vec2(x: 0, y: 1), stun: false)
+        }
+        if ball.isLive, ball.position.distance(to: centre) <= ZRules.burstRadius + BallRules.radius {
+            let away = ball.position - centre
+            let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: facing, y: 0)
+            ball.tornadoCentre = nil
+            ball.release(from: ball.position, velocity: direction * ZRules.burstBallPush, by: index, straight: false)
+        }
+    }
+
+    /// A snatch's reach, a throw stance in its opening frames, or the change into FloState from
+    /// its first frame to its burst, its reach the burst's, meeting a live blade: the slasher is
+    /// the one stripped and knocked back, and the blade is spent. Before the blades are
+    /// resolved, so it wins.
     private mutating func resolveParries() {
         for index in players.indices {
             guard let other = players.indices.first(where: { $0 != index }), let blade = players[other].slashHitbox else { continue }
+            let changing = players[index].state == .transforming && players[index].stateTimer <= TransformRules.burstFrame
             let reaches = players[index].snatchHitbox != nil ? players[index].snatchReaches(box: blade)
+                : changing ? blade.distance(to: players[index].body.center) <= ZRules.burstRadius
                 : players[index].throwParrying && blade.overlaps(players[index].body)
             guard reaches else { continue }
             players[other].slashHit = true

@@ -29,6 +29,42 @@ final class TransformTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .transforming)
     }
 
+    func testTheChangesBurstPushesTheOtherAndTheBallAway() {
+        var match = standing()
+        match.players[1].position = Vec2(x: 120, y: 10)
+        match.players[1].grounded = true
+        match.ball.respawn(at: Vec2(x: 85, y: 14))
+        match.advance(inputs: [both, .idle])
+        for _ in 0..<(TransformRules.burstFrame + 2) { match.advance(inputs: [both, .idle]) }
+        XCTAssertGreaterThan(match.players[1].position.x, 120, "pushed away")
+        XCTAssertEqual(match.players[1].hitStun, 0, "not stunned")
+        XCTAssertLessThan(match.ball.position.x, 85, "the ball sent away too")
+    }
+
+    func testTheChangeParriesABladeFromItsFirstFrameToItsBurst() {
+        for at in [0, TransformRules.burstFrame] {
+            var match = standing()
+            match.players[1].position = Vec2(x: 115, y: 10)
+            match.players[1].grounded = true
+            match.players[1].facing = .left
+            match.advance(inputs: [both, .idle])
+            var parried = false
+            for _ in 0..<(TransformRules.burstFrame + 2) {
+                // The other's blade live, on the body, at that frame of the change.
+                if match.players[0].state == .transforming, match.players[0].stateTimer == max(at - 1, 0), !parried,
+                   match.players[1].state != .slashing {
+                    match.players[1].enter(.slashing)
+                    match.players[1].stateTimer = SlashRules.liveFrames.lowerBound
+                }
+                match.advance(inputs: [both, .idle])
+                if match.events.contains(.parried(player: 1, by: 0)) { parried = true }
+            }
+            XCTAssertTrue(parried, "at frame \(at)")
+            XCTAssertGreaterThan(match.players[1].hitStun, 0, "the slasher stripped, as a parry strips")
+            XCTAssertTrue(match.players[0].inFloState || match.players[0].state == .transforming, "the change went on")
+        }
+    }
+
     func testTheSecondInAStanceJustTakenStillChanges() {
         var match = standing()
         match.players[0].hasBall = true

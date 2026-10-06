@@ -377,10 +377,8 @@ final class SpriteLibrary {
         let centres: [BodyPart: CGPoint]
         /// The limbs' tops, where a boot's or a sleeve's cubes come off.
         let tops: [BodyPart: CGPoint]
-        /// The figure's line apart from it, in white: a whole art pixel thick, and half of one
-        /// on a canvas twice as fine. Nil where the line's still on the figure.
+        /// The figure's line apart from it, in white, to be drawn in the look's line colour.
         let line: CGImage?
-        let thinLine: CGImage?
     }
     private var portraits: [String: Portrait] = [:]
 
@@ -443,7 +441,7 @@ final class SpriteLibrary {
         guard let glowing = glowContext.makeImage() else { return nil }
         let made = Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
                             centres: figure.centres, tops: SpriteLibrary.partTops(source),
-                            line: figure.outline?.cgImage(), thinLine: figure.thinOutline?.cgImage())
+                            line: figure.outline?.cgImage())
         // Kept in the cache too, so a new look drops it with the rest of the player's.
         cache[key] = SKTexture(cgImage: body)
         portraits[key] = made

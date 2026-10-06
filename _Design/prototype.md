@@ -657,14 +657,13 @@ the same colour, the second takes the opposite, as before. Online is still the c
   in the wind, shaded as the Metal layer shades them, the back limb's behind.
 - The projector at 0.25 of an art pixel, 7 down from the ring; the player at 2, standing on the
   lens, 6 up from it (`CustomizeScreen.projectorScale` and the rest).
+- The player's line a whole art pixel thick, drawn apart from the figure in the look's line colour.
 - Tuning, low in the middle (HIDE/TUNE), kept between launches: HEAD X and HEAD Y in art pixels
-  and HEAD SCALE in tenths (1, 1, 1 to start); NAME Y (26); FONT, cycling the faces of everything
-  but START and the big H.O.O.D. (`CustomizeFont`, alphabetically: Accidental Presidency, Bigdex,
-  BM Army, Board of Directors, CashMarket, Kapel, PlanetaryContact, Quicksilver, Upheaval, each
-  sized so its capitals stand as Bigdex's would; Silom, an Apple system font, isn't bundled);
-  OUTLINE, the player's line half an art pixel thick (A, `thinLine`) or a whole one (B, `line`),
-  the figure built with its line apart; LINE PULL, how many art pixels short of the limbs the
-  arm and leg boxes' lines stop, the dot with them (0 to start).
+  and HEAD SCALE in tenths (1, 1, 1 to start); NAME Y (26); FONT, cycling the face of everything
+  but START and the big H.O.O.D. between the finalists (`CustomizeFont.finalists`, alphabetically:
+  BM Army, Board of Directors, Kapel, Upheaval, BM Army to start), each sized so its capitals stand
+  as Bigdex's would; LETTER GAP, the space between the side labels' stacked letters, in points of
+  the screen at 1080 high (0 to start).
 - Energy glows: the halos, the projector's lit parts, the player's shoes, sleeves, boots and hood,
   its strings and cubes, the lit box lines and the display's bar; a blurred copy added over at 0.6.
 - The boxes, each labelled under it in Bigdex. SKIN and H.O.O.D. are pickers: while one is chosen
@@ -679,13 +678,15 @@ the same colour, the second takes the opposite, as before. Online is still the c
   H.O.O.D. shows large over the player, centred on it, two-toned (its lower half the energy
   ramp's lightest, `Look.bright`), each word of "Hyper- Osmotic Output Driver" small under its
   letter; and over the player the colour's gem name lettered as CUSTOMIZE is, a period between its
-  letters (R.U.B.Y), NAME Y art pixels over the player's middle, only while the hood's colours are picked. The arm and
-  leg boxes are ticks, a sleeve or a boot each (`Dressing`), labelled ARM SLEEVE (two rows) or BOOT,
-  smaller than the others (ARM SLEEVE 0.25 of the box's height, BOOT and SKIN, one four-letter word,
-  0.5, H.O.O.D. 0.4), each with a line from it to its
-  limb's middle on the player, run as the screen's top and bottom lines are (level out of the box,
-  then 45 degrees onto the limb, a dot there), in the boxes' cyan or, under the cursor, the side's
-  colour, glowing: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
+  letters (R.U.B.Y), after MODEL in the face and size of the words under H.O.O.D., centred
+  against it, a name wider than 0.35 of the halo scaled down to it; NAME Y art pixels over the
+  player's middle, only while the hood's colours are picked. The arm and leg boxes are ticks, a
+  sleeve or a boot each (`Dressing`), labelled SLEEVE or BRACER; those and SKIN have their letters
+  stacked down the box's side away from the player, at 0.25 of its height (H.O.O.D.'s under its
+  box, at 0.4). Each arm and leg box has a line from it to its limb's middle on the player, run as
+  the screen's top and bottom lines are, a dot at the end: a bracer's level out of the box's side
+  toward the player, then 45 degrees onto the limb; a sleeve's out of the box's bottom, 45 degrees
+  first, then level; in the boxes' cyan or, under the cursor, the side's colour, glowing: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
   the middle, the back. Front and back are kept as the body faces right; facing left, in play and
   on the second side, the body is drawn turned round (`Look.turnedRound`, `SpriteLibrary.turnedPlayer`,
   `bodyPlayer`), front and back swapped, so a sleeve stays on its arm. Its frames are built ahead
@@ -997,7 +998,7 @@ ramp take that map (the rest to their nearest mapped colour); since moved up one
 `fire_explosion`, a different sheet, is left as the tool had it. The importer's `NOT_TONED` keeps the strike bolts,
 which the recolour took to pure white, drawn as painted. Each has an opposite: gold and teal,
 red and lime, purple and pink, orange and blue. Each has a gem's name (`EnergyColour.name`):
-Sapphire blue, Topaz orange, Ruby red, Amethyst purple, Quartz pink, Peridot lime, Tourmaline
+Sapphire blue, Topaz orange, Ruby red, Amethyst purple, Quartz pink, Peridot lime, Zircon
 teal, Citrine gold. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two

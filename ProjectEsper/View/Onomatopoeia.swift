@@ -186,8 +186,7 @@ enum Onomatopoeia {
     static let registered: Void = {
         // The words' faces, and the customize screen's to choose from (`CustomizeFont`).
         for name in ["Bigdex", "CherryBombOne-Regular", "DarumadropOne-Regular", "DelaGothicOne-Regular",
-                     "AccidentalPresidency", "BMarmy", "BoardOfDirectors-Hv", "CashMarket-BoldRounded", "Kapel",
-                     "PlanetaryContact", "Quicksilver", "upheavtt"] {
+                     "BMarmy", "BoardOfDirectors-Hv", "Kapel", "upheavtt"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "ttf") ?? Bundle.main.url(forResource: name, withExtension: "otf") {
                 CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
             }

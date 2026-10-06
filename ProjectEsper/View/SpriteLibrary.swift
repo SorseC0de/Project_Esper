@@ -16,11 +16,22 @@ final class SpriteLibrary {
     /// Where the glowing parts sit in each player frame, in art pixels from the feet.
     private var landmarks: [String: [BodyPart: CGPoint]] = [:]
     /// The two players' looks, then the ice look frozen bodies and ice clones are drawn in,
-    /// asked for as the player `icePlayer`.
-    private var looks = Look.byPlayer + [Look.ice] + Look.byPlayer.map(\.transformed)
+    /// asked for as the player `icePlayer`, then each player's energy form, then each player
+    /// turned round: a body mirrored to face left shows its sheet's back limbs in front, so the
+    /// sleeves and boots swap over to stay on the same arm and leg.
+    private var looks = Look.byPlayer + [Look.ice] + Look.byPlayer.map(\.transformed) + Look.byPlayer.map(\.turnedRound)
     static let icePlayer = Look.byPlayer.count
     /// A player's energy form, asked for as a player of its own.
     static func transformedPlayer(_ player: Int) -> Int { icePlayer + 1 + player }
+    /// A player facing left, asked for as a player of its own.
+    static func turnedPlayer(_ player: Int) -> Int { icePlayer + 1 + Look.byPlayer.count + player }
+
+    /// Who a player's body is drawn as facing this way: turned round facing left, where that
+    /// changes anything.
+    func bodyPlayer(_ player: Int, facingLeft: Bool) -> Int {
+        let turned = SpriteLibrary.turnedPlayer(player)
+        return facingLeft && looks[turned] != looks[player] ? turned : player
+    }
 
     func look(for player: Int) -> Look {
         looks[min(player, looks.count - 1)]
@@ -33,9 +44,13 @@ final class SpriteLibrary {
         looks[player] = look
         let energyForm = SpriteLibrary.transformedPlayer(player)
         looks[energyForm] = look.transformed
-        cache = cache.filter { !$0.key.hasPrefix("p\(player)_") && !$0.key.hasPrefix("p\(energyForm)_") }
+        let turned = SpriteLibrary.turnedPlayer(player)
+        looks[turned] = look.turnedRound
+        cache = cache.filter { !$0.key.hasPrefix("p\(player)_") && !$0.key.hasPrefix("p\(energyForm)_") && !$0.key.hasPrefix("p\(turned)_") }
         rewarm(player: player)
         rewarm(player: energyForm)
+        // Turned round, only where it differs: built ahead, so turning never makes frames.
+        if looks[turned] != look { rewarm(player: turned) }
     }
 
     /// Every player's frames dropped and rebuilt, for a change to how all looks are drawn.
@@ -273,12 +288,16 @@ final class SpriteLibrary {
         return result
     }
 
+    /// The brightest an energy face's lightest tone may be, as a grey level: lime (0.76) comes
+    /// down to it, gold and teal (0.67, 0.68) a touch; the other colours are under it.
+    static let energyFaceLevel = 0.6
     /// The hood's greys a touch down the ramp, nearer the legs' plain colour.
     static let hoodLevel = 0.9
 
     /// The hooded head, a frame of `player_hoodheads` for one skin: its hood, the white and the
     /// cool greys, toned through the player's energy ramp, the skin left as drawn; and the hood
-    /// and the face each alone in white, for the glow's mask.
+    /// and the face each alone in white, for the glow's mask. As the ice player, the frozen
+    /// bodies' and ice clones' look, the face too is toned, in the ice's front colour.
     /// In FloState (`energy`), the hood is the energy form's near-white clothes colour
     /// (`EnergyColour.body`), shaded by its greys, and the face the regular energy colour, its
     /// lighter skin tone the colour itself and the darker in proportion.
@@ -302,6 +321,9 @@ final class SpriteLibrary {
         func level(_ index: Int) -> Double {
             (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / 255
         }
+        // A light energy colour, lime's, is dimmed on the face so its features don't burn out in the glow.
+        let glowLevel = (0.2126 * Double((look.glow >> 16) & 0xFF) + 0.7152 * Double((look.glow >> 8) & 0xFF) + 0.0722 * Double(look.glow & 0xFF)) / 255
+        let faceDimming = energy ? min(SpriteLibrary.energyFaceLevel / max(glowLevel, 0.01), 1) : 1
         // The face's lightest tone, which the energy colour stands for.
         let faceLightest = (0..<(width * height)).filter { pixels[$0 * 4 + 3] != 0 && pixels[$0 * 4 + 2] < pixels[$0 * 4] }
             .map { level($0 * 4) }.max() ?? 1
@@ -313,8 +335,8 @@ final class SpriteLibrary {
             let mask = isHood ? hoodPixels : facePixels
             for channel in 0..<4 { mask[index + channel] = 255 }
             guard isHood else {
-                if energy {
-                    paint(pixels, index, Look.scaled(look.glow, min(level(index) / max(faceLightest, 0.01), 1)))
+                if energy || player == SpriteLibrary.icePlayer {
+                    paint(pixels, index, Look.scaled(look.glow, min(level(index) / max(faceLightest, 0.01), 1) * faceDimming))
                 } else if let swap = faceSwaps[RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])] {
                     paint(pixels, index, swap)
                 }
@@ -510,7 +532,8 @@ final class SpriteLibrary {
     func warmUp(players: Int, completion: @escaping () -> Void) {
         // The ice look's frames as well, and each player's energy form, so a freeze or a
         // change never makes them mid-match.
-        for drawn in [SpriteLibrary.icePlayer] + (0..<players).map(SpriteLibrary.transformedPlayer) {
+        let turned = (0..<players).map(SpriteLibrary.turnedPlayer).filter { look(for: $0) != look(for: $0 - SpriteLibrary.turnedPlayer(0)) }
+        for drawn in [SpriteLibrary.icePlayer] + (0..<players).map(SpriteLibrary.transformedPlayer) + turned {
             for animation in Animation.allCases {
                 for frame in 0..<animation.frameCount {
                     _ = texture(AnimationFrame(animation, frame), player: drawn)

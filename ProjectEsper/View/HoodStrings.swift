@@ -150,6 +150,11 @@ final class HoodStrings {
 
     fileprivate static func gap(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
 
+    /// The strings as drawn this frame moved, as a board ride moves the body after they're placed.
+    func move(_ moved: (CGPoint) -> CGPoint) {
+        for pixel in pixels where !pixel.isHidden { pixel.position = moved(pixel.position) }
+    }
+
     func hide() {
         pixels.forEach { $0.isHidden = true }
         motion.reset()

@@ -7,7 +7,7 @@ import CoreGraphics
 enum CustomizeLayout {
     static let aspect: CGFloat = 2560 / 1440
     static let frames: [String: CGRect] = [
-        "customize_ground": CGRect(x: 0.00000, y: 0.00000, width: 1.00000, height: 1.00000),
+        "customize_ground": CGRect(x: 0.02656, y: 0.03819, width: 0.94492, height: 0.89583),
         "customize_return": CGRect(x: 0.43477, y: 0.89444, width: 0.13164, height: 0.07431),
         "customize_start": CGRect(x: 0.41523, y: 0.35347, width: 0.16914, height: 0.30139),
         "customize_spin_ccw": CGRect(x: 0.42930, y: 0.38889, width: 0.13945, height: 0.23889),

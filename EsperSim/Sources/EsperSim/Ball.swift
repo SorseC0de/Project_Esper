@@ -246,6 +246,16 @@ public struct Ball: Equatable {
         pace = 1
     }
 
+    /// Taken and held by a tornado or a gale: its shot or throw over, as a bounce ends one, so
+    /// anyone may catch it.
+    mutating func endFlight() {
+        settlePace()
+        straight = false
+        floater = 0
+        steers = false
+        shotInFlight = false
+    }
+
     private mutating func bounceX(events: inout [MatchEvent]) {
         settlePace()
         straight = false

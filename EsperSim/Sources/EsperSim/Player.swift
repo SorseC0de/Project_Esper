@@ -1007,8 +1007,9 @@ public struct Player: Equatable {
                     hasBall = false
                     catchCooldown = BallRules.catchCooldownFrames
                     action = .releaseShot(velocity: shotVelocity + Vec2(x: 0, y: lift))
+                    // The ball's own; a fireball's release is its own event.
+                    events.append(.shot(player: index))
                 }
-                events.append(.shot(player: index))
             } else if stateTimer >= BallRules.shotReleaseFrames + (grounded ? BallRules.shotRecoveryFrames : BallRules.shotHangFrames) {
                 fastFalling = false
                 enter(grounded ? .idle : .air)
@@ -1092,8 +1093,8 @@ public struct Player: Equatable {
                     hasBall = false
                     catchCooldown = BallRules.catchCooldownFrames
                     action = .releaseThrow(velocity: direction * BallRules.throwSpeed)
+                    events.append(.thrown(player: index))
                 }
-                events.append(.thrown(player: index))
             } else if stateTimer >= BallRules.throwRecoveryFrames {
                 enter(grounded ? .idle : .air)
             }
@@ -1140,6 +1141,10 @@ public struct Player: Equatable {
             }
             if jumpPressed {
                 enter(.jumpSquat)
+            } else if fireballAsked(input, throwPressed: throwPressed) {
+                // Down held a frame or more before the throw is a crouch: Blazing Boba's
+                // summon still comes first, and the fireball in hand stands it up.
+                summonFireball(events: &events)
             } else if throwPressed, snatchCooldown == 0, throwIsSnatch {
                 startSnatch()
             } else if shootPressed {

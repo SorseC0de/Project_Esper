@@ -556,6 +556,28 @@ final class PowerTests: XCTestCase {
         XCTAssertLessThan(burst, 120)
     }
 
+    func testDownHeldIntoACrouchThenThrowStillSummonsTheFireballAndItsThrowIsNoBallThrow() {
+        var match = with(.blazingBoba, level: 2)
+        match.players[1].position.x = 60
+        // Down a few frames first: a crouch.
+        run(&match, frames: 4, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) })
+        XCTAssertEqual(match.players[0].state, .crouch)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+        XCTAssertTrue(match.players[0].hasFireball)
+        // Thrown: the fireball's own release, not the ball's.
+        run(&match, frames: 4, input: { _ in .idle })
+        var events: [MatchEvent] = []
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        events += match.events
+        for _ in 0..<(BallRules.throwWindupFrames + 12) {
+            match.advance(inputs: [.idle, .idle])
+            events += match.events
+        }
+        XCTAssertFalse(match.players[0].hasFireball)
+        XCTAssertFalse(events.contains(.thrown(player: 0)))
+        XCTAssertFalse(events.contains(.shot(player: 0)))
+    }
+
     // MARK: Pulsepistol Punch
 
     func testThePulseKnocksTheBallAndTheOtherAwayWithoutStunning() {

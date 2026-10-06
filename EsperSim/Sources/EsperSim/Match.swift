@@ -248,6 +248,7 @@ public struct Match: Equatable {
         bolts = []
         clones = []
         flames = []
+        gales = []
         fireballs = []
         helmets = []
         helmetClock = 0
@@ -675,6 +676,8 @@ public struct Match: Equatable {
         let ballIn = ballBox.map { boxes[$0].center }
         ball.tornadoCentre = ballBox.map(burns) == true || (ball.tornadoCentre == nil && !ball.outsideTornados) ? nil : ballIn
         ball.outsideTornados = ballFree && ballIn == nil
+        // Held, it's nobody's shot or throw any more: anyone's to catch, as after a bounce.
+        if ball.tornadoCentre != nil { ball.endFlight() }
         for index in players.indices {
             let body = players[index].body
             guard let hit = boxes.firstIndex(where: { $0.overlaps(body) }) else {
@@ -769,6 +772,7 @@ public struct Match: Equatable {
                         ball.tornadoCentre = gale.box.center
                         ball.outsideTornados = false
                         ball.lastTouched = gale.owner
+                        ball.endFlight()
                     } else {
                         gale.carrying = false
                     }

@@ -147,9 +147,11 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   zone's colours, and the change leaves near-white clothes and energy skin: whatever a human wears
   (the clothes, the shoes, the hood and its strings) in the glow lifted a third to white
   (`EnergyColour.body`, the back parts at two thirds of it), whatever a human shows bare (what
-  `HumanLook.skin` names: the arms, the hands, the lower legs, and the hooded head's face) in the
-  regular energy colour (`HumanLook.energyFormBare`), all of it glowing; so clothes picked later
-  follow on their own. Going in or out, `burst` plays at
+  `HumanLook.bareParts` names: the arms, the hands, the lower legs, and the hooded head's face, sleeves
+  and boots or not) in the regular energy colour (`Dressing.energyFormBare`), all of it glowing; so
+  clothes picked later follow on their own. The face's lightest tone is held to a grey level of 0.6
+  (`SpriteLibrary.energyFaceLevel`): lime's, at 0.76, burned the features out in the glow (gold and
+  teal come down a touch). Going in or out, `burst` plays at
   the chest in the energy's colour and the cubes swirl up round the body for half a second, following
   it, as they do through the change. Each of the slash's
   afterimages the next of them; the line round the body cycles the zone's colours at half its
@@ -385,7 +387,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 - Frost Tea (I). The snatch freezes what it reaches, a body or the loose ball, for 60
   frames: held exactly where it is, nothing running, nothing caught, no hitbox live, though
   a frozen ball can still be picked up or snatched;
-  a frozen body is stripped as well. The slide has no friction and no end, until jump,
+  a frozen body is stripped as well; a frozen body and an ice clone wear the hooded head in ice. The slide has no friction and no end, until jump,
   throw, shoot, the stick against it, or down let go cancel it. Level two: a double
   jump or a slide leaves an ice clone, the body's box, that freezes whatever touches it
   and shatters, or shatters after 60 frames. Numbers in `FrostRules`.
@@ -395,9 +397,11 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   the flame is spent. Shots and throws set the ball alight until its first bounce, and
   nobody but the thrower can catch or snatch it; the slash still can. Level two: throw
   with down held and nothing in hand makes a fireball in hand, fire swirling into
-  it; it leaves at one and a half times the ball's speed; shot it arcs under half the ball's gravity with the aiming dots, but a quick shot's takes the quick shot's preset arc, at the ball's speed and gravity, from where the ball leaves; thrown it flies
+  it, crouched too (down held first is a crouch; protocol 96); it leaves at one and a half times the ball's speed; shot it arcs under half the ball's gravity with the aiming dots, but a quick shot's takes the quick shot's preset arc, at the ball's speed and gravity, from where the ball leaves; thrown it flies
   dead straight, and it bursts on the first thing it meets and strips and knocks
-  whatever's within 15 of the burst. Numbers in `BlazeRules`.
+  whatever's within 15 of the burst; its release is its own (`.fireballThrown`), not the ball's
+  shot or throw, so one sound plays, and the hit it lands says no word of its own under the burst's
+  BOOM. Numbers in `BlazeRules`.
 - Pulsepistol Punch (K). Shoot without the ball is the pulse: a pillar ten units tall
   at the hand, the width of the screen the way the body faces, that knocks the ball and
   the other body away without stunning, a held ball popping free; standing it's the
@@ -473,7 +477,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   frame, sends one off from the spark the way it faces at 3 a frame, for four seconds at most; it
   strips the first other body it meets, takes the ball, theirs or loose, and carries it inside,
   and bursts on anything solid, the stage's invisible walls and the ball's own blockers included,
-  or the world's edge, letting the ball go where it is.
+  or the world's edge, letting the ball go where it is. A ball a tornado or a gale takes has its
+  shot or throw ended, as a bounce ends one (`Ball.endFlight`), so whoever's by it can catch it (a
+  held shot hung there uncatchable); gales are gone with a point (protocol 96).
 - Z Tea (N, a biomorph; protocol 64). Its slash, with nothing in hand: on the ground, the beam's
   charge, a second (`ZRules.chargeFrames`, 60), committed: nothing but the jump calls it off
   (into the jump) and a hit stops it; then the beam fires half a second (30) from the hand, growing out 40 a frame
@@ -609,48 +615,62 @@ the same colour, the second takes the opposite, as before. Online is still the c
   `Tools/import_customize.py` (rendered by macOS's own SVG renderer, `Tools/render_svg.swift`,
   2560 by 1440, each cropped) into `ProjectEsper/UI/Customize`, with where each sits in
   `CustomizeLayout.swift`. Recoloured to the menus' colours: the cyans and blues to purple's ramp,
-  the deep blues to plum's, the near-black to black's (`MENU` in the tool); the top line gold's
+  the deep blues to plum's, the near-black to black's (`MENU` in the tool); its own ground (the
+  gradient and the grid) is left out, the screen drawing its own; the top line gold's
   second (#F5BB45), the bottom line blue's second (#45BCF5), RETURN's lettering and frame blue's
   first (#6BD0FF). The halos go to greys, multiplied by the side's energy colour, the beam clear
   at its top and whole three quarters down. Each box comes as its fill, its line, and its line
   thickened (a stroke 8 wide), the lines white to be coloured; the small boxes' fill is blue's
   second out to its last, their line blue's second, the hood's line purple's first. The display
-  comes as its body and its bar. The 16:9 is fitted to the screen, the ground's black past it.
+  comes as its body and its bar. The 16:9 is fitted to the screen. Under it, to the screen's edges:
+  the vector's gradient in the menus' colours (purple's body, plum's light at 0.42, black's last,
+  out to 0.42 of the 16:9's width) and its grid (a cell 0.0139 of the width, plum's light at 0.4),
+  bowed so its cells grow toward the corners (pushed out by 1 + 0.35 of the squared distance
+  over the corner's).
   RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second.
-- Over the middle: CUSTOMIZE on the heading's plate (cap height 0.025 of the screen) and START on
+- Over the middle: CUSTOMIZE on the heading's plate (cap height 0.025 of the screen, its letters
+  spaced 0.08 of their size apart, `Word.spacing`) and START on
   the emblem (0.035), both lettered as the lit FLO is (Bigdex, gold's first over the cyan, outlined
   plum and purple, growing to the left; `Onomatopoeia.picture`), and the series' mode, BEST OF 7 or
   47, large under CUSTOMIZE.
-- Each side: `Holo-Projector_v2` (the catalog's `HoloProjector`) on the halo's ring, its white in
+- Each side: `Holo-Projector_v2` (the catalog's `HoloProjector`) on the halo's ring, under the halo, its white in
   the side's colour, and `player_customize` standing on its lens, in the side's look with its hooded
   head (`SpriteLibrary.portrait`; the hood a pixel right and up of where the idle's head puts it,
   `portraitHoodNudge`), the second side facing the first. An art pixel is 0.168/64 of the screen's
-  width; the projector is drawn at 0.5 of that, the player at 3, each a whole number of screen
-  pixels. The player is drawn a frame at a time (`CustomizeFigure`): its strings float as
-  FloState's do, the 20 back and the 12 forward; cubes rise off the head's crown (in the energy
+  width; the projector is drawn at 0.25 of that, 4 down, the player at 2, 6 up, each a whole number
+  of screen pixels. The player is drawn a frame at a time (`CustomizeFigure`): its strings float as
+  FloState's do, one back and one forward, but a human's length, five; cubes rise off the head's crown (in the energy
   colour) and the shoes at play's numbers with no FLO, swaying in the wind, shaded as the Metal
   layer shades them, the back shoe's behind.
 - Tuning, low in the middle (HIDE/TUNE): PROJ Y and PLAYER Y in art pixels up, PROJ SCALE and
-  PLAYER SCALE in quarters (the art pixels each is drawn at), kept between launches. The player
+  PLAYER SCALE in quarters (the art pixels each is drawn at), kept between launches, starting at
+  -4, 0.25, 6 and 2. The player
   stands on the lens wherever the projector goes, PLAYER Y on top of that.
 - Energy glows: the halos, the projector's lit parts, the player's shoes, sleeves, boots and hood,
   its strings and cubes, the lit box lines and the display's bar; a blurred copy added over at 0.6.
 - The boxes, each labelled under it in Bigdex. SKIN and H.O.O.D. are pickers: while one is chosen
   the bottom display shows (its bar in the side's colour) with its colours, a leaning column each,
-  the colour over an accent corner to corner; across steps round them, the picked column lined in
-  white. SKIN's are `player_hoodheads`' six skins and the robot's, 38 over 39, drawn from the fourth
+  the colour over an accent corner to corner, the picked column lined in white. Jump on the box, or
+  out from it, steps into its picker at the picked colour; across moves along it (the cursor's
+  column lined in the side's colour, past the inner end back to the box), jump picks, up or B goes
+  back to the box. SKIN's are `player_hoodheads`' six skins and the robot's, 38 over 39, drawn from the fourth
   frame with its tones swapped (`HumanLook.skinTones`, `_Design/skin-tones.md`); the accent is the
   back tone. H.O.O.D.'s are the energy colours round the wheel (red, orange, gold, lime, teal,
   blue, purple, pink), the accent the shade down the AAP-64 ramp (`EnergyColour.rampDown`); on it,
   H.O.O.D. and "Hyper-Osmotic Output Driver" show over the halo's upper outer corner. The arm and
-  leg boxes are ticks, a sleeve or a boot each (`Dressing`): the inner ones, beside the middle, the
-  front limbs (the first side's right, the second's left), the outer ones, past the halo, the back.
+  leg boxes are ticks, a sleeve or a boot each (`Dressing`), labelled by the screen's side they're on,
+  L or R: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
+  the middle, the back. Front and back are kept as the body faces right; facing left, in play and
+  on the second side, the body is drawn turned round (`Look.turnedRound`, `SpriteLibrary.turnedPlayer`,
+  `bodyPlayer`), front and back swapped, so a sleeve stays on its arm. Its frames are built ahead
+  with the look, only where they differ, so turning never makes any.
   Sleeves and boots are energy, in the energy's colour (the back ones at 0.66), glowing; the hands
   stay bare. Boots are on and sleeves off to start.
 - Each side its own cursor, lighting its box's thick line in its colour: the first pad the first
   side's, a second pad the second's; taps work on both. Up and down the inner column: SKIN, ARM,
-  LEG, H.O.O.D., START, RETURN; the outer ARM and LEG between SKIN and H.O.O.D.; across from the
-  inner ARM and LEG out to the outer and in to START. Jump ticks a box or steps a picker.
+  LEG, H.O.O.D., START, RETURN, up from SKIN round to START; the outer ARM and LEG between SKIN and
+  H.O.O.D.; across from the inner ARM and LEG out to the outer and in to START, from SKIN and H.O.O.D.
+  in to START or out into the picker. Jump ticks a box.
 
 ## The game loop
 
@@ -901,15 +921,18 @@ thirds of its brightness (`HumanLook.backLegShare`, 0.66; greyed, they barely gl
 they take the plain threshold); the head
 drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not
 glowing, its particles still rising off it. The head itself is the hooded head (`player_hoodheads`,
-six skins as a strip, the bodies' own in its fourth frame, `GameScene.hoodHeadSkin`), its own node:
+six skins as a strip, and the robot's drawn from the fourth; the player's own, `Dressing.skinTone`), its own node:
 its hood, the white and the cool greys, toned ahead of time through the energy ramp at nine
 tenths of their level, nearer the legs' plain colour (`SpriteLibrary.hoodHead`, `hoodLevel`), the skin as drawn, opaque. The sheet's own head is taken out of the body,
 its line left round where it was. Drawn for `player_idle`'s third frame and moved every frame by how
 far the head's middle (its landmark) is from there, turned and flipped with the body; in FloState
 the same hooded head (`hoodHead(energy:)`), its hood in the near-white clothes colour shaded by its
 greys and its face in the energy colour, the lighter skin tone the colour itself and the darker in
-proportion, cut out of the glow's mask whole (`player_hood_down` is no longer drawn); not
-on a frozen body. In the glow's mask the hood is cut out in black so it glows as energy
+proportion, cut out of the glow's mask whole (`player_hood_down` is no longer drawn). Frozen,
+and on Frost Tea's ice clones, it's drawn as the ice player (`SpriteLibrary.icePlayer`): hood and
+face both toned in the ice look, no strings. Surf Soda's ride carries it, its strings and its
+flashes with the body (`placeSurf`). Z Tea's beam tips it as Super Smoothie's flight does: back
+aimed up, forward aimed down, to π/15 at the aim's 45°. In the glow's mask the hood is cut out in black so it glows as energy
 (`hoodSnapshots`, `MaskScene`'s `cutOut`) and the face drawn pure red (`shieldedSnapshots`, `shield`),
 which the bright pass treats as flat and the composite leaves without bloom, so none spreads onto it.
 The hood is the H.O.O.D., the Hyper-Osmotic Output Driver: it draws in sweat and drives out

@@ -38,9 +38,19 @@ struct PlayerCustomization: Codable, Equatable {
 
 /// Where a side's cursor can stand on the customize screen. The inner arm and leg boxes, beside
 /// the middle, are the front limbs'; the outer ones, past the halo, the back's.
-enum CustomizeSpot: CaseIterable {
-    /// The skin and the hood are pickers: across steps their colours.
+enum CustomizeSpot: Hashable {
     case skin, arms, legs, hood, start, back, outerArms, outerLegs
+    /// On a column of the skin's or the hood's picker, in the display.
+    case skinPicker(Int), hoodPicker(Int)
+
+    /// The box whose picker this is, or which is its own.
+    var owner: CustomizeSpot {
+        switch self {
+        case .skinPicker: .skin
+        case .hoodPicker: .hood
+        default: self
+        }
+    }
 }
 
 extension FlowState {
@@ -67,8 +77,10 @@ extension FlowState {
     var shownCustomizations: [PlayerCustomization] { PlayerCustomization.clashed(customizations) }
 
     /// A side's cursor moved by its stick. Up and down the inner column (skin, arms, legs, the
-    /// hood, START, RETURN) or the outer arms and legs; out from the inner arms and legs to the
-    /// outer, in to START. Across on the skin or the hood steps its colour.
+    /// hood, START, RETURN, and from the skin up round to START) or the outer arms and legs; out
+    /// from the inner arms and legs to the outer, in to START; out from the skin or the hood into
+    /// its picker, at the picked colour. In a picker, across along the colours (past the inner
+    /// end back to its box) and up back to its box.
     func moveCustomize(_ player: Int, across: Int, down: Int) {
         let spot = customizeCursors[player]
         // Toward the middle: right for the first side, left for the second.
@@ -76,21 +88,29 @@ extension FlowState {
         var next: CustomizeSpot?
         if across != 0 {
             switch spot {
-            case .skin, .hood:
-                step(player, spot, by: across)
-                return
+            case .skin, .hood: next = inward > 0 ? .start : enterPicker(player, spot)
             case .arms: next = inward > 0 ? .start : .outerArms
             case .legs: next = inward > 0 ? .start : .outerLegs
             case .outerArms: next = inward > 0 ? .arms : nil
             case .outerLegs: next = inward > 0 ? .legs : nil
             case .start: next = inward < 0 ? .hood : nil
             case .back: next = nil
+            case .skinPicker(let column), .hoodPicker(let column):
+                let count = spot.owner == .skin ? HumanLook.skinTones.count : EnergyColour.wheel.count
+                let moved = column + across
+                if (0..<count).contains(moved) {
+                    next = spot.owner == .skin ? .skinPicker(moved) : .hoodPicker(moved)
+                } else if inward > 0 {
+                    next = spot.owner
+                }
             }
         } else if down != 0 {
             let column: [CustomizeSpot] = [.skin, .arms, .legs, .hood, .start, .back]
             switch spot {
             case .outerArms: next = down > 0 ? .outerLegs : .skin
             case .outerLegs: next = down > 0 ? .hood : .outerArms
+            case .skin where down < 0: next = .start
+            case .skinPicker, .hoodPicker: next = down < 0 ? spot.owner : nil
             default:
                 let at = column.firstIndex(of: spot) ?? 0
                 next = column[min(max(at + down, 0), column.count - 1)]
@@ -101,37 +121,54 @@ extension FlowState {
         SoundBoard.shared.play(SoundBoard.navigate)
     }
 
-    /// A spot picked by a side's jump, or tapped: a box ticked or unticked, a picker stepped on.
+    /// Into a box's picker, on the colour it has.
+    private func enterPicker(_ player: Int, _ box: CustomizeSpot) -> CustomizeSpot {
+        let pick = customizations[player]
+        return box == .skin ? .skinPicker(pick.dressing.skinTone) : .hoodPicker(EnergyColour.wheel.firstIndex(of: pick.energy) ?? 0)
+    }
+
+    /// Out of a picker, back to its box: B there.
+    func leaveCustomizePicker(_ player: Int) -> Bool {
+        let spot = customizeCursors[player]
+        guard spot.owner != spot else { return false }
+        customizeCursors[player] = spot.owner
+        SoundBoard.shared.play(.menuBack)
+        return true
+    }
+
+    /// The displayed front limb's sleeve and boot: the second side is shown facing left, so its
+    /// front is the dressing's back (front and back are as faced right).
+    private func frontIsBack(_ player: Int) -> Bool { player == 1 }
+
+    /// A spot picked by a side's jump, or tapped: a box ticked or unticked, a box's picker
+    /// entered, a colour picked. The outer arm and leg boxes are the shown front limbs', the
+    /// inner the back's.
     func activateCustomize(_ player: Int, _ spot: CustomizeSpot) {
         customizeCursors[player] = spot
+        let flipped = frontIsBack(player)
         switch spot {
-        case .skin, .hood: step(player, spot, by: 1)
-        case .arms: update(player) { $0.dressing.frontSleeve.toggle() }
-        case .outerArms: update(player) { $0.dressing.backSleeve.toggle() }
-        case .legs: update(player) { $0.dressing.frontBoot.toggle() }
-        case .outerLegs: update(player) { $0.dressing.backBoot.toggle() }
+        case .skin, .hood:
+            customizeCursors[player] = enterPicker(player, spot)
+            SoundBoard.shared.play(SoundBoard.navigate)
+        case .outerArms: update(player) { if flipped { $0.dressing.backSleeve.toggle() } else { $0.dressing.frontSleeve.toggle() } }
+        case .arms: update(player) { if flipped { $0.dressing.frontSleeve.toggle() } else { $0.dressing.backSleeve.toggle() } }
+        case .outerLegs: update(player) { if flipped { $0.dressing.backBoot.toggle() } else { $0.dressing.frontBoot.toggle() } }
+        case .legs: update(player) { if flipped { $0.dressing.frontBoot.toggle() } else { $0.dressing.backBoot.toggle() } }
+        case .skinPicker(let column): update(player) { $0.dressing.skinTone = column }
+        case .hoodPicker(let column): update(player) { $0.energy = EnergyColour.wheel[column] }
         case .start: startFromCustomize()
         case .back: closeCustomize()
         }
     }
 
-    /// A picker's column tapped: the skin's tone or the hood's colour outright.
-    func pickCustomize(_ player: Int, _ spot: CustomizeSpot, column: Int) {
-        customizeCursors[player] = spot
-        update(player) { pick in
-            if spot == .skin { pick.dressing.skinTone = column } else { pick.energy = EnergyColour.wheel[column] }
-        }
-    }
-
-    private func step(_ player: Int, _ spot: CustomizeSpot, by step: Int) {
-        update(player) { pick in
-            func round(_ at: Int, _ count: Int) -> Int { (at + step % count + count) % count }
-            if spot == .skin {
-                pick.dressing.skinTone = round(pick.dressing.skinTone, HumanLook.skinTones.count)
-            } else {
-                let wheel = EnergyColour.wheel
-                pick.energy = wheel[round(wheel.firstIndex(of: pick.energy) ?? 0, wheel.count)]
-            }
+    /// Whether a side's arm or leg box is ticked, by the same reckoning.
+    func customizeTicked(_ player: Int, _ spot: CustomizeSpot) -> Bool {
+        let dressing = customizations[player].dressing
+        let shownFront = spot == .outerArms || spot == .outerLegs
+        let front = shownFront != frontIsBack(player)
+        switch spot {
+        case .arms, .outerArms: return front ? dressing.frontSleeve : dressing.backSleeve
+        default: return front ? dressing.frontBoot : dressing.backBoot
         }
     }
 
@@ -155,10 +192,10 @@ struct CustomizeScreen: View {
     @Environment(\.displayScale) private var displayScale
     /// The tuning sliders: the projector's and the player's height, in art pixels up, and the
     /// art pixels each is drawn at, in quarters.
-    @AppStorage("esper.customize.projectorY") private var projectorY = 0.0
-    @AppStorage("esper.customize.projectorScale") private var projectorScale = 0.5
-    @AppStorage("esper.customize.playerY") private var playerY = 0.0
-    @AppStorage("esper.customize.playerScale") private var playerScale = 3.0
+    @AppStorage("esper.customize.projectorY.2") private var projectorY = -4.0
+    @AppStorage("esper.customize.projectorScale.2") private var projectorScale = 0.25
+    @AppStorage("esper.customize.playerY.2") private var playerY = 6.0
+    @AppStorage("esper.customize.playerScale.2") private var playerScale = 2.0
     @AppStorage("esper.customize.tuningShown") private var tuningShown = true
 
     init(flow: FlowState) {
@@ -177,6 +214,17 @@ struct CustomizeScreen: View {
     static let feetRow: CGFloat = 40
     /// The rings round START, in degrees a second.
     static let spinSpeeds: (ccw: Double, cw: Double) = (24, 36)
+    /// The space between CUSTOMIZE's letters, a share of each one's size.
+    static let headingSpacing: CGFloat = 0.08
+    /// The ground: the vector's gradient (in the menus' colours), out to the screen's edges, and
+    /// its grid, a cell 0.0139 of the 16:9's width, bowed out so the cells grow toward the corners.
+    static let groundStops: [Gradient.Stop] = [.init(color: Color(rgb: EsperPalette.purple.body), location: 0),
+                                                .init(color: Color(rgb: EsperPalette.plum.light), location: 0.42),
+                                                .init(color: Color(rgb: EsperPalette.black.shadow), location: 1)]
+    static let groundRadiusShare: CGFloat = 0.42
+    static let gridCellShare: CGFloat = 0.0139
+    static let gridBow: CGFloat = 0.35
+    static let gridOpacity = 0.4
     /// A picker's colour: its share of each column, over the accent.
     static let swatchShare: CGFloat = 0.7
     /// The small boxes' line, blue's second (the cyan); the hood's, purple's first as the vector's cyan went.
@@ -198,13 +246,53 @@ struct CustomizeScreen: View {
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
         .background {
-            // The ground's dark edge past the 16:9, taking the taps the screen doesn't.
-            Color(rgb: EsperPalette.black.shadow)
-                .contentShape(Rectangle())
-                .onTapGesture {}
+            // The ground, to the screen's edges, taking the taps the screen doesn't.
+            GeometryReader { geometry in
+                ground(geometry.size)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {}
         }
         .ignoresSafeArea()
         .environment(\.colorScheme, .dark)
+    }
+
+    /// The gradient and the bowed grid over the whole screen.
+    private func ground(_ screen: CGSize) -> some View {
+        let fitted = CustomizeScreen.fitted(screen)
+        return ZStack {
+            Color(rgb: EsperPalette.black.shadow)
+            RadialGradient(stops: CustomizeScreen.groundStops, center: .center, startRadius: 0,
+                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare)
+            Canvas { context, size in
+                let centre = CGPoint(x: size.width / 2, y: size.height / 2)
+                let reach = hypot(centre.x, centre.y)
+                let cell = fitted.width * CustomizeScreen.gridCellShare
+                // A point of the flat grid, pushed out from the middle the more the further it is.
+                func bowed(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                    let out = 1 + CustomizeScreen.gridBow * (x * x + y * y) / (reach * reach)
+                    return CGPoint(x: centre.x + x * out, y: centre.y + y * out)
+                }
+                var path = Path()
+                let lines = Int((max(centre.x, centre.y) / cell).rounded(.up))
+                let steps = 48
+                for line in -lines...lines {
+                    let at = CGFloat(line) * cell
+                    for (index, step) in (0...steps).enumerated() {
+                        let along = -reach + 2 * reach * CGFloat(step) / CGFloat(steps)
+                        let across = bowed(at, along)
+                        if index == 0 { path.move(to: across) } else { path.addLine(to: across) }
+                    }
+                    for (index, step) in (0...steps).enumerated() {
+                        let along = -reach + 2 * reach * CGFloat(step) / CGFloat(steps)
+                        let down = bowed(along, at)
+                        if index == 0 { path.move(to: down) } else { path.addLine(to: down) }
+                    }
+                }
+                context.stroke(path, with: .color(Color(rgb: EsperPalette.plum.light).opacity(CustomizeScreen.gridOpacity)), lineWidth: 1)
+            }
+        }
+        .ignoresSafeArea()
     }
 
     /// The vector's 16:9, as large as fits.
@@ -243,8 +331,8 @@ struct CustomizeScreen: View {
 
     /// Lettered as FLO is when it's lit, in Bigdex: gold's first over the cyan, outlined in plum
     /// and purple. `height` is its cap height.
-    private func litTitle(_ text: String, height: CGFloat) -> some View {
-        let word = Onomatopoeia.picture(text, face: .englishDex, colours: FloTuning.colours, growsLeft: true, height: height)
+    private func litTitle(_ text: String, height: CGFloat, spacing: CGFloat = 0) -> some View {
+        let word = Onomatopoeia.picture(text, face: .englishDex, colours: FloTuning.colours, growsLeft: true, height: height, spacing: spacing)
         return Image(uiImage: word.image).resizable().aspectRatio(contentMode: .fit).frame(height: word.height)
     }
 
@@ -258,7 +346,7 @@ struct CustomizeScreen: View {
     /// CUSTOMIZE on the heading's plate, and the series' mode large under it.
     @ViewBuilder
     private func heading(_ size: CGSize) -> some View {
-        litTitle("CUSTOMIZE", height: size.height * 0.025)
+        litTitle("CUSTOMIZE", height: size.height * 0.025, spacing: CustomizeScreen.headingSpacing)
             .position(x: size.width / 2, y: size.height * 0.078)
         title(flow.customizeMode == .rounds ? "BEST OF 7" : "47", size: size.height * 0.08)
             .position(x: size.width / 2, y: size.height * 0.19)
@@ -279,16 +367,10 @@ struct CustomizeScreen: View {
         let playerPixel = artPixel(size, times: playerScale)
         let projectorAt = CGPoint(x: ring.x, y: ring.y - projectorY * base)
         // The first side's front limbs are its right; the second, facing the other way, its left.
-        let front = player == 0 ? "R" : "L", back = player == 0 ? "L" : "R"
+        // Labelled by the screen's sides: the box on the left L, on the right R.
+        let inner = player == 0 ? "R" : "L", outer = player == 0 ? "L" : "R"
 
-        // The beam fading out to nothing at its top.
-        picture(tag + "halo").resizable()
-            .colorMultiply(Color(rgb: glow))
-            .frame(width: halo.width, height: halo.height)
-            .energyGlow(radius: halo.width * 0.02)
-            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: CustomizeScreen.haloFadeEnd)],
-                                 startPoint: .top, endPoint: .bottom))
-            .position(x: halo.midX, y: halo.midY)
+        // The projector under the halo.
         if let projector = CustomizeArt.projector(glow), let lit = CustomizeArt.projectorEnergy(glow) {
             ZStack {
                 Image(uiImage: projector).resizable().interpolation(.none)
@@ -300,6 +382,14 @@ struct CustomizeScreen: View {
             .frame(width: 64 * projectorPixel, height: 64 * projectorPixel)
             .position(projectorAt)
         }
+        // The beam fading out to nothing at its top.
+        picture(tag + "halo").resizable()
+            .colorMultiply(Color(rgb: glow))
+            .frame(width: halo.width, height: halo.height)
+            .energyGlow(radius: halo.width * 0.02)
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: CustomizeScreen.haloFadeEnd)],
+                                 startPoint: .top, endPoint: .bottom))
+            .position(x: halo.midX, y: halo.midY)
         if let portrait = flow.scene.customizePortrait(player: player) {
             // Standing on the lens, the second side facing the first.
             let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
@@ -318,13 +408,13 @@ struct CustomizeScreen: View {
             .frame(width: frame.width * 0.5, height: frame.height * 0.5)
             .clipShape(RoundedRectangle(cornerRadius: frame.width * 0.08))
         }
-        box(player, .arms, tag + "arms", label: "\(front) ARM", size: size, glow: glow, cursor: cursor) { tick(pick.dressing.frontSleeve, $0) }
-        box(player, .legs, tag + "legs", label: "\(front) LEG", size: size, glow: glow, cursor: cursor) { tick(pick.dressing.frontBoot, $0) }
-        box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "\(back) ARM", size: size, glow: glow, cursor: cursor) {
-            tick(pick.dressing.backSleeve, $0)
+        box(player, .arms, tag + "arms", label: "\(inner) ARM", size: size, glow: glow, cursor: cursor) { tick(flow.customizeTicked(player, .arms), $0) }
+        box(player, .legs, tag + "legs", label: "\(inner) LEG", size: size, glow: glow, cursor: cursor) { tick(flow.customizeTicked(player, .legs), $0) }
+        box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "\(outer) ARM", size: size, glow: glow, cursor: cursor) {
+            tick(flow.customizeTicked(player, .outerArms), $0)
         }
-        box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "\(back) LEG", size: size, glow: glow, cursor: cursor) {
-            tick(pick.dressing.backBoot, $0)
+        box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "\(outer) LEG", size: size, glow: glow, cursor: cursor) {
+            tick(flow.customizeTicked(player, .outerLegs), $0)
         }
         box(player, .hood, tag + "hood", label: "H.O.O.D", size: size, glow: glow, cursor: cursor) { frame in
             if let hood = flow.scene.customizeHood(player: player) {
@@ -333,10 +423,10 @@ struct CustomizeScreen: View {
                     .scaleEffect(x: player == 0 ? 1 : -1)
             }
         }
-        if cursor == .skin || cursor == .hood {
-            picker(player, tag + "display", size: size, spot: cursor, pick: pick)
+        if cursor.owner == .skin || cursor.owner == .hood {
+            picker(player, tag + "display", size: size, cursor: cursor, pick: pick, glow: glow)
         }
-        if cursor == .hood {
+        if cursor.owner == .hood {
             // What the H.O.O.D. is, over the halo's outer corner.
             VStack(alignment: player == 0 ? .leading : .trailing, spacing: size.height * 0.004) {
                 title("H.O.O.D.", size: size.height * 0.05)
@@ -396,16 +486,21 @@ struct CustomizeScreen: View {
 
     /// The skin's or the hood's colours in the side's display, while one is chosen: a column a
     /// colour, leaning, the colour over an accent corner to corner (a skin's back tone, a
-    /// colour's shade down its ramp); the picked column lined in white. The display's bar in
+    /// colour's shade down its ramp); the picked column lined in white, the cursor's in the side's colour. The display's bar in
     /// the side's colour, glowing.
     @ViewBuilder
-    private func picker(_ player: Int, _ name: String, size: CGSize, spot: CustomizeSpot, pick: PlayerCustomization) -> some View {
+    private func picker(_ player: Int, _ name: String, size: CGSize, cursor: CustomizeSpot, pick: PlayerCustomization, glow: RGB) -> some View {
         let frame = rect(name, size)
         let bar = rect(name + "_bar", size)
-        let columns: [(top: RGB, accent: RGB)] = spot == .skin
+        let skin = cursor.owner == .skin
+        let hovered: Int? = switch cursor {
+        case .skinPicker(let column), .hoodPicker(let column): column
+        default: nil
+        }
+        let columns: [(top: RGB, accent: RGB)] = skin
             ? HumanLook.skinTones.map { (PixelPalette.colours[$0.front], PixelPalette.colours[$0.back]) }
             : EnergyColour.wheel.map { ($0.glow, $0.rampDown) }
-        let picked = spot == .skin ? pick.dressing.skinTone : (EnergyColour.wheel.firstIndex(of: flow.customizations[player].energy) ?? 0)
+        let picked = skin ? pick.dressing.skinTone : (EnergyColour.wheel.firstIndex(of: flow.customizations[player].energy) ?? 0)
         let inner = CGSize(width: frame.width * 0.84, height: frame.height * 0.6)
         let split = CustomizeScreen.swatchShare
         picture(name).resizable()
@@ -422,10 +517,12 @@ struct CustomizeScreen: View {
                     LeaningBand(from: 0, to: split).fill(Color(rgb: columns[index].top))
                     LeaningBand(from: split, to: 1).fill(Color(rgb: columns[index].accent))
                     LeaningBand(from: 0, to: 1).stroke(.white, lineWidth: index == picked ? 2.5 : 0)
+                    // The cursor's column, in the side's colour, outside the pick's line.
+                    LeaningBand(from: 0, to: 1).stroke(Color(rgb: glow), lineWidth: index == hovered ? 3 : 0).padding(-4)
                 }
-                .scaleEffect(index == picked ? 1.12 : 1)
+                .scaleEffect(index == hovered ? 1.15 : (index == picked ? 1.08 : 1))
                 .contentShape(Rectangle())
-                .onTapGesture { flow.pickCustomize(player, spot, column: index) }
+                .onTapGesture { flow.activateCustomize(player, skin ? .skinPicker(index) : .hoodPicker(index)) }
             }
         }
         .frame(width: inner.width, height: inner.height)
@@ -656,6 +753,12 @@ final class CustomizeFigureMotion {
     private var last: Double?
     private var owed = 0.0
 
+    /// The strings floating one back and one forward as FloState's do, but a human's length, five.
+    static let strings: HoodStrings.Style = {
+        var style = HoodStrings.floState
+        for index in style.strands.indices { style.strands[index].length = HoodStrings.hanging.strands[index].length }
+        return style
+    }()
     /// The head's cubes a second, the shoes' each; the game's at no FLO.
     static let headCubeRate = 24.0
     static let shoeCubeRate = Double(ParticleLook.legCubeRate)
@@ -676,7 +779,7 @@ final class CustomizeFigureMotion {
         let anchors = HoodStrings.anchorPixels.map { pixel in
             CGPoint(x: pixel.x + 0.5 + portrait.hoodOffset.x, y: 48 - (pixel.y + 0.5 + portrait.hoodOffset.y))
         }
-        strings = stringMotion.step(anchors: anchors, style: HoodStrings.floState, facing: 1, scale: 1, time: time)
+        strings = stringMotion.step(anchors: anchors, style: CustomizeFigureMotion.strings, facing: 1, scale: 1, time: time)
 
         // Cubes off the head's crown and the shoes, as a human's are in play.
         let wind = sin(time * 2 * .pi * ParticleLook.swayPerSecond) * Double(ParticleLook.flowSpeed)

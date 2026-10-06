@@ -92,6 +92,13 @@ struct Look: Hashable {
     /// The skin tone, sleeves and pants picked on the customize screen.
     var dressing = Dressing()
 
+    /// The same player facing the other way: the sheet's front limbs are the other arm and leg,
+    /// so the sleeves and boots swap front for back.
+    var turnedRound: Look {
+        guard human else { return self }
+        return Look.team(glow, body: body ?? glow, human: true, dressing: dressing.turnedRound)
+    }
+
     /// The same player in the energy form.
     var transformed: Look { Look.team(glow, body: body ?? glow, human: false, dressing: dressing) }
 
@@ -364,6 +371,15 @@ struct Dressing: Hashable, Codable {
         backSleeve = try container.decodeIfPresent(Bool.self, forKey: .backSleeve) ?? fresh.backSleeve
         frontBoot = try container.decodeIfPresent(Bool.self, forKey: .frontBoot) ?? fresh.frontBoot
         backBoot = try container.decodeIfPresent(Bool.self, forKey: .backBoot) ?? fresh.backBoot
+    }
+
+    var turnedRound: Dressing {
+        var turned = self
+        turned.frontSleeve = backSleeve
+        turned.backSleeve = frontSleeve
+        turned.frontBoot = backBoot
+        turned.backBoot = frontBoot
+        return turned
     }
 
     var tone: (front: Int, back: Int) { HumanLook.skinTones[min(max(skinTone, 0), HumanLook.skinTones.count - 1)] }

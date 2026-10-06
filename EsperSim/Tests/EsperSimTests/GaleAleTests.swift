@@ -44,6 +44,26 @@ final class GaleAleTests: XCTestCase {
         XCTAssertNotEqual(match.players[1].state, .suspended)
     }
 
+    func testAShotTakenByAStillTornadoCanBeCaughtFromIt() {
+        var match = court(level: 1)
+        match.players[0].position = Vec2(x: 120, y: 60)
+        match.players[0].grounded = false
+        match.players[0].enter(.air)
+        match.players[0].jumpsLeft = 1
+        match.advance(inputs: [PlayerInput(jump: true), .idle])
+        guard let gale = match.gales.first else { return XCTFail("no gale") }
+        // The other held in it, and a shot of the first's dropped in from above.
+        match.players[1].position = Vec2(x: gale.box.center.x, y: gale.box.max.y + 4)
+        match.players[1].grounded = false
+        match.players[1].enter(.air)
+        for _ in 0..<20 where match.players[1].state != .suspended { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.players[1].state, .suspended)
+        match.ball.release(from: Vec2(x: gale.box.center.x, y: gale.box.max.y + 15), velocity: Vec2(x: 0, y: -2), by: 0, straight: false)
+        match.ball.shotInFlight = true
+        for _ in 0..<30 where match.ball.holder == nil { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.ball.holder, 1, "held, it's nobody's shot: caught")
+    }
+
     func testLevelOnesSnatchSendsNothing() {
         var match = court(level: 1)
         for frame in 0..<30 { match.advance(inputs: [PlayerInput(throwBall: frame == 0), .idle]) }

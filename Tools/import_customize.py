@@ -55,7 +55,8 @@ LIT_LINE_WIDTH = 8
 # second, "lit" its second thickened. Lines and the display's bar come out white, for the game
 # to multiply by a colour.
 LAYERS = {
-    "customize_ground": (["Bg", "Lines", "Heading"], "menu", None),
+    # The vector's own ground (its gradient and grid) is left out: the game draws its own to the screen's edges.
+    "customize_ground": (["Lines", "Heading"], "menu", None),
     "customize_return": (["Return-Button"], "return", None),
     "customize_start": (["Start-Button"], "menu", None),
     "customize_spin_ccw": (["RotateMeCCW"], "menu", None),

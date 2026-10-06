@@ -3138,8 +3138,9 @@ final class GameScene: SKScene {
                     menuNeedsRelease = true
                     flowState.activateCustomize(0, flowState.customizeCursors[0])
                 } else if backed {
+                    // B out of a picker to its box; else back to the title.
                     menuNeedsRelease = true
-                    flowState.closeCustomize()
+                    if !flowState.leaveCustomizePicker(0) { flowState.closeCustomize() }
                 }
                 if inputs.count > 1, hub.playerTwoHasController {
                     let second = inputs[1], last = secondMenuLast
@@ -3148,6 +3149,8 @@ final class GameScene: SKScene {
                     if second.stick.y <= -0.5, last.stick.y > -0.5 { flowState.moveCustomize(1, across: 0, down: 1) }
                     if second.stick.y >= 0.5, last.stick.y < 0.5 { flowState.moveCustomize(1, across: 0, down: -1) }
                     if second.jump, !last.jump { flowState.activateCustomize(1, flowState.customizeCursors[1]) }
+                    let secondBack = second.shootButtons & 1 != 0 || second.throwBall
+                    if secondBack, !(last.shootButtons & 1 != 0 || last.throwBall) { _ = flowState.leaveCustomizePicker(1) }
                     secondMenuLast = second
                 }
             } else if flow == .title, online == nil, let flowState, flowState.multiplayerOpen {
@@ -3719,9 +3722,11 @@ final class GameScene: SKScene {
         soundWords.removeAll { $0.parent == nil }
         let players = match.players
         func side(_ at: Vec2, from cause: Vec2) -> CGFloat { at.x >= cause.x ? 1 : -1 }
+        // A fireball's burst says its own word; the hit it lands doesn't say another.
+        let fireballBurst = events.contains { if case .fireballBurst = $0 { return true } else { return false } }
         for event in events {
             switch event {
-            case .struck(let victim, let striker):
+            case .struck(let victim, let striker) where !fireballBurst:
                 let at = players[victim].chest
                 say(.hit, at: at, away: side(at, from: players[striker].chest), rise: 25)
             case .popped(let victim, let popper):
@@ -4161,7 +4166,8 @@ final class GameScene: SKScene {
 
     /// The customize screen's player, in a side's look with its hooded head.
     func customizePortrait(player: Int) -> SpriteLibrary.Portrait? {
-        sprites.portrait("player_customize", player: player, headDrawnFor: GameScene.hoodDrawnFor)
+        // The second side is shown facing left.
+        sprites.portrait("player_customize", player: sprites.bodyPlayer(player, facingLeft: player == 1), headDrawnFor: GameScene.hoodDrawnFor)
     }
 
     /// A side's hooded head alone, cut to what's drawn, for the customize screen's hood box.
@@ -5348,11 +5354,14 @@ final class GameScene: SKScene {
             head.position = turned(head.position + CGPoint(x: 0, y: bob))
             head.zRotation += angle
         }
-        // Whatever rides the body turns with it: the ball in hand, its glow, the energy, the charge.
-        for rider in [handBalls[index], handHalos[index], energyNodes[index], chargeNodes[index]] where !rider.isHidden {
+        // Whatever rides the body turns with it: the ball in hand, its glow, the energy, the
+        // charge, the hooded head and its flashes and strings, the stun's and lockout's copies.
+        for rider in [handBalls[index], handHalos[index], energyNodes[index], chargeNodes[index], hoodNodes[index], hoodFlashes[index],
+                      lockoutHoods[index], lockoutClothes[index], stunBodies[index], stunHeads[index], eyesNodes[index]] where !rider.isHidden {
             rider.position = turned(rider.position + CGPoint(x: 0, y: bob))
             rider.zRotation += angle
         }
+        hoodStrings[index].move { turned($0 + CGPoint(x: 0, y: bob)) }
         board.position = SpriteLibrary.point(player.board.centre) + CGPoint(x: 0, y: bob)
         board.zRotation = angle
         board.xScale = CGFloat(player.facing.sign)
@@ -6210,16 +6219,17 @@ final class GameScene: SKScene {
                 node.alpha = 0.8
                 node.position = SpriteLibrary.point(Vec2(x: clone.box.center.x, y: clone.box.min.y))
                 node.zPosition = 6
-                // Its head, where the body's sat that frame; the body's space is already flipped.
-                if let head = sprites.landmark(.head, in: frame, player: clone.owner),
-                   let headTexture = sprites.headTexture(frame, player: ice),
-                   let anchor = sprites.headAnchor(frame, player: ice) {
-                    let headNode = SKSpriteNode(texture: headTexture)
-                    headNode.size = CGSize(width: headTexture.size().width * GameScene.headScale, height: headTexture.size().height * GameScene.headScale)
-                    headNode.anchorPoint = anchor
-                    headNode.position = CGPoint(x: head.x, y: head.y + GameScene.headLift)
-                    headNode.zPosition = 1
-                    node.addChild(headNode)
+                // Its hooded head in the ice look, placed as the player's is, moved from the idle
+                // frame it's drawn for by how far the head is from there; the body's space is already flipped.
+                if let now = sprites.landmark(.head, in: frame, player: clone.owner),
+                   let drawnFor = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: clone.owner) {
+                    let texture = sprites.hoodHead(skin: sprites.look(for: clone.owner).dressing.skinTone, player: ice).drawn
+                    let hood = SKSpriteNode(texture: texture)
+                    hood.size = texture.size()
+                    hood.anchorPoint = sprites.anchor(for: GameScene.hoodDrawnFor.animation)
+                    hood.position = now - drawnFor
+                    hood.zPosition = 1
+                    node.addChild(hood)
                 }
                 glowers.addChild(node)
                 cloneNodes[clone.id] = node
@@ -6384,7 +6394,9 @@ final class GameScene: SKScene {
             // Changing, the energy form from the sheet's sixth frame on.
             let changing = player.state == .transforming
             let energyForm = player.inFloState || (changing && frame.frame >= GameScene.transformEnergyFrame)
-            let drawnAs = player.frozen > 0 ? SpriteLibrary.icePlayer : (energyForm ? SpriteLibrary.transformedPlayer(index) : index)
+            // Facing left, turned round where the sleeves and boots need swapping.
+            let drawnAs = player.frozen > 0 ? SpriteLibrary.icePlayer
+                : (energyForm ? SpriteLibrary.transformedPlayer(index) : sprites.bodyPlayer(index, facingLeft: player.facing == .left))
             node.texture = sprites.texture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
             // Titan Tea's size, grown into after its port-in.
             if titanGrowDelay[index] > 0 {
@@ -6551,13 +6563,17 @@ final class GameScene: SKScene {
             // It follows the head, the human's and FloState's alike.
             let partNow = sprites.landmark(.head, in: frame, player: index)
             let partDrawnFor = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index)
-            if player.frozen == 0, !node.isHidden, let partNow, let partDrawnFor {
+            if !node.isHidden, let partNow, let partDrawnFor {
                 hood.isHidden = false
                 // Toned ahead of time through the energy's ramp, opaque, rather than by a shader:
                 // up, the whole hooded head in the skin it's drawn for, its hood alone toned.
-                // In FloState the same hooded head, its hood in the energy form's colour.
-                let hoodHead = sprites.hoodHead(skin: sprites.look(for: index).dressing.skinTone, player: index, energy: energyForm)
-                if energyForm { energyHoods.insert(index) } else { energyHoods.remove(index) }
+                // In FloState the same hooded head, its hood in the energy form's colour; frozen,
+                // all of it in the ice look's.
+                let skin = sprites.look(for: index).dressing.skinTone
+                let frozen = player.frozen > 0
+                let hoodHead = frozen ? sprites.hoodHead(skin: skin, player: SpriteLibrary.icePlayer)
+                    : sprites.hoodHead(skin: skin, player: index, energy: energyForm)
+                if energyForm, !frozen { energyHoods.insert(index) } else { energyHoods.remove(index) }
                 hood.texture = hoodHead.drawn
                 hoodMasks[index] = (hoodHead.hood, hoodHead.face)
                 hood.zPosition = GameScene.hoodUpZ
@@ -6574,7 +6590,11 @@ final class GameScene: SKScene {
                 let ahead = player.velocity.x * player.facing.sign
                 let diving = player.velocity.y < -FlightSheet.still && -player.velocity.y > ahead
                 let rising = player.velocity.y > FlightSheet.still || ahead > FlightSheet.still
-                let wantedTip: CGFloat = player.state != .flying ? 0
+                // Z Tea's beam aimed up, the head tips back with it, down, forward: as far as
+                // flying's tip at the aim's limit.
+                let aiming = player.state == .beamCharging || player.state == .beamFiring
+                let wantedTip: CGFloat = aiming ? CGFloat(player.beamAim / ZRules.aimRange) * GameScene.flightHeadTip
+                    : player.state != .flying ? 0
                     : (diving ? -GameScene.flightHeadTip : (rising ? GameScene.flightHeadTip : 0))
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
                 if abs(headTip[index, default: 0]) > 0.001, let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
@@ -6602,7 +6622,7 @@ final class GameScene: SKScene {
             }
             // Its strings, off the hood, over the body: behind it, the hood down's were lost under
             // the torso. Toned as the hood's white and its palette 37 are.
-            if hood.isHidden {
+            if hood.isHidden || player.frozen > 0 {
                 hoodStrings[index].hide()
             } else if !held {
                 let look = sprites.look(for: index)

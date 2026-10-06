@@ -176,6 +176,8 @@ enum Onomatopoeia {
         let height: CGFloat
         /// Its letters grow to the left, the small end on the right.
         var growsLeft = false
+        /// Space between the letters, a share of each one's size.
+        var spacing: CGFloat = 0
     }
 
     /// Bundled, and registered with the process on first use.
@@ -278,8 +280,9 @@ enum Onomatopoeia {
 
     /// Lettering as the words are drawn, for SwiftUI: the picture, and how tall to show it for
     /// a cap height of `height` points.
-    static func picture(_ text: String, face: Lettering, colours: Colours, growsLeft: Bool, height: CGFloat) -> (image: UIImage, height: CGFloat) {
-        let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft)
+    static func picture(_ text: String, face: Lettering, colours: Colours, growsLeft: Bool, height: CGFloat,
+                        spacing: CGFloat = 0) -> (image: UIImage, height: CGFloat) {
+        let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft, spacing: spacing)
         let (texture, capShare) = rendered(word)
         return (UIImage(cgImage: texture.cgImage()), height * face.scale / capShare)
     }
@@ -339,7 +342,7 @@ enum Onomatopoeia {
             let width = (text as NSString).size(withAttributes: [.font: letterFont]).width
             let sign: CGFloat = index.isMultiple(of: 2) ? -1 : 1
             letters.append(Letter(text: text, font: letterFont, centre: CGPoint(x: x + width / 2, y: sign * bob * size), angle: sign * rock))
-            x += width * (1 - tuck)
+            x += width * (1 - tuck) + word.spacing * size
             top = max(top, ink(reference, in: letterFont).height * 0.6 + bob * size)
         }
         let largest = drawSize * (1 + growth)

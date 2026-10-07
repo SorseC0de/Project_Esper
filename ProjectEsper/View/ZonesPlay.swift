@@ -672,7 +672,8 @@ struct CoinFlipDisc: View {
 
     var body: some View {
         TimelineView(.animation) { timeline in
-            let share = min(timeline.date.timeIntervalSince(thrown) / CoinFlipDisc.seconds, 1)
+            // Never under 0: the clock can tick once before the throw's own stamp.
+            let share = min(max(timeline.date.timeIntervalSince(thrown) / CoinFlipDisc.seconds, 0), 1)
             let eased = 1 - pow(1 - share, 3)
             let turns = halfTurns * eased
             let side = Int(turns.rounded(.down)) % 2

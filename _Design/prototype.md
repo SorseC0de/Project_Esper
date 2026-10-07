@@ -1789,8 +1789,9 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 ## Flight
 
 A hand-laid stage, for now called Flight (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`,
-protocol 83), parked off the select for now (`StageChoice.selectable`), its code kept. 26 by 12 (`FlightRules`, protocol 86), drawn for
-6x: on a 2532 by 1170 phone it fits whole at 6x. The bodies were drawn into its art at 8 of its pixels an art pixel (a
+protocol 83), on the select (`StageChoice.selectable`). 26 by 12 (`FlightRules`, protocol 86), seen
+whole, edge to edge, as the map maker sees a stage (the camera fitted to the screen, not by whole
+pixels): on a 2532 by 1170 phone that's 6x. The bodies were drawn into its art at 8 of its pixels an art pixel (a
 48-pixel sheet 192 on the half-size 1248 by 576 canvas), so on it every body is 8 / 6 its size
 (`StageFeatures.bodyScale`, `Stage.sized`, protocol 90): its
 scale, its box, and the reaches and heights that go with them grown as Titan Tea's are, its moves as
@@ -1815,8 +1816,16 @@ between the middle two, the left edge of the cell it's marked in (column 13), as
 Its hoops are tilted down: the first frames of the Hoopfish pile's `backboards` and `hoops` sheets,
 placed with Longball Stadium's hoop, net and dunk numbers (`StageLook.tiltedHoop`); outside the stage is black (palette 0).
 
-Being tried: the stage drawn whole in Aseprite instead (`FlightBackdrop`, from `Flight/test.png`,
-2496 by 1152: six of its pixels an art pixel, so one to a screen pixel at 6x, the whole 26 by 12), over the tiles and covering them; the walls still the map's.
+The stage is drawn whole in Aseprite (`Flight/Flight_Map.aseprite`, 1248 by 576: three of its pixels
+an art pixel, the whole 26 by 12), over the tiles and covering them; the walls still the map's. Its
+layers, bottom up: Tiles, Back Fade, Back Chairs, Bins, Open Bin, then a hidden Player (the figure
+at its size, where the players draw), then Front Chairs and Front Fade. `Tools/aseprite.py` reads
+the file without Aseprite (the layers listed with no output named; named layers flattened to a PNG
+otherwise) and makes two pictures of the whole stage: `FlightBackdrop`, the layers under the player,
+on the stage's ground behind the players (`FlightArt.backdropZ`), and `FlightFront`, the two over,
+in `stageFront` in front of them (z 22, with the Elements' tornado overlays), both nearest-sampled,
+neither glowing. Re-import with `python3 Tools/aseprite.py <file> <png> <layers...>` into the two
+imagesets.
 
 Planned, not built: the ball starts in an open overhead compartment in the middle; the stage pitches
 at random, bending the shots' angles, and a serving cart rolls up and down the aisle with the pitch,

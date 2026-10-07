@@ -859,6 +859,8 @@ final class GameScene: SKScene {
         tornadoOverlays.maskNode = overLava
         tornadoOverlays.zPosition = 22
         world.addChild(tornadoOverlays)
+        stageFront.zPosition = 22
+        world.addChild(stageFront)
         // The rain over everything in the world, room left under it for more, stopping at the lava.
         let aboveLava = SKSpriteNode(color: .white, size: CGSize(width: 100_000, height: 100_000))
         aboveLava.anchorPoint = CGPoint(x: 0.5, y: 0)
@@ -1659,6 +1661,8 @@ final class GameScene: SKScene {
     /// away: the tiles or the scenery, the rims and their nets.
     private let stageGround = SKNode()
     private let stageGlowers = SKNode()
+    /// A stage's scenery in front of the players: Flight's front chairs.
+    private let stageFront = SKNode()
     /// Cropped to the court's inside, the walls and the floor cutting the lines off.
     private let threePointArcs = SKCropNode()
     private var threePointArcSides: [(node: SKShapeNode, side: Int)] = []
@@ -1688,7 +1692,7 @@ final class GameScene: SKScene {
         if let art = hoopfishHideawayArt { flats += art.flats }
         // Flight's tiles are painted, not lit: none of them glows.
         if let art = flightArt {
-            flats += (Array(art.tiles.values) + [art.backdrop].compactMap { $0 }).compactMap { node in
+            flats += (Array(art.tiles.values) + [art.backdrop, art.front].compactMap { $0 }).compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
         }
@@ -1712,11 +1716,12 @@ final class GameScene: SKScene {
         hangingIcicles = [:]
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
         tornadoOverlays.removeAllChildren()
+        stageFront.removeAllChildren()
         if isHoopfishHideaway {
             hoopfishHideawayArt = HoopfishHideawayArt.build(stage: stage, map: StageMap.current[.hoopfishHideaway], into: stageGround)
         }
         if stage.features.look == .flight {
-            flightArt = FlightArt.build(map: StageMap.current[.flight], into: stageGround)
+            flightArt = FlightArt.build(map: StageMap.current[.flight], into: stageGround, front: stageFront)
         }
         if isElements {
             elementsArt = ElementsArt.build(stage: stage, map: StageMap.current[.elements], into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
@@ -1925,6 +1930,7 @@ final class GameScene: SKScene {
     /// The world drawn again from the match's stage, everything for it taken away first.
     private func redrawStage() {
         stageGround.removeAllChildren()
+        stageFront.removeAllChildren()
         stageGlowers.removeAllChildren()
         courtTiles = []
         blockTiles = []
@@ -2846,8 +2852,10 @@ final class GameScene: SKScene {
         // The map maker sees the whole stage at once, as big as it fits, not by whole pixels.
         // Hoopfish Hideaway fills the screen's width, its bottom on the screen's: a phone crops blank
         // water off the top, a squarer screen shows more of it.
+        // Flight is seen whole, edge to edge, as the map maker sees a stage.
         let fills = match.stage.features.look == .hoopfishHideaway && !wholeStageView
-        let pointsPerGamePixel = wholeStageView ? min(size.width / stageWidth, size.height / stageHeight)
+        let whole = wholeStageView || match.stage.features.look == .flight
+        let pointsPerGamePixel = whole ? min(size.width / stageWidth, size.height / stageHeight)
             : (fills ? size.width / stageWidth : screenPixelsPerGamePixel / screenScale)
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale

@@ -856,7 +856,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
     case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flight
 
     /// The stages on the select, in its order: Slamstill Traffic and Flight parked off it.
-    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .hoopfishHideaway]
+    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .hoopfishHideaway, .flight]
     /// The stages 47 plays on.
     public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway]
 

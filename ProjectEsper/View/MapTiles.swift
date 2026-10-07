@@ -83,14 +83,18 @@ struct TileSpot: Hashable {
     static func z(_ layer: Int) -> CGFloat { -8 + CGFloat(layer) * 0.1 }
 }
 
-/// Flight's scenery: the backdrop drawn whole in Aseprite (`FlightBackdrop`, 2496 by 1152, six of
-/// its pixels to an art pixel, so one to a screen pixel at 6x), over the whole stage, over a sprite
-/// for every tile the map has placed, cut from its sheets, which it covers while it's tried.
+/// Flight's scenery: the stage drawn whole in Aseprite (`Flight_Map.aseprite`, 1248 by 576, three
+/// of its pixels to an art pixel, flattened by `Tools/aseprite.py`) in two pictures, the whole
+/// stage each: `FlightBackdrop`, its layers up to the open bin, behind the players, over a sprite
+/// for every tile the map has placed, cut from its sheets, which it covers; and `FlightFront`, the
+/// front chairs and the fade over them, in front of the players. The file's hidden Player layer
+/// sits between the two, and is where the players draw.
 enum FlightArt {
     /// What the stage's art gives back: each placed tile's sprite by its cell, to be changed by the map maker.
     struct Handles {
         var tiles: [TileSpot: SKSpriteNode] = [:]
         var backdrop: SKSpriteNode?
+        var front: SKSpriteNode?
         let parent: SKNode
 
         mutating func set(_ placed: StageMap.Placed?, at cell: StageMap.Cell, layer: Int) {
@@ -109,21 +113,26 @@ enum FlightArt {
         }
     }
 
-    /// Over the tiles' two layers, under everything else on the stage; its pixels to an art pixel.
+    /// Over the tiles' two layers, under everything else on the stage; the pictures' pixels to an art pixel.
     static let backdropZ: CGFloat = -7.8
-    static let backdropScale: CGFloat = 6
+    static let backdropScale: CGFloat = 3
 
-    static func build(map: StageMap, into parent: SKNode) -> Handles {
+    /// The backdrop into `parent` on the stage's ground, the front into `front`, over the players.
+    static func build(map: StageMap, into parent: SKNode, front frontParent: SKNode) -> Handles {
         var handles = Handles(parent: parent)
-        let texture = SKTexture(imageNamed: "FlightBackdrop")
-        texture.filteringMode = .linear
-        let backdrop = SKSpriteNode(texture: texture)
-        backdrop.anchorPoint = .zero
-        backdrop.size = CGSize(width: texture.size().width / backdropScale, height: texture.size().height / backdropScale)
-        backdrop.position = CGPoint(x: ((CGFloat(FlightRules.columns) * ElementsArt.tileSide - backdrop.size.width) / 2).rounded(), y: 0)
-        backdrop.zPosition = backdropZ
-        parent.addChild(backdrop)
-        handles.backdrop = backdrop
+        func picture(_ name: String, z: CGFloat, into parent: SKNode) -> SKSpriteNode {
+            let texture = SKTexture(imageNamed: name)
+            texture.filteringMode = .nearest
+            let node = SKSpriteNode(texture: texture)
+            node.anchorPoint = .zero
+            node.size = CGSize(width: texture.size().width / backdropScale, height: texture.size().height / backdropScale)
+            node.position = CGPoint(x: ((CGFloat(FlightRules.columns) * ElementsArt.tileSide - node.size.width) / 2).rounded(), y: 0)
+            node.zPosition = z
+            parent.addChild(node)
+            return node
+        }
+        handles.backdrop = picture("FlightBackdrop", z: backdropZ, into: parent)
+        handles.front = picture("FlightFront", z: 0, into: frontParent)
         for placed in map.tiles { handles.set(placed, at: placed.cell, layer: placed.layer) }
         return handles
     }

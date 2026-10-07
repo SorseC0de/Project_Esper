@@ -3093,7 +3093,12 @@ final class GameScene: SKScene {
 
         if let next = pendingFlow, match.frame >= pendingFlowFrame {
             pendingFlow = nil
-            enter(next)
+            // The win behind the curtain; the rest straight on, the point's pace kept.
+            if next == .won, let flowState {
+                flowState.transition { [weak self] in self?.enter(.won) }
+            } else {
+                enter(next)
+            }
         }
         if roundIntro > 0 { roundIntro -= 1 }
         hub.touch = flow == .playing ? controls?.sample() ?? .idle : .idle
@@ -3104,7 +3109,7 @@ final class GameScene: SKScene {
         // Start or delete pauses a match offline, and again resumes it; over the settings, it shuts them.
         if hub.consumePause(), online == nil {
             if let flowState, flowState.customizeOpen, !flowState.settingsOpen {
-                flowState.startFromCustomize()
+                flowState.pressReady(flowState.customizeLocal)
             } else if let flowState, flowState.settingsOpen {
                 flowState.closeSettings()
             } else if flow == .playing {
@@ -3153,20 +3158,27 @@ final class GameScene: SKScene {
                     screen.goBack()
                 }
             } else if flow == .title, let flowState, flowState.customizeOpen {
-                // The customize screen: the first pad the first side's cursor, a second pad the second's.
-                if right { flowState.moveCustomize(0, across: 1, down: 0) }
-                if left { flowState.moveCustomize(0, across: -1, down: 0) }
-                if down { flowState.moveCustomize(0, across: 0, down: 1) }
-                if up { flowState.moveCustomize(0, across: 0, down: -1) }
+                // The customize screen: the first pad the first side's cursor (this phone's side
+                // online), a second pad the second's offline.
+                let mine = flowState.customizeLocal
+                if right { flowState.moveCustomize(mine, across: 1, down: 0) }
+                if left { flowState.moveCustomize(mine, across: -1, down: 0) }
+                if down { flowState.moveCustomize(mine, across: 0, down: 1) }
+                if up { flowState.moveCustomize(mine, across: 0, down: -1) }
                 if picked {
                     menuNeedsRelease = true
-                    flowState.activateCustomize(0, flowState.customizeCursors[0])
+                    flowState.activateCustomize(mine, flowState.customizeCursors[mine])
                 } else if backed {
-                    // B out of a picker to its box; else back to the title.
+                    // B out of a picker to its box; ready, READY taken back; else back to the title.
                     menuNeedsRelease = true
-                    if !flowState.leaveCustomizePicker(0) { flowState.closeCustomize() }
+                    if flowState.leaveCustomizePicker(mine) {
+                    } else if flowState.customizeOnline, flowState.customizeReady[mine] {
+                        flowState.pressReady(mine)
+                    } else {
+                        flowState.closeCustomize()
+                    }
                 }
-                if inputs.count > 1, hub.playerTwoHasController {
+                if inputs.count > 1, hub.playerTwoHasController, !flowState.customizeOnline {
                     let second = inputs[1], last = secondMenuLast
                     if second.stick.x >= 0.5, last.stick.x < 0.5 { flowState.moveCustomize(1, across: 1, down: 0) }
                     if second.stick.x <= -0.5, last.stick.x > -0.5 { flowState.moveCustomize(1, across: -1, down: 0) }
@@ -3465,7 +3477,7 @@ final class GameScene: SKScene {
             zones.beginReplay()
         case .won:
             session.mutate { $0.finished = true }
-            enter(.won)
+            flowState?.transition { [weak self] in self?.enter(.won) }
         }
         zonesGhost(zones.isReplaying)
         zonesPublishHud()
@@ -3616,12 +3628,15 @@ final class GameScene: SKScene {
         }
         stageVotes = [:]
         stageLanding = nil
+        stageSettling = false
     }
+    /// The stage chosen and the match on its way in behind the curtain: the select's done.
+    private var stageSettling = false
 
     /// Every frame on the stage select: the second pad's cursor offline, the other phone's
     /// vote, the settle, and the coin flip.
     private func tickStageSelect(_ inputs: [PlayerInput]) {
-        guard let select = screen as? StageSelectScreen else { return }
+        guard let select = screen as? StageSelectScreen, !stageSettling else { return }
         if online == nil, stageVoters.contains(1), inputs.count > 1 {
             let pad = inputs[1]
             if pad.stick.x >= 0.5, secondMenuLast.stick.x < 0.5 { select.move(voter: 1, by: 1) }
@@ -3677,6 +3692,8 @@ final class GameScene: SKScene {
     /// The chosen stage in: a fresh match on it in place of the stopped one, keeping the
     /// frame so the session runs on; then the drink pick if one is due, or play.
     private func settleStage(_ choice: StageChoice) {
+        guard !stageSettling else { return }
+        stageSettling = true
         stageLanding = nil
         if series.rounds.isEmpty {
             series.stage = choice
@@ -3696,19 +3713,23 @@ final class GameScene: SKScene {
             enter(.picking)
             return
         }
-        session.stopAt = nil
-        bringPlayersIn()
-        if let heldBanner {
-            bannerQueue.append((heldBanner, 26))
-            self.heldBanner = nil
+        // Into the match behind the curtain: the session held until the stage's seen.
+        let bannerHeld = heldBanner
+        heldBanner = nil
+        let change = { [weak self] in
+            guard let self else { return }
+            self.session.stopAt = nil
+            self.bringPlayersIn()
+            if let bannerHeld { self.bannerQueue.append((bannerHeld, 26)) }
+            self.announceDoublePoints()
+            self.enter(.playing)
+            if self.zones != nil {
+                self.zones?.game.stage = choice
+                self.zonesLooks()
+                self.zonesRedraw()
+            }
         }
-        announceDoublePoints()
-        enter(.playing)
-        if zones != nil {
-            zones?.game.stage = choice
-            zonesLooks()
-            zonesRedraw()
-        }
+        if let flowState { flowState.transition(.fade, change) } else { change() }
     }
 
     /// In 47 on a stage where points are worth double, it says so as play starts there.
@@ -4063,7 +4084,7 @@ final class GameScene: SKScene {
     /// NEW MATCH offline; REMATCH online, which starts once both sides have pressed it.
     private func playAgain() {
         guard online != nil else {
-            startSeries()
+            flowState?.transition { [weak self] in self?.startSeries() }
             return
         }
         guard online?.rematchRandom == nil else { return }
@@ -4082,11 +4103,14 @@ final class GameScene: SKScene {
     }
 
     private func leaveToTitle() {
-        if online != nil {
-            send(.bye, reliable: true)
-            endOnline(nil)
-        } else {
-            enter(.title)
+        flowState?.transition { [weak self] in
+            guard let self else { return }
+            if self.online != nil {
+                self.send(.bye, reliable: true)
+                self.endOnline(nil)
+            } else {
+                self.enter(.title)
+            }
         }
     }
 
@@ -4171,7 +4195,17 @@ final class GameScene: SKScene {
             }
             for (voter, vote) in stageVotes { select.show(vote: listed.firstIndex(of: vote) ?? 0, by: voter) }
             // Back to the title from the first pick offline, before anything's been played.
-            if online == nil, series.stagesPlayed == 0 { select.back = { [weak self] in self?.enter(.title) } }
+            // Back off the first select, offline: to the customize screen, picks kept.
+            if online == nil, series.stagesPlayed == 0 {
+                select.back = { [weak self] in
+                    guard let self, let flowState = self.flowState else { return }
+                    let mode = self.gameMode
+                    flowState.transition { [weak self] in
+                        self?.enter(.title)
+                        flowState.openCustomize(mode)
+                    }
+                }
+            }
             screen = select
         case .paused:
             // ZONES: the turn's own choices on the pause, for the pad.
@@ -4189,7 +4223,7 @@ final class GameScene: SKScene {
             let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight,
                                     onRestart: { [weak self] in self?.restartMatch() },
                                     onSettings: { [weak self] in self?.flowState?.openSettings() },
-                                    onTitle: { [weak self] in self?.enter(.title) },
+                                    onTitle: { [weak self] in self?.flowState?.transition { self?.enter(.title) } },
                                     onResume: { [weak self] in self?.enter(.playing) }, extras: extras)
             pause.back = { [weak self] in self?.enter(.playing) }
             screen = pause
@@ -4345,10 +4379,13 @@ final class GameScene: SKScene {
     private func startOnline() {
         guard let net = flowState?.net else { return }
         online = Online(localIndex: net.localIsFirst ? 0 : 1, random: UInt32.random(in: .min ... .max))
-        // Whatever was on, off: the title holds until the series starts.
+        // Whatever was on, off: the title holds under the customize screen, where both sides
+        // pick and ready up, until the series starts.
         pendingFlow = nil
         session.stopAt = nil
         enter(.title)
+        let local = online?.localIndex ?? 0
+        flowState?.transition { [weak self] in self?.flowState?.openCustomize(GameScene.savedOnlineMode, online: true, local: local) }
     }
 
     /// Every frame online: the hello until the other's random is in, then the series;
@@ -4361,11 +4398,12 @@ final class GameScene: SKScene {
                 sendHello(online.random)
                 self.online?.helloAgainIn = 60
             }
-            if let online, let theirs = online.theirRandom {
+            // The series once the randoms have crossed and both sides are ready and launched.
+            if let online, let theirs = online.theirRandom, let flowState, flowState.customizeLaunched {
+                flowState.customizeLaunched = false
                 self.online?.started = true
-                // The host, player one, keeps their colour; the other gives way if they match.
-                let mine = EnergyColour.saved, other = online.theirColour ?? .teal
-                applyColours(online.localIndex == 0 ? EnergyColour.pair(first: mine, second: other) : EnergyColour.pair(first: other, second: mine))
+                // Both sides in their picks, the clash settled the same on both phones.
+                applyCustomizations(flowState.shownCustomizations)
                 // The host's mode is played.
                 gameMode = online.localIndex == 0 ? GameScene.savedOnlineMode : (online.theirMode ?? .rounds)
                 startSeries(seed: online.random ^ theirs)
@@ -4411,10 +4449,38 @@ final class GameScene: SKScene {
     }
 
     /// The customize screen's player, in a side's look with its hooded head.
-    func customizePortrait(player: Int, headNudge: CGPoint, headScale: CGFloat) -> SpriteLibrary.Portrait? {
+    func customizePortrait(player: Int, sheet: String = "player_customize", frame: Int = 0, headNudge: CGPoint, headScale: CGFloat) -> SpriteLibrary.Portrait? {
         // The second side is shown facing left.
-        sprites.portrait("player_customize", player: sprites.bodyPlayer(player, facingLeft: player == 1), headDrawnFor: GameScene.hoodDrawnFor,
+        sprites.portrait(sheet, frame: frame, player: sprites.bodyPlayer(player, facingLeft: player == 1), headDrawnFor: GameScene.hoodDrawnFor,
                          headNudge: headNudge, headScale: headScale)
+    }
+
+    /// Both sides' picks onto everything drawn in them: the customize screen's, live.
+    func applyCustomizations(_ sides: [PlayerCustomization]) {
+        guard sides.count == 2 else { return }
+        applyColours(sides.map(\.energy), looks: sides.map(\.look))
+    }
+
+    // MARK: Online customize
+
+    func sendCustomization(_ pick: PlayerCustomization) {
+        guard online != nil, let data = try? JSONEncoder().encode(pick) else { return }
+        send(.customize(data), reliable: true)
+    }
+
+    func sendReady(_ ready: Bool) {
+        guard online != nil else { return }
+        send(.ready(ready), reliable: true)
+    }
+
+    /// RETURN on the customize screen online: out of the match, to the title.
+    func leaveOnlineCustomize() {
+        guard online != nil else { return }
+        send(.bye, reliable: true)
+        flowState?.transition { [weak self] in
+            self?.flowState?.customizeOpen = false
+            self?.endOnline(nil)
+        }
     }
 
     /// A side's hooded head alone, cut to what's drawn, for the customize screen's hood box.
@@ -4458,6 +4524,8 @@ final class GameScene: SKScene {
                 online?.theirRandom = random
                 online?.theirColour = EnergyColour.allCases.indices.contains(Int(colour)) ? EnergyColour.allCases[Int(colour)] : .teal
                 online?.theirMode = GameMode(rawValue: mode) ?? .rounds
+                // The host's mode is played: the customize screen says so on the other phone.
+                if online?.localIndex == 1, let theirs = online?.theirMode { flowState?.customizeMode = theirs }
                 if let mine = online?.random { sendHello(mine) }
             }
         case .inputs(let packet):
@@ -4473,6 +4541,10 @@ final class GameScene: SKScene {
             endOnline("THEY LEFT")
         case .stage(let stagesPlayed, let choice):
             online?.theirStageVote = (stagesPlayed, choice)
+        case .customize(let data):
+            if let pick = try? JSONDecoder().decode(PlayerCustomization.self, from: data) { flowState?.remoteCustomization(pick) }
+        case .ready(let ready):
+            flowState?.remoteReady(ready)
         }
     }
 
@@ -4480,6 +4552,11 @@ final class GameScene: SKScene {
     private func endOnline(_ why: String?) {
         guard online != nil else { return }
         online = nil
+        // The customize screen, if the other side left while it was up.
+        if let flowState, flowState.customizeOpen, flowState.customizeOnline {
+            flowState.customizeOpen = false
+            flowState.customizeLaunch = nil
+        }
         applySavedColours()
         session.stopAt = nil
         pendingFlow = nil

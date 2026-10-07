@@ -432,17 +432,17 @@ final class SpriteLibrary {
         return made
     }
 
-    func portrait(_ name: String, player: Int, headDrawnFor: AnimationFrame, headNudge: CGPoint, headScale: CGFloat) -> Portrait? {
-        let key = "p\(player)_portrait_\(name)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
+    func portrait(_ name: String, frame: Int = 0, player: Int, headDrawnFor: AnimationFrame, headNudge: CGPoint, headScale: CGFloat) -> Portrait? {
+        let key = "p\(player)_portrait_\(name)_\(frame)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
         if cache[key] != nil, let made = portraits[key] { return made }
         let look = look(for: player)
-        let plain = recolour(texture(name, 0), look: look, holdsBall: false, detach: false)
+        let plain = recolour(texture(name, frame), look: look, holdsBall: false, detach: false)
         let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
         var figure = plain
         if look.human, let here = plain.centres[.head], let there = drawnFor.centres[.head] {
             let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             let place = SpriteLibrary.hoodPlace(head: here, offset: offset, nudge: headNudge, scale: headScale)
-            figure = recolour(texture(name, 0), look: look, holdsBall: false, detach: true,
+            figure = recolour(texture(name, frame), look: look, holdsBall: false, detach: true,
                               hood: (hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage(), place.origin, place.scale))
         }
         let body = figure.texture.cgImage()
@@ -451,7 +451,7 @@ final class SpriteLibrary {
               let (sourceContext, sourcePixels) = makeCanvas(width: width, height: height) else { return nil }
         // What glows: the figure's pixels of the parts that do, as drawn.
         glowContext.draw(body, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let source = texture(name, 0).cgImage()
+        let source = texture(name, frame).cgImage()
         sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
         for pixel in 0..<(width * height) {
             let index = pixel * 4

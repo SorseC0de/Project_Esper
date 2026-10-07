@@ -1,3 +1,4 @@
+import EsperSim
 import GameKit
 import SwiftUI
 
@@ -40,6 +41,12 @@ struct MultiplayerScreen: View {
 
     private var menu: some View {
         VStack(spacing: 10 * scale(.buttons)) {
+            // The mode first; the host's is played.
+            HStack(spacing: 10) {
+                ForEach(FlowState.onlineModes, id: \.self) { mode in
+                    modeSwitch(mode)
+                }
+            }
             plated("PLAY NOW", piece: .buttonBlue, item: .playNow)
             plated("INVITE A FRIEND", piece: .buttonBlue, item: .inviteFriend)
             plated("BACK", piece: .buttonPlum, item: .back)
@@ -95,6 +102,26 @@ struct MultiplayerScreen: View {
 
     /// A lettered button on a plate at the title's sizes; under the cursor, gold, a little
     /// bigger, the lettering's lower half lit.
+    /// A mode's switch: plum when it's the one asked for, black otherwise, gold under the cursor.
+    private func modeSwitch(_ mode: GameMode) -> some View {
+        let lit = flow.multiplayerSelection == .mode(mode)
+        let picked = GameScene.savedOnlineMode == mode
+        let piece = lit ? UIPiece.buttonGold : (picked ? UIPiece.buttonPlum : UIPiece.buttonBlack)
+        return Button { flow.activate(.mode(mode)) } label: {
+            Text(mode == .rounds ? "ROUNDS" : "47")
+                .font(TitleText.switchFont(size: 12 * scale(.text)))
+                .foregroundStyle(.white)
+                .shadow(color: .black, radius: 0, x: 1, y: 1)
+                .offset(y: -UIPiece.buttonPlum.faceRise * scale(.buttons) * tuning.textRise)
+                .frame(minWidth: 110 * scale(.buttons), minHeight: 30 * scale(.buttons))
+                .padding(.horizontal, 8)
+                .background(piece.image(corners: scale(.buttons)))
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(lit ? TitleOverlay.cursorGrowth : 1)
+        .noSystemFocus()
+    }
+
     private func plated(_ text: String, piece: UIPiece, item: FlowState.MultiplayerItem, size: CGFloat = 24) -> some View {
         let lit = flow.multiplayerSelection == item
         let plate = lit ? UIPiece.buttonGold : piece

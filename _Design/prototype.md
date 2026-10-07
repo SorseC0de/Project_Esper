@@ -538,8 +538,8 @@ black card under a royal blue header ribbon as wide as it; a choice is a royal b
 way back (RESUME, TITLE, TITLE SCREEN), and the cursor's plate turns gold and grows, in
 place of the arrow. A piece drawn bigger has its corners and rims scaled with it, so a big plate
 keeps the depth of a small one rather than flattening. The title: the name, ROUNDS and 47 on royal blue, VS CPU and VS
-HUMAN as small switches, plum when picked and black when not, MULTIPLAYER on plum with
-its two mode switches under it (the energy colours are the customize screen's now, and in a
+HUMAN as small switches, plum when picked and black when not, MULTIPLAYER on plum (its mode
+switches are on the multiplayer screen now; the energy colours are the customize screen's now, and in a
 match the debug strip's COLOUR, the first side's, round the wheel), and UI and FONT A/B, bottom
 left (B letters the title and its small switches in Bigdex, `TitleText.bigdex`, kept between
 launches), the tuning panel, with over it two placeholder pickers of every
@@ -621,7 +621,21 @@ or the pad's start) goes on to the stage select, RETURN or B back to the title. 
 (`PlayerCustomization`) are kept between rounds and launches, under `esper.customize.p1`/`p2`;
 the first side's colour is also this phone's (`EnergyColour.storageKey`), so the debug COLOUR
 and multiplayer's hello still read it. Offline both sides play in their picks; when the two pick
-the same colour, the second takes the opposite, as before. Online is still the colours alone.
+the same colour, the second takes the opposite, as before.
+
+Online the screen is shared: once two phones are connected (MULTIPLAYER, the mode, PLAY NOW or an
+invite, the wait) both open it, each on its own side (`customizeLocal`, the host's the left),
+editing only that side; every pick goes to the other phone as it's made (`NetMessage.customize`,
+the `PlayerCustomization` as JSON) and is drawn there at once, the clash settled the same on
+both. This phone's pick is kept as its own whichever side it's on. START reads READY: pressed,
+the side's figure takes the snatch's first frame (`player_snatch` 0), grows a quarter
+(`readyGrowth`), and its controls shrink away; READY can be taken back (B, or READY again) until
+both are ready (`NetMessage.ready`). Both ready, the launch (`customizeLaunch`): the figures go
+through the snatch's second and third frames at the snatch's rate and hold the third, drifting
+after a beat (0.2 s) over a second to stand on the middle button, READY gone; 1.4 s in, the
+curtain, and the series starts (the host's mode, the randoms' seed) behind it, on the stage
+select. Offline START does the same with the sides present. RETURN online leaves the match.
+A disconnect on the screen closes it to the title.
 
 - The art: `_Graphic Assets/Vectors/Customize_Screen.svg`, cut into its groups by
   `Tools/import_customize.py` (rendered by macOS's own SVG renderer, `Tools/render_svg.swift`,
@@ -779,8 +793,8 @@ rim's side, cut off at the walls and the floor; 4 art pixels thick (3PT WIDTH on
 UI tuning panel, under HUD), breathing between gone and a quarter every six seconds. THREE!! goes up for three, BUCKET!! for two. Each side's
 points sit either side of a small 47 at the top, in its colour, in place of the round
 circles. The first to 47 wins, on the same win screen. RESET, and RESTART MATCH, start
-it again from nothing. Online, the host's mode is played: MULTIPLAYER has BEST OF 7 and
-47 under it, the pick kept between launches and sent in hello.
+it again from nothing. Online, the host's mode is played: the multiplayer screen has ROUNDS and
+47 over PLAY NOW, the pick kept between launches and sent in hello.
 
 The score on the plate: each side's points either side of its middle in CardCourt's seven-segment
 digits (`SegmentDigits`), always two, 10 by 20 points, the lit segments in the side's colour with a
@@ -915,6 +929,17 @@ title opens the customize screen, then the stage select of 47's stages (`ZonesRu
   The win screen shows the letters each side has.
 - Online, when it comes: Game Center's turn-based matches, each turn the run's inputs and the
   game's state, replayed on the other phone (protocol 100).
+
+## Screen transitions
+
+Between screens the curtain (`ScreenTransition`, `TransitionCurtain`, `FlowState.transition`):
+down over everything in its kind's way, the change made at full cover, up again; one at a time,
+a change asked for mid-way queued after. Its kinds: the fade, to black, 0.3 s down and 0.35 up,
+the one between the game's screens; a wipe in from an edge; an iris closing on the middle. A new
+kind is a case and its drawing, by modifiers of the cover alone so it animates. Used: the title
+to the customize and multiplayer screens, the customize screen's launch and RETURN, the stage
+select into the match (the session held until the stage's seen, both phones alike), the win,
+NEW MATCH, and every way back to the title. The Greateraid pick between points stays instant.
 
 ## Greateraid
 
@@ -1993,7 +2018,9 @@ confirmed, as a change outside the inputs (`RollbackSession.mutate`), then both 
 Twenty seconds to pick, or the raised bottle drinks itself. The seed is the two phones'
 randoms together, exchanged in hello; the side whose Game Center player ID sorts first
 plays the left. The hello also carries the mode each side wants (`NetMessage.hello`'s `mode`);
-the host's is played. A stage vote or pick crosses as the stage's raw value with the count of
+the host's is played. Connected, both phones open the customize screen before anything and
+the series starts only once both have readied and launched there (`customize` and `ready`
+messages; protocol 102). A stage vote or pick crosses as the stage's raw value with the count of
 stages played, and goes in, like a drink, only once every frame before the stop is
 confirmed; a coin flip rolls on the shared dice, so both land the same. Protocol version 4. MULTIPLAYER opens the game's own multiplayer screen (`MultiplayerScreen`, in place of Apple's
 matchmaker sheet, doing what it did, through GameKit's matchmaker): full screen on the screens' ground, PLAY NOW (matched with anyone looking), INVITE A FRIEND (the Game Center friends list,

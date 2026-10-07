@@ -32,6 +32,39 @@ final class FlowState: ObservableObject {
         net.onInviteAccepted = { [weak self] in self?.multiplayerOpen = true }
     }
 
+    // MARK: The curtain
+
+    /// The curtain between screens (`ScreenTransition`): down over everything, the change made
+    /// at full cover, then up again. One at a time; a change asked for mid-way goes after the
+    /// one running.
+    @Published var curtain = 0.0
+    @Published var curtainStyle = ScreenTransition.fade
+    private var curtainBusy = false
+    private var curtainQueue: [(ScreenTransition, () -> Void)] = []
+
+    func transition(_ style: ScreenTransition = .fade, _ change: @escaping () -> Void) {
+        guard !curtainBusy else {
+            curtainQueue.append((style, change))
+            return
+        }
+        curtainBusy = true
+        curtainStyle = style
+        withAnimation(.easeIn(duration: style.downSeconds)) { curtain = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + style.downSeconds + 0.05) { [weak self] in
+            guard let self else { return }
+            change()
+            withAnimation(.easeOut(duration: style.upSeconds)) { self.curtain = 0 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds) { [weak self] in
+                guard let self else { return }
+                self.curtainBusy = false
+                if !self.curtainQueue.isEmpty {
+                    let next = self.curtainQueue.removeFirst()
+                    self.transition(next.0, next.1)
+                }
+            }
+        }
+    }
+
     // MARK: The settings
 
     /// The settings screen, over the title or the pause; its cursor's row (the last past the
@@ -86,6 +119,15 @@ final class FlowState: ObservableObject {
     @Published var customizeCursors: [CustomizeSpot] = [.skin, .skin]
     @Published var customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
     var customizeMode = GameMode.rounds
+    /// Online: both sides on the screen at once, this phone editing only its own side
+    /// (`customizeLocal`), the other's picks arriving as they're made.
+    @Published var customizeOnline = false
+    var customizeLocal = 0
+    /// Each side's READY, and the moment both were, when the launch animation starts.
+    @Published var customizeReady = [false, false]
+    @Published var customizeLaunch: Date?
+    /// Online: the launch animation's played through; the series can start.
+    var customizeLaunched = false
 
     // MARK: The multiplayer screen
 
@@ -97,8 +139,10 @@ final class FlowState: ObservableObject {
     @Published var multiplayerCursor = 0
 
     enum MultiplayerItem: Hashable {
-        case playNow, inviteFriend, friend(String), cancel, back
+        case mode(GameMode), playNow, inviteFriend, friend(String), cancel, back
     }
+    /// The modes multiplayer offers: ZONES waits on its turn-based transport.
+    static let onlineModes: [GameMode] = [.rounds, .fortySeven]
 
     /// What the screen offers, top to bottom: the wait's cancel while matching, else the
     /// page's choices.
@@ -108,7 +152,7 @@ final class FlowState: ObservableObject {
         default: break
         }
         switch multiplayerPage {
-        case .menu: return [.playNow, .inviteFriend, .back]
+        case .menu: return FlowState.onlineModes.map { .mode($0) } + [.playNow, .inviteFriend, .back]
         case .friends: return net.friends.map { .friend($0.gamePlayerID) } + [.back]
         }
     }
@@ -121,7 +165,8 @@ final class FlowState: ObservableObject {
     func openMultiplayer() {
         multiplayerOpen = true
         multiplayerPage = .menu
-        multiplayerCursor = 0
+        // On PLAY NOW, past the modes.
+        multiplayerCursor = FlowState.onlineModes.count
         net.signIn()
     }
 
@@ -137,6 +182,10 @@ final class FlowState: ObservableObject {
     func activate(_ item: MultiplayerItem) {
         if let index = multiplayerItems.firstIndex(of: item) { multiplayerCursor = index }
         switch item {
+        case .mode(let mode):
+            UserDefaults.standard.set(Int(mode.rawValue), forKey: GameScene.onlineModeKey)
+            SoundBoard.shared.play(SoundBoard.navigate)
+            objectWillChange.send()
         case .playNow:
             SoundBoard.shared.play(SoundBoard.confirm)
             net.playNow()
@@ -209,7 +258,8 @@ final class FlowState: ObservableObject {
         case .bestOfSeven, .fortySeven, .zones:
             guard !busy else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
-            openCustomize(item == .bestOfSeven ? .rounds : item == .fortySeven ? .fortySeven : .zones)
+            let mode: GameMode = item == .bestOfSeven ? .rounds : item == .fortySeven ? .fortySeven : .zones
+            transition { [weak self] in self?.openCustomize(mode) }
         case .vsCPU, .vsHuman:
             guard !busy else { return }
             defaults.set(item == .vsCPU, forKey: GameScene.vsCPUKey)
@@ -217,11 +267,7 @@ final class FlowState: ObservableObject {
         case .multiplayer:
             guard !busy else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
-            openMultiplayer()
-        case .onlineRounds, .onlineFortySeven:
-            guard !busy else { return }
-            defaults.set(Int((item == .onlineRounds ? GameMode.rounds : .fortySeven).rawValue), forKey: GameScene.onlineModeKey)
-            SoundBoard.shared.play(SoundBoard.navigate)
+            transition { [weak self] in self?.openMultiplayer() }
         case .tuning:
             tuningOpen.toggle()
         case .titleFont:
@@ -247,7 +293,7 @@ final class FlowState: ObservableObject {
 
 /// Everything on the title the cursor can land on, row by row as they're laid out.
 enum TitleItem: Hashable {
-    case bestOfSeven, fortySeven, zones, vsCPU, vsHuman, multiplayer, onlineRounds, onlineFortySeven
+    case bestOfSeven, fortySeven, zones, vsCPU, vsHuman, multiplayer
     case tuning
     /// The A/B of the title's lettering: the rounded face or Bigdex.
     case titleFont
@@ -266,7 +312,6 @@ enum TitleItem: Hashable {
         [.bestOfSeven, .fortySeven, .zones],
         [.vsCPU, .vsHuman],
         [.multiplayer],
-        [.onlineRounds, .onlineFortySeven],
         UIColourPicks.Grid.allCases.flatMap { grid in UIColourPicks.Tone.allCases.map { TitleItem.toneTab(grid, $0) } },
     ] + stride(from: 0, to: EsperPalette.swatches.count, by: swatchesPerRow).map { start in
         // The grids side by side, bottom left.
@@ -284,8 +329,6 @@ enum TitleItem: Hashable {
 struct TitleOverlay: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
-    /// The mode multiplayer asks for; the host's is played.
-    @AppStorage(GameScene.onlineModeKey) private var onlineMode = Int(GameMode.rounds.rawValue)
     /// Offline, whether the computer plays player 2 or a second pad does.
     @AppStorage(GameScene.vsCPUKey) private var vsCPU = true
     @ObservedObject private var tuning = UITuning.shared
@@ -344,12 +387,6 @@ struct TitleOverlay: View {
                 VStack(spacing: 10) {
                     plated("MULTIPLAYER", piece: .buttonPlum, width: 240, item: .multiplayer)
                     .opacity(busy ? 0.5 : 1)
-                    HStack(spacing: 10) {
-                        ForEach([GameMode.rounds, .fortySeven], id: \.self) { mode in
-                            small(mode == .rounds ? "ROUNDS" : "47", picked: onlineMode == Int(mode.rawValue),
-                                  item: mode == .rounds ? .onlineRounds : .onlineFortySeven)
-                        }
-                    }
                     if let caption = net.state.caption {
                         Text(caption)
                             .font(.system(size: 12, weight: .bold, design: .monospaced))

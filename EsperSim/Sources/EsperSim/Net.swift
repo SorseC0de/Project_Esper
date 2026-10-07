@@ -5,7 +5,7 @@ import Foundation
 /// most this far past the last remote input it knows, predicting it as held; and every
 /// packet carries this many of the newest inputs, so a lost packet costs nothing.
 public enum NetRules {
-    public static let protocolVersion: UInt8 = 101
+    public static let protocolVersion: UInt8 = 102
     public static let inputDelay = 2
     public static let predictionWindow = 8
     public static let redundantInputs = 8
@@ -89,8 +89,12 @@ public enum NetMessage: Equatable {
     /// A stage vote, or the pick of whoever lost the last stage: the stage's raw value, for
     /// the stage select after `stagesPlayed` stages.
     case stage(stagesPlayed: Int, choice: Int)
+    /// The sender's pick on the customize screen, `PlayerCustomization` as JSON, on every change.
+    case customize(Data)
+    /// The sender's READY on the customize screen, or its taking back.
+    case ready(Bool)
 
-    private enum Tag: UInt8 { case hello = 1, inputs, pick, rematch, bye, stage }
+    private enum Tag: UInt8 { case hello = 1, inputs, pick, rematch, bye, stage, customize, ready }
 
     public var data: Data {
         var data = Data()
@@ -124,6 +128,13 @@ public enum NetMessage: Equatable {
             data.append(Tag.stage.rawValue)
             data.append(int32: Int32(stagesPlayed))
             data.append(UInt8(clamping: choice))
+        case .customize(let pick):
+            data.append(Tag.customize.rawValue)
+            data.append(uint32: UInt32(pick.count))
+            data.append(pick)
+        case .ready(let ready):
+            data.append(Tag.ready.rawValue)
+            data.append(ready ? 1 : 0)
         }
         return data
     }
@@ -157,6 +168,14 @@ public enum NetMessage: Equatable {
         case .stage:
             guard bytes.count >= 6 else { return nil }
             self = .stage(stagesPlayed: Int(bytes.int32(at: 1)), choice: Int(bytes[5]))
+        case .customize:
+            guard bytes.count >= 5 else { return nil }
+            let count = Int(bytes.uint32(at: 1))
+            guard bytes.count >= 5 + count else { return nil }
+            self = .customize(Data(bytes[5..<(5 + count)]))
+        case .ready:
+            guard bytes.count >= 2 else { return nil }
+            self = .ready(bytes[1] != 0)
         }
     }
 }

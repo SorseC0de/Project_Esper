@@ -60,6 +60,8 @@ struct GameView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(20)
             }
+            // The curtain between screens, over everything, taking the touches while it's down.
+            TransitionCurtain(transition: flow.curtainStyle, cover: flow.curtain)
         }
         .animation(.easeOut(duration: 0.25), value: flow.showsTitle)
         .animation(.easeOut(duration: 0.25), value: flow.veiled)

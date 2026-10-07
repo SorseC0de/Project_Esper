@@ -55,22 +55,104 @@ enum CustomizeSpot: Hashable {
 
 extension FlowState {
     /// Over the title, before the stage select of a series in `mode`, both cursors on START.
-    func openCustomize(_ mode: GameMode) {
+    /// Online, this phone's side is `local`; its own pick goes there, the other side's arrives.
+    func openCustomize(_ mode: GameMode, online: Bool = false, local: Int = 0) {
         customizeMode = mode
-        customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
+        customizeOnline = online
+        customizeLocal = online ? local : 0
+        customizeReady = [false, false]
+        customizeLaunch = nil
+        customizeLaunched = false
+        if online {
+            var sides = [PlayerCustomization.saved(0), PlayerCustomization.saved(0)]
+            sides[1 - local] = PlayerCustomization(energy: sides[local].energy.opposite)
+            customizations = sides
+        } else {
+            customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
+        }
         customizeCursors = [.start, .start]
         customizeOpen = true
+        scene.applyCustomizations(shownCustomizations)
     }
 
+    /// RETURN: back to the title; online, out of the match.
     func closeCustomize() {
+        guard customizeLaunch == nil else { return }
         SoundBoard.shared.play(.menuBack)
-        customizeOpen = false
+        if customizeOnline {
+            scene.leaveOnlineCustomize()
+        } else {
+            transition { [weak self] in self?.customizeOpen = false }
+        }
     }
 
-    func startFromCustomize() {
-        SoundBoard.shared.play(SoundBoard.confirm)
-        customizeOpen = false
-        startSeries?(customizeMode)
+    /// Whether this phone may move or change a side: any offline, its own online.
+    private func customizeOwns(_ player: Int) -> Bool { !customizeOnline || player == customizeLocal }
+
+    /// START offline, READY online: the side's figure goes to the snatch's first frame and its
+    /// controls go; online READY can be taken back until both are ready. Both ready, the launch.
+    func pressReady(_ player: Int) {
+        guard customizeLaunch == nil, customizeOwns(player) else { return }
+        if customizeOnline {
+            customizeReady[player].toggle()
+            SoundBoard.shared.play(customizeReady[player] ? SoundBoard.confirm : .menuBack)
+            scene.sendReady(customizeReady[player])
+        } else {
+            SoundBoard.shared.play(SoundBoard.confirm)
+            customizeReady = [true, true]
+        }
+        checkLaunch()
+    }
+
+    /// The other phone's READY.
+    func remoteReady(_ ready: Bool) {
+        guard customizeOpen, customizeOnline, customizeLaunch == nil else { return }
+        customizeReady[1 - customizeLocal] = ready
+        checkLaunch()
+    }
+
+    /// The other phone's pick, as made.
+    func remoteCustomization(_ pick: PlayerCustomization) {
+        guard customizeOpen, customizeOnline else { return }
+        customizations[1 - customizeLocal] = pick
+        scene.applyCustomizations(shownCustomizations)
+    }
+
+    /// Seconds the launch plays before the curtain: the snatch's two frames on, the drift to the middle.
+    static let launchSeconds = 1.4
+
+    private func checkLaunch() {
+        guard customizeReady.allSatisfy({ $0 }), customizeLaunch == nil else { return }
+        customizeLaunch = Date()
+        // The snatch's second and third frames need the screen drawn again as they come.
+        for sheetFrame in 1...2 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(sheetFrame) / Double(SnatchRules.sheetFramesPerSecond) + 0.01) { [weak self] in
+                self?.objectWillChange.send()
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + FlowState.launchSeconds) { [weak self] in
+            guard let self, self.customizeOpen, self.customizeLaunch != nil else { return }
+            self.transition { [weak self] in
+                guard let self else { return }
+                self.customizeOpen = false
+                self.customizeLaunch = nil
+                if self.customizeOnline {
+                    self.customizeLaunched = true
+                } else {
+                    self.startSeries?(self.customizeMode)
+                }
+            }
+        }
+    }
+
+    /// What a side's figure is drawn from: the customize pose, or READY the snatch's first
+    /// frame, and through the launch its second and third, the third held.
+    func customizeFigureFrame(_ player: Int) -> (sheet: String, frame: Int) {
+        if let launch = customizeLaunch {
+            let sheetFrame = Int(Date().timeIntervalSince(launch) * Double(SnatchRules.sheetFramesPerSecond))
+            return ("player_snatch", min(max(sheetFrame, 0), 2))
+        }
+        return customizeReady[player] ? ("player_snatch", 0) : ("player_customize", 0)
     }
 
     /// Both sides as they'll play, the clash settled.
@@ -82,6 +164,7 @@ extension FlowState {
     /// its picker, at the picked colour. In a picker, across along the colours (past the inner
     /// end back to its box) and up back to its box.
     func moveCustomize(_ player: Int, across: Int, down: Int) {
+        guard customizeOwns(player), !customizeReady[player] else { return }
         let spot = customizeCursors[player]
         // Toward the middle: right for the first side, left for the second.
         let inward = player == 0 ? across : -across
@@ -129,6 +212,7 @@ extension FlowState {
 
     /// Out of a picker, back to its box: B there.
     func leaveCustomizePicker(_ player: Int) -> Bool {
+        guard customizeOwns(player) else { return false }
         let spot = customizeCursors[player]
         guard spot.owner != spot else { return false }
         customizeCursors[player] = spot.owner
@@ -144,6 +228,9 @@ extension FlowState {
     /// entered, a colour picked. The outer arm and leg boxes are the shown front limbs', the
     /// inner the back's.
     func activateCustomize(_ player: Int, _ spot: CustomizeSpot) {
+        guard customizeOwns(player), customizeLaunch == nil else { return }
+        // Ready, only START (to take it back) and RETURN still answer.
+        if customizeReady[player], spot != .start, spot != .back { return }
         customizeCursors[player] = spot
         let flipped = frontIsBack(player)
         switch spot {
@@ -156,7 +243,7 @@ extension FlowState {
         case .legs: update(player) { if flipped { $0.dressing.frontBoot.toggle() } else { $0.dressing.backBoot.toggle() } }
         case .skinPicker(let column): update(player) { $0.dressing.skinTone = column }
         case .hoodPicker(let column): update(player) { $0.energy = EnergyColour.wheel[column] }
-        case .start: startFromCustomize()
+        case .start: pressReady(player)
         case .back: closeCustomize()
         }
     }
@@ -175,9 +262,11 @@ extension FlowState {
     /// A pick changed: kept, and the players drawn in it at once.
     private func update(_ player: Int, _ change: (inout PlayerCustomization) -> Void) {
         change(&customizations[player])
-        customizations[player].save(as: player)
+        // Online this phone's pick is kept as its own, whichever side it's on, and sent.
+        customizations[player].save(as: customizeOnline ? 0 : player)
         SoundBoard.shared.play(SoundBoard.navigate)
-        scene.applySavedColours()
+        scene.applyCustomizations(shownCustomizations)
+        if customizeOnline { scene.sendCustomization(customizations[player]) }
     }
 }
 
@@ -228,6 +317,23 @@ struct CustomizeScreen: View {
     /// The projector's lens, the row the player stands on, and the player's feet, in art pixels.
     static let lensRow: CGFloat = 18
     static let feetRow: CGFloat = 40
+    /// READY: the figure a quarter bigger; the launch: the drift to the middle, after a beat,
+    /// each side's reaching hand stopping at the ball on the middle button, this much of the
+    /// button's width out from its centre.
+    static let readyGrowth: CGFloat = 1.25
+    static let driftSeconds = 1.0
+    static let driftDelaySeconds = 0.2
+    static let ballRadiusShare: CGFloat = 0.27
+
+    /// Where a side's figure drifts to: its reaching hand (the snatch's third frame's, stretched
+    /// out) on the ball's near edge, the first side from the left, the second from the right.
+    static func driftX(for player: Int, portrait: SpriteLibrary.Portrait, start: CGRect, pixel: CGFloat) -> CGFloat {
+        // Whichever hand's out ahead: the snatch reaches with the back arm.
+        let hands = [portrait.centres[.frontHand]?.x, portrait.centres[.backHand]?.x].compactMap { $0 }
+        let reach = ((hands.max() ?? 40) - 24) * pixel * readyGrowth
+        let edge = start.width * ballRadiusShare
+        return player == 0 ? start.midX - edge - reach : start.midX + edge + reach
+    }
     /// The rings round START, in degrees a second.
     static let spinSpeeds: (ccw: Double, cw: Double) = (24, 36)
     /// A box's label's size, a share of the box's height: H.O.O.D.'s under it, and SKIN's,
@@ -462,14 +568,24 @@ struct CustomizeScreen: View {
         // Standing on the lens, the second side facing the first.
         let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
         let figureMiddle = lens - (CustomizeScreen.feetRow - 24) * playerPixel - CustomizeScreen.playerY * base
-        if let portrait = flow.scene.customizePortrait(player: player, headNudge: CGPoint(x: headX, y: headY), headScale: headScale) {
+        let ready = flow.customizeReady[player]
+        let launched = flow.customizeLaunch != nil
+        let figureFrame = flow.customizeFigureFrame(player)
+        let start = rect("customize_start", size)
+        if let portrait = flow.scene.customizePortrait(player: player, sheet: figureFrame.sheet, frame: figureFrame.frame,
+                                                       headNudge: CGPoint(x: headX, y: headY), headScale: headScale) {
             let side = (48 + 2 * CustomizeFigure.margin) * playerPixel
             // The second side is shown turned round, its sleeves and boots swapped as drawn.
+            // Ready, a quarter bigger; both ready, drifting to the middle button.
             CustomizeFigure(portrait: portrait, look: player == 1 ? pick.look.turnedRound : pick.look, pixel: playerPixel, mirrored: player == 1,
                             headNudge: CGPoint(x: headX, y: headY), headScale: headScale)
                 .frame(width: side, height: side)
+                .scaleEffect(ready ? CustomizeScreen.readyGrowth : 1)
+                .animation(.easeOut(duration: 0.2), value: ready)
                 .allowsHitTesting(false)
-                .position(x: ring.x, y: figureMiddle)
+                .position(x: launched ? CustomizeScreen.driftX(for: player, portrait: portrait, start: start, pixel: playerPixel) : ring.x,
+                          y: launched ? start.midY - (CustomizeScreen.feetRow - 24) * playerPixel : figureMiddle)
+                .animation(.easeIn(duration: CustomizeScreen.driftSeconds).delay(CustomizeScreen.driftDelaySeconds), value: launched)
             // From each arm and leg box to its limb on the player: the outer boxes the shown
             // front limbs', the inner the back's, as the boxes tick them. The bracers' leave the
             // box's side toward the player, level, then turn; the sleeves' its bottom, a short
@@ -479,6 +595,7 @@ struct CustomizeScreen: View {
                 (.arms, tag + "arms_line", false, .backArm), (.legs, tag + "legs_line", false, .backLeg),
             ]
             ForEach(Array(limbs.enumerated()), id: \.offset) { _, limb in
+                if ready { EmptyView() } else
                 if let centre = portrait.centres[limb.part] {
                     let box = rect(limb.layer, size, mirroredAbout: limb.mirrored ? halo.midX : nil)
                     let across = (centre.x - 24) * playerPixel * (player == 1 ? -1 : 1)
@@ -504,6 +621,8 @@ struct CustomizeScreen: View {
         }
 
         let side = CustomizeScreen.sideLabelShare
+        // The controls go once the side's ready, shrinking away.
+        if !ready {
         box(player, .skin, tag + "skin", label: "SKIN", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) { frame in
             VStack(spacing: 0) {
                 Color(rgb: PixelPalette.colours[pick.dressing.tone.front])
@@ -534,7 +653,8 @@ struct CustomizeScreen: View {
         if cursor.owner == .skin || cursor.owner == .hood {
             picker(player, tag + "display", size: size, cursor: cursor, pick: pick, glow: glow)
         }
-        if cursor.owner == .hood {
+        }
+        if cursor.owner == .hood, !ready {
             // What the H.O.O.D. is, over the player: each word of it under its letter.
             HStack(alignment: .top, spacing: size.height * 0.012) {
                 ForEach(Array(CustomizeScreen.hoodWords.enumerated()), id: \.offset) { index, word in
@@ -702,15 +822,18 @@ struct CustomizeScreen: View {
                 layer("customize_start", size)
                 spinning("customize_spin_ccw", size, about: start, degrees: -seconds * CustomizeScreen.spinSpeeds.ccw)
                 spinning("customize_spin_cw", size, about: start, degrees: seconds * CustomizeScreen.spinSpeeds.cw)
-                litTitle("START", height: size.height * 0.035, ownFace: false)
-                    .position(x: start.midX, y: start.midY)
+                if flow.customizeLaunch == nil {
+                    litTitle(flow.customizeOnline ? "READY" : "START", height: size.height * 0.035, ownFace: false)
+                        .opacity(flow.customizeOnline && flow.customizeReady[flow.customizeLocal] ? 0.5 : 1)
+                        .position(x: start.midX, y: start.midY)
+                }
             }
             .frame(width: size.width, height: size.height)
         }
         .brightness(lit ? 0.15 : 0)
         .scaleEffect(lit ? TitleOverlay.cursorGrowth : 1, anchor: UnitPoint(x: start.midX / size.width, y: start.midY / size.height))
         .contentShape(Rectangle().path(in: start))
-        .onTapGesture { flow.activateCustomize(0, .start) }
+        .onTapGesture { flow.activateCustomize(flow.customizeLocal, .start) }
     }
 
     /// A ring turned about START's middle.
@@ -731,7 +854,7 @@ struct CustomizeScreen: View {
             .brightness(lit ? 0.2 : 0)
             .scaleEffect(lit ? TitleOverlay.cursorGrowth : 1)
             .contentShape(Rectangle())
-            .onTapGesture { flow.activateCustomize(0, .back) }
+            .onTapGesture { flow.activateCustomize(flow.customizeLocal, .back) }
             .position(x: frame.midX, y: frame.midY)
     }
 

@@ -19,7 +19,7 @@ struct MultiplayerScreen: View {
             VStack(spacing: 18 * scale(.buttons)) {
                 Image(uiImage: TitleText.image("MULTIPLAYER", size: 56 * scale(.titles)))
                 content
-                if let caption = net.state.caption {
+                if let caption = flow.zonesOnlinePicked && flow.multiplayerPage == .menu ? net.turnNote : net.state.caption {
                     Text(caption)
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.8))
@@ -47,9 +47,30 @@ struct MultiplayerScreen: View {
                     modeSwitch(mode)
                 }
             }
-            plated("PLAY NOW", piece: .buttonBlue, item: .playNow)
+            plated(flow.zonesOnlinePicked ? "NEW MATCH" : "PLAY NOW", piece: .buttonBlue, item: .playNow)
             plated("INVITE A FRIEND", piece: .buttonBlue, item: .inviteFriend)
+            if flow.zonesOnlinePicked { turnMatches }
             plated("BACK", piece: .buttonPlum, item: .back)
+        }
+    }
+
+    /// ZONES: this player's matches, whose turn each is on or how it ended, with the other
+    /// side's name; on its turn, tapped to play.
+    private var turnMatches: some View {
+        ScrollViewReader { reader in
+            ScrollView {
+                VStack(spacing: 6 * scale(.buttons)) {
+                    ForEach(net.turnMatches, id: \.matchID) { match in
+                        plated("\(net.turnLine(for: match)) VS \(net.otherName(in: match))", piece: net.isLocalTurn(match) ? .buttonPlum : .buttonBlack,
+                               item: .turnMatch(match.matchID), size: 13)
+                            .id(match.matchID)
+                    }
+                }
+            }
+            .frame(maxHeight: 150 * scale(.buttons))
+            .onChange(of: flow.multiplayerCursor) {
+                if case .turnMatch(let id) = flow.multiplayerSelection { withAnimation { reader.scrollTo(id) } }
+            }
         }
     }
 
@@ -108,7 +129,7 @@ struct MultiplayerScreen: View {
         let picked = GameScene.savedOnlineMode == mode
         let piece = lit ? UIPiece.buttonGold : (picked ? UIPiece.buttonPlum : UIPiece.buttonBlack)
         return Button { flow.activate(.mode(mode)) } label: {
-            Text(mode == .rounds ? "ROUNDS" : "47")
+            Text(mode == .rounds ? "ROUNDS" : mode == .zones ? "ZONES" : "47")
                 .font(TitleText.switchFont(size: 12 * scale(.text)))
                 .foregroundStyle(.white)
                 .shadow(color: .black, radius: 0, x: 1, y: 1)

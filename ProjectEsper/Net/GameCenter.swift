@@ -42,6 +42,20 @@ final class GameCenter: NSObject, ObservableObject {
     var onDisconnect: ((String) -> Void)?
     /// An invite was accepted from outside the game: the multiplayer screen shows the joining.
     var onInviteAccepted: (() -> Void)?
+    /// Signed in, after being asked to: whatever waited on it goes on.
+    var onSignedIn: (() -> Void)?
+
+    // MARK: ZONES, turn by turn
+
+    /// ZONES online goes turn by turn through Game Center's turn-based matches, Words With
+    /// Friends fashion: a turn is the game's state and the run set, kept by Game Center and
+    /// handed to the other phone; the list of this player's matches, newest first with their
+    /// turn first; the one being played; and a note under the list.
+    @Published private(set) var turnMatches: [GKTurnBasedMatch] = []
+    @Published var turnNote: String?
+    private(set) var currentTurnMatch: GKTurnBasedMatch?
+    /// A match tapped in a Game Center notification: the multiplayer screen opens on its turn.
+    var onTurnTapped: ((GKTurnBasedMatch) -> Void)?
 
     /// A friend's answer to an invite.
     enum InviteAnswer: Equatable { case waiting, accepted, declined }
@@ -74,6 +88,7 @@ final class GameCenter: NSObject, ObservableObject {
                 if GKLocalPlayer.local.isAuthenticated {
                     GKLocalPlayer.local.register(self)
                     if self.state == .signingIn || self.state == .signedOut { self.state = .ready }
+                    self.onSignedIn?()
                 } else {
                     self.state = .failed(error.map { self.short($0) } ?? "Not signed in")
                 }
@@ -241,6 +256,165 @@ final class GameCenter: NSObject, ObservableObject {
         connectTimer = nil
         state = .connected
         onConnected?()
+    }
+}
+
+// MARK: - Turn-based
+
+extension GameCenter {
+    /// Whether turn-based play can start: signed in and allowed. Signs in or says why not otherwise.
+    private func readyForTurns() -> Bool {
+        guard GKLocalPlayer.local.isAuthenticated else {
+            signIn()
+            turnNote = "SIGN IN TO GAME CENTER"
+            return false
+        }
+        if GKLocalPlayer.local.isMultiplayerGamingRestricted {
+            turnNote = "MULTIPLAYER IS OFF IN SCREEN TIME"
+            return false
+        }
+        return true
+    }
+
+    /// This player's matches: those on their turn first, then the rest, newest first.
+    func loadTurnMatches() {
+        guard readyForTurns() else { return }
+        turnNote = "LOADING MATCHES"
+        GKTurnBasedMatch.loadMatches { [weak self] matches, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let loaded = (matches ?? []).sorted { a, b in
+                    let aMine = self.isLocalTurn(a), bMine = self.isLocalTurn(b)
+                    if aMine != bMine { return aMine }
+                    return (a.creationDate ?? .distantPast) > (b.creationDate ?? .distantPast)
+                }
+                self.turnMatches = loaded
+                self.turnNote = error.map { self.short($0).uppercased() } ?? (loaded.isEmpty ? "NO MATCHES YET" : nil)
+            }
+        }
+    }
+
+    /// A new match: with `friend`, or with anyone looking, who Game Center finds once the
+    /// first turn is sent. The match comes back to be played.
+    func newTurnMatch(with friend: GKPlayer?, _ done: @escaping (GKTurnBasedMatch?) -> Void) {
+        guard readyForTurns() else { return done(nil) }
+        let request = matchRequest()
+        request.inviteMessage = "Project Esper: ZONES?"
+        if let friend { request.recipients = [friend] }
+        turnNote = "MAKING A MATCH"
+        GKTurnBasedMatch.find(for: request) { [weak self] match, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let error { self.turnNote = self.short(error).uppercased() } else { self.turnNote = nil }
+                if let match { self.turnMatches.insert(match, at: 0) }
+                done(match)
+            }
+        }
+    }
+
+    /// The side this phone plays in a match: its place among the participants, the maker first.
+    func localIndex(in match: GKTurnBasedMatch) -> Int {
+        match.participants.firstIndex { $0.player?.gamePlayerID == GKLocalPlayer.local.gamePlayerID } ?? 0
+    }
+
+    func isLocalTurn(_ match: GKTurnBasedMatch) -> Bool {
+        match.status == .open && match.currentParticipant?.player?.gamePlayerID == GKLocalPlayer.local.gamePlayerID
+    }
+
+    /// The other side's name, or who they'll be.
+    func otherName(in match: GKTurnBasedMatch) -> String {
+        let local = localIndex(in: match)
+        let other = match.participants.indices.contains(1 - local) ? match.participants[1 - local] : nil
+        return other?.player?.displayName.uppercased() ?? "ANYONE"
+    }
+
+    /// What a match's row says: whose turn, or how it ended.
+    func turnLine(for match: GKTurnBasedMatch) -> String {
+        let local = localIndex(in: match)
+        switch match.status {
+        case .ended:
+            let mine = match.participants.indices.contains(local) ? match.participants[local].matchOutcome : .none
+            return mine == .won ? "OVER: YOU WON" : mine == .lost ? "OVER: YOU LOST" : "OVER"
+        case .matching:
+            return isLocalTurn(match) ? "YOUR TURN" : "FINDING AN OPPONENT"
+        default:
+            return isLocalTurn(match) ? "YOUR TURN" : "THEIR TURN"
+        }
+    }
+
+    /// The match being played: its turn data, or nothing for a new one.
+    func openTurn(_ match: GKTurnBasedMatch) -> Data? {
+        currentTurnMatch = match
+        return match.matchData.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    private var others: [GKTurnBasedParticipant] {
+        guard let match = currentTurnMatch else { return [] }
+        return match.participants.filter { $0.player?.gamePlayerID != GKLocalPlayer.local.gamePlayerID }
+    }
+
+    /// The turn's state kept mid-turn, so leaving and coming back resumes it.
+    func saveCurrentTurn(_ data: Data) {
+        currentTurnMatch?.saveCurrentTurn(withMatch: data) { _ in }
+    }
+
+    /// The turn over: the state to the other side, who's told.
+    func endCurrentTurn(_ data: Data, _ done: @escaping (String?) -> Void) {
+        guard let match = currentTurnMatch else { return done("NO MATCH") }
+        match.endTurn(withNextParticipants: others, turnTimeout: GKTurnTimeoutDefault, match: data) { [weak self] error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if error == nil { self.currentTurnMatch = nil }
+                done(error.map { self.short($0).uppercased() })
+            }
+        }
+    }
+
+    /// The game won: the outcomes set and the match ended, by the side whose turn it was.
+    func endCurrentMatch(_ data: Data, winner: Int) {
+        guard let match = currentTurnMatch else { return }
+        for (index, participant) in match.participants.enumerated() {
+            participant.matchOutcome = index == winner ? .won : .lost
+        }
+        match.endMatchInTurn(withMatch: data) { [weak self] _ in
+            DispatchQueue.main.async { self?.currentTurnMatch = nil; self?.loadTurnMatches() }
+        }
+    }
+
+    /// Out of a match: quit, in turn or not, and the match off the list.
+    func quitTurnMatch(_ match: GKTurnBasedMatch) {
+        let finish: (Error?) -> Void = { [weak self] _ in
+            match.remove { _ in DispatchQueue.main.async { self?.loadTurnMatches() } }
+        }
+        if match.status == .ended {
+            finish(nil)
+        } else if isLocalTurn(match) {
+            let next = match.participants.filter { $0.player?.gamePlayerID != GKLocalPlayer.local.gamePlayerID }
+            match.participantQuitInTurn(with: .quit, nextParticipants: next, turnTimeout: GKTurnTimeoutDefault, match: match.matchData ?? Data(), completionHandler: finish)
+        } else {
+            match.participantQuitOutOfTurn(with: .quit, withCompletionHandler: finish)
+        }
+        if currentTurnMatch?.matchID == match.matchID { currentTurnMatch = nil }
+    }
+
+    func dropCurrentTurn() { currentTurnMatch = nil }
+}
+
+extension GameCenter: GKTurnBasedEventListener {
+    /// A turn came in, or a match's over: the list again; tapped in a notification, the match opens.
+    nonisolated func player(_ player: GKPlayer, receivedTurnEventFor match: GKTurnBasedMatch, didBecomeActive: Bool) {
+        DispatchQueue.main.async {
+            self.loadTurnMatches()
+            if didBecomeActive { self.onTurnTapped?(match) }
+        }
+    }
+
+    nonisolated func player(_ player: GKPlayer, matchEnded match: GKTurnBasedMatch) {
+        DispatchQueue.main.async { self.loadTurnMatches() }
+    }
+
+    nonisolated func player(_ player: GKPlayer, wantsToQuitMatch match: GKTurnBasedMatch) {
+        DispatchQueue.main.async { self.quitTurnMatch(match) }
     }
 }
 

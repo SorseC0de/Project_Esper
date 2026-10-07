@@ -297,4 +297,54 @@ final class ZonesTests: XCTestCase {
         XCTAssertNotNil(data)
         XCTAssertEqual(try? JSONDecoder().decode(ZonesRun.self, from: data ?? Data()), recorder.run)
     }
+
+    // MARK: Over the wire
+
+    func testARunIsCodedWithItsInputsPackedFiveBytesAFrame() throws {
+        // A quantized stick, as the pad's is before it's recorded, comes back exactly.
+        var inputs: [PlayerInput] = []
+        for frame in 0..<600 {
+            var input = PlayerInput(stick: Vec2(x: 0.4, y: -0.7), aim: Vec2(x: 1, y: 0))
+            input.jump = frame % 7 == 0
+            input.shootButtons = UInt8(frame % 4)
+            input.throwBall = frame % 11 == 0
+            input.taunt = frame % 13 == 0
+            inputs.append(input.quantized)
+        }
+        let run = ZonesRun(actions: [ZoneAction(kind: .jump, zone: Zone(column: 1, row: 0), frame: 7)], inputs: inputs, floStatePower: .voltaCola)
+        let data = try JSONEncoder().encode(run)
+        XCTAssertEqual(ZonesRun.pack(inputs).count, 600 * PlayerInput.wireBytes)
+        XCTAssertLessThan(data.count, 6000, "ten seconds of run, packed, under six kilobytes with its log")
+        XCTAssertEqual(try JSONDecoder().decode(ZonesRun.self, from: data), run)
+    }
+
+    func testTheWholeGameRoundTrips() throws {
+        var game = ZonesGame(leader: 1, stage: .hoopfishHideaway)
+        game.beginRecording()
+        _ = game.runEnded(ZonesRun(actions: [ZoneAction(kind: .shoot, zone: Zone(column: 2, row: 1), frame: 40)],
+                                   inputs: [PlayerInput.idle, PlayerInput(jump: true)], floStatePower: .galeAle), outcome: .made)
+        game.keepCandidate()
+        let data = try JSONEncoder().encode(game)
+        XCTAssertEqual(try JSONDecoder().decode(ZonesGame.self, from: data), game)
+    }
+
+    func testAForfeitedTurnPassesTheLeadOrTakesTheLetter() {
+        var game = ZonesGame(leader: 0, stage: .wreckCenter)
+        XCTAssertTrue(game.isAtStart)
+        game.beginRecording()
+        XCTAssertFalse(game.isAtStart)
+        game.forfeitTurn()
+        XCTAssertEqual(game.leader, 1, "the leader gave the turn up: the other leads")
+        XCTAssertEqual(game.phase, .lobby)
+        // The follower gives their turn up: a letter.
+        game.beginRecording()
+        _ = game.runEnded(ZonesRun(actions: [ZoneAction(kind: .shoot, zone: Zone(column: 0, row: 0), frame: 1)]), outcome: .made)
+        game.keepCandidate()
+        _ = game.runEnded(ZonesRun(actions: [ZoneAction(kind: .shoot, zone: Zone(column: 0, row: 0), frame: 1)]), outcome: .made)
+        XCTAssertEqual(game.phase, .watching)
+        game.forfeitTurn()
+        XCTAssertEqual(game.letters, [1, 0])
+        XCTAssertEqual(game.phase, .lobby)
+        XCTAssertNil(game.set)
+    }
 }

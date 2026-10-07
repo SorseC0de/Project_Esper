@@ -161,6 +161,38 @@ public struct ZonesRun: Equatable, Codable {
 
     public var frames: Int { inputs.count }
 
+    // Coded with the inputs packed as they go over the wire, five bytes a frame, so a run of
+    // thirty seconds is nine kilobytes, well inside a turn's room; what plays back is the
+    // quantized input the recorder was given.
+    private enum CodingKeys: String, CodingKey { case actions, inputs, floStatePower }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        actions = try container.decode([ZoneAction].self, forKey: .actions)
+        floStatePower = try container.decode(Power.self, forKey: .floStatePower)
+        inputs = ZonesRun.unpack(try container.decode(Data.self, forKey: .inputs))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(actions, forKey: .actions)
+        try container.encode(floStatePower, forKey: .floStatePower)
+        try container.encode(ZonesRun.pack(inputs), forKey: .inputs)
+    }
+
+    public static func pack(_ inputs: [PlayerInput]) -> Data {
+        var data = Data()
+        data.reserveCapacity(inputs.count * PlayerInput.wireBytes)
+        for input in inputs { input.encode(into: &data) }
+        return data
+    }
+
+    public static func unpack(_ data: Data) -> [PlayerInput] {
+        let bytes = [UInt8](data)
+        let whole = bytes.count - bytes.count % PlayerInput.wireBytes
+        return stride(from: 0, to: whole, by: PlayerInput.wireBytes).map { PlayerInput.decode(bytes, at: $0) }
+    }
+
     /// Whether `other` follows this run move for move, zone for zone.
     public func isFollowed(by other: ZonesRun) -> Bool {
         actions.count == other.actions.count && zip(actions, other.actions).allSatisfy { $0.matches($1) }
@@ -321,6 +353,8 @@ public struct ZonesGame: Equatable, Codable {
     public var stage: StageChoice
     /// How many runs each side has led, for the log.
     public var turns = 0
+    /// How often the lead has passed without a run set.
+    public var leadPasses = 0
 
     public init(leader: Int, stage: StageChoice) {
         self.leader = leader
@@ -338,6 +372,8 @@ public struct ZonesGame: Equatable, Codable {
         }
     }
     public var winner: Int? { if case .over(let winner) = phase { winner } else { nil } }
+    /// Before anything's happened: the coin's just been flipped.
+    public var isAtStart: Bool { phase == .lobby && turns == 0 && leadPasses == 0 && letters == [0, 0] && candidate == nil && set == nil }
 
     /// The leader presses to begin recording.
     public mutating func beginRecording() {
@@ -444,10 +480,28 @@ public struct ZonesGame: Equatable, Codable {
         }
     }
 
+    /// The mover gave their turn up (online, a turn timed out): a leader passes the lead, a
+    /// follower takes the letter, with no run.
+    public mutating func forfeitTurn() {
+        switch phase {
+        case .lobby, .recording, .confirming:
+            passLead()
+        case .watching, .following:
+            letters[follower] += 1
+            let lost = letters[follower] >= ZonesRules.lettersToLose
+            set = nil
+            resumeAfterWatching = nil
+            phase = lost ? .over(winner: leader) : .lobby
+        case .over:
+            break
+        }
+    }
+
     private mutating func passLead() {
         candidate = nil
         set = nil
         leader = follower
+        leadPasses += 1
         phase = .lobby
     }
 

@@ -9,8 +9,10 @@ import SwiftUI
 @MainActor
 final class ZonesPlay {
     /// Who the two sides are: two people passing one device, one person playing both sides
-    /// (no hand-off screens), or the computer leading and following.
-    enum Opponent { case passAndPlay, practice, cpu }
+    /// (no hand-off screens), the computer leading and following, or another phone turn by
+    /// turn through Game Center, this one playing side `local`.
+    enum Opponent: Equatable { case passAndPlay, practice, cpu, online(local: Int) }
+    var isOnline: Bool { if case .online = opponent { return true } else { return false } }
 
     /// What the scene's loop should do this frame.
     enum Step: Equatable {
@@ -30,9 +32,14 @@ final class ZonesPlay {
     private(set) var recorder: ZonesRecorder?
     /// Each side's FloState power pick.
     var powers: [Power] = [.none, .none]
-    /// The screens between: the coin flip at the start, a hand-off between people, a result.
-    enum Pause: Equatable { case coinFlip, handOff, result(String), choice }
+    /// The screens between: the coin flip at the start, a hand-off between people, a result;
+    /// online, the turn's start, and the turn on its way to the other phone.
+    enum Pause: Equatable { case coinFlip, handOff, result(String), choice, yourTurn, sending }
     private(set) var pause: Pause? = .coinFlip
+    /// Online: the turn's over and waiting to be sent, until it is.
+    private var turnPending = false
+    /// Online: the state's changed since it was last kept, so a resume comes back to it.
+    private var turnChanged = false
     /// After a run ends, frames to let the shot be seen, the sim running on, before the result's up.
     private var settle = 0
     /// The ghost replay: its frame, and after its last input the frames waited for its shot.
@@ -58,6 +65,35 @@ final class ZonesPlay {
         crown = SKSpriteNode()
         crown.zPosition = 40
         crown.isHidden = true
+    }
+
+    /// A game taken up where it was left, online: at its very start the coin flip, else the
+    /// turn's start. A try at a run being matched watches the run again first, so its
+    /// phantoms are back on the stage.
+    init(game: ZonesGame, opponent: Opponent, powers: [Power]) {
+        self.game = game
+        self.opponent = opponent
+        if powers.count == 2 { self.powers = powers }
+        crown = SKSpriteNode()
+        crown.zPosition = 40
+        crown.isHidden = true
+        switch game.phase {
+        case .confirming, .following: self.game.watchAgain()
+        default: break
+        }
+        pause = game.isAtStart ? .coinFlip : .yourTurn
+    }
+
+    /// Whether the state's changed since this was last asked, for keeping the turn.
+    func takeTurnChange() -> Bool {
+        defer { turnChanged = false }
+        return turnChanged
+    }
+
+    /// The turn couldn't be sent: said, and sent again on the next tap.
+    func sendFailed(_ why: String) {
+        guard turnPending else { return }
+        pause = .result(why)
     }
 
     var mover: Int { game.mover }
@@ -137,6 +173,7 @@ final class ZonesPlay {
         guard let run = recorder?.run else { return }
         let result = game.runEnded(run, outcome: outcome)
         pendingResult = result
+        turnChanged = true
         switch result {
         case .candidateMade(let last):
             if last, outcome != .made {
@@ -161,7 +198,7 @@ final class ZonesPlay {
     }
 
     /// A button or the pad. Returns what the scene has to do about it.
-    enum Effect: Equatable { case none, freshRun, lobby, replay, won(Int), power(Power) }
+    enum Effect: Equatable { case none, freshRun, lobby, replay, won(Int), power(Power), turnOver }
 
     func handle(_ request: Request) -> Effect {
         switch request {
@@ -172,16 +209,19 @@ final class ZonesPlay {
         case .record:
             guard pause == nil, game.phase == .lobby else { return .none }
             game.beginRecording()
+            turnChanged = true
             return .freshRun
         case .keep:
             guard pause == .choice else { return .none }
             pause = nil
             game.keepCandidate()
+            turnChanged = true
             return .freshRun
         case .rewind:
             if pause == .choice {
                 pause = nil
                 game.rewind()
+                turnChanged = true
                 return .freshRun
             }
             // Given up on mid-run, it counts as a miss: the next try, or on the last the turn's end.
@@ -214,11 +254,16 @@ final class ZonesPlay {
             case .coinFlip:
                 self.pause = nil
                 return .lobby
-            case .handOff:
+            case .handOff, .yourTurn:
                 self.pause = nil
                 return nextAfterPause()
             case .result:
                 self.pause = nil
+                // Online, a turn waiting to go goes again.
+                if turnPending {
+                    self.pause = .sending
+                    return .turnOver
+                }
                 // Between two people, a hand-off before the other side's turn.
                 let changes = pendingResult.map(ZonesPlay.changesMover) ?? false
                 pendingResult = nil
@@ -227,7 +272,7 @@ final class ZonesPlay {
                     return .none
                 }
                 return nextAfterPause()
-            case .choice:
+            case .choice, .sending:
                 return .none
             }
         }
@@ -242,9 +287,15 @@ final class ZonesPlay {
         }
     }
 
-    /// After a pause: where the turn goes.
+    /// After a pause: where the turn goes. Online, to the other phone whenever the move is
+    /// theirs: after a result, or straight off a coin that lands on them.
     private func nextAfterPause() -> Effect {
         if let winner = game.winner { return .won(winner) }
+        if case .online(let local) = opponent, game.mover != local {
+            turnPending = true
+            pause = .sending
+            return .turnOver
+        }
         switch game.phase {
         case .lobby: return .lobby
         case .watching:
@@ -687,6 +738,11 @@ struct ZonesOverlay: View {
                 case .handOff:
                     Text("PASS TO \(hud.names[hud.mover])").font(.custom("Bigdex", size: 22)).foregroundStyle(Color(rgb: hud.colours[hud.mover]))
                     Text("TAP WHEN READY").font(.custom("Bigdex", size: 11)).foregroundStyle(.white.opacity(0.7))
+                case .yourTurn:
+                    Text("YOUR TURN").font(.custom("Bigdex", size: 22)).foregroundStyle(Color(rgb: hud.colours[hud.mover]))
+                    Text("TAP TO START").font(.custom("Bigdex", size: 11)).foregroundStyle(.white.opacity(0.7))
+                case .sending:
+                    Text("SENDING").font(.custom("Bigdex", size: 22)).foregroundStyle(.white)
                 case .result(let text):
                     Text(text).font(.custom("Bigdex", size: 22)).foregroundStyle(.white)
                     Text("TAP TO GO ON").font(.custom("Bigdex", size: 11)).foregroundStyle(.white.opacity(0.7))
@@ -701,7 +757,7 @@ struct ZonesOverlay: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if pause == .choice { return }
+            if pause == .choice || pause == .sending { return }
             if pause == .coinFlip, !flipped { return }
             flow.scene.zonesRequest(.proceed)
         }

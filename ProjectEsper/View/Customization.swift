@@ -56,16 +56,19 @@ enum CustomizeSpot: Hashable {
 extension FlowState {
     /// Over the title, before the stage select of a series in `mode`, both cursors on START.
     /// Online, this phone's side is `local`; its own pick goes there, the other side's arrives.
-    func openCustomize(_ mode: GameMode, online: Bool = false, local: Int = 0) {
+    /// ZONES turn by turn, `turnBased`: this phone's side only, the other's as `other`, their
+    /// last turn's look, or the opposite colour before they've sent one.
+    func openCustomize(_ mode: GameMode, online: Bool = false, local: Int = 0, turnBased: Bool = false, other: PlayerCustomization? = nil) {
         customizeMode = mode
         customizeOnline = online
-        customizeLocal = online ? local : 0
+        customizeTurnBased = turnBased
+        customizeLocal = online || turnBased ? local : 0
         customizeReady = [false, false]
         customizeLaunch = nil
         customizeLaunched = false
-        if online {
+        if online || turnBased {
             var sides = [PlayerCustomization.saved(0), PlayerCustomization.saved(0)]
-            sides[1 - local] = PlayerCustomization(energy: sides[local].energy.opposite)
+            sides[1 - local] = other ?? PlayerCustomization(energy: sides[local].energy.opposite)
             customizations = sides
         } else {
             customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
@@ -82,12 +85,14 @@ extension FlowState {
         if customizeOnline {
             scene.leaveOnlineCustomize()
         } else {
+            // A ZONES turn left before it's begun stays theirs to come back to.
+            if customizeTurnBased { scene.dropZonesTurn() }
             transition { [weak self] in self?.customizeOpen = false }
         }
     }
 
     /// Whether this phone may move or change a side: any offline, its own online.
-    private func customizeOwns(_ player: Int) -> Bool { !customizeOnline || player == customizeLocal }
+    private func customizeOwns(_ player: Int) -> Bool { (!customizeOnline && !customizeTurnBased) || player == customizeLocal }
 
     /// START offline, READY online: the side's figure goes to the snatch's first frame and its
     /// controls go; online READY can be taken back until both are ready. Both ready, the launch.
@@ -263,7 +268,7 @@ extension FlowState {
     private func update(_ player: Int, _ change: (inout PlayerCustomization) -> Void) {
         change(&customizations[player])
         // Online this phone's pick is kept as its own, whichever side it's on, and sent.
-        customizations[player].save(as: customizeOnline ? 0 : player)
+        customizations[player].save(as: customizeOnline || customizeTurnBased ? 0 : player)
         SoundBoard.shared.play(SoundBoard.navigate)
         scene.applyCustomizations(shownCustomizations)
         if customizeOnline { scene.sendCustomization(customizations[player]) }

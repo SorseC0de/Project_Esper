@@ -872,10 +872,11 @@ out).
 ## ZONES
 
 HORSE on a grid (`GameMode.zones`; `Zones.swift` in the sim, `ZonesPlay.swift` in the view),
-turn by turn, meant above all for asynchronous online play, Words With Friends fashion, and built
-offline first: two people passing one device (VS HUMAN) or one playing both sides (VS CPU, for now:
-the computer leading and following is to come, its runs searched for on the sim). ZONES on the
-title opens the customize screen, then the stage select of 47's stages (`ZonesRules.stages`).
+turn by turn, meant above all for asynchronous online play, Words With Friends fashion, which
+it has (below); offline, two people passing one device (VS HUMAN) or one playing both sides (VS
+CPU, for now: the computer leading and following is to come, its runs searched for on the sim).
+ZONES on the title opens the customize screen, then the stage select of 47's stages
+(`ZonesRules.stages`).
 
 - The stage divides into zones four tiles across and up (`ZoneGrid`), lettered A upward from the
   left and numbered 1 upward from the floor; what doesn't divide goes to A1's column and row: the
@@ -931,8 +932,29 @@ title opens the customize screen, then the stage select of 47's stages (`ZonesRu
   wheel under them, and the run's log down the right (the run being matched while confirming or
   following, the matched moves lit).
   The win screen shows the letters each side has.
-- Online, when it comes: Game Center's turn-based matches, each turn the run's inputs and the
-  game's state, replayed on the other phone (protocol 100).
+- Online: Game Center's turn-based matches (`GameCenter`'s turn section, `ZonesTurn`). ZONES on
+  the multiplayer screen's mode switch lists this player's matches under NEW MATCH (anyone
+  looking, found once the first turn is sent) and INVITE A FRIEND, each row whose turn it is on
+  (YOUR TURN, THEIR TURN, FINDING AN OPPONENT) or how it ended (OVER: YOU WON / LOST; tapped,
+  off the list), the other side's Game Center name after it, this player's turns first. A match
+  on its turn opens the customize screen for this side alone (`openCustomize(turnBased:)`), the
+  other side drawn as their last turn sent them; START takes the turn up. A new match goes
+  through the stage select and the coin flip; one in play comes straight onto its stage behind
+  YOUR TURN, a try at a run being matched watching the run again first so its phantoms are
+  back. The turn is played as offline, this phone's pad alone, its inputs quantized as they go
+  over the wire so the run replays on the other phone to the frame; whenever the move passes to
+  the other side (a run set, the lead passed, a run followed, a letter short of the last, or a
+  coin landing on them) the turn goes to them with Game Center (SENDING; a send that fails
+  says so and goes again on the next tap) and the matches list comes back with SENT. A turn
+  Game Center's default timeout gives up is forfeited (`ZonesGame.forfeitTurn`): a leader's
+  passes the lead, a follower's takes the letter. The game lost ends the match with its
+  outcomes, by the side whose turn it was; the win screen's MATCHES is the list. The turn is
+  the game's state (`ZonesGame`, Codable, its runs' inputs packed five bytes a frame, nine
+  kilobytes a thirty-second run; protocol 104), each side's FloState pick and each side's look, kept with
+  Game Center at every result so a turn left mid-way resumes (RESTART MATCH resumes it too,
+  from the last kept state); its version is the protocol's, and a turn from another build says
+  UPDATE THE GAME. A turn tapped in Game Center's notification opens from the title. The
+  TV plays it the same.
 
 ## Screen transitions
 
@@ -2025,6 +2047,8 @@ same frame, 60 past it, and change screens together: the scored-on side picks, t
 other watches WAIT with the same clock, and the pick crosses as an index into the offers
 both rolled off the shared dice. The pick is applied once every frame before the stop is
 confirmed, as a change outside the inputs (`RollbackSession.mutate`), then both resume.
+ZONES doesn't run in lockstep at all: it goes turn by turn through Game Center's turn-based
+matches, under ZONES.
 Twenty seconds to pick, or the raised bottle drinks itself. The seed is the two phones'
 randoms together, exchanged in hello; the side whose Game Center player ID sorts first
 plays the left. The hello also carries the mode each side wants (`NetMessage.hello`'s `mode`);

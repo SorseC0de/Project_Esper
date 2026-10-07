@@ -86,6 +86,14 @@ final class GameScene: SKScene {
     /// ZONES, while it's the game.
     private var zones: ZonesPlay?
     private var zonesLooksFor: Int?
+    /// ZONES online, turn by turn: this phone's side, the turn as it came or was last kept
+    /// (none for a new match), and the other side's look as they last sent it.
+    private struct ZonesOnline {
+        var localIndex: Int
+        var turn: ZonesTurn?
+        var other: PlayerCustomization?
+    }
+    private var zonesOnline: ZonesOnline?
     /// The mode multiplayer asks for, kept between launches.
     static let onlineModeKey = "esper.onlineMode"
     static var savedOnlineMode: GameMode {
@@ -3354,7 +3362,12 @@ final class GameScene: SKScene {
     private func startSeries(mode: GameMode? = nil) {
         guard online == nil else { return }
         if let mode { gameMode = mode }
-        applySavedColours()
+        if gameMode == .zones, zonesOnline != nil {
+            let sides = zonesSides
+            applyColours(sides.map(\.energy), looks: sides.map(\.look))
+        } else {
+            applySavedColours()
+        }
         startSeries(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
     }
 
@@ -3364,12 +3377,30 @@ final class GameScene: SKScene {
         heldBanner = nil
         series = Series(seed: seed)
         if gameMode == .zones {
-            // Who leads is the coin's; two people pass the device, or one plays both sides. The
-            // last game's lines and phantoms go first.
+            // Who leads is the coin's; two people pass the device, or one plays both sides, or
+            // another phone takes turns. The last game's lines and phantoms go first.
             zones?.removeAll()
-            zones = ZonesPlay(leader: Int.random(in: 0...1), stage: series.stage,
-                              opponent: UserDefaults.standard.bool(forKey: GameScene.vsCPUKey) ? .practice : .passAndPlay)
             zonesLooksFor = nil
+            if let zonesOnline {
+                let opponent = ZonesPlay.Opponent.online(local: zonesOnline.localIndex)
+                if let turn = zonesOnline.turn {
+                    // A turn taken up where the other phone left it: straight onto its stage.
+                    zones = ZonesPlay(game: turn.game, opponent: opponent, powers: turn.powers)
+                    series.stage = turn.game.stage
+                    if built { layout(displayScale: displayScale) }
+                    startRound(portingIn: false)
+                    session.stopAt = nil
+                    bringPlayersIn()
+                    enter(.playing)
+                    zonesLooks()
+                    zonesRedraw()
+                    return
+                }
+                zones = ZonesPlay(leader: Int.random(in: 0...1), stage: series.stage, opponent: opponent)
+            } else {
+                zones = ZonesPlay(leader: Int.random(in: 0...1), stage: series.stage,
+                                  opponent: UserDefaults.standard.bool(forKey: GameScene.vsCPUKey) ? .practice : .passAndPlay)
+            }
         } else {
             zonesEnd()
         }
@@ -3384,15 +3415,24 @@ final class GameScene: SKScene {
 
     // MARK: ZONES
 
-    private var zonesNames: [String] { PlayerCustomization.sides.map { $0.energy.rawValue.uppercased() } }
-    private var zonesColours: [RGB] { PlayerCustomization.sides.map(\.glow) }
+    /// The two sides' looks: both this phone's picks, or online this phone's own and the
+    /// other's as sent, the second giving way on a clash as ever.
+    private var zonesSides: [PlayerCustomization] {
+        guard let zonesOnline else { return PlayerCustomization.sides }
+        var sides = [PlayerCustomization.saved(0), PlayerCustomization.saved(0)]
+        sides[1 - zonesOnline.localIndex] = zonesOnline.other ?? PlayerCustomization(energy: sides[zonesOnline.localIndex].energy.opposite)
+        return PlayerCustomization.clashed(sides)
+    }
+    private var zonesNames: [String] { zonesSides.map { $0.energy.rawValue.uppercased() } }
+    private var zonesColours: [RGB] { zonesSides.map(\.glow) }
 
     /// The ZONES loop a frame: held while a screen's up (jump goes on from one), else the
     /// mover's own input, or the set run's, replayed as a ghost, through the sim; the recorder
     /// watching, phantoms dropped where moves start.
     private func zonesTick(_ inputs: [PlayerInput]) {
         guard let zones else { return }
-        var pad = hub.playerTwoHasController && inputs.count > 1 ? inputs[zones.mover] : (inputs.first ?? .idle)
+        // Online this phone's pad is the only one, whichever side it plays.
+        var pad = hub.playerTwoHasController && inputs.count > 1 && !zones.isOnline ? inputs[zones.mover] : (inputs.first ?? .idle)
         if zones.holds {
             accumulator = 0
             // A jump held over from another screen doesn't go on; a fresh press does.
@@ -3422,7 +3462,8 @@ final class GameScene: SKScene {
                 accumulator = 0
                 zonesPublishHud()
                 return
-            case .play: input = pad
+            // The pad's input as it goes over the wire, so a run replays on another phone as recorded.
+            case .play: input = pad.quantized
             case .replay(let recorded): input = recorded
             }
             let tick = session.tick(local: input, remote: .idle)
@@ -3449,6 +3490,11 @@ final class GameScene: SKScene {
 
     private func zonesPublishHud() {
         guard let zones, let flowState else { return }
+        // Online, the state kept with Game Center as it changes, so a turn left comes back.
+        if zones.takeTurnChange(), zonesOnline != nil, let data = zonesTurnData() {
+            zonesOnline?.turn = ZonesTurn(game: zones.game, powers: zones.powers, sides: [])
+            flowState.net.saveCurrentTurn(data)
+        }
         let hud = zones.hud(names: zonesNames, colours: zonesColours)
         if flowState.zonesHud != hud { flowState.zonesHud = hud }
         if !hoodNodes.isEmpty {
@@ -3479,12 +3525,75 @@ final class GameScene: SKScene {
         case .replay:
             zonesFreshMatch()
             zones.beginReplay()
-        case .won:
+        case .won(let winner):
             session.mutate { $0.finished = true }
+            // Online, the match ended with Game Center by the side whose turn it was.
+            if zonesOnline != nil, let data = zonesTurnData() { flowState?.net.endCurrentMatch(data, winner: winner) }
             flowState?.transition { [weak self] in self?.enter(.won) }
+        case .turnOver:
+            zonesSendTurn()
         }
         zonesGhost(zones.isReplaying)
         zonesPublishHud()
+    }
+
+    // MARK: ZONES online
+
+    /// A match of this player's to play, from the multiplayer screen: its turn read, or none
+    /// for a new match. Returns the other side's look as they sent it, or what's wrong.
+    func beginZonesTurn(data: Data?, localIndex: Int) -> (other: PlayerCustomization?, problem: String?) {
+        var turn: ZonesTurn?
+        if let data {
+            do {
+                turn = try ZonesTurn.decode(data)
+            } catch ZonesTurn.Problem.otherVersion {
+                return (nil, "UPDATE THE GAME TO PLAY THIS MATCH")
+            } catch {
+                return (nil, "CAN'T READ THIS MATCH")
+            }
+        }
+        // The turn came to this side while the other was the mover: theirs timed out, given up.
+        if var came = turn, came.game.winner == nil, came.game.mover != localIndex {
+            came.game.forfeitTurn()
+            turn = came
+        }
+        let other = turn.flatMap { $0.sides.indices.contains(1 - localIndex) ? $0.sides[1 - localIndex] : nil }
+        zonesOnline = ZonesOnline(localIndex: localIndex, turn: turn, other: other)
+        return (other, nil)
+    }
+
+    /// The turn put down before it's begun: still theirs with Game Center.
+    func dropZonesTurn() {
+        zonesOnline = nil
+        flowState?.net.dropCurrentTurn()
+    }
+
+    /// The turn as it goes to Game Center: the game, the picks, and each side's look, this
+    /// phone's as last saved.
+    private func zonesTurnData() -> Data? {
+        guard let zones, let zonesOnline else { return nil }
+        var sides: [PlayerCustomization?] = [nil, nil]
+        sides[zonesOnline.localIndex] = PlayerCustomization.saved(0)
+        sides[1 - zonesOnline.localIndex] = zonesOnline.other
+        return ZonesTurn(game: zones.game, powers: zones.powers, sides: sides).encoded()
+    }
+
+    /// The turn over: to the other phone; sent, the matches list; not, said, to try again.
+    private func zonesSendTurn() {
+        guard let zones, let flowState, let data = zonesTurnData() else { return }
+        flowState.net.endCurrentTurn(data) { [weak self] problem in
+            guard let self, self.zones === zones else { return }
+            if let problem {
+                zones.sendFailed("COULDN'T SEND: \(problem)")
+                self.zonesPublishHud()
+                return
+            }
+            flowState.transition { [weak self] in
+                self?.enter(.title)
+                flowState.openMultiplayer()
+                flowState.net.turnNote = "SENT: THEIR TURN"
+            }
+        }
     }
 
     /// A fresh match for the one on the stage now, in their look, ported in at A1.
@@ -3507,7 +3616,7 @@ final class GameScene: SKScene {
         let shown = zones.isReplaying ? zones.game.leader : zones.mover
         guard zonesLooksFor != shown else { return }
         zonesLooksFor = shown
-        let sides = PlayerCustomization.sides
+        let sides = zonesSides
         applyColours([sides[shown].energy, sides[1 - shown].energy], looks: [sides[shown].look, sides[1 - shown].look])
     }
 
@@ -3530,6 +3639,7 @@ final class GameScene: SKScene {
         zonesLooksFor = nil
         zonesGhost(false)
         flowState?.zonesHud = nil
+        if zonesOnline != nil { dropZonesTurn() }
         applySavedColours()
     }
 
@@ -3628,7 +3738,8 @@ final class GameScene: SKScene {
         if online != nil {
             stageVoters = series.stageWinner.map { [1 - $0] } ?? [0, 1]
         } else {
-            stageVoters = hub.playerTwoHasController ? [0, 1] : [0]
+            // ZONES online, this phone alone picks, whatever pads are in.
+            stageVoters = hub.playerTwoHasController && zonesOnline == nil ? [0, 1] : [0]
         }
         stageVotes = [:]
         stageLanding = nil
@@ -4088,7 +4199,16 @@ final class GameScene: SKScene {
     /// NEW MATCH offline; REMATCH online, which starts once both sides have pressed it.
     private func playAgain() {
         guard online != nil else {
-            flowState?.transition { [weak self] in self?.startSeries() }
+            flowState?.transition { [weak self] in
+                guard let self else { return }
+                // ZONES online: the matches list, for the next.
+                if self.zonesOnline != nil {
+                    self.enter(.title)
+                    self.flowState?.openMultiplayer()
+                } else {
+                    self.startSeries()
+                }
+            }
             return
         }
         guard online?.rematchRandom == nil else { return }
@@ -4237,7 +4357,7 @@ final class GameScene: SKScene {
             // ZONES: the letters each side has, fewer wins.
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: zones != nil ? zonesNames[winner] : sideName(winner),
                                score: gameMode == .fortySeven ? fortySevenScores : (zones?.game.letters ?? series.wins),
-                               again: online == nil ? "NEW MATCH" : "REMATCH",
+                               again: online != nil ? "REMATCH" : zonesOnline != nil ? "MATCHES" : "NEW MATCH",
                                onAgain: { [weak self] in self?.playAgain() },
                                onTitle: { [weak self] in self?.leaveToTitle() })
             if online?.rematchRandom != nil { (screen as? WinScreen)?.showWaiting() }

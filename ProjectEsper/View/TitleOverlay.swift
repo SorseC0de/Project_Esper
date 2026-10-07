@@ -1,4 +1,5 @@
 import EsperSim
+import GameKit
 import SwiftUI
 
 /// The game and what its scene tells the SwiftUI layer: whether the title is up, whether
@@ -30,6 +31,18 @@ final class FlowState: ObservableObject {
         SoundBoard.shared.prepare()
         // An invite accepted from outside the game opens the multiplayer screen on the joining.
         net.onInviteAccepted = { [weak self] in self?.multiplayerOpen = true }
+        // Signed in with the ZONES matches waiting on it: the list.
+        net.onSignedIn = { [weak self] in
+            guard let self, self.multiplayerOpen, self.zonesOnlinePicked else { return }
+            self.net.loadTurnMatches()
+        }
+        // A ZONES turn tapped in Game Center's notification: its turn opens, from the title.
+        net.onTurnTapped = { [weak self] match in
+            guard let self, self.showsTitle, !self.customizeOpen, self.net.isLocalTurn(match) else { return }
+            UserDefaults.standard.set(Int(GameMode.zones.rawValue), forKey: GameScene.onlineModeKey)
+            self.multiplayerOpen = true
+            self.openZonesTurn(match)
+        }
     }
 
     // MARK: The curtain
@@ -122,6 +135,8 @@ final class FlowState: ObservableObject {
     /// Online: both sides on the screen at once, this phone editing only its own side
     /// (`customizeLocal`), the other's picks arriving as they're made.
     @Published var customizeOnline = false
+    /// ZONES online: this phone's side only, the other's look as their last turn sent it.
+    @Published var customizeTurnBased = false
     var customizeLocal = 0
     /// Each side's READY, and the moment both were, when the launch animation starts.
     @Published var customizeReady = [false, false]
@@ -140,9 +155,13 @@ final class FlowState: ObservableObject {
 
     enum MultiplayerItem: Hashable {
         case mode(GameMode), playNow, inviteFriend, friend(String), cancel, back
+        /// A ZONES match of this player's, by Game Center's ID.
+        case turnMatch(String)
     }
-    /// The modes multiplayer offers: ZONES waits on its turn-based transport.
-    static let onlineModes: [GameMode] = [.rounds, .fortySeven]
+    /// The modes multiplayer offers: ROUNDS and 47 live over Game Center, ZONES turn by turn.
+    static let onlineModes: [GameMode] = [.rounds, .fortySeven, .zones]
+    /// ZONES is the mode asked for: the screen lists this player's matches.
+    var zonesOnlinePicked: Bool { GameScene.savedOnlineMode == .zones }
 
     /// What the screen offers, top to bottom: the wait's cancel while matching, else the
     /// page's choices.
@@ -152,7 +171,9 @@ final class FlowState: ObservableObject {
         default: break
         }
         switch multiplayerPage {
-        case .menu: return FlowState.onlineModes.map { .mode($0) } + [.playNow, .inviteFriend, .back]
+        case .menu:
+            let matches: [MultiplayerItem] = zonesOnlinePicked ? net.turnMatches.map { .turnMatch($0.matchID) } : []
+            return FlowState.onlineModes.map { .mode($0) } + [.playNow, .inviteFriend] + matches + [.back]
         case .friends: return net.friends.map { .friend($0.gamePlayerID) } + [.back]
         }
     }
@@ -168,6 +189,24 @@ final class FlowState: ObservableObject {
         // On PLAY NOW, past the modes.
         multiplayerCursor = FlowState.onlineModes.count
         net.signIn()
+        if zonesOnlinePicked { net.loadTurnMatches() }
+    }
+
+    /// A ZONES match of this player's to play: its turn into the scene, then the customize
+    /// screen for this side, START taking the turn up.
+    func openZonesTurn(_ match: GKTurnBasedMatch) {
+        let local = net.localIndex(in: match)
+        let opened = scene.beginZonesTurn(data: net.openTurn(match), localIndex: local)
+        if let problem = opened.problem {
+            net.turnNote = problem
+            net.dropCurrentTurn()
+            return
+        }
+        transition { [weak self] in
+            guard let self else { return }
+            self.multiplayerOpen = false
+            self.openCustomize(.zones, local: local, turnBased: true, other: opened.other)
+        }
     }
 
     func moveMultiplayerCursor(_ step: Int) {
@@ -185,9 +224,14 @@ final class FlowState: ObservableObject {
         case .mode(let mode):
             UserDefaults.standard.set(Int(mode.rawValue), forKey: GameScene.onlineModeKey)
             SoundBoard.shared.play(SoundBoard.navigate)
+            if mode == .zones { net.loadTurnMatches() }
             objectWillChange.send()
         case .playNow:
             SoundBoard.shared.play(SoundBoard.confirm)
+            if zonesOnlinePicked {
+                net.newTurnMatch(with: nil) { [weak self] match in if let match { self?.openZonesTurn(match) } }
+                return
+            }
             net.playNow()
             multiplayerCursor = 0
         case .inviteFriend:
@@ -198,8 +242,25 @@ final class FlowState: ObservableObject {
         case .friend(let id):
             guard let friend = net.friends.first(where: { $0.gamePlayerID == id }) else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
+            if zonesOnlinePicked {
+                multiplayerPage = .menu
+                net.newTurnMatch(with: friend) { [weak self] match in if let match { self?.openZonesTurn(match) } }
+                return
+            }
             net.invite(friend)
             multiplayerCursor = 0
+        case .turnMatch(let id):
+            // On its turn, played; over, taken off the list; theirs, nothing to do yet.
+            guard let match = net.turnMatches.first(where: { $0.matchID == id }) else { return }
+            if match.status == .ended {
+                SoundBoard.shared.play(.menuBack)
+                net.quitTurnMatch(match)
+            } else if net.isLocalTurn(match) {
+                SoundBoard.shared.play(SoundBoard.confirm)
+                openZonesTurn(match)
+            } else {
+                SoundBoard.shared.play(SoundBoard.navigate)
+            }
         case .cancel, .back:
             multiplayerBack()
         }

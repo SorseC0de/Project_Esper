@@ -6915,6 +6915,8 @@ final class GameScene: SKScene {
                 let moved = CGPoint(x: (partNow.x - partDrawnFor.x).rounded(), y: (partNow.y - partDrawnFor.y).rounded()) * drawScale
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
+                // FloState's snatch, its third frame: the head looks back over the step-through.
+                if frame.animation == .snatchFloState, frame.frame == 2 { hood.xScale = -hood.xScale }
                 hood.zRotation = node.zRotation
                 // Super Smoothie flying down, the hooded head tips forward; flying up or forward, back;
                 // eased, about the head's middle, and let down a little to sit on the neck turned.

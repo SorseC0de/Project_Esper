@@ -564,6 +564,8 @@ public enum SnatchRules {
     public static var sparkFrame: Int { simStart(ofSheetFrame: sparkSheetFrame) }
     public static let cooldownFrames = 0
     public static let parryKnock = Vec2(x: 3, y: 1.5)
+    /// FloState's snatch on the ground steps through the other: 48 art pixels forward over the snatch.
+    public static let floStateTravel = 30.0
 }
 
 /// The ledge's numbers: falling past a corner with no ball, the hand catches it when the

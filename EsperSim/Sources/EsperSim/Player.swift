@@ -1239,7 +1239,12 @@ public struct Player: Equatable {
             }
 
         case .snatching:
-            if grounded {
+            if grounded, inFloState {
+                // FloState's snatch steps through: the body carried forward its travel over the
+                // snatch, through the other, the reach taking the ball on the way. The travel
+                // goes by the snatch's clock, so FloState's hurrying of it moves the body as far.
+                velocity.x = stateTimer < SnatchRules.frames ? facing.sign * SnatchRules.floStateTravel / Double(SnatchRules.frames) * Double(timerStep) : 0
+            } else if grounded {
                 velocity.x = approach(velocity.x, 0, attackBrake)
             } else {
                 airDrift(input)
@@ -2294,7 +2299,11 @@ public struct Player: Equatable {
     /// mid-swing, the swing carries on with it.
     public mutating func catchBall() {
         hasBall = true
-        if state == .snatching { snatchCooldown = SnatchRules.cooldownFrames }
+        if state == .snatching {
+            snatchCooldown = SnatchRules.cooldownFrames
+            // FloState's step-through carries on with the ball in hand, through the other.
+            if inFloState, grounded { return }
+        }
         if state == .webSwing { return }
         if grounded { velocity = .zero }
         enter(.catching)

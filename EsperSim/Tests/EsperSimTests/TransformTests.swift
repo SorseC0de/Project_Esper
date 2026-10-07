@@ -29,6 +29,23 @@ final class TransformTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .transforming)
     }
 
+    func testTheSnatchInFloStateStepsThroughTheOtherAndTakesTheBall() {
+        var match = standing()
+        match.players[0].inFloState = true
+        // The other right ahead with the ball, facing away.
+        match.players[1].position = Vec2(x: 112, y: 10)
+        match.players[1].grounded = true
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        let from = match.players[0].position.x
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        // The snatch's frames, and the hit-stop the taking holds the match for.
+        for _ in 0..<(SnatchRules.frames + HitStopRules.hitFrames + 2) { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.players[0].position.x - from, SnatchRules.floStateTravel, accuracy: 1, "carried 48 art pixels forward")
+        XCTAssertEqual(match.ball.holder, 0, "the ball taken on the way through")
+        XCTAssertGreaterThan(match.players[0].position.x, match.players[1].position.x, "and past the other")
+    }
+
     func testTheSnatchInFloStateIsDrawnFromItsOwnSheet() {
         var match = standing()
         match.players[0].inFloState = true

@@ -152,7 +152,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   clothes picked later follow on their own. The face's lightest tone is held to a grey level of 0.6
   (`SpriteLibrary.energyFaceLevel`): lime's, at 0.76, burned the features out in the glow (gold and
   teal come down a touch). The snatch on the ground in FloState is drawn from
-  `player_snatch_flostate`, seven frames at the snatch's own timing, its last held (protocol 101).
+  `player_snatch_flostate`, seven frames at the snatch's own timing, its last held (protocol 101):
+  a step-through, the body carried 48 art pixels forward over the snatch (`SnatchRules.floStateTravel`),
+  through the other, the reach taking the ball on the way; on the third frame the hooded head looks
+  back (protocol 103).
   From the change's first frame to its burst on the sheet's third
   (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`ZRules.burstRadius`) is
   parried as a snatch parries one, before the blades are resolved; at the burst everything else
@@ -682,7 +685,7 @@ A disconnect on the screen closes it to the title.
 - The player's line a whole art pixel thick, drawn apart from the figure in the look's line colour.
 - Tuning, low in the middle (HIDE/TUNE), kept between launches: HEAD X and HEAD Y in art pixels
   and HEAD SCALE in tenths (1, 1, 1 to start); NAME Y (26); DRIFT Y, where the figures stand after
-  the launch's drift, art pixels up from the middle button's centre (0); FONT, cycling the face of everything
+  the launch's drift, art pixels up from the middle button's centre (-16, level with the ball); FONT, cycling the face of everything
   but START and the big H.O.O.D. between the finalists (`CustomizeFont.finalists`, alphabetically:
   BM Army, Board of Directors, Kapel, Upheaval, Kapel to start), each sized so its capitals stand
   as Bigdex's would; LETTER GAP, the space between the side labels' stacked letters, in points of

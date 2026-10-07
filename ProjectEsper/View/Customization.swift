@@ -298,7 +298,7 @@ struct CustomizeScreen: View {
     /// points of the screen at 1080 high.
     @AppStorage("esper.customize.hoodSpread.2") private var hoodSpread = 112.0
     /// Where the figures stand after the launch's drift, in art pixels up from the middle button's centre.
-    @AppStorage("esper.customize.driftY") private var driftY = 0.0
+    @AppStorage("esper.customize.driftY.2") private var driftY = -16.0
 
     init(flow: FlowState) {
         self.flow = flow

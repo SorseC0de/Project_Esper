@@ -3348,7 +3348,9 @@ final class GameScene: SKScene {
         heldBanner = nil
         series = Series(seed: seed)
         if gameMode == .zones {
-            // Who leads is the coin's; two people pass the device, or one plays both sides.
+            // Who leads is the coin's; two people pass the device, or one plays both sides. The
+            // last game's lines and phantoms go first.
+            zones?.removeAll()
             zones = ZonesPlay(leader: Int.random(in: 0...1), stage: series.stage,
                               opponent: UserDefaults.standard.bool(forKey: GameScene.vsCPUKey) ? .practice : .passAndPlay)
             zonesLooksFor = nil
@@ -3374,17 +3376,29 @@ final class GameScene: SKScene {
     /// watching, phantoms dropped where moves start.
     private func zonesTick(_ inputs: [PlayerInput]) {
         guard let zones else { return }
-        let pad = hub.playerTwoHasController && inputs.count > 1 ? inputs[zones.mover] : (inputs.first ?? .idle)
+        var pad = hub.playerTwoHasController && inputs.count > 1 ? inputs[zones.mover] : (inputs.first ?? .idle)
         if zones.holds {
             accumulator = 0
-            if pad.jump, !zonesLastPad.jump { zonesRequest(.proceed) }
+            // A jump held over from another screen doesn't go on; a fresh press does.
+            if zonesNeedsRelease {
+                if !pad.jump { zonesNeedsRelease = false }
+            } else if pad.jump, !zonesLastPad.jump {
+                zonesRequest(.proceed)
+            }
             zonesLastPad = pad
             zonesPublishHud()
             return
         }
         zonesLastPad = pad
+        // The jump that went on from a screen isn't the run's first move: held off until let go.
+        if zonesNeedsRelease {
+            if pad.jump { pad.jump = false } else { zonesNeedsRelease = false }
+        }
         var steps = 0
-        while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
+        // Skipping the ghost, many frames a frame.
+        let most = zones.fastForward ? GameScene.zonesFastForwardSteps : GameScene.maxStepsPerFrame
+        if zones.fastForward { accumulator = max(accumulator, GameScene.stepSeconds * Double(most)) }
+        while accumulator >= GameScene.stepSeconds, steps < most {
             let step = zones.step()
             let input: PlayerInput
             switch step {
@@ -3399,9 +3413,10 @@ final class GameScene: SKScene {
             show(tick.shown)
             confirm(tick.confirmed)
             let logged = zones.observe(match, input: input)
-            if !playerNodes.isEmpty, !hoodNodes.isEmpty {
-                for action in logged {
-                    zones.dropPhantom(for: action, body: playerNodes[0], hood: hoodNodes[0], into: bodies, ghost: zones.isReplaying)
+            if zones.dropsPhantoms, !playerNodes.isEmpty, !hoodNodes.isEmpty {
+                for action in logged where !match.players.isEmpty {
+                    zones.dropPhantom(for: action, body: playerNodes[0], hood: hoodNodes[0], at: SpriteLibrary.point(match.players[0].position),
+                                      facing: CGFloat(match.players[0].facing.sign), into: bodies, ghost: zones.isReplaying)
                 }
             }
             tickBallColour()
@@ -3413,6 +3428,8 @@ final class GameScene: SKScene {
         zonesPublishHud()
     }
     private var zonesLastPad = PlayerInput.idle
+    private var zonesNeedsRelease = false
+    private static let zonesFastForwardSteps = 12
 
     private func zonesPublishHud() {
         guard let zones, let flowState else { return }
@@ -3428,15 +3445,21 @@ final class GameScene: SKScene {
     /// The screen's buttons and the pad, through the turn.
     func zonesRequest(_ request: ZonesPlay.Request) {
         guard let zones else { return }
+        zonesNeedsRelease = true
         switch zones.handle(request) {
         case .none:
             break
+        case .power(let power):
+            // Onto the leader in the lobby, to try.
+            session.mutate { $0.players[0].floStatePower = power }
         case .freshRun:
             zonesFreshMatch()
             zones.beginRun(on: match)
         case .lobby:
             zonesFreshMatch()
             zones.beginLobby()
+            // The lines in the leader's colour, who may have changed.
+            zonesRedraw()
         case .replay:
             zonesFreshMatch()
             zones.beginReplay()
@@ -3496,6 +3519,11 @@ final class GameScene: SKScene {
 
     /// The pause's RESTART MATCH: a fresh best of seven on the stage this one started on.
     private func restartMatch() {
+        // ZONES: a new game, from the coin flip.
+        if zones != nil {
+            startSeries()
+            return
+        }
         pendingFlow = nil
         heldBanner = nil
         series = Series(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
@@ -3543,14 +3571,15 @@ final class GameScene: SKScene {
         for mapStage in MapStage.allCases {
             StageMap.current[mapStage] = online == nil ? (SavedStageMap.value(mapStage) ?? StageMap.baked(mapStage)) : StageMap.baked(mapStage)
         }
+        var fresh = Match(stage: series.stage.stage, specs: drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed,
+                          mode: gameMode)
         if let zones {
-            // ZONES: the one on the stage alone, the ball in hand, their FloState power picked.
-            var fresh = Match(stage: .zones(series.stage), specs: [.starting], countdown: 0, seed: fieldSeed, mode: .zones)
+            // ZONES: the one on the stage alone, the ball in hand, their FloState power picked;
+            // the same seed every time, so a run replays as it was.
+            fresh = Match(stage: .zones(series.stage), specs: [.starting], countdown: 0, seed: 1, mode: .zones)
             fresh.players[0].floStatePower = zones.moverPower
             return fresh
         }
-        var fresh = Match(stage: series.stage.stage, specs: drinks.map { $0.spec() }, countdown: GameScene.countdownFrames, seed: fieldSeed,
-                          mode: gameMode)
         for index in fresh.players.indices {
             fresh.players[index].power = drinks[index].power
             fresh.players[index].powerLevel = drinks[index].powerLevel
@@ -3979,6 +4008,8 @@ final class GameScene: SKScene {
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
         ballCamFrame.isHidden = next != .playing
         if next == .title { zonesEnd() }
+        // ZONES: whatever's held on the way into play is let go of before it counts.
+        if next == .playing, zones != nil { zonesNeedsRelease = true }
         // ZONES' screen only over play; the loop brings it back.
         if next != .playing, zones != nil { flowState?.zonesHud = nil }
         // The winner's line once, as the win screen goes up, not each time it's redrawn.
@@ -4148,6 +4179,8 @@ final class GameScene: SKScene {
             if let hud = zones.map({ $0.hud(names: zonesNames, colours: zonesColours) }) {
                 if hud.canRecord { extras.append(("BEGIN RUN", { [weak self] in self?.enter(.playing); self?.zonesRequest(.record) })) }
                 if hud.canRewind { extras.append(("REWIND", { [weak self] in self?.enter(.playing); self?.zonesRequest(.rewind) })) }
+                if hud.canReplay { extras.append(("REPLAY", { [weak self] in self?.enter(.playing); self?.zonesRequest(.replay) })) }
+                if hud.canSkip { extras.append(("SKIP", { [weak self] in self?.enter(.playing); self?.zonesRequest(.skip) })) }
                 if hud.pause == .choice {
                     extras.append(("KEEP RUN", { [weak self] in self?.enter(.playing); self?.zonesRequest(.keep) }))
                     extras.append(("REWIND", { [weak self] in self?.enter(.playing); self?.zonesRequest(.rewind) }))
@@ -4533,7 +4566,8 @@ final class GameScene: SKScene {
             return
         }
         // In Rounds every point ends on it too, the Greateraid pick after.
-        if gameMode == .rounds || gameMode == .zones { startFinish() }
+        // ZONES: only a run's shot gets the finish; the lobby plays on.
+        if gameMode == .rounds || (gameMode == .zones && zones?.recorder != nil) { startFinish() }
         var pool: [(lines: [SoundBoard.Effect], weight: Int)] = [(SoundBoard.scores, GameScene.scoreWeight)]
         if dunk {
             pool.append((SoundBoard.dunks, GameScene.likelyWeight))

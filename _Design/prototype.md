@@ -872,14 +872,18 @@ title opens the customize screen, then the stage select of 47's stages (`ZonesRu
   runs), thirty seconds to shoot. Every move is logged as it starts, by its zone (`ZonesRecorder`,
   `ZoneAction`): Walk, Run (the dash is the run's start), Jump, Double Jump, Wall Jump, Crouch,
   Slide, Taunt, Throw, Catch, FloState and FloState Off, a power's move by its name (Bolt, Beam,
-  Burst, Gale, Fly, Web, Flash, Wall, Pulse, Fireball, Quake), and Shoot or Dunk, which end it: made
+  Burst, Gale, Fly, Web, Flash, Wall, Pulse, Fireball, Quake), and Shoot, Dunk, the floater (an
+  up-throw, logged as the shot "Floater") or a throw down at the Hoopfish's rim ("Throw Down"),
+  which end it: made
   as the ball goes through; missed once it's falling wholly under the rim, or caught or gone; the
   time up with no shot. A run is kept with the inputs that made it (`ZonesRun`), so it replays to
   the frame anywhere.
 - Where each move started a phantom stays: the body as drawn, half seen, in the move's own colour
   (`ZonesPlay.colour(of:)`: Walk 36, Run 5, Jump 19, Double Jump 20, Wall Jump 18, Crouch 34, Slide
   7, Taunt 27, Throw 8, Catch 10, FloState 22, FloState Off 39, a power 28, Shoot 12, Dunk 13, all
-  AAP-64), its move named over it. Rewind clears them.
+  AAP-64), its move named over it. They drop while the leader records and while the ghost plays,
+  and stay through the tries that follow: the leader confirms against their own, the follower
+  follows against the leader's. A new recording, the lobby and a replay clear them.
 - The turn (`ZonesGame`): the leader, loose on the stage first (the lobby, where they can move
   about, shoot and pick their FloState power from the wheel), presses RECORD and is warped to A1
   with the ball. They have three tries to record a run they like: a made run can be kept or
@@ -889,15 +893,23 @@ title opens the customize screen, then the stage select of 47's stages (`ZonesRu
   play as a ghost of the leader (the crown on it), the phantoms dropping as it goes and staying,
   then has three tries to follow it: a move that strays from the set's next ends the try on the
   spot; all three failed earns a letter of Z-O-N-E-S, five to lose. The leader keeps leading
-  through a follower's success and failure, as in HORSE. Rewind mid-run gives the try up. The
-  follower goes into FloState with the leader's power.
+  through a follower's success and failure, as in HORSE. Rewind mid-run gives the try up, on
+  the last try the turn with it; a failed try goes on to the next as its result shows. A made
+  run kept over a later missed one is played back as the ghost first, so its phantoms are the
+  ones on the stage. REPLAY, before a try's moved, plays the run
+  again as the ghost (the set run, or the leader's own while confirming) and comes back to that
+  try; SKIP runs the rest of the ghost at speed, its phantoms still dropping. The follower goes
+  into FloState with the leader's power; a power picked in the lobby goes onto the leader there
+  to try. The jump that goes on from a screen is held off until let go, so it isn't the run's
+  first move. The finish's slow close-in comes only on a run's shot, not in the lobby.
 - The coin flip decides who leads first; between two people a hand-off screen comes before the
   other side's turn (tap, or jump on the pad). The pause menu carries the turn's choices (BEGIN
   RUN, REWIND, KEEP RUN) for the pad.
 - Over play (`ZonesOverlay`): each side's letters at the top with `crown.svg` by the leader's
   (the crown also floats over the leader's head on the stage, in their colour, bobbing, glowing),
-  the turn and the seconds left in the middle, the run's log down the right (the set run's while
-  following, the matched moves lit), and RECORD, REWIND, SKIP and the power wheel at the bottom.
+  the turn and the seconds left in the middle with RECORD, REWIND, REPLAY, SKIP and the power
+  wheel under them, and the run's log down the right (the run being matched while confirming or
+  following, the matched moves lit).
   The win screen shows the letters each side has.
 - Online, when it comes: Game Center's turn-based matches, each turn the run's inputs and the
   game's state, replayed on the other phone (protocol 100).

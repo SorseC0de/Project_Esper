@@ -23,7 +23,7 @@ final class ZonesPlay {
     }
 
     /// Something the screen's buttons or the pad ask for.
-    enum Request { case record, keep, rewind, skip, proceed, pickPower(Power) }
+    enum Request { case record, keep, rewind, skip, replay, proceed, pickPower(Power) }
 
     var game: ZonesGame
     let opponent: Opponent
@@ -38,16 +38,19 @@ final class ZonesPlay {
     /// The ghost replay: its frame, and after its last input the frames waited for its shot.
     private var replayFrame = 0
     private var replayTail = 0
+    /// Skipped: the rest of the replay run through as fast as the loop allows, so its phantoms still drop.
+    private(set) var fastForward = false
     /// The result of the run just ended, to act on once it's been seen.
     private var pendingResult: ZonesGame.Result?
     private var pendingOutcome: ZonesRecorder.Outcome?
+    private var lastProceed = 0.0
+    static let proceedGapSeconds = 0.4
 
     // What's drawn.
     private let lines = SKNode()
     private var phantoms: [SKNode] = []
     private let crown: SKSpriteNode
-    private var crownTexture: (RGB, SKTexture)?
-    private var ghostMarks: [Int: ZoneAction] = [:]
+    private var crownTexture: (RGB, SKTexture?)?
 
     init(leader: Int, stage: StageChoice, opponent: Opponent) {
         game = ZonesGame(leader: leader, stage: stage)
@@ -61,7 +64,7 @@ final class ZonesPlay {
     /// The power the mover goes into FloState with: the follower's is the leader's.
     var moverPower: Power {
         switch game.phase {
-        case .watching, .following: game.set?.floStatePower ?? .none
+        case .watching, .following: game.watched?.floStatePower ?? .none
         default: powers[game.leader]
         }
     }
@@ -85,7 +88,7 @@ final class ZonesPlay {
         case .lobby: return .play
         case .recording, .confirming, .following: return recorder == nil ? .hold : .play
         case .watching:
-            guard let set = game.set else { return .hold }
+            guard let set = game.watched else { return .hold }
             if replayFrame < set.inputs.count {
                 let input = set.inputs[replayFrame]
                 replayFrame += 1
@@ -99,16 +102,21 @@ final class ZonesPlay {
     /// The match a frame on, on `input`, for the recorder; and the phantoms it earns.
     /// Returns the actions logged this frame, for the scene to mark.
     func observe(_ match: Match, input: PlayerInput) -> [ZoneAction] {
-        if case .watching = game.phase, let set = game.set {
+        if case .watching = game.phase, let set = game.watched {
             // The ghost: its moves drop phantoms at their frames; done once it's played through
-            // and the shot's settled.
+            // and the shot's settled, then back to the try it's watched from, or the first.
             let dropped = set.actions.filter { $0.frame == replayFrame }
             if replayFrame >= set.inputs.count {
                 replayTail += 1
                 if replayTail > ZonesRules.shotSettleFrames / 4 || match.events.contains(where: { if case .scored = $0 { return true } else { return false } }) {
                     replayTail = 0
+                    fastForward = false
                     game.beginFollowing()
-                    pause = .result("YOUR TURN: \(ZonesRules.tries) TRIES")
+                    switch game.phase {
+                    case .confirming(let attempt): pause = .result("YOUR RUN: DO IT AGAIN, TRY \(attempt)")
+                    case .following(let attempt): pause = .result(attempt == 1 ? "YOUR TURN: \(ZonesRules.tries) TRIES" : "TRY \(attempt)")
+                    default: pause = .result("GO ON")
+                    }
                 }
             }
             return dropped
@@ -131,10 +139,19 @@ final class ZonesPlay {
         pendingResult = result
         switch result {
         case .candidateMade(let last):
-            pause = last ? .result("RUN KEPT: NOW DO IT AGAIN") : .choice
+            if last, outcome != .made {
+                // An earlier made run kept over this one: its phantoms, played back as the ghost.
+                clearPhantoms()
+                game.watchAgain()
+                pause = .result("YOUR EARLIER RUN KEPT: WATCH IT")
+            } else {
+                pause = last ? .result("RUN KEPT: NOW DO IT AGAIN") : .choice
+            }
         case .tryAgain(let left):
-            pause = .result(outcome == .strayed(at: 0) || { if case .strayed = outcome { return true } else { return false } }()
-                            ? "STRAYED: \(left) LEFT" : outcome == .timedOut ? "TIME'S UP: \(left) LEFT" : "MISSED: \(left) LEFT")
+            // On to the next try now, so the count shows it.
+            game.rewind()
+            let strayed: Bool = { if case .strayed = outcome { return true } else { return false } }()
+            pause = .result(strayed ? "STRAYED: \(left) LEFT" : outcome == .timedOut ? "TIME'S UP: \(left) LEFT" : "MISSED: \(left) LEFT")
         case .leadPassed: pause = .result("LEAD PASSES")
         case .runSet: pause = .result("RUN SET")
         case .followed: pause = .result("FOLLOWED!")
@@ -144,14 +161,14 @@ final class ZonesPlay {
     }
 
     /// A button or the pad. Returns what the scene has to do about it.
-    enum Effect: Equatable { case none, freshRun, lobby, replay, won(Int) }
+    enum Effect: Equatable { case none, freshRun, lobby, replay, won(Int), power(Power) }
 
     func handle(_ request: Request) -> Effect {
         switch request {
         case .pickPower(let power):
             guard game.phase == .lobby else { return .none }
             powers[game.leader] = power
-            return .none
+            return .power(power)
         case .record:
             guard pause == nil, game.phase == .lobby else { return .none }
             game.beginRecording()
@@ -167,23 +184,32 @@ final class ZonesPlay {
                 game.rewind()
                 return .freshRun
             }
-            guard pause == nil, settle == 0, let recorder else { return .none }
-            let attempt: Int
+            // Given up on mid-run, it counts as a miss: the next try, or on the last the turn's end.
+            guard pause == nil, settle == 0, let recorder, recorder.outcome == nil else { return .none }
             switch game.phase {
-            case .recording(let a), .confirming(let a), .following(let a): attempt = a
+            case .recording, .confirming, .following: break
             default: return .none
             }
-            guard attempt < ZonesRules.tries else { return .none }
-            // Given up on mid-run, it counts as a miss; then the next try.
-            if recorder.outcome == nil { _ = game.runEnded(recorder.run, outcome: .missed) }
-            game.rewind()
-            return .freshRun
-        case .skip:
-            guard pause == nil, case .watching = game.phase, let set = game.set else { return .none }
-            replayFrame = set.inputs.count
+            settleRun(.missed)
+            if case .tryAgain = pendingResult {
+                pause = nil
+                pendingResult = nil
+                return .freshRun
+            }
             return .none
+        case .skip:
+            // The rest of the ghost's run at speed, its phantoms still dropping.
+            guard isReplaying else { return .none }
+            fastForward = true
+            return .none
+        case .replay:
+            guard canReplay else { return .none }
+            game.watchAgain()
+            return .replay
         case .proceed:
-            guard let pause else { return .none }
+            // Not twice in a tap: a screen that replaces this one needs a tap of its own.
+            guard let pause, CACurrentMediaTime() - lastProceed > ZonesPlay.proceedGapSeconds else { return .none }
+            lastProceed = CACurrentMediaTime()
             switch pause {
             case .coinFlip:
                 self.pause = nil
@@ -230,9 +256,26 @@ final class ZonesPlay {
         }
     }
 
-    /// A fresh run's recorder, on a fresh match.
-    /// Following, the set run is the target; confirming, the leader's own candidate is, so
-    /// straying from either ends the try on the spot.
+    /// Whether the run can be watched again: following or confirming, before the try's moved.
+    var canReplay: Bool {
+        guard pause == nil, settle == 0, let recorder, recorder.run.actions.isEmpty else { return false }
+        switch game.phase {
+        case .following, .confirming: return true
+        default: return false
+        }
+    }
+
+    /// Phantoms drop while the leader records and while the ghost plays; they stay through
+    /// the tries that follow.
+    var dropsPhantoms: Bool {
+        if isReplaying { return true }
+        if case .recording = game.phase { return pause == nil }
+        return false
+    }
+
+    /// A fresh run's recorder, on a fresh match. Following, the set run is the target;
+    /// confirming, the leader's own candidate is, so straying from either ends the try on the
+    /// spot. A new recording clears the phantoms; the tries after keep them.
     func beginRun(on match: Match) {
         let target: ZonesRun? = {
             switch game.phase {
@@ -242,8 +285,7 @@ final class ZonesPlay {
             }
         }()
         recorder = ZonesRecorder(match: match, player: 0, target: target)
-        clearPhantoms()
-        if target == nil { ghostMarks = [:] }
+        if case .recording = game.phase { clearPhantoms() }
     }
 
     func beginLobby() {
@@ -256,6 +298,7 @@ final class ZonesPlay {
         clearPhantoms()
         replayFrame = 0
         replayTail = 0
+        fastForward = false
     }
 
     /// Whether the sim should be held still.
@@ -350,7 +393,8 @@ final class ZonesPlay {
 
     /// A phantom where a move started: the body as drawn, in the move's colour, half seen,
     /// its name over it.
-    func dropPhantom(for action: ZoneAction, body: SKSpriteNode, hood: SKSpriteNode, into parent: SKNode, ghost: Bool) {
+    /// `at` and `facing` are the sim's at the drop, since the nodes show the frame before.
+    func dropPhantom(for action: ZoneAction, body: SKSpriteNode, hood: SKSpriteNode, at: CGPoint, facing: CGFloat, into parent: SKNode, ghost: Bool) {
         let colour = SKColor(rgb: ZonesPlay.colour(of: action.kind))
         // Behind the figures, which sit at 0 and up in their layer.
         let group = SKNode()
@@ -359,8 +403,11 @@ final class ZonesPlay {
             let copy = SKSpriteNode(texture: source.texture)
             copy.size = CGSize(width: abs(source.size.width), height: abs(source.size.height))
             copy.anchorPoint = source.anchorPoint
-            copy.position = source.position
-            copy.xScale = source.xScale < 0 ? -1 : 1
+            // Where it sits off the body, turned about the body if the sim's facing differs.
+            let offset = CGPoint(x: (source.position.x - body.position.x) * (facing == (source.xScale < 0 ? -1 : 1) || source === body ? 1 : -1),
+                                 y: source.position.y - body.position.y)
+            copy.position = CGPoint(x: at.x + offset.x, y: at.y + offset.y)
+            copy.xScale = facing
             copy.zRotation = source.zRotation
             copy.color = colour
             copy.colorBlendFactor = 1
@@ -373,7 +420,7 @@ final class ZonesPlay {
         tag.fontColor = colour
         tag.horizontalAlignmentMode = .center
         tag.verticalAlignmentMode = .bottom
-        tag.position = CGPoint(x: body.position.x, y: body.position.y + abs(body.size.height) * (1 - body.anchorPoint.y) + 12)
+        tag.position = CGPoint(x: at.x, y: at.y + abs(body.size.height) * (1 - body.anchorPoint.y) + 12)
         group.addChild(tag)
         parent.addChild(group)
         phantoms.append(group)
@@ -388,20 +435,21 @@ final class ZonesPlay {
     /// one on the stage, the ghost included.
     func placeCrown(over hood: SKSpriteNode, colour: RGB, into parent: SKNode, shown: Bool, time: Double) {
         if crown.parent == nil { parent.addChild(crown) }
-        crown.isHidden = !shown || hood.isHidden
-        guard crown.isHidden == false else { return }
         if crownTexture?.0 != colour {
             crownTexture = (colour, ZonesPlay.tinted("Crown", colour: SKColor(rgb: colour)))
         }
+        // Without its picture there's nothing to draw.
+        crown.isHidden = !shown || hood.isHidden || crownTexture?.1 == nil
+        guard crown.isHidden == false else { return }
         crown.texture = crownTexture?.1
         crown.size = CGSize(width: 18, height: 18)
         let bob = CGFloat(sin(time * 2 * .pi * 0.8)) * 1.5
         crown.position = CGPoint(x: hood.position.x, y: hood.position.y + abs(hood.size.height) * (1 - hood.anchorPoint.y) + 6 + bob)
     }
 
-    /// A vector drawn black, filled in a colour through its own alpha.
-    static func tinted(_ name: String, colour: SKColor) -> SKTexture {
-        guard let image = UIImage(named: name) else { return SKTexture() }
+    /// A vector drawn black, filled in a colour through its own alpha; nil without the picture.
+    static func tinted(_ name: String, colour: SKColor) -> SKTexture? {
+        guard let image = UIImage(named: name) else { return nil }
         let side: CGFloat = 128
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -447,7 +495,7 @@ final class ZonesPlay {
         if let target = recorder?.target {
             hud.log = target.actions.map(\.line)
             hud.matched = recorder?.followed ?? 0
-        } else if case .watching = game.phase, let set = game.set {
+        } else if case .watching = game.phase, let set = game.watched {
             hud.log = set.actions.filter { $0.frame <= replayFrame }.map(\.line)
             hud.matched = hud.log.count
         } else if let recorder {
@@ -463,7 +511,8 @@ final class ZonesPlay {
             default: false
             }
         }()
-        hud.canSkip = isReplaying
+        hud.canSkip = isReplaying && !fastForward
+        hud.canReplay = canReplay
         return hud
     }
 }
@@ -485,6 +534,7 @@ struct ZonesHud: Equatable {
     var canRecord = false
     var canRewind = false
     var canSkip = false
+    var canReplay = false
 }
 
 /// The ZONES screen over play: each side's letters at the top, the crown by the leader's,
@@ -500,8 +550,8 @@ struct ZonesOverlay: View {
             ZStack {
                 top(hud)
                 side(hud)
-                bottom(hud)
-                if wheelOpen { wheel(hud) }
+                buttons(hud)
+                if wheelOpen, hud.powerPickable { wheel(hud) }
                 if let pause = hud.pause { curtain(pause, hud) }
             }
             .environment(\.colorScheme, .dark)
@@ -567,18 +617,20 @@ struct ZonesOverlay: View {
         .allowsHitTesting(false)
     }
 
-    private func bottom(_ hud: ZonesHud) -> some View {
+    /// The turn's buttons, under the turn line at the top, clear of the pad at the bottom.
+    private func buttons(_ hud: ZonesHud) -> some View {
         VStack {
-            Spacer()
             HStack(spacing: 10) {
                 if hud.powerPickable {
                     button(hud.power == .none ? "POWER" : hud.power.shortName.uppercased()) { wheelOpen.toggle() }
                 }
                 if hud.canRecord { button("RECORD") { flow.scene.zonesRequest(.record) } }
                 if hud.canRewind { button("REWIND") { flow.scene.zonesRequest(.rewind) } }
+                if hud.canReplay { button("REPLAY") { flow.scene.zonesRequest(.replay) } }
                 if hud.canSkip { button("SKIP") { flow.scene.zonesRequest(.skip) } }
             }
-            .padding(.bottom, 10)
+            .padding(.top, 58)
+            Spacer()
         }
     }
 

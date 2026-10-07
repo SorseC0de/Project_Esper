@@ -198,7 +198,11 @@ public struct ZonesRecorder: Equatable {
 
     public var ended: Bool { outcome != nil }
     /// How many of the target's actions have been matched so far.
-    public var followed: Int { run.actions.count }
+    /// How many of the target's actions have been matched: the strayed one isn't.
+    public var followed: Int {
+        if case .strayed = outcome { return max(run.actions.count - 1, 0) }
+        return run.actions.count
+    }
 
     /// A frame on, after the match has advanced on `input`.
     public mutating func observe(_ match: Match, input: PlayerInput) {
@@ -233,7 +237,10 @@ public struct ZonesRecorder: Equatable {
                 case .jumped(let who) where who == player: log(.jump)
                 case .doubleJumped(let who) where who == player: log(.doubleJump)
                 case .wallJumped(let who, _) where who == player: log(.wallJump)
-                case .thrown(let who) where who == player: log(.throwBall)
+                // An up-throw is the floater, and a throw down at the Hoopfish's rim goes
+                // through it: shots, the run's end.
+                case .thrown(let who) where who == player:
+                    if match.ball.floaterShot { log(.shoot, "Floater") } else if match.ball.scoring { log(.shoot, "Throw Down") } else { log(.throwBall) }
                 case .caught(let who) where who == player: log(.catchBall)
                 case .shot(let who) where who == player: log(.shoot)
                 case .dunked(let who) where who == player: log(.dunk)
@@ -309,6 +316,8 @@ public struct ZonesGame: Equatable, Codable {
     public var candidate: ZonesRun?
     /// The run the follower has to match.
     public var set: ZonesRun?
+    /// Watching the run again mid-turn: the phase to go back to after.
+    public var resumeAfterWatching: Phase?
     public var stage: StageChoice
     /// How many runs each side has led, for the log.
     public var turns = 0
@@ -323,7 +332,8 @@ public struct ZonesGame: Equatable, Codable {
     public var mover: Int {
         switch phase {
         case .lobby, .recording, .confirming: leader
-        case .watching, .following: follower
+        case .watching: { if case .confirming = resumeAfterWatching { leader } else { follower } }()
+        case .following: follower
         case .over(let winner): winner
         }
     }
@@ -352,10 +362,25 @@ public struct ZonesGame: Equatable, Codable {
         }
     }
 
-    /// The watching done: the follower's first try.
+    /// The run being watched: the set one, or the leader's own candidate while confirming.
+    public var watched: ZonesRun? { self.set ?? candidate }
+
+    /// The watching done: the follower's first try, or back to the try it was watched from.
     public mutating func beginFollowing() {
         guard phase == .watching else { return }
-        phase = .following(attempt: 1)
+        phase = resumeAfterWatching ?? .following(attempt: 1)
+        resumeAfterWatching = nil
+    }
+
+    /// The run watched again, from a try of following it or confirming it, which goes on after.
+    public mutating func watchAgain() {
+        switch phase {
+        case .following, .confirming:
+            guard watched != nil else { return }
+            resumeAfterWatching = phase
+            phase = .watching
+        default: break
+        }
     }
 
     /// A run over: what it means for the turn. Returns what happened, for the screen.

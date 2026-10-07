@@ -141,6 +141,46 @@ final class ZonesTests: XCTestCase {
         XCTAssertEqual(recorder.run.actions.last?.kind, .dunk)
     }
 
+    func testAFloaterIsTheShot() {
+        var match = court()
+        var recorder = ZonesRecorder(match: match, player: 0)
+        // Throw held, then let go with the stick up: the floater.
+        for _ in 0..<(BallRules.throwWindupFrames + 2) {
+            let input = PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true)
+            match.advance(inputs: [input])
+            recorder.observe(match, input: input)
+        }
+        for _ in 0..<30 where recorder.run.actions.last?.kind != .shoot {
+            let input = PlayerInput(stick: Vec2(x: 0, y: 1))
+            match.advance(inputs: [input])
+            recorder.observe(match, input: input)
+        }
+        XCTAssertEqual(recorder.run.actions.last?.kind, .shoot, "\(recorder.run.actions.map(\.line))")
+        XCTAssertEqual(recorder.run.actions.last?.label, "Floater")
+    }
+
+    func testWatchingAgainGoesBackToTheTryItWasWatchedFrom() {
+        var game = ZonesGame(leader: 0, stage: .wreckCenter)
+        let run = ZonesRun(actions: [ZoneAction(kind: .shoot, zone: Zone(column: 5, row: 0), frame: 10)])
+        game.beginRecording()
+        _ = game.runEnded(run, outcome: .made)
+        game.keepCandidate()
+        game.rewind()
+        XCTAssertEqual(game.phase, .confirming(attempt: 2))
+        XCTAssertEqual(game.watched, run, "the leader's own run to watch")
+        game.watchAgain()
+        XCTAssertEqual(game.phase, .watching)
+        XCTAssertEqual(game.mover, 0, "still the leader's turn while they watch their own run")
+        game.beginFollowing()
+        XCTAssertEqual(game.phase, .confirming(attempt: 2))
+        _ = game.runEnded(run, outcome: .made)
+        game.beginFollowing()
+        game.rewind()
+        game.watchAgain()
+        game.beginFollowing()
+        XCTAssertEqual(game.phase, .following(attempt: 2))
+    }
+
     func testTheRunTimesOutWithoutAShot() {
         var match = court()
         var recorder = ZonesRecorder(match: match, player: 0)
@@ -172,6 +212,7 @@ final class ZonesTests: XCTestCase {
             recorder.observe(match, input: jump)
         }
         XCTAssertEqual(recorder.outcome, .strayed(at: 1))
+        XCTAssertEqual(recorder.followed, 1, "the strayed move isn't counted as matched")
         // The same run matches itself.
         XCTAssertTrue(set.isFollowed(by: set))
         var longer = set

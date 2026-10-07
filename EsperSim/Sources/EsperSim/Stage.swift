@@ -165,12 +165,24 @@ public struct Stage: Equatable {
     public var fixedSlopes: [Slope] = []
     public var ceilingSlopes: [Slope] = []
 
-    public var width: Double { Double(columns) * Stage.tileSize }
+    /// How wide the stage is: its grid's columns, unless it ends short of them, as Flight does.
+    public var width: Double
     public var height: Double { Double(rows) * Stage.tileSize }
+    /// Flight's pitch, in radians, leaning gravity: nose up positive, the left side down. Its
+    /// pull sideways and its share straight down, on anything that falls.
+    public var tilt = 0.0
+    public var tiltPull: Double { tilt == 0 ? 0 : Trig.sin(tilt) }
+    public var tiltDown: Double { tilt == 0 ? 1 : Trig.cos(tilt) }
+    /// Pitched steeply enough that the floor is a slide (`FlightRules.slideTilt`): the way down it.
+    public var pitchDownhill: Facing? {
+        guard features.tilts, abs(tilt) >= FlightRules.slideTilt else { return nil }
+        return tilt > 0 ? .left : .right
+    }
 
     public init(columns: Int, rows: Int, hoops: [Hoop], playerSpawns: [Vec2], playerFacings: [Facing], ballSpawn: Vec2) {
         self.columns = columns
         self.rows = rows
+        width = Double(columns) * Stage.tileSize
         tiles = Array(repeating: .empty, count: columns * rows)
         self.hoops = hoops
         self.playerSpawns = playerSpawns
@@ -258,6 +270,8 @@ public struct Stage: Equatable {
     /// Whether the floor slope under the box's middle, close under the feet, goes down the way
     /// `facing` looks: a falling one to the right, a rising one to the left.
     public func slopeDescends(under box: Box, facing: Facing, reach: Double) -> Bool {
+        // A steep pitch: the floor descends its way.
+        if let downhill = pitchDownhill { return facing == downhill }
         let middle = (box.min.x + box.max.x) / 2
         for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x && abs(slope.surface(at: middle) - box.min.y) <= reach {
             return slope.rising == (facing == .left)
@@ -267,6 +281,8 @@ public struct Stage: Equatable {
 
     /// The way down a slide slope under the box's middle, close under its feet, if it's on one.
     public func slideSlopeDownhill(under box: Box, reach: Double) -> Facing? {
+        // A steep pitch makes the whole floor one.
+        if let downhill = pitchDownhill { return downhill }
         let middle = (box.min.x + box.max.x) / 2
         for slope in slopes where slope.slides && slope.box.min.x <= middle && middle <= slope.box.max.x
             && abs(slope.surface(at: middle) - box.min.y) <= reach {
@@ -719,29 +735,29 @@ public struct Stage: Equatable {
         }
     }
 
-    /// Flight: 26 by 12, laid out in the map maker over its backdrop; two rims, as the Elements.
+    /// Flight: the aisle of a plane, 19 and a half tiles by 9 (`FlightRules`), as its art is
+    /// drawn: two rows of floor, the rims at the ends, the starts in from them, the ball in the
+    /// open bin over the middle; it pitches, and a cart rolls with the pitch.
     public static var flight: Stage {
-        let map = StageMap.current[.flight]
         let columns = FlightRules.columns, rows = FlightRules.rows
-        func centre(_ cell: StageMap.Cell) -> Vec2 {
-            Vec2(x: (Double(cell.column) + 0.5) * tileSize, y: (Double(cell.row) + 0.5) * tileSize)
-        }
+        let width = FlightRules.width
+        let floor = Double(FlightRules.floorRows) * tileSize
         var stage = Stage(
             columns: columns, rows: rows,
             hoops: [
-                Hoop(position: centre(map.leftRim), owner: 1, backboard: .left),
-                Hoop(position: centre(map.rightRim), owner: 0, backboard: .right),
+                Hoop(position: Vec2(x: FlightRules.rimInset, y: FlightRules.rimHeight), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: width - FlightRules.rimInset, y: FlightRules.rimHeight), owner: 0, backboard: .right),
             ],
-            playerSpawns: map.spawns.map { Vec2(x: (Double($0.column) + 0.5) * tileSize, y: Double($0.row) * tileSize) },
-            playerFacings: map.spawns.map { Double($0.column) * tileSize < Double(columns) * tileSize / 2 ? .right : .left },
-            // An even number of columns: the ball starts on the line between the middle two, the
-            // left edge of the cell it's marked in, as the court's does.
-            ballSpawn: Vec2(x: Double(map.ball.column) * tileSize, y: (Double(map.ball.row) + 0.5) * tileSize)
+            playerSpawns: [Vec2(x: FlightRules.startInset, y: floor), Vec2(x: width - FlightRules.startInset, y: floor)],
+            playerFacings: [.right, .left],
+            ballSpawn: Vec2(x: width / 2, y: FlightRules.ballHeight)
         )
-        stage.lay(map.walls)
-        stage.slopes = stage.fixedSlopes
+        stage.width = width
+        stage.fill(.solid, columns: 0...(columns - 1), rows: 0...(FlightRules.floorRows - 1))
+        // The right wall where the art ends, half a tile short of the grid's last column.
+        stage.fixedExtras = [Box(min: Vec2(x: width, y: 0), max: Vec2(x: Double(columns) * tileSize, y: Double(rows + Stage.skyRows) * tileSize))]
         stage.features = StageFeatures(look: .flight)
-        stage.features.bodyScale = FlightRules.bodyScale
+        stage.features.tilts = true
         return stage
     }
 

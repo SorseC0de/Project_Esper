@@ -363,6 +363,9 @@ public struct Player: Equatable {
     /// speeds, the jumps, the ground's and the air's speeds and every pick-up and brake at half,
     /// and the clock, every state's timing and its sheet with it, at half its rate.
     public var underwater = false
+    /// The stage's pitch as this frame began: gravity's pull sideways and its share straight down.
+    private var tiltPull = 0.0
+    private var tiltDown = 1.0
     var waterTicks = 0
     var waterShare: Double { underwater ? 0.5 : 1 }
     /// Under water a jump rises at half its push but to twice its height: the pull on the way up
@@ -500,6 +503,8 @@ public struct Player: Equatable {
                               ballHolder: Int? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         var input = given
         underwater = sharedStage.features.underwater
+        tiltPull = sharedStage.tiltPull
+        tiltDown = sharedStage.tiltDown
         // Surf Soda rides the lava as ground.
         var stage = sharedStage
         if power == .surfSoda, let lava = stage.features.lavaSurface {
@@ -2146,7 +2151,9 @@ public struct Player: Equatable {
         let floor = fastFalling ? -fastFall : -fallSpeed
         // Feather Fresca floats down; a fast fall doesn't.
         let gravity = velocity.y <= 0 && !fastFalling ? gravity * spec.fallGravityShare : gravity
-        velocity.y = max(velocity.y - gravity, floor)
+        // On a pitched stage gravity leans: a share of it sideways, in the air.
+        velocity.y = max(velocity.y - gravity * tiltDown, floor)
+        velocity.x -= gravity * tiltPull
     }
 
     /// A stance comes to a stop on the ground and drifts down slowly in the air, its
@@ -2159,8 +2166,9 @@ public struct Player: Equatable {
             if velocity.y <= 0 {
                 velocity.y = -BallRules.stanceFallSpeed
             } else {
-                velocity.y -= gravity
+                velocity.y -= gravity * tiltDown
             }
+            velocity.x -= gravity * tiltPull
         }
     }
 

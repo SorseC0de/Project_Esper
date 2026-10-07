@@ -39,6 +39,13 @@ public struct Match: Equatable {
     /// Hoopfish Hideaway's Hoopfish, swimming across with the ball or the rim on its antenna.
     public var hoopfish: Hoopfish?
     public var lastHelicopterHoop: Int?
+    /// Flight's pitch: the lean it's going from and to and the frames into it; its cart, and the
+    /// frames before the cart can hit each body again.
+    public var tiltFrom = 0.0
+    public var tiltTarget = 0.0
+    public var tiltClock = 0
+    public var cart: Cart?
+    public var cartHitFrames: [Int] = []
     public var scores: [Int]
     /// Rounds reset on a point; 47 plays on through its baskets.
     public var mode = GameMode.rounds
@@ -75,6 +82,10 @@ public struct Match: Equatable {
         countdownLength = countdown
         self.countdown = countdown
         fieldDice = Dice(seed: seed)
+        if stage.features.tilts {
+            cart = Cart.starting(on: stage)
+            cartHitFrames = players.map { _ in 0 }
+        }
         if let fish = stage.hoopfishStart {
             if stage.hoopfishStationary {
                 // ZONES: in place, facing left, the rim on its antenna.
@@ -136,6 +147,7 @@ public struct Match: Equatable {
         refreshExtras()
         if portalCooldown > 0 { portalCooldown -= 1 }
         stepField()
+        stepFlight()
         stepTornados()
         stepHoopfish()
         gatherFloBundles()
@@ -972,7 +984,7 @@ public struct Match: Equatable {
     }
 
     /// Hit-stop to at least this many frames.
-    private mutating func holdHitStop(_ frames: Int) {
+    mutating func holdHitStop(_ frames: Int) {
         hitStop = max(hitStop, frames)
     }
 

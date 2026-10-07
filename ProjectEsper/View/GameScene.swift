@@ -807,6 +807,8 @@ final class GameScene: SKScene {
 
     var cameraPosition: CGPoint { cameraNode.position }
     var cameraScale: CGFloat { cameraNode.xScale }
+    /// The camera's turn: Flight's lean, the other way.
+    var cameraRotation: CGFloat { cameraNode.zRotation }
 
     private static let background = SKColor(red: 0.18, green: 0.12, blue: 0.24, alpha: 1)
 
@@ -1673,6 +1675,12 @@ final class GameScene: SKScene {
     /// The Elements' placed tiles, while it's the stage drawn; Hoopfish Hideaway's props likewise.
     private var elementsArt: ElementsArt.Handles?
     private var flightArt: FlightArt.Handles?
+    /// Flight's cart, a plain rectangle until its sprite comes.
+    private var cartNode: SKSpriteNode?
+    /// Flight's turbulence: frames to the next small shake.
+    private var turbulenceIn = 0
+    private static let turbulenceGap = 60...240
+    private static let turbulenceShake = 6
     private var hoopfishHideawayArt: HoopfishHideawayArt.Handles?
     private let tornadoOverlays = SKCropNode()
 
@@ -1692,7 +1700,7 @@ final class GameScene: SKScene {
         if let art = hoopfishHideawayArt { flats += art.flats }
         // Flight's tiles are painted, not lit: none of them glows.
         if let art = flightArt {
-            flats += (Array(art.tiles.values) + [art.backdrop, art.front].compactMap { $0 }).compactMap { node in
+            flats += [art.backdrop, art.front].compactMap { $0 }.compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
         }
@@ -1708,10 +1716,11 @@ final class GameScene: SKScene {
         Ambience.shared.play(isElements ? "thunderstorm" : nil)
         let isHoopfishHideaway = stage.features.look == .hoopfishHideaway
         backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : (isHoopfishHideaway ? SKColor(rgb: HoopfishHideawayArt.waterTop)
-            : (stage.features.look == .flight ? SKColor(rgb: PixelPalette.colours[0]) : GameScene.background))
+            : (stage.features.look == .flight ? SKColor(rgb: FlightArt.beyond) : GameScene.background))
         elementsArt = nil
         hoopfishHideawayArt = nil
         flightArt = nil
+        cartNode = nil
         fallingIcicles = [:]
         hangingIcicles = [:]
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
@@ -1721,7 +1730,15 @@ final class GameScene: SKScene {
             hoopfishHideawayArt = HoopfishHideawayArt.build(stage: stage, map: StageMap.current[.hoopfishHideaway], into: stageGround)
         }
         if stage.features.look == .flight {
-            flightArt = FlightArt.build(map: StageMap.current[.flight], into: stageGround, front: stageFront)
+            flightArt = FlightArt.build(into: stageGround, front: stageFront)
+            // The cart: a rectangle its size, for now.
+            let cart = SKSpriteNode(color: SKColor(white: 0.9, alpha: 1),
+                                    size: CGSize(width: FlightRules.cartSize.x * SpriteLibrary.pixelsPerUnit, height: FlightRules.cartSize.y * SpriteLibrary.pixelsPerUnit))
+            cart.anchorPoint = .zero
+            cart.zPosition = 5
+            stageGround.addChild(cart)
+            cartNode = cart
+            turbulenceIn = Int.random(in: GameScene.turbulenceGap)
         }
         if isElements {
             elementsArt = ElementsArt.build(stage: stage, map: StageMap.current[.elements], into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
@@ -1949,6 +1966,7 @@ final class GameScene: SKScene {
         elementsArt = nil
         hoopfishHideawayArt = nil
         flightArt = nil
+        cartNode = nil
         fallingIcicles = [:]
         hangingIcicles = [:]
         fieldBlooms = []
@@ -2839,7 +2857,7 @@ final class GameScene: SKScene {
 
     /// One game pixel is a whole number of screen pixels, as many as fit the whole court.
     private func layout(displayScale screenScale: CGFloat) {
-        let stageWidth = CGFloat(match.stage.columns) * GameScene.pixelsPerTile
+        let stageWidth = CGFloat(match.stage.width / Stage.tileSize) * GameScene.pixelsPerTile
         let scrolls = [StageLook.footballField, .elements].contains(match.stage.features.look)
         // The field and the Elements scroll sideways, so only its height is fitted; a scenic stage counts the
         // ground below the floor in, so the players stand in the middle of it; not the Elements,
@@ -2852,10 +2870,10 @@ final class GameScene: SKScene {
         // The map maker sees the whole stage at once, as big as it fits, not by whole pixels.
         // Hoopfish Hideaway fills the screen's width, its bottom on the screen's: a phone crops blank
         // water off the top, a squarer screen shows more of it.
-        // Flight is seen whole, edge to edge, as the map maker sees a stage.
+        // Flight is seen whole at its lean, edge to edge when level.
         let fills = match.stage.features.look == .hoopfishHideaway && !wholeStageView
-        let whole = wholeStageView || match.stage.features.look == .flight
-        let pointsPerGamePixel = whole ? min(size.width / stageWidth, size.height / stageHeight)
+        let pointsPerGamePixel = match.stage.features.tilts ? flightFit(tilt: CGFloat(match.stage.tilt))
+            : wholeStageView ? min(size.width / stageWidth, size.height / stageHeight)
             : (fills ? size.width / stageWidth : screenPixelsPerGamePixel / screenScale)
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale
@@ -2919,7 +2937,7 @@ final class GameScene: SKScene {
         }
         // The map maker only means anything on a hand-laid stage, offline, with a mouse.
         #if !os(tvOS)
-        if [StageLook.elements, .hoopfishHideaway, .flight].contains(match.stage.features.look), online == nil {
+        if [StageLook.elements, .hoopfishHideaway].contains(match.stage.features.look), online == nil {
             controls.addPicker(title: "MAP", options: ["OFF", "ON"], selected: mapEditor == nil ? 0 : 1) { [weak self] index in
                 index == 1 ? self?.openMapEditor() : self?.closeMapEditor(restart: true)
             }
@@ -3080,6 +3098,15 @@ final class GameScene: SKScene {
         powerLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 4)
         debugLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 26)
         fpsLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)
+    }
+
+    /// Flight seen whole at its lean: points to an art pixel that fit the stage's box turned by `tilt`.
+    private func flightFit(tilt: CGFloat) -> CGFloat {
+        let stageWidth = CGFloat(match.stage.width / Stage.tileSize) * GameScene.pixelsPerTile
+        let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile
+        let boxWidth = stageWidth * abs(cos(tilt)) + stageHeight * abs(sin(tilt))
+        let boxHeight = stageHeight * abs(cos(tilt)) + stageWidth * abs(sin(tilt))
+        return min(size.width / boxWidth, size.height / boxHeight)
     }
 
     // MARK: Stepping
@@ -4089,6 +4116,8 @@ final class GameScene: SKScene {
             case .popped(let victim, let popper):
                 let at = players[victim].heldBallPoint
                 say(.steal, at: at, away: side(at, from: players[popper].chest), rise: 20)
+            case .cartHit(let victim, let at):
+                say(.hit, at: at, away: side(at, from: players[victim].chest), rise: 20)
             case .swatted(let index, hit: true):
                 let at = match.ball.position
                 say(.spike, at: at, away: side(at, from: players[index].chest), rise: -15)
@@ -4951,6 +4980,8 @@ final class GameScene: SKScene {
             case .popped(let victim, let popper):
                 // A spark off the ball as it leaves the hands, in the colour of whoever knocked it.
                 spawnHitSpark(player: popper, at: match.players[victim].heldBallPoint)
+            case .cartHit(let victim, _):
+                spawnHitSpark(player: victim, at: match.players[victim].chest)
             case .swatted(let index, hit: true):
                 spawnHitSpark(player: index, at: match.ball.position)
             case .slashClanked(let index):
@@ -5900,7 +5931,6 @@ final class GameScene: SKScene {
         switch look {
         case .elements: mapStage = .elements
         case .hoopfishHideaway: mapStage = .hoopfishHideaway
-        case .flight: mapStage = .flight
         default: return
         }
         guard mapEditor == nil, online == nil else { return }
@@ -5908,7 +5938,6 @@ final class GameScene: SKScene {
             switch mapStage {
             case .elements: .elements
             case .hoopfishHideaway: .hoopfishHideaway
-            case .flight: .flight
             }
         }
         wholeStageView = true
@@ -5931,7 +5960,6 @@ final class GameScene: SKScene {
                     for layer in StageMap.layers {
                         let placed = map.tiles.first { $0.cell == cell && $0.layer == layer }
                         self.elementsArt?.set(placed, at: cell, layer: layer)
-                        self.flightArt?.set(placed, at: cell, layer: layer)
                     }
                 }
                 self.refreshStaticFlats()
@@ -6450,6 +6478,12 @@ final class GameScene: SKScene {
         }
     }
     private var portalId = 0
+
+    /// Flight's cart where the sim has it.
+    private func drawFlight() {
+        guard let cartNode, let cart = match.cart else { return }
+        cartNode.position = SpriteLibrary.point(cart.box.min)
+    }
 
     /// Helmets in their defender's colour, facing the way they travel and tipped back 15
     /// degrees, and the portal's loop.
@@ -7351,6 +7385,7 @@ final class GameScene: SKScene {
         drawPowersLeavings()
         section("powers")
         drawField()
+        drawFlight()
         section("field")
         drawTraffic()
         section("traffic")
@@ -7449,6 +7484,28 @@ final class GameScene: SKScene {
         if !threePointArcs.isHidden {
             let breath = CGFloat(0.5 - 0.5 * cos(CACurrentMediaTime() / ThreePointTuning.breathSeconds * 2 * .pi))
             for arc in threePointArcSides { arc.node.alpha = ThreePointTuning.breathMax * breath }
+        }
+        // Flight: the view leans with the plane, the stage kept whole in it, zoomed out as far
+        // as the lean needs; and turbulence, a small shake now and then.
+        if match.stage.features.tilts {
+            let tilt = CGFloat(match.stage.tilt)
+            cameraNode.zRotation = -tilt
+            glowHud.zRotation = -tilt
+            cameraBaseScale = 1 / flightFit(tilt: tilt)
+            if finishFrames == 0 {
+                cameraNode.setScale(cameraBaseScale)
+                glowHud.setScale(cameraNode.xScale * hudScale)
+            }
+            if flow == .playing, GameSettings.screenShake {
+                turbulenceIn -= 1
+                if turbulenceIn <= 0 {
+                    turbulenceIn = Int.random(in: GameScene.turbulenceGap)
+                    shake = max(shake, GameScene.turbulenceShake)
+                }
+            }
+        } else if cameraNode.zRotation != 0 {
+            cameraNode.zRotation = 0
+            glowHud.zRotation = 0
         }
         // Quake-Up Coffee's shake: the camera a pixel or two off, a few frames; none with it set off.
         if shake > 0, !GameSettings.screenShake { shake = 0 }

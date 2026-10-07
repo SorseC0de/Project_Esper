@@ -46,6 +46,8 @@ public struct StageFeatures: Equatable {
     /// Every body this many times its size, as Titan Tea grows one: on a stage drawn bigger than
     /// the bodies' own art, Flight's.
     public var bodyScale = 1.0
+    /// The stage pitches now and then, leaning gravity (`Stage.tilt`), with a cart rolling it: Flight's.
+    public var tilts = false
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets

@@ -1788,48 +1788,45 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 
 ## Flight
 
-A hand-laid stage, for now called Flight (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`,
-protocol 83), on the select (`StageChoice.selectable`). 26 by 12 (`FlightRules`, protocol 86), seen
-whole, edge to edge, as the map maker sees a stage (the camera fitted to the screen, not by whole
-pixels): on a 2532 by 1170 phone that's 6x. The bodies were drawn into its art at 8 of its pixels an art pixel (a
-48-pixel sheet 192 on the half-size 1248 by 576 canvas), so on it every body is 8 / 6 its size
-(`StageFeatures.bodyScale`, `Stage.sized`, protocol 90): its
-scale, its box, and the reaches and heights that go with them grown as Titan Tea's are, its moves as
-they are (a Titan on it 2 times that). Laid out in the map maker (`MapStage.flight`) on its own twelve RPG Maker sheets
-(`FlightTiles0` to `11` at the catalog's root, from `_Graphic Assets/Pixel Art/Stages/Flight`): the
-A2 floors, the A4 walls, the five B sheets and the five numbered ones, 48-pixel cells but the A4 walls'
-and "2"'s 32-pixel ones (the walls' 720 pixels high make 22 rows, the half row under them left off), each drawn as one 16-pixel tile, painted rather than pixel art, so smoothed (at 3x a cell is its own 48 screen
-pixels). `MapTiles` holds a stage's sheets for the art and the map maker: a placed tile's art cell
-counts across the sheets side by side, 32 columns kept for each (`MapTiles.flightStride`; maps kept
-from when it was 16 are moved over once, `SavedStageMap`), and the map maker pages through them
-(◀ SHEET n/12 ▶) with more of the screen's height for the palette, the sheet last shown kept
-between openings and launches. With a sheet the panel has MULTI and OVER. MULTI: a drag across the sheet
-picks a block of it (ringed), put down whole with its top left on the cell pressed, its empty cells
-leaving what's under them, and a stroke laying more side by side, the stage's cell outline showing
-the block's size. OVER: tiles go on the layer over the ground (`StageMap.Placed.layer` 1, drawn a
-tenth above it, `TileSpot`), such as a window on a wall, bringing no wall; erasing and picking up
-then work on that layer alone. Tiles kept before layers are on the ground. The autotiles aren't joined up:
-a cell is placed as it's painted. The tiles never glow (they're the glow mask's flats). The baked map
-(version 5) is the user's: three rows of floor, the rims at the very ends eight rows up, the starts
-two in from each end, the ball at the top. With an even number of columns the ball starts on the line
-between the middle two, the left edge of the cell it's marked in (column 13), as the court's does.
-Its hoops are tilted down: the first frames of the Hoopfish pile's `backboards` and `hoops` sheets,
-placed with Longball Stadium's hoop, net and dunk numbers (`StageLook.tiltedHoop`); outside the stage is black (palette 0).
+The aisle of a plane (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`, `FlightRules` in
+`Flight.swift`; protocol 83, remade at protocol 105), on the select (`StageChoice.selectable`). It's
+drawn whole in Aseprite, `Flight/Flight_Map.aseprite`, 1248 by 576, and four of its pixels are an art
+pixel: 312 by 144 art pixels, 19 and a half tiles by 9, on a grid of 20 columns whose last half is
+walled off (`Stage.width`, stored, is where a stage ends when that's short of its grid; the wall a
+`fixedExtras` box). The bodies are their own size on it; so is everything else. Two rows of floor
+(the file's hidden Player layer stands on them); the rims at the very ends, 65 up; the starts two
+and a half tiles in; the ball over the middle, in the open bin, at 60. The map maker has nothing to
+do with it any more: its tile sheets are gone from the catalog and `MapStage` with them.
 
-The stage is drawn whole in Aseprite (`Flight/Flight_Map.aseprite`, 1248 by 576: three of its pixels
-an art pixel, the whole 26 by 12), over the tiles and covering them; the walls still the map's. Its
-layers, bottom up: Tiles, Back Fade, Back Chairs, Bins, Open Bin, then a hidden Player (the figure
-at its size, where the players draw), then Front Chairs and Front Fade. `Tools/aseprite.py` reads
-the file without Aseprite (the layers listed with no output named; named layers flattened to a PNG
-otherwise) and makes two pictures of the whole stage: `FlightBackdrop`, the layers under the player,
-on the stage's ground behind the players (`FlightArt.backdropZ`), and `FlightFront`, the two over,
-in `stageFront` in front of them (z 22, with the Elements' tornado overlays), both nearest-sampled,
-neither glowing. Re-import with `python3 Tools/aseprite.py <file> <png> <layers...>` into the two
-imagesets.
+The file's layers, bottom up: Tiles, Back Fade, Back Chairs, Bins, Open Bin, then the hidden Player
+(the figure at its size, where the players draw), then Front Chairs and Front Fade. `Tools/aseprite.py`
+reads the file without Aseprite (the layers listed with no output named; named layers flattened to a
+PNG otherwise) and makes two pictures of the whole stage: `FlightBackdrop`, the layers under the
+player, on the stage's ground behind the players (`FlightArt.backdropZ`), and `FlightFront`, the two
+over, in `stageFront` in front of them (z 22, with the Elements' tornado overlays), both
+nearest-sampled, neither glowing. Re-import with `python3 Tools/aseprite.py <file> <png> <layers...>`
+into the two imagesets. Beyond the stage, above, below and beside it, is palette 30 (`FlightArt.beyond`).
 
-Planned, not built: the ball starts in an open overhead compartment in the middle; the stage pitches
-at random, bending the shots' angles, and a serving cart rolls up and down the aisle with the pitch,
-popping the ball from whoever it runs into.
+The hazard is the pitch. The plane leans now and then (`Match.stepFlight`, on the match's dice):
+a round is a lean to a new angle over 90 frames, held 300, back level over 90, and level for 120
+before the next; the angle comes in tenths of the most, 60 degrees either way, nose up positive, the
+left side down (`Stage.tilt`). Gravity leans with it: anything falling, the bodies in the air and the
+loose ball, gets `Stage.tiltPull` (the sine) of its gravity sideways and `tiltDown` (the cosine) of
+it down, and a loose ball on the floor rolls downhill; so jumps drift and shots bend, aimed as if
+level. At 45 degrees or more (`FlightRules.slideTilt`) the floor is a slide: `pitchDownhill` makes
+`slideSlopeDownhill` and `slopeDescends` answer for the whole floor, so whoever is grounded goes
+into the forced slide down it, the slide slopes' own. The view leans with the plane: the camera is
+turned the other way (`cameraRotation`, mirrored into the mask scenes and the cubes' projection),
+the glow HUD turned back upright, and the camera zoomed so the stage's whole turned box fits the
+screen at the lean it's at (`flightFit`): edge to edge level, letterboxed in palette 30 as it leans.
+Turbulence: on the stage a small shake comes every one to four seconds (`turbulenceIn`, six frames
+of the Quake shake), off with the screen shake setting.
+
+The cart (`Cart`, `FlightRules.cartSize`, 40 by 64 art pixels, a plain rectangle until its sprite
+comes) stands in the middle of the aisle and rolls with the pitch at the ball's pull, dragged
+0.005 a frame, no faster than 2, stopping at the walls. Rolling into a body at 0.2 or more it
+knocks them its way (`cartPush`), stuns them, pops the ball out of their hands if they hold it
+(`.cartHit`; HIT, a spark), and can't hit them again for 30 frames.
 
 ## Hoop supports
 

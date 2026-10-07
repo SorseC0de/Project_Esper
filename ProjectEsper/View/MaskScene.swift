@@ -86,10 +86,11 @@ final class MaskScene: SKScene {
     /// `shield`: drawn red under the cut-outs: no glow, its own or any spread onto it.
     func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], under: [BodySnapshot] = [], through: [BodySnapshot] = [],
                 throughFront: [BodySnapshot] = [], throughNets: [CGPath] = [], cutOut: [BodySnapshot] = [], shield: [BodySnapshot] = [],
-                size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat) {
+                size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat, cameraRotation: CGFloat = 0) {
         if self.size != size { self.size = size }
         cameraNode.position = cameraPosition
         cameraNode.setScale(cameraScale)
+        cameraNode.zRotation = cameraRotation
         place(snapshots, in: &bodies, green: false)
         place(shield, in: &shielded, green: false, depth: 2.5, shader: MaskScene.flatRed)
         place(cutOut, in: &cutOuts, green: false, depth: 3, shader: MaskScene.flatBlack)

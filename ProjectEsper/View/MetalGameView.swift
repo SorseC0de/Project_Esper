@@ -332,7 +332,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.syncStatic(scene.staticFlats, version: scene.staticFlatsVersion)
-        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.hoodSnapshots, shield: scene.shieldedSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
+        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.hoodSnapshots, shield: scene.shieldedSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
         maskRenderer.update(atTime: now)
         let maskPass = MTLRenderPassDescriptor()
         maskPass.colorAttachments[0].texture = bodyMask
@@ -401,7 +401,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
               let occluderTexture else { return }
         if cubes.contains(where: { $0.flags.x > 0.5 }) {
             // The bodies as they stand, for the cubes behind them to keep out of.
-            occluderScene.mirror(scene.occluderSnapshots, flat: scene.rimSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale)
+            occluderScene.mirror(scene.occluderSnapshots, flat: scene.rimSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
             occluderRenderer.update(atTime: now)
             let occluderPass = MTLRenderPassDescriptor()
             occluderPass.colorAttachments[0].texture = occluderTexture
@@ -432,14 +432,18 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         descriptor.stencilAttachment.storeAction = .dontCare
         guard let encoder = commands.makeRenderCommandEncoder(descriptor: descriptor) else { return }
         // Scene coordinates to clip space: the camera's middle at the centre, its view the
-        // screen's points times its scale across; a cube's depth sorts only its own faces.
+        // screen's points times its scale across, turned back by the camera's turn (Flight's
+        // lean); a cube's depth sorts only its own faces.
         let viewWidth = Float(scene.size.width * scene.cameraScale), viewHeight = Float(scene.size.height * scene.cameraScale)
         let camera = scene.cameraPosition
+        let turn = Float(scene.cameraRotation)
+        let c = cos(turn), s = sin(turn)
         let projection = simd_float4x4(columns: (
-            SIMD4<Float>(2 / viewWidth, 0, 0, 0),
-            SIMD4<Float>(0, 2 / viewHeight, 0, 0),
+            SIMD4<Float>(2 * c / viewWidth, -2 * s / viewHeight, 0, 0),
+            SIMD4<Float>(2 * s / viewWidth, 2 * c / viewHeight, 0, 0),
             SIMD4<Float>(0, 0, -0.001, 0),
-            SIMD4<Float>(-2 * Float(camera.x) / viewWidth, -2 * Float(camera.y) / viewHeight, 0.5, 1)))
+            SIMD4<Float>(-2 * (c * Float(camera.x) + s * Float(camera.y)) / viewWidth,
+                         -2 * (-s * Float(camera.x) + c * Float(camera.y)) / viewHeight, 0.5, 1)))
         var uniforms = CubeUniforms(viewProjection: projection, light: SIMD4<Float>(-0.4, 0.7, 0.6, 0))
         if let water = scene.waterTint {
             uniforms.waterTop = SIMD4(GlowRenderer.channels(water.top), Float(water.alpha))

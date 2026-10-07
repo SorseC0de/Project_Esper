@@ -105,7 +105,9 @@ public struct Ball: Equatable {
         } else if floater > 0 {
             floater -= 1
         } else if !straight {
-            velocity.y = max(velocity.y - BallRules.gravity * Ball.gravityShare(stage) * pace * pace, -BallRules.fallSpeed * Ball.gravityShare(stage) * pace)
+            // On a pitched stage gravity leans: a share of it sideways.
+            velocity.y = max(velocity.y - BallRules.gravity * Ball.gravityShare(stage) * pace * pace * stage.tiltDown, -BallRules.fallSpeed * Ball.gravityShare(stage) * pace)
+            velocity.x -= BallRules.gravity * Ball.gravityShare(stage) * pace * pace * stage.tiltPull
         }
 
         // The way it came in, for a slope to turn: a block's flat top under the slope may
@@ -185,6 +187,8 @@ public struct Ball: Equatable {
             velocity.x += slope.downhill.sign * BallRules.gravity * Ball.gravityShare(stage) * SlopeRules.diagonal
         } else if onFloor, velocity.y == 0 {
             let share = Ball.gravityShare(stage)
+            // On a pitched stage it rolls downhill.
+            velocity.x -= BallRules.gravity * share * stage.tiltPull
             let slowed = abs(velocity.x) * (1 - BallRules.rollingFriction * share) - BallRules.rollingDrag * share
             velocity.x = slowed > 0 ? (velocity.x < 0 ? -slowed : slowed) : 0
         }

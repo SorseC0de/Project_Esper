@@ -36,22 +36,6 @@ enum SavedStageMap {
     static func value(_ stage: MapStage) -> StageMap? {
         putAsideIfStale(stage)
         let map = UserDefaults.standard.data(forKey: key(stage)).flatMap { try? JSONDecoder().decode(StageMap.self, from: $0) }
-        return stage == .flight ? movedToFlightStride(map) : map
-    }
-
-    /// A Flight map kept when each sheet had 16 columns, its art cells moved to `MapTiles.flightStride`, once.
-    private static let flightStrideKey = "esper.flightMap.artStride"
-    private static func movedToFlightStride(_ kept: StageMap?) -> StageMap? {
-        let defaults = UserDefaults.standard
-        guard defaults.integer(forKey: flightStrideKey) != MapTiles.flightStride else { return kept }
-        defaults.set(MapTiles.flightStride, forKey: flightStrideKey)
-        guard var map = kept else { return nil }
-        map.tiles = map.tiles.map { tile in
-            var moved = tile
-            moved.art.column = tile.art.column / 16 * MapTiles.flightStride + tile.art.column % 16
-            return moved
-        }
-        store(map, for: .flight)
         return map
     }
 
@@ -249,7 +233,6 @@ final class MapEditor: SKNode {
         switch stage {
         case .hoopfishHideaway: .prop(.plant1)
         case .elements: .brush(ElementsArt.filled.first { $0 == StageMap.Cell(3, 3) } ?? ElementsArt.filled[0])
-        case .flight: .brush(MapTiles.flight.filled(sheet: 0).first ?? StageMap.Cell(0, 0))
         }
     }
 

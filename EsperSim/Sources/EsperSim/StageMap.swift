@@ -1,20 +1,18 @@
 /// The stages laid out by hand in the map maker.
 public enum MapStage: String, CaseIterable, Codable {
-    case elements, hoopfishHideaway, flight
+    case elements, hoopfishHideaway
 
     /// Its size in tiles.
     public var columns: Int {
         switch self {
         case .elements: ElementsRules.columns
         case .hoopfishHideaway: HoopfishHideawayRules.columns
-        case .flight: FlightRules.columns
         }
     }
     public var rows: Int {
         switch self {
         case .elements: ElementsRules.rows
         case .hoopfishHideaway: HoopfishHideawayRules.rows
-        case .flight: FlightRules.rows
         }
     }
 }
@@ -220,7 +218,6 @@ public struct StageMap: Equatable, Codable {
     public static func bakedVersion(_ stage: MapStage) -> Int {
         switch stage {
         case .elements, .hoopfishHideaway: 5
-        case .flight: 5
         }
     }
 
@@ -229,43 +226,10 @@ public struct StageMap: Equatable, Codable {
         switch stage {
         case .elements: elementsBaked
         case .hoopfishHideaway: hoopfishHideawayBaked
-        case .flight: flightBaked
         }
     }
     private static let elementsBaked: StageMap = StageMap.defaultMap()
     private static let hoopfishHideawayBaked: StageMap = StageMap.hoopfishHideawayDefaultMap()
-    private static let flightBaked: StageMap = StageMap.flightDefaultMap()
-
-    /// Flight as laid out in the map maker: three rows of floor, the rims at the ends eight rows up,
-    /// the starts near the ends, the ball between the middle two columns at the top.
-    private static func flightDefaultMap() -> StageMap {
-        let walls: [Wall] = [
-            Wall(Cell(0, 0), .solid), Wall(Cell(1, 0), .solid), Wall(Cell(2, 0), .solid), Wall(Cell(3, 0), .solid),
-            Wall(Cell(4, 0), .solid), Wall(Cell(5, 0), .solid), Wall(Cell(6, 0), .solid), Wall(Cell(7, 0), .solid),
-            Wall(Cell(8, 0), .solid), Wall(Cell(9, 0), .solid), Wall(Cell(10, 0), .solid), Wall(Cell(11, 0), .solid),
-            Wall(Cell(12, 0), .solid), Wall(Cell(13, 0), .solid), Wall(Cell(14, 0), .solid),
-            Wall(Cell(15, 0), .solid), Wall(Cell(16, 0), .solid), Wall(Cell(17, 0), .solid),
-            Wall(Cell(18, 0), .solid), Wall(Cell(19, 0), .solid), Wall(Cell(20, 0), .solid),
-            Wall(Cell(21, 0), .solid), Wall(Cell(22, 0), .solid), Wall(Cell(23, 0), .solid),
-            Wall(Cell(24, 0), .solid), Wall(Cell(25, 0), .solid), Wall(Cell(0, 1), .solid), Wall(Cell(1, 1), .solid),
-            Wall(Cell(2, 1), .solid), Wall(Cell(3, 1), .solid), Wall(Cell(4, 1), .solid), Wall(Cell(5, 1), .solid),
-            Wall(Cell(6, 1), .solid), Wall(Cell(7, 1), .solid), Wall(Cell(8, 1), .solid), Wall(Cell(9, 1), .solid),
-            Wall(Cell(10, 1), .solid), Wall(Cell(11, 1), .solid), Wall(Cell(12, 1), .solid),
-            Wall(Cell(13, 1), .solid), Wall(Cell(14, 1), .solid), Wall(Cell(15, 1), .solid),
-            Wall(Cell(16, 1), .solid), Wall(Cell(17, 1), .solid), Wall(Cell(18, 1), .solid),
-            Wall(Cell(19, 1), .solid), Wall(Cell(20, 1), .solid), Wall(Cell(21, 1), .solid),
-            Wall(Cell(22, 1), .solid), Wall(Cell(23, 1), .solid), Wall(Cell(24, 1), .solid),
-            Wall(Cell(25, 1), .solid), Wall(Cell(0, 2), .solid), Wall(Cell(1, 2), .solid), Wall(Cell(2, 2), .solid),
-            Wall(Cell(3, 2), .solid), Wall(Cell(4, 2), .solid), Wall(Cell(5, 2), .solid), Wall(Cell(6, 2), .solid),
-            Wall(Cell(7, 2), .solid), Wall(Cell(8, 2), .solid), Wall(Cell(9, 2), .solid), Wall(Cell(10, 2), .solid),
-            Wall(Cell(11, 2), .solid), Wall(Cell(12, 2), .solid), Wall(Cell(13, 2), .solid),
-            Wall(Cell(14, 2), .solid), Wall(Cell(15, 2), .solid), Wall(Cell(16, 2), .solid),
-            Wall(Cell(17, 2), .solid), Wall(Cell(18, 2), .solid), Wall(Cell(19, 2), .solid),
-            Wall(Cell(20, 2), .solid), Wall(Cell(21, 2), .solid), Wall(Cell(22, 2), .solid),
-            Wall(Cell(23, 2), .solid), Wall(Cell(24, 2), .solid), Wall(Cell(25, 2), .solid),
-        ]
-        return StageMap(leftRim: Cell(0, 8), rightRim: Cell(25, 8), spawns: [Cell(2, 3), Cell(23, 3)], ball: Cell(13, 11), walls: walls)
-    }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.
     public struct Store {
@@ -292,7 +256,6 @@ public struct StageMap: Equatable, Codable {
         let name = switch stage {
         case .elements: "defaultMap"
         case .hoopfishHideaway: "hoopfishHideawayDefaultMap"
-        case .flight: "flightDefaultMap"
         }
         var lines = ["    private static func \(name)() -> StageMap {",
                      "        let tiles: [Placed] = ["]
@@ -435,16 +398,6 @@ public enum IcicleRules {
     public static let width = 5.0
     public static let length = 13.0
 
-}
-
-/// Flight: drawn for 6x, its backdrop 2496 by 1152 screen pixels, 416 by 192 art pixels: 26 tiles
-/// by 12, all of it on a 2532 by 1170 screen at 6x. The bodies were drawn into it at 8 of its
-/// pixels an art pixel (a 48-pixel sheet 192 on the half-size 1248 by 576 canvas), so on it
-/// they're 8 / 6 their size.
-public enum FlightRules {
-    public static let columns = 26
-    public static let rows = 12
-    public static let bodyScale = 8.0 / 6.0
 }
 
 /// Hoopfish Hideaway: 37 by 19, under water, its one rim on the Hoopfish: the background's 17 rows a

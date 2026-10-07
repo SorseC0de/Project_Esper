@@ -1675,8 +1675,9 @@ final class GameScene: SKScene {
     /// The Elements' placed tiles, while it's the stage drawn; Hoopfish Hideaway's props likewise.
     private var elementsArt: ElementsArt.Handles?
     private var flightArt: FlightArt.Handles?
-    /// Flight's cart, a plain rectangle until its sprite comes.
+    /// Flight's cart from its sheet, and its two wheels, which turn as it rolls.
     private var cartNode: SKSpriteNode?
+    private var cartWheels: [SKSpriteNode] = []
     /// Flight's turbulence: frames to the next small shake.
     private var turbulenceIn = 0
     private static let turbulenceGap = 60...240
@@ -1721,6 +1722,7 @@ final class GameScene: SKScene {
         hoopfishHideawayArt = nil
         flightArt = nil
         cartNode = nil
+        cartWheels = []
         fallingIcicles = [:]
         hangingIcicles = [:]
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
@@ -1731,13 +1733,10 @@ final class GameScene: SKScene {
         }
         if stage.features.look == .flight {
             flightArt = FlightArt.build(into: stageGround, front: stageFront)
-            // The cart: a rectangle its size, for now.
-            let cart = SKSpriteNode(color: SKColor(white: 0.9, alpha: 1),
-                                    size: CGSize(width: FlightRules.cartSize.x * SpriteLibrary.pixelsPerUnit, height: FlightRules.cartSize.y * SpriteLibrary.pixelsPerUnit))
-            cart.anchorPoint = .zero
-            cart.zPosition = 5
-            stageGround.addChild(cart)
-            cartNode = cart
+            let cart = FlightArt.cart()
+            stageGround.addChild(cart.node)
+            cartNode = cart.node
+            cartWheels = cart.wheels
             turbulenceIn = Int.random(in: GameScene.turbulenceGap)
         }
         if isElements {
@@ -1967,6 +1966,7 @@ final class GameScene: SKScene {
         hoopfishHideawayArt = nil
         flightArt = nil
         cartNode = nil
+        cartWheels = []
         fallingIcicles = [:]
         hangingIcicles = [:]
         fieldBlooms = []
@@ -3140,9 +3140,17 @@ final class GameScene: SKScene {
 
         if let next = pendingFlow, match.frame >= pendingFlowFrame {
             pendingFlow = nil
-            // The win behind the curtain; the rest straight on, the point's pace kept.
             if next == .won, let flowState {
+                // The win behind the curtain, the sim held under it so no count shows through.
+                session.stopAt = match.frame
                 flowState.transition { [weak self] in self?.enter(.won) }
+            } else if next == .playing {
+                // The point's finish seen out with nobody to pick: the close-in let go and the
+                // round's count again from its start.
+                endFinish()
+                session.mutate { $0.countdown = $0.countdownLength }
+                lastCount = match.countdown
+                enter(.playing)
             } else {
                 enter(next)
             }
@@ -3993,6 +4001,9 @@ final class GameScene: SKScene {
                 applyDrinks()
                 bringPlayersIn()
                 bannerQueue.append((banner, 26))
+                // The finish plays out as it would before a pick, then play goes on.
+                pendingFlow = .playing
+                pendingFlowFrame = frame + GameScene.flowDelayFrames
             }
         } else {
             picker = 1 - scorer
@@ -4831,6 +4842,14 @@ final class GameScene: SKScene {
     private static let finishTimeScale = 0.35
     private var finishTarget: CGPoint?
     private func startFinish() { finishFrames = 1 }
+
+    /// The close-in let go of: the camera back at its base.
+    private func endFinish() {
+        finishFrames = 0
+        finishTarget = nil
+        cameraNode.setScale(cameraBaseScale)
+        glowHud.setScale(cameraNode.xScale * hudScale)
+    }
     /// Art pixels past the screen's edge over which a sound fades to nothing.
     private static let soundFadeMargin: CGFloat = 32
     private static let bounceSoundFloor = 0.6
@@ -6479,10 +6498,12 @@ final class GameScene: SKScene {
     }
     private var portalId = 0
 
-    /// Flight's cart where the sim has it.
+    /// Flight's cart where the sim has it, its wheels turned by how far it's rolled.
     private func drawFlight() {
         guard let cartNode, let cart = match.cart else { return }
         cartNode.position = SpriteLibrary.point(cart.box.min)
+        let turn = -CGFloat(cart.rolled) * SpriteLibrary.pixelsPerUnit / FlightArt.wheelRadius
+        for wheel in cartWheels { wheel.zRotation = turn }
     }
 
     /// Helmets in their defender's colour, facing the way they travel and tipped back 15

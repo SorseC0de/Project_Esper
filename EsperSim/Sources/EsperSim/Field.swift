@@ -173,13 +173,13 @@ extension Match {
         events.append(.helmetSpawned(at: box.center, owner: defender))
     }
 
-    private func stands(_ player: Player, on box: Box) -> Bool {
+    func stands(_ player: Player, on box: Box) -> Bool {
         player.grounded && abs(player.position.y - box.max.y) < 0.01
             && player.body.max.x > box.min.x && player.body.min.x < box.max.x
     }
 
     /// Moved along with a helmet it stands on, stopping at a wall.
-    private mutating func carry(_ index: Int, by dx: Double) {
+    mutating func carry(_ index: Int, by dx: Double) {
         let swept = stage.sweepHorizontally(players[index].body, by: dx)
         players[index].position.x += swept.moved
     }

@@ -17,6 +17,7 @@ of the white is energy, the skid's puffs, a release's streaks, the slide's speed
 which the app draws in the team colour. The sim's Animation.holdsBall and SpriteLibrary
 apply the same rule. Run it again whenever the art changes.
 """
+from pngio import read_png, write_png
 import glob
 import json
 import os
@@ -56,6 +57,7 @@ ROOT_IMAGES = {
     "HoopfishTopfin": ["Stages/Hoopfish Hideaway/Hoopfish/Hoopfish_topfin.png"],
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
     "HoloProjector": ["UI/Holo-Projector_v2.png"],
+    "Cart": ["Stages/Flight/Cart.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")
 LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources", "EsperSim", "BallLandmarks.swift")
@@ -362,6 +364,17 @@ def write_imageset(short, index, png_source=None, png_writer=None):
               open(os.path.join(imageset, "Contents.json"), "w"), indent=2)
 
 
+def copy_as_rgba(source, target):
+    """A picture into the catalog: a colormap PNG written out as plain RGBA, since its palette's
+    transparency is lost on the way through the catalog and its clear colour draws instead."""
+    header = open(source, "rb").read(26)
+    if header[25] == 3:
+        w, h, pixels = read_png(source)
+        write_png(target, w, h, pixels)
+    else:
+        shutil.copy(source, target)
+
+
 def write_root_images():
     """The whole pictures in ROOT_IMAGES, each its own imageset at the catalog's root."""
     root = os.path.dirname(ATLAS)
@@ -371,7 +384,7 @@ def write_root_images():
             shutil.rmtree(imageset)
         os.makedirs(imageset)
         saved = [os.path.join(STRIPS, path) for path in source if os.path.exists(os.path.join(STRIPS, path))]
-        shutil.copy(max(saved, key=os.path.getmtime), os.path.join(imageset, name + ".png"))
+        copy_as_rgba(max(saved, key=os.path.getmtime), os.path.join(imageset, name + ".png"))
         json.dump({"images": [{"filename": name + ".png", "idiom": "universal", "scale": "1x"}],
                    "info": {"author": "xcode", "version": 1}},
                   open(os.path.join(imageset, "Contents.json"), "w"), indent=2)

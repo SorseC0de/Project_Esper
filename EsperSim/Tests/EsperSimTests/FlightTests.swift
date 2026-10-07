@@ -114,5 +114,24 @@ final class FlightTests: XCTestCase {
         XCTAssertTrue(popped, "and the ball left their hands")
         XCTAssertLessThan(match.cart?.box.min.x ?? 0, cartStart, "rolled left, down the lean")
         XCTAssertLessThan(match.players[0].velocity.x, 0, "knocked its way")
+        XCTAssertLessThan(match.cart?.rolled ?? 0, 0, "and its wheels turned that way")
+    }
+
+    func testTheCartIsStoodOnAndRidden() {
+        var match = flight()
+        hold(&match, at: 0)
+        // The second dropped onto the cart's top, level.
+        guard let cart = match.cart else { return XCTFail("no cart") }
+        match.players[1].position = Vec2(x: cart.box.center.x, y: cart.box.max.y + 1)
+        match.players[1].velocity = .zero
+        for _ in 0..<30 { hold(&match, at: 0); match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.players[1].grounded)
+        XCTAssertEqual(match.players[1].position.y, cart.box.max.y, accuracy: 1e-6, "standing on the cart")
+        // The plane leans: the cart rolls, and they go with it.
+        let before = match.players[1].position.x
+        hold(&match, at: FlightRules.tiltMax / 2)
+        for _ in 0..<120 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertLessThan(match.cart?.box.min.x ?? 0, cart.box.min.x, "the cart rolled left")
+        XCTAssertLessThan(match.players[1].position.x, before - 5, "carried along on it")
     }
 }

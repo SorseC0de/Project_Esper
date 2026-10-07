@@ -29,10 +29,11 @@ public enum FlightRules {
     public static let levelFrames = 120
     public static var tiltEveryFrames: Int { tiltOverFrames + tiltHoldFrames + tiltOverFrames + levelFrames }
 
-    /// The cart: 40 by 64 art pixels, rolling with the pitch at the ball's pull, its drag a
-    /// frame, no faster than its most; rolling into a body at least `cartHitSpeed` it knocks
-    /// them its way, the ball out of their hands, and can't hit them again for `cartHitFrames`.
-    public static let cartSize = Vec2(x: 25, y: 40)
+    /// The cart: 16 by 24 art pixels solid (its art 32 tall, the top row nothing), stood on and
+    /// ridden, rolling with the pitch at the ball's pull, its drag a frame, no faster than its
+    /// most; rolling into a body at least `cartHitSpeed` it knocks them its way, the ball out of
+    /// their hands, and can't hit them again for `cartHitFrames`.
+    public static let cartSize = Vec2(x: 10, y: 15)
     public static let cartDrag = 0.005
     public static let cartTopSpeed = 2.0
     public static let cartPush = Vec2(x: 3, y: 2)
@@ -40,10 +41,12 @@ public enum FlightRules {
     public static let cartHitFrames = 30
 }
 
-/// The serving cart on the aisle: where it is, and its speed along it.
+/// The serving cart on the aisle: where it is, its speed along it, and how far it's rolled in
+/// all, for its wheels.
 public struct Cart: Equatable {
     public var box: Box
     public var velocity: Double
+    public var rolled = 0.0
 
     /// In the middle of the aisle, on the floor, still.
     static func starting(on stage: Stage) -> Cart {
@@ -83,6 +86,8 @@ extension Match {
     private mutating func stepCart() {
         guard var cart else { return }
         for index in cartHitFrames.indices where cartHitFrames[index] > 0 { cartHitFrames[index] -= 1 }
+        // Whoever stands on it rides it.
+        let riders = players.indices.filter { stands(players[$0], on: cart.box) }
         // Rolling with the pitch, slowed by its drag, no faster than its most; stopped at the walls.
         cart.velocity -= BallRules.gravity * stage.tiltPull
         let slowed = max(abs(cart.velocity) - FlightRules.cartDrag, 0)
@@ -96,11 +101,17 @@ extension Match {
             left = stage.width - FlightRules.cartSize.x
             cart.velocity = 0
         }
+        let moved = left - cart.box.min.x
+        cart.rolled += moved
         cart.box = Box(min: Vec2(x: left, y: cart.box.min.y), max: Vec2(x: left + FlightRules.cartSize.x, y: cart.box.max.y))
+        self.cart = cart
+        refreshExtras()
+        for index in riders { carry(index, by: moved) }
         // Into a body: the ball out of their hands, and they're knocked its way.
         if abs(cart.velocity) >= FlightRules.cartHitSpeed {
             let way: Double = cart.velocity < 0 ? -1 : 1
-            for index in players.indices where cartHitFrames.indices.contains(index) && cartHitFrames[index] == 0 && players[index].body.overlaps(cart.box) {
+            for index in players.indices where !riders.contains(index) && cartHitFrames.indices.contains(index) && cartHitFrames[index] == 0
+                && players[index].body.overlaps(cart.box) {
                 cartHitFrames[index] = FlightRules.cartHitFrames
                 if ball.holder == index {
                     let from = players[index].heldBallPoint
@@ -114,6 +125,5 @@ extension Match {
                 events.append(.cartHit(player: index, at: cart.box.center))
             }
         }
-        self.cart = cart
     }
 }

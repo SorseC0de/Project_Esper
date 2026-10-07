@@ -91,6 +91,31 @@ enum FlightArt {
     static let backdropScale: CGFloat = 4
 
     /// The backdrop into `parent` on the stage's ground, the front into `front`, over the players.
+    /// The cart's sheet, `Cart`: 48 by 64 drawn at 2x, so 24 by 32 art pixels in 8-pixel cells;
+    /// the cart its first two columns, 16 by 32, standing on its box's bottom left; the wheel the
+    /// bottom right cell, two of them centred on the cart's bottom two cells, a pixel down. The
+    /// wheels turn by the cart's rolling.
+    static let wheelRadius: CGFloat = 3.5
+    static func cart() -> (node: SKSpriteNode, wheels: [SKSpriteNode]) {
+        let sheet = SKTexture(imageNamed: "Cart")
+        sheet.filteringMode = .nearest
+        let body = SKTexture(rect: CGRect(x: 0, y: 0, width: 2 / 3, height: 1), in: sheet)
+        let node = SKSpriteNode(texture: body)
+        node.anchorPoint = .zero
+        node.size = CGSize(width: 16, height: 32)
+        node.zPosition = 5
+        let wheelArt = SKTexture(rect: CGRect(x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 4), in: sheet)
+        let wheels = [4, 12].map { x -> SKSpriteNode in
+            let wheel = SKSpriteNode(texture: wheelArt)
+            wheel.size = CGSize(width: 8, height: 8)
+            wheel.position = CGPoint(x: x, y: 4 - 1)
+            wheel.zPosition = 0.1
+            node.addChild(wheel)
+            return wheel
+        }
+        return (node, wheels)
+    }
+
     static func build(into parent: SKNode, front frontParent: SKNode) -> Handles {
         var handles = Handles()
         func picture(_ name: String, z: CGFloat, into parent: SKNode) -> SKSpriteNode {

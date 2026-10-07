@@ -1822,11 +1822,15 @@ screen at the lean it's at (`flightFit`): edge to edge level, letterboxed in pal
 Turbulence: on the stage a small shake comes every one to four seconds (`turbulenceIn`, six frames
 of the Quake shake), off with the screen shake setting.
 
-The cart (`Cart`, `FlightRules.cartSize`, 40 by 64 art pixels, a plain rectangle until its sprite
-comes) stands in the middle of the aisle and rolls with the pitch at the ball's pull, dragged
-0.005 a frame, no faster than 2, stopping at the walls. Rolling into a body at 0.2 or more it
-knocks them its way (`cartPush`), stuns them, pops the ball out of their hands if they hold it
-(`.cartHit`; HIT, a spark), and can't hit them again for 30 frames.
+The cart (`Cart`, `FlightRules.cartSize`: 16 by 24 art pixels solid, drawn from `Cart`, its
+sheet `Flight/Cart.png`, 48 by 64 drawn at 2x, so 24 by 32 art pixels in 8-pixel cells: the cart
+its first two columns, 16 by 32, the top row of it nothing to stand on; the wheel the bottom
+right cell, two of them centred on the cart's bottom two cells and a pixel down, turning by how
+far it's rolled, `Cart.rolled`, at `FlightArt.wheelRadius`) stands in the middle of the aisle and rolls with the pitch at the
+ball's pull, dragged 0.005 a frame, no faster than 2, stopping at the walls. It's solid, one of
+the stage's extras: stood on, it carries whoever's on it, as a helmet does. Rolling into anyone
+else at 0.2 or more it knocks them its way (`cartPush`), stuns them, pops the ball out of their
+hands if they hold it (`.cartHit`; HIT, a spark), and can't hit them again for 30 frames.
 
 ## Hoop supports
 
@@ -1986,7 +1990,9 @@ shown, once, like the effects.
   easing in on the ball to 0.55 of its view over 40 frames and then staying on it, in a hand or
   loose (where it was last seen while it's drawn nowhere), on Hoopfish Hideaway and the Elements kept inside the
   stage's sides, the HUD keeping its size, until
-  the win screen; from the winning bucket nobody moves or catches (`Match.finished`: no inputs,
+  the win screen (the sim held under its fade) or the Greateraid pick, or, with the computer
+  scored on and drinking at once, until the pick would have come (`pendingFlow` `.playing`, 60
+  frames), when the close-in lets go and the count starts again from 3; from the winning bucket nobody moves or catches (`Match.finished`: no inputs,
   the computer's among them, and no catches); otherwise a line drawn by weight: the generic score (score, -2, -3,
   whatascore) always in at 4, a dunk's (slamdunk, -2, -3, dunk) at 2 on a dunk, the wrist work
   (watchthewristwork, -2) at 1 on any other shot and 2 on a floater (`Ball.floaterShot`,

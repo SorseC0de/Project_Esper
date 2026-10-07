@@ -129,13 +129,15 @@ final class TouchControls: SKNode {
         // WALLS under HITBOX.
         wallsButton.position = CGPoint(x: hitboxButton.position.x, y: hitboxButton.position.y - (TouchControls.cornerSize.height + 6) * k)
         addChild(wallsButton)
+        // The switches for working on the game, in a debug build only.
+        for button in [hitboxButton, wallsButton, aiButton] { button.isHidden = !DebugUI.enabled }
     }
 
     /// Online there's no reset, no pause, no computer and no tuning: only the pad and HITBOX.
     func setOnline(_ online: Bool) {
         resetButton.isHidden = online
         pauseButton.isHidden = online
-        aiButton.isHidden = online
+        aiButton.isHidden = online || !DebugUI.enabled
         for picker in pickers { picker.isHidden = online }
         for slider in sliders { slider.isHidden = online }
     }
@@ -238,12 +240,12 @@ final class TouchControls: SKNode {
             onPause?()
             return
         }
-        if hitboxButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
+        if !hitboxButton.isHidden, hitboxButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             showHitboxes.toggle()
             onToggleHitboxes?(showHitboxes)
             return
         }
-        if wallsButton.frame.insetBy(dx: -8, dy: -3).contains(point) {
+        if !wallsButton.isHidden, wallsButton.frame.insetBy(dx: -8, dy: -3).contains(point) {
             showWalls.toggle()
             onToggleWalls?(showWalls)
             return

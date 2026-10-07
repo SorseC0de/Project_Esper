@@ -995,6 +995,12 @@ art pixel, 4 to start).
 
 ## Tuning pickers
 
+All of these are for working on the game, and a debug build only has them: `DebugUI.enabled`
+gates the tuning panel and the title's UI and FONT switches and colour grids, the customize
+screen's TUNE panel, the pickers and sliders over the pad, the HITBOX, WALLS and AI switches,
+the state readout, and L1, L2 and the FLO number keys. A Release build, the testers', has
+none; PAUSE, RESET and R3 stay.
+
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
 holds the variants; A is always the baseline as tuned. POWER's fourteen sit in two rows of seven.
 

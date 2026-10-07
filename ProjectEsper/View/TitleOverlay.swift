@@ -312,6 +312,10 @@ enum TitleItem: Hashable {
         [.bestOfSeven, .fortySeven, .zones],
         [.vsCPU, .vsHuman],
         [.multiplayer],
+    ] + (DebugUI.enabled ? debugRows : [])
+
+    /// The colour grids' tabs and swatches and the UI and FONT switches, in a debug build.
+    static let debugRows: [[TitleItem]] = [
         UIColourPicks.Grid.allCases.flatMap { grid in UIColourPicks.Tone.allCases.map { TitleItem.toneTab(grid, $0) } },
     ] + stride(from: 0, to: EsperPalette.swatches.count, by: swatchesPerRow).map { start in
         // The grids side by side, bottom left.
@@ -353,25 +357,7 @@ struct TitleOverlay: View {
                         .padding(.trailing, 18)
                 }
                 .overlay(alignment: .bottomLeading) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(alignment: .bottom, spacing: 8) {
-                            ForEach(UIColourPicks.Grid.allCases, id: \.self) { grid in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    pickerLabel(grid.label)
-                                    HStack(spacing: 4) {
-                                        ForEach(UIColourPicks.Tone.allCases, id: \.self) { tone in toneTab(grid, tone) }
-                                    }
-                                    SwatchGrid(flow: flow, grid: grid)
-                                }
-                            }
-                        }
-                        HStack(spacing: 8) {
-                            small("UI", picked: flow.tuningOpen, item: .tuning)
-                            small(TitleText.bigdex ? "FONT B" : "FONT A", picked: TitleText.bigdex, item: .titleFont)
-                        }
-                    }
-                        .padding(.bottom, 20)
-                        .padding(.leading, 24)
+                    if DebugUI.enabled { colourGrids }
                 }
             VStack(spacing: 22 * scale(.buttons)) {
                 Image(uiImage: TitleText.image("PROJECT ESPER", size: 56 * scale(.titles)))
@@ -439,6 +425,29 @@ struct TitleOverlay: View {
         .disabled(busy && item != .tuning)
         .scaleEffect(flow.titleCursor == item ? TitleOverlay.cursorGrowth : 1)
         .noSystemFocus()
+    }
+
+    /// The UI's colour grids and the UI and FONT switches, bottom left: for working on the game.
+    private var colourGrids: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(UIColourPicks.Grid.allCases, id: \.self) { grid in
+                    VStack(alignment: .leading, spacing: 4) {
+                        pickerLabel(grid.label)
+                        HStack(spacing: 4) {
+                            ForEach(UIColourPicks.Tone.allCases, id: \.self) { tone in toneTab(grid, tone) }
+                        }
+                        SwatchGrid(flow: flow, grid: grid)
+                    }
+                }
+            }
+            HStack(spacing: 8) {
+                small("UI", picked: flow.tuningOpen, item: .tuning)
+                small(TitleText.bigdex ? "FONT B" : "FONT A", picked: TitleText.bigdex, item: .titleFont)
+            }
+        }
+        .padding(.bottom, 20)
+        .padding(.leading, 24)
     }
 
     private func pickerLabel(_ text: String) -> some View {

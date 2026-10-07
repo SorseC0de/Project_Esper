@@ -391,7 +391,7 @@ struct CustomizeScreen: View {
                 ForEach(0..<2, id: \.self) { player in side(player, size) }
                 middle(size)
                 returnButton(size)
-                tuning(size)
+                if DebugUI.enabled { tuning(size) }
             }
             .frame(width: size.width, height: size.height)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)

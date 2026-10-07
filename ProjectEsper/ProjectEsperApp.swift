@@ -55,7 +55,7 @@ struct GameView: View {
                 SettingsScreen(flow: flow)
                     .transition(.opacity)
             }
-            if flow.tuningOpen {
+            if DebugUI.enabled, flow.tuningOpen {
                 UITuningPanel(flow: flow)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(20)

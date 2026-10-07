@@ -1153,6 +1153,7 @@ final class GameScene: SKScene {
         debugLabel.horizontalAlignmentMode = .left
         debugLabel.verticalAlignmentMode = .top
         debugLabel.numberOfLines = 0
+        debugLabel.isHidden = !DebugUI.enabled
         hud.addChild(debugLabel)
 
         fpsLabel.fontName = "Menlo-Bold"
@@ -2870,6 +2871,8 @@ final class GameScene: SKScene {
         controls.onToggleWalls = { [weak self] on in self?.showWalls = on }
         controls.aiOn = aiOn
         controls.onToggleAI = { [weak self] on in self?.aiOn = on }
+        // The pickers and sliders for working on the game, in a debug build only.
+        if DebugUI.enabled {
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
             self?.headVariant = HeadVariant(rawValue: index)!
         }
@@ -3047,6 +3050,7 @@ final class GameScene: SKScene {
                 ySlider.set(Float(DunkArt.offsets(for: dunkLook)[DunkTuning.frame].y))
             }
         }
+        }
         controls.setOnline(online != nil)
         controls.isHidden = !GameScene.touchControlsShown
         hud.addChild(controls)
@@ -3223,19 +3227,19 @@ final class GameScene: SKScene {
             render()
             return
         }
-        if hub.consumeCycle() { controls?.cyclePicker(titled: "POWER") }
+        if DebugUI.enabled, hub.consumeCycle() { controls?.cyclePicker(titled: "POWER") }
         if online == nil, hub.consumeAIToggle() {
             aiOn.toggle()
             controls?.aiOn = aiOn
         }
         // Testing FLO, offline: 1 to 3 the first player's, 4 to 6 the second's.
-        if let asked = hub.consumeFloSet(), online == nil {
+        if DebugUI.enabled, let asked = hub.consumeFloSet(), online == nil {
             session.mutate { match in
                 guard match.players.indices.contains(asked.player) else { return }
                 match.players[asked.player].flo = asked.flo
             }
         }
-        if hub.consumeHitboxToggle() {
+        if DebugUI.enabled, hub.consumeHitboxToggle() {
             showHitboxes.toggle()
             controls?.showHitboxes = showHitboxes
         }
@@ -7560,6 +7564,7 @@ final class GameScene: SKScene {
         fpsLabel.isHidden = !GameScene.diagnosingPerformance
         if GameScene.diagnosingPerformance { fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms\n\(frameReadout)" }
         let p = match.players[localIndex]
+        if DebugUI.enabled {
         let side: String
         if online != nil {
             side = "  net lead \(session.frame - session.remoteFrame) rollbacks \(session.rollbacks)/\(session.framesRerun)\(session.desynced ? "  DESYNC" : "")"
@@ -7570,6 +7575,7 @@ final class GameScene: SKScene {
                                  String(describing: p.state), p.stateTimer, p.velocity.x, p.velocity.y,
                                  lastLocalInput.stick.x, lastLocalInput.stick.y, p.jumpsLeft,
                                  p.hasBall ? "  ball" : "", hub.playerOneHasController ? "  pad" : "", side)
+        }
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"

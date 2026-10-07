@@ -33,6 +33,8 @@ public enum Animation: String, CaseIterable {
     case esperSlash = "player_esperslash"
     case snatch = "player_snatch"
     case snatchAir = "player_snatch_air"
+    /// In FloState, the snatch on the ground drawn in its own sheet.
+    case snatchFloState = "player_snatch_flostate"
     case ledge = "player_ledge"
     case dunk = "player_dunk"
     case gunShoot = "player_gun_shoot"
@@ -60,6 +62,7 @@ public enum Animation: String, CaseIterable {
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall, .fly, .flyBall: 3
         case .jumpSquat: 4
         case .doubleJump, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
+        case .snatchFloState: 7
         case .land: 9
         case .shoot: 10
         case .shootAir, .taunt: 11
@@ -217,6 +220,10 @@ extension Player {
             // The double jump's somersault, run through in the roll's frames.
             return AnimationFrame(.doubleJump, t * SlashRules.sheetFramesPerSecond / 60)
         case .snatching, .walling:
+            // In FloState on the ground, its own sheet at the same timing, its last frame held.
+            if grounded, inFloState, state == .snatching {
+                return AnimationFrame(.snatchFloState, min(SnatchRules.sheetFrame(at: t), Animation.snatchFloState.frameCount - 1))
+            }
             return AnimationFrame(grounded ? .snatch : .snatchAir, SnatchRules.sheetFrame(at: t))
         case .ledgeHang:
             return AnimationFrame(.ledge, (t - 1) * 12 / 60)

@@ -151,7 +151,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   and boots or not) in the regular energy colour (`Dressing.energyFormBare`), all of it glowing; so
   clothes picked later follow on their own. The face's lightest tone is held to a grey level of 0.6
   (`SpriteLibrary.energyFaceLevel`): lime's, at 0.76, burned the features out in the glow (gold and
-  teal come down a touch). From the change's first frame to its burst on the sheet's third
+  teal come down a touch). The snatch on the ground in FloState is drawn from
+  `player_snatch_flostate`, seven frames at the snatch's own timing, its last held (protocol 101).
+  From the change's first frame to its burst on the sheet's third
   (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`ZRules.burstRadius`) is
   parried as a snatch parries one, before the blades are resolved; at the burst everything else
   near is pushed away as Z Tea's burst pushes it, the other unstunned, the ball sent too (protocol

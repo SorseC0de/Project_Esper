@@ -29,6 +29,22 @@ final class TransformTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .transforming)
     }
 
+    func testTheSnatchInFloStateIsDrawnFromItsOwnSheet() {
+        var match = standing()
+        match.players[0].inFloState = true
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertEqual(match.players[0].state, .snatching)
+        XCTAssertEqual(match.players[0].animationFrame.animation, .snatchFloState)
+        // Its seven frames under the snatch's timing: never past the last.
+        for _ in 0..<SnatchRules.frames {
+            XCTAssertLessThan(match.players[0].animationFrame.frame, Animation.snatchFloState.frameCount)
+            match.advance(inputs: [.idle, .idle])
+        }
+        var human = standing()
+        human.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        XCTAssertEqual(human.players[0].animationFrame.animation, .snatch)
+    }
+
     func testTheChangesBurstPushesTheOtherAndTheBallAway() {
         var match = standing()
         match.players[1].position = Vec2(x: 120, y: 10)

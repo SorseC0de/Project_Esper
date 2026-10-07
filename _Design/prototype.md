@@ -681,7 +681,8 @@ A disconnect on the screen closes it to the title.
   lens, 6 up from it (`CustomizeScreen.projectorScale` and the rest).
 - The player's line a whole art pixel thick, drawn apart from the figure in the look's line colour.
 - Tuning, low in the middle (HIDE/TUNE), kept between launches: HEAD X and HEAD Y in art pixels
-  and HEAD SCALE in tenths (1, 1, 1 to start); NAME Y (26); FONT, cycling the face of everything
+  and HEAD SCALE in tenths (1, 1, 1 to start); NAME Y (26); DRIFT Y, where the figures stand after
+  the launch's drift, art pixels up from the middle button's centre (0); FONT, cycling the face of everything
   but START and the big H.O.O.D. between the finalists (`CustomizeFont.finalists`, alphabetically:
   BM Army, Board of Directors, Kapel, Upheaval, Kapel to start), each sized so its capitals stand
   as Bigdex's would; LETTER GAP, the space between the side labels' stacked letters, in points of

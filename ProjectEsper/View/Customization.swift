@@ -297,6 +297,8 @@ struct CustomizeScreen: View {
     /// How much further from the screen's middle each side's H.O.O.D. and its words sit, in
     /// points of the screen at 1080 high.
     @AppStorage("esper.customize.hoodSpread.2") private var hoodSpread = 112.0
+    /// Where the figures stand after the launch's drift, in art pixels up from the middle button's centre.
+    @AppStorage("esper.customize.driftY") private var driftY = 0.0
 
     init(flow: FlowState) {
         self.flow = flow
@@ -584,7 +586,7 @@ struct CustomizeScreen: View {
                 .animation(.easeOut(duration: 0.2), value: ready)
                 .allowsHitTesting(false)
                 .position(x: launched ? CustomizeScreen.driftX(for: player, portrait: portrait, start: start, pixel: playerPixel) : ring.x,
-                          y: launched ? start.midY - (CustomizeScreen.feetRow - 24) * playerPixel : figureMiddle)
+                          y: launched ? start.midY - (CustomizeScreen.feetRow - 24 + driftY) * playerPixel : figureMiddle)
                 .animation(.easeIn(duration: CustomizeScreen.driftSeconds).delay(CustomizeScreen.driftDelaySeconds), value: launched)
             // From each arm and leg box to its limb on the player: the outer boxes the shown
             // front limbs', the inner the back's, as the boxes tick them. The bracers' leave the
@@ -874,6 +876,7 @@ struct CustomizeScreen: View {
                 }
                 tuningRow("LETTER GAP", value: $letterGap, step: 1, range: -20...20, format: "%.0f")
                 tuningRow("HOOD SPREAD", value: $hoodSpread, step: 1, range: -200...200, format: "%.0f")
+                tuningRow("DRIFT Y", value: $driftY, step: 1, range: -64...64, format: "%.0f")
                 tuningRow("HEAD X", value: $headX, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD Y", value: $headY, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD SCALE", value: $headScale, step: 0.1, range: 0.5...2, format: "×%.1f")

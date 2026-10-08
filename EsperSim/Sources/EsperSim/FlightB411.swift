@@ -61,14 +61,15 @@ public enum FlightB411Rules {
     /// suitcase's top, which hangs `hoopcaseDrop` under the bin's bottom, the HOOPCASE Y
     /// slider's, offline; online every phone plays the default.
     public static let rimUnderCase = 18.0
-    public static let defaultHoopcaseDrop = 0.0
+    public static let defaultHoopcaseDrop = -17.0
     nonisolated(unsafe) public static var hoopcaseDrop = defaultHoopcaseDrop
+    /// The hoopcase slides out of its bin over this many frames, and back in as it retreats.
+    public static let caseSlideFrames = 20
 
     /// A start: the plane level and the bins still through the count and this long after.
     public static let startLevelFrames = 7 * 60
-    /// The bins' cycle: a bin opens every `binEveryFrames`, for `binOpenFrames`, with nothing in
-    /// it, or one side's hoop, or the other's; never a second hoop while one is out.
-    public static let binEveryFrames = 300
+    /// The bins' cycle: one bin open at a time, for `binOpenFrames`, then another, never the
+    /// same one twice running, with nothing in it, or one side's hoop, or the other's.
     public static let binOpenFrames = 600
 
     /// Where a bin is: its middle, and the ball's wait in its mouth, and its hoopcase's ring.
@@ -77,7 +78,8 @@ public enum FlightB411Rules {
     public static func rimSpot(in index: Int) -> Vec2 { Vec2(x: binCentre(index), y: binBottom - (hoopcaseDrop + rimUnderCase) * 0.625) }
 }
 
-/// An overhead bin: shut, or open with what's in it, and the frames it stays open.
+/// An overhead bin: shut, or open with what's in it, and the frames it stays open; its
+/// hoopcase's slide, out from the bin to 1, and whether it's on its way back in.
 public struct Bin: Equatable {
     public enum Load: Equatable {
         case empty
@@ -87,6 +89,17 @@ public struct Bin: Equatable {
     public var open = false
     public var load = Load.empty
     public var framesLeft = 0
+    /// Frames of the case's slide done, out of `FlightB411Rules.caseSlideFrames`.
+    public var caseFrames = 0
+    public var retreating = false
+
+    /// How far the case is out, 0 in the bin to 1 hanging.
+    public var caseOut: Double { Double(caseFrames) / Double(FlightB411Rules.caseSlideFrames) }
+    /// Whether its hoop is out to be scored on: all the way out and not on its way back.
+    public var hoopLive: Bool {
+        if case .hoop = load { return open && !retreating && caseFrames >= FlightB411Rules.caseSlideFrames }
+        return false
+    }
 }
 
 /// The serving cart on the aisle: where it is, its speed along it, and how far it's rolled in
@@ -109,6 +122,7 @@ extension Match {
     mutating func startFlightB411() {
         bins = Array(repeating: Bin(), count: FlightB411Rules.binLefts.count)
         startFromBin(FlightB411Rules.centreBin)
+        lastBin = FlightB411Rules.centreBin
         for index in stage.hoops.indices { stage.hoops[index].position = HighwayRules.parked }
     }
 
@@ -120,6 +134,7 @@ extension Match {
         bins[index].open = true
         bins[index].framesLeft = countdown + FlightB411Rules.startLevelFrames
         ballBin = index
+        lastBin = index
         ball.respawn(at: FlightB411Rules.ballSpot(in: index))
     }
 
@@ -161,33 +176,57 @@ extension Match {
         stepCart()
     }
 
-    /// The bins: the ball held in its bin's mouth through the count, then dropped; after the
-    /// start's level spell, every so often an open bin shuts and another opens with nothing, or a
-    /// hoop, never a second hoop while one's out. A hoop's rim hangs where its bin is, or is away.
+    /// The bins: the ball held in its bin's mouth through the count, then dropped. One bin is
+    /// open at a time: its spell over, its hoopcase, if it has one, slides back in, then it
+    /// shuts and another opens, never the same one twice running, with nothing, or one side's
+    /// hoop, or the other's, which slides out. A hoop's rim hangs where its case is once it's
+    /// all the way out, and is away otherwise.
     private mutating func stepBins() {
         guard !bins.isEmpty else { return }
         // The ball's wait in its bin (held in `advance`) is over with the count.
         if ballBin != nil, countdown == 0 || ball.holder != nil { ballBin = nil }
         for index in bins.indices where bins[index].open {
-            bins[index].framesLeft -= 1
-            if bins[index].framesLeft <= 0 { bins[index] = Bin() }
-        }
-        if frame >= flightStartsAt, (frame - flightStartsAt) % FlightB411Rules.binEveryFrames == 0 {
-            let shut = bins.indices.filter { !bins[$0].open }
-            if !shut.isEmpty {
-                let index = shut[fieldDice.roll(shut.count)]
-                let hoopOut = bins.contains { if case .hoop = $0.load { return $0.open } else { return false } }
-                let roll = fieldDice.roll(3)
-                bins[index].open = true
-                bins[index].framesLeft = FlightB411Rules.binOpenFrames
-                bins[index].load = hoopOut || roll == 0 ? .empty : .hoop(owner: roll - 1)
+            if bins[index].retreating {
+                bins[index].caseFrames = max(bins[index].caseFrames - 1, 0)
+                if bins[index].caseFrames == 0 { bins[index] = Bin() }
+                continue
             }
+            if case .hoop = bins[index].load { bins[index].caseFrames = min(bins[index].caseFrames + 1, FlightB411Rules.caseSlideFrames) }
+            bins[index].framesLeft -= 1
+            if bins[index].framesLeft <= 0 {
+                if case .hoop = bins[index].load, bins[index].caseFrames > 0 {
+                    bins[index].retreating = true
+                } else {
+                    bins[index] = Bin()
+                }
+            }
+        }
+        // None open, past the start's spell: the next, any but the last.
+        if frame >= flightStartsAt, !bins.contains(where: \.open) {
+            let choices = bins.indices.filter { $0 != lastBin }
+            let index = choices[fieldDice.roll(choices.count)]
+            let roll = fieldDice.roll(3)
+            bins[index].open = true
+            bins[index].framesLeft = FlightB411Rules.binOpenFrames
+            bins[index].load = roll == 0 ? .empty : .hoop(owner: roll - 1)
+            lastBin = index
         }
         for hoop in stage.hoops.indices {
             let owner = stage.hoops[hoop].owner
-            let holding = bins.indices.first { bins[$0].open && bins[$0].load == .hoop(owner: owner) }
+            let holding = bins.indices.first { bins[$0].hoopLive && bins[$0].load == .hoop(owner: owner) }
             stage.hoops[hoop].position = holding.map(FlightB411Rules.rimSpot) ?? HighwayRules.parked
         }
+    }
+
+    /// Scored on: the hoop's case retreats into its bin at once, which then shuts and the next
+    /// opens, so the same hoop can't take the ball twice.
+    mutating func flightB411Scored(on hoop: Int) {
+        guard stage.features.tilts, stage.hoops.indices.contains(hoop) else { return }
+        let owner = stage.hoops[hoop].owner
+        for index in bins.indices where bins[index].open && bins[index].load == .hoop(owner: owner) {
+            bins[index].retreating = true
+        }
+        stage.hoops[hoop].position = HighwayRules.parked
     }
 
     private mutating func stepCart() {

@@ -553,8 +553,13 @@ final class GameScene: SKScene {
 
     /// What glows on Hoopfish Hideaway over its background, which doesn't: the Hoopfish's rings and eye.
     var glowThroughSnapshots: [BodySnapshot] {
-        guard let art = hoopfishHideawayArt else { return [] }
-        return art.fishGlowParts
+        if let art = hoopfishHideawayArt { return art.fishGlowParts }
+        // Flight B411's NO DUNKING sign and its red "no", glowing through the backdrop's flat.
+        guard let holder = noDunkingNode, !holder.isHidden else { return [] }
+        return noDunkingSprites.compactMap { sprite in
+            sprite.texture.map { BodySnapshot(texture: $0, position: CGPoint(x: holder.position.x + sprite.position.x * holder.xScale, y: holder.position.y + sprite.position.y * holder.yScale),
+                                              anchor: sprite.anchorPoint, xScale: 1, size: CGSize(width: sprite.size.width * holder.xScale, height: sprite.size.height * holder.yScale)) }
+        }
     }
 
     /// Hoopfish Hideaway's rims, in front of the Hoopfish, glowing through its mask.
@@ -846,8 +851,8 @@ final class GameScene: SKScene {
         for (index, side) in PlayerCustomization.sides.enumerated() {
             sprites.setLook(side.look, for: index)
         }
-        // The sky beyond the plane, under the world.
-        skyNode.zPosition = -1
+        // The sky beyond the plane, under everything of the world's, the stage's ground too.
+        skyNode.zPosition = -100
         addChild(skyNode)
         addChild(world)
         world.addChild(ground)
@@ -1687,7 +1692,13 @@ final class GameScene: SKScene {
     /// sim has the rim or away with it; and the sky beyond the plane, with its clouds, on the
     /// camera and turned back level, behind the world.
     private var openBinNodes: [SKSpriteNode] = []
+    /// Each hoop's case in two: the back, with the suitcase, and the ring's front half over the
+    /// net and the ball; the sheet they're cut from; and the sign, with its sprites for the glow.
     private var hoopcaseNodes: [SKSpriteNode] = []
+    private var hoopcaseFronts: [SKSpriteNode] = []
+    private var hoopcaseSheets: [SKTexture] = []
+    private var noDunkingNode: SKNode?
+    private var noDunkingSprites: [SKSpriteNode] = []
     private let skyNode = SKNode()
     private var clouds: [(node: SKSpriteNode, speed: CGFloat)] = []
     private static let cloudCount = 6
@@ -1751,6 +1762,11 @@ final class GameScene: SKScene {
         cartWheels = []
         openBinNodes = []
         hoopcaseNodes = []
+        hoopcaseFronts.forEach { $0.removeFromParent() }
+        hoopcaseFronts = []
+        hoopcaseSheets = []
+        noDunkingNode = nil
+        noDunkingSprites = []
         skyNode.removeAllChildren()
         clouds = []
         fallingIcicles = [:]
@@ -1769,16 +1785,27 @@ final class GameScene: SKScene {
             cartNode = cart.node
             cartWheels = cart.wheels
             openBinNodes = FlightB411Art.openBins(into: stageGround)
-            _ = FlightB411Art.noDunkingSign(into: stageGround)
-            // The hoopcases, in the colour of the side guarding each hoop, as its net is.
-            hoopcaseNodes = stage.hoops.map { hoop in
+            let sign = FlightB411Art.noDunkingSign(into: stageGround)
+            noDunkingNode = sign.holder
+            noDunkingSprites = sign.sprites
+            // The hoopcases, in the colour of the side guarding each hoop, as its net is: the
+            // back under the net, the ring's front over the ball.
+            hoopcaseSheets = stage.hoops.map { hoop in
                 let colour = sideColours.indices.contains(1 - hoop.owner) ? sideColours[1 - hoop.owner] : sideColours[0]
-                let node = SKSpriteNode(texture: FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), shade: SKColor(rgb: colour.rampDown)))
-                node.anchorPoint = .zero
-                node.size = CGSize(width: FlightB411Art.hoopcaseCanvas, height: FlightB411Art.hoopcaseCanvas)
-                node.zPosition = 5.5
+                return FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body)) ?? SKTexture()
+            }
+            hoopcaseNodes = stage.hoops.map { _ in
+                let node = SKSpriteNode()
+                node.zPosition = 5.4
                 node.isHidden = true
                 stageGround.addChild(node)
+                return node
+            }
+            hoopcaseFronts = stage.hoops.map { _ in
+                let node = SKSpriteNode()
+                node.zPosition = GameScene.rimFrontZ
+                node.isHidden = true
+                glowers.addChild(node)
                 return node
             }
             // The clouds, scattered over the sky, each its own size and pace, left to right.
@@ -2024,6 +2051,11 @@ final class GameScene: SKScene {
         cartWheels = []
         openBinNodes = []
         hoopcaseNodes = []
+        hoopcaseFronts.forEach { $0.removeFromParent() }
+        hoopcaseFronts = []
+        hoopcaseSheets = []
+        noDunkingNode = nil
+        noDunkingSprites = []
         skyNode.removeAllChildren()
         clouds = []
         fallingIcicles = [:]
@@ -3022,6 +3054,11 @@ final class GameScene: SKScene {
                 FlightB411Rules.hoopcaseDrop = Double(value)
                 UserDefaults.standard.set(Double(value), forKey: GameScene.hoopcaseDropKey)
             }
+            controls.addSlider(title: "NO DUNK SCALE", range: 0.5...4, notch: 0.25, value: Float(FlightB411Art.signScale)) { value in
+                FlightB411Art.signScale = CGFloat(value)
+                UserDefaults.standard.set(Double(value), forKey: FlightB411Art.signScaleKey)
+            }
+            addNetSliders(.flightB411)
         }
         // The bounds gallery only means anything on the highway.
         if match.stage.features.traffic {
@@ -4744,9 +4781,9 @@ final class GameScene: SKScene {
         for (index, colour) in colours.enumerated() { sprites.setLook(looks.map { $0[index] } ?? colour.look, for: index) }
         sideColours = colours
         // Flight B411's hoopcases in the new colours, each its hoop's guard's.
-        for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseNodes.count && colours.indices.contains(1 - hoop.owner) {
+        for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseSheets.count && colours.indices.contains(1 - hoop.owner) {
             let colour = colours[1 - hoop.owner]
-            hoopcaseNodes[index].texture = FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), shade: SKColor(rgb: colour.rampDown))
+            hoopcaseSheets[index] = FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body)) ?? SKTexture()
         }
         headStreamsCache = [:]
         for (index, flashes) in zip(stunBodies.indices, zip(stunBodies, stunHeads)) {
@@ -6589,22 +6626,32 @@ final class GameScene: SKScene {
     /// the clouds on their way.
     private func drawFlightB411() {
         guard match.stage.features.tilts else { return }
+        let tilt = CGFloat(match.stage.tilt)
         if let cartNode, let cart = match.cart {
-            cartNode.position = SpriteLibrary.point(cart.box.min)
+            // On its wheels' line, tipped a little by the lean and by its speed.
+            cartNode.position = SpriteLibrary.point(Vec2(x: cart.box.center.x, y: cart.box.min.y))
+            cartNode.zRotation = -tilt * FlightB411Art.cartLean - CGFloat(cart.velocity) * FlightB411Art.cartSpeedTip
             let turn = -CGFloat(cart.rolled) * SpriteLibrary.pixelsPerUnit / FlightB411Art.wheelRadius
             for wheel in cartWheels { wheel.zRotation = turn }
         }
         for (index, door) in openBinNodes.enumerated() where match.bins.indices.contains(index) {
             door.isHidden = !match.bins[index].open
         }
-        for (index, hoop) in match.stage.hoops.enumerated() {
-            let away = hoop.position == HighwayRules.parked
-            if index < hoopcaseNodes.count {
-                hoopcaseNodes[index].isHidden = away
-                let rim = SpriteLibrary.point(hoop.position)
-                hoopcaseNodes[index].position = CGPoint(x: rim.x - FlightB411Art.hoopcaseRing.x,
-                                                        y: rim.y + FlightB411Art.hoopcaseRing.y - FlightB411Art.hoopcaseCanvas)
+        noDunkingNode?.setScale(FlightB411Art.signScale)
+        // Each hoop's case: hanging from its bin's mask line, as far out as its slide is, swung
+        // a share of the lean about that line; away with nothing to hang from.
+        for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseNodes.count && index < hoopcaseFronts.count {
+            let bin = match.bins.indices.first { match.bins[$0].open && match.bins[$0].load == .hoop(owner: hoop.owner) }
+            guard let bin else {
+                hoopcaseNodes[index].isHidden = true
+                hoopcaseFronts[index].isHidden = true
+                continue
             }
+            let rim = SpriteLibrary.point(FlightB411Rules.rimSpot(in: bin))
+            // The mask line: the suitcase's top at rest, less the masked rows.
+            let line = CGPoint(x: rim.x, y: rim.y + FlightB411Art.hoopcaseRing.y - FlightB411Art.caseTopRow - FlightB411Art.caseMaskRows)
+            FlightB411Art.layCase(back: hoopcaseNodes[index], front: hoopcaseFronts[index], sheet: hoopcaseSheets[index],
+                                  out: CGFloat(match.bins[bin].caseOut), anchor: line, swing: -tilt * FlightB411Art.caseSwing)
         }
         skyNode.position = cameraNode.position
         for index in clouds.indices {
@@ -6616,7 +6663,7 @@ final class GameScene: SKScene {
     /// A cloud somewhere over the sky, or just off its left edge, its own size and pace.
     private func placeCloud(_ index: Int, fromTheLeft: Bool) {
         let cloud = clouds[index].node
-        let scale = CGFloat.random(in: 0.25...0.75)
+        let scale = CGFloat.random(in: 0.5...2.5)
         cloud.size = CGSize(width: 192 * scale, height: 64 * scale)
         cloud.position = CGPoint(x: fromTheLeft ? -size.width / 2 - cloud.size.width / 2 : CGFloat.random(in: -size.width / 2...size.width / 2),
                                  y: CGFloat.random(in: -size.height / 2...size.height / 2))

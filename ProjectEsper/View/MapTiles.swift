@@ -101,11 +101,12 @@ enum FlightB411Art {
         sheet.filteringMode = .nearest
         let body = SKTexture(rect: CGRect(x: 0, y: 0, width: 2.0 / 3.0, height: 1), in: sheet)
         let node = SKSpriteNode(texture: body)
-        node.anchorPoint = .zero
+        // Stood on its wheels' line, so it tips about them.
+        node.anchorPoint = CGPoint(x: 0.5, y: 0)
         node.size = CGSize(width: 16, height: 32)
         node.zPosition = 5
         let wheelArt = SKTexture(rect: CGRect(x: 2.0 / 3.0, y: 0, width: 1.0 / 3.0, height: 0.25), in: sheet)
-        let wheels = [4, 12].map { x -> SKSpriteNode in
+        let wheels = [-4, 4].map { x -> SKSpriteNode in
             let wheel = SKSpriteNode(texture: wheelArt)
             wheel.size = CGSize(width: 8, height: 8)
             wheel.position = CGPoint(x: x, y: 4 - 1)
@@ -139,16 +140,54 @@ enum FlightB411Art {
         return doors
     }
 
-    /// Where a hoopcase's canvas sits for its ring's centre: the suitcase's middle is 17 in from
-    /// the canvas's left, the ring's centre 33 down from its top, on its 48 by 48.
+    /// The hoopcase on its 48 by 48 canvas: the suitcase's middle 17 in from the left; the
+    /// suitcase's top row 15 down from the canvas's top, its lowest row 39; the ring's centre 33
+    /// down, its front half (over the net and the ball) from row 34. The top `caseMaskRows` of
+    /// the suitcase are never drawn: the case rotates about that line and slides out past it.
     static let hoopcaseCanvas: CGFloat = 48
     static let hoopcaseRing = CGPoint(x: 17, y: 33)
+    static let caseTopRow: CGFloat = 15
+    static let caseBottomRow: CGFloat = 40
+    static let caseFrontRow: CGFloat = 34
+    static let caseMaskRows: CGFloat = 3
+    /// How much of the plane's lean the hanging case takes, swinging about its top.
+    static let caseSwing: CGFloat = 0.5
 
-    /// A hoopcase in a side's colours: the suitcase's two greys, as drawn, become the energy's
-    /// glow and its ramp down; the ring and the lines stay. Cached by colour.
+    /// The case's two sprites for a slide of `out` (0 in the bin to 1 hanging): the back, the
+    /// suitcase and the ring's back half, and the front, the ring's front half; each cut to the
+    /// rows below the mask line as the case stands now, their sizes with them. Sized and
+    /// positioned to hang from `anchor` (the mask line, at the suitcase's middle), turned by `swing`.
+    static func layCase(back: SKSpriteNode, front: SKSpriteNode, sheet: SKTexture, out: CGFloat, anchor: CGPoint, swing: CGFloat) {
+        let caseRows = caseBottomRow - caseTopRow
+        // The case's top row, as it stands: slid up into the bin by what's not out yet.
+        let top = caseTopRow - (1 - out) * caseRows
+        let line = caseTopRow + caseMaskRows
+        func cut(_ node: SKSpriteNode, from first: CGFloat, to last: CGFloat) {
+            // Rows of the canvas, top down, kept below the line; the sprite holds what's left.
+            let firstKept = max(first, line), lastKept = last
+            let rows = lastKept - firstKept
+            node.isHidden = rows <= 0
+            guard rows > 0 else { return }
+            let height = hoopcaseCanvas
+            node.texture = SKTexture(rect: CGRect(x: 0, y: (height - lastKept) / height, width: 1, height: rows / height), in: sheet)
+            node.size = CGSize(width: hoopcaseCanvas, height: rows)
+            node.anchorPoint = CGPoint(x: hoopcaseRing.x / hoopcaseCanvas, y: 1)
+            // Its top sits this far under the line, turned with the case about the line.
+            let drop = firstKept - line
+            node.position = CGPoint(x: anchor.x + drop * sin(swing), y: anchor.y - drop * cos(swing))
+            node.zRotation = swing
+        }
+        let frontTop = top + (caseFrontRow - caseTopRow)
+        cut(back, from: top, to: frontTop)
+        cut(front, from: frontTop, to: top + caseRows)
+    }
+
+    /// A hoopcase in a side's colours: the suitcase's main grey, as drawn, becomes the energy's
+    /// glow and its lighter grey the glow lifted as a body's is; the ring and the lines stay.
+    /// Cached by colour.
     nonisolated(unsafe) private static var hoopcases: [String: SKTexture] = [:]
-    static func hoopcase(glow: SKColor, shade: SKColor) -> SKTexture? {
-        let key = "\(glow)|\(shade)"
+    static func hoopcase(glow: SKColor, lifted: SKColor) -> SKTexture? {
+        let key = "\(glow)|\(lifted)"
         if let made = hoopcases[key] { return made }
         guard let image = UIImage(named: "Hoopcase")?.cgImage else { return nil }
         let width = image.width, height = image.height
@@ -157,7 +196,7 @@ enum FlightB411Art {
             colour.getRed(&r, green: &g, blue: &b, alpha: &a)
             return (UInt8((r * 255).rounded()), UInt8((g * 255).rounded()), UInt8((b * 255).rounded()))
         }
-        let light = bytes(glow), dark = bytes(shade)
+        let light = bytes(lifted), dark = bytes(glow)
         // The context's bytes are the array's, so everything with it happens while the array's
         // pointer holds: drawn in, swapped, and the image made before the pointer's scope ends.
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
@@ -184,7 +223,7 @@ enum FlightB411Art {
 
     /// NO DUNKING, in the dark over the bins: the sign in palette 7, glowing, and over it the red
     /// "no", a ring and a slash, glowing too. Centred on the stage, halfway up the band over the bins.
-    static func noDunkingSign(into parent: SKNode) -> SKNode {
+    static func noDunkingSign(into parent: SKNode) -> (holder: SKNode, sprites: [SKSpriteNode]) {
         let holder = SKNode()
         let centre = CGPoint(x: (CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide / 2).rounded(),
                              y: ((FlightB411Rules.binTop * SpriteLibrary.pixelsPerUnit + CGFloat(FlightB411Rules.rows) * ElementsArt.tileSide) / 2).rounded())
@@ -195,25 +234,44 @@ enum FlightB411Art {
         let sign = SKSpriteNode(texture: texture)
         sign.size = CGSize(width: 22, height: 24)
         holder.addChild(sign)
-        let no = SKShapeNode()
-        let path = CGMutablePath()
-        path.addEllipse(in: CGRect(x: -noRadius, y: -noRadius, width: noRadius * 2, height: noRadius * 2))
-        let across = noRadius * 0.7071
-        path.move(to: CGPoint(x: -across, y: across))
-        path.addLine(to: CGPoint(x: across, y: -across))
-        no.path = path
-        no.strokeColor = noRed
-        no.lineWidth = 2
-        no.lineCap = .round
+        // The "no" drawn once as a picture, so the glow can be told of it as of the sign.
+        let no = SKSpriteNode(texture: noTexture)
+        no.size = CGSize(width: noRadius * 2 + 4, height: noRadius * 2 + 4)
         no.zPosition = 0.1
         holder.addChild(no)
         parent.addChild(holder)
-        SKTexture.preload([texture]) {}
-        return holder
+        SKTexture.preload([texture, noTexture]) {}
+        return (holder, [sign, no])
     }
     static let noRadius: CGFloat = 16
     /// Red, lifted enough to pass the glow's threshold.
     static let noRed = SKColor(red: 1, green: 0.16, blue: 0.16, alpha: 1)
+    /// The ring and the slash, red, on a clear square.
+    static let noTexture: SKTexture = {
+        let side = noRadius * 2 + 4
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
+            let cg = context.cgContext
+            cg.setStrokeColor(noRed.cgColor)
+            cg.setLineWidth(2)
+            cg.setLineCap(.round)
+            cg.strokeEllipse(in: CGRect(x: 2, y: 2, width: noRadius * 2, height: noRadius * 2))
+            let across = noRadius * 0.7071
+            cg.move(to: CGPoint(x: side / 2 - across, y: side / 2 - across))
+            cg.addLine(to: CGPoint(x: side / 2 + across, y: side / 2 + across))
+            cg.strokePath()
+        }
+        return SKTexture(image: image)
+    }()
+    /// The sign's size, the NO DUNK SCALE slider's, kept between launches.
+    static let signScaleKey = "esper.flightB411.signScale"
+    nonisolated(unsafe) static var signScale: CGFloat = {
+        CGFloat(UserDefaults.standard.object(forKey: signScaleKey) as? Double ?? 1)
+    }()
+    /// How much of the plane's lean the cart tips, about its wheels, and how much its speed.
+    static let cartLean: CGFloat = 0.25
+    static let cartSpeedTip: CGFloat = 0.03
 
     /// A cloud, `FlightB411Cloud` (192 by 64), for the sky beyond the plane.
     static let cloud: SKTexture = {

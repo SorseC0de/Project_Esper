@@ -186,24 +186,48 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertLessThan(match.ball.position.y, FlightB411Rules.binBottom, "dropped out of the bin")
         XCTAssertEqual(match.stage.tilt, 0)
         XCTAssertEqual(match.bins.filter(\.open).count, 1)
-        // Then the cycle: bins open and shut, never two hoops out at once; a hoop out hangs under its bin.
+        // Then the cycle: one bin open at a time, never the same one twice running; a hoop hangs
+        // under its bin once its case is all the way out, and only then.
         var hoopsSeen = 0
-        var opened = Set<Int>()
-        for _ in 0..<(FlightB411Rules.binEveryFrames * 12) {
+        var opened: [Int] = []
+        for _ in 0..<(FlightB411Rules.binOpenFrames * 8) {
             match.advance(inputs: [.idle, .idle])
-            let out = match.bins.indices.filter { if case .hoop = match.bins[$0].load { return match.bins[$0].open } else { return false } }
-            XCTAssertLessThanOrEqual(out.count, 1)
-            for index in match.bins.indices where match.bins[index].open { opened.insert(index) }
-            if let bin = out.first, case .hoop(let owner) = match.bins[bin].load {
-                hoopsSeen += 1
+            let open = match.bins.indices.filter { match.bins[$0].open }
+            XCTAssertLessThanOrEqual(open.count, 1, "one bin open at a time")
+            if let bin = open.first, opened.last != bin { opened.append(bin) }
+            if let bin = open.first, case .hoop(let owner) = match.bins[bin].load {
                 let hoop = match.stage.hoops.first { $0.owner == owner }
-                XCTAssertEqual(hoop?.position, FlightB411Rules.rimSpot(in: bin))
+                if match.bins[bin].hoopLive {
+                    hoopsSeen += 1
+                    XCTAssertEqual(hoop?.position, FlightB411Rules.rimSpot(in: bin))
+                } else {
+                    XCTAssertEqual(hoop?.position, HighwayRules.parked, "away while the case slides")
+                }
                 XCTAssertTrue(match.stage.hoops.filter { $0.owner != owner }.allSatisfy { $0.position == HighwayRules.parked })
             }
         }
         XCTAssertGreaterThan(hoopsSeen, 0, "a hoop came out at some point")
-        XCTAssertGreaterThan(opened.count, 2, "several bins opened")
-        XCTAssertFalse(match.bins[centre].open && match.bins[centre].framesLeft > FlightB411Rules.binOpenFrames, "the start's bin shut in its turn")
+        XCTAssertGreaterThan(opened.count, 3, "several bins opened in turn")
+        for (first, second) in zip(opened, opened.dropFirst()) { XCTAssertNotEqual(first, second, "never the same bin twice running") }
+        XCTAssertNotEqual(opened.first, centre, "the first of the cycle isn't the start's bin")
+    }
+
+    func testAScoredHoopRetreatsIntoItsBin() {
+        var match = Match(stage: .flightB411, countdown: 0, seed: 5, mode: .fortySeven)
+        match.frame = FlightB411Rules.startLevelFrames
+        // A bin opened with the first player's hoop, its case out.
+        match.bins = match.bins.map { _ in Bin() }
+        match.bins[1] = Bin(open: true, load: .hoop(owner: 0), framesLeft: FlightB411Rules.binOpenFrames, caseFrames: FlightB411Rules.caseSlideFrames, retreating: false)
+        match.lastBin = 1
+        match.advance(inputs: [.idle, .idle])
+        guard let hoop = match.stage.hoops.firstIndex(where: { $0.owner == 0 }) else { return XCTFail("no hoop") }
+        XCTAssertEqual(match.stage.hoops[hoop].position, FlightB411Rules.rimSpot(in: 1))
+        match.flightB411Scored(on: hoop)
+        XCTAssertTrue(match.bins[1].retreating)
+        XCTAssertEqual(match.stage.hoops[hoop].position, HighwayRules.parked, "away at once, not to be scored on again")
+        for _ in 0..<(FlightB411Rules.caseSlideFrames + 1) { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertFalse(match.bins[1].open, "shut once the case is back in")
+        XCTAssertTrue(match.bins.contains(where: \.open), "and the next bin open")
     }
 
     func testARoundCanStartTheBallFromAnyBin() {

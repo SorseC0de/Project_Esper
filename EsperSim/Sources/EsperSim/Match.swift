@@ -49,6 +49,7 @@ public struct Match: Equatable {
     /// Its overhead bins, and the bin the ball waits in through the count.
     public var bins: [Bin] = []
     public var ballBin: Int?
+    public var lastBin: Int?
     public var scores: [Int]
     /// Rounds reset on a point; 47 plays on through its baskets.
     public var mode = GameMode.rounds
@@ -221,6 +222,7 @@ public struct Match: Equatable {
                     if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, off: nil, at: stage.hoops[hoop].position) }
                     holdHitStop(HitStopRules.shotFrames)
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
+                    flightB411Scored(on: hoop)
                     ball.launchPoint = nil
                     // Through the net it's nobody's shot any more: anyone but the scorer can take it.
                     ball.shotInFlight = false

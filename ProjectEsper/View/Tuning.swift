@@ -232,7 +232,7 @@ enum RimLook {
 extension StageLook {
     /// The hoop tilted down, its rim seen from above, with Longball Stadium's hoop, net and dunk
     /// placing; else straight on.
-    var tiltedHoop: Bool { self == .footballField || self == .flight }
+    var tiltedHoop: Bool { self == .footballField || self == .flightB411 }
 }
 
 enum HoopTuning {
@@ -241,10 +241,10 @@ enum HoopTuning {
     static func pivot(for look: StageLook) -> CGPoint {
         look.tiltedHoop ? CGPoint(x: 27.5 / 48, y: 1 - 34 / 48) : CGPoint(x: 29.5 / 48, y: 1 - 35.5 / 48)
     }
-    /// The hoop's two pieces for a stage: straight on, Longball Stadium's turned, or Flight's
+    /// The hoop's two pieces for a stage: straight on, Longball Stadium's turned, or Flight B411's
     /// tilted down, the first of the Hoopfish pile's sheets (`backboards`, `hoops`).
     static func art(for look: StageLook) -> (backboard: String, rim: String) {
-        if look == .flight { return ("backboards", "hoops") }
+        if look == .flightB411 { return ("backboards", "hoops") }
         return look.tiltedHoop ? ("backboard", "hoop") : ("backboard_straight", "hoop_straight")
     }
     nonisolated(unsafe) static var courtOffset = CGPoint(x: 5, y: 10)

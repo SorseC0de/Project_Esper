@@ -183,7 +183,7 @@ final class MapEditor: SKNode {
     /// Screen points to a tileset pixel: small, in the corner, or less if the sheet is big for the screen.
     private var paletteScale: CGFloat {
         let sheet = tiles.sheets[sheetIndex].size()
-        // Flight's big sheets get more of the screen's height, or their cells are too small to pick.
+        // A stage with several sheets gets more of the screen's height, or their cells are too small to pick.
         let heightShare: CGFloat = tiles.sheets.count > 1 ? 0.8 : 0.5
         return min(0.85, halfWidth * 0.6 / max(sheet.width, 1), halfHeight * heightShare / max(sheet.height, 1))
     }

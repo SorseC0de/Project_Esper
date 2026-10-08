@@ -72,7 +72,7 @@ enum FieldArt {
 
     static func build(for stage: Stage, into parent: SKNode, flat: (CGFloat) -> SKTexture, glow: SKTexture) -> Handles {
         let width = CGFloat(stage.columns) * 16
-        let top = CGFloat(stage.rows + Stage.skyRows) * 16
+        let top = CGFloat(stage.rows + stage.skyRows) * 16
         let centre = width / 2
         @discardableResult
         func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ colour: SKColor, z: CGFloat = -10) -> SKSpriteNode {

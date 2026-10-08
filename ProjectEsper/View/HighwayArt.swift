@@ -12,7 +12,7 @@ enum HighwayArt {
 
     static func build(for stage: Stage, into parent: SKNode, flat: (CGFloat) -> SKTexture) {
         let width = CGFloat(stage.columns) * 16
-        let top = CGFloat(stage.rows + Stage.skyRows) * 16
+        let top = CGFloat(stage.rows + stage.skyRows) * 16
         func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ colour: SKColor, z: CGFloat) {
             let node = SKSpriteNode(texture: flat(4))
             node.anchorPoint = .zero

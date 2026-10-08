@@ -875,8 +875,9 @@ HORSE on a grid (`GameMode.zones`; `Zones.swift` in the sim, `ZonesPlay.swift` i
 turn by turn, meant above all for asynchronous online play, Words With Friends fashion, which
 it has (below); offline, two people passing one device (VS HUMAN) or one playing both sides (VS
 CPU, for now: the computer leading and following is to come, its runs searched for on the sim).
-ZONES on the title opens the customize screen, then the stage select of 47's stages
-(`ZonesRules.stages`).
+ZONES on the title opens the customize screen, then the stage select of its stages
+(`ZonesRules.stages`: the Wreck Center and Hoopfish Hideaway; not Flight B411, whose pitch and cart
+would make a run too much of a lottery, as the Elements would).
 
 - The stage divides into zones four tiles across and up (`ZoneGrid`), lettered A upward from the
   left and numbered 1 upward from the floor; what doesn't divide goes to A1's column and row: the
@@ -983,7 +984,7 @@ bottle carries its comment (`Greateraid.comment`), the user's line; "..." is the
 placeholder for one not written yet. In the middle, standing on the blurb's banner, the one
 picking: `player_drinkchoice` in their look, with the hooded head and its neck as in play
 (`SpriteLibrary.standalone`), its towel (palette 22 and 37) kept as drawn, its two frames played
-very slowly, 1.5 seconds each; its size on the UI panel's PICK screen (DRINKER, the points to an
+at 2 a second; its size on the UI panel's PICK screen (DRINKER, the points to an
 art pixel, 4 to start).
 
 - Hasty Horchata: run, dash and air speed up by half a unit a drink. The body a match
@@ -1002,7 +1003,7 @@ art pixel, 4 to start).
 - Web Water: the swing; level two adds the web line. The swing's line is drawn on past its anchor off
   the top of the screen, the view's alone.
 - Super Smoothie: flight; level two flies faster, with the ball as fast as level one
-  without, lasts 180 frames rather than 120, and glides forward. Flight needs no second
+  without, lasts 180 frames rather than 120, and glides forward. Flight B411 needs no second
   jump.
 - Flash Fizz: the flash on jump, five tiles, tearing; level two gives two a cooldown.
 - Platform Protein Shake: the slab; level two adds the wall.
@@ -1786,10 +1787,16 @@ at its top (the energy cubes, drawn apart, tinted to match in their shader), at 
 game pixel and a half side to side in three waves down the screen (WATER SWAY), in the glow's composite
 (`GameScene.screenWave`), but not in the map maker, nor across the score's band at the top. The floor's fill doesn't glow either.
 
-## Flight
+## Flight B411
 
-The aisle of a plane (`StageChoice.flight`, `Stage.flight`, `StageLook.flight`, `FlightRules` in
-`Flight.swift`; protocol 83, remade at protocol 105), on the select (`StageChoice.selectable`). It's
+The aisle of a plane (`StageChoice.flightB411`, `Stage.flightB411`, `StageLook.flightB411`, `FlightB411Rules` in
+`FlightB411.swift`; protocol 83, remade at protocol 105, named at 106), on the select
+(`StageChoice.selectable`) and 47's (`StageChoice.fortySeven`), not ZONES'. On it every body
+moves at half its speed, on the ground, in the air and in Super Smoothie's flight
+(`StageFeatures.speedShare`, `FlightB411Rules.speedShare`), and nothing dunks
+(`StageFeatures.dunks`, `Stage.dunkable`). Its ceiling is the plane's: no rows of sky over it
+(`Stage.skyRows` is the stage's own, ten everywhere else), flat in the sim whatever the lean,
+since only the view turns. It's
 drawn whole in Aseprite, `Flight/Flight_Map.aseprite`, 1248 by 576, and four of its pixels are an art
 pixel: 312 by 144 art pixels, 19 and a half tiles by 9, on a grid of 20 columns whose last half is
 walled off (`Stage.width`, stored, is where a stage ends when that's short of its grid; the wall a
@@ -1801,32 +1808,32 @@ do with it any more: its tile sheets are gone from the catalog and `MapStage` wi
 The file's layers, bottom up: Tiles, Back Fade, Back Chairs, Bins, Open Bin, then the hidden Player
 (the figure at its size, where the players draw), then Front Chairs and Front Fade. `Tools/aseprite.py`
 reads the file without Aseprite (the layers listed with no output named; named layers flattened to a
-PNG otherwise) and makes two pictures of the whole stage: `FlightBackdrop`, the layers under the
-player, on the stage's ground behind the players (`FlightArt.backdropZ`), and `FlightFront`, the two
+PNG otherwise) and makes two pictures of the whole stage: `FlightB411Backdrop`, the layers under the
+player, on the stage's ground behind the players (`FlightB411Art.backdropZ`), and `FlightB411Front`, the two
 over, in `stageFront` in front of them (z 22, with the Elements' tornado overlays), both
 nearest-sampled, neither glowing. Re-import with `python3 Tools/aseprite.py <file> <png> <layers...>`
-into the two imagesets. Beyond the stage, above, below and beside it, is palette 30 (`FlightArt.beyond`).
+into the two imagesets. Beyond the stage, above, below and beside it, is palette 30 (`FlightB411Art.beyond`).
 
-The hazard is the pitch. The plane leans now and then (`Match.stepFlight`, on the match's dice):
+The hazard is the pitch. The plane leans now and then (`Match.stepFlightB411`, on the match's dice):
 a round is a lean to a new angle over 90 frames, held 300, back level over 90, and level for 120
 before the next; the angle comes in tenths of the most, 60 degrees either way, nose up positive, the
 left side down (`Stage.tilt`). Gravity leans with it: anything falling, the bodies in the air and the
 loose ball, gets `Stage.tiltPull` (the sine) of its gravity sideways and `tiltDown` (the cosine) of
 it down, and a loose ball on the floor rolls downhill; so jumps drift and shots bend, aimed as if
-level. At 45 degrees or more (`FlightRules.slideTilt`) the floor is a slide: `pitchDownhill` makes
+level. At 45 degrees or more (`FlightB411Rules.slideTilt`) the floor is a slide: `pitchDownhill` makes
 `slideSlopeDownhill` and `slopeDescends` answer for the whole floor, so whoever is grounded goes
 into the forced slide down it, the slide slopes' own. The view leans with the plane: the camera is
 turned the other way (`cameraRotation`, mirrored into the mask scenes and the cubes' projection),
 the glow HUD turned back upright, and the camera zoomed so the stage's whole turned box fits the
-screen at the lean it's at (`flightFit`): edge to edge level, letterboxed in palette 30 as it leans.
+screen at the lean it's at (`flightB411Fit`): edge to edge level, letterboxed in palette 30 as it leans.
 Turbulence: on the stage a small shake comes every one to four seconds (`turbulenceIn`, six frames
 of the Quake shake), off with the screen shake setting.
 
-The cart (`Cart`, `FlightRules.cartSize`: 16 by 24 art pixels solid, drawn from `Cart`, its
+The cart (`Cart`, `FlightB411Rules.cartSize`: 16 by 24 art pixels solid, drawn from `Cart`, its
 sheet `Flight/Cart.png`, 48 by 64 drawn at 2x, so 24 by 32 art pixels in 8-pixel cells: the cart
 its first two columns, 16 by 32, the top row of it nothing to stand on; the wheel the bottom
 right cell, two of them centred on the cart's bottom two cells and a pixel down, turning by how
-far it's rolled, `Cart.rolled`, at `FlightArt.wheelRadius`) stands in the middle of the aisle and rolls with the pitch at the
+far it's rolled, `Cart.rolled`, at `FlightB411Art.wheelRadius`) stands in the middle of the aisle and rolls with the pitch at the
 ball's pull, dragged 0.005 a frame, no faster than 2, stopping at the walls. It's solid, one of
 the stage's extras: stood on, it carries whoever's on it, as a helmet does. Rolling into anyone
 else at 0.2 or more it knocks them its way (`cartPush`), stuns them, pops the ball out of their

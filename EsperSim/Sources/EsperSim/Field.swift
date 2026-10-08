@@ -44,10 +44,14 @@ public struct StageFeatures: Equatable {
     /// In 47, a basket's points doubled; a round is a round either way.
     public var doublePoints = false
     /// Every body this many times its size, as Titan Tea grows one: on a stage drawn bigger than
-    /// the bodies' own art, Flight's.
+    /// the bodies' own art, Flight B411's.
     public var bodyScale = 1.0
-    /// The stage pitches now and then, leaning gravity (`Stage.tilt`), with a cart rolling it: Flight's.
+    /// The stage pitches now and then, leaning gravity (`Stage.tilt`), with a cart rolling it: Flight B411's.
     public var tilts = false
+    /// Every body this share of its speeds, on the ground, in the air and in flight: half on Flight B411.
+    public var speedShare = 1.0
+    /// Whether its rims can be dunked on at all: not the plane's.
+    public var dunks = true
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets
@@ -63,7 +67,7 @@ public struct StageFeatures: Equatable {
 
 /// The scenery a stage is drawn with.
 public enum StageLook: Equatable {
-    case court, footballField, highway, elements, hoopfishHideaway, flight
+    case court, footballField, highway, elements, hoopfishHideaway, flightB411
 }
 
 extension StageFeatures {
@@ -250,7 +254,7 @@ extension Match {
     mutating func keepBallInWorld() {
         guard ball.holder == nil, ball.isLive else { return }
         let outside = ball.position.y < -Stage.tileSize || ball.position.x < 0 || ball.position.x > stage.width
-            || ball.position.y > Double(stage.rows + Stage.skyRows) * Stage.tileSize
+            || ball.position.y > Double(stage.rows + stage.skyRows) * Stage.tileSize
             || (ball.resting && stage.outOfReach.contains { $0.min.x <= ball.position.x && ball.position.x <= $0.max.x
                 && $0.min.y <= ball.position.y && ball.position.y <= $0.max.y })
         if outside {

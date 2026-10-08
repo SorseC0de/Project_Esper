@@ -120,6 +120,9 @@ public struct Stage: Equatable {
     public static let tileSize = 10.0
     /// Rows of open sky above the grid before a ceiling, so a ball thrown straight up comes back.
     public static let skyRows = 10
+    /// This stage's rows of sky: the usual ten, or none where the ceiling is the stage's top, as
+    /// in the plane. Flat in the sim whatever the lean, which only the view turns.
+    public var skyRows = Stage.skyRows
 
     public let columns: Int
     public let rows: Int
@@ -137,10 +140,10 @@ public struct Stage: Equatable {
     public var outOfReach: [Box] = []
     /// Where each tornado stands when it's up, its whole square.
     public var tornados: [Box] = []
-    /// Whether a rim can be dunked on where it is: not in the stage's first or last column, which
-    /// a swimming one passes through on its way off.
+    /// Whether a rim can be dunked on where it is: not on a stage without dunks, and not in the
+    /// stage's first or last column, which a swimming one passes through on its way off.
     public func dunkable(_ hoop: Hoop) -> Bool {
-        hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
+        features.dunks && hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
     }
 
     /// Where Hoopfish Hideaway's Hoopfish starts, its picture's bottom left.
@@ -165,17 +168,17 @@ public struct Stage: Equatable {
     public var fixedSlopes: [Slope] = []
     public var ceilingSlopes: [Slope] = []
 
-    /// How wide the stage is: its grid's columns, unless it ends short of them, as Flight does.
+    /// How wide the stage is: its grid's columns, unless it ends short of them, as Flight B411 does.
     public var width: Double
     public var height: Double { Double(rows) * Stage.tileSize }
-    /// Flight's pitch, in radians, leaning gravity: nose up positive, the left side down. Its
+    /// Flight B411's pitch, in radians, leaning gravity: nose up positive, the left side down. Its
     /// pull sideways and its share straight down, on anything that falls.
     public var tilt = 0.0
     public var tiltPull: Double { tilt == 0 ? 0 : Trig.sin(tilt) }
     public var tiltDown: Double { tilt == 0 ? 1 : Trig.cos(tilt) }
-    /// Pitched steeply enough that the floor is a slide (`FlightRules.slideTilt`): the way down it.
+    /// Pitched steeply enough that the floor is a slide (`FlightB411Rules.slideTilt`): the way down it.
     public var pitchDownhill: Facing? {
-        guard features.tilts, abs(tilt) >= FlightRules.slideTilt else { return nil }
+        guard features.tilts, abs(tilt) >= FlightB411Rules.slideTilt else { return nil }
         return tilt > 0 ? .left : .right
     }
 
@@ -195,7 +198,7 @@ public struct Stage: Equatable {
     public func tile(column: Int, row: Int) -> Tile {
         guard column >= 0, column < columns, row >= 0 else { return .solid }
         guard row < rows else {
-            return column == 0 || column == columns - 1 || row >= rows + Stage.skyRows ? .solid : .empty
+            return column == 0 || column == columns - 1 || row >= rows + skyRows ? .solid : .empty
         }
         return tiles[row * columns + column]
     }
@@ -735,29 +738,33 @@ public struct Stage: Equatable {
         }
     }
 
-    /// Flight: the aisle of a plane, 19 and a half tiles by 9 (`FlightRules`), as its art is
+    /// Flight B411: the aisle of a plane, 19 and a half tiles by 9 (`FlightB411Rules`), as its art is
     /// drawn: two rows of floor, the rims at the ends, the starts in from them, the ball in the
     /// open bin over the middle; it pitches, and a cart rolls with the pitch.
-    public static var flight: Stage {
-        let columns = FlightRules.columns, rows = FlightRules.rows
-        let width = FlightRules.width
-        let floor = Double(FlightRules.floorRows) * tileSize
+    public static var flightB411: Stage {
+        let columns = FlightB411Rules.columns, rows = FlightB411Rules.rows
+        let width = FlightB411Rules.width
+        let floor = Double(FlightB411Rules.floorRows) * tileSize
         var stage = Stage(
             columns: columns, rows: rows,
             hoops: [
-                Hoop(position: Vec2(x: FlightRules.rimInset, y: FlightRules.rimHeight), owner: 1, backboard: .left),
-                Hoop(position: Vec2(x: width - FlightRules.rimInset, y: FlightRules.rimHeight), owner: 0, backboard: .right),
+                Hoop(position: Vec2(x: FlightB411Rules.rimInset, y: FlightB411Rules.rimHeight), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: width - FlightB411Rules.rimInset, y: FlightB411Rules.rimHeight), owner: 0, backboard: .right),
             ],
-            playerSpawns: [Vec2(x: FlightRules.startInset, y: floor), Vec2(x: width - FlightRules.startInset, y: floor)],
+            playerSpawns: [Vec2(x: FlightB411Rules.startInset, y: floor), Vec2(x: width - FlightB411Rules.startInset, y: floor)],
             playerFacings: [.right, .left],
-            ballSpawn: Vec2(x: width / 2, y: FlightRules.ballHeight)
+            ballSpawn: Vec2(x: width / 2, y: FlightB411Rules.ballHeight)
         )
         stage.width = width
-        stage.fill(.solid, columns: 0...(columns - 1), rows: 0...(FlightRules.floorRows - 1))
+        stage.fill(.solid, columns: 0...(columns - 1), rows: 0...(FlightB411Rules.floorRows - 1))
         // The right wall where the art ends, half a tile short of the grid's last column.
-        stage.fixedExtras = [Box(min: Vec2(x: width, y: 0), max: Vec2(x: Double(columns) * tileSize, y: Double(rows + Stage.skyRows) * tileSize))]
-        stage.features = StageFeatures(look: .flight)
+        // The ceiling is the plane's: no sky over it.
+        stage.skyRows = 0
+        stage.fixedExtras = [Box(min: Vec2(x: width, y: 0), max: Vec2(x: Double(columns) * tileSize, y: Double(rows) * tileSize))]
+        stage.features = StageFeatures(look: .flightB411)
         stage.features.tilts = true
+        stage.features.speedShare = FlightB411Rules.speedShare
+        stage.features.dunks = false
         return stage
     }
 
@@ -806,7 +813,7 @@ public struct Stage: Equatable {
         stage.slopes = stage.fixedSlopes
         // Above the ceiling the sky is solid, but for a shaft up over each open cell of the
         // ceiling's row, up to the sky's top.
-        let skyBottom = Double(rows) * tileSize, skyTop = Double(rows + Stage.skyRows) * tileSize
+        let skyBottom = Double(rows) * tileSize, skyTop = Double(rows + stage.skyRows) * tileSize
         var runStart: Int?
         for column in 0...columns {
             let solid = column < columns && map.wall(at: .init(column, rows - 1)) == .solid
@@ -869,12 +876,12 @@ public struct Stage: Equatable {
 /// The stages to pick from, in the order the select screen shows them; the wire carries
 /// the raw value.
 public enum StageChoice: Int, CaseIterable, Codable {
-    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flight
+    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flightB411
 
-    /// The stages on the select, in its order: Slamstill Traffic and Flight parked off it.
-    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .hoopfishHideaway, .flight]
+    /// The stages on the select, in its order: Slamstill Traffic and Flight B411 parked off it.
+    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .hoopfishHideaway, .flightB411]
     /// The stages 47 plays on.
-    public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway]
+    public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway, .flightB411]
 
     public var name: String {
         switch self {
@@ -884,7 +891,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .theElements: "The Elements"
         case .skyNet: "Sky Net"
         case .hoopfishHideaway: "Hoopfish Hideaway"
-        case .flight: "Flight"
+        case .flightB411: "Flight B411 B411"
         }
     }
 
@@ -897,7 +904,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         // To be detailed: the court for now.
         case .skyNet: .court
         case .hoopfishHideaway: .hoopfishHideaway
-        case .flight: .flight
+        case .flightB411: .flightB411
         }
     }
 }

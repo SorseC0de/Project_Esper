@@ -39,7 +39,7 @@ public struct Match: Equatable {
     /// Hoopfish Hideaway's Hoopfish, swimming across with the ball or the rim on its antenna.
     public var hoopfish: Hoopfish?
     public var lastHelicopterHoop: Int?
-    /// Flight's pitch: the lean it's going from and to and the frames into it; its cart, and the
+    /// Flight B411's pitch: the lean it's going from and to and the frames into it; its cart, and the
     /// frames before the cart can hit each body again.
     public var tiltFrom = 0.0
     public var tiltTarget = 0.0
@@ -147,7 +147,7 @@ public struct Match: Equatable {
         refreshExtras()
         if portalCooldown > 0 { portalCooldown -= 1 }
         stepField()
-        stepFlight()
+        stepFlightB411()
         stepTornados()
         stepHoopfish()
         gatherFloBundles()
@@ -1067,7 +1067,7 @@ public struct Match: Equatable {
     /// ball, popped up.
     private mutating func strike(x: Double, bottom: Double, by index: Int) {
         let other = players.indices.first { $0 != index }
-        var y = Double(stage.rows + Stage.skyRows) * Stage.tileSize - 1
+        var y = Double(stage.rows + stage.skyRows) * Stage.tileSize - 1
         while y > bottom {
             let bit = Box(min: Vec2(x: x - VoltaRules.strikeHalfWidth, y: y - 2), max: Vec2(x: x + VoltaRules.strikeHalfWidth, y: y))
             if let other, players[other].frozen == 0, players[other].body.overlaps(bit) {

@@ -221,7 +221,7 @@ final class PickScreen: Screen {
     /// blurb's banner in the middle; its art pixels this many points, on the UI panel's slider.
     static let drinkerScaleKey = "ui.pick.drinkerScale"
     static var drinkerScale: CGFloat { UserDefaults.standard.object(forKey: drinkerScaleKey).map { CGFloat(($0 as? Double) ?? 4) } ?? 4 }
-    static let drinkerFrameSeconds = 1.5
+    static let drinkerFrameSeconds = 0.5
     /// The sheet's feet, eight pixels up its 48.
     static let drinkerFeet: CGFloat = 8.0 / 48
 

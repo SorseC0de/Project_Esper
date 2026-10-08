@@ -73,12 +73,12 @@ struct TileSpot: Hashable {
     static func z(_ layer: Int) -> CGFloat { -8 + CGFloat(layer) * 0.1 }
 }
 
-/// Flight's scenery: the stage drawn whole in Aseprite (`Flight_Map.aseprite`, 1248 by 576, four
+/// Flight B411's scenery: the stage drawn whole in Aseprite (`Flight_Map.aseprite`, 1248 by 576, four
 /// of its pixels to an art pixel, flattened by `Tools/aseprite.py`) in two pictures, the whole
-/// stage each: `FlightBackdrop`, its layers up to the open bin, behind the players; and
-/// `FlightFront`, the front chairs and the fade over them, in front of the players. The file's
+/// stage each: `FlightB411Backdrop`, its layers up to the open bin, behind the players; and
+/// `FlightB411Front`, the front chairs and the fade over them, in front of the players. The file's
 /// hidden Player layer sits between the two, and is where the players draw.
-enum FlightArt {
+enum FlightB411Art {
     struct Handles {
         var backdrop: SKSpriteNode?
         var front: SKSpriteNode?
@@ -124,13 +124,13 @@ enum FlightArt {
             let node = SKSpriteNode(texture: texture)
             node.anchorPoint = .zero
             node.size = CGSize(width: texture.size().width / backdropScale, height: texture.size().height / backdropScale)
-            node.position = CGPoint(x: ((CGFloat(FlightRules.width / Stage.tileSize) * ElementsArt.tileSide - node.size.width) / 2).rounded(), y: 0)
+            node.position = CGPoint(x: ((CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide - node.size.width) / 2).rounded(), y: 0)
             node.zPosition = z
             parent.addChild(node)
             return node
         }
-        handles.backdrop = picture("FlightBackdrop", z: backdropZ, into: parent)
-        handles.front = picture("FlightFront", z: 0, into: frontParent)
+        handles.backdrop = picture("FlightB411Backdrop", z: backdropZ, into: parent)
+        handles.front = picture("FlightB411Front", z: 0, into: frontParent)
         return handles
     }
 }

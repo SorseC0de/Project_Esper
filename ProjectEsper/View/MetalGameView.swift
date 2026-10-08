@@ -432,7 +432,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         descriptor.stencilAttachment.storeAction = .dontCare
         guard let encoder = commands.makeRenderCommandEncoder(descriptor: descriptor) else { return }
         // Scene coordinates to clip space: the camera's middle at the centre, its view the
-        // screen's points times its scale across, turned back by the camera's turn (Flight's
+        // screen's points times its scale across, turned back by the camera's turn (Flight B411's
         // lean); a cube's depth sorts only its own faces.
         let viewWidth = Float(scene.size.width * scene.cameraScale), viewHeight = Float(scene.size.height * scene.cameraScale)
         let camera = scene.cameraPosition

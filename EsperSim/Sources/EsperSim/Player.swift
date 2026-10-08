@@ -366,6 +366,8 @@ public struct Player: Equatable {
     /// The stage's pitch as this frame began: gravity's pull sideways and its share straight down.
     private var tiltPull = 0.0
     private var tiltDown = 1.0
+    /// The stage's share of every body's speeds (`StageFeatures.speedShare`), as this frame began.
+    private var stageSpeedShare = 1.0
     var waterTicks = 0
     var waterShare: Double { underwater ? 0.5 : 1 }
     /// Under water a jump rises at half its push but to twice its height: the pull on the way up
@@ -390,13 +392,13 @@ public struct Player: Equatable {
     var stanceAirBrake: Double { spec.stanceAirBrake * waterShare }
     var throwStanceAirBrake: Double { spec.throwStanceAirBrake * waterShare }
     var fastFallSpeed: Double { spec.fastFallSpeed * waterShare }
-    var runSpeed: Double { spec.runSpeed * speedShare * waterShare }
-    var walkMaxSpeed: Double { spec.walkMaxSpeed * speedShare * waterShare }
-    var dashInitialVelocity: Double { runSpeed + (spec.dashInitialVelocity - spec.runSpeed) }
+    var runSpeed: Double { spec.runSpeed * speedShare * waterShare * stageSpeedShare }
+    var walkMaxSpeed: Double { spec.walkMaxSpeed * speedShare * waterShare * stageSpeedShare }
+    var dashInitialVelocity: Double { runSpeed + (spec.dashInitialVelocity - spec.runSpeed) * stageSpeedShare }
     /// The air moves as the ground does: the run's speed, which the jumps set off at too, and
     /// the ground's traction to brake when the stick lets go. Moves that don't steer coast
     /// on the spec's light air friction instead, so their momentum carries.
-    var airSpeedMax: Double { spec.runSpeed * speedShare * waterShare }
+    var airSpeedMax: Double { spec.runSpeed * speedShare * waterShare * stageSpeedShare }
     var airBrake: Double { traction }
 
     /// Crouched or sliding, the body is half as tall, so it fits under what a standing
@@ -505,6 +507,7 @@ public struct Player: Equatable {
         underwater = sharedStage.features.underwater
         tiltPull = sharedStage.tiltPull
         tiltDown = sharedStage.tiltDown
+        stageSpeedShare = sharedStage.features.speedShare
         // Surf Soda rides the lava as ground.
         var stage = sharedStage
         if power == .surfSoda, let lava = stage.features.lavaSurface {
@@ -1143,7 +1146,7 @@ public struct Player: Equatable {
             // Down with no ball. The crouch walk is slow, and the stick turns the body.
             if let direction = stickFacing(input) { facing = direction }
             if state == .crouchWalk {
-                velocity.x = approach(velocity.x, spec.crouchWalkSpeed * waterShare * input.stick.x, walkAcceleration)
+                velocity.x = approach(velocity.x, spec.crouchWalkSpeed * waterShare * stageSpeedShare * input.stick.x, walkAcceleration)
                 animationPhase += (Player.steady(max(abs(velocity.x) / spec.crouchWalkSpeed * 15, 10)) / 60) * waterShare
             } else {
                 velocity.x = approach(velocity.x, 0, traction)
@@ -1174,7 +1177,7 @@ public struct Player: Equatable {
             // Prone: the stick moves the cursor, not the body; shoot repels and throw
             // attracts at it; jump gets up.
             velocity.x = approach(velocity.x, 0, traction)
-            let top = Double(stage.rows + Stage.skyRows) * Stage.tileSize
+            let top = Double(stage.rows + stage.skyRows) * Stage.tileSize
             snipeCursor = Vec2(x: min(max(snipeCursor.x + input.stick.x * SnipeRules.cursorSpeed, 0), stage.width),
                                y: min(max(snipeCursor.y + input.stick.y * SnipeRules.cursorSpeed, 0), top))
             if snipeFire > 0 {
@@ -1371,9 +1374,9 @@ public struct Player: Equatable {
                 } else {
                     vertical = -SmoothieRules.glideSink
                 }
-                velocity = Vec2(x: facing.sign * forward * SmoothieRules.glideSpeed(withBall: hasBall), y: vertical)
+                velocity = Vec2(x: facing.sign * forward * SmoothieRules.glideSpeed(withBall: hasBall), y: vertical) * stageSpeedShare
             } else {
-                velocity = input.stick * SmoothieRules.flightSpeed(level: powerLevel, withBall: hasBall)
+                velocity = input.stick * SmoothieRules.flightSpeed(level: powerLevel, withBall: hasBall) * stageSpeedShare
             }
             if holding, input.shoot, shootReady {
                 enterShootStance()

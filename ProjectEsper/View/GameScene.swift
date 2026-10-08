@@ -1794,17 +1794,19 @@ final class GameScene: SKScene {
                 let colour = sideColours.indices.contains(1 - hoop.owner) ? sideColours[1 - hoop.owner] : sideColours[0]
                 return FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body)) ?? SKTexture()
             }
-            hoopcaseNodes = stage.hoops.map { _ in
-                let node = SKSpriteNode()
+            hoopcaseNodes = hoopcaseSheets.map { sheet in
+                let node = SKSpriteNode(texture: FlightB411Art.casePieces(sheet: sheet).back)
                 node.zPosition = 5.4
                 node.isHidden = true
+                node.shader = FlightB411Art.caseMaskShader()
                 stageGround.addChild(node)
                 return node
             }
-            hoopcaseFronts = stage.hoops.map { _ in
-                let node = SKSpriteNode()
+            hoopcaseFronts = hoopcaseSheets.map { sheet in
+                let node = SKSpriteNode(texture: FlightB411Art.casePieces(sheet: sheet).front)
                 node.zPosition = GameScene.rimFrontZ
                 node.isHidden = true
+                node.shader = FlightB411Art.caseMaskShader()
                 glowers.addChild(node)
                 return node
             }
@@ -4784,6 +4786,9 @@ final class GameScene: SKScene {
         for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseSheets.count && colours.indices.contains(1 - hoop.owner) {
             let colour = colours[1 - hoop.owner]
             hoopcaseSheets[index] = FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body)) ?? SKTexture()
+            let pieces = FlightB411Art.casePieces(sheet: hoopcaseSheets[index])
+            if index < hoopcaseNodes.count { hoopcaseNodes[index].texture = pieces.back }
+            if index < hoopcaseFronts.count { hoopcaseFronts[index].texture = pieces.front }
         }
         headStreamsCache = [:]
         for (index, flashes) in zip(stunBodies.indices, zip(stunBodies, stunHeads)) {
@@ -5576,7 +5581,8 @@ final class GameScene: SKScene {
 
     /// The rims' art, for the net behind them to keep out of.
     var rimSnapshots: [BodySnapshot] {
-        rimNodes.filter { !$0.isHidden }.compactMap { rim in
+        // Flight B411's ring fronts stand in for its rims: the net's cylinder hides behind them.
+        (rimNodes + hoopcaseFronts).filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
         }
     }
@@ -6628,9 +6634,9 @@ final class GameScene: SKScene {
         guard match.stage.features.tilts else { return }
         let tilt = CGFloat(match.stage.tilt)
         if let cartNode, let cart = match.cart {
-            // On its wheels' line, tipped a little by the lean and by its speed.
+            // On its wheels' line, tipped a little into the way it's going; flat once it's stopped.
             cartNode.position = SpriteLibrary.point(Vec2(x: cart.box.center.x, y: cart.box.min.y))
-            cartNode.zRotation = -tilt * FlightB411Art.cartLean - CGFloat(cart.velocity) * FlightB411Art.cartSpeedTip
+            cartNode.zRotation = -CGFloat(cart.velocity) * FlightB411Art.cartSpeedTip
             let turn = -CGFloat(cart.rolled) * SpriteLibrary.pixelsPerUnit / FlightB411Art.wheelRadius
             for wheel in cartWheels { wheel.zRotation = turn }
         }
@@ -6650,7 +6656,7 @@ final class GameScene: SKScene {
             let rim = SpriteLibrary.point(FlightB411Rules.rimSpot(in: bin))
             // The mask line: the suitcase's top at rest, less the masked rows.
             let line = CGPoint(x: rim.x, y: rim.y + FlightB411Art.hoopcaseRing.y - FlightB411Art.caseTopRow - FlightB411Art.caseMaskRows)
-            FlightB411Art.layCase(back: hoopcaseNodes[index], front: hoopcaseFronts[index], sheet: hoopcaseSheets[index],
+            FlightB411Art.layCase(back: hoopcaseNodes[index], front: hoopcaseFronts[index],
                                   out: CGFloat(match.bins[bin].caseOut), anchor: line, swing: -tilt * FlightB411Art.caseSwing)
         }
         skyNode.position = cameraNode.position

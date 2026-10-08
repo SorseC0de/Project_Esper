@@ -190,11 +190,15 @@ final class FlightB411Tests: XCTestCase {
         // under its bin once its case is all the way out, and only then.
         var hoopsSeen = 0
         var opened: [Int] = []
-        for _ in 0..<(FlightB411Rules.binOpenFrames * 8) {
+        var loads: [Bin.Load] = []
+        for _ in 0..<(FlightB411Rules.binOpenFrames * 12) {
             match.advance(inputs: [.idle, .idle])
             let open = match.bins.indices.filter { match.bins[$0].open }
             XCTAssertLessThanOrEqual(open.count, 1, "one bin open at a time")
-            if let bin = open.first, opened.last != bin { opened.append(bin) }
+            if let bin = open.first, opened.last != bin {
+                opened.append(bin)
+                loads.append(match.bins[bin].load)
+            }
             if let bin = open.first, case .hoop(let owner) = match.bins[bin].load {
                 let hoop = match.stage.hoops.first { $0.owner == owner }
                 if match.bins[bin].hoopLive {
@@ -210,6 +214,19 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertGreaterThan(opened.count, 3, "several bins opened in turn")
         for (first, second) in zip(opened, opened.dropFirst()) { XCTAssertNotEqual(first, second, "never the same bin twice running") }
         XCTAssertNotEqual(opened.first, centre, "the first of the cycle isn't the start's bin")
+        // Never three empty bins running, and the hoops take turns whose they are.
+        var emptyRun = 0
+        var lastOwner: Int?
+        for load in loads {
+            if case .hoop(let owner) = load {
+                if let lastOwner { XCTAssertEqual(owner, 1 - lastOwner, "the other side's hoop after one side's") }
+                lastOwner = owner
+                emptyRun = 0
+            } else {
+                emptyRun += 1
+                XCTAssertLessThanOrEqual(emptyRun, FlightB411Rules.emptyRunMost, "a third bin running is always a hoop")
+            }
+        }
     }
 
     func testAScoredHoopRetreatsIntoItsBin() {

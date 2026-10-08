@@ -1790,7 +1790,7 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 ## Flight B411
 
 The aisle of a plane (`StageChoice.flightB411`, `Stage.flightB411`, `StageLook.flightB411`, `FlightB411Rules` in
-`FlightB411.swift`; protocol 83, remade at protocol 105, named at 106, its bins at 107 and 108), on the select
+`FlightB411.swift`; protocol 83, remade at protocol 105, named at 106, its bins at 107 to 109), on the select
 (`StageChoice.selectable`) and 47's (`StageChoice.fortySeven`), not ZONES'. On it every body
 moves at half its speed, on the ground, in the air and in Super Smoothie's flight
 (`StageFeatures.speedShare`, `FlightB411Rules.speedShare`), and nothing dunks
@@ -1839,8 +1839,10 @@ start: the plane level and the bins still through the count and seven seconds af
 (`startLevelFrames`), the middle bin alone open with the ball waiting in its mouth, held there
 (`Match.ballBin`, in `advance`) until the count's done, when it drops. Then the cycle: one bin
 open at a time, for ten seconds (`binOpenFrames`), then shut and another opened off the dice, never
-the same one twice running (`Match.lastBin`), with nothing in it, or one side's hoop, or the
-other's, so there is at most one hoop on the stage. A hoop comes out in a hoopcase that slides down
+the same one twice running (`Match.lastBin`), with nothing in it, or a hoop: empty one time in
+three but never a third time running (`emptyRunMost`, `Match.emptyRun`), and the hoops alternate
+whose after the first (`Match.lastHoopOwner`), so there is at most one hoop on the stage and each
+side gets its turn. A hoop comes out in a hoopcase that slides down
 out of the bin over 20 frames (`caseSlideFrames`, `Bin.caseFrames`) and slides back in before the
 bin shuts; scored on, in 47, it retreats at once (`flightB411Scored`, `Bin.retreating`) and its bin
 shuts and the next opens, so the one hoop can't take the ball twice (in Rounds the point's restart
@@ -1850,11 +1852,14 @@ under its bin (`rimSpot`), and away (`HighwayRules.parked`) otherwise. The hoopc
 colour of the side guarding the hoop, as its net is, and its lighter grey (139 147 175) in that
 colour lifted as a body's is (`FlightB411Art.hoopcase`); the ring's centre 17 in and 33 down on the
 canvas, the suitcase's top row 15, its lowest 39, the ring's front half from row 34. It's drawn in
-two sprites cut from that sheet (`FlightB411Art.layCase`): the back, the suitcase and the ring's
-back half, under the net, and the front, the ring's front half, over the net and the ball
-(`rimFrontZ`); the top three rows of the suitcase (`caseMaskRows`) are never drawn, and that
-line is the case's anchor: it swings about it by half the lean (`caseSwing`), and as it slides it
-rises into the bin, whatever's past the line cut off, so it looks to go in and out. The suitcase's
+two sprites cut from that sheet (`FlightB411Art.casePieces`, `layCase`): the back, the suitcase
+and the ring's back half, under the net, and the front, the ring's front half, over the net and
+the ball (`rimFrontZ`), which also stands in for a rim in `rimSnapshots` so the net's cylinder
+hides behind it. The mask line is the stage's: three rows under the suitcase's top when it's out
+(`caseMaskRows`), level in the plane's frame whatever the swing; each piece hangs from it as its
+anchor, swings about it by half the lean (`caseSwing`), and as the case slides in it rises past
+it; a shader on each piece (`caseMaskShader`) drops whatever is above the line in the stage's
+frame, so no crop node is needed and the cut doesn't turn with the case. The suitcase's
 top hangs `hoopcaseDrop` art pixels under the bin's bottom, -17 by default (up into the bin): the
 debug strip's HOOPCASE Y slider, an art pixel at a time, kept between launches, offline; online the
 default. The rims' own art and backboards aren't drawn on it; the net hangs from the ring's centre,
@@ -1862,17 +1867,19 @@ with its own NET X and NET Y (`.flight` keys, 0 and 0 to start), on the strip th
 three-point line drawn on it, too small for one (`StageFeatures.threePointLine`); 47's threes
 count as ever, from past the usual radius round the hoop. After a point the
 bins shut, the hoops go away and the ball waits in the middle bin again; in Rounds the third round's
-ball drops from any of the five, off the series' dice (`startFromBin`). NO DUNKING over the bins:
-`no_dunking.svg` (`_Graphic Assets/Vectors/Stages/Flight B411`) rendered 24 high into
-`FlightB411NoDunking` in palette 7, centred on the stage halfway up the dark band over the bins,
-and over it a red ring and slash drawn once as a picture (`FlightB411Art.noTexture`, `noRed`),
-both told to the glow mask as glowing through the backdrop's flat (`glowThroughSnapshots`), since
-over a flat nothing glows otherwise; the sign's size the strip's NO DUNK SCALE slider (`signScale`,
-0.5 to 4, kept). Clouds (`FlightB411Cloud`, `Flight/cloud.png`, 192 by 64) drift left to right
+ball drops from any of the five, off the series' dice (`startFromBin`). The signs over the bins, in a
+row centred on the stage halfway up the dark band, a gap of 6 between: NO DUNKING, `no_dunking.svg`
+(`_Graphic Assets/Vectors/Stages/Flight B411`) rendered 24 high into `FlightB411NoDunking` in
+palette 7, with over it a red ring and slash drawn once as a picture (`FlightB411Art.noTexture`,
+`noRed`); and the seatbelt, `seatbelt.svg` rendered 24 high into `FlightB411Seatbelt`, its arrow
+(the file's middle path, which the others never overlap sideways) red and the rest palette 7. All
+told to the glow mask as glowing through the backdrop's flat (`glowThroughSnapshots`), since over
+a flat nothing glows otherwise; their size the strip's NO DUNK SCALE slider (`signScale`, 0.5 to 4,
+half to start, kept). Clouds (`FlightB411Cloud`, `Flight/cloud.png`, 192 by 64) drift left to right
 over the sky beyond the plane: six, each its own size (half to two and a half times) and pace, in
 `skyNode`, on the camera, turned back level and under everything of the world's (z -100), so the
-plane covers them. The cart stands on its wheels' line and tips a little, a quarter of the lean
-and a touch with its speed (`cartLean`, `cartSpeedTip`).
+plane covers them. The cart stands on its wheels' line, the wheels drawn under its body, and
+tips a little into the way it's going with its speed (`cartSpeedTip`), flat once it stops.
 
 The cart (`Cart`, `FlightB411Rules.cartSize`: 16 by 24 art pixels solid, drawn from `Cart`, its
 sheet `Flight/Cart.png`, 48 by 64 drawn at 2x, so 24 by 32 art pixels in 8-pixel cells: the cart

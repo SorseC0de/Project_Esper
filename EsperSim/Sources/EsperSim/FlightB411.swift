@@ -69,8 +69,10 @@ public enum FlightB411Rules {
     /// A start: the plane level and the bins still through the count and this long after.
     public static let startLevelFrames = 7 * 60
     /// The bins' cycle: one bin open at a time, for `binOpenFrames`, then another, never the
-    /// same one twice running, with nothing in it, or one side's hoop, or the other's.
+    /// same one twice running, with nothing in it, or a hoop: no more than `emptyRunMost` empty
+    /// in a row, and the hoops alternate whose after the first.
     public static let binOpenFrames = 600
+    public static let emptyRunMost = 2
 
     /// Where a bin is: its middle, and the ball's wait in its mouth, and its hoopcase's ring.
     public static func binCentre(_ index: Int) -> Double { binLefts[index] + binWidth / 2 }
@@ -201,14 +203,23 @@ extension Match {
                 }
             }
         }
-        // None open, past the start's spell: the next, any but the last.
+        // None open, past the start's spell: the next, any but the last; empty one time in
+        // three but never a third time running; a hoop the other side's than the last.
         if frame >= flightStartsAt, !bins.contains(where: \.open) {
             let choices = bins.indices.filter { $0 != lastBin }
             let index = choices[fieldDice.roll(choices.count)]
-            let roll = fieldDice.roll(3)
+            let empty = emptyRun < FlightB411Rules.emptyRunMost && fieldDice.roll(3) == 0
             bins[index].open = true
             bins[index].framesLeft = FlightB411Rules.binOpenFrames
-            bins[index].load = roll == 0 ? .empty : .hoop(owner: roll - 1)
+            if empty {
+                bins[index].load = .empty
+                emptyRun += 1
+            } else {
+                let owner = lastHoopOwner.map { 1 - $0 } ?? fieldDice.roll(2)
+                bins[index].load = .hoop(owner: owner)
+                lastHoopOwner = owner
+                emptyRun = 0
+            }
             lastBin = index
         }
         for hoop in stage.hoops.indices {

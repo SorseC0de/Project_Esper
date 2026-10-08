@@ -50,6 +50,9 @@ public struct Match: Equatable {
     public var bins: [Bin] = []
     public var ballBin: Int?
     public var lastBin: Int?
+    /// Empty bins opened in a row, and whose hoop came out last, for the next to be the other's.
+    public var emptyRun = 0
+    public var lastHoopOwner: Int?
     public var scores: [Int]
     /// Rounds reset on a point; 47 plays on through its baskets.
     public var mode = GameMode.rounds

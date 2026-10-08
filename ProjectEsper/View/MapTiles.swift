@@ -110,7 +110,7 @@ enum FlightB411Art {
             let wheel = SKSpriteNode(texture: wheelArt)
             wheel.size = CGSize(width: 8, height: 8)
             wheel.position = CGPoint(x: x, y: 4 - 1)
-            wheel.zPosition = 0.1
+            wheel.zPosition = -0.1
             node.addChild(wheel)
             return wheel
         }
@@ -153,33 +153,60 @@ enum FlightB411Art {
     /// How much of the plane's lean the hanging case takes, swinging about its top.
     static let caseSwing: CGFloat = 0.5
 
-    /// The case's two sprites for a slide of `out` (0 in the bin to 1 hanging): the back, the
-    /// suitcase and the ring's back half, and the front, the ring's front half; each cut to the
-    /// rows below the mask line as the case stands now, their sizes with them. Sized and
-    /// positioned to hang from `anchor` (the mask line, at the suitcase's middle), turned by `swing`.
-    static func layCase(back: SKSpriteNode, front: SKSpriteNode, sheet: SKTexture, out: CGFloat, anchor: CGPoint, swing: CGFloat) {
-        let caseRows = caseBottomRow - caseTopRow
-        // The case's top row, as it stands: slid up into the bin by what's not out yet.
-        let top = caseTopRow - (1 - out) * caseRows
-        let line = caseTopRow + caseMaskRows
-        func cut(_ node: SKSpriteNode, from first: CGFloat, to last: CGFloat) {
-            // Rows of the canvas, top down, kept below the line; the sprite holds what's left.
-            let firstKept = max(first, line), lastKept = last
-            let rows = lastKept - firstKept
-            node.isHidden = rows <= 0
-            guard rows > 0 else { return }
-            let height = hoopcaseCanvas
-            node.texture = SKTexture(rect: CGRect(x: 0, y: (height - lastKept) / height, width: 1, height: rows / height), in: sheet)
-            node.size = CGSize(width: hoopcaseCanvas, height: rows)
-            node.anchorPoint = CGPoint(x: hoopcaseRing.x / hoopcaseCanvas, y: 1)
-            // Its top sits this far under the line, turned with the case about the line.
-            let drop = firstKept - line
-            node.position = CGPoint(x: anchor.x + drop * sin(swing), y: anchor.y - drop * cos(swing))
-            node.zRotation = swing
+    /// The case's two pieces, whole, cut from the sheet once: the back, the suitcase and the
+    /// ring's back half, and the front, the ring's front half.
+    static func casePieces(sheet: SKTexture) -> (back: SKTexture, front: SKTexture) {
+        let height = hoopcaseCanvas
+        func rows(_ first: CGFloat, _ last: CGFloat) -> SKTexture {
+            let texture = SKTexture(rect: CGRect(x: 0, y: (height - last) / height, width: 1, height: (last - first) / height), in: sheet)
+            texture.filteringMode = .nearest
+            return texture
         }
-        let frontTop = top + (caseFrontRow - caseTopRow)
-        cut(back, from: top, to: frontTop)
-        cut(front, from: frontTop, to: top + caseRows)
+        return (rows(caseTopRow, caseFrontRow), rows(caseFrontRow, caseBottomRow))
+    }
+
+    /// The mask line in the stage's frame: whatever of a piece is above the line, as the piece
+    /// is turned and slid, isn't drawn. The line passes through the piece's anchor; `u_anchor`
+    /// and `u_size` put a fragment in the piece's own units, `u_swing` turns it as the piece is.
+    static let caseMaskSource = """
+    void main() {
+        vec2 p = (v_tex_coord - u_anchor) * u_size;
+        float up = -sin(u_swing) * p.x + cos(u_swing) * p.y;
+        if (up > 0.0) discard;
+        gl_FragColor = SKDefaultShading();
+    }
+    """
+    static func caseMaskShader() -> SKShader {
+        let shader = SKShader(source: caseMaskSource)
+        shader.uniforms = [SKUniform(name: "u_swing", float: 0), SKUniform(name: "u_size", vectorFloat2: vector_float2(1, 1)),
+                           SKUniform(name: "u_anchor", vectorFloat2: vector_float2(0, 1))]
+        return shader
+    }
+
+    /// The case's two pieces laid for a slide of `out` (0 in the bin to 1 hanging): each hung
+    /// from `anchor`, the mask line at the suitcase's middle, and turned about it by `swing`,
+    /// the case's top `caseMaskRows` above the line when it's out, and further up as it slides
+    /// in; its shader cuts what's above the line.
+    static func layCase(back: SKSpriteNode, front: SKSpriteNode, out: CGFloat, anchor: CGPoint, swing: CGFloat) {
+        let caseRows = caseBottomRow - caseTopRow
+        // Rows from the case's top down to the line, as it stands.
+        let toLine = caseMaskRows + (1 - out) * caseRows
+        func lay(_ node: SKSpriteNode, top: CGFloat, rows: CGFloat) {
+            node.size = CGSize(width: hoopcaseCanvas, height: rows)
+            // The anchor on the line: this piece's top is `top` rows under the case's.
+            let anchorPoint = CGPoint(x: hoopcaseRing.x / hoopcaseCanvas, y: 1 - (toLine - top) / rows)
+            node.anchorPoint = anchorPoint
+            node.position = anchor
+            node.zRotation = swing
+            node.isHidden = toLine - top >= rows
+            if let shader = node.shader {
+                shader.uniformNamed("u_swing")?.floatValue = Float(swing)
+                shader.uniformNamed("u_size")?.vectorFloat2Value = vector_float2(Float(hoopcaseCanvas), Float(rows))
+                shader.uniformNamed("u_anchor")?.vectorFloat2Value = vector_float2(Float(anchorPoint.x), Float(anchorPoint.y))
+            }
+        }
+        lay(back, top: 0, rows: caseFrontRow - caseTopRow)
+        lay(front, top: caseFrontRow - caseTopRow, rows: caseBottomRow - caseFrontRow)
     }
 
     /// A hoopcase in a side's colours: the suitcase's main grey, as drawn, becomes the energy's
@@ -231,17 +258,28 @@ enum FlightB411Art {
         holder.zPosition = backdropZ + 0.2
         let texture = SKTexture(imageNamed: "FlightB411NoDunking")
         texture.filteringMode = .nearest
+        let belt = SKTexture(imageNamed: "FlightB411Seatbelt")
+        belt.filteringMode = .nearest
+        // Side by side, a gap between, the row centred: NO DUNKING, then the seatbelt.
+        let signWidth: CGFloat = 22, beltWidth: CGFloat = 118, gap: CGFloat = 6
+        let row = signWidth + gap + beltWidth
         let sign = SKSpriteNode(texture: texture)
-        sign.size = CGSize(width: 22, height: 24)
+        sign.size = CGSize(width: signWidth, height: 24)
+        sign.position = CGPoint(x: -row / 2 + signWidth / 2, y: 0)
         holder.addChild(sign)
         // The "no" drawn once as a picture, so the glow can be told of it as of the sign.
         let no = SKSpriteNode(texture: noTexture)
         no.size = CGSize(width: noRadius * 2 + 4, height: noRadius * 2 + 4)
+        no.position = sign.position
         no.zPosition = 0.1
         holder.addChild(no)
+        let seatbelt = SKSpriteNode(texture: belt)
+        seatbelt.size = CGSize(width: beltWidth, height: 24)
+        seatbelt.position = CGPoint(x: row / 2 - beltWidth / 2, y: 0)
+        holder.addChild(seatbelt)
         parent.addChild(holder)
-        SKTexture.preload([texture, noTexture]) {}
-        return (holder, [sign, no])
+        SKTexture.preload([texture, noTexture, belt]) {}
+        return (holder, [sign, no, seatbelt])
     }
     static let noRadius: CGFloat = 16
     /// Red, lifted enough to pass the glow's threshold.
@@ -264,14 +302,14 @@ enum FlightB411Art {
         }
         return SKTexture(image: image)
     }()
-    /// The sign's size, the NO DUNK SCALE slider's, kept between launches.
-    static let signScaleKey = "esper.flightB411.signScale"
+    /// The signs' size, the NO DUNK SCALE slider's, kept between launches; half to start.
+    static let signScaleKey = "esper.flightB411.signScale.2"
     nonisolated(unsafe) static var signScale: CGFloat = {
-        CGFloat(UserDefaults.standard.object(forKey: signScaleKey) as? Double ?? 1)
+        CGFloat(UserDefaults.standard.object(forKey: signScaleKey) as? Double ?? 0.5)
     }()
-    /// How much of the plane's lean the cart tips, about its wheels, and how much its speed.
-    static let cartLean: CGFloat = 0.25
-    static let cartSpeedTip: CGFloat = 0.03
+    /// How much the cart tips with its speed, into the way it's going, about its wheels; flat
+    /// at rest.
+    static let cartSpeedTip: CGFloat = 0.06
 
     /// A cloud, `FlightB411Cloud` (192 by 64), for the sky beyond the plane.
     static let cloud: SKTexture = {

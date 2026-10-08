@@ -195,7 +195,9 @@ final class FlightB411Tests: XCTestCase {
         // Through the count the ball waits shut in the bin, over the bin's middle, the plane level.
         for _ in 0..<59 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.ball.position, FlightB411Rules.ballSpot(in: centre))
-        XCTAssertEqual(match.ball.position.x, FlightB411Rules.binCentre(centre), accuracy: 1e-9)
+        XCTAssertEqual(match.ball.position.x, FlightB411Rules.width / 2, accuracy: 1e-9, "over the plane's middle")
+        XCTAssertEqual(match.ball.position.x - match.players[0].position.x, match.players[1].position.x - match.ball.position.x,
+                       accuracy: 1e-9, "as far from one start as the other")
         XCTAssertTrue(match.bins.allSatisfy { !$0.open }, "still shut")
         XCTAssertEqual(match.stage.tilt, 0)
         // On go the bin opens and the ball drops; the plane stays level the spell after.
@@ -204,7 +206,7 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertTrue(match.bins[centre].open, "opened on go")
         for _ in 0..<FlightB411Rules.startLevelFrames - 2 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertLessThan(match.ball.position.y, FlightB411Rules.binBottom, "dropped out of the bin")
-        XCTAssertEqual(match.ball.position.x, FlightB411Rules.binCentre(centre), accuracy: 1e-6, "straight down")
+        XCTAssertEqual(match.ball.position.x, FlightB411Rules.width / 2, accuracy: 1e-6, "straight down")
         XCTAssertEqual(match.stage.tilt, 0)
         XCTAssertEqual(match.bins.filter(\.open).count, 1)
         // Then the cycle: one bin open at a time, never the same one twice running; a hoop hangs

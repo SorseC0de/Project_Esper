@@ -357,6 +357,13 @@ enum DunkTuning {
 
 /// The glow, as GameMaker's Glow filter had it: what counts as bright, how soft the cut is,
 /// how far it spreads, how strong it comes back, and its colour.
+/// Debug strip sliders put away once tuned; their values stay as baked.
+enum ParkedSliders {
+    static let net = true
+    static let flo = true
+    static let kAndALights = true
+}
+
 enum GlowSettings {
     /// Luminance above which a pixel glows, and the higher bar the bodies have to clear.
     static let threshold: Float = 0.2
@@ -366,4 +373,11 @@ enum GlowSettings {
     static let blurPasses = 2
     static let intensity: Float = 1.0
     static let tint = SIMD4<Float>(1, 1, 1, 1)
+    /// The share of its glow a hooded head's hood takes, as the customize screen draws it
+    /// (`CustomizeArt.glowStrength`): the hood is lighter than the energy colour and big, and at
+    /// the whole glow it went to gold. HOOD GLOW on the strip moves it, kept.
+    static let hoodShareKey = "glow.hoodShare"
+    nonisolated(unsafe) static var hoodShare: Float = {
+        Float(UserDefaults.standard.object(forKey: hoodShareKey) as? Double ?? 0.6)
+    }()
 }

@@ -120,7 +120,11 @@ enum KAndAArt {
     static let coneZ: CGFloat = washZ + 1
     /// The wash over the whole stage: palette 30 at a tenth, on the camera at 95 as Hoopfish
     /// Hideaway's water is; the lights are drawn over it, the nets and the glow go through it.
-    static let washAlpha: CGFloat = 0.1
+    /// A tenth, WASH on the strip moving it, kept.
+    static let washAlphaKey = "esper.kAndA.washAlpha"
+    nonisolated(unsafe) static var washAlpha: CGFloat = {
+        CGFloat(UserDefaults.standard.object(forKey: washAlphaKey) as? Double ?? 0.1)
+    }()
     static let washZ: CGFloat = 95
     /// One chance in 600 a frame: a flicker every ten seconds or so.
     static let flickerChance = 1.0 / 600
@@ -513,6 +517,11 @@ enum FlightB411Art {
     static let planeScaleKey = "esper.flightB411.planeScale"
     nonisolated(unsafe) static var planeScale: CGFloat = {
         CGFloat(UserDefaults.standard.object(forKey: planeScaleKey) as? Double ?? 1)
+    }()
+    /// The plane moved up from the stage's middle, in art pixels: PLANE Y on the strip, kept.
+    static let planeYKey = "esper.flightB411.planeY"
+    nonisolated(unsafe) static var planeY: CGFloat = {
+        CGFloat(UserDefaults.standard.object(forKey: planeYKey) as? Double ?? 0)
     }()
     static var planeSize: CGSize {
         let width = CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide * planeScale

@@ -19,6 +19,8 @@ final class MaskScene: SKScene {
     private let cameraNode = SKCameraNode()
     private var bodies: [SKSpriteNode] = []
     private var cutOuts: [SKSpriteNode] = []
+    /// The hooded heads' hoods, in magenta: the plain threshold, at the hood's share of the glow.
+    private var hoods: [SKSpriteNode] = []
     private var shielded: [SKSpriteNode] = []
     private var flats: [SKSpriteNode] = []
     private var underFlats: [SKSpriteNode] = []
@@ -65,6 +67,7 @@ final class MaskScene: SKScene {
     private static let flatBlue = flat(SIMD4<Float>(0, 0, 1, 1))
     private static let flatBlack = flat(SIMD4<Float>(0, 0, 0, 1))
     private static let flatRed = flat(SIMD4<Float>(1, 0, 0, 1))
+    private static let flatMagenta = flat(SIMD4<Float>(1, 0, 1, 1))
 
     /// The stage's still, non-glowing art in green, redone when `version` changes.
     func syncStatic(_ flats: [BodySnapshot], version: Int) {
@@ -84,8 +87,9 @@ final class MaskScene: SKScene {
     /// Copies the game's bodies and camera, and the flat things in green.
     /// `cutOut`: drawn black over the bodies, so what's there takes the plain threshold.
     /// `shield`: drawn red under the cut-outs: no glow, its own or any spread onto it.
+    /// `hoods`: drawn magenta with the cut-outs: the plain threshold, at the hood's share.
     func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], under: [BodySnapshot] = [], through: [BodySnapshot] = [],
-                throughFront: [BodySnapshot] = [], throughNets: [CGPath] = [], cutOut: [BodySnapshot] = [], shield: [BodySnapshot] = [],
+                throughFront: [BodySnapshot] = [], throughNets: [CGPath] = [], cutOut: [BodySnapshot] = [], hoods: [BodySnapshot] = [], shield: [BodySnapshot] = [],
                 size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat, cameraRotation: CGFloat = 0) {
         if self.size != size { self.size = size }
         cameraNode.position = cameraPosition
@@ -94,6 +98,7 @@ final class MaskScene: SKScene {
         place(snapshots, in: &bodies, green: false)
         place(shield, in: &shielded, green: false, depth: 2.5, shader: MaskScene.flatRed)
         place(cutOut, in: &cutOuts, green: false, depth: 3, shader: MaskScene.flatBlack)
+        place(hoods, in: &self.hoods, green: false, depth: 3, shader: MaskScene.flatMagenta)
         place(flat, in: &flats, green: true)
         place(under, in: &underFlats, green: true, depth: -0.5)
         place(through, in: &glowingThrough, green: false, depth: -0.75, shader: MaskScene.flatBlue)

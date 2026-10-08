@@ -1117,9 +1117,15 @@ aimed up, forward aimed down, to π/15 at the aim's 45°. A human's limb cubes c
 the limbs is energy (`Dressing.cubeSources`): a boot's top, the knee, rather than the shoe, a
 sleeve's, the shoulder, and a shoe where there's no boot; the tops are each part's topmost row's
 middle on the sheet (`SpriteLibrary.top`, the same in every look, warmed with the rest), and the
-cubes take the part's colour as drawn, turned round or not. In the glow's mask the hood is cut out in black so it glows as energy
-(`hoodSnapshots`, `MaskScene`'s `cutOut`) and the face drawn pure red (`shieldedSnapshots`, `shield`),
+cubes take the part's colour as drawn, turned round or not. In the glow's mask the hood is drawn
+magenta (`hoodSnapshots`, `MaskScene`'s `hoods`): the plain threshold, at the hood's share of the glow,
+0.6 as the customize screen adds it (`GlowSettings.hoodShare`, the strip's HOOD GLOW, kept; at the whole
+glow the big, light hood doubled toward gold); the face is drawn pure red (`shieldedSnapshots`, `shield`),
 which the bright pass treats as flat and the composite leaves without bloom, so none spreads onto it.
+The hood's strings, the energy form's head apart and each body's energy are cut out in black
+(`cutOutSnapshots`, `cutOut`), and a body's own glowing parts (the sleeves, boots and shoes) are black
+in its glow mask rather than left out, so they all take the plain threshold over any stage: left out,
+a stage's flat backdrop under them (Flight B411's, K&A's) kept them from glowing.
 The hood is the H.O.O.D., the Hyper-Osmotic Output Driver: it draws in sweat and drives out
 energy. Its two strings are drawn rather than painted (`HoodStrings`): chains of whole art pixels, each pixel
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
@@ -1819,7 +1825,8 @@ walled off (`Stage.width`, stored, is where a stage ends when that's short of it
 (the file's hidden Player layer stands on them); one rim, anyone's to score on (`Hoop.shared`,
 the point to whoever put the ball through, protocol 117), out of whichever bin has it; the starts
 against the plane's two ends (`startInset`, 5, a body's half width); the ball shut in the middle
-bin, over its middle, which sits 4 art pixels right of the plane's in the art. The map maker has nothing to
+bin over the plane's middle, as far from one start as the other (`ballSpot`; the bin's own middle is 4
+art pixels right of it in the art; protocol 118). The map maker has nothing to
 do with it any more: its tile sheets are gone from the catalog and `MapStage` with them.
 
 The file's layers, bottom up: Tiles, Back Fade, Back Chairs, Bins, Open Bin, then the hidden Player
@@ -1902,10 +1909,11 @@ half to start, kept). Clouds (`FlightB411Cloud`, `Flight/cloud.png`, 192 by 64) 
 over the sky beyond the plane: six, each its own size (one to four times) and pace (0.6 to 1.6 a
 frame times its size, times two), at two thirds (`cloudAlpha`), in
 `skyNode`, on the camera, turned back level and under everything of the world's (z -100), so the
-plane covers them. Under the clouds the plane itself (`FlightB411Plane`, `Flight/plane.png`, 464
+cabin covers them; each pass a cloud goes behind the plane or in front of it at random (z -102 or -100). Under the clouds the plane itself (`FlightB411Plane`, `Flight/plane.png`, 464
 by 368, a root imageset of `Tools/import_sprites.py`): the stage's width (312 art pixels across)
 times the strip's PLANE SCALE slider (`planeScale`, 0.5 to 8, 1 to start, kept), past the screen's
-edges as it grows, centred on the stage, at a fifth (`planeAlpha`), a child of the
+edges as it grows, centred on the stage and moved up by the strip's PLANE Y (`planeY`, art pixels,
+-400 to 400, kept), at a fifth (`planeAlpha`), a child of the
 scene at z -101, in the world's frame rather than the camera's, so it pitches with the stage
 while the clouds stay level. The cart stands on its wheels' line, the wheels drawn under its body, and
 tips a little into the way it's going with its speed (`cartSpeedTip`), flat once it stops.
@@ -1920,7 +1928,7 @@ the stage's extras: stood on, it carries whoever's on it, as a helmet does. Neit
 plane's walls is anything to land on or jump off (`StageFeatures.wallJumps`, false here; the
 board's ride is still allowed). Rolling into anyone
 else at 0.2 or more it knocks them its way (`cartPush`), stuns them, pops the ball out of their
-hands if they hold it (`.cartHit`; HIT, a spark), and can't hit them again for 30 frames.
+hands if they hold it (`.cartHit`; HIT, a spark, the strike's sound), and can't hit them again for 30 frames.
 
 ## K&A
 
@@ -1937,9 +1945,9 @@ flattens the first eleven into `KAndABackdrop`, on the stage's ground, and the l
 beside the new one, which the tool now reads right); `python3 Tools/import_stage_art.py kanda`
 does both again when the picture changes (`flight` the plane's, none for every stage). Its walls,
 starts, ball and rims are laid out in the map maker (`MapStage.kAndA`, protocol 111; the rims the
-map's at 114), as the Elements' are, every marker on it: the baked map (version 4, the builder's COPY) is three rows of ground,
-the starts at columns 8 and 28 over the two cars, the ball at 18, 15, the rims at 2, 13 and 34,
-13, and the cars' walls: each roof a row of one-ways with a one-way slope at either end, and
+map's at 114), as the Elements' are, every marker on it: the baked map (version 5, the builder's COPY) is three rows of ground,
+the starts at columns 8 and 28 over the two cars, the ball at 18, 15, the rims at 3, 13 and 33,
+13 (protocol 118), and the cars' walls: each roof a row of one-ways with a one-way slope at either end, and
 one-ways along the hood and the trunk (protocol 115); nothing else is solid, the pillars and the painted cars scenery, until walls are painted.
 The file's `[Dont_Draw]` layer isn't drawn: it places the red car (`red_car.aseprite`, 128 by 48,
 its Body and Wheels layers each their own picture, `KAndACarBody` and `KAndACarWheels`, `python3
@@ -1948,13 +1956,15 @@ Tools/import_stage_art.py redcar`) with its bottom left at the ground's top 64 a
 landing on the car sags its body (not the wheels) two pixels, which comes back up one and stays
 there while anyone stands on it, and up the last once they've gone, a pixel every three frames
 (`KAndAArt.sagStepFrames`); whoever stands on it is drawn down with it (`standsOnCar`). Three
-street lights hang off the wire (`lampXs`, their bottoms at `lampBottom`): from each a trapezoid
+street lights hang off the wire (`lampXs`, their bottoms at `lampBottom`, 240 art pixels up, a tile
+lower than first drawn): from each a trapezoid
 of its light (`KAndAArt.Light`, `conePicture`), 8 across at the lamp and 126 at its foot, 150 down,
-fading to clear from halfway down, palette 7 at 0.12, added, over the backdrop; the strip's LIGHT
-TOP W, LIGHT BOTTOM W, LIGHT DROP and LIGHT FADE FROM sliders, kept, draw them again as they move.
+fading to clear from halfway down, palette 7 at 0.12, added, over the backdrop; the LIGHT TOP W,
+LIGHT BOTTOM W, LIGHT DROP and LIGHT FADE FROM sliders are parked (`ParkedSliders`), as the nets'
+and the FLO meters' are.
 Now and then (one chance in 600 a frame, every ten seconds or so) one flickers for 6 to 20 frames,
 dimming to a third every other pair of frames. Over the whole stage lies a wash of palette 30 at a
-tenth (`KAndAArt.washAlpha`, `washOverlay`, a flat sprite on the camera at 95, as Hoopfish
+tenth (`KAndAArt.washAlpha`, the strip's WASH, kept, `washOverlay`, a flat sprite on the camera at 95, as Hoopfish
 Hideaway's water is, and the chevrons lifted over it as there): the lights' cones are drawn over
 it (`coneZ`, 96), the nets' strands glow through it (`glowThroughNets`, the mask's blue, their
 colour taken from under the wash as from under the water, `waterTint` naming the wash), and the

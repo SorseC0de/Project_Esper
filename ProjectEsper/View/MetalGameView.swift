@@ -71,6 +71,7 @@ struct GlowUniforms {
     var wave: SIMD4<Float> = .zero
     var waterTop: SIMD4<Float> = .zero
     var waterBottom: SIMD4<Float> = .zero
+    var hood = SIMD4<Float>(GlowSettings.hoodShare, 0, 0, 0)
 }
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.
@@ -332,7 +333,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.syncStatic(scene.staticFlats, version: scene.staticFlatsVersion)
-        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.hoodSnapshots, shield: scene.shieldedSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
+        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.cutOutSnapshots, hoods: scene.hoodSnapshots, shield: scene.shieldedSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
         maskRenderer.update(atTime: now)
         let maskPass = MTLRenderPassDescriptor()
         maskPass.colorAttachments[0].texture = bodyMask

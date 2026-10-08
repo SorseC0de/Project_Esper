@@ -74,8 +74,12 @@ public enum FlightB411Rules {
     public static let emptyRunMost = 2
 
     /// Where a bin is: its middle, and the ball's wait in its mouth, and its hoopcase's ring.
+    /// The middle bin's ball waits over the plane's middle, equally far from both starts: the
+    /// bin's own middle is 4 art pixels right of it in the art.
     public static func binCentre(_ index: Int) -> Double { binLefts[index] + binWidth / 2 }
-    public static func ballSpot(in index: Int) -> Vec2 { Vec2(x: binCentre(index), y: binBottom + ballInBin) }
+    public static func ballSpot(in index: Int) -> Vec2 {
+        Vec2(x: index == centreBin ? width / 2 : binCentre(index), y: binBottom + ballInBin)
+    }
     public static func rimSpot(in index: Int) -> Vec2 { Vec2(x: binCentre(index), y: binBottom - (hoopcaseDrop + rimUnderCase) * 0.625) }
 }
 

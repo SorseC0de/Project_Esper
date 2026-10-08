@@ -439,11 +439,22 @@ final class GameScene: SKScene {
 
     /// The hooded heads' hoods, cut out of the glow's body mask in black so they glow as the
     /// energy does; and their faces, shielded in red, so no glow lands on them.
+    /// The hooded heads' hoods, for the glow's mask to give the hood's share of the glow; in
+    /// FloState the face is energy and glows with the hood.
     var hoodSnapshots: [BodySnapshot] {
-        // Every string with it, up or down: over skin, which never glows, they were swallowed. In
-        // FloState the face is energy and glows with the hood.
         hoodMaskSnapshots(\.hood) + hoodMaskSnapshots(\.face, only: energyHoods)
-            + hoodStrings.indices.filter { !greyedOut.contains($0) }.flatMap { hoodStrings[$0].snapshots }
+    }
+
+    /// What glows at the plain threshold wherever it is, over the stage's flats too: the hood's
+    /// strings, up or down (over skin, which never glows, they were swallowed), the energy
+    /// form's head apart, and each body's energy, the slash's blade and the sheets' puffs.
+    var cutOutSnapshots: [BodySnapshot] {
+        let strings = hoodStrings.indices.filter { !greyedOut.contains($0) }.flatMap { hoodStrings[$0].snapshots }
+        let apart = (headNodes + energyNodes).filter { !$0.isHidden && $0.parent != nil }.compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
+                                            size: node.size, zRotation: node.zRotation) }
+        }
+        return strings + apart
     }
     var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face, only: Set(hoodNodes.indices).subtracting(energyHoods)) }
     /// The players whose hooded head is FloState's, its face energy.
@@ -2666,6 +2677,7 @@ final class GameScene: SKScene {
             world.addChild(washOverlay)
         }
         washOverlay.isHidden = !washed
+        washOverlay.alpha = KAndAArt.washAlpha
         washOverlay.size = CGSize(width: halfWidth * 2, height: halfHeight * 2)
         washOverlay.position = cameraNode.position
         // The ball's and the hoop's chevrons stay clear of the water and the wash, over them (glowers sit at 21).
@@ -3131,6 +3143,10 @@ final class GameScene: SKScene {
                 FlightB411Art.planeScale = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: FlightB411Art.planeScaleKey)
             }
+            controls.addSlider(title: "PLANE Y", range: -400...400, notch: 1, value: Float(FlightB411Art.planeY)) { value in
+                FlightB411Art.planeY = CGFloat(value)
+                UserDefaults.standard.set(Double(value), forKey: FlightB411Art.planeYKey)
+            }
             controls.addSlider(title: "NO DUNK SCALE", range: 0.5...4, notch: 0.25, value: Float(FlightB411Art.signScale)) { value in
                 FlightB411Art.signScale = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: FlightB411Art.signScaleKey)
@@ -3139,15 +3155,22 @@ final class GameScene: SKScene {
         // K&A's street lights: the cones' widths at the lamp and the foot, their drop, and
         // where their fade to clear starts, as a share of the way down.
         if match.stage.features.look == .kAndA, online == nil {
-            let relay: (Float) -> Void = { [weak self] _ in
-                KAndAArt.Light.save()
-                if let cones = self?.kAndAArt?.cones { KAndAArt.layCones(cones) }
+            if !ParkedSliders.kAndALights {
+                let relay: (Float) -> Void = { [weak self] _ in
+                    KAndAArt.Light.save()
+                    if let cones = self?.kAndAArt?.cones { KAndAArt.layCones(cones) }
+                }
+                controls.addSlider(title: "LIGHT TOP W", range: 0...64, notch: 1, value: Float(KAndAArt.Light.topWidth)) { KAndAArt.Light.topWidth = CGFloat($0); relay($0) }
+                controls.addSlider(title: "LIGHT BOTTOM W", range: 0...200, notch: 2, value: Float(KAndAArt.Light.bottomWidth)) { KAndAArt.Light.bottomWidth = CGFloat($0); relay($0) }
+                controls.addSlider(title: "LIGHT DROP", range: 8...256, notch: 2, value: Float(KAndAArt.Light.drop)) { KAndAArt.Light.drop = CGFloat($0); relay($0) }
+                controls.addSlider(title: "LIGHT FADE FROM", range: 0...1, notch: 0.05, value: Float(KAndAArt.Light.fadeFrom)) { KAndAArt.Light.fadeFrom = CGFloat($0); relay($0) }
             }
-            controls.addSlider(title: "LIGHT TOP W", range: 0...64, notch: 1, value: Float(KAndAArt.Light.topWidth)) { KAndAArt.Light.topWidth = CGFloat($0); relay($0) }
-            controls.addSlider(title: "LIGHT BOTTOM W", range: 0...200, notch: 2, value: Float(KAndAArt.Light.bottomWidth)) { KAndAArt.Light.bottomWidth = CGFloat($0); relay($0) }
-            controls.addSlider(title: "LIGHT DROP", range: 8...256, notch: 2, value: Float(KAndAArt.Light.drop)) { KAndAArt.Light.drop = CGFloat($0); relay($0) }
-            controls.addSlider(title: "LIGHT FADE FROM", range: 0...1, notch: 0.05, value: Float(KAndAArt.Light.fadeFrom)) { KAndAArt.Light.fadeFrom = CGFloat($0); relay($0) }
-            addNetSliders(.flightB411)
+            // The wash over the whole stage, palette 30, how much of it.
+            controls.addSlider(title: "WASH", range: 0...0.6, notch: 0.02, value: Float(KAndAArt.washAlpha)) { value in
+                KAndAArt.washAlpha = CGFloat(value)
+                UserDefaults.standard.set(Double(value), forKey: KAndAArt.washAlphaKey)
+            }
+            if !ParkedSliders.net { addNetSliders(.kAndA) }
         }
         // The bounds gallery only means anything on the highway.
         if match.stage.features.traffic {
@@ -3191,7 +3214,7 @@ final class GameScene: SKScene {
         }
         if series.stage.stage.features.look == .footballField {
             // Longball's net, tuned in play.
-            addNetSliders(.footballField)
+            if !ParkedSliders.net { addNetSliders(.footballField) }
             controls.addSlider(title: "CROSSBAR ANGLE", range: -45...45, notch: 1, value: Float(GoalpostTuning.crossbarAngle)) { [weak self] value in
                 GoalpostTuning.crossbarAngle = CGFloat(value)
                 self?.buildGoalposts()
@@ -3228,16 +3251,25 @@ final class GameScene: SKScene {
         }
         // The FLO meters' look, while it's settled.
         let relayoutFlo: () -> Void = { [weak self] in self?.layoutFloMeters() }
-        controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO METER Y", range: -60...60, notch: 1, value: Float(FloTuning.meterY)) { FloTuning.meterY = CGFloat($0); relayoutFlo() }
+        if !ParkedSliders.flo {
+            controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
+            controls.addSlider(title: "FLO METER Y", range: -60...60, notch: 1, value: Float(FloTuning.meterY)) { FloTuning.meterY = CGFloat($0); relayoutFlo() }
+        }
         // The A/B test: A empties from the word's end, MAX on the word; B fills from it.
         controls.addPicker(title: "FLO BAR", options: ["A", "B"], selected: FloTuning.variant == .emptiesFromWord ? 0 : 1) { index in
             FloTuning.variant = index == 0 ? .emptiesFromWord : .fillsFromWord
             relayoutFlo()
         }
-        controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.cornerMaxY)) { FloTuning.cornerMaxY = CGFloat($0); relayoutFlo() }
+        if !ParkedSliders.flo {
+            controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
+            controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
+            controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.cornerMaxY)) { FloTuning.cornerMaxY = CGFloat($0); relayoutFlo() }
+        }
+        // How much of its glow a hood takes against everything else's.
+        controls.addSlider(title: "HOOD GLOW", range: 0...1, notch: 0.05, value: GlowSettings.hoodShare) { value in
+            GlowSettings.hoodShare = value
+            UserDefaults.standard.set(Double(value), forKey: GlowSettings.hoodShareKey)
+        }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
@@ -4987,7 +5019,7 @@ final class GameScene: SKScene {
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
             case .snatchReached(let index): play(.snatch, at: body(index))
             case .caught(let index): play(.catchBall, at: body(index))
-            case .struck(let victim, _), .popped(let victim, _): play(.playerHit, at: body(victim))
+            case .struck(let victim, _), .popped(let victim, _), .cartHit(let victim, _): play(.playerHit, at: body(victim))
             case .parried(let victim, _): play(.parry, at: body(victim))
             case .dunked: dunkScoring = true
             // Quiet for a soft bounce, silent once it's only settling.
@@ -6777,6 +6809,7 @@ final class GameScene: SKScene {
         // The seatbelt sign lit while the ball's shut in its bin, off once it drops.
         if noDunkingSprites.count == 3 { noDunkingSprites[2].texture = seatbeltLit ? FlightB411Art.seatbelt : FlightB411Art.seatbeltOff }
         planeNode?.size = FlightB411Art.planeSize
+        planeNode?.position = stageGround.convert(FlightB411Art.stageCentre + CGPoint(x: 0, y: FlightB411Art.planeY), to: self)
         // Each hoop's case: hanging from its bin's mask line, as far out as its slide is, swung
         // a share of the lean about that line; away with nothing to hang from.
         for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseNodes.count && index < hoopcaseFronts.count {
@@ -6804,6 +6837,8 @@ final class GameScene: SKScene {
         let cloud = clouds[index].node
         let scale = CGFloat.random(in: 1...4)
         cloud.size = CGSize(width: 192 * scale, height: 64 * scale)
+        // Half of them behind the plane (-101), half in front of it.
+        cloud.zPosition = Bool.random() ? -2 : 0
         cloud.position = CGPoint(x: fromTheLeft ? -size.width / 2 - cloud.size.width / 2 : CGFloat.random(in: -size.width / 2...size.width / 2),
                                  y: CGFloat.random(in: -size.height / 2...size.height / 2))
         clouds[index].speed = CGFloat.random(in: 0.6...1.6) * scale * 2

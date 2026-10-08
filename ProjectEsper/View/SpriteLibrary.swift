@@ -1003,11 +1003,15 @@ final class SpriteLibrary {
             bareOutline = bareContext.makeImage().map { SKTexture(cgImage: $0) }
         }
 
-        // The body as the glow's mask sees it, in white, the glowing pixels left out so they
-        // take the glow's plain threshold rather than the body's. A human's skin is green, so it
-        // never glows however light it is.
+        // The body as the glow's mask sees it, in white, the glowing pixels black so they take
+        // the glow's plain threshold rather than the body's, whatever's under them: left out, a
+        // stage's flat backdrop showed through and they didn't glow. A human's skin is green, so
+        // it never glows however light it is.
         var glowMask: SKTexture?
         if detach, glowing.contains(true), let (maskContext, maskPixels) = makeCanvas(width: width, height: height) {
+            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && glowing[pixel] {
+                maskPixels[pixel * 4 + 3] = 255
+            }
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
                 let index = pixel * 4
                 let skin = look.human ? parts[pixel].map { look.dressing.skin[$0] != nil } == true : bareSkin(parts[pixel])

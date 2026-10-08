@@ -21,6 +21,8 @@ struct GlowUniforms {
     // none at 0.
     float4 waterTop;
     float4 waterBottom;
+    // x: the share of its glow a hood takes, marked magenta in the mask (the customize screen's 0.6).
+    float4 hood;
 };
 
 struct FullScreen {
@@ -56,7 +58,9 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
     // a single art pixel wide, so any blue at all counts, and the brightest of the full-size
     // pixels under this half-size one is taken rather than their blend with the flats.
     float through = step(0.1, mask.b) * step(mask.r, 0.05);
-    float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body) * (1 - through));
+    // Magenta, a hood: the plain threshold, its glow at a share.
+    float hood = step(0.9, mask.r) * step(mask.g, 0.05) * step(0.9, mask.b);
+    float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body) * (1 - through) * (1 - hood));
     if (through > 0) {
         float2 halfTexel = 0.5 / float2(scene.get_width(), scene.get_height());
         float brightest = -1;
@@ -73,7 +77,8 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
     }
     float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
     float background = u.unglowed.a * step(distance(color.rgb, u.unglowed.rgb), 0.01);
-    float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance) * (1 - flat) * (1 - background);
+    float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance) * (1 - flat) * (1 - background)
+        * mix(1.0, u.hood.x, hood);
     return float4(color.rgb * amount, 1);
 }
 

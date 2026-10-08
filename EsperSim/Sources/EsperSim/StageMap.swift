@@ -224,7 +224,7 @@ public struct StageMap: Equatable, Codable {
     public static func bakedVersion(_ stage: MapStage) -> Int {
         switch stage {
         case .elements, .hoopfishHideaway: 5
-        case .kAndA: 4
+        case .kAndA: 5
         }
     }
 
@@ -254,7 +254,7 @@ public struct StageMap: Equatable, Codable {
             Wall(Cell(27, 4), .oneWay), Wall(Cell(28, 4), .oneWay), Wall(Cell(29, 4), .oneWay),
             Wall(Cell(30, 4), .oneWayLowerLeft),
         ]
-        return StageMap(leftRim: Cell(2, 13), rightRim: Cell(34, 13), spawns: [Cell(8, 6), Cell(28, 6)], ball: Cell(18, 15), walls: walls)
+        return StageMap(leftRim: Cell(3, 13), rightRim: Cell(33, 13), spawns: [Cell(8, 6), Cell(28, 6)], ball: Cell(18, 15), walls: walls)
     }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.

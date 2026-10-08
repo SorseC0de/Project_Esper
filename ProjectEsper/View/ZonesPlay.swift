@@ -361,8 +361,7 @@ final class ZonesPlay {
     /// The phantom colours: one a move.
     static func colour(of kind: ZoneAction.Kind) -> RGB {
         switch kind {
-        case .walk: PixelPalette.colours[36]
-        case .run: PixelPalette.colours[5]
+        case .move: PixelPalette.colours[5]
         case .jump: PixelPalette.colours[19]
         case .doubleJump: PixelPalette.colours[20]
         case .wallJump: PixelPalette.colours[18]

@@ -874,9 +874,11 @@ public struct Player: Equatable {
         case .air:
             // The body turns with the stick in the air, at once.
             if airControlLock == 0, let direction = stickFacing(input) { facing = direction }
-            // Into a stance the stick aims, not steers, so the frame it starts on coasts too.
+            // Into a stance the stick aims, not steers, so the frame it starts on coasts too; so
+            // does the frame a slash or a snatch starts on, which carry the speed they came with.
             let stancing = holding && ((input.shoot && shootReady) || (input.throwBall && throwReady))
-            if airControlLock > 0 || stancing { airCoast() } else { airDrift(input) }
+            let attacking = !holding && ((shootPressed && slashAllowed) || (throwPressed && snatchCooldown == 0 && throwIsSnatch))
+            if airControlLock > 0 || stancing || attacking { airCoast() } else { airDrift(input) }
             fall(input)
             if jumpPressed, coyote > 0 {
                 // Just off an edge: the jump the ground would have given.
@@ -1227,12 +1229,11 @@ public struct Player: Equatable {
             }
 
         case .slashing:
-            // On the ground the swing carries the run it came from, bleeding it off; in the
-            // air gravity is cut, so the body hangs through it, and the roll follows.
-            if grounded {
-                velocity.x = approach(velocity.x, 0, attackBrake)
-            } else {
-                velocity.x = approach(velocity.x, 0, airBrake)
+            // The swing carries the speed it came from, bleeding it off at the attack's brake, on
+            // the ground and in the air alike; in the air gravity is cut, so the body hangs
+            // through it, and the roll follows.
+            velocity.x = approach(velocity.x, 0, attackBrake)
+            if !grounded {
                 velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -fallSpeed)
             }
             if stateTimer >= SlashRules.frames {
@@ -1253,11 +1254,11 @@ public struct Player: Equatable {
                 // goes by the snatch's clock, so FloState's hurrying of it moves the body as far.
                 // The clock's first tick is the press's own frame, which doesn't move: the rest carry it all.
                 velocity.x = stateTimer < SnatchRules.frames ? facing.sign * SnatchRules.floStateTravel / Double(SnatchRules.frames - 1) * Double(timerStep) : 0
-            } else if grounded {
-                velocity.x = approach(velocity.x, 0, attackBrake)
             } else {
-                airDrift(input)
-                fall(.idle)
+                // Carrying the speed it came from, bleeding it off at the attack's brake, on the
+                // ground and in the air alike.
+                velocity.x = approach(velocity.x, 0, attackBrake)
+                if !grounded { fall(.idle) }
             }
             if reached(SnatchRules.sparkFrame) {
                 events.append(.snatchReached(player: index))

@@ -835,11 +835,14 @@ public struct Stage: Equatable {
         )
         stage.lay(map.walls)
         stage.slopes = stage.fixedSlopes
+        // The backboards solid from under the rim up to the stage's ceiling: the bridge isn't, so
+        // stopped at it they left a way over the top.
+        let ceiling = Double(rows + stage.skyRows) * tileSize
         for hoop in stage.hoops {
             let side = hoop.backboard.sign
             let face = hoop.position.x + side * backboardFace, back = face + side * backboardDepth
             stage.fixedExtras.append(Box(min: Vec2(x: min(face, back), y: hoop.position.y + backboardBottom),
-                                         max: Vec2(x: max(face, back), y: KAndARules.bridgeBottom)))
+                                         max: Vec2(x: max(face, back), y: ceiling)))
         }
         stage.extras = stage.fixedExtras
         stage.features = StageFeatures(look: .kAndA)

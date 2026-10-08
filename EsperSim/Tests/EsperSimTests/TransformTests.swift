@@ -68,6 +68,27 @@ final class TransformTests: XCTestCase {
         }
     }
 
+    func testTheSlashAndTheSnatchKeepTheirSpeedInTheAirAsOnTheGround() {
+        for press in [PlayerInput(shoot: true), PlayerInput(throwBall: true)] {
+            var travelled: [Double] = []
+            for aloft in [false, true] {
+                var match = Match(stage: .court, specs: [.starting, .starting])
+                match.countdown = 0
+                match.ball.respawn(at: Vec2(x: 300, y: 100))
+                match.players[0].position = Vec2(x: 100, y: aloft ? 90 : 10)
+                match.players[0].grounded = !aloft
+                match.players[0].enter(aloft ? .air : .run)
+                match.players[0].velocity = Vec2(x: 2.7, y: 0)
+                let from = match.players[0].position.x
+                match.advance(inputs: [press, .idle])
+                for _ in 0..<12 { match.advance(inputs: [.idle, .idle]) }
+                travelled.append(match.players[0].position.x - from)
+            }
+            XCTAssertGreaterThan(travelled[1], 20, "carried on in the air")
+            XCTAssertEqual(travelled[1], travelled[0], accuracy: 1, "as far as on the ground")
+        }
+    }
+
     func testTheSnatchInFloStateIsDrawnFromItsOwnSheet() {
         var match = standing()
         match.players[0].inFloState = true

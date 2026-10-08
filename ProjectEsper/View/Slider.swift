@@ -63,6 +63,18 @@ final class Slider: SKNode {
     private func show() {
         let share = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
         knob.position = CGPoint(x: -Slider.size.width / 2 + share * Slider.size.width, y: 0)
-        label.text = String(format: "%@ %.1f", title, value)
+        label.text = "\(title) " + String(format: "%.\(decimals)f", value)
+    }
+
+    /// As many decimals as the notch has, so every value it stops on reads exactly: 0.25 as
+    /// 0.25, whole steps as whole numbers.
+    private var decimals: Int {
+        var places = 0
+        var step = Double(notch)
+        while places < 3, abs(step - step.rounded()) > 1e-6 {
+            step *= 10
+            places += 1
+        }
+        return places
     }
 }

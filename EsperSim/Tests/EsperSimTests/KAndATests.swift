@@ -30,10 +30,10 @@ final class KAndATests: XCTestCase {
         XCTAssertEqual(match.stage.hoops.count, 2)
         for hoop in match.stage.hoops {
             // The rims where the map puts them, under the bridge; the backboard solid from under the
-            // rim up to the bridge, as the court's to its blocks.
+            // rim up to the stage's ceiling, the bridge being no wall.
             XCTAssertLessThan(hoop.position.y, KAndARules.bridgeBottom)
             let board = match.stage.fixedExtras.first { $0.min.y < hoop.position.y && $0.max.y > hoop.position.y }
-            XCTAssertEqual(board?.max.y, KAndARules.bridgeBottom)
+            XCTAssertEqual(board?.max.y, Double(match.stage.rows + match.stage.skyRows) * Stage.tileSize, "the backboard solid up to the ceiling, over the bridge")
         }
         XCTAssertEqual(match.stage.hoops[0].backboard, .left)
         XCTAssertEqual(match.stage.hoops[1].backboard, .right)

@@ -95,7 +95,9 @@ public struct ZoneGrid: Equatable {
 /// What a run logs: the action and the zone it started in. Two match when both do.
 public struct ZoneAction: Hashable, Codable {
     public enum Kind: String, Codable, CaseIterable {
-        case walk, run, jump, doubleJump, wallJump, crouch, slide, taunt, throwBall, catchBall
+        /// Moving along the ground, a walk, a dash or a run alike: the stick's push isn't told apart.
+        case move
+        case jump, doubleJump, wallJump, crouch, slide, taunt, throwBall, catchBall
         case floStateOn, floStateOff
         /// A power's move; `label` says which.
         case power
@@ -104,8 +106,7 @@ public struct ZoneAction: Hashable, Codable {
 
         public var label: String {
             switch self {
-            case .walk: "Walk"
-            case .run: "Run"
+            case .move: "Move"
             case .jump: "Jump"
             case .doubleJump: "Double Jump"
             case .wallJump: "Wall Jump"
@@ -237,6 +238,9 @@ public struct ZonesRecorder: Equatable {
         return run.actions.count
     }
 
+    /// The ground states that are one move.
+    static let moving: Set<PlayerState> = [.walk, .dash, .run, .pivot]
+
     /// A frame on, after the match has advanced on `input`.
     public mutating func observe(_ match: Match, input: PlayerInput) {
         guard outcome == nil, match.players.indices.contains(player) else { return }
@@ -252,8 +256,8 @@ public struct ZonesRecorder: Equatable {
             let state = me.state
             if state != lastState {
                 switch state {
-                case .walk: log(.walk)
-                case .dash, .run: if lastState != .dash && lastState != .run { log(.run) }
+                // Walking, dashing, running and turning in a run are one move, from its start.
+                case .walk, .dash, .run, .pivot: if !ZonesRecorder.moving.contains(lastState) { log(.move) }
                 case .crouch, .crouchWalk: if lastState != .crouch && lastState != .crouchWalk { log(.crouch) }
                 case .taunt: log(.taunt)
                 case .slide: log(.slide)

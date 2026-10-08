@@ -112,7 +112,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   it fires on the preset arc if nothing was flicked and the ball leaves with the body's
   lift. On the way down it's an ordinary air shot.
 - Shoot (without ball, in neutral or on defence): the Esper Slash, the swat. On the
-  ground it carries the run or dash it came from, bleeding 0.15 a frame; in the air the
+  ground and in the air alike it carries the speed it came from, bleeding 0.15 a frame
+  (`attackBrake`; the snatch the same, and the air's first frame of either coasts rather than
+  braking for a let-go stick, protocol 119); in the air the
   body rises at least 0.5 a frame and gravity is cut to seven tenths, a little hang
   through the swing. The sheet's six frames at 15 a second, 24 sim frames, and the roll the same. The
   blade is a square round the body, 56 art pixels a side, its centre 4 art pixels in
@@ -906,7 +908,8 @@ would make a run too much of a lottery, as the Elements would).
 - A run: one player alone on the stage, from the floor of A1 in from the left wall, the ball in
   hand, FLO full and never spent (`Player.unlimitedFlo`; the lockout between activations still
   runs), thirty seconds to shoot. Every move is logged as it starts, by its zone (`ZonesRecorder`,
-  `ZoneAction`): Walk, Run (the dash is the run's start), Jump, Double Jump, Wall Jump, Crouch,
+  `ZoneAction`): Move (a walk, a dash, a run or a pivot alike, from where it starts, the stick's push
+  not told apart, protocol 119), Jump, Double Jump, Wall Jump, Crouch,
   Slide, Taunt, Throw, Catch, FloState and FloState Off, a power's move by its name (Bolt, Beam,
   Burst, Gale, Fly, Web, Flash, Wall, Pulse, Fireball, Quake), and Shoot, Dunk, the floater (an
   up-throw, logged as the shot "Floater") or a throw down at the Hoopfish's rim ("Throw Down"),
@@ -915,7 +918,7 @@ would make a run too much of a lottery, as the Elements would).
   time up with no shot. A run is kept with the inputs that made it (`ZonesRun`), so it replays to
   the frame anywhere.
 - Where each move started a phantom stays: the body as drawn, half seen, in the move's own colour
-  (`ZonesPlay.colour(of:)`: Walk 36, Run 5, Jump 19, Double Jump 20, Wall Jump 18, Crouch 34, Slide
+  (`ZonesPlay.colour(of:)`: Move 5, Jump 19, Double Jump 20, Wall Jump 18, Crouch 34, Slide
   7, Taunt 27, Throw 8, Catch 10, FloState 22, FloState Off 39, a power 28, Shoot 12, Dunk 13, all
   AAP-64), its move named over it. They drop while the leader records and while the ghost plays,
   and stay through the tries that follow: the leader confirms against their own, the follower
@@ -1816,7 +1819,8 @@ moves at half its speed, on the ground, in the air and in Super Smoothie's fligh
 (`StageFeatures.speedShare`, `FlightB411Rules.speedShare`), and nothing dunks
 (`StageFeatures.dunks`, `Stage.dunkable`). Its ceiling is near the plane's: a few rows of sky
 over the art (`Stage.skyRows` is the stage's own, ten everywhere else; `FlightB411Rules.skyRows`,
-2 by default, the debug strip's CEILING slider offline, 0 to 10, kept between launches; online
+2 by default, the debug strip's CEILING slider offline, 0 to 10, kept between launches (every slider
+shows its value to as many decimals as its step has, 0.25 as 0.25, whole steps whole); online
 the default), flat in the sim whatever the lean, since only the view turns. It's
 drawn whole in Aseprite, `Flight/Flight_Map.aseprite`, 1248 by 576, and four of its pixels are an art
 pixel: 312 by 144 art pixels, 19 and a half tiles by 9, on a grid of 20 columns whose last half is
@@ -1911,9 +1915,9 @@ frame times its size, times two), at two thirds (`cloudAlpha`), in
 `skyNode`, on the camera, turned back level and under everything of the world's (z -100), so the
 cabin covers them; each pass a cloud goes behind the plane or in front of it at random (z -102 or -100). Under the clouds the plane itself (`FlightB411Plane`, `Flight/plane.png`, 464
 by 368, a root imageset of `Tools/import_sprites.py`): the stage's width (312 art pixels across)
-times the strip's PLANE SCALE slider (`planeScale`, 0.5 to 8, 1 to start, kept), past the screen's
-edges as it grows, centred on the stage and moved up by the strip's PLANE Y (`planeY`, art pixels,
--400 to 400, kept), at a fifth (`planeAlpha`), a child of the
+times the strip's PLANE SCALE slider (`planeScale`, 0.5 to 8, 3 baked, kept), past the screen's
+edges, centred on the stage and moved up by the strip's PLANE Y (`planeY`, art pixels,
+-400 to 400, -80 baked, kept), at a fifth (`planeAlpha`), a child of the
 scene at z -101, in the world's frame rather than the camera's, so it pitches with the stage
 while the clouds stay level. The cart stands on its wheels' line, the wheels drawn under its body, and
 tips a little into the way it's going with its speed (`cartSpeedTip`), flat once it stops.
@@ -1971,8 +1975,8 @@ colour taken from under the wash as from under the water, `waterTint` naming the
 bodies' glow is added over it by the glow pass. The hoops hang from the bridge's underside, the
 tracks' 39 rows down from the top (`bridgeBottom`), on the Wreck Center's support beams
 (`HoopSupport`, the same layout, drawn at each hoop as there), with the court's straight
-backboards and rims, the backboard solid from under the rim up to the bridge as the court's is to
-its blocks. The starts 150 and 220 along, on
+backboards and rims, the backboard solid from under the rim up to the stage's ceiling, over the
+bridge, which is no wall (protocol 119). The starts 150 and 220 along, on
 the ground; the ball over the middle at 100. ZONES keeps the right rim, the left backboard
 rimless, the run starting on the ground. Dunks and threes as on the court.
 

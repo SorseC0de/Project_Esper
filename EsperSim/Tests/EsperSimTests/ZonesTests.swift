@@ -106,7 +106,8 @@ final class ZonesTests: XCTestCase {
                 recorder.observe(match, input: input)
             }
         }
-        // A walk, a stop, then the stick flicked out: the dash into the run; a jump; the shot.
+        // A walk, a stop, then the stick flicked out: the dash into the run, a move again, the
+        // walk's or the run's alike; a jump; the shot.
         step(PlayerInput(stick: Vec2(x: 0.4, y: 0)), 20)
         step(.idle, 10)
         step(PlayerInput(stick: Vec2(x: 1, y: 0)), 60)
@@ -115,7 +116,7 @@ final class ZonesTests: XCTestCase {
         step(PlayerInput(shoot: true), 1)
         for _ in 0..<120 where recorder.run.actions.last?.kind != .shoot { step(.idle) }
         let kinds = recorder.run.actions.map(\.kind)
-        XCTAssertEqual(kinds, [.walk, .run, .jump, .shoot], "\(recorder.run.actions.map(\.line))")
+        XCTAssertEqual(kinds, [.move, .move, .jump, .shoot], "\(recorder.run.actions.map(\.line))")
         XCTAssertEqual(recorder.run.actions[0].zone.name, "A1")
         XCTAssertNil(recorder.outcome, "the shot's still in the air")
         step(.idle, 240)
@@ -193,12 +194,12 @@ final class ZonesTests: XCTestCase {
     }
 
     func testAFollowerStraysOnTheFirstMoveThatDiffers() {
-        let set = ZonesRun(actions: [ZoneAction(kind: .walk, zone: Zone(column: 0, row: 0), frame: 1),
+        let set = ZonesRun(actions: [ZoneAction(kind: .move, zone: Zone(column: 0, row: 0), frame: 1),
                                      ZoneAction(kind: .jump, zone: Zone(column: 2, row: 0), frame: 60),
                                      ZoneAction(kind: .shoot, zone: Zone(column: 2, row: 1), frame: 80)])
         var match = court()
         var recorder = ZonesRecorder(match: match, player: 0, target: set)
-        // A walk from A1 matches; a jump from A1 doesn't.
+        // A move from A1 matches; a jump from A1 doesn't.
         for _ in 0..<5 {
             let input = PlayerInput(stick: Vec2(x: 0.4, y: 0))
             match.advance(inputs: [input])

@@ -513,15 +513,15 @@ enum FlightB411Art {
     /// dark grey (40) as 33.
     static let caseLight: RGB = PixelPalette.colours[34]
     static let caseDark: RGB = PixelPalette.colours[33]
-    /// The plane's size against the stage's width, the PLANE SCALE slider's, kept; 1 fits it to the stage.
+    /// The plane's size against the stage's width, the PLANE SCALE slider's, kept; 3 baked.
     static let planeScaleKey = "esper.flightB411.planeScale"
     nonisolated(unsafe) static var planeScale: CGFloat = {
-        CGFloat(UserDefaults.standard.object(forKey: planeScaleKey) as? Double ?? 1)
+        CGFloat(UserDefaults.standard.object(forKey: planeScaleKey) as? Double ?? 3)
     }()
-    /// The plane moved up from the stage's middle, in art pixels: PLANE Y on the strip, kept.
+    /// The plane moved up from the stage's middle, in art pixels: PLANE Y on the strip, kept; -80 baked.
     static let planeYKey = "esper.flightB411.planeY"
     nonisolated(unsafe) static var planeY: CGFloat = {
-        CGFloat(UserDefaults.standard.object(forKey: planeYKey) as? Double ?? 0)
+        CGFloat(UserDefaults.standard.object(forKey: planeYKey) as? Double ?? -80)
     }()
     static var planeSize: CGSize {
         let width = CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide * planeScale

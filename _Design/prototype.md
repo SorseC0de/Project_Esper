@@ -1794,9 +1794,10 @@ The aisle of a plane (`StageChoice.flightB411`, `Stage.flightB411`, `StageLook.f
 (`StageChoice.selectable`) and 47's (`StageChoice.fortySeven`), not ZONES'. On it every body
 moves at half its speed, on the ground, in the air and in Super Smoothie's flight
 (`StageFeatures.speedShare`, `FlightB411Rules.speedShare`), and nothing dunks
-(`StageFeatures.dunks`, `Stage.dunkable`). Its ceiling is the plane's: no rows of sky over it
-(`Stage.skyRows` is the stage's own, ten everywhere else), flat in the sim whatever the lean,
-since only the view turns. It's
+(`StageFeatures.dunks`, `Stage.dunkable`). Its ceiling is near the plane's: a few rows of sky
+over the art (`Stage.skyRows` is the stage's own, ten everywhere else; `FlightB411Rules.skyRows`,
+2 by default, the debug strip's CEILING slider offline, 0 to 10, kept between launches; online
+the default), flat in the sim whatever the lean, since only the view turns. It's
 drawn whole in Aseprite, `Flight/Flight_Map.aseprite`, 1248 by 576, and four of its pixels are an art
 pixel: 312 by 144 art pixels, 19 and a half tiles by 9, on a grid of 20 columns whose last half is
 walled off (`Stage.width`, stored, is where a stage ends when that's short of its grid; the wall a

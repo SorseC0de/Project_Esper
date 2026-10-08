@@ -758,9 +758,10 @@ public struct Stage: Equatable {
         stage.width = width
         stage.fill(.solid, columns: 0...(columns - 1), rows: 0...(FlightB411Rules.floorRows - 1))
         // The right wall where the art ends, half a tile short of the grid's last column.
-        // The ceiling is the plane's: no sky over it.
-        stage.skyRows = 0
-        stage.fixedExtras = [Box(min: Vec2(x: width, y: 0), max: Vec2(x: Double(columns) * tileSize, y: Double(rows) * tileSize))]
+        // The ceiling near the plane's: a few rows of sky over the art, as tuned. The wall box
+        // reaches as high as any sky could, so the sky's own edge never stands in for it.
+        stage.skyRows = FlightB411Rules.skyRows
+        stage.fixedExtras = [Box(min: Vec2(x: width, y: 0), max: Vec2(x: Double(columns) * tileSize, y: Double(rows + Stage.skyRows) * tileSize))]
         stage.features = StageFeatures(look: .flightB411)
         stage.features.tilts = true
         stage.features.speedShare = FlightB411Rules.speedShare
@@ -891,7 +892,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .theElements: "The Elements"
         case .skyNet: "Sky Net"
         case .hoopfishHideaway: "Hoopfish Hideaway"
-        case .flightB411: "Flight B411 B411"
+        case .flightB411: "Flight B411"
         }
     }
 

@@ -16,6 +16,10 @@ public enum FlightB411Rules {
     public static let ballHeight = 60.0
     /// Every body's speeds on it, on the ground, in the air and in flight.
     public static let speedShare = 0.5
+    /// Rows of sky over the art before the ceiling, being tuned: the CEILING slider's, offline;
+    /// online every phone plays the default.
+    public static let defaultSkyRows = 2
+    nonisolated(unsafe) public static var skyRows = defaultSkyRows
 
     /// The pitch: its most, in degrees, and the leans come in tenths of it. A lean's round:
     /// the lean over `tiltOverFrames`, held `tiltHoldFrames`, back level over `tiltOverFrames`

@@ -840,6 +840,7 @@ final class GameScene: SKScene {
         // The vehicles' shapes as last set in the bounds gallery, offline.
         BoundsGallery.loadSaved()
         NetTuning.dropSavedIfStale()
+        FlightB411Rules.skyRows = GameScene.savedFlightCeiling
         // The colours as last picked, before anything is drawn in them.
         for (index, side) in PlayerCustomization.sides.enumerated() {
             sprites.setLook(side.look, for: index)
@@ -1678,6 +1679,11 @@ final class GameScene: SKScene {
     /// Flight B411's cart from its sheet, and its two wheels, which turn as it rolls.
     private var cartNode: SKSpriteNode?
     private var cartWheels: [SKSpriteNode] = []
+    /// Flight B411's ceiling as the CEILING slider last left it, rows of sky over the art.
+    private static let flightCeilingKey = "esper.flightB411.skyRows"
+    private static var savedFlightCeiling: Int {
+        UserDefaults.standard.object(forKey: flightCeilingKey) as? Int ?? FlightB411Rules.defaultSkyRows
+    }
     /// Flight B411's turbulence: frames to the next small shake.
     private var turbulenceIn = 0
     private static let turbulenceGap = 60...240
@@ -2951,6 +2957,14 @@ final class GameScene: SKScene {
             }
         }
         #endif
+        // Flight B411's ceiling: rows of sky over the art, on the match as it stands and kept.
+        if match.stage.features.tilts, online == nil {
+            controls.addSlider(title: "CEILING", range: 0...10, notch: 1, value: Float(FlightB411Rules.skyRows)) { [weak self] value in
+                FlightB411Rules.skyRows = Int(value)
+                UserDefaults.standard.set(Int(value), forKey: GameScene.flightCeilingKey)
+                self?.session.mutate { $0.stage.skyRows = Int(value) }
+            }
+        }
         // The bounds gallery only means anything on the highway.
         if match.stage.features.traffic {
             controls.addPicker(title: "BOUNDS", options: ["OFF", "ON"], selected: boundsGallery == nil ? 0 : 1) { [weak self] index in
@@ -4551,6 +4565,8 @@ final class GameScene: SKScene {
     private func startOnline() {
         guard let net = flowState?.net else { return }
         online = Online(localIndex: net.localIsFirst ? 0 : 1, random: UInt32.random(in: .min ... .max))
+        // Tuning that both phones must agree on plays at its default online.
+        FlightB411Rules.skyRows = FlightB411Rules.defaultSkyRows
         // Whatever was on, off: the title holds under the customize screen, where both sides
         // pick and ready up, until the series starts.
         pendingFlow = nil
@@ -4724,6 +4740,7 @@ final class GameScene: SKScene {
     private func endOnline(_ why: String?) {
         guard online != nil else { return }
         online = nil
+        FlightB411Rules.skyRows = GameScene.savedFlightCeiling
         // The customize screen, if the other side left while it was up.
         if let flowState, flowState.customizeOpen, flowState.customizeOnline {
             flowState.customizeOpen = false

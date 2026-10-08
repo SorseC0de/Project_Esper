@@ -34,9 +34,10 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertFalse(stage.features.dunks)
         XCTAssertFalse(stage.dunkable(stage.hoops[1]))
         XCTAssertFalse(stage.dunkable(Hoop(position: Vec2(x: stage.width / 2, y: 65), owner: 0, backboard: .right)))
-        // The ceiling is the plane's: nothing rises past the art's top, whatever the lean.
-        XCTAssertEqual(stage.skyRows, 0)
-        XCTAssertEqual(stage.tile(column: 5, row: stage.rows), .solid)
+        // The ceiling near the plane's: the tuned rows of sky over the art, then solid, whatever the lean.
+        XCTAssertEqual(stage.skyRows, FlightB411Rules.skyRows)
+        XCTAssertEqual(stage.tile(column: 5, row: stage.rows + stage.skyRows), .solid)
+        XCTAssertEqual(stage.tile(column: 5, row: stage.rows), stage.skyRows == 0 ? .solid : .empty)
         var match = flight()
         match.cart = nil
         var highest = 0.0
@@ -45,7 +46,7 @@ final class FlightB411Tests: XCTestCase {
             match.advance(inputs: [.idle, PlayerInput(jump: frame % 40 == 0)])
             highest = max(highest, match.players[1].body.max.y)
         }
-        XCTAssertLessThanOrEqual(highest, stage.height + 1e-6)
+        XCTAssertLessThanOrEqual(highest, stage.height + Double(stage.skyRows) * Stage.tileSize + 1e-6)
     }
 
     func testEveryoneStandsOnTheFloorAndTheWallIsWhereTheArtEnds() {

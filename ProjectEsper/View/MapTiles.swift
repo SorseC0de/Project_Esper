@@ -86,7 +86,7 @@ enum KAndAArt {
         var carBody: SKSpriteNode?
         var carWheels: SKSpriteNode?
         /// The street lights' cones, one a lamp.
-        var cones: [SKShapeNode] = []
+        var cones: [SKSpriteNode] = []
     }
     /// Past the stage's edges: palette 30, the sky's own top.
     static let beyond: RGB = PixelPalette.colours[30]
@@ -96,13 +96,65 @@ enum KAndAArt {
     /// one and held there while they stay, up the last once they've gone, a pixel every few frames.
     static let carZ: CGFloat = backdropZ + 0.1
     static let sagStepFrames = 3
-    /// The street lights' cones: from each lamp's bottom down to the ground, this wide a side
-    /// at the ground, in the lamp's warm light, faint and added; now and then one flickers.
-    static let coneHalfWidth: CGFloat = 36
+    /// The street lights' cones: from each lamp's bottom, a trapezoid `Light.topWidth` across at
+    /// the lamp and `bottomWidth` at its foot, `drop` down, in the lamp's warm light, faint and
+    /// added, fading to clear from `fadeFrom` of the way down; the LIGHT sliders', kept. Now and
+    /// then one flickers.
+    enum Light {
+        static let keys = (top: "esper.kAndA.light.top", bottom: "esper.kAndA.light.bottom", drop: "esper.kAndA.light.drop", fade: "esper.kAndA.light.fade")
+        nonisolated(unsafe) static var topWidth: CGFloat = stored(keys.top) ?? 8
+        nonisolated(unsafe) static var bottomWidth: CGFloat = stored(keys.bottom) ?? 72
+        nonisolated(unsafe) static var drop: CGFloat = stored(keys.drop) ?? 208
+        nonisolated(unsafe) static var fadeFrom: CGFloat = stored(keys.fade) ?? 0.5
+        private static func stored(_ key: String) -> CGFloat? { UserDefaults.standard.object(forKey: key).flatMap { $0 as? Double }.map { CGFloat($0) } }
+        static func save() {
+            UserDefaults.standard.set(Double(topWidth), forKey: keys.top)
+            UserDefaults.standard.set(Double(bottomWidth), forKey: keys.bottom)
+            UserDefaults.standard.set(Double(drop), forKey: keys.drop)
+            UserDefaults.standard.set(Double(fadeFrom), forKey: keys.fade)
+        }
+    }
     static let coneAlpha: CGFloat = 0.12
     static let coneColour = SKColor(rgb: PixelPalette.colours[7])
     static let flickerChance = 1.0 / 240
     static let flickerFrames = 6...20
+
+    /// A cone's picture as the sliders have it: the trapezoid, full at the top, clear at the
+    /// foot from `fadeFrom` of the way down; its size, the wider width by the drop.
+    static func conePicture() -> (texture: SKTexture, size: CGSize)? {
+        let width = max(Light.topWidth, Light.bottomWidth, 1), height = max(Light.drop, 1)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
+            let cg = context.cgContext
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: width / 2 - Light.topWidth / 2, y: 0))
+            path.addLine(to: CGPoint(x: width / 2 + Light.topWidth / 2, y: 0))
+            path.addLine(to: CGPoint(x: width / 2 + Light.bottomWidth / 2, y: height))
+            path.addLine(to: CGPoint(x: width / 2 - Light.bottomWidth / 2, y: height))
+            path.closeSubpath()
+            cg.addPath(path)
+            cg.clip()
+            let fade = min(max(Light.fadeFrom, 0), 0.999)
+            let colours = [coneColour.cgColor, coneColour.cgColor, coneColour.withAlphaComponent(0).cgColor] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colours, locations: [0, fade, 1]) else { return }
+            cg.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: height), options: [])
+        }
+        let texture = SKTexture(image: image)
+        texture.filteringMode = .nearest
+        return (texture, CGSize(width: width, height: height))
+    }
+
+    /// Each cone drawn again from the sliders, hung from its lamp's bottom.
+    static func layCones(_ cones: [SKSpriteNode]) {
+        guard let picture = conePicture() else { return }
+        for (index, cone) in cones.enumerated() where index < KAndARules.lampXs.count {
+            cone.texture = picture.texture
+            cone.size = picture.size
+            cone.anchorPoint = CGPoint(x: 0.5, y: 1)
+            cone.position = CGPoint(x: CGFloat(KAndARules.lampXs[index] * SpriteLibrary.pixelsPerUnit), y: CGFloat(KAndARules.lampBottom * SpriteLibrary.pixelsPerUnit))
+        }
+    }
 
     static func build(into parent: SKNode, front frontParent: SKNode) -> Handles {
         var handles = Handles()
@@ -126,23 +178,15 @@ enum KAndAArt {
         body.position = carAt
         handles.carWheels = wheels
         handles.carBody = body
-        let ground = CGFloat(KAndARules.floorRows) * ElementsArt.tileSide
-        handles.cones = KAndARules.lampXs.map { lampX in
-            let x = CGFloat(lampX * SpriteLibrary.pixelsPerUnit), top = CGFloat(KAndARules.lampBottom * SpriteLibrary.pixelsPerUnit)
-            let path = CGMutablePath()
-            path.move(to: CGPoint(x: x, y: top))
-            path.addLine(to: CGPoint(x: x - coneHalfWidth, y: ground))
-            path.addLine(to: CGPoint(x: x + coneHalfWidth, y: ground))
-            path.closeSubpath()
-            let cone = SKShapeNode(path: path)
-            cone.fillColor = coneColour
-            cone.strokeColor = .clear
+        handles.cones = KAndARules.lampXs.map { _ in
+            let cone = SKSpriteNode()
             cone.alpha = coneAlpha
             cone.blendMode = .add
             cone.zPosition = carZ + 0.2
             parent.addChild(cone)
             return cone
         }
+        layCones(handles.cones)
         return handles
     }
 }

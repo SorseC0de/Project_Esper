@@ -220,7 +220,7 @@ public struct StageMap: Equatable, Codable {
     public static func bakedVersion(_ stage: MapStage) -> Int {
         switch stage {
         case .elements, .hoopfishHideaway: 5
-        case .kAndA: 2
+        case .kAndA: 3
         }
     }
 
@@ -244,7 +244,9 @@ public struct StageMap: Equatable, Codable {
         var walls = (0..<KAndARules.floorRows).flatMap { row in (0..<KAndARules.columns).map { Wall(Cell($0, row), .solid) } }
         walls += (4...11).map { Wall(Cell($0, 3), .solid) }
         walls += [Wall(Cell(6, 4), .lowerRight)] + (7...9).map { Wall(Cell($0, 4), .solid) } + [Wall(Cell(10, 4), .lowerLeft)]
-        return StageMap(leftRim: Cell(5, 14), rightRim: Cell(31, 14), spawns: [Cell(14, 3), Cell(21, 3)], ball: Cell(18, 10), walls: walls)
+        let rims = KAndARules.rimCells
+        return StageMap(leftRim: Cell(rims.left.0, rims.left.1), rightRim: Cell(rims.right.0, rims.right.1),
+                        spawns: [Cell(14, 3), Cell(21, 3)], ball: Cell(18, 10), walls: walls)
     }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.

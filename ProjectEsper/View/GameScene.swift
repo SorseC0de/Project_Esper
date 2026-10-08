@@ -3089,6 +3089,18 @@ final class GameScene: SKScene {
                 FlightB411Art.beltScale = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: FlightB411Art.beltScaleKey)
             }
+        }
+        // K&A's street lights: the cones' widths at the lamp and the foot, their drop, and
+        // where their fade to clear starts, as a share of the way down.
+        if match.stage.features.look == .kAndA, online == nil {
+            let relay: (Float) -> Void = { [weak self] _ in
+                KAndAArt.Light.save()
+                if let cones = self?.kAndAArt?.cones { KAndAArt.layCones(cones) }
+            }
+            controls.addSlider(title: "LIGHT TOP W", range: 0...64, notch: 1, value: Float(KAndAArt.Light.topWidth)) { KAndAArt.Light.topWidth = CGFloat($0); relay($0) }
+            controls.addSlider(title: "LIGHT BOTTOM W", range: 0...200, notch: 2, value: Float(KAndAArt.Light.bottomWidth)) { KAndAArt.Light.bottomWidth = CGFloat($0); relay($0) }
+            controls.addSlider(title: "LIGHT DROP", range: 8...256, notch: 2, value: Float(KAndAArt.Light.drop)) { KAndAArt.Light.drop = CGFloat($0); relay($0) }
+            controls.addSlider(title: "LIGHT FADE FROM", range: 0...1, notch: 0.05, value: Float(KAndAArt.Light.fadeFrom)) { KAndAArt.Light.fadeFrom = CGFloat($0); relay($0) }
             addNetSliders(.flightB411)
         }
         // The bounds gallery only means anything on the highway.

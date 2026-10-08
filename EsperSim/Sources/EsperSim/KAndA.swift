@@ -10,10 +10,11 @@ public enum KAndARules {
     public static let floorRows = 3
     /// The bridge's underside, up from the floor: the tracks' 39 rows down from the picture's top.
     public static let bridgeBottom = Double(304 - 39) * 0.625
-    public static let rimInset = 58.0
-    /// How far under the bridge the rim hangs: the court's supports reach this far over its rim.
+    /// How far under the bridge a rim hangs: the court's supports reach this far over its rim.
+    /// The map's baked rim cells are the ones whose middles hang there, 58 in from each wall as the
+    /// court's; moved in the map maker, a rim goes where it's put.
     public static let rimUnderBridge = 25.0
-    public static var rimHeight: Double { bridgeBottom - rimUnderBridge }
+    public static let rimCells = (left: (5, 14), right: (31, 14))
     /// The red car: its picture 128 by 48 art pixels, its bottom left at the ground's top, 64
     /// along, as the file's [Dont_Draw] layer places it; its span, for who stands on it.
     public static let carLeft = 64.0 * 0.625

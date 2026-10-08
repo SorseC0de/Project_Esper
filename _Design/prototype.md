@@ -1903,8 +1903,12 @@ Signs, Text, Back Pillar, Cars, Train Support L, Train Tracks, then Front Pillar
 R, Front Pillar R; the players draw between Train Tracks and Front Pillar L, so `Tools/aseprite.py`
 flattens the first eleven into `KAndABackdrop`, on the stage's ground, and the last three into
 `KAndAFront`, in `stageFront` over the players (the file keeps an old-style 8-bit palette chunk
-beside the new one, which the tool now reads right). Three rows of ground; nothing else is
-solid: the pillars and the cars are scenery. The hoops hang from the bridge's underside, the
+beside the new one, which the tool now reads right); `python3 Tools/import_stage_art.py kanda`
+does both again when the picture changes (`flight` the plane's, none for every stage). Its walls,
+starts and ball are laid out in the map maker (`MapStage.kAndA`, protocol 111), which opens in
+walls mode on it, with the starts and the ball to place and no rims: the baked map is three rows
+of ground, the starts at columns 14 and 21, the ball at 18, 10; nothing else is solid, the pillars
+and the cars scenery, until walls are painted. The hoops hang from the bridge's underside, the
 tracks' 39 rows down from the top (`bridgeBottom`), on the Wreck Center's support beams
 (`HoopSupport`, the same layout, drawn at each hoop as there), the rim 25 under the bridge
 (`rimUnderBridge`), which is how far the court's beams reach over its rim; the rims 58 in from

@@ -1,18 +1,20 @@
 /// The stages laid out by hand in the map maker.
 public enum MapStage: String, CaseIterable, Codable {
-    case elements, hoopfishHideaway
+    case elements, hoopfishHideaway, kAndA
 
     /// Its size in tiles.
     public var columns: Int {
         switch self {
         case .elements: ElementsRules.columns
         case .hoopfishHideaway: HoopfishHideawayRules.columns
+        case .kAndA: KAndARules.columns
         }
     }
     public var rows: Int {
         switch self {
         case .elements: ElementsRules.rows
         case .hoopfishHideaway: HoopfishHideawayRules.rows
+        case .kAndA: KAndARules.rows
         }
     }
 }
@@ -218,6 +220,7 @@ public struct StageMap: Equatable, Codable {
     public static func bakedVersion(_ stage: MapStage) -> Int {
         switch stage {
         case .elements, .hoopfishHideaway: 5
+        case .kAndA: 1
         }
     }
 
@@ -226,10 +229,19 @@ public struct StageMap: Equatable, Codable {
         switch stage {
         case .elements: elementsBaked
         case .hoopfishHideaway: hoopfishHideawayBaked
+        case .kAndA: kAndABaked
         }
     }
     private static let elementsBaked: StageMap = StageMap.defaultMap()
     private static let hoopfishHideawayBaked: StageMap = StageMap.hoopfishHideawayDefaultMap()
+    private static let kAndABaked: StageMap = StageMap.kAndADefaultMap()
+
+    /// K&A as laid out in the map maker: three rows of ground, the starts on it, the ball over
+    /// the middle; its rims hang from the bridge and aren't the map's to place.
+    private static func kAndADefaultMap() -> StageMap {
+        let walls = (0..<KAndARules.floorRows).flatMap { row in (0..<KAndARules.columns).map { Wall(Cell($0, row), .solid) } }
+        return StageMap(leftRim: Cell(5, 14), rightRim: Cell(31, 14), spawns: [Cell(14, 3), Cell(21, 3)], ball: Cell(18, 10), walls: walls)
+    }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.
     public struct Store {
@@ -256,6 +268,7 @@ public struct StageMap: Equatable, Codable {
         let name = switch stage {
         case .elements: "defaultMap"
         case .hoopfishHideaway: "hoopfishHideawayDefaultMap"
+        case .kAndA: "kAndADefaultMap"
         }
         var lines = ["    private static func \(name)() -> StageMap {",
                      "        let tiles: [Placed] = ["]

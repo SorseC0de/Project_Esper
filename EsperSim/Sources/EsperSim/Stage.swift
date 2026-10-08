@@ -776,13 +776,14 @@ public struct Stage: Equatable {
         return stage
     }
 
-    /// K&A: a street under a railway bridge, 37 by 19 (`KAndARules`), three rows of ground, the
-    /// rims hung from the bridge's underside on the court's support beams, the backboards solid
-    /// up to the bridge as the court's are to its blocks.
+    /// K&A: a street under a railway bridge, 37 by 19 (`KAndARules`), laid out in the map maker
+    /// over its picture: the walls, the starts and the ball the map's; the rims hung from the
+    /// bridge's underside on the court's support beams, the backboards solid up to the bridge as
+    /// the court's are to its blocks.
     public static var kAndA: Stage {
+        let map = StageMap.current[.kAndA]
         let columns = KAndARules.columns, rows = KAndARules.rows
         let width = Double(columns) * tileSize
-        let floor = Double(KAndARules.floorRows) * tileSize
         let rim = KAndARules.rimHeight
         var stage = Stage(
             columns: columns, rows: rows,
@@ -790,11 +791,12 @@ public struct Stage: Equatable {
                 Hoop(position: Vec2(x: KAndARules.rimInset, y: rim), owner: 1, backboard: .left),
                 Hoop(position: Vec2(x: width - KAndARules.rimInset, y: rim), owner: 0, backboard: .right),
             ],
-            playerSpawns: [Vec2(x: KAndARules.startInsets.0, y: floor), Vec2(x: KAndARules.startInsets.1, y: floor)],
-            playerFacings: [.right, .left],
-            ballSpawn: Vec2(x: width / 2, y: KAndARules.ballHeight)
+            playerSpawns: map.spawns.map { Vec2(x: (Double($0.column) + 0.5) * tileSize, y: Double($0.row) * tileSize) },
+            playerFacings: map.spawns.map { Double($0.column) * tileSize < width / 2 ? .right : .left },
+            ballSpawn: Vec2(x: (Double(map.ball.column) + 0.5) * tileSize, y: (Double(map.ball.row) + 0.5) * tileSize)
         )
-        stage.fill(.solid, columns: 0...(columns - 1), rows: 0...(KAndARules.floorRows - 1))
+        stage.lay(map.walls)
+        stage.slopes = stage.fixedSlopes
         for hoop in stage.hoops {
             let side = hoop.backboard.sign
             let face = hoop.position.x + side * backboardFace, back = face + side * backboardDepth

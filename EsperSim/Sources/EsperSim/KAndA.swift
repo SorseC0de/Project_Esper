@@ -14,6 +14,4 @@ public enum KAndARules {
     /// How far under the bridge the rim hangs: the court's supports reach this far over its rim.
     public static let rimUnderBridge = 25.0
     public static var rimHeight: Double { bridgeBottom - rimUnderBridge }
-    public static let startInsets = (150.0, 220.0)
-    public static let ballHeight = 100.0
 }

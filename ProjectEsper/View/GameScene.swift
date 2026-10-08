@@ -3044,7 +3044,7 @@ final class GameScene: SKScene {
         }
         // The map maker only means anything on a hand-laid stage, offline, with a mouse.
         #if !os(tvOS)
-        if [StageLook.elements, .hoopfishHideaway].contains(match.stage.features.look), online == nil {
+        if [StageLook.elements, .hoopfishHideaway, .kAndA].contains(match.stage.features.look), online == nil {
             controls.addPicker(title: "MAP", options: ["OFF", "ON"], selected: mapEditor == nil ? 0 : 1) { [weak self] index in
                 index == 1 ? self?.openMapEditor() : self?.closeMapEditor(restart: true)
             }
@@ -6093,6 +6093,7 @@ final class GameScene: SKScene {
         switch look {
         case .elements: mapStage = .elements
         case .hoopfishHideaway: mapStage = .hoopfishHideaway
+        case .kAndA: mapStage = .kAndA
         default: return
         }
         guard mapEditor == nil, online == nil else { return }
@@ -6100,6 +6101,7 @@ final class GameScene: SKScene {
             switch mapStage {
             case .elements: .elements
             case .hoopfishHideaway: .hoopfishHideaway
+            case .kAndA: .kAndA
             }
         }
         wholeStageView = true

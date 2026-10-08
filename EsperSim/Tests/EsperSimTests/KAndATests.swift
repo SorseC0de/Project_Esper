@@ -34,6 +34,21 @@ final class KAndATests: XCTestCase {
         XCTAssertEqual(match.stage.hoops[1].backboard, .right)
     }
 
+    func testTheMapLaysItsWallsAndStarts() {
+        let before = StageMap.current[.kAndA]
+        defer { StageMap.current[.kAndA] = before }
+        XCTAssertEqual(Stage.kAndA.tile(column: 10, row: 5), .empty)
+        var map = before
+        map.walls.append(StageMap.Wall(StageMap.Cell(10, 5), .solid))
+        map.spawns = [StageMap.Cell(3, 3), StageMap.Cell(30, 3)]
+        StageMap.current[.kAndA] = map
+        let stage = Stage.kAndA
+        XCTAssertEqual(stage.tile(column: 10, row: 5), .solid, "a wall painted in the map maker is the stage's")
+        XCTAssertEqual(stage.playerSpawns[0].x, 35, accuracy: 1e-9, "the starts the map's")
+        XCTAssertEqual(stage.playerFacings, [.right, .left])
+        XCTAssertEqual(stage.hoops[1].position.y, KAndARules.rimHeight, "the rims the bridge's, not the map's")
+    }
+
     func testZonesKeepsItsRightRimAndStartsOnTheGround() {
         let stage = Stage.zones(.kAndA)
         XCTAssertTrue(stage.hoops[0].rimless)

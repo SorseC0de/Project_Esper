@@ -82,7 +82,7 @@ final class MapEditor: SKNode {
         case leftRim, rightRim, firstStart, secondStart, ball
 
         /// The markers a stage has: Hoopfish Hideaway's one rim rides the Hoopfish, so no rims.
-        static func on(_ stage: MapStage) -> [Marker] { stage == .hoopfishHideaway ? [.firstStart, .secondStart, .ball] : allCases }
+        static func on(_ stage: MapStage) -> [Marker] { stage == .hoopfishHideaway || stage == .kAndA ? [.firstStart, .secondStart, .ball] : allCases }
 
         var label: String {
             switch self {
@@ -193,6 +193,7 @@ final class MapEditor: SKNode {
          onMarkers: @escaping () -> Void, onTornados: @escaping () -> Void, onProps: @escaping () -> Void, onWalls: @escaping () -> Void,
          onClose: @escaping () -> Void) {
         self.stage = stage
+        wallsMode = stage == .kAndA
         tiles = MapTiles.of(stage)
         sheetIndex = min(max(UserDefaults.standard.integer(forKey: MapEditor.sheetKey(stage)), 0), tiles.sheets.count - 1)
         self.map = map
@@ -233,6 +234,8 @@ final class MapEditor: SKNode {
         switch stage {
         case .hoopfishHideaway: .prop(.plant1)
         case .elements: .brush(ElementsArt.filled.first { $0 == StageMap.Cell(3, 3) } ?? ElementsArt.filled[0])
+        // K&A's picture is drawn whole: only walls and markers to lay, so it opens in walls mode.
+        case .kAndA: .wall(.solid)
         }
     }
 

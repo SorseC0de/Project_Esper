@@ -59,6 +59,9 @@ public struct StageFeatures: Equatable {
     public var seenWhole = false
     /// Whether a body can land on the stage's walls and jump off them: not the plane's.
     public var wallJumps = true
+    /// Whether a rim's top turns back a ball not scoring and a body coming down on it: not the
+    /// plane's, whose rims hang in their cases with no net.
+    public var rimBounce = true
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets

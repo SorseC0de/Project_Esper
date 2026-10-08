@@ -1956,6 +1956,22 @@ final class FootsiesTests: XCTestCase {
         XCTAssertTrue(match.players[0].grounded)
     }
 
+    func testALedgeWantsASolidFaceThreeTilesTall() {
+        // The former court's blocks are three tall: the right one's top-left corner, (290, 100).
+        let body = Box(min: Vec2(x: 277, y: 85), max: Vec2(x: 287, y: 102.5))
+        XCTAssertEqual(Stage.formerCourt.ledge(beside: body, side: .right, reach: 10, top: 90...110), Vec2(x: 290, y: 100))
+        // Today's court's are two tall, their tops at 140: no ledge, until a row more is under them.
+        var court = Stage.court
+        let higher = Box(min: Vec2(x: 277, y: 125), max: Vec2(x: 287, y: 142.5))
+        XCTAssertNil(court.ledge(beside: higher, side: .right, reach: 10, top: 130...150))
+        court.fill(.solid, columns: 29...32, rows: 11...11)
+        XCTAssertEqual(court.ledge(beside: higher, side: .right, reach: 10, top: 130...150), Vec2(x: 290, y: 140))
+        // A one-way's corner, however tall its stack, is no ledge either.
+        court.fill(.oneWay, columns: 10...10, rows: 1...3)
+        let low = Box(min: Vec2(x: 87, y: 25), max: Vec2(x: 97, y: 42.5))
+        XCTAssertNil(court.ledge(beside: low, side: .right, reach: 10, top: 30...50))
+    }
+
     func testNoLedgeGrabWithTheBall() {
         var match = Match(stage: .formerCourt)
         match.players[0].hasBall = true

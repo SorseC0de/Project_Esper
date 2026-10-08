@@ -116,7 +116,14 @@ enum KAndAArt {
     }
     static let coneAlpha: CGFloat = 0.12
     static let coneColour = SKColor(rgb: PixelPalette.colours[7])
-    static let flickerChance = 1.0 / 240
+    /// The cones over the wash, so the lights shine through it.
+    static let coneZ: CGFloat = washZ + 1
+    /// The wash over the whole stage: palette 30 at a tenth, on the camera at 95 as Hoopfish
+    /// Hideaway's water is; the lights are drawn over it, the nets and the glow go through it.
+    static let washAlpha: CGFloat = 0.1
+    static let washZ: CGFloat = 95
+    /// One chance in 600 a frame: a flicker every ten seconds or so.
+    static let flickerChance = 1.0 / 600
     static let flickerFrames = 6...20
 
     /// A cone's picture as the sliders have it: the trapezoid, full at the top, clear at the
@@ -182,7 +189,7 @@ enum KAndAArt {
             let cone = SKSpriteNode()
             cone.alpha = coneAlpha
             cone.blendMode = .add
-            cone.zPosition = carZ + 0.2
+            cone.zPosition = coneZ
             parent.addChild(cone)
             return cone
         }
@@ -385,8 +392,7 @@ enum FlightB411Art {
         let belt = SKTexture(imageNamed: "FlightB411Seatbelt")
         belt.filteringMode = .nearest
         // Side by side, a gap between, the row centred: NO DUNKING, then the seatbelt.
-        let signWidth: CGFloat = 22, beltWidth: CGFloat = 118, gap: CGFloat = 6
-        let row = signWidth + gap + beltWidth
+        let row = signWidth + signGap + beltWidth
         let sign = SKSpriteNode(texture: texture)
         sign.size = CGSize(width: signWidth, height: 24)
         sign.position = CGPoint(x: -row / 2 + signWidth / 2, y: 0)
@@ -427,8 +433,8 @@ enum FlightB411Art {
         }
         return SKTexture(image: image)
     }()
-    /// The signs in their row, the seatbelt at its own scale (`beltScale`), the row centred.
-    static let signWidth: CGFloat = 22, beltWidth: CGFloat = 118, signGap: CGFloat = 6
+    /// The signs in their row, the seatbelt at its own scale (`beltScale`), a gap of 12 between, the row centred.
+    static let signWidth: CGFloat = 22, beltWidth: CGFloat = 118, signGap: CGFloat = 12
     static func laySigns(sign: SKSpriteNode, no: SKSpriteNode, seatbelt: SKSpriteNode) {
         let belt = beltWidth * beltScale
         let row = signWidth + signGap + belt
@@ -437,12 +443,8 @@ enum FlightB411Art {
         seatbelt.setScale(beltScale)
         seatbelt.position = CGPoint(x: row / 2 - belt / 2, y: 0)
     }
-    /// The seatbelt's own scale against the sign's, the SEATBELT SCALE slider's, kept; a fifth
-    /// to start, which brings it to the sign's size.
-    static let beltScaleKey = "esper.flightB411.beltScale"
-    nonisolated(unsafe) static var beltScale: CGFloat = {
-        CGFloat(UserDefaults.standard.object(forKey: beltScaleKey) as? Double ?? 0.2)
-    }()
+    /// The seatbelt's own scale against the sign's: 0.4, baked.
+    static let beltScale: CGFloat = 0.4
     /// The signs' size, the NO DUNK SCALE slider's, kept between launches; half to start.
     static let signScaleKey = "esper.flightB411.signScale.2"
     nonisolated(unsafe) static var signScale: CGFloat = {
@@ -452,13 +454,31 @@ enum FlightB411Art {
     /// at rest.
     static let cartSpeedTip: CGFloat = 0.06
 
-    /// A cloud, `FlightB411Cloud` (192 by 64), for the sky beyond the plane.
+    /// A cloud, `FlightB411Cloud` (192 by 64), for the sky beyond the plane, at two thirds.
     static let cloud: SKTexture = {
         let texture = SKTexture(imageNamed: "FlightB411Cloud")
         texture.filteringMode = .nearest
         SKTexture.preload([texture]) {}
         return texture
     }()
+    static let cloudAlpha: CGFloat = 0.66
+    /// The plane itself, `FlightB411Plane` (464 by 368, `plane.png`), faint under the clouds and
+    /// pitching with the stage: fitted to the stage's width, centred on it, at a fifth.
+    static let plane: SKTexture = {
+        let texture = SKTexture(imageNamed: "FlightB411Plane")
+        texture.filteringMode = .nearest
+        SKTexture.preload([texture]) {}
+        return texture
+    }()
+    static let planeAlpha: CGFloat = 0.2
+    static var planeSize: CGSize {
+        let width = CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide
+        return CGSize(width: width, height: (width * plane.size().height / max(plane.size().width, 1)).rounded())
+    }
+    /// The stage's middle, in its ground's space.
+    static var stageCentre: CGPoint {
+        CGPoint(x: CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide / 2, y: CGFloat(FlightB411Rules.rows) * ElementsArt.tileSide / 2)
+    }
 
     static func build(into parent: SKNode, front frontParent: SKNode) -> Handles {
         var handles = Handles()

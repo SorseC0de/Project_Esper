@@ -2187,7 +2187,7 @@ public struct Player: Equatable {
     /// Coming down onto a rim's top from above: straight back up, never standing on it, higher
     /// with jump held, as off a spring. Not while dunking, which hangs on it.
     private mutating func bounceOffRims(in stage: Stage, feetBefore: Double, jumpHeld: Bool, events: inout [MatchEvent]) {
-        guard state != .dunking, feetBefore > position.y else { return }
+        guard state != .dunking, feetBefore > position.y, stage.features.rimBounce else { return }
         for (index, hoop) in stage.hoops.enumerated()
         where !hoop.rimless && feetBefore >= hoop.position.y && position.y < hoop.position.y
             && body.max.x > hoop.position.x - BallRules.rimHalfWidth && body.min.x < hoop.position.x + BallRules.rimHalfWidth {
@@ -2222,7 +2222,7 @@ public struct Player: Equatable {
                 let reach = SlopeRules.step + body.width / 2 + abs(step)
                 let edge = Box(min: Vec2(x: leading - 0.001, y: position.y), max: Vec2(x: leading + 0.001, y: position.y + 1))
                 let ahead = [stage.slopeHeight(atX: leading, near: position.y, reach: reach),
-                             stage.blockTop(under: edge, near: position.y, reach: SlopeRules.step)].compactMap { $0 }.max()
+                             stage.blockTop(under: edge, near: position.y, reach: SlopeRules.step, oneWays: true)].compactMap { $0 }.max()
                 if let ahead, ahead > position.y { lift = ahead - position.y }
             }
         }
@@ -2234,12 +2234,13 @@ public struct Player: Equatable {
         }
         // On the ground and not jumping, the feet ride a slope up or down, a block's height
         // at most; standing still on one, the body stays put. Off the slope's end, where the
-        // middle has left it, the feet go to the top of the block stepped onto or down from.
+        // middle has left it, the feet go to the top of the block, or the one-way, stepped
+        // onto or down from.
         if grounded, velocity.y <= 0 {
             if let surface = stage.slopeSurface(under: body, reach: SlopeRules.step) {
                 position.y = surface
                 velocity.y = 0
-            } else if onSlope, let top = stage.blockTop(under: body, near: position.y, reach: SlopeRules.step) {
+            } else if onSlope, let top = stage.blockTop(under: body, near: position.y, reach: SlopeRules.step, oneWays: true) {
                 position.y = top
                 velocity.y = 0
             }

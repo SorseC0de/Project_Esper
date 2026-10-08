@@ -247,12 +247,13 @@ public struct Stage: Equatable {
     }
 
     /// The top of the highest exposed solid block under the box's span whose top is within
-    /// `reach` of `y`, above or below: a step to climb onto or down from.
-    public func blockTop(under box: Box, near y: Double, reach: Double) -> Double? {
+    /// `reach` of `y`, above or below: a step to climb onto or down from. With `oneWays`, a
+    /// one-way's top too: the roof a car's slope climbs onto.
+    public func blockTop(under box: Box, near y: Double, reach: Double, oneWays: Bool = false) -> Double? {
         var best: Double?
         for column in columns(of: box) {
             for row in max(row(at: y - reach - Stage.edge), 0)...max(row(at: y + reach + Stage.edge), 0)
-            where tile(column: column, row: row) == .solid && tile(column: column, row: row + 1) != .solid {
+            where (tile(column: column, row: row) == .solid || (oneWays && tile(column: column, row: row) == .oneWay)) && tile(column: column, row: row + 1) != .solid {
                 let top = Double(row + 1) * Stage.tileSize
                 if abs(top - y) <= reach + Stage.edge, best == nil || top > best! { best = top }
             }
@@ -305,8 +306,9 @@ public struct Stage: Equatable {
         var best: Double?
         for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x {
             let surface = slope.surface(at: middle)
-            // A one-way slope holds nothing that's under it.
-            if slope.oneWay, box.min.y < surface - Stage.edge { continue }
+            // A one-way slope holds nothing from under its base; feet at the base, stepping
+            // on from the flat at its foot, climb it as any slope.
+            if slope.oneWay, box.min.y < slope.box.min.y - Stage.edge { continue }
             if abs(surface - box.min.y) <= reach, best == nil || surface > best! { best = surface }
         }
         return best
@@ -531,9 +533,28 @@ public struct Stage: Equatable {
         (fixedSlopes + ceilingSlopes).contains { self.column(at: $0.box.center.x) == column && self.row(at: $0.box.center.y) == row }
     }
 
+    /// A wall to land on and jump off is at least this many tiles tall, a ledge to hang from
+    /// and climb at least this many: a car's side, a block on the floor, are neither.
+    public static let wallJumpTiles = 2
+    public static let ledgeTiles = 3
+
+    /// How many tiles tall the solid face at `column` is through `row`: the solids above and
+    /// below it in a run whose side toward `toward` is open, a one-way beside it no cover.
+    private func faceHeight(column: Int, row: Int, toward: Int) -> Int {
+        func exposed(_ row: Int) -> Bool { tile(column: column, row: row) == .solid && tile(column: toward, row: row) != .solid }
+        guard exposed(row) else { return 0 }
+        var height = 1
+        var above = row + 1
+        while above < rows, exposed(above) { height += 1; above += 1 }
+        var below = row - 1
+        while below >= 0, exposed(below) { height += 1; below -= 1 }
+        return height
+    }
+
     /// The side with a wall pressed against the box, if either. Only within the court's
-    /// rows: the walls up in the sky can't be clung to or jumped off.
-    /// `riding`: the board's question, which passes over the unridable extras.
+    /// rows: the walls up in the sky can't be clung to or jumped off. A face under
+    /// `wallJumpTiles` tall, a block's or a slab's, is no wall to jump off.
+    /// `riding`: the board's question, which passes over the unridable extras and rides any height.
     public func wall(beside box: Box, riding: Bool = false) -> Facing? {
         // A stage whose walls can't be jumped off has none to land on, but for the board's ride.
         guard features.wallJumps || riding else { return nil }
@@ -543,22 +564,25 @@ public struct Stage: Equatable {
         let leftColumn = column(at: box.min.x - Stage.edge)
         // Outside the grid the bounds are invisible, never a wall to land on.
         let inGrid = 0..<columns
+        func tall(_ column: Int, _ row: Int, toward: Int) -> Bool { riding || faceHeight(column: column, row: row, toward: toward) >= Stage.wallJumpTiles }
         for row in rows where row < self.rows && (riding || features.tileWallsHold) {
             // A block whose face abuts a slope is the slope's own fill, never a wall.
-            if inGrid.contains(rightColumn), tile(column: rightColumn, row: row) == .solid, !isSlopeCell(column: rightColumn - 1, row: row) { return .right }
-            if inGrid.contains(leftColumn), tile(column: leftColumn, row: row) == .solid, !isSlopeCell(column: leftColumn + 1, row: row) { return .left }
+            if inGrid.contains(rightColumn), tile(column: rightColumn, row: row) == .solid, !isSlopeCell(column: rightColumn - 1, row: row), tall(rightColumn, row, toward: rightColumn - 1) { return .right }
+            if inGrid.contains(leftColumn), tile(column: leftColumn, row: row) == .solid, !isSlopeCell(column: leftColumn + 1, row: row), tall(leftColumn, row, toward: leftColumn + 1) { return .left }
         }
-        for extra in extras where spansY(extra, box) && !(riding && unridable.contains(extra)) {
+        let tallEnough = Double(Stage.wallJumpTiles) * Stage.tileSize - Stage.edge
+        for extra in extras where spansY(extra, box) && !(riding && unridable.contains(extra)) && (riding || extra.max.y - extra.min.y >= tallEnough) {
             if abs(extra.min.x - box.max.x) < 0.01 { return .right }
             if abs(extra.max.x - box.min.x) < 0.01 { return .left }
         }
         return nil
     }
 
-    /// The top corner of a floor or ledge tile within `reach` of the box's `side`, with
-    /// its top in `top`, nothing beside it toward the box and nothing above either: what a
-    /// hand can hang from. The nearest, if any. A corner may sit up to two units back
-    /// inside the box's span. Only within the court's rows, and never a made platform.
+    /// The top corner of a solid tile within `reach` of the box's `side`, with its top in
+    /// `top`, nothing beside it toward the box and nothing above either, on a face at least
+    /// `ledgeTiles` tall: what a hand can hang from. The nearest, if any. A corner may sit up
+    /// to two units back inside the box's span. Only within the court's rows; never a made
+    /// platform, a one-way's corner (a car's roof) or a low block's.
     public func ledge(beside box: Box, side: Facing, reach: Double, top: ClosedRange<Double>) -> Vec2? {
         let near = side == .right ? box.max.x : box.min.x
         let far = near + side.sign * reach
@@ -571,11 +595,12 @@ public struct Stage: Equatable {
         for row in stride(from: lowRow, through: highRow, by: 1) {
             let tileTop = Double(row + 1) * Stage.tileSize
             guard top.contains(tileTop) else { continue }
-            for column in columns where tile(column: column, row: row) != .empty {
+            for column in columns where tile(column: column, row: row) == .solid {
                 let toward = column - side.rawValue
                 guard tile(column: toward, row: row) == .empty,
                       tile(column: column, row: row + 1) == .empty,
-                      tile(column: toward, row: row + 1) == .empty else { continue }
+                      tile(column: toward, row: row + 1) == .empty,
+                      faceHeight(column: column, row: row, toward: toward) >= Stage.ledgeTiles else { continue }
                 // Nor under a solid extra, such as the sky over the Elements' ceiling.
                 let above = Box(min: Vec2(x: Double(column) * Stage.tileSize, y: tileTop), max: Vec2(x: Double(column + 1) * Stage.tileSize, y: tileTop + Stage.tileSize))
                 guard !extras.contains(where: { $0.overlaps(above) }) else { continue }
@@ -785,6 +810,7 @@ public struct Stage: Equatable {
         stage.features.threePointLine = false
         stage.features.seenWhole = true
         stage.features.wallJumps = false
+        stage.features.rimBounce = false
         return stage
     }
 

@@ -39,6 +39,8 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertEqual(FortySevenRules.points(from: rim.position + Vec2(x: -10, y: -10), through: rim, on: stage), 2)
         // Neither wall is anything to land on or jump off.
         XCTAssertFalse(stage.features.wallJumps)
+        XCTAssertFalse(stage.features.rimBounce, "no net, no rim to bounce off")
+        XCTAssertTrue(Stage.court.features.rimBounce)
         let atRight = Box(min: Vec2(x: stage.width - 10, y: 40), max: Vec2(x: stage.width, y: 57))
         let atLeft = Box(min: Vec2(x: 0, y: 40), max: Vec2(x: 10, y: 57))
         XCTAssertNil(stage.wall(beside: atRight))

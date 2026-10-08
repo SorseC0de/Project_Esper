@@ -85,6 +85,38 @@ final class KAndATests: XCTestCase {
         XCTAssertGreaterThan(top, 50, "the ball up through the slope")
     }
 
+    func testTheCarIsNeitherClimbedNorJumpedOff() {
+        let stage = Stage.kAndA
+        // Beside the hood's end, cell 4, 3, a one-way with its top at 40: no ledge, no wall.
+        let body = Box(min: Vec2(x: 28, y: 30), max: Vec2(x: 38, y: 47.5))
+        XCTAssertNil(stage.ledge(beside: body, side: .right, reach: 10, top: 30...50))
+        XCTAssertNil(stage.wall(beside: body))
+        // Nor the roof's corner over the slope, from under it.
+        let underRoof = Box(min: Vec2(x: 59, y: 35), max: Vec2(x: 69, y: 52.5))
+        XCTAssertNil(stage.ledge(beside: underRoof, side: .right, reach: 10, top: 40...60))
+    }
+
+    func testTheHoodIsWalkedUpOntoTheRoof() {
+        var match = Match(stage: .kAndA)
+        match.countdown = 0
+        // Set down on the hood, cell 5, 3's top at 40, the slope up to the roof at 6, 4 ahead.
+        match.players[0].position = Vec2(x: 52, y: 40)
+        for _ in 0..<10 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.players[0].grounded)
+        XCTAssertEqual(match.players[0].position.y, 40, accuracy: 1e-9)
+        var lowest = 40.0
+        var frames = 0
+        while match.players[0].position.x < 80, frames < 120 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle])
+            lowest = min(lowest, match.players[0].position.y)
+            frames += 1
+        }
+        XCTAssertLessThan(frames, 120, "walked onto the roof")
+        XCTAssertEqual(lowest, 40, accuracy: 1e-9, "never through the slope")
+        XCTAssertEqual(match.players[0].position.y, 50, accuracy: 1e-9, "up on the roof")
+        XCTAssertTrue(match.players[0].grounded)
+    }
+
     func testTheMapLaysItsWallsAndStarts() {
         let before = StageMap.current[.kAndA]
         defer { StageMap.current[.kAndA] = before }

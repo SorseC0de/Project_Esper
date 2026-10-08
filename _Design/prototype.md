@@ -260,12 +260,17 @@ whatever lands on it came at, held down 12° while someone
   starting on it (`DunkTuning.stage`).
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
+  A ledge is a solid tile's corner on a face at least three tiles tall (`Stage.ledgeTiles`,
+  protocol 116): a one-way's corner, a car's roof, or a block two tall, as the court's
+  backboard blocks are, can't be climbed.
 - Wall: hold toward a wall in the air to cling and slide, for as long as it's held. Jump
   leaves it, direction automatic, the double jump restored, and the stick doesn't steer
   for 12 frames so the arc clears the wall. A wall jump comes only out of the cling: no
   jump off a wall merely in reach, none after letting go. A cling can't start for 8
   frames after leaving the ground, and the walls above the court's top row can't be
-  clung to or jumped off.
+  clung to or jumped off. A wall is a solid face at least two tiles tall, a slab or a box
+  at least two tiles tall (`Stage.wallJumpTiles`): a block on the floor, a car, a one-way
+  are none; the board rides any height.
 - Catch is automatic, in two rings: the ball within 12.5 of the chest and either in front,
   or in the way of where the body is moving; or within the catch spark's ring where the
   snatch puts it, on the hand at full stretch: 16 art pixels, the spark's full size,
@@ -1864,26 +1869,31 @@ it; a shader on each piece (`caseMaskShader`) drops whatever is above the line i
 frame, so no crop node is needed and the cut doesn't turn with the case. The suitcase's
 top hangs `hoopcaseDrop` art pixels under the bin's bottom, -17 by default (up into the bin): the
 debug strip's HOOPCASE Y slider, an art pixel at a time, kept between launches, offline; online the
-default. The rims' own art and backboards aren't drawn on it; the net hangs from the ring's centre,
-with its own NET X and NET Y (`.flight` keys, 0 and 0 to start), on the strip there. There's no
+default. The rims' own art and backboards aren't drawn on it, and there's no net: the ring hangs
+bare in its case, nothing drawn and nothing in the glow, and a rim's top turns back neither a
+ball that isn't scoring nor a body coming down on it (`StageFeatures.rimBounce`, false here,
+protocol 116); a miss drops on through the ring. There's no
 three-point line drawn on it, too small for one (`StageFeatures.threePointLine`); 47's threes
 count as ever, from past the usual radius round the hoop. After a point the
 bins shut, the hoops go away and the ball waits in the middle bin again; in Rounds the third round's
 ball drops from any of the five, off the series' dice (`startFromBin`). The signs over the bins, in a
-row centred on the stage halfway up the dark band, a gap of 6 between: NO DUNKING, `no_dunking.svg`
+row centred on the stage halfway up the dark band, a gap of 12 between (`signGap`): NO DUNKING, `no_dunking.svg`
 (`_Graphic Assets/Vectors/Stages/Flight B411`) rendered 24 high into `FlightB411NoDunking` in
 palette 7, with over it a red ring and slash drawn once as a picture (`FlightB411Art.noTexture`,
 `noRed`); and the seatbelt, `seatbelt.svg` rendered 24 high into `FlightB411Seatbelt`, its arrow
 (the file's middle path, which the others never overlap sideways) red and the rest palette 7, at
-its own scale against the sign (`beltScale`, the strip's SEATBELT SCALE slider, 0.1 to 1, a
-fifth to start, which brings it to the sign's size, kept), the row laid again as it changes
-(`laySigns`). All
+its own scale against the sign (`beltScale`, 0.4, baked; the row laid by `laySigns`). All
 told to the glow mask as glowing through the backdrop's flat (`glowThroughSnapshots`), since over
 a flat nothing glows otherwise; their size the strip's NO DUNK SCALE slider (`signScale`, 0.5 to 4,
 half to start, kept). Clouds (`FlightB411Cloud`, `Flight/cloud.png`, 192 by 64) drift left to right
-over the sky beyond the plane: six, each its own size (half to two and a half times) and pace, in
+over the sky beyond the plane: six, each its own size (one to four times) and pace (0.6 to 1.6 a
+frame times its size, times two), at two thirds (`cloudAlpha`), in
 `skyNode`, on the camera, turned back level and under everything of the world's (z -100), so the
-plane covers them. The cart stands on its wheels' line, the wheels drawn under its body, and
+plane covers them. Under the clouds the plane itself (`FlightB411Plane`, `Flight/plane.png`, 464
+by 368, a root imageset of `Tools/import_sprites.py`): fitted to the stage's width (312 art
+pixels across, so 247 high), centred on the stage, at a fifth (`planeAlpha`), a child of the
+scene at z -101, in the world's frame rather than the camera's, so it pitches with the stage
+while the clouds stay level. The cart stands on its wheels' line, the wheels drawn under its body, and
 tips a little into the way it's going with its speed (`cartSpeedTip`), flat once it stops.
 
 The cart (`Cart`, `FlightB411Rules.cartSize`: 16 by 24 art pixels solid, drawn from `Cart`, its
@@ -1928,8 +1938,13 @@ street lights hang off the wire (`lampXs`, their bottoms at `lampBottom`): from 
 of its light (`KAndAArt.Light`, `conePicture`), 8 across at the lamp and 126 at its foot, 150 down,
 fading to clear from halfway down, palette 7 at 0.12, added, over the backdrop; the strip's LIGHT
 TOP W, LIGHT BOTTOM W, LIGHT DROP and LIGHT FADE FROM sliders, kept, draw them again as they move.
-Now and then (one chance in 240 a frame) one flickers for 6 to 20 frames, dimming to a third every
-other pair of frames. The hoops hang from the bridge's underside, the
+Now and then (one chance in 600 a frame, every ten seconds or so) one flickers for 6 to 20 frames,
+dimming to a third every other pair of frames. Over the whole stage lies a wash of palette 30 at a
+tenth (`KAndAArt.washAlpha`, `washOverlay`, a flat sprite on the camera at 95, as Hoopfish
+Hideaway's water is, and the chevrons lifted over it as there): the lights' cones are drawn over
+it (`coneZ`, 96), the nets' strands glow through it (`glowThroughNets`, the mask's blue, their
+colour taken from under the wash as from under the water, `waterTint` naming the wash), and the
+bodies' glow is added over it by the glow pass. The hoops hang from the bridge's underside, the
 tracks' 39 rows down from the top (`bridgeBottom`), on the Wreck Center's support beams
 (`HoopSupport`, the same layout, drawn at each hoop as there), with the court's straight
 backboards and rims, the backboard solid from under the rim up to the bridge as the court's is to
@@ -1943,7 +1958,9 @@ A wall kind of the map maker's walls mode (`StageMap.Kind.oneWayLowerRight` and
 `oneWayLowerLeft`, 1-WAY ◢ and 1-WAY ◣ on its row; `Slope.oneWay`): a slope that's landed on
 from above, as a slope is, and passed through from below and from the sides, and dropped through,
 as a one-way block is. It's no wall to the horizontal sweep, no ceiling to the vertical one, holds
-nothing that's under its surface (`slopeSurface`), and turns only a ball that came down onto it
+nothing from under its base (`slopeSurface`: feet at its base, stepping on from the flat at its
+foot, climb it as any slope, and off its top the step onto a one-way's top counts as onto a
+block's, `blockTop` with `oneWays`, protocol 116), and turns only a ball that was at its base or above
 (`Ball.rollOffSlopes`, by the ball's last height). In walls mode one-ways, blocks and slopes, show
 in lime, slide slopes in orange, the rest in red. K&A's cars' roofs end in them.
 

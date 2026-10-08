@@ -59,6 +59,7 @@ ROOT_IMAGES = {
     "HoloProjector": ["UI/Holo-Projector_v2.png"],
     "Cart": ["Stages/Flight/Cart.png"],
     "FlightB411Cloud": ["Stages/Flight/cloud.png"],
+    "FlightB411Plane": ["Stages/Flight/plane.png"],
     "Hoopcase": ["Stages/Flight/Hoopcase.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")

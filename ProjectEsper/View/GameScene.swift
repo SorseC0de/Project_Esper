@@ -546,9 +546,14 @@ final class GameScene: SKScene {
     /// The Elements' flat background, which never glows; nil elsewhere.
     var unglowedBackground: SKColor? { [StageLook.elements, .hoopfishHideaway, .flightB411, .kAndA].contains(match.stage.features.look) ? backgroundColor : nil }
 
-    /// The water's tint over the world, for what's drawn apart from the scene (the cubes); nil off Hoopfish Hideaway.
+    /// The water's tint over the world, for what's drawn apart from the scene (the cubes) and for
+    /// what glows through it; K&A's wash the same way; nil elsewhere.
     var waterTint: (top: RGB, bottom: RGB, alpha: CGFloat)? {
-        match.stage.features.look == .hoopfishHideaway ? (PixelPalette.colours[19], PixelPalette.colours[18], WaterTuning.overlayAlpha) : nil
+        switch match.stage.features.look {
+        case .hoopfishHideaway: (PixelPalette.colours[19], PixelPalette.colours[18], WaterTuning.overlayAlpha)
+        case .kAndA: (KAndAArt.beyond, KAndAArt.beyond, KAndAArt.washAlpha)
+        default: nil
+        }
     }
 
     /// What glows on Hoopfish Hideaway over its background, which doesn't: the Hoopfish's rings and eye.
@@ -571,9 +576,9 @@ final class GameScene: SKScene {
         }
     }
 
-    /// Hoopfish Hideaway's nets' strands, glowing through its mask.
+    /// Hoopfish Hideaway's and K&A's nets' strands, glowing through the water and the wash.
     var glowThroughNets: [CGPath] {
-        guard hoopfishHideawayArt != nil else { return [] }
+        guard hoopfishHideawayArt != nil || match.stage.features.look == .kAndA else { return [] }
         return nets.compactMap(\.drawnPath)
     }
 
@@ -1709,6 +1714,8 @@ final class GameScene: SKScene {
     private var noDunkingSprites: [SKSpriteNode] = []
     private let skyNode = SKNode()
     private var clouds: [(node: SKSpriteNode, speed: CGFloat)] = []
+    /// The plane itself, under the sky's clouds, pitching with the stage.
+    private var planeNode: SKSpriteNode?
     private static let cloudCount = 6
     /// Flight B411's hoopcase drop as the HOOPCASE Y slider last left it, art pixels under the bin.
     private static let hoopcaseDropKey = "esper.flightB411.hoopcaseDrop"
@@ -1785,6 +1792,8 @@ final class GameScene: SKScene {
         noDunkingSprites = []
         skyNode.removeAllChildren()
         clouds = []
+        planeNode?.removeFromParent()
+        planeNode = nil
         fallingIcicles = [:]
         hangingIcicles = [:]
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
@@ -1837,10 +1846,19 @@ final class GameScene: SKScene {
             skyNode.removeAllChildren()
             clouds = (0..<GameScene.cloudCount).map { _ in
                 let cloud = SKSpriteNode(texture: FlightB411Art.cloud)
+                cloud.alpha = FlightB411Art.cloudAlpha
                 skyNode.addChild(cloud)
                 return (cloud, 0)
             }
             for index in clouds.indices { placeCloud(index, fromTheLeft: false) }
+            // The plane, faint beyond the cabin, under the clouds; in the world, so it pitches with the stage.
+            let plane = SKSpriteNode(texture: FlightB411Art.plane)
+            plane.size = FlightB411Art.planeSize
+            plane.alpha = FlightB411Art.planeAlpha
+            plane.zPosition = skyNode.zPosition - 1
+            plane.position = stageGround.convert(FlightB411Art.stageCentre, to: self)
+            addChild(plane)
+            planeNode = plane
             turbulenceIn = Int.random(in: GameScene.turbulenceGap)
         }
         if isElements {
@@ -2024,7 +2042,7 @@ final class GameScene: SKScene {
             rimSpin.append(0)
             nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
                                 into: stageGround, depth: 5.5))
-            nets[nets.count - 1].hidden = hoop.rimless
+            nets[nets.count - 1].hidden = hoop.rimless || netless
         }
         refreshSupports(HoopSupport.pieces)
         warmDrawnArt()
@@ -2085,6 +2103,8 @@ final class GameScene: SKScene {
         noDunkingSprites = []
         skyNode.removeAllChildren()
         clouds = []
+        planeNode?.removeFromParent()
+        planeNode = nil
         fallingIcicles = [:]
         hangingIcicles = [:]
         fieldBlooms = []
@@ -2491,6 +2511,8 @@ final class GameScene: SKScene {
     /// The water over everything in the world, under the HUD: palette 18 at the bottom of the
     /// screen to 19 at the top, faint, so the play stays clear.
     private let waterOverlay = SKSpriteNode()
+    /// K&A's wash: palette 30 at a tenth over the whole stage, on the camera, as the water is.
+    private let washOverlay = SKSpriteNode(color: SKColor(rgb: KAndAArt.beyond), size: CGSize(width: 1, height: 1))
     private static let waterGradient: SKTexture = {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -2622,8 +2644,17 @@ final class GameScene: SKScene {
         waterOverlay.alpha = WaterTuning.overlayAlpha
         waterOverlay.size = CGSize(width: halfWidth * 2, height: halfHeight * 2)
         waterOverlay.position = cameraNode.position
-        // The ball's and the hoop's chevrons stay clear of the water, over it (glowers sit at 21).
-        for chevron in chevrons + targetChevrons + [opponentChevron] { chevron.zPosition = wet ? 80 : 6 }
+        let washed = match.stage.features.look == .kAndA
+        if washOverlay.parent == nil {
+            washOverlay.zPosition = KAndAArt.washZ
+            washOverlay.alpha = KAndAArt.washAlpha
+            world.addChild(washOverlay)
+        }
+        washOverlay.isHidden = !washed
+        washOverlay.size = CGSize(width: halfWidth * 2, height: halfHeight * 2)
+        washOverlay.position = cameraNode.position
+        // The ball's and the hoop's chevrons stay clear of the water and the wash, over them (glowers sit at 21).
+        for chevron in chevrons + targetChevrons + [opponentChevron] { chevron.zPosition = wet || washed ? 80 : 6 }
         let step = GameScene.stepSeconds
         bubbles = bubbles.compactMap { bubble in
             var bubble = bubble
@@ -3084,10 +3115,6 @@ final class GameScene: SKScene {
             controls.addSlider(title: "NO DUNK SCALE", range: 0.5...4, notch: 0.25, value: Float(FlightB411Art.signScale)) { value in
                 FlightB411Art.signScale = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: FlightB411Art.signScaleKey)
-            }
-            controls.addSlider(title: "SEATBELT SCALE", range: 0.1...1, notch: 0.05, value: Float(FlightB411Art.beltScale)) { value in
-                FlightB411Art.beltScale = CGFloat(value)
-                UserDefaults.standard.set(Double(value), forKey: FlightB411Art.beltScaleKey)
             }
         }
         // K&A's street lights: the cones' widths at the lamp and the foot, their drop, and
@@ -5609,7 +5636,7 @@ final class GameScene: SKScene {
             var colour = cube.colour
             colour.w = Float(node.alpha)
             return CubeInstance(model: model, color: colour, flags: SIMD4<Float>(particle.behind ? 1 : 0, 0, 0, 0))
-        } + (NetTuning.cylinder ? nets.enumerated().flatMap { index, net in
+        } + (NetTuning.cylinder && !netless ? nets.enumerated().flatMap { index, net in
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             net.colour.getRed(&r, green: &g, blue: &b, alpha: &a)
             // Hung from the rim as it's turned, and turned with it.
@@ -5619,6 +5646,9 @@ final class GameScene: SKScene {
                                          colour: SIMD4<Float>(Float(r), Float(g), Float(b), 1))
         } : [])
     }
+
+    /// Flight B411's rims hang in their cases with no net at all.
+    private var netless: Bool { match.stage.features.look == .flightB411 }
 
     /// The rims' art, for the net behind them to keep out of.
     var rimSnapshots: [BodySnapshot] {
@@ -6723,7 +6753,6 @@ final class GameScene: SKScene {
             door.isHidden = !match.bins[index].open
         }
         noDunkingNode?.setScale(FlightB411Art.signScale)
-        if noDunkingSprites.count == 3 { FlightB411Art.laySigns(sign: noDunkingSprites[0], no: noDunkingSprites[1], seatbelt: noDunkingSprites[2]) }
         // Each hoop's case: hanging from its bin's mask line, as far out as its slide is, swung
         // a share of the lean about that line; away with nothing to hang from.
         for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseNodes.count && index < hoopcaseFronts.count {
@@ -6749,11 +6778,11 @@ final class GameScene: SKScene {
     /// A cloud somewhere over the sky, or just off its left edge, its own size and pace.
     private func placeCloud(_ index: Int, fromTheLeft: Bool) {
         let cloud = clouds[index].node
-        let scale = CGFloat.random(in: 0.5...2.5)
+        let scale = CGFloat.random(in: 1...4)
         cloud.size = CGSize(width: 192 * scale, height: 64 * scale)
         cloud.position = CGPoint(x: fromTheLeft ? -size.width / 2 - cloud.size.width / 2 : CGFloat.random(in: -size.width / 2...size.width / 2),
                                  y: CGFloat.random(in: -size.height / 2...size.height / 2))
-        clouds[index].speed = CGFloat.random(in: 0.3...0.8) * scale * 2
+        clouds[index].speed = CGFloat.random(in: 0.6...1.6) * scale * 2
     }
 
     /// Helmets in their defender's colour, facing the way they travel and tipped back 15
@@ -7938,7 +7967,7 @@ final class GameScene: SKScene {
                     front.color = rim.color
                     front.colorBlendFactor = rim.colorBlendFactor
                 }
-                if index < nets.count { nets[index].hidden = spinning }
+                if index < nets.count { nets[index].hidden = spinning || netless }
                 if index < nets.count {
                     // The Elements' wind blows the nets leftward, in gusts; elsewhere a light breeze sways them.
                     let time = CACurrentMediaTime() * GameScene.netGustRate

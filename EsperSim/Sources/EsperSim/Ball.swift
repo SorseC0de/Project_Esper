@@ -137,7 +137,7 @@ public struct Ball: Equatable {
                 if scoring {
                     enteringHoop = index
                     if throughNet == nil { throughNet = NetDrop(hoop: index, carriedX: velocity.x) }
-                } else {
+                } else if stage.features.rimBounce {
                     events.append(.rimBounced(hoop: index, speed: abs(velocity.y), ball: true))
                     position.y = hoop.position.y + BallRules.radius
                     bounceY(events: &events)
@@ -226,8 +226,8 @@ public struct Ball: Equatable {
         for slope in stage.slopes where slope.box.min.x <= position.x && position.x <= slope.box.max.x {
             let surface = slope.surface(at: position.x)
             guard position.y - BallRules.radius < surface - Stage.edge, position.y > slope.box.min.y - BallRules.radius else { continue }
-            // A one-way slope turns only a ball that came down onto it.
-            if slope.oneWay, previousY - BallRules.radius < surface - Stage.edge { continue }
+            // A one-way slope turns only a ball that was at its base or above: come down onto it, or rolled on from its foot.
+            if slope.oneWay, previousY - BallRules.radius < slope.box.min.y - Stage.edge { continue }
             position.y = surface + BallRules.radius
             let normal = slope.rising ? Vec2(x: -SlopeRules.diagonal, y: SlopeRules.diagonal) : Vec2(x: SlopeRules.diagonal, y: SlopeRules.diagonal)
             // Resting on it, gravity alone still pushes in: that push is what rolls it down.

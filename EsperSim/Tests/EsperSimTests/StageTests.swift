@@ -399,6 +399,22 @@ final class HighwayTests: XCTestCase {
         XCTAssertEqual(a, b)
     }
 
+    func testAWallToJumpOffIsTwoTilesTall() {
+        var stage = Stage.court
+        stage.fill(.solid, columns: 10...10, rows: 1...1)
+        let body = Box(min: Vec2(x: 90, y: 10), max: Vec2(x: 100, y: 27.5))
+        XCTAssertNil(stage.wall(beside: body), "a block on the floor is no wall")
+        XCTAssertEqual(stage.wall(beside: body, riding: true), .right, "the board rides anything")
+        stage.fill(.solid, columns: 10...10, rows: 2...2)
+        XCTAssertEqual(stage.wall(beside: body), .right)
+        // An extra the same: a slab a tile tall isn't, a box two tall is.
+        var slabbed = Stage.court
+        slabbed.extras = [Box(min: Vec2(x: 100, y: 10), max: Vec2(x: 140, y: 20))]
+        XCTAssertNil(slabbed.wall(beside: body))
+        slabbed.extras = [Box(min: Vec2(x: 100, y: 10), max: Vec2(x: 140, y: 30))]
+        XCTAssertEqual(slabbed.wall(beside: body), .right)
+    }
+
     func testTheBoardPassesOverAnUnridableWall() {
         var stage = Stage.court
         let car = Box(min: Vec2(x: 100, y: 10), max: Vec2(x: 140, y: 30))

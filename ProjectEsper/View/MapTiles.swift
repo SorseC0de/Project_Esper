@@ -113,6 +113,10 @@ enum FlightB411Art {
             node.addChild(wheel)
             return wheel
         }
+        // A texture draws as a blank square until it's reached the GPU, and these cuts of the
+        // sheet aren't among what's warmed before play: loaded first, the cart hidden till then.
+        node.isHidden = true
+        SKTexture.preload([sheet, body, wheelArt]) { DispatchQueue.main.async { node.isHidden = false } }
         return (node, wheels)
     }
 

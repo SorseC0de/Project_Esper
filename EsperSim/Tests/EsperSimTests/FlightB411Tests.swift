@@ -32,6 +32,11 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertEqual(stage.ballSpawn, FlightB411Rules.ballSpot(in: FlightB411Rules.centreBin), "the ball in the middle bin")
         XCTAssertTrue(StageChoice.fortySeven.contains(.flightB411), "47 plays on it")
         XCTAssertFalse(ZonesRules.stages.contains(.flightB411), "ZONES doesn't")
+        // No three-point line drawn on it, too small for one; 47's threes count as ever, from past the usual radius.
+        XCTAssertFalse(stage.features.threePointLine)
+        let rim = Hoop(position: FlightB411Rules.rimSpot(in: 4), owner: 0, backboard: .right)
+        XCTAssertEqual(FortySevenRules.points(from: Vec2(x: 5, y: 20), through: rim, on: stage), 3)
+        XCTAssertEqual(FortySevenRules.points(from: rim.position + Vec2(x: -10, y: -10), through: rim, on: stage), 2)
         // No dunking on it, wherever a rim is.
         XCTAssertFalse(stage.features.dunks)
         XCTAssertFalse(stage.dunkable(stage.hoops[1]))

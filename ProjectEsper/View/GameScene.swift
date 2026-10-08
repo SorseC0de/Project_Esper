@@ -863,7 +863,7 @@ final class GameScene: SKScene {
         let overLava = SKSpriteNode(color: .white, size: CGSize(width: 100_000, height: 100_000))
         overLava.anchorPoint = CGPoint(x: 0.5, y: 0)
         overLava.position = CGPoint(x: 0, y: ElementsArt.lavaTop)
-        tornadoOverlays.maskNode = overLava
+        self.overLava = overLava
         tornadoOverlays.zPosition = 22
         world.addChild(tornadoOverlays)
         stageFront.zPosition = 22
@@ -1707,6 +1707,9 @@ final class GameScene: SKScene {
     private static let turbulenceShake = 6
     private var hoopfishHideawayArt: HoopfishHideawayArt.Handles?
     private let tornadoOverlays = SKCropNode()
+    /// Its mask, over the lava: on the Elements alone. A crop's mask is a Metal scissor rect, and
+    /// with the camera turned (Flight B411's lean) the rect SpriteKit works out runs off the pass.
+    private var overLava: SKSpriteNode?
 
     /// What the stage draws that must not glow, its tiles, its mountains and its icicles, with
     /// a version for the glow's mask to redo them only when they change. The lava glows.
@@ -1754,6 +1757,7 @@ final class GameScene: SKScene {
         hangingIcicles = [:]
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
         tornadoOverlays.removeAllChildren()
+        tornadoOverlays.maskNode = isElements ? overLava : nil
         stageFront.removeAllChildren()
         if isHoopfishHideaway {
             hoopfishHideawayArt = HoopfishHideawayArt.build(stage: stage, map: StageMap.current[.hoopfishHideaway], into: stageGround)
@@ -1887,14 +1891,16 @@ final class GameScene: SKScene {
         threePointArcs.removeAllChildren()
         threePointArcs.zPosition = -30
         // The line stays put; Hoopfish Hideaway's rim swims, so it has none drawn.
-        threePointArcs.isHidden = gameMode != .fortySeven || stage.features.look == .hoopfishHideaway
+        threePointArcs.isHidden = gameMode != .fortySeven || stage.features.look == .hoopfishHideaway || !stage.features.threePointLine
         let inside = CGRect(x: GameScene.pixelsPerTile, y: GameScene.pixelsPerTile,
                             width: CGFloat(stage.columns - 2) * GameScene.pixelsPerTile,
                             height: CGFloat(stage.rows + stage.skyRows) * GameScene.pixelsPerTile)
         let mask = SKSpriteNode(color: .white, size: inside.size)
         mask.anchorPoint = .zero
         mask.position = inside.origin
-        threePointArcs.maskNode = mask
+        // Not where the camera turns (the plane, which has no line anyway): a crop's mask is a
+        // Metal scissor rect, and turned it runs off the pass.
+        threePointArcs.maskNode = stage.features.tilts ? nil : mask
         stageGlowers.addChild(threePointArcs)
         // Under the floor's row, the outline black, all the way down and out.
         if !stage.features.scenic && !isElements {
@@ -1915,9 +1921,7 @@ final class GameScene: SKScene {
             path.addLine(to: CGPoint(x: 0, y: -radius))
             path.addArc(center: .zero, radius: radius, startAngle: -.pi / 2, endAngle: .pi / 2, clockwise: facingMiddle != 0)
             path.addLine(to: CGPoint(x: run, y: radius))
-            // Flight B411's hoop hangs anywhere along the ceiling: a whole ring round it, drawn
-            // again where it hangs, kept inside the plane by the crop.
-            let arc = SKShapeNode(path: stage.features.tilts ? CGPath(ellipseIn: CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2), transform: nil) : path)
+            let arc = SKShapeNode(path: path)
             arc.position = SpriteLibrary.point(hoop.position)
             arc.strokeColor = SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)
             arc.lineWidth = ThreePointTuning.lineWidth
@@ -4516,7 +4520,7 @@ final class GameScene: SKScene {
     /// winner's colour as they go, a sixth and seventh added if the series gets there;
     /// and to either side of them each side's drinks, with their levels.
     private func drawSeries() {
-        threePointArcs.isHidden = (gameMode != .fortySeven && previewing != .hud) || match.stage.features.look == .hoopfishHideaway
+        threePointArcs.isHidden = (gameMode != .fortySeven && previewing != .hud) || match.stage.features.look == .hoopfishHideaway || !match.stage.features.threePointLine
         for arc in threePointArcSides { arc.node.lineWidth = ThreePointTuning.lineWidth }
         if gameMode == .zones {
             // ZONES: the letters are the SwiftUI layer's; nothing across the top.
@@ -6582,7 +6586,7 @@ final class GameScene: SKScene {
 
     /// Flight B411 a frame: the cart where the sim has it, its wheels turned by how far it's
     /// rolled; the bins' doors open or shut; each hoopcase hanging where its rim is, or away;
-    /// the three-point ring with it; the clouds on their way.
+    /// the clouds on their way.
     private func drawFlightB411() {
         guard match.stage.features.tilts else { return }
         if let cartNode, let cart = match.cart {
@@ -6600,10 +6604,6 @@ final class GameScene: SKScene {
                 let rim = SpriteLibrary.point(hoop.position)
                 hoopcaseNodes[index].position = CGPoint(x: rim.x - FlightB411Art.hoopcaseRing.x,
                                                         y: rim.y + FlightB411Art.hoopcaseRing.y - FlightB411Art.hoopcaseCanvas)
-            }
-            if index < threePointArcSides.count {
-                threePointArcSides[index].node.position = SpriteLibrary.point(hoop.position)
-                threePointArcSides[index].node.isHidden = away
             }
         }
         skyNode.position = cameraNode.position

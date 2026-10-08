@@ -766,6 +766,7 @@ public struct Stage: Equatable {
         stage.features.tilts = true
         stage.features.speedShare = FlightB411Rules.speedShare
         stage.features.dunks = false
+        stage.features.threePointLine = false
         return stage
     }
 

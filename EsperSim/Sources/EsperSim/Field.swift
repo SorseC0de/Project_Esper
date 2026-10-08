@@ -52,6 +52,9 @@ public struct StageFeatures: Equatable {
     public var speedShare = 1.0
     /// Whether its rims can be dunked on at all: not the plane's.
     public var dunks = true
+    /// Whether 47 draws a three-point line round each rim: not on the plane, too small for one.
+    /// Threes still count from past the usual radius.
+    public var threePointLine = true
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets

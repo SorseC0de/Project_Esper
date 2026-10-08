@@ -1847,8 +1847,9 @@ of the side guarding the hoop, as its net is, the glow and its ramp down (`Fligh
 its ring's centre 17 in and 33 down on the canvas, the suitcase's top 18 over the ring. The
 suitcase hangs `hoopcaseDrop` art pixels under the bin's bottom: the debug strip's HOOPCASE Y
 slider, an art pixel at a time, kept between launches, offline; online the default, 0. The rims'
-own art and backboards aren't drawn on it; the nets hang from the hoopcase's ring. 47's three-point
-line round a hanging hoop is a whole ring, moving with it, kept inside the plane. After a point the
+own art and backboards aren't drawn on it; the nets hang from the hoopcase's ring. There's no
+three-point line drawn on it, too small for one (`StageFeatures.threePointLine`); 47's threes
+count as ever, from past the usual radius round the hoop. After a point the
 bins shut, the hoops go away and the ball waits in the middle bin again; in Rounds the third round's
 ball drops from any of the five, off the series' dice (`startFromBin`). NO DUNKING over the bins:
 `no_dunking.svg` (`_Graphic Assets/Vectors/Stages/Flight B411`) rendered 24 high into

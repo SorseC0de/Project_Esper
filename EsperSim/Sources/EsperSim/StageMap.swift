@@ -220,7 +220,7 @@ public struct StageMap: Equatable, Codable {
     public static func bakedVersion(_ stage: MapStage) -> Int {
         switch stage {
         case .elements, .hoopfishHideaway: 5
-        case .kAndA: 1
+        case .kAndA: 2
         }
     }
 
@@ -237,9 +237,13 @@ public struct StageMap: Equatable, Codable {
     private static let kAndABaked: StageMap = StageMap.kAndADefaultMap()
 
     /// K&A as laid out in the map maker: three rows of ground, the starts on it, the ball over
-    /// the middle; its rims hang from the bridge and aren't the map's to place.
+    /// the middle; the red car's walls as the file's [Dont_Draw] layer marks them, eleven solid
+    /// and two slopes: its length along row 3, columns 4 to 11, and its roof on row 4, columns
+    /// 7 to 9, sloping down at 6 and 10. Its rims hang from the bridge and aren't the map's to place.
     private static func kAndADefaultMap() -> StageMap {
-        let walls = (0..<KAndARules.floorRows).flatMap { row in (0..<KAndARules.columns).map { Wall(Cell($0, row), .solid) } }
+        var walls = (0..<KAndARules.floorRows).flatMap { row in (0..<KAndARules.columns).map { Wall(Cell($0, row), .solid) } }
+        walls += (4...11).map { Wall(Cell($0, 3), .solid) }
+        walls += [Wall(Cell(6, 4), .lowerRight)] + (7...9).map { Wall(Cell($0, 4), .solid) } + [Wall(Cell(10, 4), .lowerLeft)]
         return StageMap(leftRim: Cell(5, 14), rightRim: Cell(31, 14), spawns: [Cell(14, 3), Cell(21, 3)], ball: Cell(18, 10), walls: walls)
     }
 

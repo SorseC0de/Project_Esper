@@ -17,9 +17,15 @@ STAGES = {
     },
     "kanda": {
         "file": "K&A/K&A_Map.aseprite",
-        "KAndABackdrop": ["Background Sky", "Background Houses", "Ground", "Buildings", "Extras", "Signs", "Text",
-                          "Back Pillar", "Cars", "Train Support L", "Train Tracks"],
-        "KAndAFront": ["Front Pillar L", "Train Support R", "Front Pillar R"],
+        # Everything under the players but the file's [Dont_Draw] layer, which marks the red car's place and walls.
+        "KAndABackdrop": ["Background Sky", "Background Houses", "Ground", "Buildings", "Signs", "Text", "Back Pillar 2",
+                          "Back Pillar 1", "Cars", "Extras", "Train Support 3", "Train Support 2", "Train Support 1", "Train Tracks"],
+        "KAndAFront": ["Front Pillar 2", "Front Pillar 1"],
+    },
+    "redcar": {
+        "file": "K&A/red_car.aseprite",
+        "KAndACarBody": ["Body"],
+        "KAndACarWheels": ["Wheels"],
     },
 }
 

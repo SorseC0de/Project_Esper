@@ -34,6 +34,21 @@ final class KAndATests: XCTestCase {
         XCTAssertEqual(match.stage.hoops[1].backboard, .right)
     }
 
+    func testTheRedCarIsElevenSolidsAndTwoSlopesToStandOn() {
+        let stage = Stage.kAndA
+        let solids = (4...11).filter { stage.tile(column: $0, row: 3) == .solid }.count + (7...9).filter { stage.tile(column: $0, row: 4) == .solid }.count
+        XCTAssertEqual(solids, 11)
+        XCTAssertEqual(stage.fixedSlopes.count, 2)
+        XCTAssertEqual(stage.fixedSlopes.filter(\.rising).count, 1, "one slope up onto the roof, one down off it")
+        // A body dropped onto the roof stands on it, above the ground.
+        var match = Match(stage: .kAndA)
+        match.countdown = 0
+        match.players[0].position = Vec2(x: 80, y: 70)
+        for _ in 0..<60 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.players[0].grounded)
+        XCTAssertEqual(match.players[0].position.y, 50, accuracy: 1e-9, "on the roof, row 4's top")
+    }
+
     func testTheMapLaysItsWallsAndStarts() {
         let before = StageMap.current[.kAndA]
         defer { StageMap.current[.kAndA] = before }

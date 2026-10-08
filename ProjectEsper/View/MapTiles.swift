@@ -82,10 +82,27 @@ enum KAndAArt {
     struct Handles {
         var backdrop: SKSpriteNode?
         var front: SKSpriteNode?
+        /// The red car's body, which sags under a body, and its wheels, which don't.
+        var carBody: SKSpriteNode?
+        var carWheels: SKSpriteNode?
+        /// The street lights' cones, one a lamp.
+        var cones: [SKShapeNode] = []
     }
     /// Past the stage's edges: palette 30, the sky's own top.
     static let beyond: RGB = PixelPalette.colours[30]
     static let backdropZ: CGFloat = -7.8
+    /// The car (`red_car.aseprite`, 128 by 48, its Body and Wheels layers each their own
+    /// picture) just over the backdrop; its sag: down two pixels as someone lands on it, back up
+    /// one and held there while they stay, up the last once they've gone, a pixel every few frames.
+    static let carZ: CGFloat = backdropZ + 0.1
+    static let sagStepFrames = 3
+    /// The street lights' cones: from each lamp's bottom down to the ground, this wide a side
+    /// at the ground, in the lamp's warm light, faint and added; now and then one flickers.
+    static let coneHalfWidth: CGFloat = 36
+    static let coneAlpha: CGFloat = 0.12
+    static let coneColour = SKColor(rgb: PixelPalette.colours[7])
+    static let flickerChance = 1.0 / 240
+    static let flickerFrames = 6...20
 
     static func build(into parent: SKNode, front frontParent: SKNode) -> Handles {
         var handles = Handles()
@@ -102,6 +119,30 @@ enum KAndAArt {
         }
         handles.backdrop = picture("KAndABackdrop", z: backdropZ, into: parent)
         handles.front = picture("KAndAFront", z: 0, into: frontParent)
+        let carAt = CGPoint(x: CGFloat(KAndARules.carLeft * SpriteLibrary.pixelsPerUnit), y: CGFloat(KAndARules.floorRows) * ElementsArt.tileSide)
+        let wheels = picture("KAndACarWheels", z: carZ, into: parent)
+        wheels.position = carAt
+        let body = picture("KAndACarBody", z: carZ + 0.1, into: parent)
+        body.position = carAt
+        handles.carWheels = wheels
+        handles.carBody = body
+        let ground = CGFloat(KAndARules.floorRows) * ElementsArt.tileSide
+        handles.cones = KAndARules.lampXs.map { lampX in
+            let x = CGFloat(lampX * SpriteLibrary.pixelsPerUnit), top = CGFloat(KAndARules.lampBottom * SpriteLibrary.pixelsPerUnit)
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: x, y: top))
+            path.addLine(to: CGPoint(x: x - coneHalfWidth, y: ground))
+            path.addLine(to: CGPoint(x: x + coneHalfWidth, y: ground))
+            path.closeSubpath()
+            let cone = SKShapeNode(path: path)
+            cone.fillColor = coneColour
+            cone.strokeColor = .clear
+            cone.alpha = coneAlpha
+            cone.blendMode = .add
+            cone.zPosition = carZ + 0.2
+            parent.addChild(cone)
+            return cone
+        }
         return handles
     }
 }

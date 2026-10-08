@@ -1687,6 +1687,12 @@ final class GameScene: SKScene {
     private var elementsArt: ElementsArt.Handles?
     private var flightB411Art: FlightB411Art.Handles?
     private var kAndAArt: KAndAArt.Handles?
+    /// K&A's red car: how far its body sags, in art pixels, where it's going, the frames to its
+    /// next pixel, and whether it's settled under someone; and each lamp's flicker, frames left.
+    private var carSag: CGFloat = 0
+    private var carSagSettled = false
+    private var carSagClock = 0
+    private var lampFlicker: [Int] = []
     /// Flight B411's cart from its sheet, and its two wheels, which turn as it rolls.
     private var cartNode: SKSpriteNode?
     private var cartWheels: [SKSpriteNode] = []
@@ -1738,9 +1744,9 @@ final class GameScene: SKScene {
             }
         }
         if let art = hoopfishHideawayArt { flats += art.flats }
-        // K&A's pictures don't glow either.
+        // K&A's pictures don't glow either, nor its car.
         if let art = kAndAArt {
-            flats += [art.backdrop, art.front].compactMap { $0 }.compactMap { node in
+            flats += [art.backdrop, art.front, art.carBody, art.carWheels].compactMap { $0 }.compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
         }
@@ -1790,6 +1796,9 @@ final class GameScene: SKScene {
         }
         if stage.features.look == .kAndA {
             kAndAArt = KAndAArt.build(into: stageGround, front: stageFront)
+            carSag = 0
+            carSagSettled = false
+            lampFlicker = kAndAArt?.cones.map { _ in 0 } ?? []
         }
         if stage.features.look == .flightB411 {
             flightB411Art = FlightB411Art.build(into: stageGround, front: stageFront)
@@ -6649,6 +6658,42 @@ final class GameScene: SKScene {
     }
     private var portalId = 0
 
+    /// Whether a body stands on K&A's red car: grounded above the ground, within the car's length.
+    private func standsOnCar(_ player: Player) -> Bool {
+        player.grounded && player.position.y > Double(KAndARules.floorRows) * Stage.tileSize + 0.5
+            && player.position.x >= KAndARules.carLeft && player.position.x <= KAndARules.carRight
+    }
+
+    /// K&A a frame: the red car's body sagging under whoever stands on it, two pixels down as
+    /// they land, back up one while they stay, up the last once they've gone, a pixel at a time;
+    /// and the street lights, one flickering now and then.
+    private func drawKAndA() {
+        guard let art = kAndAArt else { return }
+        let occupied = match.players.contains(where: standsOnCar)
+        if !occupied { carSagSettled = false }
+        let target: CGFloat = !occupied ? 0 : (carSagSettled ? -1 : -2)
+        if carSag != target {
+            carSagClock += 1
+            if carSagClock >= KAndAArt.sagStepFrames {
+                carSagClock = 0
+                carSag += carSag < target ? 1 : -1
+                if carSag == -2 { carSagSettled = true }
+            }
+        } else {
+            carSagClock = 0
+        }
+        art.carBody?.position.y = CGFloat(KAndARules.floorRows) * ElementsArt.tileSide + carSag
+        for (index, cone) in art.cones.enumerated() where index < lampFlicker.count {
+            if lampFlicker[index] > 0 {
+                lampFlicker[index] -= 1
+                cone.alpha = lampFlicker[index] % 4 < 2 ? KAndAArt.coneAlpha * 0.3 : KAndAArt.coneAlpha
+            } else {
+                cone.alpha = KAndAArt.coneAlpha
+                if Double.random(in: 0..<1) < KAndAArt.flickerChance { lampFlicker[index] = Int.random(in: KAndAArt.flickerFrames) }
+            }
+        }
+    }
+
     /// Flight B411 a frame: the cart where the sim has it, its wheels turned by how far it's
     /// rolled; the bins' doors open or shut; each hoopcase hanging where its rim is, or away;
     /// the clouds on their way.
@@ -7127,6 +7172,8 @@ final class GameScene: SKScene {
             let radius = (inTornado ? ElementsArt.hoverRadius : GameScene.hoverRadius) * hover[index]
             let drift = CGPoint(x: (cos(lap) * Double(radius)).rounded(), y: (sin(lap) * Double(radius)).rounded())
             node.position = SpriteLibrary.point(player.position) + drift
+            // K&A: standing on the red car, carried down with its sag.
+            if kAndAArt != nil, standsOnCar(player) { node.position.y += carSag }
             // Held a few pixels up off the ground the whole change.
             if changing { node.position.y += GameScene.transformLift }
             if player.state == .dunking {
@@ -7600,6 +7647,7 @@ final class GameScene: SKScene {
         section("powers")
         drawField()
         drawFlightB411()
+        drawKAndA()
         section("field")
         drawTraffic()
         section("traffic")

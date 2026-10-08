@@ -1913,9 +1913,21 @@ flattens the first eleven into `KAndABackdrop`, on the stage's ground, and the l
 beside the new one, which the tool now reads right); `python3 Tools/import_stage_art.py kanda`
 does both again when the picture changes (`flight` the plane's, none for every stage). Its walls,
 starts and ball are laid out in the map maker (`MapStage.kAndA`, protocol 111), which opens in
-walls mode on it, with the starts and the ball to place and no rims: the baked map is three rows
-of ground, the starts at columns 14 and 21, the ball at 18, 10; nothing else is solid, the pillars
-and the cars scenery, until walls are painted. The hoops hang from the bridge's underside, the
+walls mode on it, with the starts and the ball to place and no rims: the baked map (version 2) is
+three rows of ground, the starts at columns 14 and 21, the ball at 18, 10, and the red car's
+walls; nothing else is solid, the pillars and the painted cars scenery, until walls are painted.
+The file's `[Dont_Draw]` layer isn't drawn: it places the red car (`red_car.aseprite`, 128 by 48,
+its Body and Wheels layers each their own picture, `KAndACarBody` and `KAndACarWheels`, `python3
+Tools/import_stage_art.py redcar`) with its bottom left at the ground's top 64 along
+(`KAndARules.carLeft`), and marks its walls, eleven solid and two slopes: row 3 from column 4 to
+11, and the roof on row 4, columns 7 to 9, sloping down at 6 and 10 (protocol 113). Someone
+landing on the car sags its body (not the wheels) two pixels, which comes back up one and stays
+there while anyone stands on it, and up the last once they've gone, a pixel every three frames
+(`KAndAArt.sagStepFrames`); whoever stands on it is drawn down with it (`standsOnCar`). Three
+street lights hang off the wire (`lampXs`, their bottoms at `lampBottom`): from each a cone of
+its light down to the ground, 36 wide a side there, palette 7 at 0.12, added, over the backdrop;
+now and then (one chance in 240 a frame) one flickers for 6 to 20 frames, dimming to a third
+every other pair of frames. The hoops hang from the bridge's underside, the
 tracks' 39 rows down from the top (`bridgeBottom`), on the Wreck Center's support beams
 (`HoopSupport`, the same layout, drawn at each hoop as there), the rim 25 under the bridge
 (`rimUnderBridge`), which is how far the court's beams reach over its rim; the rims 58 in from

@@ -558,7 +558,8 @@ final class GameScene: SKScene {
         guard let holder = noDunkingNode, !holder.isHidden else { return [] }
         return noDunkingSprites.compactMap { sprite in
             sprite.texture.map { BodySnapshot(texture: $0, position: CGPoint(x: holder.position.x + sprite.position.x * holder.xScale, y: holder.position.y + sprite.position.y * holder.yScale),
-                                              anchor: sprite.anchorPoint, xScale: 1, size: CGSize(width: sprite.size.width * holder.xScale, height: sprite.size.height * holder.yScale)) }
+                                              anchor: sprite.anchorPoint, xScale: 1,
+                                              size: CGSize(width: sprite.size.width * sprite.xScale * holder.xScale, height: sprite.size.height * sprite.yScale * holder.yScale)) }
         }
     }
 
@@ -1697,7 +1698,7 @@ final class GameScene: SKScene {
     /// net and the ball; the sheet they're cut from; and the sign, with its sprites for the glow.
     private var hoopcaseNodes: [SKSpriteNode] = []
     private var hoopcaseFronts: [SKSpriteNode] = []
-    private var hoopcaseSheets: [SKTexture] = []
+    private var hoopcaseSheets: [CGImage?] = []
     private var noDunkingNode: SKNode?
     private var noDunkingSprites: [SKSpriteNode] = []
     private let skyNode = SKNode()
@@ -1804,18 +1805,19 @@ final class GameScene: SKScene {
             // back under the net, the ring's front over the ball.
             hoopcaseSheets = stage.hoops.map { hoop in
                 let colour = sideColours.indices.contains(1 - hoop.owner) ? sideColours[1 - hoop.owner] : sideColours[0]
-                return FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body)) ?? SKTexture()
+                return FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body))
             }
-            hoopcaseNodes = hoopcaseSheets.map { sheet in
-                let node = SKSpriteNode(texture: FlightB411Art.casePieces(sheet: sheet).back)
+            let pieces = hoopcaseSheets.map { $0.flatMap(FlightB411Art.casePieces) }
+            hoopcaseNodes = pieces.map { piece in
+                let node = SKSpriteNode(texture: piece?.back)
                 node.zPosition = 5.4
                 node.isHidden = true
                 node.shader = FlightB411Art.caseMaskShader()
                 stageGround.addChild(node)
                 return node
             }
-            hoopcaseFronts = hoopcaseSheets.map { sheet in
-                let node = SKSpriteNode(texture: FlightB411Art.casePieces(sheet: sheet).front)
+            hoopcaseFronts = pieces.map { piece in
+                let node = SKSpriteNode(texture: piece?.front)
                 node.zPosition = GameScene.rimFrontZ
                 node.isHidden = true
                 node.shader = FlightB411Art.caseMaskShader()
@@ -3073,6 +3075,10 @@ final class GameScene: SKScene {
             controls.addSlider(title: "NO DUNK SCALE", range: 0.5...4, notch: 0.25, value: Float(FlightB411Art.signScale)) { value in
                 FlightB411Art.signScale = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: FlightB411Art.signScaleKey)
+            }
+            controls.addSlider(title: "SEATBELT SCALE", range: 0.1...1, notch: 0.05, value: Float(FlightB411Art.beltScale)) { value in
+                FlightB411Art.beltScale = CGFloat(value)
+                UserDefaults.standard.set(Double(value), forKey: FlightB411Art.beltScaleKey)
             }
             addNetSliders(.flightB411)
         }
@@ -4799,8 +4805,8 @@ final class GameScene: SKScene {
         // Flight B411's hoopcases in the new colours, each its hoop's guard's.
         for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseSheets.count && colours.indices.contains(1 - hoop.owner) {
             let colour = colours[1 - hoop.owner]
-            hoopcaseSheets[index] = FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body)) ?? SKTexture()
-            let pieces = FlightB411Art.casePieces(sheet: hoopcaseSheets[index])
+            hoopcaseSheets[index] = FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body))
+            guard let pieces = hoopcaseSheets[index].flatMap(FlightB411Art.casePieces) else { continue }
             if index < hoopcaseNodes.count { hoopcaseNodes[index].texture = pieces.back }
             if index < hoopcaseFronts.count { hoopcaseFronts[index].texture = pieces.front }
         }
@@ -6660,6 +6666,7 @@ final class GameScene: SKScene {
             door.isHidden = !match.bins[index].open
         }
         noDunkingNode?.setScale(FlightB411Art.signScale)
+        if noDunkingSprites.count == 3 { FlightB411Art.laySigns(sign: noDunkingSprites[0], no: noDunkingSprites[1], seatbelt: noDunkingSprites[2]) }
         // Each hoop's case: hanging from its bin's mask line, as far out as its slide is, swung
         // a share of the lean about that line; away with nothing to hang from.
         for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseNodes.count && index < hoopcaseFronts.count {

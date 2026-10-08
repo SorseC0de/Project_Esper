@@ -528,6 +528,8 @@ public struct Stage: Equatable {
     /// rows: the walls up in the sky can't be clung to or jumped off.
     /// `riding`: the board's question, which passes over the unridable extras.
     public func wall(beside box: Box, riding: Bool = false) -> Facing? {
+        // A stage whose walls can't be jumped off has none to land on, but for the board's ride.
+        guard features.wallJumps || riding else { return nil }
         if chutes.contains(where: { $0.overlaps(box) }) { return nil }
         let rows = rows(of: box)
         let rightColumn = column(at: box.max.x + Stage.edge)
@@ -773,6 +775,7 @@ public struct Stage: Equatable {
         stage.features.dunks = false
         stage.features.threePointLine = false
         stage.features.seenWhole = true
+        stage.features.wallJumps = false
         return stage
     }
 

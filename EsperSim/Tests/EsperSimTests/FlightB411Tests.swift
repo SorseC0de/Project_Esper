@@ -37,6 +37,13 @@ final class FlightB411Tests: XCTestCase {
         let rim = Hoop(position: FlightB411Rules.rimSpot(in: 4), owner: 0, backboard: .right)
         XCTAssertEqual(FortySevenRules.points(from: Vec2(x: 5, y: 20), through: rim, on: stage), 3)
         XCTAssertEqual(FortySevenRules.points(from: rim.position + Vec2(x: -10, y: -10), through: rim, on: stage), 2)
+        // Neither wall is anything to land on or jump off.
+        XCTAssertFalse(stage.features.wallJumps)
+        let atRight = Box(min: Vec2(x: stage.width - 10, y: 40), max: Vec2(x: stage.width, y: 57))
+        let atLeft = Box(min: Vec2(x: 0, y: 40), max: Vec2(x: 10, y: 57))
+        XCTAssertNil(stage.wall(beside: atRight))
+        XCTAssertNil(stage.wall(beside: atLeft))
+        XCTAssertNotNil(Stage.court.wall(beside: Box(min: Vec2(x: 10, y: 40), max: Vec2(x: 20, y: 57))), "the court's walls are")
         // No dunking on it, wherever a rim is.
         XCTAssertFalse(stage.features.dunks)
         XCTAssertFalse(stage.dunkable(stage.hoops[1]))

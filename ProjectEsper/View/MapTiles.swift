@@ -186,16 +186,19 @@ enum FlightB411Art {
     /// How much of the plane's lean the hanging case takes, swinging about its top.
     static let caseSwing: CGFloat = 0.5
 
-    /// The case's two pieces, whole, cut from the sheet once: the back, the suitcase and the
-    /// ring's back half, and the front, the ring's front half.
-    static func casePieces(sheet: SKTexture) -> (back: SKTexture, front: SKTexture) {
-        let height = hoopcaseCanvas
-        func rows(_ first: CGFloat, _ last: CGFloat) -> SKTexture {
-            let texture = SKTexture(rect: CGRect(x: 0, y: (height - last) / height, width: 1, height: (last - first) / height), in: sheet)
+    /// The case's two pieces, cut from the sheet once as textures of their own (a shader's
+    /// texture coordinates run over the whole of a texture, so a cut of a sheet would mislay
+    /// the mask): the back, the suitcase and the ring's back half, and the front, the ring's
+    /// front half.
+    static func casePieces(sheet: CGImage) -> (back: SKTexture, front: SKTexture)? {
+        func rows(_ first: CGFloat, _ last: CGFloat) -> SKTexture? {
+            guard let cut = sheet.cropping(to: CGRect(x: 0, y: first, width: hoopcaseCanvas, height: last - first)) else { return nil }
+            let texture = SKTexture(cgImage: cut)
             texture.filteringMode = .nearest
             return texture
         }
-        return (rows(caseTopRow, caseFrontRow), rows(caseFrontRow, caseBottomRow))
+        guard let back = rows(caseTopRow, caseFrontRow), let front = rows(caseFrontRow, caseBottomRow) else { return nil }
+        return (back, front)
     }
 
     /// The mask line in the stage's frame: whatever of a piece is above the line, as the piece
@@ -242,11 +245,11 @@ enum FlightB411Art {
         lay(front, top: caseFrontRow - caseTopRow, rows: caseBottomRow - caseFrontRow)
     }
 
-    /// A hoopcase in a side's colours: the suitcase's main grey, as drawn, becomes the energy's
-    /// glow and its lighter grey the glow lifted as a body's is; the ring and the lines stay.
-    /// Cached by colour.
-    nonisolated(unsafe) private static var hoopcases: [String: SKTexture] = [:]
-    static func hoopcase(glow: SKColor, lifted: SKColor) -> SKTexture? {
+    /// A hoopcase in a side's colours, as a picture to cut: the suitcase's main grey, as drawn,
+    /// becomes the energy's glow and its lighter grey the glow lifted as a body's is; the ring
+    /// and the lines stay. Cached by colour.
+    nonisolated(unsafe) private static var hoopcases: [String: CGImage] = [:]
+    static func hoopcase(glow: SKColor, lifted: SKColor) -> CGImage? {
         let key = "\(glow)|\(lifted)"
         if let made = hoopcases[key] { return made }
         guard let image = UIImage(named: "Hoopcase")?.cgImage else { return nil }
@@ -275,10 +278,8 @@ enum FlightB411Art {
             return context.makeImage()
         }
         guard let made else { return nil }
-        let texture = SKTexture(cgImage: made)
-        texture.filteringMode = .nearest
-        hoopcases[key] = texture
-        return texture
+        hoopcases[key] = made
+        return made
     }
 
     /// NO DUNKING, in the dark over the bins: the sign in palette 7, glowing, and over it the red
@@ -310,6 +311,7 @@ enum FlightB411Art {
         seatbelt.size = CGSize(width: beltWidth, height: 24)
         seatbelt.position = CGPoint(x: row / 2 - beltWidth / 2, y: 0)
         holder.addChild(seatbelt)
+        laySigns(sign: sign, no: no, seatbelt: seatbelt)
         parent.addChild(holder)
         SKTexture.preload([texture, noTexture, belt]) {}
         return (holder, [sign, no, seatbelt])
@@ -334,6 +336,22 @@ enum FlightB411Art {
             cg.strokePath()
         }
         return SKTexture(image: image)
+    }()
+    /// The signs in their row, the seatbelt at its own scale (`beltScale`), the row centred.
+    static let signWidth: CGFloat = 22, beltWidth: CGFloat = 118, signGap: CGFloat = 6
+    static func laySigns(sign: SKSpriteNode, no: SKSpriteNode, seatbelt: SKSpriteNode) {
+        let belt = beltWidth * beltScale
+        let row = signWidth + signGap + belt
+        sign.position = CGPoint(x: -row / 2 + signWidth / 2, y: 0)
+        no.position = sign.position
+        seatbelt.setScale(beltScale)
+        seatbelt.position = CGPoint(x: row / 2 - belt / 2, y: 0)
+    }
+    /// The seatbelt's own scale against the sign's, the SEATBELT SCALE slider's, kept; a fifth
+    /// to start, which brings it to the sign's size.
+    static let beltScaleKey = "esper.flightB411.beltScale"
+    nonisolated(unsafe) static var beltScale: CGFloat = {
+        CGFloat(UserDefaults.standard.object(forKey: beltScaleKey) as? Double ?? 0.2)
     }()
     /// The signs' size, the NO DUNK SCALE slider's, kept between launches; half to start.
     static let signScaleKey = "esper.flightB411.signScale.2"

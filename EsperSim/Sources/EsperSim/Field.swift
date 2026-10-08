@@ -57,6 +57,8 @@ public struct StageFeatures: Equatable {
     public var threePointLine = true
     /// Seen whole: the camera fitted to the stage, not by whole screen pixels, as the plane and K&A are.
     public var seenWhole = false
+    /// Whether a body can land on the stage's walls and jump off them: not the plane's.
+    public var wallJumps = true
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets

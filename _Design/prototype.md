@@ -1790,7 +1790,7 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 ## Flight B411
 
 The aisle of a plane (`StageChoice.flightB411`, `Stage.flightB411`, `StageLook.flightB411`, `FlightB411Rules` in
-`FlightB411.swift`; protocol 83, remade at protocol 105, named at 106, its bins at 107 to 109), on the select
+`FlightB411.swift`; protocol 83, remade at protocol 105, named at 106, its bins at 107 to 109, its walls at 112), on the select
 (`StageChoice.selectable`) and 47's (`StageChoice.fortySeven`), not ZONES'. On it every body
 moves at half its speed, on the ground, in the air and in Super Smoothie's flight
 (`StageFeatures.speedShare`, `FlightB411Rules.speedShare`), and nothing dunks
@@ -1852,7 +1852,9 @@ under its bin (`rimSpot`), and away (`HighwayRules.parked`) otherwise. The hoopc
 colour of the side guarding the hoop, as its net is, and its lighter grey (139 147 175) in that
 colour lifted as a body's is (`FlightB411Art.hoopcase`); the ring's centre 17 in and 33 down on the
 canvas, the suitcase's top row 15, its lowest 39, the ring's front half from row 34. It's drawn in
-two sprites cut from that sheet (`FlightB411Art.casePieces`, `layCase`): the back, the suitcase
+two sprites cut from that picture as textures of their own (`FlightB411Art.casePieces`, `layCase`;
+a shader's texture coordinates run over the whole of a texture, so a cut of a sheet mislays the
+mask): the back, the suitcase
 and the ring's back half, under the net, and the front, the ring's front half, over the net and
 the ball (`rimFrontZ`), which also stands in for a rim in `rimSnapshots` so the net's cylinder
 hides behind it. The mask line is the stage's: three rows under the suitcase's top when it's out
@@ -1872,7 +1874,10 @@ row centred on the stage halfway up the dark band, a gap of 6 between: NO DUNKIN
 (`_Graphic Assets/Vectors/Stages/Flight B411`) rendered 24 high into `FlightB411NoDunking` in
 palette 7, with over it a red ring and slash drawn once as a picture (`FlightB411Art.noTexture`,
 `noRed`); and the seatbelt, `seatbelt.svg` rendered 24 high into `FlightB411Seatbelt`, its arrow
-(the file's middle path, which the others never overlap sideways) red and the rest palette 7. All
+(the file's middle path, which the others never overlap sideways) red and the rest palette 7, at
+its own scale against the sign (`beltScale`, the strip's SEATBELT SCALE slider, 0.1 to 1, a
+fifth to start, which brings it to the sign's size, kept), the row laid again as it changes
+(`laySigns`). All
 told to the glow mask as glowing through the backdrop's flat (`glowThroughSnapshots`), since over
 a flat nothing glows otherwise; their size the strip's NO DUNK SCALE slider (`signScale`, 0.5 to 4,
 half to start, kept). Clouds (`FlightB411Cloud`, `Flight/cloud.png`, 192 by 64) drift left to right
@@ -1887,7 +1892,9 @@ its first two columns, 16 by 32, the top row of it nothing to stand on; the whee
 right cell, two of them centred on the cart's bottom two cells and a pixel down, turning by how
 far it's rolled, `Cart.rolled`, at `FlightB411Art.wheelRadius`) stands in the middle of the aisle and rolls with the pitch at the
 ball's pull, dragged 0.005 a frame, no faster than 2, stopping at the walls. It's solid, one of
-the stage's extras: stood on, it carries whoever's on it, as a helmet does. Rolling into anyone
+the stage's extras: stood on, it carries whoever's on it, as a helmet does. Neither of the
+plane's walls is anything to land on or jump off (`StageFeatures.wallJumps`, false here; the
+board's ride is still allowed). Rolling into anyone
 else at 0.2 or more it knocks them its way (`cartPush`), stuns them, pops the ball out of their
 hands if they hold it (`.cartHit`; HIT, a spark), and can't hit them again for 30 frames.
 

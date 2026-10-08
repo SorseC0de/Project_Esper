@@ -55,6 +55,8 @@ public struct StageFeatures: Equatable {
     /// Whether 47 draws a three-point line round each rim: not on the plane, too small for one.
     /// Threes still count from past the usual radius.
     public var threePointLine = true
+    /// Seen whole: the camera fitted to the stage, not by whole screen pixels, as the plane and K&A are.
+    public var seenWhole = false
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets
@@ -70,7 +72,7 @@ public struct StageFeatures: Equatable {
 
 /// The scenery a stage is drawn with.
 public enum StageLook: Equatable {
-    case court, footballField, highway, elements, hoopfishHideaway, flightB411
+    case court, footballField, highway, elements, hoopfishHideaway, flightB411, kAndA
 }
 
 extension StageFeatures {

@@ -1891,6 +1891,28 @@ the stage's extras: stood on, it carries whoever's on it, as a helmet does. Roll
 else at 0.2 or more it knocks them its way (`cartPush`), stuns them, pops the ball out of their
 hands if they hold it (`.cartHit`; HIT, a spark), and can't hit them again for 30 frames.
 
+## K&A
+
+A street under a railway bridge (`StageChoice.kAndA`, `Stage.kAndA`, `StageLook.kAndA`,
+`KAndARules` in `KAndA.swift`; protocol 110), on the select, 47's and ZONES' lists all three.
+Drawn whole in Aseprite, `Stages/K&A/K&A_Map.aseprite`, 592 by 304, one of its pixels an art
+pixel: 37 tiles by 19, Hoopfish Hideaway's size, seen whole (`StageFeatures.seenWhole`, the
+camera fitted to the screen as the plane's is, palette 30 beyond the edges, the sky's own top).
+The file's layers, bottom up: Background Sky, Background Houses, Ground, Buildings, Extras,
+Signs, Text, Back Pillar, Cars, Train Support L, Train Tracks, then Front Pillar L, Train Support
+R, Front Pillar R; the players draw between Train Tracks and Front Pillar L, so `Tools/aseprite.py`
+flattens the first eleven into `KAndABackdrop`, on the stage's ground, and the last three into
+`KAndAFront`, in `stageFront` over the players (the file keeps an old-style 8-bit palette chunk
+beside the new one, which the tool now reads right). Three rows of ground; nothing else is
+solid: the pillars and the cars are scenery. The hoops hang from the bridge's underside, the
+tracks' 39 rows down from the top (`bridgeBottom`), on the Wreck Center's support beams
+(`HoopSupport`, the same layout, drawn at each hoop as there), the rim 25 under the bridge
+(`rimUnderBridge`), which is how far the court's beams reach over its rim; the rims 58 in from
+each wall as the court's, with the court's straight backboards and rims, the backboard solid from
+under the rim up to the bridge as the court's is to its blocks. The starts 150 and 220 along, on
+the ground; the ball over the middle at 100. ZONES keeps the right rim, the left backboard
+rimless, the run starting on the ground. Dunks and threes as on the court.
+
 ## Hoop supports
 
 The Wreck Center's hoops stand on supports (`View/HoopSupport.swift`): `hoop_support` pieces (a

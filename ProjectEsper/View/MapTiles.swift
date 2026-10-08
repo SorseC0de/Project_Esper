@@ -73,6 +73,39 @@ struct TileSpot: Hashable {
     static func z(_ layer: Int) -> CGFloat { -8 + CGFloat(layer) * 0.1 }
 }
 
+/// K&A's scenery: the stage drawn whole in Aseprite (`K&A_Map.aseprite`, 592 by 304, one of its
+/// pixels an art pixel, flattened by `Tools/aseprite.py`) in two pictures, the whole stage each:
+/// `KAndABackdrop`, its layers up to the train tracks, behind the players; and `KAndAFront`, the
+/// front pillars and the right train support, in front of them. The players draw between the
+/// file's Train Tracks and Front Pillar L layers.
+enum KAndAArt {
+    struct Handles {
+        var backdrop: SKSpriteNode?
+        var front: SKSpriteNode?
+    }
+    /// Past the stage's edges: palette 30, the sky's own top.
+    static let beyond: RGB = PixelPalette.colours[30]
+    static let backdropZ: CGFloat = -7.8
+
+    static func build(into parent: SKNode, front frontParent: SKNode) -> Handles {
+        var handles = Handles()
+        func picture(_ name: String, z: CGFloat, into parent: SKNode) -> SKSpriteNode {
+            let texture = SKTexture(imageNamed: name)
+            texture.filteringMode = .nearest
+            let node = SKSpriteNode(texture: texture)
+            node.anchorPoint = .zero
+            node.size = texture.size()
+            node.zPosition = z
+            parent.addChild(node)
+            SKTexture.preload([texture]) {}
+            return node
+        }
+        handles.backdrop = picture("KAndABackdrop", z: backdropZ, into: parent)
+        handles.front = picture("KAndAFront", z: 0, into: frontParent)
+        return handles
+    }
+}
+
 /// Flight B411's scenery: the stage drawn whole in Aseprite (`Flight_Map.aseprite`, 1248 by 576, four
 /// of its pixels to an art pixel, flattened by `Tools/aseprite.py`) in two pictures, the whole
 /// stage each: `FlightB411Backdrop`, its layers up to the open bin, behind the players; and

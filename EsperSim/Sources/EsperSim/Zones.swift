@@ -23,7 +23,7 @@ public enum ZonesRules {
     public static let startX = 2.5 * Stage.tileSize
     /// The stages ZONES is played on: 47's, the small ones.
     /// Its stages: 47's but the plane, whose pitch and cart would make a run too much of a lottery.
-    public static let stages: [StageChoice] = [.wreckCenter, .hoopfishHideaway]
+    public static let stages: [StageChoice] = [.wreckCenter, .hoopfishHideaway, .kAndA]
 }
 
 /// A zone of the grid: its column, A upward, and its row, 1 upward from the floor.

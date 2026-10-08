@@ -653,11 +653,16 @@ public struct Stage: Equatable {
             stage.hoopfishStart = fish
             stage.hoopfishStationary = true
             stage.hoops[0].position = fish + HoopfishHideawayRules.rimFromHoopfish
+        case .kAndA:
+            // Its right rim kept, the left backboard rimless, as the Wreck Center's; the start on its ground.
+            stage = kAndA
+            stage.hoops[0].rimless = true
         default:
             stage = court
             stage.hoops[0].rimless = true
         }
-        stage.playerSpawns = stage.playerSpawns.map { _ in Vec2(x: ZonesRules.startX, y: tileSize) }
+        let floor = choice == .kAndA ? Double(KAndARules.floorRows) * tileSize : tileSize
+        stage.playerSpawns = stage.playerSpawns.map { _ in Vec2(x: ZonesRules.startX, y: floor) }
         stage.playerFacings = stage.playerFacings.map { _ in .right }
         return stage
     }
@@ -767,6 +772,38 @@ public struct Stage: Equatable {
         stage.features.speedShare = FlightB411Rules.speedShare
         stage.features.dunks = false
         stage.features.threePointLine = false
+        stage.features.seenWhole = true
+        return stage
+    }
+
+    /// K&A: a street under a railway bridge, 37 by 19 (`KAndARules`), three rows of ground, the
+    /// rims hung from the bridge's underside on the court's support beams, the backboards solid
+    /// up to the bridge as the court's are to its blocks.
+    public static var kAndA: Stage {
+        let columns = KAndARules.columns, rows = KAndARules.rows
+        let width = Double(columns) * tileSize
+        let floor = Double(KAndARules.floorRows) * tileSize
+        let rim = KAndARules.rimHeight
+        var stage = Stage(
+            columns: columns, rows: rows,
+            hoops: [
+                Hoop(position: Vec2(x: KAndARules.rimInset, y: rim), owner: 1, backboard: .left),
+                Hoop(position: Vec2(x: width - KAndARules.rimInset, y: rim), owner: 0, backboard: .right),
+            ],
+            playerSpawns: [Vec2(x: KAndARules.startInsets.0, y: floor), Vec2(x: KAndARules.startInsets.1, y: floor)],
+            playerFacings: [.right, .left],
+            ballSpawn: Vec2(x: width / 2, y: KAndARules.ballHeight)
+        )
+        stage.fill(.solid, columns: 0...(columns - 1), rows: 0...(KAndARules.floorRows - 1))
+        for hoop in stage.hoops {
+            let side = hoop.backboard.sign
+            let face = hoop.position.x + side * backboardFace, back = face + side * backboardDepth
+            stage.fixedExtras.append(Box(min: Vec2(x: min(face, back), y: hoop.position.y + backboardBottom),
+                                         max: Vec2(x: max(face, back), y: KAndARules.bridgeBottom)))
+        }
+        stage.extras = stage.fixedExtras
+        stage.features = StageFeatures(look: .kAndA)
+        stage.features.seenWhole = true
         return stage
     }
 
@@ -878,12 +915,12 @@ public struct Stage: Equatable {
 /// The stages to pick from, in the order the select screen shows them; the wire carries
 /// the raw value.
 public enum StageChoice: Int, CaseIterable, Codable {
-    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flightB411
+    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flightB411, kAndA
 
-    /// The stages on the select, in its order: Slamstill Traffic and Flight B411 parked off it.
-    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .hoopfishHideaway, .flightB411]
+    /// The stages on the select, in its order: Slamstill Traffic parked off it.
+    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .skyNet, .hoopfishHideaway, .flightB411, .kAndA]
     /// The stages 47 plays on.
-    public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway, .flightB411]
+    public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway, .flightB411, .kAndA]
 
     public var name: String {
         switch self {
@@ -894,6 +931,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .skyNet: "Sky Net"
         case .hoopfishHideaway: "Hoopfish Hideaway"
         case .flightB411: "Flight B411"
+        case .kAndA: "K&A"
         }
     }
 
@@ -907,6 +945,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .skyNet: .court
         case .hoopfishHideaway: .hoopfishHideaway
         case .flightB411: .flightB411
+        case .kAndA: .kAndA
         }
     }
 }

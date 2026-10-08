@@ -15,6 +15,7 @@ def read(path):
     assert magic == 0xA5E0, "not an aseprite file"
     pos = 128
     layers, palette, cels = [], [(0, 0, 0, 255)] * 256, []
+    new_palette = False
     for frame in range(frames):
         fsize, fmagic, old_chunks, _, new_chunks = struct.unpack("<IHHH2xI", data[pos:pos+16])
         assert fmagic == 0xF1FA
@@ -37,17 +38,21 @@ def read(path):
                     cel["link"] = struct.unpack("<H", body[16:18])[0]
                 cels.append(cel)
             elif ctype == 0x2019:
+                new_palette = True
                 n, first, last = struct.unpack("<III", body[:12]); q = 20
                 for i in range(first, last + 1):
                     eflags, r, g, b, a = struct.unpack("<HBBBB", body[q:q+6]); q += 6
                     if eflags & 1: q += 2 + struct.unpack("<H", body[q:q+2])[0]
                     palette[i] = (r, g, b, a)
-            elif ctype == 0x0004 and frame == 0:
+            elif ctype in (0x0004, 0x0011) and frame == 0 and not new_palette:
+                # The old palette chunks, only without the new one: 0x0004 in 8-bit colours,
+                # 0x0011 in 6-bit.
+                shift = 2 if ctype == 0x0011 else 0
                 n = struct.unpack("<H", body[:2])[0]; q = 2
                 for _ in range(n):
                     skip, count = struct.unpack("<BB", body[q:q+2]); q += 2
                     for i in range(skip, skip + (count or 256)):
-                        if i < 256: palette[i] = (body[q] << 2, body[q+1] << 2, body[q+2] << 2, 255)
+                        if i < 256: palette[i] = (body[q] << shift, body[q+1] << shift, body[q+2] << shift, 255)
                         q += 3
         pos += fsize
     return dict(w=w, h=h, depth=depth, transparent=transparent, layers=layers, cels=cels, palette=palette)

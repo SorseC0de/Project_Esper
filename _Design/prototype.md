@@ -1790,7 +1790,7 @@ game pixel and a half side to side in three waves down the screen (WATER SWAY), 
 ## Flight B411
 
 The aisle of a plane (`StageChoice.flightB411`, `Stage.flightB411`, `StageLook.flightB411`, `FlightB411Rules` in
-`FlightB411.swift`; protocol 83, remade at protocol 105, named at 106), on the select
+`FlightB411.swift`; protocol 83, remade at protocol 105, named at 106, its bins at 107), on the select
 (`StageChoice.selectable`) and 47's (`StageChoice.fortySeven`), not ZONES'. On it every body
 moves at half its speed, on the ground, in the air and in Super Smoothie's flight
 (`StageFeatures.speedShare`, `FlightB411Rules.speedShare`), and nothing dunks
@@ -1829,6 +1829,34 @@ the glow HUD turned back upright, and the camera zoomed so the stage's whole tur
 screen at the lean it's at (`flightB411Fit`): edge to edge level, letterboxed in palette 30 as it leans.
 Turbulence: on the stage a small shake comes every one to four seconds (`turbulenceIn`, six frames
 of the Quake shake), off with the screen shake setting.
+
+The overhead bins (`Bin`, `Match.bins`; `FlightB411Rules.binLefts`, five whole bins 48 art pixels
+wide along the ceiling's band, 88 to 112 up, measured off the file's Bins layer, which repeats
+every 192 of its pixels from 160; the art's end bins are cut by the plane's ends and never open).
+The backdrop is flattened with every bin shut; the file's Open Bin layer, 45 by 19, is its own
+picture, `FlightB411OpenBin`, drawn over a bin while it's open, its bottom left on the bin's. A
+start: the plane level and the bins still through the count and seven seconds after
+(`startLevelFrames`), the middle bin alone open with the ball waiting in its mouth, held there
+(`Match.ballBin`, in `advance`) until the count's done, when it drops. Then the cycle: every
+five seconds (`binEveryFrames`) a shut bin opens, off the dice, for ten (`binOpenFrames`), with
+nothing in it, or one side's hoop, or the other's, never a second hoop while one is out, so there
+is at most one hoop on the stage; a hoop's rim hangs under its open bin (`rimSpot`) and is away
+(`HighwayRules.parked`) otherwise. The hoop hangs in a hoopcase: `Hoopcase`, `Flight/Hoopcase.png`,
+48 by 48, the suitcase's two greys (139 147 175 and 109 117 141) recoloured in the energy colour
+of the side guarding the hoop, as its net is, the glow and its ramp down (`FlightB411Art.hoopcase`);
+its ring's centre 17 in and 33 down on the canvas, the suitcase's top 18 over the ring. The
+suitcase hangs `hoopcaseDrop` art pixels under the bin's bottom: the debug strip's HOOPCASE Y
+slider, an art pixel at a time, kept between launches, offline; online the default, 0. The rims'
+own art and backboards aren't drawn on it; the nets hang from the hoopcase's ring. 47's three-point
+line round a hanging hoop is a whole ring, moving with it, kept inside the plane. After a point the
+bins shut, the hoops go away and the ball waits in the middle bin again; in Rounds the third round's
+ball drops from any of the five, off the series' dice (`startFromBin`). NO DUNKING over the bins:
+`no_dunking.svg` (`_Graphic Assets/Vectors/Stages/Flight B411`) rendered 24 high into
+`FlightB411NoDunking` in palette 7, centred on the stage halfway up the dark band over the bins,
+and over it a red ring and slash (`FlightB411Art.noRed`, lifted past the glow's threshold), both
+glowing. Clouds (`FlightB411Cloud`, `Flight/cloud.png`, 192 by 64) drift left to right over the
+sky beyond the plane: six, each its own size (a quarter to three quarters) and pace, in `skyNode`,
+on the camera, turned back level and behind the world, so the plane covers them.
 
 The cart (`Cart`, `FlightB411Rules.cartSize`: 16 by 24 art pixels solid, drawn from `Cart`, its
 sheet `Flight/Cart.png`, 48 by 64 drawn at 2x, so 24 by 32 art pixels in 8-pixel cells: the cart

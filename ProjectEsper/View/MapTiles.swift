@@ -99,12 +99,12 @@ enum FlightB411Art {
     static func cart() -> (node: SKSpriteNode, wheels: [SKSpriteNode]) {
         let sheet = SKTexture(imageNamed: "Cart")
         sheet.filteringMode = .nearest
-        let body = SKTexture(rect: CGRect(x: 0, y: 0, width: 2 / 3, height: 1), in: sheet)
+        let body = SKTexture(rect: CGRect(x: 0, y: 0, width: 2.0 / 3.0, height: 1), in: sheet)
         let node = SKSpriteNode(texture: body)
         node.anchorPoint = .zero
         node.size = CGSize(width: 16, height: 32)
         node.zPosition = 5
-        let wheelArt = SKTexture(rect: CGRect(x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 4), in: sheet)
+        let wheelArt = SKTexture(rect: CGRect(x: 2.0 / 3.0, y: 0, width: 1.0 / 3.0, height: 0.25), in: sheet)
         let wheels = [4, 12].map { x -> SKSpriteNode in
             let wheel = SKSpriteNode(texture: wheelArt)
             wheel.size = CGSize(width: 8, height: 8)
@@ -119,6 +119,109 @@ enum FlightB411Art {
         SKTexture.preload([sheet, body, wheelArt]) { DispatchQueue.main.async { node.isHidden = false } }
         return (node, wheels)
     }
+
+    /// The bins' open doors, `FlightB411OpenBin` (the file's Open Bin layer, 45 by 19 art pixels),
+    /// one over each whole bin, its bottom left on the bin's, shown while the bin's open.
+    static func openBins(into parent: SKNode) -> [SKSpriteNode] {
+        let texture = SKTexture(imageNamed: "FlightB411OpenBin")
+        texture.filteringMode = .nearest
+        let doors = FlightB411Rules.binLefts.map { left -> SKSpriteNode in
+            let door = SKSpriteNode(texture: texture)
+            door.anchorPoint = .zero
+            door.size = CGSize(width: 45, height: 19)
+            door.position = CGPoint(x: (left * SpriteLibrary.pixelsPerUnit).rounded(), y: (FlightB411Rules.binBottom * SpriteLibrary.pixelsPerUnit).rounded())
+            door.zPosition = backdropZ + 0.1
+            door.isHidden = true
+            parent.addChild(door)
+            return door
+        }
+        SKTexture.preload([texture]) {}
+        return doors
+    }
+
+    /// Where a hoopcase's canvas sits for its ring's centre: the suitcase's middle is 17 in from
+    /// the canvas's left, the ring's centre 33 down from its top, on its 48 by 48.
+    static let hoopcaseCanvas: CGFloat = 48
+    static let hoopcaseRing = CGPoint(x: 17, y: 33)
+
+    /// A hoopcase in a side's colours: the suitcase's two greys, as drawn, become the energy's
+    /// glow and its ramp down; the ring and the lines stay. Cached by colour.
+    nonisolated(unsafe) private static var hoopcases: [String: SKTexture] = [:]
+    static func hoopcase(glow: SKColor, shade: SKColor) -> SKTexture? {
+        let key = "\(glow)|\(shade)"
+        if let made = hoopcases[key] { return made }
+        guard let image = UIImage(named: "Hoopcase")?.cgImage else { return nil }
+        let width = image.width, height = image.height
+        func bytes(_ colour: SKColor) -> (UInt8, UInt8, UInt8) {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            colour.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return (UInt8((r * 255).rounded()), UInt8((g * 255).rounded()), UInt8((b * 255).rounded()))
+        }
+        let light = bytes(glow), dark = bytes(shade)
+        // The context's bytes are the array's, so everything with it happens while the array's
+        // pointer holds: drawn in, swapped, and the image made before the pointer's scope ends.
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let made: CGImage? = pixels.withUnsafeMutableBytes { bytes in
+            guard let context = CGContext(data: bytes.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                          space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            let data = bytes.bindMemory(to: UInt8.self)
+            for index in stride(from: 0, to: data.count, by: 4) where data[index + 3] == 255 {
+                let pixel = (data[index], data[index + 1], data[index + 2])
+                let swap: (UInt8, UInt8, UInt8)?
+                if pixel == (139, 147, 175) { swap = light } else if pixel == (109, 117, 141) { swap = dark } else { swap = nil }
+                if let swap { (data[index], data[index + 1], data[index + 2]) = swap }
+            }
+            return context.makeImage()
+        }
+        guard let made else { return nil }
+        let texture = SKTexture(cgImage: made)
+        texture.filteringMode = .nearest
+        hoopcases[key] = texture
+        return texture
+    }
+
+    /// NO DUNKING, in the dark over the bins: the sign in palette 7, glowing, and over it the red
+    /// "no", a ring and a slash, glowing too. Centred on the stage, halfway up the band over the bins.
+    static func noDunkingSign(into parent: SKNode) -> SKNode {
+        let holder = SKNode()
+        let centre = CGPoint(x: (CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide / 2).rounded(),
+                             y: ((FlightB411Rules.binTop * SpriteLibrary.pixelsPerUnit + CGFloat(FlightB411Rules.rows) * ElementsArt.tileSide) / 2).rounded())
+        holder.position = centre
+        holder.zPosition = backdropZ + 0.2
+        let texture = SKTexture(imageNamed: "FlightB411NoDunking")
+        texture.filteringMode = .nearest
+        let sign = SKSpriteNode(texture: texture)
+        sign.size = CGSize(width: 22, height: 24)
+        holder.addChild(sign)
+        let no = SKShapeNode()
+        let path = CGMutablePath()
+        path.addEllipse(in: CGRect(x: -noRadius, y: -noRadius, width: noRadius * 2, height: noRadius * 2))
+        let across = noRadius * 0.7071
+        path.move(to: CGPoint(x: -across, y: across))
+        path.addLine(to: CGPoint(x: across, y: -across))
+        no.path = path
+        no.strokeColor = noRed
+        no.lineWidth = 2
+        no.lineCap = .round
+        no.zPosition = 0.1
+        holder.addChild(no)
+        parent.addChild(holder)
+        SKTexture.preload([texture]) {}
+        return holder
+    }
+    static let noRadius: CGFloat = 16
+    /// Red, lifted enough to pass the glow's threshold.
+    static let noRed = SKColor(red: 1, green: 0.16, blue: 0.16, alpha: 1)
+
+    /// A cloud, `FlightB411Cloud` (192 by 64), for the sky beyond the plane.
+    static let cloud: SKTexture = {
+        let texture = SKTexture(imageNamed: "FlightB411Cloud")
+        texture.filteringMode = .nearest
+        SKTexture.preload([texture]) {}
+        return texture
+    }()
 
     static func build(into parent: SKNode, front frontParent: SKNode) -> Handles {
         var handles = Handles()

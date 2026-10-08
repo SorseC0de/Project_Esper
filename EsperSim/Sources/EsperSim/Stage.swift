@@ -753,7 +753,7 @@ public struct Stage: Equatable {
             ],
             playerSpawns: [Vec2(x: FlightB411Rules.startInset, y: floor), Vec2(x: width - FlightB411Rules.startInset, y: floor)],
             playerFacings: [.right, .left],
-            ballSpawn: Vec2(x: width / 2, y: FlightB411Rules.ballHeight)
+            ballSpawn: FlightB411Rules.ballSpot(in: FlightB411Rules.centreBin)
         )
         stage.width = width
         stage.fill(.solid, columns: 0...(columns - 1), rows: 0...(FlightB411Rules.floorRows - 1))

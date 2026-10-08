@@ -46,6 +46,9 @@ public struct Match: Equatable {
     public var tiltClock = 0
     public var cart: Cart?
     public var cartHitFrames: [Int] = []
+    /// Its overhead bins, and the bin the ball waits in through the count.
+    public var bins: [Bin] = []
+    public var ballBin: Int?
     public var scores: [Int]
     /// Rounds reset on a point; 47 plays on through its baskets.
     public var mode = GameMode.rounds
@@ -85,6 +88,7 @@ public struct Match: Equatable {
         if stage.features.tilts {
             cart = Cart.starting(on: stage)
             cartHitFrames = players.map { _ in 0 }
+            startFlightB411()
         }
         if let fish = stage.hoopfishStart {
             if stage.hoopfishStationary {
@@ -194,6 +198,10 @@ public struct Match: Equatable {
             // On the Hoopfish's antenna, where a hand can take it off.
             tryCatch()
             if ball.holder != nil { hoopfish?.carrying = .nothing }
+        } else if let waiting = ballBin, countdown > 0, ball.holder == nil {
+            // Flight B411: in its bin's mouth through the count, still, till the count's done.
+            ball.position = FlightB411Rules.ballSpot(in: waiting)
+            ball.velocity = .zero
         } else if ball.isLive, ball.tether == nil {
             // The ball sees the stage's ball-only solids as well.
             var ballStage = stage
@@ -292,6 +300,9 @@ public struct Match: Equatable {
             players[holder].hasBall = true
             ball.holder = holder
             ball.position = players[holder].heldBallPoint
+        } else if stage.features.tilts {
+            // Flight B411: back into the middle bin, the bins shut and the hoops away again.
+            startFlightB411()
         } else if hoopfish != nil {
             // In neutral on Hoopfish Hideaway is back on the Hoopfish's antenna.
             hoopfish?.carrying = .ball

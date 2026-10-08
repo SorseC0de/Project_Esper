@@ -17,7 +17,7 @@ of the white is energy, the skid's puffs, a release's streaks, the slide's speed
 which the app draws in the team colour. The sim's Animation.holdsBall and SpriteLibrary
 apply the same rule. Run it again whenever the art changes.
 """
-from pngio import read_png, write_png
+from pngio import read_png as read_rgba, write_png as write_rgba
 import glob
 import json
 import os
@@ -58,6 +58,8 @@ ROOT_IMAGES = {
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
     "HoloProjector": ["UI/Holo-Projector_v2.png"],
     "Cart": ["Stages/Flight/Cart.png"],
+    "FlightB411Cloud": ["Stages/Flight/cloud.png"],
+    "Hoopcase": ["Stages/Flight/Hoopcase.png"],
 }
 ATLAS = os.path.join(os.path.dirname(__file__), "..", "ProjectEsper", "Assets.xcassets", "Sprites.spriteatlas")
 LANDMARKS = os.path.join(os.path.dirname(__file__), "..", "EsperSim", "Sources", "EsperSim", "BallLandmarks.swift")
@@ -369,8 +371,8 @@ def copy_as_rgba(source, target):
     transparency is lost on the way through the catalog and its clear colour draws instead."""
     header = open(source, "rb").read(26)
     if header[25] == 3:
-        w, h, pixels = read_png(source)
-        write_png(target, w, h, pixels)
+        w, h, pixels = read_rgba(source)
+        write_rgba(target, w, h, pixels)
     else:
         shutil.copy(source, target)
 

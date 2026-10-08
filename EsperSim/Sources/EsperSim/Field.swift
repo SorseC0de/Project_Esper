@@ -52,9 +52,11 @@ public struct StageFeatures: Equatable {
     public var speedShare = 1.0
     /// Whether its rims can be dunked on at all: not the plane's.
     public var dunks = true
-    /// Whether 47 draws a three-point line round each rim: not on the plane, too small for one.
-    /// Threes still count from past the usual radius.
-    public var threePointLine = true
+    /// Whether 47 has threes at all, and draws their line: not on the plane, too small for them.
+    public var threes = true
+    /// 47's three-point radius on this stage, rather than one measured to its one-ways: K&A's,
+    /// whose one-ways are its cars.
+    public var threeRadius: Double?
     /// Seen whole: the camera fitted to the stage, not by whole screen pixels, as the plane and K&A are.
     public var seenWhole = false
     /// Whether a body can land on the stage's walls and jump off them: not the plane's.

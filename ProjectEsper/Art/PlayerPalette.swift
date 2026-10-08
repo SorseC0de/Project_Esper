@@ -120,12 +120,14 @@ struct Look: Hashable {
             for part in dressing.glowing { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
         } else {
             // The energy form: the body in the lighter colour of the earlier builds, the back
-            // parts down its ramp as a human's back leg is; what a human shows bare in the regular
-            // energy colour.
+            // parts down its ramp as a human's back leg is; the sleeves and boots in the regular
+            // energy colour, and the bare arms and legs still in their skin, not glowing.
             for part in BodyPart.allCases where !part.isEnergy && part != .ball {
                 colours[part] = part.isBack ? Look.scaled(body, HumanLook.backLegShare) : body
             }
-            for part in dressing.energyFormBare { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
+            for part in dressing.energyFormBare {
+                colours[part] = dressing.skin[part] ?? (part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow)
+            }
         }
         return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body, dressing: dressing)
     }
@@ -412,7 +414,8 @@ struct Dressing: Hashable, Codable {
     /// The parts in the energy's colours, glowing: the shoes, and the sleeves and boots.
     var glowing: Set<BodyPart> { HumanLook.glowingParts.union(covered) }
 
-    /// What a human shows bare or in sleeves and boots, but the head (the hooded head's own):
-    /// in the energy form, the regular energy colour rather than the energy form's lighter one, glowing.
+    /// What a human shows bare or in sleeves and boots, but the head (the hooded head's own): in
+    /// the energy form, the sleeves and boots the regular energy colour rather than the energy
+    /// form's lighter one, glowing, and the bare skin its own.
     var energyFormBare: Set<BodyPart> { HumanLook.bareParts.subtracting([.head]) }
 }

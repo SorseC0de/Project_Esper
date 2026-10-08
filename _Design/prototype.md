@@ -147,15 +147,19 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   zone's colours, and the change leaves near-white clothes and energy skin: whatever a human wears
   (the clothes, the shoes, the hood and its strings) in the glow lifted a third to white
   (`EnergyColour.body`, the back parts at two thirds of it), whatever a human shows bare (what
-  `HumanLook.bareParts` names: the arms, the hands, the lower legs, and the hooded head's face, sleeves
-  and boots or not) in the regular energy colour (`Dressing.energyFormBare`), all of it glowing; so
+  `HumanLook.bareParts` names: the arms, the hands, the lower legs, and the hooded head's face) in
+  sleeves and boots in the regular energy colour, glowing, and bare in its own skin, not glowing
+  (`Dressing.energyFormBare`, the glow mask's skin green as a human's); so
   clothes picked later follow on their own. The face's lightest tone is held to a grey level of 0.6
   (`SpriteLibrary.energyFaceLevel`): lime's, at 0.76, burned the features out in the glow (gold and
   teal come down a touch). The snatch on the ground in FloState is drawn from
   `player_snatch_flostate`, seven frames at the snatch's own timing, its last held (protocol 101):
-  a step-through, the body carried 48 art pixels forward over the snatch (`SnatchRules.floStateTravel`),
-  through the other, the reach taking the ball on the way; on the third frame the hooded head looks
-  back (protocol 103).
+  a step-through, the body carried 96 art pixels forward over the snatch, two of the sheets'
+  48-pixel boxes (`SnatchRules.floStateTravel`, protocol 117), through the other; the whole way the
+  body takes the ball off whoever it passes, or a loose ball it passes (`Player.snatchSteppingThrough`),
+  as well as the hand's reach at full stretch; on the third frame the hooded head looks
+  back (protocol 103). The sheet draws the ball taken from its fourth frame on; a snatch that took
+  nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
   From the change's first frame to its burst on the sheet's third
   (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`ZRules.burstRadius`) is
   parried as a snatch parries one, before the blades are resolved; at the burst everything else
@@ -377,7 +381,10 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   hovering or going back, up or not, 1 going forward or up, 2 going down more than forward; under 0.3 a frame
   counts as still, `FlightSheet`, protocol 92), streams its hood's strings out behind, and hovering
   still throws a vortex of cubes up off the foot that hangs lowest; flying up or forward the hooded
-  head tips back 12° and flying down forward, about its middle, eased, let down up to 2 pixels to sit on the neck; round the body, bellying out from 2
+  head tips back 12° and flying down forward, about its middle, eased, let down up to 2 pixels to sit on the neck. Tipped,
+  the hood carries its own line (`SpriteLibrary.hoodLine`, a node under the body that turns with the hood, so
+  only what's outside the body shows), and the body's line is drawn without the hood's place in it
+  (`bareOutlineTexture`, made with the frame on the sheets the head tips on, `tippingHead`); round the body, bellying out from 2
   pixels at the foot to 18 halfway up and back in at the top (30 a second). At level two the stick forward
   is the glide: 3.5 forward (2.5 with the ball), sinking 0.8 a frame unless up is held,
   which rises at the flight speed, and diving at 3 on down; the stick backward is the
@@ -783,9 +790,11 @@ walked round a ring, a black drop to the south-east, drawn into a texture per st
 
 A second mode (`GameMode.fortySeven`), on The Wreck Center or Hoopfish Hideaway (`StageChoice.fortySeven`,
 picked on the stage select; on Hoopfish Hideaway, whose rim swims, the three-point radius is the plain
-90 units round wherever it is, and its line isn't drawn: while the local player aims a shot, a
-stretch of it 5 tiles long and 2 pixels thick shows round the rim toward them, clear at both ends
-and their energy's colour in the middle, `drawSwimmingThreeLine`), no stage
+90 units round wherever it is, and on K&A, whose one-ways are its cars, the same 90
+(`StageFeatures.threeRadius`, protocol 117); on both the line isn't drawn: while the local player
+aims a shot, a stretch of it 5 tiles long and 2 pixels thick shows round the rim they score on,
+toward them, clear at both ends and their energy's colour in the middle, `drawPortableThreeLine`,
+`portableThreeLooks`), no stage
 select, no drinks and no powers. The title has 47 beside BEST OF 7. A basket doesn't
 reset anything: the points go up and play goes on, the scorer unable to take the ball,
 by hand or by snatch, or to slash (a slash knocking it loose bought the time to take it back;
@@ -1749,7 +1758,7 @@ Condensed Heavy, `TitleText.markTexture`) in palette 7 over 20, outlined 29, fro
 size up to its own over 0.3 seconds, held 1.2, then out to 1.2 as it fades over 0.5. A rim can't be dunked on in the stage's first or last column, and one swimming into either
 lets go of whoever hangs on it (`Stage.dunkable`, protocol 59). A body bouncing off the rim's top
 rises half as high as it would under water elsewhere (`RimRules.underwaterBounceShare`, the push
-at the square root of a half; protocol 60). The ball's and the hoop's chevrons and the swimming
+at the square root of a half; protocol 60). The ball's and the hoop's chevrons and the portable
 three-point line draw over the water's tint, not under it. No chevrons point at the ball off
 screen here: off screen it's only ever on the antenna. The plants sway 5 degrees either way over four
 seconds, each on its own beat, from their bottom middle. It carries the stage's one rim (`Hoop.shared`): both players score on it, the point
@@ -1807,8 +1816,10 @@ drawn whole in Aseprite, `Flight/Flight_Map.aseprite`, 1248 by 576, and four of 
 pixel: 312 by 144 art pixels, 19 and a half tiles by 9, on a grid of 20 columns whose last half is
 walled off (`Stage.width`, stored, is where a stage ends when that's short of its grid; the wall a
 `fixedExtras` box). The bodies are their own size on it; so is everything else. Two rows of floor
-(the file's hidden Player layer stands on them); the rims at the very ends, 65 up; the starts two
-and a half tiles in; the ball over the middle, in the open bin, at 60. The map maker has nothing to
+(the file's hidden Player layer stands on them); one rim, anyone's to score on (`Hoop.shared`,
+the point to whoever put the ball through, protocol 117), out of whichever bin has it; the starts
+against the plane's two ends (`startInset`, 5, a body's half width); the ball shut in the middle
+bin, over its middle, which sits 4 art pixels right of the plane's in the art. The map maker has nothing to
 do with it any more: its tile sheets are gone from the catalog and `MapStage` with them.
 
 The file's layers, bottom up: Tiles, Back Fade, Back Chairs, Bins, Open Bin, then the hidden Player
@@ -1841,21 +1852,23 @@ every 192 of its pixels from 160; the art's end bins are cut by the plane's ends
 The backdrop is flattened with every bin shut; the file's Open Bin layer, 45 by 19, is its own
 picture, `FlightB411OpenBin`, drawn over a bin while it's open, its bottom left on the bin's. A
 start: the plane level and the bins still through the count and seven seconds after
-(`startLevelFrames`), the middle bin alone open with the ball waiting in its mouth, held there
-(`Match.ballBin`, in `advance`) until the count's done, when it drops. Then the cycle: one bin
+(`startLevelFrames`), every bin shut through the count with the ball inside the middle one, unseen,
+held in its mouth (`Match.ballBin`, in `advance`); on go that bin opens and the ball drops, and the
+bin stays open the seven seconds. Meanwhile the seatbelt sign is lit, glowing; once the ball drops
+it goes off, unglowing, its red palette 2 and its gold palette 33 (`FlightB411Art.seatbeltOff`,
+made at load from the lit picture). Then the cycle: one bin
 open at a time, for ten seconds (`binOpenFrames`), then shut and another opened off the dice, never
-the same one twice running (`Match.lastBin`), with nothing in it, or a hoop: empty one time in
-three but never a third time running (`emptyRunMost`, `Match.emptyRun`), and the hoops alternate
-whose after the first (`Match.lastHoopOwner`), so there is at most one hoop on the stage and each
-side gets its turn. A hoop comes out in a hoopcase that slides down
+the same one twice running (`Match.lastBin`), with nothing in it, or the hoop: empty one time in
+three but never a third time running (`emptyRunMost`, `Match.emptyRun`), so there is at most one
+hoop on the stage. The hoop comes out in a hoopcase that slides down
 out of the bin over 20 frames (`caseSlideFrames`, `Bin.caseFrames`) and slides back in before the
 bin shuts; scored on, in 47, it retreats at once (`flightB411Scored`, `Bin.retreating`) and its bin
 shuts and the next opens, so the one hoop can't take the ball twice (in Rounds the point's restart
 shuts everything anyway). The rim is live only with the case all the way out (`Bin.hoopLive`),
 under its bin (`rimSpot`), and away (`HighwayRules.parked`) otherwise. The hoopcase: `Hoopcase`,
-`Flight/Hoopcase.png`, 48 by 48, the suitcase's main grey (109 117 141) recoloured in the energy
-colour of the side guarding the hoop, as its net is, and its lighter grey (139 147 175) in that
-colour lifted as a body's is (`FlightB411Art.hoopcase`); the ring's centre 17 in and 33 down on the
+`Flight/Hoopcase.png`, 48 by 48, the suitcase brown, anyone's: its main grey (palette 40)
+recoloured palette 33 and its lighter grey (39) palette 34 (`FlightB411Art.caseDark`, `caseLight`,
+`hoopcase`); the ring's centre 17 in and 33 down on the
 canvas, the suitcase's top row 15, its lowest 39, the ring's front half from row 34. It's drawn in
 two sprites cut from that picture as textures of their own (`FlightB411Art.casePieces`, `layCase`;
 a shader's texture coordinates run over the whole of a texture, so a cut of a sheet mislays the
@@ -1872,10 +1885,9 @@ debug strip's HOOPCASE Y slider, an art pixel at a time, kept between launches, 
 default. The rims' own art and backboards aren't drawn on it, and there's no net: the ring hangs
 bare in its case, nothing drawn and nothing in the glow, and a rim's top turns back neither a
 ball that isn't scoring nor a body coming down on it (`StageFeatures.rimBounce`, false here,
-protocol 116); a miss drops on through the ring. There's no
-three-point line drawn on it, too small for one (`StageFeatures.threePointLine`); 47's threes
-count as ever, from past the usual radius round the hoop. After a point the
-bins shut, the hoops go away and the ball waits in the middle bin again; in Rounds the third round's
+protocol 116); a miss drops on through the ring. There are no threes on it, too small for them:
+every basket in 47 is two, and no line is drawn (`StageFeatures.threes`, protocol 117). After a point the
+bins shut, the hoop goes away and the ball's shut in the middle bin again; in Rounds the third round's
 ball drops from any of the five, off the series' dice (`startFromBin`). The signs over the bins, in a
 row centred on the stage halfway up the dark band, a gap of 12 between (`signGap`): NO DUNKING, `no_dunking.svg`
 (`_Graphic Assets/Vectors/Stages/Flight B411`) rendered 24 high into `FlightB411NoDunking` in
@@ -1883,15 +1895,17 @@ palette 7, with over it a red ring and slash drawn once as a picture (`FlightB41
 `noRed`); and the seatbelt, `seatbelt.svg` rendered 24 high into `FlightB411Seatbelt`, its arrow
 (the file's middle path, which the others never overlap sideways) red and the rest palette 7, at
 its own scale against the sign (`beltScale`, 0.4, baked; the row laid by `laySigns`). All
-told to the glow mask as glowing through the backdrop's flat (`glowThroughSnapshots`), since over
+told to the glow mask as glowing through the backdrop's flat (`glowThroughSnapshots`; the seatbelt
+only while it's lit), since over
 a flat nothing glows otherwise; their size the strip's NO DUNK SCALE slider (`signScale`, 0.5 to 4,
 half to start, kept). Clouds (`FlightB411Cloud`, `Flight/cloud.png`, 192 by 64) drift left to right
 over the sky beyond the plane: six, each its own size (one to four times) and pace (0.6 to 1.6 a
 frame times its size, times two), at two thirds (`cloudAlpha`), in
 `skyNode`, on the camera, turned back level and under everything of the world's (z -100), so the
 plane covers them. Under the clouds the plane itself (`FlightB411Plane`, `Flight/plane.png`, 464
-by 368, a root imageset of `Tools/import_sprites.py`): fitted to the stage's width (312 art
-pixels across, so 247 high), centred on the stage, at a fifth (`planeAlpha`), a child of the
+by 368, a root imageset of `Tools/import_sprites.py`): the stage's width (312 art pixels across)
+times the strip's PLANE SCALE slider (`planeScale`, 0.5 to 8, 1 to start, kept), past the screen's
+edges as it grows, centred on the stage, at a fifth (`planeAlpha`), a child of the
 scene at z -101, in the world's frame rather than the camera's, so it pitches with the stage
 while the clouds stay level. The cart stands on its wheels' line, the wheels drawn under its body, and
 tips a little into the way it's going with its speed (`cartSpeedTip`), flat once it stops.

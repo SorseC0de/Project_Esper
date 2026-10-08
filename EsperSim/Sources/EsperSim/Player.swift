@@ -1251,7 +1251,8 @@ public struct Player: Equatable {
                 // FloState's snatch steps through: the body carried forward its travel over the
                 // snatch, through the other, the reach taking the ball on the way. The travel
                 // goes by the snatch's clock, so FloState's hurrying of it moves the body as far.
-                velocity.x = stateTimer < SnatchRules.frames ? facing.sign * SnatchRules.floStateTravel / Double(SnatchRules.frames) * Double(timerStep) : 0
+                // The clock's first tick is the press's own frame, which doesn't move: the rest carry it all.
+                velocity.x = stateTimer < SnatchRules.frames ? facing.sign * SnatchRules.floStateTravel / Double(SnatchRules.frames - 1) * Double(timerStep) : 0
             } else if grounded {
                 velocity.x = approach(velocity.x, 0, attackBrake)
             } else {
@@ -1819,6 +1820,12 @@ public struct Player: Equatable {
     /// Whether the snatch's reach takes a ball centred here.
     public func snatchReaches(ballAt at: Vec2) -> Bool {
         snatchReaches(box: Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2))
+    }
+
+    /// FloState's snatch on the ground, its body still being carried forward: everything the
+    /// body passes, the ball or whoever holds it, it takes.
+    public var snatchSteppingThrough: Bool {
+        state == .snatching && frozen == 0 && grounded && inFloState && stateTimer < SnatchRules.frames
     }
 
     /// The body, the part of the snatch's reach that isn't the hand's ring, while the hand is out.

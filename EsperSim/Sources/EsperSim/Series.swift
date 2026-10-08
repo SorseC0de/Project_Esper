@@ -88,6 +88,7 @@ public enum FortySevenRules {
     public static let fallbackRadius = 90.0
 
     public static func threePointRadius(for hoop: Hoop, on stage: Stage) -> Double {
+        if let radius = stage.features.threeRadius { return radius }
         // A rim that swims has no ledge to measure from: the plain radius round wherever it is.
         if hoop.shared { return fallbackRadius }
         var nearest: Double?
@@ -103,7 +104,7 @@ public enum FortySevenRules {
 
     /// Two or three for a basket through `hoop`, by where the ball left a hand.
     public static func points(from launch: Vec2?, through hoop: Hoop, on stage: Stage) -> Int {
-        guard let launch else { return 2 }
+        guard let launch, stage.features.threes else { return 2 }
         return launch.distance(to: hoop.position) > threePointRadius(for: hoop, on: stage) ? 3 : 2
     }
 }

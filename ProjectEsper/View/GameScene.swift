@@ -185,6 +185,11 @@ final class GameScene: SKScene {
     private var energyNodes: [SKSpriteNode] = []
     /// Each human's hood over its head, and the frame it was drawn for.
     private var hoodNodes: [SKSpriteNode] = []
+    /// Each hood's own line, while the head's tipped: the body's line is drawn without the
+    /// hood's place then, and this one turns with the hood, under the body so only what's
+    /// outside it shows.
+    private var hoodLineNodes: [SKSpriteNode] = []
+    private static let hoodLineZ: CGFloat = -0.001
     private var hoodFlashes: [SKSpriteNode] = []
     private var hoodStrings: [HoodStrings] = []
     static let hoodDrawnFor = SpriteLibrary.hoodDrawnFor
@@ -475,16 +480,19 @@ final class GameScene: SKScene {
         return bodies
     }
 
-    /// 47 on a stage whose rim swims: while the local player aims a shot, a short stretch of the
-    /// three-point line round wherever the rim is, toward them, 5 tiles long and 2 pixels thick,
-    /// fading in and out along its length in their energy.
-    private var swimmingThreeLine: [SKSpriteNode] = []
-    private static let swimmingThreeSegments = 20
-    private static let swimmingThreeLength: CGFloat = 80
+    /// 47 on Hoopfish Hideaway, whose rim swims, and on K&A: while the local player aims a shot,
+    /// a short stretch of the three-point line round the rim they score on, toward them, 5 tiles
+    /// long and 2 pixels thick, fading in and out along its length in their energy. Neither
+    /// draws the arcs.
+    private var portableThreeLine: [SKSpriteNode] = []
+    static let portableThreeLooks: [StageLook] = [.hoopfishHideaway, .kAndA]
+    private var portableThrees: Bool { GameScene.portableThreeLooks.contains(match.stage.features.look) && match.stage.features.threes }
+    private static let portableThreeSegments = 20
+    private static let portableThreeLength: CGFloat = 80
 
-    private func drawSwimmingThreeLine() {
-        if swimmingThreeLine.isEmpty {
-            swimmingThreeLine = (0..<GameScene.swimmingThreeSegments).map { _ in
+    private func drawPortableThreeLine() {
+        if portableThreeLine.isEmpty {
+            portableThreeLine = (0..<GameScene.portableThreeSegments).map { _ in
                 let segment = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
                 segment.colorBlendFactor = 1
                 // Over the water's tint.
@@ -494,25 +502,26 @@ final class GameScene: SKScene {
                 return segment
             }
         }
-        let hoop = match.stage.hoops.first
+        // Hoopfish Hideaway's one rim, or K&A's the local player scores on.
+        let hoop = match.stage.hoops.first { $0.shared || $0.owner == localIndex }
         let aiming = match.players.indices.contains(localIndex) && match.players[localIndex].state == .shootStance
-        guard gameMode == .fortySeven, aiming, let hoop, hoop.shared, hoop.position != HighwayRules.parked else {
-            swimmingThreeLine.forEach { $0.isHidden = true }
+        guard gameMode == .fortySeven, portableThrees, aiming, let hoop, !hoop.rimless, hoop.position != HighwayRules.parked else {
+            portableThreeLine.forEach { $0.isHidden = true }
             return
         }
         let rim = SpriteLibrary.point(hoop.position)
         let radius = CGFloat(FortySevenRules.threePointRadius(for: hoop, on: match.stage) * SpriteLibrary.pixelsPerUnit)
         let chest = SpriteLibrary.point(match.players[localIndex].chest)
         let toward = atan2(chest.y - rim.y, chest.x - rim.x)
-        let half = GameScene.swimmingThreeLength / 2 / radius
-        let count = CGFloat(swimmingThreeLine.count)
+        let half = GameScene.portableThreeLength / 2 / radius
+        let count = CGFloat(portableThreeLine.count)
         let colour = SKColor(rgb: sprites.look(for: localIndex).glow)
-        for (index, segment) in swimmingThreeLine.enumerated() {
+        for (index, segment) in portableThreeLine.enumerated() {
             let share = (CGFloat(index) + 0.5) / count
             let angle = toward - half + share * half * 2
             segment.isHidden = false
             segment.color = colour
-            segment.size = CGSize(width: 2, height: GameScene.swimmingThreeLength / count + 0.5)
+            segment.size = CGSize(width: 2, height: GameScene.portableThreeLength / count + 0.5)
             segment.position = CGPoint(x: rim.x + radius * cos(angle), y: rim.y + radius * sin(angle))
             segment.zRotation = angle
             // Clear at both ends, the energy's colour in the middle.
@@ -559,9 +568,11 @@ final class GameScene: SKScene {
     /// What glows on Hoopfish Hideaway over its background, which doesn't: the Hoopfish's rings and eye.
     var glowThroughSnapshots: [BodySnapshot] {
         if let art = hoopfishHideawayArt { return art.fishGlowParts }
-        // Flight B411's NO DUNKING sign and its red "no", glowing through the backdrop's flat.
+        // Flight B411's NO DUNKING sign and its red "no", glowing through the backdrop's flat;
+        // the seatbelt sign too while it's lit.
         guard let holder = noDunkingNode, !holder.isHidden else { return [] }
-        return noDunkingSprites.compactMap { sprite in
+        let glowing = seatbeltLit ? noDunkingSprites : Array(noDunkingSprites.prefix(2))
+        return glowing.compactMap { sprite in
             sprite.texture.map { BodySnapshot(texture: $0, position: CGPoint(x: holder.position.x + sprite.position.x * holder.xScale, y: holder.position.y + sprite.position.y * holder.yScale),
                                               anchor: sprite.anchorPoint, xScale: 1,
                                               size: CGSize(width: sprite.size.width * sprite.xScale * holder.xScale, height: sprite.size.height * sprite.yScale * holder.yScale)) }
@@ -999,6 +1010,12 @@ final class GameScene: SKScene {
             hood.isHidden = true
             figure.addChild(hood)
             hoodNodes.append(hood)
+            let hoodLine = SKSpriteNode()
+            hoodLine.colorBlendFactor = 1
+            hoodLine.zPosition = GameScene.hoodLineZ
+            hoodLine.isHidden = true
+            figure.addChild(hoodLine)
+            hoodLineNodes.append(hoodLine)
             let hoodFlash = SKSpriteNode()
             hoodFlash.colorBlendFactor = 1
             hoodFlash.alpha = 0.85
@@ -1819,11 +1836,9 @@ final class GameScene: SKScene {
             let sign = FlightB411Art.noDunkingSign(into: stageGround)
             noDunkingNode = sign.holder
             noDunkingSprites = sign.sprites
-            // The hoopcases, in the colour of the side guarding each hoop, as its net is: the
-            // back under the net, the ring's front over the ball.
-            hoopcaseSheets = stage.hoops.map { hoop in
-                let colour = sideColours.indices.contains(1 - hoop.owner) ? sideColours[1 - hoop.owner] : sideColours[0]
-                return FlightB411Art.hoopcase(glow: SKColor(rgb: colour.glow), lifted: SKColor(rgb: colour.body))
+            // The hoopcase, anyone's, in brown: the back with the suitcase, the ring's front over the ball.
+            hoopcaseSheets = stage.hoops.map { _ in
+                FlightB411Art.hoopcase(glow: SKColor(rgb: FlightB411Art.caseDark), lifted: SKColor(rgb: FlightB411Art.caseLight))
             }
             let pieces = hoopcaseSheets.map { $0.flatMap(FlightB411Art.casePieces) }
             hoopcaseNodes = pieces.map { piece in
@@ -1961,7 +1976,7 @@ final class GameScene: SKScene {
         threePointArcs.removeAllChildren()
         threePointArcs.zPosition = -30
         // The line stays put; Hoopfish Hideaway's rim swims, so it has none drawn.
-        threePointArcs.isHidden = gameMode != .fortySeven || stage.features.look == .hoopfishHideaway || !stage.features.threePointLine
+        threePointArcs.isHidden = gameMode != .fortySeven || GameScene.portableThreeLooks.contains(stage.features.look) || !stage.features.threes
         let inside = CGRect(x: GameScene.pixelsPerTile, y: GameScene.pixelsPerTile,
                             width: CGFloat(stage.columns - 2) * GameScene.pixelsPerTile,
                             height: CGFloat(stage.rows + stage.skyRows) * GameScene.pixelsPerTile)
@@ -3111,6 +3126,10 @@ final class GameScene: SKScene {
             controls.addSlider(title: "HOOPCASE Y", range: -32...32, notch: 1, value: Float(FlightB411Rules.hoopcaseDrop)) { value in
                 FlightB411Rules.hoopcaseDrop = Double(value)
                 UserDefaults.standard.set(Double(value), forKey: GameScene.hoopcaseDropKey)
+            }
+            controls.addSlider(title: "PLANE SCALE", range: 0.5...8, notch: 0.25, value: Float(FlightB411Art.planeScale)) { value in
+                FlightB411Art.planeScale = CGFloat(value)
+                UserDefaults.standard.set(Double(value), forKey: FlightB411Art.planeScaleKey)
             }
             controls.addSlider(title: "NO DUNK SCALE", range: 0.5...4, notch: 0.25, value: Float(FlightB411Art.signScale)) { value in
                 FlightB411Art.signScale = CGFloat(value)
@@ -4627,7 +4646,7 @@ final class GameScene: SKScene {
     /// winner's colour as they go, a sixth and seventh added if the series gets there;
     /// and to either side of them each side's drinks, with their levels.
     private func drawSeries() {
-        threePointArcs.isHidden = (gameMode != .fortySeven && previewing != .hud) || match.stage.features.look == .hoopfishHideaway || !match.stage.features.threePointLine
+        threePointArcs.isHidden = (gameMode != .fortySeven && previewing != .hud) || GameScene.portableThreeLooks.contains(match.stage.features.look) || !match.stage.features.threes
         for arc in threePointArcSides { arc.node.lineWidth = ThreePointTuning.lineWidth }
         if gameMode == .zones {
             // ZONES: the letters are the SwiftUI layer's; nothing across the top.
@@ -5649,6 +5668,8 @@ final class GameScene: SKScene {
 
     /// Flight B411's rims hang in their cases with no net at all.
     private var netless: Bool { match.stage.features.look == .flightB411 }
+    /// Flight B411's seatbelt sign: lit while the ball's shut in its bin through the count.
+    private var seatbeltLit: Bool { match.ballBin != nil }
 
     /// The rims' art, for the net behind them to keep out of.
     var rimSnapshots: [BodySnapshot] {
@@ -6753,10 +6774,13 @@ final class GameScene: SKScene {
             door.isHidden = !match.bins[index].open
         }
         noDunkingNode?.setScale(FlightB411Art.signScale)
+        // The seatbelt sign lit while the ball's shut in its bin, off once it drops.
+        if noDunkingSprites.count == 3 { noDunkingSprites[2].texture = seatbeltLit ? FlightB411Art.seatbelt : FlightB411Art.seatbeltOff }
+        planeNode?.size = FlightB411Art.planeSize
         // Each hoop's case: hanging from its bin's mask line, as far out as its slide is, swung
         // a share of the lean about that line; away with nothing to hang from.
         for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseNodes.count && index < hoopcaseFronts.count {
-            let bin = match.bins.indices.first { match.bins[$0].open && match.bins[$0].load == .hoop(owner: hoop.owner) }
+            let bin = match.bins.indices.first { match.bins[$0].open && match.bins[$0].load == .hoop }
             guard let bin else {
                 hoopcaseNodes[index].isHidden = true
                 hoopcaseFronts[index].isHidden = true
@@ -7186,6 +7210,8 @@ final class GameScene: SKScene {
             section("sounds")
             // Volta Cola's bolt throw with nothing in hand plays the whole sheet, its ball as energy.
             let wholeSheet = player.boltPose > 0 && !player.hasBall
+            // FloState's snatch draws the ball it took: one that took nothing has it lifted off.
+            let ballLifted = SpriteLibrary.liftsBall.contains(frame.animation) && !player.hasBall
             // Frozen, the body is drawn in the ice look.
             // Changing, the energy form from the sheet's sixth frame on.
             let changing = player.state == .transforming
@@ -7193,7 +7219,7 @@ final class GameScene: SKScene {
             // Facing left, turned round where the sleeves and boots need swapping.
             let drawnAs = player.frozen > 0 ? SpriteLibrary.icePlayer
                 : (energyForm ? SpriteLibrary.transformedPlayer(index) : sprites.bodyPlayer(index, facingLeft: player.facing == .left))
-            node.texture = sprites.texture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
+            node.texture = sprites.texture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted)
             // Titan Tea's size, grown into after its port-in.
             if titanGrowDelay[index] > 0 {
                 titanGrowDelay[index] -= 1
@@ -7288,7 +7314,7 @@ final class GameScene: SKScene {
             let lockedOutOfFloState = player.floStateLockout > 0 && !player.inFloState
             let lockoutOn = lockedOutOfFloState && (player.floStateLockout / 4) % 2 == 0
             let clothesFlash = lockoutClothes[index]
-            let clothesTexture = lockoutOn ? sprites.clothesTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) : nil
+            let clothesTexture = lockoutOn ? sprites.clothesTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) : nil
             clothesFlash.isHidden = clothesTexture == nil || node.isHidden
             if let clothesTexture {
                 clothesFlash.texture = clothesTexture
@@ -7316,8 +7342,8 @@ final class GameScene: SKScene {
             let outlineNode = outlineNodes[index]
             // In FloState, half as thick, in the zone's colours.
             let floStateLine = player.inFloState && player.frozen == 0
-            if let outline = floStateLine ? sprites.thinOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet)
-                : sprites.outlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) {
+            if let outline = floStateLine ? sprites.thinOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted)
+                : sprites.outlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
                 outlineNode.isHidden = false
                 outlineNode.texture = outline
                 outlineNode.size = node.size
@@ -7336,7 +7362,7 @@ final class GameScene: SKScene {
 
             // The frame's energy rides exactly where the body is drawn.
             let energyNode = energyNodes[index]
-            if let energy = sprites.energyTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet) {
+            if let energy = sprites.energyTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
                 energyNode.isHidden = false
                 energyNode.texture = energy
                 // In the zone the energy (the slash's blade among it) runs the zone's colours.
@@ -7408,6 +7434,24 @@ final class GameScene: SKScene {
             } else {
                 hood.isHidden = true
                 hoodMasks[index] = nil
+            }
+            // Tipped, the hood carries its own line: the body's is drawn without the hood's place.
+            let hoodLine = hoodLineNodes[index]
+            let tipped = !hood.isHidden && abs(headTip[index, default: 0]) > 0.001 && !outlineNode.isHidden && !floStateLine
+            if tipped, let bare = sprites.bareOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted),
+               let line = sprites.hoodLine(skin: sprites.look(for: index).dressing.skinTone) {
+                outlineNode.texture = bare
+                hoodLine.isHidden = false
+                hoodLine.texture = line
+                hoodLine.color = outlineNode.color
+                hoodLine.xScale = 1
+                hoodLine.size = line.size().scaled(by: drawScale)
+                hoodLine.anchorPoint = hood.anchorPoint
+                hoodLine.position = hood.position
+                hoodLine.xScale = hood.xScale
+                hoodLine.zRotation = hood.zRotation
+            } else {
+                hoodLine.isHidden = true
             }
             // Greyed out of FloState, the hood's own grey over it.
             let hoodGrey = lockoutHoods[index]
@@ -7755,7 +7799,8 @@ final class GameScene: SKScene {
         section("webs")
 
         let ball = match.ball
-        ballNode.isHidden = ball.holder != nil
+        // Flight B411's ball, shut in its bin through the count, unseen till the bin opens.
+        ballNode.isHidden = ball.holder != nil || match.ballBin != nil
         ballNode.position = SpriteLibrary.point(ball.position)
         // On the Hoopfish's antenna it nods with it.
         if match.hoopfish?.carrying == .ball, ball.holder == nil { ballNode.position = hoopfishNod(0).turn(ballNode.position) }
@@ -7783,7 +7828,7 @@ final class GameScene: SKScene {
         placeBallCamFrame()
         circlesOverCam.isHidden = !ballCamEnabled
         // 47's lines breathe, slowly, between gone and a quarter.
-        drawSwimmingThreeLine()
+        drawPortableThreeLine()
         if !threePointArcs.isHidden {
             let breath = CGFloat(0.5 - 0.5 * cos(CACurrentMediaTime() / ThreePointTuning.breathSeconds * 2 * .pi))
             for arc in threePointArcSides { arc.node.alpha = ThreePointTuning.breathMax * breath }

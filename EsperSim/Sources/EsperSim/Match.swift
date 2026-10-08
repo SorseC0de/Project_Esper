@@ -52,7 +52,6 @@ public struct Match: Equatable {
     public var lastBin: Int?
     /// Empty bins opened in a row, and whose hoop came out last, for the next to be the other's.
     public var emptyRun = 0
-    public var lastHoopOwner: Int?
     public var scores: [Int]
     /// Rounds reset on a point; 47 plays on through its baskets.
     public var mode = GameMode.rounds
@@ -203,7 +202,7 @@ public struct Match: Equatable {
             tryCatch()
             if ball.holder != nil { hoopfish?.carrying = .nothing }
         } else if let waiting = ballBin, countdown > 0, ball.holder == nil {
-            // Flight B411: in its bin's mouth through the count, still, till the count's done.
+            // Flight B411: shut in its bin through the count, still, till the count's done.
             ball.position = FlightB411Rules.ballSpot(in: waiting)
             ball.velocity = .zero
         } else if ball.isLive, ball.tether == nil {
@@ -531,7 +530,10 @@ public struct Match: Equatable {
                 events.append(.swatted(player: index, hit: true))
             }
         }
-        if player.snatchHitbox != nil {
+        if player.snatchHitbox != nil || player.snatchSteppingThrough {
+            // FloState's step-through takes whatever the body passes, all the way along.
+            let stepping = player.snatchSteppingThrough
+            func reaches(_ box: Box) -> Bool { player.snatchReaches(box: box) || (stepping && box.overlaps(player.body)) }
             // A stepback's ball can't be snatched.
             let held = ball.holder.flatMap { $0 == index || players[$0].state == .stepback ? nil : $0 }
             // A held ball is where the holder's sheet draws it this frame, so the hand can
@@ -539,8 +541,9 @@ public struct Match: Equatable {
             let at = held.map { holder -> Vec2 in
                 players[holder].ballInHand(on: stage) ?? players[holder].heldBallPoint
             } ?? ball.position
-            // In front, or a holder the body itself overlaps: the body is part of the reach.
-            let onTheBody = held.map { player.body.overlaps(players[$0].body) } ?? false
+            let ballBox = Box(center: at, width: BallRules.radius * 2, height: BallRules.radius * 2)
+            // In front, or a holder or a ball the body itself overlaps: the body is part of the reach.
+            let onTheBody = held.map { player.body.overlaps(players[$0].body) } ?? (stepping && ballBox.overlaps(player.body))
             let facingIt = (at.x - player.position.x) * player.facing.sign >= -1 || onTheBody
             // A burning ball is the thrower's alone.
             let allowed = (!ball.burning || ball.lastTouched == index || held != nil) && (held != nil || player.pickupLockout == 0)
@@ -551,7 +554,7 @@ public struct Match: Equatable {
                 // where it stands, and stripped.
                 strip(other, by: index, knock: nil)
                 freeze(other)
-            } else if facingIt, allowed, player.snatchReaches(ballAt: at) || (held.map { player.snatchReaches(box: players[$0].body) } ?? false),
+            } else if facingIt, allowed, reaches(ballBox) || (held.map { reaches(players[$0].body) } ?? false),
                       held != nil || ball.isLive {
                 if let held {
                     earnFlo(FloRules.snatch, by: index, off: held, at: at)

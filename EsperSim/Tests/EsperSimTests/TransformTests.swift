@@ -41,9 +41,31 @@ final class TransformTests: XCTestCase {
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         // The snatch's frames, and the hit-stop the taking holds the match for.
         for _ in 0..<(SnatchRules.frames + HitStopRules.hitFrames + 2) { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertEqual(match.players[0].position.x - from, SnatchRules.floStateTravel, accuracy: 1, "carried 48 art pixels forward")
+        XCTAssertEqual(match.players[0].position.x - from, SnatchRules.floStateTravel, accuracy: 1, "carried 96 art pixels forward")
+        XCTAssertEqual(SnatchRules.floStateTravel, 96 * 0.625, accuracy: 1e-9)
         XCTAssertEqual(match.ball.holder, 0, "the ball taken on the way through")
         XCTAssertGreaterThan(match.players[0].position.x, match.players[1].position.x, "and past the other")
+    }
+
+    func testTheSnatchInFloStateTakesWhatItSlidesPastLateInItsTravel() {
+        // Too far for the hand's reach at full stretch, but on the body's way: a holder, and a loose ball.
+        for loose in [false, true] {
+            var match = standing()
+            match.players[0].inFloState = true
+            match.players[1].position = Vec2(x: 150, y: 10)
+            match.players[1].grounded = true
+            if loose {
+                match.ball.respawn(at: Vec2(x: 150, y: 10 + BallRules.radius))
+                match.ball.velocity = .zero
+                match.players[1].position = Vec2(x: 40, y: 10)
+            } else {
+                match.players[1].hasBall = true
+                match.ball.holder = 1
+            }
+            match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+            for _ in 0..<(SnatchRules.frames + HitStopRules.hitFrames + 2) { match.advance(inputs: [.idle, .idle]) }
+            XCTAssertEqual(match.ball.holder, 0, loose ? "the loose ball taken on the way" : "the holder's ball taken on the way")
+        }
     }
 
     func testTheSnatchInFloStateIsDrawnFromItsOwnSheet() {

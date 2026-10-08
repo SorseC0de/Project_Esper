@@ -389,8 +389,7 @@ enum FlightB411Art {
         holder.zPosition = backdropZ + 0.2
         let texture = SKTexture(imageNamed: "FlightB411NoDunking")
         texture.filteringMode = .nearest
-        let belt = SKTexture(imageNamed: "FlightB411Seatbelt")
-        belt.filteringMode = .nearest
+        let belt = seatbelt
         // Side by side, a gap between, the row centred: NO DUNKING, then the seatbelt.
         let row = signWidth + signGap + beltWidth
         let sign = SKSpriteNode(texture: texture)
@@ -409,9 +408,44 @@ enum FlightB411Art {
         holder.addChild(seatbelt)
         laySigns(sign: sign, no: no, seatbelt: seatbelt)
         parent.addChild(holder)
-        SKTexture.preload([texture, noTexture, belt]) {}
+        SKTexture.preload([texture, noTexture, belt, seatbeltOff]) {}
         return (holder, [sign, no, seatbelt])
     }
+    /// The seatbelt sign lit, glowing, through the count while the ball's shut in its bin: its
+    /// arrow red and the rest palette 7.
+    static let seatbelt: SKTexture = {
+        let texture = SKTexture(imageNamed: "FlightB411Seatbelt")
+        texture.filteringMode = .nearest
+        return texture
+    }()
+    /// The seatbelt sign off once play's begun, not glowing: the red palette 2, the gold palette 33.
+    static let seatbeltOff: SKTexture = {
+        guard let image = UIImage(named: "FlightB411Seatbelt")?.cgImage else { return seatbelt }
+        let width = image.width, height = image.height
+        let red = PixelPalette.colours[2], gold = PixelPalette.colours[33]
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let made: CGImage? = pixels.withUnsafeMutableBytes { bytes in
+            guard let context = CGContext(data: bytes.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                          space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            let data = bytes.bindMemory(to: UInt8.self)
+            for index in stride(from: 0, to: data.count, by: 4) where data[index + 3] > 0 {
+                // The arrow's red has hardly any green in it; the gold's green is two thirds its red.
+                let isRed = Double(data[index + 1]) < Double(data[index]) * 0.4
+                let target = isRed ? red : gold
+                let alpha = Double(data[index + 3]) / 255
+                data[index] = UInt8((Double((target >> 16) & 0xFF) * alpha).rounded())
+                data[index + 1] = UInt8((Double((target >> 8) & 0xFF) * alpha).rounded())
+                data[index + 2] = UInt8((Double(target & 0xFF) * alpha).rounded())
+            }
+            return context.makeImage()
+        }
+        guard let made else { return seatbelt }
+        let texture = SKTexture(cgImage: made)
+        texture.filteringMode = .nearest
+        return texture
+    }()
     static let noRadius: CGFloat = 16
     /// Red, lifted enough to pass the glow's threshold.
     static let noRed = SKColor(red: 1, green: 0.16, blue: 0.16, alpha: 1)
@@ -471,9 +505,18 @@ enum FlightB411Art {
         return texture
     }()
     static let planeAlpha: CGFloat = 0.2
+    /// The hoopcase's suitcase in brown, anyone's: its light grey (palette 39) as palette 34, its
+    /// dark grey (40) as 33.
+    static let caseLight: RGB = PixelPalette.colours[34]
+    static let caseDark: RGB = PixelPalette.colours[33]
+    /// The plane's size against the stage's width, the PLANE SCALE slider's, kept; 1 fits it to the stage.
+    static let planeScaleKey = "esper.flightB411.planeScale"
+    nonisolated(unsafe) static var planeScale: CGFloat = {
+        CGFloat(UserDefaults.standard.object(forKey: planeScaleKey) as? Double ?? 1)
+    }()
     static var planeSize: CGSize {
-        let width = CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide
-        return CGSize(width: width, height: (width * plane.size().height / max(plane.size().width, 1)).rounded())
+        let width = CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide * planeScale
+        return CGSize(width: width, height: width * plane.size().height / max(plane.size().width, 1))
     }
     /// The stage's middle, in its ground's space.
     static var stageCentre: CGPoint {

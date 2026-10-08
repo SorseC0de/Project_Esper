@@ -2,18 +2,17 @@ import Foundation
 
 /// Flight B411: the aisle of a plane, drawn whole in Aseprite (`Flight_Map.aseprite`, 1248 by 576,
 /// four of its pixels an art pixel): 312 by 144 art pixels, 19 and a half tiles by 9, on a
-/// grid of 20 whose last half column is walled off. Two rows of floor; the rims at the ends two
-/// thirds of the way up; the starts two and a half tiles in; the ball in the open bin over the
-/// middle. The plane pitches now and then, which leans gravity, and a cart rolls the aisle with it.
+/// grid of 20 whose last half column is walled off. Two rows of floor; one rim, anyone's to score
+/// on, hung from whichever bin has it out; the starts against the plane's two ends; the ball shut
+/// in the bin over the middle until the count's done. The plane pitches now and then, which leans
+/// gravity, and a cart rolls the aisle with it.
 public enum FlightB411Rules {
     public static let columns = 20
     public static let rows = 9
     public static let width = 195.0
     public static let floorRows = 2
-    public static let rimHeight = 65.0
-    public static let rimInset = 5.0
-    public static let startInset = 25.0
-    public static let ballHeight = 60.0
+    /// The starts' middles this far in from each end: a body's half width, against the wall.
+    public static let startInset = 5.0
     /// Every body's speeds on it, on the ground, in the air and in flight.
     public static let speedShare = 0.5
     /// Rows of sky over the art before the ceiling, being tuned: the CEILING slider's, offline;
@@ -69,8 +68,8 @@ public enum FlightB411Rules {
     /// A start: the plane level and the bins still through the count and this long after.
     public static let startLevelFrames = 7 * 60
     /// The bins' cycle: one bin open at a time, for `binOpenFrames`, then another, never the
-    /// same one twice running, with nothing in it, or a hoop: no more than `emptyRunMost` empty
-    /// in a row, and the hoops alternate whose after the first.
+    /// same one twice running, with nothing in it, or the hoop: no more than `emptyRunMost`
+    /// empty in a row.
     public static let binOpenFrames = 600
     public static let emptyRunMost = 2
 
@@ -85,8 +84,8 @@ public enum FlightB411Rules {
 public struct Bin: Equatable {
     public enum Load: Equatable {
         case empty
-        /// A hoop, by whose it is to score on.
-        case hoop(owner: Int)
+        /// The hoop, anyone's to score on.
+        case hoop
     }
     public var open = false
     public var load = Load.empty
@@ -120,7 +119,7 @@ public struct Cart: Equatable {
 }
 
 extension Match {
-    /// Flight B411's start: the bins all shut but the one the ball waits in, the hoops away.
+    /// Flight B411's start: the bins all shut, the ball in the middle one, the hoop away.
     mutating func startFlightB411() {
         bins = Array(repeating: Bin(), count: FlightB411Rules.binLefts.count)
         startFromBin(FlightB411Rules.centreBin)
@@ -128,13 +127,12 @@ extension Match {
         for index in stage.hoops.indices { stage.hoops[index].position = HighwayRules.parked }
     }
 
-    /// The ball to wait in `index`'s bin, open for it, until the count's done and the plane's
-    /// first level spell is over: the middle bin at a start, or any on a round that says so.
+    /// The ball shut in `index`'s bin through the count, the bin opening on go to drop it and
+    /// staying open the plane's level spell: the middle bin at a start, or any on a round that
+    /// says so.
     public mutating func startFromBin(_ index: Int) {
         guard bins.indices.contains(index) else { return }
         for other in bins.indices { bins[other] = Bin() }
-        bins[index].open = true
-        bins[index].framesLeft = countdown + FlightB411Rules.startLevelFrames
         ballBin = index
         lastBin = index
         ball.respawn(at: FlightB411Rules.ballSpot(in: index))
@@ -178,15 +176,19 @@ extension Match {
         stepCart()
     }
 
-    /// The bins: the ball held in its bin's mouth through the count, then dropped. One bin is
-    /// open at a time: its spell over, its hoopcase, if it has one, slides back in, then it
-    /// shuts and another opens, never the same one twice running, with nothing, or one side's
-    /// hoop, or the other's, which slides out. A hoop's rim hangs where its case is once it's
-    /// all the way out, and is away otherwise.
+    /// The bins: the ball shut in its bin through the count, the bin opening on go to drop it.
+    /// One bin is open at a time: its spell over, its hoopcase, if it has one, slides back in,
+    /// then it shuts and another opens, never the same one twice running, with nothing, or the
+    /// hoop, which slides out. The rim hangs where its case is once it's all the way out, and
+    /// is away otherwise.
     private mutating func stepBins() {
         guard !bins.isEmpty else { return }
-        // The ball's wait in its bin (held in `advance`) is over with the count.
-        if ballBin != nil, countdown == 0 || ball.holder != nil { ballBin = nil }
+        // The ball's wait in its shut bin (held in `advance`) is over with the count: the bin opens.
+        if let waiting = ballBin, countdown == 0 || ball.holder != nil {
+            bins[waiting].open = true
+            bins[waiting].framesLeft = FlightB411Rules.startLevelFrames
+            ballBin = nil
+        }
         for index in bins.indices where bins[index].open {
             if bins[index].retreating {
                 bins[index].caseFrames = max(bins[index].caseFrames - 1, 0)
@@ -203,28 +205,20 @@ extension Match {
                 }
             }
         }
-        // None open, past the start's spell: the next, any but the last; empty one time in
-        // three but never a third time running; a hoop the other side's than the last.
-        if frame >= flightStartsAt, !bins.contains(where: \.open) {
+        // None open, past the start's spell, and the ball out of its bin: the next, any but the
+        // last; empty one time in three but never a third time running, the hoop otherwise.
+        if frame >= flightStartsAt, ballBin == nil, !bins.contains(where: \.open) {
             let choices = bins.indices.filter { $0 != lastBin }
             let index = choices[fieldDice.roll(choices.count)]
             let empty = emptyRun < FlightB411Rules.emptyRunMost && fieldDice.roll(3) == 0
             bins[index].open = true
             bins[index].framesLeft = FlightB411Rules.binOpenFrames
-            if empty {
-                bins[index].load = .empty
-                emptyRun += 1
-            } else {
-                let owner = lastHoopOwner.map { 1 - $0 } ?? fieldDice.roll(2)
-                bins[index].load = .hoop(owner: owner)
-                lastHoopOwner = owner
-                emptyRun = 0
-            }
+            bins[index].load = empty ? .empty : .hoop
+            emptyRun = empty ? emptyRun + 1 : 0
             lastBin = index
         }
+        let holding = bins.indices.first { bins[$0].hoopLive }
         for hoop in stage.hoops.indices {
-            let owner = stage.hoops[hoop].owner
-            let holding = bins.indices.first { bins[$0].hoopLive && bins[$0].load == .hoop(owner: owner) }
             stage.hoops[hoop].position = holding.map(FlightB411Rules.rimSpot) ?? HighwayRules.parked
         }
     }
@@ -233,8 +227,7 @@ extension Match {
     /// opens, so the same hoop can't take the ball twice.
     mutating func flightB411Scored(on hoop: Int) {
         guard stage.features.tilts, stage.hoops.indices.contains(hoop) else { return }
-        let owner = stage.hoops[hoop].owner
-        for index in bins.indices where bins[index].open && bins[index].load == .hoop(owner: owner) {
+        for index in bins.indices where bins[index].open && bins[index].load == .hoop {
             bins[index].retreating = true
         }
         stage.hoops[hoop].position = HighwayRules.parked

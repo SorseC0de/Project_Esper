@@ -74,14 +74,15 @@ final class SpriteLibrary {
         let look = look(for: player)
         let generation = (rewarmGeneration[player] ?? 0) + 1
         rewarmGeneration[player] = generation
-        var frameJobs: [(key: String, frame: AnimationFrame, source: SKTexture, ballAsEnergy: Bool)] = []
+        var frameJobs: [(key: String, frame: AnimationFrame, source: SKTexture, holdsBall: Bool)] = []
         for animation in Animation.allCases {
             for index in 0..<animation.frameCount {
                 let frame = AnimationFrame(animation, index)
                 let source = atlas.textureNamed("\(animation.rawValue)_\(index)")
-                let key = "p\(player)_\(animation.rawValue)_\(index)"
-                frameJobs.append((key, frame, source, false))
-                if animation.holdsBall { frameJobs.append((key + "_whole", frame, source, true)) }
+                let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: false)
+                frameJobs.append((key, frame, source, animation.holdsBall))
+                if animation.holdsBall { frameJobs.append((SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: true, ballLifted: false), frame, source, false)) }
+                if SpriteLibrary.liftsBall.contains(animation) { frameJobs.append((SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: true), frame, source, true)) }
             }
         }
         var tonedJobs: [(key: String, source: SKTexture, capped: Bool)] = []
@@ -100,7 +101,7 @@ final class SpriteLibrary {
             var built: [String: SKTexture] = [:]
             var builtLandmarks: [String: [BodyPart: CGPoint]] = [:]
             for job in frameJobs {
-                let made = makeFrame(job.frame, source: job.source, look: look, ballAsEnergy: job.ballAsEnergy)
+                let made = makeFrame(job.frame, source: job.source, look: look, holdsBall: job.holdsBall)
                 for (suffix, texture) in made.textures { built[job.key + suffix] = texture }
                 builtLandmarks[job.key] = made.landmarks
             }
@@ -168,14 +169,28 @@ final class SpriteLibrary {
         }
     }
 
+    /// The sheets whose ball can be lifted off a frame and not drawn: FloState's snatch, which
+    /// draws the ball it took, for a snatch that took none.
+    static let liftsBall: Set<Animation> = [.snatchFloState]
+    /// The sheets drawn while the hooded head can tip, flying and aiming Z Tea's beam: their line
+    /// is made a second time without the hood's place, for the hood to carry its own.
+    static let tippingHead: Set<Animation> = [.fly, .flyBall, .blast]
+
+    /// A player frame's key in the cache: with `ballAsEnergy` the sheet's whites are all energy,
+    /// with `ballLifted` its ball is lifted off and not drawn.
+    static func frameKey(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool, ballLifted: Bool) -> String {
+        "p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + (ballLifted ? "_balllifted" : "")
+    }
+
     /// A player frame in that player's look, without its head or its energy.
     /// With `ballAsEnergy`, a sheet that draws the ball has its whites taken as energy,
-    /// ball and all, for a throw made with nothing in hand.
-    func texture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture {
-        let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "")
+    /// ball and all, for a throw made with nothing in hand. With `ballLifted`, the ball the
+    /// sheet draws is lifted off and not drawn, for a snatch that took nothing.
+    func texture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture {
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
         if let texture = cache[key] { return texture }
         let made = makeFrame(frame, source: atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"),
-                             look: look(for: player), ballAsEnergy: ballAsEnergy)
+                             look: look(for: player), holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted)
         for (suffix, texture) in made.textures { cache[key + suffix] = texture }
         landmarks[key] = made.landmarks
         pairGlowMask(key)
@@ -183,13 +198,16 @@ final class SpriteLibrary {
     }
 
     /// A player frame recoloured in a look: the body under "", and "_head" and "_energy"
-    /// where the frame has them; and where its glowing parts sit. Touches nothing kept, so
-    /// it can be made off the main thread.
-    private func makeFrame(_ frame: AnimationFrame, source: SKTexture, look: Look, ballAsEnergy: Bool) -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint]) {
+    /// where the frame has them; and where its glowing parts sit. `holdsBall`: the sheet's
+    /// ball is the ball, lifted off to be drawn apart, rather than energy. Touches nothing
+    /// kept, so it can be made off the main thread.
+    private func makeFrame(_ frame: AnimationFrame, source: SKTexture, look: Look, holdsBall: Bool) -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint]) {
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
-        let result = recolour(source, look: look, holdsBall: frame.animation.holdsBall && !ballAsEnergy, detach: true,
-                              hoodShape: look.human ? SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)] : nil)
+        let result = recolour(source, look: look, holdsBall: holdsBall, detach: true,
+                              hoodShape: look.human ? SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)] : nil,
+                              bareLine: SpriteLibrary.tippingHead.contains(frame.animation))
         var textures = ["": result.texture]
+        if let bareOutline = result.bareOutline { textures["_bareoutline"] = bareOutline }
         if let head = result.head { textures["_head"] = head }
         if let energy = result.energy { textures["_energy"] = energy }
         if let outline = result.outline { textures["_outline"] = outline }
@@ -224,29 +242,69 @@ final class SpriteLibrary {
     /// blade, the skid's puffs, a release's streaks. In grey, for the view's energy tone
     /// (`Look.energyTone` in a shader) in the look's colour or the zone's. Nil when the
     /// frame has none.
-    func energyTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
-        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_energy"]
+    func energyTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_energy"]
     }
 
     /// The line round a player frame alone, in white, on the same canvas as the body, for
     /// the view to colour. Nil when the frame has none.
-    func outlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
-        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_outline"]
+    func outlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_outline"]
+    }
+
+    /// The line round a human's frame without the hood's place in it, for a tipped hood that
+    /// carries its own line (`hoodLine`). Made with the frame on the sheets the head tips on,
+    /// on the spot elsewhere; nil for a look with no hood.
+    func bareOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        let look = look(for: player)
+        guard look.human else { return nil }
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        if let made = cache[key + "_bareoutline"] { return made }
+        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look,
+                              holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted, detach: true,
+                              hoodShape: SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)], bareLine: true)
+        result.bareOutline?.filteringMode = .nearest
+        cache[key + "_bareoutline"] = result.bareOutline
+        return result.bareOutline
+    }
+
+    /// The line round the hooded head alone, in white, on its canvas, a pixel out from it: drawn
+    /// with the hood when it tips, under the body, so only what's outside the body shows.
+    func hoodLine(skin: Int) -> SKTexture? {
+        let key = "hoodline_\(skin)"
+        if let made = cache[key] { return made }
+        let image = hoodHead(skin: skin, player: 0).drawn.cgImage()
+        let width = image.width, height = image.height
+        guard let (context, pixels) = makeCanvas(width: width, height: height),
+              let (lineContext, linePixels) = makeCanvas(width: width, height: height) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        func filled(_ x: Int, _ y: Int) -> Bool { x >= 0 && y >= 0 && x < width && y < height && pixels[(y * width + x) * 4 + 3] != 0 }
+        for y in 0..<height {
+            for x in 0..<width where !filled(x, y) {
+                guard (-1...1).contains(where: { dy in (-1...1).contains { dx in (dx != 0 || dy != 0) && filled(x + dx, y + dy) } }) else { continue }
+                for channel in 0..<4 { linePixels[(y * width + x) * 4 + channel] = 255 }
+            }
+        }
+        let made = lineContext.makeImage().map { SKTexture(cgImage: $0) }
+        made?.filteringMode = .nearest
+        cache[key] = made
+        return made
     }
 
     /// The line round a player frame at half its thickness, in white, on a canvas twice as fine.
-    func thinOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
-        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_thinoutline"]
+    func thinOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_thinoutline"]
     }
 
     /// A human's clothes alone from a player frame, the dark ones and the energy's (the shoes), in
     /// white, on the same canvas as the body: the FloState lockout's flash. Nil when the frame shows none.
-    func clothesTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy)
-        return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + "_skin"]
+    func clothesTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_skin"]
     }
 
     /// A strip's frame as a silhouette in the player's energy: every painted pixel white,
@@ -721,10 +779,11 @@ final class SpriteLibrary {
     /// it as its neck, in the skin's shadow tone, and the outside line runs round the body and
     /// the hood together, the hood's own pixels left clear for it to be drawn in.
     private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool,
-                          hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint]) {
+                          hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
+                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
         // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
@@ -843,6 +902,24 @@ final class SpriteLibrary {
             }
         }
 
+        // With `bareLine` and the hood's place given, the same line again round the body alone,
+        // the hood's place left out of it, for a tipped hood that carries its own.
+        var bareLined: [Bool]?
+        if bareLine, detach, hood != nil, look.outlineWidth > 0 {
+            var lineHere = lined
+            var filled = (0..<count).map { pixels[$0 * 4 + 3] != 0 }
+            var body = (0..<count).map { filled[$0] && parts[$0]?.glows(human: look.human) != true }
+            for _ in 0..<look.outlineWidth {
+                let grown = (0..<count).filter { !filled[$0] && neighbours($0, { body[$0] }) }
+                for pixel in grown {
+                    filled[pixel] = true
+                    body[pixel] = true
+                    lineHere[pixel] = true
+                }
+            }
+            bareLined = lineHere
+        }
+
         // The outside line, grown a pixel at a time round the body. The glowing parts get
         // none: a clear pixel next to nothing but the ball stays clear.
         if look.outlineWidth > 0 {
@@ -876,9 +953,10 @@ final class SpriteLibrary {
             }
         }
 
-        // A human's energy-coloured parts glow; the
-        // energy form glows all over but its skin.
-        let glowing = (0..<count).map { look.human ? parts[$0].map(look.dressing.glowing.contains) == true : parts[$0] != nil }
+        // A human's energy-coloured parts glow; the energy form glows all over but its bare
+        // arms and legs, in their skin.
+        func bareSkin(_ part: BodyPart?) -> Bool { part.map { $0 != .head && look.dressing.skin[$0] != nil } == true }
+        let glowing = (0..<count).map { look.human ? parts[$0].map(look.dressing.glowing.contains) == true : parts[$0] != nil && !bareSkin(parts[$0]) }
 
         // The line at half its thickness, on a canvas twice as fine: of each line pixel only the
         // quarters against the body, so it hugs it. FloState's rainbow line.
@@ -917,6 +995,14 @@ final class SpriteLibrary {
             outline = lineContext.makeImage().map { SKTexture(cgImage: $0) }
         }
 
+        var bareOutline: SKTexture?
+        if let bareLined, let (bareContext, barePixels) = makeCanvas(width: width, height: height) {
+            for pixel in 0..<count where bareLined[pixel] {
+                for channel in 0..<4 { barePixels[pixel * 4 + channel] = 255 }
+            }
+            bareOutline = bareContext.makeImage().map { SKTexture(cgImage: $0) }
+        }
+
         // The body as the glow's mask sees it, in white, the glowing pixels left out so they
         // take the glow's plain threshold rather than the body's. A human's skin is green, so it
         // never glows however light it is.
@@ -924,7 +1010,7 @@ final class SpriteLibrary {
         if detach, glowing.contains(true), let (maskContext, maskPixels) = makeCanvas(width: width, height: height) {
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
                 let index = pixel * 4
-                let skin = look.human && parts[pixel].map { look.dressing.skin[$0] != nil } == true
+                let skin = look.human ? parts[pixel].map { look.dressing.skin[$0] != nil } == true : bareSkin(parts[pixel])
                 maskPixels[index] = skin ? 0 : 255
                 maskPixels[index + 1] = 255
                 maskPixels[index + 2] = skin ? 0 : 255
@@ -949,9 +1035,9 @@ final class SpriteLibrary {
             if any { skin = skinContext.makeImage().map { SKTexture(cgImage: $0) } }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:]) }
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline)
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

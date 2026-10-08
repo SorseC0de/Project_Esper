@@ -788,10 +788,8 @@ public struct Stage: Equatable {
         let floor = Double(FlightB411Rules.floorRows) * tileSize
         var stage = Stage(
             columns: columns, rows: rows,
-            hoops: [
-                Hoop(position: Vec2(x: FlightB411Rules.rimInset, y: FlightB411Rules.rimHeight), owner: 1, backboard: .left),
-                Hoop(position: Vec2(x: width - FlightB411Rules.rimInset, y: FlightB411Rules.rimHeight), owner: 0, backboard: .right),
-            ],
+            // One hoop, anyone's: out of a bin, or away.
+            hoops: [Hoop(position: HighwayRules.parked, owner: 0, backboard: .right, shared: true)],
             playerSpawns: [Vec2(x: FlightB411Rules.startInset, y: floor), Vec2(x: width - FlightB411Rules.startInset, y: floor)],
             playerFacings: [.right, .left],
             ballSpawn: FlightB411Rules.ballSpot(in: FlightB411Rules.centreBin)
@@ -807,7 +805,7 @@ public struct Stage: Equatable {
         stage.features.tilts = true
         stage.features.speedShare = FlightB411Rules.speedShare
         stage.features.dunks = false
-        stage.features.threePointLine = false
+        stage.features.threes = false
         stage.features.seenWhole = true
         stage.features.wallJumps = false
         stage.features.rimBounce = false
@@ -846,6 +844,8 @@ public struct Stage: Equatable {
         stage.extras = stage.fixedExtras
         stage.features = StageFeatures(look: .kAndA)
         stage.features.seenWhole = true
+        // Its one-ways are the cars, no ledge to measure the threes to: the plain radius.
+        stage.features.threeRadius = FortySevenRules.fallbackRadius
         return stage
     }
 

@@ -28,15 +28,19 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertEqual(stage.width, 312 * 0.625, accuracy: 1e-9)
         XCTAssertEqual(stage.height, 144 * 0.625, accuracy: 1e-9)
         XCTAssertEqual(stage.rows, 9)
-        XCTAssertEqual(stage.hoops.count, 2)
+        XCTAssertEqual(stage.hoops.count, 1, "one hoop")
+        XCTAssertTrue(stage.hoops[0].shared, "anyone's to score on")
         XCTAssertEqual(stage.ballSpawn, FlightB411Rules.ballSpot(in: FlightB411Rules.centreBin), "the ball in the middle bin")
+        // The starts against the plane's two ends.
+        XCTAssertEqual(stage.playerSpawns[0].x, 5, accuracy: 1e-9)
+        XCTAssertEqual(stage.playerSpawns[1].x, stage.width - 5, accuracy: 1e-9)
         XCTAssertTrue(StageChoice.fortySeven.contains(.flightB411), "47 plays on it")
         XCTAssertFalse(ZonesRules.stages.contains(.flightB411), "ZONES doesn't")
-        // No three-point line drawn on it, too small for one; 47's threes count as ever, from past the usual radius.
-        XCTAssertFalse(stage.features.threePointLine)
-        let rim = Hoop(position: FlightB411Rules.rimSpot(in: 4), owner: 0, backboard: .right)
-        XCTAssertEqual(FortySevenRules.points(from: Vec2(x: 5, y: 20), through: rim, on: stage), 3)
-        XCTAssertEqual(FortySevenRules.points(from: rim.position + Vec2(x: -10, y: -10), through: rim, on: stage), 2)
+        // No threes on it, too small for them: two from anywhere.
+        XCTAssertFalse(stage.features.threes)
+        let rim = Hoop(position: FlightB411Rules.rimSpot(in: 4), owner: 0, backboard: .right, shared: true)
+        XCTAssertEqual(FortySevenRules.points(from: Vec2(x: 5, y: 20), through: rim, on: stage), 2)
+        XCTAssertEqual(FortySevenRules.points(from: Vec2(x: 5, y: 20), through: rim, on: .court), 3, "a court's from as far")
         // Neither wall is anything to land on or jump off.
         XCTAssertFalse(stage.features.wallJumps)
         XCTAssertFalse(stage.features.rimBounce, "no net, no rim to bounce off")
@@ -48,7 +52,7 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertNotNil(Stage.court.wall(beside: Box(min: Vec2(x: 10, y: 40), max: Vec2(x: 20, y: 57))), "the court's walls are")
         // No dunking on it, wherever a rim is.
         XCTAssertFalse(stage.features.dunks)
-        XCTAssertFalse(stage.dunkable(stage.hoops[1]))
+        XCTAssertFalse(stage.dunkable(stage.hoops[0]))
         XCTAssertFalse(stage.dunkable(Hoop(position: Vec2(x: stage.width / 2, y: 65), owner: 0, backboard: .right)))
         // The ceiling near the plane's: the tuned rows of sky over the art, then solid, whatever the lean.
         XCTAssertEqual(stage.skyRows, FlightB411Rules.skyRows)
@@ -132,6 +136,8 @@ final class FlightB411Tests: XCTestCase {
     func testTheCartRollsDownTheLeanIntoABodyAndPopsTheBall() {
         var match = flight()
         hold(&match, at: FlightB411Rules.tiltMax / 2)
+        // Off the wall it starts against, so there's room to be knocked.
+        match.players[0].position.x = 40
         match.ball.holder = 0
         match.players[0].hasBall = true
         let cartStart = match.cart?.box.min.x ?? 0
@@ -183,16 +189,22 @@ final class FlightB411Tests: XCTestCase {
         var match = Match(stage: .flightB411, countdown: 60, seed: 3)
         let centre = FlightB411Rules.centreBin
         XCTAssertEqual(match.bins.count, FlightB411Rules.binLefts.count)
-        XCTAssertTrue(match.bins[centre].open, "the middle bin open for the ball")
-        XCTAssertEqual(match.bins.filter(\.open).count, 1, "the rest shut")
+        XCTAssertTrue(match.bins.allSatisfy { !$0.open }, "every bin shut, the ball in the middle one")
+        XCTAssertEqual(match.ballBin, centre)
         XCTAssertTrue(match.stage.hoops.allSatisfy { $0.position == HighwayRules.parked }, "no hoop out")
-        // Through the count the ball waits in the bin's mouth, the plane level.
+        // Through the count the ball waits shut in the bin, over the bin's middle, the plane level.
         for _ in 0..<59 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.ball.position, FlightB411Rules.ballSpot(in: centre))
+        XCTAssertEqual(match.ball.position.x, FlightB411Rules.binCentre(centre), accuracy: 1e-9)
+        XCTAssertTrue(match.bins.allSatisfy { !$0.open }, "still shut")
         XCTAssertEqual(match.stage.tilt, 0)
-        // The count done, it drops; the plane stays level the spell after, the bins as they were.
-        for _ in 0..<FlightB411Rules.startLevelFrames { match.advance(inputs: [.idle, .idle]) }
+        // On go the bin opens and the ball drops; the plane stays level the spell after.
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertNil(match.ballBin)
+        XCTAssertTrue(match.bins[centre].open, "opened on go")
+        for _ in 0..<FlightB411Rules.startLevelFrames - 2 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertLessThan(match.ball.position.y, FlightB411Rules.binBottom, "dropped out of the bin")
+        XCTAssertEqual(match.ball.position.x, FlightB411Rules.binCentre(centre), accuracy: 1e-6, "straight down")
         XCTAssertEqual(match.stage.tilt, 0)
         XCTAssertEqual(match.bins.filter(\.open).count, 1)
         // Then the cycle: one bin open at a time, never the same one twice running; a hoop hangs
@@ -208,28 +220,23 @@ final class FlightB411Tests: XCTestCase {
                 opened.append(bin)
                 loads.append(match.bins[bin].load)
             }
-            if let bin = open.first, case .hoop(let owner) = match.bins[bin].load {
-                let hoop = match.stage.hoops.first { $0.owner == owner }
+            if let bin = open.first, match.bins[bin].load == .hoop {
                 if match.bins[bin].hoopLive {
                     hoopsSeen += 1
-                    XCTAssertEqual(hoop?.position, FlightB411Rules.rimSpot(in: bin))
+                    XCTAssertEqual(match.stage.hoops[0].position, FlightB411Rules.rimSpot(in: bin))
                 } else {
-                    XCTAssertEqual(hoop?.position, HighwayRules.parked, "away while the case slides")
+                    XCTAssertEqual(match.stage.hoops[0].position, HighwayRules.parked, "away while the case slides")
                 }
-                XCTAssertTrue(match.stage.hoops.filter { $0.owner != owner }.allSatisfy { $0.position == HighwayRules.parked })
             }
         }
         XCTAssertGreaterThan(hoopsSeen, 0, "a hoop came out at some point")
         XCTAssertGreaterThan(opened.count, 3, "several bins opened in turn")
         for (first, second) in zip(opened, opened.dropFirst()) { XCTAssertNotEqual(first, second, "never the same bin twice running") }
         XCTAssertNotEqual(opened.first, centre, "the first of the cycle isn't the start's bin")
-        // Never three empty bins running, and the hoops take turns whose they are.
+        // Never three empty bins running.
         var emptyRun = 0
-        var lastOwner: Int?
         for load in loads {
-            if case .hoop(let owner) = load {
-                if let lastOwner { XCTAssertEqual(owner, 1 - lastOwner, "the other side's hoop after one side's") }
-                lastOwner = owner
+            if load == .hoop {
                 emptyRun = 0
             } else {
                 emptyRun += 1
@@ -243,10 +250,10 @@ final class FlightB411Tests: XCTestCase {
         match.frame = FlightB411Rules.startLevelFrames
         // A bin opened with the first player's hoop, its case out.
         match.bins = match.bins.map { _ in Bin() }
-        match.bins[1] = Bin(open: true, load: .hoop(owner: 0), framesLeft: FlightB411Rules.binOpenFrames, caseFrames: FlightB411Rules.caseSlideFrames, retreating: false)
+        match.bins[1] = Bin(open: true, load: .hoop, framesLeft: FlightB411Rules.binOpenFrames, caseFrames: FlightB411Rules.caseSlideFrames, retreating: false)
         match.lastBin = 1
         match.advance(inputs: [.idle, .idle])
-        guard let hoop = match.stage.hoops.firstIndex(where: { $0.owner == 0 }) else { return XCTFail("no hoop") }
+        let hoop = 0
         XCTAssertEqual(match.stage.hoops[hoop].position, FlightB411Rules.rimSpot(in: 1))
         match.flightB411Scored(on: hoop)
         XCTAssertTrue(match.bins[1].retreating)
@@ -259,10 +266,12 @@ final class FlightB411Tests: XCTestCase {
     func testARoundCanStartTheBallFromAnyBin() {
         var match = Match(stage: .flightB411, countdown: 30)
         match.startFromBin(4)
-        XCTAssertTrue(match.bins[4].open)
-        XCTAssertFalse(match.bins[FlightB411Rules.centreBin].open)
+        XCTAssertEqual(match.ballBin, 4)
+        XCTAssertTrue(match.bins.allSatisfy { !$0.open })
         for _ in 0..<29 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.ball.position, FlightB411Rules.ballSpot(in: 4))
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertTrue(match.bins[4].open, "that bin opens on go")
     }
 
     func testTheCartIsStoodOnAndRidden() {

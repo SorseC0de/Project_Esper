@@ -36,6 +36,8 @@ public struct StageMap: Equatable, Codable {
     /// stands or walks up on; and a one-way, stood on from above, passed through from below.
     public enum Kind: String, Codable, CaseIterable {
         case solid, lowerRight, lowerLeft, upperRight, upperLeft, slideLowerRight, slideLowerLeft, oneWay
+        /// One-way slopes: landed on from above, passed through otherwise.
+        case oneWayLowerRight, oneWayLowerLeft
 
         /// The same kind facing the other way, for the right side mirrored off the left.
         public var mirrored: Kind {
@@ -47,6 +49,8 @@ public struct StageMap: Equatable, Codable {
             case .upperLeft: .upperRight
             case .slideLowerRight: .slideLowerLeft
             case .slideLowerLeft: .slideLowerRight
+            case .oneWayLowerRight: .oneWayLowerLeft
+            case .oneWayLowerLeft: .oneWayLowerRight
             case .oneWay: .oneWay
             }
         }
@@ -220,7 +224,7 @@ public struct StageMap: Equatable, Codable {
     public static func bakedVersion(_ stage: MapStage) -> Int {
         switch stage {
         case .elements, .hoopfishHideaway: 5
-        case .kAndA: 3
+        case .kAndA: 4
         }
     }
 
@@ -236,17 +240,21 @@ public struct StageMap: Equatable, Codable {
     private static let hoopfishHideawayBaked: StageMap = StageMap.hoopfishHideawayDefaultMap()
     private static let kAndABaked: StageMap = StageMap.kAndADefaultMap()
 
-    /// K&A as laid out in the map maker: three rows of ground, the starts on it, the ball over
-    /// the middle; the red car's walls as the file's [Dont_Draw] layer marks them, eleven solid
-    /// and two slopes: its length along row 3, columns 4 to 11, and its roof on row 4, columns
-    /// 7 to 9, sloping down at 6 and 10. Its rims hang from the bridge and aren't the map's to place.
+    /// K&A as laid out in the map maker (the builder's COPY): three rows of ground, the two cars'
+    /// roofs as one-ways (their ends one-way slopes), the rims, the starts and the ball where
+    /// they were put.
     private static func kAndADefaultMap() -> StageMap {
-        var walls = (0..<KAndARules.floorRows).flatMap { row in (0..<KAndARules.columns).map { Wall(Cell($0, row), .solid) } }
-        walls += (4...11).map { Wall(Cell($0, 3), .solid) }
-        walls += [Wall(Cell(6, 4), .lowerRight)] + (7...9).map { Wall(Cell($0, 4), .solid) } + [Wall(Cell(10, 4), .lowerLeft)]
-        let rims = KAndARules.rimCells
-        return StageMap(leftRim: Cell(rims.left.0, rims.left.1), rightRim: Cell(rims.right.0, rims.right.1),
-                        spawns: [Cell(14, 3), Cell(21, 3)], ball: Cell(18, 10), walls: walls)
+        var walls: [Wall] = []
+        for row in 0..<KAndARules.floorRows { for column in 0..<KAndARules.columns { walls.append(Wall(Cell(column, row), .solid)) } }
+        walls += [
+            Wall(Cell(4, 3), .oneWay), Wall(Cell(5, 3), .oneWay), Wall(Cell(11, 3), .oneWay),
+            Wall(Cell(24, 3), .oneWay), Wall(Cell(25, 3), .oneWay), Wall(Cell(6, 4), .oneWayLowerRight),
+            Wall(Cell(7, 4), .oneWay), Wall(Cell(8, 4), .oneWay), Wall(Cell(9, 4), .oneWay),
+            Wall(Cell(10, 4), .oneWayLowerLeft), Wall(Cell(24, 4), .oneWay), Wall(Cell(26, 4), .oneWayLowerRight),
+            Wall(Cell(27, 4), .oneWay), Wall(Cell(28, 4), .oneWay), Wall(Cell(29, 4), .oneWay),
+            Wall(Cell(30, 4), .oneWayLowerLeft),
+        ]
+        return StageMap(leftRim: Cell(2, 13), rightRim: Cell(34, 13), spawns: [Cell(8, 6), Cell(28, 6)], ball: Cell(18, 15), walls: walls)
     }
 
     /// The maps in play: each stage's baked one, or offline the map maker's.

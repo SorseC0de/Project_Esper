@@ -226,6 +226,8 @@ public struct Ball: Equatable {
         for slope in stage.slopes where slope.box.min.x <= position.x && position.x <= slope.box.max.x {
             let surface = slope.surface(at: position.x)
             guard position.y - BallRules.radius < surface - Stage.edge, position.y > slope.box.min.y - BallRules.radius else { continue }
+            // A one-way slope turns only a ball that came down onto it.
+            if slope.oneWay, previousY - BallRules.radius < surface - Stage.edge { continue }
             position.y = surface + BallRules.radius
             let normal = slope.rising ? Vec2(x: -SlopeRules.diagonal, y: SlopeRules.diagonal) : Vec2(x: SlopeRules.diagonal, y: SlopeRules.diagonal)
             // Resting on it, gravity alone still pushes in: that push is what rolls it down.

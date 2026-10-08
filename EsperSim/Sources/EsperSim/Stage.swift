@@ -72,11 +72,15 @@ public struct Slope: Equatable {
     public var rising: Bool
     /// A slide slope: whoever is on it slides down, and held uphill is carried back down.
     public var slides = false
+    /// A one-way slope: landed on from above, passed through from below and from the sides,
+    /// and dropped through, as a one-way block is.
+    public var oneWay = false
 
-    public init(box: Box, rising: Bool, slides: Bool = false) {
+    public init(box: Box, rising: Bool, slides: Bool = false, oneWay: Bool = false) {
         self.box = box
         self.rising = rising
         self.slides = slides
+        self.oneWay = oneWay
     }
 
     /// The way down it.
@@ -239,7 +243,7 @@ public struct Stage: Equatable {
                 return true
             }
         }
-        return extras.contains { $0.overlaps(box) } || slopes.contains { $0.overlaps(box) } || ceilingSlopes.contains { $0.ceilingOverlaps(box) }
+        return extras.contains { $0.overlaps(box) } || slopes.contains { !$0.oneWay && $0.overlaps(box) } || ceilingSlopes.contains { $0.ceilingOverlaps(box) }
     }
 
     /// The top of the highest exposed solid block under the box's span whose top is within
@@ -301,6 +305,8 @@ public struct Stage: Equatable {
         var best: Double?
         for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x {
             let surface = slope.surface(at: middle)
+            // A one-way slope holds nothing that's under it.
+            if slope.oneWay, box.min.y < surface - Stage.edge { continue }
             if abs(surface - box.min.y) <= reach, best == nil || surface > best! { best = surface }
         }
         return best
@@ -340,8 +346,8 @@ public struct Stage: Equatable {
             }
         }
         // A slope's straight side is a wall: a rising one's on its right, a falling one's on
-        // its left; its diagonal side is climbed, not bumped.
-        for slope in slopes where spansY(slope.box, box) && box.min.y < slope.box.max.y - Stage.edge {
+        // its left; its diagonal side is climbed, not bumped. A one-way slope is no wall at all.
+        for slope in slopes where !slope.oneWay && spansY(slope.box, box) && box.min.y < slope.box.max.y - Stage.edge {
             if direction == .left, slope.rising, slope.box.max.x <= leading + Stage.edge, slope.box.max.x - leading > moved {
                 moved = min(slope.box.max.x - leading, 0)
                 blocked = direction
@@ -419,9 +425,10 @@ public struct Stage: Equatable {
                 moved = min(slope.box.max.y - feet, 0)
                 landed = true
             }
-            // Down onto a slope's surface under the middle, crossing it this frame.
+            // Down onto a slope's surface under the middle, crossing it this frame; a one-way
+            // slope's only from above it, and not when dropping through.
             let middle = (box.min.x + box.max.x) / 2
-            for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x {
+            for slope in slopes where slope.box.min.x <= middle && middle <= slope.box.max.x && (oneWays || !slope.oneWay) {
                 let surface = slope.surface(at: middle)
                 if surface <= feet + Stage.edge, surface - feet > moved {
                     moved = min(surface - feet, 0)
@@ -444,7 +451,7 @@ public struct Stage: Equatable {
                     break search
                 }
             }
-            for extra in extras + slopes.map(\.box) where spansX(extra, box) && extra.min.y >= head - Stage.edge && extra.min.y - head < moved {
+            for extra in extras + slopes.filter({ !$0.oneWay }).map(\.box) where spansX(extra, box) && extra.min.y >= head - Stage.edge && extra.min.y - head < moved {
                 moved = max(extra.min.y - head, 0)
                 ceiling = true
             }
@@ -741,6 +748,8 @@ public struct Stage: Equatable {
             case .slideLowerRight: fixedSlopes.append(Slope(box: square, rising: true, slides: true))
             case .slideLowerLeft: fixedSlopes.append(Slope(box: square, rising: false, slides: true))
             case .oneWay: set(.oneWay, column: cell.column, row: cell.row)
+            case .oneWayLowerRight: fixedSlopes.append(Slope(box: square, rising: true, oneWay: true))
+            case .oneWayLowerLeft: fixedSlopes.append(Slope(box: square, rising: false, oneWay: true))
             }
         }
     }

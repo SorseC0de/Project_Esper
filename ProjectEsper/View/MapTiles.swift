@@ -103,8 +103,8 @@ enum KAndAArt {
     enum Light {
         static let keys = (top: "esper.kAndA.light.top", bottom: "esper.kAndA.light.bottom", drop: "esper.kAndA.light.drop", fade: "esper.kAndA.light.fade")
         nonisolated(unsafe) static var topWidth: CGFloat = stored(keys.top) ?? 8
-        nonisolated(unsafe) static var bottomWidth: CGFloat = stored(keys.bottom) ?? 72
-        nonisolated(unsafe) static var drop: CGFloat = stored(keys.drop) ?? 208
+        nonisolated(unsafe) static var bottomWidth: CGFloat = stored(keys.bottom) ?? 126
+        nonisolated(unsafe) static var drop: CGFloat = stored(keys.drop) ?? 150
         nonisolated(unsafe) static var fadeFrom: CGFloat = stored(keys.fade) ?? 0.5
         private static func stored(_ key: String) -> CGFloat? { UserDefaults.standard.object(forKey: key).flatMap { $0 as? Double }.map { CGFloat($0) } }
         static func save() {
@@ -289,12 +289,17 @@ enum FlightB411Art {
     /// The mask line in the stage's frame: whatever of a piece is above the line, as the piece
     /// is turned and slid, isn't drawn. The line passes through the piece's anchor; `u_anchor`
     /// and `u_size` put a fragment in the piece's own units, `u_swing` turns it as the piece is.
+    /// Checked in a headless render (a sprite turned 0.4 cuts level at its anchor's height):
+    /// the fragment's place turned by the swing is `(sin, cos)` of it, and the sample is
+    /// snapped to the texel so the piece stays crisp as drawn.
     static let caseMaskSource = """
     void main() {
-        vec2 p = (v_tex_coord - u_anchor) * u_size;
-        float up = -sin(u_swing) * p.x + cos(u_swing) * p.y;
+        vec2 texel = floor(v_tex_coord * u_size) + 0.5;
+        vec2 uv = texel / u_size;
+        vec2 p = (uv - u_anchor) * u_size;
+        float up = sin(u_swing) * p.x + cos(u_swing) * p.y;
         if (up > 0.0) discard;
-        gl_FragColor = SKDefaultShading();
+        gl_FragColor = texture2D(u_texture, uv);
     }
     """
     static func caseMaskShader() -> SKShader {

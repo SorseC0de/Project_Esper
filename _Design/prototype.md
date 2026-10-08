@@ -1913,20 +1913,19 @@ flattens the first eleven into `KAndABackdrop`, on the stage's ground, and the l
 beside the new one, which the tool now reads right); `python3 Tools/import_stage_art.py kanda`
 does both again when the picture changes (`flight` the plane's, none for every stage). Its walls,
 starts, ball and rims are laid out in the map maker (`MapStage.kAndA`, protocol 111; the rims the
-map's at 114), as the Elements' are, every marker on it: the baked map (version 3) is three rows
-of ground, the starts at columns 14 and 21, the ball at 18, 10, the rims at 5, 14 and 31, 14,
-whose middles hang about as far under the bridge as the court's beams reach over its rim
-(`rimUnderBridge`), and the red car's walls; nothing else is solid, the pillars and the painted cars scenery, until walls are painted.
+map's at 114), as the Elements' are, every marker on it: the baked map (version 4, the builder's COPY) is three rows of ground,
+the starts at columns 8 and 28 over the two cars, the ball at 18, 15, the rims at 2, 13 and 34,
+13, and the cars' walls: each roof a row of one-ways with a one-way slope at either end, and
+one-ways along the hood and the trunk (protocol 115); nothing else is solid, the pillars and the painted cars scenery, until walls are painted.
 The file's `[Dont_Draw]` layer isn't drawn: it places the red car (`red_car.aseprite`, 128 by 48,
 its Body and Wheels layers each their own picture, `KAndACarBody` and `KAndACarWheels`, `python3
 Tools/import_stage_art.py redcar`) with its bottom left at the ground's top 64 along
-(`KAndARules.carLeft`), and marks its walls, eleven solid and two slopes: row 3 from column 4 to
-11, and the roof on row 4, columns 7 to 9, sloping down at 6 and 10 (protocol 113). Someone
+(`KAndARules.carLeft`), and marks its walls, which the map lays as above (protocol 113). Someone
 landing on the car sags its body (not the wheels) two pixels, which comes back up one and stays
 there while anyone stands on it, and up the last once they've gone, a pixel every three frames
 (`KAndAArt.sagStepFrames`); whoever stands on it is drawn down with it (`standsOnCar`). Three
 street lights hang off the wire (`lampXs`, their bottoms at `lampBottom`): from each a trapezoid
-of its light (`KAndAArt.Light`, `conePicture`), 8 across at the lamp and 72 at its foot, 208 down,
+of its light (`KAndAArt.Light`, `conePicture`), 8 across at the lamp and 126 at its foot, 150 down,
 fading to clear from halfway down, palette 7 at 0.12, added, over the backdrop; the strip's LIGHT
 TOP W, LIGHT BOTTOM W, LIGHT DROP and LIGHT FADE FROM sliders, kept, draw them again as they move.
 Now and then (one chance in 240 a frame) one flickers for 6 to 20 frames, dimming to a third every
@@ -1937,6 +1936,16 @@ backboards and rims, the backboard solid from under the rim up to the bridge as 
 its blocks. The starts 150 and 220 along, on
 the ground; the ball over the middle at 100. ZONES keeps the right rim, the left backboard
 rimless, the run starting on the ground. Dunks and threes as on the court.
+
+## One-way slopes
+
+A wall kind of the map maker's walls mode (`StageMap.Kind.oneWayLowerRight` and
+`oneWayLowerLeft`, 1-WAY ◢ and 1-WAY ◣ on its row; `Slope.oneWay`): a slope that's landed on
+from above, as a slope is, and passed through from below and from the sides, and dropped through,
+as a one-way block is. It's no wall to the horizontal sweep, no ceiling to the vertical one, holds
+nothing that's under its surface (`slopeSurface`), and turns only a ball that came down onto it
+(`Ball.rollOffSlopes`, by the ball's last height). In walls mode one-ways, blocks and slopes, show
+in lime, slide slopes in orange, the rest in red. K&A's cars' roofs end in them.
 
 ## Hoop supports
 

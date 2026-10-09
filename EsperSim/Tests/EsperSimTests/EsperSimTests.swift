@@ -1803,7 +1803,7 @@ final class FootsiesTests: XCTestCase {
         for _ in 0..<5 { match.advance(inputs: [.idle, PlayerInput(throwBall: true)]) }
         XCTAssertEqual(match.players[1].state, .idle, "the held button wants a fresh press")
         XCTAssertTrue(match.players[1].hasBall)
-        // The slasher: stunned, then still no slash or snatch for a second more.
+        // The slasher: stunned, then still no slash or snatch for half a second more.
         XCTAssertGreaterThan(match.players[0].hitStun, 0)
         // Run out the stun (the parry's hit-stop holds it a while first).
         for _ in 0..<200 where match.players[0].hitStun > 0 { match.advance(inputs: [.idle, .idle]) }

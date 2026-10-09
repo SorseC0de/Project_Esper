@@ -506,7 +506,7 @@ public enum ThrowParryRules {
 /// parried is stunned (`BallRules.hitStunFrames`) and then can't slash or snatch for this
 /// long more, so the parry can be made something of.
 public enum ParryRules {
-    public static let attackLockoutAfterStunFrames = 60
+    public static let attackLockoutAfterStunFrames = 30
 }
 
 /// The stepback: down on the ground in a shot's or throw's stance once it's held, once a

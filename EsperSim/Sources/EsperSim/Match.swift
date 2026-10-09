@@ -695,8 +695,11 @@ public struct Match: Equatable {
 
     private mutating func placeHoopfishLoad() {
         guard let fish = hoopfish, !stage.hoops.isEmpty else { return }
-        // Spinning, the rim spins with it, out of play.
+        // Spinning, the rim spins with it, out of play. Its motion kept while it swims in play.
+        let was = stage.hoops[0].position
         stage.hoops[0].position = fish.carrying == .hoop && !fish.away && fish.spin == 0 ? fish.antenna : HighwayRules.parked
+        let now = stage.hoops[0].position
+        stage.hoops[0].velocity = was == HighwayRules.parked || now == HighwayRules.parked ? .zero : now - was
         stage.hoops[0].backboard = fish.facesRight ? .left : .right
         if fish.carrying == .ball, ball.holder == nil {
             ball.position = fish.ballPoint

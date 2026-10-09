@@ -116,16 +116,18 @@ enum KAndAArt {
     }
     static let coneAlpha: CGFloat = 0.12
     static let coneColour = SKColor(rgb: PixelPalette.colours[7])
-    /// The cones over the wash, so the lights shine through it.
-    static let coneZ: CGFloat = washZ + 1
-    /// The wash over the whole stage: palette 30 at a tenth, on the camera at 95 as Hoopfish
-    /// Hideaway's water is; the lights are drawn over it, the nets and the glow go through it.
+    /// The cones over the wash, so the lights shine through it, and under the players.
+    static let coneZ: CGFloat = washZ + 0.1
+    /// The wash over the stage's art: palette 30 at a tenth, on the camera, under the players
+    /// (20), the effects and the rims' fronts (21); the players take it as a tint and their
+    /// glowing parts don't, the front pillars (22) take it as a tint too, and the nets, drawn
+    /// apart, never had it.
     /// A tenth, WASH on the strip moving it, kept.
     static let washAlphaKey = "esper.kAndA.washAlpha"
     nonisolated(unsafe) static var washAlpha: CGFloat = {
         CGFloat(UserDefaults.standard.object(forKey: washAlphaKey) as? Double ?? 0.1)
     }()
-    static let washZ: CGFloat = 95
+    static let washZ: CGFloat = 19.5
     /// One chance in 600 a frame: a flicker every ten seconds or so.
     static let flickerChance = 1.0 / 600
     static let flickerFrames = 6...20
@@ -425,6 +427,11 @@ enum FlightB411Art {
         return (holder, [sign, no, seatbelt] + multipliers)
     }
 
+    /// The 2X and 3X signs' scale against the row's, the 2X 3X SCALE slider's, kept.
+    static let multiplierScaleKey = "esper.flightB411.multiplierScale"
+    nonisolated(unsafe) static var multiplierScale: CGFloat = {
+        CGFloat(UserDefaults.standard.object(forKey: multiplierScaleKey) as? Double ?? 1)
+    }()
     /// 47's 2X or 3X sign, as the cabin's signs are: the lettering 24 high, palette 7 lit and
     /// glowing, palette 33 out. Cached.
     nonisolated(unsafe) private static var multiplierSigns: [String: SKTexture] = [:]
@@ -511,8 +518,10 @@ enum FlightB411Art {
     static let signWidth: CGFloat = 22, beltWidth: CGFloat = 118, signGap: CGFloat = 12
     static func laySigns(sign: SKSpriteNode, no: SKSpriteNode, seatbelt: SKSpriteNode, double: SKSpriteNode, triple: SKSpriteNode) {
         let belt = beltWidth * beltScale
-        // 2X, NO DUNKING, the seatbelt, 3X, a gap between each.
-        let widths = [double.size.width, signWidth, belt, triple.size.width]
+        // 2X, NO DUNKING, the seatbelt, 3X, a gap between each; the 2X and 3X at their own scale.
+        double.setScale(multiplierScale)
+        triple.setScale(multiplierScale)
+        let widths = [(double.texture?.size().width ?? 0) * multiplierScale, signWidth, belt, (triple.texture?.size().width ?? 0) * multiplierScale]
         let row = widths.reduce(0, +) + signGap * CGFloat(widths.count - 1)
         var left = -row / 2
         func place(_ node: SKSpriteNode, _ width: CGFloat) {
@@ -594,27 +603,67 @@ enum FlightB411Art {
         }
         handles.backdrop = picture("FlightB411Backdrop", z: backdropZ, into: parent)
         handles.front = picture("FlightB411Front", z: 0, into: frontParent)
-        for node in [handles.backdrop, handles.front].compactMap({ $0 }) { node.shader = softEdges(for: node) }
         return handles
     }
 
-    /// The map's edges soft: each picture fading to clear over its outer `edgeFade` art pixels,
-    /// into the sky; the EDGE FADE slider's, kept.
+    /// The window's soft edges: over the whole map, players and all, a veil of what's beyond it
+    /// (palette 30 and the plane at its fifth), drawn only inside the window and opaque at its
+    /// edge, clear `edgeFade` art pixels in; so the map fades into the plane, and the plane
+    /// itself is never masked. The EDGE FADE slider's, kept.
     static let edgeFadeKey = "esper.flightB411.edgeFade"
     nonisolated(unsafe) static var edgeFade: CGFloat = {
         CGFloat(UserDefaults.standard.object(forKey: edgeFadeKey) as? Double ?? 8)
     }()
-    static func softEdges(for node: SKSpriteNode) -> SKShader {
-        let shader = SKShader(source: """
-        void main() {
-            vec4 colour = texture2D(u_texture, v_tex_coord);
-            vec2 pixel = v_tex_coord * u_size;
-            float inside = min(min(pixel.x, u_size.x - pixel.x), min(pixel.y, u_size.y - pixel.y));
-            gl_FragColor = colour * smoothstep(0.0, max(u_fade, 0.001), inside);
+    /// Over everything of the map's: the front (22) and the rims' fronts.
+    static let veilZ: CGFloat = 23
+    /// The veil's two layers, the colour beyond and the plane over it, each with its own shader.
+    static func edgeVeil(into parent: SKNode) -> [SKSpriteNode] {
+        let beyondTexture: SKTexture = {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let image = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1), format: format).image { context in
+                SKColor(rgb: beyond).setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+            }
+            return SKTexture(image: image)
+        }()
+        return [(beyondTexture, CGFloat(1)), (plane, planeAlpha)].enumerated().map { index, layer in
+            let node = SKSpriteNode(texture: layer.0)
+            node.zPosition = veilZ + CGFloat(index) * 0.01
+            node.shader = SKShader(source: """
+            void main() {
+                vec4 colour = texture2D(u_texture, v_tex_coord);
+                vec2 pixel = v_tex_coord * u_size;
+                vec2 low = pixel - u_window_min;
+                vec2 high = u_window_max - pixel;
+                float inside = min(min(low.x, high.x), min(low.y, high.y));
+                float veil = inside < 0.0 ? 0.0 : 1.0 - smoothstep(0.0, max(u_fade, 0.001), inside);
+                gl_FragColor = colour * veil * u_alpha;
+            }
+            """)
+            node.shader?.uniforms = [SKUniform(name: "u_size", vectorFloat2: vector_float2(1, 1)),
+                                     SKUniform(name: "u_window_min", vectorFloat2: vector_float2(0, 0)),
+                                     SKUniform(name: "u_window_max", vectorFloat2: vector_float2(1, 1)),
+                                     SKUniform(name: "u_fade", float: Float(edgeFade)),
+                                     SKUniform(name: "u_alpha", float: Float(layer.1))]
+            parent.addChild(node)
+            return node
         }
-        """)
-        shader.uniforms = [SKUniform(name: "u_size", vectorFloat2: vector_float2(Float(node.size.width), Float(node.size.height))),
-                           SKUniform(name: "u_fade", float: Float(edgeFade))]
-        return shader
+    }
+    /// The veil laid over `window` (the map's picture, in its parent's space): the colour beyond
+    /// on the window itself, the plane where the plane is.
+    static func layVeil(_ veil: [SKSpriteNode], window: CGRect) {
+        guard veil.count == 2 else { return }
+        let planeFrame = CGRect(origin: CGPoint(x: stageCentre.x - planeSize.width / 2, y: stageCentre.y + planeY - planeSize.height / 2), size: planeSize)
+        for (node, frame) in zip(veil, [window, planeFrame]) {
+            node.anchorPoint = .zero
+            node.position = frame.origin
+            node.size = frame.size
+            guard let shader = node.shader else { continue }
+            shader.uniformNamed("u_size")?.vectorFloat2Value = vector_float2(Float(frame.width), Float(frame.height))
+            shader.uniformNamed("u_window_min")?.vectorFloat2Value = vector_float2(Float(window.minX - frame.minX), Float(window.minY - frame.minY))
+            shader.uniformNamed("u_window_max")?.vectorFloat2Value = vector_float2(Float(window.maxX - frame.minX), Float(window.maxY - frame.minY))
+            shader.uniformNamed("u_fade")?.floatValue = Float(edgeFade)
+        }
     }
 }

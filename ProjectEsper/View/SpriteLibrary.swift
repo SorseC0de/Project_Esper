@@ -208,6 +208,7 @@ final class SpriteLibrary {
                               bareLine: SpriteLibrary.tippingHead.contains(frame.animation))
         var textures = ["": result.texture]
         if let bareOutline = result.bareOutline { textures["_bareoutline"] = bareOutline }
+        if let glowingParts = result.glowingParts { textures["_glowing"] = glowingParts }
         if let head = result.head { textures["_head"] = head }
         if let energy = result.energy { textures["_energy"] = energy }
         if let outline = result.outline { textures["_outline"] = outline }
@@ -252,6 +253,12 @@ final class SpriteLibrary {
     func outlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
         _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
         return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_outline"]
+    }
+
+    /// A frame's glowing parts alone, as drawn, on the body's canvas; nil where it has none.
+    func glowingPartsTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_glowing"]
     }
 
     /// The line round a human's frame without the hood's place in it, for a tipped hood that
@@ -780,10 +787,10 @@ final class SpriteLibrary {
     /// the hood together, the hood's own pixels left clear for it to be drawn in.
     private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
-                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?) {
+                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?) {
         let image = texture.cgImage()
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
         // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
@@ -1003,6 +1010,15 @@ final class SpriteLibrary {
             bareOutline = bareContext.makeImage().map { SKTexture(cgImage: $0) }
         }
 
+        // The glowing parts alone, as drawn: over K&A's wash, so the night doesn't dim them.
+        var glowingParts: SKTexture?
+        if detach, glowing.contains(true), let (partsContext, partsPixels) = makeCanvas(width: width, height: height) {
+            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && glowing[pixel] {
+                for channel in 0..<4 { partsPixels[pixel * 4 + channel] = pixels[pixel * 4 + channel] }
+            }
+            glowingParts = partsContext.makeImage().map { SKTexture(cgImage: $0) }
+        }
+
         // The body as the glow's mask sees it, in white, the glowing pixels black so they take
         // the glow's plain threshold rather than the body's, whatever's under them: left out, a
         // stage's flat backdrop showed through and they didn't glow. A human's skin is green, so
@@ -1039,9 +1055,9 @@ final class SpriteLibrary {
             if any { skin = skinContext.makeImage().map { SKTexture(cgImage: $0) } }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil) }
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline, glowingParts)
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

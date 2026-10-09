@@ -291,7 +291,10 @@ whatever lands on it came at, held down 12° while someone
   though the stick still moves it, and its sprite flickers white: the taker has first
   go at the ball.
 - Rims steer: a ball falling within reach has its sideways speed blended toward what
-  would carry it through the rim, a share a frame, never snapped. Only a shot's or a
+  would carry it through the rim, a share a frame, never snapped. A swimming rim (the
+  Hoopfish's) is led: aimed at where it will be when the ball has fallen to it, by its motion
+  over the last frame (`Hoop.velocity`, protocol 121), no stronger a pull, as the computer's
+  aim already led it; of balls dropped at it through its swim, 58% go in to 41% before. Only a shot's or a
   floater's ball, and only until its first bounce off anything; a throw's never. Only the rim
   it's meant for, the one whoever last touched it scores on (a shared rim for anyone, an
   untouched ball any): an own basket can still drop, but nothing draws it there (protocol 77). Down
@@ -1943,9 +1946,12 @@ protocol 120). In 47 the row of signs has 2X and 3X at its two ends, out in pale
 start's level spell, every 5 to 15 seconds the dice pick neither, 2X or 3X, a third each
 (`FlightB411Rules.multiplierWaitFrames`), and one lit, palette 7 and glowing, stays lit three seconds
 (`multiplierLitFrames`, `Match.pointMultiplier`), a basket meanwhile worth that many times its points
-(`pointValue`). In Rounds a point is a point and they never light. The map's edges are soft: the
-backdrop and the front fade to clear over their outer 8 art pixels into the sky (`softEdges`, the
-strip's EDGE FADE, 0 to 32, kept).
+(`pointValue`). In Rounds a point is a point and they never light. Their size is the strip's 2X 3X
+SCALE (`multiplierScale`, 0.25 to 3, 1 to start, kept), the row laid again each frame. The window's
+edges are soft: over the whole map, players and all (z 23, `veilZ`), a veil of what's beyond it,
+palette 30 and a copy of the plane at its fifth where the plane is, drawn only inside the window,
+opaque at its edge and clear 8 art pixels in (`edgeVeil`, `layVeil`, the strip's EDGE FADE, 0 to
+32, kept); so the map fades into the plane, and the plane itself is never masked.
 
 ## K&A
 
@@ -1980,12 +1986,13 @@ fading to clear from halfway down, palette 7 at 0.12, added, over the backdrop; 
 LIGHT BOTTOM W, LIGHT DROP and LIGHT FADE FROM sliders are parked (`ParkedSliders`), as the nets'
 and the FLO meters' are.
 Now and then (one chance in 600 a frame, every ten seconds or so) one flickers for 6 to 20 frames,
-dimming to a third every other pair of frames. Over the whole stage lies a wash of palette 30 at a
-tenth (`KAndAArt.washAlpha`, the strip's WASH, kept, `washOverlay`, a flat sprite on the camera at 95, as Hoopfish
-Hideaway's water is, and the chevrons lifted over it as there): the lights' cones are drawn over
-it (`coneZ`, 96), the nets' strands glow through it (`glowThroughNets`, the mask's blue, their
-colour taken from under the wash as from under the water, `waterTint` naming the wash), and the
-bodies' glow is added over it by the glow pass. The hoops hang from the bridge's underside, the
+dimming to a third every other pair of frames. Over the stage's art lies a wash of palette 30 at a
+tenth (`KAndAArt.washAlpha`, the strip's WASH, kept, `washOverlay`, a flat sprite on the camera at
+19.5, `washZ`, the chevrons lifted over it): under the lights' cones (`coneZ`, just over it), the
+players (20), the effects and the rims' fronts (21); the bodies take it as a tint (their colour
+blend, when nothing else is tinting them) with their glowing parts drawn again over them
+untinted (`glowingPartNodes`, `SpriteLibrary.glowingPartsTexture`), and the front pillars (22) take
+it as a tint too; the cylinder nets, drawn apart, never have it (`waterTint` nil here). The hoops hang from the bridge's underside, the
 tracks' 39 rows down from the top (`bridgeBottom`), on the Wreck Center's support beams
 (`HoopSupport`, the same layout, drawn at each hoop as there), with the court's straight
 backboards and rims, the backboard solid from under the rim up to the stage's ceiling, over the

@@ -291,4 +291,22 @@ final class DeciderTests: XCTestCase {
         match.advance(inputs: [.idle, .idle])
         XCTAssertNotEqual(match.players[0].state, .dunking, "the rim in the first column lets go")
     }
+
+    func testTheSwimmingRimsMotionIsKeptForAShotToLeadIt() {
+        var match = Match(stage: .hoopfishHideaway, specs: [.starting, .starting], countdown: 0, seed: 3, mode: .fortySeven)
+        match.hoopfish?.carrying = .hoop
+        match.players[0].hasBall = true
+        match.ball.holder = 0
+        var moving = 0
+        for _ in 0..<600 {
+            let was = match.stage.hoops[0].position
+            match.advance(inputs: [.idle, .idle])
+            let now = match.stage.hoops[0].position
+            guard was != HighwayRules.parked, now != HighwayRules.parked else { continue }
+            XCTAssertEqual(match.stage.hoops[0].velocity, now - was)
+            if match.stage.hoops[0].velocity != .zero { moving += 1 }
+        }
+        XCTAssertGreaterThan(moving, 100, "it swims, and its motion is kept")
+        XCTAssertEqual(Stage.court.hoops[0].velocity, .zero, "a still rim has none")
+    }
 }

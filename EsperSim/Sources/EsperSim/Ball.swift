@@ -204,15 +204,23 @@ public struct Ball: Equatable {
 
     /// Bends a falling ball's path so it arrives over the rim: the sideways speed it would
     /// need to reach the rim's centre in the time it will take to fall to the rim's height,
-    /// approached a share at a time.
+    /// approached a share at a time. A swimming rim is led: aimed at where it will be by then,
+    /// not where it is, as the computer's own aim already does.
     private mutating func steer(toward hoop: Hoop, gravityShare: Double) {
-        let across = hoop.position.x - position.x
-        let above = position.y - hoop.position.y
-        guard abs(across) <= BallRules.hoopReach, above <= BallRules.hoopReach else { return }
+        guard abs(hoop.position.x - position.x) <= BallRules.hoopReach, position.y - hoop.position.y <= BallRules.hoopReach else { return }
         let down = -velocity.y
         let g = BallRules.gravity * gravityShare * pace * pace
-        let frames = (-down + (down * down + 2 * g * above).squareRoot()) / g
+        func framesToFall(to rimY: Double) -> Double {
+            let above = position.y - rimY
+            return (-down + (down * down + 2 * g * max(above, 0)).squareRoot()) / g
+        }
+        var frames = framesToFall(to: hoop.position.y)
+        // Twice round: where the rim will be when the ball falls to it, and the fall to there.
+        for _ in 0..<2 where hoop.velocity != .zero {
+            frames = framesToFall(to: hoop.position.y + hoop.velocity.y * frames)
+        }
         guard frames > 0 else { return }
+        let across = hoop.position.x + hoop.velocity.x * frames - position.x
         let needed = across / frames
         let change = (needed - velocity.x) * BallRules.hoopSteerShare
         let most = BallRules.hoopSteerMax * pace

@@ -16,6 +16,9 @@ public struct Hoop: Equatable {
     public var shared: Bool
     /// ZONES: the backboard alone, to jump off or throw at, no rim, no net, nothing to score on.
     public var rimless = false
+    /// How far the rim moved over the last frame: the Hoopfish's as it swims, for a shot's
+    /// correction to lead it; still everywhere else.
+    public var velocity = Vec2.zero
 
     public init(position: Vec2, owner: Int, backboard: Facing, shared: Bool = false) {
         self.position = position

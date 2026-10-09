@@ -185,6 +185,8 @@ final class GameScene: SKScene {
     private var energyNodes: [SKSpriteNode] = []
     /// Each human's hood over its head, and the frame it was drawn for.
     private var hoodNodes: [SKSpriteNode] = []
+    /// Each body's glowing parts drawn again over it on K&A, where the body takes the wash and they don't.
+    private var glowingPartNodes: [SKSpriteNode] = []
     /// Each hood's own line, while the head's tipped: the body's line is drawn without the
     /// hood's place then, and this one turns with the hood, under the body so only what's
     /// outside it shows.
@@ -567,11 +569,10 @@ final class GameScene: SKScene {
     var unglowedBackground: SKColor? { [StageLook.elements, .hoopfishHideaway, .flightB411, .kAndA].contains(match.stage.features.look) ? backgroundColor : nil }
 
     /// The water's tint over the world, for what's drawn apart from the scene (the cubes) and for
-    /// what glows through it; K&A's wash the same way; nil elsewhere.
+    /// what glows through it; nil elsewhere (K&A's wash is under what it would touch).
     var waterTint: (top: RGB, bottom: RGB, alpha: CGFloat)? {
         switch match.stage.features.look {
         case .hoopfishHideaway: (PixelPalette.colours[19], PixelPalette.colours[18], WaterTuning.overlayAlpha)
-        case .kAndA: (KAndAArt.beyond, KAndAArt.beyond, KAndAArt.washAlpha)
         default: nil
         }
     }
@@ -992,6 +993,12 @@ final class GameScene: SKScene {
             outline.zPosition = 0.005
             node.addChild(outline)
             outlineNodes.append(outline)
+            // K&A: the glowing parts again over the body, untouched by the wash the body takes.
+            let glowingParts = SKSpriteNode()
+            glowingParts.zPosition = 0.001
+            glowingParts.isHidden = true
+            node.addChild(glowingParts)
+            glowingPartNodes.append(glowingParts)
             let cursor = SKSpriteNode(texture: SKTexture(imageNamed: "Crosshair"))
             cursor.size = CGSize(width: GameScene.snipeCursorSize, height: GameScene.snipeCursorSize)
             cursor.zPosition = 40
@@ -1743,8 +1750,10 @@ final class GameScene: SKScene {
     private var noDunkingSprites: [SKSpriteNode] = []
     private let skyNode = SKNode()
     private var clouds: [(node: SKSpriteNode, speed: CGFloat)] = []
-    /// The plane itself, under the sky's clouds, pitching with the stage.
+    /// The plane itself, under the sky's clouds, pitching with the stage; and the veil over the
+    /// window's edges that fades the map into it.
     private var planeNode: SKSpriteNode?
+    private var edgeVeil: [SKSpriteNode] = []
     private static let cloudCount = 6
     /// Flight B411's hoopcase drop as the HOOPCASE Y slider last left it, art pixels under the bin.
     private static let hoopcaseDropKey = "esper.flightB411.hoopcaseDrop"
@@ -1823,6 +1832,8 @@ final class GameScene: SKScene {
         clouds = []
         planeNode?.removeFromParent()
         planeNode = nil
+        edgeVeil.forEach { $0.removeFromParent() }
+        edgeVeil = []
         fallingIcicles = [:]
         hangingIcicles = [:]
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
@@ -1886,6 +1897,7 @@ final class GameScene: SKScene {
             plane.position = stageGround.convert(FlightB411Art.stageCentre, to: self)
             addChild(plane)
             planeNode = plane
+            edgeVeil = FlightB411Art.edgeVeil(into: stageGround)
             turbulenceIn = Int.random(in: GameScene.turbulenceGap)
         }
         if isElements {
@@ -2132,6 +2144,8 @@ final class GameScene: SKScene {
         clouds = []
         planeNode?.removeFromParent()
         planeNode = nil
+        edgeVeil.forEach { $0.removeFromParent() }
+        edgeVeil = []
         fallingIcicles = [:]
         hangingIcicles = [:]
         fieldBlooms = []
@@ -3147,6 +3161,10 @@ final class GameScene: SKScene {
             controls.addSlider(title: "PLANE Y", range: -400...400, notch: 1, value: Float(FlightB411Art.planeY)) { value in
                 FlightB411Art.planeY = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: FlightB411Art.planeYKey)
+            }
+            controls.addSlider(title: "2X 3X SCALE", range: 0.25...3, notch: 0.05, value: Float(FlightB411Art.multiplierScale)) { value in
+                FlightB411Art.multiplierScale = CGFloat(value)
+                UserDefaults.standard.set(Double(value), forKey: FlightB411Art.multiplierScaleKey)
             }
             controls.addSlider(title: "EDGE FADE", range: 0...32, notch: 1, value: Float(FlightB411Art.edgeFade)) { value in
                 FlightB411Art.edgeFade = CGFloat(value)
@@ -6772,6 +6790,9 @@ final class GameScene: SKScene {
     /// and the street lights, one flickering now and then.
     private func drawKAndA() {
         guard let art = kAndAArt else { return }
+        // The front pillars, over the players and so over the wash, take it as a tint.
+        art.front?.color = SKColor(rgb: KAndAArt.beyond)
+        art.front?.colorBlendFactor = KAndAArt.washAlpha
         let occupied = match.players.contains(where: standsOnCar)
         if !occupied { carSagSettled = false }
         let target: CGFloat = !occupied ? 0 : (carSagSettled ? -1 : -2)
@@ -6820,8 +6841,10 @@ final class GameScene: SKScene {
             noDunkingSprites[3].texture = FlightB411Art.multiplierSign(2, lit: match.pointMultiplier == 2)
             noDunkingSprites[4].texture = FlightB411Art.multiplierSign(3, lit: match.pointMultiplier == 3)
         }
-        for picture in [flightB411Art?.backdrop, flightB411Art?.front].compactMap({ $0 }) {
-            picture.shader?.uniformNamed("u_fade")?.floatValue = Float(FlightB411Art.edgeFade)
+        if let window = flightB411Art?.backdrop?.frame { FlightB411Art.layVeil(edgeVeil, window: window) }
+        if noDunkingSprites.count == 5 {
+            FlightB411Art.laySigns(sign: noDunkingSprites[0], no: noDunkingSprites[1], seatbelt: noDunkingSprites[2],
+                                   double: noDunkingSprites[3], triple: noDunkingSprites[4])
         }
         planeNode?.size = FlightB411Art.planeSize
         planeNode?.position = stageGround.convert(FlightB411Art.stageCentre + CGPoint(x: 0, y: FlightB411Art.planeY), to: self)
@@ -7323,6 +7346,22 @@ final class GameScene: SKScene {
             let tintShare: CGFloat = growing || flashWhite ? 1 : (player.throwParrying ? 0.85 : 0)
             node.color = tint
             node.colorBlendFactor = tintShare
+            // K&A: the body under the night's wash, as the stage is, its glowing parts drawn
+            // again over it without.
+            let washed = kAndAArt != nil && tintShare == 0
+            if washed {
+                node.color = SKColor(rgb: KAndAArt.beyond)
+                node.colorBlendFactor = KAndAArt.washAlpha
+            }
+            let glowingParts = glowingPartNodes[index]
+            if washed, let parts = sprites.glowingPartsTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
+                glowingParts.isHidden = false
+                glowingParts.texture = parts
+                glowingParts.size = node.size
+                glowingParts.anchorPoint = node.anchorPoint
+            } else {
+                glowingParts.isHidden = true
+            }
             headNodes[index].color = tint
             headNodes[index].colorBlendFactor = tintShare
 

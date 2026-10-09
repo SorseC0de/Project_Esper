@@ -249,8 +249,10 @@ public struct Player: Equatable {
         didSet { if power == .titanTea || firingBeam, hitStun > 0 { hitStun = 0 } }
     }
     public var snatchCooldown = 0
-    /// Parried: frames before a slash or a snatch answers again, through the stun and on past it.
+    /// Parried: frames, through the stun and on past it, in which nothing answers, stick or
+    /// button, and the body's drawn reeling (the ledge sheet's last frame).
     public var attackLockout = 0
+    public var parryLocked: Bool { attackLockout > 0 }
     /// The corner being hung from, and frames after walking off an edge before a corner
     /// can be grabbed.
     public var ledge: Vec2?
@@ -505,7 +507,8 @@ public struct Player: Equatable {
     /// is, for Flash Fizz's warp to it.
     public mutating func step(input given: PlayerInput, stage sharedStage: Stage, opponentX: Double? = nil,
                               ballHolder: Int? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
-        var input = given
+        // Parried: every input held off, stick and buttons, till the lockout's done.
+        var input = parryLocked ? PlayerInput.idle : given
         underwater = sharedStage.features.underwater
         tiltPull = sharedStage.tiltPull
         tiltDown = sharedStage.tiltDown
@@ -1566,7 +1569,8 @@ public struct Player: Equatable {
             action = asked
         }
         wanted = nil
-        lastInput = input
+        // Locked, the buttons as really held, so one held through the lock doesn't fire as it ends.
+        lastInput = parryLocked ? given : input
         return action
     }
 

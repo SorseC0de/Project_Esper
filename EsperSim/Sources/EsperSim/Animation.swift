@@ -136,6 +136,8 @@ extension Player {
     /// the sim, so the drawing can never change the game.
     public var animationFrame: AnimationFrame {
         let t = stateTimer
+        // Parried: reeling, the ledge sheet's last frame, the whole lockout.
+        if parryLocked { return AnimationFrame(.ledge, Animation.ledge.frameCount - 1) }
         if boltPose > 0, state != .webSwing, state != .webPull, state != .webbed {
             // Volta Cola's bolt: the whole throw sheet at 15 a second, ground or air.
             return AnimationFrame(grounded ? .throwForward : .throwAir, (VoltaRules.boltPoseFrames - boltPose) * 15 / 60)

@@ -503,8 +503,8 @@ public enum ThrowParryRules {
 }
 
 /// A parry's reward: the parrier back in neutral at once, free to do anything, while the one
-/// parried is stunned (`BallRules.hitStunFrames`) and then can't slash or snatch for this
-/// long more, so the parry can be made something of.
+/// parried is locked out of every input, reeling, through the stun (`BallRules.hitStunFrames`)
+/// and this long more, so the parry can be made something of.
 public enum ParryRules {
     public static let attackLockoutAfterStunFrames = 30
 }

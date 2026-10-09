@@ -544,8 +544,10 @@ the body flashing white and its line the bright version of its colour: a slash m
 ball. A snatch still takes the ball through it. A parry's reward (`ParryRules`, protocol 120):
 the parrier is back in neutral at once, out of the snatch, the throw's stance or the stepback,
 the ball kept, no throw made, the buttons wanting a fresh press (`Player.recoverFromParry`); the
-one parried is stunned as ever and then can't slash or snatch for 30 frames past the stun (60 at first, too long)
-(`Player.attackLockout`, protocol 122), so the parry can be made something of.
+one parried is stunned as ever and locked out of every input, stick and buttons, through the stun
+and 30 frames past it (60 at first, too long), drawn reeling in the ledge sheet's last frame and
+flashing palette 2 every other pair of frames (`Player.attackLockout`, `parryLocked`; a button held
+through it doesn't fire as it ends; protocol 123), so the parry can be made something of.
 
 ## Interface
 

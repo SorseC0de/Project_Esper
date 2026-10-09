@@ -1803,14 +1803,19 @@ final class FootsiesTests: XCTestCase {
         for _ in 0..<5 { match.advance(inputs: [.idle, PlayerInput(throwBall: true)]) }
         XCTAssertEqual(match.players[1].state, .idle, "the held button wants a fresh press")
         XCTAssertTrue(match.players[1].hasBall)
-        // The slasher: stunned, then still no slash or snatch for half a second more.
+        // The slasher: stunned, then locked out of everything for half a second more, reeling.
         XCTAssertGreaterThan(match.players[0].hitStun, 0)
+        XCTAssertTrue(match.players[0].parryLocked)
+        XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.ledge, Animation.ledge.frameCount - 1))
         // Run out the stun (the parry's hit-stop holds it a while first).
         for _ in 0..<200 where match.players[0].hitStun > 0 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.players[0].hitStun, 0)
         XCTAssertGreaterThan(match.players[0].attackLockout, ParryRules.attackLockoutAfterStunFrames - 2)
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         XCTAssertNotEqual(match.players[0].state, .slashing, "locked out past the stun")
+        let before = match.players[0].position.x
+        for _ in 0..<5 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
+        XCTAssertEqual(match.players[0].position.x, before, accuracy: 0.5, "the stick does nothing either")
         while match.players[0].attackLockout > 0 { match.advance(inputs: [.idle, .idle]) }
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .slashing, "and free again after")

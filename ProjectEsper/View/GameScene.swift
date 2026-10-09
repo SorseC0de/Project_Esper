@@ -7392,11 +7392,14 @@ final class GameScene: SKScene {
 
             // Hit by the blade, the body and head flicker a dark shade of their energy, every
             // other pair of frames; locked out after a 47 basket, black, every other four.
-            let stunned = player.hitStun > 0 && (player.hitStun / 2) % 2 == 0
-            let lockedOut = player.hitStun == 0 && player.pickupLockout > 0 && (player.pickupLockout / 4) % 2 == 0
+            // Parried, the whole lockout, palette 2 every other pair of frames.
+            let parried = player.parryLocked && (player.attackLockout / 2) % 2 == 0
+            let stunned = parried || (!player.parryLocked && player.hitStun > 0 && (player.hitStun / 2) % 2 == 0)
+            let lockedOut = player.hitStun == 0 && !player.parryLocked && player.pickupLockout > 0 && (player.pickupLockout / 4) % 2 == 0
             // Taking a FLO orb, the whole body flashes its energy's own colour.
             let absorbing = floFlash.indices.contains(index) && floFlash[index] > 0
             let flashColour = absorbing ? SKColor(rgb: sprites.look(for: index).glow)
+                : parried ? SKColor(rgb: PixelPalette.colours[2])
                 : lockedOut ? SKColor(rgb: PixelPalette.outline) : SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
             for (flash, source) in [(stunBodies[index], node), (stunHeads[index], headNodes[index])] {
                 flash.isHidden = !(stunned || lockedOut || absorbing) || source.isHidden

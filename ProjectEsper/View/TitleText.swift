@@ -126,6 +126,25 @@ enum TitleText {
         return node
     }
 
+    /// `text` broken into lines at its spaces, each as wide as the lettering at `size` allows
+    /// within `width` (outline and drop counted); a word wider than that alone on its line.
+    static func wrapped(_ text: String, size: CGFloat, width: CGFloat, italic: Bool = false) -> [String] {
+        func fits(_ line: String) -> Bool { node(line, size: size, italic: italic).size.width <= width }
+        var lines: [String] = []
+        var line = ""
+        for word in text.split(separator: " ").map(String.init) {
+            let tried = line.isEmpty ? word : line + " " + word
+            if line.isEmpty || fits(tried) {
+                line = tried
+            } else {
+                lines.append(line)
+                line = word
+            }
+        }
+        if !line.isEmpty { lines.append(line) }
+        return lines
+    }
+
     /// Swaps a sprite's lettering, keeping its place.
     static func set(_ node: SKSpriteNode, to text: String, size: CGFloat, italic: Bool = false, lit: Bool = false) {
         let texture = texture(text, size: size, italic: italic, lit: lit)

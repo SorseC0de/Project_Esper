@@ -127,7 +127,8 @@ enum KAndAArt {
     nonisolated(unsafe) static var washAlpha: CGFloat = {
         CGFloat(UserDefaults.standard.object(forKey: washAlphaKey) as? Double ?? 0.1)
     }()
-    static let washZ: CGFloat = 19.5
+    /// Under the sound words (19) too.
+    static let washZ: CGFloat = 18.5
     /// One chance in 600 a frame: a flicker every ten seconds or so.
     static let flickerChance = 1.0 / 600
     static let flickerFrames = 6...20

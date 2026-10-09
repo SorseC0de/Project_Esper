@@ -598,12 +598,18 @@ at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the p
 face, above its lip, and is nudged up and left by half its own drop. TEXT Y on the panel
 scales that lift, one value a platform: half of it, 0.5, on all of them. The stage select: STAGE SELECT on a ribbon, each stage a royal blue plate
 with its name on the face, gold when a cursor or a pick is on it. The Greateraid pick,
-on the palette's black rather than the royal blue: its ribbon, the line under it in title
-lettering, the raised drink's name under that (and "(Second Sip)" under the name when it
-is one), the quote and what the drink does on a blue banner below, and online the
-seconds in a blue round button, top right. The bottles carry no names and no arrow: the
-raised one grows and wears a thick white outline, white copies of it ringed behind it so
-it takes the lean. The wait screen: the same black, the same ribbon, and its seconds in
+on the palette's black rather than the royal blue: its ribbon, smaller than the other
+screens' (26 on a 200 by 38 ribbon), the line under it in title lettering, and on a blue
+banner below, 120 deep, its top where the drinker stands: the raised drink's name across the
+banner's top edge, in front of the drinker, lettered as the FLO meter's word (Bigdex, gold over
+cyan, plum and purple outline, unskewed; "(Second Sip)" over it when it is one), the quote under
+it, 13, italic, at 0.7, and what the drink does under that in as many lines as it takes, at the
+largest of 20, 18, 16, 14 or 12 whose lines fit the banner (`TitleText.wrapped`,
+`PickScreen.layBlurb`); online the seconds in a blue round button, top right. The bottles carry
+no names and no arrow: each vector drawn once at the size it's shown (`PickScreen.bottle`), the
+raised one grows and wears a thick white outline, one white silhouette baked from it and drawn
+behind it as its child, so it takes the lean (sixteen recoloured copies of the vector drew as a
+broken second bottle). The wait screen: the same black, the same ribbon, and its seconds in
 the same blue round button. The HUD: the
 round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, THROW, SHOOT and
@@ -1988,8 +1994,10 @@ and the FLO meters' are.
 Now and then (one chance in 600 a frame, every ten seconds or so) one flickers for 6 to 20 frames,
 dimming to a third every other pair of frames. Over the stage's art lies a wash of palette 30 at a
 tenth (`KAndAArt.washAlpha`, the strip's WASH, kept, `washOverlay`, a flat sprite on the camera at
-19.5, `washZ`, the chevrons lifted over it): under the lights' cones (`coneZ`, just over it), the
-players (20), the effects and the rims' fronts (21); the bodies take it as a tint (their colour
+18.5, `washZ`, the chevrons lifted over it): under the lights' cones (`coneZ`, just over it), the
+sound words (19), the players (20), the effects, the rims' fronts and the score lightning (21; the
+lightning also cut out in the glow's mask, `cutOutSnapshots`, so it glows over the backdrop as on
+the Wreck Center); the bodies take it as a tint (their colour
 blend, when nothing else is tinting them) with their glowing parts drawn again over them
 untinted (`glowingPartNodes`, `SpriteLibrary.glowingPartsTexture`), and the front pillars (22) take
 it as a tint too; the cylinder nets, drawn apart, never have it (`waterTint` nil here). The hoops hang from the bridge's underside, the

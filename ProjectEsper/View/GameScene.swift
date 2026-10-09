@@ -449,14 +449,18 @@ final class GameScene: SKScene {
 
     /// What glows at the plain threshold wherever it is, over the stage's flats too: the hood's
     /// strings, up or down (over skin, which never glows, they were swallowed), the energy
-    /// form's head apart, and each body's energy, the slash's blade and the sheets' puffs.
+    /// form's head apart, each body's energy, the slash's blade and the sheets' puffs, and the score lightning.
     var cutOutSnapshots: [BodySnapshot] {
         let strings = hoodStrings.indices.filter { !greyedOut.contains($0) }.flatMap { hoodStrings[$0].snapshots }
         let apart = (headNodes + energyNodes).filter { !$0.isHidden && $0.parent != nil }.compactMap { node in
             node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
                                             size: node.size, zRotation: node.zRotation) }
         }
-        return strings + apart
+        let strikes = scoreStrikes.filter { $0.parent != nil && !$0.isHidden }.compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
+                                            size: node.size, zRotation: node.zRotation) }
+        }
+        return strings + apart + strikes
     }
     var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face, only: Set(hoodNodes.indices).subtracting(energyHoods)) }
     /// The players whose hooded head is FloState's, its face energy.
@@ -5619,7 +5623,12 @@ final class GameScene: SKScene {
         let crown = EnergyEffect.scoreStrike.node(sprites, player: scorer, at: rim)
         crown.zPosition = 46
         glowers.addChild(crown)
+        scoreStrikes.removeAll { $0.parent == nil }
+        scoreStrikes.append(crown)
     }
+    /// The score lightning on the go, for the glow's mask: it glows over a stage's flat backdrop
+    /// as the bodies' effects do.
+    private var scoreStrikes: [SKSpriteNode] = []
 
     private func line(from a: CGPoint, to b: CGPoint) -> CGPath {
         let path = CGMutablePath()

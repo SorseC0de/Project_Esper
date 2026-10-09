@@ -50,8 +50,12 @@ public struct Match: Equatable {
     public var bins: [Bin] = []
     public var ballBin: Int?
     public var lastBin: Int?
-    /// Empty bins opened in a row, and whose hoop came out last, for the next to be the other's.
+    /// Empty bins opened in a row.
     public var emptyRun = 0
+    /// Flight B411's 2X and 3X signs in 47: the multiplier lit, 1 with neither, and the frames to
+    /// the next roll of the dice for one, or to its going out.
+    public var pointMultiplier = 1
+    public var multiplierClock = 0
     public var scores: [Int]
     /// Rounds reset on a point; 47 plays on through its baskets.
     public var mode = GameMode.rounds
@@ -505,6 +509,17 @@ public struct Match: Equatable {
             players[index].slideHit = true
             strip(other, by: index, knock: nil)
         }
+        if let blade = player.slashHitbox, var cart, blade.overlaps(cart.box) {
+            // Flight B411: the blade sends the cart rolling the way the swing goes, at its most,
+            // into whoever's there; not back into the slasher.
+            let way = player.facing.sign
+            if cart.velocity * way < FlightB411Rules.cartTopSpeed {
+                cart.velocity = way * FlightB411Rules.cartTopSpeed
+                self.cart = cart
+                if cartHitFrames.indices.contains(index) { cartHitFrames[index] = FlightB411Rules.cartHitFrames }
+                events.append(.cartSlashed(player: index))
+            }
+        }
         if let blade = player.slashHitbox {
             // Clear of the floor the body stands on, the blade in a wall clanks, once a swing.
             if player.reached(SlashRules.liveFrames.lowerBound) {
@@ -609,6 +624,10 @@ public struct Match: Equatable {
             players[other].slashHit = true
             let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
             strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), flo: 0)
+            // The one parried can't swing or snatch again until a while after the stun; the
+            // parrier is back in neutral at once.
+            players[other].attackLockout = players[other].hitStun + ParryRules.attackLockoutAfterStunFrames
+            players[index].recoverFromParry()
             events.append(.parried(player: other, by: index))
             earnFlo(FloRules.counter, by: index, off: other, at: players[other].chest)
             holdHitStop(HitStopRules.counterFrames)
@@ -685,8 +704,9 @@ public struct Match: Equatable {
         }
     }
 
-    /// What a 47 basket's points are multiplied by on this stage.
-    var pointValue: Int { stage.features.doublePoints ? 2 : 1 }
+    /// What a 47 basket's points are multiplied by on this stage: Hoopfish Hideaway's double, and
+    /// Flight B411's 2X or 3X sign while one's lit.
+    var pointValue: Int { (stage.features.doublePoints ? 2 : 1) * pointMultiplier }
 
     /// Where a player starts: the stage's spot, lifted onto whatever stands there, such as a car.
     func spawnPoint(_ index: Int) -> Vec2 {

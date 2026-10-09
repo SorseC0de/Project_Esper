@@ -384,7 +384,9 @@ enum FlightB411Art {
     }
 
     /// NO DUNKING, in the dark over the bins: the sign in palette 7, glowing, and over it the red
-    /// "no", a ring and a slash, glowing too. Centred on the stage, halfway up the band over the bins.
+    /// "no", a ring and a slash, glowing too; the seatbelt beside it, and 47's 2X and 3X at the
+    /// row's two ends. Centred on the stage, halfway up the band over the bins.
+    /// The sprites: the sign, the "no", the seatbelt, 2X, 3X.
     static func noDunkingSign(into parent: SKNode) -> (holder: SKNode, sprites: [SKSpriteNode]) {
         let holder = SKNode()
         let centre = CGPoint(x: (CGFloat(FlightB411Rules.width / Stage.tileSize) * ElementsArt.tileSide / 2).rounded(),
@@ -410,10 +412,44 @@ enum FlightB411Art {
         seatbelt.size = CGSize(width: beltWidth, height: 24)
         seatbelt.position = CGPoint(x: row / 2 - beltWidth / 2, y: 0)
         holder.addChild(seatbelt)
-        laySigns(sign: sign, no: no, seatbelt: seatbelt)
+        let multipliers = [2, 3].map { times -> SKSpriteNode in
+            let texture = multiplierSign(times, lit: false)
+            let node = SKSpriteNode(texture: texture)
+            node.size = texture.size()
+            holder.addChild(node)
+            return node
+        }
+        laySigns(sign: sign, no: no, seatbelt: seatbelt, double: multipliers[0], triple: multipliers[1])
         parent.addChild(holder)
-        SKTexture.preload([texture, noTexture, belt, seatbeltOff]) {}
-        return (holder, [sign, no, seatbelt])
+        SKTexture.preload([texture, noTexture, belt, seatbeltOff] + [2, 3].flatMap { [multiplierSign($0, lit: false), multiplierSign($0, lit: true)] }) {}
+        return (holder, [sign, no, seatbelt] + multipliers)
+    }
+
+    /// 47's 2X or 3X sign, as the cabin's signs are: the lettering 24 high, palette 7 lit and
+    /// glowing, palette 33 out. Cached.
+    nonisolated(unsafe) private static var multiplierSigns: [String: SKTexture] = [:]
+    static func multiplierSign(_ times: Int, lit: Bool) -> SKTexture {
+        let key = "\(times)|\(lit)"
+        if let made = multiplierSigns[key] { return made }
+        let text = "\(times)X" as NSString
+        let font = UIFont(name: "AvenirNextCondensed-Heavy", size: 30) ?? UIFont.boldSystemFont(ofSize: 30)
+        let rgb = PixelPalette.colours[lit ? 7 : 33]
+        let colour = UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255, blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colour]
+        let measured = text.size(withAttributes: attributes)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        // The capitals' height is the sign's 24: the line box trimmed to them.
+        let capTop = font.ascender - font.capHeight
+        let scale = 24 / font.capHeight
+        let image = UIGraphicsImageRenderer(size: CGSize(width: ceil(measured.width * scale), height: 24), format: format).image { context in
+            context.cgContext.scaleBy(x: scale, y: scale)
+            text.draw(at: CGPoint(x: 0, y: -capTop), withAttributes: attributes)
+        }
+        let texture = SKTexture(image: image)
+        texture.filteringMode = .nearest
+        multiplierSigns[key] = texture
+        return texture
     }
     /// The seatbelt sign lit, glowing, through the count while the ball's shut in its bin: its
     /// arrow red and the rest palette 7.
@@ -473,13 +509,22 @@ enum FlightB411Art {
     }()
     /// The signs in their row, the seatbelt at its own scale (`beltScale`), a gap of 12 between, the row centred.
     static let signWidth: CGFloat = 22, beltWidth: CGFloat = 118, signGap: CGFloat = 12
-    static func laySigns(sign: SKSpriteNode, no: SKSpriteNode, seatbelt: SKSpriteNode) {
+    static func laySigns(sign: SKSpriteNode, no: SKSpriteNode, seatbelt: SKSpriteNode, double: SKSpriteNode, triple: SKSpriteNode) {
         let belt = beltWidth * beltScale
-        let row = signWidth + signGap + belt
-        sign.position = CGPoint(x: -row / 2 + signWidth / 2, y: 0)
+        // 2X, NO DUNKING, the seatbelt, 3X, a gap between each.
+        let widths = [double.size.width, signWidth, belt, triple.size.width]
+        let row = widths.reduce(0, +) + signGap * CGFloat(widths.count - 1)
+        var left = -row / 2
+        func place(_ node: SKSpriteNode, _ width: CGFloat) {
+            node.position = CGPoint(x: left + width / 2, y: 0)
+            left += width + signGap
+        }
+        place(double, widths[0])
+        place(sign, widths[1])
         no.position = sign.position
         seatbelt.setScale(beltScale)
-        seatbelt.position = CGPoint(x: row / 2 - belt / 2, y: 0)
+        place(seatbelt, widths[2])
+        place(triple, widths[3])
     }
     /// The seatbelt's own scale against the sign's: 0.4, baked.
     static let beltScale: CGFloat = 0.4
@@ -491,6 +536,8 @@ enum FlightB411Art {
     /// How much the cart tips with its speed, into the way it's going, about its wheels; flat
     /// at rest.
     static let cartSpeedTip: CGFloat = 0.06
+    /// The hoopcase's wobble as it slides out of its bin, either way, radians.
+    static let caseSlideWobble: CGFloat = 0.03
 
     /// A cloud, `FlightB411Cloud` (192 by 64), for the sky beyond the plane, at two thirds.
     static let cloud: SKTexture = {
@@ -547,6 +594,27 @@ enum FlightB411Art {
         }
         handles.backdrop = picture("FlightB411Backdrop", z: backdropZ, into: parent)
         handles.front = picture("FlightB411Front", z: 0, into: frontParent)
+        for node in [handles.backdrop, handles.front].compactMap({ $0 }) { node.shader = softEdges(for: node) }
         return handles
+    }
+
+    /// The map's edges soft: each picture fading to clear over its outer `edgeFade` art pixels,
+    /// into the sky; the EDGE FADE slider's, kept.
+    static let edgeFadeKey = "esper.flightB411.edgeFade"
+    nonisolated(unsafe) static var edgeFade: CGFloat = {
+        CGFloat(UserDefaults.standard.object(forKey: edgeFadeKey) as? Double ?? 8)
+    }()
+    static func softEdges(for node: SKSpriteNode) -> SKShader {
+        let shader = SKShader(source: """
+        void main() {
+            vec4 colour = texture2D(u_texture, v_tex_coord);
+            vec2 pixel = v_tex_coord * u_size;
+            float inside = min(min(pixel.x, u_size.x - pixel.x), min(pixel.y, u_size.y - pixel.y));
+            gl_FragColor = colour * smoothstep(0.0, max(u_fade, 0.001), inside);
+        }
+        """)
+        shader.uniforms = [SKUniform(name: "u_size", vectorFloat2: vector_float2(Float(node.size.width), Float(node.size.height))),
+                           SKUniform(name: "u_fade", float: Float(edgeFade))]
+        return shader
     }
 }

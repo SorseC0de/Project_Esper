@@ -498,7 +498,15 @@ public enum StunRules {
 /// trip) before the other phone's slash start arrives, the least that still leaves a read
 /// online rather than luck.
 public enum ThrowParryRules {
-    public static let frames = 10
+    /// A third of a second: at ten it was too short to read a slash coming.
+    public static let frames = 20
+}
+
+/// A parry's reward: the parrier back in neutral at once, free to do anything, while the one
+/// parried is stunned (`BallRules.hitStunFrames`) and then can't slash or snatch for this
+/// long more, so the parry can be made something of.
+public enum ParryRules {
+    public static let attackLockoutAfterStunFrames = 60
 }
 
 /// The stepback: down on the ground in a shot's or throw's stance once it's held, once a

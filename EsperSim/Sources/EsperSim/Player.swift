@@ -249,6 +249,8 @@ public struct Player: Equatable {
         didSet { if power == .titanTea || firingBeam, hitStun > 0 { hitStun = 0 } }
     }
     public var snatchCooldown = 0
+    /// Parried: frames before a slash or a snatch answers again, through the stun and on past it.
+    public var attackLockout = 0
     /// The corner being hung from, and frames after walking off an edge before a corner
     /// can be grabbed.
     public var ledge: Vec2?
@@ -574,6 +576,7 @@ public struct Player: Equatable {
         if input.shootButtons == 0 { shootReady = true }
         if !input.throwBall { throwReady = true }
         if snatchCooldown > 0 { snatchCooldown -= 1 }
+        if attackLockout > 0 { attackLockout -= 1 }
         if ledgeCooldown > 0 { ledgeCooldown -= 1 }
         if hitStun > 0 {
             // Stunned: no button answers; with the lock on, the stick doesn't either. It ends a snipe.
@@ -1571,7 +1574,7 @@ public struct Player: Equatable {
     /// button for their own thing, nor for 47's scorer while they're kept off the ball (a slash
     /// knocking it loose bought the time to take it back).
     private var slashAllowed: Bool {
-        !power.takesShoot && !(power == .platformShake && powerLevel >= 2) && pickupLockout == 0
+        !power.takesShoot && !(power == .platformShake && powerLevel >= 2) && pickupLockout == 0 && attackLockout == 0
     }
 
     /// Whether throw without the ball is the snatch: Web Water's line and Pulsepistol's
@@ -1724,8 +1727,20 @@ public struct Player: Equatable {
     }
 
     private mutating func startSnatch() {
+        // Parried a moment ago: the throw button does nothing yet.
+        guard attackLockout == 0 else { return }
         fastFalling = false
         enter(.snatching)
+    }
+
+    /// Having parried: out of the snatch, the throw's stance or the stepback at once, back in
+    /// neutral to do anything, the ball kept if held; the buttons wanting a fresh press.
+    public mutating func recoverFromParry() {
+        guard [.snatching, .throwStance, .stepback].contains(state) else { return }
+        shootReady = false
+        throwReady = false
+        quickThrow = false
+        enter(grounded ? .idle : .air)
     }
 
     /// At level two, up and down on the stick turn the beam, any angle within its range.

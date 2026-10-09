@@ -72,6 +72,11 @@ public enum FlightB411Rules {
     /// empty in a row.
     public static let binOpenFrames = 600
     public static let emptyRunMost = 2
+    /// 47's 2X and 3X signs: after the start's level spell, every 5 to 15 seconds the dice pick
+    /// neither, 2X or 3X, a third each; one lit stays lit 3 seconds, a basket meanwhile worth
+    /// that many times its points.
+    public static let multiplierWaitFrames = 300...900
+    public static let multiplierLitFrames = 180
 
     /// Where a bin is: its middle, and the ball's wait in its mouth, and its hoopcase's ring.
     /// The middle bin's ball waits over the plane's middle, equally far from both starts: the
@@ -150,6 +155,7 @@ extension Match {
     mutating func stepFlightB411() {
         guard stage.features.tilts else { return }
         stepBins()
+        if mode == .fortySeven, frame >= flightStartsAt { stepMultiplier() }
         // Level through the count and a while after, the bins still.
         if frame < flightStartsAt {
             stage.tilt = 0
@@ -235,6 +241,27 @@ extension Match {
             bins[index].retreating = true
         }
         stage.hoops[hoop].position = HighwayRules.parked
+    }
+
+    /// The 2X and 3X signs: one lit for its spell, then out; between, a wait off the dice and a
+    /// roll for neither, the one or the other.
+    private mutating func stepMultiplier() {
+        if multiplierClock > 0 {
+            multiplierClock -= 1
+            return
+        }
+        if pointMultiplier > 1 {
+            pointMultiplier = 1
+        } else {
+            let lit = [1, 2, 3][fieldDice.roll(3)]
+            pointMultiplier = lit
+            if lit > 1 {
+                multiplierClock = FlightB411Rules.multiplierLitFrames
+                return
+            }
+        }
+        let wait = FlightB411Rules.multiplierWaitFrames
+        multiplierClock = wait.lowerBound + fieldDice.roll(wait.upperBound - wait.lowerBound + 1)
     }
 
     private mutating func stepCart() {

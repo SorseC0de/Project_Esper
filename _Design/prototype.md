@@ -535,11 +535,14 @@ well (`Player.knock`), and the pulse doesn't stun. The slash strips a body with 
 without the ball, knocking it 4 along the swing and 2 up. The snatch has no
 cooldown, as the slash has none, and meeting a live blade it's the parry: the slasher
 is the one stripped and knocked back, the blade spent, resolved before the blades so it
-always wins. The throw stance parries too, over its first ten frames (`ThrowParryRules`),
+always wins. The throw stance parries too, over its first twenty frames, a third of a second
+(`ThrowParryRules`, ten was too short to read a slash coming; protocol 120),
 the body flashing white and its line the bright version of its colour: a slash meeting it strips the slasher and the thrower keeps the
-ball. Six is two frames of online input delay and about four of a slash start still on
-its way from the other phone, the least that leaves a read online. A snatch still takes
-the ball through it.
+ball. A snatch still takes the ball through it. A parry's reward (`ParryRules`, protocol 120):
+the parrier is back in neutral at once, out of the snatch, the throw's stance or the stepback,
+the ball kept, no throw made, the buttons wanting a fresh press (`Player.recoverFromParry`); the
+one parried is stunned as ever and then can't slash or snatch for 60 frames past the stun
+(`Player.attackLockout`), so the parry can be made something of.
 
 ## Interface
 
@@ -1194,7 +1197,7 @@ differently, and it holds its jumps through the squat so its hops are full.
   dunk, and it only takes the stance for one inside the dunk's reach, 25, so the stance
   goes onto the rim rather than letting go as a throw. Once the other has swung twice in
   a second and a half, spam as it reads it, the next swing in reach facing it is met with
-  the throw stance's parry, held its ten frames and cancelled with shoot, the ball kept.
+  the throw stance's parry, held its frames and cancelled with shoot, the ball kept.
 - Without the ball and the other holding it, it guards the rim they score on: it walks
   to a spot 25 in front of that rim on their side and stands facing them. It strikes,
   a dash in and the swing when the blade will reach, a hop first if they're above, when
@@ -1872,7 +1875,8 @@ open at a time, for ten seconds (`binOpenFrames`), then shut and another opened 
 the same one twice running (`Match.lastBin`), with nothing in it, or the hoop: empty one time in
 three but never a third time running (`emptyRunMost`, `Match.emptyRun`), so there is at most one
 hoop on the stage. The hoop comes out in a hoopcase that slides down
-out of the bin over 20 frames (`caseSlideFrames`, `Bin.caseFrames`) and slides back in before the
+out of the bin over 20 frames (`caseSlideFrames`, `Bin.caseFrames`), jittering as it comes, a pixel
+either way and a hair of turn (`caseSlideWobble`), and slides back in before the
 bin shuts; scored on, in 47, it retreats at once (`flightB411Scored`, `Bin.retreating`) and its bin
 shuts and the next opens, so the one hoop can't take the ball twice (in Rounds the point's restart
 shuts everything anyway). The rim is live only with the case all the way out (`Bin.hoopLive`),
@@ -1933,6 +1937,15 @@ plane's walls is anything to land on or jump off (`StageFeatures.wallJumps`, fal
 board's ride is still allowed). Rolling into anyone
 else at 0.2 or more it knocks them its way (`cartPush`), stuns them, pops the ball out of their
 hands if they hold it (`.cartHit`; HIT, a spark, the strike's sound), and can't hit them again for 30 frames.
+A slash's blade meeting the cart sends it rolling the way the swing goes at its top speed, 2, into
+whoever's there, and not back into the slasher for 30 frames (`.cartSlashed`, a clank and a spark;
+protocol 120). In 47 the row of signs has 2X and 3X at its two ends, out in palette 33: after the
+start's level spell, every 5 to 15 seconds the dice pick neither, 2X or 3X, a third each
+(`FlightB411Rules.multiplierWaitFrames`), and one lit, palette 7 and glowing, stays lit three seconds
+(`multiplierLitFrames`, `Match.pointMultiplier`), a basket meanwhile worth that many times its points
+(`pointValue`). In Rounds a point is a point and they never light. The map's edges are soft: the
+backdrop and the front fade to clear over their outer 8 art pixels into the sky (`softEdges`, the
+strip's EDGE FADE, 0 to 32, kept).
 
 ## K&A
 

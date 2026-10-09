@@ -265,6 +265,46 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertTrue(match.bins.contains(where: \.open), "and the next bin open")
     }
 
+    func testA2XOr3XSignLightsNowAndThenIn47AndMultipliesABasket() {
+        var match = Match(stage: .flightB411, countdown: 0, seed: 9, mode: .fortySeven)
+        match.cart = nil
+        var seen: Set<Int> = []
+        var litRun = 0, longest = 0
+        for _ in 0..<(FlightB411Rules.startLevelFrames + 60 * 120) {
+            match.advance(inputs: [.idle, .idle])
+            seen.insert(match.pointMultiplier)
+            litRun = match.pointMultiplier > 1 ? litRun + 1 : 0
+            longest = max(longest, litRun)
+            XCTAssertEqual(match.pointValue, match.pointMultiplier)
+        }
+        XCTAssertEqual(seen, [1, 2, 3], "both signs light at some point")
+        XCTAssertLessThanOrEqual(longest, FlightB411Rules.multiplierLitFrames + 1, "three seconds at a time")
+        // In Rounds a point is a point: the signs never light.
+        var rounds = Match(stage: .flightB411, countdown: 0, seed: 9)
+        for _ in 0..<(FlightB411Rules.startLevelFrames + 60 * 60) {
+            rounds.advance(inputs: [.idle, .idle])
+            XCTAssertEqual(rounds.pointMultiplier, 1)
+        }
+    }
+
+    func testASlashSendsTheCartRollingTheWayItSwings() {
+        var match = flight()
+        hold(&match, at: 0)
+        guard let cart = match.cart else { return XCTFail("no cart") }
+        match.players[0].position = Vec2(x: cart.box.min.x - 8, y: cart.box.min.y)
+        match.players[0].facing = .right
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        var sent = false
+        for _ in 0..<SlashRules.frames where !sent {
+            hold(&match, at: 0)
+            match.advance(inputs: [.idle, .idle])
+            sent = match.events.contains(.cartSlashed(player: 0))
+        }
+        XCTAssertTrue(sent)
+        XCTAssertGreaterThan(match.cart?.velocity ?? 0, 1, "rolling right")
+        XCTAssertGreaterThan(match.cartHitFrames[0], 0, "not back into the slasher")
+    }
+
     func testARoundCanStartTheBallFromAnyBin() {
         var match = Match(stage: .flightB411, countdown: 30)
         match.startFromBin(4)

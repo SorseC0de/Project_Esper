@@ -580,9 +580,10 @@ final class GameScene: SKScene {
     var glowThroughSnapshots: [BodySnapshot] {
         if let art = hoopfishHideawayArt { return art.fishGlowParts }
         // Flight B411's NO DUNKING sign and its red "no", glowing through the backdrop's flat;
-        // the seatbelt sign too while it's lit.
+        // the seatbelt sign, and the 2X or the 3X, while lit.
         guard let holder = noDunkingNode, !holder.isHidden else { return [] }
-        let glowing = seatbeltLit ? noDunkingSprites : Array(noDunkingSprites.prefix(2))
+        let lit = [true, true, seatbeltLit, match.pointMultiplier == 2, match.pointMultiplier == 3]
+        let glowing = noDunkingSprites.indices.filter { $0 < lit.count && lit[$0] }.map { noDunkingSprites[$0] }
         return glowing.compactMap { sprite in
             sprite.texture.map { BodySnapshot(texture: $0, position: CGPoint(x: holder.position.x + sprite.position.x * holder.xScale, y: holder.position.y + sprite.position.y * holder.yScale),
                                               anchor: sprite.anchorPoint, xScale: 1,
@@ -3147,6 +3148,10 @@ final class GameScene: SKScene {
                 FlightB411Art.planeY = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: FlightB411Art.planeYKey)
             }
+            controls.addSlider(title: "EDGE FADE", range: 0...32, notch: 1, value: Float(FlightB411Art.edgeFade)) { value in
+                FlightB411Art.edgeFade = CGFloat(value)
+                UserDefaults.standard.set(Double(value), forKey: FlightB411Art.edgeFadeKey)
+            }
             controls.addSlider(title: "NO DUNK SCALE", range: 0.5...4, notch: 0.25, value: Float(FlightB411Art.signScale)) { value in
                 FlightB411Art.signScale = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: FlightB411Art.signScaleKey)
@@ -5020,6 +5025,7 @@ final class GameScene: SKScene {
             case .snatchReached(let index): play(.snatch, at: body(index))
             case .caught(let index): play(.catchBall, at: body(index))
             case .struck(let victim, _), .popped(let victim, _), .cartHit(let victim, _): play(.playerHit, at: body(victim))
+            case .cartSlashed(let index): play(.slashWallClank, at: body(index))
             case .parried(let victim, _): play(.parry, at: body(victim))
             case .dunked: dunkScoring = true
             // Quiet for a soft bounce, silent once it's only settling.
@@ -5248,6 +5254,8 @@ final class GameScene: SKScene {
                 spawnHitSpark(player: popper, at: match.players[victim].heldBallPoint)
             case .cartHit(let victim, _):
                 spawnHitSpark(player: victim, at: match.players[victim].chest)
+            case .cartSlashed(let index):
+                if let cart = match.cart { spawnHitSpark(player: index, at: cart.box.center) }
             case .swatted(let index, hit: true):
                 spawnHitSpark(player: index, at: match.ball.position)
             case .slashClanked(let index):
@@ -6807,7 +6815,14 @@ final class GameScene: SKScene {
         }
         noDunkingNode?.setScale(FlightB411Art.signScale)
         // The seatbelt sign lit while the ball's shut in its bin, off once it drops.
-        if noDunkingSprites.count == 3 { noDunkingSprites[2].texture = seatbeltLit ? FlightB411Art.seatbelt : FlightB411Art.seatbeltOff }
+        if noDunkingSprites.count == 5 {
+            noDunkingSprites[2].texture = seatbeltLit ? FlightB411Art.seatbelt : FlightB411Art.seatbeltOff
+            noDunkingSprites[3].texture = FlightB411Art.multiplierSign(2, lit: match.pointMultiplier == 2)
+            noDunkingSprites[4].texture = FlightB411Art.multiplierSign(3, lit: match.pointMultiplier == 3)
+        }
+        for picture in [flightB411Art?.backdrop, flightB411Art?.front].compactMap({ $0 }) {
+            picture.shader?.uniformNamed("u_fade")?.floatValue = Float(FlightB411Art.edgeFade)
+        }
         planeNode?.size = FlightB411Art.planeSize
         planeNode?.position = stageGround.convert(FlightB411Art.stageCentre + CGPoint(x: 0, y: FlightB411Art.planeY), to: self)
         // Each hoop's case: hanging from its bin's mask line, as far out as its slide is, swung
@@ -6822,8 +6837,12 @@ final class GameScene: SKScene {
             let rim = SpriteLibrary.point(FlightB411Rules.rimSpot(in: bin))
             // The mask line: the suitcase's top at rest, less the masked rows.
             let line = CGPoint(x: rim.x, y: rim.y + FlightB411Art.hoopcaseRing.y - FlightB411Art.caseTopRow - FlightB411Art.caseMaskRows)
+            // Sliding out of the bin, it jitters a little: a pixel either way, a hair of turn.
+            let sliding = !match.bins[bin].retreating && match.bins[bin].caseFrames > 0 && match.bins[bin].caseFrames < FlightB411Rules.caseSlideFrames
+            let jitter = sliding ? CGPoint(x: CGFloat(Int.random(in: -1...1)), y: 0) : .zero
+            let wobble = sliding ? CGFloat.random(in: -FlightB411Art.caseSlideWobble...FlightB411Art.caseSlideWobble) : 0
             FlightB411Art.layCase(back: hoopcaseNodes[index], front: hoopcaseFronts[index],
-                                  out: CGFloat(match.bins[bin].caseOut), anchor: line, swing: -tilt * FlightB411Art.caseSwing)
+                                  out: CGFloat(match.bins[bin].caseOut), anchor: line + jitter, swing: -tilt * FlightB411Art.caseSwing + wobble)
         }
         skyNode.position = cameraNode.position
         for index in clouds.indices {

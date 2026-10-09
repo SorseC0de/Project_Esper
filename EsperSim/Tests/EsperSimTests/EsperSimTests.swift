@@ -1780,8 +1780,40 @@ final class FootsiesTests: XCTestCase {
         let early = slashed(stanceFramesBefore: 1)
         XCTAssertTrue(early.events.contains(.parried(player: 0, by: 1)), "early in the stance it's a parry")
         XCTAssertTrue(early.players[1].hasBall)
-        let late = slashed(stanceFramesBefore: 20)
+        // Its window a third of a second: a slash met fifteen frames in is still parried.
+        XCTAssertTrue(slashed(stanceFramesBefore: 12).events.contains(.parried(player: 0, by: 1)))
+        let late = slashed(stanceFramesBefore: 24)
         XCTAssertTrue(late.events.contains(.popped(player: 1, by: 0)), "long into it the slash lands")
+    }
+
+    func testAParryPutsTheParrierBackInNeutralAndLocksTheSlasherOutPastTheStun() {
+        var match = defending(otherAt: 150)
+        match.players[1].facing = .left
+        match.advance(inputs: [.idle, PlayerInput(throwBall: true)])
+        match.advance(inputs: [PlayerInput(shoot: true), PlayerInput(throwBall: true)])
+        var parried = false
+        for _ in 0..<SlashRules.frames where !parried {
+            match.advance(inputs: [.idle, PlayerInput(throwBall: true)])
+            parried = match.events.contains(.parried(player: 0, by: 1))
+        }
+        XCTAssertTrue(parried)
+        // The parrier out of the stance at once, ball in hand, no throw made.
+        XCTAssertEqual(match.players[1].state, .idle)
+        XCTAssertTrue(match.players[1].hasBall)
+        for _ in 0..<5 { match.advance(inputs: [.idle, PlayerInput(throwBall: true)]) }
+        XCTAssertEqual(match.players[1].state, .idle, "the held button wants a fresh press")
+        XCTAssertTrue(match.players[1].hasBall)
+        // The slasher: stunned, then still no slash or snatch for a second more.
+        XCTAssertGreaterThan(match.players[0].hitStun, 0)
+        // Run out the stun (the parry's hit-stop holds it a while first).
+        for _ in 0..<200 where match.players[0].hitStun > 0 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.players[0].hitStun, 0)
+        XCTAssertGreaterThan(match.players[0].attackLockout, ParryRules.attackLockoutAfterStunFrames - 2)
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertNotEqual(match.players[0].state, .slashing, "locked out past the stun")
+        while match.players[0].attackLockout > 0 { match.advance(inputs: [.idle, .idle]) }
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .slashing, "and free again after")
     }
 
     func testSlashPopsTheBallOffAHolderTheBladeOnlyTouchesTheBodyOf() {

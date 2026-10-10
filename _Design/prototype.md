@@ -570,7 +570,7 @@ keeps the depth of a small one rather than flattening.
 The UI is being redone a screen at a time in `Futuristic_UI.svg`'s pieces (`_Graphic Assets/Vectors`):
 `Tools/import_futuristic.py` brings every named group in, the backdrop rectangle left out, as
 `ProjectEsper/UI/Futuristic/futuristic_<group>.png`, in greys for the game to multiply by a colour,
-at rest the customize screen's bottom line (blue's light, 0x45BCF5). `Futuristic` (Futuristic.swift) holds the look: a black ground,
+at rest the customize screen's bottom line (blue's light, 0x45BCF5). `Futuristic` (Futuristic.swift) holds the look: the customize screen's ground (`MenuGround`),
 Upheaval TT lettering, every piece at 0.14 points to its imported pixel so the pieces keep their sizes
 in the vector, and each frame's face (where its lettering sits, off its leads). In place of a cursor
 plate, what the cursor's on turns gold (gold's light, the customize screen's top line) and grows a
@@ -699,15 +699,16 @@ A disconnect on the screen closes it to the title.
   second (#F5BB45), the bottom line blue's second (#45BCF5), RETURN's lettering and frame blue's
   first (#6BD0FF). The halos go to greys, multiplied by the side's energy colour, the beam clear
   at its top and whole three quarters down. Each box comes as its fill, its line, and its line
-  thickened (a stroke 8 wide), the lines white to be coloured; the small boxes' fill is blue's
-  second out to its last, their line blue's second, the hood's line purple's first. The display
+  thickened (a stroke 8 wide), the lines white to be coloured; the fill isn't drawn (the player
+  boxes are lines alone, as the title's frames are; it's imported for its place), their line blue's
+  second, the hood's line purple's first. The display
   comes as its body and its bar. The 16:9 is fitted to the screen. Under it, to the screen's edges:
   the vector's gradient in the menus' colours (purple's body, plum's light at 0.42, black's last,
   out to 0.42 of the 16:9's width) and its grid (a cell 0.0139 of the width, plum's light at 0.4),
   bowed so its cells grow toward the corners (pushed out by 1 + 0.35 of the squared distance
   over the corner's). Under the grid, two glows a tenth of the width off the middle, gold's body up
   and to the left and blue's down and to the right, fading to clear at three quarters of the
-  gradient's reach, half seen.
+  gradient's reach, half seen. That ground is `MenuGround`, the title's too.
   RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second.
 - Over the middle: CUSTOMIZE on the heading's plate (cap height 0.025 of the screen, its letters
   spaced 0.08 of their size apart, `Word.spacing`) and START on

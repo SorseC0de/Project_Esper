@@ -390,7 +390,7 @@ enum TitleItem: Hashable {
     ]
 }
 
-/// The title screen, in `Futuristic_UI.svg`'s pieces on black: the gear in frame 1 in the
+/// The title screen, in `Futuristic_UI.svg`'s pieces on the customize screen's ground: the gear in frame 1 in the
 /// upper right; the name over rule4; ROUNDS, 47 and ZONES in frames 7, 9 and 6; VS CPU and
 /// VS HUMAN between rule5s with rule6 between them; MULTIPLAYER in box4, which opens the
 /// multiplayer screen, with Game Center's word under it. What the cursor's on is gold and a
@@ -412,7 +412,7 @@ struct TitleOverlay: View {
 
     var body: some View {
         ZStack {
-            Futuristic.ground
+            MenuGround()
                 .ignoresSafeArea()
                 .overlay(alignment: .topTrailing) {
                     Button { flow.activate(.settings) } label: {

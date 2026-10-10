@@ -1,10 +1,9 @@
 import SwiftUI
 
 /// The menus' look from `Futuristic_UI.svg` (brought in by Tools/import_futuristic.py): its
-/// frames and rules on black, lettered in Upheaval. Pieces come in white and are multiplied
+/// frames and rules on the customize screen's ground (`MenuGround`), lettered in Upheaval. Pieces come in white and are multiplied
 /// by the vector's cyan, or by gold when highlighted, when they also grow a tenth.
 enum Futuristic {
-    static let ground = Color.black
     /// The customize screen's bottom line.
     static let line = Color(rgb: EsperPalette.blue.light)
     /// The customize screen's top line.

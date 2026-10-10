@@ -406,60 +406,12 @@ struct CustomizeScreen: View {
         }
         .background {
             // The ground, to the screen's edges, taking the taps the screen doesn't.
-            GeometryReader { geometry in
-                ground(geometry.size)
-            }
+            MenuGround()
             .contentShape(Rectangle())
             .onTapGesture {}
         }
         .ignoresSafeArea()
         .environment(\.colorScheme, .dark)
-    }
-
-    /// The gradient and the bowed grid over the whole screen.
-    private func ground(_ screen: CGSize) -> some View {
-        let fitted = CustomizeScreen.fitted(screen)
-        return ZStack {
-            Color(rgb: EsperPalette.black.shadow)
-            RadialGradient(stops: CustomizeScreen.groundStops, center: .center, startRadius: 0,
-                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare)
-            RadialGradient(stops: CustomizeScreen.ground2Stops, center: .center, startRadius: 0,
-                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
-            .opacity(CustomizeScreen.glowOpacity)
-            .offset(x: -(fitted.width * 0.2), y: -(fitted.width * 0.1))
-            RadialGradient(stops: CustomizeScreen.ground3Stops, center: .center, startRadius: 0,
-                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
-            .opacity(CustomizeScreen.glowOpacity)
-            .offset(x: fitted.width * 0.2, y: fitted.width * 0.1)
-            Canvas { context, size in
-                let centre = CGPoint(x: size.width / 2, y: size.height / 2)
-                let reach = hypot(centre.x, centre.y)
-                let cell = fitted.width * CustomizeScreen.gridCellShare
-                // A point of the flat grid, pushed out from the middle the more the further it is.
-                func bowed(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-                    let out = 1 + CustomizeScreen.gridBow * (x * x + y * y) / (reach * reach)
-                    return CGPoint(x: centre.x + x * out, y: centre.y + y * out)
-                }
-                var path = Path()
-                let lines = Int((max(centre.x, centre.y) / cell).rounded(.up))
-                let steps = 48
-                for line in -lines...lines {
-                    let at = CGFloat(line) * cell
-                    for (index, step) in (0...steps).enumerated() {
-                        let along = -reach + 2 * reach * CGFloat(step) / CGFloat(steps)
-                        let across = bowed(at, along)
-                        if index == 0 { path.move(to: across) } else { path.addLine(to: across) }
-                    }
-                    for (index, step) in (0...steps).enumerated() {
-                        let along = -reach + 2 * reach * CGFloat(step) / CGFloat(steps)
-                        let down = bowed(along, at)
-                        if index == 0 { path.move(to: down) } else { path.addLine(to: down) }
-                    }
-                }
-                context.stroke(path, with: .color(Color(rgb: EsperPalette.plum.light).opacity(CustomizeScreen.gridOpacity)), lineWidth: 1)
-            }
-        }
-        .ignoresSafeArea()
     }
 
     /// The vector's 16:9, as large as fits.
@@ -717,7 +669,8 @@ struct CustomizeScreen: View {
         .position(x: size.width / 2, y: size.height / 2)
     }
 
-    /// One of a side's boxes: its fill, what's in it, its line, and its label under it. Under
+    /// One of a side's boxes: what's in it, its line, and its label under it (its gradient face
+    /// left out, as the title's frames have none). Under
     /// its side's cursor the line thickens and lights in the side's colour, glowing.
     @ViewBuilder
     private func box(_ player: Int, _ spot: CustomizeSpot, _ name: String, mirroredAbout axis: CGFloat? = nil, label: String,
@@ -727,9 +680,6 @@ struct CustomizeScreen: View {
         let fill = rect(name, size, mirroredAbout: axis)
         let line = rect(name + "_line", size, mirroredAbout: axis)
         let lit = cursor == spot
-        picture(name).resizable().scaleEffect(x: flip)
-            .frame(width: fill.width, height: fill.height)
-            .position(x: fill.midX, y: fill.midY)
         content(fill)
             .position(x: fill.midX, y: fill.midY)
         if lit {
@@ -1269,5 +1219,60 @@ enum CustomizeArt {
         }
         guard right >= 0 else { return image }
         return image.cropping(to: CGRect(x: left, y: top, width: right - left + 1, height: bottom - top + 1)) ?? image
+    }
+}
+
+/// The customize screen's ground, also the title's: the gradient, its gold and blue glows, and
+/// the bowed purple grid, over the whole screen.
+struct MenuGround: View {
+    var body: some View {
+        GeometryReader { geometry in
+            ground(geometry.size)
+        }
+    }
+
+    private func ground(_ screen: CGSize) -> some View {
+        let fitted = CustomizeScreen.fitted(screen)
+        return ZStack {
+            Color(rgb: EsperPalette.black.shadow)
+            RadialGradient(stops: CustomizeScreen.groundStops, center: .center, startRadius: 0,
+                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare)
+            RadialGradient(stops: CustomizeScreen.ground2Stops, center: .center, startRadius: 0,
+                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
+            .opacity(CustomizeScreen.glowOpacity)
+            .offset(x: -(fitted.width * 0.2), y: -(fitted.width * 0.1))
+            RadialGradient(stops: CustomizeScreen.ground3Stops, center: .center, startRadius: 0,
+                           endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
+            .opacity(CustomizeScreen.glowOpacity)
+            .offset(x: fitted.width * 0.2, y: fitted.width * 0.1)
+            Canvas { context, size in
+                let centre = CGPoint(x: size.width / 2, y: size.height / 2)
+                let reach = hypot(centre.x, centre.y)
+                let cell = fitted.width * CustomizeScreen.gridCellShare
+                // A point of the flat grid, pushed out from the middle the more the further it is.
+                func bowed(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                    let out = 1 + CustomizeScreen.gridBow * (x * x + y * y) / (reach * reach)
+                    return CGPoint(x: centre.x + x * out, y: centre.y + y * out)
+                }
+                var path = Path()
+                let lines = Int((max(centre.x, centre.y) / cell).rounded(.up))
+                let steps = 48
+                for line in -lines...lines {
+                    let at = CGFloat(line) * cell
+                    for (index, step) in (0...steps).enumerated() {
+                        let along = -reach + 2 * reach * CGFloat(step) / CGFloat(steps)
+                        let across = bowed(at, along)
+                        if index == 0 { path.move(to: across) } else { path.addLine(to: across) }
+                    }
+                    for (index, step) in (0...steps).enumerated() {
+                        let along = -reach + 2 * reach * CGFloat(step) / CGFloat(steps)
+                        let down = bowed(along, at)
+                        if index == 0 { path.move(to: down) } else { path.addLine(to: down) }
+                    }
+                }
+                context.stroke(path, with: .color(Color(rgb: EsperPalette.plum.light).opacity(CustomizeScreen.gridOpacity)), lineWidth: 1)
+            }
+        }
+        .ignoresSafeArea()
     }
 }

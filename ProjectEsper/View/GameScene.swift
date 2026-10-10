@@ -178,32 +178,37 @@ final class GameScene: SKScene {
     var onLoading: ((Double?) -> Void)? {
         didSet { sprites.onLoading = { [weak self] _ in self?.reportLoading() } }
     }
+    /// Anything loading: the sprites' rebuilds or a stage's warm-up.
+    var loading: Bool { sprites.loadingCounts != nil || stageWarm != nil }
 
+    /// One count over everything loading, pieces made of all of them: each texture the stage
+    /// sends a piece, as each sprite made is.
     private func reportLoading() {
-        let parts = [sprites.loadingProgress, stageWarm.map { Double($0.made) / Double($0.all) }].compactMap { $0 }
-        onLoading?(parts.isEmpty ? nil : parts.reduce(0, +) / Double(parts.count))
+        let parts = [sprites.loadingCounts, stageWarm].compactMap { $0 }
+        let all = parts.reduce(0) { $0 + $1.all }
+        onLoading?(parts.isEmpty ? nil : Double(parts.reduce(0) { $0 + $1.made }) / Double(max(all, 1)))
     }
 
-    /// A new stage readied behind the curtain before anything plays on it: every texture in
-    /// the scene sent to the GPU, then a few frames drawn so what's first drawn then (its
-    /// shaders) is made, and only then `then`. Its steps the loading bar's.
+    /// A new stage readied before anything plays on it: every texture in the scene sent to the
+    /// GPU, then a few frames drawn so what's first drawn then (its shaders) is made, and then
+    /// `then`. Its steps the loading bar's.
     private var stageWarm: (made: Int, all: Int)?
     private var stageWarmFramesLeft = 0
     private var afterStageWarm: (() -> Void)?
     static let stageWarmFrames = 4
 
-    private func warmStage(then: @escaping () -> Void) {
+    private func warmStage(then: (() -> Void)? = nil) {
         var textures: [SKTexture] = []
         enumerateChildNodes(withName: "//*") { node, _ in
             if let texture = (node as? SKSpriteNode)?.texture { textures.append(texture) }
         }
         afterStageWarm = then
-        stageWarm = (0, 1 + GameScene.stageWarmFrames)
+        stageWarm = (0, textures.count + GameScene.stageWarmFrames)
         reportLoading()
         SKTexture.preload(textures) {
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.stageWarm != nil else { return }
-                self.stageWarm?.made = 1
+                self.stageWarm?.made = textures.count
                 self.stageWarmFramesLeft = GameScene.stageWarmFrames
                 self.reportLoading()
             }
@@ -4242,13 +4247,25 @@ final class GameScene: SKScene {
                 self.zonesRedraw()
             }
         }
+        if previewDue, let flowState {
+            // The preview's own time spent loading: the stage built behind a quick curtain, the
+            // preview straight on with the loading bar over it, held on its full page till done.
+            flowState.transition(.fade) { [weak self] in
+                guard let self else { return }
+                self.showStage()
+                self.freshRoundView()
+                self.warmStage()
+                play()
+            }
+            return
+        }
         let change = { [weak self] in
             guard let self else { return }
             self.showStage()
             self.freshRoundView()
             self.warmStage(then: play)
         }
-        if let flowState { flowState.transition(.fade, change) } else {
+        if let flowState { flowState.transition(.fade, holdsForLoading: true, change) } else {
             showStage()
             freshRoundView()
             play()
@@ -8690,6 +8707,7 @@ extension GameScene {
         base.ball.respawn(at: Vec2(x: -600, y: -600))
         base.ball.frozen = 1_000_000
         stagePreview = StagePreview(shots: shots, base: base, title: series.stage.name.uppercased())
+        flowState?.previewing = true
         flow = .preview
         flowState?.showsTitle = false
         presentScreen()
@@ -8747,7 +8765,8 @@ extension GameScene {
             flowState?.previewTitle = state.title
         }
         stagePreview = state
-        if state.elapsed >= MangaPage.length { finishPreview() }
+        // Done, or held on its full page while anything's still loading.
+        if state.elapsed >= MangaPage.length, !loading { finishPreview() }
     }
 
     /// Out of the preview: everything it set aside back, the session let go, the players in, and the count.
@@ -8759,6 +8778,7 @@ extension GameScene {
         mangaPage = nil
         signsDarkFrames = 0
         flowState?.previewTitle = nil
+        flowState?.previewing = false
         if let hidden = arcsWereHidden { threePointArcs.isHidden = hidden }
         arcsWereHidden = nil
         hud.isHidden = false

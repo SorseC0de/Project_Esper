@@ -56,8 +56,9 @@ final class FlowState: ObservableObject {
 
     // MARK: Loading
 
-    /// The loading bar's lit slots, the rebuilds underway's progress over its sixteen, or nil
-    /// with nothing loading. A transition's curtain stays down, the bar on it, until it's nil.
+    /// The loading bar's lit slots, what's loading's progress over its sixteen, or nil with
+    /// nothing loading. A transition that holds for loading keeps its curtain down, the bar on
+    /// it, until it's nil; the stage preview shows the bar over its page while it isn't.
     @Published var loadingSlots: Int? {
         didSet {
             guard loadingSlots == nil, let lift = heldLift else { return }
@@ -67,13 +68,20 @@ final class FlowState: ObservableObject {
     }
     static let loadingSlotCount = FuturisticMeter.slots.count
     private var heldLift: (() -> Void)?
+    /// A curtain's down waiting on loading; the stage preview's up.
+    @Published var curtainHeld = false
+    @Published var previewing = false
     /// The longest a curtain waits on loading before going up regardless.
     static let loadingHoldLimit = 15.0
 
     /// `lift` now, or once nothing's loading.
     private func whenLoaded(_ lift: @escaping () -> Void) {
         guard loadingSlots != nil else { return lift() }
-        heldLift = lift
+        curtainHeld = true
+        heldLift = { [weak self] in
+            self?.curtainHeld = false
+            lift()
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + FlowState.loadingHoldLimit) { [weak self] in
             guard let self, let held = self.heldLift else { return }
             self.heldLift = nil
@@ -89,11 +97,11 @@ final class FlowState: ObservableObject {
     @Published var curtain = 0.0
     @Published var curtainStyle = ScreenTransition.fade
     private var curtainBusy = false
-    private var curtainQueue: [(ScreenTransition, () -> Void)] = []
+    private var curtainQueue: [(ScreenTransition, Bool, () -> Void)] = []
 
-    func transition(_ style: ScreenTransition = .fade, _ change: @escaping () -> Void) {
+    func transition(_ style: ScreenTransition = .fade, holdsForLoading: Bool = false, _ change: @escaping () -> Void) {
         guard !curtainBusy else {
-            curtainQueue.append((style, change))
+            curtainQueue.append((style, holdsForLoading, change))
             return
         }
         curtainBusy = true
@@ -102,8 +110,8 @@ final class FlowState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + style.downSeconds + 0.05) { [weak self] in
             guard let self else { return }
             change()
-            // Held down over anything the change set loading, the bar filling on it.
-            self.whenLoaded { [weak self] in
+            // Held down over anything the change set loading, the bar filling on it, if it's to be.
+            let lift = { [weak self] in
                 guard let self else { return }
                 withAnimation(.easeOut(duration: style.upSeconds)) { self.curtain = 0 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds) { [weak self] in
@@ -111,10 +119,11 @@ final class FlowState: ObservableObject {
                     self.curtainBusy = false
                     if !self.curtainQueue.isEmpty {
                         let next = self.curtainQueue.removeFirst()
-                        self.transition(next.0, next.1)
+                        self.transition(next.0, holdsForLoading: next.1, next.2)
                     }
                 }
             }
+            if holdsForLoading { self.whenLoaded(lift) } else { lift() }
         }
     }
 

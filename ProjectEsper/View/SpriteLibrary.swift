@@ -79,23 +79,38 @@ final class SpriteLibrary {
     static let tonedParticleSheets = ["lightning_particle", "lightning_particle2"]
     private var rewarmGeneration: [Int: Int] = [:]
     private let rewarmQueue = DispatchQueue(label: "SpriteLibrary.rewarm", qos: .userInitiated)
-    /// Each player's rebuild underway: its pieces made, of all of them, for the loading bar.
+    /// Each player's rebuild underway: its pieces made, of all of them, for the loading bar;
+    /// and the pieces of the ones done (or overtaken, counted whole) since nothing was loading,
+    /// so the count only ever climbs until it's all done.
     private var rebuilding: [Int: (made: Int, all: Int)] = [:]
-    /// How far the rebuilds underway have got, 0 to 1, or nil with none; told on the main
-    /// thread as it changes.
-    var onLoading: ((Double?) -> Void)?
-    var loadingProgress: Double? {
+    private var rebuilt = 0
+    /// Pieces made of all of them while rebuilds are underway, or nil with none; told on the
+    /// main thread as it changes.
+    var onLoading: (((made: Int, all: Int)?) -> Void)?
+    var loadingCounts: (made: Int, all: Int)? {
         guard !rebuilding.isEmpty else { return nil }
-        let all = rebuilding.values.reduce(0) { $0 + $1.all }
-        return Double(rebuilding.values.reduce(0) { $0 + $1.made }) / Double(max(all, 1))
+        return (rebuilt + rebuilding.values.reduce(0) { $0 + $1.made }, rebuilt + rebuilding.values.reduce(0) { $0 + $1.all })
     }
     /// The bar's told every this many pieces.
     private static let loadingReportEvery = 8
 
+    /// A rebuild starting: one it overtakes is counted done.
+    private func beginRebuilding(_ player: Int, pieces: Int) {
+        if let overtaken = rebuilding[player] { rebuilt += overtaken.all }
+        rebuilding[player] = (0, pieces)
+        onLoading?(loadingCounts)
+    }
+
     private func reportRebuilding(_ player: Int, generation: Int, made: Int?) {
-        guard rewarmGeneration[player] == generation else { return }
-        if let made { rebuilding[player]?.made = made } else { rebuilding[player] = nil }
-        onLoading?(loadingProgress)
+        guard rewarmGeneration[player] == generation, let entry = rebuilding[player] else { return }
+        if let made {
+            rebuilding[player]?.made = made
+        } else {
+            rebuilding[player] = nil
+            rebuilt += entry.all
+            if rebuilding.isEmpty { rebuilt = 0 }
+        }
+        onLoading?(loadingCounts)
     }
 
     /// Everything drawn in a player's look rebuilt off the main thread after their look
@@ -129,9 +144,7 @@ final class SpriteLibrary {
             silhouetteJobs.append(("p\(player)_sil_\(Effect.fireWallSpark.name)_\(index)", texture(Effect.fireWallSpark.name, index)))
         }
         // Counted as pieces made, the last one the textures reaching the GPU.
-        let pieces = frameJobs.count + tonedJobs.count + silhouetteJobs.count + 1
-        rebuilding[player] = (0, pieces)
-        onLoading?(loadingProgress)
+        beginRebuilding(player, pieces: frameJobs.count + tonedJobs.count + silhouetteJobs.count + 1)
         rewarmQueue.async { [weak self] in
             guard let self else { return }
             var built: [String: SKTexture] = [:]

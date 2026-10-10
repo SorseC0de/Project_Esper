@@ -85,12 +85,15 @@ struct GameView: View {
             }
             // The curtain between screens, over everything, taking the touches while it's down.
             TransitionCurtain(transition: flow.curtainStyle, cover: flow.curtain)
-            // The loading bar on it, bottom right, full with nothing to load.
-            LoadingBar(litSlots: flow.loadingSlots ?? FlowState.loadingSlotCount)
-                .opacity(flow.curtain)
-                .padding(24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .allowsHitTesting(false)
+            // The loading bar, bottom right, while something loads: on a curtain held for it,
+            // or over the stage preview's page.
+            if let slots = flow.loadingSlots, flow.curtainHeld || flow.previewing {
+                LoadingBar(litSlots: slots)
+                    .opacity(flow.curtainHeld ? flow.curtain : 1)
+                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .allowsHitTesting(false)
+            }
         }
         .animation(.easeOut(duration: 0.25), value: flow.showsTitle)
         .animation(.spring(response: 0.35, dampingFraction: 0.6), value: flow.previewTitle)

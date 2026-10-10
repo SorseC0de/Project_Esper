@@ -570,14 +570,16 @@ keeps the depth of a small one rather than flattening.
 The UI is being redone a screen at a time in `Futuristic_UI.svg`'s pieces (`_Graphic Assets/Vectors`):
 `Tools/import_futuristic.py` brings every named group in, the backdrop rectangle left out, as
 `ProjectEsper/UI/Futuristic/futuristic_<group>.png`, in greys for the game to multiply by a colour,
-the vector's cyan (0x00D0FF) at rest. `Futuristic` (Futuristic.swift) holds the look: a black ground,
+at rest the customize screen's bottom line (blue's light, 0x45BCF5). `Futuristic` (Futuristic.swift) holds the look: a black ground,
 Upheaval TT lettering, every piece at 0.14 points to its imported pixel so the pieces keep their sizes
 in the vector, and each frame's face (where its lettering sits, off its leads). In place of a cursor
 plate, what the cursor's on turns gold (gold's light, the customize screen's top line) and grows a
-tenth. The title, the first done: the gear in frame 1, upper right; the name over rule4; ROUNDS, 47
+tenth. The title, the first done: the gear in frame 1, upper right, at half the others' size; the name over
+rule4 and a mirrored rule4 left of it, meeting as one; ROUNDS, 47
 and ZONES in frames 7, 9 and 6; VS CPU and VS HUMAN as plain words, white when picked and dim when
 not, with rule6 between them and rule5 at each end, the left one flipped both ways; MULTIPLAYER in
-box4 (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
+box4; bottom right in a debug build, sliders for each mode frame's drop and size, its lettering
+holding still (kept between launches, to be baked) (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
 and in a match the debug strip's COLOUR, the first side's, round the wheel). Still on the old pieces:
 UI and FONT A/B, bottom
 left (B letters the title and its small switches in Bigdex, `TitleText.bigdex`, kept between

@@ -416,13 +416,13 @@ struct TitleOverlay: View {
                 .ignoresSafeArea()
                 .overlay(alignment: .topTrailing) {
                     Button { flow.activate(.settings) } label: {
-                        FuturisticFrame(name: "1", lit: flow.titleCursor == .settings, scale: scale(.buttons)) { colour in
+                        FuturisticFrame(name: "1", lit: flow.titleCursor == .settings, scale: TitleOverlay.settingsScale * scale(.buttons)) { colour in
                             Image(uiImage: UIImage(named: "ui_icon_settings") ?? UIImage())
                                 .renderingMode(.template)
                                 .resizable()
                                 .interpolation(.high)
                                 .foregroundStyle(colour)
-                                .frame(width: 30 * scale(.buttons), height: 31 * scale(.buttons))
+                                .frame(width: 30 * TitleOverlay.settingsScale * scale(.buttons), height: 31 * TitleOverlay.settingsScale * scale(.buttons))
                         }
                     }
                     .buttonStyle(.plain)
@@ -433,17 +433,24 @@ struct TitleOverlay: View {
                 .overlay(alignment: .bottomLeading) {
                     if DebugUI.enabled { colourGrids }
                 }
+                .overlay(alignment: .bottomTrailing) {
+                    if DebugUI.enabled { frameSliders }
+                }
             VStack(spacing: 14 * scale(.buttons)) {
                 VStack(spacing: 6 * scale(.buttons)) {
                     Text("PROJECT ESPER")
                         .font(Futuristic.font(size: 52 * scale(.titles)))
                         .foregroundStyle(.white)
-                    FuturisticPiece(name: "rule4", scale: scale(.buttons))
+                    // Two, the left one mirrored, meeting in the middle as one.
+                    HStack(spacing: 0) {
+                        FuturisticPiece(name: "rule4", scale: scale(.buttons)).scaleEffect(x: -1, y: 1)
+                        FuturisticPiece(name: "rule4", scale: scale(.buttons))
+                    }
                 }
                 HStack(spacing: 18 * scale(.buttons)) {
-                    framed("ROUNDS", in: "7", item: .bestOfSeven)
-                    framed("47", in: "9", item: .fortySeven)
-                    framed("ZONES", in: "6", item: .zones)
+                    framed("ROUNDS", in: "7", item: .bestOfSeven, drop: roundsFrameDrop, frameScale: roundsFrameScale)
+                    framed("47", in: "9", item: .fortySeven, drop: fortySevenFrameDrop, frameScale: fortySevenFrameScale)
+                    framed("ZONES", in: "6", item: .zones, drop: zonesFrameDrop, frameScale: zonesFrameScale)
                 }
                 HStack(spacing: 12 * scale(.buttons)) {
                     rule("rule5", width: TitleOverlay.endRuleWidth).scaleEffect(x: -1, y: -1)
@@ -467,14 +474,26 @@ struct TitleOverlay: View {
         .onAppear { net.signIn() }
     }
 
+    /// The settings gear and its frame against the other pieces.
+    static let settingsScale: CGFloat = 0.5
+
+    /// The mode frames' drop and size, from the debug sliders, their lettering holding still.
+    @AppStorage("titleRoundsFrameDrop") private var roundsFrameDrop = 0.0
+    @AppStorage("titleRoundsFrameScale") private var roundsFrameScale = 1.0
+    @AppStorage("titleFortySevenFrameDrop") private var fortySevenFrameDrop = 0.0
+    @AppStorage("titleFortySevenFrameScale") private var fortySevenFrameScale = 1.0
+    @AppStorage("titleZonesFrameDrop") private var zonesFrameDrop = 0.0
+    @AppStorage("titleZonesFrameScale") private var zonesFrameScale = 1.0
+
     /// The opponent row's rules, by their width in points.
     static let endRuleWidth: CGFloat = 110
     static let middleRuleWidth: CGFloat = 120
 
     /// A lettered button in one of the vector's frames.
-    private func framed(_ text: String, in frame: String, item: TitleItem) -> some View {
+    private func framed(_ text: String, in frame: String, item: TitleItem, drop: Double = 0, frameScale: Double = 1) -> some View {
         Button { flow.activate(item) } label: {
-            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons)) { colour in
+            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons),
+                            frameDrop: drop, frameScale: frameScale) { colour in
                 Text(text)
                     .font(Futuristic.font(size: 24 * scale(.text)))
                     .foregroundStyle(colour)
@@ -513,6 +532,35 @@ struct TitleOverlay: View {
             .colorMultiply(Futuristic.line)
             .frame(width: width, height: width * image.size.height / max(image.size.width, 1))
     }
+
+    /// The mode frames' sliders, bottom right: each frame's drop in points and its size.
+    @ViewBuilder
+    private var frameSliders: some View {
+        #if os(iOS)
+        VStack(alignment: .trailing, spacing: 4) {
+            frameSlider("ROUNDS Y", $roundsFrameDrop, -30...30)
+            frameSlider("ROUNDS SCALE", $roundsFrameScale, 0.5...1.5)
+            frameSlider("47 Y", $fortySevenFrameDrop, -30...30)
+            frameSlider("47 SCALE", $fortySevenFrameScale, 0.5...1.5)
+            frameSlider("ZONES Y", $zonesFrameDrop, -30...30)
+            frameSlider("ZONES SCALE", $zonesFrameScale, 0.5...1.5)
+        }
+        .padding(8)
+        .background(.black.opacity(0.6))
+        .padding(.bottom, 20)
+        .padding(.trailing, 24)
+        #endif
+    }
+
+    #if os(iOS)
+    private func frameSlider(_ label: String, _ value: Binding<Double>, _ range: ClosedRange<Double>) -> some View {
+        HStack(spacing: 6) {
+            pickerLabel("\(label) \(String(format: range.upperBound > 2 ? "%.0f" : "%.2f", value.wrappedValue))")
+            SwiftUI.Slider(value: value, in: range, step: range.upperBound > 2 ? 1 : 0.01)
+                .frame(width: 140)
+        }
+    }
+    #endif
 
     /// Under the cursor, the other screens' plates grow this much.
     static let cursorGrowth: CGFloat = 1.08

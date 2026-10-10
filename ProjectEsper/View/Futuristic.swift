@@ -5,8 +5,8 @@ import SwiftUI
 /// by the vector's cyan, or by gold when highlighted, when they also grow a tenth.
 enum Futuristic {
     static let ground = Color.black
-    /// The vector's own cyan.
-    static let line = Color(rgb: 0x00D0FF)
+    /// The customize screen's bottom line.
+    static let line = Color(rgb: EsperPalette.blue.light)
     /// The customize screen's top line.
     static let lit = Color(rgb: EsperPalette.gold.light)
     static let litGrowth: CGFloat = 1.1
@@ -58,16 +58,20 @@ struct FuturisticFrame<Content: View>: View {
     let name: String
     let lit: Bool
     var scale: CGFloat = 1
+    /// The frame alone moved down and sized, what it holds staying put at its size.
+    var frameDrop: CGFloat = 0
+    var frameScale: CGFloat = 1
     @ViewBuilder let content: (Color) -> Content
 
     var body: some View {
-        let piece = FuturisticPiece(name: name, colour: lit ? Futuristic.lit : Futuristic.line, scale: scale)
+        let piece = FuturisticPiece(name: name, colour: lit ? Futuristic.lit : Futuristic.line, scale: scale * frameScale)
         let face = Futuristic.faces[name] ?? CGPoint(x: 0.5, y: 0.5)
         piece
             .overlay {
                 content(lit ? Futuristic.lit : .white)
-                    .offset(x: (face.x - 0.5) * piece.size.width, y: (face.y - 0.5) * piece.size.height)
+                    .offset(x: (face.x - 0.5) * piece.size.width, y: (face.y - 0.5) * piece.size.height - frameDrop)
             }
+            .offset(y: frameDrop)
             .scaleEffect(lit ? Futuristic.litGrowth : 1)
     }
 }

@@ -584,13 +584,13 @@ tenth. The title, the first done: the gear in frame 1, upper right, at half the 
 rule4 and a mirrored rule4 left of it, joined as one image with the meeting end's soft edge cut
 (`Futuristic.mirroredPair`), in a debug build the Variaball logo in the name's place (`variaball_logo`,
 rendered by the same tool); ROUNDS in frame 6 turned round (`FuturisticFrame.mirrored`), 47 in
-ring5 and ZONES in frame 6, between arrow2s pointing out; VS CPU and VS HUMAN as plain words, blue when
+ring5 and ZONES in frame 6, ROUNDS' and ZONES' frames at 0.8 and 47's at 0.66, between arrow2s at
+0.6 pointing out; VS CPU and VS HUMAN as plain words, blue when
 picked and dim when not, with rule6 between them and rule5 at each end, the left one flipped both
 ways; MULTIPLAYER in box4, a little smaller, under svgrepo's multiplayer icon
 (`futuristic_icon_multiplayer`, from `Vectors/multiplayer.svg` by the same tool); the grid on black
-behind, without the customize screen's glows; bottom right in a debug build, sliders for each mode
-button's drop and its frame's size, the lettering keeping its size (kept between launches; ROUNDS -20
-and 0.80 as ZONES, 47 0 and 1, ZONES -20 and 0.80 as tuned) (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
+behind, without the customize screen's glows; bottom right in a debug build, ICON X, ICON Y and ICON
+SCALE for the multiplayer icon (kept between launches) (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
 and in a match the debug strip's COLOUR, the first side's, round the wheel). UI and FONT A/B, bottom left, are words over rule8,
 white when on (B letters the title and its small switches in Bigdex, `TitleText.bigdex`, kept between
 launches), the tuning panel, with over it two placeholder pickers of every
@@ -625,7 +625,7 @@ text 1.5, titles 1.5 and panels 0.9, as tuned on one; and the iPad's and the TV'
 at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the plate's
 face, above its lip, and is nudged up and left by half its own drop. TEXT Y on the panel
 scales that lift, one value a platform: half of it, 0.5, on all of them. The stage select: on the warped grid on black (`MenuGround`
-without its glows), STAGE SELECT lettered as FLO is (30 high), each stage in Futuristic_UI's box1
+without its glows), STAGE SELECT lettered as FLO is (15 high), each stage in Futuristic_UI's box1
 in the menus' blue with its name in Upheaval, the blue too, in two lines, broken at the space
 nearest its middle (one line with no space), gold and a tenth bigger when a cursor or a pick is on
 it; more than four stages in two rows, the first the longer (`StageSelectScreen.lines`,
@@ -650,10 +650,11 @@ touch pad: THROW and SHOOT side by side, JUMP below and between them, JUMP and T
 Futuristic_UI's ring1 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their
 names in Upheaval in it too, gold while held, the ring turning a full circle as it's pressed (0.35
 seconds); the stick a faded black round button with a blue knob; pause offline in frame 1 small
-(0.4 of the menus' size) with a pause sign in its face, upper right just under the second FLO
+(0.3 of the menus' size) with a pause sign in its face, in the top right corner over the second FLO
 meter (`TouchControls.placeCornerRow`), and AI, HITBOX and RESET small black plates to its left,
 plum when on. The pause: the match under a third-black wash and a thin dark material (SwiftUI's
-`.ultraThinMaterial`, dark); each choice in frame 8 at 0.6, every other one turned round, sliding
+`.ultraThinMaterial`, dark); each choice in frame 8 at 0.8, its lettering 12, every other one
+turned round both ways, sliding
 in and fading from the left, then the right, down the screen, 0.07 seconds apart; RESUME frame 1
 with arrow1 in its face on the pause icon's own place, as big, and the settings' gear in frame 9
 upside down under it; the cursor's choice gold and a tenth bigger (`Screen.addFramed`). Every one of them is on the tuning panel (STAGE, PICK, HUD, TOUCH), the dialogs
@@ -667,9 +668,12 @@ A gear in the title's upper right corner (the dobo pack's `settings_icon_128px`,
 in Futuristic frame 1, the first of the title cursor's rows) and the gear in frame 9 under the
 pause's RESUME open the
 settings (`SettingsScreen`, SwiftUI, full screen on the screens' ground, over the title or the
-pause), kept between launches (`GameSettings`). Each row its name and its choices, the picked one
-plum, gold on the cursor's row; up and down a row, left and right its choice (jump steps it on), B,
-start or BACK to shut them; a tap picks a choice outright.
+pause), kept between launches (`GameSettings`). Each row its name in Futuristic frame 11, the names
+stacked with no room between, and its choices beside it each in frame 5, every row as tall as fits
+the screen (48 at most); the lettering the menus' blue, the picked choice whole and the rest dim,
+the cursor's row's name and picked choice gold; up and down a row, left and right its choice (jump
+steps it on), B or start to shut them, or on a touch screen the corner arrow; a tap picks a choice
+outright.
 
 - SFX: the sound words ON, SOME (only the biggest, the 16-high ones, `Sound.isBiggest`), OFF.
 - SFX STYLE: their face, CHERRY, DARUMA or DELA (`Onomatopoeia.style`); nothing picked yet, DARUMA in ENG.
@@ -735,7 +739,7 @@ A disconnect on the screen closes it to the title.
   are rebuilt in the picks once, as the match starts, off the main thread, through the stage
   select and on into the stage preview, whose loading bar counts them.
 - Back on a touch screen (iOS): arrow6 turned to point left (`BackArrow`), bottom right over the
-  screens between the title and play: the settings over the title (closes them), the multiplayer
+  screens between the title and play: the settings, wherever they're opened (closes them), the multiplayer
   screen (its back), the customize screen (RETURN's), and the stage select before the series'
   first stage offline (the customize screen again for the same mode, `backFromStageSelect`) or
   online (out of the match).
@@ -961,7 +965,9 @@ the meter shows what they have less what's still on its way, so it never runs ah
 A gain is shown once, a rolled-back frame run again bringing no second set; a new round clears them.
  The meters are in the HUD's top corners, the first player's top left and the second's top right,
 each one's outer end and top FLO INSET X and FLO INSET Y in from the corner past the safe insets
-(12 and 8 points), the word outside and the bar toward the middle, the second's bar mirrored and its
+(20 and 0 points), MAX included (it rides the word's top outer corner, unclamped, the whole meter
+fitted into the corner with it), the second's under pause offline, which has the top right
+corner, the word outside and the bar toward the middle, the second's bar mirrored and its
 word outside it, skewed as the first's is,
 shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames) a point
 an art pixel. Its inside is 100 columns from its sixth, five rows tall from its fifth, the last
@@ -975,7 +981,7 @@ it (FLO MAX SCALE 1.25, FLO MAX X 54 and Y 0 on sliders, mirrored for the second
 growing out of the word, MAX on the bar's corner as above, the word in its own colours throughout; in FloState, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
 its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
-moved 15 right and 6 down from its place, the whole meter at 0.75, on the FLO SCALE slider
+moved 15 right and 6 down from its place, the whole meter at 1.25, on the FLO SCALE slider
 (`FloTuning`, its other numbers baked): the bar and the word each at 1 and 1.25 of it; the bar
 squeezed to 0.75 across and 1.5 down, the word keeping its own; the bar's left and right ends' heights over its
 middle's (1.5 and 0.5), and its middle raised by half its height,
@@ -2019,16 +2025,17 @@ told to the glow mask as glowing through the backdrop's flat (`glowThroughSnapsh
 only while it's lit), since over
 a flat nothing glows otherwise; their size the strip's NO DUNK SCALE slider (`signScale`, 0.5 to 4,
 half to start, kept). Clouds (`FlightB411Cloud`, `Flight/cloud.png`, 192 by 64) drift left to right
-over the sky beyond the plane: six, each its own size (one to four times) and pace (0.6 to 1.6 a
+over the sky beyond the plane: fourteen over a square as wide as the view's diagonal (`cloudReach`,
+as thick as six were over the view), each its own size (one to four times) and pace (0.6 to 1.6 a
 frame times its size, times two), at two thirds (`cloudAlpha`), in
-`skyNode`, on the camera, turned back level and under everything of the world's (z -100), so the
+`skyNode`, on the camera, leaning with the plane, and under everything of the world's (z -100), so the
 cabin covers them; each pass a cloud goes behind the plane or in front of it at random (z -102 or -100). Under the clouds the plane itself (`FlightB411Plane`, `Flight/plane.png`, 464
 by 368, a root imageset of `Tools/import_sprites.py`): the stage's width (312 art pixels across)
 times the strip's PLANE SCALE slider (`planeScale`, 0.5 to 8, 3 baked, kept), past the screen's
 edges, centred on the stage and moved up by the strip's PLANE Y (`planeY`, art pixels,
 -400 to 400, -80 baked, kept), at a fifth (`planeAlpha`), a child of the
 scene at z -101, in the world's frame rather than the camera's, so it pitches with the stage
-while the clouds stay level. The cart stands on its wheels' line, the wheels drawn under its body, and
+as the clouds do. The cart stands on its wheels' line, the wheels drawn under its body, and
 tips a little into the way it's going with its speed (`cartSpeedTip`), flat once it stops.
 
 The cart (`Cart`, `FlightB411Rules.cartSize`: 16 by 24 art pixels solid, drawn from `Cart`, its
@@ -2049,7 +2056,8 @@ start's level spell, every 5 to 15 seconds the dice pick neither, 2X or 3X, a th
 (`FlightB411Rules.multiplierWaitFrames`), and one lit, palette 7 and glowing, stays lit three seconds
 (`multiplierLitFrames`, `Match.pointMultiplier`), a basket meanwhile worth that many times its points
 (`pointValue`). In Rounds a point is a point and they never light. Their size is the strip's 2X 3X
-SCALE (`multiplierScale`, 0.25 to 3, 1 to start, kept), the row laid again each frame. The window's
+SCALE (`multiplierScale`, 0.25 to 3, 0.66 to start, kept), the row laid again each frame; their
+glow takes the size they're drawn at (their frame in the sign's holder). The window's
 edges are soft: over the whole map, players and all (z 23, `veilZ`), a veil of what's beyond it,
 palette 30 and a copy of the plane at its fifth where the plane is, drawn only inside the window,
 opaque at its edge and clear 8 art pixels in (`edgeVeil`, `layVeil`, the strip's EDGE FADE, 0 to
@@ -2296,7 +2304,7 @@ shown, once, like the effects.
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`). slashclash: two blades meeting.
 - dunk: a dunk going in, in the swish's place. slide: the slide. flo_collect: each FLO orb landing
-  on its player, at 0.35 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a
+  on its player, at 0.25 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a
   meter showing full as it fills. These five are levelled as they're imported to the effects'
   middle loudness, -21 dB while sounding, peaks under -3 (`LEVELLED_EFFECTS`, `EFFECT_LEVEL`); the
   effects from before them came in as they are.

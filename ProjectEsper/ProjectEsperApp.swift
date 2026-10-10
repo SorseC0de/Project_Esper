@@ -21,7 +21,7 @@ struct GameView: View {
     /// the material; and the title on top of everything.
     /// What the back arrow does on the screen that's up, the topmost first; nil where it's not shown.
     private var backAction: (() -> Void)? {
-        if flow.settingsOpen, flow.showsTitle { return { flow.closeSettings() } }
+        if flow.settingsOpen { return { flow.closeSettings() } }
         if flow.multiplayerOpen { return { flow.multiplayerBack() } }
         if flow.customizeOpen { return { flow.activateCustomize(flow.customizeLocal, .back) } }
         if flow.stageSelectBack, !flow.showsTitle { return { flow.scene.backFromStageSelect() } }

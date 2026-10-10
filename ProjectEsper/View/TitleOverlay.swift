@@ -154,9 +154,9 @@ final class FlowState: ObservableObject {
         settingsOpen = false
     }
 
-    /// Up or down a row, BACK under the last.
+    /// Up or down a row; back is the corner arrow, or B.
     func moveSettingsCursor(_ step: Int) {
-        let next = min(max(settingsCursor + step, 0), GameSettings.Row.allCases.count)
+        let next = min(max(settingsCursor + step, 0), GameSettings.Row.allCases.count - 1)
         guard next != settingsCursor else { return }
         settingsCursor = next
         SoundBoard.shared.play(SoundBoard.navigate)
@@ -508,11 +508,11 @@ struct TitleOverlay: View {
                 }
                 // ROUNDS in ZONES' frame turned round, 47 in ring5, between arrow2s pointing out.
                 HStack(spacing: 18 * scale(.buttons)) {
-                    FuturisticPiece(name: "arrow2", scale: scale(.buttons)).scaleEffect(x: -1)
-                    framed("ROUNDS", in: "6", mirrored: true, item: .bestOfSeven, drop: roundsFrameDrop, frameScale: roundsFrameScale)
-                    framed("47", in: "ring5", item: .fortySeven, drop: fortySevenFrameDrop, frameScale: fortySevenFrameScale)
-                    framed("ZONES", in: "6", item: .zones, drop: zonesFrameDrop, frameScale: zonesFrameScale)
-                    FuturisticPiece(name: "arrow2", scale: scale(.buttons))
+                    FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons)).scaleEffect(x: -1)
+                    framed("ROUNDS", in: "6", mirrored: true, item: .bestOfSeven, frameScale: TitleOverlay.sideModeScale)
+                    framed("47", in: "ring5", item: .fortySeven, frameScale: TitleOverlay.fortySevenScale)
+                    framed("ZONES", in: "6", item: .zones, frameScale: TitleOverlay.sideModeScale)
+                    FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons))
                 }
                 HStack(spacing: 12 * scale(.buttons)) {
                     rule("rule5", width: TitleOverlay.endRuleWidth).scaleEffect(x: -1, y: -1)
@@ -523,7 +523,8 @@ struct TitleOverlay: View {
                 }
                 VStack(spacing: 6) {
                     framed("MULTIPLAYER", in: "box4", item: .multiplayer, textSize: TitleOverlay.multiplayerTextSize,
-                           icon: "futuristic_icon_multiplayer")
+                           icon: "futuristic_icon_multiplayer",
+                           iconPlace: CGSize(width: multiplayerIconX, height: multiplayerIconY), iconScale: multiplayerIconScale)
                         .opacity(busy ? 0.5 : 1)
                     if let caption = net.state.caption {
                         Text(caption)
@@ -543,15 +544,14 @@ struct TitleOverlay: View {
     /// The settings gear and its frame against the other pieces.
     static let settingsScale: CGFloat = 0.5
 
-    /// The mode buttons' drop, and their frames' size, the lettering keeping its own; from the
-    /// debug sliders, these defaults as tuned.
-    /// ROUNDS starts where ZONES is, in the same frame.
-    @AppStorage("titleRoundsFrameDrop.2") private var roundsFrameDrop = -20.0
-    @AppStorage("titleRoundsFrameScale.2") private var roundsFrameScale = 0.8
-    @AppStorage("titleFortySevenFrameDrop.2") private var fortySevenFrameDrop = 0.0
-    @AppStorage("titleFortySevenFrameScale.2") private var fortySevenFrameScale = 1.0
-    @AppStorage("titleZonesFrameDrop") private var zonesFrameDrop = -20.0
-    @AppStorage("titleZonesFrameScale") private var zonesFrameScale = 0.8
+    /// The mode frames' size, as tuned, their lettering keeping its own; the arrows either side.
+    static let sideModeScale: CGFloat = 0.8
+    static let fortySevenScale: CGFloat = 0.66
+    static let arrowScale: CGFloat = 0.6
+    /// MULTIPLAYER's icon moved and sized on the debug sliders, bottom right, kept between launches.
+    @AppStorage("titleMultiplayerIconX") private var multiplayerIconX = 0.0
+    @AppStorage("titleMultiplayerIconY") private var multiplayerIconY = 0.0
+    @AppStorage("titleMultiplayerIconScale") private var multiplayerIconScale = 1.0
 
     /// The opponent row's rules, by their width in points.
     static let endRuleWidth: CGFloat = 110
@@ -562,8 +562,8 @@ struct TitleOverlay: View {
     static let iconHeight: CGFloat = 26
 
     /// A lettered button in one of the vector's frames, an icon over the lettering if it has one.
-    private func framed(_ text: String, in frame: String, mirrored: Bool = false, item: TitleItem, drop: Double = 0, frameScale: Double = 1,
-                        textSize: CGFloat = 24, icon: String? = nil) -> some View {
+    private func framed(_ text: String, in frame: String, mirrored: Bool = false, item: TitleItem, frameScale: CGFloat = 1,
+                        textSize: CGFloat = 24, icon: String? = nil, iconPlace: CGSize = .zero, iconScale: CGFloat = 1) -> some View {
         Button { flow.activate(item) } label: {
             FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons), frameScale: frameScale, mirrored: mirrored) { colour in
                 VStack(spacing: 4 * scale(.buttons)) {
@@ -573,7 +573,8 @@ struct TitleOverlay: View {
                             .interpolation(.high)
                             .aspectRatio(contentMode: .fit)
                             .colorMultiply(colour)
-                            .frame(height: TitleOverlay.iconHeight * scale(.buttons))
+                            .frame(height: TitleOverlay.iconHeight * iconScale * scale(.buttons))
+                            .offset(iconPlace)
                     }
                     Text(text)
                         .font(Futuristic.font(size: textSize * scale(.text)))
@@ -583,7 +584,6 @@ struct TitleOverlay: View {
             }
         }
         .buttonStyle(.plain)
-        .offset(y: drop)
         .disabled(busy)
         .noSystemFocus()
     }
@@ -616,17 +616,14 @@ struct TitleOverlay: View {
             .frame(width: width, height: width * image.size.height / max(image.size.width, 1))
     }
 
-    /// The mode frames' sliders, bottom right: each frame's drop in points and its size.
+    /// MULTIPLAYER's icon's sliders, bottom right: its place in points and its size.
     @ViewBuilder
     private var frameSliders: some View {
         #if os(iOS)
         VStack(alignment: .trailing, spacing: 4) {
-            frameSlider("ROUNDS Y", $roundsFrameDrop, -30...30)
-            frameSlider("ROUNDS SCALE", $roundsFrameScale, 0.5...1.5)
-            frameSlider("47 Y", $fortySevenFrameDrop, -30...30)
-            frameSlider("47 SCALE", $fortySevenFrameScale, 0.5...1.5)
-            frameSlider("ZONES Y", $zonesFrameDrop, -30...30)
-            frameSlider("ZONES SCALE", $zonesFrameScale, 0.5...1.5)
+            frameSlider("ICON X", $multiplayerIconX, -60...60)
+            frameSlider("ICON Y", $multiplayerIconY, -40...40)
+            frameSlider("ICON SCALE", $multiplayerIconScale, 0.25...2)
         }
         .padding(8)
         .background(.black.opacity(0.6))

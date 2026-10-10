@@ -431,7 +431,7 @@ enum FlightB411Art {
     /// The 2X and 3X signs' scale against the row's, the 2X 3X SCALE slider's, kept.
     static let multiplierScaleKey = "esper.flightB411.multiplierScale"
     nonisolated(unsafe) static var multiplierScale: CGFloat = {
-        CGFloat(UserDefaults.standard.object(forKey: multiplierScaleKey) as? Double ?? 1)
+        CGFloat(UserDefaults.standard.object(forKey: multiplierScaleKey) as? Double ?? 0.66)
     }()
     /// 47's 2X or 3X sign, as the cabin's signs are: the lettering 24 high, palette 7 lit and
     /// glowing, palette 33 out. Cached.

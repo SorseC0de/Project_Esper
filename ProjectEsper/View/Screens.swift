@@ -653,7 +653,7 @@ final class StageSelectScreen: Screen {
     /// The name's lines' spacing, a share of the lettering's size.
     static let lineShare: CGFloat = 1.05
     /// STAGE SELECT's cap height, in points.
-    static let titleHeight: CGFloat = 30
+    static let titleHeight: CGFloat = 15
     /// A name in two lines, broken at the space nearest its middle; one with no space in one.
     static func lines(of name: String) -> [String] {
         let spaces = name.indices.filter { name[$0] == " " }
@@ -749,7 +749,9 @@ final class StageSelectScreen: Screen {
 /// pause icon's own place, and the settings' gear in frame 9 turned upside down under it.
 final class PauseScreen: Screen {
     /// The choices' frames' size against the menus', the gap between them, and their entrance.
-    static let optionScale: CGFloat = 0.6
+    static let optionScale: CGFloat = 0.8
+    /// The choices' lettering, small enough to sit inside the frame.
+    static let optionTextSize: CGFloat = 12
     static let optionGap: CGFloat = 8
     static let slideDistance: CGFloat = 120
     static let slideSeconds = 0.3
@@ -771,8 +773,10 @@ final class PauseScreen: Screen {
         let total = CGFloat(options.count) * height + CGFloat(options.count - 1) * PauseScreen.optionGap
         for (index, option) in options.enumerated() {
             let place = CGPoint(x: 0, y: total / 2 - height / 2 - CGFloat(index) * (height + PauseScreen.optionGap))
-            let node = addFramed(option.text, frame: "8", scale: PauseScreen.optionScale, mirroredX: index % 2 == 1, at: place,
-                                 sound: option.sound, action: option.action)
+            // The second, fourth and so on turned round both ways.
+            let turned = index % 2 == 1
+            let node = addFramed(option.text, frame: "8", scale: PauseScreen.optionScale, mirroredX: turned, mirroredY: turned,
+                                 textSize: PauseScreen.optionTextSize, at: place, sound: option.sound, action: option.action)
             // In from the left, then the right, each a beat after the one over it.
             let side: CGFloat = index % 2 == 0 ? -1 : 1
             node.position.x += side * PauseScreen.slideDistance

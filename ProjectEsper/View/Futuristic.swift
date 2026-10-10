@@ -65,10 +65,12 @@ enum Futuristic {
     /// lettering or icon sits, the frames' leads and trim being off to a side.
     static let faces: [String: CGPoint] = [
         "1": CGPoint(x: 0.75, y: 0.48),
+        "5": CGPoint(x: 0.60, y: 0.33),
         "6": CGPoint(x: 0.62, y: 0.49),
         "7": CGPoint(x: 0.50, y: 0.40),
         "8": CGPoint(x: 0.48, y: 0.36),
         "9": CGPoint(x: 0.50, y: 0.32),
+        "11": CGPoint(x: 0.54, y: 0.35),
         "box4": CGPoint(x: 0.38, y: 0.50),
     ]
 }

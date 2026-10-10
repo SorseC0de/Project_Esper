@@ -38,9 +38,9 @@ final class TouchControls: SKNode {
     private let hitboxButton = TouchControls.cornerButton("HITBOX")
     private let aiButton = TouchControls.cornerButton("AI")
     private let wallsButton = TouchControls.cornerButton("WALLS")
-    /// Pause, offline: frame 1 small, a pause sign in its face, upper right under the FLO meter.
+    /// Pause, offline: frame 1 small, a pause sign in its face, in the top right corner over the FLO meter.
     private let pauseButton = TouchControls.pauseIcon()
-    static let pauseScale: CGFloat = 0.4
+    static let pauseScale: CGFloat = 0.3
 
     private static let cornerSize = CGSize(width: 50, height: 22)
 
@@ -78,7 +78,7 @@ final class TouchControls: SKNode {
         return frame
     }
 
-    /// The corner row: pause at the right, under `top` (the FLO meter's foot), the switches to its left.
+    /// The corner row: pause at the right, under `top`, the switches to its left.
     func placeCornerRow(top: CGFloat, right: CGFloat) {
         pauseButton.position = CGPoint(x: right - pauseButton.size.width / 2, y: top - pauseButton.size.height / 2)
         let k = TouchControls.scale

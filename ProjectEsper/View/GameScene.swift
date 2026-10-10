@@ -668,9 +668,10 @@ final class GameScene: SKScene {
         let lit = [signsDarkFrames == 0, signsDarkFrames == 0, seatbeltLit, match.pointMultiplier == 2, match.pointMultiplier == 3]
         let glowing = noDunkingSprites.indices.filter { $0 < lit.count && lit[$0] }.map { noDunkingSprites[$0] }
         return glowing.compactMap { sprite in
-            sprite.texture.map { BodySnapshot(texture: $0, position: CGPoint(x: holder.position.x + sprite.position.x * holder.xScale, y: holder.position.y + sprite.position.y * holder.yScale),
-                                              anchor: sprite.anchorPoint, xScale: 1,
-                                              size: CGSize(width: sprite.size.width * sprite.xScale * holder.xScale, height: sprite.size.height * sprite.yScale * holder.yScale)) }
+            // As drawn: its frame in the holder, the 2X's and 3X's own scale in it.
+            sprite.texture.map { BodySnapshot(texture: $0, position: CGPoint(x: holder.position.x + sprite.frame.midX * holder.xScale, y: holder.position.y + sprite.frame.midY * holder.yScale),
+                                              anchor: CGPoint(x: 0.5, y: 0.5), xScale: 1,
+                                              size: CGSize(width: sprite.frame.width * holder.xScale, height: sprite.frame.height * holder.yScale)) }
         }
     }
 
@@ -1616,27 +1617,19 @@ final class GameScene: SKScene {
             }
             floWordsShort.append(words[0])
             floWordsFull.append(words[1])
-            // In its top corner: the bar and word's outer end and top the insets in from it.
-            meter.setScale(FloTuning.meterScale)
-            meter.position = .zero
-            let drawn = meter.calculateAccumulatedFrame()
-            let outer = hudHalf.width - (mirrored ? hudInsets.right : hudInsets.left) - FloTuning.cornerInsetX
-            meter.position = CGPoint(x: mirrored ? outer - drawn.maxX : -outer - drawn.minX,
-                                     y: hudHalf.height - hudInsets.top - FloTuning.cornerInsetY - drawn.maxY)
             // MAX, lettered as a footstep is, in Bigdex: bar A's on the word's top outer corner,
             // on its sliders; bar B's on the bar's top trailing corner, against the scoreboard.
             let full = Onomatopoeia.still("MAX", face: .englishDex, colours: FloTuning.colours, height: GameScene.floMaxHeight, growsLeft: false,
                                           left: 1, right: 1)
             full.anchorPoint = CGPoint(x: 0.5, y: 0)
             if barA {
-                // Centred on the corner, kept under the screen's top edge, which the meters sit just
-                // below; then moved by the sliders, unclamped.
+                // Centred on the word's top outer corner, moved by the sliders; the whole meter,
+                // MAX and all, is fitted into its corner below.
                 full.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                 full.setScale(FloTuning.cornerMaxScale)
                 let wordFrame = words[0].frame
-                let screenTop = (circles.position.y + GameScene.scoreboardBelowTop - meter.position.y) / FloTuning.meterScale
                 full.position = CGPoint(x: (mirrored ? wordFrame.maxX : wordFrame.minX) - side * FloTuning.cornerMaxX,
-                                        y: min(wordFrame.maxY, screenTop - full.frame.height / 2) + FloTuning.cornerMaxY)
+                                        y: wordFrame.maxY + FloTuning.cornerMaxY)
             } else {
                 full.position = CGPoint(x: -side * (barWidth / 2 + FloTuning.maxX), y: barHeight / 2 + FloTuning.maxY)
                 full.setScale(FloTuning.maxScale)
@@ -1646,6 +1639,17 @@ final class GameScene: SKScene {
             meter.addChild(full)
             meter.setScale(FloTuning.meterScale)
             hud.addChild(meter)
+            // In its top corner, MAX included: the outer end and top the insets in from it; the
+            // second under pause, which has the very corner offline.
+            meter.position = .zero
+            let wasHidden = full.isHidden
+            full.isHidden = false
+            let drawn = meter.calculateAccumulatedFrame()
+            full.isHidden = wasHidden
+            let outer = hudHalf.width - (mirrored ? hudInsets.right : hudInsets.left) - FloTuning.cornerInsetX
+            let pauseRoom = mirrored && online == nil ? (controls?.pauseFrame.height ?? 0) + GameScene.cornerRowGap : 0
+            meter.position = CGPoint(x: mirrored ? outer - drawn.maxX : -outer - drawn.minX,
+                                     y: hudHalf.height - hudInsets.top - FloTuning.cornerInsetY - pauseRoom - drawn.maxY)
             floMeters.append(meter)
             floBars.append(bar)
             floBarHolders.append(holder)
@@ -1653,17 +1657,17 @@ final class GameScene: SKScene {
             floShown.append((0, shownFlo(index)))
         }
         showFloMeters()
-        // Pause and the corner switches under the second meter, and pause's place told to the
-        // pause menu, whose resume button sits on it.
-        if let controls, floMeters.count > 1 {
-            let foot = floMeters[1].calculateAccumulatedFrame().minY
-            controls.placeCornerRow(top: foot - GameScene.cornerRowGap, right: hudHalf.width - hudInsets.right - TouchControls.padding)
+        // Pause in the top right corner over the second meter, the corner switches beside it, and
+        // pause's place told to the pause menu, whose resume button sits on it.
+        if let controls {
+            controls.placeCornerRow(top: hudHalf.height - hudInsets.top - FloTuning.cornerInsetY,
+                                    right: hudHalf.width - hudInsets.right - FloTuning.cornerInsetX)
             let frame = controls.pauseFrame, view = hudScene.size
             flowState?.pauseRect = CGRect(x: view.width / 2 + frame.minX * hudScale, y: view.height / 2 - frame.maxY * hudScale,
                                           width: frame.width * hudScale, height: frame.height * hudScale)
         }
     }
-    /// Between the second FLO meter's foot and the corner row, in points.
+    /// Between pause and the second FLO meter under it, in points.
     private static let cornerRowGap: CGFloat = 6
     /// The pause icon's frame in the HUD's points, the pause menu's RESUME's place.
     private var pauseIconFrame: CGRect {
@@ -1697,7 +1701,7 @@ final class GameScene: SKScene {
     }
     private var floOrbs: [FloOrb] = []
     /// `flo_collect`'s volume against the rest.
-    private static let floCollectVolume: Float = 0.35
+    private static let floCollectVolume: Float = 0.25
     /// FLO still on its way to each player in orbs, kept off their meter till it lands.
     private var floOnTheWay: [Int: Double] = [:]
     /// Frames left of each player's flash on taking an orb.
@@ -1879,7 +1883,8 @@ final class GameScene: SKScene {
     /// window's edges that fades the map into it.
     private var planeNode: SKSpriteNode?
     private var edgeVeil: [SKSpriteNode] = []
-    private static let cloudCount = 6
+    /// Over the view's diagonal square, as thick as six were over the view.
+    private static let cloudCount = 14
     /// Flight B411's hoopcase drop as the HOOPCASE Y slider last left it, art pixels under the bin.
     private static let hoopcaseDropKey = "esper.flightB411.hoopcaseDrop"
     private static var savedHoopcaseDrop: Double {
@@ -7129,9 +7134,12 @@ final class GameScene: SKScene {
         skyNode.position = cameraNode.position
         for index in clouds.indices {
             clouds[index].node.position.x += clouds[index].speed
-            if clouds[index].node.position.x - clouds[index].node.size.width / 2 > size.width / 2 { placeCloud(index, fromTheLeft: true) }
+            if clouds[index].node.position.x - clouds[index].node.size.width / 2 > GameScene.cloudReach(size) { placeCloud(index, fromTheLeft: true) }
         }
     }
+
+    /// Half the view's diagonal: how far out the clouds go, the sky leaning with the plane.
+    private static func cloudReach(_ view: CGSize) -> CGFloat { hypot(view.width, view.height) / 2 }
 
     /// A cloud somewhere over the sky, or just off its left edge, its own size and pace.
     private func placeCloud(_ index: Int, fromTheLeft: Bool) {
@@ -7140,8 +7148,10 @@ final class GameScene: SKScene {
         cloud.size = CGSize(width: 192 * scale, height: 64 * scale)
         // Half of them behind the plane (-101), half in front of it.
         cloud.zPosition = Bool.random() ? -2 : 0
-        cloud.position = CGPoint(x: fromTheLeft ? -size.width / 2 - cloud.size.width / 2 : CGFloat.random(in: -size.width / 2...size.width / 2),
-                                 y: CGFloat.random(in: -size.height / 2...size.height / 2))
+        // Over a square as wide as the view's diagonal, so the sky's covered at any lean.
+        let reach = GameScene.cloudReach(size)
+        cloud.position = CGPoint(x: fromTheLeft ? -reach - cloud.size.width / 2 : CGFloat.random(in: -reach...reach),
+                                 y: CGFloat.random(in: -reach...reach))
         clouds[index].speed = CGFloat.random(in: 0.6...1.6) * scale * 2
     }
 
@@ -8213,9 +8223,9 @@ final class GameScene: SKScene {
                 cameraNode.setScale(cameraBaseScale)
                 glowHud.setScale(cameraNode.xScale * hudScale)
             }
-            // The sky on the camera, level, the view's size.
+            // The sky on the camera, the view's size, leaning with the plane: the clouds take the pitch.
             skyNode.isHidden = false
-            skyNode.zRotation = -tilt
+            skyNode.zRotation = 0
             skyNode.setScale(cameraNode.xScale)
             if flow == .playing, GameSettings.screenShake {
                 turbulenceIn -= 1

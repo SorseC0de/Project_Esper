@@ -14,66 +14,74 @@ struct SettingsScreen: View {
             Color(rgb: UIColourPicks.ground).ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {}
-            VStack(spacing: 14 * scale(.buttons)) {
-                Image(uiImage: TitleText.image("SETTINGS", size: 44 * scale(.titles)))
-                VStack(alignment: .leading, spacing: 8 * scale(.buttons)) {
-                    ForEach(Array(GameSettings.Row.allCases.enumerated()), id: \.offset) { index, row in
-                        rowView(row, index: index)
+            GeometryReader { geometry in
+                // Each row as tall as fits the screen, its title in frame 11 and its choices each
+                // in frame 5, the titles stacked with no room between.
+                let rows = GameSettings.Row.allCases
+                let titleImage = Futuristic.image("11"), optionImage = Futuristic.image("5")
+                let rowHeight = min(SettingsScreen.rowHeightMost * scale(.buttons),
+                                    (geometry.size.height * SettingsScreen.rowsShare - 44 * scale(.titles)) / CGFloat(rows.count))
+                let titleScale = rowHeight / (titleImage.size.height * titleImage.scale * Futuristic.pointsPerPixel)
+                let optionScale = rowHeight * SettingsScreen.optionShare / (optionImage.size.height * optionImage.scale * Futuristic.pointsPerPixel)
+                VStack(spacing: 10 * scale(.buttons)) {
+                    Image(uiImage: TitleText.image("SETTINGS", size: 44 * scale(.titles)))
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                            rowView(row, index: index, rowHeight: rowHeight, titleScale: titleScale, optionScale: optionScale)
+                        }
                     }
                 }
-                back
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .environment(\.colorScheme, .dark)
     }
 
-    private func rowView(_ row: GameSettings.Row, index: Int) -> some View {
+    /// The tallest a row is, in points, and the share of the screen's height the rows and title fill.
+    static let rowHeightMost: CGFloat = 48
+    static let rowsShare: CGFloat = 0.9
+    /// A choice's frame against its row's height.
+    static let optionShare: CGFloat = 0.8
+
+    private func rowView(_ row: GameSettings.Row, index: Int, rowHeight: CGFloat, titleScale: CGFloat, optionScale: CGFloat) -> some View {
         let onRow = flow.settingsCursor == index
         // Read so the row redraws when a choice changes.
         _ = flow.settingsVersion
-        return HStack(spacing: 8) {
-            Text(row.title)
-                .font(.system(size: 13 * scale(.text), weight: .heavy, design: .rounded))
-                .foregroundStyle(onRow ? Color(rgb: EsperPalette.gold.body) : .white)
-                .shadow(color: .black, radius: 0, x: 1, y: 1)
-                .frame(width: 130 * scale(.buttons), alignment: .trailing)
+        return HStack(spacing: 4 * scale(.buttons)) {
+            FuturisticFrame(name: "11", lit: onRow, scale: titleScale) { colour in
+                Text(row.title)
+                    .font(Futuristic.font(size: rowHeight * SettingsScreen.titleTextShare))
+                    .foregroundStyle(colour)
+                    .fixedSize()
+            }
+            .scaleEffect(onRow ? 1 / Futuristic.litGrowth : 1)
             ForEach(Array(row.options.enumerated()), id: \.offset) { option, label in
-                choice(label, picked: row.picked == option, cursor: onRow) { flow.pickSetting(row: index, option: option) }
+                choice(label, picked: row.picked == option, cursor: onRow, scale: optionScale, textSize: rowHeight * SettingsScreen.optionTextShare) {
+                    flow.pickSetting(row: index, option: option)
+                }
             }
         }
+        .frame(height: rowHeight)
     }
 
-    /// A choice: plum when it's the one picked, gold when it's also the cursor's row, black otherwise.
-    private func choice(_ text: String, picked: Bool, cursor: Bool, action: @escaping () -> Void) -> some View {
-        let piece = picked ? (cursor ? UIPiece.buttonGold : UIPiece.buttonPlum) : UIPiece.buttonBlack
-        return Button(action: action) {
-            Text(text)
-                .font(.system(size: 11 * scale(.text), weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .shadow(color: .black, radius: 0, x: 1, y: 1)
-                .offset(y: -UIPiece.buttonPlum.faceRise * scale(.buttons) * tuning.textRise)
-                .frame(minWidth: 64 * scale(.buttons), minHeight: 28 * scale(.buttons))
-                .padding(.horizontal, 6)
-                .background(piece.image(corners: scale(.buttons)))
-        }
-        .buttonStyle(.plain)
-        .noSystemFocus()
-    }
+    /// The lettering against a row's height: a title's, a choice's.
+    static let titleTextShare: CGFloat = 0.3
+    static let optionTextShare: CGFloat = 0.28
 
-    private var back: some View {
-        let lit = flow.settingsCursor == GameSettings.Row.allCases.count
-        let piece = lit ? UIPiece.buttonGold : UIPiece.buttonPlum
-        return Button { flow.closeSettings() } label: {
-            let rise = tuning.textRise
-            let shift = TitleText.dropShift(size: 22 * scale(.text)) * rise
-            Image(uiImage: TitleText.image("BACK", size: 22 * scale(.text), lit: lit))
-                .offset(x: -shift, y: -(piece.faceRise * scale(.buttons) * rise + shift))
-                .frame(width: 170 * scale(.buttons), height: 48 * scale(.buttons))
-                .background(piece.image(corners: scale(.buttons)))
+    /// A choice in frame 5: the one picked in the menus' blue, gold and a tenth bigger on the
+    /// cursor's row; the rest dim.
+    private func choice(_ text: String, picked: Bool, cursor: Bool, scale frameScale: CGFloat, textSize: CGFloat,
+                        action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            FuturisticFrame(name: "5", lit: picked && cursor, scale: frameScale) { colour in
+                Text(text)
+                    .font(Futuristic.font(size: textSize))
+                    .foregroundStyle(colour)
+                    .fixedSize()
+            }
+            .opacity(picked ? 1 : TitleOverlay.unpickedOpacity)
         }
         .buttonStyle(.plain)
-        .scaleEffect(lit ? TitleOverlay.cursorGrowth : 1)
         .noSystemFocus()
     }
 }

@@ -133,12 +133,7 @@ class Screen: SKNode {
         let faceX = mirroredX ? 1 - face.x : face.x, faceY = mirroredY ? 1 - face.y : face.y
         let middle = CGPoint(x: (faceX - 0.5) * frame.size.width, y: (0.5 - faceY) * frame.size.height)
         if let text {
-            let label = SKLabelNode(fontNamed: Futuristic.fontName)
-            label.text = text
-            label.fontSize = textSize * tuned(.text)
-            label.fontColor = Futuristic.lineColour
-            label.verticalAlignmentMode = .center
-            label.horizontalAlignmentMode = .center
+            let label = Futuristic.label(text, size: textSize * tuned(.text))
             label.position = middle
             button.addChild(label)
         }
@@ -581,11 +576,7 @@ final class StageSelectScreen: Screen {
         title.position = CGPoint(x: 0, y: halfHeight * 0.7)
         addChild(title)
         if let heading {
-            let sub = SKLabelNode(fontNamed: Futuristic.fontName)
-            sub.text = heading
-            sub.fontSize = 22 * tuned(.titles)
-            sub.fontColor = Futuristic.lineColour
-            sub.verticalAlignmentMode = .center
+            let sub = Futuristic.label(heading, size: 22 * tuned(.titles))
             sub.position = CGPoint(x: 0, y: halfHeight * 0.44)
             addChild(sub)
         }
@@ -617,12 +608,7 @@ final class StageSelectScreen: Screen {
             let lines = StageSelectScreen.lines(of: name)
             var labels: [SKLabelNode] = []
             for (number, line) in lines.enumerated() {
-                let label = SKLabelNode(fontNamed: Futuristic.fontName)
-                label.text = line
-                label.fontSize = textSize
-                label.fontColor = Futuristic.lineColour
-                label.verticalAlignmentMode = .center
-                label.horizontalAlignmentMode = .center
+                let label = Futuristic.label(line, size: textSize)
                 label.setScale(min(1, (width * 0.82) / max(label.frame.width, 1)))
                 let step = textSize * StageSelectScreen.lineShare
                 label.position = CGPoint(x: 0, y: (CGFloat(lines.count - 1) / 2 - CGFloat(number)) * step)

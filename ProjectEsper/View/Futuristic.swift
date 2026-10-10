@@ -11,13 +11,38 @@ enum Futuristic {
     /// The customize screen's top line.
     static let lit = Color(rgb: EsperPalette.gold.light)
     static let litGrowth: CGFloat = 1.1
-    static let fontName = "UpheavalTT-BRK-"
+    /// The menus' face: the debug strip's UI FONT pick, A to K, Upheaval to start; kept.
+    static let typefaces = ["UpheavalTT-BRK-", "InfiniumGuardian", "PlanetaryContact", "SadMachine", "BoldPixels", "Caja",
+                        "7pixelsOfPerfect", "BoardofDirectors-Heavy", "BMarmyA12", "Kapel", "LongShot"]
+    static let typefaceKey = "ui.futuristic.face"
+    static var typefacePick: Int {
+        get { min(max(UserDefaults.standard.integer(forKey: typefaceKey), 0), typefaces.count - 1) }
+        set { UserDefaults.standard.set(newValue, forKey: typefaceKey) }
+    }
+    static var fontName: String { typefaces[typefacePick] }
+    /// Every face drawn so its capitals stand as tall as Upheaval's at the same size.
+    static func fontSize(_ size: CGFloat) -> CGFloat {
+        _ = Onomatopoeia.registered
+        let probe: CGFloat = 100
+        guard let reference = UIFont(name: typefaces[0], size: probe), let face = UIFont(name: fontName, size: probe), face.capHeight > 0 else { return size }
+        return size * reference.capHeight / face.capHeight
+    }
     /// Every piece at the same points per pixel of its import, so they keep their sizes in the vector.
     static let pointsPerPixel: CGFloat = 0.14
 
     static func font(size: CGFloat) -> Font {
-        _ = Onomatopoeia.registered
-        return .custom(fontName, size: size)
+        .custom(fontName, size: fontSize(size))
+    }
+
+    /// A line in the menus' face for SpriteKit, centred on its position, in the blue.
+    static func label(_ text: String, size: CGFloat) -> SKLabelNode {
+        let label = SKLabelNode(fontNamed: fontName)
+        label.text = text
+        label.fontSize = fontSize(size)
+        label.fontColor = lineColour
+        label.verticalAlignmentMode = .center
+        label.horizontalAlignmentMode = .center
+        return label
     }
 
     static func image(_ piece: String) -> UIImage { UIImage(named: "futuristic_\(piece)") ?? UIImage() }

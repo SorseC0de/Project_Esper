@@ -648,7 +648,7 @@ the same blue round button. The HUD: the
 round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, JUMP and THROW in
 Futuristic_UI's ring1 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their
-names in Upheaval in it too, gold while held, the ring turning a full circle as it's pressed (0.35
+names in the menus' face in it too, shrunk to fit inside the ring (0.72 of the button across), gold while held, the ring turning a full circle as it's pressed (0.35
 seconds); the stick a faded black round button with a blue knob; pause offline in frame 1 small
 (0.3 of the menus' size) with a pause sign in its face, in the top right corner over the second FLO
 meter (`TouchControls.placeCornerRow`), and AI, HITBOX and RESET small black plates to its left,
@@ -974,9 +974,9 @@ an art pixel. Its inside is 100 columns from its sixth, five rows tall from its 
 three shorter as its end slants (4, 3 and 2). The FLO missing is drawn over it, before its warp, a
 column of the plum ramp's last for each from its first column on; full, none, and MAX, in Bigdex
 in the word's four colours, 6 high at 1.5, stands on the bar's top trailing corner, the scoreboard's
-end, 5 in from it and 15 down, steady. An A/B test on the FLO BAR picker (`FloTuning.variant`, kept between launches):
+end, 5 in from it and 15 down, steady. An A/B test (`FloTuning.variant`, kept between launches; its picker gone, A as it stands):
 A, as above, the missing FLO from the word's end on, the fill shrinking toward the scoreboard, MAX
-instead centred on the word's top outer corner, kept under the screen's top edge, then moved in from
+instead centred on the word's top outer corner, then moved in from
 it (FLO MAX SCALE 1.25, FLO MAX X 54 and Y 0 on sliders, mirrored for the second), and the word in palette 34 over 51 until full or in FloState; B, the missing from the scoreboard's end back, the fill
 growing out of the word, MAX on the bar's corner as above, the word in its own colours throughout; in FloState, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
@@ -1154,6 +1154,15 @@ none; PAUSE, RESET and R3 stay.
 
 Segmented pickers in the top-left corner change a stat live on both players. `Tuning.swift`
 holds the variants; A is always the baseline as tuned. POWER's fourteen sit in two rows of seven.
+The pickers sit under a PICKERS tab top left and the sliders under a SLIDERS tab top middle, each
+folding its bench away and opening it again (`TouchControls.refreshBenches`, kept between launches,
+folded to start); the corner text under the pickers moves with them.
+
+- UI FONT: the menus' face, A to K (`Futuristic.typefaces`, kept): Upheaval TT, Infinium Guardian,
+  Planetary Contact, Sad Machine, Bold Pixels, Caja, 7 Pixels of Perfection, Board of Directors, BM
+  Army, Kapel and Long Shot, all bundled; every face drawn so its capitals stand as tall as
+  Upheaval's at the same size (`Futuristic.fontSize`, their cap heights 31 to 78 against its 50), in
+  SwiftUI and SpriteKit (`Futuristic.label`); a pick redraws the HUD and the screens.
 
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
@@ -1233,8 +1242,8 @@ sleeve's, the shoulder, and a shoe where there's no boot; the tops are each part
 middle on the sheet (`SpriteLibrary.top`, the same in every look, warmed with the rest), and the
 cubes take the part's colour as drawn, turned round or not. In the glow's mask the hood is drawn
 magenta (`hoodSnapshots`, `MaskScene`'s `hoods`): the plain threshold, at the hood's share of the glow,
-0.6 as the customize screen adds it (`GlowSettings.hoodShare`, the strip's HOOD GLOW, kept; at the whole
-glow the big, light hood doubled toward gold); the face is drawn pure red (`shieldedSnapshots`, `shield`),
+0.6 as the customize screen adds it (`GlowSettings.hoodShare`, baked; at the whole glow the big, light
+hood doubled toward gold), the whole of it on K&A under its wash (`kAndAHoodShare`, `hoodGlowShare`); the face is drawn pure red (`shieldedSnapshots`, `shield`),
 which the bright pass treats as flat and the composite leaves without bloom, so none spreads onto it.
 The hood's strings, the energy form's head apart and each body's energy are cut out in black
 (`cutOutSnapshots`, `cutOut`), and a body's own glowing parts (the sleeves, boots and shoes) are black
@@ -1819,7 +1828,8 @@ never a painted slope.
 
 `Stage.hoopfishHideaway`, `StageChoice.hoopfishHideaway`: 37 by 19 tiles, under water, zoomed to the screen's width (not by
 whole pixels), its bottom on the screen's: a phone crops blank water off the top (about two rows),
-a squarer screen shows more water over it,
+a squarer screen shows more water round it, a third of what's left over under the stage
+(`hoopfishBottomShare`) and the rest over it,
 laid out in the map maker like the Elements (`MapStage.hoopfishHideaway`, `StageMap.current[.hoopfishHideaway]`,
 kept offline under `esper.hoopfishHideawayMap`; its first map a floor along the bottom row, the
 Hoopfish over the middle). Its first name, Hoopfish Hideaway, and Hoopfish Harbor are kept for later

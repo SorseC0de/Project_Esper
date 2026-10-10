@@ -379,9 +379,8 @@ enum GlowSettings {
     static let tint = SIMD4<Float>(1, 1, 1, 1)
     /// The share of its glow a hooded head's hood takes, as the customize screen draws it
     /// (`CustomizeArt.glowStrength`): the hood is lighter than the energy colour and big, and at
-    /// the whole glow it went to gold. HOOD GLOW on the strip moves it, kept.
-    static let hoodShareKey = "glow.hoodShare"
-    nonisolated(unsafe) static var hoodShare: Float = {
-        Float(UserDefaults.standard.object(forKey: hoodShareKey) as? Double ?? 0.6)
-    }()
+    /// the whole glow it went to gold; on K&A, under its wash, the whole of it.
+    static let hoodShare: Float = 0.6
+    static let kAndAHoodShare: Float = 1.0
+    static func hoodShare(on look: StageLook) -> Float { look == .kAndA ? kAndAHoodShare : hoodShare }
 }

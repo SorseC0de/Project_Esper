@@ -18,6 +18,12 @@ final class TouchControls: SKNode {
         var text: String
         let radius: CGFloat
     }
+    /// A name shrunk to fit inside its ring: no wider than this share of the button's diameter.
+    static let labelShare: CGFloat = 0.72
+    private static func fit(_ label: SKLabelNode, inside radius: CGFloat) {
+        label.setScale(1)
+        label.setScale(min(1, radius * 2 * labelShare / max(label.frame.width, 1)))
+    }
     /// A ring's turn on a press, in seconds.
     static let ringSpinSeconds = 0.35
     /// A ring's diameter over the button's.
@@ -114,6 +120,48 @@ final class TouchControls: SKNode {
     private var pickers: [SegmentedPicker] = []
     private let pickerOrigin: CGPoint
     private var sliders: [Slider] = []
+    /// The debug pickers, top left, and the sliders, top middle, each under a tab that folds
+    /// them away and opens them again; kept between launches.
+    private let pickerTab = TouchControls.benchTab()
+    private let sliderTab = TouchControls.benchTab()
+    static let pickersOpenKey = "debug.bench.pickersOpen", slidersOpenKey = "debug.bench.slidersOpen"
+    private var pickersOpen = UserDefaults.standard.bool(forKey: TouchControls.pickersOpenKey) {
+        didSet { UserDefaults.standard.set(pickersOpen, forKey: TouchControls.pickersOpenKey); refreshBenches() }
+    }
+    private var slidersOpen = UserDefaults.standard.bool(forKey: TouchControls.slidersOpenKey) {
+        didSet { UserDefaults.standard.set(slidersOpen, forKey: TouchControls.slidersOpenKey); refreshBenches() }
+    }
+    private var online = false
+    /// A bench opened or folded: what sits under the pickers moves with them.
+    var onBenchesChanged: (() -> Void)?
+    static let benchTabSize = CGSize(width: 76, height: 16)
+    /// The first slider's row under the slider tab.
+    private static let slidersTop: CGFloat = 50
+
+    private static func benchTab() -> SKShapeNode {
+        let tab = SKShapeNode(rectOf: benchTabSize, cornerRadius: 4)
+        tab.fillColor = SKColor(white: 0, alpha: 0.6)
+        tab.strokeColor = SKColor(rgb: Futuristic.lineRGB)
+        tab.lineWidth = 1
+        let label = SKLabelNode(fontNamed: "Menlo-Bold")
+        label.name = "label"
+        label.fontSize = 9
+        label.fontColor = SKColor(rgb: Futuristic.lineRGB)
+        label.verticalAlignmentMode = .center
+        tab.addChild(label)
+        return tab
+    }
+
+    /// The benches shown, folded or open, and what's in them shown with them.
+    private func refreshBenches() {
+        (pickerTab.childNode(withName: "label") as? SKLabelNode)?.text = "PICKERS " + (pickersOpen ? "▾" : "▸")
+        (sliderTab.childNode(withName: "label") as? SKLabelNode)?.text = "SLIDERS " + (slidersOpen ? "▾" : "▸")
+        pickerTab.isHidden = online || pickers.isEmpty
+        sliderTab.isHidden = online || sliders.isEmpty
+        for picker in pickers { picker.isHidden = online || !pickersOpen }
+        for slider in sliders { slider.isHidden = online || !slidersOpen }
+        onBenchesChanged?()
+    }
     private var sliderTouches: [UITouch: Slider] = [:]
     private let topCentre: CGPoint
     private var stickTouch: UITouch?
@@ -163,6 +211,11 @@ final class TouchControls: SKNode {
         buttons = [jump.button, shoot.button, throwButton.button]
         buttonSets = [jump.set, shoot.set, throwButton.set]
 
+        pickerTab.position = CGPoint(x: left + TouchControls.benchTabSize.width / 2, y: top - TouchControls.benchTabSize.height / 2)
+        sliderTab.position = CGPoint(x: 0, y: top - 30)
+        addChild(pickerTab)
+        addChild(sliderTab)
+        refreshBenches()
         // The corner row along the top, right to left, till the FLO meter's laid out and it's put under it.
         for button in [resetButton, hitboxButton, aiButton, wallsButton] as [SKNode] + [pauseButton] { addChild(button) }
         placeCornerRow(top: top, right: right)
@@ -176,8 +229,8 @@ final class TouchControls: SKNode {
         resetButton.isHidden = online
         pauseButton.isHidden = online
         aiButton.isHidden = online || !DebugUI.enabled
-        for picker in pickers { picker.isHidden = online }
-        for slider in sliders { slider.isHidden = online }
+        self.online = online
+        refreshBenches()
     }
 
     /// The buttons' names, for what they'd do right now.
@@ -185,6 +238,7 @@ final class TouchControls: SKNode {
         for (index, text) in [jump, shoot, throwBall].enumerated() where buttons.indices.contains(index) && buttons[index].text != text {
             buttons[index].text = text
             buttons[index].label.text = text
+            TouchControls.fit(buttons[index].label, inside: buttons[index].radius)
         }
     }
 
@@ -204,12 +258,8 @@ final class TouchControls: SKNode {
         ring.colorBlendFactor = 1
         ring.zPosition = -1
         node.addChild(ring)
-        let text = SKLabelNode(fontNamed: Futuristic.fontName)
-        text.text = label
-        text.fontSize = 10 * TouchControls.textScale
-        text.fontColor = TouchControls.line
-        text.verticalAlignmentMode = .center
-        text.horizontalAlignmentMode = .center
+        let text = Futuristic.label(label, size: 10 * TouchControls.textScale)
+        TouchControls.fit(text, inside: radius)
         node.addChild(text)
         addChild(node)
         return (Button(node: node, ring: ring, label: text, text: label, radius: radius), set)
@@ -243,9 +293,10 @@ final class TouchControls: SKNode {
     /// Adds a picker under the ones already in the top-left corner.
     func addPicker(title: String, options: [String], selected: Int, perRow: Int = .max, onSelect: @escaping (Int) -> Void) {
         let picker = SegmentedPicker(title: title, options: options, selected: selected, perRow: perRow, onSelect: onSelect)
-        picker.position = CGPoint(x: pickerOrigin.x, y: pickerBottom)
+        picker.position = CGPoint(x: pickerOrigin.x, y: pickersBottom)
         addChild(picker)
         pickers.append(picker)
+        refreshBenches()
     }
 
     /// Adds a slider across the top, under the score, below any already there, eight to a column.
@@ -260,8 +311,9 @@ final class TouchControls: SKNode {
         for (index, placed) in sliders.enumerated() {
             let column = CGFloat(index / perColumn) - CGFloat(columns - 1) / 2
             placed.position = CGPoint(x: topCentre.x + column * (Slider.size.width + 14),
-                                      y: topCentre.y - 30 - CGFloat(index % perColumn) * 16)
+                                      y: topCentre.y - TouchControls.slidersTop - CGFloat(index % perColumn) * 16)
         }
+        refreshBenches()
         return slider
     }
 
@@ -277,17 +329,30 @@ final class TouchControls: SKNode {
 
     /// Under the sliders across the top, or under the score with none.
     var slidersBottom: CGFloat {
-        topCentre.y - 30 - CGFloat(max(min(sliders.count, 8) - 1, 0)) * 16 - 10
+        guard slidersOpen else { return topCentre.y - 30 - TouchControls.benchTabSize.height }
+        return topCentre.y - TouchControls.slidersTop - CGFloat(max(min(sliders.count, 8) - 1, 0)) * 16 - 10
     }
 
-    /// Where the next picker would go, so other corner text can sit under them.
+    /// Where the next picker goes, under the tab and the ones there.
+    private var pickersBottom: CGFloat {
+        pickerOrigin.y - TouchControls.benchTabSize.height - 4 - pickers.reduce(0) { $0 + $1.height + 4 }
+    }
+    /// The foot of the pickers' bench, open or folded, so other corner text can sit under it.
     var pickerBottom: CGFloat {
-        pickerOrigin.y - pickers.reduce(0) { $0 + $1.height + 4 }
+        pickersOpen ? pickersBottom : pickerOrigin.y - TouchControls.benchTabSize.height - 4
     }
 
     // MARK: Touches, in this node's space
 
     func began(_ touch: UITouch, at point: CGPoint) {
+        if !pickerTab.isHidden, pickerTab.frame.insetBy(dx: -4, dy: -4).contains(point) {
+            pickersOpen.toggle()
+            return
+        }
+        if !sliderTab.isHidden, sliderTab.frame.insetBy(dx: -4, dy: -4).contains(point) {
+            slidersOpen.toggle()
+            return
+        }
         if !resetButton.isHidden, resetButton.frame.insetBy(dx: -8, dy: -8).contains(point) {
             onReset?()
             return

@@ -1667,6 +1667,10 @@ final class GameScene: SKScene {
                                           width: frame.width * hudScale, height: frame.height * hudScale)
         }
     }
+    /// Hoopfish Hideaway's room over the stage on a squarer screen: this share of it goes under the stage instead.
+    private static let hoopfishBottomShare: CGFloat = 1.0 / 3
+    /// The hood's glow share for the stage up: the renderer's.
+    var hoodGlowShare: Float { GlowSettings.hoodShare(on: match.stage.features.look) }
     /// Between pause and the second FLO meter under it, in points.
     private static let cornerRowGap: CGFloat = 6
     /// The pause icon's frame in the HUD's points, the pause menu's RESUME's place.
@@ -3198,8 +3202,10 @@ final class GameScene: SKScene {
             : (fills ? size.width / stageWidth : screenPixelsPerGamePixel / screenScale)
         cameraNode.setScale(1 / pointsPerGamePixel)
         cameraBaseScale = cameraNode.xScale
+        // Filling the width, a share of the height the stage leaves over goes under it rather than all over it.
+        let leftOver = max(size.height * cameraNode.yScale - stageHeight, 0)
         cameraNode.position = CGPoint(x: scrolls && !wholeStageView ? cameraBase.x : stageWidth / 2,
-                                      y: fills ? size.height * cameraNode.yScale / 2 : stageHeight / 2 - below)
+                                      y: fills ? size.height * cameraNode.yScale / 2 - leftOver * GameScene.hoopfishBottomShare : stageHeight / 2 - below)
         if scrolls, !wholeStageView, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
         cameraBase = cameraNode.position
         // The HUD is laid out in the phone's points and scaled up for a bigger screen.
@@ -3410,10 +3416,13 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
-        // The A/B test: A empties from the word's end, MAX on the word; B fills from it.
-        controls.addPicker(title: "FLO BAR", options: ["A", "B"], selected: FloTuning.variant == .emptiesFromWord ? 0 : 1) { index in
-            FloTuning.variant = index == 0 ? .emptiesFromWord : .fillsFromWord
-            relayoutFlo()
+        // The menus' face, A to K (`Futuristic.typefaces`): everything in it drawn again.
+        controls.addPicker(title: "UI FONT", options: (0..<Futuristic.typefaces.count).map { String(UnicodeScalar(UInt8(65 + $0))) },
+                           selected: Futuristic.typefacePick, perRow: 6) { [weak self] index in
+            Futuristic.typefacePick = index
+            UITuning.shared.touch()
+            guard let self else { return }
+            DispatchQueue.main.async { self.layout(displayScale: self.displayScale) }
         }
         if !ParkedSliders.flo {
             controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
@@ -3424,11 +3433,6 @@ final class GameScene: SKScene {
         controls.addSlider(title: "ORBIT RADIUS", range: 0...96, notch: 1, value: Float(GameScene.orbitRadius)) { value in
             GameScene.orbitRadius = CGFloat(value)
             UserDefaults.standard.set(Double(value), forKey: GameScene.orbitRadiusKey)
-        }
-        // How much of its glow a hood takes against everything else's.
-        controls.addSlider(title: "HOOD GLOW", range: 0...1, notch: 0.05, value: GlowSettings.hoodShare) { value in
-            GlowSettings.hoodShare = value
-            UserDefaults.standard.set(Double(value), forKey: GlowSettings.hoodShareKey)
         }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
@@ -3485,8 +3489,13 @@ final class GameScene: SKScene {
         drawSeries()
         presentScreen()
         layoutFloMeters()
-        powerLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 4)
-        debugLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 26)
+        let placeCornerText = { [weak self, weak controls] in
+            guard let self, let controls else { return }
+            self.powerLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 4)
+            self.debugLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: controls.pickerBottom - 26)
+        }
+        placeCornerText()
+        controls.onBenchesChanged = placeCornerText
         fpsLabel.position = CGPoint(x: -halfWidth + insets.left + TouchControls.padding, y: -halfHeight + insets.bottom + TouchControls.padding)
     }
 

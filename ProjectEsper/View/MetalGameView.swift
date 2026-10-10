@@ -385,6 +385,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             uniforms.waterTop = SIMD4(GlowRenderer.channels(water.top), Float(water.alpha))
             uniforms.waterBottom = SIMD4(GlowRenderer.channels(water.bottom), 0)
         }
+        uniforms.hood = SIMD4(scene.hoodGlowShare, 0, 0, 0)
 
         pass(glowCommands, pipeline: bright, into: glowA, sources: [sceneTexture, bodyMask], uniforms: uniforms)
         for _ in 0..<GlowSettings.blurPasses {
@@ -570,9 +571,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     }
 
     private func camGlowUniforms(_ glow: MTLTexture) -> GlowUniforms {
-        GlowUniforms(texelSize: SIMD2(1 / Float(glow.width), 1 / Float(glow.height)), direction: .zero,
-                     threshold: GlowSettings.threshold, bodyThreshold: GlowSettings.bodyThreshold,
-                     softness: GlowSettings.softness, intensity: GlowSettings.intensity, tint: GlowSettings.tint)
+        var uniforms = GlowUniforms(texelSize: SIMD2(1 / Float(glow.width), 1 / Float(glow.height)), direction: .zero,
+                                    threshold: GlowSettings.threshold, bodyThreshold: GlowSettings.bodyThreshold,
+                                    softness: GlowSettings.softness, intensity: GlowSettings.intensity, tint: GlowSettings.tint)
+        uniforms.hood = SIMD4(scene.hoodGlowShare, 0, 0, 0)
+        return uniforms
     }
 
     /// The ball cam's texture on a trapezoid, a quarter of the screen across at the top and a

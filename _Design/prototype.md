@@ -162,9 +162,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   as well as the hand's reach at full stretch; on the third frame the hooded head looks
   back (protocol 103). The sheet draws the ball taken from its fourth frame on; a snatch that took
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
-  Changing with the ball in hand, the ball circles the body clockwise, from the top, one lap over
-  the change, 48 art pixels out from the body's middle (`GameScene.orbitRadius`, the strip's
-  ORBIT RADIUS, 0 to 96, kept).
+  Changing with the ball in hand, the ball circles the body clockwise from in front, three laps
+  over the change ending in front again (`GameScene.orbitLaps`), mirrored facing left, 32 art
+  pixels out from the body's middle (`GameScene.orbitRadius`, the strip's ORBIT RADIUS, 0 to 96,
+  kept).
   From the change's first frame to its burst on the sheet's third
   (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`ZRules.burstRadius`) is
   parried as a snatch parries one, before the blades are resolved; at the burst everything else
@@ -551,6 +552,11 @@ one parried is stunned as ever and locked out of every input, stick and buttons,
 and 30 frames past it (60 at first, too long), drawn reeling in the ledge sheet's last frame and
 flashing palette 2 every other pair of frames (`Player.attackLockout`, `parryLocked`; a button held
 through it doesn't fire as it ends; protocol 123), so the parry can be made something of.
+Two live blades meeting each other is a slashclash (`Match.resolveSlashClash`, before the parries
+and the hits, protocol 127): both blades spent, nobody struck, a 24-frame hit stop
+(`HitStopRules.slashClashFrames`, three times a hit's) with the wall clank's sound, CLANG where
+they met and a hit spark there in each side's colour; as the hit stop ends both are put back in
+neutral, the rest of their swings cancelled (`Player.recoverFromSlashClash`).
 
 ## Interface
 

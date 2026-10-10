@@ -51,6 +51,8 @@ public enum MatchEvent: Equatable {
     case slashed(player: Int)
     /// The blade met a wall on its first live frame.
     case slashClanked(player: Int)
+    /// Both blades met each other: a slashclash, where they met.
+    case slashClashed(at: Vec2)
     /// The snatch's hand is at full stretch.
     case snatchReached(player: Int)
     /// FLO earned, this much, from a play there: the rim of a basket, a counter, a snatch, a

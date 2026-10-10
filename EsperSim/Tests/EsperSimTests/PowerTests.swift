@@ -23,6 +23,25 @@ final class PowerTests: XCTestCase {
 
     // MARK: Slash and snatch
 
+    func testTwoBladesMeetingSlashclashAndBothGoBackToNeutralAfterTheHitStop() {
+        var match = with(.none)
+        match.players[1].position.x = match.players[0].position.x + 14
+        match.players[1].facing = .left
+        match.advance(inputs: [PlayerInput(shoot: true), PlayerInput(shoot: true)])
+        let clashed = run(&match, frames: SlashRules.frames, input: { _ in .idle }) { match in
+            match.events.contains { if case .slashClashed = $0 { return true } else { return false } }
+        }
+        XCTAssertLessThan(clashed, SlashRules.frames)
+        XCTAssertEqual(match.hitStop, HitStopRules.slashClashFrames)
+        XCTAssertEqual(match.players[0].hitStun, 0, "nobody's struck")
+        XCTAssertEqual(match.players[1].hitStun, 0)
+        XCTAssertEqual(match.players[0].state, .slashing, "held in the swing through the hit stop")
+        run(&match, frames: HitStopRules.slashClashFrames, input: { _ in .idle })
+        XCTAssertEqual(match.hitStop, 0)
+        XCTAssertNotEqual(match.players[0].state, .slashing, "the rest of the swing cancelled")
+        XCTAssertNotEqual(match.players[1].state, .slashing)
+    }
+
     func testSlashStripsAndKnocksABodyWithoutTheBall() {
         var match = with(.none)
         match.players[1].position.x = match.players[0].position.x + 14

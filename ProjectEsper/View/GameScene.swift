@@ -146,10 +146,12 @@ final class GameScene: SKScene {
     private var arcsWereHidden: Bool?
     /// The ball's circle round a body changing into FloState with it, in art pixels: ORBIT
     /// RADIUS on the strip, kept.
-    static let orbitRadiusKey = "esper.transform.orbitRadius"
+    static let orbitRadiusKey = "esper.transform.orbitRadius.2"
     nonisolated(unsafe) static var orbitRadius: CGFloat = {
-        CGFloat(UserDefaults.standard.object(forKey: orbitRadiusKey) as? Double ?? 48)
+        CGFloat(UserDefaults.standard.object(forKey: orbitRadiusKey) as? Double ?? 32)
     }()
+    /// Laps the ball makes round the body over the change.
+    static let orbitLaps: CGFloat = 3
     private var bannerFrames = 0
     private var bannerQueue: [(text: String, size: CGFloat)] = []
     private static let bannerHold = 45
@@ -4504,6 +4506,8 @@ final class GameScene: SKScene {
                 // Where the blade meets the wall, back off it.
                 let player = players[index]
                 say(.clang, at: player.chest + Vec2(x: player.facing.sign * GameScene.bladeReach, y: 0), away: -player.facing.sign, rise: 30)
+            case .slashClashed(let at):
+                say(.clang, at: at, away: 0, rise: 30)
             case .wallJumped(let index, let wall):
                 // Out of the wall spark at the shoe, away from the wall.
                 say(.squeak, at: players[index].position + Vec2(x: wall.sign * 4, y: 5), away: -wall.sign, rise: 15)
@@ -5197,6 +5201,7 @@ final class GameScene: SKScene {
             case .shot(let index), .thrown(let index), .fireballThrown(let index), .boltFired(let index): play(.shootV2, at: body(index))
             case .slashed(let index): play(.esperSlash, at: body(index))
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
+            case .slashClashed(let at): play(.slashWallClank, at: at)
             case .snatchReached(let index): play(.snatch, at: body(index))
             case .caught(let index): play(.catchBall, at: body(index))
             case .struck(let victim, _), .popped(let victim, _), .cartHit(let victim, _): play(.playerHit, at: body(victim))
@@ -5446,6 +5451,9 @@ final class GameScene: SKScene {
                 if let cart = match.cart { spawnHitSpark(player: index, at: cart.box.center) }
             case .swatted(let index, hit: true):
                 spawnHitSpark(player: index, at: match.ball.position)
+            case .slashClashed(let at):
+                // A spark off each blade, in its slasher's colour.
+                for index in match.players.indices { spawnHitSpark(player: index, at: at) }
             case .slashClanked(let index):
                 // The blade against a backboard shakes it.
                 let player = match.players[index]
@@ -7788,13 +7796,14 @@ final class GameScene: SKScene {
             let teamColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).glow)
             halo.color = player.hasFireball ? GameScene.fireballColour : teamColour
             if player.holding, changing {
-                // Changing with the ball: it circles the body clockwise, from the top, a lap over
-                // the change, `orbitRadius` art pixels out from the body's middle.
-                let lap = CGFloat(player.stateTimer) / CGFloat(TransformRules.frames)
-                let angle = .pi / 2 - lap * 2 * .pi
+                // Changing with the ball: it circles the body clockwise, from in front and back
+                // there, `orbitLaps` laps over the change, `orbitRadius` art pixels out from the
+                // body's middle; facing left, mirrored.
+                let share = CGFloat(player.stateTimer) / CGFloat(TransformRules.frames)
+                let angle = -share * GameScene.orbitLaps * 2 * .pi
                 let middle = node.position + CGPoint(x: 0, y: CGFloat(player.spec.bodyHeight / 2 * Double(SpriteLibrary.pixelsPerUnit)))
                 let radius = GameScene.orbitRadius * drawScale
-                let at = CGPoint(x: middle.x + cos(angle) * radius, y: middle.y + sin(angle) * radius)
+                let at = CGPoint(x: middle.x + cos(angle) * radius * CGFloat(player.facing.sign), y: middle.y + sin(angle) * radius)
                 halo.isHidden = player.frozen > 0
                 halo.position = at
                 handBall.isHidden = false

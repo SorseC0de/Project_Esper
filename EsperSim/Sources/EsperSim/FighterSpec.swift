@@ -536,6 +536,8 @@ public enum HitStopRules {
     public static let hitFrames = 8
     public static let shotFrames = 12
     public static let counterFrames = 16
+    /// A slashclash's, held long.
+    public static let slashClashFrames = 24
 }
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many

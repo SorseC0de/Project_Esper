@@ -72,6 +72,8 @@ public struct Match: Equatable {
     public var scoreLockout = 0
     /// Frames left of hit-stop: while it runs the match is held, nothing moves or counts down.
     public var hitStop = 0
+    /// A slashclash's hit stop is on: as it ends, both are put back in neutral.
+    public var slashClashRecovery = false
     /// What happened on the last `advance`.
     public var events: [MatchEvent] = []
     /// The winning bucket's been made: no inputs and no catches from here, set by the
@@ -141,6 +143,11 @@ public struct Match: Equatable {
         if scoreLockout > 0 { scoreLockout -= 1 }
         if hitStop > 0 {
             hitStop -= 1
+            if hitStop == 0, slashClashRecovery {
+                // A slashclash's hit stop over: both out of their swings, back in neutral.
+                slashClashRecovery = false
+                for index in players.indices { players[index].recoverFromSlashClash() }
+            }
             return
         }
         if restartIn > 0 {
@@ -179,6 +186,7 @@ public struct Match: Equatable {
         }
         burnInLava()
         burnDribbles()
+        resolveSlashClash()
         resolveParries()
         for index in players.indices {
             resolveHits(by: index)
@@ -608,6 +616,18 @@ public struct Match: Equatable {
             ball.tornadoCentre = nil
             ball.release(from: ball.position, velocity: direction * ZRules.burstBallPush, by: index, straight: false)
         }
+    }
+
+    /// Two live blades meeting: a slashclash. Both spent, a long hit stop and a clank, and once
+    /// it's over both back in neutral, the rest of their swings cancelled. Before the parries
+    /// and the hits, so it wins.
+    private mutating func resolveSlashClash() {
+        guard players.count == 2, let first = players[0].slashHitbox, let second = players[1].slashHitbox, first.overlaps(second) else { return }
+        players[0].slashHit = true
+        players[1].slashHit = true
+        slashClashRecovery = true
+        events.append(.slashClashed(at: (first.center + second.center) * 0.5))
+        holdHitStop(HitStopRules.slashClashFrames)
     }
 
     /// A snatch's reach, a throw stance in its opening frames, or the change into FloState from

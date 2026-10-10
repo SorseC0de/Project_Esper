@@ -1737,6 +1737,12 @@ public struct Player: Equatable {
         enter(.snatching)
     }
 
+    /// A slashclash's hit stop over: out of the swing at once, back in neutral.
+    public mutating func recoverFromSlashClash() {
+        guard state == .slashing else { return }
+        enter(grounded ? .idle : .air)
+    }
+
     /// Having parried: out of the snatch, the throw's stance or the stepback at once, back in
     /// neutral to do anything, the ball kept if held; the buttons wanting a fresh press.
     public mutating func recoverFromParry() {

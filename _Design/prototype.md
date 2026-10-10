@@ -624,10 +624,12 @@ pause and win at buttons 1, text 0.8, titles 0.8 and panels 0.9; the iPad's paus
 text 1.5, titles 1.5 and panels 0.9, as tuned on one; and the iPad's and the TV's title
 at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the plate's
 face, above its lip, and is nudged up and left by half its own drop. TEXT Y on the panel
-scales that lift, one value a platform: half of it, 0.5, on all of them. The stage select: STAGE SELECT on a ribbon, each stage a royal blue plate
-with its name on the face in two lines, broken at the space nearest its middle (one line with no
-space), gold when a cursor or a pick is on it; more than four stages in two rows, the first the
-longer, the plates 84 deep there (`StageSelectScreen.lines`, `oneRowMost`). The Greateraid pick,
+scales that lift, one value a platform: half of it, 0.5, on all of them. The stage select: on the warped grid on black (`MenuGround`
+without its glows), STAGE SELECT lettered as FLO is (30 high), each stage in Futuristic_UI's box1
+in the menus' blue with its name in Upheaval, the blue too, in two lines, broken at the space
+nearest its middle (one line with no space), gold and a tenth bigger when a cursor or a pick is on
+it; more than four stages in two rows, the first the longer (`StageSelectScreen.lines`,
+`oneRowMost`). The Greateraid pick,
 on the palette's black rather than the royal blue: its ribbon, smaller than the other
 screens' (26 on a 200 by 38 ribbon), the line under it in title lettering just under the ribbon, and on a blue
 banner below, 120 deep, its top where the drinker stands: the raised drink's name across the

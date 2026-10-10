@@ -551,11 +551,12 @@ final class WinScreen: Screen {
 /// voter shows only once their pick is in. Two different picks flip a coin between them,
 /// the light going back and forth before it lands.
 final class StageSelectScreen: Screen {
-    /// Each stage: its plate, royal blue or gold when raised, in a container that grows.
+    /// Each stage: Futuristic_UI's box1, in the menus' blue or gold when raised, in a container
+    /// that grows a tenth.
     private var tiles: [SKNode] = []
     private var tilePlates: [SKSpriteNode] = []
-    /// Each stage's name in its lines, two when it has a space to break at.
-    private var tileLabels: [[(label: SKSpriteNode, text: String, size: CGFloat)]] = []
+    /// Each stage's name in its lines, two when it has a space to break at, in the menus' face.
+    private var tileLabels: [[SKLabelNode]] = []
     private var tileSize = CGSize.zero
     private var cursors: [Int: Int] = [:]
     private var picks: [Int: Int] = [:]
@@ -575,9 +576,16 @@ final class StageSelectScreen: Screen {
         self.colours = colours
         self.onPick = onPick
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .stageSelect)
-        addHeader("STAGE SELECT", size: 38, at: CGPoint(x: 0, y: halfHeight * 0.7), width: 360)
+        // The title lettered as FLO is.
+        let title = FloText.node("STAGE SELECT", height: StageSelectScreen.titleHeight * tuned(.titles))
+        title.position = CGPoint(x: 0, y: halfHeight * 0.7)
+        addChild(title)
         if let heading {
-            let sub = TitleText.node(heading, size: 22 * tuned(.titles))
+            let sub = SKLabelNode(fontNamed: Futuristic.fontName)
+            sub.text = heading
+            sub.fontSize = 22 * tuned(.titles)
+            sub.fontColor = Futuristic.lineColour
+            sub.verticalAlignmentMode = .center
             sub.position = CGPoint(x: 0, y: halfHeight * 0.44)
             addChild(sub)
         }
@@ -588,10 +596,10 @@ final class StageSelectScreen: Screen {
         let perRow = (stages.count + rows - 1) / rows
         let fitting = (halfWidth * 2 * 0.92 - 20 * CGFloat(perRow - 1)) / CGFloat(max(perRow, 1))
         let width = min(halfWidth * 0.56, 180 * buttons, fitting)
-        tileSize = CGSize(width: width, height: (rows == 2 ? 84 : 96) * buttons)
+        let box = Futuristic.image("box1")
+        tileSize = CGSize(width: width, height: width * box.size.height / max(box.size.width, 1))
         let spacing = width + 20
         let rowGap = tileSize.height + 14 * buttons
-        let rise = UITuning.shared.textRise
         for (index, name) in stages.enumerated() {
             let tile = SKNode()
             let row = index / perRow
@@ -599,21 +607,27 @@ final class StageSelectScreen: Screen {
             let column = index - row * perRow
             tile.position = CGPoint(x: (CGFloat(column) - CGFloat(inRow - 1) / 2) * spacing,
                                     y: -halfHeight * (rows == 2 ? 0.15 : 0.1) + (CGFloat(rows - 1) / 2 - CGFloat(row)) * rowGap)
-            let plate = UIPiece.buttonBlue.node(size: tileSize, corners: buttons)
+            let plate = SKSpriteNode(texture: SKTexture(image: box))
+            plate.size = tileSize
+            plate.color = Futuristic.lineColour
+            plate.colorBlendFactor = 1
             plate.zPosition = -1
             tile.addChild(plate)
-            let textSize = 20 * tuned(.text)
-            let shift = TitleText.dropShift(size: textSize) * rise
+            let textSize = 18 * tuned(.text)
             let lines = StageSelectScreen.lines(of: name)
-            var labels: [(label: SKSpriteNode, text: String, size: CGFloat)] = []
+            var labels: [SKLabelNode] = []
             for (number, line) in lines.enumerated() {
-                let label = TitleText.node(line, size: textSize)
-                label.setScale(min(1, (width - 20) / max(label.size.width, 1)))
-                let step = label.size.height * StageSelectScreen.lineShare
-                label.position = CGPoint(x: -shift, y: UIPiece.buttonBlue.faceRise * buttons * rise + shift
-                                         + (CGFloat(lines.count - 1) / 2 - CGFloat(number)) * step)
+                let label = SKLabelNode(fontNamed: Futuristic.fontName)
+                label.text = line
+                label.fontSize = textSize
+                label.fontColor = Futuristic.lineColour
+                label.verticalAlignmentMode = .center
+                label.horizontalAlignmentMode = .center
+                label.setScale(min(1, (width * 0.82) / max(label.frame.width, 1)))
+                let step = textSize * StageSelectScreen.lineShare
+                label.position = CGPoint(x: 0, y: (CGFloat(lines.count - 1) / 2 - CGFloat(number)) * step)
                 tile.addChild(label)
-                labels.append((label, line, textSize))
+                labels.append(label)
             }
             addChild(tile)
             tiles.append(tile)
@@ -636,8 +650,10 @@ final class StageSelectScreen: Screen {
 
     /// A row holds this many stages at most before they go in two.
     static let oneRowMost = 4
-    /// The name's lines' spacing, a share of a line's drawn height (the outline and drop overlap).
-    static let lineShare: CGFloat = 0.8
+    /// The name's lines' spacing, a share of the lettering's size.
+    static let lineShare: CGFloat = 1.05
+    /// STAGE SELECT's cap height, in points.
+    static let titleHeight: CGFloat = 30
     /// A name in two lines, broken at the space nearest its middle; one with no space in one.
     static func lines(of name: String) -> [String] {
         let spaces = name.indices.filter { name[$0] == " " }
@@ -702,9 +718,9 @@ final class StageSelectScreen: Screen {
         let raised: Set<Int> = flipLit.map { [$0] } ?? Set(voters.compactMap { picks[$0] ?? cursors[$0] })
         for (index, tile) in tiles.enumerated() {
             let lit = raised.contains(index)
-            tile.setScale(lit ? 1.12 : 1)
-            (lit ? UIPiece.buttonGold : UIPiece.buttonBlue).fit(tilePlates[index], to: tileSize, corners: tuned(.buttons))
-            for line in tileLabels[index] { TitleText.set(line.label, to: line.text, size: line.size, lit: lit) }
+            tile.setScale(lit ? Futuristic.litGrowth : 1)
+            tilePlates[index].color = lit ? Futuristic.litColour : Futuristic.lineColour
+            for label in tileLabels[index] { label.fontColor = lit ? Futuristic.litColour : Futuristic.lineColour }
         }
         // Each voter's circle in the bottom-right corner of their stage, the second beside the first.
         var taken: [Int: Int] = [:]

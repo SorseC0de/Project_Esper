@@ -4860,6 +4860,7 @@ final class GameScene: SKScene {
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
         flowState?.blackGround = screen is PickScreen || screen is WaitScreen
         flowState?.pauseGround = screen is PauseScreen
+        flowState?.gridGround = screen is StageSelectScreen
         flowState?.winGround = screen is WinScreen
         flowState?.veiled = screen != nil
     }

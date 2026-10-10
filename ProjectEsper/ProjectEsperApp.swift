@@ -41,6 +41,10 @@ struct GameView: View {
                 .environment(\.colorScheme, .dark)
                 .ignoresSafeArea()
                 .transition(.opacity)
+            } else if flow.veiled, flow.gridGround {
+                MenuGround(glows: false)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
             } else if flow.veiled {
                 // The screens' ground: the royal blue, dark, the world just showing through.
                 // Flat: the win screen on black's second, the rest on purple's last; the

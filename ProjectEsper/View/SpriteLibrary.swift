@@ -18,13 +18,17 @@ final class SpriteLibrary {
     /// The two players' looks, then the ice look frozen bodies and ice clones are drawn in,
     /// asked for as the player `icePlayer`, then each player's energy form, then each player
     /// turned round: a body mirrored to face left shows its sheet's back limbs in front, so the
-    /// sleeves and boots swap over to stay on the same arm and leg.
-    private var looks = Look.byPlayer + [Look.ice] + Look.byPlayer.map(\.transformed) + Look.byPlayer.map(\.turnedRound)
+    /// sleeves and boots swap over to stay on the same arm and leg; then each side as the
+    /// customize screen shows it.
+    private var looks = Look.byPlayer + [Look.ice] + Look.byPlayer.map(\.transformed) + Look.byPlayer.map(\.turnedRound) + Look.byPlayer
     static let icePlayer = Look.byPlayer.count
     /// A player's energy form, asked for as a player of its own.
     static func transformedPlayer(_ player: Int) -> Int { icePlayer + 1 + player }
     /// A player facing left, asked for as a player of its own.
     static func turnedPlayer(_ player: Int) -> Int { icePlayer + 1 + Look.byPlayer.count + player }
+    /// A side as the customize screen shows it, asked for as a player of its own: only what that
+    /// screen draws is made in it, so a pick never rebuilds the game's frames.
+    static func customizePlayer(_ player: Int) -> Int { icePlayer + 1 + 2 * Look.byPlayer.count + player }
 
     /// Who a player's body is drawn as facing this way: turned round facing left, where that
     /// changes anything.
@@ -53,11 +57,21 @@ final class SpriteLibrary {
         if looks[turned] != look { rewarm(player: turned) }
     }
 
-    /// Every player's frames dropped and rebuilt, for a change to how all looks are drawn.
+    /// The customize screen's side drawn in `look`, as shown (the second side's turned round):
+    /// what it drew in the last look dropped, nothing else made or touched.
+    func setCustomizeLook(_ look: Look, for player: Int) {
+        let slot = SpriteLibrary.customizePlayer(player)
+        guard look != looks[slot] else { return }
+        looks[slot] = look
+        cache = cache.filter { !$0.key.hasPrefix("p\(slot)_") }
+    }
+
+    /// Every player's frames dropped and rebuilt, for a change to how all looks are drawn; the
+    /// customize screen's sides dropped, made again as it asks.
     func redrawPlayers() {
         for player in looks.indices {
             cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
-            rewarm(player: player)
+            if player < SpriteLibrary.customizePlayer(0) { rewarm(player: player) }
         }
     }
 

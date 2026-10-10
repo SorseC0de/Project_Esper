@@ -712,6 +712,12 @@ A disconnect on the screen closes it to the title.
   over the corner's). Under the grid, two glows a tenth of the width off the middle, gold's body up
   and to the left and blue's down and to the right, fading to clear at three quarters of the
   gradient's reach, half seen. That ground is `MenuGround`, the title's too.
+  The screen's figures and hood boxes are drawn in the picks apart from the game's frames
+  (`SpriteLibrary.customizePlayer`, a slot a side, only what the screen draws made in it), so a
+  pick redraws one small figure; the old look stays under the new one while it fades in over
+  0.25 seconds (`CustomizeFigure`), its glow giving way to the new one's. The game's own frames
+  are rebuilt in the picks once, as the match starts, behind the curtain, off the main thread,
+  during the stage select, as a loading screen would.
   The entrance (`CustomizeIntro`), as the screen appears: the top line, CUSTOMIZE and the mode
   float down and the bottom line and RETURN up, from a quarter of the screen's height away, over
   0.5 seconds; from 0.3 seconds, over 0.8, the players fade in from nothing as their halos (the

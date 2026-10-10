@@ -75,7 +75,6 @@ extension FlowState {
         }
         customizeCursors = [.start, .start]
         customizeOpen = true
-        scene.applyCustomizations(shownCustomizations)
     }
 
     /// RETURN: back to the title; online, out of the match.
@@ -121,7 +120,6 @@ extension FlowState {
     func remoteCustomization(_ pick: PlayerCustomization) {
         guard customizeOpen, customizeOnline else { return }
         customizations[1 - customizeLocal] = pick
-        scene.applyCustomizations(shownCustomizations)
     }
 
     /// Seconds the launch plays before the curtain: the snatch's two frames on, the drift to the middle.
@@ -267,13 +265,13 @@ extension FlowState {
         }
     }
 
-    /// A pick changed: kept, and the players drawn in it at once.
+    /// A pick changed: kept, and the screen's figures drawn in it. The game's own frames are
+    /// rebuilt in the picks once, as the match starts, behind the curtain.
     private func update(_ player: Int, _ change: (inout PlayerCustomization) -> Void) {
         change(&customizations[player])
         // Online this phone's pick is kept as its own, whichever side it's on, and sent.
         customizations[player].save(as: customizeOnline || customizeTurnBased ? 0 : player)
         SoundBoard.shared.play(SoundBoard.navigate)
-        scene.applyCustomizations(shownCustomizations)
         if customizeOnline { scene.sendCustomization(customizations[player]) }
     }
 }
@@ -558,7 +556,7 @@ struct CustomizeScreen: View {
         let launched = flow.customizeLaunch != nil
         let figureFrame = flow.customizeFigureFrame(player)
         let start = rect("customize_start", size)
-        if let portrait = flow.scene.customizePortrait(player: player, sheet: figureFrame.sheet, frame: figureFrame.frame,
+        if let portrait = flow.scene.customizePortrait(player: player, look: pick.look, sheet: figureFrame.sheet, frame: figureFrame.frame,
                                                        headNudge: CGPoint(x: headX, y: headY), headScale: headScale) {
             let side = (48 + 2 * CustomizeFigure.margin) * playerPixel
             // The second side is shown turned round, its sleeves and boots swapped as drawn.
@@ -632,7 +630,7 @@ struct CustomizeScreen: View {
             tick(flow.customizeTicked(player, .outerLegs), $0, lit: cursor == .outerLegs, glow: glow)
         }
         box(player, .hood, tag + "hood", label: "H.O.O.D", size: size, glow: glow, cursor: cursor, slide: slide) { frame in
-            if let hood = flow.scene.customizeHood(player: player) {
+            if let hood = flow.scene.customizeHood(player: player, look: pick.look) {
                 Image(uiImage: UIImage(cgImage: hood)).resizable().interpolation(.none).aspectRatio(contentMode: .fit)
                     .frame(width: frame.width * 0.7, height: frame.height * 0.7)
                     .scaleEffect(x: player == 0 ? 1 : -1)
@@ -998,8 +996,20 @@ struct CustomizeFigure: View {
     let headNudge: CGPoint
     let headScale: CGFloat
     @State private var motion = CustomizeFigureMotion()
+    /// The figure as last drawn, and, a pick having changed its look, the one before it, left
+    /// under the new one while that fades in over it.
+    @State private var held: (portrait: SpriteLibrary.Portrait, look: Look)?
+    @State private var previous: (portrait: SpriteLibrary.Portrait, look: Look)?
+    @State private var fadeStart: Date?
 
     static let margin: CGFloat = 24
+    static let crossfadeSeconds = 0.25
+
+    /// How far the new look has faded in: 1 once it's whole.
+    private func crossfade(at date: Date) -> Double {
+        guard let fadeStart else { return 1 }
+        return min(max(date.timeIntervalSince(fadeStart) / CustomizeFigure.crossfadeSeconds, 0), 1)
+    }
 
     /// Where the hooded head goes and how big: its canvas's top left on the figure's, in pixels
     /// from the top left, and its scale. About the figure's head's middle, which the hood's
@@ -1024,17 +1034,27 @@ struct CustomizeFigure: View {
                 }
                 for cube in motion.cubes where cube.behind { draw(cube, in: context, at: spot(cube.position)) }
                 let figureRect = CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel)
-                context.draw(Image(decorative: portrait.image, scale: 1).interpolation(.none), in: figureRect)
-                if let line = portrait.line {
-                    context.drawLayer { layer in
-                        layer.addFilter(.colorMultiply(Color(rgb: look.outline)))
-                        layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect)
-                    }
+                func hoodRect(_ shown: SpriteLibrary.Portrait) -> CGRect {
+                    let place = CustomizeFigure.hoodPlace(shown, nudge: headNudge, scale: headScale)
+                    return CGRect(x: (margin + place.origin.x) * pixel, y: (margin + place.origin.y) * pixel,
+                                  width: 48 * place.scale * pixel, height: 48 * place.scale * pixel)
                 }
-                let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: headScale)
-                let hoodRect = CGRect(x: (margin + place.origin.x) * pixel, y: (margin + place.origin.y) * pixel,
-                                      width: 48 * place.scale * pixel, height: 48 * place.scale * pixel)
-                if let hood = portrait.hood { context.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect) }
+                /// A figure, its line in its look's colour, and its hooded head.
+                func drawFigure(_ shown: SpriteLibrary.Portrait, _ shownLook: Look, opacity: Double) {
+                    var figure = context
+                    figure.opacity = opacity
+                    figure.draw(Image(decorative: shown.image, scale: 1).interpolation(.none), in: figureRect)
+                    if let line = shown.line {
+                        figure.drawLayer { layer in
+                            layer.addFilter(.colorMultiply(Color(rgb: shownLook.outline)))
+                            layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect)
+                        }
+                    }
+                    if let hood = shown.hood { figure.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(shown)) }
+                }
+                let fade = crossfade(at: timeline.date)
+                if let previous, fade < 1 { drawFigure(previous.portrait, previous.look, opacity: 1) }
+                drawFigure(portrait, look, opacity: fade)
                 let plain = Color(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel))
                 let accent = Color(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel))
                 for string in motion.strings {
@@ -1048,9 +1068,15 @@ struct CustomizeFigure: View {
                 glowing.opacity = CustomizeArt.glowStrength
                 glowing.drawLayer { layer in
                     layer.addFilter(.blur(radius: pixel * CustomizeArt.glowPixels))
-                    layer.draw(Image(decorative: portrait.glowing, scale: 1).interpolation(.none),
-                               in: CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel))
-                    if let hood = portrait.hoodGlowing { layer.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect) }
+                    // Through a change, the old look's glow giving way to the new's.
+                    func drawGlow(_ shown: SpriteLibrary.Portrait, opacity: Double) {
+                        var glow = layer
+                        glow.opacity = opacity
+                        glow.draw(Image(decorative: shown.glowing, scale: 1).interpolation(.none), in: figureRect)
+                        if let hood = shown.hoodGlowing { glow.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(shown)) }
+                    }
+                    if let previous, fade < 1 { drawGlow(previous.portrait, opacity: 1 - fade) }
+                    drawGlow(portrait, opacity: fade)
                     for string in motion.strings {
                         let at = spot(string.point)
                         layer.fill(Path(CGRect(x: at.x - pixel / 2, y: at.y - pixel / 2, width: pixel, height: pixel)), with: .color(string.accent ? accent : plain))
@@ -1058,6 +1084,15 @@ struct CustomizeFigure: View {
                     for cube in motion.cubes { draw(cube, in: layer, at: spot(cube.position)) }
                 }
             }
+        }
+        .onAppear { held = (portrait, look) }
+        // A new figure: a new look fades in over the last; a new pose or head place just shows.
+        .onChange(of: ObjectIdentifier(portrait.image)) {
+            if let held, held.look != look {
+                previous = held
+                fadeStart = Date()
+            }
+            held = (portrait, look)
         }
     }
 

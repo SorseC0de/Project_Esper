@@ -4971,11 +4971,14 @@ final class GameScene: SKScene {
         applyColours(sides.map(\.energy), looks: sides.map(\.look))
     }
 
-    /// The customize screen's player, in a side's look with its hooded head.
-    func customizePortrait(player: Int, sheet: String = "player_customize", frame: Int = 0, headNudge: CGPoint, headScale: CGFloat) -> SpriteLibrary.Portrait? {
+    /// The customize screen's player in a pick's look with its hooded head, made apart from
+    /// the game's frames: they're rebuilt in the picks as the match starts.
+    func customizePortrait(player: Int, look: Look, sheet: String = "player_customize", frame: Int = 0, headNudge: CGPoint,
+                           headScale: CGFloat) -> SpriteLibrary.Portrait? {
         // The second side is shown facing left.
-        sprites.portrait(sheet, frame: frame, player: sprites.bodyPlayer(player, facingLeft: player == 1), headDrawnFor: GameScene.hoodDrawnFor,
-                         headNudge: headNudge, headScale: headScale)
+        sprites.setCustomizeLook(player == 1 ? look.turnedRound : look, for: player)
+        return sprites.portrait(sheet, frame: frame, player: SpriteLibrary.customizePlayer(player), headDrawnFor: GameScene.hoodDrawnFor,
+                                headNudge: headNudge, headScale: headScale)
     }
 
     /// Both sides' picks onto everything drawn in them: the customize screen's, live.
@@ -5006,9 +5009,11 @@ final class GameScene: SKScene {
         }
     }
 
-    /// A side's hooded head alone, cut to what's drawn, for the customize screen's hood box.
-    func customizeHood(player: Int) -> CGImage? {
-        CustomizeArt.trimmed(sprites.hoodHead(skin: sprites.look(for: player).dressing.skinTone, player: player).drawn.cgImage())
+    /// A side's hooded head alone in a pick's look, cut to what's drawn, for the customize
+    /// screen's hood box.
+    func customizeHood(player: Int, look: Look) -> CGImage? {
+        sprites.setCustomizeLook(player == 1 ? look.turnedRound : look, for: player)
+        return CustomizeArt.trimmed(sprites.hoodHead(skin: look.dressing.skinTone, player: SpriteLibrary.customizePlayer(player)).drawn.cgImage())
     }
 
     /// Both sides' colours onto everything drawn in them, in `looks` where given.

@@ -113,6 +113,23 @@ struct FuturisticFrame<Content: View>: View {
     }
 }
 
+/// Back, on a touch screen: arrow6 turned to point left, bottom right of the screens between
+/// the title and play.
+struct BackArrow: View {
+    let action: () -> Void
+    static let scale: CGFloat = 1
+
+    var body: some View {
+        Button(action: action) {
+            FuturisticPiece(name: "arrow6", scale: BackArrow.scale)
+                .scaleEffect(x: -1)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .noSystemFocus()
+    }
+}
+
 /// The loading bar: bar4's frame and slot outlines, `litSlots` of its sixteen slots filled
 /// from the left (`FuturisticMeter`).
 struct LoadingBar: View {

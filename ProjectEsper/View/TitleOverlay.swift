@@ -68,6 +68,9 @@ final class FlowState: ObservableObject {
     }
     static let loadingSlotCount = FuturisticMeter.slots.count
     private var heldLift: (() -> Void)?
+    /// The stage select can go back: offline before the series' first stage, to the customize
+    /// screen; online, out of the match.
+    @Published var stageSelectBack = false
     /// A curtain's down waiting on loading; the stage preview's up.
     @Published var curtainHeld = false
     @Published var previewing = false

@@ -4589,6 +4589,7 @@ final class GameScene: SKScene {
 
     private func enter(_ next: Flow) {
         headingToWin = false
+        flowState?.stageSelectBack = next == .stageSelect && zonesOnline == nil && (online != nil || series.rounds.isEmpty)
         // A stage's first count waits for its preview.
         if next == .playing, previewDue, startPreview() { return }
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
@@ -4686,6 +4687,20 @@ final class GameScene: SKScene {
         online?.rematchRandom = nil
         online?.theirRematch = nil
         startSeries(seed: mine ^ theirs)
+    }
+
+    /// The stage select's back: online, out of the match; offline, the customize screen again for
+    /// the same mode.
+    func backFromStageSelect() {
+        guard flow == .stageSelect, !stageSettling else { return }
+        SoundBoard.shared.play(.menuBack)
+        if online != nil { return leaveToTitle() }
+        let mode = gameMode
+        flowState?.transition { [weak self] in
+            guard let self else { return }
+            self.enter(.title)
+            self.flowState?.openCustomize(mode)
+        }
     }
 
     private func leaveToTitle() {

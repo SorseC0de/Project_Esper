@@ -19,6 +19,15 @@ struct GameView: View {
     /// The world with its glow at the bottom; the royal blue over it while a screen is up,
     /// opaque; the HUD's own view over that, so nothing in it glows and the screens sit on
     /// the material; and the title on top of everything.
+    /// What the back arrow does on the screen that's up, the topmost first; nil where it's not shown.
+    private var backAction: (() -> Void)? {
+        if flow.settingsOpen, flow.showsTitle { return { flow.closeSettings() } }
+        if flow.multiplayerOpen { return { flow.multiplayerBack() } }
+        if flow.customizeOpen { return { flow.activateCustomize(flow.customizeLocal, .back) } }
+        if flow.stageSelectBack, !flow.showsTitle { return { flow.scene.backFromStageSelect() } }
+        return nil
+    }
+
     var body: some View {
         ZStack {
             MetalGameView(scene: flow.scene)
@@ -78,6 +87,15 @@ struct GameView: View {
                 SettingsScreen(flow: flow)
                     .transition(.opacity)
             }
+            #if os(iOS)
+            // Back on a touch screen, bottom right, on the screens between the title and play.
+            if let back = backAction {
+                BackArrow(action: back)
+                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .transition(.opacity)
+            }
+            #endif
             if DebugUI.enabled, flow.tuningOpen {
                 UITuningPanel(flow: flow)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

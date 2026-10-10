@@ -726,6 +726,11 @@ A disconnect on the screen closes it to the title.
   0.25 seconds (`CustomizeFigure`), its glow giving way to the new one's. The game's own frames
   are rebuilt in the picks once, as the match starts, off the main thread, through the stage
   select and on into the stage preview, whose loading bar counts them.
+- Back on a touch screen (iOS): arrow6 turned to point left (`BackArrow`), bottom right over the
+  screens between the title and play: the settings over the title (closes them), the multiplayer
+  screen (its back), the customize screen (RETURN's), and the stage select before the series'
+  first stage offline (the customize screen again for the same mode, `backFromStageSelect`) or
+  online (out of the match).
 - The loading bar: Futuristic_UI's bar4, bottom right, while something's loading: over the
   stage preview's page, or on a curtain held for loading (fading with it). One count over
   everything loading, pieces made of all of them: each sprite `SpriteLibrary`'s rebuilds make (the

@@ -128,6 +128,12 @@ final class GameScene: SKScene {
     /// Title lettering over the court: the count, BALL OUT, BUCKET, what the computer
     /// drank, one after another; the round circles; and each side's drinks beside them.
     private let banner = SKSpriteNode()
+    /// The ball's circle round a body changing into FloState with it, in art pixels: ORBIT
+    /// RADIUS on the strip, kept.
+    static let orbitRadiusKey = "esper.transform.orbitRadius"
+    nonisolated(unsafe) static var orbitRadius: CGFloat = {
+        CGFloat(UserDefaults.standard.object(forKey: orbitRadiusKey) as? Double ?? 48)
+    }()
     private var bannerFrames = 0
     private var bannerQueue: [(text: String, size: CGFloat)] = []
     private static let bannerHold = 45
@@ -3300,6 +3306,11 @@ final class GameScene: SKScene {
             controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
             controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
             controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.cornerMaxY)) { FloTuning.cornerMaxY = CGFloat($0); relayoutFlo() }
+        }
+        // How far out the ball circles a body changing with it.
+        controls.addSlider(title: "ORBIT RADIUS", range: 0...96, notch: 1, value: Float(GameScene.orbitRadius)) { value in
+            GameScene.orbitRadius = CGFloat(value)
+            UserDefaults.standard.set(Double(value), forKey: GameScene.orbitRadiusKey)
         }
         // How much of its glow a hood takes against everything else's.
         controls.addSlider(title: "HOOD GLOW", range: 0...1, notch: 0.05, value: GlowSettings.hoodShare) { value in
@@ -7671,7 +7682,20 @@ final class GameScene: SKScene {
             // In the zone the ball in hand runs the zone's colours.
             let teamColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).glow)
             halo.color = player.hasFireball ? GameScene.fireballColour : teamColour
-            if player.holding, let landmark = sprites.landmark(.ball, in: frame, player: index) {
+            if player.holding, changing {
+                // Changing with the ball: it circles the body clockwise, from the top, a lap over
+                // the change, `orbitRadius` art pixels out from the body's middle.
+                let lap = CGFloat(player.stateTimer) / CGFloat(TransformRules.frames)
+                let angle = .pi / 2 - lap * 2 * .pi
+                let middle = node.position + CGPoint(x: 0, y: CGFloat(player.spec.bodyHeight / 2 * Double(SpriteLibrary.pixelsPerUnit)))
+                let radius = GameScene.orbitRadius * drawScale
+                let at = CGPoint(x: middle.x + cos(angle) * radius, y: middle.y + sin(angle) * radius)
+                halo.isHidden = player.frozen > 0
+                halo.position = at
+                handBall.isHidden = false
+                handBall.position = at
+                handBall.texture = (player.hasFireball ? sprites.basketballFireFrames : sprites.basketballFrames)[0]
+            } else if player.holding, let landmark = sprites.landmark(.ball, in: frame, player: index) {
                 let inHand = landmark * drawScale
                 let ballX = player.position.x + Double(inHand.x) * player.facing.sign / SpriteLibrary.pixelsPerUnit
                 let dribbling = Animation.dribbles.contains(frame.animation)

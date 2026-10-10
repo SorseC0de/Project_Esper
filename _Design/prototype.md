@@ -162,6 +162,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   as well as the hand's reach at full stretch; on the third frame the hooded head looks
   back (protocol 103). The sheet draws the ball taken from its fourth frame on; a snatch that took
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
+  Changing with the ball in hand, the ball circles the body clockwise, from the top, one lap over
+  the change, 48 art pixels out from the body's middle (`GameScene.orbitRadius`, the strip's
+  ORBIT RADIUS, 0 to 96, kept).
   From the change's first frame to its burst on the sheet's third
   (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`ZRules.burstRadius`) is
   parried as a snatch parries one, before the blades are resolved; at the burst everything else
@@ -1962,7 +1965,7 @@ else at 0.2 or more it knocks them its way (`cartPush`), stuns them, pops the ba
 hands if they hold it (`.cartHit`; HIT, a spark, the strike's sound), and can't hit them again for 30 frames.
 A slash's blade meeting the cart sends it rolling the way the swing goes at its top speed, 2, into
 whoever's there, and not back into the slasher for 30 frames (`.cartSlashed`, a clank and a spark;
-protocol 120). In 47 the row of signs has 2X and 3X at its two ends, out in palette 33: after the
+protocol 120); once a swing, the blade spent on it as on anything it hits (protocol 125). In 47 the row of signs has 2X and 3X at its two ends, out in palette 33: after the
 start's level spell, every 5 to 15 seconds the dice pick neither, 2X or 3X, a third each
 (`FlightB411Rules.multiplierWaitFrames`), and one lit, palette 7 and glowing, stays lit three seconds
 (`multiplierLitFrames`, `Match.pointMultiplier`), a basket meanwhile worth that many times its points
@@ -2186,8 +2189,9 @@ shown, once, like the effects.
 - The announcer's 3, 2, 1 (announcer_1..3, or the second set announcer_1-2..3-2 on the COUNT
   picker, A or B): each number of the count as it goes up, in play.
 - announcer_ballout and ballout2 together at BALL OUT, each panned halfway to its own side.
-- port_in: the port-in at a round's start, and on the customize screen's first Start, whoever
-  presses it, once until the screen opens again (`customizeStartHeard`).
+- port_in: the port-in at a round's start, and on the customize screen as both are ready and
+  the figures set off for the ball (`checkLaunch`); Start itself plays no confirm there, and
+  taking READY back online plays the back.
 - pause: the pause menu coming up.
 - A steal, a snatch taking the ball out of a holder's hands (`.stolen`, from confirmed frames as
   a basket's lines are): one of the announcer's nine (stole, stole2, stole3, nabbed, -2, -3,

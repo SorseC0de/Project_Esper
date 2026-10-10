@@ -294,13 +294,19 @@ final class FlightB411Tests: XCTestCase {
         match.players[0].position = Vec2(x: cart.box.min.x - 8, y: cart.box.min.y)
         match.players[0].facing = .right
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        var sent = false
-        for _ in 0..<SlashRules.frames where !sent {
+        var sent = 0
+        for _ in 0..<SlashRules.frames {
             hold(&match, at: 0)
             match.advance(inputs: [.idle, .idle])
-            sent = match.events.contains(.cartSlashed(player: 0))
+            if match.events.contains(.cartSlashed(player: 0)) { sent += 1 }
+            if sent == 1, match.cart.map({ $0.velocity > 1 }) == true { break }
         }
-        XCTAssertTrue(sent)
+        XCTAssertEqual(sent, 1)
+        for _ in 0..<SlashRules.frames {
+            hold(&match, at: 0)
+            match.advance(inputs: [.idle, .idle])
+            XCTAssertFalse(match.events.contains(.cartSlashed(player: 0)), "once a swing")
+        }
         XCTAssertGreaterThan(match.cart?.velocity ?? 0, 1, "rolling right")
         XCTAssertGreaterThan(match.cartHitFrames[0], 0, "not back into the slasher")
     }

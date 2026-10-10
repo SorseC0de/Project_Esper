@@ -64,7 +64,6 @@ extension FlowState {
         customizeTurnBased = turnBased
         customizeLocal = online || turnBased ? local : 0
         customizeReady = [false, false]
-        customizeStartHeard = false
         customizeLaunch = nil
         customizeLaunched = false
         if online || turnBased {
@@ -99,29 +98,21 @@ extension FlowState {
     /// controls go; online READY can be taken back until both are ready. Both ready, the launch.
     func pressReady(_ player: Int) {
         guard customizeLaunch == nil, customizeOwns(player) else { return }
-        // The port-in sound on the screen's first Start, whoever presses it.
-        playStartHeard()
+        // No confirm on Start here: the port-in plays as both are ready and the launch begins.
+        // Taking READY back, the back.
         if customizeOnline {
             customizeReady[player].toggle()
-            SoundBoard.shared.play(customizeReady[player] ? SoundBoard.confirm : .menuBack)
+            if !customizeReady[player] { SoundBoard.shared.play(.menuBack) }
             scene.sendReady(customizeReady[player])
         } else {
-            SoundBoard.shared.play(SoundBoard.confirm)
             customizeReady = [true, true]
         }
         checkLaunch()
     }
 
-    private func playStartHeard() {
-        guard !customizeStartHeard else { return }
-        customizeStartHeard = true
-        SoundBoard.shared.play(.portIn)
-    }
-
     /// The other phone's READY.
     func remoteReady(_ ready: Bool) {
         guard customizeOpen, customizeOnline, customizeLaunch == nil else { return }
-        if ready { playStartHeard() }
         customizeReady[1 - customizeLocal] = ready
         checkLaunch()
     }
@@ -139,6 +130,8 @@ extension FlowState {
     private func checkLaunch() {
         guard customizeReady.allSatisfy({ $0 }), customizeLaunch == nil else { return }
         customizeLaunch = Date()
+        // Both ready: the figures set off for the ball, and the port-in with them.
+        SoundBoard.shared.play(.portIn)
         // The snatch's second and third frames need the screen drawn again as they come.
         for sheetFrame in 1...2 {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(sheetFrame) / Double(SnatchRules.sheetFramesPerSecond) + 0.01) { [weak self] in

@@ -511,14 +511,14 @@ public struct Match: Equatable {
         }
         if let blade = player.slashHitbox, var cart, blade.overlaps(cart.box) {
             // Flight B411: the blade sends the cart rolling the way the swing goes, at its most,
-            // into whoever's there; not back into the slasher.
+            // into whoever's there; not back into the slasher. Once a swing: the blade's spent on
+            // it, as on anything it hits.
             let way = player.facing.sign
-            if cart.velocity * way < FlightB411Rules.cartTopSpeed {
-                cart.velocity = way * FlightB411Rules.cartTopSpeed
-                self.cart = cart
-                if cartHitFrames.indices.contains(index) { cartHitFrames[index] = FlightB411Rules.cartHitFrames }
-                events.append(.cartSlashed(player: index))
-            }
+            cart.velocity = way * FlightB411Rules.cartTopSpeed
+            self.cart = cart
+            players[index].slashHit = true
+            if cartHitFrames.indices.contains(index) { cartHitFrames[index] = FlightB411Rules.cartHitFrames }
+            events.append(.cartSlashed(player: index))
         }
         if let blade = player.slashHitbox {
             // Clear of the floor the body stands on, the blade in a wall clanks, once a swing.

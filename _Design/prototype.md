@@ -946,9 +946,10 @@ lightened a third of the way to white, glowing. Each landing flashes the player'
 their glow's own colour for 8 frames, and only then puts its share on their meter:
 the meter shows what they have less what's still on its way, so it never runs ahead of the orbs.
 A gain is shown once, a rolled-back frame run again bringing no second set; a new round clears them.
- The meters are in the HUD either side of the scoreboard, level with it, the first player's on its
-left, the word outside and the bar against the plate, the second's on its right, the bar mirrored
-against the plate and the word outside it, skewed as the first's is, 20 points off the plate,
+ The meters are in the HUD's top corners, the first player's top left and the second's top right,
+each one's outer end and top FLO INSET X and FLO INSET Y in from the corner past the safe insets
+(12 and 8 points), the word outside and the bar toward the middle, the second's bar mirrored and its
+word outside it, skewed as the first's is,
 shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames) a point
 an art pixel. Its inside is 100 columns from its sixth, five rows tall from its fifth, the last
 three shorter as its end slants (4, 3 and 2). The FLO missing is drawn over it, before its warp, a
@@ -961,8 +962,7 @@ it (FLO MAX SCALE 1.25, FLO MAX X 54 and Y 0 on sliders, mirrored for the second
 growing out of the word, MAX on the bar's corner as above, the word in its own colours throughout; in FloState, its eight frames play at 12 a second. and over each bar's left end the word FLO in Bigdex,
 lettered as the sound words are, its letters big to small, 14 high, skewed (`Onomatopoeia.still`):
 its left end drawn 1.5 and its right 0.5 times its middle's height, the middle arched, at 1.25,
-moved 15 right and 6 down from its place, the whole meter at 0.75, on the FLO METER SCALE slider,
-and moved up or down on FLO METER Y (-2, points)
+moved 15 right and 6 down from its place, the whole meter at 0.75, on the FLO SCALE slider
 (`FloTuning`, its other numbers baked): the bar and the word each at 1 and 1.25 of it; the bar
 squeezed to 0.75 across and 1.5 down, the word keeping its own; the bar's left and right ends' heights over its
 middle's (1.5 and 0.5), and its middle raised by half its height,

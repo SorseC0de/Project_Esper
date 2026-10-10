@@ -1329,6 +1329,10 @@ final class GameScene: SKScene {
     /// the plum ramp's last, one a FLO; full, none and MAX on its top trailing corner; burning,
     /// its eight frames playing.
     private var floMeters: [SKSpriteNode] = []
+    /// The HUD's half size and the screen's safe insets in its points, as last laid out: where
+    /// its corners are.
+    private var hudHalf = CGSize.zero
+    private var hudInsets = UIEdgeInsets.zero
     private var floBars: [SKSpriteNode] = []
     /// Each bar's holder, warped, its sparkles inside it with the bar so the warp takes them too.
     private var floBarHolders: [SKEffectNode] = []
@@ -1610,6 +1614,13 @@ final class GameScene: SKScene {
             }
             floWordsShort.append(words[0])
             floWordsFull.append(words[1])
+            // In its top corner: the bar and word's outer end and top the insets in from it.
+            meter.setScale(FloTuning.meterScale)
+            meter.position = .zero
+            let drawn = meter.calculateAccumulatedFrame()
+            let outer = hudHalf.width - (mirrored ? hudInsets.right : hudInsets.left) - FloTuning.cornerInsetX
+            meter.position = CGPoint(x: mirrored ? outer - drawn.maxX : -outer - drawn.minX,
+                                     y: hudHalf.height - hudInsets.top - FloTuning.cornerInsetY - drawn.maxY)
             // MAX, lettered as a footstep is, in Bigdex: bar A's on the word's top outer corner,
             // on its sliders; bar B's on the bar's top trailing corner, against the scoreboard.
             let full = Onomatopoeia.still("MAX", face: .englishDex, colours: FloTuning.colours, height: GameScene.floMaxHeight, growsLeft: false,
@@ -3175,6 +3186,8 @@ final class GameScene: SKScene {
         let insets = UIEdgeInsets(top: safeInsets.top / hudScale, left: safeInsets.left / hudScale,
                                   bottom: safeInsets.bottom / hudScale, right: safeInsets.right / hudScale)
         controls?.removeFromParent()
+        hudHalf = CGSize(width: halfWidth, height: halfHeight)
+        hudInsets = insets
         let controls = TouchControls(halfWidth: halfWidth, halfHeight: halfHeight, insets: insets)
         controls.onReset = { [weak self] in self?.reset() }
         controls.onPause = { [weak self] in
@@ -3365,10 +3378,10 @@ final class GameScene: SKScene {
         }
         // The FLO meters' look, while it's settled.
         let relayoutFlo: () -> Void = { [weak self] in self?.layoutFloMeters() }
-        if !ParkedSliders.flo {
-            controls.addSlider(title: "FLO METER SCALE", range: 0.5...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
-            controls.addSlider(title: "FLO METER Y", range: -60...60, notch: 1, value: Float(FloTuning.meterY)) { FloTuning.meterY = CGFloat($0); relayoutFlo() }
-        }
+        // The meters in the corners: how far in, and the whole meter's scale.
+        controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
         // The A/B test: A empties from the word's end, MAX on the word; B fills from it.
         controls.addPicker(title: "FLO BAR", options: ["A", "B"], selected: FloTuning.variant == .emptiesFromWord ? 0 : 1) { index in
             FloTuning.variant = index == 0 ? .emptiesFromWord : .fillsFromWord

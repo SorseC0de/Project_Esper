@@ -296,6 +296,10 @@ enum FloTuning {
     nonisolated(unsafe) static var meterScale: CGFloat = 0.75
     /// The whole meter moved up from level with the scoreboard, in points.
     nonisolated(unsafe) static var meterY: CGFloat = -2
+    /// The meters in the screen's top corners: each one's outer end and top this far in from the
+    /// corner (past its safe insets), in points; FLO INSET X and Y on the strip.
+    nonisolated(unsafe) static var cornerInsetX: CGFloat = 12
+    nonisolated(unsafe) static var cornerInsetY: CGFloat = 8
     static let barScale: CGFloat = 1
     static let wordScale: CGFloat = 1.25
     static let leftSkew: CGFloat = 1.5

@@ -390,11 +390,11 @@ enum TitleItem: Hashable {
     ]
 }
 
-/// The title screen, on the royal blue ground with the court just showing through, in the
-/// dobo UI pack's pieces: the name; ROUNDS and 47 against the computer on royal blue
-/// plates, with the VS CPU / VS HUMAN switch under them; MULTIPLAYER on gold, which opens
-/// Game Center's matchmaker, with the mode it asks for under it and Game Center's word
-/// under that. The energy colour is the customize screen's (and the match's debug COLOUR).
+/// The title screen, in `Futuristic_UI.svg`'s pieces on black: the gear in frame 1 in the
+/// upper right; the name over rule4; ROUNDS, 47 and ZONES in frames 7, 9 and 6; VS CPU and
+/// VS HUMAN between rule5s with rule6 between them; MULTIPLAYER in box4, which opens the
+/// multiplayer screen, with Game Center's word under it. What the cursor's on is gold and a
+/// tenth bigger.
 struct TitleOverlay: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
@@ -412,35 +412,52 @@ struct TitleOverlay: View {
 
     var body: some View {
         ZStack {
-            Color(rgb: UIColourPicks.ground)
+            Futuristic.ground
                 .ignoresSafeArea()
-                // The UI tuning in the bottom left.
-                // The settings' gear in the upper right corner.
                 .overlay(alignment: .topTrailing) {
-                    SettingsGear(lit: flow.titleCursor == .settings) { flow.activate(.settings) }
-                        .padding(.top, 14)
-                        .padding(.trailing, 18)
+                    Button { flow.activate(.settings) } label: {
+                        FuturisticFrame(name: "1", lit: flow.titleCursor == .settings, scale: scale(.buttons)) { colour in
+                            Image(uiImage: UIImage(named: "ui_icon_settings") ?? UIImage())
+                                .renderingMode(.template)
+                                .resizable()
+                                .interpolation(.high)
+                                .foregroundStyle(colour)
+                                .frame(width: 30 * scale(.buttons), height: 31 * scale(.buttons))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .noSystemFocus()
+                    .padding(.top, 14)
+                    .padding(.trailing, 18)
                 }
                 .overlay(alignment: .bottomLeading) {
                     if DebugUI.enabled { colourGrids }
                 }
-            VStack(spacing: 22 * scale(.buttons)) {
-                Image(uiImage: TitleText.image("PROJECT ESPER", size: 56 * scale(.titles)))
-                HStack(spacing: 24 * scale(.buttons)) {
-                    plated("ROUNDS", piece: .buttonBlue, width: 150, item: .bestOfSeven)
-                    plated("47", piece: .buttonBlue, width: 110, item: .fortySeven)
-                    plated("ZONES", piece: .buttonBlue, width: 150, item: .zones)
+            VStack(spacing: 14 * scale(.buttons)) {
+                VStack(spacing: 6 * scale(.buttons)) {
+                    Text("PROJECT ESPER")
+                        .font(Futuristic.font(size: 52 * scale(.titles)))
+                        .foregroundStyle(.white)
+                    FuturisticPiece(name: "rule4", scale: scale(.buttons))
                 }
-                HStack(spacing: 10) {
-                    small("VS CPU", picked: vsCPU, item: .vsCPU)
-                    small("VS HUMAN", picked: !vsCPU, item: .vsHuman)
+                HStack(spacing: 18 * scale(.buttons)) {
+                    framed("ROUNDS", in: "7", item: .bestOfSeven)
+                    framed("47", in: "9", item: .fortySeven)
+                    framed("ZONES", in: "6", item: .zones)
                 }
-                VStack(spacing: 10) {
-                    plated("MULTIPLAYER", piece: .buttonPlum, width: 240, item: .multiplayer)
-                    .opacity(busy ? 0.5 : 1)
+                HStack(spacing: 12 * scale(.buttons)) {
+                    rule("rule5", width: TitleOverlay.endRuleWidth).scaleEffect(x: -1, y: -1)
+                    plain("VS CPU", picked: vsCPU, item: .vsCPU)
+                    rule("rule6", width: TitleOverlay.middleRuleWidth)
+                    plain("VS HUMAN", picked: !vsCPU, item: .vsHuman)
+                    rule("rule5", width: TitleOverlay.endRuleWidth)
+                }
+                VStack(spacing: 6) {
+                    framed("MULTIPLAYER", in: "box4", item: .multiplayer)
+                        .opacity(busy ? 0.5 : 1)
                     if let caption = net.state.caption {
                         Text(caption)
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .font(Futuristic.font(size: 12 * scale(.text)))
                             .foregroundStyle(.white.opacity(0.8))
                     }
                 }
@@ -450,30 +467,57 @@ struct TitleOverlay: View {
         .onAppear { net.signIn() }
     }
 
-    /// A lettered button on one of the pack's plates, at the title's tuned sizes; under the
-    /// cursor, on the gold plate and a little bigger, as the screens' cursor is.
-    private func plated(_ text: String, piece: UIPiece, width: CGFloat, item: TitleItem) -> some View {
-        let piece = flow.titleCursor == item ? UIPiece.buttonGold : piece
-        return Button { flow.activate(item) } label: {
-            let rise = tuning.textRise
-            let shift = TitleText.dropShift(size: 26 * scale(.text)) * rise
-            // On the gold plate, the lettering's lower half goes light blue.
-            Image(uiImage: TitleText.image(text, size: 26 * scale(.text), lit: flow.titleCursor == item))
-                // Centred on the plate's face, the drop taken off (SwiftUI's y runs down).
-                .offset(x: -shift, y: -(piece.faceRise * scale(.buttons) * rise + shift))
-                .frame(width: width * scale(.buttons), height: 54 * scale(.buttons))
-                .background(piece.image(corners: scale(.buttons)))
+    /// The opponent row's rules, by their width in points.
+    static let endRuleWidth: CGFloat = 110
+    static let middleRuleWidth: CGFloat = 120
+
+    /// A lettered button in one of the vector's frames.
+    private func framed(_ text: String, in frame: String, item: TitleItem) -> some View {
+        Button { flow.activate(item) } label: {
+            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons)) { colour in
+                Text(text)
+                    .font(Futuristic.font(size: 24 * scale(.text)))
+                    .foregroundStyle(colour)
+                    .fixedSize()
+            }
         }
         .buttonStyle(.plain)
         .disabled(busy)
-        .scaleEffect(flow.titleCursor == item ? TitleOverlay.cursorGrowth : 1)
         .noSystemFocus()
     }
 
-    /// Under the cursor, a plate grows this much.
+    /// One of the opponent row's words: white when it's the one picked, dim otherwise.
+    private func plain(_ text: String, picked: Bool, item: TitleItem) -> some View {
+        let lit = flow.titleCursor == item
+        return Button { flow.activate(item) } label: {
+            Text(text)
+                .font(Futuristic.font(size: 18 * scale(.text)))
+                .foregroundStyle(lit ? Futuristic.lit : .white.opacity(picked ? 1 : TitleOverlay.unpickedOpacity))
+                .fixedSize()
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+        .scaleEffect(lit ? Futuristic.litGrowth : 1)
+        .noSystemFocus()
+    }
+
+    static let unpickedOpacity = 0.4
+
+    /// A rule at a width, its height as the vector has it.
+    private func rule(_ name: String, width: CGFloat) -> some View {
+        let image = Futuristic.image(name)
+        let width = width * scale(.buttons)
+        return Image(uiImage: image)
+            .resizable()
+            .interpolation(.high)
+            .colorMultiply(Futuristic.line)
+            .frame(width: width, height: width * image.size.height / max(image.size.width, 1))
+    }
+
+    /// Under the cursor, the other screens' plates grow this much.
     static let cursorGrowth: CGFloat = 1.08
 
-    /// A small switch: plum when it's the one picked, black otherwise, gold under the cursor.
+    /// A small switch on the debug corner: plum when it's the one picked, black otherwise, gold under the cursor.
     private func small(_ text: String, picked: Bool, item: TitleItem) -> some View {
         let piece = flow.titleCursor == item ? UIPiece.buttonGold : (picked ? UIPiece.buttonPlum : UIPiece.buttonBlack)
         return Button { flow.activate(item) } label: {

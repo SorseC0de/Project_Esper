@@ -77,24 +77,3 @@ struct SettingsScreen: View {
         .noSystemFocus()
     }
 }
-
-/// The settings gear, on one of the pack's round plates: gold under the cursor.
-struct SettingsGear: View {
-    let lit: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                (lit ? UIPiece.circleGold : UIPiece.circleBlue).image(corners: 0.6)
-                    .frame(width: 46, height: 48)
-                if let gear = UIImage(named: "ui_icon_settings") {
-                    Image(uiImage: gear).resizable().interpolation(.high).frame(width: 24, height: 25).offset(y: -2)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(lit ? TitleOverlay.cursorGrowth : 1)
-        .noSystemFocus()
-    }
-}

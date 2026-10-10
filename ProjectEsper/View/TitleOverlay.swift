@@ -32,6 +32,11 @@ final class FlowState: ObservableObject {
 
     init() {
         scene.flowState = self
+        scene.onLoading = { [weak self] progress in
+            guard let self else { return }
+            let slots = progress.map { Int($0 * Double(FlowState.loadingSlotCount)) }
+            if slots != self.loadingSlots { self.loadingSlots = slots }
+        }
         SoundBoard.shared.prepare()
         // An invite accepted from outside the game opens the multiplayer screen on the joining.
         net.onInviteAccepted = { [weak self] in self?.multiplayerOpen = true }
@@ -46,6 +51,33 @@ final class FlowState: ObservableObject {
             UserDefaults.standard.set(Int(GameMode.zones.rawValue), forKey: GameScene.onlineModeKey)
             self.multiplayerOpen = true
             self.openZonesTurn(match)
+        }
+    }
+
+    // MARK: Loading
+
+    /// The loading bar's lit slots, the rebuilds underway's progress over its sixteen, or nil
+    /// with nothing loading. A transition's curtain stays down, the bar on it, until it's nil.
+    @Published var loadingSlots: Int? {
+        didSet {
+            guard loadingSlots == nil, let lift = heldLift else { return }
+            heldLift = nil
+            lift()
+        }
+    }
+    static let loadingSlotCount = FuturisticMeter.slots.count
+    private var heldLift: (() -> Void)?
+    /// The longest a curtain waits on loading before going up regardless.
+    static let loadingHoldLimit = 15.0
+
+    /// `lift` now, or once nothing's loading.
+    private func whenLoaded(_ lift: @escaping () -> Void) {
+        guard loadingSlots != nil else { return lift() }
+        heldLift = lift
+        DispatchQueue.main.asyncAfter(deadline: .now() + FlowState.loadingHoldLimit) { [weak self] in
+            guard let self, let held = self.heldLift else { return }
+            self.heldLift = nil
+            held()
         }
     }
 
@@ -70,13 +102,17 @@ final class FlowState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + style.downSeconds + 0.05) { [weak self] in
             guard let self else { return }
             change()
-            withAnimation(.easeOut(duration: style.upSeconds)) { self.curtain = 0 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds) { [weak self] in
+            // Held down over anything the change set loading, the bar filling on it.
+            self.whenLoaded { [weak self] in
                 guard let self else { return }
-                self.curtainBusy = false
-                if !self.curtainQueue.isEmpty {
-                    let next = self.curtainQueue.removeFirst()
-                    self.transition(next.0, next.1)
+                withAnimation(.easeOut(duration: style.upSeconds)) { self.curtain = 0 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds) { [weak self] in
+                    guard let self else { return }
+                    self.curtainBusy = false
+                    if !self.curtainQueue.isEmpty {
+                        let next = self.curtainQueue.removeFirst()
+                        self.transition(next.0, next.1)
+                    }
                 }
             }
         }

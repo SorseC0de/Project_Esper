@@ -171,6 +171,11 @@ final class GameScene: SKScene {
     private var powerVariant = PowerVariant.none
     private var powerLevelVariant = PowerLevelVariant.two
     private let sprites = SpriteLibrary()
+    /// The sprites' rebuilds underway, 0 to 1, or nil with none, as they go: the loading bar's.
+    var onLoading: ((Double?) -> Void)? {
+        get { sprites.onLoading }
+        set { sprites.onLoading = newValue }
+    }
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
     private let world = SKNode()

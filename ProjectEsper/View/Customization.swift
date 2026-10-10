@@ -143,6 +143,8 @@ extension FlowState {
                 self.customizeOpen = false
                 self.customizeLaunch = nil
                 if self.customizeOnline {
+                    // The picks into the game's frames now, behind the curtain, rather than as the session starts.
+                    self.scene.applyCustomizations(self.shownCustomizations)
                     self.customizeLaunched = true
                 } else {
                     self.startSeries?(self.customizeMode)

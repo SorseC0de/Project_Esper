@@ -79,6 +79,24 @@ final class SpriteLibrary {
     static let tonedParticleSheets = ["lightning_particle", "lightning_particle2"]
     private var rewarmGeneration: [Int: Int] = [:]
     private let rewarmQueue = DispatchQueue(label: "SpriteLibrary.rewarm", qos: .userInitiated)
+    /// Each player's rebuild underway: its pieces made, of all of them, for the loading bar.
+    private var rebuilding: [Int: (made: Int, all: Int)] = [:]
+    /// How far the rebuilds underway have got, 0 to 1, or nil with none; told on the main
+    /// thread as it changes.
+    var onLoading: ((Double?) -> Void)?
+    var loadingProgress: Double? {
+        guard !rebuilding.isEmpty else { return nil }
+        let all = rebuilding.values.reduce(0) { $0 + $1.all }
+        return Double(rebuilding.values.reduce(0) { $0 + $1.made }) / Double(max(all, 1))
+    }
+    /// The bar's told every this many pieces.
+    private static let loadingReportEvery = 8
+
+    private func reportRebuilding(_ player: Int, generation: Int, made: Int?) {
+        guard rewarmGeneration[player] == generation else { return }
+        if let made { rebuilding[player]?.made = made } else { rebuilding[player] = nil }
+        onLoading?(loadingProgress)
+    }
 
     /// Everything drawn in a player's look rebuilt off the main thread after their look
     /// changes, then kept and sent to the GPU, so no frame, head, energy or toned effect is
@@ -110,23 +128,48 @@ final class SpriteLibrary {
         for index in 0..<Effect.fireWallSpark.frameCount {
             silhouetteJobs.append(("p\(player)_sil_\(Effect.fireWallSpark.name)_\(index)", texture(Effect.fireWallSpark.name, index)))
         }
+        // Counted as pieces made, the last one the textures reaching the GPU.
+        let pieces = frameJobs.count + tonedJobs.count + silhouetteJobs.count + 1
+        rebuilding[player] = (0, pieces)
+        onLoading?(loadingProgress)
         rewarmQueue.async { [weak self] in
             guard let self else { return }
             var built: [String: SKTexture] = [:]
             var builtLandmarks: [String: [BodyPart: CGPoint]] = [:]
-            for job in frameJobs {
-                let made = makeFrame(job.frame, source: job.source, look: look, holdsBall: job.holdsBall)
-                for (suffix, texture) in made.textures { built[job.key + suffix] = texture }
-                builtLandmarks[job.key] = made.landmarks
+            var made = 0
+            func count() {
+                made += 1
+                guard made % SpriteLibrary.loadingReportEvery == 0 else { return }
+                let so = made
+                DispatchQueue.main.async { self.reportRebuilding(player, generation: generation, made: so) }
             }
-            for job in tonedJobs { built[job.key] = makeToned(job.source, look: look, capped: job.capped) }
-            for job in silhouetteJobs { built[job.key] = makeSilhouette(job.source, look: look) }
+            for job in frameJobs {
+                let frameMade = makeFrame(job.frame, source: job.source, look: look, holdsBall: job.holdsBall)
+                for (suffix, texture) in frameMade.textures { built[job.key + suffix] = texture }
+                builtLandmarks[job.key] = frameMade.landmarks
+                count()
+            }
+            for job in tonedJobs {
+                built[job.key] = makeToned(job.source, look: look, capped: job.capped)
+                count()
+            }
+            for job in silhouetteJobs {
+                built[job.key] = makeSilhouette(job.source, look: look)
+                count()
+            }
             DispatchQueue.main.async {
-                guard self.rewarmGeneration[player] == generation, self.look(for: player) == look else { return }
+                guard self.rewarmGeneration[player] == generation else { return }
+                // Its look changed since without a new rebuild (a turned look no longer differing): nothing to keep.
+                guard self.look(for: player) == look else {
+                    self.reportRebuilding(player, generation: generation, made: nil)
+                    return
+                }
                 for (key, texture) in built where self.cache[key] == nil { self.cache[key] = texture }
                 for (key, marks) in builtLandmarks where self.landmarks[key] == nil { self.landmarks[key] = marks }
                 for job in frameJobs { self.pairGlowMask(job.key) }
-                SKTexture.preload(Array(built.values)) {}
+                SKTexture.preload(Array(built.values)) {
+                    DispatchQueue.main.async { self.reportRebuilding(player, generation: generation, made: nil) }
+                }
             }
         }
     }

@@ -1,12 +1,13 @@
 // Renders an SVG with macOS's own renderer into a PNG of the given size, cropped to what's
-// drawn, and prints the crop as "x y width height" in the render's pixels from the top left.
-// Used by import_customize.py: swiftc render_svg.swift -o render_svg; render_svg in.svg out.png 2560 1440
+// drawn, and prints the crop as "x y width height" in the render's pixels from the top left;
+// "whole" after the size keeps the whole render, uncropped.
+// Used by import_customize.py: swiftc render_svg.swift -o render_svg; render_svg in.svg out.png 2560 1440 [whole]
 import AppKit
 
 let arguments = CommandLine.arguments
-guard arguments.count == 5, let image = NSImage(contentsOf: URL(fileURLWithPath: arguments[1])),
+guard arguments.count == 5 || arguments.count == 6, let image = NSImage(contentsOf: URL(fileURLWithPath: arguments[1])),
       let width = Int(arguments[3]), let height = Int(arguments[4]) else {
-    FileHandle.standardError.write("usage: render_svg in.svg out.png width height\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: render_svg in.svg out.png width height [whole]\n".data(using: .utf8)!)
     exit(1)
 }
 let canvas = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4,
@@ -23,6 +24,9 @@ for y in 0..<height {
         left = min(left, x); right = max(right, x)
         top = min(top, y); bottom = max(bottom, y)
     }
+}
+if arguments.count == 6, arguments[5] == "whole" {
+    left = 0; top = 0; right = width - 1; bottom = height - 1
 }
 guard right >= 0 else {
     FileHandle.standardError.write("nothing drawn in \(arguments[1])\n".data(using: .utf8)!)

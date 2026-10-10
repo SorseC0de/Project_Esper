@@ -716,8 +716,17 @@ A disconnect on the screen closes it to the title.
   (`SpriteLibrary.customizePlayer`, a slot a side, only what the screen draws made in it), so a
   pick redraws one small figure; the old look stays under the new one while it fades in over
   0.25 seconds (`CustomizeFigure`), its glow giving way to the new one's. The game's own frames
-  are rebuilt in the picks once, as the match starts, behind the curtain, off the main thread,
-  during the stage select, as a loading screen would.
+  are rebuilt in the picks once, as the match starts, off the main thread,
+  behind the curtain, which stays down until they're done (online too: the picks go in as the
+  launch's curtain comes down).
+- The loading bar: Futuristic_UI's bar4, bottom right on every transition's curtain, fading with
+  it. Its sixteen slots fill left to right with the rebuilds underway (`SpriteLibrary`'s pieces
+  made over all of them, the last the textures reaching the GPU, by sixteenths); full with
+  nothing loading. A transition's curtain stays down while anything's loading (at most 15
+  seconds). `Tools/import_futuristic.py` writes bar4's frame without the vector's fills
+  (`futuristic_bar4_frame`) and each slot's inside (`FuturisticMeter.swift`): the vector's fill
+  where it has one, else the first slanted fill moved along, and the right end's triangle inset
+  from its outline as the left end's fill is from its own.
   The entrance (`CustomizeIntro`), as the screen appears: the top line, CUSTOMIZE and the mode
   float down and the bottom line and RETURN up, from a quarter of the screen's height away, over
   0.5 seconds; from 0.3 seconds, over 0.8, the players fade in from nothing as their halos (the

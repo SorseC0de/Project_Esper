@@ -107,3 +107,24 @@ struct FuturisticFrame<Content: View>: View {
             .scaleEffect(lit ? Futuristic.litGrowth : 1)
     }
 }
+
+/// The loading bar: bar4's frame and slot outlines, `litSlots` of its sixteen slots filled
+/// from the left (`FuturisticMeter`).
+struct LoadingBar: View {
+    let litSlots: Int
+    var scale: CGFloat = 1
+
+    var body: some View {
+        FuturisticPiece(name: "bar4_frame", scale: scale)
+            .overlay {
+                Canvas { context, size in
+                    for slot in FuturisticMeter.slots.prefix(litSlots) {
+                        var path = Path()
+                        path.addLines(slot.map { CGPoint(x: $0.x * size.width, y: $0.y * size.height) })
+                        path.closeSubpath()
+                        context.fill(path, with: .color(Futuristic.line))
+                    }
+                }
+            }
+    }
+}

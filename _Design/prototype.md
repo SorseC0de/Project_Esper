@@ -664,7 +664,7 @@ plum, gold on the cursor's row; up and down a row, left and right its choice (ju
 start or BACK to shut them; a tap picks a choice outright.
 
 - SFX: the sound words ON, SOME (only the biggest, the 16-high ones, `Sound.isBiggest`), OFF.
-- SFX STYLE: their face, CHERRY, DARUMA or DELA (`Onomatopoeia.style`).
+- SFX STYLE: their face, CHERRY, DARUMA or DELA (`Onomatopoeia.style`); nothing picked yet, DARUMA in ENG.
 - SFX LANGUAGE: ENG, JPN or SPA (`Onomatopoeia.language`); Spanish in the English faces, spelled
   ¡SHUAS!, ¡¡SHUAAAS!!, ¡¡CATAPUM!!, ¡ZAS!, ¡PAF!, ¡ZASCA!, ¡CLING!, CLANC, ÑIC, TAC, PUM, POM, POM,
   ZUUUUM, ¡BUUUM!, BRRRUM, ¡CRAC!, ¡CABUM!, CHSSS, ¡CRAS! and ¡CATACRAC! in the table's order. A face

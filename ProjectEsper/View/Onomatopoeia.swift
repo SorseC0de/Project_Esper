@@ -60,8 +60,11 @@ enum Onomatopoeia {
         get { (UserDefaults.standard.object(forKey: languageKey) as? Int).flatMap(Language.init) ?? fromOldFace.language }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: languageKey) }
     }
+    /// Nothing picked yet, the words are English in Darumadrop.
     private static var fromOldFace: (style: Style, language: Language) {
-        let old = Lettering(rawValue: UserDefaults.standard.integer(forKey: letteringKey)) ?? .cherryBomb
+        guard let picked = UserDefaults.standard.object(forKey: letteringKey) as? Int, let old = Lettering(rawValue: picked) else {
+            return (.daruma, .english)
+        }
         switch old {
         case .cherryBomb: return (.cherry, .japanese)
         case .darumadrop: return (.daruma, .japanese)

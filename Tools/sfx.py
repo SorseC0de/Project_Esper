@@ -2,7 +2,7 @@
 """A bfxr-style sound maker. Each sound in `Tools/sfx.json` is one or more voices mixed:
 an oscillator (square with a duty, saw, triangle, sine or noise), an envelope (attack,
 sustain, punch, decay), a pitch that slides and wobbles and can jump (arpeggio), and
-low- and high-pass filters; then, for the whole sound, an optional flanger. Written as 16-bit 44.1 kHz mono WAV into `_Sound FX`, where
+low- and high-pass filters; then, for the whole sound, an optional flanger. Written as 16-bit 44.1 kHz mono WAV into `_Audio/Sound FX`, where
 `Tools/import_sounds.py` takes it into the app like any other.
 
     ./Tools/sfx.py            every sound in the file
@@ -18,7 +18,7 @@ import wave
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RECIPES = ROOT / "Tools" / "sfx.json"
-OUT = ROOT / "_Sound FX"
+OUT = ROOT / "_Audio" / "Sound FX"
 RATE = 44100
 
 VOICE_DEFAULTS = {

@@ -28,6 +28,7 @@ final class SoundBoard {
         case snatch
         case parry
         case portIn = "port_in"
+        case pause
         case slashWallClank = "slash_wallclank"
         case step
         // The announcer, levelled by the importer.
@@ -40,7 +41,12 @@ final class SoundBoard {
         case wristWork = "announcer_watchthewristwork", wristWork2 = "announcer_watchthewristwork-2"
         case itsAThree = "announcer_itsathree"
         case winner = "announcer_winner", winner2 = "announcer_winner-2", whatAWin = "announcer_whatawin"
+        case steal = "announcer_stole", steal2 = "announcer_stole2", steal3 = "announcer_stole3"
+        case nabbed = "announcer_nabbed", nabbed2 = "announcer_nabbed2", nabbed3 = "announcer_nabbed3"
+        case knicked = "announcer_knicked", knicked2 = "announcer_knicked2", knicked3 = "announcer_knicked3"
+        case whatWillYouDo = "announcer_whatwillyoudo", whatWillTheyDo = "announcer_whatwilltheydo", toughChoice = "announcer_atoughchoice"
         case crowdCheer = "crowd_cheer"
+        case crowdGasp = "crowd_gasp"
     }
 
     /// The announcer's lines by what they're for.
@@ -49,6 +55,11 @@ final class SoundBoard {
     static let dunks: [Effect] = [.slamDunk, .slamDunk2, .slamDunk3, .dunk]
     static let wristWorks: [Effect] = [.wristWork, .wristWork2]
     static let winners: [Effect] = [.winner, .winner2, .whatAWin]
+    static let steals: [Effect] = [.steal, .steal2, .steal3, .nabbed, .nabbed2, .nabbed3, .knicked, .knicked2, .knicked3]
+    /// Into the Greateraid pick: the one picking hears "what will you do", the one waiting
+    /// "what will they do", either side "a tough choice", a coin flip each.
+    static let pickYou: [Effect] = [.whatWillYouDo, .toughChoice]
+    static let pickThey: [Effect] = [.whatWillTheyDo, .toughChoice]
 
     private static let voiceCount = 16
     private let engine = AVAudioEngine()

@@ -599,7 +599,9 @@ text 1.5, titles 1.5 and panels 0.9, as tuned on one; and the iPad's and the TV'
 at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the plate's
 face, above its lip, and is nudged up and left by half its own drop. TEXT Y on the panel
 scales that lift, one value a platform: half of it, 0.5, on all of them. The stage select: STAGE SELECT on a ribbon, each stage a royal blue plate
-with its name on the face, gold when a cursor or a pick is on it. The Greateraid pick,
+with its name on the face in two lines, broken at the space nearest its middle (one line with no
+space), gold when a cursor or a pick is on it; more than four stages in two rows, the first the
+longer, the plates 84 deep there (`StageSelectScreen.lines`, `oneRowMost`). The Greateraid pick,
 on the palette's black rather than the royal blue: its ribbon, smaller than the other
 screens' (26 on a 200 by 38 ribbon), the line under it in title lettering, and on a blue
 banner below, 120 deep, its top where the drinker stands: the raised drink's name across the
@@ -1671,7 +1673,7 @@ surfs the slide slopes rather than sliding: down them on the board at its run un
 takes it up them, which it can.
 
 Under it all plays `thunderstorm`, low (0.2), looped (`Ambience`): the first five minutes of
-`_Sound FX/thunderstorm.mp3`, faded in and out four seconds at each end, as AAC
+`_Audio/Sound FX/thunderstorm.wav`, faded in and out four seconds at each end, as AAC
 (`Tools/import_ambience.py`; `import_sounds.py` leaves it alone).
 
 The lightning (`LightningRules`, `Match.lightningWarning`): every ten seconds the screen flashes
@@ -2141,13 +2143,15 @@ main queue, away from a frame, and a sound that finds the engine or its voice do
 skipped and asks for that restart, never starting the engine itself.
 
 `Tools/sfx.py` makes sounds the bfxr way from recipes in `Tools/sfx.json` (oscillator,
-envelope, pitch slide and vibrato, arpeggio, filters, voices mixed) into `_Sound FX`, for
+envelope, pitch slide and vibrato, arpeggio, filters, voices mixed) into `_Audio/Sound FX`, for
 the importer to take in like any other.
 
-The user's effects in `_Sound FX`, any of WAV, MP3 or M4A, brought into `ProjectEsper/Sounds`
+The user's effects in `_Audio/Sound FX` (`_Audio` holds Sound FX, Music and Vocals; anything
+else in it is dropped), any of WAV, MP3 or M4A, brought into `ProjectEsper/Sounds`
 as 16-bit 44.1 kHz mono WAV by
 `Tools/import_sounds.py` (run it after adding or changing one; the originals are only
-read). `SoundBoard` reads each into memory once and plays it on a pool of sixteen voices
+read; a sound in the app no longer there is removed: the old countdown 1, 2, 3 and basket,
+taken from another game, went that way). `SoundBoard` reads each into memory once and plays it on a pool of sixteen voices
 through one engine, left running, heard by where they happen: full on the screen,
 fading to nothing 32 art pixels past its edge, so nothing off the screen is heard (the
 menus and the count are everywhere); each sound to a voice that has finished, or with all busy to the one
@@ -2172,7 +2176,16 @@ shown, once, like the effects.
 - The announcer's 3, 2, 1 (announcer_1..3, or the second set announcer_1-2..3-2 on the COUNT
   picker, A or B): each number of the count as it goes up, in play.
 - announcer_ballout and ballout2 together at BALL OUT, each panned halfway to its own side.
-- port_in: the port-in at a round's start.
+- port_in: the port-in at a round's start, and on the customize screen as the two figures reach
+  the ball in the middle (the drift's 0.2 s beat and its 1 s).
+- pause: the pause menu coming up.
+- A steal, a snatch taking the ball out of a holder's hands (`.stolen`, from confirmed frames as
+  a basket's lines are): one of the announcer's nine (stole, stole2, stole3, nabbed, -2, -3,
+  knicked, -2, -3) in the middle, and crowd_gasp twice at half its levelled loudness, panned hard
+  left and hard right (`GameScene.announceSteal`).
+- Into the Greateraid pick, once: the one picking hears whatwillyoudo or atoughchoice, the one
+  waiting (online) whatwilltheydo or atoughchoice, a coin flip each (`SoundBoard.pickYou`,
+  `pickThey`).
 - swish: a point, with the strike on the rim; a dunk has none, the announcer's line instead.
 - crowd_cheer, behind the rest, on every basket, and with it the announcer: on the game's last,
   thatlldoit, thatlldoit-2 or thatdecidesit, the finish (in Rounds, on every point too, before the
@@ -2188,7 +2201,7 @@ shown, once, like the effects.
   (watchthewristwork, -2) at 1 on any other shot and 2 on a floater (`Ball.floaterShot`,
   carried by the score event), itsathree at 2 on a three in 47. winner, winner-2 or whatawin
   once as the game goes to the win screen, not again when it's redrawn (a rematch's wait).
-- The vocals come in from `_Sound FX/Vocals` by a list in `Tools/import_sounds.py`, the rest of
+- The vocals come in from `_Audio/Vocals` by a list in `Tools/import_sounds.py`, the rest of
   the folder left out, each levelled as it's converted: its loudness while sounding (the RMS
   of its 10 ms stretches above -40 dBFS) to -21 dB for the announcer, just under the swish
   (-20.5), and -27 for the crowd, its peak kept under -3.

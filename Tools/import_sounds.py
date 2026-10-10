@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Copies every sound in `_Sound FX` into the app as 16-bit, 44.1 kHz mono PCM WAV,
+"""Copies every sound in `_Audio/Sound FX` into the app as 16-bit, 44.1 kHz mono PCM WAV,
 whatever it was saved as (WAV of any rate, AAC inside a .wav, MP3, M4A), so the app
-reads them all the same way. The name keeps its stem, lowercased, with `.wav`.
+reads them all the same way. The name keeps its stem, lowercased, with `.wav`. A sound in
+the app that's no longer there is removed (the old countdown and basket went that way).
 
-From `_Sound FX/Vocals` only the files in `VOCALS` come in, each levelled as it's
+From `_Audio/Vocals` only the files in `VOCALS` come in, each levelled as it's
 converted: its loudness while it's sounding (the RMS of its 10 ms stretches above
 -40 dBFS) brought to its target, and its peak kept under `PEAK_CEILING`, so the lines
 are even with each other and sit under the effects they play with.
@@ -15,7 +16,8 @@ import struct
 import subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "_Sound FX"
+SOURCE = ROOT / "_Audio" / "Sound FX"
+VOCALS_SOURCE = ROOT / "_Audio" / "Vocals"
 DESTINATION = ROOT / "ProjectEsper" / "Sounds"
 
 # The announcer at -21 dB, just under the swish (-20.5); the crowd behind everything.
@@ -34,13 +36,16 @@ VOCALS = {
         "watchthewristwork", "watchthewristwork-2",
         "itsathree",
         "winner", "winner-2", "whatawin",
+        "stole", "stole2", "stole3", "nabbed", "nabbed2", "nabbed3", "knicked", "knicked2", "knicked3",
+        "whatwillyoudo", "whatwilltheydo", "atoughchoice",
     ]},
     "crowd_cheer.wav": ("crowd_cheer", CROWD_LEVEL),
+    "crowd_gasp.wav": ("crowd_gasp", CROWD_LEVEL),
 }
 
 SUFFIXES = {".wav", ".mp3", ".m4a", ".aif", ".aiff", ".caf"}
 # Long backgrounds that come in through Tools/import_ambience.py instead, as AAC.
-AMBIENCE = {"thunderstorm.mp3"}
+AMBIENCE = {"thunderstorm.mp3", "thunderstorm.wav"}
 
 
 def convert(sound, out):
@@ -97,7 +102,7 @@ for sound in sorted(SOURCE.iterdir()):
     convert(sound, out)
     print(f"{sound.name}")
 for file, (name, target) in VOCALS.items():
-    sound = SOURCE / "Vocals" / file
+    sound = VOCALS_SOURCE / file
     if not sound.exists():
         print(f"missing Vocals/{file}")
         continue

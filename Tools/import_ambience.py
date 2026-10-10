@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Brings the long background sounds in `_Sound FX` into the app as AAC, cut to their
+"""Brings the long background sounds in `_Audio/Sound FX` into the app as AAC, cut to their
 loop length with a fade in and a fade out, so they loop without a seam: the stage's
 ambience, played low under everything (`Ambience.swift`).
 
@@ -10,11 +10,11 @@ import subprocess
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "_Sound FX"
+SOURCE = ROOT / "_Audio" / "Sound FX"
 DESTINATION = ROOT / "ProjectEsper" / "Sounds"
 
 # Source file: (name in the app, seconds kept, seconds of fade at each end).
-AMBIENCE = {"thunderstorm.mp3": ("thunderstorm", 300, 4)}
+AMBIENCE = {"thunderstorm.wav": ("thunderstorm", 300, 4)}
 
 for file, (name, seconds, fade) in AMBIENCE.items():
     with tempfile.TemporaryDirectory() as scratch:

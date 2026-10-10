@@ -39,8 +39,13 @@ final class TransformTests: XCTestCase {
         match.ball.holder = 1
         let from = match.players[0].position.x
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        var stolen = match.events.contains(.stolen(player: 0, from: 1))
         // The snatch's frames, and the hit-stop the taking holds the match for.
-        for _ in 0..<(SnatchRules.frames + HitStopRules.hitFrames + 2) { match.advance(inputs: [.idle, .idle]) }
+        for _ in 0..<(SnatchRules.frames + HitStopRules.hitFrames + 2) {
+            match.advance(inputs: [.idle, .idle])
+            if match.events.contains(.stolen(player: 0, from: 1)) { stolen = true }
+        }
+        XCTAssertTrue(stolen, "a steal, for the announcer")
         XCTAssertEqual(match.players[0].position.x - from, SnatchRules.floStateTravel, accuracy: 1, "carried 96 art pixels forward")
         XCTAssertEqual(SnatchRules.floStateTravel, 96 * 0.625, accuracy: 1e-9)
         XCTAssertEqual(match.ball.holder, 0, "the ball taken on the way through")

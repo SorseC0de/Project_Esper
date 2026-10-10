@@ -497,7 +497,8 @@ final class StageSelectScreen: Screen {
     /// Each stage: its plate, royal blue or gold when raised, in a container that grows.
     private var tiles: [SKNode] = []
     private var tilePlates: [SKSpriteNode] = []
-    private var tileLabels: [(label: SKSpriteNode, text: String, size: CGFloat)] = []
+    /// Each stage's name in its lines, two when it has a space to break at.
+    private var tileLabels: [[(label: SKSpriteNode, text: String, size: CGFloat)]] = []
     private var tileSize = CGSize.zero
     private var cursors: [Int: Int] = [:]
     private var picks: [Int: Int] = [:]
@@ -524,28 +525,43 @@ final class StageSelectScreen: Screen {
             addChild(sub)
         }
         let buttons = tuned(.buttons)
-        // As wide as fits the whole row on the screen, however many stages there are.
-        let fitting = (halfWidth * 2 * 0.92 - 20 * CGFloat(stages.count - 1)) / CGFloat(max(stages.count, 1))
+        // More than four stages go in two rows, the first the longer; each as wide as fits its
+        // row on the screen.
+        let rows = stages.count > StageSelectScreen.oneRowMost ? 2 : 1
+        let perRow = (stages.count + rows - 1) / rows
+        let fitting = (halfWidth * 2 * 0.92 - 20 * CGFloat(perRow - 1)) / CGFloat(max(perRow, 1))
         let width = min(halfWidth * 0.56, 180 * buttons, fitting)
-        tileSize = CGSize(width: width, height: 96 * buttons)
+        tileSize = CGSize(width: width, height: (rows == 2 ? 84 : 96) * buttons)
         let spacing = width + 20
+        let rowGap = tileSize.height + 14 * buttons
         let rise = UITuning.shared.textRise
         for (index, name) in stages.enumerated() {
             let tile = SKNode()
-            tile.position = CGPoint(x: (CGFloat(index) - CGFloat(stages.count - 1) / 2) * spacing, y: -halfHeight * 0.1)
+            let row = index / perRow
+            let inRow = row == 0 ? min(perRow, stages.count) : stages.count - perRow
+            let column = index - row * perRow
+            tile.position = CGPoint(x: (CGFloat(column) - CGFloat(inRow - 1) / 2) * spacing,
+                                    y: -halfHeight * (rows == 2 ? 0.15 : 0.1) + (CGFloat(rows - 1) / 2 - CGFloat(row)) * rowGap)
             let plate = UIPiece.buttonBlue.node(size: tileSize, corners: buttons)
             plate.zPosition = -1
             tile.addChild(plate)
             let textSize = 20 * tuned(.text)
-            let label = TitleText.node(name, size: textSize)
-            label.setScale(min(1, (width - 20) / max(label.size.width, 1)))
             let shift = TitleText.dropShift(size: textSize) * rise
-            label.position = CGPoint(x: -shift, y: UIPiece.buttonBlue.faceRise * buttons * rise + shift)
-            tile.addChild(label)
+            let lines = StageSelectScreen.lines(of: name)
+            var labels: [(label: SKSpriteNode, text: String, size: CGFloat)] = []
+            for (number, line) in lines.enumerated() {
+                let label = TitleText.node(line, size: textSize)
+                label.setScale(min(1, (width - 20) / max(label.size.width, 1)))
+                let step = label.size.height * StageSelectScreen.lineShare
+                label.position = CGPoint(x: -shift, y: UIPiece.buttonBlue.faceRise * buttons * rise + shift
+                                         + (CGFloat(lines.count - 1) / 2 - CGFloat(number)) * step)
+                tile.addChild(label)
+                labels.append((label, line, textSize))
+            }
             addChild(tile)
             tiles.append(tile)
             tilePlates.append(plate)
-            tileLabels.append((label, name, textSize))
+            tileLabels.append(labels)
         }
         for voter in localVoters { cursors[voter] = min(max(start, 0), stages.count - 1) }
         for voter in voters {
@@ -560,6 +576,19 @@ final class StageSelectScreen: Screen {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// A row holds this many stages at most before they go in two.
+    static let oneRowMost = 4
+    /// The name's lines' spacing, a share of a line's drawn height (the outline and drop overlap).
+    static let lineShare: CGFloat = 0.8
+    /// A name in two lines, broken at the space nearest its middle; one with no space in one.
+    static func lines(of name: String) -> [String] {
+        let spaces = name.indices.filter { name[$0] == " " }
+        guard let middle = spaces.min(by: {
+            abs(name.distance(from: name.startIndex, to: $0) * 2 - name.count) < abs(name.distance(from: name.startIndex, to: $1) * 2 - name.count)
+        }) else { return [name] }
+        return [String(name[..<middle]), String(name[name.index(after: middle)...])]
+    }
 
     func move(voter: Int, by delta: Int) {
         guard picks[voter] == nil, flipLit == nil, let at = cursors[voter] else { return }
@@ -618,7 +647,7 @@ final class StageSelectScreen: Screen {
             let lit = raised.contains(index)
             tile.setScale(lit ? 1.12 : 1)
             (lit ? UIPiece.buttonGold : UIPiece.buttonBlue).fit(tilePlates[index], to: tileSize, corners: tuned(.buttons))
-            TitleText.set(tileLabels[index].label, to: tileLabels[index].text, size: tileLabels[index].size, lit: lit)
+            for line in tileLabels[index] { TitleText.set(line.label, to: line.text, size: line.size, lit: lit) }
         }
         // Each voter's circle in the bottom-right corner of their stage, the second beside the first.
         var taken: [Int: Int] = [:]

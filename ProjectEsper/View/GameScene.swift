@@ -4459,6 +4459,13 @@ final class GameScene: SKScene {
         if next != .playing, zones != nil { flowState?.zonesHud = nil }
         // The winner's line once, as the win screen goes up, not each time it's redrawn.
         if next == .won, flow != .won { SoundBoard.shared.play(SoundBoard.winners.randomElement()!) }
+        // The pause menu coming up, however it was asked for.
+        if next == .paused, flow != .paused { SoundBoard.shared.play(.pause) }
+        // Into the Greateraid pick, once: "what will you do" to the one picking, "what will they
+        // do" to the one waiting, or "a tough choice" to either, a coin flip.
+        if next == .picking, flow != .picking {
+            SoundBoard.shared.play((picker == localIndex ? SoundBoard.pickYou : SoundBoard.pickThey).randomElement()!)
+        }
         flow = next
         showFloMeters()
         if next == .stageSelect { openStageSelect() }
@@ -5079,6 +5086,15 @@ final class GameScene: SKScene {
     private static let uniqueWeight = 1
     private static let likelyWeight = 2
 
+    /// A steal, from confirmed frames as a basket is: one of the announcer's nine lines in the
+    /// middle, and the crowd's gasp twice, hard left and hard right, each at half its levelled
+    /// loudness, which sits under his.
+    private func announceSteal() {
+        SoundBoard.shared.play(SoundBoard.steals.randomElement()!)
+        for side: Float in [-1, 1] { SoundBoard.shared.play(.crowdGasp, volume: GameScene.gaspVolume, pan: side) }
+    }
+    private static let gaspVolume: Float = 0.5
+
     /// The announcer on a basket, over the crowd's cheer. The game's last is "that'll do it"
     /// and the finish slows and closes in on the ball. Otherwise a line drawn by weight: the
     /// generic score always in, and the unique lines, fewer, a little more where they fit.
@@ -5175,6 +5191,7 @@ final class GameScene: SKScene {
     /// The events of frames both sides' inputs have confirmed: the point.
     private func confirm(_ frames: [FrameEvents]) {
         for frameEvents in frames {
+            for case .stolen in frameEvents.events { announceSteal() }
             for case .scored(let scorer, let hoop, let entry, let points, let floater) in frameEvents.events {
                 rimFlash[hoop] = 8
                 let dunk = dunkScoring

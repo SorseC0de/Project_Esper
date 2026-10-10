@@ -573,6 +573,7 @@ public struct Match: Equatable {
                       held != nil || ball.isLive {
                 if let held {
                     earnFlo(FloRules.snatch, by: index, off: held, at: at)
+                    if player.power != .frostTea { events.append(.stolen(player: index, from: held)) }
                     players[held].loseBall()
                     players[held].hitStun = BallRules.hitStunFrames
                     holdHitStop(HitStopRules.hitFrames)

@@ -58,6 +58,8 @@ public enum MatchEvent: Equatable {
     case floGained(player: Int, amount: Int, at: Vec2)
     /// The ball knocked out of `player`'s hands by `by`.
     case popped(player: Int, by: Int)
+    /// The ball taken out of `from`'s hands by `player`'s snatch: a steal, for the announcer.
+    case stolen(player: Int, from: Int)
     /// Flight B411's cart rolled into a body, where it was.
     case cartHit(player: Int, at: Vec2)
     /// Flight B411's cart sent rolling by a slash.

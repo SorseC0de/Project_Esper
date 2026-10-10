@@ -135,6 +135,11 @@ extension FlowState {
                 self?.objectWillChange.send()
             }
         }
+        // The port-in sound as the two arrive at the ball in the middle, their drift done.
+        DispatchQueue.main.asyncAfter(deadline: .now() + CustomizeScreen.driftDelaySeconds + CustomizeScreen.driftSeconds) { [weak self] in
+            guard let self, self.customizeOpen, self.customizeLaunch != nil else { return }
+            SoundBoard.shared.play(.portIn)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + FlowState.launchSeconds) { [weak self] in
             guard let self, self.customizeOpen, self.customizeLaunch != nil else { return }
             self.transition { [weak self] in

@@ -36,6 +36,18 @@ struct GameView: View {
             }
             HudView(scene: flow.scene)
                 .ignoresSafeArea()
+            // The stage preview's name over its big panel, low in it, in FLO lettering.
+            if let title = flow.previewTitle {
+                GeometryReader { geometry in
+                    let fit = MangaPage.fit(in: geometry.size)
+                    let box = MangaPage.bounds(MangaPage.bigPanel)
+                    FloText(title, height: geometry.size.height * MangaPage.titleHeight, maxWidth: box.width * fit.scale * 0.85)
+                        .position(x: fit.origin.x + box.midX * fit.scale, y: fit.origin.y + (box.maxY - box.height * 0.16) * fit.scale)
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .transition(.scale(scale: 1.4).combined(with: .opacity))
+            }
             // BALL OUT on the Z card, its bars' streaks the customize screen's top and bottom lines'.
             if let call = flow.ballOutCall, !flow.veiled {
                 GeometryReader { geometry in
@@ -75,6 +87,7 @@ struct GameView: View {
             TransitionCurtain(transition: flow.curtainStyle, cover: flow.curtain)
         }
         .animation(.easeOut(duration: 0.25), value: flow.showsTitle)
+        .animation(.spring(response: 0.35, dampingFraction: 0.6), value: flow.previewTitle)
         .animation(.easeOut(duration: 0.25), value: flow.veiled)
         .animation(.easeOut(duration: 0.2), value: flow.multiplayerOpen)
         .animation(.easeOut(duration: 0.2), value: flow.settingsOpen)

@@ -2025,6 +2025,41 @@ bridge, which is no wall (protocol 119). The starts 150 and 220 along, on
 the ground; the ball over the middle at 100. ZONES keeps the right rim, the left backboard
 rimless, the run starting on the ground. Dunks and threes as on the court.
 
+## Stage preview
+
+Before a stage's first count in a series (not ZONES), a manga page of it plays to
+`stage_preview.wav` (6.3 seconds), then the players port in and the count runs. The page is
+`_Graphic Assets/Vectors/Stages/Manga_Panels.svg` (`MangaPage`, 3750 by 2625): fitted whole to the
+screen on white, five panels filling in turn, the right side's top, middle and bottom right, the
+triangle at the bottom, then the big one on the left (at 0.15, 0.95, 1.75, 2.55 and 3.45 s). Each
+panel is a cut of the stage: it plays a few frames (24, the big one 40, a cut's own count over
+either) and freezes. The big one is the whole stage (a long one's middle, 420 by 260 units at
+most), the stage's name over it in FloText, low in the panel, springing in 0.25 s after it.
+
+How it's drawn: the flow's `.preview` (`GameScene.startPreview`, `stepPreview`, `finishPreview`):
+the session held where it is (`stopAt`, a round's first frame, the same on both phones online), a
+throwaway copy of the match (`previewMatch`, which the scene draws while it's set) with the bodies
+and the ball put out of the way, and the scene's camera on the cut playing (`previewFraming`); the
+bodies, the ball's glow and chevrons, the HUD and the count hidden, the cuts' events seen but not
+heard. The renderer (`GlowRenderer`) draws the frame off the screen, copies its middle, cut to the
+panel's shape, into that panel's picture while it plays, and lays the page on the screen with
+every panel up so far (`mangaVertex`, `mangaFragment`).
+
+The cuts (`previewShots`):
+- Flight B411: the hoopcase sliding out of a bin; the cart rolling, tipped; the chairs, panned;
+  NO DUNKING lighting up (held dark 12 frames, `signsDarkFrames`).
+- Hoopfish Hideaway: the Hoopfish swimming with the hoop, followed; the pile, panned; a school of
+  fish swimming by (`previewSchool`); bubbles going up in front of a plant (`previewBubble`).
+- K&A: the first street light flickering; along the car on the right; the white building's sign;
+  along the trash by it.
+- The Wreck Center: the hoop; the floor changing colour (one side's ball, then the other's);
+  along the three-point line, breathing; the middle platform, the view drawing back from it.
+- The Elements: a fire tornado rising out of the lava (the fourth rise); lightning striking (the
+  warning's last frames); a hoop with the rain in front of it; an icicle at the end of its hold,
+  dropping (the match run ahead to it).
+- Longball Stadium: along the field; up the goalpost from its foot; a portal opening and a helmet
+  on its way (the match run ahead to each).
+
 ## One-way slopes
 
 A wall kind of the map maker's walls mode (`StageMap.Kind.oneWayLowerRight` and

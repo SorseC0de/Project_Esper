@@ -13,6 +13,8 @@ final class FlowState: ObservableObject {
     @Published var veiled = false
     /// BALL OUT called: its Z card across the screen, once a call, gone when it's crossed.
     @Published var ballOutCall: UUID?
+    /// The stage preview's name over its big panel, once it's in.
+    @Published var previewTitle: String?
     /// The ground under the screen is the palette's black rather than the royal blue: the
     /// Greateraid pick and wait.
     @Published var blackGround = false

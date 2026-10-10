@@ -210,3 +210,27 @@ fragment float4 cube_fragment(CubeFragment in [[stage_in]],
     }
     return float4(colour, in.color.a);
 }
+
+// The stage preview's page: a panel's cut taken from the frame (a quad over the panel's own
+// texture, sampling the frame's middle), and the panels laid on the page (each a fan of
+// triangles over its picture). Positions in clip space, uv into the source.
+struct MangaVertex {
+    float2 position;
+    float2 uv;
+};
+
+struct MangaOut {
+    float4 position [[position]];
+    float2 uv;
+};
+
+vertex MangaOut mangaVertex(uint id [[vertex_id]], constant MangaVertex *vertices [[buffer(0)]]) {
+    MangaOut out;
+    out.position = float4(vertices[id].position, 0, 1);
+    out.uv = vertices[id].uv;
+    return out;
+}
+
+fragment float4 mangaFragment(MangaOut in [[stage_in]], texture2d<float> source [[texture(0)]], sampler linear [[sampler(0)]]) {
+    return float4(source.sample(linear, in.uv).rgb, 1);
+}

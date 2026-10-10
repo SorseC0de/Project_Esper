@@ -29,6 +29,7 @@ final class SoundBoard {
         case parry
         case portIn = "port_in"
         case pause
+        case stagePreview = "stage_preview"
         case slashWallClank = "slash_wallclank"
         case step
         // The announcer, levelled by the importer.

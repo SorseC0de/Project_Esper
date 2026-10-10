@@ -148,6 +148,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private var sceneDepthStencil: MTLTexture?
     private var glowA: MTLTexture?
     private var glowB: MTLTexture?
+    /// The stage preview's page: the frame drawn off the screen, each panel's picture, and the
+    /// pipeline that copies one into the other and lays the panels down.
+    private var shotTexture: MTLTexture?
+    private var panelTextures: [MTLTexture] = []
+    private let mangaPipeline: MTLRenderPipelineState
 
     init(scene: GameScene, device: MTLDevice) {
         self.scene = scene
@@ -187,6 +192,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         nearestDescriptor.sAddressMode = .clampToEdge
         nearestDescriptor.tAddressMode = .clampToEdge
         nearest = device.makeSamplerState(descriptor: nearestDescriptor)!
+        let mangaDescriptor = MTLRenderPipelineDescriptor()
+        mangaDescriptor.vertexFunction = library.makeFunction(name: "mangaVertex")
+        mangaDescriptor.fragmentFunction = library.makeFunction(name: "mangaFragment")
+        mangaDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        mangaPipeline = try! device.makeRenderPipelineState(descriptor: mangaDescriptor)
         bright = pipeline("glowBright")
         blur = pipeline("glowBlur")
         composite = pipeline("glowComposite")
@@ -231,6 +241,13 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         sceneDepthStencil = makeTexture(width: Int(size.width), height: Int(size.height), pixelFormat: .depth32Float_stencil8)
         bodyMask = makeTexture(width: Int(size.width), height: Int(size.height))
         occluderTexture = makeTexture(width: Int(size.width), height: Int(size.height))
+        shotTexture = makeTexture(width: Int(size.width), height: Int(size.height))
+        // Each panel's picture the size it's drawn on the page.
+        let fit = MangaPage.fit(in: size)
+        panelTextures = MangaPage.panels.indices.map { panel in
+            let box = MangaPage.bounds(panel)
+            return makeTexture(width: Int((box.width * fit.scale).rounded()), height: Int((box.height * fit.scale).rounded()))
+        }
         makeGlowTextures(for: size)
         scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor, insets: view.safeAreaInsets)
     }
@@ -385,8 +402,22 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             // A share of a screen pixel's width per game pixel of reach.
             uniforms.wave = SIMD4(Float(wave.reach) / Float(max(view.drawableSize.width, 1)), Float(wave.waves), Float(wave.phase), Float(wave.calmTop))
         }
-        pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms,
-             then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)
+        if let page = scene.mangaPage, let shotTexture, panelTextures.count == MangaPage.panels.count {
+            // The stage preview: the frame drawn off the screen, the playing panel's cut taken
+            // from its middle, and the page laid on the screen in the stage's place.
+            let shotPass = MTLRenderPassDescriptor()
+            shotPass.colorAttachments[0].texture = shotTexture
+            shotPass.colorAttachments[0].loadAction = .dontCare
+            shotPass.colorAttachments[0].storeAction = .store
+            pass(commands, pipeline: composite, descriptor: shotPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms)
+            if let live = page.live, panelTextures.indices.contains(live) {
+                capture(commands, from: shotTexture, into: panelTextures[live], panel: live, screen: view.drawableSize)
+            }
+            layPage(commands, descriptor: screenPass, shown: page.shown, screen: view.drawableSize)
+        } else {
+            pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms,
+                 then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)
+        }
 
         commands.present(drawable)
         commands.commit()
@@ -565,6 +596,58 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         var uniforms = camGlowUniforms(ballCamGlowA ?? texture)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<GlowUniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+    }
+
+    /// A panel's cut: the frame's middle, as wide or as tall as the frame, at the panel's shape,
+    /// into the panel's picture.
+    private func capture(_ commands: MTLCommandBuffer, from frame: MTLTexture, into panel: MTLTexture, panel index: Int, screen: CGSize) {
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = panel
+        descriptor.colorAttachments[0].loadAction = .dontCare
+        descriptor.colorAttachments[0].storeAction = .store
+        guard let encoder = commands.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        let share = MangaPage.cropShare(index, screen: screen)
+        let left = Float((1 - share.width) / 2), top = Float((1 - share.height) / 2)
+        let right = left + Float(share.width), bottom = top + Float(share.height)
+        var corners: [SIMD4<Float>] = [
+            SIMD4(-1, 1, left, top), SIMD4(1, 1, right, top), SIMD4(-1, -1, left, bottom), SIMD4(1, -1, right, bottom),
+        ]
+        encoder.setRenderPipelineState(mangaPipeline)
+        encoder.setVertexBytes(&corners, length: MemoryLayout<SIMD4<Float>>.stride * corners.count, index: 0)
+        encoder.setFragmentTexture(frame, index: 0)
+        encoder.setFragmentSamplerState(sampler, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        encoder.endEncoding()
+    }
+
+    /// The page on the screen: its ground, and the first `shown` panels, each its picture.
+    private func layPage(_ commands: MTLCommandBuffer, descriptor: MTLRenderPassDescriptor, shown: Int, screen: CGSize) {
+        let ground = MangaPage.ground
+        descriptor.colorAttachments[0].loadAction = .clear
+        descriptor.colorAttachments[0].clearColor = MTLClearColor(red: Double((ground >> 16) & 0xFF) / 255, green: Double((ground >> 8) & 0xFF) / 255,
+                                                                  blue: Double(ground & 0xFF) / 255, alpha: 1)
+        guard let encoder = commands.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        encoder.setRenderPipelineState(mangaPipeline)
+        encoder.setFragmentSamplerState(sampler, index: 0)
+        let fit = MangaPage.fit(in: screen)
+        for panel in 0..<min(shown, panelTextures.count) {
+            let points = MangaPage.panels[panel]
+            let box = MangaPage.bounds(panel)
+            func vertex(_ point: CGPoint) -> SIMD4<Float> {
+                let x = (fit.origin.x + point.x * fit.scale) / screen.width * 2 - 1
+                let y = 1 - (fit.origin.y + point.y * fit.scale) / screen.height * 2
+                return SIMD4(Float(x), Float(y), Float((point.x - box.minX) / box.width), Float((point.y - box.minY) / box.height))
+            }
+            // A fan from the first corner: every panel is convex.
+            var triangles: [SIMD4<Float>] = []
+            for corner in 1..<(points.count - 1) {
+                triangles += [vertex(points[0]), vertex(points[corner]), vertex(points[corner + 1])]
+            }
+            encoder.setVertexBytes(&triangles, length: MemoryLayout<SIMD4<Float>>.stride * triangles.count, index: 0)
+            encoder.setFragmentTexture(panelTextures[panel], index: 0)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: triangles.count)
+        }
+        encoder.endEncoding()
     }
 
     private func pass(_ commands: MTLCommandBuffer, pipeline: MTLRenderPipelineState, descriptor: MTLRenderPassDescriptor,

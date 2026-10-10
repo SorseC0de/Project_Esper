@@ -44,7 +44,8 @@ final class GameScene: SKScene {
     /// confirms at once; online the other phone's inputs arrive by frame and the sim
     /// rolls back when a prediction was wrong.
     private var session = RollbackSession(match: Match(stage: .court, countdown: GameScene.countdownFrames), localIndex: 0)
-    private var match: Match { session.match }
+    /// The match drawn: the session's, or while the stage preview plays, its throwaway one.
+    private var match: Match { previewMatch ?? session.match }
     /// The computer on the other side, when the AI switch is on; never online.
     private var opponent = Opponent(index: 1)
     /// VS CPU: the computer plays player 2, whatever pads are in; off, player 2 is the
@@ -78,7 +79,7 @@ final class GameScene: SKScene {
 
     /// The game loop round the sim: the title, the stage select, a best of seven, a drink
     /// between rounds for whoever was scored on, the pause, and the win.
-    private enum Flow { case title, stageSelect, playing, picking, paused, won }
+    private enum Flow { case title, stageSelect, preview, playing, picking, paused, won }
     private var flow = Flow.title
     private var series = Series(seed: 1)
     /// What the match is played to; online, the host's.
@@ -128,6 +129,18 @@ final class GameScene: SKScene {
     /// Title lettering over the court: the count, BALL OUT, BUCKET, what the computer
     /// drank, one after another; the round circles; and each side's drinks beside them.
     private let banner = SKSpriteNode()
+    /// The stage preview before a stage's first count: the throwaway match its cuts are drawn
+    /// from, the page the renderer lays down, its cuts and how far it's got, the stage it was
+    /// last played for, and the camera's framing of the cut playing.
+    private var previewMatch: Match?
+    var mangaPage: MangaPageFrame?
+    private var stagePreview: StagePreview?
+    private var previewedStage: StageChoice?
+    private var previewFraming: (centre: CGPoint, scale: CGFloat)?
+    /// Flight B411's NO DUNKING sign held dark, frames left, for its cut's lighting up.
+    private var signsDarkFrames = 0
+    /// The three-point arcs as they were before a cut showed them.
+    private var arcsWereHidden: Bool?
     /// The ball's circle round a body changing into FloState with it, in art pixels: ORBIT
     /// RADIUS on the strip, kept.
     static let orbitRadiusKey = "esper.transform.orbitRadius"
@@ -593,7 +606,7 @@ final class GameScene: SKScene {
         // Flight B411's NO DUNKING sign and its red "no", glowing through the backdrop's flat;
         // the seatbelt sign, and the 2X or the 3X, while lit.
         guard let holder = noDunkingNode, !holder.isHidden else { return [] }
-        let lit = [true, true, seatbeltLit, match.pointMultiplier == 2, match.pointMultiplier == 3]
+        let lit = [signsDarkFrames == 0, signsDarkFrames == 0, seatbeltLit, match.pointMultiplier == 2, match.pointMultiplier == 3]
         let glowing = noDunkingSprites.indices.filter { $0 < lit.count && lit[$0] }.map { noDunkingSprites[$0] }
         return glowing.compactMap { sprite in
             sprite.texture.map { BodySnapshot(texture: $0, position: CGPoint(x: holder.position.x + sprite.position.x * holder.xScale, y: holder.position.y + sprite.position.y * holder.yScale),
@@ -3453,6 +3466,7 @@ final class GameScene: SKScene {
             }
         }
         if flow == .stageSelect { tickStageSelect(inputs) }
+        if flow == .preview { stepPreview(accumulator) }
         if flow != .playing {
             // A screen is up: the stick moves its cursor and jump picks; the sim waits. On
             // the title, which the SwiftUI layer draws, the stick moves the title's cursor.
@@ -3695,6 +3709,7 @@ final class GameScene: SKScene {
     private func startSeries(seed: UInt32) {
         pendingFlow = nil
         heldBanner = nil
+        previewedStage = nil
         series = Series(seed: seed)
         if gameMode == .zones {
             // Who leads is the coin's; two people pass the device, or one plays both sides, or
@@ -3972,6 +3987,7 @@ final class GameScene: SKScene {
         }
         pendingFlow = nil
         heldBanner = nil
+        previewedStage = nil
         series = Series(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
         series.stage = firstStage
         startRound()
@@ -4194,6 +4210,8 @@ final class GameScene: SKScene {
     /// Both bodies ported in at their spawns in a flash cluster in their colours, hidden
     /// until it's up.
     private func bringPlayersIn() {
+        // The preview first: the players come in once it's played.
+        guard stagePreview == nil, !previewDue else { return }
         roundIntro = 12
         // Once for both, as loud as the nearer of the two is.
         let nearest = match.players.map { audibility(at: $0.position) }.max() ?? 1
@@ -4470,6 +4488,8 @@ final class GameScene: SKScene {
     private var fortySevenScores = [0, 0]
 
     private func enter(_ next: Flow) {
+        // A stage's first count waits for its preview.
+        if next == .playing, previewDue, startPreview() { return }
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
         ballCamFrame.isHidden = next != .playing
         if next == .title { zonesEnd() }
@@ -4697,7 +4717,7 @@ final class GameScene: SKScene {
                                onAgain: { [weak self] in self?.playAgain() },
                                onTitle: { [weak self] in self?.leaveToTitle() })
             if online?.rematchRandom != nil { (screen as? WinScreen)?.showWaiting() }
-        case .playing:
+        case .playing, .preview:
             break
         }
         if let screen { hud.addChild(screen) }
@@ -5264,8 +5284,11 @@ final class GameScene: SKScene {
     }
 
     private func show(_ events: [MatchEvent]) {
-        playSounds(events)
-        exclaim(events)
+        // The preview's cuts are seen, not heard: its own sound plays under them.
+        if previewMatch == nil {
+            playSounds(events)
+            exclaim(events)
+        }
         for event in events {
             switch event {
             case .zBurst(let player, let at):
@@ -6912,6 +6935,11 @@ final class GameScene: SKScene {
         noDunkingNode?.setScale(FlightB411Art.signScale)
         // The seatbelt sign lit while the ball's shut in its bin, off once it drops.
         if noDunkingSprites.count == 5 {
+            // Held dark for the preview's cut, then lit.
+            for sprite in noDunkingSprites.prefix(2) {
+                sprite.color = .black
+                sprite.colorBlendFactor = signsDarkFrames > 0 ? 0.8 : 0
+            }
             noDunkingSprites[2].texture = seatbeltLit ? FlightB411Art.seatbelt : FlightB411Art.seatbeltOff
             noDunkingSprites[3].texture = FlightB411Art.multiplierSign(2, lit: match.pointMultiplier == 2)
             noDunkingSprites[4].texture = FlightB411Art.multiplierSign(3, lit: match.pointMultiplier == 3)
@@ -7984,7 +8012,7 @@ final class GameScene: SKScene {
 
         let ball = match.ball
         // Flight B411's ball, shut in its bin through the count, unseen till the bin opens.
-        ballNode.isHidden = ball.holder != nil || match.ballBin != nil
+        ballNode.isHidden = ball.holder != nil || match.ballBin != nil || previewMatch != nil
         ballNode.position = SpriteLibrary.point(ball.position)
         // On the Hoopfish's antenna it nods with it.
         if match.hoopfish?.carrying == .ball, ball.holder == nil { ballNode.position = hoopfishNod(0).turn(ballNode.position) }
@@ -8080,6 +8108,15 @@ final class GameScene: SKScene {
                 cameraNode.setScale(cameraBaseScale)
             }
             glowHud.setScale(cameraNode.xScale * hudScale)
+        }
+        // The stage preview's cut playing: the camera on it, level.
+        if let framing = previewFraming {
+            cameraNode.position = framing.centre
+            cameraNode.setScale(framing.scale)
+            cameraNode.zRotation = 0
+            skyNode.position = cameraNode.position
+            skyNode.zRotation = 0
+            skyNode.setScale(framing.scale)
         }
         glowHud.position = cameraNode.position
         ballTrail.position = ballNode.position
@@ -8247,7 +8284,11 @@ final class GameScene: SKScene {
         // The count in title lettering, BALL OUT as it ends, and any other banner for its frames.
         // With a screen up or on its way, the count waits: it starts again as play comes back.
         let counting = flow == .playing && pendingFlow == nil
-        if match.countdown > 0, !counting {
+        if previewMatch != nil {
+            // The stage preview: no count, no banner; the session's count waits for it.
+            banner.isHidden = true
+            hideCount()
+        } else if match.countdown > 0, !counting {
             // BUCKET and the rest play out meanwhile.
             hideCount()
             tickBanner()
@@ -8272,7 +8313,13 @@ final class GameScene: SKScene {
         } else {
             tickBanner()
         }
-        lastCount = match.countdown
+        if previewMatch == nil { lastCount = match.countdown }
+        // The stage preview shows the stage alone: no bodies, no ball's glow or chevrons.
+        bodies.isHidden = previewMatch != nil
+        if previewMatch != nil {
+            ballHalo.isHidden = true
+            for chevron in chevrons + targetChevrons + [opponentChevron] { chevron.isHidden = true }
+        }
         if roundIntro > 0 {
             for index in match.players.indices {
                 playerNodes[index].isHidden = true
@@ -8479,5 +8526,395 @@ final class GameScene: SKScene {
         }
         #endif
         controls?.ended(touch)
+    }
+}
+
+// MARK: - The stage preview
+
+/// One cut of the stage preview: what of the stage it shows (its middle, in units, asked again
+/// each frame so a cut can follow something, and how much, in units, the panel fitted round
+/// it), how it moves over the frames it plays (a pan, in units, and a zoom, the view's size
+/// times this by the end), how long it plays before it freezes, and what's set going for it:
+/// on the throwaway match before it plays, on it each frame, and on the view as it starts and
+/// each frame.
+private struct PreviewShot {
+    var centre: (Match) -> Vec2
+    var view: CGSize
+    var pan = Vec2.zero
+    var zoom: CGFloat = 1
+    var frames: Int?
+    var prepare: (inout Match) -> Void = { _ in }
+    var tick: ((inout Match, Int) -> Void)?
+    var begin: ((GameScene) -> Void)?
+    var everyFrame: ((GameScene, Int) -> Void)?
+
+    init(at centre: Vec2, view: CGSize, pan: Vec2 = .zero, zoom: CGFloat = 1, frames: Int? = nil) {
+        self.centre = { _ in centre }
+        self.view = view
+        self.pan = pan
+        self.zoom = zoom
+        self.frames = frames
+    }
+
+    init(following centre: @escaping (Match) -> Vec2, view: CGSize, frames: Int? = nil) {
+        self.centre = centre
+        self.view = view
+        self.frames = frames
+    }
+}
+
+/// The preview under way: its cuts, the seconds it's played, the panel up last and the frames
+/// its cut has played, and the clock its throwaway match steps by.
+private struct StagePreview {
+    var shots: [PreviewShot]
+    var base: Match
+    var title: String
+    var elapsed = 0.0
+    var panel = -1
+    var liveFrame = 0
+    var stepClock = 0.0
+}
+
+extension GameScene {
+    /// The stage's preview is owed: its first count in this series, a stage with cuts, not ZONES.
+    fileprivate var previewDue: Bool {
+        stagePreview == nil && previewedStage != series.stage && zones == nil && gameMode != .zones
+            && GameScene.previewLooks.contains(series.stage.stage.features.look)
+    }
+    /// The stages with a preview.
+    fileprivate static let previewLooks: [StageLook] = [.flightB411, .hoopfishHideaway, .kAndA, .court, .elements, .footballField]
+
+    /// Into the preview in play's place: the session held where it is (the same frame on both
+    /// phones online, a round's first), a throwaway copy of the match for the cuts, its bodies
+    /// and ball put out of the way, and its sound. False if this stage has none.
+    fileprivate func startPreview() -> Bool {
+        let shots = previewShots(for: series.stage.stage.features.look)
+        guard !shots.isEmpty else { return false }
+        previewedStage = series.stage
+        session.stopAt = session.match.frame
+        var base = session.match
+        base.countdown = 0
+        base.ballBin = nil
+        for index in base.players.indices {
+            base.players[index].position = Vec2(x: -400, y: -400)
+            base.players[index].frozen = 1_000_000
+        }
+        base.ball.respawn(at: Vec2(x: -600, y: -600))
+        base.ball.frozen = 1_000_000
+        stagePreview = StagePreview(shots: shots, base: base, title: series.stage.name.uppercased())
+        flow = .preview
+        flowState?.showsTitle = false
+        presentScreen()
+        hud.isHidden = true
+        glowHud.isHidden = true
+        mangaPage = MangaPageFrame(shown: 0, live: nil)
+        SoundBoard.shared.play(.stagePreview)
+        return true
+    }
+
+    /// A frame of the preview, `delta` seconds on: the next panel in when it's due, the cut
+    /// playing stepped and framed, the name over the big panel, and play once it's all done.
+    fileprivate func stepPreview(_ delta: Double) {
+        guard var state = stagePreview else { return }
+        state.elapsed += delta
+        let due = MangaPage.starts.lastIndex { $0 <= state.elapsed } ?? -1
+        if due > state.panel, state.shots.indices.contains(due) {
+            state.panel = due
+            state.liveFrame = 0
+            var match = state.base
+            state.shots[due].prepare(&match)
+            previewMatch = match
+            state.shots[due].begin?(self)
+        }
+        guard state.panel >= 0 else {
+            stagePreview = state
+            return
+        }
+        let shot = state.shots[state.panel]
+        let frames = shot.frames ?? (state.panel == MangaPage.bigPanel ? MangaPage.bigLiveFrames : MangaPage.liveFrames)
+        state.stepClock += delta
+        while state.stepClock >= GameScene.stepSeconds {
+            state.stepClock -= GameScene.stepSeconds
+            guard state.liveFrame < frames, var match = previewMatch else { continue }
+            shot.tick?(&match, state.liveFrame)
+            match.advance(inputs: match.players.map { _ in .idle })
+            previewMatch = match
+            show(match.events)
+            shot.everyFrame?(self, state.liveFrame)
+            state.liveFrame += 1
+            if signsDarkFrames > 0 { signsDarkFrames -= 1 }
+        }
+        // Framed on the cut: its middle and how much of it, moved along its pan and zoom.
+        let progress = CGFloat(min(Double(state.liveFrame) / Double(max(frames, 1)), 1))
+        let centre = shot.centre(match) + shot.pan * Double(progress)
+        let view = shot.view.scaled(by: 1 + (shot.zoom - 1) * progress)
+        let crop = MangaPage.cropShare(state.panel, screen: size)
+        let ppu = CGFloat(SpriteLibrary.pixelsPerUnit)
+        let scale = max(view.width * ppu / max(size.width * crop.width, 1), view.height * ppu / max(size.height * crop.height, 1))
+        previewFraming = (SpriteLibrary.point(centre), scale)
+        mangaPage = MangaPageFrame(shown: state.panel + 1, live: state.liveFrame <= frames ? state.panel : nil)
+        if state.panel == MangaPage.bigPanel, state.elapsed >= MangaPage.starts[MangaPage.bigPanel] + MangaPage.titleDelay,
+           flowState?.previewTitle == nil {
+            flowState?.previewTitle = state.title
+        }
+        stagePreview = state
+        if state.elapsed >= MangaPage.length { finishPreview() }
+    }
+
+    /// Out of the preview: everything it set aside back, the session let go, the players in, and the count.
+    private func finishPreview() {
+        stagePreview = nil
+        previewMatch = nil
+        previewFraming = nil
+        mangaPage = nil
+        signsDarkFrames = 0
+        flowState?.previewTitle = nil
+        if let hidden = arcsWereHidden { threePointArcs.isHidden = hidden }
+        arcsWereHidden = nil
+        hud.isHidden = false
+        glowHud.isHidden = false
+        // The camera back to the stage's own framing: only Flight B411 sets its zoom each frame.
+        cameraNode.setScale(cameraBaseScale)
+        cameraNode.position = cameraBase
+        glowHud.setScale(cameraNode.xScale * hudScale)
+        session.stopAt = nil
+        lastCount = match.countdown
+        bringPlayersIn()
+        enter(.playing)
+    }
+
+    // MARK: The cuts, stage by stage
+
+    /// Four cuts and the whole stage, for the stages that have them.
+    fileprivate func previewShots(for look: StageLook) -> [PreviewShot] {
+        let stage = series.stage.stage
+        // The big panel: the whole stage, or as much of a long one as reads.
+        let whole = PreviewShot(at: Vec2(x: stage.width / 2, y: stage.height / 2),
+                                view: CGSize(width: min(stage.width, 420), height: min(stage.height, 260)))
+        switch look {
+        case .flightB411: return flightB411Shots() + [whole]
+        case .hoopfishHideaway: return hoopfishShots() + [whole]
+        case .kAndA: return kAndAShots() + [whole]
+        case .court: return wreckCenterShots() + [whole]
+        case .elements: return elementsShots() + [whole]
+        case .footballField: return longballShots() + [whole]
+        default: return []
+        }
+    }
+
+    private func flightB411Shots() -> [PreviewShot] {
+        let bin = 3
+        // The hoopcase sliding out of a bin.
+        var hoopcase = PreviewShot(at: Vec2(x: FlightB411Rules.binCentre(bin), y: FlightB411Rules.binBottom - 6),
+                                   view: CGSize(width: 34, height: 30), frames: 30)
+        hoopcase.prepare = { match in
+            for index in match.bins.indices {
+                match.bins[index].open = false
+                match.bins[index].load = .empty
+                match.bins[index].caseFrames = 0
+                match.bins[index].retreating = false
+            }
+            if match.bins.indices.contains(bin) {
+                match.bins[bin].open = true
+                match.bins[bin].load = .hoop
+                match.bins[bin].framesLeft = 100_000
+            }
+            match.lastBin = bin
+        }
+        // The cart rolling, tipped into the way it goes.
+        var cart = PreviewShot(following: { match in match.cart.map { Vec2(x: $0.box.center.x, y: $0.box.center.y + 4) } ?? .zero },
+                               view: CGSize(width: 40, height: 32), frames: 32)
+        cart.prepare = { match in
+            guard var rolling = match.cart else { return }
+            let left = 40.0
+            rolling.box = Box(min: Vec2(x: left, y: rolling.box.min.y), max: Vec2(x: left + FlightB411Rules.cartSize.x, y: rolling.box.max.y))
+            rolling.velocity = FlightB411Rules.cartTopSpeed
+            match.cart = rolling
+            match.refreshExtras()
+        }
+        // The chairs, panned along.
+        let chairs = PreviewShot(at: Vec2(x: 34, y: 24), view: CGSize(width: 42, height: 30), pan: Vec2(x: 34, y: 0), frames: 36)
+        // NO DUNKING lighting up.
+        var sign = PreviewShot(at: Vec2(x: FlightB411Rules.width / 2, y: 80), view: CGSize(width: 34, height: 18), frames: 30)
+        sign.begin = { scene in scene.signsDarkFrames = 12 }
+        return [hoopcase, cart, chairs, sign]
+    }
+
+    private func hoopfishShots() -> [PreviewShot] {
+        let map = StageMap.current[.hoopfishHideaway]
+        // The Hoopfish swimming with the hoop on its antenna, a while into its swim.
+        var fish = PreviewShot(following: { match in match.hoopfish.map { $0.antenna + Vec2(x: 0, y: -10) } ?? .zero },
+                               view: CGSize(width: 80, height: 50), frames: 32)
+        fish.prepare = { match in
+            match.hoopfish?.carrying = .hoop
+            for _ in 0..<90 { match.advance(inputs: match.players.map { _ in .idle }) }
+        }
+        // The pile of hoops and backboards.
+        let pieces = map.pile
+        let pileMiddle = pieces.isEmpty ? CGPoint(x: 296, y: 60)
+            : CGPoint(x: pieces.map { CGFloat($0.x) }.reduce(0, +) / CGFloat(pieces.count), y: pieces.map { CGFloat($0.y) }.reduce(0, +) / CGFloat(pieces.count))
+        let pile = PreviewShot(at: Vec2(x: Double(pileMiddle.x) / Double(SpriteLibrary.pixelsPerUnit), y: Double(pileMiddle.y) / Double(SpriteLibrary.pixelsPerUnit)),
+                               view: CGSize(width: 90, height: 60), pan: Vec2(x: 12, y: 0), frames: 30)
+        // A school of fish swimming by.
+        let schoolAt = Vec2(x: 185, y: 120)
+        var school = PreviewShot(at: schoolAt, view: CGSize(width: 110, height: 60), frames: 36)
+        school.begin = { scene in scene.previewSchool(at: SpriteLibrary.point(schoolAt)) }
+        // Bubbles going up in front of a plant.
+        let plant = map.props.first { [.plant1, .plant2, .plant3, .plant4, .plant5].contains($0.kind) }
+        let plantFoot = plant.map { Vec2(x: (Double($0.cell.column) + 1) * Stage.tileSize, y: Double($0.cell.row) * Stage.tileSize) } ?? Vec2(x: 60, y: 20)
+        var bubbles = PreviewShot(at: plantFoot + Vec2(x: 0, y: 18), view: CGSize(width: 50, height: 40), frames: 36)
+        bubbles.everyFrame = { scene, frame in
+            if frame % 3 == 0 { scene.previewBubble(at: SpriteLibrary.point(plantFoot + Vec2(x: Double.random(in: -12...12), y: Double.random(in: 0...10)))) }
+        }
+        return [fish, pile, school, bubbles]
+    }
+
+    private func kAndAShots() -> [PreviewShot] {
+        let unit = 0.625
+        // A street light flickering.
+        let lamp = KAndARules.lampXs.first ?? 45
+        var light = PreviewShot(at: Vec2(x: lamp, y: KAndARules.lampBottom - 16), view: CGSize(width: 44, height: 46), frames: 36)
+        light.begin = { scene in if !scene.lampFlicker.isEmpty { scene.lampFlicker[0] = 30 } }
+        // Along the car on the right.
+        let car = PreviewShot(at: Vec2(x: 392 * unit, y: 64 * unit), view: CGSize(width: 44, height: 30), pan: Vec2(x: 46, y: 0), frames: 36)
+        // The white building's sign.
+        let sign = PreviewShot(at: Vec2(x: 201 * unit, y: 114 * unit), view: CGSize(width: 76, height: 34), frames: 28)
+        // Along the trash by the white building.
+        let trash = PreviewShot(at: Vec2(x: 196 * unit, y: 58 * unit), view: CGSize(width: 40, height: 28), pan: Vec2(x: 52, y: 0), frames: 36)
+        return [light, car, sign, trash]
+    }
+
+    private func wreckCenterShots() -> [PreviewShot] {
+        let court = series.stage.stage
+        let rim = court.hoops.first { $0.backboard == .right }?.position ?? Vec2(x: 287, y: 95)
+        // The hoop.
+        let hoop = PreviewShot(at: rim + Vec2(x: 2, y: 8), view: CGSize(width: 56, height: 46), frames: 28)
+        // The floor changing colour: one side's ball, then the other's.
+        var floor = PreviewShot(at: Vec2(x: court.width / 2, y: 18), view: CGSize(width: 120, height: 40), frames: 40)
+        floor.prepare = { match in
+            match.ball.owned = true
+            match.ball.lastTouched = 0
+        }
+        floor.tick = { match, frame in if frame == 14 { match.ball.lastTouched = 1 } }
+        // Along the three-point line, breathing.
+        let radius = FortySevenRules.threePointRadius(for: Hoop(position: rim, owner: 0, backboard: .right), on: court)
+        var arc = PreviewShot(at: Vec2(x: rim.x - radius, y: 24), view: CGSize(width: 70, height: 44),
+                              pan: Vec2(x: radius * 0.6, y: radius * 0.7), frames: 40)
+        arc.begin = { scene in
+            if scene.arcsWereHidden == nil { scene.arcsWereHidden = scene.threePointArcs.isHidden }
+            scene.threePointArcs.isHidden = false
+        }
+        // The platform in the middle, the view drawing back from it.
+        let platform = PreviewShot(at: Vec2(x: court.width / 2, y: 38), view: CGSize(width: 50, height: 30), zoom: 3.5, frames: 40)
+        return [hoop, floor, arc, platform]
+    }
+
+    private func elementsShots() -> [PreviewShot] {
+        let stage = series.stage.stage
+        // A fire tornado rising out of the lava: the fourth rise is a fire one.
+        let cycle = TornadoRules.cycleFrames
+        let fireRise = 2 * cycle + TornadoRules.upFrames + TornadoRules.burstFrames + TornadoRules.underFrames - 4
+        let tornado = stage.tornados.first.map { Vec2(x: $0.center.x, y: $0.min.y + 18) } ?? Vec2(x: stage.width / 2, y: 60)
+        var fire = PreviewShot(at: tornado, view: CGSize(width: 70, height: 90), frames: 38)
+        fire.prepare = { match in match.frame = fireRise }
+        // Lightning striking a rock: the warning's last frames, then the bolt.
+        let strikeFrame = LightningRules.everyFrames + LightningRules.warningFrames - 14
+        var probe = Match(stage: stage)
+        probe.frame = strikeFrame
+        let strikeAt = probe.lightningWarning?.target ?? Vec2(x: stage.width / 2, y: 40)
+        var lightning = PreviewShot(at: strikeAt + Vec2(x: 0, y: 26), view: CGSize(width: 60, height: 70), frames: 34)
+        lightning.prepare = { match in match.frame = strikeFrame }
+        // A hoop with the rain in front of it.
+        let rim = stage.hoops.last?.position ?? Vec2(x: stage.width - 60, y: 100)
+        let hoop = PreviewShot(at: rim + Vec2(x: 0, y: 6), view: CGSize(width: 60, height: 48), frames: 28)
+        // An icicle at the end of its hold, shaking and dropping: the match run ahead to it.
+        var icicleAt = Vec2(x: stage.width / 2, y: stage.height - 20)
+        var icicleFrame = 0
+        var ahead = Match(stage: stage)
+        ahead.countdown = 0
+        for index in ahead.players.indices { ahead.players[index].frozen = 1_000_000; ahead.players[index].position = Vec2(x: -400, y: -400) }
+        search: for _ in 0..<1200 {
+            ahead.advance(inputs: ahead.players.map { _ in .idle })
+            for (index, icicle) in ahead.icicles.enumerated() where icicle.formedAt != nil && icicle.dropAt - ahead.frame == 24 {
+                icicleFrame = ahead.frame
+                if stage.icicleSockets.indices.contains(index) { icicleAt = stage.icicleSockets[index] }
+                break search
+            }
+        }
+        let snapshot = ahead
+        var icicle = PreviewShot(at: icicleAt + Vec2(x: 0, y: -26), view: CGSize(width: 46, height: 64), pan: Vec2(x: 0, y: -14), frames: 48)
+        icicle.prepare = { match in
+            guard icicleFrame > 0 else { return }
+            match = snapshot
+        }
+        return [fire, lightning, hoop, icicle]
+    }
+
+    private func longballShots() -> [PreviewShot] {
+        let stage = series.stage.stage
+        let rim = stage.hoops.last?.position ?? Vec2(x: stage.width - Stage.fieldRimInset, y: Stage.fieldRimHeight)
+        // Along the field.
+        let field = PreviewShot(at: Vec2(x: stage.width / 2 - 140, y: 40), view: CGSize(width: 150, height: 80), pan: Vec2(x: 200, y: 0), frames: 40)
+        // Up the goalpost from its foot.
+        let post = PreviewShot(at: Vec2(x: rim.x + 6, y: 24), view: CGSize(width: 46, height: 52), pan: Vec2(x: 0, y: rim.y - 24), frames: 40)
+        // The field run ahead to a portal opening and a helmet on its way, each shown from there.
+        var ahead = Match(stage: stage)
+        ahead.countdown = 0
+        for index in ahead.players.indices { ahead.players[index].frozen = 1_000_000; ahead.players[index].position = Vec2(x: -400, y: -400) }
+        ahead.ball.respawn(at: Vec2(x: -600, y: -600))
+        ahead.ball.frozen = 1_000_000
+        var portalAt: Vec2?
+        var portalMatch: Match?
+        var helmetMatch: Match?
+        for _ in 0..<2400 where portalMatch == nil || helmetMatch == nil {
+            let before = ahead
+            ahead.advance(inputs: ahead.players.map { _ in .idle })
+            for event in ahead.events {
+                if case .portalOpened(let at) = event, portalMatch == nil {
+                    portalAt = at
+                    portalMatch = before
+                }
+                if case .helmetSpawned = event, helmetMatch == nil {
+                    // On its way a little first, so it's in the open.
+                    var going = ahead
+                    for _ in 0..<40 { going.advance(inputs: going.players.map { _ in .idle }) }
+                    helmetMatch = going
+                }
+            }
+        }
+        var portal = PreviewShot(at: portalAt ?? Vec2(x: stage.width / 2, y: 60), view: CGSize(width: 60, height: 54), frames: 36)
+        portal.prepare = { match in if let portalMatch { match = portalMatch } }
+        var helmet = PreviewShot(following: { match in match.helmets.first?.box.center ?? Vec2(x: stage.width / 2, y: 60) },
+                                 view: CGSize(width: 60, height: 44), frames: 36)
+        helmet.prepare = { match in if let helmetMatch { match = helmetMatch } }
+        return [field, post, portal, helmet]
+    }
+
+    // MARK: What the cuts set going in the view
+
+    /// A school of fish across a cut, from its left, swimming right.
+    fileprivate func previewSchool(at centre: CGPoint) {
+        let sheet = seaLifeFrames(.fish)
+        guard !sheet.isEmpty else { return }
+        let frames = fishFrames(colour: Int.random(in: 0..<2), sheet: sheet)
+        for member in 0..<5 {
+            let node = SKSpriteNode(texture: frames[0])
+            node.position = CGPoint(x: centre.x - 60 + CGFloat(member) * 14, y: centre.y + .random(in: -14...14))
+            node.zPosition = GameScene.seaLifeZ
+            stageGround.addChild(node)
+            swimmers.append(Swimmer(kind: .fish, node: node, frames: frames, baseY: node.position.y, age: 0,
+                                    speed: CGFloat.random(in: 34...40), bob: .random(in: 2...4), bobRate: .random(in: 0.2...0.4),
+                                    phase: .random(in: 0...GameScene.breathSeconds)))
+        }
+    }
+
+    /// A bubble in front of everything, going up.
+    fileprivate func previewBubble(at point: CGPoint) {
+        let node = SKSpriteNode(texture: sprites.texture("bubbles_jellyfish", Int.random(in: 0...2)))
+        node.position = point
+        node.zPosition = 24
+        world.addChild(node)
+        bubbles.append(Bubble(node: node, baseX: point.x, age: 0, life: .random(in: 1.5...2.5), rise: .random(in: 14...24),
+                              wobble: .random(in: 1...2), wobbleRate: .random(in: 0.5...1)))
     }
 }

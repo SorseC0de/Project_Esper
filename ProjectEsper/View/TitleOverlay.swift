@@ -231,8 +231,8 @@ final class FlowState: ObservableObject {
         switch multiplayerPage {
         case .menu:
             let matches: [MultiplayerItem] = zonesOnlinePicked ? net.turnMatches.map { .turnMatch($0.matchID) } : []
-            return FlowState.onlineModes.map { .mode($0) } + [.playNow, .inviteFriend] + matches + [.back]
-        case .friends: return net.friends.map { .friend($0.gamePlayerID) } + [.back]
+            return FlowState.onlineModes.map { .mode($0) } + [.playNow, .inviteFriend] + matches
+        case .friends: return net.friends.map { .friend($0.gamePlayerID) }
         }
     }
 
@@ -337,7 +337,8 @@ final class FlowState: ObservableObject {
         }
         if multiplayerPage == .friends {
             multiplayerPage = .menu
-            multiplayerCursor = 1
+            // Back on INVITE A FRIEND, past the modes and PLAY NOW.
+            multiplayerCursor = FlowState.onlineModes.count + 1
         } else {
             multiplayerOpen = false
         }
@@ -390,9 +391,10 @@ final class FlowState: ObservableObject {
         case .tuning:
             tuningOpen.toggle()
         case .titleFont:
-            // A/B: the lettering and the small switches in Bigdex or the rounded face.
-            TitleText.bigdex.toggle()
+            // The menus' face on to the next, A to K round (`Futuristic.typefaces`), everything in it drawn again.
+            Futuristic.typefacePick = (Futuristic.typefacePick + 1) % Futuristic.typefaces.count
             SoundBoard.shared.play(SoundBoard.navigate)
+            UITuning.shared.touch()
             objectWillChange.send()
         case .settings:
             SoundBoard.shared.play(SoundBoard.confirm)
@@ -414,7 +416,7 @@ final class FlowState: ObservableObject {
 enum TitleItem: Hashable {
     case bestOfSeven, fortySeven, zones, vsCPU, vsHuman, multiplayer
     case tuning
-    /// The A/B of the title's lettering: the rounded face or Bigdex.
+    /// The menus' face, stepped on A to K.
     case titleFont
     /// The gear in the upper right corner, opening the settings.
     case settings
@@ -549,9 +551,9 @@ struct TitleOverlay: View {
     static let fortySevenScale: CGFloat = 0.66
     static let arrowScale: CGFloat = 0.6
     /// MULTIPLAYER's icon moved and sized on the debug sliders, bottom right, kept between launches.
-    @AppStorage("titleMultiplayerIconX") private var multiplayerIconX = 0.0
+    @AppStorage("titleMultiplayerIconX") private var multiplayerIconX = 60.0
     @AppStorage("titleMultiplayerIconY") private var multiplayerIconY = 0.0
-    @AppStorage("titleMultiplayerIconScale") private var multiplayerIconScale = 1.0
+    @AppStorage("titleMultiplayerIconScale") private var multiplayerIconScale = 1.75
 
     /// The opponent row's rules, by their width in points.
     static let endRuleWidth: CGFloat = 110
@@ -621,8 +623,8 @@ struct TitleOverlay: View {
     private var frameSliders: some View {
         #if os(iOS)
         VStack(alignment: .trailing, spacing: 4) {
-            frameSlider("ICON X", $multiplayerIconX, -60...60)
-            frameSlider("ICON Y", $multiplayerIconY, -40...40)
+            frameSlider("ICON X", $multiplayerIconX, -200...200)
+            frameSlider("ICON Y", $multiplayerIconY, -100...100)
             frameSlider("ICON SCALE", $multiplayerIconScale, 0.25...2)
         }
         .padding(8)
@@ -681,7 +683,7 @@ struct TitleOverlay: View {
             }
             HStack(spacing: 16) {
                 debugSwitch("UI", picked: flow.tuningOpen, item: .tuning)
-                debugSwitch(TitleText.bigdex ? "FONT B" : "FONT A", picked: TitleText.bigdex, item: .titleFont)
+                debugSwitch("FONT " + String(UnicodeScalar(UInt8(65 + Futuristic.typefacePick))), picked: true, item: .titleFont)
             }
         }
         .padding(.bottom, 20)

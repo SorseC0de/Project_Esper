@@ -10,8 +10,9 @@ struct SettingsScreen: View {
 
     var body: some View {
         ZStack {
-            // Taken by the ground, so a tap off the choices doesn't reach the pause under it.
-            Color(rgb: UIColourPicks.ground).ignoresSafeArea()
+            // The stage select's ground, the grid on black, taken so a tap off the choices doesn't
+            // reach the pause under it.
+            MenuGround(glows: false).ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {}
             GeometryReader { geometry in
@@ -20,11 +21,11 @@ struct SettingsScreen: View {
                 let rows = GameSettings.Row.allCases
                 let titleImage = Futuristic.image("11"), optionImage = Futuristic.image("5")
                 let rowHeight = min(SettingsScreen.rowHeightMost * scale(.buttons),
-                                    (geometry.size.height * SettingsScreen.rowsShare - 44 * scale(.titles)) / CGFloat(rows.count))
+                                    (geometry.size.height * SettingsScreen.rowsShare - 2 * SettingsScreen.titleHeight * scale(.titles)) / CGFloat(rows.count))
                 let titleScale = rowHeight / (titleImage.size.height * titleImage.scale * Futuristic.pointsPerPixel)
                 let optionScale = rowHeight * SettingsScreen.optionShare / (optionImage.size.height * optionImage.scale * Futuristic.pointsPerPixel)
                 VStack(spacing: 10 * scale(.buttons)) {
-                    Image(uiImage: TitleText.image("SETTINGS", size: 44 * scale(.titles)))
+                    FloText("SETTINGS", height: SettingsScreen.titleHeight * scale(.titles))
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                             rowView(row, index: index, rowHeight: rowHeight, titleScale: titleScale, optionScale: optionScale)
@@ -37,6 +38,8 @@ struct SettingsScreen: View {
         .environment(\.colorScheme, .dark)
     }
 
+    /// SETTINGS lettered as FLO is, as STAGE SELECT is, its cap height in points.
+    static let titleHeight: CGFloat = 15
     /// The tallest a row is, in points, and the share of the screen's height the rows and title fill.
     static let rowHeightMost: CGFloat = 48
     static let rowsShare: CGFloat = 0.9

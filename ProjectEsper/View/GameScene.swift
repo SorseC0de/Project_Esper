@@ -3426,14 +3426,6 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
-        // The menus' face, A to K (`Futuristic.typefaces`): everything in it drawn again.
-        controls.addPicker(title: "UI FONT", options: (0..<Futuristic.typefaces.count).map { String(UnicodeScalar(UInt8(65 + $0))) },
-                           selected: Futuristic.typefacePick, perRow: 6) { [weak self] index in
-            Futuristic.typefacePick = index
-            UITuning.shared.touch()
-            guard let self else { return }
-            DispatchQueue.main.async { self.layout(displayScale: self.displayScale) }
-        }
         if !ParkedSliders.flo {
             controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
             controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }

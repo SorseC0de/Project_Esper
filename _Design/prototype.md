@@ -590,10 +590,10 @@ picked and dim when not, with rule6 between them and rule5 at each end, the left
 ways; MULTIPLAYER in box4, a little smaller, under svgrepo's multiplayer icon
 (`futuristic_icon_multiplayer`, from `Vectors/multiplayer.svg` by the same tool); the grid on black
 behind, without the customize screen's glows; bottom right in a debug build, ICON X, ICON Y and ICON
-SCALE for the multiplayer icon (kept between launches) (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
-and in a match the debug strip's COLOUR, the first side's, round the wheel). UI and FONT A/B, bottom left, are words over rule8,
-white when on (B letters the title and its small switches in Bigdex, `TitleText.bigdex`, kept between
-launches), the tuning panel, with over it two placeholder pickers of every
+SCALE for the multiplayer icon (kept between launches; 60, 0 and 1.75 to start, X to 200 either way)
+(its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
+and in a match the debug strip's COLOUR, the first side's, round the wheel). UI and FONT, bottom left, are words over rule8,
+white when on (FONT steps the menus' face on, A to K round, its letter on it: see UI FONT), the tuning panel, with over it two placeholder pickers of every
 `EsperPalette` swatch (its twelve ramps two to a row, a black plate each; the pick ringed white,
 kept, picking it again takes the pack's own tone back; `UIColourPicks`), NON-SELECTED for the
 black buttons and BLUE for the light blue ones, each with MAIN, TOP and BOTTOM tabs over it (the
@@ -667,8 +667,8 @@ sliders keep their plain look.
 A gear in the title's upper right corner (the dobo pack's `settings_icon_128px`, `ui_icon_settings`,
 in Futuristic frame 1, the first of the title cursor's rows) and the gear in frame 9 under the
 pause's RESUME open the
-settings (`SettingsScreen`, SwiftUI, full screen on the screens' ground, over the title or the
-pause), kept between launches (`GameSettings`). Each row its name in Futuristic frame 11, the names
+settings (`SettingsScreen`, SwiftUI, full screen on the stage select's ground, the grid on black,
+SETTINGS lettered as FLO is, 15 high, over the title or the pause), kept between launches (`GameSettings`). Each row its name in Futuristic frame 11, the names
 stacked with no room between, and its choices beside it each in frame 5, every row as tall as fits
 the screen (48 at most); the lettering the menus' blue, the picked choice whole and the rest dim,
 the cursor's row's name and picked choice gold; up and down a row, left and right its choice (jump
@@ -1158,7 +1158,7 @@ The pickers sit under a PICKERS tab top left and the sliders under a SLIDERS tab
 folding its bench away and opening it again (`TouchControls.refreshBenches`, kept between launches,
 folded to start); the corner text under the pickers moves with them.
 
-- UI FONT: the menus' face, A to K (`Futuristic.typefaces`, kept): Upheaval TT, Infinium Guardian,
+- UI FONT, the title's FONT switch (no picker in play): the menus' face, A to K (`Futuristic.typefaces`, kept): Upheaval TT, Infinium Guardian,
   Planetary Contact, Sad Machine, Bold Pixels, Caja, 7 Pixels of Perfection, Board of Directors, BM
   Army, Kapel and Long Shot, all bundled; every face drawn so its capitals stand as tall as
   Upheaval's at the same size (`Futuristic.fontSize`, their cap heights 31 to 78 against its 50), in
@@ -2433,10 +2433,14 @@ the series starts only once both have readied and launched there (`customize` an
 messages; protocol 102). A stage vote or pick crosses as the stage's raw value with the count of
 stages played, and goes in, like a drink, only once every frame before the stop is
 confirmed; a coin flip rolls on the shared dice, so both land the same. Protocol version 4. MULTIPLAYER opens the game's own multiplayer screen (`MultiplayerScreen`, in place of Apple's
-matchmaker sheet, doing what it did, through GameKit's matchmaker): full screen on the screens' ground, PLAY NOW (matched with anyone looking), INVITE A FRIEND (the Game Center friends list,
-pick one; the app asks for the list with `NSGKFriendListUsageDescription`), BACK; while matching,
-the caption, whoever was invited with their answer (invited, on their way, can't play; a decline
-ends the wait) and CANCEL. On the title's cursor, B back. An invite accepted from Game Center's
+matchmaker sheet, doing what it did, through GameKit's matchmaker): full screen in the menus' look,
+the grid on black and MULTIPLAYER lettered as FLO is (15 high), the modes as words with rule6 between
+them (the one asked for blue, the rest dim), each choice in frame 8 at 0.8 (a list's at 0.6), every
+other one turned round both ways, the cursor's gold and a tenth bigger: PLAY NOW (matched with anyone
+looking), INVITE A FRIEND (the Game Center friends list, pick one; the app asks for the list with
+`NSGKFriendListUsageDescription`); while matching, the caption, whoever was invited with their
+answer (invited, on their way, can't play; a decline ends the wait) and CANCEL. Back is the corner
+arrow on a touch screen, or B; the friends list back to the menu on INVITE A FRIEND. An invite accepted from Game Center's
 notification opens it on the joining. It fails at once until the app's record in App Store
 Connect has Game Center on. The win screen's REMATCH waits for both; TITLE says bye. A disconnect
 or a bye puts the title up with why under MULTIPLAYER. No computer, no reset, no

@@ -137,19 +137,21 @@ struct FuturisticFrame<Content: View>: View {
     var scale: CGFloat = 1
     /// The frame alone sized, what it holds keeping its size.
     var frameScale: CGFloat = 1
-    /// The frame turned round left to right, what it holds the right way round.
+    /// The frame turned round left to right, or upside down, what it holds the right way round.
     var mirrored = false
+    var upsideDown = false
     @ViewBuilder let content: (Color) -> Content
 
     var body: some View {
         let piece = FuturisticPiece(name: name, colour: lit ? Futuristic.lit : Futuristic.line, scale: scale * frameScale)
         let face = Futuristic.faces[name] ?? CGPoint(x: 0.5, y: 0.5)
         let faceX = mirrored ? 1 - face.x : face.x
+        let faceY = upsideDown ? 1 - face.y : face.y
         piece
-            .scaleEffect(x: mirrored ? -1 : 1)
+            .scaleEffect(x: mirrored ? -1 : 1, y: upsideDown ? -1 : 1)
             .overlay {
                 content(lit ? Futuristic.lit : Futuristic.line)
-                    .offset(x: (faceX - 0.5) * piece.size.width, y: (face.y - 0.5) * piece.size.height)
+                    .offset(x: (faceX - 0.5) * piece.size.width, y: (faceY - 0.5) * piece.size.height)
             }
             .scaleEffect(lit ? Futuristic.litGrowth : 1)
     }

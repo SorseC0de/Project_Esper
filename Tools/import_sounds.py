@@ -9,6 +9,9 @@ converted: its loudness while it's sounding (the RMS of its 10 ms stretches abov
 -40 dBFS) brought to its target, and its peak kept under `PEAK_CEILING`, so the lines
 are even with each other and sit under the effects they play with.
 
+Effects named in `LEVELLED_EFFECTS` are levelled the same way, to `EFFECT_LEVEL`, the effects'
+middle loudness, so a new one sits with the rest; the ones from before it came in as they are.
+
 The originals are only read. Run from the project root after adding or changing one."""
 import math
 import pathlib
@@ -24,6 +27,9 @@ DESTINATION = ROOT / "ProjectEsper" / "Sounds"
 ANNOUNCER_LEVEL = -21.0
 CROWD_LEVEL = -27.0
 PEAK_CEILING = -3.0
+# The effects in the app sit around -21 dB while sounding (their median); new ones are brought there.
+EFFECT_LEVEL = -21.0
+LEVELLED_EFFECTS = {"dunk", "slashclash", "flo_collect", "slide", "flo_max"}
 
 # File in Vocals: (name in the app, loudness while sounding in dBFS).
 VOCALS = {
@@ -101,6 +107,8 @@ for sound in sorted(SOURCE.iterdir()):
     wanted.add(out.name)
     convert(sound, out)
     print(f"{sound.name}")
+    if out.stem in LEVELLED_EFFECTS:
+        level(out, EFFECT_LEVEL)
 for file, (name, target) in VOCALS.items():
     sound = VOCALS_SOURCE / file
     if not sound.exists():

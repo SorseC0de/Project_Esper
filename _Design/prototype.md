@@ -2294,7 +2294,12 @@ shown, once, like the effects.
 - shoot_v2: the shot, the throw, the fireball's throw and Volta Cola's bolt (player_shoot
   is unused).
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
-  clear of the floor the body stands on (`slashClanked`).
+  clear of the floor the body stands on (`slashClanked`). slashclash: two blades meeting.
+- dunk: a dunk going in, in the swish's place. slide: the slide. flo_collect: each FLO orb landing
+  on its player, at 0.35 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a
+  meter showing full as it fills. These five are levelled as they're imported to the effects'
+  middle loudness, -21 dB while sounding, peaks under -3 (`LEVELLED_EFFECTS`, `EFFECT_LEVEL`); the
+  effects from before them came in as they are.
 - snatch: the snatch at full stretch. catch: a catch.
 - parry and parry2, mixed at 0.3 each as they're read: a parry, the snatch's or the
   throw stance's.

@@ -1450,6 +1450,8 @@ final class GameScene: SKScene {
                 floWordsFull[index].isHidden = !lit
             }
             guard floShown.indices.contains(index), floShown[index].frame != frame || floShown[index].flo != flo else { continue }
+            // Filling up: flo_max as it first shows full.
+            if floShown[index].flo < FloRules.full, flo >= FloRules.full { play(.floMax, at: player.chest) }
             floShown[index] = (frame, flo)
             floBars[index].texture = floBarTexture(frame: frame, flo: flo)
         }
@@ -1694,6 +1696,8 @@ final class GameScene: SKScene {
         var trail: [CGPoint] = []
     }
     private var floOrbs: [FloOrb] = []
+    /// `flo_collect`'s volume against the rest.
+    private static let floCollectVolume: Float = 0.35
     /// FLO still on its way to each player in orbs, kept off their meter till it lands.
     private var floOnTheWay: [Int: Double] = [:]
     /// Frames left of each player's flash on taking an orb.
@@ -1777,6 +1781,10 @@ final class GameScene: SKScene {
 
     private func takeFloOrb(_ orb: FloOrb) {
         floOnTheWay[orb.owner] = max(floOnTheWay[orb.owner, default: 0] - orb.value, 0)
+        // Quiet: the orbs land often and fast.
+        if match.players.indices.contains(orb.owner) {
+            play(.floCollect, at: match.players[orb.owner].chest, volume: GameScene.floCollectVolume)
+        }
         if floFlash.indices.contains(orb.owner) { floFlash[orb.owner] = GameScene.floFlashFrames }
     }
 
@@ -5263,7 +5271,8 @@ final class GameScene: SKScene {
             case .shot(let index), .thrown(let index), .fireballThrown(let index), .boltFired(let index): play(.shootV2, at: body(index))
             case .slashed(let index): play(.esperSlash, at: body(index))
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
-            case .slashClashed(let at): play(.slashWallClank, at: at)
+            case .slashClashed(let at): play(.slashClash, at: at)
+            case .slid(let index): play(.slide, at: body(index))
             case .snatchReached(let index): play(.snatch, at: body(index))
             case .caught(let index): play(.catchBall, at: body(index))
             case .struck(let victim, _), .popped(let victim, _), .cartHit(let victim, _): play(.playerHit, at: body(victim))
@@ -5830,8 +5839,8 @@ final class GameScene: SKScene {
     /// the same tone and the floor and walls go white, fading back. `score_strike` erupts off
     /// the rim with it.
     private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
-        // A shot goes in with the net's swish; a dunk's sound is the announcer's.
-        if !dunkScoring { play(.swish, at: match.stage.hoops[hoop].position) }
+        // A shot goes in with the net's swish, a dunk with its slam.
+        play(dunkScoring ? .dunkSlam : .swish, at: match.stage.hoops[hoop].position)
         dunkScoring = false
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)

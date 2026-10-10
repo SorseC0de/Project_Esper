@@ -31,6 +31,11 @@ final class SoundBoard {
         case pause
         case stagePreview = "stage_preview"
         case slashWallClank = "slash_wallclank"
+        case slashClash = "slashclash"
+        case dunkSlam = "dunk"
+        case slide
+        case floCollect = "flo_collect"
+        case floMax = "flo_max"
         case step
         // The announcer, levelled by the importer.
         case countA1 = "announcer_1", countA2 = "announcer_2", countA3 = "announcer_3"

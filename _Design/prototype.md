@@ -695,9 +695,12 @@ A disconnect on the screen closes it to the title.
   2560 by 1440, each cropped) into `ProjectEsper/UI/Customize`, with where each sits in
   `CustomizeLayout.swift`. Recoloured to the menus' colours: the cyans and blues to purple's ramp,
   the deep blues to plum's, the near-black to black's (`MENU` in the tool); its own ground (the
-  gradient and the grid) is left out, the screen drawing its own; the top line gold's
-  second (#F5BB45), the bottom line blue's second (#45BCF5), RETURN's lettering and frame blue's
-  first (#6BD0FF). The halos go to greys, multiplied by the side's energy colour, the beam clear
+  gradient and the grid) and the heading's plate are left out, the screen drawing its own ground;
+  the top line gold's second (#F5BB45) and the bottom line blue's second (#45BCF5), each its own
+  layer. RETURN is lines alone in white, its gradient face out and its frame (not its letters)
+  twice as thick, multiplied by blue's first (#6BD0FF), or under the cursor by the title's gold,
+  growing a tenth, as the title's frames do. The boxes' lines are twice the vector's width (a
+  stroke as wide as each line along it); the cursor's thickened line is as it was. The halos go to greys, multiplied by the side's energy colour, the beam clear
   at its top and whole three quarters down. Each box comes as its fill, its line, and its line
   thickened (a stroke 8 wide), the lines white to be coloured; the fill isn't drawn (the player
   boxes are lines alone, as the title's frames are; it's imported for its place), their line blue's
@@ -709,8 +712,13 @@ A disconnect on the screen closes it to the title.
   over the corner's). Under the grid, two glows a tenth of the width off the middle, gold's body up
   and to the left and blue's down and to the right, fading to clear at three quarters of the
   gradient's reach, half seen. That ground is `MenuGround`, the title's too.
+  The entrance (`CustomizeIntro`), as the screen appears: the top line, CUSTOMIZE and the mode
+  float down and the bottom line and RETURN up, from a quarter of the screen's height away, over
+  0.5 seconds; from 0.3 seconds, over 0.8, the players fade in from nothing as their halos (the
+  beam and the projector's light) flicker on, off at first, and each side's boxes, their
+  connectors and the colour display slide in from that side's edge of the screen.
   RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second.
-- Over the middle: CUSTOMIZE on the heading's plate (cap height 0.025 of the screen, its letters
+- Over the middle: CUSTOMIZE, no plate behind it (cap height 0.025 of the screen, its letters
   spaced 0.08 of their size apart, `Word.spacing`) and START on
   the emblem (0.035), both lettered as the lit FLO is (Bigdex, gold's first over the cyan, outlined
   plum and purple, growing to the left; `Onomatopoeia.picture`), and the series' mode, ROUNDS or
@@ -758,7 +766,7 @@ A disconnect on the screen closes it to the title.
   ramp's lightest, `Look.bright`), each word of "Hyper- Osmotic Output Driver" small under its
   letter; and over the player the colour's gem name lettered as CUSTOMIZE is (RUBY), after MODEL in the face and size of the words under H.O.O.D., centred
   against it, a name wider than 0.35 of the halo scaled down to it; NAME Y art pixels over the
-  player's middle, only while the hood's colours are picked. The arm and leg boxes are ticks (Bigdex's X, which has no check, in the box's line's colour, no drop), a
+  player's middle, only while the hood's colours are picked. The arm and leg boxes are ticks (Futuristic_UI's ring8 at 0.6 of the box's height, in the box's line's colour, the side's under the cursor), a
   sleeve or a boot each (`Dressing`), labelled SLEEVE or BRACER; those and SKIN have their letters
   stacked down the box's side away from the player, at 0.25 of its height (H.O.O.D.'s under its
   box, at 0.4). Each arm and leg box has a line from it to its limb's middle on the player, run as

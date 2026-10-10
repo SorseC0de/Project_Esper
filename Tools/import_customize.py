@@ -49,15 +49,23 @@ RETURN = {"#00ffff": RETURN_CYAN}
 SMALL_BOX = {"#307ac3": "#45bcf5", "#23549a": "#1468a3"}
 # A box's line, thickened for the cursor: a stroke this wide along it, in the vector's units.
 LIT_LINE_WIDTH = 8
+# The boxes' lines and RETURN's frame drawn twice as thick as the vector has them: a stroke as
+# wide as each line is (3 and 5 units) along both its edges.
+BOX_LINE_WIDTH = 3
+RETURN_LINE_WIDTH = 5
 
 # name: (groups kept, recolour, part). A player's groups end in "" for P1 and "1" for P2. A box
 # and a display are a fill and a line over it: "fill" keeps the group's first shape, "line" its
-# second, "lit" its second thickened. Lines and the display's bar come out white, for the game
-# to multiply by a colour.
+# second, "thick" its second at twice its width, "lit" its second thickened for the cursor.
+# Lines and the display's bar come out white, for the game to multiply by a colour.
 LAYERS = {
-    # The vector's own ground (its gradient and grid) is left out: the game draws its own to the screen's edges.
-    "customize_ground": (["Lines", "Heading"], "menu", None),
-    "customize_return": (["Return-Button"], "return", None),
+    # The vector's own ground (its gradient and grid) and the heading's plate are left out: the
+    # game draws its own ground to the screen's edges. The lines come apart, top and bottom, to
+    # float in from their own edges.
+    "customize_top_line": (["Lines"], "menu", "top"),
+    "customize_bottom_line": (["Lines"], "menu", "bottom"),
+    # RETURN as lines alone in white, its gradient face left out, for the game to colour.
+    "customize_return": (["Return-Button"], "white", "plain"),
     "customize_start": (["Start-Button"], "menu", None),
     "customize_spin_ccw": (["RotateMeCCW"], "menu", None),
     "customize_spin_cw": (["RotateMeCW"], "menu", None),
@@ -65,7 +73,7 @@ LAYERS = {
 for player, suffix in ((1, ""), (2, "1")):
     for box, group in (("skin", "Skin"), ("arms", "Arms"), ("legs", "Legs"), ("hood", "HOOD")):
         LAYERS[f"customize_p{player}_{box}"] = ([group + suffix], "menu" if box == "hood" else "small", "fill")
-        LAYERS[f"customize_p{player}_{box}_line"] = ([group + suffix], "white", "line")
+        LAYERS[f"customize_p{player}_{box}_line"] = ([group + suffix], "white", "thick")
         LAYERS[f"customize_p{player}_{box}_lit"] = ([group + suffix], "white", "lit")
     LAYERS[f"customize_p{player}_halo"] = ([f"Halo{suffix}"], "energy", None)
     LAYERS[f"customize_p{player}_display"] = ([f"Bottom-Display{suffix}"], "menu", "fill")
@@ -104,15 +112,42 @@ def recolour(text, mode):
     return re.sub(r"((?:fill|stroke|stop-color):)(#[0-9a-fA-F]{3,6})\b", lambda m: m.group(1) + change(m.group(2)), text)
 
 
+def thicken(shape, width):
+    """A filled line drawn thicker: a stroke of its own colour `width` wide along its edges."""
+    for path in shape.iter():
+        style = path.get("style") or ""
+        fill = re.search(r"fill:(#[0-9a-fA-F]{3,6})", style)
+        if fill and path.tag in (f"{{{SVG}}}path", f"{{{SVG}}}rect"):
+            path.set("style", style + f"stroke:{fill.group(1)};stroke-width:{width};stroke-linejoin:miter;")
+
+
 def keep_part(root, group, part):
-    """A box's or display's fill alone, its line alone, or its line thickened."""
+    """A box's or display's fill alone, its line alone (twice as thick), its line thickened for
+    the cursor, the top or bottom half of the lines, or RETURN without its face."""
     for element in root.iter(f"{{{SVG}}}g"):
         if element.get("id") != group:
+            continue
+        if part in ("top", "bottom"):
+            for piece in list(element):
+                down = float(re.findall(r"[-\d.e]+", piece.get("transform", "matrix(1,0,0,1,0,0)"))[-1])
+                if (down < 1080) != (part == "top"):
+                    element.remove(piece)
+            continue
+        if part == "plain":
+            # Its gradient face out; its frame thickened, the last pieces being its letters.
+            pieces = [piece for piece in element if "url(#" not in ET.tostring(piece, encoding="unicode")]
+            for piece in list(element):
+                if piece not in pieces:
+                    element.remove(piece)
+            for piece in pieces[:-len("RETURN")]:
+                thicken(piece, RETURN_LINE_WIDTH)
             continue
         shapes = list(element)
         for index, shape in enumerate(shapes):
             if index != (0 if part == "fill" else 1):
                 element.remove(shape)
+        if part == "thick":
+            thicken(shapes[1], BOX_LINE_WIDTH)
         if part == "lit":
             for path in shapes[1].iter(f"{{{SVG}}}path"):
                 path.set("style", path.get("style") + f"stroke:#ffffff;stroke-width:{LIT_LINE_WIDTH};stroke-linejoin:round;")

@@ -307,6 +307,9 @@ struct CustomizeScreen: View {
     @AppStorage("esper.customize.hoodSpread.2") private var hoodSpread = 112.0
     /// Where the figures stand after the launch's drift, in art pixels up from the middle button's centre.
     @AppStorage("esper.customize.driftY.2") private var driftY = -16.0
+    /// When the screen appeared, for its entrance (`CustomizeIntro`), and whether that's played.
+    @State private var introStart: Date?
+    @State private var introDone = false
 
     init(flow: FlowState) {
         self.flow = flow
@@ -389,17 +392,35 @@ struct CustomizeScreen: View {
     /// The small boxes' line, blue's second (the cyan); the hood's, purple's first as the vector's cyan went.
     static let smallBoxLine: RGB = EsperPalette.blue.light
     static let hoodLine: RGB = EsperPalette.purple.highlight
+    /// RETURN's lettering and frame, blue's first; under the cursor, the title's gold.
+    static let returnLine: RGB = EsperPalette.blue.highlight
+    /// A ticked box's ring, a share of the box's height.
+    static let tickShare: CGFloat = 0.6
 
     var body: some View {
         GeometryReader { geometry in
             let size = CustomizeScreen.fitted(geometry.size)
-            ZStack(alignment: .topLeading) {
-                layer("customize_ground", size)
-                heading(size)
-                ForEach(0..<2, id: \.self) { player in side(player, size) }
-                middle(size)
-                returnButton(size)
-                if DebugUI.enabled { tuning(size) }
+            TimelineView(.animation(paused: introDone)) { timeline in
+                let intro = CustomizeIntro(seconds: introStart.map { timeline.date.timeIntervalSince($0) } ?? 0)
+                ZStack(alignment: .topLeading) {
+                    // The top line and the titles floating down, the bottom line and RETURN up.
+                    ZStack(alignment: .topLeading) {
+                        layer("customize_top_line", size)
+                        heading(size)
+                    }
+                    .frame(width: size.width, height: size.height)
+                    .offset(y: -intro.linesAway * size.height * CustomizeIntro.linesDistanceShare)
+                    ZStack(alignment: .topLeading) {
+                        layer("customize_bottom_line", size)
+                        returnButton(size)
+                    }
+                    .frame(width: size.width, height: size.height)
+                    .offset(y: intro.linesAway * size.height * CustomizeIntro.linesDistanceShare)
+                    ForEach(0..<2, id: \.self) { player in side(player, size, intro: intro, boxesAway: geometry.size.width) }
+                    middle(size)
+                    if DebugUI.enabled { tuning(size) }
+                }
+                .frame(width: size.width, height: size.height)
             }
             .frame(width: size.width, height: size.height)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
@@ -412,6 +433,11 @@ struct CustomizeScreen: View {
         }
         .ignoresSafeArea()
         .environment(\.colorScheme, .dark)
+        .onAppear { introStart = Date() }
+        .task {
+            try? await Task.sleep(nanoseconds: UInt64(CustomizeIntro.length * 1_000_000_000))
+            introDone = true
+        }
     }
 
     /// The vector's 16:9, as large as fits.
@@ -490,7 +516,7 @@ struct CustomizeScreen: View {
     // MARK: A side
 
     @ViewBuilder
-    private func side(_ player: Int, _ size: CGSize) -> some View {
+    private func side(_ player: Int, _ size: CGSize, intro: CustomizeIntro, boxesAway away: CGFloat) -> some View {
         let tag = "customize_p\(player + 1)_"
         let pick = flow.shownCustomizations[player]
         let glow = pick.glow
@@ -501,6 +527,8 @@ struct CustomizeScreen: View {
         let projectorPixel = artPixel(size, times: CustomizeScreen.projectorScale)
         let playerPixel = artPixel(size, times: CustomizeScreen.playerScale)
         let projectorAt = CGPoint(x: ring.x, y: ring.y - CustomizeScreen.projectorY * base)
+        // The boxes slide in from the side's own edge of the screen.
+        let slide = intro.boxesAway * away * (player == 0 ? -1 : 1)
         // The first side's front limbs are its right; the second, facing the other way, its left.
         // The projector under the halo.
         if let projector = CustomizeArt.projector(glow), let lit = CustomizeArt.projectorEnergy(glow) {
@@ -509,7 +537,7 @@ struct CustomizeScreen: View {
                 Image(uiImage: lit).resizable().interpolation(.none)
                     .blur(radius: projectorPixel * 3)
                     .blendMode(.plusLighter)
-                    .opacity(CustomizeArt.glowStrength)
+                    .opacity(CustomizeArt.glowStrength * intro.haloOn)
             }
             .frame(width: 64 * projectorPixel, height: 64 * projectorPixel)
             .position(projectorAt)
@@ -521,6 +549,7 @@ struct CustomizeScreen: View {
             .energyGlow(radius: halo.width * 0.02)
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: CustomizeScreen.haloFadeEnd)],
                                  startPoint: .top, endPoint: .bottom))
+            .opacity(intro.haloOn)
             .position(x: halo.midX, y: halo.midY)
         // Standing on the lens, the second side facing the first.
         let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
@@ -537,6 +566,7 @@ struct CustomizeScreen: View {
             CustomizeFigure(portrait: portrait, look: player == 1 ? pick.look.turnedRound : pick.look, pixel: playerPixel, mirrored: player == 1,
                             headNudge: CGPoint(x: headX, y: headY), headScale: headScale)
                 .frame(width: side, height: side)
+                .opacity(intro.figuresIn)
                 .scaleEffect(ready ? CustomizeScreen.readyGrowth : 1)
                 .animation(.easeOut(duration: 0.2), value: ready)
                 .allowsHitTesting(false)
@@ -554,13 +584,14 @@ struct CustomizeScreen: View {
             ForEach(Array(limbs.enumerated()), id: \.offset) { _, limb in
                 if ready { EmptyView() } else
                 if let centre = portrait.centres[limb.part] {
-                    let box = rect(limb.layer, size, mirroredAbout: limb.mirrored ? halo.midX : nil)
+                    let box = rect(limb.layer, size, mirroredAbout: limb.mirrored ? halo.midX : nil).offsetBy(dx: slide, dy: 0)
                     let across = (centre.x - 24) * playerPixel * (player == 1 ? -1 : 1)
                     let target = CGPoint(x: ring.x + across, y: figureMiddle + (centre.y - 24) * playerPixel)
                     let sleeve = limb.part == .frontArm || limb.part == .backArm
                     let start = sleeve ? CGPoint(x: box.midX, y: box.maxY) : CGPoint(x: box.midX < target.x ? box.maxX : box.minX, y: box.midY)
                     connector(from: start, to: target, drop: sleeve ? box.height * CustomizeScreen.sleeveDropShare : 0,
                               size: size, lit: cursor == limb.spot, glow: glow)
+                        .opacity(intro.figuresIn)
                 }
             }
         }
@@ -580,7 +611,7 @@ struct CustomizeScreen: View {
         let side = CustomizeScreen.sideLabelShare
         // The controls go once the side's ready, shrinking away.
         if !ready {
-        box(player, .skin, tag + "skin", label: "SKIN", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) { frame in
+        box(player, .skin, tag + "skin", label: "SKIN", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor, slide: slide) { frame in
             VStack(spacing: 0) {
                 Color(rgb: PixelPalette.colours[pick.dressing.tone.front])
                 Color(rgb: PixelPalette.colours[pick.dressing.tone.back])
@@ -588,19 +619,19 @@ struct CustomizeScreen: View {
             .frame(width: frame.width * 0.5, height: frame.height * 0.5)
             .clipShape(RoundedRectangle(cornerRadius: frame.width * 0.08))
         }
-        box(player, .arms, tag + "arms", label: "SLEEVE", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) {
+        box(player, .arms, tag + "arms", label: "SLEEVE", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor, slide: slide) {
             tick(flow.customizeTicked(player, .arms), $0, lit: cursor == .arms, glow: glow)
         }
-        box(player, .legs, tag + "legs", label: "BRACER", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) {
+        box(player, .legs, tag + "legs", label: "BRACER", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor, slide: slide) {
             tick(flow.customizeTicked(player, .legs), $0, lit: cursor == .legs, glow: glow)
         }
-        box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "SLEEVE", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) {
+        box(player, .outerArms, tag + "arms", mirroredAbout: halo.midX, label: "SLEEVE", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor, slide: slide) {
             tick(flow.customizeTicked(player, .outerArms), $0, lit: cursor == .outerArms, glow: glow)
         }
-        box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "BRACER", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor) {
+        box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "BRACER", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor, slide: slide) {
             tick(flow.customizeTicked(player, .outerLegs), $0, lit: cursor == .outerLegs, glow: glow)
         }
-        box(player, .hood, tag + "hood", label: "H.O.O.D", size: size, glow: glow, cursor: cursor) { frame in
+        box(player, .hood, tag + "hood", label: "H.O.O.D", size: size, glow: glow, cursor: cursor, slide: slide) { frame in
             if let hood = flow.scene.customizeHood(player: player) {
                 Image(uiImage: UIImage(cgImage: hood)).resizable().interpolation(.none).aspectRatio(contentMode: .fit)
                     .frame(width: frame.width * 0.7, height: frame.height * 0.7)
@@ -608,7 +639,7 @@ struct CustomizeScreen: View {
             }
         }
         if cursor.owner == .skin || cursor.owner == .hood {
-            picker(player, tag + "display", size: size, cursor: cursor, pick: pick, glow: glow)
+            picker(player, tag + "display", size: size, cursor: cursor, pick: pick, glow: glow, slide: slide)
         }
         }
         if cursor.owner == .hood, !ready {
@@ -627,15 +658,16 @@ struct CustomizeScreen: View {
         }
     }
 
-    /// A box's tick: empty, or a check.
+    /// A box's tick: empty, or Futuristic_UI's ring8 in its box's line's colour, the side's under the cursor.
     @ViewBuilder
-    /// Bigdex's X (it has no check), in its box's line's colour, the side's under the cursor.
     private func tick(_ on: Bool, _ frame: CGRect, lit: Bool, glow: RGB) -> some View {
         if on {
-            Text("X")
-                .font(.custom(CustomizeFont.bigdex.fontName, size: frame.height * 0.5))
-                .foregroundStyle(Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine))
-                .fixedSize()
+            Image(uiImage: Futuristic.image("ring8"))
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .colorMultiply(Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine))
+                .frame(width: frame.height * CustomizeScreen.tickShare, height: frame.height * CustomizeScreen.tickShare)
         }
     }
 
@@ -675,15 +707,16 @@ struct CustomizeScreen: View {
     @ViewBuilder
     private func box(_ player: Int, _ spot: CustomizeSpot, _ name: String, mirroredAbout axis: CGFloat? = nil, label: String,
                      labelShare: CGFloat = CustomizeScreen.labelShare, labelBeside playerX: CGFloat? = nil,
-                     size: CGSize, glow: RGB, cursor: CustomizeSpot, @ViewBuilder content: (CGRect) -> some View) -> some View {
+                     size: CGSize, glow: RGB, cursor: CustomizeSpot, slide: CGFloat = 0,
+                     @ViewBuilder content: (CGRect) -> some View) -> some View {
         let flip: CGFloat = axis == nil ? 1 : -1
-        let fill = rect(name, size, mirroredAbout: axis)
-        let line = rect(name + "_line", size, mirroredAbout: axis)
+        let fill = rect(name, size, mirroredAbout: axis).offsetBy(dx: slide, dy: 0)
+        let line = rect(name + "_line", size, mirroredAbout: axis).offsetBy(dx: slide, dy: 0)
         let lit = cursor == spot
         content(fill)
             .position(x: fill.midX, y: fill.midY)
         if lit {
-            let thick = rect(name + "_lit", size, mirroredAbout: axis)
+            let thick = rect(name + "_lit", size, mirroredAbout: axis).offsetBy(dx: slide, dy: 0)
             picture(name + "_lit").resizable().scaleEffect(x: flip)
                 .colorMultiply(Color(rgb: glow))
                 .frame(width: thick.width, height: thick.height)
@@ -722,9 +755,10 @@ struct CustomizeScreen: View {
     /// colour's shade down its ramp); the picked column lined in white, the cursor's in the side's colour. The display's bar in
     /// the side's colour, glowing.
     @ViewBuilder
-    private func picker(_ player: Int, _ name: String, size: CGSize, cursor: CustomizeSpot, pick: PlayerCustomization, glow: RGB) -> some View {
-        let frame = rect(name, size)
-        let bar = rect(name + "_bar", size)
+    private func picker(_ player: Int, _ name: String, size: CGSize, cursor: CustomizeSpot, pick: PlayerCustomization, glow: RGB,
+                        slide: CGFloat = 0) -> some View {
+        let frame = rect(name, size).offsetBy(dx: slide, dy: 0)
+        let bar = rect(name + "_bar", size).offsetBy(dx: slide, dy: 0)
         let skin = cursor.owner == .skin
         let hovered: Int? = switch cursor {
         case .skinPicker(let column), .hoodPicker(let column): column
@@ -805,9 +839,9 @@ struct CustomizeScreen: View {
         let frame = rect("customize_return", size)
         let lit = flow.customizeCursors.contains(.back)
         return picture("customize_return").resizable()
+            .colorMultiply(lit ? Futuristic.lit : Color(rgb: CustomizeScreen.returnLine))
             .frame(width: frame.width, height: frame.height)
-            .brightness(lit ? 0.2 : 0)
-            .scaleEffect(lit ? TitleOverlay.cursorGrowth : 1)
+            .scaleEffect(lit ? Futuristic.litGrowth : 1)
             .contentShape(Rectangle())
             .onTapGesture { flow.activateCustomize(flow.customizeLocal, .back) }
             .position(x: frame.midX, y: frame.midY)
@@ -1274,5 +1308,33 @@ struct MenuGround: View {
             }
         }
         .ignoresSafeArea()
+    }
+}
+
+/// The customize screen's entrance, by the seconds since it appeared: the top line and the titles
+/// float down and the bottom line and RETURN up; then the players fade in as their halos flicker
+/// on, and each side's boxes slide in from its own edge.
+struct CustomizeIntro {
+    let seconds: Double
+
+    static let linesSeconds = 0.5
+    /// How far the lines come from, a share of the screen's height.
+    static let linesDistanceShare: CGFloat = 0.25
+    static let castDelay = 0.3
+    static let castSeconds = 0.8
+    static var length: Double { castDelay + castSeconds }
+    /// When the halos are on, as shares of the players' fade: off between, on for good from the last.
+    static let flickers: [ClosedRange<Double>] = [0.15...0.22, 0.35...0.42, 0.55...0.6, 0.7...1]
+
+    /// The lines' way still to go: 1 away, 0 home.
+    var linesAway: CGFloat { 1 - CustomizeIntro.easeOut(seconds / CustomizeIntro.linesSeconds) }
+    private var cast: Double { min(max((seconds - CustomizeIntro.castDelay) / CustomizeIntro.castSeconds, 0), 1) }
+    var figuresIn: Double { cast }
+    var boxesAway: CGFloat { 1 - CustomizeIntro.easeOut(cast) }
+    var haloOn: Double { cast >= 1 || CustomizeIntro.flickers.contains { $0.contains(cast) } ? 1 : 0 }
+
+    private static func easeOut(_ share: Double) -> CGFloat {
+        let clamped = min(max(share, 0), 1)
+        return 1 - pow(1 - clamped, 3)
     }
 }

@@ -17,6 +17,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "_Graphic Assets" / "Vectors" / "Futuristic_UI.svg"
 OUT = ROOT / "ProjectEsper" / "UI" / "Futuristic"
 RENDERER = ROOT / "Tools" / "render_svg.swift"
+# The Variaball logo, standing in for the title's name in a debug build, and its rendered width.
+LOGO = ROOT / "_Graphic Assets" / "Vectors" / "Variaball Logo.svg"
+LOGO_OUT = ROOT / "ProjectEsper" / "UI" / "variaball_logo.png"
+LOGO_WIDTH = 1600
 # The finding pass's width, and the whole vector's width the kept pass renders at.
 FIND_WIDTH = 2560
 FULL_WIDTH = 8192
@@ -89,6 +93,9 @@ def main():
             name = f"futuristic_{group}"
             _, _, pw, ph = render(renderer, path, OUT / f"{name}.png", round(box[2] * density), round(box[3] * density))
             print(f"{name:22s} {pw}x{ph}")
+        logo = re.search(r'viewBox="([^"]+)"', LOGO.read_text()).group(1).split()
+        _, _, lw, lh = render(renderer, LOGO, LOGO_OUT, LOGO_WIDTH, round(LOGO_WIDTH * float(logo[3]) / float(logo[2])))
+        print(f"{LOGO_OUT.stem:22s} {lw}x{lh}")
     wanted = {f"futuristic_{group}.png" for group in groups}
     for stale in OUT.glob("*.png"):
         if stale.name not in wanted:

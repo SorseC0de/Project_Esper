@@ -575,14 +575,16 @@ Upheaval TT lettering, every piece at 0.14 points to its imported pixel so the p
 in the vector, and each frame's face (where its lettering sits, off its leads). In place of a cursor
 plate, what the cursor's on turns gold (gold's light, the customize screen's top line) and grows a
 tenth. The title, the first done: the gear in frame 1, upper right, at half the others' size; the name over
-rule4 and a mirrored rule4 left of it, meeting as one; ROUNDS, 47
+rule4 and a mirrored rule4 left of it, joined as one image with the meeting end's soft edge cut
+(`Futuristic.mirroredPair`), in a debug build the Variaball logo in the name's place (`variaball_logo`,
+rendered by the same tool); ROUNDS, 47
 and ZONES in frames 7, 9 and 6; VS CPU and VS HUMAN as plain words, white when picked and dim when
 not, with rule6 between them and rule5 at each end, the left one flipped both ways; MULTIPLAYER in
-box4; bottom right in a debug build, sliders for each mode frame's drop and size, its lettering
-holding still (kept between launches, to be baked) (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
-and in a match the debug strip's COLOUR, the first side's, round the wheel). Still on the old pieces:
-UI and FONT A/B, bottom
-left (B letters the title and its small switches in Bigdex, `TitleText.bigdex`, kept between
+box4; bottom right in a debug build, sliders for each mode button's drop and its frame's size, the
+lettering keeping its size (kept between launches; ROUNDS 0 and 0.80, 47 8 and 0.66, ZONES -20 and
+0.80 as tuned) (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
+and in a match the debug strip's COLOUR, the first side's, round the wheel). UI and FONT A/B, bottom left, are words over rule8,
+white when on (B letters the title and its small switches in Bigdex, `TitleText.bigdex`, kept between
 launches), the tuning panel, with over it two placeholder pickers of every
 `EsperPalette` swatch (its twelve ramps two to a row, a black plate each; the pick ringed white,
 kept, picking it again takes the pack's own tone back; `UIColourPicks`), NON-SELECTED for the

@@ -438,14 +438,19 @@ struct TitleOverlay: View {
                 }
             VStack(spacing: 14 * scale(.buttons)) {
                 VStack(spacing: 6 * scale(.buttons)) {
-                    Text("PROJECT ESPER")
-                        .font(Futuristic.font(size: 52 * scale(.titles)))
-                        .foregroundStyle(.white)
-                    // Two, the left one mirrored, meeting in the middle as one.
-                    HStack(spacing: 0) {
-                        FuturisticPiece(name: "rule4", scale: scale(.buttons)).scaleEffect(x: -1, y: 1)
-                        FuturisticPiece(name: "rule4", scale: scale(.buttons))
+                    if DebugUI.enabled {
+                        Image(uiImage: UIImage(named: "variaball_logo") ?? UIImage())
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(contentMode: .fit)
+                            .frame(height: TitleOverlay.logoHeight * scale(.titles))
+                    } else {
+                        Text("PROJECT ESPER")
+                            .font(Futuristic.font(size: 52 * scale(.titles)))
+                            .foregroundStyle(.white)
                     }
+                    // Two, the left one mirrored, meeting in the middle as one.
+                    FuturisticPiece(image: Futuristic.mirroredPair("rule4"), scale: scale(.buttons))
                 }
                 HStack(spacing: 18 * scale(.buttons)) {
                     framed("ROUNDS", in: "7", item: .bestOfSeven, drop: roundsFrameDrop, frameScale: roundsFrameScale)
@@ -474,16 +479,20 @@ struct TitleOverlay: View {
         .onAppear { net.signIn() }
     }
 
+    /// The Variaball logo standing in for the name in a debug build.
+    static let logoHeight: CGFloat = 64
+
     /// The settings gear and its frame against the other pieces.
     static let settingsScale: CGFloat = 0.5
 
-    /// The mode frames' drop and size, from the debug sliders, their lettering holding still.
+    /// The mode buttons' drop, and their frames' size, the lettering keeping its own; from the
+    /// debug sliders, these defaults as tuned.
     @AppStorage("titleRoundsFrameDrop") private var roundsFrameDrop = 0.0
-    @AppStorage("titleRoundsFrameScale") private var roundsFrameScale = 1.0
-    @AppStorage("titleFortySevenFrameDrop") private var fortySevenFrameDrop = 0.0
-    @AppStorage("titleFortySevenFrameScale") private var fortySevenFrameScale = 1.0
-    @AppStorage("titleZonesFrameDrop") private var zonesFrameDrop = 0.0
-    @AppStorage("titleZonesFrameScale") private var zonesFrameScale = 1.0
+    @AppStorage("titleRoundsFrameScale") private var roundsFrameScale = 0.8
+    @AppStorage("titleFortySevenFrameDrop") private var fortySevenFrameDrop = 8.0
+    @AppStorage("titleFortySevenFrameScale") private var fortySevenFrameScale = 0.66
+    @AppStorage("titleZonesFrameDrop") private var zonesFrameDrop = -20.0
+    @AppStorage("titleZonesFrameScale") private var zonesFrameScale = 0.8
 
     /// The opponent row's rules, by their width in points.
     static let endRuleWidth: CGFloat = 110
@@ -492,8 +501,7 @@ struct TitleOverlay: View {
     /// A lettered button in one of the vector's frames.
     private func framed(_ text: String, in frame: String, item: TitleItem, drop: Double = 0, frameScale: Double = 1) -> some View {
         Button { flow.activate(item) } label: {
-            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons),
-                            frameDrop: drop, frameScale: frameScale) { colour in
+            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons), frameScale: frameScale) { colour in
                 Text(text)
                     .font(Futuristic.font(size: 24 * scale(.text)))
                     .foregroundStyle(colour)
@@ -501,6 +509,7 @@ struct TitleOverlay: View {
             }
         }
         .buttonStyle(.plain)
+        .offset(y: drop)
         .disabled(busy)
         .noSystemFocus()
     }
@@ -565,24 +574,25 @@ struct TitleOverlay: View {
     /// Under the cursor, the other screens' plates grow this much.
     static let cursorGrowth: CGFloat = 1.08
 
-    /// A small switch on the debug corner: plum when it's the one picked, black otherwise, gold under the cursor.
-    private func small(_ text: String, picked: Bool, item: TitleItem) -> some View {
-        let piece = flow.titleCursor == item ? UIPiece.buttonGold : (picked ? UIPiece.buttonPlum : UIPiece.buttonBlack)
+    /// A debug corner switch: its word over rule8, white when it's on, dim otherwise, gold under the cursor.
+    private func debugSwitch(_ text: String, picked: Bool, item: TitleItem) -> some View {
+        let lit = flow.titleCursor == item
+        let colour = lit ? Futuristic.lit : .white.opacity(picked ? 1 : TitleOverlay.unpickedOpacity)
         return Button { flow.activate(item) } label: {
-            Text(text)
-                .font(TitleText.switchFont(size: 12 * scale(.text)))
-                .foregroundStyle(.white)
-                .shadow(color: .black, radius: 0, x: 1, y: 1)
-                .offset(y: -UIPiece.buttonPlum.faceRise * scale(.buttons) * tuning.textRise)
-                .frame(minWidth: 96 * scale(.buttons), minHeight: 30 * scale(.buttons))
-                .padding(.horizontal, 8)
-                .background(piece.image(corners: scale(.buttons)))
+            VStack(spacing: 3) {
+                Text(text)
+                    .font(Futuristic.font(size: 14 * scale(.text)))
+                    .foregroundStyle(colour)
+                    .fixedSize()
+                rule("rule8", width: TitleOverlay.debugRuleWidth)
+            }
         }
         .buttonStyle(.plain)
-        .disabled(busy && item != .tuning)
-        .scaleEffect(flow.titleCursor == item ? TitleOverlay.cursorGrowth : 1)
+        .scaleEffect(lit ? Futuristic.litGrowth : 1)
         .noSystemFocus()
     }
+
+    static let debugRuleWidth: CGFloat = 80
 
     /// The UI's colour grids and the UI and FONT switches, bottom left: for working on the game.
     private var colourGrids: some View {
@@ -598,9 +608,9 @@ struct TitleOverlay: View {
                     }
                 }
             }
-            HStack(spacing: 8) {
-                small("UI", picked: flow.tuningOpen, item: .tuning)
-                small(TitleText.bigdex ? "FONT B" : "FONT A", picked: TitleText.bigdex, item: .titleFont)
+            HStack(spacing: 16) {
+                debugSwitch("UI", picked: flow.tuningOpen, item: .tuning)
+                debugSwitch(TitleText.bigdex ? "FONT B" : "FONT A", picked: TitleText.bigdex, item: .titleFont)
             }
         }
         .padding(.bottom, 20)

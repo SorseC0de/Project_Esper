@@ -21,6 +21,32 @@ enum Futuristic {
 
     static func image(_ piece: String) -> UIImage { UIImage(named: "futuristic_\(piece)") ?? UIImage() }
 
+    /// Two of a piece as one image, the left one mirrored, meeting at the piece's left end. That
+    /// end's soft edge (its first `softEdge` pixel columns) is cut from both, so they join solid.
+    @MainActor static func mirroredPair(_ piece: String) -> UIImage {
+        if let made = pairs[piece] { return made }
+        let softEdge = 2
+        let source = image(piece)
+        guard let whole = source.cgImage,
+              let cut = whole.cropping(to: CGRect(x: softEdge, y: 0, width: whole.width - softEdge, height: whole.height)) else { return source }
+        let half = CGSize(width: cut.width, height: cut.height)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let made = UIGraphicsImageRenderer(size: CGSize(width: half.width * 2, height: half.height), format: format).image { context in
+            let cg = context.cgContext
+            // Core Graphics draws bottom up: flipped once for the page, the left copy again across.
+            cg.translateBy(x: 0, y: half.height)
+            cg.scaleBy(x: 1, y: -1)
+            cg.draw(cut, in: CGRect(origin: CGPoint(x: half.width, y: 0), size: half))
+            cg.translateBy(x: half.width, y: 0)
+            cg.scaleBy(x: -1, y: 1)
+            cg.draw(cut, in: CGRect(origin: .zero, size: half))
+        }
+        pairs[piece] = made
+        return made
+    }
+    @MainActor private static var pairs: [String: UIImage] = [:]
+
     /// The middle of what a frame holds, as a share of its image from the top left: where its
     /// lettering or icon sits, the frames' leads and trim being off to a side.
     static let faces: [String: CGPoint] = [
@@ -34,18 +60,27 @@ enum Futuristic {
 
 /// One of the vector's pieces at its imported size times `scale`, in a colour.
 struct FuturisticPiece: View {
-    let name: String
+    let image: UIImage
     var colour: Color = Futuristic.line
     var scale: CGFloat = 1
 
+    init(name: String, colour: Color = Futuristic.line, scale: CGFloat = 1) {
+        self.init(image: Futuristic.image(name), colour: colour, scale: scale)
+    }
+
+    init(image: UIImage, colour: Color = Futuristic.line, scale: CGFloat = 1) {
+        self.image = image
+        self.colour = colour
+        self.scale = scale
+    }
+
     var size: CGSize {
-        let image = Futuristic.image(name)
         return CGSize(width: image.size.width * image.scale * Futuristic.pointsPerPixel * scale,
                       height: image.size.height * image.scale * Futuristic.pointsPerPixel * scale)
     }
 
     var body: some View {
-        Image(uiImage: Futuristic.image(name))
+        Image(uiImage: image)
             .resizable()
             .interpolation(.high)
             .colorMultiply(colour)
@@ -58,8 +93,7 @@ struct FuturisticFrame<Content: View>: View {
     let name: String
     let lit: Bool
     var scale: CGFloat = 1
-    /// The frame alone moved down and sized, what it holds staying put at its size.
-    var frameDrop: CGFloat = 0
+    /// The frame alone sized, what it holds keeping its size.
     var frameScale: CGFloat = 1
     @ViewBuilder let content: (Color) -> Content
 
@@ -69,9 +103,8 @@ struct FuturisticFrame<Content: View>: View {
         piece
             .overlay {
                 content(lit ? Futuristic.lit : .white)
-                    .offset(x: (face.x - 0.5) * piece.size.width, y: (face.y - 0.5) * piece.size.height - frameDrop)
+                    .offset(x: (face.x - 0.5) * piece.size.width, y: (face.y - 0.5) * piece.size.height)
             }
-            .offset(y: frameDrop)
             .scaleEffect(lit ? Futuristic.litGrowth : 1)
     }
 }

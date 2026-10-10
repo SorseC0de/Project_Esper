@@ -71,7 +71,7 @@ public enum FlightB411Rules {
     /// same one twice running, with nothing in it, or the hoop: no more than `emptyRunMost`
     /// empty in a row.
     public static let binOpenFrames = 600
-    public static let emptyRunMost = 2
+    public static let emptyRunMost = 1
     /// 47's 2X and 3X signs: after the start's level spell, every 5 to 15 seconds the dice pick
     /// neither, 2X or 3X, a third each; one lit stays lit 3 seconds, a basket meanwhile worth
     /// that many times its points.
@@ -148,8 +148,27 @@ extension Match {
     }
 
     /// Frames into the match before the pitch and the bins' cycle start: the count, and the
-    /// level spell after it.
-    private var flightStartsAt: Int { countdownLength + FlightB411Rules.startLevelFrames }
+    /// level spell after it, from the match's start or the round's.
+    private var flightStartsAt: Int { flightRoundStart + countdownLength + FlightB411Rules.startLevelFrames }
+
+    /// A new round of Rounds starts as a fresh match does: the plane level, every bin shut and
+    /// the hoops away, the count and the level spell from now; the ball in the middle bin if
+    /// it's in neutral, else in the hands it's given to, the bins still shut.
+    mutating func restartFlightB411(ballInBin: Bool) {
+        flightRoundStart = frame
+        stage.tilt = 0
+        tiltFrom = 0
+        tiltTarget = 0
+        tiltClock = 0
+        emptyRun = 0
+        if ballInBin {
+            startFlightB411()
+        } else {
+            bins = Array(repeating: Bin(), count: FlightB411Rules.binLefts.count)
+            ballBin = nil
+            for index in stage.hoops.indices { stage.hoops[index].position = HighwayRules.parked }
+        }
+    }
 
     /// The pitch, the cart and the bins, a frame on, before anyone moves.
     mutating func stepFlightB411() {
@@ -216,7 +235,7 @@ extension Match {
             }
         }
         // None open, past the start's spell, and the ball out of its bin: the next, any but the
-        // last; empty one time in three but never a third time running, the hoop otherwise.
+        // last; empty one time in three but never twice running, the hoop otherwise.
         if frame >= flightStartsAt, ballBin == nil, !bins.contains(where: \.open) {
             let choices = bins.indices.filter { $0 != lastBin }
             let index = choices[fieldDice.roll(choices.count)]

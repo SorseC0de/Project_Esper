@@ -52,6 +52,8 @@ public struct Match: Equatable {
     public var lastBin: Int?
     /// Empty bins opened in a row.
     public var emptyRun = 0
+    /// The frame Flight B411's round started on: the match's start, or a Rounds point's restart.
+    public var flightRoundStart = 0
     /// Flight B411's 2X and 3X signs in 47: the multiplier lit, 1 with neither, and the frames to
     /// the next roll of the dice for one, or to its going out.
     public var pointMultiplier = 1
@@ -316,10 +318,12 @@ public struct Match: Equatable {
             players[holder].hasBall = true
             ball.holder = holder
             ball.position = players[holder].heldBallPoint
-        } else if stage.features.tilts {
-            // Flight B411: back into the middle bin, the bins shut and the hoops away again.
-            startFlightB411()
-        } else if hoopfish != nil {
+        }
+        if stage.features.tilts {
+            // Flight B411: as a fresh match starts, level and every bin shut; in neutral the ball
+            // back in the middle bin.
+            restartFlightB411(ballInBin: holder == nil)
+        } else if holder == nil, hoopfish != nil {
             // In neutral on Hoopfish Hideaway is back on the Hoopfish's antenna.
             hoopfish?.carrying = .ball
             placeHoopfishLoad()

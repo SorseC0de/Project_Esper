@@ -235,16 +235,42 @@ final class FlightB411Tests: XCTestCase {
         XCTAssertGreaterThan(opened.count, 3, "several bins opened in turn")
         for (first, second) in zip(opened, opened.dropFirst()) { XCTAssertNotEqual(first, second, "never the same bin twice running") }
         XCTAssertNotEqual(opened.first, centre, "the first of the cycle isn't the start's bin")
-        // Never three empty bins running.
+        // Never two empty bins running.
         var emptyRun = 0
         for load in loads {
             if load == .hoop {
                 emptyRun = 0
             } else {
                 emptyRun += 1
-                XCTAssertLessThanOrEqual(emptyRun, FlightB411Rules.emptyRunMost, "a third bin running is always a hoop")
+                XCTAssertLessThanOrEqual(emptyRun, FlightB411Rules.emptyRunMost, "after an empty bin the next is always a hoop")
             }
         }
+    }
+
+    func testARoundsPointRestartsFlightAsAFreshMatchLevelWithEveryBinShut() {
+        var match = flight(seed: 3)
+        // Well into the match: leaning, a bin open with the hoop out.
+        hold(&match, at: 0.5)
+        match.frame += 2000
+        match.bins = match.bins.map { _ in Bin() }
+        match.bins[2] = Bin(open: true, load: .hoop, framesLeft: FlightB411Rules.binOpenFrames, caseFrames: FlightB411Rules.caseSlideFrames, retreating: false)
+        match.emptyRun = 1
+        // The point: the ball to the one scored on.
+        match.restart(ballTo: 1)
+        XCTAssertEqual(match.stage.tilt, 0, "level again")
+        XCTAssertEqual(match.tiltClock, 0)
+        XCTAssertFalse(match.bins.contains(where: \.open), "every bin shut")
+        XCTAssertNil(match.ballBin, "the ball's in hand, not in a bin")
+        XCTAssertEqual(match.ball.holder, 1)
+        XCTAssertEqual(match.stage.hoops[0].position, HighwayRules.parked, "no hoop to shoot at")
+        XCTAssertEqual(match.emptyRun, 0)
+        // Through the count and the level spell, still level and shut; then the cycle starts.
+        let spell = match.countdownLength + FlightB411Rules.startLevelFrames
+        for _ in 0..<(spell - 1) { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.stage.tilt, 0)
+        XCTAssertFalse(match.bins.contains(where: \.open), "shut through the spell")
+        for _ in 0..<2 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.bins.contains(where: \.open), "the bins' cycle starts after it")
     }
 
     func testAScoredHoopRetreatsIntoItsBin() {

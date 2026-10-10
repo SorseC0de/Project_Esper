@@ -1975,13 +1975,16 @@ it goes off, unglowing, its red palette 2 and its gold palette 33 (`FlightB411Ar
 made at load from the lit picture). Then the cycle: one bin
 open at a time, for ten seconds (`binOpenFrames`), then shut and another opened off the dice, never
 the same one twice running (`Match.lastBin`), with nothing in it, or the hoop: empty one time in
-three but never a third time running (`emptyRunMost`, `Match.emptyRun`), so there is at most one
-hoop on the stage. The hoop comes out in a hoopcase that slides down
+three but never twice running (`emptyRunMost` 1, `Match.emptyRun`; protocol 128), so there is at
+most one hoop on the stage. The hoop comes out in a hoopcase that slides down
 out of the bin over 20 frames (`caseSlideFrames`, `Bin.caseFrames`), jittering as it comes, a pixel
 either way and a hair of turn (`caseSlideWobble`), and slides back in before the
 bin shuts; scored on, in 47, it retreats at once (`flightB411Scored`, `Bin.retreating`) and its bin
-shuts and the next opens, so the one hoop can't take the ball twice (in Rounds the point's restart
-shuts everything anyway). The rim is live only with the case all the way out (`Bin.hoopLive`),
+shuts and the next opens, so the one hoop can't take the ball twice. In Rounds every point's
+restart starts the plane over as a fresh match does (`restartFlightB411`, `Match.flightRoundStart`;
+protocol 128): level, every bin shut and the hoop away, the count and the seven-second level spell
+counted from the restart; the ball in the hands of whoever was scored on with the bins still shut,
+so there's nothing to shoot at the moment the count ends, or, in neutral, in the middle bin. The rim is live only with the case all the way out (`Bin.hoopLive`),
 under its bin (`rimSpot`), and away (`HighwayRules.parked`) otherwise. The hoopcase: `Hoopcase`,
 `Flight/Hoopcase.png`, 48 by 48, the suitcase brown, anyone's: its main grey (palette 40)
 recoloured palette 33 and its lighter grey (39) palette 34 (`FlightB411Art.caseDark`, `caseLight`,

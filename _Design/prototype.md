@@ -727,6 +727,12 @@ A disconnect on the screen closes it to the title.
   (`futuristic_bar4_frame`) and each slot's inside (`FuturisticMeter.swift`): the vector's fill
   where it has one, else the first slanted fill moved along, and the right end's triangle inset
   from its outline as the left end's fill is from its own.
+- A stage chosen on the select is built behind the curtain, not before it comes down: the
+  stage's art made (`showStage`), then warmed (`warmStage`): every texture in the scene sent to
+  the GPU, then four frames drawn behind the curtain so what's first drawn (its shaders) is
+  made, each a step on the loading bar with the sprites' rebuilds; only then the session let go
+  and play or the stage preview starts, and the curtain goes up. (A stage chosen with the drink
+  pick after it is still built as it's chosen, there being no curtain before the pick.)
   The entrance (`CustomizeIntro`), as the screen appears: the top line, CUSTOMIZE and the mode
   float down and the bottom line and RETURN up, from a quarter of the screen's height away, over
   0.5 seconds; from 0.3 seconds, over 0.8, the players fade in from nothing as their halos (the

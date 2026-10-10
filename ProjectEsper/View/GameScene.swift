@@ -171,10 +171,54 @@ final class GameScene: SKScene {
     private var powerVariant = PowerVariant.none
     private var powerLevelVariant = PowerLevelVariant.two
     private let sprites = SpriteLibrary()
-    /// The sprites' rebuilds underway, 0 to 1, or nil with none, as they go: the loading bar's.
+    /// What's loading, 0 to 1, or nil with nothing, as it goes: the loading bar's. The sprites'
+    /// rebuilds and a new stage's warm-up, each its share.
     var onLoading: ((Double?) -> Void)? {
-        get { sprites.onLoading }
-        set { sprites.onLoading = newValue }
+        didSet { sprites.onLoading = { [weak self] _ in self?.reportLoading() } }
+    }
+
+    private func reportLoading() {
+        let parts = [sprites.loadingProgress, stageWarm.map { Double($0.made) / Double($0.all) }].compactMap { $0 }
+        onLoading?(parts.isEmpty ? nil : parts.reduce(0, +) / Double(parts.count))
+    }
+
+    /// A new stage readied behind the curtain before anything plays on it: every texture in
+    /// the scene sent to the GPU, then a few frames drawn so what's first drawn then (its
+    /// shaders) is made, and only then `then`. Its steps the loading bar's.
+    private var stageWarm: (made: Int, all: Int)?
+    private var stageWarmFramesLeft = 0
+    private var afterStageWarm: (() -> Void)?
+    static let stageWarmFrames = 4
+
+    private func warmStage(then: @escaping () -> Void) {
+        var textures: [SKTexture] = []
+        enumerateChildNodes(withName: "//*") { node, _ in
+            if let texture = (node as? SKSpriteNode)?.texture { textures.append(texture) }
+        }
+        afterStageWarm = then
+        stageWarm = (0, 1 + GameScene.stageWarmFrames)
+        reportLoading()
+        SKTexture.preload(textures) {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.stageWarm != nil else { return }
+                self.stageWarm?.made = 1
+                self.stageWarmFramesLeft = GameScene.stageWarmFrames
+                self.reportLoading()
+            }
+        }
+    }
+
+    /// A frame drawn behind the curtain toward the stage's warm-up; done, what waited on it.
+    private func stepStageWarm() {
+        guard stageWarmFramesLeft > 0, let warm = stageWarm else { return }
+        stageWarmFramesLeft -= 1
+        stageWarm = (warm.made + 1, warm.all)
+        guard stageWarmFramesLeft == 0 else { return reportLoading() }
+        let then = afterStageWarm
+        afterStageWarm = nil
+        then?()
+        stageWarm = nil
+        reportLoading()
     }
     private let hub = InputHub()
     private let cameraNode = SKCameraNode()
@@ -3411,6 +3455,7 @@ final class GameScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         defer { lastTime = currentTime }
+        stepStageWarm()
         if !ready {
             // Hold until the textures have all been drawn once.
             if preloaded, warmFramesLeft > 0 { warmFramesLeft -= 1 }
@@ -4172,16 +4217,17 @@ final class GameScene: SKScene {
             match = fresh
             match.frame = frame
         }
-        showStage()
-        freshRoundView()
         if pickAfterStage {
+            showStage()
+            freshRoundView()
             enter(.picking)
             return
         }
-        // Into the match behind the curtain: the session held until the stage's seen.
+        // Into the match behind the curtain: the stage built and warmed there, the curtain held
+        // on the loading bar till it's done, then the session let go and play (or the preview).
         let bannerHeld = heldBanner
         heldBanner = nil
-        let change = { [weak self] in
+        let play = { [weak self] in
             guard let self else { return }
             self.session.stopAt = nil
             self.bringPlayersIn()
@@ -4194,7 +4240,17 @@ final class GameScene: SKScene {
                 self.zonesRedraw()
             }
         }
-        if let flowState { flowState.transition(.fade, change) } else { change() }
+        let change = { [weak self] in
+            guard let self else { return }
+            self.showStage()
+            self.freshRoundView()
+            self.warmStage(then: play)
+        }
+        if let flowState { flowState.transition(.fade, change) } else {
+            showStage()
+            freshRoundView()
+            play()
+        }
     }
 
     /// In 47 on a stage where points are worth double, it says so as play starts there.

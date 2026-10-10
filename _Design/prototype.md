@@ -644,11 +644,17 @@ second bottle). Offline, a biomorph drunk sets the debug POWER picker back to no
 biomorph stands over the drinks, and left set it kept one biomorph's moves under another's name. The wait screen: the same black, the same ribbon, and its seconds in
 the same blue round button. The HUD: the
 round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
-touch pad: THROW and SHOOT side by side, JUMP below and between them, THROW, SHOOT and
-JUMP as the pack's round buttons in blue, plum and black,
-gold while held, their names in title lettering; the stick a faded black round button
-with a blue knob; PAUSE, AI, HITBOX and RESET small black plates along the top, plum when
-on. Every one of them is on the tuning panel (STAGE, PICK, HUD, TOUCH), the dialogs
+touch pad: THROW and SHOOT side by side, JUMP below and between them, JUMP and THROW in
+Futuristic_UI's ring1 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their
+names in Upheaval in it too, gold while held, the ring turning a full circle as it's pressed (0.35
+seconds); the stick a faded black round button with a blue knob; pause offline in frame 1 small
+(0.4 of the menus' size) with a pause sign in its face, upper right just under the second FLO
+meter (`TouchControls.placeCornerRow`), and AI, HITBOX and RESET small black plates to its left,
+plum when on. The pause: the match under a third-black wash and a thin dark material (SwiftUI's
+`.ultraThinMaterial`, dark); each choice in frame 8 at 0.6, every other one turned round, sliding
+in and fading from the left, then the right, down the screen, 0.07 seconds apart; RESUME frame 1
+with arrow1 in its face on the pause icon's own place, as big, and the settings' gear in frame 9
+upside down under it; the cursor's choice gold and a tenth bigger (`Screen.addFramed`). Every one of them is on the tuning panel (STAGE, PICK, HUD, TOUCH), the dialogs
 starting from the pause's and the win's sizes on each platform, the HUD and the pad at
 1 (the iPad's pad at buttons 0.75 and text 1.5, as tuned); the HUD and the pad are previewed over the court, as in play. The debug pickers and
 sliders keep their plain look.
@@ -656,8 +662,8 @@ sliders keep their plain look.
 ## Settings
 
 A gear in the title's upper right corner (the dobo pack's `settings_icon_128px`, `ui_icon_settings`,
-in Futuristic frame 1, the first of the title cursor's rows) and the same small gear beside the
-pause's header, right of it, open the
+in Futuristic frame 1, the first of the title cursor's rows) and the gear in frame 9 under the
+pause's RESUME open the
 settings (`SettingsScreen`, SwiftUI, full screen on the screens' ground, over the title or the
 pause), kept between launches (`GameSettings`). Each row its name and its choices, the picked one
 plum, gold on the cursor's row; up and down a row, left and right its choice (jump steps it on), B,

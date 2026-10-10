@@ -18,6 +18,8 @@ final class FlowState: ObservableObject {
     /// The ground under the screen is the palette's black rather than the royal blue: the
     /// Greateraid pick and wait.
     @Published var blackGround = false
+    /// The pause's: a third-black wash under a thin dark material over the match.
+    @Published var pauseGround = false
     /// The win screen's own ground.
     @Published var winGround = false
     /// The UI tuning panel is open.
@@ -68,6 +70,8 @@ final class FlowState: ObservableObject {
     }
     static let loadingSlotCount = FuturisticMeter.slots.count
     private var heldLift: (() -> Void)?
+    /// Where the in-match pause icon is, in the view's points: the pause menu's resume button's place.
+    @Published var pauseRect = CGRect.zero
     /// The stage select can go back: offline before the series' first stage, to the customize
     /// screen; online, out of the match.
     @Published var stageSelectBack = false

@@ -32,7 +32,16 @@ struct GameView: View {
         ZStack {
             MetalGameView(scene: flow.scene)
                 .ignoresSafeArea()
-            if flow.veiled {
+            if flow.veiled, flow.pauseGround {
+                // The pause's: the match under a third-black wash and a thin dark material over it.
+                ZStack {
+                    Color.black.opacity(PauseScreen.washOpacity)
+                    Rectangle().fill(.ultraThinMaterial)
+                }
+                .environment(\.colorScheme, .dark)
+                .ignoresSafeArea()
+                .transition(.opacity)
+            } else if flow.veiled {
                 // The screens' ground: the royal blue, dark, the world just showing through.
                 // Flat: the win screen on black's second, the rest on purple's last; the
                 // Greateraid pick and wait on black, shaded.

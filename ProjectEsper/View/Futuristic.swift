@@ -1,3 +1,4 @@
+import SpriteKit
 import SwiftUI
 
 /// The menus' look from `Futuristic_UI.svg` (brought in by Tools/import_futuristic.py): its
@@ -20,6 +21,19 @@ enum Futuristic {
     }
 
     static func image(_ piece: String) -> UIImage { UIImage(named: "futuristic_\(piece)") ?? UIImage() }
+
+    /// The same for SpriteKit: the blue and the gold, and a piece as a sprite at `scale` of the
+    /// menus' size, in the blue.
+    static let lineColour = SKColor(rgb: lineRGB)
+    static let litColour = SKColor(rgb: EsperPalette.gold.light)
+    static func sprite(_ piece: String, scale: CGFloat) -> SKSpriteNode {
+        let image = image(piece)
+        let sprite = SKSpriteNode(texture: SKTexture(image: image))
+        sprite.size = CGSize(width: image.size.width * image.scale * pointsPerPixel * scale, height: image.size.height * image.scale * pointsPerPixel * scale)
+        sprite.color = lineColour
+        sprite.colorBlendFactor = 1
+        return sprite
+    }
 
     /// Two of a piece as one image, the left one mirrored, meeting at the piece's left end. That
     /// end's soft edge (its first `softEdge` pixel columns) is cut from both, so they join solid.
@@ -53,6 +67,7 @@ enum Futuristic {
         "1": CGPoint(x: 0.75, y: 0.48),
         "6": CGPoint(x: 0.62, y: 0.49),
         "7": CGPoint(x: 0.50, y: 0.40),
+        "8": CGPoint(x: 0.48, y: 0.36),
         "9": CGPoint(x: 0.50, y: 0.32),
         "box4": CGPoint(x: 0.38, y: 0.50),
     ]

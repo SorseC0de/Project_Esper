@@ -1651,6 +1651,21 @@ final class GameScene: SKScene {
             floShown.append((0, shownFlo(index)))
         }
         showFloMeters()
+        // Pause and the corner switches under the second meter, and pause's place told to the
+        // pause menu, whose resume button sits on it.
+        if let controls, floMeters.count > 1 {
+            let foot = floMeters[1].calculateAccumulatedFrame().minY
+            controls.placeCornerRow(top: foot - GameScene.cornerRowGap, right: hudHalf.width - hudInsets.right - TouchControls.padding)
+            let frame = controls.pauseFrame, view = hudScene.size
+            flowState?.pauseRect = CGRect(x: view.width / 2 + frame.minX * hudScale, y: view.height / 2 - frame.maxY * hudScale,
+                                          width: frame.width * hudScale, height: frame.height * hudScale)
+        }
+    }
+    /// Between the second FLO meter's foot and the corner row, in points.
+    private static let cornerRowGap: CGFloat = 6
+    /// The pause icon's frame in the HUD's points, the pause menu's RESUME's place.
+    private var pauseIconFrame: CGRect {
+        controls?.pauseFrame ?? CGRect(x: hudHalf.width - 80, y: hudHalf.height - 40, width: 68, height: 35)
     }
 
     // MARK: FLO's orbs
@@ -4744,7 +4759,7 @@ final class GameScene: SKScene {
             screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: Array(Greateraid.boosters.prefix(3)), drinks: .none,
                                 colour: SKColor(rgb: sprites.look(for: 0).glow), timed: true, drinker: drinkerFrames(0)) { _ in }
         case .pause:
-            screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
+            screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
         case .win:
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(1), score: [1, 4], again: "NEW MATCH",
                                onAgain: {}, onTitle: {})
@@ -4821,7 +4836,7 @@ final class GameScene: SKScene {
                     extras.append(("REWIND", { [weak self] in self?.enter(.playing); self?.zonesRequest(.rewind) }))
                 }
             }
-            let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight,
+            let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame,
                                     onRestart: { [weak self] in self?.restartMatch() },
                                     onSettings: { [weak self] in self?.flowState?.openSettings() },
                                     onTitle: { [weak self] in self?.flowState?.transition { self?.enter(.title) } },
@@ -4844,6 +4859,7 @@ final class GameScene: SKScene {
         if let screen { hud.addChild(screen) }
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
         flowState?.blackGround = screen is PickScreen || screen is WaitScreen
+        flowState?.pauseGround = screen is PauseScreen
         flowState?.winGround = screen is WinScreen
         flowState?.veiled = screen != nil
     }

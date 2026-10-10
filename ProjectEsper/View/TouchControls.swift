@@ -8,16 +8,22 @@ final class TouchControls: SKNode {
     static let stickRadius = 40.0
     static let flickRadius = 32.0
 
-    /// A round button: its circle, invisible, for the touch; the pack's round button over
-    /// it, gold while it's held; and its name in title lettering on the face.
+    /// A round button: its circle, invisible, for the touch; one of Futuristic_UI's rings over
+    /// it, in the menus' blue, gold while it's held, turning a full circle as it's pressed; and
+    /// its name in the menus' lettering inside it.
     private struct Button {
         let node: SKShapeNode
-        let plate: SKSpriteNode
-        let piece: UIPiece
-        let label: SKSpriteNode
+        let ring: SKSpriteNode
+        let label: SKLabelNode
         var text: String
         let radius: CGFloat
     }
+    /// A ring's turn on a press, in seconds.
+    static let ringSpinSeconds = 0.35
+    /// A ring's diameter over the button's.
+    static let ringShare: CGFloat = 1.1
+    private static let line = SKColor(rgb: Futuristic.lineRGB)
+    private static let lit = SKColor(rgb: EsperPalette.gold.light)
     private var buttonSets: [(inout PlayerInput, Bool, Vec2) -> Void] = []
 
     /// The touch pad's tuned sizes (`UITuning`, TOUCH).
@@ -32,7 +38,9 @@ final class TouchControls: SKNode {
     private let hitboxButton = TouchControls.cornerButton("HITBOX")
     private let aiButton = TouchControls.cornerButton("AI")
     private let wallsButton = TouchControls.cornerButton("WALLS")
-    private let pauseButton = TouchControls.cornerButton("PAUSE")
+    /// Pause, offline: frame 1 small, a pause sign in its face, upper right under the FLO meter.
+    private let pauseButton = TouchControls.pauseIcon()
+    static let pauseScale: CGFloat = 0.4
 
     private static let cornerSize = CGSize(width: 50, height: 22)
 
@@ -50,6 +58,40 @@ final class TouchControls: SKNode {
         node.addChild(label)
         return node
     }
+
+    /// Frame 1 at `pauseScale` of the menus' size, in their blue, two bars in its face.
+    private static func pauseIcon() -> SKSpriteNode {
+        let image = Futuristic.image("1")
+        let frame = SKSpriteNode(texture: SKTexture(image: image))
+        frame.size = CGSize(width: image.size.width * image.scale * Futuristic.pointsPerPixel * pauseScale,
+                            height: image.size.height * image.scale * Futuristic.pointsPerPixel * pauseScale)
+        frame.color = line
+        frame.colorBlendFactor = 1
+        let face = Futuristic.faces["1"] ?? CGPoint(x: 0.5, y: 0.5)
+        let middle = CGPoint(x: (face.x - 0.5) * frame.size.width, y: (0.5 - face.y) * frame.size.height)
+        let bar = CGSize(width: frame.size.height * 0.1, height: frame.size.height * 0.36)
+        for side: CGFloat in [-1, 1] {
+            let piece = SKSpriteNode(color: line, size: bar)
+            piece.position = CGPoint(x: middle.x + side * bar.width, y: middle.y)
+            frame.addChild(piece)
+        }
+        return frame
+    }
+
+    /// The corner row: pause at the right, under `top` (the FLO meter's foot), the switches to its left.
+    func placeCornerRow(top: CGFloat, right: CGFloat) {
+        pauseButton.position = CGPoint(x: right - pauseButton.size.width / 2, y: top - pauseButton.size.height / 2)
+        let k = TouchControls.scale
+        let step = (TouchControls.cornerSize.width + 6) * k
+        let rowY = top - TouchControls.cornerSize.height * k / 2
+        let start = pauseButton.position.x - pauseButton.size.width / 2 - 6 - TouchControls.cornerSize.width * k / 2
+        for (index, button) in [resetButton, hitboxButton, aiButton].enumerated() {
+            button.position = CGPoint(x: start - CGFloat(index) * step, y: rowY)
+        }
+        wallsButton.position = CGPoint(x: hitboxButton.position.x, y: hitboxButton.position.y - (TouchControls.cornerSize.height + 6) * k)
+    }
+    /// Where pause is, in this node's space.
+    var pauseFrame: CGRect { pauseButton.frame }
 
     /// A corner switch on or off: plum when on, black when off.
     private static func light(_ button: SKShapeNode, on: Bool) {
@@ -103,32 +145,28 @@ final class TouchControls: SKNode {
         addChild(stickBase)
         addChild(stickKnob)
 
-        // Throw and shoot side by side, jump below and between them, all at the tuned size.
+        _ = Onomatopoeia.registered
+        // Throw and shoot side by side, jump below and between them, all at the tuned size:
+        // jump and throw in ring1, shoot in ring4.
         let k = TouchControls.scale
-        let jump = makeButton("JUMP", piece: .circleBlue, radius: 30 * k, at: CGPoint(x: right - 76 * k, y: bottom + 26 * k)) { input, down, _ in
+        let jump = makeButton("JUMP", ring: "ring1", radius: 30 * k, at: CGPoint(x: right - 76 * k, y: bottom + 26 * k)) { input, down, _ in
             input.jump = down
         }
-        let shoot = makeButton("SHOOT", piece: .circlePlum, radius: 30 * k, at: CGPoint(x: right - 38 * k, y: bottom + 84 * k)) { input, down, aim in
+        let shoot = makeButton("SHOOT", ring: "ring4", radius: 30 * k, at: CGPoint(x: right - 38 * k, y: bottom + 84 * k)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", piece: .circleBlack, radius: 24 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
+        let throwButton = makeButton("THROW", ring: "ring1", radius: 24 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }
         buttons = [jump.button, shoot.button, throwButton.button]
         buttonSets = [jump.set, shoot.set, throwButton.set]
 
-        // The corner switches in a row along the top, right to left.
-        let step = (TouchControls.cornerSize.width + 6) * k
-        for (index, button) in [resetButton, hitboxButton, aiButton, pauseButton].enumerated() {
-            button.position = CGPoint(x: right - TouchControls.cornerSize.width * k / 2 - CGFloat(index) * step, y: top - TouchControls.cornerSize.height * k / 2)
-            addChild(button)
-        }
+        // The corner row along the top, right to left, till the FLO meter's laid out and it's put under it.
+        for button in [resetButton, hitboxButton, aiButton, wallsButton] as [SKNode] + [pauseButton] { addChild(button) }
+        placeCornerRow(top: top, right: right)
         TouchControls.light(aiButton, on: aiOn)
-        // WALLS under HITBOX.
-        wallsButton.position = CGPoint(x: hitboxButton.position.x, y: hitboxButton.position.y - (TouchControls.cornerSize.height + 6) * k)
-        addChild(wallsButton)
         // The switches for working on the game, in a debug build only.
         for button in [hitboxButton, wallsButton, aiButton] { button.isHidden = !DebugUI.enabled }
     }
@@ -146,35 +184,48 @@ final class TouchControls: SKNode {
     func setLabels(jump: String, shoot: String, throwBall: String) {
         for (index, text) in [jump, shoot, throwBall].enumerated() where buttons.indices.contains(index) && buttons[index].text != text {
             buttons[index].text = text
-            TitleText.set(buttons[index].label, to: text, size: 10 * TouchControls.textScale)
+            buttons[index].label.text = text
         }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    private func makeButton(_ label: String, piece: UIPiece, radius: CGFloat, at point: CGPoint,
+    private func makeButton(_ label: String, ring name: String, radius: CGFloat, at point: CGPoint,
                             set: @escaping (inout PlayerInput, Bool, Vec2) -> Void) -> (button: Button, set: (inout PlayerInput, Bool, Vec2) -> Void) {
         let node = SKShapeNode(circleOfRadius: radius)
         node.position = point
         node.fillColor = .clear
         node.strokeColor = .clear
-        let corners = radius * 2 / (109 * UIPiece.pointsPerPixel)
-        let plate = piece.node(size: CGSize(width: radius * 2, height: radius * 2 * 117 / 109), corners: corners)
-        plate.alpha = 0.9
-        plate.zPosition = -1
-        node.addChild(plate)
-        let text = TitleText.node(label, size: 10 * TouchControls.textScale)
-        text.position = CGPoint(x: 0, y: piece.faceRise * corners)
+        let image = Futuristic.image(name)
+        let ring = SKSpriteNode(texture: SKTexture(image: image))
+        let across = radius * 2 * TouchControls.ringShare
+        ring.size = CGSize(width: across, height: across * image.size.height / max(image.size.width, 1))
+        ring.color = TouchControls.line
+        ring.colorBlendFactor = 1
+        ring.zPosition = -1
+        node.addChild(ring)
+        let text = SKLabelNode(fontNamed: Futuristic.fontName)
+        text.text = label
+        text.fontSize = 10 * TouchControls.textScale
+        text.fontColor = TouchControls.line
+        text.verticalAlignmentMode = .center
+        text.horizontalAlignmentMode = .center
         node.addChild(text)
         addChild(node)
-        return (Button(node: node, plate: plate, piece: piece, label: text, text: label, radius: radius), set)
+        return (Button(node: node, ring: ring, label: text, text: label, radius: radius), set)
     }
 
-    /// A round button held or let go: gold while held.
+    /// A round button held or let go: gold while held, its ring turning a full circle as it goes down.
     private func press(_ index: Int, down: Bool) {
         let button = buttons[index]
-        let corners = button.radius * 2 / (109 * UIPiece.pointsPerPixel)
-        (down ? UIPiece.circleGold : button.piece).fit(button.plate, to: CGSize(width: button.radius * 2, height: button.radius * 2 * 117 / 109), corners: corners)
+        button.ring.color = down ? TouchControls.lit : TouchControls.line
+        button.label.fontColor = down ? TouchControls.lit : TouchControls.line
+        guard down else { return }
+        button.ring.removeAction(forKey: "spin")
+        button.ring.zRotation = 0
+        let spin = SKAction.rotate(byAngle: -2 * .pi, duration: TouchControls.ringSpinSeconds)
+        spin.timingMode = .easeOut
+        button.ring.run(spin, withKey: "spin")
     }
 
     /// The controls as the sim should see them this frame: what's held, plus anything that

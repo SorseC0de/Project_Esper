@@ -22,6 +22,8 @@ class Screen: SKNode {
     /// Lettered buttons' plates, by choice: the plate, its own piece, and its size. The
     /// cursor's plate turns gold.
     private var plates: [Int: (plate: SKSpriteNode, piece: UIPiece, size: CGSize, label: SKSpriteNode, text: String, textSize: CGFloat)] = [:]
+    /// Futuristic_UI choices, by choice: what's coloured, the blue or, under the cursor, gold.
+    private var tinted: [Int: SKNode] = [:]
 
     /// This screen's tuned scale for one of its parts, 1 for a screen that isn't tuned.
     func tuned(_ part: UIPart) -> CGFloat {
@@ -114,6 +116,54 @@ class Screen: SKNode {
         return ribbonSize.width
     }
 
+    /// A choice in one of Futuristic_UI's frames at `scale` of the menus' size, turned round
+    /// across or down as asked, and in its face its lettering in the menus' face or `icon`: all
+    /// in the menus' blue, gold and a tenth bigger under the cursor.
+    @discardableResult
+    func addFramed(_ text: String?, frame name: String, scale: CGFloat, mirroredX: Bool = false, mirroredY: Bool = false,
+                   icon: SKNode? = nil, textSize: CGFloat = 16, at point: CGPoint, sound: SoundBoard.Effect = SoundBoard.confirm,
+                   action: @escaping () -> Void) -> SKNode {
+        let button = SKNode()
+        button.position = point
+        let frame = Futuristic.sprite(name, scale: scale)
+        frame.xScale = mirroredX ? -1 : 1
+        frame.yScale = mirroredY ? -1 : 1
+        button.addChild(frame)
+        let face = Futuristic.faces[name] ?? CGPoint(x: 0.5, y: 0.5)
+        let faceX = mirroredX ? 1 - face.x : face.x, faceY = mirroredY ? 1 - face.y : face.y
+        let middle = CGPoint(x: (faceX - 0.5) * frame.size.width, y: (0.5 - faceY) * frame.size.height)
+        if let text {
+            let label = SKLabelNode(fontNamed: Futuristic.fontName)
+            label.text = text
+            label.fontSize = textSize * tuned(.text)
+            label.fontColor = Futuristic.lineColour
+            label.verticalAlignmentMode = .center
+            label.horizontalAlignmentMode = .center
+            label.position = middle
+            button.addChild(label)
+        }
+        if let icon {
+            icon.position = middle
+            button.addChild(icon)
+        }
+        addChild(button)
+        let size = frame.size
+        let hit = CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2, width: size.width, height: size.height)
+        choices.append(Choice(node: button, hit: hit, enabled: true, arrowAt: point, arrowTurn: 0, sound: sound, action: action))
+        tinted[choices.count - 1] = button
+        if choices.count == 1 { cursor = 0 }
+        showCursor()
+        return button
+    }
+
+    /// A node and everything in it in a colour: sprites tinted, lettering coloured.
+    private static func colour(_ node: SKNode, _ colour: SKColor) {
+        if let sprite = node as? SKSpriteNode, sprite.colorBlendFactor > 0 { sprite.color = colour }
+        if let sprite = node as? SKSpriteNode, sprite.texture == nil { sprite.color = colour }
+        if let label = node as? SKLabelNode { label.fontColor = colour }
+        for child in node.children { Screen.colour(child, colour) }
+    }
+
     /// `arrowAt` is where the arrow sits for this choice, turned `arrowTurn` from pointing down.
     func addChoice(_ node: SKNode, hit: CGRect, enabled: Bool = true, arrowAt: CGPoint, arrowTurn: CGFloat, action: @escaping () -> Void) {
         choices.append(Choice(node: node, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: arrowTurn, sound: SoundBoard.confirm, action: action))
@@ -125,6 +175,11 @@ class Screen: SKNode {
     func showCursor() {
         for (index, choice) in choices.enumerated() {
             let lit = index == cursor && choice.enabled
+            if let node = tinted[index] {
+                choice.node.setScale(lit ? Futuristic.litGrowth : 1)
+                Screen.colour(node, lit ? Futuristic.litColour : Futuristic.lineColour)
+                continue
+            }
             choice.node.setScale(lit ? 1.12 : 1)
             if let plate = plates[index] {
                 (lit ? UIPiece.buttonGold : plate.piece).fit(plate.plate, to: plate.size, corners: tuned(.buttons))
@@ -672,43 +727,73 @@ final class StageSelectScreen: Screen {
 }
 
 /// The pause, against the computer: start the match over, the settings, go to the title, or play on.
+/// The pause, over the match on a dark wash under a thin material (drawn by the SwiftUI layer):
+/// each choice in Futuristic_UI's frame 8, every other one turned round, sliding and fading in
+/// from the left, then the right, and so on down; RESUME frame 1 with arrow1 in it, on the
+/// pause icon's own place, and the settings' gear in frame 9 turned upside down under it.
 final class PauseScreen: Screen {
-    /// `extras`: a game's own choices, ZONES' turn's, over the rest.
-    init(halfWidth: CGFloat, halfHeight: CGFloat, onRestart: @escaping () -> Void, onSettings: @escaping () -> Void,
+    /// The choices' frames' size against the menus', the gap between them, and their entrance.
+    static let optionScale: CGFloat = 0.6
+    static let optionGap: CGFloat = 8
+    static let slideDistance: CGFloat = 120
+    static let slideSeconds = 0.3
+    static let slideStagger = 0.07
+    /// The gear's frame under RESUME's.
+    static let gearGap: CGFloat = 4
+    /// The wash under the material.
+    static let washOpacity = 0.33
+
+    /// `extras`: a game's own choices, ZONES' turn's, over the rest. `resumeAt`: the pause
+    /// icon's frame, in the HUD's points.
+    init(halfWidth: CGFloat, halfHeight: CGFloat, resumeAt: CGRect, onRestart: @escaping () -> Void, onSettings: @escaping () -> Void,
          onTitle: @escaping () -> Void, onResume: @escaping () -> Void, extras: [(String, () -> Void)] = []) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pause)
-        let width: CGFloat = 230
-        // The card as wide as the header over it, so their edges line up.
-        let headerWidth = addHeader("PAUSED", at: CGPoint(x: 0, y: halfHeight * 0.62), width: width + 90)
-        addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.5), at: CGPoint(x: 0, y: -halfHeight * 0.12), piece: .cardPurple)
-        // With extras, everything packed closer to make room over RESTART.
-        let rows = 3 + extras.count
-        let top = halfHeight * 0.25 + CGFloat(extras.count) * halfHeight * 0.12
-        let gap = (top + halfHeight * 0.45) / CGFloat(max(rows - 1, 1))
-        for (index, extra) in extras.enumerated() {
-            addButton(extra.0, at: CGPoint(x: 0, y: top - gap * CGFloat(index)), width: width, action: extra.1)
+        let options: [(text: String, sound: SoundBoard.Effect, action: () -> Void)] =
+            extras.map { ($0.0, SoundBoard.confirm, $0.1) } + [("RESTART MATCH", SoundBoard.confirm, onRestart), ("TITLE SCREEN", .menuBack, onTitle)]
+        let image = Futuristic.image("8")
+        let height = image.size.height * image.scale * Futuristic.pointsPerPixel * PauseScreen.optionScale
+        let total = CGFloat(options.count) * height + CGFloat(options.count - 1) * PauseScreen.optionGap
+        for (index, option) in options.enumerated() {
+            let place = CGPoint(x: 0, y: total / 2 - height / 2 - CGFloat(index) * (height + PauseScreen.optionGap))
+            let node = addFramed(option.text, frame: "8", scale: PauseScreen.optionScale, mirroredX: index % 2 == 1, at: place,
+                                 sound: option.sound, action: option.action)
+            // In from the left, then the right, each a beat after the one over it.
+            let side: CGFloat = index % 2 == 0 ? -1 : 1
+            node.position.x += side * PauseScreen.slideDistance
+            node.alpha = 0
+            let slide = SKAction.move(to: place, duration: PauseScreen.slideSeconds)
+            slide.timingMode = .easeOut
+            node.run(.sequence([.wait(forDuration: Double(index) * PauseScreen.slideStagger),
+                                .group([slide, .fadeIn(withDuration: PauseScreen.slideSeconds)])]))
         }
-        addButton("RESTART MATCH", at: CGPoint(x: 0, y: top - gap * CGFloat(extras.count)), width: width, action: onRestart)
-        addButton("TITLE SCREEN", at: CGPoint(x: 0, y: top - gap * CGFloat(extras.count + 1)), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
-        addButton("RESUME", at: CGPoint(x: 0, y: -halfHeight * 0.45), sound: .menuBack, piece: .buttonPlum, width: width, action: onResume)
-        // The settings on a small round gear, as on the title, beside the header on its right.
-        let gear = SKNode()
-        gear.position = CGPoint(x: headerWidth / 2 + 34, y: halfHeight * 0.62)
-        let plate = UIPiece.circleBlue.node(size: CGSize(width: 40, height: 42), corners: 0.55)
-        plate.zPosition = -1
-        gear.addChild(plate)
-        if let icon = UIImage(named: "ui_icon_settings") {
-            let mark = SKSpriteNode(texture: SKTexture(image: icon))
-            mark.size = CGSize(width: 21, height: 22)
-            mark.position = CGPoint(x: 0, y: 2)
-            gear.addChild(mark)
-        }
-        addChild(gear)
-        addChoice(gear, hit: CGRect(x: gear.position.x - 22, y: gear.position.y - 22, width: 44, height: 44),
-                  arrowAt: CGPoint(x: gear.position.x - 34, y: gear.position.y), arrowTurn: .pi / 2, action: onSettings)
+        // RESUME on the pause icon, as big: frame 1, arrow1 in its face.
+        let iconScale = TouchControls.pauseScale
+        let arrowImage = Futuristic.image("arrow1")
+        let arrow = Futuristic.sprite("arrow1", scale: 1)
+        let resumeFrame = Futuristic.image("1")
+        let faceHeight = resumeFrame.size.height * resumeFrame.scale * Futuristic.pointsPerPixel * iconScale * 0.45
+        arrow.size = CGSize(width: faceHeight * arrowImage.size.width / max(arrowImage.size.height, 1), height: faceHeight)
+        let resume = addFramed(nil, frame: "1", scale: iconScale, icon: arrow, at: CGPoint(x: resumeAt.midX, y: resumeAt.midY),
+                               sound: .menuBack, action: onResume)
+        // The gear under it: frame 9 upside down, centred under RESUME's face.
+        let gearFrame = Futuristic.image("9")
+        let gearSize = CGSize(width: gearFrame.size.width * gearFrame.scale * Futuristic.pointsPerPixel * iconScale,
+                              height: gearFrame.size.height * gearFrame.scale * Futuristic.pointsPerPixel * iconScale)
+        let gear = SKSpriteNode(texture: UIImage(named: "ui_icon_settings").map { SKTexture(image: $0) })
+        gear.size = CGSize(width: gearSize.width * 0.5, height: gearSize.width * 0.5 * 31 / 30)
+        gear.color = Futuristic.lineColour
+        gear.colorBlendFactor = 1
+        let resumeFace = Futuristic.faces["1"] ?? CGPoint(x: 0.5, y: 0.5)
+        let faceX = resume.position.x + (resumeFace.x - 0.5) * resumeAt.width
+        let nineFace = Futuristic.faces["9"] ?? CGPoint(x: 0.5, y: 0.5)
+        addFramed(nil, frame: "9", scale: iconScale, mirroredY: true, icon: gear,
+                  at: CGPoint(x: faceX - (nineFace.x - 0.5) * gearSize.width, y: resumeAt.minY - PauseScreen.gearGap - gearSize.height / 2),
+                  action: onSettings)
         // On RESUME, so a press of jump straight after pausing plays on.
-        place(cursor: 2 + extras.count)
+        place(cursor: options.count)
     }
+
+    override var showsArrow: Bool { false }
 
     required init?(coder: NSCoder) { fatalError() }
 }

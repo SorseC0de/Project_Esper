@@ -38,9 +38,9 @@ MENU = {
     "#1b364d": "#262634", "#041121": "#0b0b12",          # black light, shadow
 }
 
-# Taken as they are: the top line in gold's second (the menus' orange), the bottom in blue's
-# second (the cyan), RETURN's lettering and frame in blue's first.
-TOP_LINE, BOTTOM_LINE, RETURN_CYAN = "#f5bb45", "#45bcf5", "#6bd0ff"
+# Taken as they are: the top line in gold's second (the menus' orange), the bottom in the
+# menus' blue (Futuristic.lineRGB), RETURN's lettering and frame in blue's first.
+TOP_LINE, BOTTOM_LINE, RETURN_CYAN = "#f5bb45", "#88d7ed", "#6bd0ff"
 KEPT = {TOP_LINE, BOTTOM_LINE, RETURN_CYAN}
 # RETURN's own: its cyan to blue's first, the rest as the menus'.
 RETURN = {"#00ffff": RETURN_CYAN}

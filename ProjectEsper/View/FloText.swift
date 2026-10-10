@@ -14,17 +14,21 @@ struct FloText: View {
     var maxWidth: CGFloat? = nil
     /// Space between the letters, a share of each one's size.
     var spacing: CGFloat = 0
+    /// Lit, as ever; or the FLO word's short of full (`FloTuning.shortColours`).
+    var colours = FloTuning.colours
 
-    init(_ text: String, height: CGFloat, fontName: String? = nil, maxWidth: CGFloat? = nil, spacing: CGFloat = 0) {
+    init(_ text: String, height: CGFloat, fontName: String? = nil, maxWidth: CGFloat? = nil, spacing: CGFloat = 0,
+         colours: Onomatopoeia.Colours = FloTuning.colours) {
         self.text = text
         self.height = height
         self.fontName = fontName
         self.maxWidth = maxWidth
         self.spacing = spacing
+        self.colours = colours
     }
 
     var body: some View {
-        let word = Onomatopoeia.picture(text, face: .englishDex, colours: FloTuning.colours, growsLeft: true, height: height,
+        let word = Onomatopoeia.picture(text, face: .englishDex, colours: colours, growsLeft: true, height: height,
                                         spacing: spacing, fontName: fontName)
         let width = word.height * word.image.size.width / max(word.image.size.height, 1)
         let shrink = maxWidth.map { min($0 / max(width, 1), 1) } ?? 1

@@ -24,6 +24,8 @@ LOGO_WIDTH = 1600
 # bar4, the loading bar: its frame and slot outlines without the vector's fills, uncropped, and
 # its sixteen slots' insides, as shares of that frame, written to FuturisticMeter.swift.
 METER = "bar4"
+# Icons from svgrepo, black on clear, brought in white to be coloured: (vector, published name, width).
+ICONS = [(ROOT / "_Graphic Assets" / "Vectors" / "multiplayer.svg", "futuristic_icon_multiplayer", 512)]
 METER_LAYOUT = ROOT / "ProjectEsper" / "View" / "FuturisticMeter.swift"
 # The finding pass's width, and the whole vector's width the kept pass renders at.
 FIND_WIDTH = 2560
@@ -163,10 +165,18 @@ def main():
             _, _, pw, ph = render(renderer, path, OUT / f"{name}.png", round(box[2] * density), round(box[3] * density))
             print(f"{name:22s} {pw}x{ph}")
         meter(renderer, source, boxes[METER], FULL_WIDTH / whole_width, scratch)
+        for vector, name, width in ICONS:
+            text = vector.read_text().replace('fill="#000000"', 'fill="#ffffff"')
+            text = re.sub(r"((?:fill|stroke):)(#[0-9a-fA-F]{3,6})\b", grey, text)
+            white = scratch / f"{name}.svg"
+            white.write_text(text)
+            view = [float(n) for n in re.search(r'viewBox="([^"]+)"', text).group(1).split()]
+            _, _, iw, ih = render(renderer, white, OUT / f"{name}.png", width, round(width * view[3] / view[2]))
+            print(f"{name:22s} {iw}x{ih}")
         logo = re.search(r'viewBox="([^"]+)"', LOGO.read_text()).group(1).split()
         _, _, lw, lh = render(renderer, LOGO, LOGO_OUT, LOGO_WIDTH, round(LOGO_WIDTH * float(logo[3]) / float(logo[2])))
         print(f"{LOGO_OUT.stem:22s} {lw}x{lh}")
-    wanted = {f"futuristic_{group}.png" for group in groups} | {f"futuristic_{METER}_frame.png"}
+    wanted = {f"futuristic_{group}.png" for group in groups} | {f"futuristic_{METER}_frame.png"} | {f"{name}.png" for _, name, _ in ICONS}
     for stale in OUT.glob("*.png"):
         if stale.name not in wanted:
             stale.unlink()

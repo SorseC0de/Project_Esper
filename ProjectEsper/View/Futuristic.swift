@@ -4,8 +4,9 @@ import SwiftUI
 /// frames and rules on the customize screen's ground (`MenuGround`), lettered in Upheaval. Pieces come in white and are multiplied
 /// by the vector's cyan, or by gold when highlighted, when they also grow a tenth.
 enum Futuristic {
-    /// The customize screen's bottom line.
-    static let line = Color(rgb: EsperPalette.blue.light)
+    /// The menus' blue, their pieces' and their lettering's.
+    static let lineRGB: RGB = 0x88D7ED
+    static let line = Color(rgb: lineRGB)
     /// The customize screen's top line.
     static let lit = Color(rgb: EsperPalette.gold.light)
     static let litGrowth: CGFloat = 1.1
@@ -94,15 +95,19 @@ struct FuturisticFrame<Content: View>: View {
     var scale: CGFloat = 1
     /// The frame alone sized, what it holds keeping its size.
     var frameScale: CGFloat = 1
+    /// The frame turned round left to right, what it holds the right way round.
+    var mirrored = false
     @ViewBuilder let content: (Color) -> Content
 
     var body: some View {
         let piece = FuturisticPiece(name: name, colour: lit ? Futuristic.lit : Futuristic.line, scale: scale * frameScale)
         let face = Futuristic.faces[name] ?? CGPoint(x: 0.5, y: 0.5)
+        let faceX = mirrored ? 1 - face.x : face.x
         piece
+            .scaleEffect(x: mirrored ? -1 : 1)
             .overlay {
-                content(lit ? Futuristic.lit : .white)
-                    .offset(x: (face.x - 0.5) * piece.size.width, y: (face.y - 0.5) * piece.size.height)
+                content(lit ? Futuristic.lit : Futuristic.line)
+                    .offset(x: (faceX - 0.5) * piece.size.width, y: (face.y - 0.5) * piece.size.height)
             }
             .scaleEffect(lit ? Futuristic.litGrowth : 1)
     }

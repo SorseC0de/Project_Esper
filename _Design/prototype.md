@@ -576,19 +576,21 @@ keeps the depth of a small one rather than flattening.
 The UI is being redone a screen at a time in `Futuristic_UI.svg`'s pieces (`_Graphic Assets/Vectors`):
 `Tools/import_futuristic.py` brings every named group in, the backdrop rectangle left out, as
 `ProjectEsper/UI/Futuristic/futuristic_<group>.png`, in greys for the game to multiply by a colour,
-at rest the customize screen's bottom line (blue's light, 0x45BCF5). `Futuristic` (Futuristic.swift) holds the look: the customize screen's ground (`MenuGround`),
+at rest the menus' blue (#88D7ED, `Futuristic.lineRGB`), their lettering in it too. `Futuristic` (Futuristic.swift) holds the look: the customize screen's ground (`MenuGround`, or its grid alone on black, `glows: false`),
 Upheaval TT lettering, every piece at 0.14 points to its imported pixel so the pieces keep their sizes
 in the vector, and each frame's face (where its lettering sits, off its leads). In place of a cursor
 plate, what the cursor's on turns gold (gold's light, the customize screen's top line) and grows a
 tenth. The title, the first done: the gear in frame 1, upper right, at half the others' size; the name over
 rule4 and a mirrored rule4 left of it, joined as one image with the meeting end's soft edge cut
 (`Futuristic.mirroredPair`), in a debug build the Variaball logo in the name's place (`variaball_logo`,
-rendered by the same tool); ROUNDS, 47
-and ZONES in frames 7, 9 and 6; VS CPU and VS HUMAN as plain words, white when picked and dim when
-not, with rule6 between them and rule5 at each end, the left one flipped both ways; MULTIPLAYER in
-box4; bottom right in a debug build, sliders for each mode button's drop and its frame's size, the
-lettering keeping its size (kept between launches; ROUNDS 0 and 0.80, 47 8 and 0.66, ZONES -20 and
-0.80 as tuned) (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
+rendered by the same tool); ROUNDS in frame 6 turned round (`FuturisticFrame.mirrored`), 47 in
+ring5 and ZONES in frame 6, between arrow2s pointing out; VS CPU and VS HUMAN as plain words, blue when
+picked and dim when not, with rule6 between them and rule5 at each end, the left one flipped both
+ways; MULTIPLAYER in box4, a little smaller, under svgrepo's multiplayer icon
+(`futuristic_icon_multiplayer`, from `Vectors/multiplayer.svg` by the same tool); the grid on black
+behind, without the customize screen's glows; bottom right in a debug build, sliders for each mode
+button's drop and its frame's size, the lettering keeping its size (kept between launches; ROUNDS -20
+and 0.80 as ZONES, 47 0 and 1, ZONES -20 and 0.80 as tuned) (its mode switches are on the multiplayer screen; the energy colours are the customize screen's,
 and in a match the debug strip's COLOUR, the first side's, round the wheel). UI and FONT A/B, bottom left, are words over rule8,
 white when on (B letters the title and its small switches in Bigdex, `TitleText.bigdex`, kept between
 launches), the tuning panel, with over it two placeholder pickers of every
@@ -702,7 +704,7 @@ A disconnect on the screen closes it to the title.
   `CustomizeLayout.swift`. Recoloured to the menus' colours: the cyans and blues to purple's ramp,
   the deep blues to plum's, the near-black to black's (`MENU` in the tool); its own ground (the
   gradient and the grid) and the heading's plate are left out, the screen drawing its own ground;
-  the top line gold's second (#F5BB45) and the bottom line blue's second (#45BCF5), each its own
+  the top line gold's second (#F5BB45) and the bottom line the menus' blue (#88D7ED), each its own
   layer. RETURN is lines alone in white, its gradient face out and its frame (not its letters)
   twice as thick, multiplied by blue's first (#6BD0FF), or under the cursor by the title's gold,
   growing a tenth, as the title's frames do. The boxes' lines are twice the vector's width (a
@@ -744,7 +746,11 @@ A disconnect on the screen closes it to the title.
   0.5 seconds; from 0.3 seconds, over 0.8, the players fade in from nothing as their halos (the
   beam and the projector's light) flicker on, off at first, and each side's boxes, their
   connectors and the colour display slide in from that side's edge of the screen.
-  RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second.
+  RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second, only while
+  START's under a cursor, held where they stopped otherwise; START's lettering lit as FLO's then, as
+  the FLO word's short of full otherwise (`FloTuning.shortColours`). The screen's lettering, the
+  labels and the mode's name, in the menus' blue, no drop shadows; "Game Mode:" small over the
+  mode's name (0.135 down).
 - Over the middle: CUSTOMIZE, no plate behind it (cap height 0.025 of the screen, its letters
   spaced 0.08 of their size apart, `Word.spacing`) and START on
   the emblem (0.035), both lettered as the lit FLO is (Bigdex, gold's first over the cyan, outlined

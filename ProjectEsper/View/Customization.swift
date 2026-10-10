@@ -310,6 +310,9 @@ struct CustomizeScreen: View {
     /// When the screen appeared, for its entrance (`CustomizeIntro`), and whether that's played.
     @State private var introStart: Date?
     @State private var introDone = false
+    /// START's rings: the seconds they've turned, and since when they've been turning now.
+    @State private var spunSeconds = 0.0
+    @State private var spinningSince: Date?
 
     init(flow: FlowState) {
         self.flow = flow
@@ -390,10 +393,12 @@ struct CustomizeScreen: View {
     /// A picker's colour: its share of each column, over the accent.
     static let swatchShare: CGFloat = 0.7
     /// The small boxes' line, blue's second (the cyan); the hood's, purple's first as the vector's cyan went.
-    static let smallBoxLine: RGB = EsperPalette.blue.light
+    static let smallBoxLine: RGB = Futuristic.lineRGB
     static let hoodLine: RGB = EsperPalette.purple.highlight
-    /// RETURN's lettering and frame, blue's first; under the cursor, the title's gold.
-    static let returnLine: RGB = EsperPalette.blue.highlight
+    /// RETURN's lettering and frame, the menus' blue; under the cursor, the title's gold.
+    static let returnLine: RGB = Futuristic.lineRGB
+    /// "Game Mode:" over the mode's name, its middle down the screen.
+    static let gameModeLabelY: CGFloat = 0.135
     /// A ticked box's ring, a share of the box's height.
     static let tickShare: CGFloat = 0.6
 
@@ -471,15 +476,15 @@ struct CustomizeScreen: View {
         let face = face ?? font
         return Text(text)
             .font(.custom(face.fontName, size: face.size(size)))
-            .foregroundStyle(.white)
-            .shadow(color: .black, radius: 0, x: 1, y: 2)
+            .foregroundStyle(Futuristic.line)
             .fixedSize()
     }
 
     /// Lettered as FLO is when it's lit: gold's first over the cyan, outlined in plum and purple,
     /// in the chosen face or in Bigdex (`ownFace` off). `height` is its cap height, whatever the face.
-    private func litTitle(_ text: String, height: CGFloat, spacing: CGFloat = 0, ownFace: Bool = true, maxWidth: CGFloat? = nil) -> some View {
-        FloText(text, height: height, fontName: ownFace ? font.fontName : nil, maxWidth: maxWidth, spacing: spacing)
+    private func litTitle(_ text: String, height: CGFloat, spacing: CGFloat = 0, ownFace: Bool = true, maxWidth: CGFloat? = nil,
+                          colours: Onomatopoeia.Colours = FloTuning.colours) -> some View {
+        FloText(text, height: height, fontName: ownFace ? font.fontName : nil, maxWidth: maxWidth, spacing: spacing, colours: colours)
     }
 
     /// Bigdex as `title`, its lower half in `lower`.
@@ -500,8 +505,7 @@ struct CustomizeScreen: View {
     private func subtitle(_ text: String, size: CGFloat) -> some View {
         Text(text)
             .font(.custom(font.fontName, size: font.size(size)))
-            .foregroundStyle(.white.opacity(0.9))
-            .shadow(color: .black, radius: 0, x: 1, y: 1)
+            .foregroundStyle(Futuristic.line)
     }
 
     /// CUSTOMIZE on the heading's plate, and the series' mode large under it.
@@ -509,6 +513,8 @@ struct CustomizeScreen: View {
     private func heading(_ size: CGSize) -> some View {
         litTitle("CUSTOMIZE", height: size.height * 0.025, spacing: CustomizeScreen.headingSpacing)
             .position(x: size.width / 2, y: size.height * 0.078)
+        subtitle("Game Mode:", size: size.height * CustomizeScreen.hoodWordShare)
+            .position(x: size.width / 2, y: size.height * CustomizeScreen.gameModeLabelY)
         title(flow.customizeMode == .rounds ? "ROUNDS" : flow.customizeMode == .zones ? "ZONES" : "47", size: size.height * 0.08)
             .position(x: size.width / 2, y: size.height * 0.19)
     }
@@ -806,14 +812,17 @@ struct CustomizeScreen: View {
     private func middle(_ size: CGSize) -> some View {
         let start = rect("customize_start", size)
         let lit = flow.customizeCursors.contains(.start)
-        return TimelineView(.animation) { timeline in
-            let seconds = timeline.date.timeIntervalSinceReferenceDate
+        // The rings turn only while START's lit, held where they stopped otherwise.
+        return TimelineView(.animation(paused: !lit)) { timeline in
+            let seconds = spunSeconds + (spinningSince.map { timeline.date.timeIntervalSince($0) } ?? 0)
             ZStack(alignment: .topLeading) {
                 layer("customize_start", size)
                 spinning("customize_spin_ccw", size, about: start, degrees: -seconds * CustomizeScreen.spinSpeeds.ccw)
                 spinning("customize_spin_cw", size, about: start, degrees: seconds * CustomizeScreen.spinSpeeds.cw)
                 if flow.customizeLaunch == nil {
-                    litTitle(flow.customizeOnline ? "READY" : "START", height: size.height * 0.035, ownFace: false)
+                    // Lettered as FLO is lit while START's lit, as it is short of full otherwise.
+                    litTitle(flow.customizeOnline ? "READY" : "START", height: size.height * 0.035, ownFace: false,
+                             colours: lit ? FloTuning.colours : FloTuning.shortColours)
                         .opacity(flow.customizeOnline && flow.customizeReady[flow.customizeLocal] ? 0.5 : 1)
                         .position(x: start.midX, y: start.midY)
                 }
@@ -824,6 +833,15 @@ struct CustomizeScreen: View {
         .scaleEffect(lit ? TitleOverlay.cursorGrowth : 1, anchor: UnitPoint(x: start.midX / size.width, y: start.midY / size.height))
         .contentShape(Rectangle().path(in: start))
         .onTapGesture { flow.activateCustomize(flow.customizeLocal, .start) }
+        .onAppear { if lit { spinningSince = Date() } }
+        .onChange(of: lit) {
+            if lit {
+                spinningSince = Date()
+            } else if let since = spinningSince {
+                spunSeconds += Date().timeIntervalSince(since)
+                spinningSince = nil
+            }
+        }
     }
 
     /// A ring turned about START's middle.
@@ -1297,6 +1315,9 @@ enum CustomizeArt {
 /// The customize screen's ground, also the title's: the gradient, its gold and blue glows, and
 /// the bowed purple grid, over the whole screen.
 struct MenuGround: View {
+    /// The gradient and its glows; without, the grid on black alone.
+    var glows = true
+
     var body: some View {
         GeometryReader { geometry in
             ground(geometry.size)
@@ -1306,7 +1327,15 @@ struct MenuGround: View {
     private func ground(_ screen: CGSize) -> some View {
         let fitted = CustomizeScreen.fitted(screen)
         return ZStack {
-            Color(rgb: EsperPalette.black.shadow)
+            Color(rgb: glows ? EsperPalette.black.shadow : 0x000000)
+            if glows { glowLayers(fitted) }
+            grid(fitted)
+        }
+        .ignoresSafeArea()
+    }
+
+    private func glowLayers(_ fitted: CGSize) -> some View {
+        ZStack {
             RadialGradient(stops: CustomizeScreen.groundStops, center: .center, startRadius: 0,
                            endRadius: fitted.width * CustomizeScreen.groundRadiusShare)
             RadialGradient(stops: CustomizeScreen.ground2Stops, center: .center, startRadius: 0,
@@ -1317,7 +1346,12 @@ struct MenuGround: View {
                            endRadius: fitted.width * CustomizeScreen.groundRadiusShare * CustomizeScreen.glowSizeShare)
             .opacity(CustomizeScreen.glowOpacity)
             .offset(x: fitted.width * 0.2, y: fitted.width * 0.1)
-            Canvas { context, size in
+        }
+    }
+
+    /// The purple grid, bowed so its cells grow toward the corners.
+    private func grid(_ fitted: CGSize) -> some View {
+        Canvas { context, size in
                 let centre = CGPoint(x: size.width / 2, y: size.height / 2)
                 let reach = hypot(centre.x, centre.y)
                 let cell = fitted.width * CustomizeScreen.gridCellShare
@@ -1343,9 +1377,7 @@ struct MenuGround: View {
                     }
                 }
                 context.stroke(path, with: .color(Color(rgb: EsperPalette.plum.light).opacity(CustomizeScreen.gridOpacity)), lineWidth: 1)
-            }
         }
-        .ignoresSafeArea()
     }
 }
 

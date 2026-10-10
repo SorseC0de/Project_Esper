@@ -448,7 +448,7 @@ struct TitleOverlay: View {
 
     var body: some View {
         ZStack {
-            MenuGround()
+            MenuGround(glows: false)
                 .ignoresSafeArea()
                 .overlay(alignment: .topTrailing) {
                     Button { flow.activate(.settings) } label: {
@@ -483,15 +483,18 @@ struct TitleOverlay: View {
                     } else {
                         Text("PROJECT ESPER")
                             .font(Futuristic.font(size: 52 * scale(.titles)))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Futuristic.line)
                     }
                     // Two, the left one mirrored, meeting in the middle as one.
                     FuturisticPiece(image: Futuristic.mirroredPair("rule4"), scale: scale(.buttons))
                 }
+                // ROUNDS in ZONES' frame turned round, 47 in ring5, between arrow2s pointing out.
                 HStack(spacing: 18 * scale(.buttons)) {
-                    framed("ROUNDS", in: "7", item: .bestOfSeven, drop: roundsFrameDrop, frameScale: roundsFrameScale)
-                    framed("47", in: "9", item: .fortySeven, drop: fortySevenFrameDrop, frameScale: fortySevenFrameScale)
+                    FuturisticPiece(name: "arrow2", scale: scale(.buttons)).scaleEffect(x: -1)
+                    framed("ROUNDS", in: "6", mirrored: true, item: .bestOfSeven, drop: roundsFrameDrop, frameScale: roundsFrameScale)
+                    framed("47", in: "ring5", item: .fortySeven, drop: fortySevenFrameDrop, frameScale: fortySevenFrameScale)
                     framed("ZONES", in: "6", item: .zones, drop: zonesFrameDrop, frameScale: zonesFrameScale)
+                    FuturisticPiece(name: "arrow2", scale: scale(.buttons))
                 }
                 HStack(spacing: 12 * scale(.buttons)) {
                     rule("rule5", width: TitleOverlay.endRuleWidth).scaleEffect(x: -1, y: -1)
@@ -501,12 +504,13 @@ struct TitleOverlay: View {
                     rule("rule5", width: TitleOverlay.endRuleWidth)
                 }
                 VStack(spacing: 6) {
-                    framed("MULTIPLAYER", in: "box4", item: .multiplayer)
+                    framed("MULTIPLAYER", in: "box4", item: .multiplayer, textSize: TitleOverlay.multiplayerTextSize,
+                           icon: "futuristic_icon_multiplayer")
                         .opacity(busy ? 0.5 : 1)
                     if let caption = net.state.caption {
                         Text(caption)
                             .font(Futuristic.font(size: 12 * scale(.text)))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(Futuristic.line.opacity(0.8))
                     }
                 }
             }
@@ -523,10 +527,11 @@ struct TitleOverlay: View {
 
     /// The mode buttons' drop, and their frames' size, the lettering keeping its own; from the
     /// debug sliders, these defaults as tuned.
-    @AppStorage("titleRoundsFrameDrop") private var roundsFrameDrop = 0.0
-    @AppStorage("titleRoundsFrameScale") private var roundsFrameScale = 0.8
-    @AppStorage("titleFortySevenFrameDrop") private var fortySevenFrameDrop = 8.0
-    @AppStorage("titleFortySevenFrameScale") private var fortySevenFrameScale = 0.66
+    /// ROUNDS starts where ZONES is, in the same frame.
+    @AppStorage("titleRoundsFrameDrop.2") private var roundsFrameDrop = -20.0
+    @AppStorage("titleRoundsFrameScale.2") private var roundsFrameScale = 0.8
+    @AppStorage("titleFortySevenFrameDrop.2") private var fortySevenFrameDrop = 0.0
+    @AppStorage("titleFortySevenFrameScale.2") private var fortySevenFrameScale = 1.0
     @AppStorage("titleZonesFrameDrop") private var zonesFrameDrop = -20.0
     @AppStorage("titleZonesFrameScale") private var zonesFrameScale = 0.8
 
@@ -534,14 +539,29 @@ struct TitleOverlay: View {
     static let endRuleWidth: CGFloat = 110
     static let middleRuleWidth: CGFloat = 120
 
-    /// A lettered button in one of the vector's frames.
-    private func framed(_ text: String, in frame: String, item: TitleItem, drop: Double = 0, frameScale: Double = 1) -> some View {
+    /// MULTIPLAYER's lettering, a little smaller than the modes', under its icon.
+    static let multiplayerTextSize: CGFloat = 20
+    static let iconHeight: CGFloat = 26
+
+    /// A lettered button in one of the vector's frames, an icon over the lettering if it has one.
+    private func framed(_ text: String, in frame: String, mirrored: Bool = false, item: TitleItem, drop: Double = 0, frameScale: Double = 1,
+                        textSize: CGFloat = 24, icon: String? = nil) -> some View {
         Button { flow.activate(item) } label: {
-            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons), frameScale: frameScale) { colour in
-                Text(text)
-                    .font(Futuristic.font(size: 24 * scale(.text)))
-                    .foregroundStyle(colour)
-                    .fixedSize()
+            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons), frameScale: frameScale, mirrored: mirrored) { colour in
+                VStack(spacing: 4 * scale(.buttons)) {
+                    if let icon {
+                        Image(uiImage: UIImage(named: icon) ?? UIImage())
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(contentMode: .fit)
+                            .colorMultiply(colour)
+                            .frame(height: TitleOverlay.iconHeight * scale(.buttons))
+                    }
+                    Text(text)
+                        .font(Futuristic.font(size: textSize * scale(.text)))
+                        .foregroundStyle(colour)
+                        .fixedSize()
+                }
             }
         }
         .buttonStyle(.plain)
@@ -556,7 +576,7 @@ struct TitleOverlay: View {
         return Button { flow.activate(item) } label: {
             Text(text)
                 .font(Futuristic.font(size: 18 * scale(.text)))
-                .foregroundStyle(lit ? Futuristic.lit : .white.opacity(picked ? 1 : TitleOverlay.unpickedOpacity))
+                .foregroundStyle(lit ? Futuristic.lit : Futuristic.line.opacity(picked ? 1 : TitleOverlay.unpickedOpacity))
                 .fixedSize()
         }
         .buttonStyle(.plain)
@@ -613,7 +633,7 @@ struct TitleOverlay: View {
     /// A debug corner switch: its word over rule8, white when it's on, dim otherwise, gold under the cursor.
     private func debugSwitch(_ text: String, picked: Bool, item: TitleItem) -> some View {
         let lit = flow.titleCursor == item
-        let colour = lit ? Futuristic.lit : .white.opacity(picked ? 1 : TitleOverlay.unpickedOpacity)
+        let colour = lit ? Futuristic.lit : Futuristic.line.opacity(picked ? 1 : TitleOverlay.unpickedOpacity)
         return Button { flow.activate(item) } label: {
             VStack(spacing: 3) {
                 Text(text)

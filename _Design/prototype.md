@@ -606,17 +606,19 @@ with its name on the face in two lines, broken at the space nearest its middle (
 space), gold when a cursor or a pick is on it; more than four stages in two rows, the first the
 longer, the plates 84 deep there (`StageSelectScreen.lines`, `oneRowMost`). The Greateraid pick,
 on the palette's black rather than the royal blue: its ribbon, smaller than the other
-screens' (26 on a 200 by 38 ribbon), the line under it in title lettering, and on a blue
+screens' (26 on a 200 by 38 ribbon), the line under it in title lettering just under the ribbon, and on a blue
 banner below, 120 deep, its top where the drinker stands: the raised drink's name across the
 banner's top edge, in front of the drinker, lettered as the FLO meter's word (Bigdex, gold over
-cyan, plum and purple outline, unskewed; "(Second Sip)" over it when it is one), the quote under
+cyan, plum and purple outline, unskewed, 16 high; "(Second Sip)" over it when it is one), the quote under
 it, 13, italic, at 0.7, and what the drink does under that in as many lines as it takes, at the
 largest of 20, 18, 16, 14 or 12 whose lines fit the banner (`TitleText.wrapped`,
 `PickScreen.layBlurb`); online the seconds in a blue round button, top right. The bottles carry
-no names and no arrow: each vector drawn once at the size it's shown (`PickScreen.bottle`), the
-raised one grows and wears a thick white outline, one white silhouette baked from it and drawn
-behind it as its child, so it takes the lean (sixteen recoloured copies of the vector drew as a
-broken second bottle). The wait screen: the same black, the same ribbon, and its seconds in
+no names and no arrow, and are drawn over everything on the screen: each vector drawn once at the
+size it's shown (`PickScreen.bottle`), the raised one grows and wears a thick white outline, one
+white silhouette baked from it (filled only where the copies drew, `sourceIn`) and drawn behind it
+as its child, so it takes the lean (sixteen recoloured copies of the vector drew as a broken
+second bottle). Offline, a biomorph drunk sets the debug POWER picker back to none: the picker's
+biomorph stands over the drinks, and left set it kept one biomorph's moves under another's name. The wait screen: the same black, the same ribbon, and its seconds in
 the same blue round button. The HUD: the
 round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, THROW, SHOOT and
@@ -798,7 +800,8 @@ series is over both go to the select before the drink. A stage that goes to its 
 starts that decider with the ball in neutral, loose where it starts, rather than in the hands of
 whoever was just scored on (`Match.restartBallTo` nil when a point levels it, protocol 55).
 Rectangles in a row, the stages not parked (`StageChoice.selectable`: The Wreck Center, Longball
-Stadium, The Elements, Sky Net and Hoopfish Hideaway), the one under a cursor
+Stadium, The Elements, Hoopfish Hideaway, Flight B411 and K&A; Slamstill Traffic and Sky Net
+parked, protocol 126), the one under a cursor
 grown, and in its bottom-right corner a circle in the voter's colour, a ring while they
 look and filled once they've picked. Two picks the same go there; two different flip a
 coin on the series' dice, the light going back and forth for a second and a half before
@@ -2030,11 +2033,12 @@ rimless, the run starting on the ground. Dunks and threes as on the court.
 Before a stage's first count in a series (not ZONES), a manga page of it plays to
 `stage_preview.wav` (6.3 seconds), then the players port in and the count runs. The page is
 `_Graphic Assets/Vectors/Stages/Manga_Panels.svg` (`MangaPage`, 3750 by 2625): fitted whole to the
-screen on white, five panels filling in turn, the right side's top, middle and bottom right, the
+screen on black, five panels filling in turn, the right side's top, middle and bottom right, the
 triangle at the bottom, then the big one on the left (at 0.15, 0.95, 1.75, 2.55 and 3.45 s). Each
 panel is a cut of the stage: it plays a few frames (24, the big one 40, a cut's own count over
 either) and freezes. The big one is the whole stage (a long one's middle, 420 by 260 units at
-most), the stage's name over it in FloText, low in the panel, springing in 0.25 s after it.
+most; Flight B411's out round the whole plane, nose and all), the stage's name over its middle in
+FloText (0.085 of the screen's height), springing in 0.25 s after it.
 
 How it's drawn: the flow's `.preview` (`GameScene.startPreview`, `stepPreview`, `finishPreview`):
 the session held where it is (`stopAt`, a round's first frame, the same on both phones online), a
@@ -2046,19 +2050,22 @@ panel's shape, into that panel's picture while it plays, and lays the page on th
 every panel up so far (`mangaVertex`, `mangaFragment`).
 
 The cuts (`previewShots`):
-- Flight B411: the hoopcase sliding out of a bin; the cart rolling, tipped; the chairs, panned;
-  NO DUNKING lighting up (held dark 12 frames, `signsDarkFrames`).
+- Flight B411: the hoopcase sliding out of a bin; the cart rolling, tipped; the shut middle bin
+  opening and the ball dropping out, frozen on its way down (`showsBall`); NO DUNKING lighting up
+  (held dark 12 frames, `signsDarkFrames`).
 - Hoopfish Hideaway: the Hoopfish swimming with the hoop, followed; the pile, panned; a school of
   fish swimming by (`previewSchool`); bubbles going up in front of a plant (`previewBubble`).
 - K&A: the first street light flickering; along the car on the right; the white building's sign;
   along the trash by it.
 - The Wreck Center: the hoop; the floor changing colour (one side's ball, then the other's);
-  along the three-point line, breathing; the middle platform, the view drawing back from it.
+  the left hoop; the middle platform, the view drawing back from it.
 - The Elements: a fire tornado rising out of the lava (the fourth rise); lightning striking (the
-  warning's last frames); a hoop with the rain in front of it; an icicle at the end of its hold,
-  dropping (the match run ahead to it).
+  warning's last frames), frozen with the bolt down; a hoop with the rain in front of it, the
+  view left of the rim; the row of icicles, one wiggling at the end of its hold and dropping,
+  frozen as it starts down (the match run ahead to it).
 - Longball Stadium: along the field; up the goalpost from its foot; a portal opening and a helmet
-  on its way (the match run ahead to each).
+  on its way (the match run ahead to each, the first player, out of the way, holding the ball, since
+  helmets come only against a holder).
 
 ## One-way slopes
 
@@ -2092,7 +2099,7 @@ COPY puts the layout on the clipboard as Swift for `HoopSupport.baked`; DONE clo
 
 ## Sky Net
 
-`StageChoice.skyNet`, on the select: to be detailed; the court for now.
+`StageChoice.skyNet`, parked off the select until it's made: to be detailed; the court for now.
 
 ## Court
 

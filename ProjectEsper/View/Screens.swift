@@ -241,7 +241,8 @@ final class PickScreen: Screen {
         // Smaller than the other screens' headers, box and lettering: the drinks are the thing here.
         addHeader("GREATERAID", size: 26, at: CGPoint(x: 0, y: halfHeight * 0.8), width: 200, height: 38)
         let sub = TitleText.node("YOU WERE SCORED ON. DRINK UP.", size: 13 * tuned(.text))
-        sub.position = CGPoint(x: 0, y: halfHeight * 0.62)
+        // Just under the ribbon.
+        sub.position = CGPoint(x: 0, y: halfHeight * 0.8 - 19 * tuned(.panels) - sub.size.height / 2 - 4)
         addChild(sub)
         if timed {
             // The seconds in a blue round button, top right.
@@ -280,6 +281,8 @@ final class PickScreen: Screen {
             let lean = CGFloat(5 + Int.random(in: 0...15)) * .pi / 180 * (Bool.random() ? 1 : -1)
             bottle.zRotation = lean
             bottle.position = CGPoint(x: x, y: -halfHeight - 24)
+            // Over everything on the screen.
+            bottle.zPosition = 5
             addChild(bottle)
             outlines.append(PickScreen.outline(of: bottle, width: 5 * tuned(.buttons)))
             let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight)
@@ -325,9 +328,9 @@ final class PickScreen: Screen {
                 let angle = CGFloat(step) / 24 * 2 * .pi
                 image.draw(at: CGPoint(x: pad + cos(angle) * width, y: pad + sin(angle) * width))
             }
-            context.cgContext.setBlendMode(.sourceIn)
             UIColor.white.setFill()
-            context.fill(CGRect(origin: .zero, size: size))
+            // Only where the copies drew: the plain fill's own blend is normal, a white box.
+            context.fill(CGRect(origin: .zero, size: size), blendMode: .sourceIn)
         }
         let ring = SKSpriteNode(texture: SKTexture(image: silhouette))
         ring.size = size
@@ -394,7 +397,7 @@ final class PickScreen: Screen {
     /// how much of it shows; the description's sizes, largest first; and its lines' spacing as a
     /// share of a line's drawn height (the lettering's outline and drop overlap).
     static let plateHeight: CGFloat = 120
-    static let nameHeight: CGFloat = 22
+    static let nameHeight: CGFloat = 16
     static let commentSize: CGFloat = 13
     static let commentAlpha: CGFloat = 0.7
     static let blurbSizes: [CGFloat] = [20, 18, 16, 14, 12]

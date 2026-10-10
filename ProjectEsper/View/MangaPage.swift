@@ -42,8 +42,8 @@ enum MangaPage {
             : CGSize(width: panelAspect / screenAspect, height: 1)
     }
 
-    /// The page's ground and the gutters between the panels: a manga page's white.
-    static let ground: RGB = 0xFFFFFF
+    /// The page's ground and the gutters between the panels: black.
+    static let ground: RGB = 0x000000
 
     // MARK: The timeline, to `stage_preview.wav`'s 6.3 seconds
 
@@ -53,10 +53,10 @@ enum MangaPage {
     static let liveFrames = 24
     static let bigLiveFrames = 40
     static let length = 6.3
-    /// The name over the big panel comes in this long after it, and its cap height as a share
-    /// of the screen's height.
+    /// The name over the big panel's middle comes in this long after it, and its cap height as a
+    /// share of the screen's height.
     static let titleDelay = 0.25
-    static let titleHeight: CGFloat = 0.11
+    static let titleHeight: CGFloat = 0.085
 }
 
 /// What the renderer is told of the page each frame: how many panels are up and which one's

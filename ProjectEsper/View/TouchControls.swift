@@ -214,6 +214,11 @@ final class TouchControls: SKNode {
         return slider
     }
 
+    /// A picker shown on an option the game chose, without calling back.
+    func showPicker(titled title: String, at index: Int) {
+        pickers.first { $0.title == title }?.show(index)
+    }
+
     /// The newest picker steps to its next option.
     func cyclePicker(titled title: String) {
         pickers.first { $0.title == title }?.selectNext()

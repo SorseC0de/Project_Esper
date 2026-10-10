@@ -64,6 +64,13 @@ final class SegmentedPicker: SKNode {
     }
 
     /// Steps to the next segment, wrapping.
+    /// Shows `index` as picked without calling back: the game set it.
+    func show(_ index: Int) {
+        guard segments.indices.contains(index) else { return }
+        selected = index
+        light()
+    }
+
     func selectNext() {
         selected = (selected + 1) % segments.count
         light()

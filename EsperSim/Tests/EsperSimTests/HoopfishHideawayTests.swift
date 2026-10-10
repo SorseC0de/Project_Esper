@@ -69,10 +69,10 @@ final class HoopfishHideawayTests: XCTestCase {
         }
     }
 
-    func testTheSelectParksSlamstillTraffic() {
+    func testTheSelectParksSlamstillTrafficAndSkyNet() {
         XCTAssertFalse(StageChoice.selectable.contains(.slamstillTraffic))
+        XCTAssertFalse(StageChoice.selectable.contains(.skyNet), "not made yet")
         XCTAssertTrue(StageChoice.selectable.contains(.hoopfishHideaway))
-        XCTAssertTrue(StageChoice.selectable.contains(.skyNet))
     }
 
     func testAMapWithPropsCodesAndReadsBack() throws {

@@ -137,6 +137,9 @@ final class GameScene: SKScene {
     private var stagePreview: StagePreview?
     private var previewedStage: StageChoice?
     private var previewFraming: (centre: CGPoint, scale: CGFloat)?
+    private var previewShowsBall = false
+    /// The win's on its way behind the curtain: no count meanwhile.
+    private var headingToWin = false
     /// Flight B411's NO DUNKING sign held dark, frames left, for its cut's lighting up.
     private var signsDarkFrames = 0
     /// The three-point arcs as they were before a cut showed them.
@@ -3431,8 +3434,10 @@ final class GameScene: SKScene {
         if let next = pendingFlow, match.frame >= pendingFlowFrame {
             pendingFlow = nil
             if next == .won, let flowState {
-                // The win behind the curtain, the sim held under it so no count shows through.
+                // The win behind the curtain, the sim held under it so no count shows through,
+                // and none heard or shown either while the curtain comes down.
                 session.stopAt = match.frame
+                headingToWin = true
                 flowState.transition { [weak self] in self?.enter(.won) }
             } else if next == .playing {
                 // The point's finish seen out with nobody to pick: the close-in let go and the
@@ -4488,6 +4493,7 @@ final class GameScene: SKScene {
     private var fortySevenScores = [0, 0]
 
     private func enter(_ next: Flow) {
+        headingToWin = false
         // A stage's first count waits for its preview.
         if next == .playing, previewDue, startPreview() { return }
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
@@ -4540,6 +4546,11 @@ final class GameScene: SKScene {
         guard flow == .picking, pickOffers.indices.contains(choice) else { return }
         let drink = pickOffers[choice]
         series.drink(drink, by: picker)
+        // A biomorph drunk here takes over from the POWER picker's: one biomorph at a time.
+        if drink.kind == .biomorph, picker == 0, online == nil, powerVariant != .none {
+            powerVariant = .none
+            controls?.showPicker(titled: "POWER", at: PowerVariant.none.rawValue)
+        }
         applyDrinks()
         drawSeries()
         session.mutate { $0.countdown = $0.countdownLength }
@@ -8012,7 +8023,7 @@ final class GameScene: SKScene {
 
         let ball = match.ball
         // Flight B411's ball, shut in its bin through the count, unseen till the bin opens.
-        ballNode.isHidden = ball.holder != nil || match.ballBin != nil || previewMatch != nil
+        ballNode.isHidden = ball.holder != nil || match.ballBin != nil || (previewMatch != nil && !previewShowsBall)
         ballNode.position = SpriteLibrary.point(ball.position)
         // On the Hoopfish's antenna it nods with it.
         if match.hoopfish?.carrying == .ball, ball.holder == nil { ballNode.position = hoopfishNod(0).turn(ballNode.position) }
@@ -8283,7 +8294,7 @@ final class GameScene: SKScene {
         section("hitbox")
         // The count in title lettering, BALL OUT as it ends, and any other banner for its frames.
         // With a screen up or on its way, the count waits: it starts again as play comes back.
-        let counting = flow == .playing && pendingFlow == nil
+        let counting = flow == .playing && pendingFlow == nil && !headingToWin
         if previewMatch != nil {
             // The stage preview: no count, no banner; the session's count waits for it.
             banner.isHidden = true
@@ -8317,7 +8328,7 @@ final class GameScene: SKScene {
         // The stage preview shows the stage alone: no bodies, no ball's glow or chevrons.
         bodies.isHidden = previewMatch != nil
         if previewMatch != nil {
-            ballHalo.isHidden = true
+            if !previewShowsBall { ballHalo.isHidden = true }
             for chevron in chevrons + targetChevrons + [opponentChevron] { chevron.isHidden = true }
         }
         if roundIntro > 0 {
@@ -8544,6 +8555,8 @@ private struct PreviewShot {
     var zoom: CGFloat = 1
     var frames: Int?
     var prepare: (inout Match) -> Void = { _ in }
+    /// The ball drawn in this cut, which the preview otherwise keeps out of sight.
+    var showsBall = false
     var tick: ((inout Match, Int) -> Void)?
     var begin: ((GameScene) -> Void)?
     var everyFrame: ((GameScene, Int) -> Void)?
@@ -8624,6 +8637,7 @@ extension GameScene {
             var match = state.base
             state.shots[due].prepare(&match)
             previewMatch = match
+            previewShowsBall = state.shots[due].showsBall
             state.shots[due].begin?(self)
         }
         guard state.panel >= 0 else {
@@ -8665,6 +8679,7 @@ extension GameScene {
     private func finishPreview() {
         stagePreview = nil
         previewMatch = nil
+        previewShowsBall = false
         previewFraming = nil
         mangaPage = nil
         signsDarkFrames = 0
@@ -8692,7 +8707,13 @@ extension GameScene {
         let whole = PreviewShot(at: Vec2(x: stage.width / 2, y: stage.height / 2),
                                 view: CGSize(width: min(stage.width, 420), height: min(stage.height, 260)))
         switch look {
-        case .flightB411: return flightB411Shots() + [whole]
+        case .flightB411:
+            // Out far enough to see the plane, nose and all, round the cabin.
+            let plane = FlightB411Art.planeSize
+            let ppu = Double(SpriteLibrary.pixelsPerUnit)
+            let aroundPlane = PreviewShot(at: Vec2(x: stage.width / 2, y: stage.height / 2 + Double(FlightB411Art.planeY) / ppu),
+                                          view: CGSize(width: plane.width / CGFloat(ppu) * 1.04, height: plane.height / CGFloat(ppu) * 1.04))
+            return flightB411Shots() + [aroundPlane]
         case .hoopfishHideaway: return hoopfishShots() + [whole]
         case .kAndA: return kAndAShots() + [whole]
         case .court: return wreckCenterShots() + [whole]
@@ -8732,12 +8753,19 @@ extension GameScene {
             match.cart = rolling
             match.refreshExtras()
         }
-        // The chairs, panned along.
-        let chairs = PreviewShot(at: Vec2(x: 34, y: 24), view: CGSize(width: 42, height: 30), pan: Vec2(x: 34, y: 0), frames: 36)
+        // A shut bin opening and the ball dropping out of it, frozen on its way down.
+        let middle = FlightB411Rules.centreBin
+        var drop = PreviewShot(at: Vec2(x: FlightB411Rules.width / 2, y: FlightB411Rules.binBottom - 10), view: CGSize(width: 36, height: 34), frames: 30)
+        drop.showsBall = true
+        drop.prepare = { match in
+            match.startFromBin(middle)
+            match.ball.frozen = 0
+            match.countdown = 10
+        }
         // NO DUNKING lighting up.
         var sign = PreviewShot(at: Vec2(x: FlightB411Rules.width / 2, y: 80), view: CGSize(width: 34, height: 18), frames: 30)
         sign.begin = { scene in scene.signsDarkFrames = 12 }
-        return [hoopcase, cart, chairs, sign]
+        return [hoopcase, cart, drop, sign]
     }
 
     private func hoopfishShots() -> [PreviewShot] {
@@ -8796,14 +8824,9 @@ extension GameScene {
             match.ball.lastTouched = 0
         }
         floor.tick = { match, frame in if frame == 14 { match.ball.lastTouched = 1 } }
-        // Along the three-point line, breathing.
-        let radius = FortySevenRules.threePointRadius(for: Hoop(position: rim, owner: 0, backboard: .right), on: court)
-        var arc = PreviewShot(at: Vec2(x: rim.x - radius, y: 24), view: CGSize(width: 70, height: 44),
-                              pan: Vec2(x: radius * 0.6, y: radius * 0.7), frames: 40)
-        arc.begin = { scene in
-            if scene.arcsWereHidden == nil { scene.arcsWereHidden = scene.threePointArcs.isHidden }
-            scene.threePointArcs.isHidden = false
-        }
+        // The left hoop.
+        let leftRim = court.hoops.first { $0.backboard == .left }?.position ?? Vec2(x: 53, y: 95)
+        let arc = PreviewShot(at: leftRim + Vec2(x: -2, y: 8), view: CGSize(width: 56, height: 46), frames: 28)
         // The platform in the middle, the view drawing back from it.
         let platform = PreviewShot(at: Vec2(x: court.width / 2, y: 38), view: CGSize(width: 50, height: 30), zoom: 3.5, frames: 40)
         return [hoop, floor, arc, platform]
@@ -8822,11 +8845,12 @@ extension GameScene {
         var probe = Match(stage: stage)
         probe.frame = strikeFrame
         let strikeAt = probe.lightningWarning?.target ?? Vec2(x: stage.width / 2, y: 40)
-        var lightning = PreviewShot(at: strikeAt + Vec2(x: 0, y: 26), view: CGSize(width: 60, height: 70), frames: 34)
+        // Frozen with the bolt still down.
+        var lightning = PreviewShot(at: strikeAt + Vec2(x: 0, y: 26), view: CGSize(width: 60, height: 70), frames: 17)
         lightning.prepare = { match in match.frame = strikeFrame }
         // A hoop with the rain in front of it.
         let rim = stage.hoops.last?.position ?? Vec2(x: stage.width - 60, y: 100)
-        let hoop = PreviewShot(at: rim + Vec2(x: 0, y: 6), view: CGSize(width: 60, height: 48), frames: 28)
+        let hoop = PreviewShot(at: rim + Vec2(x: -26, y: 8), view: CGSize(width: 80, height: 58), frames: 28)
         // An icicle at the end of its hold, shaking and dropping: the match run ahead to it.
         var icicleAt = Vec2(x: stage.width / 2, y: stage.height - 20)
         var icicleFrame = 0
@@ -8842,7 +8866,8 @@ extension GameScene {
             }
         }
         let snapshot = ahead
-        var icicle = PreviewShot(at: icicleAt + Vec2(x: 0, y: -26), view: CGSize(width: 46, height: 64), pan: Vec2(x: 0, y: -14), frames: 48)
+        // The row of them, the one wiggling and then dropping, frozen as it starts down.
+        var icicle = PreviewShot(at: icicleAt + Vec2(x: 0, y: -14), view: CGSize(width: 140, height: 44), frames: 27)
         icicle.prepare = { match in
             guard icicleFrame > 0 else { return }
             match = snapshot
@@ -8866,6 +8891,10 @@ extension GameScene {
         var portalAt: Vec2?
         var portalMatch: Match?
         var helmetMatch: Match?
+        // Helmets come only against whoever holds the ball: the first, out of the way, holds it.
+        ahead.players[0].hasBall = true
+        ahead.ball.holder = 0
+        ahead.ball.frozen = 0
         for _ in 0..<2400 where portalMatch == nil || helmetMatch == nil {
             let before = ahead
             ahead.advance(inputs: ahead.players.map { _ in .idle })

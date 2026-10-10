@@ -36,13 +36,13 @@ struct GameView: View {
             }
             HudView(scene: flow.scene)
                 .ignoresSafeArea()
-            // The stage preview's name over its big panel, low in it, in FLO lettering.
+            // The stage preview's name over its big panel's middle, in FLO lettering.
             if let title = flow.previewTitle {
                 GeometryReader { geometry in
                     let fit = MangaPage.fit(in: geometry.size)
                     let box = MangaPage.bounds(MangaPage.bigPanel)
                     FloText(title, height: geometry.size.height * MangaPage.titleHeight, maxWidth: box.width * fit.scale * 0.85)
-                        .position(x: fit.origin.x + box.midX * fit.scale, y: fit.origin.y + (box.maxY - box.height * 0.16) * fit.scale)
+                        .position(x: fit.origin.x + box.midX * fit.scale, y: fit.origin.y + box.midY * fit.scale)
                 }
                 .ignoresSafeArea()
                 .allowsHitTesting(false)

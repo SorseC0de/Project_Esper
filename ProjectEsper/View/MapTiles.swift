@@ -80,6 +80,7 @@ struct TileSpot: Hashable {
 /// file's Train Tracks and Front Pillar L layers.
 enum KAndAArt {
     struct Handles {
+        var sky: SKSpriteNode?
         var backdrop: SKSpriteNode?
         var front: SKSpriteNode?
         /// The red car's body, which sags under a body, and its wheels, which don't.
@@ -91,6 +92,26 @@ enum KAndAArt {
     /// Past the stage's edges: palette 30, the sky's own top.
     static let beyond: RGB = PixelPalette.colours[30]
     static let backdropZ: CGFloat = -7.8
+    /// The sky under it, and its clouds between the two.
+    static let skyZ: CGFloat = backdropZ - 0.2
+    static let cloudZ: CGFloat = backdropZ - 0.1
+    /// The clouds (`KAndAClouds`, three 96 by 32 cells down the picture), drifting left to right
+    /// over the sky, slowly, each a cell at random at a height at random from the houses' top up
+    /// (`cloudLowest`, art pixels up from the stage's foot); never more than `cloudsMost` at once,
+    /// the next a while after one's gone (`cloudGapFrames`).
+    static let cloudCells: [SKTexture] = {
+        let sheet = SKTexture(imageNamed: "KAndAClouds")
+        sheet.filteringMode = .nearest
+        return (0..<3).map { row in
+            let cell = SKTexture(rect: CGRect(x: 0, y: CGFloat(2 - row) / 3, width: 1, height: 1.0 / 3), in: sheet)
+            cell.filteringMode = .nearest
+            return cell
+        }
+    }()
+    static let cloudsMost = 4
+    static let cloudSpeeds: ClosedRange<CGFloat> = 0.1...0.25
+    static let cloudLowest: CGFloat = 105
+    static let cloudGapFrames = 180...600
     /// The car (`red_car.aseprite`, 128 by 48, its Body and Wheels layers each their own
     /// picture) just over the backdrop; its sag: down two pixels as someone lands on it, back up
     /// one and held there while they stay, up the last once they've gone, a pixel every few frames.
@@ -183,6 +204,7 @@ enum KAndAArt {
             SKTexture.preload([texture]) {}
             return node
         }
+        handles.sky = picture("KAndASky", z: skyZ, into: parent)
         handles.backdrop = picture("KAndABackdrop", z: backdropZ, into: parent)
         handles.front = picture("KAndAFront", z: 0, into: frontParent)
         let carAt = CGPoint(x: CGFloat(KAndARules.carLeft * SpriteLibrary.pixelsPerUnit), y: CGFloat(KAndARules.floorRows) * ElementsArt.tileSide)

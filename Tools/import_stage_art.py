@@ -3,7 +3,7 @@ its backdrop, the layers over them into its front, by Tools/aseprite.py.
 
 Usage: import_stage_art.py flight|kanda [...]      (no name: every stage)
 """
-import os, subprocess, sys
+import os, shutil, subprocess, sys
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 ART = os.path.join(ROOT, "_Graphic Assets", "Pixel Art", "Stages")
 CATALOG = os.path.join(ROOT, "ProjectEsper", "Assets.xcassets")
@@ -17,8 +17,12 @@ STAGES = {
     },
     "kanda": {
         "file": "K&A/K&A_Map.aseprite",
-        # Everything under the players but the file's [Dont_Draw] layer, which marks the red car's place and walls.
-        "KAndABackdrop": ["Background Sky", "Background Houses", "Ground", "Buildings", "Signs", "Text", "Back Pillar 2",
+        # The sky alone, the clouds drifting over it (`KAndAClouds`, the file beside it, three cells
+        # down), then everything else under the players but the file's [Dont_Draw] layer, which
+        # marks the red car's place and walls.
+        "KAndASky": ["Background Sky"],
+        "KAndAClouds": "K&A/clouds.png",
+        "KAndABackdrop": ["Background Houses", "Ground", "Buildings", "Signs", "Text", "Back Pillar 2",
                           "Back Pillar 1", "Cars", "Extras", "Train Support 3", "Train Support 2", "Train Support 1", "Train Tracks"],
         "KAndAFront": ["Front Pillar 2", "Front Pillar 1"],
     },
@@ -30,9 +34,14 @@ STAGES = {
 }
 
 def write(name, layers, source):
+    """Layers flattened out of the stage's file, or a picture beside it, named by its path, taken as it is."""
     folder = os.path.join(CATALOG, name + ".imageset")
     os.makedirs(folder, exist_ok=True)
-    subprocess.run([sys.executable, ASEPRITE, source, os.path.join(folder, name + ".png")] + layers, check=True)
+    if isinstance(layers, str):
+        shutil.copyfile(os.path.join(ART, layers), os.path.join(folder, name + ".png"))
+        layers = [layers]
+    else:
+        subprocess.run([sys.executable, ASEPRITE, source, os.path.join(folder, name + ".png")] + layers, check=True)
     contents = os.path.join(folder, "Contents.json")
     if not os.path.exists(contents):
         open(contents, "w").write('{\n  "images": [\n    {\n      "filename": "%s.png",\n      "idiom": "universal",\n      "scale": "1x"\n    }\n  ],\n  "info": {\n    "author": "xcode",\n    "version": 1\n  }\n}\n' % name)

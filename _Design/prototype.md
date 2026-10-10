@@ -2080,11 +2080,16 @@ A street under a railway bridge (`StageChoice.kAndA`, `Stage.kAndA`, `StageLook.
 Drawn whole in Aseprite, `Stages/K&A/K&A_Map.aseprite`, 592 by 304, one of its pixels an art
 pixel: 37 tiles by 19, Hoopfish Hideaway's size, seen whole (`StageFeatures.seenWhole`, the
 camera fitted to the screen as the plane's is, palette 30 beyond the edges, the sky's own top).
-The file's layers, bottom up: Background Sky, Background Houses, Ground, Buildings, Extras,
-Signs, Text, Back Pillar, Cars, Train Support L, Train Tracks, then Front Pillar L, Train Support
-R, Front Pillar R; the players draw between Train Tracks and Front Pillar L, so `Tools/aseprite.py`
-flattens the first eleven into `KAndABackdrop`, on the stage's ground, and the last three into
-`KAndAFront`, in `stageFront` over the players (the file keeps an old-style 8-bit palette chunk
+The file's layers, bottom up: Background Sky, Background Houses, Ground, Buildings, Signs, Text,
+Back Pillar 2 and 1, Cars, Train Support 3, 2 and 1, Extras, Train Tracks, then Front Pillar 2 and 1;
+the players draw between Train Tracks and the front pillars, so `Tools/aseprite.py` flattens
+Background Sky alone into `KAndASky`, the rest under the players into `KAndABackdrop`, on the
+stage's ground, and the front pillars into `KAndAFront`, in `stageFront` over the players. Between
+the sky and the backdrop the clouds (`Stages/K&A/clouds.png`, three 96 by 32 cells down it, copied in
+as `KAndAClouds`) drift left to right, slowly (0.1 to 0.25 art pixels a frame, drawn on whole
+pixels), each a cell at random at a height at random from 105 art pixels up (the houses' top) to the
+top, never more than four at once, the next three to ten seconds after one's gone, two to four
+already on their way as the stage is built (`KAndAArt.cloudCells`, `GameScene.kAndAClouds`) (the file keeps an old-style 8-bit palette chunk
 beside the new one, which the tool now reads right); `python3 Tools/import_stage_art.py kanda`
 does both again when the picture changes (`flight` the plane's, none for every stage). Its walls,
 starts, ball and rims are laid out in the map maker (`MapStage.kAndA`, protocol 111; the rims the
@@ -2098,7 +2103,8 @@ Tools/import_stage_art.py redcar`) with its bottom left at the ground's top 64 a
 (`KAndARules.carLeft`), and marks its walls, which the map lays as above (protocol 113). Someone
 landing on the car sags its body (not the wheels) two pixels, which comes back up one and stays
 there while anyone stands on it, and up the last once they've gone, a pixel every three frames
-(`KAndAArt.sagStepFrames`); whoever stands on it is drawn down with it (`standsOnCar`). Three
+(`KAndAArt.sagStepFrames`); whoever stands on it is drawn down with it less a pixel, the roof's
+own pixel being in the map already (`standsOnCar`): still while it's held, a pixel down at the dip. Three
 street lights hang off the wire (`lampXs`, their bottoms at `lampBottom`, 240 art pixels up, a tile
 lower than first drawn): from each a trapezoid
 of its light (`KAndAArt.Light`, `conePicture`), 8 across at the lamp and 126 at its foot, 150 down,

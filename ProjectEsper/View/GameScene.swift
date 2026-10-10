@@ -1867,6 +1867,10 @@ final class GameScene: SKScene {
     private var carSagSettled = false
     private var carSagClock = 0
     private var lampFlicker: [Int] = []
+    /// K&A's clouds on their way, each with its pace and its place across kept unrounded, and the
+    /// frames to the next.
+    private var kAndAClouds: [(node: SKSpriteNode, speed: CGFloat, x: CGFloat)] = []
+    private var kAndACloudIn = 0
     /// Flight B411's cart from its sheet, and its two wheels, which turn as it rolls.
     private var cartNode: SKSpriteNode?
     private var cartWheels: [SKSpriteNode] = []
@@ -1982,6 +1986,12 @@ final class GameScene: SKScene {
             carSag = 0
             carSagSettled = false
             lampFlicker = kAndAArt?.cones.map { _ in 0 } ?? []
+            // A few already on their way across the sky.
+            kAndAClouds = []
+            for _ in 0..<Int.random(in: 2...KAndAArt.cloudsMost) {
+                sendKAndACloud(at: CGFloat.random(in: 0...CGFloat(match.stage.width * SpriteLibrary.pixelsPerUnit)))
+            }
+            kAndACloudIn = Int.random(in: KAndAArt.cloudGapFrames)
         }
         if stage.features.look == .flightB411 {
             flightB411Art = FlightB411Art.build(into: stageGround, front: stageFront)
@@ -7075,6 +7085,22 @@ final class GameScene: SKScene {
             carSagClock = 0
         }
         art.carBody?.position.y = CGFloat(KAndARules.floorRows) * ElementsArt.tileSide + carSag
+        // The clouds on, on whole pixels; one gone off the right, and the next due with room for it.
+        let across = CGFloat(match.stage.width * SpriteLibrary.pixelsPerUnit)
+        for index in kAndAClouds.indices {
+            kAndAClouds[index].x += kAndAClouds[index].speed
+            kAndAClouds[index].node.position.x = kAndAClouds[index].x.rounded()
+        }
+        kAndAClouds.removeAll { cloud in
+            guard cloud.x - cloud.node.size.width / 2 > across else { return false }
+            cloud.node.removeFromParent()
+            return true
+        }
+        if kAndACloudIn > 0 { kAndACloudIn -= 1 }
+        if kAndACloudIn == 0, kAndAClouds.count < KAndAArt.cloudsMost {
+            sendKAndACloud(at: nil)
+            kAndACloudIn = Int.random(in: KAndAArt.cloudGapFrames)
+        }
         for (index, cone) in art.cones.enumerated() where index < lampFlicker.count {
             if lampFlicker[index] > 0 {
                 lampFlicker[index] -= 1
@@ -7084,6 +7110,20 @@ final class GameScene: SKScene {
                 if Double.random(in: 0..<1) < KAndAArt.flickerChance { lampFlicker[index] = Int.random(in: KAndAArt.flickerFrames) }
             }
         }
+    }
+
+    /// A K&A cloud, a cell at random at a height at random, from just off the left edge or `x` across.
+    private func sendKAndACloud(at x: CGFloat?) {
+        guard let cell = KAndAArt.cloudCells.randomElement() else { return }
+        let cloud = SKSpriteNode(texture: cell)
+        cloud.size = cell.size()
+        cloud.zPosition = KAndAArt.cloudZ
+        let top = CGFloat(match.stage.height * SpriteLibrary.pixelsPerUnit) - cloud.size.height / 2
+        let lowest = KAndAArt.cloudLowest + cloud.size.height / 2
+        let start = x ?? -cloud.size.width / 2
+        cloud.position = CGPoint(x: start.rounded(), y: CGFloat.random(in: lowest...max(lowest, top)).rounded())
+        stageGround.addChild(cloud)
+        kAndAClouds.append((cloud, CGFloat.random(in: KAndAArt.cloudSpeeds), start))
     }
 
     /// Flight B411 a frame: the cart where the sim has it, its wheels turned by how far it's
@@ -7595,7 +7635,8 @@ final class GameScene: SKScene {
             let drift = CGPoint(x: (cos(lap) * Double(radius)).rounded(), y: (sin(lap) * Double(radius)).rounded())
             node.position = SpriteLibrary.point(player.position) + drift
             // K&A: standing on the red car, carried down with its sag.
-            if kAndAArt != nil, standsOnCar(player) { node.position.y += carSag }
+            // The roof's own pixel is in the map already: carried by the sag less that.
+            if kAndAArt != nil, standsOnCar(player) { node.position.y += min(carSag + 1, 0) }
             // Held a few pixels up off the ground the whole change.
             if changing { node.position.y += GameScene.transformLift }
             if player.state == .dunking {

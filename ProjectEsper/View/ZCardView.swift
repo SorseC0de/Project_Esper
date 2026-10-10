@@ -5,10 +5,10 @@ import SwiftUI
 // emblems, affixes and wormhole left behind, since nothing here calls for them. Esper's words
 // are FLO lettering, and each bar's streaks are its own colour.
 
-/// Two slanted bars that cross the screen, line up into one Z through the middle as they pass,
-/// and carry on out the other side: the upper one left to right, the lower one right to left.
-/// The words straddle the seam, springing up as the bars meet and going as they part. The
-/// card never stops: one pass, `ZCardStyle.pass` long, and then it's gone.
+/// Two slanted bars that come in from opposite sides, settle a little past centre as one Z,
+/// hold while the words across the seam are read, and carry on out the way they were going:
+/// the upper one left to right, the lower one right to left. The words spring up as the bars
+/// land. CardCourt's arrive, hold and leave, the hold timed rather than waiting on a press.
 struct ZCardView<Words: View>: View {
     /// What's called out across the seam.
     let words: Words
@@ -29,7 +29,7 @@ struct ZCardView<Words: View>: View {
     /// Whether the words are showing: the gathered moment's alone.
     @State private var said: Double = 0
 
-    private enum Stage { case offstage, parted }
+    private enum Stage { case offstage, gathered, parted }
     private typealias Slat = ZCardSlat
 
     var body: some View {
@@ -57,7 +57,7 @@ struct ZCardView<Words: View>: View {
             .frame(width: width, height: geometry.size.height)
         }
         .allowsHitTesting(false)
-        .task { await passThrough() }
+        .task { await play() }
     }
 
     /// One bar at its place along its line of travel, fading out at its outer end.
@@ -69,23 +69,25 @@ struct ZCardView<Words: View>: View {
                     + slat.outward * (ZCardStyle.length + ZCardStyle.spread) * bar.height / 2)
     }
 
-    /// How far this bar is from centre: waiting off one side, or gone off the other.
+    /// How far this bar is from centre: waiting off one side, resting on its own side of the
+    /// card a little past centre, or gone off the other side.
     private func travel(_ slat: Slat, width: CGFloat, bar: ZCardStyle.Bar) -> CGFloat {
         let away = width / 2 + bar.width + ZCardStyle.spread * bar.height
-        return stage == .offstage ? -slat.heading * away : slat.heading * away
+        switch stage {
+        case .offstage: return -slat.heading * away
+        case .gathered: return slat.outward * ZCardStyle.overshoot * bar.height
+        case .parted: return slat.heading * away
+        }
     }
 
-    /// Straight through: the bars linear from one side to the other, dead centre at half the
-    /// pass, the words' spring started a spring's length before so they're whole as the Z forms.
-    private func passThrough() async {
-        withAnimation(.linear(duration: ZCardStyle.pass)) { stage = .parted }
-        let middle = ZCardStyle.pass / 2
-        let lead = max(0, middle - ZCardStyle.textResponse)
-        await sleep(lead)
+    /// In, the words springing up as the bars land; held; the words gone and the bars on out.
+    private func play() async {
+        withAnimation(.easeOut(duration: ZCardStyle.arrival)) { stage = .gathered }
         said = 1
-        await sleep(middle - lead)
+        await sleep(ZCardStyle.arrival + ZCardStyle.hold)
         said = 0
-        await sleep(middle)
+        withAnimation(.easeIn(duration: ZCardStyle.departure)) { stage = .parted }
+        await sleep(ZCardStyle.departure)
         onFinished()
     }
 
@@ -124,11 +126,16 @@ enum ZCardStyle {
     static let wordsHeight: CGFloat = 0.42
     /// The streaks' thickness against a bar's.
     static let streakThickness: CGFloat = 0.06
-    /// The whole pass, the Z formed at half of it.
-    static let pass: Double = 2.0
+    /// How far each bar settles past centre, into the other's side: what makes it a Z.
+    static let overshoot: CGFloat = 0.24
+    /// In, held for the words, and out; the words' spring, a beat after the bars set off.
+    static let arrival: Double = 0.30
+    static let hold: Double = 1.2
+    static let departure: Double = 0.30
+    static let textDelay: Double = 0.15
     static let textResponse: Double = 0.35
     static let textBounce: Double = 0.50
-    static var pop: Animation { .spring(response: textResponse, dampingFraction: textBounce) }
+    static var pop: Animation { .spring(response: textResponse, dampingFraction: textBounce).delay(textDelay) }
 
     struct Bar {
         let width: CGFloat

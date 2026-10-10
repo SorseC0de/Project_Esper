@@ -142,6 +142,8 @@ final class FlowState: ObservableObject {
     var customizeLocal = 0
     /// Each side's READY, and the moment both were, when the launch animation starts.
     @Published var customizeReady = [false, false]
+    /// The customize screen's first Start has played port_in, until the screen opens again.
+    var customizeStartHeard = false
     @Published var customizeLaunch: Date?
     /// Online: the launch animation's played through; the series can start.
     var customizeLaunched = false

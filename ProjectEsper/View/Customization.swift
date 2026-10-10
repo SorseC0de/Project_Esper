@@ -64,6 +64,7 @@ extension FlowState {
         customizeTurnBased = turnBased
         customizeLocal = online || turnBased ? local : 0
         customizeReady = [false, false]
+        customizeStartHeard = false
         customizeLaunch = nil
         customizeLaunched = false
         if online || turnBased {
@@ -98,6 +99,8 @@ extension FlowState {
     /// controls go; online READY can be taken back until both are ready. Both ready, the launch.
     func pressReady(_ player: Int) {
         guard customizeLaunch == nil, customizeOwns(player) else { return }
+        // The port-in sound on the screen's first Start, whoever presses it.
+        playStartHeard()
         if customizeOnline {
             customizeReady[player].toggle()
             SoundBoard.shared.play(customizeReady[player] ? SoundBoard.confirm : .menuBack)
@@ -109,9 +112,16 @@ extension FlowState {
         checkLaunch()
     }
 
+    private func playStartHeard() {
+        guard !customizeStartHeard else { return }
+        customizeStartHeard = true
+        SoundBoard.shared.play(.portIn)
+    }
+
     /// The other phone's READY.
     func remoteReady(_ ready: Bool) {
         guard customizeOpen, customizeOnline, customizeLaunch == nil else { return }
+        if ready { playStartHeard() }
         customizeReady[1 - customizeLocal] = ready
         checkLaunch()
     }
@@ -134,11 +144,6 @@ extension FlowState {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(sheetFrame) / Double(SnatchRules.sheetFramesPerSecond) + 0.01) { [weak self] in
                 self?.objectWillChange.send()
             }
-        }
-        // The port-in sound as the two arrive at the ball in the middle, their drift done.
-        DispatchQueue.main.asyncAfter(deadline: .now() + CustomizeScreen.driftDelaySeconds + CustomizeScreen.driftSeconds) { [weak self] in
-            guard let self, self.customizeOpen, self.customizeLaunch != nil else { return }
-            SoundBoard.shared.play(.portIn)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + FlowState.launchSeconds) { [weak self] in
             guard let self, self.customizeOpen, self.customizeLaunch != nil else { return }

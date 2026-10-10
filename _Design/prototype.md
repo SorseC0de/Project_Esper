@@ -773,8 +773,10 @@ screen's titles and the Greateraid pick's drink use it too): each number centred
 times its size, shrinking to 0.9 and fading out over its second, kept out of the glow. As it hits
 zero, when both can act, BALL OUT!!! in FloText on the Z card (`ZCardView`, Variaball's
 `ModeCardView` ported, in the SwiftUI over the HUD while no screen is up, `FlowState.ballOutCall`):
-two black bars, 0.16 of the screen's height thick, crossing the screen in one 2-second pass and
-lining up into a Z at half of it as the words spring up across the seam, the upper bar's streaks
+two black bars, 0.16 of the screen's height thick, in from opposite sides over 0.3 seconds to
+settle a little past centre as a Z, the words springing up across the seam as they land (a 0.15
+beat after they set off), held 1.2 seconds, then the words gone and the bars on out over 0.3 (a
+single 2-second pass came in too late and showed the words too briefly), the upper bar's streaks
 in the customize screen's top line's orange (gold's light, #F5BB45) and the lower's in its bottom
 line's teal (blue's light, #45BCF5). A point is a round: BUCKET!! goes up
 with the strike, and whoever was scored on drinks. The computer drinks at once, one of
@@ -2184,8 +2186,8 @@ shown, once, like the effects.
 - The announcer's 3, 2, 1 (announcer_1..3, or the second set announcer_1-2..3-2 on the COUNT
   picker, A or B): each number of the count as it goes up, in play.
 - announcer_ballout and ballout2 together at BALL OUT, each panned halfway to its own side.
-- port_in: the port-in at a round's start, and on the customize screen as the two figures reach
-  the ball in the middle (the drift's 0.2 s beat and its 1 s).
+- port_in: the port-in at a round's start, and on the customize screen's first Start, whoever
+  presses it, once until the screen opens again (`customizeStartHeard`).
 - pause: the pause menu coming up.
 - A steal, a snatch taking the ball out of a holder's hands (`.stolen`, from confirmed frames as
   a basket's lines are): one of the announcer's nine (stole, stole2, stole3, nabbed, -2, -3,

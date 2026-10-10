@@ -601,8 +601,9 @@ struct CustomizeScreen: View {
             // MODEL, as the words under H.O.O.D. are, centred against it.
             HStack(alignment: .center, spacing: size.height * 0.01) {
                 subtitle("MODEL", size: size.height * CustomizeScreen.hoodWordShare)
-                litTitle(pick.energy.name.uppercased(), height: size.height * 0.025,
-                         spacing: CustomizeScreen.headingSpacing, maxWidth: halo.width * CustomizeScreen.nameMaxWidthShare)
+                // A new colour's name rolls in letter by letter, as Apple's numbers do.
+                FloRollText(pick.energy.name.uppercased(), height: size.height * 0.025, fontName: font.fontName,
+                            maxWidth: halo.width * CustomizeScreen.nameMaxWidthShare, spacing: CustomizeScreen.headingSpacing)
             }
             .fixedSize()
             .position(x: ring.x, y: figureMiddle - nameY * playerPixel)

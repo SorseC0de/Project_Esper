@@ -791,7 +791,7 @@ A disconnect on the screen closes it to the title.
   blue, purple, pink), the accent the shade down the AAP-64 ramp (`EnergyColour.rampDown`); on it,
   H.O.O.D. shows large over the player, centred on it, two-toned (its lower half the energy
   ramp's lightest, `Look.bright`), each word of "Hyper- Osmotic Output Driver" small under its
-  letter; and over the player the colour's gem name lettered as CUSTOMIZE is (RUBY), after MODEL in the face and size of the words under H.O.O.D., centred
+  letter; and over the player the colour's gem name lettered as CUSTOMIZE is (RUBY; a new colour's name rolls in a letter at a time as Apple's numeric text does, each changed letter sliding up and out blurring as its new one slides up in from below and clears, the rest moving to their places: `FloRollText`, from the word's letters drawn apart, `Onomatopoeia.letterPictures`, every outline under every fill so at rest it's the word's own picture), after MODEL in the face and size of the words under H.O.O.D., centred
   against it, a name wider than 0.35 of the halo scaled down to it; NAME Y art pixels over the
   player's middle, only while the hood's colours are picked. The arm and leg boxes are ticks (Futuristic_UI's ring8 at 0.6 of the box's height, in the box's line's colour, the side's under the cursor), a
   sleeve or a boot each (`Dressing`), labelled SLEEVE or BRACER; those and SKIN have their letters

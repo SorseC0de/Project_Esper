@@ -326,8 +326,19 @@ enum Onomatopoeia {
         let angle: CGFloat
     }
 
-    private static func rendered(_ word: Word) -> (texture: SKTexture, capShare: CGFloat) {
-        if let cached = cache[word] { return cached }
+    /// A word laid out: each letter turned and set on the line, and the canvas round them all.
+    private struct Layout {
+        let letters: [Letter]
+        let canvas: CGSize
+        let pad: CGFloat
+        let lineY: CGFloat
+        let largest: CGFloat
+        let ring: CGFloat
+        let shadow: CGFloat
+        let capShare: CGFloat
+    }
+
+    private static func layout(_ word: Word) -> Layout {
         _ = registered
         func font(_ size: CGFloat) -> UIFont { UIFont(name: word.face ?? word.lettering.fontName, size: size) ?? TitleText.font(size: size, italic: true) }
         let reference = word.lettering.reference
@@ -356,17 +367,22 @@ enum Onomatopoeia {
         let width = x + largest * tuck + pad * 2
         let height = top * 2 + pad * 2
         let canvas = CGSize(width: ceil(width), height: ceil(height))
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = renderScale
-        let lineY = canvas.height / 2
+        return Layout(letters: letters, canvas: canvas, pad: pad, lineY: canvas.height / 2, largest: largest, ring: ring, shadow: shadow,
+                      capShare: ink(reference, in: font(drawSize)).height / canvas.height)
+    }
+
+    /// Letters of a laid-out word drawn into `cg`, moved `offset` (a letter's own canvas's
+    /// place in the word's): their drops and outlines, a ring round each letter split at its
+    /// middle as the fill is, and, `fill`, their fills, each letter `upper` over `lower`.
+    private static func draw(_ letters: [Letter], of word: Word, laid layout: Layout, into cg: CGContext, offset: CGPoint,
+                             outline: Bool, fill: Bool) {
+        let reference = word.lettering.reference
         let upper = colour(word.colours.upper), lower = colour(word.colours.lower)
         let lineUpper = colour(word.colours.lineUpper), lineLower = colour(word.colours.lineLower)
-        /// Each letter turned and set on the line, `shift` off it, for `draw` to put down with
-        /// its size and where its glyph is drawn from.
-        func eachLetter(_ cg: CGContext, shift: CGFloat, draw: (Letter, CGFloat, CGPoint) -> Void) {
+        func eachLetter(shift: CGFloat, draw: (Letter, CGFloat, CGPoint) -> Void) {
             for letter in letters {
                 cg.saveGState()
-                cg.translateBy(x: pad + letter.centre.x + shift, y: lineY + letter.centre.y + shift)
+                cg.translateBy(x: layout.pad + letter.centre.x + shift - offset.x, y: layout.lineY + letter.centre.y + shift - offset.y)
                 cg.rotate(by: letter.angle)
                 // The glyph's middle on the letter's centre.
                 let origin = CGPoint(x: -(letter.text as NSString).size(withAttributes: [.font: letter.font]).width / 2,
@@ -378,12 +394,10 @@ enum Onomatopoeia {
         func text(_ letter: Letter, _ colour: UIColor, at point: CGPoint) {
             (letter.text as NSString).draw(at: point, withAttributes: [.font: letter.font, .foregroundColor: colour])
         }
-        let image = UIGraphicsImageRenderer(size: canvas, format: format).image { context in
-            let cg = context.cgContext
-            // The drop, then the outline, each a ring round every letter, split at its middle as the fill is.
-            for shift in [shadow, 0] {
-                eachLetter(cg, shift: shift) { letter, size, origin in
-                    let letterRing = ring * size / largest
+        if outline {
+            for shift in [layout.shadow, 0] {
+                eachLetter(shift: shift) { letter, size, origin in
+                    let letterRing = layout.ring * size / layout.largest
                     split(cg, size: size, upper: lineUpper, lower: lineLower) { colour in
                         for step in 0..<steps {
                             let angle = CGFloat(step) * 2 * .pi / CGFloat(steps)
@@ -392,15 +406,68 @@ enum Onomatopoeia {
                     }
                 }
             }
-            // The fill, each letter `upper` over `lower` split at its middle.
-            eachLetter(cg, shift: 0) { letter, size, origin in
+        }
+        if fill {
+            eachLetter(shift: 0) { letter, size, origin in
                 split(cg, size: size, upper: upper, lower: lower) { text(letter, $0, at: origin) }
             }
         }
-        let capShare = ink(reference, in: font(drawSize)).height / canvas.height
-        let result = (SKTexture(image: image), capShare)
+    }
+
+    private static func rendered(_ word: Word) -> (texture: SKTexture, capShare: CGFloat) {
+        if let cached = cache[word] { return cached }
+        let laid = layout(word)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = renderScale
+        let image = UIGraphicsImageRenderer(size: laid.canvas, format: format).image { context in
+            // Every letter's drop and outline, then every fill over them all.
+            draw(laid.letters, of: word, laid: laid, into: context.cgContext, offset: .zero, outline: true, fill: false)
+            draw(laid.letters, of: word, laid: laid, into: context.cgContext, offset: .zero, outline: false, fill: true)
+        }
+        let result = (SKTexture(image: image), laid.capShare)
         cache[word] = result
         return result
+    }
+
+    /// A word's letters apart, for SwiftUI to move one at a time: each one's outline (and drop)
+    /// and its fill, on a canvas of its own, and where that sits on the word's; drawn together,
+    /// all the outlines under all the fills, they're the word's picture. Sizes in the word's
+    /// points, `canvas` its whole.
+    struct LetterPictures {
+        struct Piece {
+            let text: String
+            let frame: CGRect
+            let outline: UIImage
+            let fill: UIImage
+        }
+        let pieces: [Piece]
+        let canvas: CGSize
+        let capShare: CGFloat
+    }
+    nonisolated(unsafe) private static var letterCache: [Word: LetterPictures] = [:]
+
+    static func letterPictures(_ text: String, face: Lettering, colours: Colours, growsLeft: Bool, height: CGFloat,
+                               spacing: CGFloat = 0, fontName: String? = nil) -> LetterPictures {
+        let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft, spacing: spacing, face: fontName)
+        if let cached = letterCache[word] { return cached }
+        let laid = layout(word)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = renderScale
+        let pieces = laid.letters.map { letter -> LetterPictures.Piece in
+            // The letter's own canvas: the word's height, as wide as the letter and its ring,
+            // drop and turn, about its centre.
+            let half = (letter.text as NSString).size(withAttributes: [.font: letter.font]).width / 2 + laid.pad
+            let frame = CGRect(x: floor(laid.pad + letter.centre.x - half), y: 0, width: ceil(half * 2), height: laid.canvas.height)
+            func picture(outline: Bool) -> UIImage {
+                UIGraphicsImageRenderer(size: frame.size, format: format).image { context in
+                    draw([letter], of: word, laid: laid, into: context.cgContext, offset: frame.origin, outline: outline, fill: !outline)
+                }
+            }
+            return LetterPictures.Piece(text: letter.text, frame: frame, outline: picture(outline: true), fill: picture(outline: false))
+        }
+        let made = LetterPictures(pieces: pieces, canvas: laid.canvas, capShare: laid.capShare)
+        letterCache[word] = made
+        return made
     }
 
     /// The fill drawn twice, `upper` above the letter's middle and `lower` under it.

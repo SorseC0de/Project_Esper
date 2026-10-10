@@ -351,8 +351,7 @@ final class PickScreen: Screen {
         for (index, outline) in outlines.enumerated() { outline.isHidden = index != cursor }
         // The name as the FLO meter letters its word, straight, centred on the plate's top edge.
         drinkName.removeAllChildren()
-        let name = Onomatopoeia.still(offer.name.uppercased(), face: .englishDex, colours: FloTuning.colours,
-                                      height: PickScreen.nameHeight * tuned(.titles), growsLeft: true, left: 1, right: 1)
+        let name = FloText.node(offer.name.uppercased(), height: PickScreen.nameHeight * tuned(.titles))
         drinkName.addChild(name)
         if drinks.isSecondSip(offer) {
             TitleText.set(secondSip, to: "(Second Sip)", size: 14 * tuned(.titles), italic: true)

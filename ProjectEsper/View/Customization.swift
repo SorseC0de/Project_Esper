@@ -503,12 +503,7 @@ struct CustomizeScreen: View {
     /// Lettered as FLO is when it's lit: gold's first over the cyan, outlined in plum and purple,
     /// in the chosen face or in Bigdex (`ownFace` off). `height` is its cap height, whatever the face.
     private func litTitle(_ text: String, height: CGFloat, spacing: CGFloat = 0, ownFace: Bool = true, maxWidth: CGFloat? = nil) -> some View {
-        let word = Onomatopoeia.picture(text, face: .englishDex, colours: FloTuning.colours, growsLeft: true, height: height, spacing: spacing,
-                                        fontName: ownFace ? font.fontName : nil)
-        // Wider than `maxWidth`, scaled down to it.
-        let width = word.height * word.image.size.width / max(word.image.size.height, 1)
-        let shrink = maxWidth.map { min($0 / max(width, 1), 1) } ?? 1
-        return Image(uiImage: word.image).resizable().aspectRatio(contentMode: .fit).frame(height: word.height * shrink)
+        FloText(text, height: height, fontName: ownFace ? font.fontName : nil, maxWidth: maxWidth, spacing: spacing)
     }
 
     /// Bigdex as `title`, its lower half in `lower`.

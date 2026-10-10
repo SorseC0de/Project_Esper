@@ -767,8 +767,16 @@ at 0.4 unskewed, held the 12 frames the body is hidden and faded over 0.3 second
 old bolt and crown, `boltEntry`, are Titan Tea's entry); then the three count. With
 a screen up or on its way (the drink, the stage select, the win) the port-in and the
 count both wait for it to close, BUCKET!! playing out meanwhile; the sim's own count is
-set again as play comes back in title lettering
-and BALL OUT!!! as it hits zero, when both can act. A point is a round: BUCKET!! goes up
+set again as play comes back. The count's numbers are in `FloText`, the FLO meter's lit
+lettering made a view of its own (SwiftUI, and `FloText.node` for SpriteKit; the customize
+screen's titles and the Greateraid pick's drink use it too): each number centred, in at 2.2
+times its size, shrinking to 0.9 and fading out over its second, kept out of the glow. As it hits
+zero, when both can act, BALL OUT!!! in FloText on the Z card (`ZCardView`, Variaball's
+`ModeCardView` ported, in the SwiftUI over the HUD while no screen is up, `FlowState.ballOutCall`):
+two black bars, 0.16 of the screen's height thick, crossing the screen in one 2-second pass and
+lining up into a Z at half of it as the words spring up across the seam, the upper bar's streaks
+in the customize screen's top line's orange (gold's light, #F5BB45) and the lower's in its bottom
+line's teal (blue's light, #45BCF5). A point is a round: BUCKET!! goes up
 with the strike, and whoever was scored on drinks. The computer drinks at once, one of
 its three at random on the series' dice; the human gets the pick screen once the strike
 has played, and the round counts again after the drink. Five circles across the top,

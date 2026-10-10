@@ -712,6 +712,15 @@ final class GameScene: SKScene {
                                          size: body.size, zRotation: body.zRotation))
             }
         }
+        // The count, out of the glow as the banner is, at its size this moment.
+        if let count = countNode, let texture = count.texture {
+            let scale = glowHud.xScale
+            flat.append(BodySnapshot(texture: texture,
+                                     position: CGPoint(x: glowHud.position.x + count.position.x * scale, y: glowHud.position.y + count.position.y * scale),
+                                     anchor: count.anchorPoint, xScale: 1,
+                                     size: CGSize(width: count.frame.width * scale, height: count.frame.height * scale),
+                                     warp: count.warpGeometry))
+        }
         guard !banner.isHidden, let texture = banner.texture else { return flat }
         let scale = glowHud.xScale
         flat.append(BodySnapshot(texture: texture,
@@ -4780,6 +4789,35 @@ final class GameScene: SKScene {
         }
     }
 
+    /// The count's number in FLO lettering, centred where the banner is: in oversized, shrinking
+    /// and fading over its second; made afresh for each number.
+    private var countNode: SKSpriteNode?
+    private var countShown = 0
+    private static let countHeight: CGFloat = 56
+    private static let countFromScale: CGFloat = 2.2
+    private static let countToScale: CGFloat = 0.9
+    private func showCount(_ number: Int) {
+        guard number != countShown || countNode == nil else { return }
+        countShown = number
+        countNode?.removeFromParent()
+        let node = FloText.node("\(number)", height: GameScene.countHeight)
+        node.position = banner.position
+        node.zPosition = banner.zPosition
+        node.setScale(GameScene.countFromScale)
+        glowHud.addChild(node)
+        let shrink = SKAction.scale(to: GameScene.countToScale, duration: 1)
+        shrink.timingMode = .easeOut
+        let fade = SKAction.fadeOut(withDuration: 1)
+        fade.timingMode = .easeIn
+        node.run(.group([shrink, fade]))
+        countNode = node
+    }
+    private func hideCount() {
+        countNode?.removeFromParent()
+        countNode = nil
+        countShown = 0
+    }
+
     private func showBanner(_ text: String, size: CGFloat) {
         TitleText.set(banner, to: text, size: size)
         banner.isHidden = false
@@ -8187,6 +8225,7 @@ final class GameScene: SKScene {
         let counting = flow == .playing && pendingFlow == nil
         if match.countdown > 0, !counting {
             // BUCKET and the rest play out meanwhile.
+            hideCount()
             tickBanner()
         } else if match.countdown > 0 {
             let number = (match.countdown + 59) / 60
@@ -8195,12 +8234,14 @@ final class GameScene: SKScene {
                 lastCountSounded = number
                 if let sound = SoundBoard.count[number] { SoundBoard.shared.play(sound) }
             }
-            TitleText.set(banner, to: "\(number)", size: 80)
-            banner.isHidden = false
+            showCount(number)
+            banner.isHidden = true
             bannerFrames = 0
         } else if lastCount > 0 {
             lastCountSounded = 0
-            showBanner("BALL OUT!!!", size: 48)
+            hideCount()
+            // BALL OUT on its Z card, over the HUD.
+            flowState?.ballOutCall = UUID()
             // Both his takes at once, each half toward its own side.
             SoundBoard.shared.play(.ballOut, pan: -0.5)
             SoundBoard.shared.play(.ballOut2, pan: 0.5)

@@ -36,6 +36,17 @@ struct GameView: View {
             }
             HudView(scene: flow.scene)
                 .ignoresSafeArea()
+            // BALL OUT on the Z card, its bars' streaks the customize screen's top and bottom lines'.
+            if let call = flow.ballOutCall, !flow.veiled {
+                GeometryReader { geometry in
+                    ZCardView(upperStreaks: Color(rgb: EsperPalette.gold.light), lowerStreaks: Color(rgb: EsperPalette.blue.light),
+                              onFinished: { if flow.ballOutCall == call { flow.ballOutCall = nil } }) {
+                        FloText("BALL OUT!!!", height: ZCardStyle.bar(across: geometry.size).height * ZCardStyle.wordsHeight)
+                    }
+                }
+                .id(call)
+                .ignoresSafeArea()
+            }
             if flow.showsTitle {
                 TitleOverlay(flow: flow, net: flow.net)
                     .transition(.opacity)

@@ -17,8 +17,8 @@ public enum KAndARules {
     /// along, as the file's [Dont_Draw] layer places it; its span, for who stands on it.
     public static let carLeft = 64.0 * 0.625
     public static let carRight = 192.0 * 0.625
-    /// The three street lights hanging off the wire: their middles along, and their bottoms up,
-    /// a tile lower than they were drawn first.
-    public static let lampXs: [Double] = [71.5 * 0.625, 295.5 * 0.625, 503.5 * 0.625]
+    /// The three street lights hanging off the wire: their middles along (the leftmost a tile
+    /// right of where it was first), and their bottoms up, a tile lower than they were drawn first.
+    public static let lampXs: [Double] = [87.5 * 0.625, 295.5 * 0.625, 503.5 * 0.625]
     public static let lampBottom = 240.0 * 0.625
 }

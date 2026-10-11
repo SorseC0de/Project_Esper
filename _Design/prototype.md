@@ -2088,7 +2088,8 @@ Drawn whole in Aseprite, `Stages/K&A/K&A_Map.aseprite`, 592 by 304, one of its p
 pixel: 37 tiles by 19, Hoopfish Hideaway's size, seen whole (`StageFeatures.seenWhole`, the
 camera fitted to the screen as the plane's is, palette 30 beyond the edges, the sky's own top).
 The file's layers, bottom up: Background Sky, Background Houses, Ground, Buildings, Signs, Text,
-Back Pillar 2 and 1, Cars, Train Support 3, 2 and 1, Extras, Train Tracks, then Front Pillar 2 and 1;
+Back Pillar 2 and 1, two [Dont_Draw] layers (the cars' places), Train Support 3, 2 and 1, Extras,
+Train Tracks, then Front Pillar 2 and 1;
 the players draw between Train Tracks and the front pillars, so `Tools/aseprite.py` flattens
 Background Sky alone into `KAndASky`, the rest under the players into `KAndABackdrop`, on the
 stage's ground, and the front pillars into `KAndAFront`, in `stageFront` over the players. Between
@@ -2111,8 +2112,13 @@ Tools/import_stage_art.py redcar`) with its bottom left at the ground's top 64 a
 landing on the car sags its body (not the wheels) two pixels, which comes back up one and stays
 there while anyone stands on it, and up the last once they've gone, a pixel every three frames
 (`KAndAArt.sagStepFrames`); whoever stands on it is drawn down with it less a pixel, the roof's
-own pixel being in the map already (`standsOnCar`): still while it's held, a pixel down at the dip. Three
-street lights hang off the wire (`lampXs`, their bottoms at `lampBottom`, 240 art pixels up, a tile
+own pixel being in the map already (`standsOnCar`): still while it's held, a pixel down at the dip.
+The broken car, where the file's other [Dont_Draw] layer places it (bottom left at the ground's top,
+384 along), is its own sprite, `Stages/K&A/broken_car.png` (three 128 by 32 frames down it, copied in
+as `KAndABrokenCar`), over the backdrop as the red car is: someone on its hood (its first 24 art pixels
+across, above the ground; `standsOnBrokenHood`) springs it through frames 0, 1 and 2, one every four
+frames, and it rests at 1 while they stay; nobody on it, back to 0 the same way (`brokenCarStepFrames`). Three
+street lights hang off the wire (`lampXs`, the leftmost moved a tile right with the art, their bottoms at `lampBottom`, 240 art pixels up, a tile
 lower than first drawn): from each a trapezoid
 of its light (`KAndAArt.Light`, `conePicture`), 8 across at the lamp and 126 at its foot, 150 down,
 fading to clear from halfway down, palette 7 at 0.12, added, over the backdrop; the LIGHT TOP W,

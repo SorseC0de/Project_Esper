@@ -86,6 +86,8 @@ enum KAndAArt {
         /// The red car's body, which sags under a body, and its wheels, which don't.
         var carBody: SKSpriteNode?
         var carWheels: SKSpriteNode?
+        /// The broken car, its hood springing under whoever stands on it.
+        var brokenCar: SKSpriteNode?
         /// The street lights' cones, one a lamp.
         var cones: [SKSpriteNode] = []
     }
@@ -117,6 +119,22 @@ enum KAndAArt {
     /// one and held there while they stay, up the last once they've gone, a pixel every few frames.
     static let carZ: CGFloat = backdropZ + 0.1
     static let sagStepFrames = 3
+    /// The broken car (`broken_car.png`, three 128 by 32 frames down it), drawn where the file's
+    /// second [Dont_Draw] layer places it: its bottom left at the ground's top, 384 along. Someone on
+    /// its hood (its first `brokenHoodWidth` across) springs it through frames 0, 1 and 2, a frame
+    /// every `brokenCarStepFrames`, and it rests at 1 while they stay; nobody on it, back to 0.
+    static let brokenCarLeft: CGFloat = 384
+    static let brokenHoodWidth: CGFloat = 24
+    static let brokenCarStepFrames = 4
+    static let brokenCarFrames: [SKTexture] = {
+        let sheet = SKTexture(imageNamed: "KAndABrokenCar")
+        sheet.filteringMode = .nearest
+        return (0..<3).map { row in
+            let cell = SKTexture(rect: CGRect(x: 0, y: CGFloat(2 - row) / 3, width: 1, height: 1.0 / 3), in: sheet)
+            cell.filteringMode = .nearest
+            return cell
+        }
+    }()
     /// The street lights' cones: from each lamp's bottom, a trapezoid `Light.topWidth` across at
     /// the lamp and `bottomWidth` at its foot, `drop` down, in the lamp's warm light, faint and
     /// added, fading to clear from `fadeFrom` of the way down; the LIGHT sliders', kept. Now and
@@ -214,6 +232,13 @@ enum KAndAArt {
         body.position = carAt
         handles.carWheels = wheels
         handles.carBody = body
+        let broken = SKSpriteNode(texture: brokenCarFrames.first)
+        broken.anchorPoint = .zero
+        broken.size = brokenCarFrames.first?.size() ?? .zero
+        broken.position = CGPoint(x: brokenCarLeft, y: CGFloat(KAndARules.floorRows) * ElementsArt.tileSide)
+        broken.zPosition = carZ
+        parent.addChild(broken)
+        handles.brokenCar = broken
         handles.cones = KAndARules.lampXs.map { _ in
             let cone = SKSpriteNode()
             cone.alpha = coneAlpha

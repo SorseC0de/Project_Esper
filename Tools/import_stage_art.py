@@ -18,12 +18,14 @@ STAGES = {
     "kanda": {
         "file": "K&A/K&A_Map.aseprite",
         # The sky alone, the clouds drifting over it (`KAndAClouds`, the file beside it, three cells
-        # down), then everything else under the players but the file's [Dont_Draw] layer, which
-        # marks the red car's place and walls.
+        # down), then everything else under the players but the file's [Dont_Draw] layers, which
+        # mark the red car's and the broken car's places and walls; the broken car its own
+        # sprite (`KAndABrokenCar`, the file beside it, three 128 by 32 frames down).
         "KAndASky": ["Background Sky"],
         "KAndAClouds": "K&A/clouds.png",
+        "KAndABrokenCar": "K&A/broken_car.png",
         "KAndABackdrop": ["Background Houses", "Ground", "Buildings", "Signs", "Text", "Back Pillar 2",
-                          "Back Pillar 1", "Cars", "Extras", "Train Support 3", "Train Support 2", "Train Support 1", "Train Tracks"],
+                          "Back Pillar 1", "Extras", "Train Support 3", "Train Support 2", "Train Support 1", "Train Tracks"],
         "KAndAFront": ["Front Pillar 2", "Front Pillar 1"],
     },
     "redcar": {

@@ -1868,6 +1868,10 @@ final class GameScene: SKScene {
     private var carSag: CGFloat = 0
     private var carSagSettled = false
     private var carSagClock = 0
+    /// The broken car's frame, its clock to the next, and whether it's sprung to 2 under this body yet.
+    private var brokenHoodFrame = 0
+    private var brokenHoodClock = 0
+    private var brokenHoodSprung = false
     private var lampFlicker: [Int] = []
     /// K&A's clouds on their way, each with its pace and its place across kept unrounded, and the
     /// frames to the next.
@@ -1987,6 +1991,8 @@ final class GameScene: SKScene {
             kAndAArt = KAndAArt.build(into: stageGround, front: stageFront)
             carSag = 0
             carSagSettled = false
+            brokenHoodFrame = 0
+            brokenHoodSprung = false
             lampFlicker = kAndAArt?.cones.map { _ in 0 } ?? []
             // A few already on their way across the sky.
             kAndAClouds = []
@@ -7078,6 +7084,13 @@ final class GameScene: SKScene {
     private var portalId = 0
 
     /// Whether a body stands on K&A's red car: grounded above the ground, within the car's length.
+    /// On the broken car's hood: standing above the ground over its first stretch.
+    private func standsOnBrokenHood(_ player: Player) -> Bool {
+        let left = Double(KAndAArt.brokenCarLeft) / SpriteLibrary.pixelsPerUnit
+        return player.grounded && player.position.y > Double(KAndARules.floorRows) * Stage.tileSize + 0.5
+            && player.position.x >= left && player.position.x <= left + Double(KAndAArt.brokenHoodWidth) / SpriteLibrary.pixelsPerUnit
+    }
+
     private func standsOnCar(_ player: Player) -> Bool {
         player.grounded && player.position.y > Double(KAndARules.floorRows) * Stage.tileSize + 0.5
             && player.position.x >= KAndARules.carLeft && player.position.x <= KAndARules.carRight
@@ -7105,6 +7118,21 @@ final class GameScene: SKScene {
             carSagClock = 0
         }
         art.carBody?.position.y = CGFloat(KAndARules.floorRows) * ElementsArt.tileSide + carSag
+        // The broken car's hood: through 0, 1 and 2 under a body, then resting at 1; empty, back to 0.
+        let onHood = match.players.contains(where: standsOnBrokenHood)
+        if !onHood { brokenHoodSprung = false }
+        let hoodTarget = !onHood ? 0 : (brokenHoodSprung ? 1 : 2)
+        if brokenHoodFrame != hoodTarget {
+            brokenHoodClock += 1
+            if brokenHoodClock >= KAndAArt.brokenCarStepFrames {
+                brokenHoodClock = 0
+                brokenHoodFrame += brokenHoodFrame < hoodTarget ? 1 : -1
+                if brokenHoodFrame == 2 { brokenHoodSprung = true }
+            }
+        } else {
+            brokenHoodClock = 0
+        }
+        if KAndAArt.brokenCarFrames.indices.contains(brokenHoodFrame) { art.brokenCar?.texture = KAndAArt.brokenCarFrames[brokenHoodFrame] }
         // The clouds on, on whole pixels; one gone off the right, and the next due with room for it.
         let across = CGFloat(match.stage.width * SpriteLibrary.pixelsPerUnit)
         for index in kAndAClouds.indices {

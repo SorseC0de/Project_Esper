@@ -625,7 +625,12 @@ text 1.5, titles 1.5 and panels 0.9, as tuned on one; and the iPad's and the TV'
 at 2.5 and the TV's text elsewhere at 1.5. Lettering on a plate centres on the plate's
 face, above its lip, and is nudged up and left by half its own drop. TEXT Y on the panel
 scales that lift, one value a platform: half of it, 0.5, on all of them. The stage select: on the warped grid on black (`MenuGround`
-without its glows), STAGE SELECT lettered as FLO is (15 high), each stage in Futuristic_UI's box1
+without its glows), STAGE SELECT lettered as FLO is (15 high) at the bottom; behind the stages a
+window drawn as the ball cam is (a trapezoid, its bottom 0.84 of its top across, at half, ringed in
+the local side's flashspark2s), 1.3 of half the screen's height tall, showing the raised stage's
+whole-stage shot, its preview's big panel kept off the renderer as the page fills and stored in the
+app's caches (`StageShots`, `GameScene.previewShotStage`), or static with nothing raised or no shot
+taken yet (a stage's first select before its preview has played); each stage in Futuristic_UI's box1
 in the menus' blue with its name in Upheaval, the blue too, in two lines, broken at the space
 nearest its middle (one line with no space), gold and a tenth bigger when a cursor or a pick is on
 it; more than four stages in two rows, the first the longer (`StageSelectScreen.lines`,

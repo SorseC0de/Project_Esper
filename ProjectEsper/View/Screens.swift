@@ -562,6 +562,36 @@ final class StageSelectScreen: Screen {
     private let colours: [SKColor]
     private let onPick: (Int, Int) -> Void
     private static let markRadius: CGFloat = 7
+    /// The window behind the stages, as the ball cam is drawn: a trapezoid, its bottom 0.84 of its
+    /// top across, see-through; showing the raised stage's whole-stage shot, or static.
+    private let window = SKSpriteNode()
+    private var windowSparks: [(node: SKSpriteNode, edge: Int, share: CGFloat)] = []
+    static let windowHeightShare: CGFloat = 1.3
+    static let windowAspect: CGFloat = 1.09
+    static let windowOpacity: CGFloat = 0.5
+    static let windowBottomShare: CGFloat = BallCamScene.bottomWidth / BallCamScene.topWidth
+    /// Which stage's raised, told on a change: the first local voter's, or the coin flip's light.
+    var onRaised: ((Int?) -> Void)? {
+        didSet {
+            raisedTold = nil
+            tellRaised()
+        }
+    }
+    private var raisedTold: Int??
+    /// Static: a few frames of grey noise, run round.
+    private static let staticFrames: [SKTexture] = (0..<6).map { _ in
+        let width = 64, height = 40
+        var bytes = [UInt8](repeating: 255, count: width * height * 4)
+        for pixel in 0..<(width * height) {
+            let grey = UInt8.random(in: 20...200)
+            bytes[pixel * 4] = grey
+            bytes[pixel * 4 + 1] = grey
+            bytes[pixel * 4 + 2] = grey
+        }
+        let texture = SKTexture(data: Data(bytes), size: CGSize(width: width, height: height))
+        texture.filteringMode = .nearest
+        return texture
+    }
 
     /// `onPick` gets the voter and the stage's place in the row.
     init(halfWidth: CGFloat, halfHeight: CGFloat, stages: [String], voters: [Int], localVoters: [Int], colours: [SKColor],
@@ -571,10 +601,20 @@ final class StageSelectScreen: Screen {
         self.colours = colours
         self.onPick = onPick
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .stageSelect)
-        // The title lettered as FLO is.
+        // The title lettered as FLO is, at the bottom.
         let title = FloText.node("STAGE SELECT", height: StageSelectScreen.titleHeight * tuned(.titles))
-        title.position = CGPoint(x: 0, y: halfHeight * 0.7)
+        title.position = CGPoint(x: 0, y: -halfHeight * StageSelectScreen.titleDrop)
         addChild(title)
+        // The window behind the stages, warped to the ball cam's trapezoid.
+        let windowHeight = halfHeight * StageSelectScreen.windowHeightShare
+        window.size = CGSize(width: windowHeight * StageSelectScreen.windowAspect, height: windowHeight)
+        window.alpha = StageSelectScreen.windowOpacity
+        window.zPosition = -10
+        let inset = Float((1 - StageSelectScreen.windowBottomShare) / 2)
+        window.warpGeometry = SKWarpGeometryGrid(columns: 1, rows: 1, sourcePositions: [SIMD2(0, 0), SIMD2(1, 0), SIMD2(0, 1), SIMD2(1, 1)],
+                                                 destinationPositions: [SIMD2(inset, 0), SIMD2(1 - inset, 0), SIMD2(0, 1), SIMD2(1, 1)])
+        addChild(window)
+        showWindow(nil)
         if let heading {
             let sub = Futuristic.label(heading, size: 22 * tuned(.titles))
             sub.position = CGPoint(x: 0, y: halfHeight * 0.44)
@@ -638,8 +678,56 @@ final class StageSelectScreen: Screen {
     static let oneRowMost = 4
     /// The name's lines' spacing, a share of the lettering's size.
     static let lineShare: CGFloat = 1.05
-    /// STAGE SELECT's cap height, in points.
+    /// STAGE SELECT's cap height, in points, and its middle down from the screen's, a share of half its height.
     static let titleHeight: CGFloat = 15
+    static let titleDrop: CGFloat = 0.85
+
+    /// The window showing a stage's shot, or static without one.
+    func showWindow(_ shot: SKTexture?) {
+        window.removeAction(forKey: "static")
+        if let shot {
+            window.texture = shot
+        } else {
+            window.run(.repeatForever(.animate(with: StageSelectScreen.staticFrames, timePerFrame: 1.0 / 20)), withKey: "static")
+        }
+    }
+
+    /// Flashes round the window's edges, as round the ball cam's, each on its own frame.
+    func frameWindow(with frames: [SKTexture]) {
+        guard !frames.isEmpty else { return }
+        windowSparks.forEach { $0.node.removeFromParent() }
+        windowSparks = []
+        let perEdge = [9, 4, 8, 4]
+        for (edge, sparks) in perEdge.enumerated() {
+            for step in 0..<sparks {
+                let spark = SKSpriteNode(texture: frames[0])
+                spark.setScale(BackboardTuning.size)
+                spark.alpha = StageSelectScreen.windowOpacity
+                spark.zPosition = window.zPosition + 1
+                let start = (edge * 5 + step * 7) % frames.count
+                spark.run(.repeatForever(.animate(with: Array(frames[start...]) + Array(frames[..<start]), timePerFrame: 1.0 / 24)))
+                addChild(spark)
+                windowSparks.append((spark, edge, CGFloat(step) / CGFloat(sparks)))
+            }
+        }
+        // Round the trapezoid clockwise from the top left.
+        let half = CGSize(width: window.size.width / 2, height: window.size.height / 2)
+        let bottomHalf = half.width * StageSelectScreen.windowBottomShare
+        let ring = [CGPoint(x: -half.width, y: half.height), CGPoint(x: half.width, y: half.height),
+                    CGPoint(x: bottomHalf, y: -half.height), CGPoint(x: -bottomHalf, y: -half.height)]
+        for spark in windowSparks {
+            let from = ring[spark.edge], to = ring[(spark.edge + 1) % 4]
+            spark.node.position = CGPoint(x: window.position.x + from.x + (to.x - from.x) * spark.share,
+                                          y: window.position.y + from.y + (to.y - from.y) * spark.share)
+        }
+    }
+
+    private func tellRaised() {
+        let raised = flipLit ?? localVoters.first.flatMap { picks[$0] ?? cursors[$0] }
+        guard raisedTold != .some(raised) else { return }
+        raisedTold = .some(raised)
+        onRaised?(raised)
+    }
     /// A name in two lines, broken at the space nearest its middle; one with no space in one.
     static func lines(of name: String) -> [String] {
         let spaces = name.indices.filter { name[$0] == " " }
@@ -701,6 +789,7 @@ final class StageSelectScreen: Screen {
     }
 
     private func refresh() {
+        defer { tellRaised() }
         let raised: Set<Int> = flipLit.map { [$0] } ?? Set(voters.compactMap { picks[$0] ?? cursors[$0] })
         for (index, tile) in tiles.enumerated() {
             let lit = raised.contains(index)

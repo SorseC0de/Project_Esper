@@ -415,6 +415,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
                 capture(commands, from: shotTexture, into: panelTextures[live], panel: live, screen: view.drawableSize)
             }
             layPage(commands, descriptor: screenPass, shown: page.shown, screen: view.drawableSize)
+            // The page full and the big panel frozen: its picture kept for the stage select's window.
+            if let stage = scene.previewShotStage, page.shown >= MangaPage.panels.count, page.live == nil {
+                scene.previewShotStage = nil
+                keep(panelTextures[MangaPage.bigPanel], with: commands) { image in StageShots.shared.store(image, for: stage) }
+            }
         } else {
             pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms,
                  then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)
@@ -599,6 +604,28 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         var uniforms = camGlowUniforms(ballCamGlowA ?? texture)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<GlowUniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+    }
+
+    /// A picture off the GPU: copied to a texture the CPU can read, read once the copy's done, and
+    /// handed over on the main thread.
+    private func keep(_ texture: MTLTexture, with commands: MTLCommandBuffer, then: @escaping @MainActor (CGImage) -> Void) {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: texture.pixelFormat, width: texture.width, height: texture.height, mipmapped: false)
+        descriptor.storageMode = .shared
+        descriptor.usage = [.shaderRead]
+        guard let readable = device.makeTexture(descriptor: descriptor), let blit = commands.makeBlitCommandEncoder() else { return }
+        blit.copy(from: texture, to: readable)
+        blit.endEncoding()
+        commands.addCompletedHandler { _ in
+            let width = readable.width, height = readable.height, rowBytes = width * 4
+            var bytes = [UInt8](repeating: 0, count: rowBytes * height)
+            readable.getBytes(&bytes, bytesPerRow: rowBytes, from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+            guard let provider = CGDataProvider(data: Data(bytes) as CFData),
+                  let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: rowBytes,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.noneSkipFirst.rawValue),
+                                      provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent) else { return }
+            DispatchQueue.main.async { then(image) }
+        }
     }
 
     /// A panel's cut: the frame's middle, as wide or as tall as the frame, at the panel's shape,

@@ -1671,6 +1671,8 @@ final class GameScene: SKScene {
     private static let hoopfishBottomShare: CGFloat = 1.0 / 3
     /// The hood's glow share for the stage up: the renderer's.
     var hoodGlowShare: Float { GlowSettings.hoodShare(on: match.stage.features.look) }
+    /// The stage whose preview's big panel the renderer is to keep, once the page is full (`StageShots`).
+    var previewShotStage: StageChoice?
     /// Between pause and the second FLO meter under it, in points.
     private static let cornerRowGap: CGFloat = 6
     /// The pause icon's frame in the HUD's points, the pause menu's RESUME's place.
@@ -4846,6 +4848,12 @@ final class GameScene: SKScene {
                 self?.voteStage(listed.indices.contains(index) ? listed[index] : .wreckCenter, by: voter)
             }
             for (voter, vote) in stageVotes { select.show(vote: listed.firstIndex(of: vote) ?? 0, by: voter) }
+            // The window behind the stages: the raised one's whole-stage shot from its preview,
+            // static with none raised or none taken yet; ringed as the ball cam is, in the local side's flashes.
+            select.frameWindow(with: sprites.effectFrames(EnergyEffect.flashSpark2, player: localIndex))
+            select.onRaised = { [weak select] index in
+                select?.showWindow(index.flatMap { listed.indices.contains($0) ? StageShots.shared.texture(for: listed[$0]) : nil })
+            }
             // Back to the title from the first pick offline, before anything's been played.
             // Back off the first select, offline: to the customize screen, picks kept.
             if online == nil, series.stagesPlayed == 0 {
@@ -8834,6 +8842,7 @@ extension GameScene {
         base.ball.frozen = 1_000_000
         stagePreview = StagePreview(shots: shots, base: base, title: series.stage.name.uppercased())
         flowState?.previewing = true
+        previewShotStage = series.stage
         flow = .preview
         flowState?.showsTitle = false
         presentScreen()
@@ -8905,6 +8914,7 @@ extension GameScene {
         signsDarkFrames = 0
         flowState?.previewTitle = nil
         flowState?.previewing = false
+        previewShotStage = nil
         if let hidden = arcsWereHidden { threePointArcs.isHidden = hidden }
         arcsWereHidden = nil
         hud.isHidden = false

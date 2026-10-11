@@ -4270,13 +4270,18 @@ final class GameScene: SKScene {
         } else {
             series.move(to: choice)
         }
+        // The fresh match made now, off the series' dice as ever, but put in only as the stage it's
+        // on is built: drawn before that, the old stage's rims and nets would be on the new one's hoops.
         let fresh = freshMatch()
-        session.mutate { match in
-            let frame = match.frame
-            match = fresh
-            match.frame = frame
+        let swapIn = { [weak self] in
+            self?.session.mutate { match in
+                let frame = match.frame
+                match = fresh
+                match.frame = frame
+            }
         }
         if pickAfterStage {
+            swapIn()
             showStage()
             freshRoundView()
             enter(.picking)
@@ -4304,6 +4309,7 @@ final class GameScene: SKScene {
             // preview straight on with the loading bar over it, held on its full page till done.
             flowState.transition(.fade) { [weak self] in
                 guard let self else { return }
+                swapIn()
                 self.showStage()
                 self.freshRoundView()
                 self.warmStage()
@@ -4313,11 +4319,13 @@ final class GameScene: SKScene {
         }
         let change = { [weak self] in
             guard let self else { return }
+            swapIn()
             self.showStage()
             self.freshRoundView()
             self.warmStage(then: play)
         }
         if let flowState { flowState.transition(.fade, holdsForLoading: true, change) } else {
+            swapIn()
             showStage()
             freshRoundView()
             play()
@@ -5756,6 +5764,7 @@ final class GameScene: SKScene {
     /// Where a rim turns: its art's back edge, on the backboard, in the scene.
     private func rimPivot(_ index: Int) -> CGPoint {
         let look = match.stage.features.look
+        guard match.stage.hoops.indices.contains(index) else { return .zero }
         let hoop = match.stage.hoops[index]
         let art = GameScene.hoopArtPoint(for: hoop, on: look)
         let pivot = HoopTuning.pivot(for: look)
@@ -5987,8 +5996,9 @@ final class GameScene: SKScene {
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             net.colour.getRed(&r, green: &g, blue: &b, alpha: &a)
             // Hung from the rim as it's turned, and turned with it.
-            let turn = index < rimDip.count ? rimTurn(index) : 0
-            let top = index < rimDip.count ? rotated(net.hangPoint, about: rimPivot(index), by: turn) : net.hangPoint
+            let rimmed = index < rimDip.count && index < match.stage.hoops.count
+            let turn = rimmed ? rimTurn(index) : 0
+            let top = rimmed ? rotated(net.hangPoint, about: rimPivot(index), by: turn) : net.hangPoint
             return CylinderNet.instances(top: top, turn: turn, mirrored: net.mirrored, sways: net.rowSways, spreads: net.rowSpreads, flare: net.dunkFlare, swish: net.swishWeight,
                                          colour: SIMD4<Float>(Float(r), Float(g), Float(b), 1))
         } : [])
@@ -7686,7 +7696,7 @@ final class GameScene: SKScene {
             bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
             node.zRotation = bodyTilt[index]
             // Hanging on a rim the body turns with it, about the rim's back.
-            if player.state == .dunking, player.dunkHoop < rimDip.count {
+            if player.state == .dunking, player.dunkHoop < rimDip.count, player.dunkHoop < match.stage.hoops.count {
                 let turn = rimTurn(player.dunkHoop)
                 node.position = rotated(node.position, about: rimPivot(player.dunkHoop), by: turn)
                 node.zRotation += turn

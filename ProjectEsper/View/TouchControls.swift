@@ -195,16 +195,16 @@ final class TouchControls: SKNode {
 
         _ = Onomatopoeia.registered
         // Throw and shoot side by side, jump below and between them, all at the tuned size:
-        // jump and throw in ring1, shoot in ring4.
+        // jump and throw in ring6, shoot in ring4.
         let k = TouchControls.scale
-        let jump = makeButton("JUMP", ring: "ring1", radius: 30 * k, at: CGPoint(x: right - 76 * k, y: bottom + 26 * k)) { input, down, _ in
+        let jump = makeButton("JUMP", ring: "ring6", radius: 30 * k, at: CGPoint(x: right - 76 * k, y: bottom + 26 * k)) { input, down, _ in
             input.jump = down
         }
         let shoot = makeButton("SHOOT", ring: "ring4", radius: 30 * k, at: CGPoint(x: right - 38 * k, y: bottom + 84 * k)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", ring: "ring1", radius: 24 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
+        let throwButton = makeButton("THROW", ring: "ring6", radius: 24 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }

@@ -58,6 +58,18 @@ struct GameView: View {
             }
             HudView(scene: flow.scene)
                 .ignoresSafeArea()
+            // The stage preview's page framed in box2, stretched round the panels, its lines in the
+            // page's margin, clear of them (`MangaPage.frame`).
+            if flow.previewing {
+                GeometryReader { geometry in
+                    let fit = MangaPage.fit(in: geometry.size)
+                    let frame = MangaPage.frame
+                    FuturisticPiece(name: "box2", stretched: CGSize(width: frame.width * fit.scale, height: frame.height * fit.scale))
+                        .position(x: fit.origin.x + frame.midX * fit.scale, y: fit.origin.y + frame.midY * fit.scale)
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            }
             // The stage preview's name over its big panel's middle, in FLO lettering.
             if let title = flow.previewTitle {
                 GeometryReader { geometry in

@@ -95,6 +95,7 @@ enum Futuristic {
         "7": CGPoint(x: 0.50, y: 0.40),
         "8": CGPoint(x: 0.48, y: 0.36),
         "9": CGPoint(x: 0.50, y: 0.32),
+        "10": CGPoint(x: 0.45, y: 0.32),
         "11": CGPoint(x: 0.54, y: 0.35),
         "box4": CGPoint(x: 0.38, y: 0.50),
     ]
@@ -105,18 +106,22 @@ struct FuturisticPiece: View {
     let image: UIImage
     var colour: Color = Futuristic.line
     var scale: CGFloat = 1
+    /// Drawn this size outright, stretched to it, in place of its own at `scale`.
+    var stretched: CGSize?
 
-    init(name: String, colour: Color = Futuristic.line, scale: CGFloat = 1) {
-        self.init(image: Futuristic.image(name), colour: colour, scale: scale)
+    init(name: String, colour: Color = Futuristic.line, scale: CGFloat = 1, stretched: CGSize? = nil) {
+        self.init(image: Futuristic.image(name), colour: colour, scale: scale, stretched: stretched)
     }
 
-    init(image: UIImage, colour: Color = Futuristic.line, scale: CGFloat = 1) {
+    init(image: UIImage, colour: Color = Futuristic.line, scale: CGFloat = 1, stretched: CGSize? = nil) {
         self.image = image
         self.colour = colour
         self.scale = scale
+        self.stretched = stretched
     }
 
     var size: CGSize {
+        if let stretched { return stretched }
         return CGSize(width: image.size.width * image.scale * Futuristic.pointsPerPixel * scale,
                       height: image.size.height * image.scale * Futuristic.pointsPerPixel * scale)
     }
@@ -140,10 +145,12 @@ struct FuturisticFrame<Content: View>: View {
     /// The frame turned round left to right, or upside down, what it holds the right way round.
     var mirrored = false
     var upsideDown = false
+    /// The frame stretched to this size outright, as another frame's.
+    var stretched: CGSize?
     @ViewBuilder let content: (Color) -> Content
 
     var body: some View {
-        let piece = FuturisticPiece(name: name, colour: lit ? Futuristic.lit : Futuristic.line, scale: scale * frameScale)
+        let piece = FuturisticPiece(name: name, colour: lit ? Futuristic.lit : Futuristic.line, scale: scale * frameScale, stretched: stretched)
         let face = Futuristic.faces[name] ?? CGPoint(x: 0.5, y: 0.5)
         let faceX = mirrored ? 1 - face.x : face.x
         let faceY = upsideDown ? 1 - face.y : face.y

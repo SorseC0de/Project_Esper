@@ -42,6 +42,18 @@ enum MangaPage {
             : CGSize(width: panelAspect / screenAspect, height: 1)
     }
 
+    /// box2 round the page: stretched so its clear inside (its lines' shares of it in from each
+    /// side, as measured off `futuristic_box2`) holds every panel with `frameGap` to spare, in the
+    /// page's units: the frame never over a panel, nor a panel over it.
+    static let frameInside = (left: CGFloat(0.027), right: CGFloat(0.031), top: CGFloat(0.053), bottom: CGFloat(0.047))
+    static let frameGap: CGFloat = 20
+    static var frame: CGRect {
+        let held = panels.indices.map(bounds).reduce(CGRect.null) { $0.union($1) }.insetBy(dx: -frameGap, dy: -frameGap)
+        let width = held.width / (1 - frameInside.left - frameInside.right)
+        let height = held.height / (1 - frameInside.top - frameInside.bottom)
+        return CGRect(x: held.minX - frameInside.left * width, y: held.minY - frameInside.top * height, width: width, height: height)
+    }
+
     /// The page's ground and the gutters between the panels: black.
     static let ground: RGB = 0x000000
 

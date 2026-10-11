@@ -647,7 +647,7 @@ biomorph stands over the drinks, and left set it kept one biomorph's moves under
 the same blue round button. The HUD: the
 round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, JUMP and THROW in
-Futuristic_UI's ring1 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their
+Futuristic_UI's ring6 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their
 names in the menus' face in it too, shrunk to fit inside the ring (0.72 of the button across), gold while held, the ring turning a full circle as it's pressed (0.35
 seconds); the stick a faded black round button with a blue knob; pause offline in frame 1 small
 (0.3 of the menus' size) with a pause sign in its face, in the top right corner over the second FLO
@@ -668,9 +668,10 @@ A gear in the title's upper right corner (the dobo pack's `settings_icon_128px`,
 in Futuristic frame 1, the first of the title cursor's rows) and the gear in frame 9 under the
 pause's RESUME open the
 settings (`SettingsScreen`, SwiftUI, full screen on the stage select's ground, the grid on black,
-SETTINGS lettered as FLO is, 15 high, over the title or the pause), kept between launches (`GameSettings`). Each row its name in Futuristic frame 11, the names
-stacked with no room between, and its choices beside it each in frame 5, every row as tall as fits
-the screen (48 at most); the lettering the menus' blue, the picked choice whole and the rest dim,
+SETTINGS lettered as FLO is, 15 high, over the title or the pause), kept between launches (`GameSettings`). Each row its name in Futuristic frame 11, every
+other row frame 10 upside down stretched to 11's size, the names stacked with no room between, and
+its choices beside it as words, every row as tall as fits the screen (48 at most); the lettering the
+menus' blue, the picked choice whole with rule8 under it, sliding to a new pick, and the rest dim,
 the cursor's row's name and picked choice gold; up and down a row, left and right its choice (jump
 steps it on), B or start to shut them, or on a touch screen the corner arrow; a tap picks a choice
 outright.
@@ -754,7 +755,8 @@ A disconnect on the screen closes it to the title.
   (`FuturisticMeter.swift`): the vector's fill where it has one, else the first slanted fill moved
   along, and the right end's triangle inset from its outline as the left end's fill is from its own.
 - A stage chosen on the select is built behind the curtain, not before it comes down
-  (`showStage`), then warmed (`warmStage`): every texture in the scene sent to the GPU, then four
+  (`showStage`), the fresh match on it put in only then too (rolled as the stage is chosen, as ever),
+  so nothing's drawn on the new stage's hoops with the old one's rims and nets, then warmed (`warmStage`): every texture in the scene sent to the GPU, then four
   frames drawn so what's first drawn (its shaders) is made, each a piece on the loading bar. With
   its preview due, the curtain goes straight up on the preview, the bar over its page, the
   sprites' rebuild and the warm-up loading through it; the preview held on its full page (all five
@@ -2133,7 +2135,9 @@ rimless, the run starting on the ground. Dunks and threes as on the court.
 Before a stage's first count in a series (not ZONES), a manga page of it plays to
 `stage_preview.wav` (6.3 seconds), then the players port in and the count runs. The page is
 `_Graphic Assets/Vectors/Stages/Manga_Panels.svg` (`MangaPage`, 3750 by 2625): fitted whole to the
-screen on black, five panels filling in turn, the right side's top, middle and bottom right, the
+screen on black, framed in Futuristic_UI's box2 stretched round the panels (its clear inside holding
+them all with 20 of the page's units to spare, so neither covers the other: `MangaPage.frame`), five
+panels filling in turn, the right side's top, middle and bottom right, the
 triangle at the bottom, then the big one on the left (at 0.15, 0.95, 1.75, 2.55 and 3.45 s). Each
 panel is a cut of the stage: it plays a few frames (24, the big one 40, a cut's own count over
 either) and freezes. The big one is the whole stage (a long one's middle, 420 by 260 units at

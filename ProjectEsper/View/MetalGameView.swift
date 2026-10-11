@@ -415,8 +415,9 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
                 capture(commands, from: shotTexture, into: panelTextures[live], panel: live, screen: view.drawableSize)
             }
             layPage(commands, descriptor: screenPass, shown: page.shown, screen: view.drawableSize)
-            // The page full and the big panel frozen: its picture kept for the stage select's window.
-            if let stage = scene.previewShotStage, page.shown >= MangaPage.panels.count, page.live == nil {
+            // The page full and the big panel's last frame in (captured just above): its picture kept
+            // for the stage select's window.
+            if let stage = scene.previewShotStage, page.shown >= MangaPage.panels.count, page.settled {
                 scene.previewShotStage = nil
                 keep(panelTextures[MangaPage.bigPanel], with: commands) { image in StageShots.shared.store(image, for: stage) }
             }

@@ -628,7 +628,8 @@ scales that lift, one value a platform: half of it, 0.5, on all of them. The sta
 without its glows), STAGE SELECT lettered as FLO is (15 high) at the bottom; behind the stages a
 window drawn as the ball cam is (a trapezoid, its bottom 0.84 of its top across, at half, ringed in
 the local side's flashspark2s), 1.3 of half the screen's height tall, showing the raised stage's
-whole-stage shot, its preview's big panel kept off the renderer as the page fills and stored in the
+whole-stage shot, its preview's big panel kept off the renderer once its last frame's in
+(`MangaPageFrame.settled`) and stored in the
 app's caches (`StageShots`, `GameScene.previewShotStage`), or static with nothing raised or no shot
 taken yet (a stage's first select before its preview has played); each stage in Futuristic_UI's box1
 in the menus' blue with its name in Upheaval, the blue too, in two lines, broken at the space
@@ -2118,7 +2119,8 @@ The broken car, where the file's other [Dont_Draw] layer places it (bottom left 
 as `KAndABrokenCar`), over the backdrop as the red car is: someone on its hood (its first 24 art pixels
 across, above the ground; `standsOnBrokenHood`) springs it through frames 0, 1 and 2, one every four
 frames, and it rests at 1 while they stay; nobody on it, back to 0 the same way (`brokenCarStepFrames`). Three
-street lights hang off the wire (`lampXs`, the leftmost moved a tile right with the art, their bottoms at `lampBottom`, 240 art pixels up, a tile
+street lights hang off the wire (`lampXs`, the leftmost moved a tile right with the art, each cone half an
+art pixel right of its lamp's middle to sit square under it, `coneNudge`, their bottoms at `lampBottom`, 240 art pixels up, a tile
 lower than first drawn): from each a trapezoid
 of its light (`KAndAArt.Light`, `conePicture`), 8 across at the lamp and 126 at its foot, 150 down,
 fading to clear from halfway down, palette 7 at 0.12, added, over the backdrop; the LIGHT TOP W,
@@ -2335,7 +2337,7 @@ shown, once, like the effects.
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`). slashclash: two blades meeting.
 - BALL OUT's Z card times itself off the debug strip's BALL OUT DELAY, HOLD and LEAVE (`BallOutTiming`,
-  kept: 0, 1.2 and 0.3 seconds to start): how long after the call it comes in, how long it holds with
+  kept: 0, 0.75 and 0.1 seconds to start): how long after the call it comes in, how long it holds with
   the words up, how long it takes going on out.
 - dunk: a dunk going in, in the swish's place. slide: the slide. flo_collect: each FLO orb landing
   on its player, at 0.25 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a

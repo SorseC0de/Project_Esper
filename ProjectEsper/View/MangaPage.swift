@@ -76,4 +76,6 @@ enum MangaPage {
 struct MangaPageFrame: Equatable {
     var shown: Int
     var live: Int?
+    /// The playing panel's last frame is in: it holds still from here.
+    var settled = false
 }

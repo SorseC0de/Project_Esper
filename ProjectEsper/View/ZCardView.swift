@@ -114,12 +114,12 @@ enum BallOutTiming {
         set { UserDefaults.standard.set(newValue, forKey: "ballOut.delay") }
     }
     static var hold: Double {
-        get { stored("ballOut.hold", ZCardStyle.hold) }
-        set { UserDefaults.standard.set(newValue, forKey: "ballOut.hold") }
+        get { stored("ballOut.hold.2", 0.75) }
+        set { UserDefaults.standard.set(newValue, forKey: "ballOut.hold.2") }
     }
     static var departure: Double {
-        get { stored("ballOut.departure", ZCardStyle.departure) }
-        set { UserDefaults.standard.set(newValue, forKey: "ballOut.departure") }
+        get { stored("ballOut.departure.2", 0.1) }
+        set { UserDefaults.standard.set(newValue, forKey: "ballOut.departure.2") }
     }
 }
 

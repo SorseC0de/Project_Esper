@@ -154,6 +154,8 @@ enum KAndAArt {
         }
     }
     static let coneAlpha: CGFloat = 0.12
+    /// Each cone half an art pixel right of its lamp's middle, so it sits square under the drawn lamp.
+    static let coneNudge: CGFloat = 0.5
     static let coneColour = SKColor(rgb: PixelPalette.colours[7])
     /// The cones over the wash, so the lights shine through it, and under the players.
     static let coneZ: CGFloat = washZ + 0.1
@@ -205,7 +207,8 @@ enum KAndAArt {
             cone.texture = picture.texture
             cone.size = picture.size
             cone.anchorPoint = CGPoint(x: 0.5, y: 1)
-            cone.position = CGPoint(x: CGFloat(KAndARules.lampXs[index] * SpriteLibrary.pixelsPerUnit), y: CGFloat(KAndARules.lampBottom * SpriteLibrary.pixelsPerUnit))
+            cone.position = CGPoint(x: CGFloat(KAndARules.lampXs[index] * SpriteLibrary.pixelsPerUnit) + coneNudge,
+                                    y: CGFloat(KAndARules.lampBottom * SpriteLibrary.pixelsPerUnit))
         }
     }
 

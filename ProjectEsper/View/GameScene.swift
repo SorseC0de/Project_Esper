@@ -8922,7 +8922,7 @@ extension GameScene {
         let ppu = CGFloat(SpriteLibrary.pixelsPerUnit)
         let scale = max(view.width * ppu / max(size.width * crop.width, 1), view.height * ppu / max(size.height * crop.height, 1))
         previewFraming = (SpriteLibrary.point(centre), scale)
-        mangaPage = MangaPageFrame(shown: state.panel + 1, live: state.liveFrame <= frames ? state.panel : nil)
+        mangaPage = MangaPageFrame(shown: state.panel + 1, live: state.liveFrame <= frames ? state.panel : nil, settled: state.liveFrame >= frames)
         if state.panel == MangaPage.bigPanel, state.elapsed >= MangaPage.starts[MangaPage.bigPanel] + MangaPage.titleDelay,
            flowState?.previewTitle == nil {
             flowState?.previewTitle = state.title

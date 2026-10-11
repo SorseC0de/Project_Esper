@@ -2223,7 +2223,7 @@ final class GameScene: SKScene {
             boardJitter.append(0)
             rimDip.append(0)
             rimSpin.append(0)
-            nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow),
+            nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: netColour(for: hoop),
                                 into: stageGround, depth: 5.5))
             nets[nets.count - 1].hidden = hoop.rimless || netless
         }
@@ -3431,6 +3431,10 @@ final class GameScene: SKScene {
             controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
             controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.cornerMaxY)) { FloTuning.cornerMaxY = CGFloat($0); relayoutFlo() }
         }
+        // BALL OUT's Z card: how long after the call it comes in, how long it holds, how long it takes to go.
+        controls.addSlider(title: "BALL OUT DELAY", range: 0...1.5, notch: 0.05, value: Float(BallOutTiming.delay)) { BallOutTiming.delay = Double($0) }
+        controls.addSlider(title: "BALL OUT HOLD", range: 0.2...3, notch: 0.05, value: Float(BallOutTiming.hold)) { BallOutTiming.hold = Double($0) }
+        controls.addSlider(title: "BALL OUT LEAVE", range: 0.1...1.5, notch: 0.05, value: Float(BallOutTiming.departure)) { BallOutTiming.departure = Double($0) }
         // How far out the ball circles a body changing with it.
         controls.addSlider(title: "ORBIT RADIUS", range: 0...96, notch: 1, value: Float(GameScene.orbitRadius)) { value in
             GameScene.orbitRadius = CGFloat(value)
@@ -5198,7 +5202,7 @@ final class GameScene: SKScene {
         for tile in blockTiles { tile.node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: tile.side).glow)) }
         for arc in threePointArcSides { arc.node.strokeColor = SKColor(rgb: sprites.look(for: arc.side).glow) }
         for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
-        for (net, hoop) in zip(nets, match.stage.hoops) { net.recolour(SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)) }
+        for (net, hoop) in zip(nets, match.stage.hoops) { net.recolour(netColour(for: hoop)) }
         warmDrawnArt()
         drawSeries()
     }
@@ -5759,6 +5763,12 @@ final class GameScene: SKScene {
     private func rimTurn(_ index: Int) -> CGFloat {
         guard index < rimDip.count, index < match.stage.hoops.count else { return 0 }
         return rimDip[index] * .pi / 180 * CGFloat(match.stage.hoops[index].backboard.sign)
+    }
+
+    /// A net in the energy of the side its rim is for; a rim that's anyone's, as Hoopfish
+    /// Hideaway's is, neutral white.
+    private func netColour(for hoop: Hoop) -> SKColor {
+        hoop.shared ? .white : SKColor(rgb: sprites.look(for: 1 - hoop.owner).glow)
     }
 
     /// Where a rim turns: its art's back edge, on the backboard, in the scene.

@@ -664,12 +664,12 @@ sliders keep their plain look.
 
 ## Settings
 
-A gear in the title's upper right corner (the dobo pack's `settings_icon_128px`, `ui_icon_settings`,
+A gear in the title's upper right corner (SF Symbols' outlined `gearshape`, the settings' icon everywhere,
 in Futuristic frame 1, the first of the title cursor's rows) and the gear in frame 9 under the
 pause's RESUME open the
 settings (`SettingsScreen`, SwiftUI, full screen on the stage select's ground, the grid on black,
-SETTINGS lettered as FLO is, 15 high, over the title or the pause), kept between launches (`GameSettings`). Each row its name in Futuristic frame 11, every
-other row frame 10 upside down stretched to 11's size, the names stacked with no room between, and
+SETTINGS lettered as FLO is, 15 high, over the title or the pause), kept between launches (`GameSettings`). Each row its name in Futuristic frame 6 turned
+round, the names stacked with no room between, and
 its choices beside it as words, every row as tall as fits the screen (48 at most); the lettering the
 menus' blue, the picked choice whole with rule8 under it, sliding to a new pick, and the rest dim,
 the cursor's row's name and picked choice gold; up and down a row, left and right its choice (jump
@@ -1869,7 +1869,7 @@ level to 2 whole pixels at either end (`HoopfishHideawayArt.frontFinLift`), the 
 degrees either way over two seconds, the ball's glow there coming and going between none and 90%
 over two seconds, still while someone dunks (and a rim swimming off the stage,
 or gone, lets go of whoever hangs on it); each turning where it meets the
-body (`HoopfishHideawayArt.hoopfishParts`). Its rim and net glow, and so do its red rings and eye (left out of the
+body (`HoopfishHideawayArt.hoopfishParts`). Its net is white, the rim being anyone's (`netColour`; a rim with an owner has the defender's energy). Its rim and net glow, and so do its red rings and eye (left out of the
 body's mask, `HoopfishHideawayArt.bodyGlowMask`), the background's no-glow under them let through: drawn
 pure blue in the mask over it (`MaskScene`'s `through`, under the fish's flats, and `throughFront`
 and the net strands over them; `GameScene.glowThroughSnapshots`, `glowThroughFrontSnapshots`,
@@ -2323,6 +2323,9 @@ shown, once, like the effects.
   is unused).
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`). slashclash: two blades meeting.
+- BALL OUT's Z card times itself off the debug strip's BALL OUT DELAY, HOLD and LEAVE (`BallOutTiming`,
+  kept: 0, 1.2 and 0.3 seconds to start): how long after the call it comes in, how long it holds with
+  the words up, how long it takes going on out.
 - dunk: a dunk going in, in the swish's place. slide: the slide. flo_collect: each FLO orb landing
   on its player, at 0.25 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a
   meter showing full as it fills. These five are levelled as they're imported to the effects'

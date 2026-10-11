@@ -785,7 +785,10 @@ final class PauseScreen: Screen {
         let gearFrame = Futuristic.image("9")
         let gearSize = CGSize(width: gearFrame.size.width * gearFrame.scale * Futuristic.pointsPerPixel * iconScale,
                               height: gearFrame.size.height * gearFrame.scale * Futuristic.pointsPerPixel * iconScale)
-        let gear = SKSpriteNode(texture: UIImage(named: "ui_icon_settings").map { SKTexture(image: $0) })
+        // The settings' SF Symbol gear, outlined, drawn white to be coloured.
+        let symbol = UIImage(systemName: "gearshape", withConfiguration: UIImage.SymbolConfiguration(pointSize: 64, weight: .regular))?
+            .withTintColor(.white, renderingMode: .alwaysOriginal)
+        let gear = SKSpriteNode(texture: symbol.map { SKTexture(image: $0) })
         gear.size = CGSize(width: gearSize.width * 0.5, height: gearSize.width * 0.5 * 31 / 30)
         gear.color = Futuristic.lineColour
         gear.colorBlendFactor = 1

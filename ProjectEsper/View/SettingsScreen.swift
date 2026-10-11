@@ -16,10 +16,10 @@ struct SettingsScreen: View {
                 .contentShape(Rectangle())
                 .onTapGesture {}
             GeometryReader { geometry in
-                // Each row as tall as fits the screen, its title in frame 11 and its choices each
-                // in frame 5, the titles stacked with no room between.
+                // Each row as tall as fits the screen, its title in frame 6 turned round and its
+                // choices as words, the titles stacked with no room between.
                 let rows = GameSettings.Row.allCases
-                let titleImage = Futuristic.image("11")
+                let titleImage = Futuristic.image("6")
                 let rowHeight = min(SettingsScreen.rowHeightMost * scale(.buttons),
                                     (geometry.size.height * SettingsScreen.rowsShare - 2 * SettingsScreen.titleHeight * scale(.titles)) / CGFloat(rows.count))
                 let titleScale = rowHeight / (titleImage.size.height * titleImage.scale * Futuristic.pointsPerPixel)
@@ -47,13 +47,9 @@ struct SettingsScreen: View {
         let onRow = flow.settingsCursor == index
         // Read so the row redraws when a choice changes.
         _ = flow.settingsVersion
-        // Frame 11, every other row frame 10 upside down, stretched to 11's size so the stack lines up.
-        let eleven = Futuristic.image("11")
-        let titleSize = CGSize(width: eleven.size.width * eleven.scale * Futuristic.pointsPerPixel * titleScale,
-                               height: eleven.size.height * eleven.scale * Futuristic.pointsPerPixel * titleScale)
-        let alternate = index % 2 == 1
         return HStack(spacing: 10 * scale(.buttons)) {
-            FuturisticFrame(name: alternate ? "10" : "11", lit: onRow, upsideDown: alternate, stretched: titleSize) { colour in
+            // Frame 6 turned round, every row's.
+            FuturisticFrame(name: "6", lit: onRow, scale: titleScale, mirrored: true) { colour in
                 Text(row.title)
                     .font(Futuristic.font(size: rowHeight * SettingsScreen.titleTextShare))
                     .foregroundStyle(colour)

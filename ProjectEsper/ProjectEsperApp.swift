@@ -86,6 +86,7 @@ struct GameView: View {
             if let call = flow.ballOutCall, !flow.veiled {
                 GeometryReader { geometry in
                     ZCardView(upperStreaks: Color(rgb: EsperPalette.gold.light), lowerStreaks: Color(rgb: EsperPalette.blue.light),
+                              delay: BallOutTiming.delay, hold: BallOutTiming.hold, departure: BallOutTiming.departure,
                               onFinished: { if flow.ballOutCall == call { flow.ballOutCall = nil } }) {
                         FloText("BALL OUT!!!", height: ZCardStyle.bar(across: geometry.size).height * ZCardStyle.wordsHeight)
                     }

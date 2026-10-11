@@ -473,10 +473,9 @@ struct TitleOverlay: View {
                 .overlay(alignment: .topTrailing) {
                     Button { flow.activate(.settings) } label: {
                         FuturisticFrame(name: "1", lit: flow.titleCursor == .settings, scale: TitleOverlay.settingsScale * scale(.buttons)) { colour in
-                            Image(uiImage: UIImage(named: "ui_icon_settings") ?? UIImage())
-                                .renderingMode(.template)
+                            Image(systemName: "gearshape")
                                 .resizable()
-                                .interpolation(.high)
+                                .aspectRatio(contentMode: .fit)
                                 .foregroundStyle(colour)
                                 .frame(width: 30 * TitleOverlay.settingsScale * scale(.buttons), height: 31 * TitleOverlay.settingsScale * scale(.buttons))
                         }

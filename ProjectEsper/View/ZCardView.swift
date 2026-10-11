@@ -17,10 +17,18 @@ struct ZCardView<Words: View>: View {
     var lowerStreaks: Color
     /// Called once the bars are gone. The card removes itself.
     let onFinished: () -> Void
+    /// Seconds before it comes in, held with the words up, and taken going on out.
+    var delay: Double
+    var hold: Double
+    var departure: Double
 
-    init(upperStreaks: Color, lowerStreaks: Color, onFinished: @escaping () -> Void, @ViewBuilder words: () -> Words) {
+    init(upperStreaks: Color, lowerStreaks: Color, delay: Double = 0, hold: Double = ZCardStyle.hold, departure: Double = ZCardStyle.departure,
+         onFinished: @escaping () -> Void, @ViewBuilder words: () -> Words) {
         self.upperStreaks = upperStreaks
         self.lowerStreaks = lowerStreaks
+        self.delay = delay
+        self.hold = hold
+        self.departure = departure
         self.onFinished = onFinished
         self.words = words()
     }
@@ -82,17 +90,36 @@ struct ZCardView<Words: View>: View {
 
     /// In, the words springing up as the bars land; held; the words gone and the bars on out.
     private func play() async {
+        if delay > 0 { await sleep(delay) }
         withAnimation(.easeOut(duration: ZCardStyle.arrival)) { stage = .gathered }
         said = 1
-        await sleep(ZCardStyle.arrival + ZCardStyle.hold)
+        await sleep(ZCardStyle.arrival + hold)
         said = 0
-        withAnimation(.easeIn(duration: ZCardStyle.departure)) { stage = .parted }
-        await sleep(ZCardStyle.departure)
+        withAnimation(.easeIn(duration: departure)) { stage = .parted }
+        await sleep(departure)
         onFinished()
     }
 
     private func sleep(_ seconds: Double) async {
         try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+    }
+}
+
+/// BALL OUT's card's timing, on the debug strip's BALL OUT sliders, kept between launches: seconds
+/// after the call before it comes in, held with the words up, and taken going on out.
+enum BallOutTiming {
+    private static func stored(_ key: String, _ fallback: Double) -> Double { UserDefaults.standard.object(forKey: key) as? Double ?? fallback }
+    static var delay: Double {
+        get { stored("ballOut.delay", 0) }
+        set { UserDefaults.standard.set(newValue, forKey: "ballOut.delay") }
+    }
+    static var hold: Double {
+        get { stored("ballOut.hold", ZCardStyle.hold) }
+        set { UserDefaults.standard.set(newValue, forKey: "ballOut.hold") }
+    }
+    static var departure: Double {
+        get { stored("ballOut.departure", ZCardStyle.departure) }
+        set { UserDefaults.standard.set(newValue, forKey: "ballOut.departure") }
     }
 }
 

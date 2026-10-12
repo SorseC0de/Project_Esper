@@ -1053,7 +1053,7 @@ struct CustomizeFigure: View {
                 func spot(_ point: CGPoint) -> CGPoint {
                     CGPoint(x: (margin + point.x) * pixel, y: (margin + 48 - point.y) * pixel)
                 }
-                for cube in motion.cubes where cube.behind { draw(cube, in: context, at: spot(cube.position)) }
+                for cube in motion.cubes where cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) }
                 let figureRect = CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel)
                 func hoodRect(_ shown: SpriteLibrary.Portrait) -> CGRect {
                     let place = CustomizeFigure.hoodPlace(shown, nudge: headNudge, scale: headScale)
@@ -1082,7 +1082,7 @@ struct CustomizeFigure: View {
                     let at = spot(string.point)
                     context.fill(Path(CGRect(x: at.x - pixel / 2, y: at.y - pixel / 2, width: pixel, height: pixel)), with: .color(string.accent ? accent : plain))
                 }
-                for cube in motion.cubes where !cube.behind { draw(cube, in: context, at: spot(cube.position)) }
+                for cube in motion.cubes where !cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) }
                 // The glow: what's energy again, blurred and added.
                 var glowing = context
                 glowing.blendMode = .plusLighter
@@ -1102,7 +1102,7 @@ struct CustomizeFigure: View {
                         let at = spot(string.point)
                         layer.fill(Path(CGRect(x: at.x - pixel / 2, y: at.y - pixel / 2, width: pixel, height: pixel)), with: .color(string.accent ? accent : plain))
                     }
-                    for cube in motion.cubes { draw(cube, in: layer, at: spot(cube.position)) }
+                    for cube in motion.cubes { CustomizeFigure.drawCube(cube, in: layer, at: spot(cube.position), pixel: pixel) }
                 }
             }
         }
@@ -1118,8 +1118,8 @@ struct CustomizeFigure: View {
     }
 
     /// A cube as the Metal layer shades one: its faces toward us, each its colour lit toward
-    /// white where it faces the light, never dark.
-    private func draw(_ cube: CustomizeFigureMotion.Cube, in context: GraphicsContext, at centre: CGPoint) {
+    /// white where it faces the light, never dark. `pixel`: screen points an art pixel.
+    static func drawCube(_ cube: CustomizeFigureMotion.Cube, in context: GraphicsContext, at centre: CGPoint, pixel: CGFloat) {
         let share = cube.age / cube.life
         let side = Float(cube.size * pixel * (share < 0.45 ? 1 : (share < 0.75 ? 0.66 : 0.33)))
         let alpha = share < 0.85 ? 0.9 : 0.9 * (1 - share) / 0.15
@@ -1181,24 +1181,27 @@ final class CustomizeFigureMotion {
     static let headCubeRate = 24.0
     static let shoeCubeRate = Double(ParticleLook.legCubeRate)
 
-    func advance(to time: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat) {
+    /// `canvas`: the figure's sheet's side in art pixels; `style`: how its strings move.
+    func advance(to time: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat,
+                 canvas: CGFloat = 48, style: HoodStrings.Style = CustomizeFigureMotion.strings) {
         let step = 1.0 / 60
         owed += last.map { min(time - $0, 0.1) } ?? step
         last = time
         while owed >= step {
             owed -= step
-            tick(time: time, step: step, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale)
+            tick(time: time, step: step, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale, canvas: canvas, style: style)
         }
     }
 
-    private func tick(time: Double, step: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat) {
+    private func tick(time: Double, step: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat,
+                      canvas: CGFloat, style: HoodStrings.Style) {
         // The strings off the hood's own anchors, wherever the hood went on the figure and at its
         // size, floating one back and one forward.
         let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: headScale)
         let anchors = HoodStrings.anchorPixels.map { pixel in
-            CGPoint(x: place.origin.x + (pixel.x + 0.5) * place.scale, y: 48 - (place.origin.y + (pixel.y + 0.5) * place.scale))
+            CGPoint(x: place.origin.x + (pixel.x + 0.5) * place.scale, y: canvas - (place.origin.y + (pixel.y + 0.5) * place.scale))
         }
-        strings = stringMotion.step(anchors: anchors, style: CustomizeFigureMotion.strings, facing: 1, scale: 1, time: time)
+        strings = stringMotion.step(anchors: anchors, style: style, facing: 1, scale: 1, time: time)
 
         // Cubes off the head's crown, where the hood went, and off whatever of the limbs is
         // energy (`Dressing.cubeSources`), as a human's are in play.
@@ -1219,7 +1222,7 @@ final class CustomizeFigureMotion {
                 let speed = 24 + Double.random(in: -2...2)
                 let axis = simd_normalize(SIMD3<Float>.random(in: -1...1) + SIMD3<Float>(0, 0, 0.001))
                 cubes.append(Cube(position: CGPoint(x: centre.x + .random(in: -spread...spread),
-                                                    y: 48 - centre.y + source.lift + .random(in: -spread / 2...spread / 2)),
+                                                    y: canvas - centre.y + source.lift + .random(in: -spread / 2...spread / 2)),
                                   velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
                                   life: Double(ParticleLook.cubeTrail) / speed + .random(in: -0.05...0.05),
                                   orientation: simd_quatf(angle: .random(in: 0..<(2 * .pi)), axis: axis),

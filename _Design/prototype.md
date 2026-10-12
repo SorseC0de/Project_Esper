@@ -44,6 +44,16 @@ neutral to get a shot off; catch it and the roles reverse.
   `lightning1` to `4`, `esper_charge`) are grayscale strips toned per player in the app;
   the charge is a 512-pixel soft render with the swirl in its middle 150, boxed down by 4
   on import. Palette PNGs are read too.
+- `ProjectEsper/View/Previews/PlayerGallery.swift` — the player gallery, an Xcode preview
+  (not on the TV): every player sheet assembled as the game draws a body, in a picked energy
+  colour with the phone's saved dressing: the look's colours, the neck filled, the line, the
+  hooded head where the frame's head is, the strings hanging off it (gone where they'd be
+  under the arms, `stringlessFrom`), the cubes off the head, boots and sleeves, and the glow as
+  the customize screen draws it (`CustomizeArt.glowStrength`, `glowPixels`), playing at a
+  picked rate on #FF00FF. SAVE THIS SHEET or SAVE ALL writes each sheet as a PNG strip, down or
+  across, at ×1 to ×8, its cells the sheet's cell plus PAD art pixels each side (8 to start), on
+  #FF00FF, to `_Graphic Assets/Pixel Art/Assembled/` named for the sheet; the strings and cubes
+  move on between a sheet's frames as it plays.
 
 ## Units
 

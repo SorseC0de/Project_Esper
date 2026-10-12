@@ -647,17 +647,19 @@ final class SpriteLibrary {
         return context.makeImage()
     }
 
-    func portrait(_ name: String, frame: Int = 0, player: Int, headDrawnFor: AnimationFrame, headNudge: CGPoint, headScale: CGFloat) -> Portrait? {
+    /// `holdsBall`: the sheet draws the ball in hand, kept white rather than read as energy.
+    func portrait(_ name: String, frame: Int = 0, player: Int, headDrawnFor: AnimationFrame, headNudge: CGPoint, headScale: CGFloat,
+                  holdsBall: Bool = false) -> Portrait? {
         let key = "p\(player)_portrait_\(name)_\(frame)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
         if cache[key] != nil, let made = portraits[key] { return made }
         let look = look(for: player)
-        let plain = recolour(texture(name, frame), look: look, holdsBall: false, detach: false)
+        let plain = recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: false)
         let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
         var figure = plain
         if look.human, let here = plain.centres[.head], let there = drawnFor.centres[.head] {
             let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             let place = SpriteLibrary.hoodPlace(head: here, offset: offset, nudge: headNudge, scale: headScale)
-            figure = recolour(texture(name, frame), look: look, holdsBall: false, detach: true,
+            figure = recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: true,
                               hood: (hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage(), place.origin, place.scale))
         }
         let body = figure.texture.cgImage()

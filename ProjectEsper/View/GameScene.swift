@@ -5779,6 +5779,17 @@ final class GameScene: SKScene {
         return rimDip[index] * .pi / 180 * CGFloat(match.stage.hoops[index].backboard.sign)
     }
 
+    /// Sheets whose frames from the one given on draw no hood strings, the arms (or the pose) over
+    /// where they'd hang: a sheet a line, its first stringless frame.
+    static let stringlessFrom: [Animation: Int] = [
+        .shoot: 0, .shootAir: 0,
+        .throwForward: 4, .throwAir: 4, .layup: 4,
+        .ledge: 0,
+    ]
+    static func stringsUnderArms(_ frame: AnimationFrame) -> Bool {
+        stringlessFrom[frame.animation].map { frame.frame >= $0 } ?? false
+    }
+
     /// A net in the energy of the side its rim is for; a rim that's anyone's, as Hoopfish
     /// Hideaway's is, neutral white.
     private func netColour(for hoop: Hoop) -> SKColor {
@@ -7929,8 +7940,9 @@ final class GameScene: SKScene {
                 hoodGrey.zRotation = hood.zRotation
             }
             // Its strings, off the hood, over the body: behind it, the hood down's were lost under
-            // the torso. Toned as the hood's white and its palette 37 are.
-            if hood.isHidden || player.frozen > 0 {
+            // the torso. Toned as the hood's white and its palette 37 are. None where the arms
+            // would cover them (`stringsUnderArms`).
+            if hood.isHidden || player.frozen > 0 || GameScene.stringsUnderArms(player.animationFrame) {
                 hoodStrings[index].hide()
             } else if !held {
                 let look = sprites.look(for: index)

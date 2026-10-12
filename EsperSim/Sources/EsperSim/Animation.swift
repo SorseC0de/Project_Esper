@@ -22,6 +22,8 @@ public enum Animation: String, CaseIterable {
     case shootAir = "player_shoot_air"
     case throwForward = "player_throw"
     case throwAir = "player_throw_air"
+    /// The up throw, on the ground or in the air, out of the throw's hold frame.
+    case layup = "player_layup"
     case catchGround = "player_catch"
     case catchAir = "player_catch_air"
     case skid = "player_skid"
@@ -67,6 +69,7 @@ public enum Animation: String, CaseIterable {
         case .shoot: 10
         case .shootAir, .taunt: 11
         case .throwForward, .throwAir: 8
+        case .layup: 7
         case .ledge: 5
         }
     }
@@ -76,7 +79,7 @@ public enum Animation: String, CaseIterable {
     public var holdsBall: Bool {
         switch self {
         case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .flyBall, .wallLandBall, .shoot, .shootAir, .throwForward,
-             .catchGround, .catchAir, .skidBall, .taunt: true
+             .catchGround, .catchAir, .skidBall, .taunt, .layup: true
         default: false
         }
     }
@@ -209,6 +212,8 @@ extension Player {
             if stepbackFrom == .shootStance { return AnimationFrame(.airBall, Animation.airBall.frameCount - 1) }
             return AnimationFrame(grounded ? .throwForward : .throwAir, StepbackRules.sheetFrame)
         case .throwing:
+            // Straight up, the layup's seven at the same rate, the ball leaving on its frame 5.
+            if layingUp { return AnimationFrame(.layup, min(t * BallRules.throwSheetFramesPerSecond / 60, Animation.layup.frameCount - 1)) }
             // Frames 4 to 7 at the windup's 15 a second, the smear on the release; the 15-frame
             // recovery ends with the last shown three sim frames rather than four.
             return AnimationFrame(grounded ? .throwForward : .throwAir, min(4 + t * BallRules.throwSheetFramesPerSecond / 60, 7))

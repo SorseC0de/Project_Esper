@@ -249,7 +249,11 @@ whatever lands on it came at, held down 12° while someone
   frames and snatches it every time; a quick throw gets by it seven times in ten. Off
   the other it flies straight back at the thrower's chest and is theirs, at any speed and
   facing either way, until it first hits something. A release never starts inside a
-  wall: the hand is pushed out of one the body is pressed against. Up is the floater: a soft drift up at 1.5 with gravity
+  wall: the hand is pushed out of one the body is pressed against. Up is the layup (protocol 129): out
+  of the throw's hold frame into `player_layup`'s seven frames (48 by 48, its ball landmarks the
+  importer's) at the throw's 15 a second, the ball in hand through its first five and let go on frame 5,
+  20 frames into the throw (`BallRules.layupReleaseFrames`), acting again once its last is done, 28 in
+  (`layupRecoveryFrames`, `Player.layingUp`), on the ground or in the air; its ball the floater: a soft drift up at 1.5 with gravity
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the air the throw stance keeps its run,
@@ -1260,6 +1264,9 @@ a stage's flat backdrop under them (Flight B411's, K&A's) kept them from glowing
 The hood is the H.O.O.D., the Hyper-Osmotic Output Driver: it draws in sweat and drives out
 energy. Its two strings are drawn rather than painted (`HoodStrings`): chains of whole art pixels, each pixel
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
+none drawn where the arms or the pose would cover them (`GameScene.stringlessFrom`, a sheet a line and
+its first stringless frame: both shot sheets whole, the throws and the layup from frame 4, the ledge
+whole),
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; Super Smoothie flying,
 twenty each streaming straight back as FloState's near one does (`HoodStrings.streaming`); in FloState,

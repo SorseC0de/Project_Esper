@@ -309,6 +309,11 @@ public enum BallRules {
     /// Frames from the release to the ball leaving the hand, then to acting again.
     public static let throwReleaseFrames = 3
     public static let throwRecoveryFrames = 15
+    /// The up throw, the layup: out of the throw's hold frame into `player_layup`'s seven frames
+    /// at the throw's 15 a second, the ball leaving the hand on its sixth (frame 5), acting again
+    /// once its last is done.
+    public static let layupReleaseFrames = 5 * 60 / throwSheetFramesPerSecond
+    public static let layupRecoveryFrames = 7 * 60 / throwSheetFramesPerSecond
     /// A throw stance with the chest this close to a rim becomes a dunk, wider than the
     /// basket. The ball goes in halfway through the dunk's frames, and the dunker hangs
     /// on the rim for this long after before the point restarts.

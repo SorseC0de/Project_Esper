@@ -147,6 +147,8 @@ public struct Player: Equatable {
     public var shotLift = false
     /// The last cardinal recorded in the throwing stance; zero throws forward.
     public var throwDirection: Vec2 = .zero
+    /// Throwing straight up: the layup, its own sheet and timing.
+    public var layingUp: Bool { throwDirection.y > 0 && throwDirection.x == 0 }
     public var catchCooldown = 0
     /// 47: the scorer can't take the ball, by hand or snatch, nor slash, until this runs out.
     public var pickupLockout = 0
@@ -1104,7 +1106,7 @@ public struct Player: Equatable {
                 airCoast()
                 fall(.idle)
             }
-            if reached(BallRules.throwReleaseFrames) {
+            if reached(layingUp ? BallRules.layupReleaseFrames : BallRules.throwReleaseFrames) {
                 let direction = throwDirection == .zero ? Vec2(x: facing.sign, y: 0) : throwDirection
                 if hasFireball {
                     hasFireball = false
@@ -1115,7 +1117,7 @@ public struct Player: Equatable {
                     action = .releaseThrow(velocity: direction * BallRules.throwSpeed)
                     events.append(.thrown(player: index))
                 }
-            } else if stateTimer >= BallRules.throwRecoveryFrames {
+            } else if stateTimer >= (layingUp ? BallRules.layupRecoveryFrames : BallRules.throwRecoveryFrames) {
                 enter(grounded ? .idle : .air)
             }
 

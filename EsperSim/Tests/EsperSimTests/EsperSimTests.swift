@@ -589,7 +589,7 @@ final class BallTests: XCTestCase {
             for _ in 0..<BallRules.throwWindupFrames + 2 {
                 match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
             }
-            run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+            run(&match, frames: BallRules.layupReleaseFrames + 1, input: { _ in .idle })
             XCTAssertEqual(match.ball.velocity.x, direction * match.players[0].spec.runSpeed * BallRules.floaterMomentumShare, accuracy: 0.001)
         }
     }
@@ -614,12 +614,32 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.ball.velocity, Vec2(x: BallRules.throwSpeed, y: 0))
     }
 
+    func testUpThrowIsALayupThatLetsGoOnItsSixthFrame() {
+        var match = matchWithBallHeld()
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        }
+        XCTAssertEqual(match.players[0].animationFrame.animation, .throwForward, "the stance holds the throw's frame")
+        // Into the layup, the ball in hand through its first five frames.
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertEqual(match.players[0].state, .throwing)
+        XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.layup, 0))
+        run(&match, frames: BallRules.layupReleaseFrames - 2, input: { _ in .idle })
+        XCTAssertEqual(match.ball.holder, 0, "still in hand before frame 5")
+        run(&match, frames: 2, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder, "gone on frame 5")
+        XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.layup, 5))
+        // Acting again once the last frame's done.
+        run(&match, frames: BallRules.layupRecoveryFrames - BallRules.layupReleaseFrames, input: { _ in .idle })
+        XCTAssertNotEqual(match.players[0].state, .throwing)
+    }
+
     func testUpThrowIsAFloater() {
         var match = matchWithBallHeld()
         for _ in 0..<BallRules.throwWindupFrames + 2 {
             match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
         }
-        run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+        run(&match, frames: BallRules.layupReleaseFrames + 1, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
         XCTAssertTrue(match.ball.thrown)
         XCTAssertEqual(match.ball.velocity.y, BallRules.floaterSpeed, accuracy: 0.001)
@@ -893,7 +913,7 @@ final class BallTests: XCTestCase {
     func testTheFloaterSteers() {
         var match = matchWithBallHeld()
         for _ in 0..<BallRules.throwWindupFrames + 2 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle]) }
-        run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
+        run(&match, frames: BallRules.layupReleaseFrames + 1, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
         XCTAssertTrue(match.ball.thrown)
         XCTAssertTrue(match.ball.steers)

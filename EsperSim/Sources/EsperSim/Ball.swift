@@ -151,6 +151,14 @@ public struct Ball: Equatable {
             }
         }
 
+        // Down onto a spring's top (the jellyfish's bell): off it, as off a floor.
+        for spring in stage.springs where position.x >= spring.left && position.x <= spring.right
+            && previousY - BallRules.radius >= spring.y && position.y - BallRules.radius < spring.y {
+            events.append(.springBounced(at: Vec2(x: position.x, y: spring.y), speed: abs(velocity.y), ball: true))
+            position.y = spring.y + BallRules.radius
+            bounceY(events: &events)
+        }
+
         // In the rim it came down into: scored as its middle goes through, or lost if it leaves.
         if let entering = enteringHoop, stage.hoops.indices.contains(entering) {
             let hoop = stage.hoops[entering]

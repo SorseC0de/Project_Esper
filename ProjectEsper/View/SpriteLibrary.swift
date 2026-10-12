@@ -1417,6 +1417,21 @@ enum EnergyEffect: CaseIterable {
     }
 }
 
+/// DUST X, DUST Y and DUST SCALE on the UI tuning panel, under HUD, for each of the run,
+/// dash and skid-stop dust: art pixels ahead of the feet (mirrored with facing) and up,
+/// and the sheet's scale.
+enum DustTuning {
+    static let effects: [Effect] = [.dustRun3, .dustDash, .dustSkid]
+    static func xKey(_ effect: Effect) -> String { "ui.dust.\(effect.name).x" }
+    static func yKey(_ effect: Effect) -> String { "ui.dust.\(effect.name).y" }
+    static func scaleKey(_ effect: Effect) -> String { "ui.dust.\(effect.name).scale" }
+    static func offset(_ effect: Effect) -> CGPoint { CGPoint(x: stored(xKey(effect)) ?? 0, y: stored(yKey(effect)) ?? 0) }
+    static func scale(_ effect: Effect) -> CGFloat { stored(scaleKey(effect)) ?? 0.5 }
+    private static func stored(_ key: String) -> CGFloat? {
+        UserDefaults.standard.object(forKey: key) == nil ? nil : CGFloat(UserDefaults.standard.double(forKey: key))
+    }
+}
+
 /// One-shot sprites: sparks, smoke, the swish, and Blazing Boba's fire and Flash Fizz's
 /// flash, painted as they are. Each plays through and removes itself. The jump spark, the
 /// smoke and the catch spark are drawn in the player's energy colour.
@@ -1424,12 +1439,13 @@ enum Effect {
     case smoke, jumpSpark, catchSpark, wallJumpSpark
     case fireJump, fireDash, fireWallSpark, fireSkid, fireTrail, fireCharge, fireCharge2, fireExplosion, fireballSummon
     case flashSpark, flashSpark2
-    case dustWalk, dustRun
+    case dustWalk, dustRun, dustRun3, dustDash, dustSkid
 
-    static let inEnergyColour: [Effect] = [.smoke, .jumpSpark, .catchSpark, .dustWalk, .dustRun]
+    static let inEnergyColour: [Effect] = [.smoke, .jumpSpark, .catchSpark, .dustWalk, .dustRun, .dustRun3, .dustDash, .dustSkid]
     /// Toned no lighter than the energy colour itself: the jump spark, the smoke of the
     /// dash and slide, and the footfalls' dust. The catch spark keeps the paler ramp.
-    static let sparkNames: Set<String> = [Effect.smoke.name, Effect.jumpSpark.name, Effect.dustWalk.name, Effect.dustRun.name]
+    static let sparkNames: Set<String> = [Effect.smoke.name, Effect.jumpSpark.name, Effect.dustWalk.name, Effect.dustRun.name,
+                                          Effect.dustRun3.name, Effect.dustDash.name, Effect.dustSkid.name]
 
     var name: String {
         switch self {
@@ -1450,8 +1466,14 @@ enum Effect {
         case .flashSpark2: "flashspark2"
         case .dustWalk: "dust_walk"
         case .dustRun: "dust_run"
+        case .dustRun3: "dust_run3"
+        case .dustDash: "dust_dash"
+        case .dustSkid: "dust_skid"
         }
     }
+
+    /// A measured strip's frame count by name, 0 before it's imported.
+    static func frameCount(named name: String) -> Int { EffectSheets.frames[name] ?? 0 }
 
     /// Whether the sheet has been imported: a sheet named before it lands falls back.
     var available: Bool { EffectSheets.frames[name] != nil }
@@ -1469,7 +1491,7 @@ enum Effect {
     var fps: Double {
         switch self {
         case .catchSpark: 15
-        case .smoke, .wallJumpSpark, .dustWalk, .dustRun: 12
+        case .smoke, .wallJumpSpark, .dustWalk, .dustRun, .dustRun3, .dustDash, .dustSkid: 12
         default: 24
         }
     }

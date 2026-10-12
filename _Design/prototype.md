@@ -1538,6 +1538,12 @@ comes down, `dust_walk` or `dust_run` puffs up 2 units behind the feet, bottom-a
 second in the energy colour as the dash's smoke is (not under water); every second footfall,
 from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 5 high, out of the dust.
 
+Running, `dust_run3` stands in for `dust_run`; a dash kicks up `dust_dash` in place of its smoke (a slide keeps the smoke);
+a skid stop (idle out of a run, dash or slide, the turn the skid sheet plays) kicks up `dust_skid`,
+except for Blazing Boba, whose fire skid it is. All three are in the energy colour at 12 a second,
+placed and sized by `DustTuning`: X (ahead of the feet, mirrored with facing), Y and SIZE for each on
+the UI tuning panel under HUD, scale 0.5 until set.
+
 | | JP | EN |
 |---|---|---|
 | Basket, confirmed, beside the net toward the court (no word over 16 high: a basket's, a hit's, an explosion's, the powers' all 16) | パサッ！ | SWISH! |
@@ -1962,6 +1968,12 @@ three groups in ten behind the background's foreground (-18.5; the rest at -10):
 - fish (`fish`, 32 × 16, three frames at 8 a second, two colours side by side on the sheet), commoner: three to
   seven seconds apart, a school of two to five in one colour, 20 to 30 a second;
 - a shark (`shark`, 64 × 32, four frames at 6 a second), rare: forty to eighty seconds apart, alone, 24 to 32 a second.
+
+A jellyfish (`jellyfish`, 32 × 32, four frames at 8 a second) belongs to the sim (`Match.jellyfish`,
+`JellyfishRules`): every 3000 to 6000 frames (off its own dice) one drifts in from a side, at a row
+between 4 and 13, across to the other at 12 art pixels a second and off. The top of its bell, 10
+pixels over its middle and 12 either way, is a one-way spring (`Stage.springs`): a body or ball coming
+down on it bounces as off a rim's top and says BOING!. It trails bubbles, three a second.
 
 A crab (`crab`, 32 × 16, three frames at 6 a second) walks the sea floor, in front of the rocks and
 behind the players (4.2): one crossing at a time, 16 art pixels a second, right to left first and

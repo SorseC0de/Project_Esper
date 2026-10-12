@@ -171,6 +171,8 @@ public struct Stage: Equatable {
     public var ballBlockers: [Box] = []
     /// Slopes that come and go with what's standing, such as a car's, plus `fixedSlopes`.
     public var slopes: [Slope] = []
+    /// One-way springs on the stage as it is this frame (the jellyfish's bell), as a rim's top is.
+    public var springs: [SpringTop] = []
     /// Floor slopes that are part of the stage, and the ceiling slopes, which are all fixed.
     public var fixedSlopes: [Slope] = []
     public var ceilingSlopes: [Slope] = []

@@ -2801,6 +2801,28 @@ final class GameScene: SKScene {
         var trailBubblesPerSecond: Double { self == .shark ? 6 : 3 }
     }
 
+    /// The sim's jellyfish, its sheet at 8 a second, over the hoopfish and under the bodies,
+    /// trailing bubbles; made again when the stage is redrawn.
+    private var jellyfishNode: SKSpriteNode?
+    private func stepJellyfishNode() {
+        guard !wholeStageView, let jelly = match.jellyfish, Effect.frameCount(named: "jellyfish") > 0 else {
+            jellyfishNode?.removeFromParent()
+            jellyfishNode = nil
+            return
+        }
+        let node = jellyfishNode.flatMap { $0.parent == nil ? nil : $0 } ?? {
+            let node = SKSpriteNode(texture: sprites.texture("jellyfish", 0))
+            node.zPosition = 5.7
+            stageGround.addChild(node)
+            jellyfishNode = node
+            return node
+        }()
+        let at = SpriteLibrary.point(jelly.position)
+        node.position = CGPoint(x: at.x.rounded(), y: at.y.rounded())
+        node.texture = sprites.texture("jellyfish", Int(CACurrentMediaTime() * 8) % Effect.frameCount(named: "jellyfish"))
+        trailBubble(behind: node, heading: CGFloat(jelly.heading), perSecond: 3)
+    }
+
     /// Now and then, by `perSecond`, a small bubble off the back of `node`, the end away from
     /// `heading` (1 right, -1 left), in its layer.
     private func trailBubble(behind node: SKSpriteNode, heading: CGFloat, perSecond: Double, lift: CGFloat = 0) {
@@ -2936,6 +2958,7 @@ final class GameScene: SKScene {
                 }
             }
         }
+        stepJellyfishNode()
         HoopfishHideawayArt.animate(hoopfishHideawayArt?.hoopfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
         HoopfishHideawayArt.sway(hoopfishHideawayArt?.props ?? [], at: CACurrentMediaTime())
         swimmers = swimmers.compactMap { swimmer in
@@ -4533,12 +4556,16 @@ final class GameScene: SKScene {
             let frame = Int(player.animationPhase) % 8
             defer { footPhases[index] = frame }
             guard footPhases[index] != frame, (running ? GameScene.runFootfalls : GameScene.walkFootfalls).contains(frame) else { continue }
-            let dust: Effect = running ? .dustRun : .dustWalk
+            let dust: Effect = running ? (Effect.dustRun3.available ? .dustRun3 : .dustRun) : .dustWalk
             // A power's own trail, Blazing Boba's flames, stands in for the dust.
             if dust.available, GameSettings.walkTrails, !match.stage.features.underwater, !player.layingFlames {
-                // Kicked up behind the feet.
-                spawn(dust, at: player.position + Vec2(x: -player.facing.sign * GameScene.dustBehind, y: 0),
-                      flipped: player.facing == .left, player: index, scale: bodyScale(index))
+                if dust == .dustRun3 {
+                    spawnDust(.dustRun3, of: index)
+                } else {
+                    // Kicked up behind the feet.
+                    spawn(dust, at: player.position + Vec2(x: -player.facing.sign * GameScene.dustBehind, y: 0),
+                          flipped: player.facing == .left, player: index, scale: bodyScale(index))
+                }
             }
             let count = footfallCounts[index, default: 0]
             footfallCounts[index] = count + 1
@@ -4617,6 +4644,12 @@ final class GameScene: SKScene {
                 boingSaidAt[hoop] = now
                 let rim = match.stage.hoops[hoop]
                 say(.boing, at: rim.position + Vec2(x: 0, y: 2), away: -CGFloat(rim.backboard.sign), rise: 40)
+            case .springBounced(let at, let speed, _) where speed > GameScene.bounceSoundFloor:
+                // The jellyfish's bell, as a rim's top: once a while at most.
+                let now = CACurrentMediaTime()
+                guard now - (boingSaidAt[-1] ?? 0) >= GameScene.boingQuietSeconds else { break }
+                boingSaidAt[-1] = now
+                say(.boing, at: at + Vec2(x: 0, y: 2), away: 0, rise: 40)
             case .wallJumped(let index, let wall):
                 // Out of the wall spark at the shoe, away from the wall.
                 say(.squeak, at: players[index].position + Vec2(x: wall.sign * 4, y: 5), away: -wall.sign, rise: 15)
@@ -5572,7 +5605,11 @@ final class GameScene: SKScene {
                 if player.power == .blazingBoba {
                     spawn(.fireDash, at: player.position, flipped: player.facing == .left, scale: bodyScale(index))
                 } else {
-                    spawn(.smoke, at: player.position, flipped: player.facing == .left, player: index, scale: bodyScale(index))
+                    if case .dashed = event, Effect.dustDash.available {
+                        spawnDust(.dustDash, of: index)
+                    } else {
+                        spawn(.smoke, at: player.position, flipped: player.facing == .left, player: index, scale: bodyScale(index))
+                    }
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
             case .snatchReached(let index):
@@ -5989,6 +6026,15 @@ final class GameScene: SKScene {
         ghost.zPosition = -1
         bodies.addChild(ghost)
         ghost.run(.sequence([.wait(forDuration: GameScene.afterimageHold), .fadeOut(withDuration: GameScene.afterimageFade), .removeFromParent()]))
+    }
+
+    /// The run, dash and skid-stop dust, placed and sized by DustTuning, in the energy colour.
+    private func spawnDust(_ effect: Effect, of index: Int) {
+        let player = match.players[index]
+        guard effect.available, !match.stage.features.underwater else { return }
+        let offset = DustTuning.offset(effect)
+        let position = player.position + Vec2(x: Double(offset.x) * player.facing.sign, y: Double(offset.y)) * Double(bodyScale(index)) / SpriteLibrary.pixelsPerUnit
+        spawn(effect, at: position, flipped: player.facing == .left, player: index, scale: DustTuning.scale(effect) * bodyScale(index))
     }
 
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool, player: Int? = nil, scale: CGFloat = 1) {
@@ -8256,6 +8302,9 @@ final class GameScene: SKScene {
             if player.power == .blazingBoba, player.state == .idle, lastStates[index] == .run || lastStates[index] == .dash {
                 // The sheet skids the other way from the run sheets.
                 spawn(.fireSkid, at: player.position, flipped: player.facing == .right, scale: bodyScale(index))
+            } else if player.state == .idle, player.grounded, [.run, .dash, .slide].contains(lastStates[index]) {
+                // The skid stop: the same turn the skid sheet plays.
+                spawnDust(.dustSkid, of: index)
             }
             lastStates[index] = player.state
         }

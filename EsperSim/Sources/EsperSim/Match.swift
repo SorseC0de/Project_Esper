@@ -38,6 +38,11 @@ public struct Match: Equatable {
     public var helicopter: Helicopter?
     /// Hoopfish Hideaway's Hoopfish, swimming across with the ball or the rim on its antenna.
     public var hoopfish: Hoopfish?
+    /// Hoopfish Hideaway's jellyfish, crossing now; the frames to the next; its own dice, so the
+    /// stage's other rolls run as they did.
+    public var jellyfish: Jellyfish?
+    public var jellyfishIn = 0
+    public var jellyDice: Dice
     public var lastHelicopterHoop: Int?
     /// Flight B411's pitch: the lean it's going from and to and the frames into it; its cart, and the
     /// frames before the cart can hit each body again.
@@ -96,6 +101,7 @@ public struct Match: Equatable {
         countdownLength = countdown
         self.countdown = countdown
         fieldDice = Dice(seed: seed)
+        jellyDice = Dice(seed: seed ^ 0x5EA_1E11)
         if stage.features.tilts {
             cart = Cart.starting(on: stage)
             cartHitFrames = players.map { _ in 0 }
@@ -109,6 +115,7 @@ public struct Match: Equatable {
                 hoopfish = Hoopfish.starting(at: fish, on: stage, countdown: countdown)
             }
             placeHoopfishLoad()
+            jellyfishIn = JellyfishRules.gapFrames.lowerBound + jellyDice.roll(JellyfishRules.gapFrames.count)
         }
         if mode == .zones {
             // ZONES: one runner, the ball in hand from the start, FLO full and never spent.
@@ -170,6 +177,7 @@ public struct Match: Equatable {
         stepFlightB411()
         stepTornados()
         stepHoopfish()
+        stepJellyfish()
         gatherFloBundles()
         stepStageFireball()
         stepLightning()

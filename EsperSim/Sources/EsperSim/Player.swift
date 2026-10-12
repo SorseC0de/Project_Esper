@@ -2241,7 +2241,19 @@ public struct Player: Equatable {
     /// Coming down onto a rim's top from above: straight back up, never standing on it, higher
     /// with jump held, as off a spring. Not while dunking, which hangs on it.
     private mutating func bounceOffRims(in stage: Stage, feetBefore: Double, jumpHeld: Bool, events: inout [MatchEvent]) {
-        guard state != .dunking, feetBefore > position.y, stage.features.rimBounce else { return }
+        guard state != .dunking, feetBefore > position.y else { return }
+        // A spring's top (the jellyfish's bell) as a rim's.
+        for spring in stage.springs
+        where feetBefore >= spring.y && position.y < spring.y && body.max.x > spring.left && body.min.x < spring.right {
+            events.append(.springBounced(at: Vec2(x: position.x, y: spring.y), speed: feetBefore - position.y, ball: false))
+            position.y = spring.y
+            velocity.y = (jumpHeld ? RimRules.jumpBounce : RimRules.bodyBounce) * (underwater ? RimRules.underwaterBounceShare : 1)
+            if jumpHeld { jumpBuffer = 0 }
+            grounded = false
+            if state.isGroundState || state == .land { enter(.air) }
+            return
+        }
+        guard stage.features.rimBounce else { return }
         for (index, hoop) in stage.hoops.enumerated()
         where !hoop.rimless && feetBefore >= hoop.position.y && position.y < hoop.position.y
             && body.max.x > hoop.position.x - BallRules.rimHalfWidth && body.min.x < hoop.position.x + BallRules.rimHalfWidth {

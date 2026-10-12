@@ -28,6 +28,8 @@ public enum MatchEvent: Equatable {
     case ballBounced(position: Vec2, speed: Double)
     /// A body or a ball came down on a rim's top and bounced off it; how fast it came.
     case rimBounced(hoop: Int, speed: Double, ball: Bool)
+    /// A body or the ball off a spring's top (the jellyfish's), where.
+    case springBounced(at: Vec2, speed: Double, ball: Bool)
     case ballRespawned
     case helmetSpawned(at: Vec2, owner: Int)
     /// Gone at the far wall.

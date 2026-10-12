@@ -336,8 +336,9 @@ public struct Match: Equatable {
         switch action {
         case .releaseShot(let velocity):
             // Cannon Cola's pace: the same arc run through that many times faster.
+            // On a swimming rim, with the rim's motion too (`Stage.shotLead`).
             ball.release(from: player.position + Vec2(x: 0, y: BallRules.shotReleaseHeight * player.spec.scale),
-                         velocity: velocity * player.spec.shotPace, by: index, straight: false, pace: player.spec.shotPace)
+                         velocity: velocity * player.spec.shotPace + stage.shotLead(by: index), by: index, straight: false, pace: player.spec.shotPace)
             ball.shotInFlight = true
             ball.scoring = true
             ball.burning = player.power == .blazingBoba

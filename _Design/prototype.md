@@ -310,7 +310,10 @@ whatever lands on it came at, held down 12° while someone
   would carry it through the rim, a share a frame, never snapped. A swimming rim (the
   Hoopfish's) is led: aimed at where it will be when the ball has fallen to it, by its motion
   over the last frame (`Hoop.velocity`, protocol 121), no stronger a pull, as the computer's
-  aim already led it; of balls dropped at it through its swim, 58% go in to 41% before. Only a shot's or a
+  aim already led it; of balls dropped at it through its swim, 58% go in to 41% before. And a shot let go
+  at it carries the rim's sideways motion over the last frame on top of its arc (`Stage.shotLead`, the
+  computer's aim reckoning it the same; protocol 136), so over any flight, a quick shot's short one too,
+  it drifts as far as the rim swims and comes down where the rim's got to, the steering taking up any turn. Only a shot's or a
   floater's ball, and only until its first bounce off anything but a backboard's glass (`Stage.backboard(at:)`,
   the board from its face to its back, from under it up 20 over the rim; protocol 133), so a shot kissed
   off the glass is still drawn in; a throw's never. Only the rim

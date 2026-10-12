@@ -465,7 +465,7 @@ extension Opponent {
             let aim = Vec2(x: Trig.cos(angle) * sign, y: Trig.sin(angle))
             if let (release, velocity, frames) = shotRelease(body, stage: match.stage, aim: aim, jumpShot: jumpShot, stanceSoFar: stanceSoFar) {
                 var ball = Ball(position: release)
-                ball.release(from: release, velocity: velocity, by: body.index, straight: false, pace: body.spec.shotPace)
+                ball.release(from: release, velocity: velocity + match.stage.shotLead(by: body.index), by: body.index, straight: false, pace: body.spec.shotPace)
                 ball.shotInFlight = true
                 ball.scoring = true
                 var events: [MatchEvent] = []

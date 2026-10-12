@@ -640,6 +640,14 @@ public struct Stage: Equatable {
     public static let backboardFace = 3.125
     public static let backboardDepth = 10.0
     public static let backboardBottom = -3.75
+    /// What a shot let go by `player` carries across beyond its arc: the sideways motion over the
+    /// last frame of the moving rim it's for (the Hoopfish's), so over the whole flight it drifts as
+    /// far as the rim swims and comes down where the rim's gone; nothing with every rim still.
+    public func shotLead(by player: Int) -> Vec2 {
+        guard let hoop = hoops.first(where: { $0.velocity != .zero && ($0.shared || $0.owner == player) }) else { return .zero }
+        return Vec2(x: hoop.velocity.x, y: 0)
+    }
+
     /// How far up from the rim the board's glass counts, in units.
     public static let backboardTop = 20.0
 

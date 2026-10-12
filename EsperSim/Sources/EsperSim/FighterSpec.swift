@@ -309,13 +309,15 @@ public enum BallRules {
     /// Frames from the release to the ball leaving the hand, then to acting again.
     public static let throwReleaseFrames = 3
     public static let throwRecoveryFrames = 15
-    /// The up throw, the layup: out of the throw's hold frame into `player_layup`'s seven frames
-    /// at 30 a second, the ball leaving the hand on its sixth (frame 5), acting again once its
-    /// last is done; and on its way up off a half jump, a full hop's speed times the root of a
-    /// half, so it climbs half as high (on the ground, into the air).
+    /// The up throw, the layup: out of the throw's hold frame into `player_layup`'s nine frames
+    /// (its last two drawn twice, held twice as long) at 30 a second, the ball leaving the hand on
+    /// frame 5, from where the sheet's frame before draws it, acting again once its last is done;
+    /// and on its way up off a half jump, a full hop's speed times the root of a half, so it
+    /// climbs half as high (on the ground, into the air).
     public static let layupFramesPerSecond = 30
-    public static let layupReleaseFrames = 5 * 60 / layupFramesPerSecond
-    public static let layupRecoveryFrames = 7 * 60 / layupFramesPerSecond
+    public static let layupReleaseSheetFrame = 5
+    public static let layupReleaseFrames = layupReleaseSheetFrame * 60 / layupFramesPerSecond
+    public static let layupRecoveryFrames = 9 * 60 / layupFramesPerSecond
     public static let layupHopShare = 0.7071067811865476
     /// A throw stance with the chest this close to a rim becomes a dunk, wider than the
     /// basket. The ball goes in halfway through the dunk's frames, and the dunker hangs

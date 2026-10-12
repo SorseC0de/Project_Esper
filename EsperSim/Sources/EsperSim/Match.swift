@@ -346,7 +346,8 @@ public struct Match: Equatable {
             let reach = Vec2(x: player.position.x + player.facing.sign * 6 * player.spec.scale, y: player.position.y + BallRules.throwReleaseHeight * player.spec.scale)
             let hand = reach + stage.pushOut(Box(center: reach, width: BallRules.radius * 2, height: BallRules.radius * 2), reach: 12)
             if velocity.y > 0, velocity.x == 0 {
-                ball.releaseFloater(from: Vec2(x: player.position.x, y: player.position.y + BallRules.shotReleaseHeight * player.spec.scale),
+                // From the hand, where the layup's sheet has it as it lets go.
+                ball.releaseFloater(from: player.layupReleasePoint,
                                     sideways: player.throwStanceEntrySpeed * BallRules.floaterMomentumShare, by: index)
             } else {
                 ball.release(from: hand, velocity: velocity, by: index, straight: true)

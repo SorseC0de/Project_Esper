@@ -250,11 +250,12 @@ whatever lands on it came at, held down 12° while someone
   the other it flies straight back at the thrower's chest and is theirs, at any speed and
   facing either way, until it first hits something. A release never starts inside a
   wall: the hand is pushed out of one the body is pressed against. Up is the layup (protocol 129): out
-  of the throw's hold frame into `player_layup`'s seven frames (48 by 48, its ball landmarks the
-  importer's) at 30 a second (`layupFramesPerSecond`, protocol 130), the ball in hand through its first
-  five and let go on frame 5, 10 sim frames into the throw (`BallRules.layupReleaseFrames`), acting
-  again once its last is done, 14 in (`layupRecoveryFrames`, `Player.layingUp`), on the ground or in
-  the air; and on its first frame up off a half jump (`startThrowing`): a full hop's speed times the
+  of the throw's hold frame into `player_layup`'s nine frames (48 by 48, its last two drawn twice in
+  the sheet so they hold twice as long; its ball landmarks the importer's) at 30 a second
+  (`layupFramesPerSecond`, protocol 131), the ball in hand through its first five and let go on frame
+  5, 10 sim frames into the throw (`BallRules.layupReleaseFrames`), from the hand where frame 4 draws
+  the ball (`Player.layupReleasePoint`), acting again once its last is done, 18 in
+  (`layupRecoveryFrames`, `Player.layingUp`), on the ground or in the air; and on its first frame up off a half jump (`startThrowing`): a full hop's speed times the
   root of a half (`layupHopShare`), so it climbs half a full jump's height, off the ground if on it; its ball the floater: a soft drift up at 1.5 with gravity
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
@@ -1445,7 +1446,10 @@ basket the holder scores on, the top one `ChevronTuning.basketLift` (18) art pix
 the BASKET CHEVRON Y debug slider. A
 double jump leaves a short platform of loose digital squares under the feet where it was
 taken; they hang a moment, then drop away and cut out. The head bits rise in a tight column that a steady push bends toward the ball along x, as a whole (`ParticleLook.flowSpeed`, 140, easing off within 6 pixels of level with it); with the ball in hand, one wind swings it side to side instead, as hard, 1.1 times a second (`ParticleLook.swayPerSecond`), a scarf; the legs' cubes go the same way.
-The ball in hand is its own sprite on the frame's ball, and when a dribble's ball hangs
+The ball in hand is its own sprite on the frame's ball, drawn over the body; on the sheets that pass
+it between the legs (the taunt and the dribble walk, `ballBehindLegSheets`) the sheet's front leg (its
+thigh, leg and foot, as drawn, and the line round them; `SpriteLibrary.frontLegTexture`) is laid over it
+again, so it goes behind that leg. And when a dribble's ball hangs
 off a ledge it reaches down to the real floor under it over the same frames; only the
 dribble sheets do that, so a stance's ball never sags off the edge of a slab. The feather-fan wing in `Wing.swift` is parked, not in the scene. The ball pointer
 is an SF Symbol chevron doing what the pixel one did: three steps down, then off. A slide

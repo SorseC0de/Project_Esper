@@ -629,6 +629,9 @@ final class BallTests: XCTestCase {
         run(&match, frames: 2, input: { _ in .idle })
         XCTAssertNil(match.ball.holder, "gone on frame 5")
         XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.layup, 5))
+        // From the hand, as frame 4 draws it, not the body's middle.
+        XCTAssertEqual(match.ball.position.x, match.players[0].layupReleasePoint.x, accuracy: 0.01)
+        XCTAssertNotEqual(match.ball.position.x, match.players[0].position.x, accuracy: 0.5)
         // Acting again once the last frame's done.
         run(&match, frames: BallRules.layupRecoveryFrames - BallRules.layupReleaseFrames, input: { _ in .idle })
         XCTAssertNotEqual(match.players[0].state, .throwing)

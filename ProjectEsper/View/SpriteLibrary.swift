@@ -384,6 +384,53 @@ final class SpriteLibrary {
         return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_skin"]
     }
 
+    /// The sheet's front leg alone from a player frame (its thigh, leg and foot) as drawn, and the
+    /// line drawn round it, on the body's canvas: laid over the ball in hand where the sheet passes
+    /// the ball behind that leg (the taunt's and the dribble walk's), the real ball drawn over the
+    /// body otherwise. The sheet's front leg whichever way the body faces: turned round, the node's
+    /// mirrored and only the clothes' colours swap. Nil with no front leg in the frame.
+    func frontLegTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_frontleg"
+        if let made = cache[key] { return made }
+        let drawn = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).cgImage()
+        let source = atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage()
+        let width = drawn.width, height = drawn.height
+        guard source.width == width, source.height == height,
+              let (drawnContext, drawnPixels) = makeCanvas(width: width, height: height),
+              let (sourceContext, sourcePixels) = makeCanvas(width: width, height: height),
+              let (legContext, legPixels) = makeCanvas(width: width, height: height) else { return nil }
+        drawnContext.draw(drawn, in: CGRect(x: 0, y: 0, width: width, height: height))
+        sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let legParts: Set<BodyPart> = [.frontThigh, .frontLeg, .frontFoot]
+        var isLeg = [Bool](repeating: false, count: width * height)
+        for pixel in 0..<(width * height) where sourcePixels[pixel * 4 + 3] == 255 {
+            let index = pixel * 4
+            let colour = RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2])
+            if let part = BodyPart.owning(colour), legParts.contains(part) { isLeg[pixel] = true }
+        }
+        guard isLeg.contains(true) else { return nil }
+        for y in 0..<height {
+            for x in 0..<width {
+                let pixel = y * width + x
+                var keep = isLeg[pixel]
+                // The line round it: drawn where the sheet has nothing, next to the leg.
+                if !keep, sourcePixels[pixel * 4 + 3] == 0, drawnPixels[pixel * 4 + 3] > 0 {
+                    keep = (-1...1).contains { dy in (-1...1).contains { dx in
+                        let nx = x + dx, ny = y + dy
+                        return nx >= 0 && ny >= 0 && nx < width && ny < height && isLeg[ny * width + nx]
+                    } }
+                }
+                guard keep else { continue }
+                for channel in 0..<4 { legPixels[pixel * 4 + channel] = drawnPixels[pixel * 4 + channel] }
+            }
+        }
+        guard let image = legContext.makeImage() else { return nil }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .nearest
+        cache[key] = made
+        return made
+    }
+
     /// A strip's frame as a silhouette in the player's energy: every painted pixel white,
     /// its alpha kept, then toned as white energy is.
     func silhouetteTexture(_ name: String, _ frame: Int, player: Int) -> SKTexture {

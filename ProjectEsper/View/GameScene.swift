@@ -272,6 +272,9 @@ final class GameScene: SKScene {
     private static let hoodLineZ: CGFloat = -0.001
     private var hoodFlashes: [SKSpriteNode] = []
     private var hoodStrings: [HoodStrings] = []
+    /// Each body's front leg drawn over its ball in hand, on the sheets that pass the ball behind it.
+    private var legsOverBall: [SKSpriteNode] = []
+    static let ballBehindLegSheets: Set<Animation> = [.taunt, .dribbleWalk]
     static let hoodDrawnFor = SpriteLibrary.hoodDrawnFor
     /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
     static let stringAccentLuminance = 0.876
@@ -1186,6 +1189,12 @@ final class GameScene: SKScene {
             handBall.zPosition = 0.03
             figure.addChild(handBall)
             handBalls.append(handBall)
+            // The front leg again over the ball, where the sheet passes it behind that leg.
+            let legOver = SKSpriteNode()
+            legOver.zPosition = 0.031
+            legOver.isHidden = true
+            figure.addChild(legOver)
+            legsOverBall.append(legOver)
             let halo = makeHalo(colour)
             halo.zPosition = 0.02
             figure.addChild(halo)
@@ -7800,6 +7809,22 @@ final class GameScene: SKScene {
                 clothesFlash.zRotation = node.zRotation
             }
             if lockoutOn { greyedOut.insert(index) } else { greyedOut.remove(index) }
+            // The taunt and the dribble walk pass the ball between the legs: the front leg over it.
+            if legsOverBall.indices.contains(index) {
+                let legOver = legsOverBall[index]
+                let legTexture = GameScene.ballBehindLegSheets.contains(frame.animation) && player.holding
+                    ? sprites.frontLegTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) : nil
+                legOver.isHidden = legTexture == nil || node.isHidden
+                if let legTexture {
+                    legOver.texture = legTexture
+                    legOver.size = node.size
+                    legOver.anchorPoint = node.anchorPoint
+                    legOver.position = node.position
+                    legOver.xScale = node.xScale
+                    legOver.yScale = node.yScale
+                    legOver.zRotation = node.zRotation
+                }
+            }
             // The whole lockout, small sizzles off the arms and the head, faint.
             if lockedOutOfFloState, !held, Double.random(in: 0..<1) < GameScene.lockoutSizzlesPerSecond * GameScene.stepSeconds,
                let part = [BodyPart.head, .frontArm, .backArm].randomElement(),

@@ -1508,9 +1508,13 @@ aim); the burst, the quake and the freeze the way the player faces; a lava burn 
 feet; the rest at their point (20° to 30°); a basket out of the net, 10 under the rim and 8 off
 it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
-A body or the ball springing off a rim's top says BOING! / ボヨーン！ / ¡BOING! (5 high as a squeak, white
-over teal, palette 20, the ball's only past
-the bounce's floor) up off the rim, away from its backboard.
+A body or the ball springing off a rim's top, past the bounce's floor (0.6), says BOING! / ボヨーン！ / ¡BOING!
+(5 high as a squeak, white over teal, palette 20, a rim's once in half a second at most so a body
+working down its board doesn't keep saying it) up off the rim, away from its backboard.
+One word an action: a frame's words are gathered first, and a power's or a stage's own word
+(`Sound.isSpecial`: the beam, a burst, the quake, a freeze, an explosion, a sizzle, a shatter, thunder)
+drops any generic one said within 32 units of it the same frame, as an ice snatch's CRACK! over its
+WHAM! or a fireball's KABOOM! over the hit it lands.
 A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going;
 so does a dribble's, with its sound, as small as a footstep run's (5), out of the floor under the ball
 (off a ledge, the floor below it, where the ball's drawn reaching down to), the way the dribbler faces.

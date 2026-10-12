@@ -142,6 +142,9 @@ enum Onomatopoeia {
             }
         }
 
+        /// A power's or a stage's own word: said with a generic one on the same action, it's the one shown.
+        var isSpecial: Bool { [.beam, .burst, .quake, .freeze, .explosion, .sizzle, .shatter, .thunder].contains(self) }
+
         /// One of the biggest words, which the SOME setting still shows.
         var isBiggest: Bool { spelling.height >= Sound.allCases.map(\.spelling.height).max() ?? 0 }
 

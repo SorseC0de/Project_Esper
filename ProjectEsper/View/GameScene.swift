@@ -4582,11 +4582,13 @@ final class GameScene: SKScene {
         soundWords.removeAll { $0.parent == nil }
         let players = match.players
         func side(_ at: Vec2, from cause: Vec2) -> CGFloat { at.x >= cause.x ? 1 : -1 }
-        // A fireball's burst says its own word; the hit it lands doesn't say another.
-        let fireballBurst = events.contains { if case .fireballBurst = $0 { return true } else { return false } }
+        // The frame's words gathered first: one word an action, a special one (a power's, a
+        // stage's) over a generic one said close to it, as an ice snatch's CRACK! over its WHAM!.
+        var words: [(sound: Onomatopoeia.Sound, at: Vec2, away: CGFloat, rise: CGFloat)] = []
+        func say(_ sound: Onomatopoeia.Sound, at: Vec2, away: CGFloat, rise: CGFloat) { words.append((sound, at, away, rise)) }
         for event in events {
             switch event {
-            case .struck(let victim, let striker) where !fireballBurst:
+            case .struck(let victim, let striker):
                 let at = players[victim].chest
                 say(.hit, at: at, away: side(at, from: players[striker].chest), rise: 25)
             case .popped(let victim, let popper):
@@ -4606,9 +4608,13 @@ final class GameScene: SKScene {
                 say(.clang, at: player.chest + Vec2(x: player.facing.sign * GameScene.bladeReach, y: 0), away: -player.facing.sign, rise: 30)
             case .slashClashed(let at):
                 say(.clang, at: at, away: 0, rise: 30)
-            case .rimBounced(let hoop, let speed, let ball) where !ball || speed > GameScene.bounceSoundFloor:
-                // Off the rim's top, up from it, away from its backboard.
+            case .rimBounced(let hoop, let speed, _) where speed > GameScene.bounceSoundFloor:
+                // Off the rim's top, up from it, away from its backboard; a rim's once a while at most,
+                // so a body working down its board doesn't keep saying it.
                 guard match.stage.hoops.indices.contains(hoop) else { break }
+                let now = CACurrentMediaTime()
+                guard now - (boingSaidAt[hoop] ?? 0) >= GameScene.boingQuietSeconds else { break }
+                boingSaidAt[hoop] = now
                 let rim = match.stage.hoops[hoop]
                 say(.boing, at: rim.position + Vec2(x: 0, y: 2), away: -CGFloat(rim.backboard.sign), rise: 40)
             case .wallJumped(let index, let wall):
@@ -4631,7 +4637,17 @@ final class GameScene: SKScene {
             default: break
             }
         }
+        let specials = words.filter(\.sound.isSpecial)
+        for word in words {
+            if !word.sound.isSpecial, specials.contains(where: { $0.at.distance(to: word.at) <= GameScene.sameActionReach }) { continue }
+            self.say(word.sound, at: word.at, away: word.away, rise: word.rise)
+        }
     }
+    /// How near a special word a generic one has to be to be the same action's, in units; and a
+    /// rim's quiet after its BOING.
+    private static let sameActionReach = 32.0
+    private static let boingQuietSeconds = 0.5
+    private var boingSaidAt: [Int: CFTimeInterval] = [:]
 
     /// A sample word in the middle of the screen, for trying the SFX picker's faces.
     private func previewSoundWord() {

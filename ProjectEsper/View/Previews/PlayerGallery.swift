@@ -50,7 +50,8 @@ struct AssembledFrame: View {
 
     var body: some View {
         Canvas { context, size in
-            motion.advance(to: time, portrait: portrait, look: look, headNudge: .zero, headScale: 1, canvas: canvas, style: HoodStrings.hanging)
+            let turn = GameScene.hoodTurn(frame)
+            motion.advance(to: time, portrait: portrait, look: look, headNudge: .zero, headScale: 1, canvas: canvas, style: HoodStrings.hanging, turn: turn)
             var context = context
             if mirrored {
                 context.translateBy(x: size.width, y: 0)
@@ -63,6 +64,19 @@ struct AssembledFrame: View {
             let figureRect = CGRect(x: pad * pixel, y: pad * pixel, width: canvas * pixel, height: canvas * pixel)
             let place = CustomizeFigure.hoodPlace(portrait, nudge: .zero, scale: 1)
             let hoodRect = CGRect(x: (pad + place.origin.x) * pixel, y: (pad + place.origin.y) * pixel, width: 48 * pixel, height: 48 * pixel)
+            /// The hood drawn turned about the head's middle, where the sheet turns it.
+            func drawHood(_ image: CGImage, in context: GraphicsContext) {
+                guard turn != 0, let head = portrait.centres[.head] else {
+                    return context.draw(Image(decorative: image, scale: 1).interpolation(.none), in: hoodRect)
+                }
+                let middle = CGPoint(x: (pad + head.x) * pixel, y: (pad + head.y) * pixel)
+                context.drawLayer { layer in
+                    layer.translateBy(x: middle.x, y: middle.y)
+                    layer.rotate(by: Angle(radians: turn))
+                    layer.translateBy(x: -middle.x, y: -middle.y)
+                    layer.draw(Image(decorative: image, scale: 1).interpolation(.none), in: hoodRect)
+                }
+            }
             // Strings go under the arms on some sheets' frames, as in play.
             let stringsShown = strings && !GameScene.stringsUnderArms(frame)
             let plain = Color(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel))
@@ -84,7 +98,7 @@ struct AssembledFrame: View {
                     layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect)
                 }
             }
-            if let hood = portrait.hood { context.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect) }
+            if let hood = portrait.hood { drawHood(hood, in: context) }
             drawStrings(in: context)
             // The front arm over the hood and the strings, as in play.
             if armOverHood, let arm = portrait.frontArm { context.draw(Image(decorative: arm, scale: 1).interpolation(.none), in: figureRect) }
@@ -97,7 +111,7 @@ struct AssembledFrame: View {
             glowing.drawLayer { layer in
                 layer.addFilter(.blur(radius: pixel * CustomizeArt.glowPixels))
                 layer.draw(Image(decorative: portrait.glowing, scale: 1).interpolation(.none), in: figureRect)
-                if let hood = portrait.hoodGlowing { layer.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect) }
+                if let hood = portrait.hoodGlowing { drawHood(hood, in: layer) }
                 drawStrings(in: layer)
                 if cubes { for cube in motion.cubes { CustomizeFigure.drawCube(cube, in: layer, at: spot(cube.position), pixel: pixel) } }
             }
@@ -116,7 +130,7 @@ struct GalleryDrawing {
     var glow = true
     /// The frames whose front arm goes over the hood, by sheet: the game's table to start,
     /// changed frame by frame here.
-    var armOverHood = GameScene.frontArmOverHood
+    var armOverHood: [EsperSim.Animation: Set<Int>] = Dictionary(uniqueKeysWithValues: GameScene.frontArmOverHood.map { ($0.key, Set($0.value)) })
 
     func armOverHood(_ frame: AnimationFrame) -> Bool { armOverHood[frame.animation]?.contains(frame.frame) ?? false }
 }

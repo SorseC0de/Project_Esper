@@ -48,12 +48,18 @@ neutral to get a shot off; catch it and the roles reverse.
   (not on the TV): every player sheet assembled as the game draws a body, in a picked energy
   colour with the phone's saved dressing: the look's colours, the neck filled, the line, the
   hooded head where the frame's head is, the strings hanging off it (gone where they'd be
-  under the arms, `stringlessFrom`), the cubes off the head, boots and sleeves, and the glow as
+  under the arms, `stringless`), the cubes off the head, boots and sleeves, and the glow as
   the customize screen draws it (`CustomizeArt.glowStrength`, `glowPixels`), playing at a
   picked rate on #FF00FF, or paused and stepped a frame at a time; ARM OVER HOOD, FRAME N
   draws the sheet's front arm and hand again over the hood for that frame, as the game does on
-  the frames `GameScene.frontArmOverHood` names (`SpriteLibrary.frontArmTexture`, none yet;
-  the gallery shows its table to copy into the game). SAVE THIS SHEET or SAVE ALL writes each sheet as a PNG strip, down or
+  the frames `GameScene.frontArmOverHood` names (`SpriteLibrary.frontArmTexture`: both shots, the
+  double jump, the slash, the throws from 4, both crouches, the ledge, every gun sheet, the change,
+  the dunk, the slide and the pivot; the gallery shows its table to copy into the game). Two more
+  sheet tables go with it, in play and in the gallery alike: `GameScene.hoodTurnDegrees`, the hood
+  turned with the body about the head's middle, clockwise facing right (the double jump's tumble:
+  30, 90, 135, then -90 twice), its strings' anchors turning with it and the hood carrying its own
+  line as when it tips in flight; and `SpriteLibrary.armColoursSwapped`, the front and back arm
+  and hand colours swapped where the sheet draws the back arm in front (the ground throw from 4). SAVE THIS SHEET or SAVE ALL writes each sheet as a PNG strip, down or
   across, at ×1 to ×8, its cells the sheet's cell plus PAD art pixels each side (8 to start), on
   #FF00FF, to `_Graphic Assets/Pixel Art/Assembled/` named for the sheet; the strings and cubes
   move on between a sheet's frames as it plays.
@@ -1296,9 +1302,9 @@ a stage's flat backdrop under them (Flight B411's, K&A's) kept them from glowing
 The hood is the H.O.O.D., the Hyper-Osmotic Output Driver: it draws in sweat and drives out
 energy. Its two strings are drawn rather than painted (`HoodStrings`): chains of whole art pixels, each pixel
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
-none drawn where the arms or the pose would cover them (`GameScene.stringlessFrom`, a sheet a line and
-its first stringless frame: both shot sheets whole, the throws and the layup from frame 4, the ledge
-whole, the dunk from frame 1),
+none drawn where the arms or the pose would cover them (`GameScene.stringless`, a sheet a line and its
+stringless frames, 0-based: both shot sheets whole, the throws and the layup from frame 4, the ledge whole,
+the dunk from frame 1, both catches whole, the slash's 2 to 4, FloState's snatch from 2, the change's 0 to 2),
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; Super Smoothie flying,
 twenty each streaming straight back as FloState's near one does (`HoodStrings.streaming`); in FloState,

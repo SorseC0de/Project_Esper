@@ -271,8 +271,24 @@ final class SpriteLibrary {
     /// where the frame has them; and where its glowing parts sit. `holdsBall`: the sheet's
     /// ball is the ball, lifted off to be drawn apart, rather than energy. Touches nothing
     /// kept, so it can be made off the main thread.
+    /// The frames whose arms are drawn the other way round, the front arm behind: the ground
+    /// throw's follow-through, 5 on, where the back arm comes forward over the head. Their front
+    /// and back arm and hand colours swap.
+    static let armColoursSwapped: [Animation: ClosedRange<Int>] = [.throwForward: 4...7]
+    static func look(_ look: Look, for frame: AnimationFrame) -> Look {
+        guard armColoursSwapped[frame.animation]?.contains(frame.frame) == true else { return look }
+        var swapped = look
+        for (front, back) in [(BodyPart.frontArm, BodyPart.backArm), (.frontHand, .backHand)] {
+            let was = swapped.colours[front]
+            swapped.colours[front] = swapped.colours[back]
+            swapped.colours[back] = was
+        }
+        return swapped
+    }
+
     private func makeFrame(_ frame: AnimationFrame, source: SKTexture, look: Look, holdsBall: Bool) -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint]) {
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
+        let look = SpriteLibrary.look(look, for: frame)
         let result = recolour(source, look: look, holdsBall: holdsBall, detach: true,
                               hoodShape: look.human ? SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)] : nil,
                               bareLine: SpriteLibrary.tippingHead.contains(frame.animation))
@@ -340,7 +356,7 @@ final class SpriteLibrary {
         let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
         _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
         if let made = cache[key + "_bareoutline"] { return made }
-        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: look,
+        let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: SpriteLibrary.look(look, for: frame),
                               holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted, detach: true,
                               hoodShape: SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)], bareLine: true)
         result.bareOutline?.filteringMode = .nearest
@@ -670,7 +686,9 @@ final class SpriteLibrary {
                   holdsBall: Bool = false) -> Portrait? {
         let key = "p\(player)_portrait_\(name)_\(frame)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
         if cache[key] != nil, let made = portraits[key] { return made }
-        let look = look(for: player)
+        // A game sheet's frame in the look it's drawn in, its arms swapped where they are.
+        let playerLook = look(for: player)
+        let look = Animation(rawValue: name).map { SpriteLibrary.look(playerLook, for: AnimationFrame($0, frame)) } ?? playerLook
         let plain = recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: false)
         let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
         var figure = plain

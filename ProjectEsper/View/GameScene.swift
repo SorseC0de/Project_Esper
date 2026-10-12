@@ -5858,20 +5858,43 @@ final class GameScene: SKScene {
 
     /// Sheets whose frames from the one given on draw no hood strings, the arms (or the pose) over
     /// where they'd hang: a sheet a line, its first stringless frame.
-    static let stringlessFrom: [Animation: Int] = [
-        .shoot: 0, .shootAir: 0,
-        .throwForward: 4, .throwAir: 4, .layup: 4,
-        .ledge: 0,
-        .dunk: 1,
+    static let stringless: [Animation: ClosedRange<Int>] = [
+        .shoot: 0...9, .shootAir: 0...10,
+        .throwForward: 4...7, .throwAir: 4...7, .layup: 4...8,
+        .ledge: 0...4,
+        .dunk: 1...5,
+        .catchGround: 0...2, .catchAir: 0...2,
+        .esperSlash: 2...4,
+        .snatchFloState: 2...6,
+        .transform: 0...2,
     ]
     /// The frames where the front arm crosses the hooded head, so the sheet's front arm and hand
-    /// are drawn again over the hood: each sheet's frames. Picked frame by frame in the player
-    /// gallery (`PlayerGallery`); none to start.
-    static let frontArmOverHood: [Animation: Set<Int>] = [:]
+    /// are drawn again over the hood: each sheet's frames, picked in the player gallery
+    /// (`PlayerGallery`).
+    static let frontArmOverHood: [Animation: ClosedRange<Int>] = [
+        .shoot: 0...9, .shootAir: 0...10,
+        .doubleJump: 0...5,
+        .esperSlash: 0...5,
+        .throwForward: 4...7, .throwAir: 4...7,
+        .crouch: 0...9, .crouchWalk: 0...9,
+        .ledge: 0...4,
+        .gunShoot: 0...9, .gunShootAir: 0...9, .gunSnipe: 0...9, .gunRun: 0...7, .gunRunShoot: 0...7,
+        .transform: 0...8,
+        .dunk: 0...5,
+        .slide: 0...7,
+        .pivot: 0...2,
+    ]
     static func frontArmOverHood(_ frame: AnimationFrame) -> Bool { frontArmOverHood[frame.animation]?.contains(frame.frame) ?? false }
+    /// The hooded head turned with the body on a sheet's frames, degrees clockwise facing right:
+    /// the double jump's tumble.
+    static let hoodTurnDegrees: [Animation: [Int: CGFloat]] = [
+        .doubleJump: [0: 30, 1: 90, 2: 135, 3: -90, 4: -90],
+    ]
+    /// A frame's hood turn in radians, clockwise facing right.
+    static func hoodTurn(_ frame: AnimationFrame) -> CGFloat { (hoodTurnDegrees[frame.animation]?[frame.frame] ?? 0) * .pi / 180 }
 
     static func stringsUnderArms(_ frame: AnimationFrame) -> Bool {
-        stringlessFrom[frame.animation].map { frame.frame >= $0 } ?? false
+        stringless[frame.animation]?.contains(frame.frame) ?? false
     }
 
     /// A net in the energy of the side its rim is for; a rim that's anyone's, as Hoopfish
@@ -8014,11 +8037,13 @@ final class GameScene: SKScene {
                     : player.state != .flying ? 0
                     : (diving ? -GameScene.flightHeadTip : (rising ? GameScene.flightHeadTip : 0))
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
-                if abs(headTip[index, default: 0]) > 0.001, let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
+                // And the sheet's own turn, the double jump's tumble, clockwise facing right.
+                let sheetTurn = GameScene.hoodTurn(frame)
+                if abs(headTip[index, default: 0]) > 0.001 || sheetTurn != 0, let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
                     let anim = GameScene.hoodDrawnFor.animation
                     let middle = CGPoint(x: anim.pixelSize / 2 + head.x, y: anim.pixelSize - anim.feetFromBottom - head.y)
                     let tip = headTip[index, default: 0]
-                    turn(hood, about: middle, by: tip * CGFloat(player.facing.sign), scale: drawScale)
+                    turn(hood, about: middle, by: (tip - sheetTurn) * CGFloat(player.facing.sign), scale: drawScale)
                     hood.position.y -= GameScene.flightHeadDrop * abs(tip) / GameScene.flightHeadTip * drawScale
                 }
             } else {
@@ -8027,7 +8052,7 @@ final class GameScene: SKScene {
             }
             // Tipped, the hood carries its own line: the body's is drawn without the hood's place.
             let hoodLine = hoodLineNodes[index]
-            let tipped = !hood.isHidden && abs(headTip[index, default: 0]) > 0.001 && !outlineNode.isHidden && !floStateLine
+            let tipped = !hood.isHidden && (abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodTurn(frame) != 0) && !outlineNode.isHidden && !floStateLine
             if tipped, let bare = sprites.bareOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted),
                let line = sprites.hoodLine(skin: sprites.look(for: index).dressing.skinTone) {
                 outlineNode.texture = bare

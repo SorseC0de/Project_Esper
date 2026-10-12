@@ -1181,25 +1181,34 @@ final class CustomizeFigureMotion {
     static let headCubeRate = 24.0
     static let shoeCubeRate = Double(ParticleLook.legCubeRate)
 
-    /// `canvas`: the figure's sheet's side in art pixels; `style`: how its strings move.
+    /// `canvas`: the figure's sheet's side in art pixels; `style`: how its strings move; `turn`: the
+    /// hood turned about the head's middle, radians clockwise, the strings' anchors with it.
     func advance(to time: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat,
-                 canvas: CGFloat = 48, style: HoodStrings.Style = CustomizeFigureMotion.strings) {
+                 canvas: CGFloat = 48, style: HoodStrings.Style = CustomizeFigureMotion.strings, turn: CGFloat = 0) {
         let step = 1.0 / 60
         owed += last.map { min(time - $0, 0.1) } ?? step
         last = time
         while owed >= step {
             owed -= step
-            tick(time: time, step: step, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale, canvas: canvas, style: style)
+            tick(time: time, step: step, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale, canvas: canvas, style: style, turn: turn)
         }
     }
 
     private func tick(time: Double, step: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat,
-                      canvas: CGFloat, style: HoodStrings.Style) {
+                      canvas: CGFloat, style: HoodStrings.Style, turn: CGFloat) {
         // The strings off the hood's own anchors, wherever the hood went on the figure and at its
         // size, floating one back and one forward.
         let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: headScale)
-        let anchors = HoodStrings.anchorPixels.map { pixel in
+        var anchors = HoodStrings.anchorPixels.map { pixel in
             CGPoint(x: place.origin.x + (pixel.x + 0.5) * place.scale, y: canvas - (place.origin.y + (pixel.y + 0.5) * place.scale))
+        }
+        if turn != 0, let head = portrait.centres[.head] {
+            // Turned with the hood about the head's middle; y up here, so clockwise is the negative way.
+            let middle = CGPoint(x: head.x, y: canvas - head.y)
+            anchors = anchors.map { anchor in
+                let dx = anchor.x - middle.x, dy = anchor.y - middle.y
+                return CGPoint(x: middle.x + dx * cos(-turn) - dy * sin(-turn), y: middle.y + dx * sin(-turn) + dy * cos(-turn))
+            }
         }
         strings = stringMotion.step(anchors: anchors, style: style, facing: 1, scale: 1, time: time)
 

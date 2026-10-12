@@ -33,7 +33,8 @@ final class SoundBoard {
         case slashWallClank = "slash_wallclank"
         case slashClash = "slashclash"
         case dunkSlam = "dunk"
-        case slide
+        case slide = "slide2"
+        case flash
         case floCollect = "flo_collect"
         case floMax = "flo_max"
         case floState = "flo_state"

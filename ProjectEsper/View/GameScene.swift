@@ -5384,6 +5384,7 @@ final class GameScene: SKScene {
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
             case .slashClashed(let at): play(.slashClash, at: at)
             case .slid(let index): play(.slide, at: body(index))
+            case .warped(_, let from, _): play(.flash, at: from)
             case .snatchReached(let index): play(.snatch, at: body(index))
             case .caught(let index): play(.catchBall, at: body(index))
             case .struck(let victim, _), .popped(let victim, _), .cartHit(let victim, _): play(.playerHit, at: body(victim))

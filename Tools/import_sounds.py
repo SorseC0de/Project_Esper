@@ -29,7 +29,7 @@ CROWD_LEVEL = -27.0
 PEAK_CEILING = -3.0
 # The effects in the app sit around -21 dB while sounding (their median); new ones are brought there.
 EFFECT_LEVEL = -21.0
-LEVELLED_EFFECTS = {"dunk", "slashclash", "flo_collect", "slide", "flo_max", "boing", "flo_state"}
+LEVELLED_EFFECTS = {"dunk", "slashclash", "flo_collect", "slide", "flo_max", "boing", "flo_state", "slide2", "flash"}
 
 # File in Vocals: (name in the app, loudness while sounding in dBFS).
 VOCALS = {

@@ -37,6 +37,8 @@ public enum Animation: String, CaseIterable {
     case snatchAir = "player_snatch_air"
     /// In FloState, the snatch on the ground drawn in its own sheet.
     case snatchFloState = "player_snatch_flostate"
+    /// In FloState on the ground, the slash's step through: forward 0 to 3, back 4 to 8.
+    case esperSlashFloState = "player_esperslash_flostate"
     case ledge = "player_ledge"
     case dunk = "player_dunk"
     case gunShoot = "player_gun_shoot"
@@ -65,6 +67,7 @@ public enum Animation: String, CaseIterable {
         case .jumpSquat: 4
         case .doubleJump, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
         case .snatchFloState: 7
+        case .esperSlashFloState: 9
         case .land: 9
         case .shoot: 10
         case .shootAir, .taunt: 11
@@ -89,9 +92,12 @@ public enum Animation: String, CaseIterable {
         pixelSize == 64 ? 16 : 8
     }
 
+    /// The sheet's cell, its height; and its width, which is the same but on FloState's slash,
+    /// wider for its reach.
     public var pixelSize: Double {
-        [.throwForward, .throwAir, .esperSlash, .blast, .blastArms].contains(self) ? 64 : 48
+        [.throwForward, .throwAir, .esperSlash, .esperSlashFloState, .blast, .blastArms].contains(self) ? 64 : 48
     }
+    public var pixelWidth: Double { self == .esperSlashFloState ? 80 : pixelSize }
 }
 
 extension Animation {
@@ -221,6 +227,9 @@ extension Player {
             return Animation.dunkEntry(at: t).frame
         case .catching:
             return AnimationFrame(grounded ? .catchGround : .catchAir, t * 12 / 60)
+        case .slashing where floSlashStep != .none:
+            let sheet = FloSlashRules.sheetFrames(backward: floSlashStep == .backward)
+            return AnimationFrame(.esperSlashFloState, sheet.lowerBound + min(t * FloSlashRules.sheetFramesPerSecond / 60, sheet.count - 1))
         case .slashing:
             return AnimationFrame(.esperSlash, t * SlashRules.sheetFramesPerSecond / 60)
         case .rolling:

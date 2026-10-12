@@ -43,10 +43,11 @@ struct AssembledFrame: View {
     let motion: CustomizeFigureMotion
     let time: Double
 
-    /// The sheet's cell, art pixels a side.
+    /// The sheet's cell, art pixels high and across.
     var canvas: CGFloat { CGFloat(frame.animation.pixelSize) }
-    /// The whole picture's side, in points.
-    var side: CGFloat { (canvas + 2 * pad) * pixel }
+    var canvasWidth: CGFloat { CGFloat(frame.animation.pixelWidth) }
+    /// The whole picture, in points.
+    var pictureSize: CGSize { CGSize(width: (canvasWidth + 2 * pad) * pixel, height: (canvas + 2 * pad) * pixel) }
 
     var body: some View {
         Canvas { context, size in
@@ -61,7 +62,7 @@ struct AssembledFrame: View {
             func spot(_ point: CGPoint) -> CGPoint {
                 CGPoint(x: (pad + point.x) * pixel, y: (pad + canvas - point.y) * pixel)
             }
-            let figureRect = CGRect(x: pad * pixel, y: pad * pixel, width: canvas * pixel, height: canvas * pixel)
+            let figureRect = CGRect(x: pad * pixel, y: pad * pixel, width: canvasWidth * pixel, height: canvas * pixel)
             let place = CustomizeFigure.hoodPlace(portrait, nudge: .zero, scale: 1)
             let hoodRect = CGRect(x: (pad + place.origin.x) * pixel, y: (pad + place.origin.y) * pixel, width: 48 * pixel, height: 48 * pixel)
             /// The hood drawn turned about the head's middle, where the sheet turns it.
@@ -121,7 +122,7 @@ struct AssembledFrame: View {
                 if cubes { for cube in motion.cubes { CustomizeFigure.drawCube(cube, in: layer, at: spot(cube.position), pixel: pixel) } }
             }
         }
-        .frame(width: side, height: side)
+        .frame(width: pictureSize.width, height: pictureSize.height)
     }
 }
 
@@ -165,9 +166,9 @@ final class PlayerGallerySheets: ObservableObject {
     /// strings and cubes moved on between frames as the frames play at the drawing's rate.
     func sheet(_ animation: EsperSim.Animation, scale: CGFloat, strip: Strip, drawing: GalleryDrawing) -> UIImage? {
         let motion = CustomizeFigureMotion()
-        let cell = (CGFloat(animation.pixelSize) + 2 * drawing.pad) * scale
+        let cell = CGSize(width: (CGFloat(animation.pixelWidth) + 2 * drawing.pad) * scale, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * scale)
         let count = animation.frameCount
-        let size = strip == .across ? CGSize(width: cell * CGFloat(count), height: cell) : CGSize(width: cell, height: cell * CGFloat(count))
+        let size = strip == .across ? CGSize(width: cell.width * CGFloat(count), height: cell.height) : CGSize(width: cell.width, height: cell.height * CGFloat(count))
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = true
@@ -188,8 +189,8 @@ final class PlayerGallerySheets: ObservableObject {
             UIColor(rgb: PlayerGalleryOutput.background).setFill()
             context.fill(CGRect(origin: .zero, size: size))
             for (index, image) in frames.enumerated() {
-                let at = strip == .across ? CGPoint(x: cell * CGFloat(index), y: 0) : CGPoint(x: 0, y: cell * CGFloat(index))
-                image.draw(in: CGRect(origin: at, size: CGSize(width: cell, height: cell)))
+                let at = strip == .across ? CGPoint(x: cell.width * CGFloat(index), y: 0) : CGPoint(x: 0, y: cell.height * CGFloat(index))
+                image.draw(in: CGRect(origin: at, size: cell))
             }
         }
     }
@@ -252,7 +253,7 @@ struct PlayerGallery: View {
                                        motion: motion, time: time)
                     }
                 }
-                .frame(width: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel)
+                .frame(width: (CGFloat(animation.pixelWidth) + 2 * drawing.pad) * pixel, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel)
                 .overlay(alignment: .bottomTrailing) {
                     Text("\(animation.rawValue)  \(index + 1)/\(animation.frameCount)")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))

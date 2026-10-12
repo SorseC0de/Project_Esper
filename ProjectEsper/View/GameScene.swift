@@ -8017,8 +8017,9 @@ final class GameScene: SKScene {
                 // all of it in the ice look's.
                 let skin = sprites.look(for: index).dressing.skinTone
                 let frozen = player.frozen > 0
-                let hoodHead = frozen ? sprites.hoodHead(skin: skin, player: SpriteLibrary.icePlayer)
-                    : sprites.hoodHead(skin: skin, player: index, energy: energyForm)
+                let view = HoodView.of(frame)
+                let hoodHead = frozen ? sprites.hoodHead(skin: skin, player: SpriteLibrary.icePlayer, view: view)
+                    : sprites.hoodHead(skin: skin, player: index, energy: energyForm, view: view)
                 if energyForm, !frozen { energyHoods.insert(index) } else { energyHoods.remove(index) }
                 hood.texture = hoodHead.drawn
                 hoodMasks[index] = (hoodHead.hood, hoodHead.face)
@@ -8063,7 +8064,7 @@ final class GameScene: SKScene {
             let hoodLine = hoodLineNodes[index]
             let tipped = !hood.isHidden && (abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodTurn(frame) != 0) && !outlineNode.isHidden && !floStateLine
             if tipped, let bare = sprites.bareOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted),
-               let line = sprites.hoodLine(skin: sprites.look(for: index).dressing.skinTone) {
+               let line = sprites.hoodLine(skin: sprites.look(for: index).dressing.skinTone, view: HoodView.of(frame)) {
                 outlineNode.texture = bare
                 hoodLine.isHidden = false
                 hoodLine.texture = line
@@ -8924,6 +8925,9 @@ final class GameScene: SKScene {
     // MARK: Touches, from the HUD's view in points
 
     /// A point in the view as a point in the HUD's space: the same points, from the centre, y up.
+    /// Points round the FLO meter a tap still takes.
+    private static let floMeterTapSlack: CGFloat = 12
+
     private func hudPoint(_ point: CGPoint, viewSize: CGSize) -> CGPoint {
         CGPoint(x: (point.x - viewSize.width / 2) / hudScale, y: (viewSize.height / 2 - point.y) / hudScale)
     }
@@ -8945,6 +8949,13 @@ final class GameScene: SKScene {
         }
         if flow != .playing, let screen {
             _ = screen.tap(at: hudPoint(point, viewSize: viewSize))
+            return
+        }
+        // A tap on your own FLO meter: into FloState, or out of it, as throw and shoot together.
+        if GameScene.touchControlsShown, floMeters.indices.contains(localIndex), !floMeters[localIndex].isHidden,
+           floMeters[localIndex].calculateAccumulatedFrame().insetBy(dx: -GameScene.floMeterTapSlack, dy: -GameScene.floMeterTapSlack)
+            .contains(hudPoint(point, viewSize: viewSize)) {
+            controls?.tapFloState()
             return
         }
         controls?.began(touch, at: hudPoint(point, viewSize: viewSize))

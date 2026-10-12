@@ -254,6 +254,11 @@ public struct Player: Equatable {
     public var tornadoCentre: Vec2?
     public var tornadoCooldown = 0
     public var slashHit = false
+    /// FloState's step-through slash on the ground (`FloSlashRules`): none, forward or back, and
+    /// whether slash was pressed in this step's window, for the next.
+    public enum FloSlashStep: Equatable { case none, forward, backward }
+    public var floSlashStep = FloSlashStep.none
+    public var floSlashQueued = false
     /// Frames of down held on the ground, and frames left falling through one-ways after a drop.
     public var dropHoldFrames = 0
     public var dropThrough = 0
@@ -1255,6 +1260,28 @@ public struct Player: Equatable {
                 }
             }
 
+        case .slashing where floSlashStep != .none:
+            // FloState's step through, forward or back its travel over the step, as the snatch's is
+            // carried; slash pressed in the step's last two sheet frames goes on into the other
+            // way's step, else it stops there.
+            let backward = floSlashStep == .backward
+            let stepFrames = FloSlashRules.frames(backward: backward)
+            velocity.x = stateTimer < stepFrames
+                ? facing.sign * (backward ? -1 : 1) * FloSlashRules.travel / Double(stepFrames - 1) * Double(timerStep) : 0
+            if shootPressed, stateTimer >= stepFrames - FloSlashRules.windowFrames { floSlashQueued = true }
+            if stateTimer >= stepFrames {
+                if floSlashQueued, inFloState, grounded {
+                    floSlashStep = backward ? .forward : .backward
+                    floSlashQueued = false
+                    slashHit = false
+                    events.append(.slashed(player: index))
+                    enter(.slashing)
+                } else {
+                    floSlashStep = .none
+                    endSlash()
+                }
+            }
+
         case .slashing:
             // The swing carries the speed it came from, bleeding it off at the attack's brake, on
             // the ground and in the air alike; in the air gravity is cut, so the body hangs
@@ -1742,6 +1769,9 @@ public struct Player: Equatable {
         slashHit = false
         fastFalling = false
         if !grounded { velocity.y = max(velocity.y, SlashRules.lift) }
+        // In FloState on the ground, the step through.
+        floSlashStep = grounded && inFloState ? .forward : .none
+        floSlashQueued = false
         events.append(.slashed(player: index))
         enter(.slashing)
     }
@@ -1853,7 +1883,8 @@ public struct Player: Equatable {
 
     /// The blade: a square round the body over the slash's live frames, until it has hit.
     public var slashHitbox: Box? {
-        guard state == .slashing, !slashHit, frozen == 0, SlashRules.liveFrames.contains(stateTimer) else { return nil }
+        let live = floSlashStep == .none ? SlashRules.liveFrames : 0..<FloSlashRules.frames(backward: floSlashStep == .backward)
+        guard state == .slashing, !slashHit, frozen == 0, live.contains(stateTimer) else { return nil }
         return Box(center: bladeCentre, width: SlashRules.reach * 2 * spec.scale, height: SlashRules.reach * 2 * spec.scale)
     }
 

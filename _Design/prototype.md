@@ -155,6 +155,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
   from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
   it's in FloState (`Player.inFloState`, protocol 79): only with a full meter (`floStateReady`, protocol 81), left any time.
+  On a touch screen a tap on your own FLO meter (or within 12 points of it) is throw and shoot
+  together for a frame, the change in or out (`TouchControls.tapFloState`).
   In it the body moves, and is hurried through its actions, a tenth faster (`FloStateRules`: the
   speed share 1.1, and one action frame in ten the clock moves two, `reached` firing for a frame
   passed over), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent every 0.3 seconds
@@ -181,7 +183,15 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   48-pixel boxes (`SnatchRules.floStateTravel`, protocol 117), through the other; the whole way the
   body takes the ball off whoever it passes, or a loose ball it passes (`Player.snatchSteppingThrough`),
   as well as the hand's reach at full stretch; on the third frame the hooded head looks
-  back (protocol 103). The sheet draws the ball taken from its fourth frame on; a snatch that took
+  back (protocol 103). The slash on the ground in FloState is a step-through too, its own sheet
+  (`player_esperslash_flostate`, nine 80 by 64 frames, the body at the cell's middle as on the
+  square sheets, `Animation.pixelWidth`) at the slash's 15 a second: frames 0 to 3 the body carried
+  the snatch's 96 art pixels forward; slash pressed again in its last two sheet frames and frames 4
+  to 8 carry it the same distance back, facing the same way, with the same window back into the
+  forward step, round and round; without the press it stops where it is (`FloSlashRules`,
+  `Player.floSlashStep`, protocol 140). The blade's box is live from each step's first frame and
+  each step can hit once; the rainbow afterimages trail both. In the air FloState's slash is the
+  plain one. The sheet draws the ball taken from its fourth frame on; a snatch that took
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
   Changing with the ball in hand, the ball circles the body clockwise from in front, three laps
   over the change ending in front again (`GameScene.orbitLaps`), mirrored facing left, 32 art
@@ -1279,7 +1289,10 @@ thirds of its brightness (`HumanLook.backLegShare`, 0.66; greyed, they barely gl
 they take the plain threshold); the head
 drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not
 glowing, its particles still rising off it. The head itself is the hooded head (`player_hoodheads`,
-six skins as a strip, and the robot's drawn from the fourth; the player's own, `Dressing.skinTone`), its own node:
+six skins as a strip, and the robot's drawn from the fourth; the player's own, `Dressing.skinTone`), its own node;
+on the frames `HoodView.frames` names (none yet) it's turned away from the camera instead, side on
+(view 1) or further round (view 2), from `player_hoodheads_v2`'s second and third frames, drawn in
+the first skin and swapped into the player's two tones, its outline, neck and line made to it:
 its hood, the white and the cool greys, toned ahead of time through the energy ramp at nine
 tenths of their level, nearer the legs' plain colour (`SpriteLibrary.hoodHead`, `hoodLevel`), the skin as drawn, opaque. The sheet's own head is taken out of the body,
 its line left round where it was. Drawn for `player_idle`'s third frame and moved every frame by how

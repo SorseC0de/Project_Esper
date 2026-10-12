@@ -73,7 +73,7 @@ BALL_MIN_PIXELS = 12
 REDUCE = {"esper_charge": 4, "flashspark": 4, "gemini_rift_v1": 4, "gemini_rift_v2": 4}
 # Strips whose frames aren't square: their frame height, after any reduction. The
 # flash's 256x144 frames come down to 64x36.
-FRAME_HEIGHT = {"dust_skid": 48, "jellyfish": 32, "fish": 16, "shark": 32, "crab": 16, "flo_meter": 16, "flashspark": 36, "hoopfish_spin": 48, "icicle_empty": 48, "small_lightning": 96, "icicle_form": 48}
+FRAME_HEIGHT = {"player_esperslash_flostate": 64, "dust_skid": 48, "jellyfish": 32, "fish": 16, "shark": 32, "crab": 16, "flo_meter": 16, "flashspark": 36, "hoopfish_spin": 48, "icicle_empty": 48, "small_lightning": 96, "icicle_form": 48}
 # Sheets that come out grey but are drawn as painted, never toned: the strike bolts, which
 # the palette's recolour took to pure white.
 NOT_TONED = {"lightning1", "lightning2", "lightning3", "lightning4"}

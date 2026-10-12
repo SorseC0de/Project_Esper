@@ -278,6 +278,12 @@ final class TouchControls: SKNode {
         button.ring.run(spin, withKey: "spin")
     }
 
+    /// The FLO meter tapped: throw and shoot together for a frame, the change into FloState or out.
+    func tapFloState() {
+        latched.shoot = true
+        latched.throwBall = true
+    }
+
     /// The controls as the sim should see them this frame: what's held, plus anything that
     /// was tapped and let go since the last sample.
     func sample() -> PlayerInput {

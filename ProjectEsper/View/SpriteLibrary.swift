@@ -595,6 +595,10 @@ final class SpriteLibrary {
         let line: CGImage?
         /// Its front arm and hand again with the line round them, to go over the hood where the arm crosses the head.
         let frontArm: CGImage?
+        /// The line without the hood's place, and the hood's own line on its canvas, for when the
+        /// hood turns and carries its line with it, as in play.
+        let bareLine: CGImage?
+        let hoodLine: CGImage?
     }
     private var portraits: [String: Portrait] = [:]
 
@@ -731,9 +735,12 @@ final class SpriteLibrary {
             }
         }
         guard let glowing = glowContext.makeImage() else { return nil }
+        let bare = look.human ? recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: true,
+                                         hoodShape: SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)], bareLine: true).bareOutline : nil
         let made = Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
                             centres: figure.centres, tops: SpriteLibrary.partTops(source),
-                            line: figure.outline?.cgImage(), frontArm: SpriteLibrary.partsImage(drawn: body, source: source, parts: [.frontArm, .frontHand]))
+                            line: figure.outline?.cgImage(), frontArm: SpriteLibrary.partsImage(drawn: body, source: source, parts: [.frontArm, .frontHand]),
+                            bareLine: bare?.cgImage(), hoodLine: look.human ? hoodLine(skin: look.dressing.skinTone)?.cgImage() : nil)
         // Kept in the cache too, so a new look drops it with the rest of the player's.
         cache[key] = SKTexture(cgImage: body)
         portraits[key] = made

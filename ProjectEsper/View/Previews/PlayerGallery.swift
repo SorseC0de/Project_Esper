@@ -90,14 +90,19 @@ struct AssembledFrame: View {
                 }
             }
             if cubes { for cube in motion.cubes where cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) } }
-            // The figure, its line in its look's colour, and its hooded head.
-            context.draw(Image(decorative: portrait.image, scale: 1).interpolation(.none), in: figureRect)
-            if let line = portrait.line {
+            func drawLine(_ line: CGImage, in context: GraphicsContext, turned: Bool) {
                 context.drawLayer { layer in
                     layer.addFilter(.colorMultiply(Color(rgb: look.outline)))
-                    layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect)
+                    if turned { drawHood(line, in: layer) } else { layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect) }
                 }
             }
+            // Turned, the hood carries its own line, under the body so only what's outside it shows,
+            // and the body's line is drawn without the hood's place; else one line runs round both.
+            let hoodTurned = turn != 0 && portrait.bareLine != nil && portrait.hoodLine != nil
+            if hoodTurned, let hoodLine = portrait.hoodLine { drawLine(hoodLine, in: context, turned: true) }
+            // The figure, its line in its look's colour, and its hooded head.
+            context.draw(Image(decorative: portrait.image, scale: 1).interpolation(.none), in: figureRect)
+            if let line = hoodTurned ? portrait.bareLine : portrait.line { drawLine(line, in: context, turned: false) }
             if let hood = portrait.hood { drawHood(hood, in: context) }
             drawStrings(in: context)
             // The front arm over the hood and the strings, as in play.

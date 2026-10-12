@@ -6007,20 +6007,27 @@ final class GameScene: SKScene {
     private var slashAfterimages: [Int: Int] = [:]
     private static let afterimageHold = 0.1
     private static let afterimageFade = 0.3
-    private func spawnAfterimage(of body: SKSpriteNode, player index: Int, colour: SKColor? = nil) {
-        guard let texture = body.texture else { return }
+    private func spawnAfterimage(of body: SKSpriteNode, player index: Int, colour: SKColor? = nil, above: CGFloat = 0) {
+        guard let texture = body.texture, !body.isHidden else { return }
         let ghost = SKSpriteNode(texture: texture)
         ghost.size = CGSize(width: abs(body.size.width), height: abs(body.size.height))
         ghost.anchorPoint = body.anchorPoint
-        ghost.position = body.position
+        ghost.position = body.parent.map { $0 === bodies ? body.position : $0.convert(body.position, to: bodies) } ?? body.position
         ghost.xScale = body.xScale
+        ghost.yScale = body.yScale
         ghost.zRotation = body.zRotation
         ghost.color = colour ?? SKColor(rgb: sprites.look(for: index).bright)
         ghost.colorBlendFactor = 1
         ghost.alpha = GameScene.afterimageAlpha
-        ghost.zPosition = -1
+        ghost.zPosition = -1 + above
         bodies.addChild(ghost)
         ghost.run(.sequence([.wait(forDuration: GameScene.afterimageHold), .fadeOut(withDuration: GameScene.afterimageFade), .removeFromParent()]))
+    }
+
+    /// A body's afterimage with its hood, which is a sprite of its own.
+    private func spawnHoodedAfterimage(of body: SKSpriteNode, player index: Int, colour: SKColor? = nil) {
+        spawnAfterimage(of: body, player: index, colour: colour)
+        if hoodNodes.indices.contains(index) { spawnAfterimage(of: hoodNodes[index], player: index, colour: colour, above: 0.01) }
     }
 
     /// The run, dash and skid-stop dust, placed and sized by DustTuning, in the energy colour.
@@ -8282,12 +8289,12 @@ final class GameScene: SKScene {
             }
             // The stepback, a jump out of the shooting stance, the throw and the slash leave the trail.
             let trailing = player.state == .stepback || player.state == .throwing || (player.state == .shootStance && !player.grounded)
-            if trailing, match.frame % 2 == 0 { spawnAfterimage(of: node, player: index) }
+            if trailing, match.frame % 2 == 0 { spawnHoodedAfterimage(of: node, player: index) }
             // The slash's trail is the body and its blade; in FloState each one the next of the zone's colours.
             if player.state == .slashing, match.frame % 2 == 0 {
                 slashAfterimages[index, default: 0] += 1
                 let rainbow = player.inFloState ? ZoneTuning.colours[slashAfterimages[index, default: 0] % ZoneTuning.colours.count] : nil
-                spawnAfterimage(of: node, player: index, colour: rainbow.map { SKColor(rgb: $0) })
+                spawnHoodedAfterimage(of: node, player: index, colour: rainbow.map { SKColor(rgb: $0) })
                 if !energyNodes[index].isHidden { spawnAfterimage(of: energyNodes[index], player: index, colour: rainbow.map { SKColor(rgb: $0) }) }
             }
             if player.power == .frostTea, player.state == .slide, match.frame % 3 == 0 {

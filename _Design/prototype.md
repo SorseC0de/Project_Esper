@@ -50,7 +50,10 @@ neutral to get a shot off; catch it and the roles reverse.
   hooded head where the frame's head is, the strings hanging off it (gone where they'd be
   under the arms, `stringlessFrom`), the cubes off the head, boots and sleeves, and the glow as
   the customize screen draws it (`CustomizeArt.glowStrength`, `glowPixels`), playing at a
-  picked rate on #FF00FF. SAVE THIS SHEET or SAVE ALL writes each sheet as a PNG strip, down or
+  picked rate on #FF00FF, or paused and stepped a frame at a time; ARM OVER HOOD, FRAME N
+  draws the sheet's front arm and hand again over the hood for that frame, as the game does on
+  the frames `GameScene.frontArmOverHood` names (`SpriteLibrary.frontArmTexture`, none yet;
+  the gallery shows its table to copy into the game). SAVE THIS SHEET or SAVE ALL writes each sheet as a PNG strip, down or
   across, at ×1 to ×8, its cells the sheet's cell plus PAD art pixels each side (8 to start), on
   #FF00FF, to `_Graphic Assets/Pixel Art/Assembled/` named for the sheet; the strings and cubes
   move on between a sheet's frames as it plays.

@@ -274,6 +274,7 @@ final class GameScene: SKScene {
     private var hoodStrings: [HoodStrings] = []
     /// Each body's front leg drawn over its ball in hand, on the sheets that pass the ball behind it.
     private var legsOverBall: [SKSpriteNode] = []
+    private var armsOverHood: [SKSpriteNode] = []
     static let ballBehindLegSheets: Set<Animation> = [.taunt, .dribbleWalk]
     static let hoodDrawnFor = SpriteLibrary.hoodDrawnFor
     /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
@@ -1195,6 +1196,12 @@ final class GameScene: SKScene {
             legOver.isHidden = true
             figure.addChild(legOver)
             legsOverBall.append(legOver)
+            // The front arm again over the hood, where it crosses the head.
+            let armOver = SKSpriteNode()
+            armOver.zPosition = GameScene.hoodUpZ + 0.001
+            armOver.isHidden = true
+            figure.addChild(armOver)
+            armsOverHood.append(armOver)
             let halo = makeHalo(colour)
             halo.zPosition = 0.02
             figure.addChild(halo)
@@ -5857,6 +5864,12 @@ final class GameScene: SKScene {
         .ledge: 0,
         .dunk: 1,
     ]
+    /// The frames where the front arm crosses the hooded head, so the sheet's front arm and hand
+    /// are drawn again over the hood: each sheet's frames. Picked frame by frame in the player
+    /// gallery (`PlayerGallery`); none to start.
+    static let frontArmOverHood: [Animation: Set<Int>] = [:]
+    static func frontArmOverHood(_ frame: AnimationFrame) -> Bool { frontArmOverHood[frame.animation]?.contains(frame.frame) ?? false }
+
     static func stringsUnderArms(_ frame: AnimationFrame) -> Bool {
         stringlessFrom[frame.animation].map { frame.frame >= $0 } ?? false
     }
@@ -8062,6 +8075,22 @@ final class GameScene: SKScene {
                                         plain: lockoutOn ? grey : SKColor(rgb: plain),
                                         accent: lockoutOn ? grey : SKColor(rgb: accent),
                                         z: energyForm ? GameScene.floatingStringZ : GameScene.hoodUpZ + 0.0005)
+            }
+            // The front arm over the hood on the frames it crosses the head.
+            if armsOverHood.indices.contains(index) {
+                let armOver = armsOverHood[index]
+                let armTexture = !hood.isHidden && GameScene.frontArmOverHood(frame)
+                    ? sprites.frontArmTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) : nil
+                armOver.isHidden = armTexture == nil || node.isHidden
+                if let armTexture {
+                    armOver.texture = armTexture
+                    armOver.size = node.size
+                    armOver.anchorPoint = node.anchorPoint
+                    armOver.position = node.position
+                    armOver.xScale = node.xScale
+                    armOver.yScale = node.yScale
+                    armOver.zRotation = node.zRotation
+                }
             }
             // The hood flashes with the body, part of its silhouette: over the body's flash when
             // it's up, over the hood itself when it's down behind.

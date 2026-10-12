@@ -7,8 +7,9 @@ import EsperSim
 /// The player gallery, an Xcode preview: every player sheet assembled as the game draws a body
 /// (its look's colours, the neck filled, the line round it, the hooded head where the frame's
 /// head is, the strings hanging off it, the cubes off its head and its boots and sleeves, and
-/// the glow as the customize screen draws it), playing at a chosen rate, and saved out as PNG
-/// sheets on #FF00FF at any scale. A tool for looking at the art, not a part of the game.
+/// the glow as the customize screen draws it), playing at a chosen rate or stepped a frame at a
+/// time, and saved out as PNG sheets on #FF00FF at any scale. A tool for looking at the art,
+/// not a part of the game.
 #Preview("Player sheets") {
     PlayerGallery()
 }
@@ -26,7 +27,8 @@ enum PlayerGalleryOutput {
 
 /// One frame of a sheet as the game assembles it, on a canvas `pad` art pixels bigger each side
 /// than the sheet's cell, at `pixel` points an art pixel. `motion` carries the strings and cubes
-/// between frames; `time` drives them and the strings' wave.
+/// between frames; `time` drives them and the strings' wave. `armOverHood`: the front arm drawn
+/// again over the hood, as `GameScene.frontArmOverHood` has it in play.
 struct AssembledFrame: View {
     let portrait: SpriteLibrary.Portrait
     let look: Look
@@ -37,6 +39,7 @@ struct AssembledFrame: View {
     let strings: Bool
     let cubes: Bool
     let glow: Bool
+    let armOverHood: Bool
     let motion: CustomizeFigureMotion
     let time: Double
 
@@ -83,6 +86,8 @@ struct AssembledFrame: View {
             }
             if let hood = portrait.hood { context.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect) }
             drawStrings(in: context)
+            // The front arm over the hood and the strings, as in play.
+            if armOverHood, let arm = portrait.frontArm { context.draw(Image(decorative: arm, scale: 1).interpolation(.none), in: figureRect) }
             if cubes { for cube in motion.cubes where !cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) } }
             // The glow: what's energy again, blurred and added, as the customize screen draws it.
             guard glow else { return }
@@ -99,6 +104,21 @@ struct AssembledFrame: View {
         }
         .frame(width: side, height: side)
     }
+}
+
+/// How a sheet is drawn and saved: the look's dressing aside, everything the gallery's controls set.
+struct GalleryDrawing {
+    var pad: CGFloat = 8
+    var fps = 12.0
+    var mirrored = false
+    var strings = true
+    var cubes = true
+    var glow = true
+    /// The frames whose front arm goes over the hood, by sheet: the game's table to start,
+    /// changed frame by frame here.
+    var armOverHood = GameScene.frontArmOverHood
+
+    func armOverHood(_ frame: AnimationFrame) -> Bool { armOverHood[frame.animation]?.contains(frame.frame) ?? false }
 }
 
 /// The sheets' frames in a look, made as the customize screen's figure is, and the sheets
@@ -123,11 +143,10 @@ final class PlayerGallerySheets: ObservableObject {
     }
 
     /// A sheet of every frame of `animation` at `scale` pixels an art pixel, on #FF00FF: the
-    /// strings and cubes moved on between frames as the frames play at `fps`.
-    func sheet(_ animation: EsperSim.Animation, scale: CGFloat, pad: CGFloat, fps: Double, strip: Strip,
-               mirrored: Bool, strings: Bool, cubes: Bool, glow: Bool) -> UIImage? {
+    /// strings and cubes moved on between frames as the frames play at the drawing's rate.
+    func sheet(_ animation: EsperSim.Animation, scale: CGFloat, strip: Strip, drawing: GalleryDrawing) -> UIImage? {
         let motion = CustomizeFigureMotion()
-        let cell = (CGFloat(animation.pixelSize) + 2 * pad) * scale
+        let cell = (CGFloat(animation.pixelSize) + 2 * drawing.pad) * scale
         let count = animation.frameCount
         let size = strip == .across ? CGSize(width: cell * CGFloat(count), height: cell) : CGSize(width: cell, height: cell * CGFloat(count))
         let format = UIGraphicsImageRendererFormat()
@@ -138,8 +157,9 @@ final class PlayerGallerySheets: ObservableObject {
         for index in 0..<count {
             let frame = AnimationFrame(animation, index)
             guard let portrait = portrait(frame) else { return nil }
-            let view = AssembledFrame(portrait: portrait, look: look, frame: frame, pixel: scale, pad: pad, mirrored: mirrored,
-                                      strings: strings, cubes: cubes, glow: glow, motion: motion, time: start + Double(index) / fps)
+            let view = AssembledFrame(portrait: portrait, look: look, frame: frame, pixel: scale, pad: drawing.pad, mirrored: drawing.mirrored,
+                                      strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
+                                      motion: motion, time: start + Double(index) / drawing.fps)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 1
             guard let image = renderer.uiImage else { return nil }
@@ -156,16 +176,13 @@ final class PlayerGallerySheets: ObservableObject {
     }
 
     /// `animations`' sheets saved as PNGs named for their sheets, in the output folder.
-    func save(_ animations: [EsperSim.Animation], scale: CGFloat, pad: CGFloat, fps: Double, strip: Strip,
-              mirrored: Bool, strings: Bool, cubes: Bool, glow: Bool) {
+    func save(_ animations: [EsperSim.Animation], scale: CGFloat, strip: Strip, drawing: GalleryDrawing) {
         let folder = PlayerGalleryOutput.folder
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             var saved = 0
             for animation in animations {
-                guard let sheet = sheet(animation, scale: scale, pad: pad, fps: fps, strip: strip, mirrored: mirrored,
-                                        strings: strings, cubes: cubes, glow: glow),
-                      let data = sheet.pngData() else { continue }
+                guard let sheet = sheet(animation, scale: scale, strip: strip, drawing: drawing), let data = sheet.pngData() else { continue }
                 try data.write(to: folder.appendingPathComponent("\(animation.rawValue).png"))
                 saved += 1
             }
@@ -176,20 +193,24 @@ final class PlayerGallerySheets: ObservableObject {
     }
 }
 
-/// The gallery: a sheet playing, its look, pace and padding, and the save controls.
+/// The frame last drawn while playing, for the pause to hold on.
+final class Playhead {
+    var shown = 0
+}
+
+/// The gallery: a sheet playing or stepped, its look, pace and padding, the per-frame arm
+/// over the hood, and the save controls.
 struct PlayerGallery: View {
     @StateObject private var sheets = PlayerGallerySheets()
     @State private var animation: EsperSim.Animation = .idle
-    @State private var fps = 12.0
-    @State private var pad = 8.0
+    @State private var drawing = GalleryDrawing()
     @State private var pixel = 6.0
     @State private var saveScale = 4.0
     @State private var strip = PlayerGallerySheets.Strip.down
-    @State private var mirrored = false
-    @State private var strings = true
-    @State private var cubes = true
-    @State private var glow = true
+    @State private var paused = false
+    @State private var held = 0
     @State private var motion = CustomizeFigureMotion()
+    @State private var playhead = Playhead()
 
     private static let saveScales: [Double] = [1, 2, 3, 4, 6, 8]
 
@@ -199,18 +220,20 @@ struct PlayerGallery: View {
                 .font(.system(size: 11, weight: .heavy, design: .monospaced))
                 .tracking(4)
                 .foregroundStyle(.secondary)
-            TimelineView(.animation) { timeline in
+            TimelineView(.animation(paused: paused)) { timeline in
                 let time = timeline.date.timeIntervalSinceReferenceDate
-                let index = Int(time * fps) % animation.frameCount
+                let index = paused ? held : Int(time * drawing.fps) % animation.frameCount
                 let frame = AnimationFrame(animation, index)
+                let _ = playhead.shown = index
                 ZStack {
                     Color(rgb: PlayerGalleryOutput.background)
                     if let portrait = sheets.portrait(frame) {
-                        AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: pixel, pad: pad, mirrored: mirrored,
-                                       strings: strings, cubes: cubes, glow: glow, motion: motion, time: time)
+                        AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: pixel, pad: drawing.pad, mirrored: drawing.mirrored,
+                                       strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
+                                       motion: motion, time: time)
                     }
                 }
-                .frame(width: (CGFloat(animation.pixelSize) + 2 * pad) * pixel, height: (CGFloat(animation.pixelSize) + 2 * pad) * pixel)
+                .frame(width: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel)
                 .overlay(alignment: .bottomTrailing) {
                     Text("\(animation.rawValue)  \(index + 1)/\(animation.frameCount)")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -219,6 +242,7 @@ struct PlayerGallery: View {
                         .foregroundStyle(.white)
                 }
             }
+            transport
             controls
             Text(sheets.status)
                 .font(.system(size: 10, design: .monospaced))
@@ -227,6 +251,49 @@ struct PlayerGallery: View {
                 .frame(maxWidth: 360)
         }
         .padding(16)
+        .onChange(of: animation) { held = 0 }
+    }
+
+    /// Play or pause, and a frame back or on (which pauses); the arm over the hood for this frame.
+    private var transport: some View {
+        let shown = paused ? held : playhead.shown
+        let frame = AnimationFrame(animation, shown)
+        return VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                Button("\u{25C0}") { step(-1) }
+                Button(paused ? "\u{25B6} PLAY" : "\u{23F8} PAUSE") {
+                    if !paused { held = playhead.shown }
+                    paused.toggle()
+                }
+                .frame(width: 110)
+                Button("\u{25B6}") { step(1) }
+            }
+            .buttonStyle(.bordered)
+            Toggle("ARM OVER HOOD, FRAME \(shown + 1)", isOn: Binding(
+                get: { drawing.armOverHood(frame) },
+                set: { on in
+                    var frames = drawing.armOverHood[animation] ?? []
+                    if on { frames.insert(frame.frame) } else { frames.remove(frame.frame) }
+                    drawing.armOverHood[animation] = frames.isEmpty ? nil : frames
+                }))
+            .toggleStyle(.button)
+            Text(armOverHoodSummary)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+        .font(.system(size: 12, weight: .bold, design: .monospaced))
+    }
+
+    /// The frames whose arm is over the hood, sheet by sheet, as the game's table would read.
+    private var armOverHoodSummary: String {
+        let lines = drawing.armOverHood.sorted { $0.key.rawValue < $1.key.rawValue }
+            .map { "\($0.key.rawValue): \($0.value.sorted().map { String($0 + 1) }.joined(separator: ", "))" }
+        return lines.isEmpty ? "arm over hood: none" : "arm over hood (frames from 1): " + lines.joined(separator: "  ·  ")
+    }
+
+    private func step(_ by: Int) {
+        if !paused { held = playhead.shown; paused = true }
+        held = (held + by + animation.frameCount) % animation.frameCount
     }
 
     private var controls: some View {
@@ -240,15 +307,15 @@ struct PlayerGallery: View {
                 }
             }
             HStack(spacing: 12) {
-                Toggle("MIRROR", isOn: $mirrored)
-                Toggle("STRINGS", isOn: $strings)
-                Toggle("CUBES", isOn: $cubes)
-                Toggle("GLOW", isOn: $glow)
+                Toggle("MIRROR", isOn: $drawing.mirrored)
+                Toggle("STRINGS", isOn: $drawing.strings)
+                Toggle("CUBES", isOn: $drawing.cubes)
+                Toggle("GLOW", isOn: $drawing.glow)
             }
             .toggleStyle(.button)
             HStack {
-                Stepper("FPS \(Int(fps))", value: $fps, in: 1...60)
-                Stepper("PAD \(Int(pad))", value: $pad, in: 0...32)
+                Stepper("FPS \(Int(drawing.fps))", value: $drawing.fps, in: 1...60)
+                Stepper("PAD \(Int(drawing.pad))", value: $drawing.pad, in: 0...32)
                 Stepper("VIEW ×\(Int(pixel))", value: $pixel, in: 1...12)
             }
             HStack {
@@ -263,17 +330,13 @@ struct PlayerGallery: View {
                 .frame(width: 150)
             }
             HStack(spacing: 12) {
-                Button("SAVE THIS SHEET") { save([animation]) }
-                Button("SAVE ALL \(EsperSim.Animation.allCases.count)") { save(EsperSim.Animation.allCases) }
+                Button("SAVE THIS SHEET") { sheets.save([animation], scale: saveScale, strip: strip, drawing: drawing) }
+                Button("SAVE ALL \(EsperSim.Animation.allCases.count)") { sheets.save(EsperSim.Animation.allCases, scale: saveScale, strip: strip, drawing: drawing) }
             }
             .buttonStyle(.borderedProminent)
         }
         .font(.system(size: 12, weight: .bold, design: .monospaced))
         .frame(maxWidth: 520)
-    }
-
-    private func save(_ animations: [EsperSim.Animation]) {
-        sheets.save(animations, scale: saveScale, pad: pad, fps: fps, strip: strip, mirrored: mirrored, strings: strings, cubes: cubes, glow: glow)
     }
 }
 #endif

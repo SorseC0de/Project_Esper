@@ -390,45 +390,61 @@ final class SpriteLibrary {
     /// body otherwise. The sheet's front leg whichever way the body faces: turned round, the node's
     /// mirrored and only the clothes' colours swap. Nil with no front leg in the frame.
     func frontLegTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_frontleg"
+        partsTexture(frame, player: player, parts: [.frontThigh, .frontLeg, .frontFoot], suffix: "_frontleg", ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    }
+
+    /// The sheet's front arm alone (its arm and hand) as drawn with the line round it, on the body's
+    /// canvas: laid over the hooded head on the frames `GameScene.frontArmOverHood` names, where the
+    /// arm crosses the head. Nil with no front arm in the frame.
+    func frontArmTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        partsTexture(frame, player: player, parts: [.frontArm, .frontHand], suffix: "_frontarm", ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    }
+
+    private func partsTexture(_ frame: AnimationFrame, player: Int, parts: Set<BodyPart>, suffix: String, ballAsEnergy: Bool, ballLifted: Bool) -> SKTexture? {
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + suffix
         if let made = cache[key] { return made }
         let drawn = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).cgImage()
         let source = atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage()
-        let width = drawn.width, height = drawn.height
-        guard source.width == width, source.height == height,
-              let (drawnContext, drawnPixels) = makeCanvas(width: width, height: height),
-              let (sourceContext, sourcePixels) = makeCanvas(width: width, height: height),
-              let (legContext, legPixels) = makeCanvas(width: width, height: height) else { return nil }
-        drawnContext.draw(drawn, in: CGRect(x: 0, y: 0, width: width, height: height))
-        sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let legParts: Set<BodyPart> = [.frontThigh, .frontLeg, .frontFoot]
-        var isLeg = [Bool](repeating: false, count: width * height)
-        for pixel in 0..<(width * height) where sourcePixels[pixel * 4 + 3] == 255 {
-            let index = pixel * 4
-            let colour = RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2])
-            if let part = BodyPart.owning(colour), legParts.contains(part) { isLeg[pixel] = true }
-        }
-        guard isLeg.contains(true) else { return nil }
-        for y in 0..<height {
-            for x in 0..<width {
-                let pixel = y * width + x
-                var keep = isLeg[pixel]
-                // The line round it: drawn where the sheet has nothing, next to the leg.
-                if !keep, sourcePixels[pixel * 4 + 3] == 0, drawnPixels[pixel * 4 + 3] > 0 {
-                    keep = (-1...1).contains { dy in (-1...1).contains { dx in
-                        let nx = x + dx, ny = y + dy
-                        return nx >= 0 && ny >= 0 && nx < width && ny < height && isLeg[ny * width + nx]
-                    } }
-                }
-                guard keep else { continue }
-                for channel in 0..<4 { legPixels[pixel * 4 + channel] = drawnPixels[pixel * 4 + channel] }
-            }
-        }
-        guard let image = legContext.makeImage() else { return nil }
+        guard let image = SpriteLibrary.partsImage(drawn: drawn, source: source, parts: parts) else { return nil }
         let made = SKTexture(cgImage: image)
         made.filteringMode = .nearest
         cache[key] = made
         return made
+    }
+
+    /// The pixels of `parts` as `drawn` has them, found by the sheet's own colours in `source`, with
+    /// the line drawn next to them; nil when the frame has none of them.
+    static func partsImage(drawn: CGImage, source: CGImage, parts: Set<BodyPart>) -> CGImage? {
+        let width = drawn.width, height = drawn.height
+        guard source.width == width, source.height == height,
+              let (drawnContext, drawnPixels) = SpriteLibrary.canvas(width: width, height: height),
+              let (sourceContext, sourcePixels) = SpriteLibrary.canvas(width: width, height: height),
+              let (partContext, partPixels) = SpriteLibrary.canvas(width: width, height: height) else { return nil }
+        drawnContext.draw(drawn, in: CGRect(x: 0, y: 0, width: width, height: height))
+        sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var isPart = [Bool](repeating: false, count: width * height)
+        for pixel in 0..<(width * height) where sourcePixels[pixel * 4 + 3] == 255 {
+            let index = pixel * 4
+            let colour = RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2])
+            if let part = BodyPart.owning(colour), parts.contains(part) { isPart[pixel] = true }
+        }
+        guard isPart.contains(true) else { return nil }
+        for y in 0..<height {
+            for x in 0..<width {
+                let pixel = y * width + x
+                var keep = isPart[pixel]
+                // The line round it: drawn where the sheet has nothing, next to the part.
+                if !keep, sourcePixels[pixel * 4 + 3] == 0, drawnPixels[pixel * 4 + 3] > 0 {
+                    keep = (-1...1).contains { dy in (-1...1).contains { dx in
+                        let nx = x + dx, ny = y + dy
+                        return nx >= 0 && ny >= 0 && nx < width && ny < height && isPart[ny * width + nx]
+                    } }
+                }
+                guard keep else { continue }
+                for channel in 0..<4 { partPixels[pixel * 4 + channel] = drawnPixels[pixel * 4 + channel] }
+            }
+        }
+        return partContext.makeImage()
     }
 
     /// A strip's frame as a silhouette in the player's energy: every painted pixel white,
@@ -561,6 +577,8 @@ final class SpriteLibrary {
         let tops: [BodyPart: CGPoint]
         /// The figure's line apart from it, in white, to be drawn in the look's line colour.
         let line: CGImage?
+        /// Its front arm and hand again with the line round them, to go over the hood where the arm crosses the head.
+        let frontArm: CGImage?
     }
     private var portraits: [String: Portrait] = [:]
 
@@ -697,7 +715,7 @@ final class SpriteLibrary {
         guard let glowing = glowContext.makeImage() else { return nil }
         let made = Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
                             centres: figure.centres, tops: SpriteLibrary.partTops(source),
-                            line: figure.outline?.cgImage())
+                            line: figure.outline?.cgImage(), frontArm: SpriteLibrary.partsImage(drawn: body, source: source, parts: [.frontArm, .frontHand]))
         // Kept in the cache too, so a new look drops it with the rest of the player's.
         cache[key] = SKTexture(cgImage: body)
         portraits[key] = made
@@ -918,7 +936,9 @@ final class SpriteLibrary {
 
     /// A clear canvas. The memory a context is given isn't promised to be clean, and a frame
     /// drawn over leftovers keeps them in its transparent area, so it's wiped first.
-    private func makeCanvas(width: Int, height: Int) -> (CGContext, UnsafeMutablePointer<UInt8>)? {
+    private func makeCanvas(width: Int, height: Int) -> (CGContext, UnsafeMutablePointer<UInt8>)? { SpriteLibrary.canvas(width: width, height: height) }
+
+    static func canvas(width: Int, height: Int) -> (CGContext, UnsafeMutablePointer<UInt8>)? {
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),

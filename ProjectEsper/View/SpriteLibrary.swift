@@ -1417,19 +1417,18 @@ enum EnergyEffect: CaseIterable {
     }
 }
 
-/// X, Y and SCALE sliders on the in-game slider list for each of the run,
-/// dash and skid-stop dust: art pixels ahead of the feet (mirrored with facing) and up,
-/// and the sheet's scale.
+/// The run, dash and skid-stop dust's place, art pixels ahead of the feet (mirrored with
+/// facing) and up, and its scale.
 enum DustTuning {
-    static let effects: [Effect] = [.dustRun3, .dustDash, .dustSkid]
-    static func xKey(_ effect: Effect) -> String { "ui.dust.\(effect.name).x" }
-    static func yKey(_ effect: Effect) -> String { "ui.dust.\(effect.name).y" }
-    static func scaleKey(_ effect: Effect) -> String { "ui.dust.\(effect.name).scale" }
-    static func offset(_ effect: Effect) -> CGPoint { CGPoint(x: stored(xKey(effect)) ?? 0, y: stored(yKey(effect)) ?? 0) }
-    static func scale(_ effect: Effect) -> CGFloat { stored(scaleKey(effect)) ?? 0.5 }
-    private static func stored(_ key: String) -> CGFloat? {
-        UserDefaults.standard.object(forKey: key) == nil ? nil : CGFloat(UserDefaults.standard.double(forKey: key))
+    static func offset(_ effect: Effect) -> CGPoint {
+        switch effect {
+        case .dustRun3: CGPoint(x: 6, y: 6)
+        case .dustDash: CGPoint(x: 10, y: 0)
+        case .dustSkid: CGPoint(x: -16, y: 0)
+        default: .zero
+        }
     }
+    static func scale(_ effect: Effect) -> CGFloat { effect == .dustSkid ? 0.25 : 0.5 }
 }
 
 /// One-shot sprites: sparks, smoke, the swish, and Blazing Boba's fire and Flash Fizz's

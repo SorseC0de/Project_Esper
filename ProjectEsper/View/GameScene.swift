@@ -3471,13 +3471,9 @@ final class GameScene: SKScene {
             controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
             controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.cornerMaxY)) { FloTuning.cornerMaxY = CGFloat($0); relayoutFlo() }
         }
-        // The run, dash and skid-stop dust: art pixels ahead of the feet and up, and scale.
-        for effect in DustTuning.effects {
-            let title = effect.name.replacingOccurrences(of: "_", with: " ").uppercased()
-            let offset = DustTuning.offset(effect)
-            controls.addSlider(title: title + " X", range: -40...40, notch: 1, value: Float(offset.x)) { UserDefaults.standard.set(Double($0), forKey: DustTuning.xKey(effect)) }
-            controls.addSlider(title: title + " Y", range: -40...40, notch: 1, value: Float(offset.y)) { UserDefaults.standard.set(Double($0), forKey: DustTuning.yKey(effect)) }
-            controls.addSlider(title: title + " SCALE", range: 0.05...2, notch: 0.05, value: Float(DustTuning.scale(effect))) { UserDefaults.standard.set(Double($0), forKey: DustTuning.scaleKey(effect)) }
+        // The Greateraid pick's transform, raised off the chair.
+        controls.addSlider(title: "TRANSFORM Y", range: -40...40, notch: 1, value: Float(PickScreen.transformLift)) {
+            UserDefaults.standard.set(Double($0), forKey: PickScreen.transformLiftKey)
         }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
@@ -4902,7 +4898,7 @@ final class GameScene: SKScene {
                                     colour: SKColor(rgb: sprites.look(for: picker).glow), timed: online != nil,
                                     drinker: drinkerFrames(picker), bench: sprites.standalone("player_bench", frame: 0, player: picker),
                                     drinking: (0..<GameScene.drinkerFrameCount).map { sprites.standalone("player_drink", frame: $0, player: picker) },
-                                    transforming: (0..<Animation.transform.frameCount).map { sprites.texture(AnimationFrame(.transform, $0), player: picker) }) { [weak self] drink in
+                                    transforming: (0..<Animation.transform.frameCount).map { sprites.standalone(Animation.transform.rawValue, frame: $0, player: picker) }) { [weak self] drink in
                     self?.choose(drink)
                 }
             } else {

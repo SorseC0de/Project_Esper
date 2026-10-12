@@ -279,8 +279,8 @@ final class PickScreen: Screen {
     static var drinkerScale: CGFloat { UserDefaults.standard.object(forKey: drinkerScaleKey).map { CGFloat(($0 as? Double) ?? 4) } ?? 4 }
     static let drinkerFrameSeconds = 0.5
     /// Picked: `player_drink` this many times through at the same pace, then `player_transform`
-    /// at 15 a second, raised `transformLift` art pixels off the chair (TRANSFORM Y on the UI
-    /// panel), and only then on; the bottles and the words falling away meanwhile.
+    /// at 15 a second, raised `transformLift` art pixels off the chair (TRANSFORM Y on the debug
+    /// strip), and only then on; the bottles and the words falling away meanwhile.
     static let drinkLoops = 2
     static let transformFramesPerSecond = 15.0
     static let transformLiftKey = "ui.pick.transformLift"

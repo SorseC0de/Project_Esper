@@ -139,7 +139,6 @@ struct UITuningPanel: View {
             }
             if screen == .pick {
                 lineRow("DRINKER", key: PickScreen.drinkerScaleKey, value: PickScreen.drinkerScale, step: 0.25, range: 0.25...16)
-                lineRow("TRANSFORM Y", key: PickScreen.transformLiftKey, value: PickScreen.transformLift, step: 1, range: -40...40)
             }
             if screen == .hud {
                 lineRow("3PT WIDTH", key: ThreePointTuning.widthKey, value: ThreePointTuning.lineWidth, step: 1, range: 1...8)

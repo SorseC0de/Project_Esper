@@ -1144,8 +1144,8 @@ picking: `player_drinkchoice` in their look, with the hooded head and its neck a
 at 2 a second, sitting on `player_bench`, its own sheet now, drawn under it; its size on the UI panel's
 PICK screen (DRINKER, the points to an art pixel, 4 to start). Picked, the bottles and the words fall
 away (half a second, easing in), the drinker plays `player_drink` twice through at the same 2 a second,
-then `player_transform` at 15 a second raised off the chair (TRANSFORM Y on the same screen, art pixels,
-4 to start; `PickScreen.finish`), and only then does the pick go on; the clock stops once it's picked,
+then `player_transform` at 15 a second raised off the chair (the debug strip's TRANSFORM Y, art pixels,
+4 to start), the hood on its head as the drinker's (`SpriteLibrary.standalone`; `PickScreen.finish`), and only then does the pick go on; the clock stops once it's picked,
 and a second pick (the clock's, at zero) doesn't land.
 
 - Hasty Horchata: run, dash and air speed up by half a unit a drink. The body a match
@@ -1540,8 +1540,8 @@ from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 5 hig
 Running, `dust_run3` stands in for `dust_run`; a dash kicks up `dust_dash` in place of its smoke (a slide keeps the smoke);
 a skid stop (idle out of a run, dash or slide, the turn the skid sheet plays) kicks up `dust_skid`,
 except for Blazing Boba, whose fire skid it is. All three are in the energy colour at 12 a second,
-placed and sized by `DustTuning`: X (ahead of the feet, mirrored with facing), Y and SCALE for each on
-the debug strip's sliders (DUST RUN3 X and so on), scale 0.5 until set.
+placed and sized by `DustTuning`, art pixels ahead of the feet (mirrored with facing) and up: the run's
+6 and 6 at 0.5, the dash's 10 and 0 at 0.5, the skid's -16 and 0 at 0.25.
 
 | | JP | EN |
 |---|---|---|
@@ -2199,8 +2199,7 @@ rimless, the run starting on the ground. Dunks and threes as on the court.
 Before a stage's first count in a series (not ZONES), a manga page of it plays to
 `stage_preview.wav` (6.3 seconds), then the players port in and the count runs. The page is
 `_Graphic Assets/Vectors/Stages/Manga_Panels.svg` (`MangaPage`, 3750 by 2625): fitted whole to the
-screen on black, framed in Futuristic_UI's box2 stretched round the panels (its clear inside holding
-them all with 20 of the page's units to spare, so neither covers the other: `MangaPage.frame`), five
+screen on black, unframed, five
 panels filling in turn, the right side's top, middle and bottom right, the
 triangle at the bottom, then the big one on the left (at 0.15, 0.95, 1.75, 2.55 and 3.45 s). Each
 panel is a cut of the stage: it plays a few frames (24, the big one 40, a cut's own count over

@@ -2388,7 +2388,9 @@ shown, once, like the effects.
   the words up, how long it takes going on out.
 - dunk: a dunk going in, in the swish's place. slide: the slide. flo_collect: each FLO orb landing
   on its player, at 0.25 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a
-  meter showing full as it fills. These five are levelled as they're imported to the effects'
+  meter showing full as it fills. flo_state: a body starting its change into FloState. boing: a body
+  (not the ball) bouncing off a rim's top or the jellyfish, half a second apart at most from each
+  (`GameScene.playBoing`; `boing.ogg`, the importer taking .ogg now). These seven are levelled as they're imported to the effects'
   middle loudness, -21 dB while sounding, peaks under -3 (`LEVELLED_EFFECTS`, `EFFECT_LEVEL`); the
   effects from before them came in as they are.
 - snatch: the snatch at full stretch. catch: a catch.

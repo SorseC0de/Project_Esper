@@ -29,7 +29,7 @@ CROWD_LEVEL = -27.0
 PEAK_CEILING = -3.0
 # The effects in the app sit around -21 dB while sounding (their median); new ones are brought there.
 EFFECT_LEVEL = -21.0
-LEVELLED_EFFECTS = {"dunk", "slashclash", "flo_collect", "slide", "flo_max"}
+LEVELLED_EFFECTS = {"dunk", "slashclash", "flo_collect", "slide", "flo_max", "boing", "flo_state"}
 
 # File in Vocals: (name in the app, loudness while sounding in dBFS).
 VOCALS = {
@@ -49,7 +49,7 @@ VOCALS = {
     "crowd_gasp.wav": ("crowd_gasp", CROWD_LEVEL),
 }
 
-SUFFIXES = {".wav", ".mp3", ".m4a", ".aif", ".aiff", ".caf"}
+SUFFIXES = {".wav", ".mp3", ".m4a", ".aif", ".aiff", ".caf", ".ogg"}
 # Long backgrounds that come in through Tools/import_ambience.py instead, as AAC.
 AMBIENCE = {"thunderstorm.mp3", "thunderstorm.wav"}
 

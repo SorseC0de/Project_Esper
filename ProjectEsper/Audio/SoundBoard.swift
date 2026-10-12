@@ -36,6 +36,8 @@ final class SoundBoard {
         case slide
         case floCollect = "flo_collect"
         case floMax = "flo_max"
+        case floState = "flo_state"
+        case boing
         case step
         // The announcer, levelled by the importer.
         case countA1 = "announcer_1", countA2 = "announcer_2", countA3 = "announcer_3"

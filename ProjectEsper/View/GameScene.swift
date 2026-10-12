@@ -4672,6 +4672,14 @@ final class GameScene: SKScene {
     private static let sameActionReach = 32.0
     private static let boingQuietSeconds = 0.5
     private var boingSaidAt: [Int: CFTimeInterval] = [:]
+    /// A body bounced off a rim's top or the jellyfish (`-1`): the boing, once a while at most from each.
+    private var boingPlayedAt: [Int: CFTimeInterval] = [:]
+    private func playBoing(from source: Int, at point: Vec2) {
+        let now = CACurrentMediaTime()
+        guard now - (boingPlayedAt[source] ?? 0) >= GameScene.boingQuietSeconds else { return }
+        boingPlayedAt[source] = now
+        play(.boing, at: point)
+    }
 
     /// A sample word in the middle of the screen, for trying the SFX picker's faces.
     private func previewSoundWord() {
@@ -5664,6 +5672,9 @@ final class GameScene: SKScene {
             case .rimBounced(let hoop, let speed, let ball):
                 if hoop < rimSpin.count { rimSpin[hoop] += CGFloat(speed) * RimLook.kickPerSpeed }
                 if ball, hoop < rimJitter.count { rimJitter[hoop] = RimLook.jitterFrames }
+                if !ball, match.stage.hoops.indices.contains(hoop) { playBoing(from: hoop, at: match.stage.hoops[hoop].position) }
+            case .springBounced(let at, _, let ball):
+                if !ball { playBoing(from: -1, at: at) }
             case .ballBounced(let position, let speed) where speed > GameScene.bounceSoundFloor:
                 if let hoop = backboard(at: position), hoop < boardJitter.count { boardJitter[hoop] = RimLook.jitterFrames }
             case .doubleJumped(let index):
@@ -8299,6 +8310,7 @@ final class GameScene: SKScene {
                 spawnSnowflakes(at: SpriteLibrary.point(player.position + Vec2(x: -player.facing.sign * 4, y: 2)), count: 2, spread: 6)
             }
             // Blazing Boba's skid: the fire sheet as the run stops.
+            if player.state == .transforming, lastStates[index] != .transforming { play(.floState, at: player.chest) }
             if player.power == .blazingBoba, player.state == .idle, lastStates[index] == .run || lastStates[index] == .dash {
                 // The sheet skids the other way from the run sheets.
                 spawn(.fireSkid, at: player.position, flipped: player.facing == .right, scale: bodyScale(index))

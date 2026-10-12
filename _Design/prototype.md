@@ -117,7 +117,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   braking for a let-go stick, protocol 119); in the air the
   body rises at least 0.5 a frame and gravity is cut to seven tenths, a little hang
   through the swing. The sheet's six frames at 15 a second, 24 sim frames, and the roll the same. The
-  blade is a square round the body, 56 art pixels a side, its centre 4 art pixels in
+  blade is a square round the body, 52 art pixels a side (56 at first; protocol 130), its centre 4 art pixels in
   front of the body's, live over sheet frames 1 to 3 (`SlashRules.liveSheetFrames`). Touching the holder's body or ball with it knocks the
   ball out of their hands, and it spikes a loose ball down and away at about 45° below
   the horizontal, jittered up to 10° by the frame, at no less than 6. In the air it ends in the roll, the double
@@ -251,9 +251,11 @@ whatever lands on it came at, held down 12° while someone
   facing either way, until it first hits something. A release never starts inside a
   wall: the hand is pushed out of one the body is pressed against. Up is the layup (protocol 129): out
   of the throw's hold frame into `player_layup`'s seven frames (48 by 48, its ball landmarks the
-  importer's) at the throw's 15 a second, the ball in hand through its first five and let go on frame 5,
-  20 frames into the throw (`BallRules.layupReleaseFrames`), acting again once its last is done, 28 in
-  (`layupRecoveryFrames`, `Player.layingUp`), on the ground or in the air; its ball the floater: a soft drift up at 1.5 with gravity
+  importer's) at 30 a second (`layupFramesPerSecond`, protocol 130), the ball in hand through its first
+  five and let go on frame 5, 10 sim frames into the throw (`BallRules.layupReleaseFrames`), acting
+  again once its last is done, 14 in (`layupRecoveryFrames`, `Player.layingUp`), on the ground or in
+  the air; and on its first frame up off a half jump (`startThrowing`): a full hop's speed times the
+  root of a half (`layupHopShare`), so it climbs half a full jump's height, off the ground if on it; its ball the floater: a soft drift up at 1.5 with gravity
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the air the throw stance keeps its run,

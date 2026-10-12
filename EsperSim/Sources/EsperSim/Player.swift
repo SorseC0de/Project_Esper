@@ -149,6 +149,15 @@ public struct Player: Equatable {
     public var throwDirection: Vec2 = .zero
     /// Throwing straight up: the layup, its own sheet and timing.
     public var layingUp: Bool { throwDirection.y > 0 && throwDirection.x == 0 }
+
+    /// Out of the stance into the throw; a layup goes up off its half jump, off the ground if on it.
+    private mutating func startThrowing() {
+        enter(.throwing)
+        guard layingUp else { return }
+        fastFalling = false
+        grounded = false
+        velocity.y = fullHopVelocity * BallRules.layupHopShare
+    }
     public var catchCooldown = 0
     /// 47: the scorer can't take the ball, by hand or snatch, nor slash, until this runs out.
     public var pickupLockout = 0
@@ -1089,14 +1098,14 @@ public struct Player: Equatable {
                 enter(.dunking)
             } else if !input.throwBall, !quickThrow {
                 if stateTimer >= BallRules.throwWindupFrames {
-                    enter(.throwing)
+                    startThrowing()
                 } else {
                     // Let go early: the throw goes when the windup ends, where the stick pointed.
                     quickThrow = true
                 }
             }
             if quickThrow, stateTimer >= BallRules.throwWindupFrames {
-                enter(.throwing)
+                startThrowing()
             }
 
         case .throwing:

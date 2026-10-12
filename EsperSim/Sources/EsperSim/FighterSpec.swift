@@ -310,10 +310,13 @@ public enum BallRules {
     public static let throwReleaseFrames = 3
     public static let throwRecoveryFrames = 15
     /// The up throw, the layup: out of the throw's hold frame into `player_layup`'s seven frames
-    /// at the throw's 15 a second, the ball leaving the hand on its sixth (frame 5), acting again
-    /// once its last is done.
-    public static let layupReleaseFrames = 5 * 60 / throwSheetFramesPerSecond
-    public static let layupRecoveryFrames = 7 * 60 / throwSheetFramesPerSecond
+    /// at 30 a second, the ball leaving the hand on its sixth (frame 5), acting again once its
+    /// last is done; and on its way up off a half jump, a full hop's speed times the root of a
+    /// half, so it climbs half as high (on the ground, into the air).
+    public static let layupFramesPerSecond = 30
+    public static let layupReleaseFrames = 5 * 60 / layupFramesPerSecond
+    public static let layupRecoveryFrames = 7 * 60 / layupFramesPerSecond
+    public static let layupHopShare = 0.7071067811865476
     /// A throw stance with the chest this close to a rim becomes a dunk, wider than the
     /// basket. The ball goes in halfway through the dunk's frames, and the dunker hangs
     /// on the rim for this long after before the point restarts.
@@ -480,7 +483,8 @@ public enum SlashRules {
     public static var rollFrames: Int { frames }
     public static let lift = 0.5
     public static let gravityShare = 0.7
-    public static let reach = 56 / 1.6 / 2
+    /// Half the blade's box across: 52 art pixels across, 56 at first.
+    public static let reach = 52 / 1.6 / 2
     public static let forward = 4 / 1.6
     public static let liveSheetFrames = 1..<6
     public static var liveFrames: Range<Int> { simFrames(liveSheetFrames, at: sheetFramesPerSecond) }

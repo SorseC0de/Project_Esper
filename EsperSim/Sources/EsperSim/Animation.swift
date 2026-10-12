@@ -212,8 +212,8 @@ extension Player {
             if stepbackFrom == .shootStance { return AnimationFrame(.airBall, Animation.airBall.frameCount - 1) }
             return AnimationFrame(grounded ? .throwForward : .throwAir, StepbackRules.sheetFrame)
         case .throwing:
-            // Straight up, the layup's seven at the same rate, the ball leaving on its frame 5.
-            if layingUp { return AnimationFrame(.layup, min(t * BallRules.throwSheetFramesPerSecond / 60, Animation.layup.frameCount - 1)) }
+            // Straight up, the layup's seven at its own 30 a second, the ball leaving on its frame 5.
+            if layingUp { return AnimationFrame(.layup, min(t * BallRules.layupFramesPerSecond / 60, Animation.layup.frameCount - 1)) }
             // Frames 4 to 7 at the windup's 15 a second, the smear on the release; the 15-frame
             // recovery ends with the last shown three sim frames rather than four.
             return AnimationFrame(grounded ? .throwForward : .throwAir, min(4 + t * BallRules.throwSheetFramesPerSecond / 60, 7))

@@ -634,6 +634,25 @@ final class BallTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .throwing)
     }
 
+    func testALayupGoesUpOffTheGroundHalfAsHighAsAFullJump() {
+        var match = matchWithBallHeld()
+        XCTAssertTrue(match.players[0].grounded)
+        let ground = match.players[0].position.y
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        }
+        match.advance(inputs: [.idle, .idle])
+        XCTAssertFalse(match.players[0].grounded, "off the ground")
+        var top = ground
+        for _ in 0..<60 {
+            match.advance(inputs: [.idle, .idle])
+            top = max(top, match.players[0].position.y)
+        }
+        let player = match.players[0]
+        let fullJump = player.spec.fullHopVelocity * player.spec.fullHopVelocity / (2 * player.spec.gravity)
+        XCTAssertEqual(top - ground, fullJump / 2, accuracy: player.spec.fullHopVelocity, "half a full jump's height, to a frame's step")
+    }
+
     func testUpThrowIsAFloater() {
         var match = matchWithBallHeld()
         for _ in 0..<BallRules.throwWindupFrames + 2 {

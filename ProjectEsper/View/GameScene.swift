@@ -3471,14 +3471,13 @@ final class GameScene: SKScene {
             controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
             controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.cornerMaxY)) { FloTuning.cornerMaxY = CGFloat($0); relayoutFlo() }
         }
-        // BALL OUT's Z card: how long after the call it comes in, how long it holds, how long it takes to go.
-        controls.addSlider(title: "BALL OUT DELAY", range: 0...1.5, notch: 0.05, value: Float(BallOutTiming.delay)) { BallOutTiming.delay = Double($0) }
-        controls.addSlider(title: "BALL OUT HOLD", range: 0.2...3, notch: 0.05, value: Float(BallOutTiming.hold)) { BallOutTiming.hold = Double($0) }
-        controls.addSlider(title: "BALL OUT LEAVE", range: 0.1...1.5, notch: 0.05, value: Float(BallOutTiming.departure)) { BallOutTiming.departure = Double($0) }
-        // How far out the ball circles a body changing with it.
-        controls.addSlider(title: "ORBIT RADIUS", range: 0...96, notch: 1, value: Float(GameScene.orbitRadius)) { value in
-            GameScene.orbitRadius = CGFloat(value)
-            UserDefaults.standard.set(Double(value), forKey: GameScene.orbitRadiusKey)
+        // The run, dash and skid-stop dust: art pixels ahead of the feet and up, and scale.
+        for effect in DustTuning.effects {
+            let title = effect.name.replacingOccurrences(of: "_", with: " ").uppercased()
+            let offset = DustTuning.offset(effect)
+            controls.addSlider(title: title + " X", range: -40...40, notch: 1, value: Float(offset.x)) { UserDefaults.standard.set(Double($0), forKey: DustTuning.xKey(effect)) }
+            controls.addSlider(title: title + " Y", range: -40...40, notch: 1, value: Float(offset.y)) { UserDefaults.standard.set(Double($0), forKey: DustTuning.yKey(effect)) }
+            controls.addSlider(title: title + " SCALE", range: 0.05...2, notch: 0.05, value: Float(DustTuning.scale(effect))) { UserDefaults.standard.set(Double($0), forKey: DustTuning.scaleKey(effect)) }
         }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }

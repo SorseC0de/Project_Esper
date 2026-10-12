@@ -152,12 +152,6 @@ struct UITuningPanel: View {
                 lineRow("NET SKEW", key: NetTuning.skewKey, value: NetTuning.skew, step: 0.25, range: -4...4)
                 lineRow("NET X", key: NetTuning.offsetXKey, value: NetTuning.offset.x, step: 1, range: -20...20)
                 lineRow("NET Y", key: NetTuning.offsetYKey, value: NetTuning.offset.y, step: 1, range: -20...20)
-                ForEach(DustTuning.effects, id: \.name) { effect in
-                    let title = effect.name.replacingOccurrences(of: "_", with: " ").uppercased()
-                    lineRow("\(title) X", key: DustTuning.xKey(effect), value: DustTuning.offset(effect).x, step: 1, range: -40...40)
-                    lineRow("\(title) Y", key: DustTuning.yKey(effect), value: DustTuning.offset(effect).y, step: 1, range: -40...40)
-                    lineRow("\(title) SIZE", key: DustTuning.scaleKey(effect), value: DustTuning.scale(effect), step: 0.05, range: 0.05...2)
-                }
             }
             HStack(spacing: 8) {
                 Text("TEXT Y").frame(width: 80, alignment: .leading)

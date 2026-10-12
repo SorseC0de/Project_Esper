@@ -164,8 +164,7 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
   Changing with the ball in hand, the ball circles the body clockwise from in front, three laps
   over the change ending in front again (`GameScene.orbitLaps`), mirrored facing left, 32 art
-  pixels out from the body's middle (`GameScene.orbitRadius`, the strip's ORBIT RADIUS, 0 to 96,
-  kept).
+  pixels out from the body's middle (`GameScene.orbitRadius`).
   From the change's first frame to its burst on the sheet's third
   (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`ZRules.burstRadius`) is
   parried as a snatch parries one, before the blades are resolved; at the burst everything else
@@ -1541,8 +1540,8 @@ from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 5 hig
 Running, `dust_run3` stands in for `dust_run`; a dash kicks up `dust_dash` in place of its smoke (a slide keeps the smoke);
 a skid stop (idle out of a run, dash or slide, the turn the skid sheet plays) kicks up `dust_skid`,
 except for Blazing Boba, whose fire skid it is. All three are in the energy colour at 12 a second,
-placed and sized by `DustTuning`: X (ahead of the feet, mirrored with facing), Y and SIZE for each on
-the UI tuning panel under HUD, scale 0.5 until set.
+placed and sized by `DustTuning`: X (ahead of the feet, mirrored with facing), Y and SCALE for each on
+the debug strip's sliders (DUST RUN3 X and so on), scale 0.5 until set.
 
 | | JP | EN |
 |---|---|---|
@@ -2388,8 +2387,7 @@ shown, once, like the effects.
   is unused).
 - esper_slash: the slash. slash_wallclank: its blade in a wall on its first live frame,
   clear of the floor the body stands on (`slashClanked`). slashclash: two blades meeting.
-- BALL OUT's Z card times itself off the debug strip's BALL OUT DELAY, HOLD and LEAVE (`BallOutTiming`,
-  kept: 0, 0.75 and 0.1 seconds to start): how long after the call it comes in, how long it holds with
+- BALL OUT's Z card times itself off `BallOutTiming` (0, 0.75 and 0.1 seconds): how long after the call it comes in, how long it holds with
   the words up, how long it takes going on out.
 - dunk: a dunk going in, in the swish's place. slide: the slide. flo_collect: each FLO orb landing
   on its player, at 0.25 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a

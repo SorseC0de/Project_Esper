@@ -1417,7 +1417,7 @@ enum EnergyEffect: CaseIterable {
     }
 }
 
-/// DUST X, DUST Y and DUST SCALE on the UI tuning panel, under HUD, for each of the run,
+/// X, Y and SCALE sliders on the in-game slider list for each of the run,
 /// dash and skid-stop dust: art pixels ahead of the feet (mirrored with facing) and up,
 /// and the sheet's scale.
 enum DustTuning {

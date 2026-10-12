@@ -8245,6 +8245,8 @@ final class GameScene: SKScene {
             let changeBurstDue = changing && frame.frame >= GameScene.transformBurstFrame
             let goingIn = changeBurstDue && lastChangeBurstDue[index] != true
             let goingOut = wasInFloState[index] == true && !player.inFloState
+            // Out of FloState: the change's sound backward.
+            if goingOut { play(.floStateExit, at: player.chest) }
             if goingIn || goingOut {
                 glowers.addChild(EnergyEffect.burst.node(sprites, player: index, at: SpriteLibrary.point(player.chest)))
                 floSwirlFrames[index] = GameScene.floSwirlFrames

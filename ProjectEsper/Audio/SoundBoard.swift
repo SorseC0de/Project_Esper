@@ -37,6 +37,7 @@ final class SoundBoard {
         case floCollect = "flo_collect"
         case floMax = "flo_max"
         case floState = "flo_state"
+        case floStateExit = "flo_state_exit"
         case boing
         case step
         // The announcer, levelled by the importer.
@@ -204,7 +205,7 @@ final class SoundBoard {
     static let navigate = Effect.menuSelect
     static let confirm = Effect.menuSelectV2
     /// Played back to front.
-    nonisolated private static let reversed: Set<Effect> = [.menuSelectV2]
+    nonisolated private static let reversed: Set<Effect> = [.menuSelectV2, .floStateExit]
     /// Louder than their files, which a voice's volume can't go past: the step is recorded
     /// very quietly, its peak at 3% of full.
     /// The lightning hits are recorded hot, about -9 dB while sounding: a quarter brings them
@@ -212,7 +213,8 @@ final class SoundBoard {
     nonisolated private static let gain: [Effect: Float] = [.step: 2, .lightningOne: 0.25, .lightningTwo: 0.25, .lightningThree: 0.25]
     /// Sounds made of more than one file, mixed as they're read, each at its own level: the
     /// parry's two halves at 0.3, which sets them beside the hit, the snatch and the catch.
-    nonisolated private static let layers: [Effect: [(file: String, level: Float)]] = [.parry: [("parry", 0.3), ("parry2", 0.3)]]
+    nonisolated private static let layers: [Effect: [(file: String, level: Float)]] = [.parry: [("parry", 0.3), ("parry2", 0.3)],
+                                                                                           .floStateExit: [("flo_state", 1)]]
     /// The count: the announcer's first set or his second, on the COUNT picker (A or B).
     static let countSetKey = "esper.countSet"
     static var count: [Int: Effect] {

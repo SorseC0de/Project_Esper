@@ -92,6 +92,8 @@ BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run
 SKIP = {"Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",
         "spr_box", "spr_floor"}
+# Strips in _Graphic Assets that nothing draws yet, kept out of the app until they're wired.
+HELD_BACK = {"shield", "dust_run2"}
 
 
 def load_yy(path):
@@ -447,6 +449,9 @@ def main():
         short = os.path.splitext(os.path.basename(strip))[0].lower()
         if " " in short:
             print(f"skipped {short!r}: not a sheet name")
+            continue
+        if short in HELD_BACK:
+            print(f"held back {short!r}: nothing draws it yet")
             continue
         width, height, ctype, bpp, rows = read_png(strip)
         if not short.startswith("player_"):

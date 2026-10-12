@@ -5648,8 +5648,17 @@ final class GameScene: SKScene {
             case .swatted(let index, hit: true):
                 spawnHitSpark(player: index, at: match.ball.position)
             case .slashClashed(let at):
-                // A spark off each blade, in its slasher's colour.
-                for index in match.players.indices { spawnHitSpark(player: index, at: at) }
+                // The clash sheet where the blades meet, once in each slasher's colour, the second
+                // turned round; the sparks stand in until it's imported.
+                if EffectSheets.frames[EnergyEffect.slashClash.name] != nil {
+                    for (slot, index) in match.players.indices.enumerated() {
+                        let clash = EnergyEffect.slashClash.node(sprites, player: index, at: SpriteLibrary.point(at))
+                        clash.xScale = slot == 0 ? 1 : -1
+                        glowers.addChild(clash)
+                    }
+                } else {
+                    for index in match.players.indices { spawnHitSpark(player: index, at: at) }
+                }
             case .slashClanked(let index):
                 // The blade against a backboard shakes it.
                 let player = match.players[index]

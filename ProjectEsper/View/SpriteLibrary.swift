@@ -1430,6 +1430,8 @@ enum EnergyEffect: CaseIterable {
     case lightningSpark, lightningSpark2, flashSpark2, flashSpark3, scoreStrike, floAbsorb
     /// Z Tea's beam's three pieces, and its burst.
     case beam, burst
+    /// Two blades meeting.
+    case slashClash
 
     /// The two sparks a hit ball throws, one or the other each time, and the four bolts.
     static let hitSparks: [EnergyEffect] = [.spark, .spark2]
@@ -1467,6 +1469,7 @@ enum EnergyEffect: CaseIterable {
         case .floAbsorb: "flo_absorb"
         case .beam: "beam"
         case .burst: "burst"
+        case .slashClash: "slashclash"
         }
     }
 

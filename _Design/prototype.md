@@ -44,6 +44,8 @@ neutral to get a shot off; catch it and the roles reverse.
   `lightning1` to `4`, `esper_charge`) are grayscale strips toned per player in the app;
   the charge is a 512-pixel soft render with the swirl in its middle 150, boxed down by 4
   on import. Palette PNGs are read too.
+- Strips in `_Graphic Assets` that nothing draws yet stay out of the app: the importer's
+  `HELD_BACK` (`shield`, `dust_run2` today) skips them until they're wired.
 - `ProjectEsper/View/Previews/PlayerGallery.swift` — the player gallery, an Xcode preview
   (not on the TV): every player sheet assembled as the game draws a body, in a picked energy
   colour with the phone's saved dressing: the look's colours, the neck filled, the line, the
@@ -590,7 +592,9 @@ through it doesn't fire as it ends; protocol 123), so the parry can be made some
 Two live blades meeting each other is a slashclash (`Match.resolveSlashClash`, before the parries
 and the hits, protocol 127): both blades spent, nobody struck, a 24-frame hit stop
 (`HitStopRules.slashClashFrames`, three times a hit's) with the wall clank's sound, CLANG where
-they met and a hit spark there in each side's colour; as the hit stop ends both are put back in
+they met and the `slashclash` sheet there (48 × 48, five frames at 24 a second, bottom-anchored),
+once in each side's colour, the second turned round (`EnergyEffect.slashClash`; the hit sparks until
+it's imported); as the hit stop ends both are put back in
 neutral, the rest of their swings cancelled (`Player.recoverFromSlashClash`).
 
 ## Interface

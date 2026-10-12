@@ -682,12 +682,20 @@ final class StageSelectScreen: Screen {
     static let titleHeight: CGFloat = 15
     static let titleDrop: CGFloat = 0.85
 
-    /// The window showing a stage's shot, or static without one.
+    /// The window showing a stage's shot, as tall as the shot is for the window's width (at most
+    /// its full height), or static without one.
     func showWindow(_ shot: SKTexture?) {
         window.removeAction(forKey: "static")
+        let fullHeight = halfHeight * StageSelectScreen.windowHeightShare
+        let width = fullHeight * StageSelectScreen.windowAspect
         if let shot {
             window.texture = shot
+            let size = shot.size()
+            window.size = CGSize(width: width, height: min(fullHeight, width * size.height / max(size.width, 1)))
+            laySparks()
         } else {
+            window.size = CGSize(width: width, height: fullHeight)
+            laySparks()
             window.run(.repeatForever(.animate(with: StageSelectScreen.staticFrames, timePerFrame: 1.0 / 20)), withKey: "static")
         }
     }
@@ -710,6 +718,11 @@ final class StageSelectScreen: Screen {
                 windowSparks.append((spark, edge, CGFloat(step) / CGFloat(sparks)))
             }
         }
+        laySparks()
+    }
+
+    /// The flashes round the window as it's sized now.
+    private func laySparks() {
         // Round the trapezoid clockwise from the top left.
         let half = CGSize(width: window.size.width / 2, height: window.size.height / 2)
         let bottomHalf = half.width * StageSelectScreen.windowBottomShare

@@ -648,7 +648,9 @@ the local side's flashspark2s), 1.3 of half the screen's height tall, showing th
 whole-stage shot, its preview's big panel kept off the renderer once its last frame's in
 (`MangaPageFrame.settled`) and stored in the
 app's caches (`StageShots`, `GameScene.previewShotStage`), or static with nothing raised or no shot
-taken yet (a stage's first select before its preview has played); each stage in Futuristic_UI's box1
+taken yet (a stage's first select before its preview has played); a shot's flat bands at its top and bottom
+cut off (`StageShots.trimmed`, K&A's colour beyond it over and under it), the window as tall as what's left is
+for its width; each stage in Futuristic_UI's box1
 in the menus' blue with its name in Upheaval, the blue too, in two lines, broken at the space
 nearest its middle (one line with no space), gold and a tenth bigger when a cursor or a pick is on
 it; more than four stages in two rows, the first the longer (`StageSelectScreen.lines`,

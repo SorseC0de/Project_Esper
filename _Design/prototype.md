@@ -692,7 +692,10 @@ SETTINGS lettered as FLO is, 15 high, over the title or the pause), kept between
 round, the names stacked with no room between, and
 its choices beside it as words, every row as tall as fits the screen (48 at most); the lettering the
 menus' blue, the picked choice whole with rule8 under it, sliding to a new pick, and the rest dim,
-the cursor's row's name and picked choice gold; up and down a row, left and right its choice (jump
+the cursor's row's name and picked choice gold (every row at 0.88 of what fits; the choices moved up by the
+face's own drop of its capitals below the line's middle, `Futuristic.capDrop`, so they sit on the row's middle;
+SFX STYLE's choices STYLE A, B and C, each lettered as its sound words are in its own face, white over
+blue's first); up and down a row, left and right its choice (jump
 steps it on), B or start to shut them, or on a touch screen the corner arrow; a tap picks a choice
 outright.
 

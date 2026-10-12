@@ -30,6 +30,15 @@ enum Futuristic {
     /// Every piece at the same points per pixel of its import, so they keep their sizes in the vector.
     static let pointsPerPixel: CGFloat = 0.14
 
+    /// How far the menus' face's capitals sit below the middle of the line SwiftUI centres, at
+    /// `size`: a line's box is centred on its ascent and descent, not its capitals, so lettering
+    /// set in the middle of something is moved up this much to look it.
+    static func capDrop(size: CGFloat) -> CGFloat {
+        _ = Onomatopoeia.registered
+        guard let face = UIFont(name: fontName, size: fontSize(size)) else { return 0 }
+        return (face.ascender + face.descender) / 2 - face.capHeight / 2
+    }
+
     static func font(size: CGFloat) -> Font {
         .custom(fontName, size: fontSize(size))
     }

@@ -52,7 +52,7 @@ enum GameSettings {
         var options: [String] {
             switch self {
             case .words: ["ON", "SOME", "OFF"]
-            case .wordStyle: Onomatopoeia.Style.allCases.map(\.label)
+            case .wordStyle: Onomatopoeia.Style.lettered.map(\.label)
             case .wordLanguage: Onomatopoeia.Language.allCases.map(\.label)
             case .walkTrails, .ambience, .screenShake: ["ON", "OFF"]
             case .sound: ["OFF", "LOW", "MID", "FULL"]
@@ -64,7 +64,7 @@ enum GameSettings {
             get {
                 switch self {
                 case .words: GameSettings.words.rawValue
-                case .wordStyle: Onomatopoeia.style.rawValue
+                case .wordStyle: Onomatopoeia.Style.lettered.firstIndex(of: Onomatopoeia.style) ?? 0
                 case .wordLanguage: Onomatopoeia.language.rawValue
                 case .walkTrails: GameSettings.walkTrails ? 0 : 1
                 case .sound: GameSettings.soundLevel
@@ -76,7 +76,7 @@ enum GameSettings {
                 let index = min(max(newValue, 0), options.count - 1)
                 switch self {
                 case .words: GameSettings.words = Words(rawValue: index) ?? .on
-                case .wordStyle: Onomatopoeia.style = Onomatopoeia.Style(rawValue: index) ?? .cherry
+                case .wordStyle: Onomatopoeia.style = Onomatopoeia.Style.lettered.indices.contains(index) ? Onomatopoeia.Style.lettered[index] : .daruma
                 case .wordLanguage: Onomatopoeia.language = Onomatopoeia.Language(rawValue: index) ?? .english
                 case .walkTrails: GameSettings.walkTrails = index == 0
                 case .sound:

@@ -699,13 +699,13 @@ its choices beside it as words, every row as tall as fits the screen (48 at most
 menus' blue, the picked choice whole with rule8 under it, sliding to a new pick, and the rest dim,
 the cursor's row's name and picked choice gold (every row at 0.88 of what fits; the choices moved up by the
 face's own drop of its capitals below the line's middle, `Futuristic.capDrop`, so they sit on the row's middle;
-SFX STYLE's choices STYLE A, B and C, each lettered as its sound words are in its own face, white over
-blue's first); up and down a row, left and right its choice (jump
+SFX STYLE's choices STYLE A (Darumadrop), B (Cherry) and C (Dela), `Onomatopoeia.Style.lettered`, each lettered as its sound words are in its own face, white over
+blue's first; SFX LANGUAGE's its flags, `language_eng`, `_jap` and `_spa`, half the row high); up and down a row, left and right its choice (jump
 steps it on), B or start to shut them, or on a touch screen the corner arrow; a tap picks a choice
 outright.
 
 - SFX: the sound words ON, SOME (only the biggest, the 16-high ones, `Sound.isBiggest`), OFF.
-- SFX STYLE: their face, CHERRY, DARUMA or DELA (`Onomatopoeia.style`); nothing picked yet, DARUMA in ENG.
+- SFX STYLE: their face, DARUMA, CHERRY or DELA (`Onomatopoeia.style`); nothing picked yet, DARUMA in ENG.
 - SFX LANGUAGE: ENG, JPN or SPA (`Onomatopoeia.language`); Spanish in the English faces, spelled
   ¡SHUAS!, ¡¡SHUAAAS!!, ¡¡CATAPUM!!, ¡ZAS!, ¡PAF!, ¡ZASCA!, ¡CLING!, CLANC, ÑIC, TAC, PUM, POM, POM, ¡BOING!,
   ZUUUUM, ¡BUUUM!, BRRRUM, ¡CRAC!, ¡CABUM!, CHSSS, ¡CRAS! and ¡CATACRAC! in the table's order. A face

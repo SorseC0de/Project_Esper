@@ -59,9 +59,13 @@ struct SettingsScreen: View {
             // The choices as words, rule8 under the picked one, sliding to a new pick.
             HStack(spacing: 14 * scale(.buttons)) {
                 ForEach(Array(row.options.enumerated()), id: \.offset) { option, label in
-                    if row == .wordStyle, Onomatopoeia.Style.allCases.indices.contains(option) {
-                        styleChoice(Onomatopoeia.Style.allCases[option], letter: option, picked: row.picked == option, cursor: onRow,
+                    if row == .wordStyle, Onomatopoeia.Style.lettered.indices.contains(option) {
+                        styleChoice(Onomatopoeia.Style.lettered[option], letter: option, picked: row.picked == option, cursor: onRow,
                                     height: rowHeight * SettingsScreen.optionTextShare * SettingsScreen.styleCapShare, row: index) {
+                            flow.pickSetting(row: index, option: option)
+                        }
+                    } else if row == .wordLanguage, let language = Onomatopoeia.Language(rawValue: option) {
+                        languageChoice(language, picked: row.picked == option, cursor: onRow, height: rowHeight * SettingsScreen.flagShare, row: index) {
                             flow.pickSetting(row: index, option: option)
                         }
                     } else {
@@ -85,6 +89,33 @@ struct SettingsScreen: View {
     static let ruleShare: CGFloat = 1.3
     static let slide = Animation.spring(response: 0.3, dampingFraction: 0.8)
     @Namespace private var rules
+
+    /// SFX LANGUAGE's choices as their flags (`language_eng`, `_jap`, `_spa`), against the row's height.
+    static let flagShare: CGFloat = 0.5
+    private func languageChoice(_ language: Onomatopoeia.Language, picked: Bool, cursor: Bool, height: CGFloat, row: Int,
+                                action: @escaping () -> Void) -> some View {
+        let name = ["language_eng", "language_jap", "language_spa"][language.rawValue]
+        return Button(action: action) {
+            Image(name)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(height: height)
+                .opacity(picked ? 1 : TitleOverlay.unpickedOpacity)
+                .overlay(alignment: .bottom) {
+                    if picked {
+                        GeometryReader { shown in
+                            FuturisticPiece(name: "rule8", colour: cursor ? Futuristic.lit : Futuristic.line,
+                                            stretched: CGSize(width: shown.size.width * 0.9, height: max(height * 0.15, 2)))
+                                .frame(width: shown.size.width, alignment: .center)
+                                .offset(y: shown.size.height * 1.05)
+                        }
+                        .matchedGeometryEffect(id: "rule\(row)", in: rules)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .noSystemFocus()
+    }
 
     /// SFX STYLE's choices as STYLE A, B and C, each lettered as its sound words are, in its own
     /// face, white over light blue (blue's first), outlined as they are; the picked one whole with

@@ -43,6 +43,8 @@ enum Onomatopoeia {
     enum Style: Int, CaseIterable {
         case cherry, daruma, dela
         var label: String { ["CHERRY", "DARUMA", "DELA"][rawValue] }
+        /// The settings' order, lettered STYLE A, B and C.
+        static let lettered: [Style] = [.daruma, .cherry, .dela]
     }
     /// The words' language: the settings' SFX LANGUAGE. Spanish is drawn in the English faces.
     enum Language: Int, CaseIterable {

@@ -2462,11 +2462,8 @@ public enum FloRules {
     public static let snatch = 7
     public static let hit = 5
     /// A thrown ball's hit and Blazing Boba's fireball's.
-    public static let siphon = 10
+    public static let thrownHit = 10
     public static let taunt = 3
-    /// An experiment, to be undone with this: FLO earned off another player comes out of their
-    /// pool, what they have of it, the earner getting it all either way.
-    public static let takesFromTheOther = true
     /// A burned body's FLO hovers where it went down, this far over the lava at least, and is
     /// taken by any body whose chest comes within this of it (64 art pixels).
     public static let bundleLift = 15.0

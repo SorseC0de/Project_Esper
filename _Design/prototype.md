@@ -968,9 +968,8 @@ through your hoop scores you the point but earns nothing; protocol 77), a counte
 slasher's chest), a snatch that steals the ball from a holder 7 (where the hand met it), a hit, any
 blow that stuns, ball or not (not a parry's, not the stage's lightning or icicles), 5 (out of the
 victim's chest, or where the ball was held), and a taunt 3 (as and where its ball first meets the
-floor); none past full. An experiment, to be undone with `FloRules.takesFromTheOther`: FLO earned
-off another player, the counter, the steal and the hit, comes out of their pool, what they have of
-it, the earner getting it all either way. It's kept through a point. A burn, the lava's or a fire
+floor); none past full. Nothing earned is ever taken from the other player: FloState is a comeback,
+and a player in it mustn't be able to beat the FLO out of the other to keep them from theirs. It's kept through a point. A burn, the lava's or a fire
 tornado's, drops it all where the body went down, hovering at least 15 over the lava
 (`Match.floBundles`), `flo_absorb` looping on it in the dropper's colour; any player whose chest
 comes within 64 art pixels (40 units) takes it, as orbs out of it, as much as they have room for. FloState spends it (above): the bar's eight frames play at twelve a second meanwhile, its stroke

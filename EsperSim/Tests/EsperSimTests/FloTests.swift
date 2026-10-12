@@ -77,7 +77,7 @@ final class FloDropTests: XCTestCase {
             for case .floGained(0, let amount, _) in match.events { earned += amount }
         }
         XCTAssertEqual(earned, FloRules.hit, "a hit, no ball")
-        XCTAssertEqual(match.players[1].flo, FloRules.takesFromTheOther ? 12 - FloRules.hit : 12)
+        XCTAssertEqual(match.players[1].flo, 12, "nothing taken from the one hit")
     }
 
     func testABurnLeavesTheFloHoveringForAnyoneToTake() {

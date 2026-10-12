@@ -127,8 +127,8 @@ enum Onomatopoeia {
             case .bounce: ("BOMP", "ダム", "POM", 22, 6, 8)
             // A dribble's, as small as a footstep.
             case .dribble: ("BOMP", "ダム", "POM", 22, 6, 5)
-            // A body or the ball springing off a rim's top, in the loose ball's colours.
-            case .boing: ("BOING!", "ボヨーン！", "¡BOING!", 22, 6, 10)
+            // A body or the ball springing off a rim's top, as small as a squeak, white over teal.
+            case .boing: ("BOING!", "ボヨーン！", "¡BOING!", 22, 20, 5)
             // Powers.
             case .beam: ("VWOOOM", "ズドドドド", "ZUUUUM", 9, 7, 16)
             case .burst: ("BOOOM!", "ドオォン！", "¡BUUUM!", 9, 6, 16)

@@ -629,12 +629,26 @@ final class BallTests: XCTestCase {
         run(&match, frames: 2, input: { _ in .idle })
         XCTAssertNil(match.ball.holder, "gone on frame 5")
         XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.layup, 5))
-        // From the hand, as frame 4 draws it, not the body's middle.
+        // From the body's front edge, the ball just inside it, not the body's middle.
+        let body = match.players[0].body
         XCTAssertEqual(match.ball.position.x, match.players[0].layupReleasePoint.x, accuracy: 0.01)
-        XCTAssertNotEqual(match.ball.position.x, match.players[0].position.x, accuracy: 0.5)
+        XCTAssertEqual(match.ball.position.x, match.players[0].facing == .right ? body.max.x - BallRules.radius : body.min.x + BallRules.radius, accuracy: 0.01)
         // Acting again once the last frame's done.
         run(&match, frames: BallRules.layupRecoveryFrames - BallRules.layupReleaseFrames, input: { _ in .idle })
         XCTAssertNotEqual(match.players[0].state, .throwing)
+    }
+
+    func testALayupAgainstAWallLetsGoOutsideIt() {
+        // Pressed against the left wall, facing it.
+        var match = matchWithBallHeld()
+        match.players[0].facing = .left
+        for _ in 0..<40 { match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle]) }
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        }
+        run(&match, frames: BallRules.layupReleaseFrames + 1, input: { _ in .idle })
+        XCTAssertNil(match.ball.holder)
+        XCTAssertFalse(match.stage.overlapsSolid(match.ball.box), "not let go inside the wall")
     }
 
     func testAGroundedLayupFromUnderTheWreckCentersRimScores() {

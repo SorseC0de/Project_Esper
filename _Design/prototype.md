@@ -253,8 +253,9 @@ whatever lands on it came at, held down 12° while someone
   of the throw's hold frame into `player_layup`'s nine frames (48 by 48, its last two drawn twice in
   the sheet so they hold twice as long; its ball landmarks the importer's) at 30 a second
   (`layupFramesPerSecond`, protocol 131), the ball in hand through its first five and let go on frame
-  5, 10 sim frames into the throw (`BallRules.layupReleaseFrames`), from the hand where frame 4 draws
-  the ball (`Player.layupReleasePoint`), acting again once its last is done, 18 in
+  5, 10 sim frames into the throw (`BallRules.layupReleaseFrames`), at the height frame 4 draws the
+  ball in hand and across at the body's front edge, the ball just inside it, so one against a wall or a
+  backboard never lets go inside it (`Player.layupReleasePoint`, protocol 134), acting again once its last is done, 18 in
   (`layupRecoveryFrames`, `Player.layingUp`), on the ground or in the air; and on its first frame up off a half jump (`startThrowing`): a full hop's speed times the
   root of a half (`layupHopShare`), so it climbs half a full jump's height, off the ground if on it; its ball the floater: a soft drift up at 1.55 (`BallRules.upThrowSpeed`, a touch over a pop's 1.5, so a
   grounded layup from under the Wreck Center's rim clears it and drops through, 1.54 the least that does;
@@ -1507,7 +1508,8 @@ aim); the burst, the quake and the freeze the way the player faces; a lava burn 
 feet; the rest at their point (20° to 30°); a basket out of the net, 10 under the rim and 8 off
 it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
-A body or the ball springing off a rim's top says BOING! / ボヨーン！ / ¡BOING! (10 high, the ball's only past
+A body or the ball springing off a rim's top says BOING! / ボヨーン！ / ¡BOING! (5 high as a squeak, white
+over teal, palette 20, the ball's only past
 the bounce's floor) up off the rim, away from its backboard.
 A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going;
 so does a dribble's, with its sound, as small as a footstep run's (5), out of the floor under the ball

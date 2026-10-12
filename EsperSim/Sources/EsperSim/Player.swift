@@ -150,11 +150,14 @@ public struct Player: Equatable {
     /// Throwing straight up: the layup, its own sheet and timing.
     public var layingUp: Bool { throwDirection.y > 0 && throwDirection.x == 0 }
 
-    /// Where a layup lets go: the hand, as its sheet's last frame with the ball in it draws it.
+    /// Where a layup lets go: at the height of the hand, as its sheet's last frame with the ball
+    /// in it draws it, and across at the body's front edge, the ball just inside it, so a layup
+    /// against a wall or a backboard never lets go inside it.
     public var layupReleasePoint: Vec2 {
-        BallLandmarks.offset(AnimationFrame(.layup, BallRules.layupReleaseSheetFrame - 1))
-            .map { position + Vec2(x: $0.x / 1.6 * spec.scale * facing.sign, y: $0.y / 1.6 * spec.scale) }
-            ?? Vec2(x: position.x, y: position.y + BallRules.shotReleaseHeight * spec.scale)
+        let height = BallLandmarks.offset(AnimationFrame(.layup, BallRules.layupReleaseSheetFrame - 1)).map { $0.y / 1.6 * spec.scale }
+            ?? BallRules.shotReleaseHeight * spec.scale
+        let across = facing == .right ? body.max.x - BallRules.radius : body.min.x + BallRules.radius
+        return Vec2(x: across, y: position.y + height)
     }
 
     /// Out of the stance into the throw; a layup goes up off its half jump, off the ground if on it.

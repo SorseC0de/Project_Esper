@@ -12,9 +12,14 @@ are even with each other and sit under the effects they play with.
 Effects named in `LEVELLED_EFFECTS` are levelled the same way, to `EFFECT_LEVEL`, the effects'
 middle loudness, so a new one sits with the rest; the ones from before it came in as they are.
 
+Only effects the app plays come in: a file whose name `SoundBoard.Effect` names (a case's raw
+value, a bare case, or a layer's file) is copied; the rest stay in `_Audio` unpackaged, and one
+already in the app that nothing names any more is taken out.
+
 The originals are only read. Run from the project root after adding or changing one."""
 import math
 import pathlib
+import re
 import struct
 import subprocess
 
@@ -98,10 +103,29 @@ def level(path, target):
     print(f"  levelled {gain:+.1f} dB: {loudness:.1f} -> {loudness + gain:.1f}, peak {peak + gain:.1f}")
 
 
+def referenced_names():
+    """Every file name SoundBoard plays: its Effect cases' raw values and bare names, and its
+    layers' files (any quoted name in the file)."""
+    source = (ROOT / "ProjectEsper" / "Audio" / "SoundBoard.swift").read_text()
+    names = set(re.findall(r'"([A-Za-z0-9_\-]+)"', source))
+    enum = source[source.index("enum Effect"):]
+    enum = enum[:enum.index("\n    }")]
+    for line in re.findall(r"^\s*case ([^\n]+)", enum, re.M):
+        for item in line.split(","):
+            match = re.match(r"\s*([A-Za-z0-9_]+)\s*(=|$)", item)
+            if match and match.group(2) == "":
+                names.add(match.group(1))
+    return {name.lower() for name in names}
+
+
 DESTINATION.mkdir(exist_ok=True)
+REFERENCED = referenced_names()
 wanted = set()
 for sound in sorted(SOURCE.iterdir()):
     if sound.suffix.lower() not in SUFFIXES or sound.name in AMBIENCE:
+        continue
+    if sound.stem.lower() not in REFERENCED:
+        print(f"  not played, left out: {sound.name}")
         continue
     out = DESTINATION / (sound.stem.lower() + ".wav")
     wanted.add(out.name)

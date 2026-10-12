@@ -2386,11 +2386,11 @@ shown, once, like the effects.
   clear of the floor the body stands on (`slashClanked`). slashclash: two blades meeting.
 - BALL OUT's Z card times itself off `BallOutTiming` (0, 0.75 and 0.1 seconds): how long after the call it comes in, how long it holds with
   the words up, how long it takes going on out.
-- dunk: a dunk going in, in the swish's place. slide2: the slide (slide.wav no longer played). flash: Flash Fizz's warp, where it left from. flo_collect: each FLO orb landing
+- dunk: a dunk going in, in the swish's place. slide2: the slide. flash: every one of Flash Fizz's teleports, the warp and the flash, where it left from, with its flashspark. flo_collect: each FLO orb landing
   on its player, at 0.25 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a
   meter showing full as it fills. flo_state: a body starting its change into FloState, and backward as it leaves it (`floStateExit`). boing: a body
   (not the ball) bouncing off a rim's top or the jellyfish, half a second apart at most from each
-  (`GameScene.playBoing`; `boing.ogg`, the importer taking .ogg now). These nine are levelled as they're imported to the effects'
+  (`GameScene.playBoing`; `boing.ogg`, the importer taking .ogg now). Only sounds `SoundBoard.Effect` names are packaged (`Tools/import_sounds.py` reads it); the rest stay in `_Audio`, and one no longer named is taken out of the app. These nine are levelled as they're imported to the effects'
   middle loudness, -21 dB while sounding, peaks under -3 (`LEVELLED_EFFECTS`, `EFFECT_LEVEL`); the
   effects from before them came in as they are.
 - snatch: the snatch at full stretch. catch: a catch.

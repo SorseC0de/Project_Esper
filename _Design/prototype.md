@@ -1142,7 +1142,7 @@ picking: `player_drinkchoice` in their look, with the hooded head and its neck a
 (`SpriteLibrary.standalone`), its towel (palette 22 and 37) kept as drawn, its two frames played
 at 2 a second, sitting on `player_bench`, its own sheet now, drawn under it; its size on the UI panel's
 PICK screen (DRINKER, the points to an art pixel, 4 to start). Picked, the bottles and the words fall
-away (half a second, easing in), the drinker plays `player_drink` twice through at the same 2 a second, its hooded head tipped back 25° on frame 0 and 35° on frame 1 about its middle (`PickScreen.drinkHeadTilts`),
+away (half a second, easing in), the drinker plays `player_drink` twice through at the same 2 a second, its hooded head tipped back 25° on frame 0 and 35° on frame 1 about its middle (`PickScreen.drinkHeadTilts`), the drinking arm, its hand and the bottle drawn again over the hood (`drinkOverHood`),
 then `player_transform` at 15 a second raised 8 art pixels off the chair (`PickScreen.transformLift`), the hood on its head as the drinker's (`SpriteLibrary.standalone`; `PickScreen.finish`), and only then does the pick go on; the clock stops once it's picked,
 and a second pick (the clock's, at zero) doesn't land.
 
@@ -1191,7 +1191,7 @@ folded to start); the corner text under the pickers moves with them.
 
 - UI FONT, the title's FONT switch (no picker in play): the menus' face, A to K (`Futuristic.typefaces`, kept): Upheaval TT, Infinium Guardian,
   Planetary Contact, Sad Machine, Bold Pixels, Caja, 7 Pixels of Perfection, Board of Directors, BM
-  Army, Kapel and Long Shot, all bundled; every face drawn so its capitals stand as tall as
+  Army, Kapel and Long Shot, all bundled, I (BM Army) until one is picked (`Futuristic.defaultTypeface`); every face drawn so its capitals stand as tall as
   Upheaval's at the same size (`Futuristic.fontSize`, their cap heights 31 to 78 against its 50), in
   SwiftUI and SpriteKit (`Futuristic.label`); a pick redraws the HUD and the screens.
 
@@ -2421,8 +2421,8 @@ shown, once, like the effects.
   thatlldoit, thatlldoit-2 or thatdecidesit, the finish (in Rounds, on every point too, before the
   Greateraid pick, the announcer's line as usual) slowing to 0.35 (offline) and the camera
   easing in on the ball to 0.55 of its view over 40 frames and then staying on it, in a hand or
-  loose (where it was last seen while it's drawn nowhere), on Hoopfish Hideaway and the Elements kept inside the
-  stage's sides, the HUD keeping its size, until
+  loose (where it was last seen while it's drawn nowhere), on every stage kept inside the
+  stage's sides and inside the plain view's top and bottom (never under the floor), the HUD keeping its size, until
   the win screen (the sim held under its fade) or the Greateraid pick, or, with the computer
   scored on and drinking at once, until the pick would have come (`pendingFlow` `.playing`, 60
   frames), when the close-in lets go and the count starts again from 3; from the winning bucket nobody moves or catches (`Match.finished`: no inputs,

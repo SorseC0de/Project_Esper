@@ -15,8 +15,10 @@ enum Futuristic {
     static let typefaces = ["UpheavalTT-BRK-", "InfiniumGuardian", "PlanetaryContact", "SadMachine", "BoldPixels", "Caja",
                         "7pixelsOfPerfect", "BoardofDirectors-Heavy", "BMarmyA12", "Kapel", "LongShot"]
     static let typefaceKey = "ui.futuristic.face"
+    /// Face I, BMarmyA12, until one is picked.
+    static let defaultTypeface = 8
     static var typefacePick: Int {
-        get { min(max(UserDefaults.standard.integer(forKey: typefaceKey), 0), typefaces.count - 1) }
+        get { min(max((UserDefaults.standard.object(forKey: typefaceKey) as? Int) ?? defaultTypeface, 0), typefaces.count - 1) }
         set { UserDefaults.standard.set(newValue, forKey: typefaceKey) }
     }
     static var fontName: String { typefaces[typefacePick] }

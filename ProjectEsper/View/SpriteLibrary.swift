@@ -578,8 +578,9 @@ final class SpriteLibrary {
     /// A frame of a sheet outside the game's animations (the Greateraid pick's drinker) in a
     /// player's look, lined, its hooded head on it where the game would put it and its neck
     /// filled, as a body is in play. Its towel, palette 22 and 37, isn't energy: kept as drawn.
-    /// `headTilt`, degrees, turns the hooded head back about its middle (facing right).
-    func standalone(_ name: String, frame: Int, player: Int, headTilt: CGFloat = 0) -> SKTexture {
+    /// `headTilt`, degrees, turns the hooded head back about its middle (facing right); the
+    /// sheet's pixels in `overHood`'s colours are drawn again over the hood.
+    func standalone(_ name: String, frame: Int, player: Int, headTilt: CGFloat = 0, overHood: Set<RGB> = []) -> SKTexture {
         let key = "p\(player)_standalone_\(name)_\(frame)_\(headTilt)"
         if let made = cache[key] { return made }
         let look = look(for: player)
@@ -616,11 +617,34 @@ final class SpriteLibrary {
                 context.translateBy(x: -pivot.x, y: -pivot.y)
             }
             context.draw(hood, in: CGRect(x: offset.x, y: -offset.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
-            if let composed = context.makeImage() { made = SKTexture(cgImage: composed) }
+            if var composed = context.makeImage() {
+                if !overHood.isEmpty, let over = overlaid(composed, from: made.cgImage(), where: source, in: overHood) { composed = over }
+                made = SKTexture(cgImage: composed)
+            }
         }
         made.filteringMode = .nearest
         cache[key] = made
         return made
+    }
+
+    /// `top` with `under`'s pixels laid back over it wherever `source` is painted in one of `colours`.
+    private func overlaid(_ top: CGImage, from under: CGImage, where source: CGImage, in colours: Set<RGB>) -> CGImage? {
+        let width = top.width, height = top.height
+        guard under.width == width, under.height == height, source.width == width, source.height == height,
+              let (context, pixels) = makeCanvas(width: width, height: height),
+              let (underContext, underPixels) = makeCanvas(width: width, height: height),
+              let (sourceContext, sourcePixels) = makeCanvas(width: width, height: height) else { return nil }
+        let rect = CGRect(x: 0, y: 0, width: width, height: height)
+        context.draw(top, in: rect)
+        underContext.draw(under, in: rect)
+        sourceContext.draw(source, in: rect)
+        for pixel in 0..<(width * height) where sourcePixels[pixel * 4 + 3] == 255 {
+            let index = pixel * 4
+            let colour = RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2])
+            guard colours.contains(colour) else { continue }
+            for channel in 0..<4 { pixels[index + channel] = underPixels[index + channel] }
+        }
+        return context.makeImage()
     }
 
     func portrait(_ name: String, frame: Int = 0, player: Int, headDrawnFor: AnimationFrame, headNudge: CGPoint, headScale: CGFloat) -> Portrait? {

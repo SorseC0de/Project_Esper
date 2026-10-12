@@ -4902,7 +4902,8 @@ final class GameScene: SKScene {
                                     colour: SKColor(rgb: sprites.look(for: picker).glow), timed: online != nil,
                                     drinker: drinkerFrames(picker), bench: sprites.standalone("player_bench", frame: 0, player: picker),
                                     drinking: (0..<GameScene.drinkerFrameCount).map {
-                                        sprites.standalone("player_drink", frame: $0, player: picker, headTilt: PickScreen.drinkHeadTilts[min($0, PickScreen.drinkHeadTilts.count - 1)])
+                                        sprites.standalone("player_drink", frame: $0, player: picker, headTilt: PickScreen.drinkHeadTilts[min($0, PickScreen.drinkHeadTilts.count - 1)],
+                                                           overHood: PickScreen.drinkOverHood)
                                     },
                                     transforming: (0..<Animation.transform.frameCount).map { sprites.standalone(Animation.transform.rawValue, frame: $0, player: picker) }) { [weak self] drink in
                     self?.choose(drink)
@@ -8482,11 +8483,12 @@ final class GameScene: SKScene {
                 let ballAt = finishTarget ?? cameraBase
                 cameraNode.position = cameraBase + (ballAt - cameraBase) * eased
                 cameraNode.setScale(cameraBaseScale * (1 - (1 - GameScene.finishZoom) * eased))
-                if [StageLook.hoopfishHideaway, .elements, .flightB411, .kAndA].contains(match.stage.features.look) {
-                    // Closing in, the view stays inside the stage's sides.
-                    let halfSeen = size.width * cameraNode.xScale / 2, stageWidth = SpriteLibrary.point(Vec2(x: match.stage.width, y: 0)).x
-                    cameraNode.position.x = min(max(cameraNode.position.x, halfSeen), max(stageWidth - halfSeen, halfSeen))
-                }
+                // Closing in, on every stage, the view stays inside the stage's sides, and inside what
+                // the plain view showed up and down, so it never drops under the floor.
+                let halfSeen = size.width * cameraNode.xScale / 2, stageWidth = SpriteLibrary.point(Vec2(x: match.stage.width, y: 0)).x
+                cameraNode.position.x = min(max(cameraNode.position.x, halfSeen), max(stageWidth - halfSeen, halfSeen))
+                let spareY = size.height * (cameraBaseScale - cameraNode.yScale) / 2
+                cameraNode.position.y = min(max(cameraNode.position.y, cameraBase.y - spareY), cameraBase.y + spareY)
             } else {
                 finishFrames = 0
                 finishTarget = nil

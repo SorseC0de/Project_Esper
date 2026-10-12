@@ -1256,7 +1256,7 @@ go dark to light), front arm #59C135 and hand #9CDB43, back arm #793A80 and hand
 third (from the user's walk: the foot starts 70% down from the knee), front #A6FCDB (palette
 21) and back #E86A73 (26), drawn as shoes with the human look off, palette 22 #FFFFFF in front and 38 #B3B9D1 behind (`Look.frontShoe`, `backShoe`; `BodyPart.frontFoot`, `backFoot`;
 the sheets as they were before the feet are in `Player Backup/Pre-Feet`);
-the slash's pinks are left alone. Those are the part keys the game reads (`BodyPart`). The
+the slash's blade greys (palette 37 to 39) are left alone. Those are the part keys the game reads (`BodyPart`). The
 GMS2 sheets are written as strips in Pixel Art, taking over the GMS2 sprites, and each sheet
 as it was is kept in `Pixel Art/Player Backup`; the players' outline is `Look`'s, the palette's
 #242234. Besides the silhouette, groups are lined where they lie over the rest of the body, each on
@@ -1441,7 +1441,7 @@ through a one-way, if there is one: down with the ball standing is the taunt.
 ## Look
 
 `Art/PlayerPalette.swift` names the figure's eleven parts and the flat colour each is
-painted on the sheets, plus the Esper Slash's blade in pinks and the energy, the sheets'
+painted on the sheets, plus the Esper Slash's blade in palette greys 37 to 39 (pinks before 2026-10-12) and the energy, the sheets'
 white that isn't the ball. A `Look` maps parts to colours and the sprite library
 recolours each frame once as it's used. The blade and the energy are split out of every
 frame like the head and drawn on their own sprite over the body, among the glowers, so

@@ -4,7 +4,7 @@ import Foundation
 typealias RGB = UInt32
 
 /// The figure's parts, one flat colour each on the sheets, plus the ball in its hands,
-/// the Esper Slash's blade in pinks, and the energy: the sheets' white where it isn't
+/// the Esper Slash's blade in palette greys, and the energy: the sheets' white where it isn't
 /// the ball, the skid's puffs and a release's streaks, told apart by size rather than
 /// colour. The blade and the energy are toned by their brightness rather than painted
 /// flat. Two of the parts are drawn in two close shades across the sheets, so a part can
@@ -34,7 +34,7 @@ enum BodyPart: CaseIterable {
         case .frontFoot: [0xA6FCDB]                       // 21
         case .backFoot: [0xE86A73]                        // 26
         case .ball: [0xFFFFFF]                            // white
-        case .slash: [0xF065C4, 0xF9ABFF, 0xFBC2FF, 0xEEA6F5, 0xF098F5, 0xFDD9FF, 0xEDCEF0] // pinks, edge to core
+        case .slash: [0xDAE0EA, 0xB3B9D1, 0x8B93AF]              // palette 37 to 39, the blade's greys
         case .energy: []
         }
     }

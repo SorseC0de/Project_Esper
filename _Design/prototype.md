@@ -194,7 +194,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   either. Then back in the stance at its hold, buttons kept, the aim cleared: the stick still down from the stepback aims nothing until it's let go and pressed again, so a quick shot or throw out of it goes off the preset, not down (`stepbackAimLocked`, protocol 33). Down never cancels a stance: the
   shot and the throw cancel each other (protocol 24); off an edge, it's the air, the stance gone.
 - The rim's top is a thin platform that can't be stood on (`RimRules`): a body coming down on it
-  from above is sent back up at 3.5 a frame, 4.5 with jump held as it lands, as off a spring (the press spent on it, not on a double jump), and a ball that isn't scoring bounces off it; nothing
+  from above is sent back up at 3.5 a frame, 4.5 with jump held as it lands, as off a spring (the press spent on it, not on a double jump), and a ball that isn't scoring bounces off it, kicked
+  out across the way it's off the ring's middle (dead on, away from the board) by 0.4 and never slower across than
+  0.6, so it rolls off rather than sitting there (`BallRules.rimKick`, `rimRollOffSpeed`, protocol 135); nothing
   climbs it or drops through it, and a dunk hangs on it. A ball scores only if it was let go as a
   shot, a floater or a dunk (`Ball.scoring`), kept through its bounces off the board and walls,
   so a bank still drops; one thrown or knocked loose bounces off the top (protocol 25). The rim's
@@ -1274,7 +1276,7 @@ energy. Its two strings are drawn rather than painted (`HoodStrings`): chains of
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
 none drawn where the arms or the pose would cover them (`GameScene.stringlessFrom`, a sheet a line and
 its first stringless frame: both shot sheets whole, the throws and the layup from frame 4, the ledge
-whole),
+whole, the dunk from frame 1),
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; Super Smoothie flying,
 twenty each streaming straight back as FloState's near one does (`HoodStrings.streaming`); in FloState,

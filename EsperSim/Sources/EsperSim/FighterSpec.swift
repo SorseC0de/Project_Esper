@@ -301,6 +301,10 @@ public enum BallRules {
     /// frames, then falls as a ball does. It keeps this share of the run it started from,
     /// enough to drift with the thrower and not enough to arc.
     public static let floaterSpeed = 1.5
+    /// A ball that can't score bouncing on a rim's top: kicked out across, the way it's off the
+    /// ring's middle, and at least this fast across, so it rolls off rather than sitting there.
+    public static let rimKick = 0.4
+    public static let rimRollOffSpeed = 0.6
     /// The up throw's floater, the layup's ball: a touch quicker up than a pop's (1.5, the up
     /// throw's too at first), so one let go off the ground from under the Wreck Center's rim clears
     /// it and drops through, the baseline; 1.54 is the least that does.

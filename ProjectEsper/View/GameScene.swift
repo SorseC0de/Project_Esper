@@ -5806,6 +5806,7 @@ final class GameScene: SKScene {
         .shoot: 0, .shootAir: 0,
         .throwForward: 4, .throwAir: 4, .layup: 4,
         .ledge: 0,
+        .dunk: 1,
     ]
     static func stringsUnderArms(_ frame: AnimationFrame) -> Bool {
         stringlessFrom[frame.animation].map { frame.frame >= $0 } ?? false

@@ -141,6 +141,12 @@ public struct Ball: Equatable {
                     events.append(.rimBounced(hoop: index, speed: abs(velocity.y), ball: true))
                     position.y = hoop.position.y + BallRules.radius
                     bounceY(events: &events)
+                    // Off the ring rather than settling on it: kicked out the way it's off the
+                    // ring's middle (dead on, away from the board), and never slower across than a roll off.
+                    let off = position.x - hoop.position.x
+                    let out = abs(off) > 0.01 ? (off > 0 ? 1.0 : -1.0) : -hoop.backboard.sign
+                    velocity.x += out * BallRules.rimKick
+                    if abs(velocity.x) < BallRules.rimRollOffSpeed { velocity.x = out * BallRules.rimRollOffSpeed }
                 }
             }
         }

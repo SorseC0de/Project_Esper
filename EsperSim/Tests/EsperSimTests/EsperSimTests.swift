@@ -964,6 +964,22 @@ final class BallTests: XCTestCase {
         XCTAssertFalse(thrown.ball.steers)
     }
 
+    func testAThrownBallDroppedOnTheRimRollsOffItRatherThanSitting() {
+        var match = Match()
+        let hoop = match.stage.hoops[0]
+        // Straight down onto the ring's middle, thrown, so it can't score.
+        match.ball.release(from: Vec2(x: hoop.position.x, y: hoop.position.y + 12), velocity: Vec2(x: 0, y: -2), by: 0, straight: true)
+        XCTAssertFalse(match.ball.scoring)
+        var hitRim = false
+        for _ in 0..<120 {
+            match.advance(inputs: [.idle, .idle])
+            if match.events.contains(where: { if case .rimBounced(_, _, true) = $0 { return true } else { return false } }) { hitRim = true }
+        }
+        XCTAssertTrue(hitRim)
+        XCTAssertGreaterThan(abs(match.ball.position.x - hoop.position.x), BallRules.rimHalfWidth + BallRules.radius, "off the ring, not resting on it")
+        XCTAssertLessThan(match.ball.position.y, hoop.position.y, "and fallen off it")
+    }
+
     func testAShotOffTheGlassStillSteersButOffTheFloorItDoesnt() {
         // At the left rim's height and a little over, flying into its backboard's face.
         var match = Match()

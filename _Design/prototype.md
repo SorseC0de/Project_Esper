@@ -1142,8 +1142,12 @@ bottle carries its comment (`Greateraid.comment`), the user's line; "..." is the
 placeholder for one not written yet. In the middle, standing on the blurb's banner, the one
 picking: `player_drinkchoice` in their look, with the hooded head and its neck as in play
 (`SpriteLibrary.standalone`), its towel (palette 22 and 37) kept as drawn, its two frames played
-at 2 a second; its size on the UI panel's PICK screen (DRINKER, the points to an
-art pixel, 4 to start).
+at 2 a second, sitting on `player_bench`, its own sheet now, drawn under it; its size on the UI panel's
+PICK screen (DRINKER, the points to an art pixel, 4 to start). Picked, the bottles and the words fall
+away (half a second, easing in), the drinker plays `player_drink` twice through at the same 2 a second,
+then `player_transform` at 15 a second raised off the chair (TRANSFORM Y on the same screen, art pixels,
+4 to start; `PickScreen.finish`), and only then does the pick go on; the clock stops once it's picked,
+and a second pick (the clock's, at zero) doesn't land.
 
 - Hasty Horchata: run, dash and air speed up by half a unit a drink. The body a match
   starts on is the baseline with half a unit less of each, the double jump kept, so one

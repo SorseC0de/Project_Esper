@@ -278,15 +278,33 @@ final class PickScreen: Screen {
     static let drinkerScaleKey = "ui.pick.drinkerScale"
     static var drinkerScale: CGFloat { UserDefaults.standard.object(forKey: drinkerScaleKey).map { CGFloat(($0 as? Double) ?? 4) } ?? 4 }
     static let drinkerFrameSeconds = 0.5
+    /// Picked: `player_drink` this many times through at the same pace, then `player_transform`
+    /// at 15 a second, raised `transformLift` art pixels off the chair (TRANSFORM Y on the UI
+    /// panel), and only then on; the bottles and the words falling away meanwhile.
+    static let drinkLoops = 2
+    static let transformFramesPerSecond = 15.0
+    static let transformLiftKey = "ui.pick.transformLift"
+    static var transformLift: CGFloat { UserDefaults.standard.object(forKey: transformLiftKey).map { CGFloat(($0 as? Double) ?? 4) } ?? 4 }
+    static let fallSeconds = 0.5
+    private var finishing = false
+    /// Picked and playing the drink out: the clock's stopped and no other pick lands.
+    var isFinishing: Bool { finishing }
+    private var drinkerNode: SKSpriteNode?
+    private var bottleNodes: [SKNode] = []
+    private let drinking: [SKTexture]
+    private let transforming: [SKTexture]
     /// The sheet's feet, eight pixels up its 48.
     static let drinkerFeet: CGFloat = 8.0 / 48
 
     /// `timed` shows the seconds left, for a networked pick; `drinker`, the frames of the one picking.
     init(halfWidth: CGFloat, halfHeight: CGFloat, offers: [Greateraid], drinks: Drinks, colour: SKColor, timed: Bool = false,
-         drinker: [SKTexture] = [], onDrink: @escaping (Greateraid) -> Void) {
+         drinker: [SKTexture] = [], bench: SKTexture? = nil, drinking: [SKTexture] = [], transforming: [SKTexture] = [],
+         onDrink: @escaping (Greateraid) -> Void) {
         self.offers = offers
         self.drinks = drinks
         self.onDrink = onDrink
+        self.drinking = drinking
+        self.transforming = transforming
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pick)
         // Smaller than the other screens' headers, box and lettering: the drinks are the thing here.
         addHeader("GREATERAID", size: 26, at: CGPoint(x: 0, y: halfHeight * 0.8), width: 200, height: 38)
@@ -313,6 +331,15 @@ final class PickScreen: Screen {
         addChild(plate)
         let plateTop = plate.position.y + plateSize.height / 2
         plateInside = CGSize(width: plateSize.width - 40 * tuned(.panels), height: plateSize.height - 22 * tuned(.panels))
+        // The bench, its own sheet now, under the one on it.
+        if let bench {
+            let seat = SKSpriteNode(texture: bench)
+            seat.size = bench.size().scaled(by: PickScreen.drinkerScale)
+            seat.anchorPoint = CGPoint(x: 0.5, y: PickScreen.drinkerFeet)
+            seat.position = CGPoint(x: 0, y: plate.position.y + plate.size.height / 2)
+            seat.zPosition = 0.4
+            addChild(seat)
+        }
         if let first = drinker.first {
             let figure = SKSpriteNode(texture: first)
             figure.size = first.size().scaled(by: PickScreen.drinkerScale)
@@ -321,6 +348,7 @@ final class PickScreen: Screen {
             figure.zPosition = 0.5
             figure.run(.repeatForever(.animate(with: drinker, timePerFrame: PickScreen.drinkerFrameSeconds)))
             addChild(figure)
+            drinkerNode = figure
         }
 
         let spacing = min(halfWidth * 0.55, 200)
@@ -334,11 +362,11 @@ final class PickScreen: Screen {
             // Over everything on the screen.
             bottle.zPosition = 5
             addChild(bottle)
+            bottleNodes.append(bottle)
             outlines.append(PickScreen.outline(of: bottle, width: 5 * tuned(.buttons)))
             let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight)
             addChoice(bottle, hit: hit, arrowAt: CGPoint(x: x, y: -halfHeight + 108), arrowTurn: 0) { [weak self] in
-                guard let self else { return }
-                self.onDrink(offer)
+                self?.finish(with: offer)
             }
         }
         // The quote just under the plate's top edge, below the name sitting across it.
@@ -360,6 +388,26 @@ final class PickScreen: Screen {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Picked: the bottles and the words fall away; the drinker drinks it, twice through, then
+    /// changes a little off the chair; then the pick goes on. Once.
+    private func finish(with offer: Greateraid) {
+        guard !finishing else { return }
+        finishing = true
+        let fall = SKAction.group([.moveBy(x: 0, y: -halfHeight * 1.5, duration: PickScreen.fallSeconds), .fadeOut(withDuration: PickScreen.fallSeconds)])
+        fall.timingMode = .easeIn
+        for node in bottleNodes + [blurb, comment, drinkName, secondSip] { node.run(fall) }
+        guard let figure = drinkerNode, !drinking.isEmpty else { return onDrink(offer) }
+        figure.removeAllActions()
+        var steps: [SKAction] = [.repeat(.animate(with: drinking, timePerFrame: PickScreen.drinkerFrameSeconds), count: PickScreen.drinkLoops)]
+        if !transforming.isEmpty {
+            let lift = PickScreen.transformLift * PickScreen.drinkerScale
+            steps.append(.run { figure.position.y += lift })
+            steps.append(.animate(with: transforming, timePerFrame: 1 / PickScreen.transformFramesPerSecond))
+        }
+        steps.append(.run { [weak self] in self?.onDrink(offer) })
+        figure.run(.sequence(steps))
+    }
 
     override var tapFiresAtOnce: Bool { false }
     override var showsArrow: Bool { false }

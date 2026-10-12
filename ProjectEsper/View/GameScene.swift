@@ -4831,7 +4831,8 @@ final class GameScene: SKScene {
                                        heading: nil, start: 0) { _, _ in }
         case .pick:
             screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: Array(Greateraid.boosters.prefix(3)), drinks: .none,
-                                colour: SKColor(rgb: sprites.look(for: 0).glow), timed: true, drinker: drinkerFrames(0)) { _ in }
+                                colour: SKColor(rgb: sprites.look(for: 0).glow), timed: true, drinker: drinkerFrames(0),
+                                bench: sprites.standalone("player_bench", frame: 0, player: 0)) { _ in }
         case .pause:
             screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
         case .win:
@@ -4867,7 +4868,9 @@ final class GameScene: SKScene {
             if picker == localIndex {
                 screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: pickOffers, drinks: series.drinks[picker],
                                     colour: SKColor(rgb: sprites.look(for: picker).glow), timed: online != nil,
-                                    drinker: drinkerFrames(picker)) { [weak self] drink in
+                                    drinker: drinkerFrames(picker), bench: sprites.standalone("player_bench", frame: 0, player: picker),
+                                    drinking: (0..<GameScene.drinkerFrameCount).map { sprites.standalone("player_drink", frame: $0, player: picker) },
+                                    transforming: (0..<Animation.transform.frameCount).map { sprites.texture(AnimationFrame(.transform, $0), player: picker) }) { [weak self] drink in
                     self?.choose(drink)
                 }
             } else {
@@ -5148,6 +5151,8 @@ final class GameScene: SKScene {
             }
             return
         }
+        // Picked and drinking it: the clock's done.
+        if (screen as? PickScreen)?.isFinishing == true { return }
         pickFramesLeft -= 1
         let seconds = (pickFramesLeft + 59) / 60
         if picker == localIndex {

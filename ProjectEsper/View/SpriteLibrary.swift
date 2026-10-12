@@ -578,8 +578,9 @@ final class SpriteLibrary {
     /// A frame of a sheet outside the game's animations (the Greateraid pick's drinker) in a
     /// player's look, lined, its hooded head on it where the game would put it and its neck
     /// filled, as a body is in play. Its towel, palette 22 and 37, isn't energy: kept as drawn.
-    func standalone(_ name: String, frame: Int, player: Int) -> SKTexture {
-        let key = "p\(player)_standalone_\(name)_\(frame)"
+    /// `headTilt`, degrees, turns the hooded head back about its middle (facing right).
+    func standalone(_ name: String, frame: Int, player: Int, headTilt: CGFloat = 0) -> SKTexture {
+        let key = "p\(player)_standalone_\(name)_\(frame)_\(headTilt)"
         if let made = cache[key] { return made }
         let look = look(for: player)
         let source = texture(name, frame).cgImage()
@@ -606,6 +607,14 @@ final class SpriteLibrary {
             let hood = hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage()
             // The offset counts rows down; the context's run up.
             let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
+            if headTilt != 0 {
+                // About the head's middle; the context's rows run up.
+                let pivot = CGPoint(x: here.x, y: CGFloat(image.height) - here.y)
+                context.interpolationQuality = .none
+                context.translateBy(x: pivot.x, y: pivot.y)
+                context.rotate(by: headTilt * .pi / 180)
+                context.translateBy(x: -pivot.x, y: -pivot.y)
+            }
             context.draw(hood, in: CGRect(x: offset.x, y: -offset.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
             if let composed = context.makeImage() { made = SKTexture(cgImage: composed) }
         }

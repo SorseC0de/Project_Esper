@@ -114,6 +114,9 @@ public enum FieldRules {
     /// the drawing's 10 and 24 art pixels.
     public static let backboardOffset = Vec2(x: 6.25, y: 15)
     public static let backboardSize = Vec2(x: 4, y: 20)
+    /// The energy fence's top, in units: the goalposts' prongs' tops over the backboard, where
+    /// the drawn fence stops. The ball's blocker runs from the backboard's bottom up to here.
+    public static let fenceTop = 170.0
 }
 
 extension Match {

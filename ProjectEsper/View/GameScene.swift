@@ -3471,10 +3471,6 @@ final class GameScene: SKScene {
             controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
             controls.addSlider(title: "FLO MAX Y", range: -30...30, notch: 1, value: Float(FloTuning.cornerMaxY)) { FloTuning.cornerMaxY = CGFloat($0); relayoutFlo() }
         }
-        // The Greateraid pick's transform, raised off the chair.
-        controls.addSlider(title: "TRANSFORM Y", range: -40...40, notch: 1, value: Float(PickScreen.transformLift)) {
-            UserDefaults.standard.set(Double($0), forKey: PickScreen.transformLiftKey)
-        }
         if ParticleLook.cubes && ParticleLook.cubeSliders {
             controls.addSlider(title: "CUBE SIZE", range: 1...8, notch: 1, value: ParticleLook.cubeSize) { ParticleLook.cubeSize = $0 }
             controls.addSlider(title: "CUBE SPREAD", range: 0...16, notch: 1, value: ParticleLook.cubeSpread) { ParticleLook.cubeSpread = $0 }
@@ -4897,7 +4893,9 @@ final class GameScene: SKScene {
                 screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: pickOffers, drinks: series.drinks[picker],
                                     colour: SKColor(rgb: sprites.look(for: picker).glow), timed: online != nil,
                                     drinker: drinkerFrames(picker), bench: sprites.standalone("player_bench", frame: 0, player: picker),
-                                    drinking: (0..<GameScene.drinkerFrameCount).map { sprites.standalone("player_drink", frame: $0, player: picker) },
+                                    drinking: (0..<GameScene.drinkerFrameCount).map {
+                                        sprites.standalone("player_drink", frame: $0, player: picker, headTilt: PickScreen.drinkHeadTilts[min($0, PickScreen.drinkHeadTilts.count - 1)])
+                                    },
                                     transforming: (0..<Animation.transform.frameCount).map { sprites.standalone(Animation.transform.rawValue, frame: $0, player: picker) }) { [weak self] drink in
                     self?.choose(drink)
                 }

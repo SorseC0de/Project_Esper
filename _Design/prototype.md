@@ -1143,9 +1143,8 @@ picking: `player_drinkchoice` in their look, with the hooded head and its neck a
 (`SpriteLibrary.standalone`), its towel (palette 22 and 37) kept as drawn, its two frames played
 at 2 a second, sitting on `player_bench`, its own sheet now, drawn under it; its size on the UI panel's
 PICK screen (DRINKER, the points to an art pixel, 4 to start). Picked, the bottles and the words fall
-away (half a second, easing in), the drinker plays `player_drink` twice through at the same 2 a second,
-then `player_transform` at 15 a second raised off the chair (the debug strip's TRANSFORM Y, art pixels,
-4 to start), the hood on its head as the drinker's (`SpriteLibrary.standalone`; `PickScreen.finish`), and only then does the pick go on; the clock stops once it's picked,
+away (half a second, easing in), the drinker plays `player_drink` twice through at the same 2 a second, its hooded head tipped back 25° on frame 0 and 35° on frame 1 about its middle (`PickScreen.drinkHeadTilts`),
+then `player_transform` at 15 a second raised 8 art pixels off the chair (`PickScreen.transformLift`), the hood on its head as the drinker's (`SpriteLibrary.standalone`; `PickScreen.finish`), and only then does the pick go on; the clock stops once it's picked,
 and a second pick (the clock's, at zero) doesn't land.
 
 - Hasty Horchata: run, dash and air speed up by half a unit a drink. The body a match
@@ -1708,8 +1707,8 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   crossbar's lean and angle, 10 behind the rim, at 0.4, at two thirds; the stands, sky, rails
   and lights show (`GoalpostTuning.sceneryHidden` off; on, they go under flat black so tuning
   sliders read);
-  solid to the ball, a 20-unit-tall box (`FieldRules.backboardOffset`, `ballBlockers`)
-  from the backboard's face all the way back to the end wall, so nothing gets behind it.
+  solid to the ball from the backboard's bottom up to the energy fence's top, the prongs' (`FieldRules.fenceTop`, 170;
+  `ballBlockers`), from the backboard's face all the way back to the end wall, so nothing gets behind it.
   Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
   in the maker's energy.
 - A global stage rule: the invisible bounds outside a stage's grid are never a wall to land on or

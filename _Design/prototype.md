@@ -2219,7 +2219,10 @@ sound words (19), the players (20), the effects, the rims' fronts and the score 
 lightning also cut out in the glow's mask, `cutOutSnapshots`, so it glows over the backdrop as on
 the Wreck Center); the bodies take it as a tint (their colour
 blend, when nothing else is tinting them) with their glowing parts drawn again over them
-untinted (`glowingPartNodes`, `SpriteLibrary.glowingPartsTexture`), and the front pillars (22) take
+untinted (`glowingPartNodes`, `SpriteLibrary.glowingPartsTexture`); the front arm laid over the hood
+takes it the same way, its sleeve drawn again untinted (`frontArmGlowingTexture`), and the hooded head's
+face takes it too, a face-only copy over the hood, which glows untinted (`hoodFaceWashes`,
+`SpriteLibrary.hoodFace`); and the front pillars (22) take
 it as a tint too; the cylinder nets, drawn apart, never have it (`waterTint` nil here). The hoops hang from the bridge's underside, the
 tracks' 39 rows down from the top (`bridgeBottom`), on the Wreck Center's support beams
 (`HoopSupport`, the same layout, drawn at each hoop as there), with the court's straight

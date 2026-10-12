@@ -275,6 +275,8 @@ final class GameScene: SKScene {
     /// Each body's front leg drawn over its ball in hand, on the sheets that pass the ball behind it.
     private var legsOverBall: [SKSpriteNode] = []
     private var armsOverHood: [SKSpriteNode] = []
+    private var armGlowsOverHood: [SKSpriteNode] = []
+    private var hoodFaceWashes: [SKSpriteNode] = []
     static let ballBehindLegSheets: Set<Animation> = [.taunt, .dribbleWalk]
     static let hoodDrawnFor = SpriteLibrary.hoodDrawnFor
     /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
@@ -1196,12 +1198,24 @@ final class GameScene: SKScene {
             legOver.isHidden = true
             figure.addChild(legOver)
             legsOverBall.append(legOver)
-            // The front arm again over the hood, where it crosses the head.
+            // The front arm again over the hood, where it crosses the head; on K&A washed, its
+            // sleeve drawn again over it unwashed.
             let armOver = SKSpriteNode()
             armOver.zPosition = GameScene.hoodUpZ + 0.001
             armOver.isHidden = true
             figure.addChild(armOver)
             armsOverHood.append(armOver)
+            let armGlow = SKSpriteNode()
+            armGlow.zPosition = GameScene.hoodUpZ + 0.0011
+            armGlow.isHidden = true
+            figure.addChild(armGlow)
+            armGlowsOverHood.append(armGlow)
+            // K&A: the hooded head's face washed as the body's skin is, over the unwashed hood.
+            let face = SKSpriteNode()
+            face.zPosition = GameScene.hoodUpZ + 0.0001
+            face.isHidden = true
+            figure.addChild(face)
+            hoodFaceWashes.append(face)
             let halo = makeHalo(colour)
             halo.zPosition = 0.02
             figure.addChild(halo)
@@ -8117,6 +8131,8 @@ final class GameScene: SKScene {
                 let armTexture = !hood.isHidden && GameScene.frontArmOverHood(frame)
                     ? sprites.frontArmTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) : nil
                 armOver.isHidden = armTexture == nil || node.isHidden
+                armOver.color = node.color
+                armOver.colorBlendFactor = node.colorBlendFactor
                 if let armTexture {
                     armOver.texture = armTexture
                     armOver.size = node.size
@@ -8125,6 +8141,37 @@ final class GameScene: SKScene {
                     armOver.xScale = node.xScale
                     armOver.yScale = node.yScale
                     armOver.zRotation = node.zRotation
+                }
+                let armGlow = armGlowsOverHood[index]
+                let glowTexture = washed && !armOver.isHidden
+                    ? sprites.frontArmGlowingTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) : nil
+                armGlow.isHidden = glowTexture == nil
+                if let glowTexture {
+                    armGlow.texture = glowTexture
+                    armGlow.size = armOver.size
+                    armGlow.anchorPoint = armOver.anchorPoint
+                    armGlow.position = armOver.position
+                    armGlow.xScale = armOver.xScale
+                    armGlow.yScale = armOver.yScale
+                    armGlow.zRotation = armOver.zRotation
+                }
+            }
+            // K&A: the hood's face under the wash, the hood itself left to glow.
+            if hoodFaceWashes.indices.contains(index) {
+                let face = hoodFaceWashes[index]
+                let faceTexture = washed && !hood.isHidden && !energyForm && player.frozen == 0
+                    ? sprites.hoodFace(skin: sprites.look(for: index).dressing.skinTone, player: index, view: HoodView.of(frame)) : nil
+                face.isHidden = faceTexture == nil
+                if let faceTexture {
+                    face.texture = faceTexture
+                    face.color = SKColor(rgb: KAndAArt.beyond)
+                    face.colorBlendFactor = KAndAArt.washAlpha
+                    face.xScale = 1
+                    face.size = faceTexture.size().scaled(by: drawScale)
+                    face.anchorPoint = hood.anchorPoint
+                    face.position = hood.position
+                    face.xScale = hood.xScale
+                    face.zRotation = hood.zRotation
                 }
             }
             // The hood flashes with the body, part of its silhouette: over the body's flash when

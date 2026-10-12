@@ -347,6 +347,43 @@ final class SpriteLibrary {
         return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_glowing"]
     }
 
+    /// The glowing parts of the front arm and hand alone (a sleeve), for K&A's wash: drawn again
+    /// unwashed over the front arm laid over the hood, as the body's are over the body.
+    func frontArmGlowingTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_frontarmglowing"
+        if let made = cache[key] { return made }
+        guard let glowing = glowingPartsTexture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted),
+              let image = SpriteLibrary.partsImage(drawn: glowing.cgImage(), source: atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage(),
+                                                   parts: [.frontArm, .frontHand]) else { return nil }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .nearest
+        cache[key] = made
+        return made
+    }
+
+    /// The hooded head's face alone in its colours, on the hood's canvas: K&A's wash goes over it,
+    /// as over the body's skin, while the hood glows unwashed.
+    func hoodFace(skin: Int, player: Int, view: Int = 0) -> SKTexture? {
+        let key = "p\(player)_hoodface_\(skin)_\(view)"
+        if let made = cache[key] { return made }
+        let head = hoodHead(skin: skin, player: player, view: view)
+        let drawn = head.drawn.cgImage(), face = head.face.cgImage()
+        let width = drawn.width, height = drawn.height
+        guard face.width == width, face.height == height,
+              let (context, pixels) = makeCanvas(width: width, height: height),
+              let (maskContext, maskPixels) = makeCanvas(width: width, height: height) else { return nil }
+        context.draw(drawn, in: CGRect(x: 0, y: 0, width: width, height: height))
+        maskContext.draw(face, in: CGRect(x: 0, y: 0, width: width, height: height))
+        for pixel in 0..<(width * height) where maskPixels[pixel * 4 + 3] == 0 {
+            for channel in 0..<4 { pixels[pixel * 4 + channel] = 0 }
+        }
+        guard let image = context.makeImage() else { return nil }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .nearest
+        cache[key] = made
+        return made
+    }
+
     /// The line round a human's frame without the hood's place in it, for a tipped hood that
     /// carries its own line (`hoodLine`). Made with the frame on the sheets the head tips on,
     /// on the spot elsewhere; nil for a look with no hood.

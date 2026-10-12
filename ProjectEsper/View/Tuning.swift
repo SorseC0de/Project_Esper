@@ -223,9 +223,8 @@ enum RimLook {
     static let dunkDip: CGFloat = 12
     static let kickPerSpeed: CGFloat = 4
     static let stiffness: CGFloat = 0.2
-    /// A shake off the ball: how many frames, and how far up the backboard counts from the rim, in units.
+    /// A shake off the ball: how many frames (how far up the backboard counts is `Stage.backboardTop`).
     static let jitterFrames = 8
-    static let boardHeight = 20.0
     static let damping: CGFloat = 0.08
 }
 

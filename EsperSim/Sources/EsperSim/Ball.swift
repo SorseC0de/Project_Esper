@@ -19,7 +19,7 @@ public struct Ball: Equatable {
     public var strikes = false
     public var returning = false
     /// Whether the rims still steer it: a shot's or a floater's until its first bounce off
-    /// anything. A thrown ball never steers, so scoring off a throw is the ball going
+    /// anything but a backboard's glass, which it can bank off and still be drawn in. A thrown ball never steers, so scoring off a throw is the ball going
     /// through on its own.
     public var steers = false
     /// A shot still in flight, before its first bounce: the rings don't take it; only a
@@ -116,7 +116,7 @@ public struct Ball: Equatable {
         let sweptX = stage.sweepHorizontally(box, by: velocity.x)
         position.x += sweptX.moved
         if sweptX.blocked != nil {
-            bounceX(events: &events)
+            bounceX(events: &events, offGlass: stage.backboard(at: position) != nil)
         }
         // Slopes are left out of the fall: they turn the ball off their diagonal below,
         // rather than stopping it flat.
@@ -125,7 +125,7 @@ public struct Ball: Equatable {
         let sweptY = flat.sweepVertically(box, by: velocity.y)
         position.y += sweptY.moved
         if sweptY.landed || sweptY.ceiling {
-            bounceY(events: &events)
+            bounceY(events: &events, offGlass: stage.backboard(at: position) != nil)
         }
 
         // Down through a rim scores, whatever it did before: a floater that rose up through
@@ -270,22 +270,24 @@ public struct Ball: Equatable {
         shotInFlight = false
     }
 
-    private mutating func bounceX(events: inout [MatchEvent]) {
+    /// A bounce ends a shot's flight and the rims' pull on it; off a backboard's glass (`offGlass`)
+    /// the pull stays, so a shot kissed off the glass can still be drawn in.
+    private mutating func bounceX(events: inout [MatchEvent], offGlass: Bool = false) {
         settlePace()
         straight = false
         floater = 0
-        steers = false
+        if !offGlass { steers = false }
         shotInFlight = false
         let speed = abs(velocity.x)
         velocity.x = abs(velocity.x) > 0.3 ? -velocity.x * BallRules.bounce : 0
         events.append(.ballBounced(position: position, speed: speed))
     }
 
-    private mutating func bounceY(events: inout [MatchEvent]) {
+    private mutating func bounceY(events: inout [MatchEvent], offGlass: Bool = false) {
         settlePace()
         straight = false
         floater = 0
-        steers = false
+        if !offGlass { steers = false }
         shotInFlight = false
         let speed = abs(velocity.y)
         let rebound = -velocity.y * BallRules.bounce
@@ -319,7 +321,7 @@ public struct Ball: Equatable {
     /// The floater: a soft drift up that ignores gravity for a while, carrying the
     /// thrower's sideways speed, then a normal fall the rims steer.
     public mutating func releaseFloater(from position: Vec2, sideways: Double, by player: Int) {
-        release(from: position, velocity: Vec2(x: sideways, y: BallRules.floaterSpeed), by: player, straight: false)
+        release(from: position, velocity: Vec2(x: sideways, y: BallRules.upThrowSpeed), by: player, straight: false)
         thrown = true
         floater = BallRules.floaterFrames
         floaterShot = true

@@ -301,6 +301,10 @@ public enum BallRules {
     /// frames, then falls as a ball does. It keeps this share of the run it started from,
     /// enough to drift with the thrower and not enough to arc.
     public static let floaterSpeed = 1.5
+    /// The up throw's floater, the layup's ball: a touch quicker up than a pop's (1.5, the up
+    /// throw's too at first), so one let go off the ground from under the Wreck Center's rim clears
+    /// it and drops through, the baseline; 1.54 is the least that does.
+    public static let upThrowSpeed = 1.55
     public static let floaterFrames = 30
     public static let floaterMomentumShare = 0.2
     public static let throwReleaseHeight = 12.0

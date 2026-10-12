@@ -256,7 +256,9 @@ whatever lands on it came at, held down 12° while someone
   5, 10 sim frames into the throw (`BallRules.layupReleaseFrames`), from the hand where frame 4 draws
   the ball (`Player.layupReleasePoint`), acting again once its last is done, 18 in
   (`layupRecoveryFrames`, `Player.layingUp`), on the ground or in the air; and on its first frame up off a half jump (`startThrowing`): a full hop's speed times the
-  root of a half (`layupHopShare`), so it climbs half a full jump's height, off the ground if on it; its ball the floater: a soft drift up at 1.5 with gravity
+  root of a half (`layupHopShare`), so it climbs half a full jump's height, off the ground if on it; its ball the floater: a soft drift up at 1.55 (`BallRules.upThrowSpeed`, a touch over a pop's 1.5, so a
+  grounded layup from under the Wreck Center's rim clears it and drops through, 1.54 the least that does;
+  protocol 132) with gravity
   off for 30 frames, carrying a fifth of the sideways speed the thrower had when the stance
   began, then a normal fall. The rims don't pull a thrown ball, so scoring off a throw
   is the ball going through on its own. In the air the throw stance keeps its run,
@@ -306,7 +308,9 @@ whatever lands on it came at, held down 12° while someone
   Hoopfish's) is led: aimed at where it will be when the ball has fallen to it, by its motion
   over the last frame (`Hoop.velocity`, protocol 121), no stronger a pull, as the computer's
   aim already led it; of balls dropped at it through its swim, 58% go in to 41% before. Only a shot's or a
-  floater's ball, and only until its first bounce off anything; a throw's never. Only the rim
+  floater's ball, and only until its first bounce off anything but a backboard's glass (`Stage.backboard(at:)`,
+  the board from its face to its back, from under it up 20 over the rim; protocol 133), so a shot kissed
+  off the glass is still drawn in; a throw's never. Only the rim
   it's meant for, the one whoever last touched it scores on (a shared rim for anyone, an
   untouched ball any): an own basket can still drop, but nothing draws it there (protocol 77). Down
   through a rim scores, whatever the ball did before: a floater that rose up through it
@@ -692,7 +696,7 @@ outright.
 - SFX: the sound words ON, SOME (only the biggest, the 16-high ones, `Sound.isBiggest`), OFF.
 - SFX STYLE: their face, CHERRY, DARUMA or DELA (`Onomatopoeia.style`); nothing picked yet, DARUMA in ENG.
 - SFX LANGUAGE: ENG, JPN or SPA (`Onomatopoeia.language`); Spanish in the English faces, spelled
-  ¡SHUAS!, ¡¡SHUAAAS!!, ¡¡CATAPUM!!, ¡ZAS!, ¡PAF!, ¡ZASCA!, ¡CLING!, CLANC, ÑIC, TAC, PUM, POM, POM,
+  ¡SHUAS!, ¡¡SHUAAAS!!, ¡¡CATAPUM!!, ¡ZAS!, ¡PAF!, ¡ZASCA!, ¡CLING!, CLANC, ÑIC, TAC, PUM, POM, POM, ¡BOING!,
   ZUUUUM, ¡BUUUM!, BRRRUM, ¡CRAC!, ¡CABUM!, CHSSS, ¡CRAS! and ¡CATACRAC! in the table's order. A face
   picked before the two were apart sets both; the SFX debug picker still sets the face, keeping Spanish.
 - WALK TRAILS: the dust off a walk or a run.
@@ -1503,6 +1507,8 @@ aim); the burst, the quake and the freeze the way the player faces; a lava burn 
 feet; the rest at their point (20° to 30°); a basket out of the net, 10 under the rim and 8 off
 it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 
+A body or the ball springing off a rim's top says BOING! / ボヨーン！ / ¡BOING! (10 high, the ball's only past
+the bounce's floor) up off the rim, away from its backboard.
 A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going;
 so does a dribble's, with its sound, as small as a footstep run's (5), out of the floor under the ball
 (off a ledge, the floor below it, where the ball's drawn reaching down to), the way the dribbler faces.
@@ -1525,6 +1531,7 @@ from the first, says TAP / テク walking or THUMP / ダッ running, 4 and 5 hig
 | Wall jump | キュッ | SQUEAK |
 | Footsteps, walking / running | テク / ダッ | TAP / THUMP |
 | A loose ball's bounce | ダム | BOMP |
+| A body or the ball off a rim's top | ボヨーン！ | BOING! |
 | Z Tea's beam / burst | ズドドドド / ドオォン！ | VWOOOM / BOOOM! |
 | Quake | ゴゴゴゴ | RUMBLE |
 | Freeze | ピキッ！ | CRACK! |

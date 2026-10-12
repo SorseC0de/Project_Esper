@@ -637,6 +637,24 @@ final class BallTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .throwing)
     }
 
+    func testAGroundedLayupFromUnderTheWreckCentersRimScores() {
+        var match = matchWithBallHeld()
+        let hoop = match.stage.hoops[0]
+        XCTAssertEqual(match.stage.features.look, .court)
+        // Under the rim, the hand that lets go about over its middle.
+        match.players[0].position.x = hoop.position.x + 6
+        match.players[0].facing = hoop.backboard
+        for _ in 0..<5 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.players[0].grounded)
+        for _ in 0..<BallRules.throwWindupFrames + 2 {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        }
+        let scored = run(&match, frames: 200, input: { _ in .idle }) { match in
+            match.events.contains { if case .scored = $0 { return true } else { return false } }
+        }
+        XCTAssertLessThan(scored, 200, "it clears the rim and drops through")
+    }
+
     func testALayupGoesUpOffTheGroundHalfAsHighAsAFullJump() {
         var match = matchWithBallHeld()
         XCTAssertTrue(match.players[0].grounded)
@@ -664,10 +682,10 @@ final class BallTests: XCTestCase {
         run(&match, frames: BallRules.layupReleaseFrames + 1, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
         XCTAssertTrue(match.ball.thrown)
-        XCTAssertEqual(match.ball.velocity.y, BallRules.floaterSpeed, accuracy: 0.001)
+        XCTAssertEqual(match.ball.velocity.y, BallRules.upThrowSpeed, accuracy: 0.001)
         // Still drifting up at the same speed well into the float, then falling.
         run(&match, frames: BallRules.floaterFrames - 5, input: { _ in .idle })
-        XCTAssertEqual(match.ball.velocity.y, BallRules.floaterSpeed, accuracy: 0.001)
+        XCTAssertEqual(match.ball.velocity.y, BallRules.upThrowSpeed, accuracy: 0.001)
         run(&match, frames: 40, input: { _ in .idle })
         XCTAssertLessThan(match.ball.velocity.y, 0)
     }
@@ -930,6 +948,29 @@ final class BallTests: XCTestCase {
         run(&thrown, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
         XCTAssertNil(thrown.ball.holder)
         XCTAssertFalse(thrown.ball.steers)
+    }
+
+    func testAShotOffTheGlassStillSteersButOffTheFloorItDoesnt() {
+        // At the left rim's height and a little over, flying into its backboard's face.
+        var match = Match()
+        let hoop = match.stage.hoops[0]
+        let face = hoop.position.x + hoop.backboard.sign * Stage.backboardFace
+        match.ball.release(from: Vec2(x: face - hoop.backboard.sign * 6, y: hoop.position.y + 8),
+                           velocity: Vec2(x: hoop.backboard.sign * 2, y: 0.5), by: 0, straight: false)
+        XCTAssertTrue(match.ball.steers)
+        var bounced = false
+        for _ in 0..<20 {
+            match.advance(inputs: [.idle, .idle])
+            if match.events.contains(where: { if case .ballBounced = $0 { return true } else { return false } }) { bounced = true; break }
+        }
+        XCTAssertTrue(bounced, "it hit the glass")
+        XCTAssertNotNil(match.stage.backboard(at: match.ball.position))
+        XCTAssertTrue(match.ball.steers, "the rim still pulls it after the glass")
+        // Off the floor, the pull's gone.
+        var floor = Match()
+        floor.ball.release(from: Vec2(x: 170, y: 8), velocity: Vec2(x: 0, y: -3), by: 0, straight: false)
+        _ = run(&floor, frames: 10, input: { _ in .idle }) { $0.ball.velocity.y >= 0 }
+        XCTAssertFalse(floor.ball.steers)
     }
 
     func testTheFloaterSteers() {

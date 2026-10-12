@@ -640,6 +640,21 @@ public struct Stage: Equatable {
     public static let backboardFace = 3.125
     public static let backboardDepth = 10.0
     public static let backboardBottom = -3.75
+    /// How far up from the rim the board's glass counts, in units.
+    public static let backboardTop = 20.0
+
+    /// The hoop whose backboard's glass a ball here is against: on its backboard side, from the
+    /// board's face out past its back, from under its bottom up the glass's height, a ball's
+    /// size and a unit to spare all round. A bounce off it leaves a shot steering (`Ball`).
+    public func backboard(at position: Vec2) -> Int? {
+        hoops.indices.first { index in
+            let hoop = hoops[index]
+            let out = (position.x - hoop.position.x) * hoop.backboard.sign
+            let up = position.y - hoop.position.y
+            return out >= Stage.backboardFace - BallRules.radius - 1 && out <= Stage.backboardFace + Stage.backboardDepth + BallRules.radius + 1
+                && up >= Stage.backboardBottom - BallRules.radius - 1 && up <= Stage.backboardTop
+        }
+    }
 
     public static var court: Stage {
         let shift = courtBlockShift

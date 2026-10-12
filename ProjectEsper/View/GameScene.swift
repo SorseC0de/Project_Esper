@@ -4606,6 +4606,11 @@ final class GameScene: SKScene {
                 say(.clang, at: player.chest + Vec2(x: player.facing.sign * GameScene.bladeReach, y: 0), away: -player.facing.sign, rise: 30)
             case .slashClashed(let at):
                 say(.clang, at: at, away: 0, rise: 30)
+            case .rimBounced(let hoop, let speed, let ball) where !ball || speed > GameScene.bounceSoundFloor:
+                // Off the rim's top, up from it, away from its backboard.
+                guard match.stage.hoops.indices.contains(hoop) else { break }
+                let rim = match.stage.hoops[hoop]
+                say(.boing, at: rim.position + Vec2(x: 0, y: 2), away: -CGFloat(rim.backboard.sign), rise: 40)
             case .wallJumped(let index, let wall):
                 // Out of the wall spark at the shoe, away from the wall.
                 say(.squeak, at: players[index].position + Vec2(x: wall.sign * 4, y: 5), away: -wall.sign, rise: 15)
@@ -5771,17 +5776,8 @@ final class GameScene: SKScene {
         framesLeft == 0 ? 0 : (framesLeft % 4 < 2 ? 1 : -1)
     }
 
-    /// The hoop whose backboard a ball bounced against here: on its backboard side, from the
-    /// board's face out past its back, from under its bottom up the board's height.
-    private func backboard(at position: Vec2) -> Int? {
-        match.stage.hoops.indices.first { index in
-            let hoop = match.stage.hoops[index]
-            let out = (position.x - hoop.position.x) * hoop.backboard.sign
-            let up = position.y - hoop.position.y
-            return out >= Stage.backboardFace - BallRules.radius - 1 && out <= Stage.backboardFace + Stage.backboardDepth + BallRules.radius + 1
-                && up >= Stage.backboardBottom - BallRules.radius - 1 && up <= RimLook.boardHeight
-        }
-    }
+    /// The hoop whose backboard a ball bounced against here (`Stage.backboard(at:)`), to shake it.
+    private func backboard(at position: Vec2) -> Int? { match.stage.backboard(at: position) }
 
     private func rimTurn(_ index: Int) -> CGFloat {
         guard index < rimDip.count, index < match.stage.hoops.count else { return 0 }

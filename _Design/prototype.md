@@ -1717,6 +1717,9 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   layers and the shadows, but only those within its window round the ball and a margin:
   the rest cost one position check each, so a busy field costs it little. Emitters and
   shapes (webs, the pulse) aren't copied; the portal is sprites, so it is.
+- On a Mac (the iPad app, `isiOSAppOnMac`) the game renders at one pixel a point, 1366 by 1024
+  in the 12.9-inch iPad Pro's window rather than its 2732 by 2048, doubled up unsmoothed as on the
+  TV (`GameMetalView.onMac`): at full size the GPU frame took about 39 ms standing still.
 - On the TV the game renders at 1080p whatever the screen, the pixel art doubled onto a
   4K one unsmoothed (the HUD and menus stay at 4K); the Apple TV 4K's GPU spent about 50 ms
   a frame at 4K, most of it the glow and the composite. The glow there is half size with

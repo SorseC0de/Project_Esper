@@ -32,6 +32,14 @@ final class GameMetalView: MTKView {
         // The view's scale won't hold at 1 there, so the drawable is sized by hand.
         autoResizeDrawable = false
         layer.magnificationFilter = .nearest
+        #else
+        // On a Mac the iPad app is drawn at the 12.9-inch iPad Pro's 2732 by 2048, every pass
+        // across 5.6 million pixels: there it draws at one pixel a point and is doubled up
+        // unsmoothed, as the TV is, a quarter of the work.
+        if GameMetalView.onMac {
+            contentScaleFactor = 1
+            layer.magnificationFilter = .nearest
+        }
         #endif
         isUserInteractionEnabled = false
         delegate = renderer
@@ -39,10 +47,22 @@ final class GameMetalView: MTKView {
 
     required init(coder: NSCoder) { fatalError() }
 
+    static let onMac = ProcessInfo.processInfo.isiOSAppOnMac
+
     #if os(tvOS)
     override func layoutSubviews() {
         super.layoutSubviews()
         if drawableSize != bounds.size { drawableSize = bounds.size }
+    }
+    #else
+    // The window's screen sets the scale back on a move or a resize; held at 1 on a Mac.
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if GameMetalView.onMac { contentScaleFactor = 1 }
+    }
+    override func layoutSubviews() {
+        if GameMetalView.onMac, contentScaleFactor != 1 { contentScaleFactor = 1 }
+        super.layoutSubviews()
     }
     #endif
 
@@ -53,7 +73,7 @@ final class GameMetalView: MTKView {
         #if os(tvOS)
         1
         #else
-        contentScaleFactor
+        GameMetalView.onMac ? 1 : contentScaleFactor
         #endif
     }
 }

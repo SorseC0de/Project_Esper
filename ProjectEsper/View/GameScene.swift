@@ -494,7 +494,10 @@ final class GameScene: SKScene {
     private let powerLabel = SKSpriteNode()
     private let fpsLabel = SKLabelNode()
     /// The performance readout in the corner, parked until performance is being diagnosed.
-    static let diagnosingPerformance = false
+    static let diagnosingPerformance = DebugUI.enabled
+    /// The state readout down the left (state, velocity, stick, jumps, the net), parked: never used,
+    /// and rewriting a label every frame costs a frame's work of its own.
+    static let showsStateReadout = false
     private var lastTime: TimeInterval?
     private var accumulator = 0.0
     private var built = false
@@ -1347,7 +1350,7 @@ final class GameScene: SKScene {
         debugLabel.horizontalAlignmentMode = .left
         debugLabel.verticalAlignmentMode = .top
         debugLabel.numberOfLines = 0
-        debugLabel.isHidden = !DebugUI.enabled
+        debugLabel.isHidden = !DebugUI.enabled || !GameScene.showsStateReadout
         hud.addChild(debugLabel)
 
         fpsLabel.fontName = "Menlo-Bold"
@@ -8860,9 +8863,13 @@ final class GameScene: SKScene {
             for node in playerNodes { node.isHidden = false }
         }
         fpsLabel.isHidden = !GameScene.diagnosingPerformance
-        if GameScene.diagnosingPerformance { fpsLabel.text = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms\n\(frameReadout)" }
+        if GameScene.diagnosingPerformance {
+            // Only when it changes, once a second: a new label's text is drawn again.
+            let readout = "\(framesPerSecond) fps  worst \(worstFrameMilliseconds) ms\n\(frameReadout)"
+            if fpsLabel.text != readout { fpsLabel.text = readout }
+        }
         let p = match.players[localIndex]
-        if DebugUI.enabled {
+        if DebugUI.enabled, GameScene.showsStateReadout {
         let side: String
         if online != nil {
             side = "  net lead \(session.frame - session.remoteFrame) rollbacks \(session.rollbacks)/\(session.framesRerun)\(session.desynced ? "  DESYNC" : "")"

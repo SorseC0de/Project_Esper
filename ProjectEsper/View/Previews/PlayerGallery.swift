@@ -106,8 +106,11 @@ struct AssembledFrame: View {
             if let line = hoodTurned ? portrait.bareLine : portrait.line { drawLine(line, in: context, turned: false) }
             if let hood = portrait.hood { drawHood(hood, in: context) }
             drawStrings(in: context)
-            // The front arm over the hood and the strings, as in play.
-            if armOverHood, let arm = portrait.frontArm { context.draw(Image(decorative: arm, scale: 1).interpolation(.none), in: figureRect) }
+            // The front arm over the hood and the strings, as in play, with its own line.
+            if armOverHood, let arm = portrait.frontArm {
+                if let armLine = portrait.frontArmLine { drawLine(armLine, in: context, turned: false) }
+                context.draw(Image(decorative: arm, scale: 1).interpolation(.none), in: figureRect)
+            }
             if cubes { for cube in motion.cubes where !cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) } }
             // The glow: what's energy again, blurred and added, as the customize screen draws it.
             guard glow else { return }
@@ -213,6 +216,21 @@ final class PlayerGallerySheets: ObservableObject {
     }
 }
 
+/// The sheets as the gallery lists them: by name in words, the idles first.
+enum GallerySheets {
+    static let first: [EsperSim.Animation] = [.idle, .dribbleIdle]
+    static let listed: [EsperSim.Animation] = first + EsperSim.Animation.allCases.filter { !first.contains($0) }
+        .sorted { name($0).localizedStandardCompare(name($1)) == .orderedAscending }
+
+    /// A sheet's name in words: `player_dbl_jump` as Double Jump.
+    static func name(_ animation: EsperSim.Animation) -> String {
+        let words: [String: String] = ["dbl": "Double", "esperslash": "Esper Slash", "flostate": "FloState"]
+        return animation.rawValue.replacingOccurrences(of: "player_", with: "").split(separator: "_")
+            .map { words[String($0)] ?? $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+    }
+}
+
 /// The frame last drawn while playing, for the pause to hold on.
 final class Playhead {
     var shown = 0
@@ -255,7 +273,7 @@ struct PlayerGallery: View {
                 }
                 .frame(width: (CGFloat(animation.pixelWidth) + 2 * drawing.pad) * pixel, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel)
                 .overlay(alignment: .bottomTrailing) {
-                    Text("\(animation.rawValue)  \(index + 1)/\(animation.frameCount)")
+                    Text("\(GallerySheets.name(animation))  \(index + 1)/\(animation.frameCount)")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .padding(4)
                         .background(.black.opacity(0.6))
@@ -307,7 +325,7 @@ struct PlayerGallery: View {
     /// The frames whose arm is over the hood, sheet by sheet, as the game's table would read.
     private var armOverHoodSummary: String {
         let lines = drawing.armOverHood.sorted { $0.key.rawValue < $1.key.rawValue }
-            .map { "\($0.key.rawValue): \($0.value.sorted().map { String($0 + 1) }.joined(separator: ", "))" }
+            .map { "\(GallerySheets.name($0.key)): \($0.value.sorted().map { String($0 + 1) }.joined(separator: ", "))" }
         return lines.isEmpty ? "arm over hood: none" : "arm over hood (frames from 1): " + lines.joined(separator: "  ·  ")
     }
 
@@ -320,7 +338,7 @@ struct PlayerGallery: View {
         VStack(spacing: 8) {
             HStack {
                 Picker("Sheet", selection: $animation) {
-                    ForEach(EsperSim.Animation.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    ForEach(GallerySheets.listed, id: \.self) { Text(GallerySheets.name($0)).tag($0) }
                 }
                 Picker("Colour", selection: $sheets.pick.energy) {
                     ForEach(EnergyColour.wheel, id: \.self) { Text($0.rawValue.uppercased()).tag($0) }

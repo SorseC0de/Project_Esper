@@ -276,6 +276,7 @@ final class GameScene: SKScene {
     private var legsOverBall: [SKSpriteNode] = []
     private var armsOverHood: [SKSpriteNode] = []
     private var armGlowsOverHood: [SKSpriteNode] = []
+    private var armLinesOverHood: [SKSpriteNode] = []
     private var hoodFaceWashes: [SKSpriteNode] = []
     static let ballBehindLegSheets: Set<Animation> = [.taunt, .dribbleWalk]
     static let hoodDrawnFor = SpriteLibrary.hoodDrawnFor
@@ -1205,6 +1206,13 @@ final class GameScene: SKScene {
             armOver.isHidden = true
             figure.addChild(armOver)
             armsOverHood.append(armOver)
+            // Its own line, over the hood and under the arm, in the body's line colour.
+            let armLine = SKSpriteNode()
+            armLine.zPosition = GameScene.hoodUpZ + 0.0009
+            armLine.colorBlendFactor = 1
+            armLine.isHidden = true
+            figure.addChild(armLine)
+            armLinesOverHood.append(armLine)
             let armGlow = SKSpriteNode()
             armGlow.zPosition = GameScene.hoodUpZ + 0.0011
             armGlow.isHidden = true
@@ -5890,6 +5898,7 @@ final class GameScene: SKScene {
         .esperSlash: 2...4,
         .snatchFloState: 2...6,
         .transform: 0...2,
+        .gunSnipe: 0...9,
     ]
     /// The frames where the front arm crosses the hooded head, so the sheet's front arm and hand
     /// are drawn again over the hood: each sheet's frames, picked in the player gallery
@@ -5906,6 +5915,7 @@ final class GameScene: SKScene {
         .dunk: 0...5,
         .slide: 0...7,
         .pivot: 0...2,
+        .walk: 0...7, .dribbleWalk: 0...7, .dribbleRun: 0...7,
     ]
     static func frontArmOverHood(_ frame: AnimationFrame) -> Bool { frontArmOverHood[frame.animation]?.contains(frame.frame) ?? false }
     /// The hooded head turned with the body on a sheet's frames, degrees clockwise facing right:
@@ -8046,8 +8056,8 @@ final class GameScene: SKScene {
                 let moved = CGPoint(x: (partNow.x - partDrawnFor.x).rounded(), y: (partNow.y - partDrawnFor.y).rounded()) * drawScale
                 hood.position = node.position + leaned(CGPoint(x: moved.x * CGFloat(player.facing.sign), y: moved.y))
                 hood.xScale = node.xScale
-                // FloState's snatch, its third frame: the head looks back over the step-through.
-                if frame.animation == .snatchFloState, frame.frame == 2 { hood.xScale = -hood.xScale }
+                // Looking back the other way (`HoodView.flipped`): FloState's snatch over its step-through, the pivot.
+                if HoodView.isFlipped(frame) { hood.xScale = -hood.xScale }
                 hood.zRotation = node.zRotation
                 // Super Smoothie flying down, the hooded head tips forward; flying up or forward, back;
                 // eased, about the head's middle, and let down a little to sit on the neck turned.
@@ -8141,6 +8151,19 @@ final class GameScene: SKScene {
                     armOver.xScale = node.xScale
                     armOver.yScale = node.yScale
                     armOver.zRotation = node.zRotation
+                }
+                let armLine = armLinesOverHood[index]
+                let lineTexture = !armOver.isHidden && !outlineNode.isHidden ? sprites.frontArmLineTexture(frame, player: drawnAs) : nil
+                armLine.isHidden = lineTexture == nil
+                if let lineTexture {
+                    armLine.texture = lineTexture
+                    armLine.color = outlineNode.color
+                    armLine.size = armOver.size
+                    armLine.anchorPoint = armOver.anchorPoint
+                    armLine.position = armOver.position
+                    armLine.xScale = armOver.xScale
+                    armLine.yScale = armOver.yScale
+                    armLine.zRotation = armOver.zRotation
                 }
                 let armGlow = armGlowsOverHood[index]
                 let glowTexture = washed && !armOver.isHidden

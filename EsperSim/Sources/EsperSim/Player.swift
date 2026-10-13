@@ -125,7 +125,6 @@ public struct Player: Equatable {
     /// How far the clock moved this step: none held, two when FloState hurries an action.
     private var timerStep = 1
     private var actionTicks = 0
-    private var floStateActionTicks = 0
     /// The state's clock came to `frame` this step, or past it in the one step it moved.
     public func reached(_ frame: Int) -> Bool { stateTimer >= frame && stateTimer - timerStep < frame }
     public var grounded = true
@@ -562,12 +561,7 @@ public struct Player: Equatable {
             waterTicks += 1
             if waterTicks % 2 == 0 { timerHeld = true }
         }
-        // FloState hurries an action: one frame in `actionHurryInterval` the clock moves two.
         timerStep = timerHeld ? 0 : 1
-        if inFloState, state.isAction, !timerHeld {
-            floStateActionTicks += 1
-            if floStateActionTicks % FloStateRules.actionHurryInterval == 0 { timerStep = 2 }
-        }
         stateTimer += timerStep
         stepFloState()
         if boltCooldown > 0 { boltCooldown -= 1 }
@@ -1305,7 +1299,7 @@ public struct Player: Equatable {
             if grounded, inFloState {
                 // FloState's snatch steps through: the body carried forward its travel over the
                 // snatch, through the other, the reach taking the ball on the way. The travel
-                // goes by the snatch's clock, so FloState's hurrying of it moves the body as far.
+                // goes by the snatch's clock, so a held clock (under water) moves the body as far.
                 // The clock's first tick is the press's own frame, which doesn't move: the rest carry it all.
                 velocity.x = stateTimer < SnatchRules.frames ? facing.sign * SnatchRules.floStateTravel / Double(SnatchRules.frames - 1) * Double(timerStep) : 0
             } else {
@@ -2478,8 +2472,6 @@ public enum FloStateRules {
     public static let speedShare = 1.1
     /// The push for a tenth more height, which goes as the push squared.
     public static let jumpPush = 1.1.squareRoot()
-    /// One frame in this many, an action's clock moves two.
-    public static let actionHurryInterval = 10
     public static let spendFrames = 18
     public static let lockoutFrames = 60
 }

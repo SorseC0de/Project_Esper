@@ -46,7 +46,8 @@ neutral to get a shot off; catch it and the roles reverse.
   on import. Palette PNGs are read too.
 - Strips in `_Graphic Assets` that nothing draws yet stay out of the app: the importer's
   `HELD_BACK` (`shield`, `dust_run2` today) skips them until they're wired.
-- `ProjectEsper/View/Previews/PlayerGallery.swift` — the player gallery, an Xcode preview
+- `ProjectEsper/View/Previews/PlayerGallery.swift` — the player gallery, an Xcode preview, its sheets
+  named in words (Double Jump), Idle and Dribble Idle first and the rest alphabetical
   (not on the TV): every player sheet assembled as the game draws a body, in a picked energy
   colour with the phone's saved dressing: the look's colours, the neck filled, the line, the
   hooded head where the frame's head is, the strings hanging off it (gone where they'd be
@@ -56,7 +57,9 @@ neutral to get a shot off; catch it and the roles reverse.
   draws the sheet's front arm and hand again over the hood for that frame, as the game does on
   the frames `GameScene.frontArmOverHood` names (`SpriteLibrary.frontArmTexture`: both shots, the
   double jump, the slash, the throws from 4, both crouches, the ledge, every gun sheet, the change,
-  the dunk, the slide and the pivot; the gallery shows its table to copy into the game). Two more
+  the dunk, the slide, the pivot, the walk and both dribbling walk and run; the gallery shows its
+  table to copy into the game), with its own line (`frontArmLineTexture`, in the body's line colour):
+  round the arm and hand wherever they meet open air, the sheet's head or the hood as worn. Two more
   sheet tables go with it, in play and in the gallery alike: `GameScene.hoodTurnDegrees`, the hood
   turned with the body about the head's middle, clockwise facing right (the double jump's tumble:
   30, 90, 135, then -90 twice), its strings' anchors turning with it and the hood carrying its own
@@ -157,9 +160,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   it's in FloState (`Player.inFloState`, protocol 79): only with a full meter (`floStateReady`, protocol 81), left any time.
   On a touch screen a tap on your own FLO meter (or within 12 points of it) is throw and shoot
   together for a frame, the change in or out (`TouchControls.tapFloState`).
-  In it the body moves, and is hurried through its actions, a tenth faster (`FloStateRules`: the
-  speed share 1.1, and one action frame in ten the clock moves two, `reached` firing for a frame
-  passed over), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent every 0.3 seconds
+  In it the body moves a tenth faster (`FloStateRules`: the speed share 1.1; its actions and their
+  sheets at their own pace, 15 a second, the hurrying taken out in protocol 141), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent every 0.3 seconds
   (`spendFrames`, 18), so a full meter lasts half a minute, and with none left it's out (protocol 82).
   Out, by the same press or the FLO running out (a burn too), it can't go back for
   a second (`floStateLockout`, 60 frames), its clothes flashing palette 39's grey every other four
@@ -1290,8 +1292,12 @@ they take the plain threshold); the head
 drawn on the body rather than apart (no lag, no bob, no enlarging), outlined with it and not
 glowing, its particles still rising off it. The head itself is the hooded head (`player_hoodheads`,
 six skins as a strip, and the robot's drawn from the fourth; the player's own, `Dressing.skinTone`), its own node;
-on the frames `HoodView.frames` names (none yet) it's turned away from the camera instead, side on
-(view 1) or further round (view 2), from `player_hoodheads_v2`'s second and third frames, drawn in
+on the frames `HoodView.frames` names it's turned away from the camera instead, side on (view 1) or
+further round (view 2) — FloState's slash 1, 2, 2, 1 over frames 1 to 4, the dunk and every gun sheet
+all 1, the blast 1 from 3, the ledge 1, 1, 1, 2, 1, the layup 1 on 2 and 3 and 2 from 4, the slash 1 on
+2 to 4, the shot 1 from 2, the air shot 1 from 1 (0-based) — and on the frames `HoodView.flipped`
+names (FloState's snatch's 2, the pivot's 2) it's mirrored, looking back; the body's line, neck and
+the hood's own line are made to the hood as worn, view and mirror alike, from `player_hoodheads_v2`'s second and third frames, drawn in
 the first skin and swapped into the player's two tones, its outline, neck and line made to it:
 its hood, the white and the cool greys, toned ahead of time through the energy ramp at nine
 tenths of their level, nearer the legs' plain colour (`SpriteLibrary.hoodHead`, `hoodLevel`), the skin as drawn, opaque. The sheet's own head is taken out of the body,
@@ -1321,7 +1327,8 @@ energy. Its two strings are drawn rather than painted (`HoodStrings`): chains of
 a point carried on by its own motion and held a pixel from the last, drawn snapped to the hood's grid,
 none drawn where the arms or the pose would cover them (`GameScene.stringless`, a sheet a line and its
 stringless frames, 0-based: both shot sheets whole, the throws and the layup from frame 4, the ledge whole,
-the dunk from frame 1, both catches whole, the slash's 2 to 4, FloState's snatch from 2, the change's 0 to 2),
+the dunk from frame 1, both catches whole, the slash's 2 to 4, FloState's snatch from 2, the change's 0 to 2,
+the snipe whole),
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; Super Smoothie flying,
 twenty each streaming straight back as FloState's near one does (`HoodStrings.streaming`); in FloState,

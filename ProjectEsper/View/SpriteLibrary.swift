@@ -290,7 +290,7 @@ final class SpriteLibrary {
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
         let look = SpriteLibrary.look(look, for: frame)
         let result = recolour(source, look: look, holdsBall: holdsBall, detach: true,
-                              hoodShape: look.human ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: HoodView.of(frame)) : nil,
+                              hoodShape: look.human ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil,
                               bareLine: SpriteLibrary.tippingHead.contains(frame.animation))
         var textures = ["": result.texture]
         if let bareOutline = result.bareOutline { textures["_bareoutline"] = bareOutline }
@@ -395,7 +395,7 @@ final class SpriteLibrary {
         if let made = cache[key + "_bareoutline"] { return made }
         let result = recolour(atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"), look: SpriteLibrary.look(look, for: frame),
                               holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted, detach: true,
-                              hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: HoodView.of(frame)), bareLine: true)
+                              hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame), bareLine: true)
         result.bareOutline?.filteringMode = .nearest
         cache[key + "_bareoutline"] = result.bareOutline
         return result.bareOutline
@@ -451,6 +451,66 @@ final class SpriteLibrary {
     /// arm crosses the head. Nil with no front arm in the frame.
     func frontArmTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
         partsTexture(frame, player: player, parts: [.frontArm, .frontHand], suffix: "_frontarm", ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    }
+
+    /// The front arm's own line, in white, for the line's node colour: round the arm and hand
+    /// wherever they meet the hooded head or open air, so the arm laid over the hood is lined.
+    func frontArmLineTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
+        let look = look(for: player)
+        let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)_frontarmline"
+        if let made = cache[key] { return made }
+        let source = atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage()
+        guard let image = SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
+                                                  hood: look.human ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil) else { return nil }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .nearest
+        cache[key] = made
+        return made
+    }
+
+    /// The line round `parts` on a sheet frame, in white: each pixel next to them that isn't them and
+    /// is open air, the sheet's head, or under the hooded head placed as the game places it.
+    static func partsLine(source: CGImage, parts: Set<BodyPart>, hood: CGImage?) -> CGImage? {
+        let width = source.width, height = source.height
+        guard let (sourceContext, sourcePixels) = canvas(width: width, height: height),
+              let (lineContext, linePixels) = canvas(width: width, height: height) else { return nil }
+        sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var owner = [BodyPart?](repeating: nil, count: width * height)
+        var headSum = CGPoint.zero, heads = 0
+        for pixel in 0..<(width * height) where sourcePixels[pixel * 4 + 3] == 255 {
+            let index = pixel * 4
+            owner[pixel] = BodyPart.owning(RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2]))
+            if owner[pixel] == .head {
+                headSum.x += CGFloat(pixel % width) + 0.5
+                headSum.y += CGFloat(pixel / width) + 0.5
+                heads += 1
+            }
+        }
+        guard owner.contains(where: { $0.map(parts.contains) == true }) else { return nil }
+        // Where the hood lands: its canvas moved by how far this head is from the one it's drawn for.
+        var underHood = [Bool](repeating: false, count: width * height)
+        if let hood, heads > 0, let there = hoodDrawnForHead, let (hoodContext, hoodPixels) = canvas(width: hood.width, height: hood.height) {
+            hoodContext.draw(hood, in: CGRect(x: 0, y: 0, width: hood.width, height: hood.height))
+            let offsetX = Int((headSum.x / CGFloat(heads) - there.x).rounded()), offsetY = Int((headSum.y / CGFloat(heads) - there.y).rounded())
+            for y in 0..<hood.height {
+                for x in 0..<hood.width where hoodPixels[(y * hood.width + x) * 4 + 3] != 0 {
+                    let fx = x + offsetX, fy = y + offsetY
+                    if fx >= 0, fy >= 0, fx < width, fy < height { underHood[fy * width + fx] = true }
+                }
+            }
+        }
+        func isPart(_ x: Int, _ y: Int) -> Bool { x >= 0 && y >= 0 && x < width && y < height && owner[y * width + x].map(parts.contains) == true }
+        var any = false
+        for y in 0..<height {
+            for x in 0..<width where !isPart(x, y) {
+                let pixel = y * width + x
+                let open = sourcePixels[pixel * 4 + 3] == 0 || owner[pixel] == .head || underHood[pixel]
+                guard open, (-1...1).contains(where: { dy in (-1...1).contains { dx in (dx != 0 || dy != 0) && isPart(x + dx, y + dy) } }) else { continue }
+                for channel in 0..<4 { linePixels[pixel * 4 + channel] = 255 }
+                any = true
+            }
+        }
+        return any ? lineContext.makeImage() : nil
     }
 
     private func partsTexture(_ frame: AnimationFrame, player: Int, parts: Set<BodyPart>, suffix: String, ballAsEnergy: Bool, ballLifted: Bool) -> SKTexture? {
@@ -634,8 +694,9 @@ final class SpriteLibrary {
         let tops: [BodyPart: CGPoint]
         /// The figure's line apart from it, in white, to be drawn in the look's line colour.
         let line: CGImage?
-        /// Its front arm and hand again with the line round them, to go over the hood where the arm crosses the head.
+        /// Its front arm and hand again, and their own line in white, to go over the hood where the arm crosses the head.
         let frontArm: CGImage?
+        let frontArmLine: CGImage?
         /// The line without the hood's place, and the hood's own line on its canvas, for when the
         /// hood turns and carries its line with it, as in play.
         let bareLine: CGImage?
@@ -736,6 +797,9 @@ final class SpriteLibrary {
         let sheetFrame = Animation(rawValue: name).map { AnimationFrame($0, frame) }
         let look = sheetFrame.map { SpriteLibrary.look(playerLook, for: $0) } ?? playerLook
         let view = sheetFrame.map(HoodView.of) ?? 0
+        let flipped = sheetFrame.map(HoodView.isFlipped) ?? false
+        /// The hooded head as this frame wears it: its view, mirrored where it looks back.
+        func wornHood(_ image: CGImage) -> CGImage { flipped ? SpriteLibrary.mirrored(image) ?? image : image }
         let plain = recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: false)
         let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
         var figure = plain
@@ -743,7 +807,7 @@ final class SpriteLibrary {
             let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             let place = SpriteLibrary.hoodPlace(head: here, offset: offset, nudge: headNudge, scale: headScale)
             figure = recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: true,
-                              hood: (hoodHead(skin: look.dressing.skinTone, player: player, view: view).drawn.cgImage(), place.origin, place.scale))
+                              hood: (wornHood(hoodHead(skin: look.dressing.skinTone, player: player, view: view).drawn.cgImage()), place.origin, place.scale))
         }
         let body = figure.texture.cgImage()
         let width = body.width, height = body.height
@@ -763,14 +827,14 @@ final class SpriteLibrary {
         var hood: CGImage?, hoodGlowing: CGImage?
         if look.human, let here = figure.centres[.head], let there = drawnFor.centres[.head] {
             let hoodHead = hoodHead(skin: look.dressing.skinTone, player: player, view: view)
-            let drawn = hoodHead.drawn.cgImage()
+            let drawn = wornHood(hoodHead.drawn.cgImage())
             hood = drawn
             offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             // The hood glows; its face doesn't.
             if let (hoodContext, hoodPixels) = makeCanvas(width: drawn.width, height: drawn.height),
                let (maskContext, maskPixels) = makeCanvas(width: drawn.width, height: drawn.height) {
                 hoodContext.draw(drawn, in: CGRect(x: 0, y: 0, width: drawn.width, height: drawn.height))
-                maskContext.draw(hoodHead.hood.cgImage(), in: CGRect(x: 0, y: 0, width: drawn.width, height: drawn.height))
+                maskContext.draw(wornHood(hoodHead.hood.cgImage()), in: CGRect(x: 0, y: 0, width: drawn.width, height: drawn.height))
                 for pixel in 0..<(drawn.width * drawn.height) where maskPixels[pixel * 4 + 3] == 0 {
                     for channel in 0..<4 { hoodPixels[pixel * 4 + channel] = 0 }
                 }
@@ -779,10 +843,12 @@ final class SpriteLibrary {
         }
         guard let glowing = glowContext.makeImage() else { return nil }
         let bare = look.human ? recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: true,
-                                         hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view), bareLine: true).bareOutline : nil
+                                         hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped), bareLine: true).bareOutline : nil
         let made = Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
                             centres: figure.centres, tops: SpriteLibrary.partTops(source),
                             line: figure.outline?.cgImage(), frontArm: SpriteLibrary.partsImage(drawn: body, source: source, parts: [.frontArm, .frontHand]),
+                            frontArmLine: SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
+                                                                  hood: look.human ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped) : nil),
                             bareLine: bare?.cgImage(), hoodLine: look.human ? hoodLine(skin: look.dressing.skinTone, view: view)?.cgImage() : nil)
         // Kept in the cache too, so a new look drops it with the rest of the player's.
         cache[key] = SKTexture(cgImage: body)
@@ -871,8 +937,21 @@ final class SpriteLibrary {
         })
     }()
     /// The hooded head's outline for a skin and view: where the body's line and neck go round it.
-    static func hoodShape(skin: Int, view: Int) -> CGImage {
-        view == 0 ? hoodShapes[HumanLook.hoodHeadFrame(skin)] : turnedHoodShapes[view] ?? hoodShapes[HumanLook.hoodHeadFrame(skin)]
+    static func hoodShape(skin: Int, view: Int, flipped: Bool = false) -> CGImage {
+        let shape = view == 0 ? hoodShapes[HumanLook.hoodHeadFrame(skin)] : turnedHoodShapes[view] ?? hoodShapes[HumanLook.hoodHeadFrame(skin)]
+        return flipped ? mirrored(shape) ?? shape : shape
+    }
+    /// A frame's hood shape: its view, mirrored where the head looks back.
+    static func hoodShape(skin: Int, for frame: AnimationFrame) -> CGImage {
+        hoodShape(skin: skin, view: HoodView.of(frame), flipped: HoodView.isFlipped(frame))
+    }
+    /// An image turned round left to right about its middle.
+    static func mirrored(_ image: CGImage) -> CGImage? {
+        guard let (context, _) = canvas(width: image.width, height: image.height) else { return nil }
+        context.translateBy(x: CGFloat(image.width), y: 0)
+        context.scaleBy(x: -1, y: 1)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()
     }
     /// The frame a skin and view's hooded head is drawn from.
     static func hoodSource(skin: Int, view: Int) -> SKTexture {
@@ -1566,8 +1645,26 @@ enum EnergyEffect: CaseIterable {
 enum HoodView {
     static let count = 3
     static let drawnInSkin = 0
-    static let frames: [Animation: [Int: Int]] = [:]
+    static let frames: [Animation: [Int: Int]] = [
+        .esperSlashFloState: [1: 1, 2: 2, 3: 2, 4: 1],
+        .dunk: [0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1],
+        .blast: [3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
+        .ledge: [0: 1, 1: 1, 2: 1, 3: 2, 4: 1],
+        .gunShoot: every(1, of: .gunShoot), .gunShootAir: every(1, of: .gunShootAir), .gunSnipe: every(1, of: .gunSnipe),
+        .gunRun: every(1, of: .gunRun), .gunRunShoot: every(1, of: .gunRunShoot),
+        .layup: [2: 1, 3: 1, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2],
+        .esperSlash: [2: 1, 3: 1, 4: 1],
+        .shoot: [2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
+        .shootAir: [1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1],
+    ]
+    private static func every(_ view: Int, of animation: Animation) -> [Int: Int] {
+        Dictionary(uniqueKeysWithValues: (0..<animation.frameCount).map { ($0, view) })
+    }
     static func of(_ frame: AnimationFrame) -> Int { frames[frame.animation]?[frame.frame] ?? 0 }
+    /// The frames the hooded head is mirrored on, looking back the other way: FloState's snatch
+    /// over its step-through, the pivot as it turns.
+    static let flipped: [Animation: Set<Int>] = [.snatchFloState: [2], .pivot: [2]]
+    static func isFlipped(_ frame: AnimationFrame) -> Bool { flipped[frame.animation]?.contains(frame.frame) ?? false }
 }
 
 /// The run, dash and skid-stop dust's place, art pixels ahead of the feet (mirrored with

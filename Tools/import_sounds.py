@@ -121,9 +121,15 @@ def referenced_names():
 DESTINATION.mkdir(exist_ok=True)
 REFERENCED = referenced_names()
 wanted = set()
+# Two files of one name (boing.ogg and boing.wav): the .wav is the one meant.
+sources = {}
 for sound in sorted(SOURCE.iterdir()):
     if sound.suffix.lower() not in SUFFIXES or sound.name in AMBIENCE:
         continue
+    kept = sources.get(sound.stem.lower())
+    if kept is None or sound.suffix.lower() == ".wav":
+        sources[sound.stem.lower()] = sound
+for sound in sorted(sources.values()):
     if sound.stem.lower() not in REFERENCED:
         print(f"  not played, left out: {sound.name}")
         continue

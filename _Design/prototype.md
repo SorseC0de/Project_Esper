@@ -1295,7 +1295,7 @@ six skins as a strip, and the robot's drawn from the fourth; the player's own, `
 on the frames `HoodView.frames` names it's turned away from the camera instead, side on (view 1) or
 further round (view 2) — FloState's slash 1, 2, 2, 1 over frames 1 to 4, the dunk and every gun sheet
 all 1, the blast 1 from 3, the ledge 1, 1, 1, 2, 1, the layup 1 on 2 and 3 and 2 from 4, the slash 1 on
-2 to 4, the shot 1 from 2, the air shot 1 from 1 (0-based) — and on the frames `HoodView.flipped`
+2 to 4, the shot 1 from 2, the air shot 1 from 1, both throws 1, 2, 2, 1 over 4 to 7 (0-based) — and on the frames `HoodView.flipped`
 names (FloState's snatch's 2, the pivot's 2) it's mirrored, looking back; the body's line, neck and
 the hood's own line are made to the hood as worn, view and mirror alike, from `player_hoodheads_v2`'s second and third frames, drawn in
 the first skin and swapped into the player's two tones, its outline, neck and line made to it:
@@ -2436,7 +2436,7 @@ shown, once, like the effects.
   on its player, at 0.25 (`GameScene.floCollectVolume`), the orbs coming often and fast. flo_max: a
   meter showing full as it fills. flo_state: a body starting its change into FloState, and backward as it leaves it (`floStateExit`). boing: a body
   (not the ball) bouncing off a rim's top or the jellyfish, half a second apart at most from each
-  (`GameScene.playBoing`; `boing.ogg`, the importer taking .ogg now). Only sounds `SoundBoard.Effect` names are packaged (`Tools/import_sounds.py` reads it); the rest stay in `_Audio`, and one no longer named is taken out of the app. These nine are levelled as they're imported to the effects'
+  (`GameScene.playBoing`; `boing.wav`, the importer taking a .wav over another file of the same name). Only sounds `SoundBoard.Effect` names are packaged (`Tools/import_sounds.py` reads it); the rest stay in `_Audio`, and one no longer named is taken out of the app. These nine are levelled as they're imported to the effects'
   middle loudness, -21 dB while sounding, peaks under -3 (`LEVELLED_EFFECTS`, `EFFECT_LEVEL`); the
   effects from before them came in as they are.
 - snatch: the snatch at full stretch. catch: a catch.

@@ -1656,6 +1656,7 @@ enum HoodView {
         .esperSlash: [2: 1, 3: 1, 4: 1],
         .shoot: [2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
         .shootAir: [1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1],
+        .throwForward: [4: 1, 5: 2, 6: 2, 7: 1], .throwAir: [4: 1, 5: 2, 6: 2, 7: 1],
     ]
     private static func every(_ view: Int, of animation: Animation) -> [Int: Int] {
         Dictionary(uniqueKeysWithValues: (0..<animation.frameCount).map { ($0, view) })

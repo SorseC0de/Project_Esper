@@ -4200,7 +4200,7 @@ final class GameScene: SKScene {
 
     /// The view's hold on the last round let go: the computer, the rim flashes, the ball's colour.
     private func freshRoundView() {
-        opponent = Opponent(index: 1)
+        opponent = opponent.forNewRound()
         rimFlash = rimFlash.map { _ in 0 }
         ballTeam = SKColor(rgb: BallLook.neutral)
         ballHold = 0

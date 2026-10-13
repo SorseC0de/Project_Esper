@@ -35,8 +35,15 @@ extension Opponent {
         var candidates: [Vec2]
         var tried = 0
         var found: [ShotSpot] = []
+        /// Within the place being tried: the jump shot's angles yet (after the standing shot's), and
+        /// the next angle, a few played out a frame (`spotAnglesPerFrame`).
+        var jumping = false
+        var nextAngle = 0
         var done: Bool { tried >= candidates.count }
     }
+    /// Shot angles played out a frame in the search for spots: a frame's work kept small, a place
+    /// taking a few frames rather than the whole search's worst in one.
+    static let spotAnglesPerFrame = 3
 
     /// Whether this stage is played by its reading: everywhere but the court the computer was
     /// first taught on.
@@ -196,6 +203,8 @@ extension Opponent {
     @discardableResult
     func walk(to x: Double, me: Player, into input: inout PlayerInput, near: Double = 4) -> Bool {
         let dx = x - me.position.x
+        // Slid past it faster than a walk: let go and come to a stop, rather than turn into a dash back.
+        if Opponent.overshooting(dx, me: me) { return abs(dx) <= near }
         if abs(dx) > 40 {
             input.stick = Vec2(x: dx > 0 ? 1 : -1, y: 0)
         } else if abs(dx) > near {
@@ -454,14 +463,19 @@ extension Opponent {
     }
 
     /// The shot angles, five degrees apart through the shot's range, that go in.
-    func scoringAngles(_ match: Match, body: Player, jumpShot: Bool, stanceSoFar: Int, hoop index: Int, path: [Vec2]?, stopAtFirst: Bool) -> [Double] {
+    /// How many shot angles there are, five degrees apart through the shot's range.
+    static var shotAngleCount: Int { Int(((BallRules.shotAngleMax - BallRules.shotAngleMin) / degrees(5) + 0.001).rounded(.down)) + 1 }
+
+    /// `steps`: only these of the angles, counted from the lowest.
+    func scoringAngles(_ match: Match, body: Player, jumpShot: Bool, stanceSoFar: Int, hoop index: Int, path: [Vec2]?, stopAtFirst: Bool,
+                       steps: Range<Int>? = nil) -> [Double] {
         var stage = match.stage
         stage.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
         guard (path?.contains { $0 != HighwayRules.parked } ?? true), stage.hoops[index].position != HighwayRules.parked || path != nil else { return [] }
         let sign = aimSide(match, from: body.position, hoop: index, path: path)
         var angles: [Double] = []
-        var angle = BallRules.shotAngleMin
-        while angle <= BallRules.shotAngleMax + 0.001 {
+        for step in steps ?? 0..<Opponent.shotAngleCount {
+            let angle = BallRules.shotAngleMin + Double(step) * degrees(5)
             let aim = Vec2(x: Trig.cos(angle) * sign, y: Trig.sin(angle))
             if let (release, velocity, frames) = shotRelease(body, stage: match.stage, aim: aim, jumpShot: jumpShot, stanceSoFar: stanceSoFar) {
                 var ball = Ball(position: release)
@@ -480,7 +494,6 @@ extension Opponent {
                 }
                 if stopAtFirst, !angles.isEmpty { return angles }
             }
-            angle += degrees(5)
         }
         return angles
     }
@@ -547,13 +560,20 @@ extension Opponent {
         if spotSearch?.hoop != index { spotSearch = SpotSearch(hoop: index, candidates: spotCandidates(match, hoop: index)) }
         guard var search = spotSearch, !search.done else { return }
         let feet = search.candidates[search.tried]
-        search.tried += 1
         var body = Player(spec: me.spec, index: me.index, position: feet, facing: match.stage.hoops[index].position.x > feet.x ? .right : .left)
         body.hasBall = true
-        if !scoringAngles(match, body: body, jumpShot: false, stanceSoFar: 0, hoop: index, path: nil, stopAtFirst: true).isEmpty {
-            search.found.append(ShotSpot(feet: feet, jumpShot: false))
-        } else if !scoringAngles(match, body: body, jumpShot: true, stanceSoFar: 0, hoop: index, path: nil, stopAtFirst: true).isEmpty {
-            search.found.append(ShotSpot(feet: feet, jumpShot: true))
+        // A few of this place's angles this frame: the standing shot's, then the jump shot's.
+        let steps = search.nextAngle..<min(search.nextAngle + Opponent.spotAnglesPerFrame, Opponent.shotAngleCount)
+        let scores = !scoringAngles(match, body: body, jumpShot: search.jumping, stanceSoFar: 0, hoop: index, path: nil, stopAtFirst: true, steps: steps).isEmpty
+        search.nextAngle = steps.upperBound
+        if scores || (search.jumping && search.nextAngle >= Opponent.shotAngleCount) {
+            if scores { search.found.append(ShotSpot(feet: feet, jumpShot: search.jumping)) }
+            search.tried += 1
+            search.jumping = false
+            search.nextAngle = 0
+        } else if search.nextAngle >= Opponent.shotAngleCount {
+            search.jumping = true
+            search.nextAngle = 0
         }
         spotSearch = search
     }

@@ -23,8 +23,29 @@ public struct Opponent: Equatable {
     private var plan = Plan.none
     private var planFrames = 0
     private var shuffleDirection = 1.0
+    /// How far off the rim it hangs back while hovering, picked as the hover starts.
+    private var hoverOffset = 55.0
+    /// The dash dance before a shot: dashes still to go, which way the next goes, frames into this
+    /// one; and whether this shot has had its dance, so it isn't rolled for again until the stance.
+    private var dashDanceLeft = 0
+    private var dashDanceDirection = 1.0
+    private var dashDanceFrame = 0
+    private var dancedForShot = false
+    /// A dash dance's chance at the spot, and each dash's frames: one with the stick centred, so
+    /// the push reads as a smash, then the stick held the way it goes.
+    static let dashDanceChance: UInt32 = 25
+    static let dashDanceFrames = 8
     private var fakeHold = 0
     private var stanceFrames = 0
+    /// The aim worked out for the shot under way: found once, on its first frame that asks, and kept
+    /// to the release. The sim is deterministic, so playing the shot out again later finds the same.
+    private struct AimMemo: Equatable {
+        var stanceStart: Int
+        var hoop: Int
+        var jumpShot: Bool
+        var aim: Vec2?
+    }
+    private var aimMemo: AimMemo?
     private var rest = 0
     private var stepFrames = 0
     /// Dances in a row without getting anywhere, so it doesn't wait forever.
@@ -62,6 +83,8 @@ public struct Opponent: Equatable {
         /// backing off, going to the spot, shooting from it, the lob up and over, over
         /// them on two jumps, and climbing out from behind the block.
         case hold, shuffle, fake, dart, retreat, travel, shoot, lob, over, climb
+        /// At its spot, before a shot it's going to take: a short dash dance, to mix up the timing.
+        case dashDance
         /// Without it: the guard spot, walking up to press, the dash in and swing, and
         /// hanging back a little off the rim.
         case guardSpot, pressure, strike, hover
@@ -77,11 +100,23 @@ public struct Opponent: Equatable {
     /// The plan it's on, for the corner readout.
     public var current: Plan { plan }
 
+    /// A fresh mind for a new point that keeps what it read of the stage and the shot spots it
+    /// found: they're re-read only when the stage or the body changes (`Terrain.signature`).
+    public func forNewRound() -> Opponent {
+        var fresh = Opponent(index: index)
+        fresh.terrain = terrain
+        fresh.spotSearch = spotSearch
+        return fresh
+    }
+
     /// One frame of input for the match as it stands.
     public mutating func decide(_ match: Match) -> PlayerInput {
         guard match.players.indices.contains(index), let human = match.players.first(where: { $0.index != index }) else { return .idle }
         let me = match.players[index]
         var input = PlayerInput.idle
+        // Every stage is read, the court too, for what its own play can't reach: over the
+        // countdown, while nothing moves, rather than in the first seconds of play.
+        readStage(match, me: me)
         if match.countdown > 0 {
             plan = .none
             planFrames = 0
@@ -102,8 +137,6 @@ public struct Opponent: Equatable {
             humanThrowCharge = 0
         }
         let readsStage = Opponent.readsStage(match)
-        // Every stage is read, the court too, for what its own play can't reach.
-        readStage(match, me: me)
         // Its rim's shot spots, found by trying shots, on every stage.
         let scoringHoop = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
         if match.hoopfish == nil, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
@@ -330,6 +363,7 @@ public struct Opponent: Equatable {
         // the windup and lets go on the rise with the aim solved for the lift.
         if me.state == .shootStance {
             stanceFrames += 1
+            dancedForShot = false
             // A stance outliving its plan, a fake's run out before it was called off, is called
             // off now: never a shot it didn't pick.
             if plan != .fake, plan != .shoot {
@@ -351,10 +385,14 @@ public struct Opponent: Equatable {
                     input.shoot = true
                     if stanceFrames > BallRules.shotWindupFrames { fullHop(&input) }
                 } else {
-                    guard let aim = aimShot(match, me: me, hoop: hoopIndex, path: rimPath) else {
-                        // Nothing goes in from here: the stance called off, the ball kept.
+                    guard let aim = aimShotOnce(match, me: me, hoop: hoopIndex, path: rimPath) else {
+                        // Nothing goes in from here: the stance called off, the ball kept, and the
+                        // spot given up, so it doesn't come back for the same shot.
                         input.shoot = true
                         tapThrow(&input)
+                        plan = .none
+                        planFrames = 0
+                        readSpot = nil
                         return
                     }
                     input.aim = aim
@@ -362,15 +400,16 @@ public struct Opponent: Equatable {
                 }
                 return
             }
-            if let aim = aimShot(match, me: me, hoop: hoopIndex, path: rimPath) {
+            if let aim = aimShotOnce(match, me: me, hoop: hoopIndex, path: rimPath) {
                 input.aim = aim
                 input.shoot = stanceFrames <= BallRules.shotWindupFrames + 1 && !(inReach && !committed)
             } else {
-                // Nothing goes in from here: the stance called off, the ball kept.
+                // Nothing goes in from here: the stance called off, the ball kept, and the spot given up.
                 input.shoot = true
                 tapThrow(&input)
                 plan = .none
                 planFrames = 0
+                readSpot = nil
                 }
             return
         }
@@ -455,6 +494,16 @@ public struct Opponent: Equatable {
                     plan = .hold
                     planFrames = 4
                 }
+            } else if atSpot, !dancedForShot, chance(Opponent.dashDanceChance) {
+                // Now and then a dash dance first, back and forth so it ends where it began.
+                plan = .dashDance
+                dashDanceLeft = chance(50) ? 2 : 4
+                // First away from them, so it isn't danced into their arms.
+                dashDanceDirection = gap > 0 ? -1 : 1
+                dashDanceFrame = 0
+                planFrames = dashDanceLeft * Opponent.dashDanceFrames + 1
+                dancedForShot = true
+                dances = 0
             } else if atSpot {
                 plan = .shoot
                 planFrames = 90
@@ -552,6 +601,21 @@ public struct Opponent: Equatable {
             } else {
                 travel(to: target, me: me, human: human, into: &input)
             }
+        case .dashDance:
+            // Each dash a centred frame then the stick held; the next the other way. Done, the shot.
+            if dashDanceLeft <= 0 {
+                plan = .shoot
+                planFrames = 90
+                jumpShot = readSpot?.jumpShot ?? true
+                break
+            }
+            if dashDanceFrame > 0 { input.stick = Vec2(x: dashDanceDirection, y: 0) }
+            dashDanceFrame += 1
+            if dashDanceFrame >= Opponent.dashDanceFrames {
+                dashDanceFrame = 0
+                dashDanceLeft -= 1
+                dashDanceDirection = -dashDanceDirection
+            }
         case .shoot:
             // Pressed afresh: a stance only starts on a press.
             if !atSpot, me.grounded {
@@ -598,9 +662,16 @@ public struct Opponent: Equatable {
 
     /// Along the floor to under the target, then up onto it if it's the ledge: a full hop
     /// and the double jump at the top when it's still short.
+    /// Going away from a point it's after, faster than it walks, on the ground: past it at a run or
+    /// a dash. Reversing then is a turnaround dash, and the next overshoot another, a dance.
+    static func overshooting(_ dx: Double, me: Player) -> Bool {
+        me.grounded && abs(dx) <= 40 && me.velocity.x * dx < 0 && abs(me.velocity.x) > me.spec.walkMaxSpeed
+    }
+
     private mutating func travel(to target: Vec2, me: Player, human: Player, into input: inout PlayerInput) {
         let dx = target.x - me.position.x
         let dy = target.y - me.position.y
+        if Opponent.overshooting(dx, me: me) { return }
         if dy > 5 {
             if abs(dx) > 8, me.grounded {
                 input.stick = Vec2(x: dx > 0 ? (abs(dx) > 40 ? 1 : 0.5) : (abs(dx) > 40 ? -1 : -0.5), y: 0)
@@ -629,6 +700,14 @@ public struct Opponent: Equatable {
 
     /// The flick for the shot from where it is: the ball's own flight tried, the rim followed
     /// where it moves, on every stage.
+    private mutating func aimShotOnce(_ match: Match, me: Player, hoop hoopIndex: Int, path: [Vec2]?) -> Vec2? {
+        let stanceStart = match.frame - stanceFrames
+        if let memo = aimMemo, memo.stanceStart == stanceStart, memo.hoop == hoopIndex, memo.jumpShot == jumpShot { return memo.aim }
+        let aim = aimShot(match, me: me, hoop: hoopIndex, path: path)
+        aimMemo = AimMemo(stanceStart: stanceStart, hoop: hoopIndex, jumpShot: jumpShot, aim: aim)
+        return aim
+    }
+
     private func aimShot(_ match: Match, me: Player, hoop hoopIndex: Int, path: [Vec2]?) -> Vec2? {
         aimByFlight(match, me: me, jumpShot: jumpShot, stanceSoFar: stanceFrames - 1, hoop: hoopIndex, path: path)
     }
@@ -730,12 +809,14 @@ public struct Opponent: Equatable {
             switch roll(10) {
             case 0...5: plan = .guardSpot
             case 6...7: plan = .pressure
-            default: plan = .hover
+            default:
+                plan = .hover
+                hoverOffset = 55 + Double(roll(2)) * 10
             }
             planFrames = 60 + Int(roll(90))
         }
         if plan == .hover {
-            let hoverX = hoop.position.x + side * (55 + Double(roll(2)) * 10)
+            let hoverX = hoop.position.x + side * hoverOffset
             let toHover = hoverX - me.position.x
             if readsStage {
                 go(to: Vec2(x: hoverX, y: hoop.position.y - 40), match: match, me: me, into: &input, near: 8)

@@ -1446,10 +1446,22 @@ through a one-way, if there is one: down with the ball standing is the taunt.
   the other is on the side it's headed.
 - Hazards (`dodgeHazards`): on the ground it steps out from under the lightning's line in its
   last 45 frames, and from under an icicle falling toward it or about to drop.
-- Shots: a still rim's shot spots are found by trying shots, one place a frame, on the surfaces 25
-  to 140 in front of it; a spot is a jump shot's if a shot off the floor won't go in. Every shot's
-  flick is found by playing the shot out (a copy of the body through the rest of the stance, the
-  jump, the release) and then the ball's own flight, the middle of the angles that go in.
+- Shots: a still rim's shot spots are found by trying shots, three angles a frame
+  (`spotAnglesPerFrame`), the floor shot's then the jump shot's, a place every few frames, on the
+  surfaces 25 to 140 in front of it; a spot is a jump shot's if a shot off the floor won't go in.
+  Every shot's flick is found by playing the shot out (a copy of the body through the rest of the
+  stance, the jump, the release) and then the ball's own flight, the middle of the angles that go
+  in, worked out once a shot and kept to its release (`aimMemo`). A shot called off because nothing
+  from there goes in gives the spot up, so it picks another rather than trying the same again.
+- Its reading of the stage (`readStage`, 2000 body-frames a frame) happens over the countdown, and
+  a new point keeps it (`Opponent.forNewRound`): before, it ran in the first seconds of every
+  point, 40 to 75 ms a frame in a debug build.
+- Walking to a point it stops rather than turning when it has slid past at more than a walk
+  (`Opponent.overshooting`), and the hover's distance off the rim is picked once a hover, not every
+  frame: both had it flicking the stick back and forth, a dash dance by accident. On purpose, a
+  quarter of the times it reaches a spot to shoot from, it dash dances first: two or four dashes,
+  the first away from the other, each a centred frame then a seven-frame push, ending where it
+  began, then the shot (`Plan.dashDance`).
 - A rim that moves, Hoopfish Hideaway's, is followed ahead by stepping a copy of the Hoopfish: it
   shoots at where the rim will be, from under where it'll be in a second and a half, and only
   once a shot played out from there goes in (waiting for the rim to come round if none does,

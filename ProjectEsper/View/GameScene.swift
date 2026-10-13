@@ -2540,9 +2540,14 @@ final class GameScene: SKScene {
             switch wall.kind {
             case .solid where above == nil:
                 rainSplashSpots.append((x...(x + tile), { _ in top }, 0))
-            case .lowerLeft, .slideLowerLeft where x < CGFloat(stage.columns) * tile / 2:
+            // As it has always run: a plain slope anywhere, a slide slope only on the left half.
+            case .lowerLeft:
                 rainSplashSpots.append((x...(x + tile), { at in bottom + (x + tile - at) }, -.pi / 4))
-            case .lowerRight, .slideLowerRight where x < CGFloat(stage.columns) * tile / 2:
+            case .slideLowerLeft where x < CGFloat(stage.columns) * tile / 2:
+                rainSplashSpots.append((x...(x + tile), { at in bottom + (x + tile - at) }, -.pi / 4))
+            case .lowerRight:
+                rainSplashSpots.append((x...(x + tile), { at in bottom + (at - x) }, .pi / 4))
+            case .slideLowerRight where x < CGFloat(stage.columns) * tile / 2:
                 rainSplashSpots.append((x...(x + tile), { at in bottom + (at - x) }, .pi / 4))
             default:
                 break
@@ -7378,7 +7383,7 @@ final class GameScene: SKScene {
         planeNode?.position = stageGround.convert(FlightB411Art.stageCentre + CGPoint(x: 0, y: FlightB411Art.planeY), to: self)
         // Each hoop's case: hanging from its bin's mask line, as far out as its slide is, swung
         // a share of the lean about that line; away with nothing to hang from.
-        for (index, hoop) in match.stage.hoops.enumerated() where index < hoopcaseNodes.count && index < hoopcaseFronts.count {
+        for index in match.stage.hoops.indices where index < hoopcaseNodes.count && index < hoopcaseFronts.count {
             let bin = match.bins.indices.first { match.bins[$0].open && match.bins[$0].load == .hoop }
             guard let bin else {
                 hoopcaseNodes[index].isHidden = true

@@ -1,4 +1,4 @@
-import GameKit
+@preconcurrency import GameKit
 import UIKit
 
 /// Game Center: signing in, finding the other phone through GameKit's matchmaker behind the
@@ -286,7 +286,7 @@ extension GameCenter {
                 let loaded = (matches ?? []).sorted { a, b in
                     let aMine = self.isLocalTurn(a), bMine = self.isLocalTurn(b)
                     if aMine != bMine { return aMine }
-                    return (a.creationDate ?? .distantPast) > (b.creationDate ?? .distantPast)
+                    return a.creationDate > b.creationDate
                 }
                 self.turnMatches = loaded
                 self.turnNote = error.map { self.short($0).uppercased() } ?? (loaded.isEmpty ? "NO MATCHES YET" : nil)
@@ -383,7 +383,9 @@ extension GameCenter {
 
     /// Out of a match: quit, in turn or not, and the match off the list.
     func quitTurnMatch(_ match: GKTurnBasedMatch) {
-        let finish: (Error?) -> Void = { [weak self] _ in
+        // GameKit's objects aren't Sendable; they're only handed back to the main thread here.
+        nonisolated(unsafe) let match = match
+        let finish: @Sendable (Error?) -> Void = { [weak self] _ in
             match.remove { _ in DispatchQueue.main.async { self?.loadTurnMatches() } }
         }
         if match.status == .ended {
@@ -403,6 +405,7 @@ extension GameCenter {
 extension GameCenter: GKTurnBasedEventListener {
     /// A turn came in, or a match's over: the list again; tapped in a notification, the match opens.
     nonisolated func player(_ player: GKPlayer, receivedTurnEventFor match: GKTurnBasedMatch, didBecomeActive: Bool) {
+        nonisolated(unsafe) let match = match
         DispatchQueue.main.async {
             self.loadTurnMatches()
             if didBecomeActive { self.onTurnTapped?(match) }
@@ -414,12 +417,14 @@ extension GameCenter: GKTurnBasedEventListener {
     }
 
     nonisolated func player(_ player: GKPlayer, wantsToQuitMatch match: GKTurnBasedMatch) {
+        nonisolated(unsafe) let match = match
         DispatchQueue.main.async { self.quitTurnMatch(match) }
     }
 }
 
 extension GameCenter: GKMatchDelegate {
     nonisolated func match(_ match: GKMatch, didReceive data: Data, fromRemotePlayer player: GKPlayer) {
+        nonisolated(unsafe) let match = match
         DispatchQueue.main.async {
             guard match === self.match else { return }
             self.settleIfEveryoneIsHere(dataArrived: true)
@@ -428,6 +433,7 @@ extension GameCenter: GKMatchDelegate {
     }
 
     nonisolated func match(_ match: GKMatch, player: GKPlayer, didChange state: GKPlayerConnectionState) {
+        nonisolated(unsafe) let match = match
         DispatchQueue.main.async {
             guard match === self.match else { return }
             switch state {
@@ -442,6 +448,7 @@ extension GameCenter: GKMatchDelegate {
     }
 
     nonisolated func match(_ match: GKMatch, didFailWithError error: Error?) {
+        nonisolated(unsafe) let match = match
         DispatchQueue.main.async {
             guard match === self.match else { return }
             self.onDisconnect?(error.map { self.short($0).uppercased() } ?? "CONNECTION LOST")
@@ -457,6 +464,7 @@ extension GameCenter: GKLocalPlayerListener {
     /// An invite accepted from Game Center's own notification: the multiplayer screen opens
     /// on the joining, and the match is made from the invite.
     nonisolated func player(_ player: GKPlayer, didAccept invite: GKInvite) {
+        nonisolated(unsafe) let invite = invite
         DispatchQueue.main.async {
             guard self.match == nil else { return }
             self.invited = []

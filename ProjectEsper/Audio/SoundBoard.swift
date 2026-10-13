@@ -82,7 +82,7 @@ final class SoundBoard {
     private var ready = false
     private var restartPending = false
 
-    static let enabled = true
+    nonisolated static let enabled = true
 
     private init() {}
 
@@ -203,8 +203,8 @@ final class SoundBoard {
     static let lightning: [Effect] = [.lightningOne, .lightningTwo, .lightningThree]
     /// The menus' two sounds: moving the cursor, and choosing. menu_cursor was too loud
     /// beside everything else; the old choice sound moves to the cursor.
-    static let navigate = Effect.menuSelect
-    static let confirm = Effect.menuSelectV2
+    nonisolated static let navigate = Effect.menuSelect
+    nonisolated static let confirm = Effect.menuSelectV2
     /// Played back to front.
     nonisolated private static let reversed: Set<Effect> = [.menuSelectV2, .floStateExit]
     /// Louder than their files, which a voice's volume can't go past: the step is recorded

@@ -50,7 +50,9 @@ final class SpriteLibrary {
         looks[energyForm] = look.transformed
         let turned = SpriteLibrary.turnedPlayer(player)
         looks[turned] = look.turnedRound
-        cache = cache.filter { !$0.key.hasPrefix("p\(player)_") && !$0.key.hasPrefix("p\(energyForm)_") && !$0.key.hasPrefix("p\(turned)_") }
+        dropPlayer(player)
+        dropPlayer(energyForm)
+        dropPlayer(turned)
         rewarm(player: player)
         rewarm(player: energyForm)
         // Turned round, only where it differs: built ahead, so turning never makes frames.
@@ -63,14 +65,14 @@ final class SpriteLibrary {
         let slot = SpriteLibrary.customizePlayer(player)
         guard look != looks[slot] else { return }
         looks[slot] = look
-        cache = cache.filter { !$0.key.hasPrefix("p\(slot)_") }
+        dropPlayer(slot)
     }
 
     /// Every player's frames dropped and rebuilt, for a change to how all looks are drawn; the
     /// customize screen's sides dropped, made again as it asks.
     func redrawPlayers() {
         for player in looks.indices {
-            cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
+            dropPlayer(player)
             if player < SpriteLibrary.customizePlayer(0) { rewarm(player: player) }
         }
     }
@@ -79,6 +81,13 @@ final class SpriteLibrary {
     static let tonedParticleSheets = ["lightning_particle", "lightning_particle2"]
     private var rewarmGeneration: [Int: Int] = [:]
     private let rewarmQueue = DispatchQueue(label: "SpriteLibrary.rewarm", qos: .userInitiated)
+    /// Pieces asked for that came out empty (a frame with no front arm), so they aren't made again
+    /// every frame; dropped with the player's cache.
+    private var emptyPieces: Set<String> = []
+    private func dropPlayer(_ player: Int) {
+        cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
+        emptyPieces = emptyPieces.filter { !$0.hasPrefix("p\(player)_") }
+    }
     /// Each player's rebuild underway: its pieces made, of all of them, for the loading bar;
     /// and the pieces of the ones done (or overtaken, counted whole) since nothing was loading,
     /// so the count only ever climbs until it's all done.
@@ -150,25 +159,34 @@ final class SpriteLibrary {
             var built: [String: SKTexture] = [:]
             var builtLandmarks: [String: [BodyPart: CGPoint]] = [:]
             var made = 0
-            func count() {
+            let lock = NSLock()
+            /// One piece made, kept under the lock: the pieces are made on every core at once.
+            func keep(_ textures: [String: SKTexture], landmarks: (key: String, marks: [BodyPart: CGPoint])? = nil) {
+                lock.lock()
+                built.merge(textures) { _, new in new }
+                if let landmarks { builtLandmarks[landmarks.key] = landmarks.marks }
                 made += 1
-                guard made % SpriteLibrary.loadingReportEvery == 0 else { return }
                 let so = made
+                lock.unlock()
+                guard so % SpriteLibrary.loadingReportEvery == 0 else { return }
                 DispatchQueue.main.async { self.reportRebuilding(player, generation: generation, made: so) }
             }
-            for job in frameJobs {
-                let frameMade = makeFrame(job.frame, source: job.source, look: look, holdsBall: job.holdsBall)
-                for (suffix, texture) in frameMade.textures { built[job.key + suffix] = texture }
-                builtLandmarks[job.key] = frameMade.landmarks
-                count()
+            // The sheets' images read out one at a time first, so the cores share nothing of SpriteKit's.
+            // And the hood shapes, read out here once rather than first on some core.
+            _ = (SpriteLibrary.hoodShapes, SpriteLibrary.turnedHoodShapes, SpriteLibrary.hoodDrawnForHead)
+            let frameSources = frameJobs.map { $0.source.cgImage() }
+            let tonedSources = tonedJobs.map { $0.source.cgImage() }
+            let silhouetteSources = silhouetteJobs.map { $0.source.cgImage() }
+            DispatchQueue.concurrentPerform(iterations: frameJobs.count) { index in
+                let job = frameJobs[index]
+                let frameMade = self.makeFrame(job.frame, source: frameSources[index], look: look, holdsBall: job.holdsBall)
+                keep(Dictionary(uniqueKeysWithValues: frameMade.textures.map { (job.key + $0.key, $0.value) }), landmarks: (job.key, frameMade.landmarks))
             }
-            for job in tonedJobs {
-                built[job.key] = makeToned(job.source, look: look, capped: job.capped)
-                count()
+            DispatchQueue.concurrentPerform(iterations: tonedJobs.count) { index in
+                keep([tonedJobs[index].key: self.makeToned(image: tonedSources[index], look: look, capped: tonedJobs[index].capped)])
             }
-            for job in silhouetteJobs {
-                built[job.key] = makeSilhouette(job.source, look: look)
-                count()
+            DispatchQueue.concurrentPerform(iterations: silhouetteJobs.count) { index in
+                keep([silhouetteJobs[index].key: self.makeSilhouette(image: silhouetteSources[index], look: look)])
             }
             DispatchQueue.main.async {
                 guard self.rewarmGeneration[player] == generation else { return }
@@ -259,7 +277,7 @@ final class SpriteLibrary {
     func texture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture {
         let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
         if let texture = cache[key] { return texture }
-        let made = makeFrame(frame, source: atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)"),
+        let made = makeFrame(frame, source: atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage(),
                              look: look(for: player), holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted)
         for (suffix, texture) in made.textures { cache[key + suffix] = texture }
         landmarks[key] = made.landmarks
@@ -286,10 +304,10 @@ final class SpriteLibrary {
         return swapped
     }
 
-    private func makeFrame(_ frame: AnimationFrame, source: SKTexture, look: Look, holdsBall: Bool) -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint]) {
+    private func makeFrame(_ frame: AnimationFrame, source: CGImage, look: Look, holdsBall: Bool) -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint]) {
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
         let look = SpriteLibrary.look(look, for: frame)
-        let result = recolour(source, look: look, holdsBall: holdsBall, detach: true,
+        let result = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
                               hoodShape: look.human ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil,
                               bareLine: SpriteLibrary.tippingHead.contains(frame.animation))
         var textures = ["": result.texture]
@@ -352,9 +370,13 @@ final class SpriteLibrary {
     func frontArmGlowingTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
         let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_frontarmglowing"
         if let made = cache[key] { return made }
+        guard !emptyPieces.contains(key) else { return nil }
         guard let glowing = glowingPartsTexture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted),
               let image = SpriteLibrary.partsImage(drawn: glowing.cgImage(), source: atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage(),
-                                                   parts: [.frontArm, .frontHand]) else { return nil }
+                                                   parts: [.frontArm, .frontHand]) else {
+            emptyPieces.insert(key)
+            return nil
+        }
         let made = SKTexture(cgImage: image)
         made.filteringMode = .nearest
         cache[key] = made
@@ -459,9 +481,13 @@ final class SpriteLibrary {
         let look = look(for: player)
         let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)_frontarmline"
         if let made = cache[key] { return made }
+        guard !emptyPieces.contains(key) else { return nil }
         let source = atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage()
         guard let image = SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
-                                                  hood: look.human ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil) else { return nil }
+                                                  hood: look.human ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil) else {
+            emptyPieces.insert(key)
+            return nil
+        }
         let made = SKTexture(cgImage: image)
         made.filteringMode = .nearest
         cache[key] = made
@@ -516,9 +542,10 @@ final class SpriteLibrary {
     private func partsTexture(_ frame: AnimationFrame, player: Int, parts: Set<BodyPart>, suffix: String, ballAsEnergy: Bool, ballLifted: Bool) -> SKTexture? {
         let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + suffix
         if let made = cache[key] { return made }
+        guard !emptyPieces.contains(key) else { return nil }
         let drawn = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).cgImage()
         let source = atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage()
-        guard let image = SpriteLibrary.partsImage(drawn: drawn, source: source, parts: parts) else { return nil }
+        guard let image = SpriteLibrary.partsImage(drawn: drawn, source: source, parts: parts) else { emptyPieces.insert(key); return nil }
         let made = SKTexture(cgImage: image)
         made.filteringMode = .nearest
         cache[key] = made
@@ -571,8 +598,9 @@ final class SpriteLibrary {
     }
 
     /// A frame as a silhouette in a look's white energy; touches nothing kept.
-    private func makeSilhouette(_ source: SKTexture, look: Look) -> SKTexture {
-        let image = source.cgImage()
+    private func makeSilhouette(_ source: SKTexture, look: Look) -> SKTexture { makeSilhouette(image: source.cgImage(), look: look) }
+    private func makeSilhouette(image: CGImage, look: Look) -> SKTexture {
+        let source = SKTexture(cgImage: image)
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
@@ -858,8 +886,9 @@ final class SpriteLibrary {
 
     /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which
     /// stops at the colour; touches nothing kept.
-    private func makeToned(_ source: SKTexture, look: Look, capped: Bool = false) -> SKTexture {
-        let image = source.cgImage()
+    private func makeToned(_ source: SKTexture, look: Look, capped: Bool = false) -> SKTexture { makeToned(image: source.cgImage(), look: look, capped: capped) }
+    private func makeToned(image: CGImage, look: Look, capped: Bool = false) -> SKTexture {
+        let source = SKTexture(cgImage: image)
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return source }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
@@ -1124,7 +1153,15 @@ final class SpriteLibrary {
     private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
                           bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?) {
-        let image = texture.cgImage()
+        recolour(image: texture.cgImage(), look: look, holdsBall: holdsBall, detach: detach, hood: given, hoodShape: hoodShape, bareLine: bareLine)
+    }
+
+    /// The same from the sheet's image itself: what the rebuild's cores are handed, so none of them
+    /// reads a texture back through SpriteKit (which opens a GPU context on each thread that does).
+    private func recolour(image: CGImage, look: Look, holdsBall: Bool, detach: Bool,
+                          hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
+                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?) {
+        let texture = SKTexture(cgImage: image)
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))

@@ -39,7 +39,8 @@ final class FlowState: ObservableObject {
         scene.onLoading = { [weak self] progress in
             guard let self else { return }
             let slots = progress.map { Int($0 * Double(FlowState.loadingSlotCount)) }
-            if slots != self.loadingSlots { self.loadingSlots = slots }
+            // Told after: a look's change starts a rebuild from inside a view's update.
+            DispatchQueue.main.async { if slots != self.loadingSlots { self.loadingSlots = slots } }
         }
         SoundBoard.shared.prepare()
         // An invite accepted from outside the game opens the multiplayer screen on the joining.

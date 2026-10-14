@@ -274,8 +274,13 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             return makeTexture(width: Int((box.width * fit.scale).rounded()), height: Int((box.height * fit.scale).rounded()))
         }
         makeGlowTextures(for: size)
-        scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor,
-                         framingScale: (view as? GameMetalView)?.framingScale, insets: view.safeAreaInsets)
+        // Laid out just after: a new size arrives inside SwiftUI's own layout, and the scene's
+        // layout publishes to it (the pause button's place, the screens' grounds).
+        DispatchQueue.main.async { [weak self, weak view] in
+            guard let self, let view else { return }
+            self.scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor,
+                              framingScale: (view as? GameMetalView)?.framingScale, insets: view.safeAreaInsets)
+        }
     }
 
     private func makeGlowTextures(for size: CGSize) {

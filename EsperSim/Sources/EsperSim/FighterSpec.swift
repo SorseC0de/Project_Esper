@@ -561,11 +561,14 @@ public enum HitStopRules {
 
 /// FloState's slash, on the ground or in the air: one attack, a step through forward the FloState snatch's
 /// distance while its sheet's nine frames play through, both its swings, at 30 a second. The
-/// blade's box is live from its first frame to its last, and hits once.
+/// blade's box is live from its first frame to its last and hits once a swing: twice in all, the
+/// second swing from its sheet's fifth frame.
 public enum FloSlashRules {
     public static let sheetFramesPerSecond = 30
     public static let sheetFrames = 9
     public static var frames: Int { simFrames(sheetFrames, at: sheetFramesPerSecond) }
+    public static let secondSwingSheetFrame = 4
+    public static var secondSwingFrame: Int { simFrames(secondSwingSheetFrame, at: sheetFramesPerSecond) }
     public static var travel: Double { SnatchRules.floStateTravel }
 }
 

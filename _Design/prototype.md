@@ -192,7 +192,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   square sheets, `Animation.pixelWidth`): the whole sheet, both its swings, at 30 a second while
   the body is carried the snatch's 96 art pixels forward (`FloSlashRules`, `Player.floSlash`,
   protocol 142; a back step and a combo of them were tried and dropped as oppressive). The blade's
-  box is live from its first frame to its last and hits once; the rainbow afterimages trail it. In
+  box is live from its first frame to its last and hits once a swing, twice in all: from the sheet's
+  fifth frame (`secondSwingFrame`, 8 sim frames in) the blade's live again and the swing's sound plays
+  again, a second strike its own hit, spark and word; the rainbow afterimages trail it. In
   the air gravity is cut to the plain slash's share so the body hangs through it, and the roll follows
   (protocol 143). The sheet draws the ball taken from its fourth frame on; a snatch that took
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
@@ -1595,10 +1597,13 @@ it, toward the court (15°, a dunk 25°), the 2X keeping the rim's top.
 A body or the ball springing off a rim's top, past the bounce's floor (0.6), says BOING! / ボヨーン！ / ¡BOING!
 (5 high as a squeak, white over teal, palette 20, a rim's once in half a second at most so a body
 working down its board doesn't keep saying it) up off the rim, away from its backboard.
-One word an action: a frame's words are gathered first, and a power's or a stage's own word
-(`Sound.isSpecial`: the beam, a burst, the quake, a freeze, an explosion, a sizzle, a shatter, thunder)
-drops any generic one said within 32 units of it the same frame, as an ice snatch's CRACK! over its
-WHAM! or a fireball's KABOOM! over the hit it lands.
+One word an action: a frame's words are gathered first, each with a rank (`Sound.rank`): a power's or
+a stage's own word 3 (`Sound.isSpecial`: the beam, a burst, the quake, a freeze, an explosion, a sizzle,
+a shatter, thunder), a contest's outcome 2 (TING!, CLANG), a blow 1 (WHAM!, SMACK!, THWACK!), the rest 0.
+Of the words within 32 units of each other only the highest-ranked shows, as an ice snatch's CRACK! over
+its WHAM!, a fireball's KABOOM! over the hit it lands, a parry's TING! over its strip's WHAM!; and for a
+fifth of a second after a word of rank 1 or more none lower shows within 32 units of it, for an action
+whose words come a frame apart (`recentWords`).
 A loose ball's bounce faster than 1.5 says BOMP / ダム (8 high) out of where it hit, the way it's going;
 so does a dribble's, with its sound, as small as a footstep run's (5), out of the floor under the ball
 (off a ledge, the floor below it, where the ball's drawn reaching down to), the way the dribbler faces.
@@ -1747,9 +1752,12 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   layers and the shadows, but only those within its window round the ball and a margin:
   the rest cost one position check each, so a busy field costs it little. Emitters and
   shapes (webs, the pulse) aren't copied; the portal is sprites, so it is.
-- On a Mac (the iPad app, `isiOSAppOnMac`) the game renders at one pixel a point, 1366 by 1024
-  in the 12.9-inch iPad Pro's window rather than its 2732 by 2048, doubled up unsmoothed as on the
-  TV (`GameMetalView.onMac`): at full size the GPU frame took about 39 ms standing still.
+- On a Mac (the iPad app, `isiOSAppOnMac`) the camera's framing is worked out at the screen's own
+  scale, as everywhere (`framingScale`), and the drawable is a share of it (`GameScene.renderShare`):
+  half, 1366 by 1024 in the 12.9-inch iPad Pro's window, doubled up unsmoothed as on the TV, where
+  the fit's screen pixels a game pixel are even (each game pixel still whole) or the stage is fitted
+  rather than drawn by whole pixels; all of it otherwise. At full size the GPU frame took about 39 ms
+  standing still; drawing at one pixel a point outright had zoomed the Wreck Center out.
 - On the TV the game renders at 1080p whatever the screen, the pixel art doubled onto a
   4K one unsmoothed (the HUD and menus stay at 4K); the Apple TV 4K's GPU spent about 50 ms
   a frame at 4K, most of it the glow and the composite. The glow there is half size with

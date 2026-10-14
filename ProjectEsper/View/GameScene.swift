@@ -390,6 +390,11 @@ final class GameScene: SKScene {
     /// The HUD's scale for this screen, and the ice everything frozen goes.
     private var hudScale: CGFloat = 1
     private var displayScale: CGFloat = 1
+    private var framingScale: CGFloat = 1
+    /// The share of the screen's scale it can be drawn at and keep every game pixel whole on the
+    /// drawable: a half where the fit's screen pixels a game pixel are even, or the stage is fitted
+    /// rather than drawn by whole pixels anyway; else all of it. The Mac draws at it.
+    private(set) var renderShare: CGFloat = 1
     private static let ice = SKColor(red: 0.62, green: 0.86, blue: 1, alpha: 1)
     private static let fireballColour = SKColor(red: 1, green: 0.45, blue: 0.15, alpha: 1)
     private static let flightTilt: CGFloat = .pi / 6
@@ -958,7 +963,9 @@ final class GameScene: SKScene {
     required init?(coder: NSCoder) { fatalError() }
 
     /// The Metal view calls this with its size in points whenever that or the safe area changes.
-    func attach(size: CGSize, displayScale: CGFloat, insets: UIEdgeInsets) {
+    /// `displayScale`: drawable pixels a point; `framingScale`: the screen's own, which the camera's
+    /// whole-pixel fit is worked out at, so drawing at a share of it frames the stage the same.
+    func attach(size: CGSize, displayScale: CGFloat, framingScale: CGFloat? = nil, insets: UIEdgeInsets) {
         self.size = size
         hudScene.size = size
         safeInsets = insets
@@ -968,7 +975,8 @@ final class GameScene: SKScene {
             built = true
         }
         self.displayScale = displayScale
-        layout(displayScale: displayScale)
+        self.framingScale = framingScale ?? displayScale
+        layout(displayScale: self.framingScale)
     }
 
     // MARK: Building
@@ -2357,7 +2365,7 @@ final class GameScene: SKScene {
         builtStage = series.stage
         ballCamStale = true
         cameraBase = .zero
-        layout(displayScale: displayScale)
+        layout(displayScale: framingScale)
     }
 
     /// A soft glow in the colour, added, which the glow pass then picks up.
@@ -3282,6 +3290,8 @@ final class GameScene: SKScene {
         // water off the top, a squarer screen shows more of it.
         // A stage seen whole (the plane at its lean, K&A) is fitted to the screen, edge to edge.
         let fills = match.stage.features.look == .hoopfishHideaway && !wholeStageView
+        let wholePixels = !match.stage.features.seenWhole && !wholeStageView && !fills
+        renderShare = !wholePixels || Int(screenPixelsPerGamePixel) % 2 == 0 ? 0.5 : 1
         let pointsPerGamePixel = match.stage.features.seenWhole ? flightB411Fit(tilt: CGFloat(match.stage.tilt))
             : wholeStageView ? min(size.width / stageWidth, size.height / stageHeight)
             : (fills ? size.width / stageWidth : screenPixelsPerGamePixel / screenScale)
@@ -3906,7 +3916,7 @@ final class GameScene: SKScene {
                     // A turn taken up where the other phone left it: straight onto its stage.
                     zones = ZonesPlay(game: turn.game, opponent: opponent, powers: turn.powers)
                     series.stage = turn.game.stage
-                    if built { layout(displayScale: displayScale) }
+                    if built { layout(displayScale: framingScale) }
                     startRound(portingIn: false)
                     session.stopAt = nil
                     bringPlayersIn()
@@ -3924,7 +3934,7 @@ final class GameScene: SKScene {
             zonesEnd()
         }
         // The debug strip is built for the mode (47 has its sliders), so again for this one.
-        if built { layout(displayScale: displayScale) }
+        if built { layout(displayScale: framingScale) }
         // The port-in waits for the stage select to close.
         startRound(portingIn: false)
         session.stopAt = session.frame
@@ -4696,12 +4706,23 @@ final class GameScene: SKScene {
             default: break
             }
         }
-        let specials = words.filter(\.sound.isSpecial)
-        for word in words {
-            if !word.sound.isSpecial, specials.contains(where: { $0.at.distance(to: word.at) <= GameScene.sameActionReach }) { continue }
+        // One word an action: the highest-ranked of those said close together, and none lower than
+        // one said close by a moment ago (a parry's strip landing a frame after its TING!).
+        let now = CACurrentMediaTime()
+        recentWords.removeAll { now - $0.time > GameScene.sameActionSeconds }
+        var kept: [(at: Vec2, rank: Int)] = []
+        for word in words.enumerated().sorted(by: { ($0.element.sound.rank, -$0.offset) > ($1.element.sound.rank, -$1.offset) }).map(\.element) {
+            let near = { (at: Vec2) in at.distance(to: word.at) <= GameScene.sameActionReach }
+            if kept.contains(where: { near($0.at) }) { continue }
+            if recentWords.contains(where: { near($0.at) && $0.rank > word.sound.rank }) { continue }
+            kept.append((word.at, word.sound.rank))
+            if word.sound.rank > 0 { recentWords.append((word.at, word.sound.rank, now)) }
             self.say(word.sound, at: word.at, away: word.away, rise: word.rise)
         }
     }
+    /// Words said a moment ago, for the next frames' to give way to.
+    private var recentWords: [(at: Vec2, rank: Int, time: CFTimeInterval)] = []
+    private static let sameActionSeconds = 0.2
     /// How near a special word a generic one has to be to be the same action's, in units; and a
     /// rim's quiet after its BOING.
     private static let sameActionReach = 32.0
@@ -4893,7 +4914,7 @@ final class GameScene: SKScene {
         let halfWidth = size.width / 2 / hudScale, halfHeight = size.height / 2 / hudScale
         // The HUD and the touch pad are tuned where they are: over the court, as in play.
         let inPlace = previewing == .hud || previewing == .touch
-        if inPlace, built { layout(displayScale: displayScale) }
+        if inPlace, built { layout(displayScale: framingScale) }
         controls?.isHidden = !(inPlace && GameScene.touchControlsShown)
         switch previewing {
         case .stageSelect:
@@ -6722,7 +6743,7 @@ final class GameScene: SKScene {
             }
         }
         wholeStageView = true
-        layout(displayScale: displayScale)
+        layout(displayScale: framingScale)
         let scale = hudScale * cameraNode.xScale
         let editor = MapEditor(
             stage: mapStage, map: StageMap.current[mapStage], halfWidth: size.width / 2 / hudScale, halfHeight: size.height / 2 / hudScale, unitsPerHud: scale,
@@ -6816,7 +6837,7 @@ final class GameScene: SKScene {
         mapEditor = nil
         wholeStageView = false
         cameraBase = .zero
-        layout(displayScale: displayScale)
+        layout(displayScale: framingScale)
         // Back to play from where everyone starts, on the map as it now is.
         if restart { reset() }
     }

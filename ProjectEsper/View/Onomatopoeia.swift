@@ -146,6 +146,16 @@ enum Onomatopoeia {
 
         /// A power's or a stage's own word: said with a generic one on the same action, it's the one shown.
         var isSpecial: Bool { [.beam, .burst, .quake, .freeze, .explosion, .sizzle, .shatter, .thunder].contains(self) }
+        /// Which word an action says when it makes several at once: a power's or a stage's over the
+        /// outcome of a contest (TING!, CLANG), over a blow (WHAM!, SMACK!, THWACK!), over the rest.
+        var rank: Int {
+            if isSpecial { return 3 }
+            switch self {
+            case .parry, .clang: return 2
+            case .hit, .steal, .spike: return 1
+            default: return 0
+            }
+        }
 
         /// One of the biggest words, which the SOME setting still shows.
         var isBiggest: Bool { spelling.height >= Sound.allCases.map(\.spelling.height).max() ?? 0 }

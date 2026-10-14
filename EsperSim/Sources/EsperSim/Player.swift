@@ -1260,6 +1260,11 @@ public struct Player: Equatable {
             if !grounded {
                 velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -fallSpeed)
             }
+            // The second swing: the blade live again for a second hit, and swung, heard.
+            if reached(FloSlashRules.secondSwingFrame) {
+                slashHit = false
+                events.append(.slashed(player: index))
+            }
             if stateTimer >= FloSlashRules.frames {
                 floSlash = false
                 endSlash()

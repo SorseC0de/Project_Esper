@@ -34,12 +34,10 @@ final class GameMetalView: MTKView {
         layer.magnificationFilter = .nearest
         #else
         // On a Mac the iPad app is drawn at the 12.9-inch iPad Pro's 2732 by 2048, every pass
-        // across 5.6 million pixels: there it draws at one pixel a point and is doubled up
-        // unsmoothed, as the TV is, a quarter of the work.
-        if GameMetalView.onMac {
-            contentScaleFactor = 1
-            layer.magnificationFilter = .nearest
-        }
+        // across 5.6 million pixels: there it draws at the scene's render share of the screen's
+        // scale, half where every game pixel stays whole at that, doubled up unsmoothed as the TV
+        // is, a quarter of the work; the camera's framing is the screen's own scale's either way.
+        if GameMetalView.onMac { layer.magnificationFilter = .nearest }
         #endif
         isUserInteractionEnabled = false
         delegate = renderer
@@ -54,14 +52,21 @@ final class GameMetalView: MTKView {
         super.layoutSubviews()
         if drawableSize != bounds.size { drawableSize = bounds.size }
     }
+    /// The TV frames and draws at 1080p, one pixel a point.
+    var framingScale: CGFloat { 1 }
+    func applyRenderShare() {}
     #else
-    // The window's screen sets the scale back on a move or a resize; held at 1 on a Mac.
-    override func didMoveToWindow() {
-        super.didMoveToWindow()
-        if GameMetalView.onMac { contentScaleFactor = 1 }
+    /// The screen's own scale, the camera's framing's.
+    var framingScale: CGFloat { traitCollection.displayScale > 0 ? traitCollection.displayScale : contentScaleFactor }
+    /// On a Mac the drawable kept at the scene's render share of the screen's scale; the window's
+    /// screen sets it back on a move or a resize. Checked every frame, cheaply.
+    func applyRenderShare() {
+        guard GameMetalView.onMac, framingScale >= 2 else { return }
+        let wanted = framingScale * scene.renderShare
+        if contentScaleFactor != wanted { contentScaleFactor = wanted }
     }
     override func layoutSubviews() {
-        if GameMetalView.onMac, contentScaleFactor != 1 { contentScaleFactor = 1 }
+        applyRenderShare()
         super.layoutSubviews()
     }
     #endif
@@ -73,7 +78,7 @@ final class GameMetalView: MTKView {
         #if os(tvOS)
         1
         #else
-        GameMetalView.onMac ? 1 : contentScaleFactor
+        contentScaleFactor
         #endif
     }
 }
@@ -269,7 +274,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             return makeTexture(width: Int((box.width * fit.scale).rounded()), height: Int((box.height * fit.scale).rounded()))
         }
         makeGlowTextures(for: size)
-        scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor, insets: view.safeAreaInsets)
+        scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor,
+                         framingScale: (view as? GameMetalView)?.framingScale, insets: view.safeAreaInsets)
     }
 
     private func makeGlowTextures(for size: CGSize) {
@@ -285,6 +291,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
+        (view as? GameMetalView)?.applyRenderShare()
         // A drawable sized by hand may not have told the delegate.
         if sceneTexture.map({ $0.width != Int(view.drawableSize.width) || $0.height != Int(view.drawableSize.height) }) ?? true {
             mtkView(view, drawableSizeWillChange: view.drawableSize)
@@ -294,7 +301,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
               let commands = queue.makeCommandBuffer() else { return }
 
         if scene.size != view.bounds.size || scene.safeInsets != view.safeAreaInsets {
-            scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor, insets: view.safeAreaInsets)
+            scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor,
+                         framingScale: (view as? GameMetalView)?.framingScale, insets: view.safeAreaInsets)
         }
         let now = CACurrentMediaTime()
         framesDrawn += 1

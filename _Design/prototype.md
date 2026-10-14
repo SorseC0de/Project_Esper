@@ -94,7 +94,7 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 ## Movement
 
 Defending, without the ball while the other has it, a body walks, runs, dashes and
-drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, a 5-frame pivot, the burst always 0.4 over the
+drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, a 5-frame pivot (its three sheet frames spread over it, 2, 2 and 1 sim frames, protocol 148), the burst always 0.4 over the
 3.2 run,
 traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air in lockstep with the ground: air speed is the run's, and letting go of the stick

@@ -189,7 +189,9 @@ extension Player {
         case .slide:
             return AnimationFrame(.slide, t * 24 / 60)
         case .pivot:
-            return AnimationFrame(.pivot, t * 12 / 60)
+            // The whole sheet over the turn, however short it is.
+            let frames = Animation.pivot.frameCount
+            return AnimationFrame(.pivot, min(t * frames / max(spec.pivotFrames, 1), frames - 1))
         case .jumpSquat:
             return AnimationFrame(.jumpSquat, t)
         case .air where surfing:

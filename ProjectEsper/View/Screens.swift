@@ -195,7 +195,8 @@ class Screen: SKNode {
                 TitleText.set(plate.label, to: plate.text, size: plate.textSize, lit: lit)
             }
         }
-        if plates[cursor] != nil || !showsArrow {
+        // A framed choice marks itself, lit; only the old plated kind and the rest take the arrow.
+        if plates[cursor] != nil || tinted[cursor] != nil || !showsArrow {
             arrow.isHidden = true
         } else if choices.indices.contains(cursor) {
             arrow.isHidden = false
@@ -580,17 +581,16 @@ final class WinScreen: Screen {
     let figure: WinFigure
 
     /// The column, top to bottom, in the HUD's points from the middle: the halo's ring (the
-    /// winner stands on the projector under it, `figurePixel` points an art pixel), box 4 with
-    /// the winner's name, and the two options side by side in frame 4, the final score in box 2
+    /// winner stands on the projector under it, `figurePixel` points an art pixel), the winner's
+    /// hood in FLO lettering, and the two options side by side in frame 4, the final score in box 2
     /// between them.
     static let ringY: CGFloat = 20
     static let figurePixel: CGFloat = 2
     static let nameY: CGFloat = -40
-    static let nameScale: CGFloat = 0.55
-    static let nameTextSize: CGFloat = 16
+    static let nameHeight: CGFloat = 26
     static let optionsY: CGFloat = -105
-    static let optionScale: CGFloat = 0.55
-    static let optionTextSize: CGFloat = 12
+    static let optionScale: CGFloat = 0.75
+    static let optionTextSize: CGFloat = 10
     static let optionGap: CGFloat = 6
     static let scoreScale: CGFloat = 0.4
     static let scoreTextSize: CGFloat = 16
@@ -600,8 +600,9 @@ final class WinScreen: Screen {
          onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
         figure = WinFigure(player: player, pose: .taunt)
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .win)
-        addPlate("\(winner) Wins!", frame: "box4", scale: WinScreen.nameScale, textSize: WinScreen.nameTextSize,
-                 at: CGPoint(x: 0, y: WinScreen.nameY))
+        let name = FloText.node("\(winner) Wins", height: WinScreen.nameHeight)
+        name.position = CGPoint(x: 0, y: WinScreen.nameY)
+        addChild(name)
         let width = Futuristic.sprite("4", scale: WinScreen.optionScale).size.width
         let scoreWidth = Futuristic.sprite("box2", scale: WinScreen.scoreScale).size.width
         addPlate(score.map(String.init).joined(separator: " - "), frame: "box2", scale: WinScreen.scoreScale,

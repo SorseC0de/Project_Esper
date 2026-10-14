@@ -4944,7 +4944,7 @@ final class GameScene: SKScene {
         case .pause:
             screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
         case .win:
-            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(1), player: 1, score: [1, 4], again: "NEW MATCH",
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideColours.indices.contains(1) ? sideColours[1].name : sideName(1), player: 1, score: [1, 4], again: "NEW MATCH",
                                onAgain: {}, onTitle: {})
         default:
             break
@@ -5052,7 +5052,9 @@ final class GameScene: SKScene {
             let winner = gameMode == .fortySeven ? (fortySevenScores.firstIndex { $0 >= FortySevenRules.target } ?? 0)
                 : (zones?.game.winner ?? series.winner ?? 0)
             // ZONES: the letters each side has, fewer wins.
-            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: zones != nil ? zonesNames[winner] : sideName(winner),
+            // Their hood's name, the colour's gem.
+            let hoods = zones != nil ? zonesSides.map(\.energy) : sideColours
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: hoods.indices.contains(winner) ? hoods[winner].name : sideName(winner),
                                player: winner, score: gameMode == .fortySeven ? fortySevenScores : (zones?.game.letters ?? series.wins),
                                again: online != nil ? "REMATCH" : zonesOnline != nil ? "MATCHES" : "NEW MATCH",
                                onAgain: { [weak self] in self?.playAgain() },

@@ -956,8 +956,8 @@ colour for an unplayed one, and to either side of them each side's drinks with t
 levels, in its colour. What the computer drank goes up as a banner after BUCKET!!. Four points
 brings the win screen (`WinScreen`, `WinStage`): on the pause's black and glass, no card, a column
 of the winner on the customize screen's projector under its halo looping their pose (`WinPose`,
-the taunt with the ball first; its frames made with the stage and as the looks change), "[side]
-Wins!" in Futuristic's box 4, and under it side by side in frame 4, the left one turned round,
+the taunt with the ball first; its frames made with the stage and as the looks change), their
+hood's name in FLO lettering ("Topaz Wins", the colour's gem), and under it side by side in frame 4, the left one turned round,
 NEW MATCH, a fresh best of seven with the drinks gone, or TITLE, the final score in box 2 between
 them (ZONES: the letters each side has). RESET starts the round again with the
 drinks kept.

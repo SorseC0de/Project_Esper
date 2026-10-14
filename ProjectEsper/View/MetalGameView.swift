@@ -156,16 +156,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     /// The blur's step in the glow's texels. The TV renders at 1080p, half what the 4K screen
     /// was drawn at, so its half-size glow steps half a texel to spread as far as it did.
     #if os(tvOS)
-    private let baseBlurStep: Float = 0.5
+    private let blurStep: Float = 0.5
     #else
-    private let baseBlurStep: Float = 1
+    private let blurStep: Float = 1
     #endif
-    /// On a Mac drawing at full size (the iPad Pro's 2732 across), the glow at a quarter of the
-    /// drawable rather than a half, its step halved to spread as far, as the TV's is, and the
-    /// bodies' mask at half: both blurred or sampled soft, and at full size the GPU was the frame.
-    private var lightened = false
-    private var blurStep: Float { lightened ? baseBlurStep / 2 : baseBlurStep }
-    private var maskDepthStencil: MTLTexture?
     private var frameNumber = 0
     /// Each stage's CPU time on this thread and GPU time in its own command buffer, summed
     /// over the second and shown under the frame rate as milliseconds a frame.
@@ -270,11 +264,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         guard size.width > 0, size.height > 0 else { return }
         sceneTexture = makeTexture(width: Int(size.width), height: Int(size.height))
         sceneDepthStencil = makeTexture(width: Int(size.width), height: Int(size.height), pixelFormat: .depth32Float_stencil8)
-        lightened = GameMetalView.onMac && size.width > 2048
-        let maskShare = lightened ? 2 : 1
-        bodyMask = makeTexture(width: Int(size.width) / maskShare, height: Int(size.height) / maskShare)
-        maskDepthStencil = lightened ? makeTexture(width: Int(size.width) / maskShare, height: Int(size.height) / maskShare, pixelFormat: .depth32Float_stencil8)
-            : sceneDepthStencil
+        bodyMask = makeTexture(width: Int(size.width), height: Int(size.height))
         occluderTexture = makeTexture(width: Int(size.width), height: Int(size.height))
         shotTexture = makeTexture(width: Int(size.width), height: Int(size.height))
         // Each panel's picture the size it's drawn on the page.
@@ -289,9 +279,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     }
 
     private func makeGlowTextures(for size: CGSize) {
-        let share = lightened ? 4 : 2
-        glowA = makeTexture(width: Int(size.width) / share, height: Int(size.height) / share)
-        glowB = makeTexture(width: Int(size.width) / share, height: Int(size.height) / share)
+        glowA = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
+        glowB = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
     }
 
     private func makeTexture(width: Int, height: Int, pixelFormat: MTLPixelFormat = .bgra8Unorm) -> MTLTexture {
@@ -396,10 +385,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         maskPass.colorAttachments[0].loadAction = .clear
         maskPass.colorAttachments[0].storeAction = .store
         maskPass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
-        maskPass.depthAttachment.texture = maskDepthStencil
+        maskPass.depthAttachment.texture = sceneDepthStencil
         maskPass.depthAttachment.loadAction = .clear
         maskPass.depthAttachment.storeAction = .dontCare
-        maskPass.stencilAttachment.texture = maskDepthStencil
+        maskPass.stencilAttachment.texture = sceneDepthStencil
         maskPass.stencilAttachment.loadAction = .clear
         maskPass.stencilAttachment.storeAction = .dontCare
         maskRenderer.render(withViewport: CGRect(x: 0, y: 0, width: bodyMask.width, height: bodyMask.height),

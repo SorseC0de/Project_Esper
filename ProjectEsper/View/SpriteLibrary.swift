@@ -158,12 +158,14 @@ final class SpriteLibrary {
             guard let self else { return }
             var built: [String: SKTexture] = [:]
             var builtLandmarks: [String: [BodyPart: CGPoint]] = [:]
+            var builtEmpty: [String] = []
             var made = 0
             let lock = NSLock()
             /// One piece made, kept under the lock: the pieces are made on every core at once.
-            func keep(_ textures: [String: SKTexture], landmarks: (key: String, marks: [BodyPart: CGPoint])? = nil) {
+            func keep(_ textures: [String: SKTexture], landmarks: (key: String, marks: [BodyPart: CGPoint])? = nil, empty: [String] = []) {
                 lock.lock()
                 built.merge(textures) { _, new in new }
+                builtEmpty += empty
                 if let landmarks { builtLandmarks[landmarks.key] = landmarks.marks }
                 made += 1
                 let so = made
@@ -180,7 +182,8 @@ final class SpriteLibrary {
             DispatchQueue.concurrentPerform(iterations: frameJobs.count) { index in
                 let job = frameJobs[index]
                 let frameMade = self.makeFrame(job.frame, source: frameSources[index], look: look, holdsBall: job.holdsBall)
-                keep(Dictionary(uniqueKeysWithValues: frameMade.textures.map { (job.key + $0.key, $0.value) }), landmarks: (job.key, frameMade.landmarks))
+                keep(Dictionary(uniqueKeysWithValues: frameMade.textures.map { (job.key + $0.key, $0.value) }), landmarks: (job.key, frameMade.landmarks),
+                     empty: frameMade.empty.map { job.key + $0 })
             }
             DispatchQueue.concurrentPerform(iterations: tonedJobs.count) { index in
                 keep([tonedJobs[index].key: self.makeToned(image: tonedSources[index], look: look, capped: tonedJobs[index].capped)])
@@ -197,8 +200,9 @@ final class SpriteLibrary {
                 }
                 for (key, texture) in built where self.cache[key] == nil { self.cache[key] = texture }
                 for (key, marks) in builtLandmarks where self.landmarks[key] == nil { self.landmarks[key] = marks }
+                self.emptyPieces.formUnion(builtEmpty)
                 for job in frameJobs { self.pairGlowMask(job.key) }
-                SKTexture.preload(Array(built.values)) {
+                SKTexture.preload(Array(built.values) + self.warmHoods(player: player)) {
                     DispatchQueue.main.async { self.reportRebuilding(player, generation: generation, made: nil) }
                 }
             }
@@ -280,6 +284,7 @@ final class SpriteLibrary {
         let made = makeFrame(frame, source: atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage(),
                              look: look(for: player), holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted)
         for (suffix, texture) in made.textures { cache[key + suffix] = texture }
+        for suffix in made.empty { emptyPieces.insert(key + suffix) }
         landmarks[key] = made.landmarks
         pairGlowMask(key)
         return cache[key]!
@@ -304,7 +309,8 @@ final class SpriteLibrary {
         return swapped
     }
 
-    private func makeFrame(_ frame: AnimationFrame, source: CGImage, look: Look, holdsBall: Bool) -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint]) {
+    private func makeFrame(_ frame: AnimationFrame, source: CGImage, look: Look, holdsBall: Bool)
+        -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint], empty: [String]) {
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
         let look = SpriteLibrary.look(look, for: frame)
         let result = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
@@ -319,12 +325,27 @@ final class SpriteLibrary {
         if let glowMask = result.glowMask { textures["_glowmask"] = glowMask }
         if let skin = result.skin { textures["_skin"] = skin }
         if let thinOutline = result.thinOutline { textures["_thinoutline"] = thinOutline }
+        // The front arm laid over the hood, its glowing parts and its own line, on the frames it
+        // crosses the head: made with the frame, so none is first made mid-match.
+        var empty: [String] = []
+        if look.human, GameScene.frontArmOverHood(frame), let images = result.images {
+            let arm: Set<BodyPart> = [.frontArm, .frontHand]
+            let pieces: [(String, CGImage?)] = [
+                ("_frontarm", SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: arm)),
+                ("_frontarmglowing", images.glowing.flatMap { SpriteLibrary.partsImage(drawn: $0, source: source, parts: arm) }),
+                ("_frontarmline", SpriteLibrary.partsLine(source: source, parts: arm,
+                                                          hood: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame))),
+            ]
+            for (suffix, image) in pieces {
+                if let image { textures[suffix] = SKTexture(cgImage: image) } else { empty.append(suffix) }
+            }
+        }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize, width = frame.animation.pixelWidth
         let landmarks = result.centres.mapValues { centre in
             CGPoint(x: centre.x - width / 2, y: size - centre.y - frame.animation.feetFromBottom)
         }
-        return (textures, landmarks)
+        return (textures, landmarks, empty)
     }
 
     /// Each body texture's glow mask, where it has one, looked up by the texture a node shows.
@@ -1078,6 +1099,25 @@ final class SpriteLibrary {
     /// Everything made so far.
     var allTextures: [SKTexture] { Array(cache.values) }
 
+    /// A human player's hooded heads made ahead, every view, plain, in FloState and frozen, with the
+    /// hood's line and K&A's face: none first made mid-match. What was made, to send to the GPU.
+    @discardableResult
+    func warmHoods(player: Int) -> [SKTexture] {
+        let look = look(for: player)
+        guard look.human, player < SpriteLibrary.icePlayer else { return [] }
+        let skin = look.dressing.skinTone
+        var made: [SKTexture] = []
+        for view in 0..<HoodView.count {
+            // Plain, in FloState, and frozen in this skin.
+            for head in [hoodHead(skin: skin, player: player, view: view), hoodHead(skin: skin, player: player, energy: true, view: view),
+                         hoodHead(skin: skin, player: SpriteLibrary.icePlayer, view: view)] {
+                made += [head.drawn, head.hood, head.face]
+            }
+            made += [hoodLine(skin: skin, view: view), hoodFace(skin: skin, player: player, view: view)].compactMap { $0 }
+        }
+        return made
+    }
+
     /// Builds every frame of every player up front and sends them to the GPU, so nothing
     /// is made mid-draw.
     func warmUp(players: Int, completion: @escaping () -> Void) {
@@ -1108,6 +1148,7 @@ final class SpriteLibrary {
                 _ = effectFrames(effect, player: player)
             }
         }
+        for player in 0..<players { warmHoods(player: player) }
         _ = texture("ball", 0)
         _ = softGlow(diameter: 32)
         _ = softGlow(diameter: 8)
@@ -1152,7 +1193,7 @@ final class SpriteLibrary {
     /// the hood together, the hood's own pixels left clear for it to be drawn in.
     private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
-                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?) {
+                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?)?) {
         recolour(image: texture.cgImage(), look: look, holdsBall: holdsBall, detach: detach, hood: given, hoodShape: hoodShape, bareLine: bareLine)
     }
 
@@ -1160,10 +1201,10 @@ final class SpriteLibrary {
     /// reads a texture back through SpriteKit (which opens a GPU context on each thread that does).
     private func recolour(image: CGImage, look: Look, holdsBall: Bool, detach: Bool,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
-                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?) {
+                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?)?) {
         let texture = SKTexture(cgImage: image)
         let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil) }
+        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         let count = width * height
         // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
@@ -1385,11 +1426,13 @@ final class SpriteLibrary {
 
         // The glowing parts alone, as drawn: over K&A's wash, so the night doesn't dim them.
         var glowingParts: SKTexture?
+        var glowingImage: CGImage?
         if detach, glowing.contains(true), let (partsContext, partsPixels) = makeCanvas(width: width, height: height) {
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && glowing[pixel] {
                 for channel in 0..<4 { partsPixels[pixel * 4 + channel] = pixels[pixel * 4 + channel] }
             }
-            glowingParts = partsContext.makeImage().map { SKTexture(cgImage: $0) }
+            glowingImage = partsContext.makeImage()
+            glowingParts = glowingImage.map { SKTexture(cgImage: $0) }
         }
 
         // The body as the glow's mask sees it, in white, the glowing pixels black so they take
@@ -1428,9 +1471,10 @@ final class SpriteLibrary {
             if any { skin = skinContext.makeImage().map { SKTexture(cgImage: $0) } }
         }
 
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil) }
+        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline, glowingParts)
+        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline, glowingParts,
+                (recoloured, glowingImage))
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

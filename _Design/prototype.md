@@ -59,7 +59,10 @@ neutral to get a shot off; catch it and the roles reverse.
   double jump, the slash, the throws from 4, both crouches, the ledge, every gun sheet, the change,
   the dunk, the slide, the pivot, the walk and both dribbling walk and run; the gallery shows its
   table to copy into the game), with its own line (`frontArmLineTexture`, in the body's line colour):
-  round the arm and hand wherever they meet open air, the sheet's head or the hood as worn. Two more
+  round the arm and hand wherever they meet open air, the sheet's head or the hood as worn. The arm,
+  its line and its glowing parts are made with the frame itself (`makeFrame`), off the main thread
+  in a look's rebuild, and the hooded heads (every view, plain, FloState's and frozen, with the
+  hood's line and K&A's face) once it lands (`warmHoods`): none is first made mid-match. Two more
   sheet tables go with it, in play and in the gallery alike: `GameScene.hoodTurnDegrees`, the hood
   turned with the body about the head's middle, clockwise facing right (the double jump's tumble:
   30, 90, 135, then -90 twice), its strings' anchors turning with it and the hood carrying its own
@@ -1763,9 +1766,6 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   the fit's screen pixels a game pixel are even (each game pixel still whole) or the stage is fitted
   rather than drawn by whole pixels; all of it otherwise. At full size the GPU frame took about 39 ms
   standing still; drawing at one pixel a point outright had zoomed the Wreck Center out.
-  Drawing at full size there (2732 across), the glow is a quarter of the drawable, not a half, its
-  blur's step halved to spread as far (as the TV's), and the bodies' mask is half
-  (`GlowRenderer.lightened`): at full size the GPU frame was 26.6 ms on the Wreck Center.
 - On the TV the game renders at 1080p whatever the screen, the pixel art doubled onto a
   4K one unsmoothed (the HUD and menus stay at 4K); the Apple TV 4K's GPU spent about 50 ms
   a frame at 4K, most of it the glow and the composite. The glow there is half size with

@@ -9,10 +9,6 @@ class Screen: SKNode {
         let node: SKNode
         let hit: CGRect
         let enabled: Bool
-        /// Where the arrow sits to point at this choice, and which way it turns from
-        /// pointing down, as the drawing does.
-        let arrowAt: CGPoint
-        let arrowTurn: CGFloat
         let sound: SoundBoard.Effect
         let action: () -> Void
     }
@@ -31,18 +27,6 @@ class Screen: SKNode {
     }
     let halfWidth: CGFloat
     let halfHeight: CGFloat
-    /// CardCourt's selection arrow, the one that hangs over a man, in its own greys,
-    /// pointing at the cursor's choice. It points down as drawn.
-    private let arrow: SKSpriteNode = {
-        let texture = SKTexture(imageNamed: "MenuArrow")
-        texture.filteringMode = .nearest
-        let node = SKSpriteNode(texture: texture)
-        let width: CGFloat = 20
-        node.size = CGSize(width: width, height: width * 104 / 144)
-        node.zPosition = 3
-        node.isHidden = true
-        return node
-    }()
 
     /// The screen whose tuned sizes its buttons, text and titles take, if it has any.
     let kind: UIScreenKind?
@@ -53,7 +37,6 @@ class Screen: SKNode {
         self.kind = kind
         super.init()
         zPosition = 200
-        addChild(arrow)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -79,7 +62,7 @@ class Screen: SKNode {
         button.addChild(label)
         addChild(button)
         let hit = CGRect(x: point.x - plateSize.width / 2, y: point.y - plateSize.height / 2, width: plateSize.width, height: plateSize.height)
-        choices.append(Choice(node: button, hit: hit, enabled: enabled, arrowAt: CGPoint(x: hit.minX - 16, y: point.y), arrowTurn: .pi / 2, sound: sound, action: action))
+        choices.append(Choice(node: button, hit: hit, enabled: enabled, sound: sound, action: action))
         plates[choices.count - 1] = (plate, piece, plateSize, label, text, size * tuned(.text))
         if choices.count == 1 { cursor = 0 }
         showCursor()
@@ -157,7 +140,7 @@ class Screen: SKNode {
         addChild(button)
         let size = frame.size
         let hit = CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2, width: size.width, height: size.height)
-        choices.append(Choice(node: button, hit: hit, enabled: true, arrowAt: point, arrowTurn: 0, sound: sound, action: action))
+        choices.append(Choice(node: button, hit: hit, enabled: true, sound: sound, action: action))
         tinted[choices.count - 1] = button
         if choices.count == 1 { cursor = 0 }
         showCursor()
@@ -172,14 +155,14 @@ class Screen: SKNode {
         for child in node.children { Screen.colour(child, colour) }
     }
 
-    /// `arrowAt` is where the arrow sits for this choice, turned `arrowTurn` from pointing down.
-    func addChoice(_ node: SKNode, hit: CGRect, enabled: Bool = true, arrowAt: CGPoint, arrowTurn: CGFloat, action: @escaping () -> Void) {
-        choices.append(Choice(node: node, hit: hit, enabled: enabled, arrowAt: arrowAt, arrowTurn: arrowTurn, sound: SoundBoard.confirm, action: action))
+    /// A choice of any kind: `node` is what's raised under the cursor.
+    func addChoice(_ node: SKNode, hit: CGRect, enabled: Bool = true, action: @escaping () -> Void) {
+        choices.append(Choice(node: node, hit: hit, enabled: enabled, sound: SoundBoard.confirm, action: action))
         showCursor()
     }
 
-    /// The cursor's choice is raised a little, a plated button's plate turning gold, the
-    /// arrow points at any other kind, and the rest sit still.
+    /// The cursor's choice is raised a little, a plated button's plate turning gold, a framed
+    /// one gold, and the rest sit still.
     func showCursor() {
         for (index, choice) in choices.enumerated() {
             let lit = index == cursor && choice.enabled
@@ -194,16 +177,6 @@ class Screen: SKNode {
                 // On the gold plate the lettering's lower half goes light blue.
                 TitleText.set(plate.label, to: plate.text, size: plate.textSize, lit: lit)
             }
-        }
-        // A framed choice marks itself, lit; only the old plated kind and the rest take the arrow.
-        if plates[cursor] != nil || tinted[cursor] != nil || !showsArrow {
-            arrow.isHidden = true
-        } else if choices.indices.contains(cursor) {
-            arrow.isHidden = false
-            arrow.position = choices[cursor].arrowAt
-            arrow.zRotation = choices[cursor].arrowTurn
-        } else {
-            arrow.isHidden = true
         }
     }
 
@@ -223,9 +196,6 @@ class Screen: SKNode {
         }
         return true
     }
-
-    /// Whether the arrow points at the cursor's choice; a screen with its own mark goes without.
-    var showsArrow: Bool { true }
 
     /// Whether a tap on a choice that isn't the cursor's fires it straight away.
     var tapFiresAtOnce: Bool { true }
@@ -381,7 +351,7 @@ final class PickScreen: Screen {
             bottleNodes.append(bottle)
             outlines.append(PickScreen.outline(of: bottle, width: 5 * tuned(.buttons)))
             let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight)
-            addChoice(bottle, hit: hit, arrowAt: CGPoint(x: x, y: -halfHeight + 108), arrowTurn: 0) { [weak self] in
+            addChoice(bottle, hit: hit) { [weak self] in
                 self?.finish(with: offer)
             }
         }
@@ -426,7 +396,6 @@ final class PickScreen: Screen {
     }
 
     override var tapFiresAtOnce: Bool { false }
-    override var showsArrow: Bool { false }
 
     /// A thick white outline round a bottle, one white silhouette baked once and drawn behind
     /// it as its child, so it takes the bottle's lean and its raise. Hidden until the bottle is
@@ -994,7 +963,6 @@ final class PauseScreen: Screen {
         place(cursor: options.count)
     }
 
-    override var showsArrow: Bool { false }
 
     required init?(coder: NSCoder) { fatalError() }
 }

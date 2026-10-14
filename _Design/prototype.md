@@ -2567,9 +2567,8 @@ in the game scene under the camera. The pick and win screens sit on the same dar
 ultra-thin material as the title, a SwiftUI layer between the two views (`FlowState.veiled`).
 The count's banner stays in the world under the material, so it shows through a screen;
 the mask marks it in pure green and the bright pass leaves green alone. On a screen the
-stick moves the cursor any of the four ways, and CardCourt's selection arrow
-(`MenuArrow`, its own greys, drawn pointing down) points at the raised choice: over a
-bottle's name, or turned to the right beside a lettered button.
+stick moves the cursor any of the four ways, the raised choice lit gold and a little bigger
+(CardCourt's selection arrow, `MenuArrow`, is gone).
 The corner counter shows the frame rate and the worst frame gap of the last second,
 which is what a hitch shows up as.
 

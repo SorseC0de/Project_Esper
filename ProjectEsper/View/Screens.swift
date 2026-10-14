@@ -116,6 +116,19 @@ class Screen: SKNode {
         return ribbonSize.width
     }
 
+    /// A frame with lettering in its face and nothing to pick: a label, as the win screen's name.
+    func addPlate(_ text: String, frame name: String, scale: CGFloat, textSize: CGFloat, at point: CGPoint) {
+        let plate = SKNode()
+        plate.position = point
+        let frame = Futuristic.sprite(name, scale: scale)
+        plate.addChild(frame)
+        let face = Futuristic.faces[name] ?? CGPoint(x: 0.5, y: 0.5)
+        let label = Futuristic.label(text, size: textSize * tuned(.text))
+        label.position = CGPoint(x: (face.x - 0.5) * frame.size.width, y: (0.5 - face.y) * frame.size.height)
+        plate.addChild(label)
+        addChild(plate)
+    }
+
     /// A choice in one of Futuristic_UI's frames at `scale` of the menus' size, turned round
     /// across or down as asked, and in its face its lettering in the menus' face or `icon`: all
     /// in the menus' blue, gold and a tenth bigger under the cursor.
@@ -563,20 +576,36 @@ final class WaitScreen: Screen {
 /// offline and REMATCH online, where it waits for the other side to press theirs.
 final class WinScreen: Screen {
     private let waiting = SKSpriteNode()
+    /// The winner and their pose, drawn by the SwiftUI layer under this one (`WinStage`).
+    let figure: WinFigure
 
-    /// `score` is each side's, player one's first, as the match ended.
-    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, score: [Int], again: String,
+    /// The column, top to bottom, in the HUD's points from the middle: the halo's ring (the
+    /// winner stands on the projector under it, `figurePixel` points an art pixel), box 4 with
+    /// the winner's name, and the two options side by side in frame 4.
+    static let ringY: CGFloat = 20
+    static let figurePixel: CGFloat = 2
+    static let nameY: CGFloat = -40
+    static let nameScale: CGFloat = 0.55
+    static let nameTextSize: CGFloat = 16
+    static let optionsY: CGFloat = -105
+    static let optionScale: CGFloat = 0.55
+    static let optionTextSize: CGFloat = 12
+    static let optionGap: CGFloat = 6
+
+    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, player: Int, again: String,
          onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
+        figure = WinFigure(player: player, pose: .taunt)
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .win)
-        let width: CGFloat = 220
-        let headerWidth = addHeader("\(winner) WINS", size: 36, at: CGPoint(x: 0, y: halfHeight * 0.64), width: width + 170)
-        addCard(size: CGSize(width: headerWidth, height: halfHeight * 1.55), at: CGPoint(x: 0, y: -halfHeight * 0.1), piece: .cardPurple)
-        let final = TitleText.node(score.map(String.init).joined(separator: " - "), size: 80 * tuned(.titles))
-        final.position = CGPoint(x: 0, y: halfHeight * 0.2)
-        addChild(final)
-        addButton(again, at: CGPoint(x: 0, y: -halfHeight * 0.2), width: width, action: onAgain)
-        addButton("TITLE", at: CGPoint(x: 0, y: -halfHeight * 0.52), sound: .menuBack, piece: .buttonPlum, width: width, action: onTitle)
-        waiting.position = CGPoint(x: 0, y: -halfHeight * 0.35)
+        addPlate("\(winner) Wins!", frame: "box4", scale: WinScreen.nameScale, textSize: WinScreen.nameTextSize,
+                 at: CGPoint(x: 0, y: WinScreen.nameY))
+        let width = Futuristic.sprite("4", scale: WinScreen.optionScale).size.width
+        let across = width / 2 + WinScreen.optionGap / 2
+        // The left one turned round, its lead out to the right.
+        addFramed(again, frame: "4", scale: WinScreen.optionScale, mirroredX: true, textSize: WinScreen.optionTextSize,
+                  at: CGPoint(x: -across, y: WinScreen.optionsY), action: onAgain)
+        addFramed("TITLE", frame: "4", scale: WinScreen.optionScale, textSize: WinScreen.optionTextSize,
+                  at: CGPoint(x: across, y: WinScreen.optionsY), sound: .menuBack, action: onTitle)
+        waiting.position = CGPoint(x: 0, y: WinScreen.optionsY - Futuristic.sprite("4", scale: WinScreen.optionScale).size.height / 2 - 14)
         waiting.isHidden = true
         addChild(waiting)
     }

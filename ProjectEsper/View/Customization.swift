@@ -1016,6 +1016,10 @@ struct CustomizeFigure: View {
     /// and its size, about the head's middle.
     let headNudge: CGPoint
     let headScale: CGFloat
+    /// The ball in hand, its picture and its middle in art pixels from the canvas's bottom left;
+    /// and the front leg drawn again over it where the sheet passes it behind (the win screen's).
+    var ball: (image: CGImage, centre: CGPoint)? = nil
+    var overBall: CGImage? = nil
     @State private var motion = CustomizeFigureMotion()
     /// The figure as last drawn, and, a pick having changed its look, the one before it, left
     /// under the new one while that fades in over it.
@@ -1076,6 +1080,13 @@ struct CustomizeFigure: View {
                 let fade = crossfade(at: timeline.date)
                 if let previous, fade < 1 { drawFigure(previous.portrait, previous.look, opacity: 1) }
                 drawFigure(portrait, look, opacity: fade)
+                if let ball {
+                    let side = CGFloat(ball.image.width) * pixel
+                    let at = spot(ball.centre)
+                    context.draw(Image(decorative: ball.image, scale: 1).interpolation(.none),
+                                 in: CGRect(x: at.x - side / 2, y: at.y - side / 2, width: side, height: side))
+                }
+                if let overBall { context.draw(Image(decorative: overBall, scale: 1).interpolation(.none), in: figureRect) }
                 let plain = Color(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel))
                 let accent = Color(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel))
                 for string in motion.strings {

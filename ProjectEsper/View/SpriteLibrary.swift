@@ -1029,12 +1029,11 @@ final class SpriteLibrary {
         return context.makeImage()
     }
     /// The frame a skin and view's hooded head is drawn from.
-    /// FloState's hood blowing, standing, crouching, sliding, on the move, taunting and skidding:
-    /// its frames, how fast they play, and the sheets it's worn on.
+    /// FloState's hood blowing, held still: standing, crouching, taunting and skidding to a stop
+    /// (on the move it flicked on and off): its frames, how fast they play, and the sheets it's worn on.
     static let flowingHoodFrames = SKTextureAtlas(named: "Sprites").textureNames.filter { $0.hasPrefix("player_flowing_hood_") }.count
     static let flowingHoodFramesPerSecond = 15
-    static let flowingHoodSheets: Set<Animation> = [.idle, .dribbleIdle, .crouch, .crouchWalk, .slide, .walk, .dribbleWalk,
-                                                    .run, .dribbleRun, .taunt, .skid, .skidBall]
+    static let flowingHoodSheets: Set<Animation> = [.idle, .dribbleIdle, .crouch, .taunt, .skid, .skidBall]
     static func hoodSource(skin: Int, view: Int) -> SKTexture {
         let atlas = SKTextureAtlas(named: "Sprites")
         return view == 0 || turnedHoodShapes[view] == nil ? atlas.textureNamed("player_hoodheads_\(HumanLook.hoodHeadFrame(skin))")

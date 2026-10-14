@@ -6,6 +6,8 @@ import CoreGraphics
 /// from its top left.
 enum CustomizeLayout {
     static let aspect: CGFloat = 2560 / 1440
+    /// The first side's halo, for the win screen's, drawn in proportion away from this layout.
+    static var haloShare: CGRect { frames["customize_p1_halo"] ?? .zero }
     static let frames: [String: CGRect] = [
         "customize_top_line": CGRect(x: 0.02656, y: 0.06667, width: 0.94492, height: 0.05764),
         "customize_bottom_line": CGRect(x: 0.02656, y: 0.87639, width: 0.94492, height: 0.05764),

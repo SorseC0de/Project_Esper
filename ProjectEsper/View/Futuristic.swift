@@ -108,6 +108,7 @@ enum Futuristic {
         "9": CGPoint(x: 0.50, y: 0.32),
         "10": CGPoint(x: 0.45, y: 0.32),
         "11": CGPoint(x: 0.54, y: 0.35),
+        "4": CGPoint(x: 0.60, y: 0.38),
         "box4": CGPoint(x: 0.38, y: 0.50),
     ]
 }

@@ -22,8 +22,8 @@ final class FlowState: ObservableObject {
     @Published var pauseGround = false
     /// The stage select's: the warped grid on black, as the title's.
     @Published var gridGround = false
-    /// The win screen's own ground.
-    @Published var winGround = false
+    /// The win screen's winner and pose, for its stage under the HUD.
+    @Published var winFigure: WinFigure?
     /// The UI tuning panel is open.
     @Published var tuningOpen = false
     var startSeries: ((GameMode) -> Void)?

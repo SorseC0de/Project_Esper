@@ -9,7 +9,6 @@ enum UIColourPicks {
     /// The screens' ground: purple's last, flat.
     static let ground: RGB = EsperPalette.purple.shadow
     /// The win screen's: black's second.
-    static let winGround: RGB = EsperPalette.black.light
     /// The inside of the pause and win menus' card: purple's last.
     static let menuCard: RGB = EsperPalette.purple.shadow
     /// The title lettering's lower half: silver's second; on a gold plate, the cursor's,

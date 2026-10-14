@@ -68,9 +68,8 @@ neutral to get a shot off; catch it and the roles reverse.
   (`warmDrawnArt`), the basket and drink banners, the down marker, the fish's two colours and the
   drink pick's frames, both sides'. The rule: anything drawn in play is made on a loading screen,
   never on its first showing (debug builds log anything that still is, `reportsMisses`). The customize screen changes its figures' looks only
-  while it's open, not as it fades out into play. In FloState standing, crouching, sliding, on the move,
-  taunting and skidding (`flowingHoodSheets`: the idle, crouch, crouch walk, slide, walk, run, taunt and
-  skid, with the ball or without) the hood blows: `player_flowing_hood`'s six frames round and round at 15 a second,
+  while it's open, not as it fades out into play. In FloState held still (`flowingHoodSheets`: the idle,
+  crouch, taunt and skid stop, with the ball or without; on the move it flicked on and off) the hood blows: `player_flowing_hood`'s six frames round and round at 15 a second,
   drawn in the first skin as the turned views are (`SpriteLibrary.flowingHoodFrames`). FloState's face
   is skin, unglowing and shielded as ever; its body takes the hood as the plain body does (no head
   apart, `energyFormHeadApart` off): the neck in the skin's shadow tone and the line round the hood,
@@ -678,8 +677,8 @@ mix of their tones, so the soft corners between the face and a rim stay blends o
 (`UIPiece.toneMap`; matching a shade alone confused a grey ramp's shades with one another). Swatches
 are 7 points on a phone, 12 on an iPad or a Mac, 16 on the TV. Settled (`UIColourPicks`): the
 plum pieces' face black's second #262634, top edge and oval blue's third #36A9E0, bottom edge
-gold's last #D26614; the screens' ground flat purple's last #4D14A3, the win screen's black's
-second #262634; the inside of the pause and win menus the black card on purple's last, its rims
+gold's last #D26614; the screens' ground flat purple's last #4D14A3, the win screen on the pause's wash and glass;
+the inside of the pause menu the black card on purple's last, its rims
 moved as they are from its face; the title lettering's lower half silver's second #D1CED7, and
 on a gold plate (the cursor's, on the title, the screens and the stage select) blue's lightest
 #6BD0FF. The title has the game's own cursor on every
@@ -955,8 +954,11 @@ has played, and the round counts again after the drink. Five circles across the 
 dark purple, fill in the round winner's colour as they go, with a sixth and seventh
 added if the series gets there, and to either side of them each side's drinks with their
 levels, in its colour. What the computer drank goes up as a banner after BUCKET!!. Four points
-brings the win screen, the final score large under who won: NEW MATCH, a fresh
-best of seven with the drinks gone, or TITLE. RESET starts the round again with the
+brings the win screen (`WinScreen`, `WinStage`): on the pause's black and glass, no card, a column
+of the winner on the customize screen's projector under its halo looping their pose (`WinPose`,
+the taunt with the ball first; its frames made with the stage and as the looks change), "[side]
+Wins!" in Futuristic's box 4, and under it side by side in frame 4, the left one turned round,
+NEW MATCH, a fresh best of seven with the drinks gone, or TITLE. RESET starts the round again with the
 drinks kept.
 
 The stage select comes before the first round and after each stage's best of three:
@@ -1147,7 +1149,6 @@ would make a run too much of a lottery, as the Elements would).
   the turn and the seconds left in the middle with RECORD, REWIND, REPLAY, SKIP and the power
   wheel under them, and the run's log down the right (the run being matched while confirming or
   following, the matched moves lit).
-  The win screen shows the letters each side has.
 - Online: Game Center's turn-based matches (`GameCenter`'s turn section, `ZonesTurn`). ZONES on
   the multiplayer screen's mode switch lists this player's matches under NEW MATCH (anyone
   looking, found once the first turn is sent) and INVITE A FRIEND, each row whose turn it is on

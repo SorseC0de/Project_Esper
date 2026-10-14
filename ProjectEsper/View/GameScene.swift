@@ -2298,6 +2298,7 @@ final class GameScene: SKScene {
         refreshSupports(HoopSupport.pieces)
         warmDrawnArt()
         SKTexture.preload(pickScreenFrames()) {}
+        warmWinPoses()
     }
 
     /// The supports' picture again, for a layout.
@@ -4943,7 +4944,7 @@ final class GameScene: SKScene {
         case .pause:
             screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
         case .win:
-            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(1), score: [1, 4], again: "NEW MATCH",
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(1), player: 1, again: "NEW MATCH",
                                onAgain: {}, onTitle: {})
         default:
             break
@@ -4951,7 +4952,8 @@ final class GameScene: SKScene {
         if let screen { hud.addChild(screen) }
         drawSeries()
         flowState?.blackGround = screen is PickScreen
-        flowState?.winGround = screen is WinScreen
+        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen
+        flowState?.winFigure = (screen as? WinScreen)?.figure
         flowState?.showsTitle = previewing == nil
         flowState?.veiled = screen != nil
     }
@@ -5049,10 +5051,8 @@ final class GameScene: SKScene {
         case .won:
             let winner = gameMode == .fortySeven ? (fortySevenScores.firstIndex { $0 >= FortySevenRules.target } ?? 0)
                 : (zones?.game.winner ?? series.winner ?? 0)
-            // ZONES: the letters each side has, fewer wins.
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: zones != nil ? zonesNames[winner] : sideName(winner),
-                               score: gameMode == .fortySeven ? fortySevenScores : (zones?.game.letters ?? series.wins),
-                               again: online != nil ? "REMATCH" : zonesOnline != nil ? "MATCHES" : "NEW MATCH",
+                               player: winner, again: online != nil ? "REMATCH" : zonesOnline != nil ? "MATCHES" : "NEW MATCH",
                                onAgain: { [weak self] in self?.playAgain() },
                                onTitle: { [weak self] in self?.leaveToTitle() })
             if online?.rematchRandom != nil { (screen as? WinScreen)?.showWaiting() }
@@ -5062,9 +5062,9 @@ final class GameScene: SKScene {
         if let screen { hud.addChild(screen) }
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
         flowState?.blackGround = screen is PickScreen || screen is WaitScreen
-        flowState?.pauseGround = screen is PauseScreen
+        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen
         flowState?.gridGround = screen is StageSelectScreen
-        flowState?.winGround = screen is WinScreen
+        flowState?.winFigure = (screen as? WinScreen)?.figure
         flowState?.veiled = screen != nil
     }
 
@@ -5320,6 +5320,43 @@ final class GameScene: SKScene {
         sprites.setCustomizeLook(player == 1 ? look.turnedRound : look, for: player)
     }
 
+    /// A side's look as the game draws them.
+    func playerLook(_ index: Int) -> Look { sprites.look(for: index) }
+
+    /// A frame of the winner's pose for the win screen: the figure as the customize screen draws
+    /// one, its hood placed as that screen's sliders have it; the ball in hand at the sheet's
+    /// ball, and the front leg over it where the sheet passes it behind.
+    struct WinFrame {
+        let portrait: SpriteLibrary.Portrait
+        let headNudge: CGPoint
+        let headScale: CGFloat
+        let ball: (image: CGImage, centre: CGPoint)?
+        let overBall: CGImage?
+    }
+    func winPortrait(player: Int, pose: WinPose, frame: Int) -> WinFrame? {
+        let defaults = UserDefaults.standard
+        let headNudge = CGPoint(x: defaults.object(forKey: "esper.customize.headX") as? Double ?? 1,
+                                y: defaults.object(forKey: "esper.customize.headY") as? Double ?? 1)
+        let headScale = defaults.object(forKey: "esper.customize.headScale") as? Double ?? 1
+        let sheet = AnimationFrame(pose.animation, frame)
+        guard let portrait = sprites.portrait(pose.animation.rawValue, frame: frame, player: player, headDrawnFor: GameScene.hoodDrawnFor,
+                                              headNudge: headNudge, headScale: CGFloat(headScale), holdsBall: pose.holdsBall) else { return nil }
+        var ball: (image: CGImage, centre: CGPoint)?
+        if pose.holdsBall, let landmark = BallLandmarks.table["\(pose.animation.rawValue)_\(frame)"] {
+            ball = (winBallImage, CGPoint(x: 24 + landmark.x, y: pose.animation.feetFromBottom + landmark.y))
+        }
+        let overBall = pose.holdsBall && GameScene.ballBehindLegSheets.contains(pose.animation)
+            ? sprites.frontLegTexture(sheet, player: player)?.cgImage() : nil
+        return WinFrame(portrait: portrait, headNudge: headNudge, headScale: CGFloat(headScale), ball: ball, overBall: overBall)
+    }
+    private lazy var winBallImage: CGImage = sprites.basketballFrames[0].cgImage()
+    /// Every frame of both sides' win pose, made with the stage and again as their looks change.
+    private func warmWinPoses() {
+        for player in match.players.indices {
+            for frame in 0..<WinPose.taunt.animation.frameCount { _ = winPortrait(player: player, pose: .taunt, frame: frame) }
+        }
+    }
+
     /// Both sides' picks onto everything drawn in them: the customize screen's, live.
     func applyCustomizations(_ sides: [PlayerCustomization]) {
         guard sides.count == 2 else { return }
@@ -5380,6 +5417,7 @@ final class GameScene: SKScene {
         for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
         for (net, hoop) in zip(nets, match.stage.hoops) { net.recolour(netColour(for: hoop)) }
         warmDrawnArt()
+        warmWinPoses()
         drawSeries()
     }
 

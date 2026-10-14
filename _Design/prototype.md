@@ -76,7 +76,8 @@ neutral to get a shot off; catch it and the roles reverse.
   so FloState's coloured line runs there and no black is left at the neck. Two more
   sheet tables go with it, in play and in the gallery alike: `GameScene.hoodTurnDegrees`, the hood
   turned with the body about the head's middle, clockwise facing right (the double jump's tumble:
-  30, 90, 135, then -90 twice), its strings' anchors turning with it and the hood carrying its own
+  30, 90, 135, then -90 twice; `player_dbl_jump_ball`, the same with the ball, takes the same
+  tables, its ball drawn behind the whole body on every frame, `ballBehindBodySheets`, protocol 152), its strings' anchors turning with it and the hood carrying its own
   line as when it tips in flight; and `SpriteLibrary.armColoursSwapped`, the front and back arm
   and hand colours swapped where the sheet draws the back arm in front (the ground throw from 4). SAVE THIS SHEET or SAVE ALL writes each sheet as a PNG strip, down or
   across, at ×1 to ×8, its cells the sheet's cell plus PAD art pixels each side (8 to start), on

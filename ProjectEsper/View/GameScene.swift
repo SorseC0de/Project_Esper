@@ -285,6 +285,8 @@ final class GameScene: SKScene {
     private var armLinesOverHood: [SKSpriteNode] = []
     private var hoodFaceWashes: [SKSpriteNode] = []
     static let ballBehindLegSheets: Set<Animation> = [.taunt, .dribbleWalk]
+    /// The sheets that hold the ball behind the whole body, every frame: the double jump's.
+    static let ballBehindBodySheets: Set<Animation> = [.doubleJumpBall]
     static let hoodDrawnFor = SpriteLibrary.hoodDrawnFor
     /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
     static let stringAccentLuminance = 0.876
@@ -6021,7 +6023,7 @@ final class GameScene: SKScene {
     /// (`PlayerGallery`).
     static let frontArmOverHood: [Animation: ClosedRange<Int>] = [
         .shoot: 0...9, .shootAir: 0...10,
-        .doubleJump: 0...5,
+        .doubleJump: 0...5, .doubleJumpBall: 0...5,
         .esperSlash: 0...5,
         .throwForward: 4...7, .throwAir: 4...7,
         .crouch: 0...9, .crouchWalk: 0...9,
@@ -6038,6 +6040,7 @@ final class GameScene: SKScene {
     /// the double jump's tumble.
     static let hoodTurnDegrees: [Animation: [Int: CGFloat]] = [
         .doubleJump: [0: 30, 1: 90, 2: 135, 3: -90, 4: -90],
+        .doubleJumpBall: [0: 30, 1: 90, 2: 135, 3: -90, 4: -90],
     ]
     /// A frame's hood turn in radians, clockwise facing right.
     static func hoodTurn(_ frame: AnimationFrame) -> CGFloat { (hoodTurnDegrees[frame.animation]?[frame.frame] ?? 0) * .pi / 180 }
@@ -8369,8 +8372,14 @@ final class GameScene: SKScene {
                 halo.position = at
                 handBall.isHidden = false
                 handBall.position = at
+                handBall.zPosition = 0.03
+                halo.zPosition = 0.02
                 handBall.texture = (player.hasFireball ? sprites.basketballFireFrames : sprites.basketballFrames)[0]
             } else if player.holding, let landmark = sprites.landmark(.ball, in: frame, player: index) {
+                // Behind the body on the sheets that tuck it there, else in front.
+                let behind = GameScene.ballBehindBodySheets.contains(frame.animation)
+                handBall.zPosition = behind ? -0.002 : 0.03
+                halo.zPosition = behind ? -0.003 : 0.02
                 let inHand = landmark * drawScale
                 let ballX = player.position.x + Double(inHand.x) * player.facing.sign / SpriteLibrary.pixelsPerUnit
                 let dribbling = Animation.dribbles.contains(frame.animation)

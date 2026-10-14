@@ -87,7 +87,7 @@ ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball", "player_fly_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk",
-               "player_throw", "player_throw_air", "player_layup"}
+               "player_throw", "player_throw_air", "player_layup", "player_dbl_jump_ball"}
 
 SKIP = {"Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",

@@ -15,6 +15,7 @@ public enum Animation: String, CaseIterable {
     case air = "player_air"
     case airBall = "player_air_ball"
     case doubleJump = "player_dbl_jump"
+    case doubleJumpBall = "player_dbl_jump_ball"
     case land = "player_land"
     case wallLand = "player_wall_land"
     case wallLandBall = "player_wall_land_ball"
@@ -65,7 +66,7 @@ public enum Animation: String, CaseIterable {
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall, .fly, .flyBall: 3
         case .jumpSquat: 4
-        case .doubleJump, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
+        case .doubleJump, .doubleJumpBall, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
         case .snatchFloState: 7
         case .esperSlashFloState: 9
         case .land: 9
@@ -82,7 +83,7 @@ public enum Animation: String, CaseIterable {
     public var holdsBall: Bool {
         switch self {
         case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .flyBall, .wallLandBall, .shoot, .shootAir, .throwForward,
-             .catchGround, .catchAir, .skidBall, .taunt, .layup: true
+             .catchGround, .catchAir, .skidBall, .taunt, .layup, .doubleJumpBall: true
         default: false
         }
     }
@@ -198,7 +199,7 @@ extension Player {
             return AnimationFrame(holding ? .skidBall : .skid, 0)
         case .air:
             if doubleJumpTimer > 0 {
-                return AnimationFrame(.doubleJump, (30 - doubleJumpTimer) * 12 / 60)
+                return AnimationFrame(hasBall ? .doubleJumpBall : .doubleJump, (30 - doubleJumpTimer) * 12 / 60)
             }
             let phase = velocity.y > 0.3 ? 0 : (abs(velocity.y) <= 0.3 ? 1 : 2)
             return AnimationFrame(hasBall ? .airBall : .air, phase)

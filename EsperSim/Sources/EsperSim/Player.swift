@@ -255,6 +255,9 @@ public struct Player: Equatable {
     public var slashHit = false
     /// This slash is FloState's step-through, on the ground or in the air (`FloSlashRules`).
     public var floSlash = false
+    /// This snatch has taken the ball, or had it taken off it by another's: it takes nothing more. Two
+    /// FloState step-throughs overlapping otherwise passed the ball back and forth every frame.
+    public var snatchSpent = false
     /// Frames of down held on the ground, and frames left falling through one-ways after a drop.
     public var dropHoldFrames = 0
     public var dropThrough = 0
@@ -468,6 +471,7 @@ public struct Player: Equatable {
         state = next
         stateTimer = 0
         if next == .taunt { tauntPaid = false }
+        if next == .snatching { snatchSpent = false }
         if next != .slide { forcedSlide = false }
         if next != .suspended { tornadoCentre = nil }
         // A fresh stance has its stepback; coming back out of one doesn't.

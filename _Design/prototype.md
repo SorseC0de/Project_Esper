@@ -186,6 +186,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   a step-through, the body carried 96 art pixels forward over the snatch, two of the sheets'
   48-pixel boxes (`SnatchRules.floStateTravel`, protocol 117), through the other; the whole way the
   body takes the ball off whoever it passes, or a loose ball it passes (`Player.snatchSteppingThrough`),
+  once: a snatch takes the ball at most once, and one it's taken off mid-snatch can't take it straight
+  back (`Player.snatchSpent`, protocol 146; two step-throughs overlapping had passed it back and forth
+  every frame, a steal, a hit stop and FLO each time),
   as well as the hand's reach at full stretch; on the third frame the hooded head looks
   back (protocol 103). The slash in FloState, on the ground or in the air, is a step-through too, one attack
   (`player_esperslash_flostate`, nine 80 by 64 frames, the body at the cell's middle as on the

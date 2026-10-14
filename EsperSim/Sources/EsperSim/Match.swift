@@ -591,9 +591,12 @@ public struct Match: Equatable {
                 // where it stands, and stripped.
                 strip(other, by: index, knock: nil)
                 freeze(other)
-            } else if facingIt, allowed, reaches(ballBox) || (held.map { reaches(players[$0].body) } ?? false),
+            } else if facingIt, allowed, !player.snatchSpent, reaches(ballBox) || (held.map { reaches(players[$0].body) } ?? false),
                       held != nil || ball.isLive {
+                // One take a snatch; and the one it's taken from, mid-snatch, can't take it straight back.
+                players[index].snatchSpent = true
                 if let held {
+                    players[held].snatchSpent = true
                     earnFlo(FloRules.snatch, by: index, at: at)
                     if player.power != .frostTea { events.append(.stolen(player: index, from: held)) }
                     players[held].loseBall()

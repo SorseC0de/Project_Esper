@@ -1761,6 +1761,9 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   the fit's screen pixels a game pixel are even (each game pixel still whole) or the stage is fitted
   rather than drawn by whole pixels; all of it otherwise. At full size the GPU frame took about 39 ms
   standing still; drawing at one pixel a point outright had zoomed the Wreck Center out.
+  Drawing at full size there (2732 across), the glow is a quarter of the drawable, not a half, its
+  blur's step halved to spread as far (as the TV's), and the bodies' mask is half
+  (`GlowRenderer.lightened`): at full size the GPU frame was 26.6 ms on the Wreck Center.
 - On the TV the game renders at 1080p whatever the screen, the pixel art doubled onto a
   4K one unsmoothed (the HUD and menus stay at 4K); the Apple TV 4K's GPU spent about 50 ms
   a frame at 4K, most of it the glow and the composite. The glow there is half size with

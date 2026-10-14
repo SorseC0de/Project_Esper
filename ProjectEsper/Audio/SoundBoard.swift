@@ -149,6 +149,19 @@ final class SoundBoard {
         for voice in voices where voice.isPlaying { voice.scheduleBuffer(silence, at: nil) }
     }
 
+    /// Everything lined up on every voice dropped, and each voice free: a moment's silence scheduled
+    /// to interrupt, which discards what was waiting behind it. The win screen does this as it comes
+    /// up, so sounds held back while it showed don't all play when it goes.
+    func clearQueued() {
+        guard ready, engine.isRunning, let silence = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1) else { return }
+        silence.frameLength = 1
+        if let samples = silence.floatChannelData?[0] { samples[0] = 0 }
+        for (index, voice) in voices.enumerated() where voice.isPlaying {
+            voice.scheduleBuffer(silence, at: nil, options: .interrupts)
+            busyUntil[index] = 0
+        }
+    }
+
     /// The engine started again, and every voice set playing, each free.
     private func restart() {
         restartPending = false

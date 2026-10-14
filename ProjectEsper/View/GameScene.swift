@@ -1688,9 +1688,9 @@ final class GameScene: SKScene {
             let drawn = meter.calculateAccumulatedFrame()
             full.isHidden = wasHidden
             let outer = hudHalf.width - (mirrored ? hudInsets.right : hudInsets.left) - FloTuning.cornerInsetX
-            let pauseRoom = mirrored && online == nil ? (controls?.pauseFrame.height ?? 0) + GameScene.cornerRowGap : 0
+            // Both level; the second in under pause, which is drawn over it in the same corner.
             meter.position = CGPoint(x: mirrored ? outer - drawn.maxX : -outer - drawn.minX,
-                                     y: hudHalf.height - hudInsets.top - FloTuning.cornerInsetY - pauseRoom - drawn.maxY)
+                                     y: hudHalf.height - hudInsets.top - FloTuning.cornerInsetY - drawn.maxY)
             floMeters.append(meter)
             floBars.append(bar)
             floBarHolders.append(holder)
@@ -1701,7 +1701,7 @@ final class GameScene: SKScene {
         // Pause in the top right corner over the second meter, the corner switches beside it, and
         // pause's place told to the pause menu, whose resume button sits on it.
         if let controls {
-            controls.placeCornerRow(top: hudHalf.height - hudInsets.top - FloTuning.cornerInsetY,
+            controls.placeCornerRow(top: hudHalf.height - hudInsets.top,
                                     right: hudHalf.width - hudInsets.right - FloTuning.cornerInsetX)
             let frame = controls.pauseFrame, view = hudScene.size
             flowState?.pauseRect = CGRect(x: view.width / 2 + frame.minX * hudScale, y: view.height / 2 - frame.maxY * hudScale,
@@ -1714,8 +1714,6 @@ final class GameScene: SKScene {
     var hoodGlowShare: Float { GlowSettings.hoodShare(on: match.stage.features.look) }
     /// The stage whose preview's big panel the renderer is to keep, once the page is full (`StageShots`).
     var previewShotStage: StageChoice?
-    /// Between pause and the second FLO meter under it, in points.
-    private static let cornerRowGap: CGFloat = 6
     /// The pause icon's frame in the HUD's points, the pause menu's RESUME's place.
     private var pauseIconFrame: CGRect {
         controls?.pauseFrame ?? CGRect(x: hudHalf.width - 80, y: hudHalf.height - 40, width: 68, height: 35)
@@ -4758,7 +4756,11 @@ final class GameScene: SKScene {
         // ZONES' screen only over play; the loop brings it back.
         if next != .playing, zones != nil { flowState?.zonesHud = nil }
         // The winner's line once, as the win screen goes up, not each time it's redrawn.
-        if next == .won, flow != .won { SoundBoard.shared.play(SoundBoard.winners.randomElement()!) }
+        if next == .won, flow != .won {
+            // Whatever was lined up drops, so it doesn't all play when the screen goes.
+            SoundBoard.shared.clearQueued()
+            SoundBoard.shared.play(SoundBoard.winners.randomElement()!)
+        }
         // The pause menu coming up, however it was asked for.
         if next == .paused, flow != .paused { SoundBoard.shared.play(.pause) }
         // Into the Greateraid pick, once: "what will you do" to the one picking, "what will they

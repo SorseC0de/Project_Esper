@@ -1028,9 +1028,9 @@ the meter shows what they have less what's still on its way, so it never runs ah
 A gain is shown once, a rolled-back frame run again bringing no second set; a new round clears them.
  The meters are in the HUD's top corners, the first player's top left and the second's top right,
 each one's outer end and top FLO INSET X and FLO INSET Y in from the corner past the safe insets
-(20 and 0 points), MAX included (it rides the word's top outer corner, unclamped, the whole meter
-fitted into the corner with it), the second's under pause offline, which has the top right
-corner, the word outside and the bar toward the middle, the second's bar mirrored and its
+(20 and -10 points: up into the insets), MAX included (it rides the word's top outer corner,
+unclamped, the whole meter fitted into the corner with it), both level, the second in the same
+corner as pause offline, pause drawn over it rather than pushing it down, the word outside and the bar toward the middle, the second's bar mirrored and its
 word outside it, skewed as the first's is,
 shown in play: `FLO_meter` (`Pixel Art/UI`, eight 112 × 16 frames) a point
 an art pixel. Its inside is 100 columns from its sixth, five rows tall from its fifth, the last
@@ -2508,7 +2508,9 @@ shown, once, like the effects.
   whatascore) always in at 4, a dunk's (slamdunk, -2, -3, dunk) at 2 on a dunk, the wrist work
   (watchthewristwork, -2) at 1 on any other shot and 2 on a floater (`Ball.floaterShot`,
   carried by the score event), itsathree at 2 on a three in 47. winner, winner-2 or whatawin
-  once as the game goes to the win screen, not again when it's redrawn (a rematch's wait).
+  once as the game goes to the win screen, not again when it's redrawn (a rematch's wait); every
+  sound lined up on the voices is dropped first (`SoundBoard.clearQueued`), so nothing held back
+  plays when the screen goes.
 - The vocals come in from `_Audio/Vocals` by a list in `Tools/import_sounds.py`, the rest of
   the folder left out, each levelled as it's converted: its loudness while sounding (the RMS
   of its 10 ms stretches above -40 dBFS) to -21 dB for the announcer, just under the swish

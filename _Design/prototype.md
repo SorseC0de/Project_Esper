@@ -611,7 +611,8 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   reach (17 art pixels from the shoulder, 18 over the feet), `beam`'s tail, its middle stretched
   and its head, 16 pixels thick, in the energy colour, over a soft halo in the glow colour three times as thick at 0.5.
   Level two keeps a full charge rather than firing it (`Player.beamStored`): free to move, the
-  charge's swirl looping at the hands, until the next slash fires it at once.
+  hands breathing from skin to near-white over a second (the frame's hands alone, `_hands`, made
+  with the frame; over the hood with the arm that crosses it), until the next slash fires it at once.
 
 Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
 too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is

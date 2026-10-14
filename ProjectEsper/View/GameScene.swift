@@ -292,6 +292,13 @@ final class GameScene: SKScene {
     static let stringAccentLuminance = 0.876
     /// Over the body and under the head's own node, or behind the body.
     private static let hoodUpZ: CGFloat = 0.038
+    /// Z Tea's kept charge: the hands from skin toward this white and back, over a breath of
+    /// this many seconds, at most this far; over the body, and over the hood with the arm that crosses it.
+    private var keptChargeHands: [SKSpriteNode] = []
+    private static let keptChargeWhite = SKColor(white: 0.95, alpha: 1)
+    private static let keptChargeBreathSeconds = 1.0
+    private static let keptChargeMost: CGFloat = 0.85
+    private static let keptChargeZ: CGFloat = 0.032
     /// Over the body's flash (0.09).
     private static let hoodFlashZ: CGFloat = 0.091
     /// Super Smoothie's head tipped flying up or down: radians, eased in a share a frame, and how
@@ -1217,6 +1224,12 @@ final class GameScene: SKScene {
             legsOverBall.append(legOver)
             // The front arm again over the hood, where it crosses the head; on K&A washed, its
             // sleeve drawn again over it unwashed.
+            // Z Tea's kept charge: the hands breathing white, over the body.
+            let hands = SKSpriteNode()
+            hands.color = GameScene.keptChargeWhite
+            hands.isHidden = true
+            figure.addChild(hands)
+            keptChargeHands.append(hands)
             let armOver = SKSpriteNode()
             armOver.zPosition = GameScene.hoodUpZ + 0.001
             armOver.isHidden = true
@@ -8263,6 +8276,25 @@ final class GameScene: SKScene {
                                         accent: lockoutOn ? grey : SKColor(rgb: accent),
                                         z: energyForm ? GameScene.floatingStringZ : GameScene.hoodUpZ + 0.0005)
             }
+            // Z Tea's kept charge: the hands breathing from skin to near-white.
+            if keptChargeHands.indices.contains(index) {
+                let hands = keptChargeHands[index]
+                let texture = player.beamStored && player.power == .zTea && !node.isHidden
+                    ? sprites.handsTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) : nil
+                hands.isHidden = texture == nil
+                if let texture {
+                    hands.texture = texture
+                    hands.size = node.size
+                    hands.anchorPoint = node.anchorPoint
+                    hands.position = node.position
+                    hands.xScale = node.xScale
+                    hands.yScale = node.yScale
+                    hands.zRotation = node.zRotation
+                    hands.zPosition = GameScene.frontArmOverHood(frame) && !hood.isHidden ? GameScene.hoodUpZ + 0.0011 : GameScene.keptChargeZ
+                    let breath = 0.5 - 0.5 * cos(CACurrentMediaTime() * 2 * .pi / GameScene.keptChargeBreathSeconds)
+                    hands.colorBlendFactor = GameScene.keptChargeMost * CGFloat(breath)
+                }
+            }
             // The front arm over the hood on the frames it crosses the head.
             if armsOverHood.indices.contains(index) {
                 let armOver = armsOverHood[index]
@@ -8397,8 +8429,7 @@ final class GameScene: SKScene {
             // the rest of the sheet plays out where the ball was.
             let charge = chargeNodes[index]
             // Z Tea's beam charges at the hand the throw's way; once it fires the swirl plays out.
-            // A charge kept (level two) loops there till it's fired.
-            let beaming = player.power == .zTea && (player.state == .beamCharging || player.beamStored)
+            let beaming = player.power == .zTea && player.state == .beamCharging
             let chargingNow = (player.state == .throwStance && !handBall.isHidden) || beaming
             if chargingNow {
                 // A sprite's size is set in its parent's units, so it's divided by whatever
@@ -8419,7 +8450,7 @@ final class GameScene: SKScene {
                     charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                     charge.setScale(CGFloat(VoltaTuning.chargeScale))
                 default:
-                    let played = (beaming && player.beamStored ? match.frame : player.stateTimer) * Int(EnergyEffect.charge.fps) / 60
+                    let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
                     let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
                     let frame = played <= loopEnd ? played : loopStart + (played - loopStart) % (loopEnd - loopStart + 1)
                     charge.texture = sprites.effectTexture(EnergyEffect.charge.name, frame, player: index)

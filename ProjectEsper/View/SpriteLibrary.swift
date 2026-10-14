@@ -352,6 +352,14 @@ final class SpriteLibrary {
                 if let image { textures[suffix] = SKTexture(cgImage: image) } else { empty.append(suffix) }
             }
         }
+        // The hands alone, unlined: Z Tea's kept charge breathes them white.
+        if let images = result.images {
+            if let hands = SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: [.frontHand, .backHand], lined: false) {
+                textures["_hands"] = SKTexture(cgImage: hands)
+            } else {
+                empty.append("_hands")
+            }
+        }
         // The front leg laid over the ball the sheet passes behind it (`GameScene.ballBehindLegSheets`).
         if GameScene.ballBehindLegSheets.contains(frame.animation), let images = result.images {
             let leg = SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: [.frontThigh, .frontLeg, .frontFoot])
@@ -514,6 +522,12 @@ final class SpriteLibrary {
         partsTexture(frame, player: player, parts: [.frontThigh, .frontLeg, .frontFoot], suffix: "_frontleg", ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
     }
 
+    /// The hands alone as drawn, unlined, on the body's canvas: made with the frame. Nil with none in it.
+    func handsTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_hands"]
+    }
+
     /// The sheet's front arm alone (its arm and hand) as drawn with the line round it, on the body's
     /// canvas: laid over the hooded head on the frames `GameScene.frontArmOverHood` names, where the
     /// arm crosses the head. Nil with no front arm in the frame.
@@ -604,7 +618,7 @@ final class SpriteLibrary {
 
     /// The pixels of `parts` as `drawn` has them, found by the sheet's own colours in `source`, with
     /// the line drawn next to them; nil when the frame has none of them.
-    static func partsImage(drawn: CGImage, source: CGImage, parts: Set<BodyPart>) -> CGImage? {
+    static func partsImage(drawn: CGImage, source: CGImage, parts: Set<BodyPart>, lined: Bool = true) -> CGImage? {
         let width = drawn.width, height = drawn.height
         guard source.width == width, source.height == height,
               let (drawnContext, drawnPixels) = SpriteLibrary.canvas(width: width, height: height),
@@ -624,7 +638,7 @@ final class SpriteLibrary {
                 let pixel = y * width + x
                 var keep = isPart[pixel]
                 // The line round it: drawn where the sheet has nothing, next to the part.
-                if !keep, sourcePixels[pixel * 4 + 3] == 0, drawnPixels[pixel * 4 + 3] > 0 {
+                if lined, !keep, sourcePixels[pixel * 4 + 3] == 0, drawnPixels[pixel * 4 + 3] > 0 {
                     keep = (-1...1).contains { dy in (-1...1).contains { dx in
                         let nx = x + dx, ny = y + dy
                         return nx >= 0 && ny >= 0 && nx < width && ny < height && isPart[ny * width + nx]

@@ -43,9 +43,13 @@ final class GameScene: SKScene {
     /// one path: offline the other side's input is handed in each tick and every frame
     /// confirms at once; online the other phone's inputs arrive by frame and the sim
     /// rolls back when a prediction was wrong.
-    private var session = RollbackSession(match: Match(stage: .court, countdown: GameScene.countdownFrames), localIndex: 0)
+    private var session = RollbackSession(match: GameScene.startingMatch, localIndex: 0) {
+        didSet { match = previewMatch ?? session.match }
+    }
+    private static let startingMatch = Match(stage: .court, countdown: GameScene.countdownFrames)
     /// The match drawn: the session's, or while the stage preview plays, its throwaway one.
-    private var match: Match { previewMatch ?? session.match }
+    /// Kept rather than worked out on each read, which copied the whole match every time.
+    private var match = GameScene.startingMatch
     /// The computer on the other side, when the AI switch is on; never online.
     private var opponent = Opponent(index: 1)
     /// VS CPU: the computer plays player 2, whatever pads are in; off, player 2 is the
@@ -132,7 +136,9 @@ final class GameScene: SKScene {
     /// The stage preview before a stage's first count: the throwaway match its cuts are drawn
     /// from, the page the renderer lays down, its cuts and how far it's got, the stage it was
     /// last played for, and the camera's framing of the cut playing.
-    private var previewMatch: Match?
+    private var previewMatch: Match? {
+        didSet { match = previewMatch ?? session.match }
+    }
     var mangaPage: MangaPageFrame?
     private var stagePreview: StagePreview?
     private var previewedStage: StageChoice?
@@ -7834,10 +7840,12 @@ final class GameScene: SKScene {
         world.speed = held ? 0 : 1
         strokeFloMeters()
         stepFloSparkles()
-        if !held { stepFloOrbs() }
         updateFloMeters()
         drawFloBundles()
+        section("flo hud")
+        if !held { stepFloOrbs() }
         for index in floFlash.indices where floFlash[index] > 0 { floFlash[index] -= 1 }
+        section("orbs")
         if !held { stepHeadParticles() }
         section("particles")
         // The figure in front: the one with the ball, else the last to touch it.
@@ -8015,6 +8023,7 @@ final class GameScene: SKScene {
             snipeCursors[index].isHidden = player.state != .gunSnipe
             if player.state == .gunSnipe { snipeCursors[index].position = SpriteLibrary.point(player.snipeCursor) }
 
+            section("body")
             // The line round the body, in the look's outline or cycling through the zone's.
             let outlineNode = outlineNodes[index]
             // In FloState, half as thick, in the zone's colours.
@@ -8060,6 +8069,7 @@ final class GameScene: SKScene {
             // The hood, toned in the energy as the energy is, so it glows the same, a little
             // lighter: up over the human's head, down behind the energy form's. Drawn for the
             // idle's third frame, moved each frame by how far the head is from it there.
+            section("outline")
             let hood = hoodNodes[index]
             // It follows the head, the human's and FloState's alike.
             let partNow = sprites.landmark(.head, in: frame, player: index)
@@ -8248,6 +8258,7 @@ final class GameScene: SKScene {
             // ledge it reaches down to the real floor under it, over the same frames. Only
             // the dribble sheets do that: a stance or a throw keeps the ball where the frame
             // put it, so nothing sags off the edge of a slab.
+            section("hood")
             let halo = handHalos[index]
             let handBall = handBalls[index]
             // A fireball in hand rides where the ball would, in fire.
@@ -8352,6 +8363,7 @@ final class GameScene: SKScene {
             }
             charging[index] = chargingNow
 
+            section("hand ball")
             // The head follows its place on the body loosely and bobs, as if it only just belonged.
             let headNode = headNodes[index]
             // A head drawn apart, unless the hooded head stands in for it.
@@ -8393,6 +8405,7 @@ final class GameScene: SKScene {
                     emitHeadParticles(index, power: player.power, at: CGPoint(x: at.x, y: at.y + GameScene.crownLift * drawScale))
                 }
             }
+            section("head")
             // A human's legs, in the energy's colours, give off smaller cubes of their own; in
             // the energy form, the hands too.
             if HumanLook.enabled, ParticleLook.cubes, !lockedOutOfFloState {
@@ -8445,6 +8458,7 @@ final class GameScene: SKScene {
                                       creditKey: GameScene.vortexCreditKey + index, streams: [vortex])
                 }
             }
+            section("cubes")
             // The change's eyes over the body, in the energy's colour.
             let eyes = eyesNodes[index]
             eyes.isHidden = !changing || EffectSheets.frames["transform_eyes"] == nil
@@ -9029,10 +9043,29 @@ final class GameScene: SKScene {
 
     // MARK: Touches, from the HUD's view in points
 
-    /// A point in the view as a point in the HUD's space: the same points, from the centre, y up.
     /// Points round the FLO meter a tap still takes.
     private static let floMeterTapSlack: CGFloat = 12
 
+    /// Points a refused FLO meter shakes either way, and the seconds of each step.
+    private static let floRefusedShake: CGFloat = 4
+    private static let floRefusedStepSeconds: TimeInterval = 0.04
+
+    /// A FLO meter tapped while FloState isn't open to it: a quick side-to-side shake, its stroke with it.
+    private func shakeFloMeter(_ index: Int) {
+        var nodes: [SKNode] = [floMeters[index]]
+        if floStrokes.count == floMeters.count { nodes.append(floStrokes[index]) }
+        for node in nodes {
+            let home = (node.userData?["shakeHome"] as? CGPoint) ?? node.position
+            node.removeAction(forKey: "refused")
+            node.userData = (node.userData ?? NSMutableDictionary())
+            node.userData?["shakeHome"] = home
+            let steps = [1, -1, 1, -1, 0].map { CGFloat($0) * GameScene.floRefusedShake }
+            let moves = steps.map { SKAction.move(to: CGPoint(x: home.x + $0, y: home.y), duration: GameScene.floRefusedStepSeconds) }
+            node.run(.sequence(moves + [.run { node.userData?["shakeHome"] = nil }]), withKey: "refused")
+        }
+    }
+
+    /// A point in the view as a point in the HUD's space: the same points, from the centre, y up.
     private func hudPoint(_ point: CGPoint, viewSize: CGSize) -> CGPoint {
         CGPoint(x: (point.x - viewSize.width / 2) / hudScale, y: (viewSize.height / 2 - point.y) / hudScale)
     }
@@ -9056,11 +9089,17 @@ final class GameScene: SKScene {
             _ = screen.tap(at: hudPoint(point, viewSize: viewSize))
             return
         }
-        // A tap on your own FLO meter: into FloState, or out of it, as throw and shoot together.
+        // A tap on your own FLO meter: into FloState, or out of it, as throw and shoot together;
+        // when neither is open to it, the meter shakes and nothing's sent.
         if GameScene.touchControlsShown, floMeters.indices.contains(localIndex), !floMeters[localIndex].isHidden,
            floMeters[localIndex].calculateAccumulatedFrame().insetBy(dx: -GameScene.floMeterTapSlack, dy: -GameScene.floMeterTapSlack)
             .contains(hudPoint(point, viewSize: viewSize)) {
-            controls?.tapFloState()
+            let player = match.players[localIndex]
+            if player.inFloState ? player.unlimitedFlo : player.floStateReady {
+                controls?.tapFloState()
+            } else {
+                shakeFloMeter(localIndex)
+            }
             return
         }
         controls?.began(touch, at: hudPoint(point, viewSize: viewSize))

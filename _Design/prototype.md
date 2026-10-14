@@ -161,7 +161,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   never left early: in it the pair does nothing, and it lasts till the FLO's spent (protocol 142); with
   FLO that never runs out, ZONES' (`unlimitedFlo`), the pair is still the way out.
   On a touch screen a tap on your own FLO meter (or within 12 points of it) is throw and shoot
-  together for a frame, the change in or out (`TouchControls.tapFloState`).
+  together for a frame, the change in or out (`TouchControls.tapFloState`); only when it would
+  change: short of full, or in FloState with FLO that runs out, the meter shakes and nothing's sent
+  (`GameScene.shakeFloMeter`).
   In it the body moves a tenth faster (`FloStateRules`: the speed share 1.1; its actions and their
   sheets at their own pace, 15 a second, the hurrying taken out in protocol 141), and jumps a tenth higher (the push at the root of 1.1); a FLO is spent every 0.3 seconds
   (`spendFrames`, 18), so a full meter lasts half a minute, and with none left it's out (protocol 82).

@@ -68,9 +68,13 @@ neutral to get a shot off; catch it and the roles reverse.
   (`warmDrawnArt`), the basket and drink banners, the down marker, the fish's two colours and the
   drink pick's frames, both sides'. The rule: anything drawn in play is made on a loading screen,
   never on its first showing (debug builds log anything that still is, `reportsMisses`). The customize screen changes its figures' looks only
-  while it's open, not as it fades out into play. In FloState standing still (the idle and the
-  dribble idle) the hood blows: `player_flowing_hood`'s six frames round and round at 15 a second,
-  drawn in the first skin as the turned views are (`SpriteLibrary.flowingHoodFrames`). Two more
+  while it's open, not as it fades out into play. In FloState standing, crouching, sliding, on the move,
+  taunting and skidding (`flowingHoodSheets`: the idle, crouch, crouch walk, slide, walk, run, taunt and
+  skid, with the ball or without) the hood blows: `player_flowing_hood`'s six frames round and round at 15 a second,
+  drawn in the first skin as the turned views are (`SpriteLibrary.flowingHoodFrames`). FloState's face
+  is skin, unglowing and shielded as ever; its body takes the hood as the plain body does (no head
+  apart, `energyFormHeadApart` off): the neck in the skin's shadow tone and the line round the hood,
+  so FloState's coloured line runs there and no black is left at the neck. Two more
   sheet tables go with it, in play and in the gallery alike: `GameScene.hoodTurnDegrees`, the hood
   turned with the body about the head's middle, clockwise facing right (the double jump's tumble:
   30, 90, 135, then -90 twice), its strings' anchors turning with it and the hood carrying its own

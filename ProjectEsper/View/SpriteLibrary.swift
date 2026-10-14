@@ -324,7 +324,7 @@ final class SpriteLibrary {
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
         let look = SpriteLibrary.look(look, for: frame)
         let result = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
-                              hoodShape: !look.energyForm ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil,
+                              hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame),
                               // On every frame: a tipped head eases back level over whatever comes next.
                               bareLine: !look.energyForm)
         var textures = ["": result.texture]
@@ -346,7 +346,7 @@ final class SpriteLibrary {
                 ("_frontarm", SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: arm)),
                 ("_frontarmglowing", images.glowing.flatMap { SpriteLibrary.partsImage(drawn: $0, source: source, parts: arm) }),
                 ("_frontarmline", SpriteLibrary.partsLine(source: source, parts: arm,
-                                                          hood: !look.energyForm ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil)),
+                                                          hood: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame))),
             ]
             for (suffix, image) in pieces {
                 if let image { textures[suffix] = SKTexture(cgImage: image) } else { empty.append(suffix) }
@@ -532,7 +532,7 @@ final class SpriteLibrary {
         guard !emptyPieces.contains(key) else { return nil }
         let source = atlas.textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage()
         guard let image = SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
-                                                  hood: !look.energyForm ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil) else {
+                                                  hood: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame)) else {
             emptyPieces.insert(key)
             return nil
         }
@@ -679,9 +679,6 @@ final class SpriteLibrary {
         return result
     }
 
-    /// The brightest an energy face's lightest tone may be, as a grey level: lime (0.76) comes
-    /// down to it, gold and teal (0.67, 0.68) a touch; the other colours are under it.
-    static let energyFaceLevel = 0.6
     /// The hood's greys a touch down the ramp, nearer the legs' plain colour.
     static let hoodLevel = 0.9
 
@@ -690,8 +687,7 @@ final class SpriteLibrary {
     /// and the face each alone in white, for the glow's mask. As the ice player, the frozen
     /// bodies' and ice clones' look, the face too is toned, in the ice's front colour.
     /// In FloState (`energy`), the hood is the energy form's near-white clothes colour
-    /// (`EnergyColour.body`), shaded by its greys, and the face the regular energy colour, its
-    /// lighter skin tone the colour itself and the darker in proportion.
+    /// (`EnergyColour.body`), shaded by its greys; the face stays skin, unglowing, as ever.
     /// `view`: which way the head faces (`HoodView`), the turned ones drawn from `player_hoodheads_v2`
     /// in the first skin and swapped into this one's two tones.
     /// `flowing`: a frame of `player_flowing_hood`, FloState's idle hood blowing, drawn in the first skin too.
@@ -719,10 +715,7 @@ final class SpriteLibrary {
         func level(_ index: Int) -> Double {
             (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / 255
         }
-        // A light energy colour, lime's, is dimmed on the face so its features don't burn out in the glow.
-        let glowLevel = (0.2126 * Double((look.glow >> 16) & 0xFF) + 0.7152 * Double((look.glow >> 8) & 0xFF) + 0.0722 * Double(look.glow & 0xFF)) / 255
-        let faceDimming = energy ? min(SpriteLibrary.energyFaceLevel / max(glowLevel, 0.01), 1) : 1
-        // The face's lightest tone, which the energy colour stands for.
+        // The face's lightest tone, which the ice's colour stands for.
         let faceLightest = (0..<(width * height)).filter { pixels[$0 * 4 + 3] != 0 && pixels[$0 * 4 + 2] < pixels[$0 * 4] }
             .map { level($0 * 4) }.max() ?? 1
         for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] != 0 {
@@ -733,8 +726,8 @@ final class SpriteLibrary {
             let mask = isHood ? hoodPixels : facePixels
             for channel in 0..<4 { mask[index + channel] = 255 }
             guard isHood else {
-                if energy || player == SpriteLibrary.icePlayer {
-                    paint(pixels, index, Look.scaled(look.glow, min(level(index) / max(faceLightest, 0.01), 1) * faceDimming))
+                if player == SpriteLibrary.icePlayer {
+                    paint(pixels, index, Look.scaled(look.glow, min(level(index) / max(faceLightest, 0.01), 1)))
                 } else if let swap = faceSwaps[RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])] {
                     paint(pixels, index, swap)
                 }
@@ -1036,10 +1029,12 @@ final class SpriteLibrary {
         return context.makeImage()
     }
     /// The frame a skin and view's hooded head is drawn from.
-    /// FloState's idle hood, blowing: its frames, and how fast they play.
+    /// FloState's hood blowing, standing, crouching, sliding, on the move, taunting and skidding:
+    /// its frames, how fast they play, and the sheets it's worn on.
     static let flowingHoodFrames = SKTextureAtlas(named: "Sprites").textureNames.filter { $0.hasPrefix("player_flowing_hood_") }.count
     static let flowingHoodFramesPerSecond = 15
-    static let flowingHoodSheets: Set<Animation> = [.idle, .dribbleIdle]
+    static let flowingHoodSheets: Set<Animation> = [.idle, .dribbleIdle, .crouch, .crouchWalk, .slide, .walk, .dribbleWalk,
+                                                    .run, .dribbleRun, .taunt, .skid, .skidBall]
     static func hoodSource(skin: Int, view: Int) -> SKTexture {
         let atlas = SKTextureAtlas(named: "Sprites")
         return view == 0 || turnedHoodShapes[view] == nil ? atlas.textureNamed("player_hoodheads_\(HumanLook.hoodHeadFrame(skin))")
@@ -1262,7 +1257,7 @@ final class SpriteLibrary {
         markEnergy(&parts, holdsBall: holdsBall, width: width, height: height)
         // Where the hood will be drawn over this canvas, if it's given or its shape is.
         var hood = given
-        if hood == nil, !look.energyForm, let hoodShape, let there = SpriteLibrary.hoodDrawnForHead {
+        if hood == nil, let hoodShape, let there = SpriteLibrary.hoodDrawnForHead {
             var sum = CGPoint.zero, heads = 0
             for pixel in 0..<count where parts[pixel] == .head {
                 sum.x += CGFloat(pixel % width) + 0.5
@@ -1351,6 +1346,12 @@ final class SpriteLibrary {
             return false
         }
 
+        /// The glowing parts get no line round them; the head under the hood is the neck, and does.
+        func lineless(_ part: BodyPart?) -> Bool {
+            guard let part else { return false }
+            return part == .head ? hood == nil && part.glows(energyForm: look.energyForm) : part.glows(energyForm: look.energyForm)
+        }
+
         // Stroked groups: the body pixels next to one take the line, so it keeps its shape. A
         // pixel already lined is neither lined again nor counted as the group's, so where two
         // groups meet there's one line, not two.
@@ -1369,7 +1370,7 @@ final class SpriteLibrary {
         if bareLine, detach, hood != nil, look.outlineWidth > 0 {
             var lineHere = lined
             var filled = (0..<count).map { pixels[$0 * 4 + 3] != 0 }
-            var body = (0..<count).map { filled[$0] && parts[$0]?.glows(energyForm: look.energyForm) != true }
+            var body = (0..<count).map { filled[$0] && !lineless(parts[$0]) }
             for _ in 0..<look.outlineWidth {
                 let grown = (0..<count).filter { !filled[$0] && neighbours($0, { body[$0] }) }
                 for pixel in grown {
@@ -1384,7 +1385,7 @@ final class SpriteLibrary {
         // The outside line, grown a pixel at a time round the body. The glowing parts get
         // none: a clear pixel next to nothing but the ball stays clear.
         if look.outlineWidth > 0 {
-            var body = (0..<count).map { (pixels[$0 * 4 + 3] != 0 && parts[$0]?.glows(energyForm: look.energyForm) != true) || hoodCover[$0] }
+            var body = (0..<count).map { (pixels[$0 * 4 + 3] != 0 && !lineless(parts[$0])) || hoodCover[$0] }
             for _ in 0..<look.outlineWidth {
                 var grown: [Int] = []
                 for pixel in 0..<count where pixels[pixel * 4 + 3] == 0 && !hoodCover[pixel] && neighbours(pixel, { body[$0] }) {
@@ -1402,10 +1403,12 @@ final class SpriteLibrary {
         // A human's head is the view's, `player_hoodheads` over it: the sheet's own is taken
         // out, its line left round where it was.
         // Under the hood, the neck in the skin's shadow tone.
-        if !look.energyForm, hood != nil {
+        if hood != nil {
             for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
-                // The back hand's colour: the skin's back tone, or the ice look's back colour.
-                paint(pixels, pixel * 4, look.colours[.backHand] ?? PixelPalette.colours[look.dressing.tone.back])
+                // The back hand's colour: the skin's back tone, or the ice look's back colour; in
+                // FloState the skin's, as its face is.
+                paint(pixels, pixel * 4, look.energyForm ? PixelPalette.colours[look.dressing.tone.back]
+                      : look.colours[.backHand] ?? PixelPalette.colours[look.dressing.tone.back])
             }
         }
         if !look.energyForm, hood == nil {
@@ -1416,7 +1419,8 @@ final class SpriteLibrary {
 
         // A human's energy-coloured parts glow; the energy form glows all over but its bare
         // arms and legs, in their skin.
-        func bareSkin(_ part: BodyPart?) -> Bool { part.map { $0 != .head && look.dressing.skin[$0] != nil } == true }
+        // Under the hood the head is only the neck, in skin.
+        func bareSkin(_ part: BodyPart?) -> Bool { part.map { $0 == .head ? hood != nil : look.dressing.skin[$0] != nil } == true }
         let glowing = (0..<count).map { !look.energyForm ? parts[$0].map(look.dressing.glowing.contains) == true : parts[$0] != nil && !bareSkin(parts[$0]) }
 
         // The line at half its thickness, on a canvas twice as fine: of each line pixel only the

@@ -86,7 +86,7 @@ struct Look: Hashable {
     /// The head drawn apart from the body, a quarter bigger: the energy form's. Off
     /// (`energyFormHeadApart`), it's drawn on the body at its own size, as a human's is.
     var headApart: Bool { energyForm && Look.energyFormHeadApart }
-    static let energyFormHeadApart = true
+    static let energyFormHeadApart = false
     /// The body colour the look was made from, for its other form.
     var body: RGB?
     /// The skin tone, sleeves and pants picked on the customize screen.

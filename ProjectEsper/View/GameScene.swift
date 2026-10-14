@@ -538,12 +538,10 @@ final class GameScene: SKScene {
         return sectionTimes
     }
 
-    /// The hooded heads' hoods, cut out of the glow's body mask in black so they glow as the
-    /// energy does; and their faces, shielded in red, so no glow lands on them.
-    /// The hooded heads' hoods, for the glow's mask to give the hood's share of the glow; in
-    /// FloState the face is energy and glows with the hood.
+    /// The hooded heads' hoods, for the glow's mask to give the hood's share of the glow; their
+    /// faces, FloState's too, shielded in red (`shieldedSnapshots`), so no glow lands on them.
     var hoodSnapshots: [BodySnapshot] {
-        hoodMaskSnapshots(\.hood) + hoodMaskSnapshots(\.face, only: energyHoods)
+        hoodMaskSnapshots(\.hood)
     }
 
     /// What glows at the plain threshold wherever it is, over the stage's flats too: the hood's
@@ -561,9 +559,8 @@ final class GameScene: SKScene {
         }
         return strings + apart + strikes
     }
-    var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face, only: Set(hoodNodes.indices).subtracting(energyHoods)) }
+    var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
     /// The players whose hooded head is FloState's, its face energy.
-    private var energyHoods: Set<Int> = []
     private func hoodMaskSnapshots(_ part: KeyPath<(hood: SKTexture, face: SKTexture), SKTexture>, only: Set<Int>? = nil) -> [BodySnapshot] {
         hoodNodes.indices.filter { only?.contains($0) ?? true }.compactMap { index in
             let node = hoodNodes[index]
@@ -8122,12 +8119,11 @@ final class GameScene: SKScene {
                 let skin = sprites.look(for: index).dressing.skinTone
                 let frozen = player.frozen > 0
                 let view = HoodView.of(frame)
-                // In FloState standing still, the hood blowing: `player_flowing_hood` round and round.
+                // In FloState on the sheets it's worn on (`flowingHoodSheets`), the hood blowing: `player_flowing_hood` round and round.
                 let flowing = energyForm && !changing && SpriteLibrary.flowingHoodFrames > 0 && SpriteLibrary.flowingHoodSheets.contains(frame.animation)
                     ? match.frame * SpriteLibrary.flowingHoodFramesPerSecond / 60 % SpriteLibrary.flowingHoodFrames : nil
                 let hoodHead = frozen ? sprites.hoodHead(skin: skin, player: SpriteLibrary.icePlayer, view: view)
                     : sprites.hoodHead(skin: skin, player: index, energy: energyForm, view: view, flowing: flowing)
-                if energyForm, !frozen { energyHoods.insert(index) } else { energyHoods.remove(index) }
                 hood.texture = hoodHead.drawn
                 hoodMasks[index] = (hoodHead.hood, hoodHead.face)
                 hood.zPosition = GameScene.hoodUpZ

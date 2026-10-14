@@ -275,10 +275,6 @@ final class SpriteLibrary {
     /// The sheets whose ball can be lifted off a frame and not drawn: FloState's snatch, which
     /// draws the ball it took, for a snatch that took none.
     static let liftsBall: Set<Animation> = [.snatchFloState]
-    /// The sheets drawn while the hooded head can tip, flying and aiming Z Tea's beam, and those
-    /// it turns on (`GameScene.hoodTurnDegrees`, the double jump's tumble): their line is made a
-    /// second time without the hood's place, for the hood to carry its own.
-    static let tippingHead: Set<Animation> = Set([.fly, .flyBall, .blast]).union(GameScene.hoodTurnDegrees.keys)
 
     /// A player frame's key in the cache: with `ballAsEnergy` the sheet's whites are all energy,
     /// with `ballLifted` its ball is lifted off and not drawn.
@@ -329,7 +325,8 @@ final class SpriteLibrary {
         let look = SpriteLibrary.look(look, for: frame)
         let result = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
                               hoodShape: !look.energyForm ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame) : nil,
-                              bareLine: SpriteLibrary.tippingHead.contains(frame.animation))
+                              // On every frame: a tipped head eases back level over whatever comes next.
+                              bareLine: !look.energyForm)
         var textures = ["": result.texture]
         if let bareOutline = result.bareOutline { textures["_bareoutline"] = bareOutline }
         if let glowingParts = result.glowingParts { textures["_glowing"] = glowingParts }

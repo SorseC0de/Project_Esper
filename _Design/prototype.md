@@ -63,8 +63,11 @@ neutral to get a shot off; catch it and the roles reverse.
   its line and its glowing parts are made with the frame itself (`makeFrame`), off the main thread
   in a look's rebuild, and the hooded heads (every view, plain, FloState's and frozen, with the
   hood's line and K&A's face) once it lands (`warmHoods`): none is first made mid-match. So are
-  the front leg over the ball (`ballBehindLegSheets`) and the double jump's line without the hood
-  (`tippingHead` takes in `hoodTurnDegrees`); the customize screen changes its figures' looks only
+  the front leg over the ball (`ballBehindLegSheets`) and, on every frame, the line without the
+  hood (a tipped head eases back level over whatever comes next); with the stage
+  (`warmDrawnArt`), the basket and drink banners, the down marker, the fish's two colours and the
+  drink pick's frames, both sides'. The rule: anything drawn in play is made on a loading screen,
+  never on its first showing (debug builds log anything that still is, `reportsMisses`). The customize screen changes its figures' looks only
   while it's open, not as it fades out into play. In FloState standing still (the idle and the
   dribble idle) the hood blows: `player_flowing_hood`'s six frames round and round at 15 a second,
   drawn in the first skin as the turned views are (`SpriteLibrary.flowingHoodFrames`). Two more

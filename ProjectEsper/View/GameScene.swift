@@ -2300,6 +2300,7 @@ final class GameScene: SKScene {
         }
         refreshSupports(HoopSupport.pieces)
         warmDrawnArt()
+        SKTexture.preload(pickScreenFrames()) {}
     }
 
     /// The supports' picture again, for a layout.
@@ -4962,6 +4963,20 @@ final class GameScene: SKScene {
     private func drinkerFrames(_ player: Int) -> [SKTexture] {
         (0..<GameScene.drinkerFrameCount).map { sprites.standalone("player_drinkchoice", frame: $0, player: player) }
     }
+    private func benchFrame(_ player: Int) -> SKTexture { sprites.standalone("player_bench", frame: 0, player: player) }
+    private func drinkingFrames(_ player: Int) -> [SKTexture] {
+        (0..<GameScene.drinkerFrameCount).map {
+            sprites.standalone("player_drink", frame: $0, player: player, headTilt: PickScreen.drinkHeadTilts[min($0, PickScreen.drinkHeadTilts.count - 1)],
+                               overHood: PickScreen.drinkOverHood)
+        }
+    }
+    private func transformingFrames(_ player: Int) -> [SKTexture] {
+        (0..<Animation.transform.frameCount).map { sprites.standalone(Animation.transform.rawValue, frame: $0, player: player) }
+    }
+    /// Everything the drink pick between points draws, both sides', made with the stage.
+    private func pickScreenFrames() -> [SKTexture] {
+        match.players.indices.flatMap { drinkerFrames($0) + [benchFrame($0)] + drinkingFrames($0) + transformingFrames($0) }
+    }
     private static let drinkerFrameCount = 2
 
     /// The screen for the flow, built for the view's size.
@@ -4977,12 +4992,8 @@ final class GameScene: SKScene {
             if picker == localIndex {
                 screen = PickScreen(halfWidth: halfWidth, halfHeight: halfHeight, offers: pickOffers, drinks: series.drinks[picker],
                                     colour: SKColor(rgb: sprites.look(for: picker).glow), timed: online != nil,
-                                    drinker: drinkerFrames(picker), bench: sprites.standalone("player_bench", frame: 0, player: picker),
-                                    drinking: (0..<GameScene.drinkerFrameCount).map {
-                                        sprites.standalone("player_drink", frame: $0, player: picker, headTilt: PickScreen.drinkHeadTilts[min($0, PickScreen.drinkHeadTilts.count - 1)],
-                                                           overHood: PickScreen.drinkOverHood)
-                                    },
-                                    transforming: (0..<Animation.transform.frameCount).map { sprites.standalone(Animation.transform.rawValue, frame: $0, player: picker) }) { [weak self] drink in
+                                    drinker: drinkerFrames(picker), bench: benchFrame(picker), drinking: drinkingFrames(picker),
+                                    transforming: transformingFrames(picker)) { [weak self] drink in
                     self?.choose(drink)
                 }
             } else {
@@ -6912,6 +6923,15 @@ final class GameScene: SKScene {
     /// helicopter in its rims' colours. Each is drawn once and kept, not on its first appearance.
     private func warmDrawnArt() {
         var made: [SKTexture] = Onomatopoeia.warmed()
+        // A basket's banners, and the stages' own pictures drawn on first showing.
+        made += ["BUCKET!!", "THREE!!"].map { TitleText.texture($0, size: 48) }
+        made.append(TitleText.texture("Points Are Worth Double!", size: 26))
+        for side in match.players.indices {
+            made += Greateraid.allCases.map { TitleText.texture("\(sideName(side)) DRINKS \($0.name.uppercased())", size: 26) }
+        }
+        if match.stage.features.ballCam, let marker = downMarkerTexture { made.append(marker) }
+        let fish = seaLifeFrames(.fish)
+        if match.stage.features.underwater, !fish.isEmpty { made += (0..<2).flatMap { fishFrames(colour: $0, sheet: fish) } }
         if let board = boardTexture(for: 0) { made.append(board) }
         made += snipeCursors.compactMap(\.texture)
         for index in match.players.indices {
@@ -7245,6 +7265,7 @@ final class GameScene: SKScene {
     private var railChevrons: [SKSpriteNode] = []
     /// The down marker, stood on the top of the grass under a loose ball at rest.
     private var downMarker: SKSpriteNode?
+    private lazy var downMarkerTexture: SKTexture? = UIImage(named: "FootballMarker").map { SKTexture(image: $0) }
     /// With nobody holding it, the rails call for the ball instead, the lettering running
     /// one way on one rail and the other way on the other.
     private var railCalls: [(node: SKSpriteNode, rail: Int, home: CGFloat)] = []
@@ -7510,8 +7531,8 @@ final class GameScene: SKScene {
         let attacking = match.ball.holder.flatMap { holder in match.stage.hoops.first { $0.owner == holder } }
         // The down marker: where a loose ball last came to rest, on the top edge of the grass.
         if match.stage.features.ballCam {
-            if downMarker == nil, let image = UIImage(named: "FootballMarker") {
-                let marker = SKSpriteNode(texture: SKTexture(image: image))
+            if downMarker == nil, let texture = downMarkerTexture {
+                let marker = SKSpriteNode(texture: texture)
                 marker.size = CGSize(width: FieldArt.markerHeight * 121 / 512, height: FieldArt.markerHeight)
                 marker.anchorPoint = CGPoint(x: 0.5, y: 0)
                 marker.zPosition = -12

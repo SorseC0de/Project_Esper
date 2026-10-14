@@ -499,7 +499,7 @@ final class PowerTests: XCTestCase {
         let speed = match.players[0].velocity.x
         run(&match, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) })
         XCTAssertTrue(match.players[0].state == .slide || match.players[0].velocity.x == 0, "still sliding, or stopped by the wall")
-        if match.players[0].state == .slide { XCTAssertEqual(match.players[0].velocity.x, speed, accuracy: 0.001) }
+        if match.players[0].state == .slide, match.players[0].velocity.x != 0 { XCTAssertEqual(match.players[0].velocity.x, speed, accuracy: 0.001) }
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), jump: true), .idle])
         XCTAssertEqual(match.players[0].state, .jumpSquat, "jump cancels it")
     }

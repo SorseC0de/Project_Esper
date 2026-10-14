@@ -528,6 +528,12 @@ public struct Match: Equatable {
             players[index].slideHit = true
             strip(other, by: index, knock: nil)
         }
+        // A loose ball the slide meets is kicked on ahead, not caught.
+        if player.state == .slide, player.frozen == 0, ball.isLive, ball.holder == nil,
+           ball.box.overlaps(player.body) || player.slideHitbox.map(ball.box.overlaps) == true {
+            ball.swat(along: Vec2(x: Trig.cos(SlideRules.kickAngle) * player.facing.sign, y: Trig.sin(SlideRules.kickAngle)), by: index)
+            events.append(.swatted(player: index, hit: true))
+        }
         if let blade = player.slashHitbox, var cart, blade.overlaps(cart.box) {
             // Flight B411: the blade sends the cart rolling the way the swing goes, at its most,
             // into whoever's there; not back into the slasher. Once a swing: the blade's spent on
@@ -1497,9 +1503,9 @@ public struct Match: Equatable {
     private mutating func tryCatch() {
         // Won: nobody catches.
         guard !finished else { return }
-        // A throw coming back off the other is the thrower's at any speed, facing or not,
-        // in any state but a stun or a freeze.
-        if ball.returning, let thrower = ball.lastTouched, !players[thrower].holding, players[thrower].hitStun == 0,
+        // A throw coming back off the other is the thrower's at any speed, facing or not, in
+        // any state a ball's caught out of, but a stun or a freeze.
+        if ball.returning, let thrower = ball.lastTouched, !players[thrower].holding, players[thrower].hitStun == 0, players[thrower].state.canCatch,
            players[thrower].frozen == 0, players[thrower].chest.distance(to: ball.position) <= BallRules.catchRadius + BallRules.radius {
             hand(ballTo: thrower)
             return

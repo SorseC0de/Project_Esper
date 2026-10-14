@@ -357,6 +357,12 @@ whatever lands on it came at, held down 12° while someone
   before its first bounce, unless the body is reaching with a snatch or swinging the
   blade. Whoever last had the ball can take back their own shot or throw at any speed,
   once the release's catch cooldown is up. The snatch is the catch: there is no catch stance.
+  Only a body in a neutral state catches (`PlayerState.canCatch`, protocol 151): standing,
+  walking, dashing, running, the pivot, in the air (the jumps and the double jump), Super
+  Smoothie's flight, crouching or crouch walking; never in an action (a slash, a snatch out of its
+  own reach, a beam's charge or fire, a stance), a jump squat, a landing, a wall cling, a web or
+  a tornado's hold; and a throw coming back to its thrower goes by the same. The slide kicks a
+  loose ball it meets on ahead, 30 degrees up at the swat's speed (`SlideRules.kickAngle`).
 - Knocked loose by the blade or the slide's leg, or robbed by a snatch, a body can't
   press anything or catch anything for 60 frames, longer than the pop's round trip,
   though the stick still moves it, and its sprite flickers white: the taker has first

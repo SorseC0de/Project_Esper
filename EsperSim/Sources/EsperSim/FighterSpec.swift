@@ -476,6 +476,8 @@ public enum ShakeRules {
 public enum SlideRules {
     public static let legReach = 10.0
     public static let legHeight = 6.0
+    /// A loose ball the slide meets is kicked on ahead, this far up from level, at the swat's speed.
+    public static let kickAngle = degrees(30)
 }
 
 /// The Esper Slash's numbers: shoot without the ball, in neutral or on defence. On the

@@ -88,11 +88,12 @@ public enum PlayerState: Equatable, Hashable {
         }
     }
 
-    /// States a ball can be caught out of. The snatch takes the ball its own way.
+    /// States a loose ball is caught out of: neutral ones, standing, moving, in the air (the
+    /// jumps and the double jump) or crouching; none in an action, a jump squat or a landing. The
+    /// snatch takes the ball its own way.
     public var canCatch: Bool {
         switch self {
-        case .idle, .walk, .dash, .run, .pivot, .jumpSquat, .air, .land, .wallLand, .webSwing, .webPull, .flying,
-             .crouch, .crouchWalk, .slide, .suspended: true
+        case .idle, .walk, .dash, .run, .pivot, .air, .flying, .crouch, .crouchWalk: true
         default: false
         }
     }

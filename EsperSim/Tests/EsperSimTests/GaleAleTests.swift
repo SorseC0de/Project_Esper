@@ -44,7 +44,7 @@ final class GaleAleTests: XCTestCase {
         XCTAssertNotEqual(match.players[1].state, .suspended)
     }
 
-    func testAShotTakenByAStillTornadoCanBeCaughtFromIt() {
+    func testAShotTakenByAStillTornadoIsNotCaughtByOneHeldInIt() {
         var match = court(level: 1)
         match.players[0].position = Vec2(x: 120, y: 60)
         match.players[0].grounded = false
@@ -61,7 +61,7 @@ final class GaleAleTests: XCTestCase {
         match.ball.release(from: Vec2(x: gale.box.center.x, y: gale.box.max.y + 15), velocity: Vec2(x: 0, y: -2), by: 0, straight: false)
         match.ball.shotInFlight = true
         for _ in 0..<30 where match.ball.holder == nil { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertEqual(match.ball.holder, 1, "held, it's nobody's shot: caught")
+        XCTAssertNotEqual(match.ball.holder, 1, "held in the tornado isn't neutral: no catch")
     }
 
     func testLevelOnesSnatchSendsNothing() {

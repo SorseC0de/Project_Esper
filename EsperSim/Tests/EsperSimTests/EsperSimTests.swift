@@ -852,11 +852,8 @@ final class BallTests: XCTestCase {
         }
         XCTAssertEqual(match.scores, [1, 0])
         XCTAssertTrue(match.events.contains { if case .scored(player: 0, hoop: 1, _, _, _) = $0 { return true } else { return false } })
-        // Held in the net for the shot's hit-stop, then the restart.
-        XCTAssertEqual(match.hitStop, HitStopRules.shotFrames)
-        let held = match.ball.position
-        run(&match, frames: HitStopRules.shotFrames, input: { _ in .idle })
-        XCTAssertEqual(match.ball.position, held)
+        // No hit-stop for a basket: straight to the restart.
+        XCTAssertEqual(match.hitStop, 0)
         match.advance(inputs: [.idle, .idle])
         XCTAssertEqual(match.ball.holder, 1)
         XCTAssertTrue(match.players[1].hasBall)
@@ -896,8 +893,8 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].position.y, rim.y + BallRules.dunkOffset.y, accuracy: 0.001)
         XCTAssertEqual(match.players[0].animationFrame.animation, .dunk)
         XCTAssertEqual(match.restartIn, BallRules.dunkHangFrames)
-        // Still hanging there, the point not yet restarted, for the hit-stop and the beat.
-        run(&match, frames: HitStopRules.shotFrames + BallRules.dunkHangFrames - 2, input: { _ in .idle })
+        // Still hanging there, the point not yet restarted, for the beat.
+        run(&match, frames: BallRules.dunkHangFrames - 2, input: { _ in .idle })
         XCTAssertEqual(match.players[0].state, .dunking)
         XCTAssertEqual(match.countdown, 0)
         run(&match, frames: 2, input: { _ in .idle })

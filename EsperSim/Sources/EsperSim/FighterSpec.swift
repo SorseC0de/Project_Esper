@@ -550,11 +550,10 @@ public enum RimRules {
     public static let underwaterBounceShare = 0.5.squareRoot()
 }
 
-/// Hit-stop: the whole match held this many frames after a hit lands, a shot goes in, or a
-/// counter, the longest.
+/// Hit-stop: the whole match held this many frames after a hit lands or a counter, the longest;
+/// none for a basket.
 public enum HitStopRules {
     public static let hitFrames = 8
-    public static let shotFrames = 12
     public static let counterFrames = 16
     /// A slashclash's, held long.
     public static let slashClashFrames = 24

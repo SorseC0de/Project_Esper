@@ -244,7 +244,6 @@ public struct Match: Equatable {
                     scores[owner] += points
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: points, floater: ball.floaterShot))
                     if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, at: stage.hoops[hoop].position) }
-                    holdHitStop(HitStopRules.shotFrames)
                     players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
                     flightB411Scored(on: hoop)
                     ball.launchPoint = nil
@@ -255,7 +254,6 @@ public struct Match: Equatable {
                     // ZONES: the shot's in; the run's done, nothing restarts.
                     scores[owner] += 1
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot))
-                    holdHitStop(HitStopRules.shotFrames)
                     ball.shotInFlight = false
                 } else {
                     scores[owner] += 1
@@ -264,7 +262,6 @@ public struct Match: Equatable {
                     let tiedDecider = scores[0] == scores[1]
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot))
                     if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, at: stage.hoops[hoop].position) }
-                    holdHitStop(HitStopRules.shotFrames)
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking }) {
                             // A dunk: the dunker hangs on the rim a beat, the ball dead, then the restart.

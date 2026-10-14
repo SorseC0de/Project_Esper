@@ -263,9 +263,9 @@ whatever lands on it came at, held down 12° while someone
   off the backboard shakes the board with the rim riding it: a whole art pixel either way for
   8 frames (`RimLook.jitterFrames`); a dunk's slam shakes the backboard while the rim's held down, and 8 frames after; so does a slash's blade meeting it, and a wall jump off it.
 - Hit-stop: the whole match held, nothing moving or counting down, 8 frames when a hit lands
-  (a strip, a pop, a snatch off a holder), 12 when a shot goes in, 16 on a counter (protocol 91; it
+  (a strip, a pop, a snatch off a holder), 16 on a counter (protocol 91; it
   was 4, 6 and 10, too short to read)
-  (`HitStopRules`); a made point restarts after it, so the ball's held in the net. Protocol 22.
+  (`HitStopRules`). Protocol 22. A basket has none (protocol 150; it held 12 frames, the ball in the net).
   The view holds with it: the world's actions (every effect's sheet, the sound words), the FLO orbs,
   the head's and legs' cubes, the hood's strings and the water's life all wait out the stop.
 - Throw (without ball, in neutral or on defence): the snatch. The sheet's ten frames at

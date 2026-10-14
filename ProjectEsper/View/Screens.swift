@@ -581,7 +581,8 @@ final class WinScreen: Screen {
 
     /// The column, top to bottom, in the HUD's points from the middle: the halo's ring (the
     /// winner stands on the projector under it, `figurePixel` points an art pixel), box 4 with
-    /// the winner's name, and the two options side by side in frame 4.
+    /// the winner's name, and the two options side by side in frame 4, the final score in box 2
+    /// between them.
     static let ringY: CGFloat = 20
     static let figurePixel: CGFloat = 2
     static let nameY: CGFloat = -40
@@ -591,15 +592,21 @@ final class WinScreen: Screen {
     static let optionScale: CGFloat = 0.55
     static let optionTextSize: CGFloat = 12
     static let optionGap: CGFloat = 6
+    static let scoreScale: CGFloat = 0.4
+    static let scoreTextSize: CGFloat = 16
 
-    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, player: Int, again: String,
+    /// `score` is each side's, player one's first, as the match ended.
+    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, player: Int, score: [Int], again: String,
          onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
         figure = WinFigure(player: player, pose: .taunt)
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .win)
         addPlate("\(winner) Wins!", frame: "box4", scale: WinScreen.nameScale, textSize: WinScreen.nameTextSize,
                  at: CGPoint(x: 0, y: WinScreen.nameY))
         let width = Futuristic.sprite("4", scale: WinScreen.optionScale).size.width
-        let across = width / 2 + WinScreen.optionGap / 2
+        let scoreWidth = Futuristic.sprite("box2", scale: WinScreen.scoreScale).size.width
+        addPlate(score.map(String.init).joined(separator: " - "), frame: "box2", scale: WinScreen.scoreScale,
+                 textSize: WinScreen.scoreTextSize, at: CGPoint(x: 0, y: WinScreen.optionsY))
+        let across = scoreWidth / 2 + WinScreen.optionGap + width / 2
         // The left one turned round, its lead out to the right.
         addFramed(again, frame: "4", scale: WinScreen.optionScale, mirroredX: true, textSize: WinScreen.optionTextSize,
                   at: CGPoint(x: -across, y: WinScreen.optionsY), action: onAgain)

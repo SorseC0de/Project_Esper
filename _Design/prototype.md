@@ -93,7 +93,7 @@ all of it at a whole number of screen pixels per game pixel: 5 on an iPhone.
 ## Movement
 
 Defending, without the ball while the other has it, a body walks, runs, dashes and
-drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, a 5-frame pivot (its three sheet frames spread over it, 2, 2 and 1 sim frames, protocol 148), the burst always 0.4 over the
+drifts a tenth faster (`DefenceRules`). `FighterSpec.baseline` is Melee Fox with a Falco-style dash, 6 frames, half Fox's ground, a 9-frame pivot (its three sheet frames three sim frames each, the shortest they can be seen in; 5 until protocol 149), the burst always 0.4 over the
 3.2 run,
 traction 0.35, a shoot stance that brakes sideways drift at 0.15 a frame in the air, and
 the air in lockstep with the ground: air speed is the run's, and letting go of the stick
@@ -958,7 +958,8 @@ brings the win screen (`WinScreen`, `WinStage`): on the pause's black and glass,
 of the winner on the customize screen's projector under its halo looping their pose (`WinPose`,
 the taunt with the ball first; its frames made with the stage and as the looks change), "[side]
 Wins!" in Futuristic's box 4, and under it side by side in frame 4, the left one turned round,
-NEW MATCH, a fresh best of seven with the drinks gone, or TITLE. RESET starts the round again with the
+NEW MATCH, a fresh best of seven with the drinks gone, or TITLE, the final score in box 2 between
+them (ZONES: the letters each side has). RESET starts the round again with the
 drinks kept.
 
 The stage select comes before the first round and after each stage's best of three:

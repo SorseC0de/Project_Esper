@@ -329,7 +329,8 @@ final class ShaftAndTornadoTests: XCTestCase {
         XCTAssertEqual(slope.players[0].facing, .right)
         var up = slope
         let from = up.players[0].position.x
-        for _ in 0..<10 { up.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle]) }
+        // The turn first, then up the slope.
+        for _ in 0..<(up.players[0].spec.pivotFrames + 10) { up.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle]) }
         XCTAssertLessThan(up.players[0].position.x, from, "up it on the stick")
     }
 

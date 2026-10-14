@@ -4944,7 +4944,7 @@ final class GameScene: SKScene {
         case .pause:
             screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
         case .win:
-            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(1), player: 1, again: "NEW MATCH",
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideName(1), player: 1, score: [1, 4], again: "NEW MATCH",
                                onAgain: {}, onTitle: {})
         default:
             break
@@ -5051,8 +5051,10 @@ final class GameScene: SKScene {
         case .won:
             let winner = gameMode == .fortySeven ? (fortySevenScores.firstIndex { $0 >= FortySevenRules.target } ?? 0)
                 : (zones?.game.winner ?? series.winner ?? 0)
+            // ZONES: the letters each side has, fewer wins.
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: zones != nil ? zonesNames[winner] : sideName(winner),
-                               player: winner, again: online != nil ? "REMATCH" : zonesOnline != nil ? "MATCHES" : "NEW MATCH",
+                               player: winner, score: gameMode == .fortySeven ? fortySevenScores : (zones?.game.letters ?? series.wins),
+                               again: online != nil ? "REMATCH" : zonesOnline != nil ? "MATCHES" : "NEW MATCH",
                                onAgain: { [weak self] in self?.playAgain() },
                                onTitle: { [weak self] in self?.leaveToTitle() })
             if online?.rematchRandom != nil { (screen as? WinScreen)?.showWaiting() }

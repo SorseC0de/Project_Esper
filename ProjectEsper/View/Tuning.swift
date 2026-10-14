@@ -299,7 +299,7 @@ enum FloTuning {
     /// its top this far down (past the safe insets; up into them below 0), in points; FLO INSET X and
     /// Y on the strip. Both level, the second under pause, which sits over it in the same corner.
     nonisolated(unsafe) static var cornerInsetX: CGFloat = 20
-    nonisolated(unsafe) static var cornerInsetY: CGFloat = -10
+    nonisolated(unsafe) static var cornerInsetY: CGFloat = -25
     static let barScale: CGFloat = 1
     static let wordScale: CGFloat = 1.25
     static let leftSkew: CGFloat = 1.5

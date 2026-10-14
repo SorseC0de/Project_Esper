@@ -1045,7 +1045,7 @@ the meter shows what they have less what's still on its way, so it never runs ah
 A gain is shown once, a rolled-back frame run again bringing no second set; a new round clears them.
  The meters are in the HUD's top corners, the first player's top left and the second's top right,
 each one's outer end and top FLO INSET X and FLO INSET Y in from the corner past the safe insets
-(20 and -10 points: up into the insets), MAX included (it rides the word's top outer corner,
+(20 and -25 points: up into the insets), MAX included (it rides the word's top outer corner,
 unclamped, the whole meter fitted into the corner with it), both level, the second in the same
 corner as pause offline, pause drawn over it rather than pushing it down, the word outside and the bar toward the middle, the second's bar mirrored and its
 word outside it, skewed as the first's is,

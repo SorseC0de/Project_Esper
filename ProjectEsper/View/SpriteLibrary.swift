@@ -275,9 +275,10 @@ final class SpriteLibrary {
     /// The sheets whose ball can be lifted off a frame and not drawn: FloState's snatch, which
     /// draws the ball it took, for a snatch that took none.
     static let liftsBall: Set<Animation> = [.snatchFloState]
-    /// The sheets drawn while the hooded head can tip, flying and aiming Z Tea's beam: their line
-    /// is made a second time without the hood's place, for the hood to carry its own.
-    static let tippingHead: Set<Animation> = [.fly, .flyBall, .blast]
+    /// The sheets drawn while the hooded head can tip, flying and aiming Z Tea's beam, and those
+    /// it turns on (`GameScene.hoodTurnDegrees`, the double jump's tumble): their line is made a
+    /// second time without the hood's place, for the hood to carry its own.
+    static let tippingHead: Set<Animation> = Set([.fly, .flyBall, .blast]).union(GameScene.hoodTurnDegrees.keys)
 
     /// A player frame's key in the cache: with `ballAsEnergy` the sheet's whites are all energy,
     /// with `ballLifted` its ball is lifted off and not drawn.
@@ -353,6 +354,11 @@ final class SpriteLibrary {
             for (suffix, image) in pieces {
                 if let image { textures[suffix] = SKTexture(cgImage: image) } else { empty.append(suffix) }
             }
+        }
+        // The front leg laid over the ball the sheet passes behind it (`GameScene.ballBehindLegSheets`).
+        if GameScene.ballBehindLegSheets.contains(frame.animation), let images = result.images {
+            let leg = SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: [.frontThigh, .frontLeg, .frontFoot])
+            if let leg { textures["_frontleg"] = SKTexture(cgImage: leg) } else { empty.append("_frontleg") }
         }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize, width = frame.animation.pixelWidth
@@ -691,16 +697,17 @@ final class SpriteLibrary {
     /// lighter skin tone the colour itself and the darker in proportion.
     /// `view`: which way the head faces (`HoodView`), the turned ones drawn from `player_hoodheads_v2`
     /// in the first skin and swapped into this one's two tones.
-    func hoodHead(skin: Int, player: Int, energy: Bool = false, view: Int = 0) -> (drawn: SKTexture, hood: SKTexture, face: SKTexture) {
-        let key = "p\(player)_hoodhead_\(skin)" + (view == 0 ? "" : "_v\(view)") + (energy ? "_energy" : "")
+    /// `flowing`: a frame of `player_flowing_hood`, FloState's idle hood blowing, drawn in the first skin too.
+    func hoodHead(skin: Int, player: Int, energy: Bool = false, view: Int = 0, flowing: Int? = nil) -> (drawn: SKTexture, hood: SKTexture, face: SKTexture) {
+        let key = "p\(player)_hoodhead_\(skin)" + (view == 0 ? "" : "_v\(view)") + (flowing.map { "_flow\($0)" } ?? "") + (energy ? "_energy" : "")
         if let drawn = cache[key], let hood = cache[key + "_hood"], let face = cache[key + "_face"] { return (drawn, hood, face) }
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
-        let source = SpriteLibrary.hoodSource(skin: skin, view: view)
+        let source = flowing.map { atlas.textureNamed("player_flowing_hood_\($0)") } ?? SpriteLibrary.hoodSource(skin: skin, view: view)
         // The robot's face: the frame it's drawn from with that frame's two tones in its own; a
-        // turned view's, the first skin's two tones in this one's.
+        // turned view's or a flowing one's, the first skin's two tones in this one's.
         var faceSwaps: [RGB: RGB] = [:]
-        let drawnFrom = view == 0 ? HumanLook.hoodHeadFrame(skin) : HoodView.drawnInSkin
+        let drawnFrom = view == 0 && flowing == nil ? HumanLook.hoodHeadFrame(skin) : HoodView.drawnInSkin
         if drawnFrom != skin {
             let from = HumanLook.skinTones[drawnFrom], to = HumanLook.skinTones[skin]
             faceSwaps = [PixelPalette.colours[from.front]: PixelPalette.colours[to.front], PixelPalette.colours[from.back]: PixelPalette.colours[to.back]]
@@ -1032,6 +1039,10 @@ final class SpriteLibrary {
         return context.makeImage()
     }
     /// The frame a skin and view's hooded head is drawn from.
+    /// FloState's idle hood, blowing: its frames, and how fast they play.
+    static let flowingHoodFrames = SKTextureAtlas(named: "Sprites").textureNames.filter { $0.hasPrefix("player_flowing_hood_") }.count
+    static let flowingHoodFramesPerSecond = 15
+    static let flowingHoodSheets: Set<Animation> = [.idle, .dribbleIdle]
     static func hoodSource(skin: Int, view: Int) -> SKTexture {
         let atlas = SKTextureAtlas(named: "Sprites")
         return view == 0 || turnedHoodShapes[view] == nil ? atlas.textureNamed("player_hoodheads_\(HumanLook.hoodHeadFrame(skin))")
@@ -1142,6 +1153,10 @@ final class SpriteLibrary {
                 made += [head.drawn, head.hood, head.face]
             }
             made += [hoodLine(skin: skin, view: view), hoodFace(skin: skin, player: player, view: view)].compactMap { $0 }
+        }
+        for flowing in 0..<SpriteLibrary.flowingHoodFrames {
+            let head = hoodHead(skin: skin, player: player, energy: true, flowing: flowing)
+            made += [head.drawn, head.hood, head.face]
         }
         return made
     }

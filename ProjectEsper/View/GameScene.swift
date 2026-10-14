@@ -5300,9 +5300,16 @@ final class GameScene: SKScene {
     func customizePortrait(player: Int, look: Look, sheet: String = "player_customize", frame: Int = 0, headNudge: CGPoint,
                            headScale: CGFloat) -> SpriteLibrary.Portrait? {
         // The second side is shown facing left.
-        sprites.setCustomizeLook(player == 1 ? look.turnedRound : look, for: player)
+        setCustomizeLook(look, for: player)
         return sprites.portrait(sheet, frame: frame, player: SpriteLibrary.customizePlayer(player), headDrawnFor: GameScene.hoodDrawnFor,
                                 headNudge: headNudge, headScale: headScale)
+    }
+
+    /// A side's look onto the customize screen's figure, only while the screen is open: drawn again
+    /// as it fades out, a changed look rebuilt its figure and hood on the main thread as play began.
+    private func setCustomizeLook(_ look: Look, for player: Int) {
+        guard flowState?.customizeOpen == true else { return }
+        sprites.setCustomizeLook(player == 1 ? look.turnedRound : look, for: player)
     }
 
     /// Both sides' picks onto everything drawn in them: the customize screen's, live.
@@ -5336,7 +5343,7 @@ final class GameScene: SKScene {
     /// A side's hooded head alone in a pick's look, cut to what's drawn, for the customize
     /// screen's hood box.
     func customizeHood(player: Int, look: Look) -> CGImage? {
-        sprites.setCustomizeLook(player == 1 ? look.turnedRound : look, for: player)
+        setCustomizeLook(look, for: player)
         return CustomizeArt.trimmed(sprites.hoodHead(skin: look.dressing.skinTone, player: SpriteLibrary.customizePlayer(player)).drawn.cgImage())
     }
 
@@ -8094,8 +8101,11 @@ final class GameScene: SKScene {
                 let skin = sprites.look(for: index).dressing.skinTone
                 let frozen = player.frozen > 0
                 let view = HoodView.of(frame)
+                // In FloState standing still, the hood blowing: `player_flowing_hood` round and round.
+                let flowing = energyForm && !changing && SpriteLibrary.flowingHoodFrames > 0 && SpriteLibrary.flowingHoodSheets.contains(frame.animation)
+                    ? match.frame * SpriteLibrary.flowingHoodFramesPerSecond / 60 % SpriteLibrary.flowingHoodFrames : nil
                 let hoodHead = frozen ? sprites.hoodHead(skin: skin, player: SpriteLibrary.icePlayer, view: view)
-                    : sprites.hoodHead(skin: skin, player: index, energy: energyForm, view: view)
+                    : sprites.hoodHead(skin: skin, player: index, energy: energyForm, view: view, flowing: flowing)
                 if energyForm, !frozen { energyHoods.insert(index) } else { energyHoods.remove(index) }
                 hood.texture = hoodHead.drawn
                 hoodMasks[index] = (hoodHead.hood, hoodHead.face)

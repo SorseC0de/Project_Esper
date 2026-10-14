@@ -62,7 +62,12 @@ neutral to get a shot off; catch it and the roles reverse.
   round the arm and hand wherever they meet open air, the sheet's head or the hood as worn. The arm,
   its line and its glowing parts are made with the frame itself (`makeFrame`), off the main thread
   in a look's rebuild, and the hooded heads (every view, plain, FloState's and frozen, with the
-  hood's line and K&A's face) once it lands (`warmHoods`): none is first made mid-match. Two more
+  hood's line and K&A's face) once it lands (`warmHoods`): none is first made mid-match. So are
+  the front leg over the ball (`ballBehindLegSheets`) and the double jump's line without the hood
+  (`tippingHead` takes in `hoodTurnDegrees`); the customize screen changes its figures' looks only
+  while it's open, not as it fades out into play. In FloState standing still (the idle and the
+  dribble idle) the hood blows: `player_flowing_hood`'s six frames round and round at 15 a second,
+  drawn in the first skin as the turned views are (`SpriteLibrary.flowingHoodFrames`). Two more
   sheet tables go with it, in play and in the gallery alike: `GameScene.hoodTurnDegrees`, the hood
   turned with the body about the head's middle, clockwise facing right (the double jump's tumble:
   30, 90, 135, then -90 twice), its strings' anchors turning with it and the hood carrying its own

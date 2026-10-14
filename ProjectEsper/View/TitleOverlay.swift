@@ -17,7 +17,6 @@ final class FlowState: ObservableObject {
     @Published var previewTitle: String?
     /// The ground under the screen is the palette's black rather than the royal blue: the
     /// Greateraid pick and wait.
-    @Published var blackGround = false
     /// The pause's: a third-black wash under a thin dark material over the match.
     @Published var pauseGround = false
     /// The stage select's: the warped grid on black, as the title's.

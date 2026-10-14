@@ -731,8 +731,9 @@ and wears a thick white outline, one
 white silhouette baked from it (filled only where the copies drew, `sourceIn`) and drawn behind it
 as its child, so it takes the lean (sixteen recoloured copies of the vector drew as a broken
 second bottle). Offline, a biomorph drunk sets the debug POWER picker back to none: the picker's
-biomorph stands over the drinks, and left set it kept one biomorph's moves under another's name. The wait screen: the same black, the same ribbon, and its seconds in
-the same blue round button. The HUD: the
+biomorph stands over the drinks, and left set it kept one biomorph's moves under another's name. The wait screen (`WaitScreen`): the same glass, Greateraid in FLO lettering, "[hood] is
+drinking" in the menus' face, and its seconds in ring 8. The old UI's plates, ribbons, cards and
+buttons are gone from every screen (`addButton`, `addCard`, `addHeader` removed). The HUD: the
 rounds, or 47's score, in Futuristic's frame 8 with its tail cut off (`Futuristic.taillessEight`), the row across its face. The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, JUMP and THROW in
 Futuristic_UI's ring6 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their

@@ -33,7 +33,7 @@ struct GameView: View {
             MetalGameView(scene: flow.scene)
                 .ignoresSafeArea()
             if flow.veiled, flow.pauseGround {
-                // The pause's and the win screen's: the match under a third-black wash and a thin dark material over it.
+                // The pause's, the win screen's and the Greateraid pick's and wait's: the match under a third-black wash and a thin dark material over it.
                 ZStack {
                     Color.black.opacity(PauseScreen.washOpacity)
                     Rectangle().fill(.ultraThinMaterial)
@@ -46,12 +46,8 @@ struct GameView: View {
                     .ignoresSafeArea()
                     .transition(.opacity)
             } else if flow.veiled {
-                // The screens' ground: the royal blue, dark, the world just showing through.
-                // Flat on purple's last; the Greateraid pick and wait on black, shaded.
-                let ground: (top: RGB, bottom: RGB) = flow.blackGround ? (EsperPalette.black.light, EsperPalette.black.shadow)
-                    : (UIColourPicks.ground, UIColourPicks.ground)
-                LinearGradient(colors: [Color(rgb: ground.top), Color(rgb: ground.bottom)],
-                               startPoint: .top, endPoint: .bottom)
+                // The screens' ground: flat on purple's last.
+                Color(rgb: UIColourPicks.ground)
                     .ignoresSafeArea()
                     .transition(.opacity)
             }

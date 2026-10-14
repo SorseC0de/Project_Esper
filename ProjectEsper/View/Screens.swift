@@ -15,9 +15,6 @@ class Screen: SKNode {
 
     private(set) var choices: [Choice] = []
     private(set) var cursor = 0
-    /// Lettered buttons' plates, by choice: the plate, its own piece, and its size. The
-    /// cursor's plate turns gold.
-    private var plates: [Int: (plate: SKSpriteNode, piece: UIPiece, size: CGSize, label: SKSpriteNode, text: String, textSize: CGFloat)] = [:]
     /// Futuristic_UI choices, by choice: what's coloured, the blue or, under the cursor, gold.
     private var tinted: [Int: SKNode] = [:]
 
@@ -40,64 +37,6 @@ class Screen: SKNode {
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    /// A lettered button on a plate from the pack, royal blue by default, plum for a way
-    /// back. Disabled ones are dimmed and never fire. `width` makes a row of them even.
-    @discardableResult
-    func addButton(_ text: String, size: CGFloat = 26, at point: CGPoint, enabled: Bool = true, sound: SoundBoard.Effect = SoundBoard.confirm,
-                   piece: UIPiece = .buttonBlue, width: CGFloat? = nil, action: @escaping () -> Void) -> SKNode {
-        let button = SKNode()
-        button.position = point
-        button.alpha = enabled ? 1 : 0.45
-        let label = TitleText.node(text, size: size * tuned(.text))
-        let buttons = tuned(.buttons)
-        let plateSize = CGSize(width: max((width ?? 0) * buttons, label.size.width + 44 * buttons), height: max(label.size.height + 12, (26 + 22) * buttons))
-        let plate = piece.node(size: plateSize, corners: buttons)
-        plate.zPosition = -1
-        button.addChild(plate)
-        // Centred on the plate's face, the drop taken off.
-        let rise = UITuning.shared.textRise
-        let shift = TitleText.dropShift(size: size * tuned(.text)) * rise
-        label.position = CGPoint(x: -shift, y: piece.faceRise * buttons * rise + shift)
-        button.addChild(label)
-        addChild(button)
-        let hit = CGRect(x: point.x - plateSize.width / 2, y: point.y - plateSize.height / 2, width: plateSize.width, height: plateSize.height)
-        choices.append(Choice(node: button, hit: hit, enabled: enabled, sound: sound, action: action))
-        plates[choices.count - 1] = (plate, piece, plateSize, label, text, size * tuned(.text))
-        if choices.count == 1 { cursor = 0 }
-        showCursor()
-        return button
-    }
-
-    /// A black card from the pack behind a screen's content, `size` points round `centre`,
-    /// its height at the panels' scale (its width comes from the header's, which has it).
-    @discardableResult
-    func addCard(size: CGSize, at centre: CGPoint, piece: UIPiece = .cardBlack) -> SKSpriteNode {
-        let card = piece.node(size: CGSize(width: size.width, height: size.height * tuned(.panels)), corners: tuned(.panels))
-        card.position = centre
-        card.zPosition = -5
-        addChild(card)
-        return card
-    }
-
-    /// A royal blue header ribbon with title lettering on it; its width, for a card to match.
-    @discardableResult
-    func addHeader(_ text: String, size: CGFloat = 34, at point: CGPoint, width: CGFloat? = nil, height: CGFloat = 58) -> CGFloat {
-        let header = SKNode()
-        header.position = point
-        let panels = tuned(.panels)
-        let label = TitleText.node(text, size: size * tuned(.titles))
-        // The ribbon at the panels' scale, grown only when the lettering needs the room.
-        let ribbonSize = CGSize(width: max((width ?? 0) * panels, label.size.width + 60), height: max(height * panels, label.size.height + 18))
-        let ribbon = UIPiece.headerBlue.node(size: ribbonSize, corners: panels)
-        ribbon.zPosition = -1
-        header.addChild(ribbon)
-        let shift = TitleText.dropShift(size: size * tuned(.titles)) * UITuning.shared.textRise
-        label.position = CGPoint(x: -shift, y: shift)
-        header.addChild(label)
-        addChild(header)
-        return ribbonSize.width
-    }
 
     /// A frame with lettering in its face and nothing to pick: a label, as the win screen's name.
     func addPlate(_ text: String, frame name: String, scale: CGFloat, textSize: CGFloat, at point: CGPoint) {
@@ -161,8 +100,7 @@ class Screen: SKNode {
         showCursor()
     }
 
-    /// The cursor's choice is raised a little, a plated button's plate turning gold, a framed
-    /// one gold, and the rest sit still.
+    /// The cursor's choice is raised a little, a framed one gold, and the rest sit still.
     func showCursor() {
         for (index, choice) in choices.enumerated() {
             let lit = index == cursor && choice.enabled
@@ -172,11 +110,6 @@ class Screen: SKNode {
                 continue
             }
             choice.node.setScale(lit ? 1.12 : 1)
-            if let plate = plates[index] {
-                (lit ? UIPiece.buttonGold : plate.piece).fit(plate.plate, to: plate.size, corners: tuned(.buttons))
-                // On the gold plate the lettering's lower half goes light blue.
-                TitleText.set(plate.label, to: plate.text, size: plate.textSize, lit: lit)
-            }
         }
     }
 
@@ -545,21 +478,30 @@ final class PickScreen: Screen {
     nonisolated(unsafe) private static var bottleImages: [String: UIImage] = [:]
 }
 
-/// The other side is drinking: nothing to pick, only the clock to watch.
+/// The other side is drinking: nothing to pick, only the clock to watch. As the pick is drawn:
+/// Greateraid in FLO lettering, who's drinking in the menus' face, and the seconds in ring 8.
 final class WaitScreen: Screen {
-    private let clock = SKSpriteNode()
+    private let clock = SKLabelNode(fontNamed: Futuristic.fontName)
+    static let whoY: CGFloat = 30
+    static let whoSize: CGFloat = 18
+    static let ringY: CGFloat = -40
+    static let ringSide: CGFloat = 70
 
     init(halfWidth: CGFloat, halfHeight: CGFloat, who: String) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pick)
-        addHeader("GREATERAID", size: 38, at: CGPoint(x: 0, y: halfHeight * 0.62), width: 320)
-        let sub = TitleText.node("\(who) IS DRINKING", size: 26 * tuned(.titles))
-        sub.position = CGPoint(x: 0, y: 10)
-        addChild(sub)
-        let dial = UIPiece.circleBlue.node(size: CGSize(width: 64, height: 69).scaled(by: tuned(.buttons)), corners: tuned(.buttons))
-        dial.position = CGPoint(x: 0, y: -60)
-        dial.zPosition = -1
-        addChild(dial)
-        clock.position = CGPoint(x: 0, y: dial.position.y + UIPiece.circleBlue.faceRise * tuned(.buttons))
+        let title = FloText.node("Greateraid", height: PickScreen.titleHeight * tuned(.titles))
+        title.position = CGPoint(x: 0, y: halfHeight - PickScreen.titleDrop)
+        addChild(title)
+        let drinking = Futuristic.label("\(who) is drinking", size: WaitScreen.whoSize * tuned(.text))
+        drinking.position = CGPoint(x: 0, y: WaitScreen.whoY)
+        addChild(drinking)
+        let ring = Futuristic.sprite("ring8", scale: 1)
+        ring.size = CGSize(width: WaitScreen.ringSide, height: WaitScreen.ringSide)
+        ring.position = CGPoint(x: 0, y: WaitScreen.ringY)
+        addChild(ring)
+        clock.fontColor = Futuristic.lineColour
+        clock.verticalAlignmentMode = .center
+        clock.position = ring.position
         addChild(clock)
         showSeconds(Series.pickSeconds)
     }
@@ -567,12 +509,13 @@ final class WaitScreen: Screen {
     required init?(coder: NSCoder) { fatalError() }
 
     func showSeconds(_ seconds: Int) {
-        TitleText.set(clock, to: "\(max(seconds, 0))", size: 28 * tuned(.text))
+        clock.text = "\(max(seconds, 0))"
+        clock.fontSize = Futuristic.fontSize(24 * tuned(.text))
     }
 }
 
-/// Who won, the final score large under it, and the two ways on. `again` is NEW MATCH
-/// offline and REMATCH online, where it waits for the other side to press theirs.
+/// Who won, the two ways on and the final score between them. `again` is NEW MATCH offline and
+/// REMATCH online, where it waits for the other side to press theirs.
 final class WinScreen: Screen {
     private let waiting = SKSpriteNode()
     /// The winner and their pose, drawn by the SwiftUI layer under this one (`WinStage`).

@@ -4953,8 +4953,7 @@ final class GameScene: SKScene {
         }
         if let screen { hud.addChild(screen) }
         drawSeries()
-        flowState?.blackGround = false
-        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen
+        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen || screen is WaitScreen
         flowState?.winFigure = (screen as? WinScreen)?.figure
         flowState?.showsTitle = previewing == nil
         flowState?.veiled = screen != nil
@@ -4998,7 +4997,7 @@ final class GameScene: SKScene {
                     self?.choose(drink)
                 }
             } else {
-                screen = WaitScreen(halfWidth: halfWidth, halfHeight: halfHeight, who: sideName(picker))
+                screen = WaitScreen(halfWidth: halfWidth, halfHeight: halfHeight, who: sideColours.indices.contains(picker) ? sideColours[picker].name : sideName(picker))
             }
         case .stageSelect:
             let colours = [0, 1].map { SKColor(rgb: sprites.look(for: $0).glow) }
@@ -5067,8 +5066,7 @@ final class GameScene: SKScene {
         }
         if let screen { hud.addChild(screen) }
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
-        flowState?.blackGround = screen is WaitScreen
-        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen
+        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen || screen is WaitScreen
         flowState?.gridGround = screen is StageSelectScreen
         flowState?.winFigure = (screen as? WinScreen)?.figure
         flowState?.veiled = screen != nil

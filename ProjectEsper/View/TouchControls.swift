@@ -37,8 +37,33 @@ final class TouchControls: SKNode {
     private static var textScale: CGFloat { UITuning.shared.scale(.touch, .text) }
 
     private var buttons: [Button] = []
-    private let stickBase = UIPiece.circleBlack.node(size: CGSize(width: stickRadius * 2, height: stickRadius * 2 * 117 / 109))
-    private let stickKnob = UIPiece.circleBlue.node(size: CGSize(width: 30, height: 32))
+    /// The stick: ring 3 its base, a small arrow 2 out from it each of the four ways, and ring 7
+    /// the knob that moves inside it, all in the menus' blue.
+    private let stickBase: SKNode = {
+        let base = SKNode()
+        let ring = Futuristic.sprite("ring3", scale: 1)
+        ring.size = CGSize(width: stickRadius * 2, height: stickRadius * 2)
+        base.addChild(ring)
+        for quarter in 0..<4 {
+            let arrow = Futuristic.sprite("arrow2", scale: 1)
+            let image = Futuristic.image("arrow2")
+            arrow.size = CGSize(width: stickArrowSize * image.size.width / max(image.size.height, 1), height: stickArrowSize)
+            let angle = CGFloat(quarter) * .pi / 2
+            let out = stickRadius + stickArrowSize / 2 + stickArrowGap
+            arrow.position = CGPoint(x: cos(angle) * out, y: sin(angle) * out)
+            arrow.zRotation = angle
+            base.addChild(arrow)
+        }
+        return base
+    }()
+    private let stickKnob: SKSpriteNode = {
+        let knob = Futuristic.sprite("ring7", scale: 1)
+        knob.size = CGSize(width: stickKnobSize, height: stickKnobSize)
+        return knob
+    }()
+    private static let stickArrowSize: CGFloat = 10
+    private static let stickArrowGap: CGFloat = 2
+    private static let stickKnobSize: CGFloat = 32
     /// The corner switches: an invisible rect for the touch, a black plate on it, plum when on.
     private let resetButton = TouchControls.cornerButton("RESET")
     private let hitboxButton = TouchControls.cornerButton("HITBOX")

@@ -28,6 +28,8 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
     public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .lungeLemonade, .cannonCola, .slideCider, .featherFresca]
     public static let biomorphs: [Greateraid] = [.webWater, .superSmoothie, .flashFizz, .platformShake,
                                                  .quakeUp, .voltaCola, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle, .zTea]
+    /// Drinks kept out of the offers for now, still drinkable by the debug picker.
+    public static let parked: Set<Greateraid> = [.surfSoda]
 
     public var kind: Kind {
         Greateraid.boosters.contains(self) ? .booster : .biomorph
@@ -174,7 +176,7 @@ public struct Drinks: Equatable {
         if let biomorph {
             biomorphsLeft = biomorphLevel < 2 ? [biomorph] : []
         } else {
-            biomorphsLeft = Greateraid.biomorphs
+            biomorphsLeft = Greateraid.biomorphs.filter { !Greateraid.parked.contains($0) }
         }
         var pool: [(drink: Greateraid, weight: Int)] = []
         for booster in boostersLeft { pool.append((booster, Drinks.boosterWeight * max(biomorphsLeft.count, 1))) }

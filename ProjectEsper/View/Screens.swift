@@ -38,6 +38,32 @@ class Screen: SKNode {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// A banner across the top left corner at 45 degrees, its title in FLO lettering along it: a
+    /// band in black's first, edged in the menus' blue.
+    func addCornerBanner(_ text: String) {
+        let banner = SKNode()
+        let band = SKSpriteNode(color: SKColor(rgb: EsperPalette.black.light), size: CGSize(width: Screen.bannerLength, height: Screen.bannerThickness))
+        banner.addChild(band)
+        for side: CGFloat in [-1, 1] {
+            let edge = SKSpriteNode(color: Futuristic.lineColour, size: CGSize(width: Screen.bannerLength, height: Screen.bannerEdge))
+            edge.position = CGPoint(x: 0, y: side * (Screen.bannerThickness / 2 - Screen.bannerEdge / 2))
+            banner.addChild(edge)
+        }
+        let title = FloText.node(text, height: Screen.bannerTextHeight * tuned(.titles))
+        title.zPosition = 1
+        banner.addChild(title)
+        banner.zRotation = .pi / 4
+        banner.position = CGPoint(x: -halfWidth + Screen.bannerInset, y: halfHeight - Screen.bannerInset)
+        banner.zPosition = 10
+        addChild(banner)
+    }
+    static let bannerLength: CGFloat = 320
+    static let bannerThickness: CGFloat = 30
+    static let bannerEdge: CGFloat = 1.5
+    static let bannerTextHeight: CGFloat = 14
+    /// The band's middle in from the corner, along both edges.
+    static let bannerInset: CGFloat = 52
+
     /// A frame with lettering in its face and nothing to pick: a label, as the win screen's name.
     func addPlate(_ text: String, frame name: String, scale: CGFloat, textSize: CGFloat, at point: CGPoint) {
         let plate = SKNode()
@@ -176,7 +202,7 @@ final class PickScreen: Screen {
     private let drinks: Drinks
     /// What the raised drink does, as many lines as it takes, and its quote over it.
     private let blurb = SKNode()
-    private let comment = SKLabelNode(fontNamed: UIFont.italicSystemFont(ofSize: 12).fontName)
+    private let comment = SKLabelNode()
     private let clock = SKLabelNode(fontNamed: Futuristic.fontName)
     /// Each bottle's name in its frame, lit gold on the raised one.
     private var names: [SKNode] = []
@@ -187,7 +213,7 @@ final class PickScreen: Screen {
     /// `player_drinkchoice` in the picker's look, its frames played very slowly, on its bench;
     /// its art pixels this many points, on the UI panel's slider.
     static let drinkerScaleKey = "ui.pick.drinkerScale"
-    static var drinkerScale: CGFloat { UserDefaults.standard.object(forKey: drinkerScaleKey).map { CGFloat(($0 as? Double) ?? 2.5) } ?? 2.5 }
+    static var drinkerScale: CGFloat { UserDefaults.standard.object(forKey: drinkerScaleKey).map { CGFloat(($0 as? Double) ?? 3.75) } ?? 3.75 }
     static let drinkerFrameSeconds = 0.5
     /// Picked: `player_drink` this many times through at the same pace, then `player_transform`
     /// at 15 a second, raised `transformLift` art pixels off the chair, and only then on; the bottles and the words falling away meanwhile.
@@ -213,22 +239,23 @@ final class PickScreen: Screen {
     /// the drinker's feet; rule 6 under them and its scale; the quote's size; the description's
     /// top, its room down and across, its sizes largest first and its lines' spacing; the
     /// bottles' height and the name frames' scale and lettering, two lines at most.
-    static let titleDrop: CGFloat = 30
-    static let titleHeight: CGFloat = 26
-    static let drinkerFeetY: CGFloat = 30
-    static let ruleY: CGFloat = 22
+    static let drinkerFeetY: CGFloat = 40
+    static let ruleY: CGFloat = 32
     static let ruleScale: CGFloat = 0.5
-    static let commentY: CGFloat = 8
-    static let commentSize: CGFloat = 11
+    static let commentY: CGFloat = 20
+    static let commentSize: CGFloat = 9
     static let commentAlpha: CGFloat = 0.8
-    static let blurbTop: CGFloat = -4
-    static let blurbRoom = CGSize(width: 520, height: 44)
-    static let blurbSizes: [CGFloat] = [12, 11, 10, 9]
+    static let blurbTop: CGFloat = 10
+    static let blurbRoom = CGSize(width: 520, height: 46)
+    static let blurbSizes: [CGFloat] = [14, 13, 12, 11, 10]
     static let lineShare: CGFloat = 1.15
-    static let bottleHeight: CGFloat = 92
-    static let nameScale: CGFloat = 0.75
-    static let nameSizes: [CGFloat] = [12, 11, 10, 9, 8]
-    static let nameGap: CGFloat = 2
+    /// The bottles' height, how far their bottoms sit under the screen's edge, and their name
+    /// frames', which may sit over the bottle's top.
+    static let bottleHeight: CGFloat = 184
+    static let bottleSink: CGFloat = 70
+    static let nameScale: CGFloat = 0.9
+    static let nameSizes: [CGFloat] = [18, 17, 16, 15, 14, 13, 12, 11, 10]
+    static let nameOverBottle: CGFloat = 26
 
     /// `timed` shows the seconds left, for a networked pick; `drinker`, the frames of the one picking.
     init(halfWidth: CGFloat, halfHeight: CGFloat, offers: [Greateraid], drinks: Drinks, colour: SKColor, timed: Bool = false,
@@ -240,14 +267,12 @@ final class PickScreen: Screen {
         self.drinking = drinking
         self.transforming = transforming
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pick)
-        let title = FloText.node("Greateraid", height: PickScreen.titleHeight * tuned(.titles))
-        title.position = CGPoint(x: 0, y: halfHeight - PickScreen.titleDrop)
-        addChild(title)
+        addCornerBanner("Greateraid")
         if timed {
             // The seconds, top right, in the menus' face.
             clock.fontColor = Futuristic.lineColour
             clock.verticalAlignmentMode = .center
-            clock.position = CGPoint(x: halfWidth - 40, y: halfHeight - PickScreen.titleDrop)
+            clock.position = CGPoint(x: halfWidth - 40, y: halfHeight - 30)
             addChild(clock)
             showSeconds(Series.pickSeconds)
         }
@@ -274,8 +299,6 @@ final class PickScreen: Screen {
         let rule = Futuristic.sprite("rule6", scale: PickScreen.ruleScale)
         rule.position = CGPoint(x: 0, y: PickScreen.ruleY)
         addChild(rule)
-        comment.fontSize = PickScreen.commentSize * tuned(.text)
-        comment.fontColor = Futuristic.lineColour
         comment.alpha = PickScreen.commentAlpha
         comment.verticalAlignmentMode = .center
         comment.position = CGPoint(x: 0, y: PickScreen.commentY)
@@ -289,14 +312,14 @@ final class PickScreen: Screen {
             // Leaning between 5 and 20 degrees, either way; the bottom clipped by the screen's edge.
             let lean = CGFloat(5 + Int.random(in: 0...15)) * .pi / 180 * (Bool.random() ? 1 : -1)
             bottle.zRotation = lean
-            bottle.position = CGPoint(x: x, y: -halfHeight - 24)
+            bottle.position = CGPoint(x: x, y: -halfHeight - PickScreen.bottleSink)
             bottle.zPosition = 5
             addChild(bottle)
             bottleNodes.append(bottle)
             outlines.append(PickScreen.outline(of: bottle, width: 4 * tuned(.buttons)))
             // Its name in frame 12 over it.
             let name = nameFrame(offer.name)
-            name.position = CGPoint(x: x, y: bottle.position.y + bottle.frame.height + name.calculateAccumulatedFrame().height / 2 + 4)
+            name.position = CGPoint(x: x, y: bottle.position.y + bottle.size.height - PickScreen.nameOverBottle + name.calculateAccumulatedFrame().height / 2)
             name.zPosition = 5
             addChild(name)
             names.append(name)
@@ -412,7 +435,11 @@ final class PickScreen: Screen {
             Screen.colour(name, index == cursor ? Futuristic.litColour : Futuristic.lineColour)
             name.setScale(index == cursor ? Futuristic.litGrowth : 1)
         }
-        comment.text = "\u{201C}\(offer.comment)\u{201D}"
+        // In the system's italic: none of the menus' faces has one.
+        comment.attributedText = NSAttributedString(string: "\u{201C}\(offer.comment)\u{201D}", attributes: [
+            .font: UIFont.italicSystemFont(ofSize: PickScreen.commentSize * tuned(.text)),
+            .foregroundColor: Futuristic.lineColour,
+        ])
         let text = drinks.level(of: offer) == 0 ? offer.blurbs.first : offer.blurbs.second
         layBlurb((drinks.isSecondSip(offer) ? "Second sip: " : "") + text)
     }
@@ -489,9 +516,7 @@ final class WaitScreen: Screen {
 
     init(halfWidth: CGFloat, halfHeight: CGFloat, who: String) {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pick)
-        let title = FloText.node("Greateraid", height: PickScreen.titleHeight * tuned(.titles))
-        title.position = CGPoint(x: 0, y: halfHeight - PickScreen.titleDrop)
-        addChild(title)
+        addCornerBanner("Greateraid")
         let drinking = Futuristic.label("\(who) is drinking", size: WaitScreen.whoSize * tuned(.text))
         drinking.position = CGPoint(x: 0, y: WaitScreen.whoY)
         addChild(drinking)

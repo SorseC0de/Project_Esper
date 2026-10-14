@@ -724,12 +724,14 @@ for its width; each stage in Futuristic_UI's box1
 in the menus' blue with its name in Upheaval, the blue too, in two lines, broken at the space
 nearest its middle (one line with no space), gold and a tenth bigger when a cursor or a pick is on
 it; more than four stages in two rows, the first the longer (`StageSelectScreen.lines`,
-`oneRowMost`). The Greateraid pick (`PickScreen`), on the pause's black and glass, in the new UI, a column:
-"Greateraid" in FLO lettering; the drinker on their bench (`player_drinkchoice`, 2.5 points an
-art pixel by default, on the UI panel's DRINKER slider); Futuristic's rule 6; the raised drink's
-quote in the system italic, in the menus' blue at 0.8; what it does in the menus' face, at the
-largest of 12 down to 9 whose lines fit (prefixed "Second sip:" when it is one); and the bottles,
-smaller, each with its name in frame 12 over it, lit gold under the cursor: one line if it fits the
+`oneRowMost`). The Greateraid pick (`PickScreen`), on the pause's black and glass, in the new UI: "Greateraid"
+in FLO lettering on a banner across the top left corner at 45 degrees (`Screen.addCornerBanner`,
+black's first edged in the menus' blue), then a column: the drinker on their bench
+(`player_drinkchoice`, 3.75 points an art pixel by default, on the UI panel's DRINKER slider);
+Futuristic's rule 6; the raised drink's quote in the system italic, 9, in the menus' blue at 0.8;
+what it does in the menus' face, at the largest of 14 down to 10 whose lines fit (prefixed
+"Second sip:" when it is one); and the bottles, 184 tall, their bottoms 70 under the screen's edge,
+each with its name in frame 12 (0.9) over its top, lit gold under the cursor, from 18 down: one line if it fits the
 frame's face, else two split only at a space where the longer line is shortest ("Quake-Up" over
 "Coffee"), at the largest size that fits; online the seconds top right in the menus' face. Each
 bottle's vector is drawn once at the size it's shown (`PickScreen.bottle`), the raised one grows
@@ -737,14 +739,14 @@ and wears a thick white outline, one
 white silhouette baked from it (filled only where the copies drew, `sourceIn`) and drawn behind it
 as its child, so it takes the lean (sixteen recoloured copies of the vector drew as a broken
 second bottle). Offline, a biomorph drunk sets the debug POWER picker back to none: the picker's
-biomorph stands over the drinks, and left set it kept one biomorph's moves under another's name. The wait screen (`WaitScreen`): the same glass, Greateraid in FLO lettering, "[hood] is
+biomorph stands over the drinks, and left set it kept one biomorph's moves under another's name. The wait screen (`WaitScreen`): the same glass, the same corner banner, "[hood] is
 drinking" in the menus' face, and its seconds in ring 8. The old UI's plates, ribbons, cards and
 buttons are gone from every screen (`addButton`, `addCard`, `addHeader` removed). The HUD: the
 rounds, or 47's score, in Futuristic's frame 8 with its tail cut off (`Futuristic.taillessEight`), the row across its face. The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, JUMP and THROW in
 Futuristic_UI's ring6 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their
 names in the menus' face in it too, shrunk to fit inside the ring (0.72 of the button across), gold while held, the ring turning a full circle as it's pressed (0.35
-seconds); the stick a faded black round button with a blue knob; pause offline in frame 1 small
+seconds); the stick Futuristic's ring 3 with a small arrow 2 out from it each of the four ways, ring 7 its knob; pause offline in frame 1 small
 (0.3 of the menus' size) with a pause sign in its face, in the top right corner over the second FLO
 meter (`TouchControls.placeCornerRow`), and AI, HITBOX and RESET small black plates to its left,
 plum when on. The pause: the match under a third-black wash and a thin dark material (SwiftUI's
@@ -1248,6 +1250,7 @@ and a second pick (the clock's, at zero) doesn't land.
 - Titan Tea: the size and weight, slowed; level two at full speed, with the trample.
 - Gale Ale: the double jump's still tornado; level two adds the snatch's tornado that carries the ball off.
 - Z Tea: the slash's beam, on the ground or in the air, aimed; level two keeps a full charge for the next slash to fire.
+Parked out of the offers for now (`Greateraid.parked`, protocol 155): Surf Soda; the debug picker still gives it.
 
 ## Tuning pickers
 

@@ -559,7 +559,7 @@ public enum HitStopRules {
     public static let slashClashFrames = 24
 }
 
-/// FloState's slash on the ground: one attack, a step through forward the FloState snatch's
+/// FloState's slash, on the ground or in the air: one attack, a step through forward the FloState snatch's
 /// distance while its sheet's nine frames play through, both its swings, at 30 a second. The
 /// blade's box is live from its first frame to its last, and hits once.
 public enum FloSlashRules {

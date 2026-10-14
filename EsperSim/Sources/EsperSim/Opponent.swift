@@ -78,6 +78,7 @@ public struct Opponent: Equatable {
     /// Who held the ball last frame, so a steal or a pickup beside it is seen as it happens, and
     /// the frames left of chasing the one who took it.
     private var lastHolder: Int?
+    private var watchingHolder = false
     private var chaseFrames = 0
     /// The other's slash it last answered (the frame it started), so each is answered once.
     private var answeredSlash = -1
@@ -152,6 +153,11 @@ public struct Opponent: Equatable {
         // The ball changing hands: taken off it, or picked up by them right beside it, it goes
         // after them rather than back to its rim.
         let holder = match.ball.holder
+        // The first frame it sees only who has it: the ball in their hands from the start isn't a change.
+        if !watchingHolder {
+            watchingHolder = true
+            lastHolder = holder
+        }
         if holder == human.index, lastHolder != human.index {
             if lastHolder == index { chaseFrames = Opponent.chaseAfterSteal }
             else if abs(human.position.x - me.position.x) < Opponent.contestedPickup { chaseFrames = Opponent.chaseAfterPickup }

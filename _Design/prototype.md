@@ -181,19 +181,20 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   (`Dressing.energyFormBare`, the glow mask's skin green as a human's); so
   clothes picked later follow on their own. The face's lightest tone is held to a grey level of 0.6
   (`SpriteLibrary.energyFaceLevel`): lime's, at 0.76, burned the features out in the glow (gold and
-  teal come down a touch). The snatch on the ground in FloState is drawn from
+  teal come down a touch). The snatch in FloState, on the ground or in the air (protocol 144; in the air gravity cut to the slash's share), is drawn from
   `player_snatch_flostate`, seven frames at the snatch's own timing, its last held (protocol 101):
   a step-through, the body carried 96 art pixels forward over the snatch, two of the sheets'
   48-pixel boxes (`SnatchRules.floStateTravel`, protocol 117), through the other; the whole way the
   body takes the ball off whoever it passes, or a loose ball it passes (`Player.snatchSteppingThrough`),
   as well as the hand's reach at full stretch; on the third frame the hooded head looks
-  back (protocol 103). The slash on the ground in FloState is a step-through too, one attack
+  back (protocol 103). The slash in FloState, on the ground or in the air, is a step-through too, one attack
   (`player_esperslash_flostate`, nine 80 by 64 frames, the body at the cell's middle as on the
   square sheets, `Animation.pixelWidth`): the whole sheet, both its swings, at 30 a second while
   the body is carried the snatch's 96 art pixels forward (`FloSlashRules`, `Player.floSlash`,
   protocol 142; a back step and a combo of them were tried and dropped as oppressive). The blade's
   box is live from its first frame to its last and hits once; the rainbow afterimages trail it. In
-  the air FloState's slash is the plain one. The sheet draws the ball taken from its fourth frame on; a snatch that took
+  the air gravity is cut to the plain slash's share so the body hangs through it, and the roll follows
+  (protocol 143). The sheet draws the ball taken from its fourth frame on; a snatch that took
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
   Changing with the ball in hand, the ball circles the body clockwise from in front, three laps
   over the change ending in front again (`GameScene.orbitLaps`), mirrored facing left, 32 art

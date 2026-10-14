@@ -253,7 +253,7 @@ public struct Player: Equatable {
     public var tornadoCentre: Vec2?
     public var tornadoCooldown = 0
     public var slashHit = false
-    /// This slash is FloState's step-through on the ground (`FloSlashRules`).
+    /// This slash is FloState's step-through, on the ground or in the air (`FloSlashRules`).
     public var floSlash = false
     /// Frames of down held on the ground, and frames left falling through one-ways after a drop.
     public var dropHoldFrames = 0
@@ -1254,8 +1254,12 @@ public struct Player: Equatable {
             }
 
         case .slashing where floSlash:
-            // FloState's step through: carried forward its travel over the slash, as the snatch's is.
+            // FloState's step through: carried forward its travel over the slash, as the snatch's is,
+            // on the ground or in the air; in the air gravity cut as the plain slash's is, so it hangs.
             velocity.x = stateTimer < FloSlashRules.frames ? facing.sign * FloSlashRules.travel / Double(FloSlashRules.frames - 1) * Double(timerStep) : 0
+            if !grounded {
+                velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -fallSpeed)
+            }
             if stateTimer >= FloSlashRules.frames {
                 floSlash = false
                 endSlash()
@@ -1281,12 +1285,14 @@ public struct Player: Equatable {
             }
 
         case .snatching:
-            if grounded, inFloState {
+            if inFloState {
                 // FloState's snatch steps through: the body carried forward its travel over the
                 // snatch, through the other, the reach taking the ball on the way. The travel
                 // goes by the snatch's clock, so a held clock (under water) moves the body as far.
                 // The clock's first tick is the press's own frame, which doesn't move: the rest carry it all.
+                // In the air the same, gravity cut as the slash's is, so it hangs through it.
                 velocity.x = stateTimer < SnatchRules.frames ? facing.sign * SnatchRules.floStateTravel / Double(SnatchRules.frames - 1) * Double(timerStep) : 0
+                if !grounded { velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -fallSpeed) }
             } else {
                 // Carrying the speed it came from, bleeding it off at the attack's brake, on the
                 // ground and in the air alike.
@@ -1749,7 +1755,7 @@ public struct Player: Equatable {
         fastFalling = false
         if !grounded { velocity.y = max(velocity.y, SlashRules.lift) }
         // In FloState on the ground, the step through.
-        floSlash = grounded && inFloState
+        floSlash = inFloState
         events.append(.slashed(player: index))
         enter(.slashing)
     }
@@ -1881,7 +1887,7 @@ public struct Player: Equatable {
     /// FloState's snatch on the ground, its body still being carried forward: everything the
     /// body passes, the ball or whoever holds it, it takes.
     public var snatchSteppingThrough: Bool {
-        state == .snatching && frozen == 0 && grounded && inFloState && stateTimer < SnatchRules.frames
+        state == .snatching && frozen == 0 && inFloState && stateTimer < SnatchRules.frames
     }
 
     /// The body, the part of the snatch's reach that isn't the hand's ring, while the hand is out.
@@ -2389,7 +2395,7 @@ public struct Player: Equatable {
         if state == .snatching {
             snatchCooldown = SnatchRules.cooldownFrames
             // FloState's step-through carries on with the ball in hand, through the other.
-            if inFloState, grounded { return }
+            if inFloState { return }
         }
         if state == .webSwing { return }
         if grounded { velocity = .zero }

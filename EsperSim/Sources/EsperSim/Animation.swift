@@ -35,7 +35,7 @@ public enum Animation: String, CaseIterable {
     case esperSlash = "player_esperslash"
     case snatch = "player_snatch"
     case snatchAir = "player_snatch_air"
-    /// In FloState, the snatch on the ground drawn in its own sheet.
+    /// In FloState, the snatch, on the ground or in the air, drawn in its own sheet.
     case snatchFloState = "player_snatch_flostate"
     /// In FloState on the ground, the slash's step through: both swings, one attack.
     case esperSlashFloState = "player_esperslash_flostate"
@@ -235,8 +235,8 @@ extension Player {
             // The double jump's somersault, run through in the roll's frames.
             return AnimationFrame(.doubleJump, t * SlashRules.sheetFramesPerSecond / 60)
         case .snatching, .walling:
-            // In FloState on the ground, its own sheet at the same timing, its last frame held.
-            if grounded, inFloState, state == .snatching {
+            // In FloState, on the ground or in the air, its own sheet at the same timing, its last frame held.
+            if inFloState, state == .snatching {
                 return AnimationFrame(.snatchFloState, min(SnatchRules.sheetFrame(at: t), Animation.snatchFloState.frameCount - 1))
             }
             return AnimationFrame(grounded ? .snatch : .snatchAir, SnatchRules.sheetFrame(at: t))

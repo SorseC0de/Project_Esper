@@ -725,7 +725,7 @@ in the menus' blue with its name in Upheaval, the blue too, in two lines, broken
 nearest its middle (one line with no space), gold and a tenth bigger when a cursor or a pick is on
 it; more than four stages in two rows, the first the longer (`StageSelectScreen.lines`,
 `oneRowMost`). The Greateraid pick (`PickScreen`), on the pause's black and glass, in the new UI: "Greateraid"
-in FLO lettering on a banner across the top left corner at 45 degrees (`Screen.addCornerBanner`,
+in FLO lettering on a banner across the top left corner at 30 degrees, its lettering 10.5 (`Screen.addCornerBanner`,
 black's first edged in the menus' blue), then a column: the drinker on their bench
 (`player_drinkchoice`, 3.75 points an art pixel by default, on the UI panel's DRINKER slider);
 Futuristic's rule 6; the raised drink's quote in the system italic, 9, in the menus' blue at 0.8;
@@ -742,7 +742,9 @@ second bottle). Offline, a biomorph drunk sets the debug POWER picker back to no
 biomorph stands over the drinks, and left set it kept one biomorph's moves under another's name. The wait screen (`WaitScreen`): the same glass, the same corner banner, "[hood] is
 drinking" in the menus' face, and its seconds in ring 8. The old UI's plates, ribbons, cards and
 buttons are gone from every screen (`addButton`, `addCard`, `addHeader` removed). The HUD: the
-rounds, or 47's score, in Futuristic's frame 8 with its tail cut off (`Futuristic.taillessEight`), the row across its face. The
+rounds, or 47's score, in Futuristic's frame 8 with its tail cut off (`Futuristic.taillessEight`), the row across its face;
+the frame and the rings in the HUD's own layer, unglowing as the rest of the UI's frames are,
+the lit rounds and 47's digits in the glowing one (`scoreFrames`). The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, JUMP and THROW in
 Futuristic_UI's ring6 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their
 names in the menus' face in it too, shrunk to fit inside the ring (0.72 of the button across), gold while held, the ring turning a full circle as it's pressed (0.35
@@ -2502,7 +2504,8 @@ through one engine, left running, heard by where they happen: full on the screen
 fading to nothing 32 art pixels past its edge, so nothing off the screen is heard (the
 menus and the count are everywhere); each sound to a voice that has finished, or with all busy to the one
 nearest its end, the new sound scheduled to interrupt the old (stopping a playing voice waits
-on the audio thread, which cost the TV 4 ms a frame of footsteps), ambient, so the silent switch mutes it. Sounds come off the events
+on the audio thread, which cost the TV 4 ms a frame of footsteps), playback mixed with others, so the silent switch doesn't mute it, as other games do; the title's
+speaker in its top left corner, frame 1 as the gear is, mutes everything (`GameSettings.muted`). Sounds come off the events
 shown, once, like the effects.
 
 - jump: the jump, the double jump, the wall jump.
@@ -2660,3 +2663,9 @@ answer, the app record in App Store Connect with Game Center turned on.
 - Customisation: armbands, the front arm (not the hand) in the energy's colour and glowing as
   the lower legs are, a shooting sleeve. Tried and parked until customisation lands: add
   `.frontArm` to `HumanLook.glowingParts` and take it out of `HumanLook.skin`.
+
+## Tester builds
+
+Everything kept is wiped once on the first launch of a build whose saved data changed shape
+(`StorageReset.version`, 0.2-1 for 0.2's first build), so a tester never runs into an old shape.
+Modes not ready yet stay on the menus greyed and unpickable (`GameMode.parked`: ZONES).

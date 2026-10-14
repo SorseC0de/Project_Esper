@@ -102,7 +102,8 @@ final class GameScene: SKScene {
     /// The mode multiplayer asks for, kept between launches.
     static let onlineModeKey = "esper.onlineMode"
     static var savedOnlineMode: GameMode {
-        GameMode(rawValue: UInt8(UserDefaults.standard.integer(forKey: onlineModeKey))) ?? .rounds
+        let saved = GameMode(rawValue: UInt8(UserDefaults.standard.integer(forKey: onlineModeKey))) ?? .rounds
+        return GameMode.parked.contains(saved) ? .rounds : saved
     }
     private var screen: Screen?
     /// The bottles on offer while picking, kept so a re-laid-out screen shows the same.
@@ -157,6 +158,9 @@ final class GameScene: SKScene {
     /// The same circles in the HUD, over the ball cam, which is laid down after the world;
     /// shown only while it is, the glowing ones beneath.
     private let circlesOverCam = SKNode()
+    /// The scoreboard's frames, frame 8 and the rings, in the HUD rather than the glowing layer,
+    /// as the rest of the UI's frames are; what they hold, the lit rounds and 47's digits, glows.
+    private let scoreFrames = SKNode()
     private var drinkLabels: [SKLabelNode] = []
     private var menuLast = PlayerInput.idle
     /// After a menu press, nothing more is picked until A has been let go: a press is one
@@ -1335,6 +1339,8 @@ final class GameScene: SKScene {
         circlesOverCam.zPosition = 5
         circlesOverCam.isHidden = true
         hud.addChild(circlesOverCam)
+        scoreFrames.zPosition = 5
+        hud.addChild(scoreFrames)
         for index in 0..<2 {
             let label = SKLabelNode()
             label.fontName = "Menlo-Bold"
@@ -3590,6 +3596,7 @@ final class GameScene: SKScene {
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - insets.top - 8)
         circles.position = CGPoint(x: 0, y: halfHeight - insets.top - GameScene.scoreboardBelowTop)
         circlesOverCam.position = circles.position
+        scoreFrames.position = circles.position
         drawSeries()
         presentScreen()
         layoutFloMeters()
@@ -5098,7 +5105,7 @@ final class GameScene: SKScene {
         plate.position = CGPoint(x: (0.5 - (Futuristic.faces["8"]?.x ?? 0.5)) * plate.size.width,
                                  y: (Futuristic.taillessEightFaceY - 0.5) * plate.size.height)
         plate.zPosition = -1
-        circles.addChild(plate)
+        scoreFrames.addChild(plate)
         circlesOverCam.addChild(plate.copy() as! SKSpriteNode)
     }
 
@@ -5114,6 +5121,7 @@ final class GameScene: SKScene {
             for label in drinkLabels { label.text = "" }
             circles.removeAllChildren()
             circlesOverCam.removeAllChildren()
+            scoreFrames.removeAllChildren()
             return
         }
         if gameMode == .fortySeven {
@@ -5121,6 +5129,7 @@ final class GameScene: SKScene {
             for label in drinkLabels { label.text = "" }
             circles.removeAllChildren()
             circlesOverCam.removeAllChildren()
+            scoreFrames.removeAllChildren()
             // Each side's points in CardCourt's seven-segment digits, lit in its colour.
             let text = UITuning.shared.scale(.hud, .text)
             for (index, score) in fortySevenScores.enumerated() {
@@ -5154,6 +5163,7 @@ final class GameScene: SKScene {
         }
         circles.removeAllChildren()
         circlesOverCam.removeAllChildren()
+        scoreFrames.removeAllChildren()
         // Seven empty rings, each lit in its middle in the round winner's colour as they go.
         let count = GameScene.roundRings
         let circleScale = UITuning.shared.scale(.hud, .buttons)
@@ -5169,14 +5179,16 @@ final class GameScene: SKScene {
             let ring = Futuristic.sprite("ring8", scale: 1)
             ring.size = CGSize(width: radius * 2, height: radius * 2)
             ring.position = CGPoint(x: (CGFloat(index) - CGFloat(count - 1) / 2) * spacing, y: 0)
+            scoreFrames.addChild(ring)
+            circlesOverCam.addChild(ring.copy() as! SKSpriteNode)
             if index < series.rounds.count {
                 let lit = SKShapeNode(circleOfRadius: radius * GameScene.roundLightShare)
                 lit.fillColor = SKColor(rgb: sprites.look(for: series.rounds[index]).glow)
                 lit.strokeColor = .clear
-                ring.addChild(lit)
+                lit.position = ring.position
+                circles.addChild(lit)
+                circlesOverCam.addChild(lit.copy() as! SKShapeNode)
             }
-            circles.addChild(ring)
-            circlesOverCam.addChild(ring.copy() as! SKSpriteNode)
         }
     }
 

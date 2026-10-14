@@ -22,6 +22,12 @@ enum GameSettings {
         set { UserDefaults.standard.set(newValue, forKey: "esper.settings.soundLevel") }
     }
     /// A stage's background sound, the Elements' storm.
+    /// Everything silenced at once, the title's speaker in its top left corner.
+    static var muted: Bool {
+        get { UserDefaults.standard.bool(forKey: "esper.settings.muted") }
+        set { UserDefaults.standard.set(newValue, forKey: "esper.settings.muted") }
+    }
+
     static var ambience: Bool {
         get { UserDefaults.standard.object(forKey: "esper.settings.ambience") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "esper.settings.ambience") }

@@ -38,7 +38,7 @@ class Screen: SKNode {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// A banner across the top left corner at 45 degrees, its title in FLO lettering along it: a
+    /// A banner across the top left corner at 30 degrees, its title in FLO lettering along it: a
     /// band in black's first, edged in the menus' blue.
     func addCornerBanner(_ text: String) {
         let banner = SKNode()
@@ -52,7 +52,7 @@ class Screen: SKNode {
         let title = FloText.node(text, height: Screen.bannerTextHeight * tuned(.titles))
         title.zPosition = 1
         banner.addChild(title)
-        banner.zRotation = .pi / 4
+        banner.zRotation = Screen.bannerAngle
         banner.position = CGPoint(x: -halfWidth + Screen.bannerInset, y: halfHeight - Screen.bannerInset)
         banner.zPosition = 10
         addChild(banner)
@@ -60,7 +60,8 @@ class Screen: SKNode {
     static let bannerLength: CGFloat = 320
     static let bannerThickness: CGFloat = 30
     static let bannerEdge: CGFloat = 1.5
-    static let bannerTextHeight: CGFloat = 14
+    static let bannerTextHeight: CGFloat = 10.5
+    static let bannerAngle: CGFloat = .pi / 6
     /// The band's middle in from the corner, along both edges.
     static let bannerInset: CGFloat = 52
 

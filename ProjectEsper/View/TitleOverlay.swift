@@ -280,6 +280,7 @@ final class FlowState: ObservableObject {
         if let index = multiplayerItems.firstIndex(of: item) { multiplayerCursor = index }
         switch item {
         case .mode(let mode):
+            guard !GameMode.parked.contains(mode) else { return }
             UserDefaults.standard.set(Int(mode.rawValue), forKey: GameScene.onlineModeKey)
             SoundBoard.shared.play(SoundBoard.navigate)
             if mode == .zones { net.loadTurnMatches() }
@@ -376,7 +377,7 @@ final class FlowState: ObservableObject {
         let defaults = UserDefaults.standard
         switch item {
         case .bestOfSeven, .fortySeven, .zones:
-            guard !busy else { return }
+            guard !busy, !(item == .zones && GameMode.parked.contains(.zones)) else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
             let mode: GameMode = item == .bestOfSeven ? .rounds : item == .fortySeven ? .fortySeven : .zones
             transition { [weak self] in self?.openCustomize(mode) }
@@ -399,6 +400,12 @@ final class FlowState: ObservableObject {
         case .settings:
             SoundBoard.shared.play(SoundBoard.confirm)
             openSettings()
+        case .mute:
+            GameSettings.muted.toggle()
+            SoundBoard.shared.applyVolume()
+            Ambience.shared.applySetting()
+            SoundBoard.shared.play(SoundBoard.navigate)
+            objectWillChange.send()
         case .toneTab(let grid, let tone):
             tones[grid] = tone
             SoundBoard.shared.play(SoundBoard.navigate)
@@ -418,8 +425,8 @@ enum TitleItem: Hashable {
     case tuning
     /// The menus' face, stepped on A to K.
     case titleFont
-    /// The gear in the upper right corner, opening the settings.
-    case settings
+    /// The gear in the upper right corner, opening the settings; the speaker in the upper left, muting everything.
+    case settings, mute
     /// A swatch on one of the grids, by its index in `EsperPalette.swatches`, and the tabs
     /// that say which tone each grid picks.
     case swatch(UIColourPicks.Grid, Int)
@@ -429,8 +436,9 @@ enum TitleItem: Hashable {
     static let swatchesPerRow = 8
 
     static let rows: [[TitleItem]] = [
-        [.settings],
-        [.bestOfSeven, .fortySeven, .zones],
+        [.mute, .settings],
+        // A parked mode stays shown, greyed, but the cursor passes it by.
+        [.bestOfSeven, .fortySeven] + (GameMode.parked.contains(.zones) ? [] : [.zones]),
         [.vsCPU, .vsHuman],
         [.multiplayer],
     ] + (DebugUI.enabled ? debugRows : [])
@@ -485,6 +493,21 @@ struct TitleOverlay: View {
                     .padding(.top, 14)
                     .padding(.trailing, 18)
                 }
+                .overlay(alignment: .topLeading) {
+                    Button { flow.activate(.mute) } label: {
+                        FuturisticFrame(name: "1", lit: flow.titleCursor == .mute, scale: TitleOverlay.settingsScale * scale(.buttons)) { colour in
+                            Image(systemName: GameSettings.muted ? "speaker.slash.fill" : "speaker.fill")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .foregroundStyle(colour)
+                                .frame(width: 30 * TitleOverlay.settingsScale * scale(.buttons), height: 31 * TitleOverlay.settingsScale * scale(.buttons))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .noSystemFocus()
+                    .padding(.top, 14)
+                    .padding(.leading, 18)
+                }
                 .overlay(alignment: .bottomLeading) {
                     if DebugUI.enabled { colourGrids }
                 }
@@ -512,7 +535,7 @@ struct TitleOverlay: View {
                     FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons)).scaleEffect(x: -1)
                     framed("ROUNDS", in: "6", mirrored: true, item: .bestOfSeven, frameScale: TitleOverlay.sideModeScale)
                     framed("47", in: "ring5", item: .fortySeven, frameScale: TitleOverlay.fortySevenScale)
-                    framed("ZONES", in: "6", item: .zones, frameScale: TitleOverlay.sideModeScale)
+                    framed("ZONES", in: "6", item: .zones, frameScale: TitleOverlay.sideModeScale, available: !GameMode.parked.contains(.zones))
                     FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons))
                 }
                 HStack(spacing: 12 * scale(.buttons)) {
@@ -564,7 +587,8 @@ struct TitleOverlay: View {
 
     /// A lettered button in one of the vector's frames, an icon over the lettering if it has one.
     private func framed(_ text: String, in frame: String, mirrored: Bool = false, item: TitleItem, frameScale: CGFloat = 1,
-                        textSize: CGFloat = 24, icon: String? = nil, iconPlace: CGSize = .zero, iconScale: CGFloat = 1) -> some View {
+                        textSize: CGFloat = 24, icon: String? = nil, iconPlace: CGSize = .zero, iconScale: CGFloat = 1,
+                        available: Bool = true) -> some View {
         Button { flow.activate(item) } label: {
             FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons), frameScale: frameScale, mirrored: mirrored) { colour in
                 VStack(spacing: 4 * scale(.buttons)) {
@@ -585,9 +609,13 @@ struct TitleOverlay: View {
             }
         }
         .buttonStyle(.plain)
-        .disabled(busy)
+        .disabled(busy || !available)
+        // Not open yet: greyed, and nothing happens.
+        .saturation(available ? 1 : 0)
+        .opacity(available ? 1 : TitleOverlay.parkedOpacity)
         .noSystemFocus()
     }
+    static let parkedOpacity = 0.35
 
     /// One of the opponent row's words: white when it's the one picked, dim otherwise.
     private func plain(_ text: String, picked: Bool, item: TitleItem) -> some View {

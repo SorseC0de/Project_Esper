@@ -86,10 +86,10 @@ final class SoundBoard {
 
     private init() {}
 
-    /// The effects' loudness as the settings have it.
+    /// The effects' loudness as the settings have it; none muted.
     func applyVolume() {
         let levels = GameSettings.soundLevels
-        engine.mainMixerNode.outputVolume = levels[min(max(GameSettings.soundLevel, 0), levels.count - 1)]
+        engine.mainMixerNode.outputVolume = GameSettings.muted ? 0 : levels[min(max(GameSettings.soundLevel, 0), levels.count - 1)]
     }
 
     /// Everything read into memory and mixed off the main thread, at launch, and the
@@ -97,8 +97,9 @@ final class SoundBoard {
     /// A sound asked for before then is skipped.
     func prepare() {
         guard SoundBoard.enabled, voices.isEmpty else { return }
-        // Ambient: under the silent switch, and mixed with whatever else is playing.
-        try? AVAudioSession.sharedInstance().setCategory(.ambient)
+        // Playback, so the silent switch doesn't silence it, as other games do; mixed with
+        // whatever else is playing. The title's speaker mutes it.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         applyVolume()
         for _ in 0..<SoundBoard.voiceCount {

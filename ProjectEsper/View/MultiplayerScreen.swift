@@ -135,13 +135,17 @@ struct MultiplayerScreen: View {
     private func modeSwitch(_ mode: GameMode) -> some View {
         let lit = flow.multiplayerSelection == .mode(mode)
         let picked = GameScene.savedOnlineMode == mode
+        let parked = GameMode.parked.contains(mode)
         return Button { flow.activate(.mode(mode)) } label: {
             Text(mode == .rounds ? "ROUNDS" : mode == .zones ? "ZONES" : "47")
                 .font(Futuristic.font(size: 18 * scale(.text)))
-                .foregroundStyle(lit ? Futuristic.lit : Futuristic.line.opacity(picked ? 1 : TitleOverlay.unpickedOpacity))
+                .foregroundStyle(lit && !parked ? Futuristic.lit : Futuristic.line.opacity(picked ? 1 : TitleOverlay.unpickedOpacity))
                 .fixedSize()
         }
         .buttonStyle(.plain)
+        .disabled(parked)
+        .saturation(parked ? 0 : 1)
+        .opacity(parked ? TitleOverlay.parkedOpacity : 1)
         .scaleEffect(lit ? Futuristic.litGrowth : 1)
         .noSystemFocus()
     }

@@ -3,6 +3,11 @@ import SwiftUI
 
 @main
 struct ProjectEsperApp: App {
+    init() {
+        // Before anything reads what's kept.
+        StorageReset.runIfNeeded()
+    }
+
     var body: some Scene {
         WindowGroup {
             GameView()

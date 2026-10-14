@@ -22,7 +22,7 @@ final class Ambience {
 
     /// Heard or silenced as the settings have it, carrying on underneath either way.
     func applySetting() {
-        player?.volume = GameSettings.ambience ? Ambience.volume : 0
+        player?.volume = GameSettings.ambience && !GameSettings.muted ? Ambience.volume : 0
     }
 
     /// Plays `name`, or nothing; the same name again carries on where it is.
@@ -36,7 +36,7 @@ final class Ambience {
                 ?? Bundle.main.url(forResource: name, withExtension: "m4a", subdirectory: "Sounds"),
               let made = try? AVAudioPlayer(contentsOf: url) else { return }
         made.numberOfLoops = -1
-        made.volume = GameSettings.ambience ? Ambience.volume : 0
+        made.volume = GameSettings.ambience && !GameSettings.muted ? Ambience.volume : 0
         made.play()
         player = made
     }

@@ -534,6 +534,36 @@ extension Opponent {
     /// A jump shot is let go once the rise slows to this.
     static let jumpShotLetGo = 2.4
 
+    /// Whether the layup from right here goes in: the throw stance taken with up, held through
+    /// its windup and let go, as the computer plays it, then the floater's own flight off the hand.
+    func floaterScores(_ match: Match, body start: Player, hoop index: Int) -> Bool {
+        var stage = match.stage
+        stage.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
+        var body = start
+        var events: [MatchEvent] = []
+        var lastThrow = pressed.throwBall
+        for _ in 0..<60 {
+            var input = PlayerInput(stick: Vec2(x: 0, y: 1))
+            if body.state == .throwStance {
+                input.throwBall = body.stateTimer < BallRules.throwWindupFrames + 1
+            } else if body.state != .throwing {
+                input.throwBall = !lastThrow
+            }
+            lastThrow = input.throwBall
+            if case .releaseThrow(let velocity) = body.step(input: input, stage: match.stage, events: &events) {
+                guard velocity.y > 0, velocity.x == 0 else { return false }
+                var ball = Ball(position: body.layupReleasePoint)
+                ball.releaseFloater(from: body.layupReleasePoint, sideways: body.throwStanceEntrySpeed * BallRules.floaterMomentumShare, by: body.index)
+                for _ in 0..<200 {
+                    if let scored = ball.step(stage: stage, events: &events) { return scored == index }
+                    if ball.resting || (ball.velocity.y < 0 && ball.position.y < stage.hoops[index].position.y - 60) { return false }
+                }
+                return false
+            }
+        }
+        return false
+    }
+
     /// The places to try for a still rim's shots: on the surfaces in front of it, 25 to 140
     /// across from it and not far above or below it, the ones a middling distance away first.
     func spotCandidates(_ match: Match, hoop index: Int) -> [Vec2] {

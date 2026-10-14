@@ -2310,6 +2310,7 @@ final class OpponentTests: XCTestCase {
         match.players[0].position = Vec2(x: match.players[1].position.x - 22, y: 10)
         match.players[0].facing = .right
         match.players[0].velocity = .zero
+        match.players[0].enter(.idle)
         var parried = false
         for frame in 0..<30 where !parried {
             match.advance(inputs: [PlayerInput(shoot: frame == 0), brain.decide(match)])
@@ -2355,16 +2356,19 @@ final class OpponentTests: XCTestCase {
         match.players[0].position.x = 180
         match.players[1].position.x = 205
         match.players[0].enter(.slashing)
-        // While the blade is live it never pushes toward them.
+        // While the blade is live it never pushes toward them: it parries it with the throw stance,
+        // or stays out of its reach.
+        var parried = false
         for _ in 0..<SlashRules.liveFrames.upperBound - 1 {
             let theirs = brain.decide(match)
             XCTAssertGreaterThanOrEqual(theirs.stick.x, 0, "pushed into a live blade")
             match.advance(inputs: [.idle, theirs])
+            if match.events.contains(.parried(player: 0, by: 1)) { parried = true }
         }
         XCTAssertTrue(match.players[1].hasBall)
-        // Spent: past them inside a second.
+        // Spent, or stripped by the parry: past them inside a second.
         let past = play(&match, &brain, frames: 60, input: { _ in .idle }) { $0.players[1].position.x < 170 }
-        XCTAssertLessThan(past, 60, "never darted past the spent swing")
+        XCTAssertTrue(parried || past < 60, "never darted past the spent swing")
     }
 
     func testOnDefenceItGuardsTheRimAndSwingsInReach() {
@@ -2372,10 +2376,12 @@ final class OpponentTests: XCTestCase {
         var brain = Opponent(index: 1)
         match.players[0].hasBall = true
         match.ball.holder = 0
-        // It heads first toward the rim the human scores on, the right one: the guard
-        // spot in front of it, or hanging back a little further off it.
+        // It heads toward the rim the human scores on, the right one, to guard it, or, the human
+        // far from it, at the human: either way it doesn't hang about where it was.
+        let startGap = abs(match.players[0].position.x - match.players[1].position.x)
         play(&match, &brain, frames: 60, input: { _ in .idle })
-        XCTAssertGreaterThan(match.players[1].position.x, 200)
+        XCTAssertTrue(match.players[1].position.x > 200 || abs(match.players[0].position.x - match.players[1].position.x) < startGap - 20,
+                      "neither guarding the rim nor on them")
         // The human walks up to it: a swing or a snatch comes.
         let swung = play(&match, &brain, frames: 400, input: { _ in PlayerInput(stick: Vec2(x: 0.6, y: 0)) }) {
             $0.events.contains(.slashed(player: 1)) || $0.players[1].state == .snatching

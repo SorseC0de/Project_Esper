@@ -156,12 +156,12 @@ final class TransformTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .transforming)
     }
 
-    func testTheSameAgainChangesStraightBack() {
+    func testTheSameAgainInFloStateDoesNothing() {
         var match = standing()
         match.players[0].inFloState = true
         match.advance(inputs: [both, .idle])
-        XCTAssertFalse(match.players[0].inFloState)
-        XCTAssertNotEqual(match.players[0].state, .shootStance, "the press is spent on the change")
+        XCTAssertTrue(match.players[0].inFloState, "no leaving early")
+        XCTAssertFalse([.slashing, .snatching, .shootStance].contains(match.players[0].state), "the pair is spent on nothing")
     }
 
     func testTheTransformSheetPlaysAtTenASecond() {
@@ -182,7 +182,7 @@ final class TransformTests: XCTestCase {
         XCTAssertTrue(match.players[0].inFloState)
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         match.advance(inputs: [both, .idle])
-        XCTAssertFalse(match.players[0].inFloState, "back, the snatch just started given way")
+        XCTAssertTrue(match.players[0].inFloState, "in it, the pair never takes it back out")
     }
 
     func testShortOfFullNoChange() {
@@ -195,8 +195,10 @@ final class TransformTests: XCTestCase {
     func testLeavingLocksItOutForASecond() {
         var match = standing()
         match.players[0].inFloState = true
-        match.advance(inputs: [both, .idle])
-        XCTAssertFalse(match.players[0].inFloState)
+        match.players[0].flo = 0
+        for _ in 0..<FloStateRules.spendFrames + 1 where match.players[0].inFloState { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertFalse(match.players[0].inFloState, "out once the FLO's gone")
+        match.players[0].flo = FloRules.full
         XCTAssertFalse(match.players[0].floStateReady)
         match.advance(inputs: [.idle, .idle])
         match.advance(inputs: [both, .idle])

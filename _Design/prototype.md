@@ -157,7 +157,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   into the energy form; the same again in it changes straight back. The change holds the body still where it
   is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
   from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
-  it's in FloState (`Player.inFloState`, protocol 79): only with a full meter (`floStateReady`, protocol 81), left any time.
+  it's in FloState (`Player.inFloState`, protocol 79): only with a full meter (`floStateReady`, protocol 81), and
+  never left early: in it the pair does nothing, and it lasts till the FLO's spent (protocol 142); with
+  FLO that never runs out, ZONES' (`unlimitedFlo`), the pair is still the way out.
   On a touch screen a tap on your own FLO meter (or within 12 points of it) is throw and shoot
   together for a frame, the change in or out (`TouchControls.tapFloState`).
   In it the body moves a tenth faster (`FloStateRules`: the speed share 1.1; its actions and their
@@ -185,15 +187,13 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   48-pixel boxes (`SnatchRules.floStateTravel`, protocol 117), through the other; the whole way the
   body takes the ball off whoever it passes, or a loose ball it passes (`Player.snatchSteppingThrough`),
   as well as the hand's reach at full stretch; on the third frame the hooded head looks
-  back (protocol 103). The slash on the ground in FloState is a step-through too, its own sheet
+  back (protocol 103). The slash on the ground in FloState is a step-through too, one attack
   (`player_esperslash_flostate`, nine 80 by 64 frames, the body at the cell's middle as on the
-  square sheets, `Animation.pixelWidth`) at the slash's 15 a second: frames 0 to 3 the body carried
-  the snatch's 96 art pixels forward; slash pressed again in its last two sheet frames and frames 4
-  to 8 carry it the same distance back, facing the same way, with the same window back into the
-  forward step, round and round; without the press it stops where it is (`FloSlashRules`,
-  `Player.floSlashStep`, protocol 140). The blade's box is live from each step's first frame and
-  each step can hit once; the rainbow afterimages trail both. In the air FloState's slash is the
-  plain one. The sheet draws the ball taken from its fourth frame on; a snatch that took
+  square sheets, `Animation.pixelWidth`): the whole sheet, both its swings, at 30 a second while
+  the body is carried the snatch's 96 art pixels forward (`FloSlashRules`, `Player.floSlash`,
+  protocol 142; a back step and a combo of them were tried and dropped as oppressive). The blade's
+  box is live from its first frame to its last and hits once; the rainbow afterimages trail it. In
+  the air FloState's slash is the plain one. The sheet draws the ball taken from its fourth frame on; a snatch that took
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
   Changing with the ball in hand, the ball circles the body clockwise from in front, three laps
   over the change ending in front again (`GameScene.orbitLaps`), mirrored facing left, 32 art
@@ -1453,6 +1453,23 @@ through a one-way, if there is one: down with the ball standing is the taunt.
   stance, the jump, the release) and then the ball's own flight, the middle of the angles that go
   in, worked out once a shot and kept to its release (`aimMemo`). A shot called off because nothing
   from there goes in gives the spot up, so it picks another rather than trying the same again.
+- FloState: a full meter and it goes in after a beat (up to 45 frames, `floStateWaitMost`), at once
+  with the other's ball or a loose one within 120, out of anything free (`askForFloState`).
+- Off the ball: the ball taken off it, or picked up by the other within 100 of it, it goes after them
+  for two and a half seconds, or one and a half, keeping within 22 at their side and striking from
+  the openings, not on arrival (`chaseFrames`). Otherwise, with them near their rim (within 120) it
+  guards it half the time and presses them most of the rest; further off it presses them seven times
+  in ten, guards a fifth, hovers a tenth.
+- A slash starting whose blade can reach it (its box against the body, now or as far as the slash's
+  carry takes it, `bladeReaches`) is answered once: holding nothing, the snatch's parry half the time,
+  else its own slash to clash with it more often than not, else out of its reach (`answerSlash`);
+  with the ball, the throw stance's parry every time it's spam and half the time otherwise, else the
+  old dodge, out of reach and past once it's spent. A dart under way that a fresh swing meets turns
+  back out with a full push, the dash's turnaround, rather than sliding on in.
+- The floater: within 90 of a still rim, every frame, the layup is played out (the throw stance with
+  up, held through its windup and let go, then the floater's flight, `floaterScores`) and taken if it
+  goes in: always with the other near or swinging, and on a third of its runs at the rim anyway
+  (rolled once a run, `floaterAnyway`), rather than walking back out to a set spot.
 - Its reading of the stage (`readStage`, 2000 body-frames a frame) happens over the countdown, and
   a new point keeps it (`Opponent.forNewRound`): before, it ran in the first seconds of every
   point, 40 to 75 ms a frame in a debug build.

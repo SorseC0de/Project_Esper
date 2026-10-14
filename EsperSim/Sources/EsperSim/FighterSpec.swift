@@ -559,19 +559,14 @@ public enum HitStopRules {
     public static let slashClashFrames = 24
 }
 
-/// FloState's slash on the ground: a step through forward, its own sheet's frames 0 to 3, the
-/// FloState snatch's distance; then, slash pressed again in its last two sheet frames, a step
-/// back through the same distance, frames 4 to 8, with the same window to go forward again, and
-/// so on round. The blade's box is live from each step's first frame, and each step can hit once.
+/// FloState's slash on the ground: one attack, a step through forward the FloState snatch's
+/// distance while its sheet's nine frames play through, both its swings, at 30 a second. The
+/// blade's box is live from its first frame to its last, and hits once.
 public enum FloSlashRules {
-    public static let sheetFramesPerSecond = SlashRules.sheetFramesPerSecond
-    public static let forwardSheetFrames = 0..<4
-    public static let backwardSheetFrames = 4..<9
-    public static let windowSheetFrames = 2
+    public static let sheetFramesPerSecond = 30
+    public static let sheetFrames = 9
+    public static var frames: Int { simFrames(sheetFrames, at: sheetFramesPerSecond) }
     public static var travel: Double { SnatchRules.floStateTravel }
-    public static func sheetFrames(backward: Bool) -> Range<Int> { backward ? backwardSheetFrames : forwardSheetFrames }
-    public static func frames(backward: Bool) -> Int { simFrames(sheetFrames(backward: backward).count, at: sheetFramesPerSecond) }
-    public static var windowFrames: Int { simFrames(windowSheetFrames, at: sheetFramesPerSecond) }
 }
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many

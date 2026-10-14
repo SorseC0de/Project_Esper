@@ -37,7 +37,7 @@ public enum Animation: String, CaseIterable {
     case snatchAir = "player_snatch_air"
     /// In FloState, the snatch on the ground drawn in its own sheet.
     case snatchFloState = "player_snatch_flostate"
-    /// In FloState on the ground, the slash's step through: forward 0 to 3, back 4 to 8.
+    /// In FloState on the ground, the slash's step through: both swings, one attack.
     case esperSlashFloState = "player_esperslash_flostate"
     case ledge = "player_ledge"
     case dunk = "player_dunk"
@@ -227,9 +227,8 @@ extension Player {
             return Animation.dunkEntry(at: t).frame
         case .catching:
             return AnimationFrame(grounded ? .catchGround : .catchAir, t * 12 / 60)
-        case .slashing where floSlashStep != .none:
-            let sheet = FloSlashRules.sheetFrames(backward: floSlashStep == .backward)
-            return AnimationFrame(.esperSlashFloState, sheet.lowerBound + min(t * FloSlashRules.sheetFramesPerSecond / 60, sheet.count - 1))
+        case .slashing where floSlash:
+            return AnimationFrame(.esperSlashFloState, min(t * FloSlashRules.sheetFramesPerSecond / 60, FloSlashRules.sheetFrames - 1))
         case .slashing:
             return AnimationFrame(.esperSlash, t * SlashRules.sheetFramesPerSecond / 60)
         case .rolling:

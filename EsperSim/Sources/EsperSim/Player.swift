@@ -253,11 +253,8 @@ public struct Player: Equatable {
     public var tornadoCentre: Vec2?
     public var tornadoCooldown = 0
     public var slashHit = false
-    /// FloState's step-through slash on the ground (`FloSlashRules`): none, forward or back, and
-    /// whether slash was pressed in this step's window, for the next.
-    public enum FloSlashStep: Equatable { case none, forward, backward }
-    public var floSlashStep = FloSlashStep.none
-    public var floSlashQueued = false
+    /// This slash is FloState's step-through on the ground (`FloSlashRules`).
+    public var floSlash = false
     /// Frames of down held on the ground, and frames left falling through one-ways after a drop.
     public var dropHoldFrames = 0
     public var dropThrough = 0
@@ -662,20 +659,22 @@ public struct Player: Equatable {
         if throwingBolt { input.stick.x = 0 }
 
         // Throw and shoot together, out of anything free, or a stance, a slash or a snatch the
-        // first of them just started: the change into the energy form, or, in it, straight back out.
+        // first of them just started: the change into the energy form. In it there's no leaving
+        // early: it runs till the FLO does, and the pair does nothing; but with FLO that never runs
+        // out (ZONES) the pair is still the way back out.
         let changeFrom = [.idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .air].contains(state)
             || ([.shootStance, .throwStance, .slashing, .snatching].contains(state) && stateTimer <= TransformRules.pressWindowFrames)
-        if input.shoot, input.throwBall, shootPressed || throwPressed, changeFrom, hitStun == 0 {
+        if input.shoot, input.throwBall, shootPressed || throwPressed, changeFrom, hitStun == 0, inFloState || floStateReady {
             shootPressed = false
             throwPressed = false
             input.shootButtons = 0
             input.throwBall = false
-            if inFloState {
-                leaveFloState()
-                if ![.idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .air].contains(state) { enter(grounded ? .idle : .air) }
-            } else if floStateReady {
+            if !inFloState {
                 velocity = .zero
                 enter(.transforming)
+            } else if unlimitedFlo {
+                leaveFloState()
+                if ![.idle, .walk, .dash, .run, .pivot, .jumpSquat, .land, .crouch, .crouchWalk, .air].contains(state) { enter(grounded ? .idle : .air) }
             }
         }
 
@@ -1254,26 +1253,12 @@ public struct Player: Equatable {
                 }
             }
 
-        case .slashing where floSlashStep != .none:
-            // FloState's step through, forward or back its travel over the step, as the snatch's is
-            // carried; slash pressed in the step's last two sheet frames goes on into the other
-            // way's step, else it stops there.
-            let backward = floSlashStep == .backward
-            let stepFrames = FloSlashRules.frames(backward: backward)
-            velocity.x = stateTimer < stepFrames
-                ? facing.sign * (backward ? -1 : 1) * FloSlashRules.travel / Double(stepFrames - 1) * Double(timerStep) : 0
-            if shootPressed, stateTimer >= stepFrames - FloSlashRules.windowFrames { floSlashQueued = true }
-            if stateTimer >= stepFrames {
-                if floSlashQueued, inFloState, grounded {
-                    floSlashStep = backward ? .forward : .backward
-                    floSlashQueued = false
-                    slashHit = false
-                    events.append(.slashed(player: index))
-                    enter(.slashing)
-                } else {
-                    floSlashStep = .none
-                    endSlash()
-                }
+        case .slashing where floSlash:
+            // FloState's step through: carried forward its travel over the slash, as the snatch's is.
+            velocity.x = stateTimer < FloSlashRules.frames ? facing.sign * FloSlashRules.travel / Double(FloSlashRules.frames - 1) * Double(timerStep) : 0
+            if stateTimer >= FloSlashRules.frames {
+                floSlash = false
+                endSlash()
             }
 
         case .slashing:
@@ -1764,8 +1749,7 @@ public struct Player: Equatable {
         fastFalling = false
         if !grounded { velocity.y = max(velocity.y, SlashRules.lift) }
         // In FloState on the ground, the step through.
-        floSlashStep = grounded && inFloState ? .forward : .none
-        floSlashQueued = false
+        floSlash = grounded && inFloState
         events.append(.slashed(player: index))
         enter(.slashing)
     }
@@ -1877,7 +1861,7 @@ public struct Player: Equatable {
 
     /// The blade: a square round the body over the slash's live frames, until it has hit.
     public var slashHitbox: Box? {
-        let live = floSlashStep == .none ? SlashRules.liveFrames : 0..<FloSlashRules.frames(backward: floSlashStep == .backward)
+        let live = floSlash ? 0..<FloSlashRules.frames : SlashRules.liveFrames
         guard state == .slashing, !slashHit, frozen == 0, live.contains(stateTimer) else { return nil }
         return Box(center: bladeCentre, width: SlashRules.reach * 2 * spec.scale, height: SlashRules.reach * 2 * spec.scale)
     }

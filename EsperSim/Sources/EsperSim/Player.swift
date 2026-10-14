@@ -270,10 +270,12 @@ public struct Player: Equatable {
     /// Frames left in which no button does anything and nothing is caught, after the ball
     /// was knocked or taken out of the hands; the stick still works.
     public var hitStun = 0 {
-        // Titan Tea is stripped but never stunned.
-        // Titan Tea is never stunned; nor is Z Tea while its beam fires.
-        didSet { if power == .titanTea || firingBeam, hitStun > 0 { hitStun = 0 } }
+        // Titan Tea is never stunned; nor is anyone super armoured.
+        didSet { if power == .titanTea || superArmoured, hitStun > 0 { hitStun = 0 } }
     }
+    /// Nothing stuns or knocks them: Z Tea firing its beam, and the change into FloState, so its
+    /// burst always comes.
+    public var superArmoured: Bool { firingBeam || state == .transforming }
     public var snatchCooldown = 0
     /// Parried: frames, through the stun and on past it, in which nothing answers, stick or
     /// button, and the body's drawn reeling (the ledge sheet's last frame).
@@ -676,6 +678,7 @@ public struct Player: Equatable {
             input.throwBall = false
             if !inFloState {
                 velocity = .zero
+                orbitHit = false
                 enter(.transforming)
             } else if unlimitedFlo {
                 leaveFloState()
@@ -1674,8 +1677,8 @@ public struct Player: Equatable {
     /// Hit: whatever the body was doing is over and it's sent this way through the air.
     /// The ball, if held, is the match's to pop.
     public mutating func knock(_ push: Vec2) {
-        // Firing Z Tea's beam it stands its ground.
-        guard !firingBeam else { return }
+        // Super armoured it stands its ground.
+        guard !superArmoured else { return }
         webAnchor = nil
         pullTarget = nil
         ledge = nil
@@ -1913,6 +1916,16 @@ public struct Player: Equatable {
 
     /// FloState's snatch on the ground, its body still being carried forward: everything the
     /// body passes, the ball or whoever holds it, it takes.
+    /// Changing with the ball: where it circles the body (`TransformRules.orbitLaps`, `orbitRadius`),
+    /// and whether it's pushed someone away yet this change.
+    public var transformOrbitBall: Vec2? {
+        guard state == .transforming, hasBall else { return nil }
+        let angle = -Double(stateTimer) / Double(TransformRules.frames) * TransformRules.orbitLaps * 2 * Double.pi
+        let radius = TransformRules.orbitRadius * spec.scale
+        return Vec2(x: position.x + Trig.cos(angle) * radius * facing.sign, y: position.y + spec.bodyHeight / 2 + Trig.sin(angle) * radius)
+    }
+    var orbitHit = false
+
     public var snatchSteppingThrough: Bool {
         state == .snatching && frozen == 0 && inFloState && stateTimer < SnatchRules.frames
     }
@@ -1977,6 +1990,18 @@ public struct Player: Equatable {
             flo -= 1
         }
         if flo <= 0 { leaveFloState() }
+    }
+
+    /// Out of FloState for a point scored in Rounds: the FLO left kept for the next, no lockout,
+    /// none of it spent while the menus run.
+    mutating func leaveFloStateForPoint() {
+        guard inFloState, !unlimitedFlo else { return }
+        inFloState = false
+        floStateClock = 0
+        if floStatePower != .none {
+            power = .none
+            powerLevel = 1
+        }
     }
 
     mutating func leaveFloState() {

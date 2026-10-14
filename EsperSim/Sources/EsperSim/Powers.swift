@@ -90,6 +90,11 @@ public enum TransformRules {
     public static let burstRadius = 40.0
     public static let burstBodyPush = 5.5
     public static let burstBallPush = 7.0
+    /// Changing with the ball, it circles the body clockwise from in front this many laps over
+    /// the change, this far out from the body's middle (32 art pixels); a body it meets is pushed
+    /// away as the burst pushes one, once a change.
+    public static let orbitLaps = 3.0
+    public static let orbitRadius = 20.0
 }
 
 public enum SlopeRules {

@@ -220,14 +220,19 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   (`FloSlashRules.lastingFrames`, protocol 147), so it's no sooner ready again. The sheet draws the ball taken from its fourth frame on; a snatch that took
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
   Changing with the ball in hand, the ball circles the body clockwise from in front, three laps
-  over the change ending in front again (`GameScene.orbitLaps`), mirrored facing left, 32 art
-  pixels out from the body's middle (`GameScene.orbitRadius`).
+  over the change ending in front again (`TransformRules.orbitLaps`), mirrored facing left, 32 art
+  pixels out from the body's middle (`orbitRadius`, 20), in the sim (`Player.transformOrbitBall`):
+  a body it meets is pushed away as the burst pushes one, once a change. The change is super
+  armoured (`Player.superArmoured`, as the firing beam is): nothing stuns, knocks, strips or
+  snatches it, so its burst always comes (protocol 154). A point scored in Rounds ends FloState
+  there and then, its FLO kept and no lockout (`leaveFloStateForPoint`), not burned behind the menus.
   From the change's first frame to its burst on the sheet's third
   (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`TransformRules.burstRadius`) is
   parried as a snatch parries one, before the blades are resolved; at the burst everything else
   near is pushed away (`TransformRules.burstRadius`, 64 art pixels; a body at 5.5, the ball at 7), the other unstunned, the ball sent too (protocol
   99). Going in or out, `burst` plays at
-  the chest in the energy's colour and the cubes swirl up round the body for half a second, following
+  the chest in the energy's colour (going out, on the body, whatever it's doing, so it goes with it;
+  the lockout's sizzles off the chest where a frame has no head or arm to take them) and the cubes swirl up round the body for half a second, following
   it, as they do through the change. Each of the slash's
   afterimages the next of them; the line round the body cycles the zone's colours at half its
   thickness (`SpriteLibrary.thinOutlineTexture`: on a canvas twice as fine, each line pixel's

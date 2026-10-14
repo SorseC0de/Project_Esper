@@ -261,6 +261,8 @@ public struct Match: Equatable {
                     // neutral rather than in the hands of whoever was just scored on.
                     let tiedDecider = scores[0] == scores[1]
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot))
+                    // FloState ends with the point, its FLO kept, not burned behind the menus.
+                    for player in players.indices { players[player].leaveFloStateForPoint() }
                     if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, at: stage.hoops[hoop].position) }
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking }) {
@@ -524,6 +526,14 @@ public struct Match: Equatable {
             players[index].slideHit = true
             strip(other, by: index, knock: nil)
         }
+        // Changing with the ball: the ball circling the body pushes away a body it meets, once.
+        if let orbit = player.transformOrbitBall, !player.orbitHit, let other, players[other].frozen == 0,
+           players[other].body.overlaps(Box(center: orbit, width: BallRules.radius * 2, height: BallRules.radius * 2)) {
+            players[index].orbitHit = true
+            let away = players[other].body.center - player.body.center
+            let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: player.facing.sign, y: 0)
+            strip(other, by: index, knock: direction * TransformRules.burstBodyPush + Vec2(x: 0, y: 1), stun: false)
+        }
         // A loose ball the slide meets is kicked on ahead, not caught.
         if player.state == .slide, player.frozen == 0, ball.isLive, ball.holder == nil,
            ball.box.overlaps(player.body) || player.slideHitbox.map(ball.box.overlaps) == true {
@@ -571,7 +581,8 @@ public struct Match: Equatable {
             let stepping = player.snatchSteppingThrough
             func reaches(_ box: Box) -> Bool { player.snatchReaches(box: box) || (stepping && box.overlaps(player.body)) }
             // A stepback's ball can't be snatched.
-            let held = ball.holder.flatMap { $0 == index || players[$0].state == .stepback ? nil : $0 }
+            // Nor one mid-change into FloState, super armoured.
+            let held = ball.holder.flatMap { $0 == index || players[$0].state == .stepback || players[$0].state == .transforming ? nil : $0 }
             // A held ball is where the holder's sheet draws it this frame, so the hand can
             // take it off the dribble; failing a landmark, the chest.
             let at = held.map { holder -> Vec2 in
@@ -676,6 +687,7 @@ public struct Match: Equatable {
     /// `carry`: sideways speed for the ball: a slash sends it back toward the slasher.
     private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0, flo: Int = FloRules.hit) {
         let from = players[victim].heldBallPoint
+        guard players[victim].state != .transforming else { return }
         players[victim].loseBall()
         players[victim].hitStun = BallRules.hitStunFrames
         ball.pop(from: from)
@@ -1073,6 +1085,8 @@ public struct Match: Equatable {
     /// `pause`: the hit holds the game still a moment, as a hit does but a held beam's.
     private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, flo: Int = FloRules.hit,
                                 pause: Bool = true) {
+        // The change into FloState is super armoured: nothing takes it.
+        guard players[victim].state != .transforming else { return }
         if !stun {
             // A push, not a hit: no stun and no spark, the ball let go of if held.
             let held = players[victim].hasBall

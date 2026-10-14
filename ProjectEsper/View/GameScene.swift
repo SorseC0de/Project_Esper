@@ -150,14 +150,6 @@ final class GameScene: SKScene {
     private var signsDarkFrames = 0
     /// The three-point arcs as they were before a cut showed them.
     private var arcsWereHidden: Bool?
-    /// The ball's circle round a body changing into FloState with it, in art pixels: ORBIT
-    /// RADIUS on the strip, kept.
-    static let orbitRadiusKey = "esper.transform.orbitRadius.2"
-    nonisolated(unsafe) static var orbitRadius: CGFloat = {
-        CGFloat(UserDefaults.standard.object(forKey: orbitRadiusKey) as? Double ?? 32)
-    }()
-    /// Laps the ball makes round the body over the change.
-    static let orbitLaps: CGFloat = 3
     private var bannerFrames = 0
     private var bannerQueue: [(text: String, size: CGFloat)] = []
     private static let bannerHold = 45
@@ -8110,11 +8102,12 @@ final class GameScene: SKScene {
                 }
             }
             // The whole lockout, small sizzles off the arms and the head, faint.
+            // Whatever the body's doing: a frame without that part's mark takes the chest.
             if lockedOutOfFloState, !held, Double.random(in: 0..<1) < GameScene.lockoutSizzlesPerSecond * GameScene.stepSeconds,
-               let part = [BodyPart.head, .frontArm, .backArm].randomElement(),
-               let landmark = sprites.landmark(part, in: frame, player: index) {
+               let part = [BodyPart.head, .frontArm, .backArm].randomElement() {
+                let chest = CGPoint(x: 0, y: CGFloat((player.chest.y - player.position.y) * SpriteLibrary.pixelsPerUnit))
                 // On the body itself, so they go where it goes.
-                sizzle(at: landmark * drawScale, on: node)
+                sizzle(at: sprites.landmark(part, in: frame, player: index).map { $0 * drawScale } ?? chest, on: node)
             }
 
             // Prone in the snipe, the cursor where it's aimed.
@@ -8385,14 +8378,9 @@ final class GameScene: SKScene {
             let teamColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).glow)
             halo.color = player.hasFireball ? GameScene.fireballColour : teamColour
             if player.holding, changing {
-                // Changing with the ball: it circles the body clockwise, from in front and back
-                // there, `orbitLaps` laps over the change, `orbitRadius` art pixels out from the
-                // body's middle; facing left, mirrored.
-                let share = CGFloat(player.stateTimer) / CGFloat(TransformRules.frames)
-                let angle = -share * GameScene.orbitLaps * 2 * .pi
-                let middle = node.position + CGPoint(x: 0, y: CGFloat(player.spec.bodyHeight / 2 * Double(SpriteLibrary.pixelsPerUnit)))
-                let radius = GameScene.orbitRadius * drawScale
-                let at = CGPoint(x: middle.x + cos(angle) * radius * CGFloat(player.facing.sign), y: middle.y + sin(angle) * radius)
+                // Changing with the ball: it circles the body where the sim has it
+                // (`Player.transformOrbitBall`, its push's own place), raised with the body's lift.
+                let at = player.transformOrbitBall.map { SpriteLibrary.point($0) + CGPoint(x: 0, y: GameScene.transformLift) } ?? node.position
                 halo.isHidden = player.frozen > 0
                 halo.position = at
                 handBall.isHidden = false
@@ -8553,10 +8541,17 @@ final class GameScene: SKScene {
             let goingOut = wasInFloState[index] == true && !player.inFloState
             // Out of FloState: the change's sound backward.
             if goingOut { play(.floStateExit, at: player.chest) }
-            if goingIn || goingOut {
+            if goingIn {
                 glowers.addChild(EnergyEffect.burst.node(sprites, player: index, at: SpriteLibrary.point(player.chest)))
-                floSwirlFrames[index] = GameScene.floSwirlFrames
             }
+            if goingOut {
+                // On the body, whatever it's doing, so it goes where the body goes.
+                let burst = EnergyEffect.burst.node(sprites, player: index,
+                                                    at: CGPoint(x: 0, y: CGFloat((player.chest.y - player.position.y) * SpriteLibrary.pixelsPerUnit)))
+                burst.zPosition = 0.096
+                node.addChild(burst)
+            }
+            if goingIn || goingOut { floSwirlFrames[index] = GameScene.floSwirlFrames }
             wasInFloState[index] = player.inFloState
             lastChangeBurstDue[index] = changeBurstDue
             if floSwirlFrames[index, default: 0] > 0 { floSwirlFrames[index, default: 0] -= 1 }

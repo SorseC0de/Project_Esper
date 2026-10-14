@@ -2666,6 +2666,12 @@ answer, the app record in App Store Connect with Game Center turned on.
 
 ## Tester builds
 
+The launch's warm-up runs every look through the same rebuild a look change does, off the main
+thread on every core (`SpriteLibrary.warmUp`, `rewarm`), each sheet frame read out of the atlas
+once and shared (`sourceImages`), the limbs' tops made there too: built on the main thread it held
+it for seconds, and with Game Center's sign-in moving the app's state the system ended the app
+for its late lifecycle handlers (the testers' launch crash, 0.2 (1)).
+
 Everything kept is wiped once on the first launch of a build whose saved data changed shape
 (`StorageReset.version`, 0.2-1 for 0.2's first build), so a tester never runs into an old shape.
 Modes not ready yet stay on the menus greyed and unpickable (`GameMode.parked`: ZONES).

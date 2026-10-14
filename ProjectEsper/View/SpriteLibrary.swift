@@ -81,6 +81,8 @@ final class SpriteLibrary {
     static let tonedParticleSheets = ["lightning_particle", "lightning_particle2"]
     private var rewarmGeneration: [Int: Int] = [:]
     private let rewarmQueue = DispatchQueue(label: "SpriteLibrary.rewarm", qos: .userInitiated)
+    /// The sheets' frames as read out of the atlas, by name: touched only on `rewarmQueue`.
+    nonisolated(unsafe) private var sourceImages: [String: CGImage] = [:]
     /// Pieces asked for that came out empty (a frame with no front arm), so they aren't made again
     /// every frame; dropped with the player's cache.
     private var emptyPieces: Set<String> = []
@@ -131,7 +133,14 @@ final class SpriteLibrary {
             if rebuilding.isEmpty { rebuilt = 0 }
         }
         onLoading?(loadingCounts)
+        if rebuilding.isEmpty, !whenRebuilt.isEmpty {
+            let waiting = whenRebuilt
+            whenRebuilt = []
+            waiting.forEach { $0() }
+        }
     }
+    /// What waits for every rebuild underway to land: the launch's warm-up.
+    private var whenRebuilt: [() -> Void] = []
 
     /// Everything drawn in a player's look rebuilt off the main thread after their look
     /// changes, then kept and sent to the GPU, so no frame, head, energy or toned effect is
@@ -170,11 +179,14 @@ final class SpriteLibrary {
             var built: [String: SKTexture] = [:]
             var builtLandmarks: [String: [BodyPart: CGPoint]] = [:]
             var builtEmpty: [String] = []
+            var builtTops: [String: [BodyPart: CGPoint]] = [:]
             var made = 0
             let lock = NSLock()
             /// One piece made, kept under the lock: the pieces are made on every core at once.
-            func keep(_ textures: [String: SKTexture], landmarks: (key: String, marks: [BodyPart: CGPoint])? = nil, empty: [String] = []) {
+            func keep(_ textures: [String: SKTexture], landmarks: (key: String, marks: [BodyPart: CGPoint])? = nil, empty: [String] = [],
+                      tops: (key: String, marks: [BodyPart: CGPoint])? = nil) {
                 lock.lock()
+                if let tops { builtTops[tops.key] = tops.marks }
                 built.merge(textures) { _, new in new }
                 builtEmpty += empty
                 if let landmarks { builtLandmarks[landmarks.key] = landmarks.marks }
@@ -187,14 +199,27 @@ final class SpriteLibrary {
             // The sheets' images read out one at a time first, so the cores share nothing of SpriteKit's.
             // And the hood shapes, read out here once rather than first on some core.
             _ = (SpriteLibrary.hoodShapes, SpriteLibrary.turnedHoodShapes, SpriteLibrary.hoodDrawnForHead)
-            let frameSources = frameJobs.map { $0.source.cgImage() }
-            let tonedSources = tonedJobs.map { $0.source.cgImage() }
-            let silhouetteSources = silhouetteJobs.map { $0.source.cgImage() }
+            // Each sheet frame read out of the atlas once and kept for every look's rebuild, not
+            // once a look: each read logs a context leak, and the launch runs several.
+            func source(_ key: String, _ texture: SKTexture) -> CGImage {
+                if let read = self.sourceImages[key] { return read }
+                let read = texture.cgImage()
+                self.sourceImages[key] = read
+                return read
+            }
+            let frameSources = frameJobs.map { source("\($0.frame.animation.rawValue)_\($0.frame.frame)", $0.source) }
+            let tonedSources = tonedJobs.map { source(String($0.key.split(separator: "_", maxSplits: 2).last ?? ""), $0.source) }
+            let silhouetteSources = silhouetteJobs.map { source(String($0.key.split(separator: "_", maxSplits: 2).last ?? ""), $0.source) }
             DispatchQueue.concurrentPerform(iterations: frameJobs.count) { index in
                 let job = frameJobs[index]
                 let frameMade = self.makeFrame(job.frame, source: frameSources[index], look: look, holdsBall: job.holdsBall)
+                // The limbs' tops too, the same for every look, where the cubes come off.
+                let size = job.frame.animation.pixelSize, width = job.frame.animation.pixelWidth
+                let tops = SpriteLibrary.partTops(frameSources[index]).mapValues { top in
+                    CGPoint(x: top.x - width / 2, y: size - top.y - job.frame.animation.feetFromBottom)
+                }
                 keep(Dictionary(uniqueKeysWithValues: frameMade.textures.map { (job.key + $0.key, $0.value) }), landmarks: (job.key, frameMade.landmarks),
-                     empty: frameMade.empty.map { job.key + $0 })
+                     empty: frameMade.empty.map { job.key + $0 }, tops: ("\(job.frame.animation.rawValue)_\(job.frame.frame)", tops))
             }
             DispatchQueue.concurrentPerform(iterations: tonedJobs.count) { index in
                 keep([tonedJobs[index].key: self.makeToned(image: tonedSources[index], look: look, capped: tonedJobs[index].capped)])
@@ -212,6 +237,7 @@ final class SpriteLibrary {
                 for (key, texture) in built where self.cache[key] == nil { self.cache[key] = texture }
                 for (key, marks) in builtLandmarks where self.landmarks[key] == nil { self.landmarks[key] = marks }
                 self.emptyPieces.formUnion(builtEmpty)
+                for (key, tops) in builtTops where self.partTops[key] == nil { self.partTops[key] = tops }
                 for job in frameJobs { self.pairGlowMask(job.key) }
                 SKTexture.preload(Array(built.values) + self.warmHoods(player: player)) {
                     DispatchQueue.main.async { self.reportRebuilding(player, generation: generation, made: nil) }
@@ -1169,34 +1195,23 @@ final class SpriteLibrary {
     /// Builds every frame of every player up front and sends them to the GPU, so nothing
     /// is made mid-draw.
     func warmUp(players: Int, completion: @escaping () -> Void) {
-        // The ice look's frames as well, and each player's energy form, so a freeze or a
-        // change never makes them mid-match.
+        // Every look's frames, the ice look's, each player's energy form's and turned one's,
+        // built off the main thread on every core as a look change's are (`rewarm`): built here
+        // on the main thread they held it seconds at launch, and the system ended the app for it.
         let turned = (0..<players).map(SpriteLibrary.turnedPlayer).filter { look(for: $0) != look(for: $0 - SpriteLibrary.turnedPlayer(0)) }
-        for drawn in [SpriteLibrary.icePlayer] + (0..<players).map(SpriteLibrary.transformedPlayer) + turned {
-            for animation in Animation.allCases {
-                for frame in 0..<animation.frameCount {
-                    _ = texture(AnimationFrame(animation, frame), player: drawn)
-                }
-            }
+        for drawn in Array(0..<players) + [SpriteLibrary.icePlayer] + (0..<players).map(SpriteLibrary.transformedPlayer) + turned
+        where rebuilding[drawn] == nil && cache[SpriteLibrary.frameKey(AnimationFrame(.idle, 0), player: drawn, ballAsEnergy: false, ballLifted: false)] == nil {
+            rewarm(player: drawn)
         }
-        // The limbs' tops, where boots' and sleeves' cubes come off.
-        for animation in Animation.allCases {
-            for frame in 0..<animation.frameCount { _ = top(.frontLeg, in: AnimationFrame(animation, frame)) }
+        if rebuilding.isEmpty {
+            finishWarmUp(completion: completion)
+        } else {
+            whenRebuilt.append { [weak self] in self?.finishWarmUp(completion: completion) }
         }
-        for player in 0..<players {
-            for animation in Animation.allCases {
-                for frame in 0..<animation.frameCount {
-                    _ = texture(AnimationFrame(animation, frame), player: player)
-                }
-            }
-            for effect in EnergyEffect.allCases {
-                _ = effectFrames(effect, player: player)
-            }
-            for effect in Effect.inEnergyColour {
-                _ = effectFrames(effect, player: player)
-            }
-        }
-        for player in 0..<players { warmHoods(player: player) }
+    }
+
+    /// The warm-up's last, small pieces, then everything sent to the GPU.
+    private func finishWarmUp(completion: @escaping () -> Void) {
         _ = texture("ball", 0)
         _ = softGlow(diameter: 32)
         _ = softGlow(diameter: 8)

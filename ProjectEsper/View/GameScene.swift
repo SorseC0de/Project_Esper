@@ -5070,30 +5070,36 @@ final class GameScene: SKScene {
         flowState?.veiled = screen != nil
     }
 
-    /// The black plate under the round circles or 47's score, as dark as it is so the glow
-    /// passes it by; at the HUD's panels scale.
     /// A score digit's size in points, before the HUD's text scale.
     private static let scoreDigit = CGSize(width: 10, height: 20)
     /// Half the scoreboard plate's width, for the FLO meters either side of it.
     private var scorePlateHalfWidth: CGFloat = 60
-    private func addHUDPlate(width: CGFloat, height: CGFloat) {
+    /// Frame 8, tail off, round the scoreboard: `width` across its face, which is this share of it.
+    private static let scorePlateFaceShare: CGFloat = 0.6
+    private func addHUDPlate(width: CGFloat) {
         let panels = UITuning.shared.scale(.hud, .panels)
+        let image = Futuristic.taillessEight
+        let plateWidth = width * panels / GameScene.scorePlateFaceShare
+        let plate = Futuristic.sprite(image: image, scale: 1)
+        plate.size = CGSize(width: plateWidth, height: plateWidth * image.size.height / max(image.size.width, 1))
         // A wider or narrower plate moves the meters out or in with it.
-        let halfWidth = width * panels / 2
+        let halfWidth = plate.size.width / 2
         if halfWidth != scorePlateHalfWidth {
             scorePlateHalfWidth = halfWidth
             if !floMeters.isEmpty { layoutFloMeters() }
         }
-        let plate = UIPiece.plateBlack.node(size: CGSize(width: width, height: height).scaled(by: panels), corners: panels * 0.5)
-        plate.position = CGPoint(x: 0, y: -UIPiece.plateBlack.faceRise * panels * 0.5)
+        // Its face's middle on the row.
+        plate.position = CGPoint(x: (0.5 - (Futuristic.faces["8"]?.x ?? 0.5)) * plate.size.width,
+                                 y: (Futuristic.taillessEightFaceY - 0.5) * plate.size.height)
         plate.zPosition = -1
         circles.addChild(plate)
         circlesOverCam.addChild(plate.copy() as! SKSpriteNode)
     }
 
-    /// The rounds across the top: five circles in dark purple, filled in the round
-    /// winner's colour as they go, a sixth and seventh added if the series gets there;
-    /// and to either side of them each side's drinks, with their levels.
+    /// The rounds across the top: seven empty rings, a round's lit in its middle in its winner's
+    /// colour; and to either side of them each side's drinks, with their levels.
+    private static let roundRings = 7
+    private static let roundLightShare: CGFloat = 0.5
     private func drawSeries() {
         threePointArcs.isHidden = (gameMode != .fortySeven && previewing != .hud) || GameScene.portableThreeLooks.contains(match.stage.features.look) || !match.stage.features.threes
         for arc in threePointArcSides { arc.node.lineWidth = ThreePointTuning.lineWidth }
@@ -5120,7 +5126,7 @@ final class GameScene: SKScene {
                 number.position = CGPoint(x: index == 0 ? -12 : 12, y: 0)
                 circles.addChild(number)
             }
-            addHUDPlate(width: 120, height: 34)
+            addHUDPlate(width: 120)
             let target = SKLabelNode(text: "\(FortySevenRules.target)")
             target.fontName = "Menlo-Bold"
             target.fontSize = 8
@@ -5142,24 +5148,29 @@ final class GameScene: SKScene {
         }
         circles.removeAllChildren()
         circlesOverCam.removeAllChildren()
-        let count = series.circles
+        // Seven empty rings, each lit in its middle in the round winner's colour as they go.
+        let count = GameScene.roundRings
         let circleScale = UITuning.shared.scale(.hud, .buttons)
         let spacing: CGFloat = 18 * circleScale
-        let radius: CGFloat = 6 * circleScale
+        let radius: CGFloat = 7 * circleScale
         let halfRow = CGFloat(count - 1) / 2 * spacing + radius
-        addHUDPlate(width: halfRow * 2 + 36, height: 30 * circleScale)
+        addHUDPlate(width: halfRow * 2 + 12)
         for label in drinkLabels { label.fontSize = 8 * UITuning.shared.scale(.hud, .text) }
         for (index, label) in drinkLabels.enumerated() {
             label.position = CGPoint(x: (halfRow + 8) * (index == 0 ? -1 : 1), y: circles.position.y + radius)
         }
         for index in 0..<count {
-            let circle = SKShapeNode(circleOfRadius: radius)
-            circle.position = CGPoint(x: (CGFloat(index) - CGFloat(count - 1) / 2) * spacing, y: 0)
-            circle.fillColor = index < series.rounds.count ? SKColor(rgb: sprites.look(for: series.rounds[index]).glow) : SKColor(rgb: BallLook.darkPurple)
-            circle.strokeColor = SKColor(rgb: PixelPalette.outline).withAlphaComponent(0.6)
-            circle.lineWidth = 1
-            circles.addChild(circle)
-            circlesOverCam.addChild(circle.copy() as! SKShapeNode)
+            let ring = Futuristic.sprite("ring8", scale: 1)
+            ring.size = CGSize(width: radius * 2, height: radius * 2)
+            ring.position = CGPoint(x: (CGFloat(index) - CGFloat(count - 1) / 2) * spacing, y: 0)
+            if index < series.rounds.count {
+                let lit = SKShapeNode(circleOfRadius: radius * GameScene.roundLightShare)
+                lit.fillColor = SKColor(rgb: sprites.look(for: series.rounds[index]).glow)
+                lit.strokeColor = .clear
+                ring.addChild(lit)
+            }
+            circles.addChild(ring)
+            circlesOverCam.addChild(ring.copy() as! SKSpriteNode)
         }
     }
 

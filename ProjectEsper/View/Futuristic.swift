@@ -58,12 +58,26 @@ enum Futuristic {
 
     static func image(_ piece: String) -> UIImage { UIImage(named: "futuristic_\(piece)") ?? UIImage() }
 
+    /// Frame 8 without the tail under it, the scoreboard's: its picture down to the row where the
+    /// tail leaves the lower bar, 412 of its 579; and where its face's middle is then, from the top.
+    static let taillessEightRows = 412.0 / 579.0
+    @MainActor static let taillessEight: UIImage = {
+        let whole = image("8")
+        guard let picture = whole.cgImage,
+              let cut = picture.cropping(to: CGRect(x: 0, y: 0, width: picture.width, height: Int((Double(picture.height) * taillessEightRows).rounded())))
+        else { return whole }
+        return UIImage(cgImage: cut, scale: whole.scale, orientation: whole.imageOrientation)
+    }()
+    static var taillessEightFaceY: CGFloat { (faces["8"]?.y ?? 0.5) / taillessEightRows }
+
     /// The same for SpriteKit: the blue and the gold, and a piece as a sprite at `scale` of the
     /// menus' size, in the blue.
     static let lineColour = SKColor(rgb: lineRGB)
     static let litColour = SKColor(rgb: EsperPalette.gold.light)
     static func sprite(_ piece: String, scale: CGFloat) -> SKSpriteNode {
-        let image = image(piece)
+        sprite(image: image(piece), scale: scale)
+    }
+    static func sprite(image: UIImage, scale: CGFloat) -> SKSpriteNode {
         let sprite = SKSpriteNode(texture: SKTexture(image: image))
         sprite.size = CGSize(width: image.size.width * image.scale * pointsPerPixel * scale, height: image.size.height * image.scale * pointsPerPixel * scale)
         sprite.color = lineColour

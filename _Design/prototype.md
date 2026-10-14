@@ -727,7 +727,7 @@ as its child, so it takes the lean (sixteen recoloured copies of the vector drew
 second bottle). Offline, a biomorph drunk sets the debug POWER picker back to none: the picker's
 biomorph stands over the drinks, and left set it kept one biomorph's moves under another's name. The wait screen: the same black, the same ribbon, and its seconds in
 the same blue round button. The HUD: the
-round circles, or 47's score, on a black plate, dark enough that the glow passes it. The
+rounds, or 47's score, in Futuristic's frame 8 with its tail cut off (`Futuristic.taillessEight`), the row across its face. The
 touch pad: THROW and SHOOT side by side, JUMP below and between them, JUMP and THROW in
 Futuristic_UI's ring6 and SHOOT in ring4 (a tenth wider than the button), in the menus' blue, their
 names in the menus' face in it too, shrunk to fit inside the ring (0.72 of the button across), gold while held, the ring turning a full circle as it's pressed (0.35
@@ -950,9 +950,9 @@ in the customize screen's top line's orange (gold's light, #F5BB45) and the lowe
 line's teal (blue's light, #45BCF5). A point is a round: BUCKET!! goes up
 with the strike, and whoever was scored on drinks. The computer drinks at once, one of
 its three at random on the series' dice; the human gets the pick screen once the strike
-has played, and the round counts again after the drink. Five circles across the top,
-dark purple, fill in the round winner's colour as they go, with a sixth and seventh
-added if the series gets there, and to either side of them each side's drinks with their
+has played, and the round counts again after the drink. Seven empty rings (Futuristic's
+ring 8) across the top, each lit in its middle in the round winner's colour as they go, no
+colour for an unplayed one, and to either side of them each side's drinks with their
 levels, in its colour. What the computer drank goes up as a banner after BUCKET!!. Four points
 brings the win screen (`WinScreen`, `WinStage`): on the pause's black and glass, no card, a column
 of the winner on the customize screen's projector under its halo looping their pose (`WinPose`,

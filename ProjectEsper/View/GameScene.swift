@@ -4710,7 +4710,6 @@ final class GameScene: SKScene {
             case .beamFired(_, let from, let direction):
                 let degrees = CGFloat(Trig.atan2(direction.y, abs(direction.x)) * 180 / .pi)
                 say(.beam, at: from, away: direction.x < 0 ? -1 : 1, rise: degrees + 15)
-            case .zBurst(let index, let at): say(.burst, at: at, away: players[index].facing.sign, rise: 25)
             case .quaked(let index): say(.quake, at: players[index].position, away: players[index].facing.sign, rise: 10)
             case .frozen(let index): say(.freeze, at: players[index].chest, away: players[index].facing.sign, rise: 20)
             case .fireballBurst(let at), .stageFireballBurst(let at): say(.explosion, at: at, away: 1, rise: 30)
@@ -5703,10 +5702,6 @@ final class GameScene: SKScene {
         }
         for event in events {
             switch event {
-            case .zBurst(let player, let at):
-                let burst = EnergyEffect.burst.node(sprites, player: player, at: SpriteLibrary.point(at))
-                // At its sheet's own size: stretched to the push's reach it scaled by a third, unevenly.
-                glowers.addChild(burst)
             case .galeBurst(let at):
                 // The burst's sheet once at its own size, not squeezed as the gale is.
                 let frames = (0..<ElementsArt.burstFrames).map { sprites.texture("tornado_burst", $0) }
@@ -8402,7 +8397,8 @@ final class GameScene: SKScene {
             // the rest of the sheet plays out where the ball was.
             let charge = chargeNodes[index]
             // Z Tea's beam charges at the hand the throw's way; once it fires the swirl plays out.
-            let beaming = player.power == .zTea && player.state == .beamCharging
+            // A charge kept (level two) loops there till it's fired.
+            let beaming = player.power == .zTea && (player.state == .beamCharging || player.beamStored)
             let chargingNow = (player.state == .throwStance && !handBall.isHidden) || beaming
             if chargingNow {
                 // A sprite's size is set in its parent's units, so it's divided by whatever
@@ -8423,7 +8419,7 @@ final class GameScene: SKScene {
                     charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                     charge.setScale(CGFloat(VoltaTuning.chargeScale))
                 default:
-                    let played = player.stateTimer * Int(EnergyEffect.charge.fps) / 60
+                    let played = (beaming && player.beamStored ? match.frame : player.stateTimer) * Int(EnergyEffect.charge.fps) / 60
                     let loopStart = EnergyEffect.chargeLoopStart, loopEnd = EnergyEffect.chargeLoopEnd
                     let frame = played <= loopEnd ? played : loopStart + (played - loopStart) % (loopEnd - loopStart + 1)
                     charge.texture = sprites.effectTexture(EnergyEffect.charge.name, frame, player: index)

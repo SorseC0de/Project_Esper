@@ -283,7 +283,6 @@ public struct ZonesRecorder: Equatable {
                 case .dunked(let who) where who == player: log(.dunk)
                 case .boltFired(let who) where who == player: log(.power, "Bolt")
                 case .beamFired(let who, _, _) where who == player: log(.power, "Beam")
-                case .zBurst(let who, _) where who == player: log(.power, "Burst")
                 case .galeMade: if me.power == .galeAle { log(.power, "Gale") }
                 case .flew(let who) where who == player: log(.power, "Fly")
                 case .webSwung(let who) where who == player: log(.power, "Web")

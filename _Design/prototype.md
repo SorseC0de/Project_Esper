@@ -223,9 +223,9 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   over the change ending in front again (`GameScene.orbitLaps`), mirrored facing left, 32 art
   pixels out from the body's middle (`GameScene.orbitRadius`).
   From the change's first frame to its burst on the sheet's third
-  (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`ZRules.burstRadius`) is
+  (`TransformRules.burstFrame`, 12), a live blade within the burst's reach (`TransformRules.burstRadius`) is
   parried as a snatch parries one, before the blades are resolved; at the burst everything else
-  near is pushed away as Z Tea's burst pushes it, the other unstunned, the ball sent too (protocol
+  near is pushed away (`TransformRules.burstRadius`, 64 art pixels; a body at 5.5, the ball at 7), the other unstunned, the ball sent too (protocol
   99). Going in or out, `burst` plays at
   the chest in the energy's colour and the cubes swirl up round the body for half a second, following
   it, as they do through the change. Each of the slash's
@@ -589,9 +589,10 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   or the world's edge, letting the ball go where it is. A ball a tornado or a gale takes has its
   shot or throw ended, as a bounce ends one (`Ball.endFlight`), so whoever's by it can catch it (a
   held shot hung there uncatchable); gales are gone with a point (protocol 96).
-- Z Tea (N, a biomorph; protocol 64). Its slash, with nothing in hand: on the ground, the beam's
-  charge, a second (`ZRules.chargeFrames`, 60), committed: nothing but the jump calls it off
-  (into the jump) and a hit stops it; then the beam fires half a second (30) from the hand, growing out 40 a frame
+- Z Tea (N, a biomorph; protocol 64; all beam since protocol 153, the burst gone: it was FloState's
+  own). Its slash, with nothing in hand, on the ground or in the air: the beam's
+  charge, a second (`ZRules.chargeFrames`, 60), committed: on the ground nothing but the jump calls it off
+  (into the jump), in the air it hangs as the slash does, and a hit stops it; then the beam fires half a second (30) from the hand, growing out 40 a frame
   (`ZRules.growth`, the whole of it in ten; it meets only what it's reached; protocol 76) to 400
   units along, 5 either side, and strips and knocks along it (5, lifted 1.5) the first other body
   it meets, sending the ball along it at 7, theirs or loose. With FLO, it fires on past its half
@@ -599,7 +600,7 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   pressed again (a press, not a hold, so lag can't make the two phones disagree; protocol 97),
   hitting whoever and whatever is along it again every 15 (`holdRehitFrames`), pushed along it
   without the lift so they stay in it, those hits earning no FLO and holding no hit-stop. Firing, it can't be stunned or knocked
-  (`Player.knock`, `hitStun`). At level two up and down on the stick turn it, 2 degrees a frame at full
+  (`Player.knock`, `hitStun`). Up and down on the stick turn it, at every level, 2 degrees a frame at full
   tilt (`aimRate`), any angle up to 45 off level, through the charge and while it fires, the beam
   turning with it. The throw's charge swirl (`esper_charge`) plays through the charge between the
   hands as the blast sheet draws them (their parts' middles), its tail as the beam fires. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
@@ -608,10 +609,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   right and two down on the even frames, 4 and 6; after, 8 and 9 (`recoveryFrames`), no beam,
   no armour; the beam from the arms'
   reach (17 art pixels from the shoulder, 18 over the feet), `beam`'s tail, its middle stretched
-  and its head, 16 pixels thick, in the energy colour, over a soft halo in the glow colour three times as thick at 0.5. In the air, the burst: its momentum braked, a 0.85 share kept
-  a frame (`burstBrake`), not stopped, through `player_transform` at 10 a second, frame 2 held 24 frames more at level one, and on
-  frame 3 everything within 64 art pixels (40) is pushed away, the other without a stun (5.5
-  and a lift of 1) and the ball at 7; `burst` plays there in the energy colour at its sheet's own size, 96 square.
+  and its head, 16 pixels thick, in the energy colour, over a soft halo in the glow colour three times as thick at 0.5.
+  Level two keeps a full charge rather than firing it (`Player.beamStored`): free to move, the
+  charge's swirl looping at the hands, until the next slash fires it at once.
 
 Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
 too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is
@@ -1241,7 +1241,7 @@ and a second pick (the clock's, at zero) doesn't land.
 - Pulsepistol Punch: the pulse; level two shoots on the run and adds the pull.
 - Titan Tea: the size and weight, slowed; level two at full speed, with the trample.
 - Gale Ale: the double jump's still tornado; level two adds the snatch's tornado that carries the ball off.
-- Z Tea: the slash's beam on the ground and burst in the air; level two aims the beam and quickens the burst.
+- Z Tea: the slash's beam, on the ground or in the air, aimed; level two keeps a full charge for the next slash to fire.
 
 ## Tuning pickers
 

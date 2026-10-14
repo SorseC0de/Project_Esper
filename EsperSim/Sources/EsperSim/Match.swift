@@ -389,10 +389,6 @@ public struct Match: Equatable {
             resolveParries()
             let parried = players.indices.first { other in events.contains(.parried(player: other, by: index)) }
             burstAway(from: player.body.center, by: index, sparing: parried)
-        case .zBurst:
-            let centre = player.body.center
-            burstAway(from: centre, by: index)
-            events.append(.zBurst(player: index, at: centre))
         case .makeGale:
             // Under the feet it jumped from, the jumper let rise clear before it can hold them.
             let size = GaleRules.size
@@ -621,20 +617,20 @@ public struct Match: Equatable {
         }
     }
 
-    /// A burst at `centre`: every other body within `ZRules.burstRadius` pushed straight away
+    /// A burst at `centre`: every other body within `TransformRules.burstRadius` pushed straight away
     /// from it, unstunned, but `sparing`, and the ball within it sent away too.
     private mutating func burstAway(from centre: Vec2, by index: Int, sparing spared: Int? = nil) {
         let facing = players[index].facing.sign
-        for other in players.indices where other != index && other != spared && players[other].body.distance(to: centre) <= ZRules.burstRadius {
+        for other in players.indices where other != index && other != spared && players[other].body.distance(to: centre) <= TransformRules.burstRadius {
             let away = players[other].body.center - centre
             let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: facing, y: 0)
-            strip(other, by: index, knock: direction * ZRules.burstBodyPush + Vec2(x: 0, y: 1), stun: false)
+            strip(other, by: index, knock: direction * TransformRules.burstBodyPush + Vec2(x: 0, y: 1), stun: false)
         }
-        if ball.isLive, ball.position.distance(to: centre) <= ZRules.burstRadius + BallRules.radius {
+        if ball.isLive, ball.position.distance(to: centre) <= TransformRules.burstRadius + BallRules.radius {
             let away = ball.position - centre
             let direction = away.length > 0.01 ? away * (1 / away.length) : Vec2(x: facing, y: 0)
             ball.tornadoCentre = nil
-            ball.release(from: ball.position, velocity: direction * ZRules.burstBallPush, by: index, straight: false)
+            ball.release(from: ball.position, velocity: direction * TransformRules.burstBallPush, by: index, straight: false)
         }
     }
 
@@ -659,7 +655,7 @@ public struct Match: Equatable {
             guard let other = players.indices.first(where: { $0 != index }), let blade = players[other].slashHitbox else { continue }
             let changing = players[index].state == .transforming && players[index].stateTimer <= TransformRules.burstFrame
             let reaches = players[index].snatchHitbox != nil ? players[index].snatchReaches(box: blade)
-                : changing ? blade.distance(to: players[index].body.center) <= ZRules.burstRadius
+                : changing ? blade.distance(to: players[index].body.center) <= TransformRules.burstRadius
                 : players[index].throwParrying && blade.overlaps(players[index].body)
             guard reaches else { continue }
             players[other].slashHit = true

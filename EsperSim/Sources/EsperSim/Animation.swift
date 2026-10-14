@@ -271,8 +271,6 @@ extension Player {
             let each = ZRules.blastSheetFrameLength
             if t < beamFiringFrames { return AnimationFrame(.blast, 3 + (t / each) % 5) }
             return AnimationFrame(.blast, min(8 + (t - beamFiringFrames) / each, 9))
-        case .zBurst:
-            return AnimationFrame(.transform, ZRules.sheetFrame(at: t, level: powerLevel))
         case .suspended:
             // Falling, as it hangs.
             return AnimationFrame(hasBall ? .airBall : .air, 2)

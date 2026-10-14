@@ -70,13 +70,13 @@ public enum PlayerState: Equatable, Hashable {
     /// Changing from the human form into the energy form, held still in the air.
     case transforming
     /// Z Tea: charging the beam on the ground and firing it; the burst in the air.
-    case beamCharging, beamFiring, zBurst
+    case beamCharging, beamFiring
 
     /// The actions Titan Tea does slower.
     public var isAction: Bool {
         switch self {
         case .shootStance, .shooting, .throwStance, .throwing, .dunking, .catching, .slide, .slashing, .rolling, .snatching,
-             .walling, .gunShoot, .beamCharging, .beamFiring, .zBurst: true
+             .walling, .gunShoot, .beamCharging, .beamFiring: true
         default: false
         }
     }
@@ -1461,25 +1461,32 @@ public struct Player: Equatable {
             }
 
         case .beamCharging:
-            // Committed: the charge runs its length, the stick only aiming it at level two, and
-            // only the jump calls it off. A hit stops it.
-            velocity.x = approach(velocity.x, 0, traction)
-            if hitStun > 0 || !grounded {
+            // Committed: the charge runs its length, the stick aiming it, and on the ground only
+            // the jump calls it off. A hit stops it. In the air it hangs as the slash does.
+            if grounded {
+                velocity.x = approach(velocity.x, 0, traction)
+            } else {
+                velocity.x = approach(velocity.x, 0, attackBrake)
+                velocity.y = max(velocity.y - gravity * SlashRules.gravityShare, -fallSpeed)
+            }
+            if hitStun > 0 {
                 enter(grounded ? .idle : .air)
                 break
             }
-            if jumpPressed {
+            if grounded, jumpPressed {
                 enter(.jumpSquat)
                 break
             }
-            if powerLevel >= 2, abs(input.stick.x) >= 0.3, abs(input.stick.x) > abs(input.stick.y) { facing = input.stick.x > 0 ? .right : .left }
+            if abs(input.stick.x) >= 0.3, abs(input.stick.x) > abs(input.stick.y) { facing = input.stick.x > 0 ? .right : .left }
             turnBeam(input)
             if stateTimer >= ZRules.chargeFrames {
-                beamHeld = 0
-                beamDrainClock = 0
-                beamStopped = false
-                enter(.beamFiring)
-                wanted = .fireBeam
+                if powerLevel >= 2 {
+                    // Level two keeps the charge, free to move, till the slash fires it.
+                    beamStored = true
+                    enter(grounded ? .idle : .air)
+                } else {
+                    fireBeam()
+                }
             }
 
         case .beamFiring:
@@ -1499,14 +1506,7 @@ public struct Player: Equatable {
                     }
                 }
             }
-            if stateTimer >= beamFiringFrames + ZRules.recoveryFrames { enter(.idle) }
-
-        case .zBurst:
-            // Through the transform's sheet its momentum braked, not stopped; the burst on its
-            // fourth frame, after the third is held a while at level one.
-            velocity = velocity * ZRules.burstBrake
-            if reached(ZRules.burstFrame(level: powerLevel)) { wanted = .zBurst }
-            if stateTimer >= ZRules.burstFrame(level: powerLevel) + ZRules.afterBurstFrames { enter(.air) }
+            if stateTimer >= beamFiringFrames + ZRules.recoveryFrames { enter(grounded ? .idle : .air) }
 
         case .suspended:
             // Held in a tornado: the body's middle drawn to its middle, a share of the way a
@@ -1754,11 +1754,17 @@ public struct Player: Equatable {
 
     /// The Esper Slash. In the air the body rises at least the lift, so it floats.
     private mutating func startSlash(events: inout [MatchEvent]) {
-        // Z Tea's slash is the beam's charge on the ground, the burst in the air.
+        // Z Tea's slash is the beam, on the ground or in the air: charged, or a stored charge
+        // (level two) fired at once.
         if power == .zTea {
             fastFalling = false
             beamAim = 0
-            enter(grounded ? .beamCharging : .zBurst)
+            if beamStored {
+                beamStored = false
+                fireBeam()
+            } else {
+                enter(.beamCharging)
+            }
             return
         }
         slashHit = false
@@ -1798,9 +1804,18 @@ public struct Player: Equatable {
         enter(grounded ? .idle : .air)
     }
 
-    /// At level two, up and down on the stick turn the beam, any angle within its range.
+    /// The beam fired: on for its time, and on past it while FLO lasts.
+    private mutating func fireBeam() {
+        beamHeld = 0
+        beamDrainClock = 0
+        beamStopped = false
+        enter(.beamFiring)
+        wanted = .fireBeam
+    }
+
+    /// Up and down on the stick turn the beam, any angle within its range.
     private mutating func turnBeam(_ input: PlayerInput) {
-        guard powerLevel >= 2, abs(input.stick.y) >= 0.2 else { return }
+        guard abs(input.stick.y) >= 0.2 else { return }
         beamAim = min(max(beamAim + input.stick.y * ZRules.aimRate, -ZRules.aimRange), ZRules.aimRange)
     }
 
@@ -1814,8 +1829,10 @@ public struct Player: Equatable {
     var beamDrainClock = 0
     var beamStopped = false
 
-    /// Z Tea's beam's aim, off straight ahead the way it faces, up positive.
+    /// Z Tea's beam's aim, off straight ahead the way it faces, up positive; and at level two a
+    /// full charge kept, for the next slash to fire.
     public var beamAim = 0.0
+    public var beamStored = false
     /// Where the beam leaves from and which way it goes.
     public var beamOrigin: Vec2 {
         Vec2(x: position.x, y: position.y + ZRules.shoulderHeight / 1.6 * spec.scale) + beamDirection * (ZRules.armReach / 1.6 * spec.scale)

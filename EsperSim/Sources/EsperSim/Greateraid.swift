@@ -98,7 +98,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .featherFresca: "..."
         case .titanTea: "..."
         case .galeAle: "..."
-        case .zTea: "..."
+        case .zTea: "Your opponent will have a blast with this one"
         }
     }
 
@@ -124,8 +124,8 @@ public enum Greateraid: CaseIterable, Equatable, Hashable {
         case .titanTea: ("Twice the size and heavier: you can't be stunned, and your landings quake the floor. Slower, and no double jump or crouch.",
                          "Full speed, and running into them strips them.")
         case .galeAle: ("Your double jump leaves a tornado.", "Snatch sends a tornado that strips them and carries the ball off.")
-        case .zTea: ("Slash on the ground charges a beam across the screen; in the air, a burst that blasts everything away.",
-                     "Aim the beam, and the burst comes out quicker.")
+        case .zTea: ("Slash charges a beam across the screen, on the ground or in the air; aim it with up and down.",
+                     "Keep the charge: a full one waits for your next slash to fire it.")
         }
     }
 }

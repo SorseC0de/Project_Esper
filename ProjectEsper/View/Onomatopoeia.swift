@@ -104,7 +104,7 @@ enum Onomatopoeia {
     enum Sound: CaseIterable {
         case swish, three, dunk
         case hit, steal, spike, parry, clang, squeak, walk, run, bounce, dribble, boing
-        case beam, burst, quake, freeze, explosion
+        case beam, quake, freeze, explosion
         case sizzle, shatter, thunder
 
         /// English, Japanese, then Spanish; the palette indexes over and under each letter's
@@ -133,7 +133,6 @@ enum Onomatopoeia {
             case .boing: ("BOING!", "ボヨーン！", "¡BOING!", 22, 20, 5)
             // Powers.
             case .beam: ("VWOOOM", "ズドドドド", "ZUUUUM", 9, 7, 16)
-            case .burst: ("BOOOM!", "ドオォン！", "¡BUUUM!", 9, 6, 16)
             case .quake: ("RUMBLE", "ゴゴゴゴ", "BRRRUM", 36, 34, 16)
             case .freeze: ("CRACK!", "ピキッ！", "¡CRAC!", 22, 21, 16)
             case .explosion: ("KABOOM!", "ドカーン！", "¡CABUM!", 8, 5, 16)
@@ -145,7 +144,7 @@ enum Onomatopoeia {
         }
 
         /// A power's or a stage's own word: said with a generic one on the same action, it's the one shown.
-        var isSpecial: Bool { [.beam, .burst, .quake, .freeze, .explosion, .sizzle, .shatter, .thunder].contains(self) }
+        var isSpecial: Bool { [.beam, .quake, .freeze, .explosion, .sizzle, .shatter, .thunder].contains(self) }
         /// Which word an action says when it makes several at once: a power's or a stage's over the
         /// outcome of a contest (TING!, CLANG), over a blow (WHAM!, SMACK!, THWACK!), over the rest.
         var rank: Int {

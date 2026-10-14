@@ -83,10 +83,13 @@ public enum TransformRules {
     public static let sheetFramesPerSecond = 10
     public static let frames = 54
     public static let pressWindowFrames = 4
-    /// Going in, the burst on the sheet's third frame, as it's drawn: everything near pushed away
-    /// as Z Tea's burst pushes it (`ZRules.burstRadius` and its pushes). From the change's first
-    /// frame to the burst, a blade in that reach is parried.
+    /// Going in, the burst on the sheet's third frame, as it's drawn: everything within its reach
+    /// (64 art pixels) pushed away, a body this hard and the ball this hard. From the change's
+    /// first frame to the burst, a blade in that reach is parried.
     public static let burstFrame = 2 * 60 / sheetFramesPerSecond
+    public static let burstRadius = 40.0
+    public static let burstBodyPush = 5.5
+    public static let burstBallPush = 7.0
 }
 
 public enum SlopeRules {
@@ -261,11 +264,9 @@ public enum ZRules {
     /// The beam's sheet is 16 pixels thick.
     public static let halfThickness = 5.0
     public static let aimRange = degrees(45)
-    /// At level two, up and down on the stick turn the aim this far a frame at full tilt,
-    /// through the charge and while it fires.
+    /// Up and down on the stick turn the aim this far a frame at full tilt, through the charge
+    /// and while it fires.
     public static let aimRate = degrees(2)
-    /// The burst brakes the body's momentum by this share a frame rather than stopping it dead.
-    public static let burstBrake = 0.85
     /// The blast's arms turn about the shoulder, this many art pixels over the feet, and reach
     /// this far from it, where the beam leaves.
     public static let shoulderHeight = 18.0
@@ -276,20 +277,4 @@ public enum ZRules {
     public static let bodyKnock = 5.0
     public static let bodyLift = 1.5
     public static let ballSpeed = 7.0
-    /// The burst: its reach (64 art pixels), and how hard it sends a body and the ball.
-    public static let burstRadius = 40.0
-    public static let burstBodyPush = 5.5
-    public static let burstBallPush = 7.0
-    /// The transform sheet at ten a second, its third frame held this many frames more at level one.
-    public static let sheetFrameLength = 6
-    public static let heldThirdFrames = 24
-    public static func burstFrame(level: Int) -> Int { sheetFrameLength * 3 + (level >= 2 ? 0 : heldThirdFrames) }
-    /// The sheet's last six frames after the burst.
-    public static let afterBurstFrames = sheetFrameLength * 6
-    public static func sheetFrame(at frame: Int, level: Int) -> Int {
-        let held = level >= 2 ? 0 : heldThirdFrames
-        if frame < sheetFrameLength * 3 { return frame / sheetFrameLength }
-        if frame < sheetFrameLength * 3 + held { return 2 }
-        return min(3 + (frame - sheetFrameLength * 3 - held) / sheetFrameLength, 8)
-    }
 }

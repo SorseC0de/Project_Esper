@@ -19,7 +19,6 @@ public enum MatchEvent: Equatable {
     case galeBurst(at: Vec2)
     /// Z Tea's beam fired from here this way, and its burst going off.
     case beamFired(player: Int, from: Vec2, direction: Vec2)
-    case zBurst(player: Int, at: Vec2)
     case swatted(player: Int, hit: Bool)
     /// `entry` is the ball's velocity as it went through; `points` what it was worth.
     /// `floater`: the ball went in as a floater, for the announcer.
@@ -126,7 +125,6 @@ public enum PlayerAction: Equatable {
     case makeGale
     /// Z Tea: the beam leaves, and the burst goes off.
     case fireBeam
-    case zBurst
     /// The change into FloState's burst: pushes away as Z Tea's does, and parries.
     case floBurst
     case sendGale(at: Vec2, heading: Facing)

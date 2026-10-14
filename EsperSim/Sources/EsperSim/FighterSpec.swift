@@ -570,6 +570,8 @@ public enum FloSlashRules {
     public static let secondSwingSheetFrame = 4
     public static var secondSwingFrame: Int { simFrames(secondSwingSheetFrame, at: sheetFramesPerSecond) }
     public static var travel: Double { SnatchRules.floStateTravel }
+    /// Over its last frame till the plain slash would be over: no sooner ready again.
+    public static var lastingFrames: Int { max(frames, SlashRules.frames) }
 }
 
 /// The snatch's numbers: throw without the ball, in neutral or on defence. Over this many

@@ -204,7 +204,8 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   fifth frame (`secondSwingFrame`, 8 sim frames in) the blade's live again and the swing's sound plays
   again, a second strike its own hit, spark and word; the rainbow afterimages trail it. In
   the air gravity is cut to the plain slash's share so the body hangs through it, and the roll follows
-  (protocol 143). The sheet draws the ball taken from its fourth frame on; a snatch that took
+  (protocol 143). Its last frame holds till the plain slash's 24 sim frames are up
+  (`FloSlashRules.lastingFrames`, protocol 147), so it's no sooner ready again. The sheet draws the ball taken from its fourth frame on; a snatch that took
   nothing has that ball lifted off and not drawn (`SpriteLibrary.liftsBall`, `ballLifted`).
   Changing with the ball in hand, the ball circles the body clockwise from in front, three laps
   over the change ending in front again (`GameScene.orbitLaps`), mirrored facing left, 32 art
@@ -1293,7 +1294,7 @@ group's, so where two meet there's one line, on the later's pixels, and the earl
 front: the torso over the legs, the head over all but the arms (the head apart from the body,
 with the human look off, is its own sprite over everything). Each figure is one layer, the body, its line, head, energy,
 cape, ball in hand and flashes, their depths packed under a tenth, so a whole body is in
-front of or behind the other: in front, the one with the ball, else the last to touch it. An experiment, on (`HumanLook.enabled`; off puts it all back): the players drawn as
+front of or behind the other: in front, the one with the ball, else the last to touch it. The players are drawn as
 people, skin on the head, the arms and hands, the front in palette 35 #DBA463 and the back in 34 #BB7547 (24 and 25 were tried and are kept for later), never glowing (green in the body's glow mask),
 the torso, pelvis and front thigh palette 41 #4A5462 for everyone (`HumanLook.clothes`), the back thigh 42 #333941, the
 lower legs bare, in skin as the arms (being tried), and the feet, the shoes, the energy's own colour, the back one at two

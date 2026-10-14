@@ -46,9 +46,9 @@ enum BodyPart: CaseIterable {
         }
     }
 
-    /// The parts that burn: drawn in the team colour, outlined in it, and haloed. A human's
-    /// head doesn't.
-    func glows(human: Bool) -> Bool { (self == .head && !human) || self == .ball }
+    /// The parts that burn: drawn in the team colour, outlined in it, and haloed. The head only
+    /// in the energy form.
+    func glows(energyForm: Bool) -> Bool { (self == .head && energyForm) || self == .ball }
 
     /// The parts that are light rather than body: drawn on their own above the body so
     /// they bloom, with no line, in the team colour's tones by their brightness.
@@ -80,12 +80,12 @@ struct Look: Hashable {
     /// Groups of parts also outlined where they lie over the rest of the body, so each reads
     /// on its own; parts in one group take no line between them.
     var strokedGroups: [Set<BodyPart>] = []
-    /// Drawn as a human, skin and clothes, the head on the body; else the energy form, the
-    /// whole body in the energy's colours and the head apart.
-    var human = HumanLook.enabled
+    /// FloState's energy form: the whole body in the energy's colours and the head apart; else
+    /// skin and clothes, the head on the body.
+    var energyForm = false
     /// The head drawn apart from the body, a quarter bigger: the energy form's. Off
     /// (`energyFormHeadApart`), it's drawn on the body at its own size, as a human's is.
-    var headApart: Bool { !human && Look.energyFormHeadApart }
+    var headApart: Bool { energyForm && Look.energyFormHeadApart }
     static let energyFormHeadApart = true
     /// The body colour the look was made from, for its other form.
     var body: RGB?
@@ -95,24 +95,24 @@ struct Look: Hashable {
     /// The same player facing the other way: the sheet's front limbs are the other arm and leg,
     /// so the sleeves and boots swap front for back.
     var turnedRound: Look {
-        guard human else { return self }
-        return Look.team(glow, body: body ?? glow, human: true, dressing: dressing.turnedRound)
+        guard !energyForm else { return self }
+        return Look.team(glow, body: body ?? glow, dressing: dressing.turnedRound)
     }
 
     /// The same player in the energy form.
-    var transformed: Look { Look.team(glow, body: body ?? glow, human: false, dressing: dressing) }
+    var transformed: Look { Look.team(glow, body: body ?? glow, energyForm: true, dressing: dressing) }
 
     /// The body in its colour and the back limbs in a greyed, darker version of it, the head
     /// and the ball in the team colour, a black line round the body, and the front arm
     /// stroked on its own. The head is drawn apart from the body, with no line, and so is
     /// the energy, toned by `energyTone`.
-    static func team(_ glow: RGB, body: RGB, human: Bool = HumanLook.enabled, dressing: Dressing = Dressing()) -> Look {
+    static func team(_ glow: RGB, body: RGB, energyForm: Bool = false, dressing: Dressing = Dressing()) -> Look {
         var colours: [BodyPart: RGB] = [:]
         let back = greyedDarker(body)
         for part in BodyPart.allCases {
-            colours[part] = part.glows(human: human) || part.isEnergy ? glow : (part.isBack ? back : body)
+            colours[part] = part.glows(energyForm: energyForm) || part.isEnergy ? glow : (part.isBack ? back : body)
         }
-        if human {
+        if !energyForm {
             // Skin and clothes; the legs and feet in the energy's own colour, as the head's crown
             // is, the back ones at two thirds of it: darker but not greyed, so they glow too.
             for (part, skin) in dressing.skin { colours[part] = skin }
@@ -129,7 +129,7 @@ struct Look: Hashable {
                 colours[part] = dressing.skin[part] ?? (part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow)
             }
         }
-        return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, human: human, body: body, dressing: dressing)
+        return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, energyForm: energyForm, body: body, dressing: dressing)
     }
 
     /// Lined on their own, front to back: where two meet, the first's line sits on the
@@ -321,12 +321,11 @@ enum CourtLook {
     static let strikeFadeFrames = 20
 }
 
-/// An experiment: the players drawn as people. Skin on the head, the arms, the hands and the
+/// The players as people. Skin on the head, the arms, the hands and the
 /// lower legs, in the side's skin tone (`Dressing`); the torso, pelvis and thighs in palette 41 for
 /// everyone; the lower legs and feet in the energy's colours, glowing; the head drawn as
-/// part of the body, not apart, and not glowing. `enabled` off puts everything back as it was.
+/// part of the body, not apart, and not glowing.
 enum HumanLook {
-    static let enabled = true
     /// The parts still in the energy's colours, which glow as energy does: the shoes.
     static let glowingParts: Set<BodyPart> = [.frontFoot, .backFoot]
     /// The six skins of `player_hoodheads`, a frame each, as palette indexes: the lighter

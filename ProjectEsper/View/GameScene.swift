@@ -1419,6 +1419,8 @@ final class GameScene: SKScene {
     private var floStrokes: [SKSpriteNode] = []
     private let ciContext = CIContext()
     private var floBarTextures: [Int: SKTexture] = [:]
+    /// The bar's sheet frames, read out once.
+    private var floSheetImages: [Int: CGImage] = [:]
 
     /// A frame of the bar with `flo` gathered: one line over it for each FLO missing, from its
     /// first column on.
@@ -1426,7 +1428,8 @@ final class GameScene: SKScene {
         let variant = FloTuning.variant
         let key = (variant == .fillsFromWord ? 100_000 : 0) + frame * 1000 + flo
         if let made = floBarTextures[key] { return made }
-        let sheet = sprites.texture("flo_meter", frame).cgImage()
+        let sheet = floSheetImages[frame] ?? sprites.texture("flo_meter", frame).cgImage()
+        floSheetImages[frame] = sheet
         let width = sheet.width, height = sheet.height
         let empty = FloRules.full - min(max(flo, 0), FloRules.full)
         let texture: SKTexture
@@ -1634,6 +1637,13 @@ final class GameScene: SKScene {
         floWordsFull = []
         floShown = []
         guard (EffectSheets.frames["flo_meter"] ?? 0) > 0 else { return }
+        // Every bar, each burn frame at each FLO, made now and sent to the GPU: draining in
+        // FloState, each new one was first made mid-match.
+        var bars: [SKTexture] = []
+        for frame in 0..<(EffectSheets.frames["flo_meter"] ?? 0) {
+            for flo in 0...FloRules.full { bars.append(floBarTexture(frame: frame, flo: flo)) }
+        }
+        SKTexture.preload(bars) {}
         let barA = FloTuning.variant == .emptiesFromWord
         for index in 0..<2 {
             // The second player's mirrored: the bar against the scoreboard, the word outside it.
@@ -3607,6 +3617,7 @@ final class GameScene: SKScene {
             if preloaded, warmFramesLeft == 0 {
                 warmNode.removeFromParent()
                 ready = true
+                sprites.reportsMisses = true
             }
             return
         }
@@ -8408,7 +8419,7 @@ final class GameScene: SKScene {
             section("head")
             // A human's legs, in the energy's colours, give off smaller cubes of their own; in
             // the energy form, the hands too.
-            if HumanLook.enabled, ParticleLook.cubes, !lockedOutOfFloState {
+            if ParticleLook.cubes, !lockedOutOfFloState {
                 // A human's off whatever of the limbs is energy, as drawn (`Dressing.cubeSources`): a
                 // boot's or a sleeve's top, a shoe; the energy form's off its legs and hands.
                 let limbs: [(part: BodyPart, fromTop: Bool)] = energyForm ? [(.frontLeg, false), (.backLeg, false), (.frontHand, false), (.backHand, false)]

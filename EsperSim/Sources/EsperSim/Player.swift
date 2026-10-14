@@ -1269,7 +1269,7 @@ public struct Player: Equatable {
                 slashHit = false
                 events.append(.slashed(player: index))
             }
-            if stateTimer >= FloSlashRules.frames {
+            if stateTimer >= FloSlashRules.lastingFrames {
                 floSlash = false
                 endSlash()
             }

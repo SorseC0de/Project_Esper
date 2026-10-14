@@ -4951,8 +4951,8 @@ final class GameScene: SKScene {
         }
         if let screen { hud.addChild(screen) }
         drawSeries()
-        flowState?.blackGround = screen is PickScreen
-        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen
+        flowState?.blackGround = false
+        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen
         flowState?.winFigure = (screen as? WinScreen)?.figure
         flowState?.showsTitle = previewing == nil
         flowState?.veiled = screen != nil
@@ -5065,8 +5065,8 @@ final class GameScene: SKScene {
         }
         if let screen { hud.addChild(screen) }
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
-        flowState?.blackGround = screen is PickScreen || screen is WaitScreen
-        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen
+        flowState?.blackGround = screen is WaitScreen
+        flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen
         flowState?.gridGround = screen is StageSelectScreen
         flowState?.winFigure = (screen as? WinScreen)?.figure
         flowState?.veiled = screen != nil

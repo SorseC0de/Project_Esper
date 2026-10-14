@@ -148,7 +148,7 @@ class Screen: SKNode {
     }
 
     /// A node and everything in it in a colour: sprites tinted, lettering coloured.
-    private static func colour(_ node: SKNode, _ colour: SKColor) {
+    static func colour(_ node: SKNode, _ colour: SKColor) {
         if let sprite = node as? SKSpriteNode, sprite.colorBlendFactor > 0 { sprite.color = colour }
         if let sprite = node as? SKSpriteNode, sprite.texture == nil { sprite.color = colour }
         if let label = node as? SKLabelNode { label.fontColor = colour }
@@ -234,33 +234,27 @@ class Screen: SKNode {
     }
 }
 
-/// Three bottles of Greateraid to choose from, large, their bottoms off the screen, each
-/// leaning a little, its name across it; what the raised one does is lettered in the
-/// middle of the screen. A tap on a bottle raises it, a tap on the raised one drinks it;
-/// on the pad the stick moves and jump drinks.
+/// The Greateraid pick, a column top to bottom: GREATERAID in FLO lettering; the drinker on
+/// their bench; rule 6; the raised drink's quote in italics; what it does; and the three bottles,
+/// their bottoms off the screen, each leaning a little, its name in frame 12 over it. A tap on a
+/// bottle raises it, a tap on the raised one drinks it; on the pad the stick moves and jump drinks.
 final class PickScreen: Screen {
     private let offers: [Greateraid]
     private let drinks: Drinks
-    /// What the raised drink does, as many lines as it takes to fit the plate, and its quote
-    /// over it, smaller, dimmer, in italics.
+    /// What the raised drink does, as many lines as it takes, and its quote over it.
     private let blurb = SKNode()
-    private let comment = SKSpriteNode()
-    private let clock = SKSpriteNode()
-    /// The raised drink's name, lettered as the FLO meter's word, in front of the drinker on the
-    /// plate's top edge, and "(Second Sip)" over it when it is one.
-    private let drinkName = SKNode()
-    private let secondSip = SKSpriteNode()
-    /// The plate's inside, for the lettering to fit: its width, and the room under the quote.
-    private var plateInside = CGSize.zero
-    private var blurbTop: CGFloat = 0
+    private let comment = SKLabelNode(fontNamed: UIFont.italicSystemFont(ofSize: 12).fontName)
+    private let clock = SKLabelNode(fontNamed: Futuristic.fontName)
+    /// Each bottle's name in its frame, lit gold on the raised one.
+    private var names: [SKNode] = []
     /// Each bottle's white outline, shown on the raised one.
     private var outlines: [SKNode] = []
     private let onDrink: (Greateraid) -> Void
 
-    /// `player_drinkchoice` in the picker's look, its frames played very slowly, standing on the
-    /// blurb's banner in the middle; its art pixels this many points, on the UI panel's slider.
+    /// `player_drinkchoice` in the picker's look, its frames played very slowly, on its bench;
+    /// its art pixels this many points, on the UI panel's slider.
     static let drinkerScaleKey = "ui.pick.drinkerScale"
-    static var drinkerScale: CGFloat { UserDefaults.standard.object(forKey: drinkerScaleKey).map { CGFloat(($0 as? Double) ?? 4) } ?? 4 }
+    static var drinkerScale: CGFloat { UserDefaults.standard.object(forKey: drinkerScaleKey).map { CGFloat(($0 as? Double) ?? 2.5) } ?? 2.5 }
     static let drinkerFrameSeconds = 0.5
     /// Picked: `player_drink` this many times through at the same pace, then `player_transform`
     /// at 15 a second, raised `transformLift` art pixels off the chair, and only then on; the bottles and the words falling away meanwhile.
@@ -282,6 +276,27 @@ final class PickScreen: Screen {
     /// The sheet's feet, eight pixels up its 48.
     static let drinkerFeet: CGFloat = 8.0 / 48
 
+    /// The column, in the HUD's points: the title's middle down from the top and its cap height;
+    /// the drinker's feet; rule 6 under them and its scale; the quote's size; the description's
+    /// top, its room down and across, its sizes largest first and its lines' spacing; the
+    /// bottles' height and the name frames' scale and lettering, two lines at most.
+    static let titleDrop: CGFloat = 30
+    static let titleHeight: CGFloat = 26
+    static let drinkerFeetY: CGFloat = 30
+    static let ruleY: CGFloat = 22
+    static let ruleScale: CGFloat = 0.5
+    static let commentY: CGFloat = 8
+    static let commentSize: CGFloat = 11
+    static let commentAlpha: CGFloat = 0.8
+    static let blurbTop: CGFloat = -4
+    static let blurbRoom = CGSize(width: 520, height: 44)
+    static let blurbSizes: [CGFloat] = [12, 11, 10, 9]
+    static let lineShare: CGFloat = 1.15
+    static let bottleHeight: CGFloat = 92
+    static let nameScale: CGFloat = 0.75
+    static let nameSizes: [CGFloat] = [12, 11, 10, 9, 8]
+    static let nameGap: CGFloat = 2
+
     /// `timed` shows the seconds left, for a networked pick; `drinker`, the frames of the one picking.
     init(halfWidth: CGFloat, halfHeight: CGFloat, offers: [Greateraid], drinks: Drinks, colour: SKColor, timed: Bool = false,
          drinker: [SKTexture] = [], bench: SKTexture? = nil, drinking: [SKTexture] = [], transforming: [SKTexture] = [],
@@ -292,37 +307,24 @@ final class PickScreen: Screen {
         self.drinking = drinking
         self.transforming = transforming
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pick)
-        // Smaller than the other screens' headers, box and lettering: the drinks are the thing here.
-        addHeader("GREATERAID", size: 26, at: CGPoint(x: 0, y: halfHeight * 0.8), width: 200, height: 38)
-        let sub = TitleText.node("YOU WERE SCORED ON. DRINK UP.", size: 13 * tuned(.text))
-        // Just under the ribbon.
-        sub.position = CGPoint(x: 0, y: halfHeight * 0.8 - 19 * tuned(.panels) - sub.size.height / 2 - 4)
-        addChild(sub)
+        let title = FloText.node("Greateraid", height: PickScreen.titleHeight * tuned(.titles))
+        title.position = CGPoint(x: 0, y: halfHeight - PickScreen.titleDrop)
+        addChild(title)
         if timed {
-            // The seconds in a blue round button, top right.
-            let dial = UIPiece.circleBlue.node(size: CGSize(width: 52, height: 56).scaled(by: tuned(.buttons)), corners: tuned(.buttons))
-            dial.position = CGPoint(x: halfWidth - 50, y: halfHeight * 0.74)
-            dial.zPosition = -1
-            addChild(dial)
-            clock.position = CGPoint(x: dial.position.x, y: dial.position.y + UIPiece.circleBlue.faceRise * tuned(.buttons))
+            // The seconds, top right, in the menus' face.
+            clock.fontColor = Futuristic.lineColour
+            clock.verticalAlignmentMode = .center
+            clock.position = CGPoint(x: halfWidth - 40, y: halfHeight - PickScreen.titleDrop)
             addChild(clock)
             showSeconds(Series.pickSeconds)
         }
-        // The quote and what the raised drink does, on a blue banner over the bottles: its top
-        // where the drinker stands, as it was, and deep enough for three lines under the quote.
-        let plateSize = CGSize(width: min(halfWidth * 1.7, 620), height: PickScreen.plateHeight).scaled(by: tuned(.panels))
-        let plate = UIPiece.plateBlue.node(size: plateSize, corners: tuned(.panels))
-        plate.position = CGPoint(x: 0, y: -halfHeight * 0.05 + 43 * tuned(.panels) - plateSize.height / 2)
-        plate.zPosition = 1
-        addChild(plate)
-        let plateTop = plate.position.y + plateSize.height / 2
-        plateInside = CGSize(width: plateSize.width - 40 * tuned(.panels), height: plateSize.height - 22 * tuned(.panels))
-        // The bench, its own sheet now, under the one on it.
+        // The bench, its own sheet, under the one on it.
+        let feet = CGPoint(x: 0, y: PickScreen.drinkerFeetY)
         if let bench {
             let seat = SKSpriteNode(texture: bench)
             seat.size = bench.size().scaled(by: PickScreen.drinkerScale)
             seat.anchorPoint = CGPoint(x: 0.5, y: PickScreen.drinkerFeet)
-            seat.position = CGPoint(x: 0, y: plate.position.y + plate.size.height / 2)
+            seat.position = feet
             seat.zPosition = 0.4
             addChild(seat)
         }
@@ -330,50 +332,87 @@ final class PickScreen: Screen {
             let figure = SKSpriteNode(texture: first)
             figure.size = first.size().scaled(by: PickScreen.drinkerScale)
             figure.anchorPoint = CGPoint(x: 0.5, y: PickScreen.drinkerFeet)
-            figure.position = CGPoint(x: 0, y: plate.position.y + plate.size.height / 2)
+            figure.position = feet
             figure.zPosition = 0.5
             figure.run(.repeatForever(.animate(with: drinker, timePerFrame: PickScreen.drinkerFrameSeconds)))
             addChild(figure)
             drinkerNode = figure
         }
+        let rule = Futuristic.sprite("rule6", scale: PickScreen.ruleScale)
+        rule.position = CGPoint(x: 0, y: PickScreen.ruleY)
+        addChild(rule)
+        comment.fontSize = PickScreen.commentSize * tuned(.text)
+        comment.fontColor = Futuristic.lineColour
+        comment.alpha = PickScreen.commentAlpha
+        comment.verticalAlignmentMode = .center
+        comment.position = CGPoint(x: 0, y: PickScreen.commentY)
+        addChild(comment)
+        addChild(blurb)
 
         let spacing = min(halfWidth * 0.55, 200)
         for (index, offer) in offers.enumerated() {
             let x = (CGFloat(index) - 1) * spacing
-            let bottle = PickScreen.bottle(for: offer, colour: colour, height: 180 * tuned(.buttons))
-            // Leaning between 5 and 30 degrees, either way; the bottom clipped by the screen's edge.
+            let bottle = PickScreen.bottle(for: offer, colour: colour, height: PickScreen.bottleHeight * tuned(.buttons))
+            // Leaning between 5 and 20 degrees, either way; the bottom clipped by the screen's edge.
             let lean = CGFloat(5 + Int.random(in: 0...15)) * .pi / 180 * (Bool.random() ? 1 : -1)
             bottle.zRotation = lean
             bottle.position = CGPoint(x: x, y: -halfHeight - 24)
-            // Over everything on the screen.
             bottle.zPosition = 5
             addChild(bottle)
             bottleNodes.append(bottle)
-            outlines.append(PickScreen.outline(of: bottle, width: 5 * tuned(.buttons)))
-            let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: halfHeight)
+            outlines.append(PickScreen.outline(of: bottle, width: 4 * tuned(.buttons)))
+            // Its name in frame 12 over it.
+            let name = nameFrame(offer.name)
+            name.position = CGPoint(x: x, y: bottle.position.y + bottle.frame.height + name.calculateAccumulatedFrame().height / 2 + 4)
+            name.zPosition = 5
+            addChild(name)
+            names.append(name)
+            let hit = CGRect(x: x - spacing / 2 + 6, y: -halfHeight, width: spacing - 12, height: name.position.y + halfHeight + 30)
             addChoice(bottle, hit: hit) { [weak self] in
                 self?.finish(with: offer)
             }
         }
-        // The quote just under the plate's top edge, below the name sitting across it.
-        comment.position = CGPoint(x: 0, y: plateTop - 26 * tuned(.panels))
-        comment.zPosition = 2
-        comment.alpha = PickScreen.commentAlpha
-        addChild(comment)
-        blurbTop = plateTop - 40 * tuned(.panels)
-        plateInside.height = blurbTop - (plate.position.y - plateSize.height / 2) - 10 * tuned(.panels)
-        blurb.zPosition = 2
-        addChild(blurb)
-        // In front of the drinker (0.5) and the plate (1).
-        drinkName.position = CGPoint(x: 0, y: plateTop)
-        drinkName.zPosition = 3
-        addChild(drinkName)
-        secondSip.zPosition = 3
-        addChild(secondSip)
         moved()
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// A drink's name in frame 12, in the menus' face: on one line if it fits the frame's face,
+    /// else on two, split at a space where the longer line is shortest ("Quake-Up" over "Coffee"),
+    /// at the largest size whose lines fit across and stack within it.
+    private func nameFrame(_ text: String) -> SKNode {
+        let node = SKNode()
+        let frame = Futuristic.sprite("12", scale: PickScreen.nameScale * tuned(.buttons))
+        node.addChild(frame)
+        let faceShare = Futuristic.faces["12"] ?? CGPoint(x: 0.5, y: 0.5)
+        let face = CGSize(width: frame.size.width * PickScreen.nameFaceShare.width, height: frame.size.height * PickScreen.nameFaceShare.height)
+        let middle = CGPoint(x: (faceShare.x - 0.5) * frame.size.width, y: (0.5 - faceShare.y) * frame.size.height)
+        func width(_ line: String, _ size: CGFloat) -> CGFloat {
+            let font = UIFont(name: Futuristic.fontName, size: Futuristic.fontSize(size)) ?? .systemFont(ofSize: size)
+            return (line as NSString).size(withAttributes: [.font: font]).width
+        }
+        let words = text.split(separator: " ").map(String.init)
+        var chosen: (lines: [String], size: CGFloat) = ([text], PickScreen.nameSizes.last!)
+        for size in PickScreen.nameSizes {
+            if width(text, size) <= face.width { chosen = ([text], size); break }
+            let splits = (1..<max(words.count, 1)).map { cut in
+                [words[..<cut].joined(separator: " "), words[cut...].joined(separator: " ")]
+            }
+            guard let best = splits.min(by: { max(width($0[0], size), width($0[1], size)) < max(width($1[0], size), width($1[1], size)) }) else { continue }
+            chosen = (best, size)
+            let lineHeight = Futuristic.fontSize(size) * PickScreen.lineShare
+            if best.allSatisfy({ width($0, size) <= face.width }), lineHeight * 2 <= face.height { break }
+        }
+        let lineHeight = Futuristic.fontSize(chosen.size) * PickScreen.lineShare
+        for (index, line) in chosen.lines.enumerated() {
+            let label = Futuristic.label(line, size: chosen.size)
+            label.position = CGPoint(x: middle.x, y: middle.y + (CGFloat(chosen.lines.count - 1) / 2 - CGFloat(index)) * lineHeight)
+            node.addChild(label)
+        }
+        return node
+    }
+    /// Frame 12's face as a share of the picture, inside its bars.
+    static let nameFaceShare = CGSize(width: 0.8, height: 0.5)
 
     /// Picked: the bottles and the words fall away; the drinker drinks it, twice through, then
     /// changes a little off the chair; then the pick goes on. Once.
@@ -382,7 +421,7 @@ final class PickScreen: Screen {
         finishing = true
         let fall = SKAction.group([.moveBy(x: 0, y: -halfHeight * 1.5, duration: PickScreen.fallSeconds), .fadeOut(withDuration: PickScreen.fallSeconds)])
         fall.timingMode = .easeIn
-        for node in bottleNodes + [blurb, comment, drinkName, secondSip] { node.run(fall) }
+        for node in bottleNodes + names + [blurb, comment] { node.run(fall) }
         guard let figure = drinkerNode, !drinking.isEmpty else { return onDrink(offer) }
         figure.removeAllActions()
         var steps: [SKAction] = [.repeat(.animate(with: drinking, timePerFrame: PickScreen.drinkerFrameSeconds), count: PickScreen.drinkLoops)]
@@ -428,68 +467,58 @@ final class PickScreen: Screen {
     /// The seconds left on the pick.
     func showSeconds(_ seconds: Int) {
         guard clock.parent != nil else { return }
-        TitleText.set(clock, to: "\(max(seconds, 0))", size: 24 * tuned(.text))
+        clock.text = "\(max(seconds, 0))"
+        clock.fontSize = Futuristic.fontSize(20 * tuned(.text))
     }
 
     override func moved() {
         guard choices.indices.contains(cursor) else { return }
         let offer = offers[cursor]
         for (index, outline) in outlines.enumerated() { outline.isHidden = index != cursor }
-        // The name as the FLO meter letters its word, straight, centred on the plate's top edge.
-        drinkName.removeAllChildren()
-        let name = FloText.node(offer.name.uppercased(), height: PickScreen.nameHeight * tuned(.titles))
-        drinkName.addChild(name)
-        if drinks.isSecondSip(offer) {
-            TitleText.set(secondSip, to: "(Second Sip)", size: 14 * tuned(.titles), italic: true)
-            secondSip.position = CGPoint(x: 0, y: drinkName.position.y + name.size.height / 2 + secondSip.size.height / 2)
-            secondSip.isHidden = false
-        } else {
-            secondSip.isHidden = true
+        for (index, name) in names.enumerated() {
+            Screen.colour(name, index == cursor ? Futuristic.litColour : Futuristic.lineColour)
+            name.setScale(index == cursor ? Futuristic.litGrowth : 1)
         }
+        comment.text = "\u{201C}\(offer.comment)\u{201D}"
         let text = drinks.level(of: offer) == 0 ? offer.blurbs.first : offer.blurbs.second
-        let scale = tuned(.text)
-        TitleText.set(comment, to: "\u{201C}\(offer.comment)\u{201D}", size: PickScreen.commentSize * scale, italic: true)
-        layBlurb(text, scale: scale)
+        layBlurb((drinks.isSecondSip(offer) ? "Second sip: " : "") + text)
     }
 
-    /// What the drink does in as many lines as it needs, at the largest of its sizes whose lines
-    /// all fit the plate's width and stack within the room under the quote.
-    private func layBlurb(_ text: String, scale: CGFloat) {
+    /// What the drink does in the menus' face, in as many lines as it needs, at the largest of its
+    /// sizes whose lines all fit across and stack within its room.
+    private func layBlurb(_ text: String) {
         blurb.removeAllChildren()
-        var chosen: (lines: [String], size: CGFloat) = ([text], PickScreen.blurbSizes.last! * scale)
-        for base in PickScreen.blurbSizes {
-            let size = base * scale
-            let lines = TitleText.wrapped(text, size: size, width: plateInside.width)
-            let lineHeight = TitleText.node("Ag", size: size).size.height * PickScreen.lineShare
-            if CGFloat(lines.count) * lineHeight <= plateInside.height {
-                chosen = (lines, size)
-                break
+        let room = CGSize(width: min(PickScreen.blurbRoom.width, halfWidth * 1.6), height: PickScreen.blurbRoom.height)
+        func wrapped(_ size: CGFloat) -> [String] {
+            let font = UIFont(name: Futuristic.fontName, size: Futuristic.fontSize(size)) ?? .systemFont(ofSize: size)
+            func fits(_ line: String) -> Bool { (line as NSString).size(withAttributes: [.font: font]).width <= room.width }
+            var lines: [String] = []
+            var line = ""
+            for word in text.split(separator: " ").map(String.init) {
+                let tried = line.isEmpty ? word : line + " " + word
+                if line.isEmpty || fits(tried) { line = tried } else { lines.append(line); line = word }
             }
-            chosen = (lines, size)
+            if !line.isEmpty { lines.append(line) }
+            return lines
         }
-        let nodes = chosen.lines.map { TitleText.node($0, size: chosen.size) }
-        let lineHeight = (nodes.first?.size.height ?? 0) * PickScreen.lineShare
-        // Centred in the room under the quote.
-        let middle = blurbTop - plateInside.height / 2
-        for (index, node) in nodes.enumerated() {
-            node.position = CGPoint(x: 0, y: middle + (CGFloat(nodes.count - 1) / 2 - CGFloat(index)) * lineHeight)
-            blurb.addChild(node)
+        var chosen: (lines: [String], size: CGFloat) = ([text], PickScreen.blurbSizes.last! * tuned(.text))
+        for base in PickScreen.blurbSizes {
+            let size = base * tuned(.text)
+            chosen = (wrapped(size), size)
+            if CGFloat(chosen.lines.count) * Futuristic.fontSize(size) * PickScreen.lineShare <= room.height { break }
+        }
+        let lineHeight = Futuristic.fontSize(chosen.size) * PickScreen.lineShare
+        for (index, line) in chosen.lines.enumerated() {
+            let label = Futuristic.label(line, size: chosen.size)
+            label.position = CGPoint(x: 0, y: PickScreen.blurbTop - lineHeight / 2 - CGFloat(index) * lineHeight)
+            blurb.addChild(label)
         }
     }
-    /// The plate's depth before the panels' scale; the name's cap height; the quote's size and
-    /// how much of it shows; the description's sizes, largest first; and its lines' spacing as a
-    /// share of a line's drawn height (the lettering's outline and drop overlap).
-    static let plateHeight: CGFloat = 120
-    static let nameHeight: CGFloat = 16
-    static let commentSize: CGFloat = 13
-    static let commentAlpha: CGFloat = 0.7
-    static let blurbSizes: [CGFloat] = [20, 18, 16, 14, 12]
-    static let lineShare: CGFloat = 0.8
 
-    /// The bottle, the user's vector from the catalog, 180 points tall and anchored at its
+    /// The bottle, the user's vector from the catalog, `height` points tall and anchored at its
     /// bottom so that runs off the screen: blue for a booster, gold for a biomorph or
     /// Bio-Boba.
-    static func bottle(for drink: Greateraid, colour: SKColor, height: CGFloat = 180) -> SKSpriteNode {
+    static func bottle(for drink: Greateraid, colour: SKColor, height: CGFloat) -> SKSpriteNode {
         let name = drink.kind == .booster ? "Greateraid" : "Greateraid-Gold"
         // The vector drawn once at the size it's shown, at the screen's scale, crisp, and kept
         // for its outline.

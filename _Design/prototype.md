@@ -711,17 +711,16 @@ for its width; each stage in Futuristic_UI's box1
 in the menus' blue with its name in Upheaval, the blue too, in two lines, broken at the space
 nearest its middle (one line with no space), gold and a tenth bigger when a cursor or a pick is on
 it; more than four stages in two rows, the first the longer (`StageSelectScreen.lines`,
-`oneRowMost`). The Greateraid pick,
-on the palette's black rather than the royal blue: its ribbon, smaller than the other
-screens' (26 on a 200 by 38 ribbon), the line under it in title lettering just under the ribbon, and on a blue
-banner below, 120 deep, its top where the drinker stands: the raised drink's name across the
-banner's top edge, in front of the drinker, lettered as the FLO meter's word (Bigdex, gold over
-cyan, plum and purple outline, unskewed, 16 high; "(Second Sip)" over it when it is one), the quote under
-it, 13, italic, at 0.7, and what the drink does under that in as many lines as it takes, at the
-largest of 20, 18, 16, 14 or 12 whose lines fit the banner (`TitleText.wrapped`,
-`PickScreen.layBlurb`); online the seconds in a blue round button, top right. The bottles carry
-no names and no arrow, and are drawn over everything on the screen: each vector drawn once at the
-size it's shown (`PickScreen.bottle`), the raised one grows and wears a thick white outline, one
+`oneRowMost`). The Greateraid pick (`PickScreen`), on the pause's black and glass, in the new UI, a column:
+"Greateraid" in FLO lettering; the drinker on their bench (`player_drinkchoice`, 2.5 points an
+art pixel by default, on the UI panel's DRINKER slider); Futuristic's rule 6; the raised drink's
+quote in the system italic, in the menus' blue at 0.8; what it does in the menus' face, at the
+largest of 12 down to 9 whose lines fit (prefixed "Second sip:" when it is one); and the bottles,
+smaller, each with its name in frame 12 over it, lit gold under the cursor: one line if it fits the
+frame's face, else two split only at a space where the longer line is shortest ("Quake-Up" over
+"Coffee"), at the largest size that fits; online the seconds top right in the menus' face. Each
+bottle's vector is drawn once at the size it's shown (`PickScreen.bottle`), the raised one grows
+and wears a thick white outline, one
 white silhouette baked from it (filled only where the copies drew, `sourceIn`) and drawn behind it
 as its child, so it takes the lean (sixteen recoloured copies of the vector drew as a broken
 second bottle). Offline, a biomorph drunk sets the debug POWER picker back to none: the picker's

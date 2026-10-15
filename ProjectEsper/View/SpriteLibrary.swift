@@ -86,8 +86,8 @@ final class SpriteLibrary {
     /// Pieces asked for that came out empty (a frame with no front arm), so they aren't made again
     /// every frame; dropped with the player's cache.
     private var emptyPieces: Set<String> = []
-    /// Debug: anything made on the main thread once play's begun, logged with its time, so what's
-    /// still first made mid-match can be named.
+    /// Debug: anything made on the main thread while a match is being played, logged with its
+    /// time, so what's still first made mid-match can be named. Set by the game scene each frame.
     var reportsMisses = false
     private func reportMiss(_ key: String, since start: Double) {
         guard reportsMisses, DebugUI.enabled, Thread.isMainThread else { return }

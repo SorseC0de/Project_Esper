@@ -3687,10 +3687,11 @@ final class GameScene: SKScene {
             if preloaded, warmFramesLeft == 0 {
                 warmNode.removeFromParent()
                 ready = true
-                sprites.reportsMisses = true
             }
             return
         }
+        // Only what's made once play is underway is a miss; loading and the screens build on purpose.
+        sprites.reportsMisses = flow == .playing
         guard let last = lastTime else { return }
         #if !os(tvOS)
         if mapEditor != nil || supportBuilder != nil {

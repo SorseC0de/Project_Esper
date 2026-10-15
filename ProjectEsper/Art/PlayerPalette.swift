@@ -118,7 +118,7 @@ struct Look: Hashable {
             // is, the back ones at two thirds of it: darker but not greyed, so they glow too.
             for (part, skin) in dressing.skin { colours[part] = skin }
             for part in HumanLook.clothed { colours[part] = part.isBack ? HumanLook.backClothes : HumanLook.clothes }
-            for part in dressing.glowing { colours[part] = part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow }
+            for part in dressing.glowing { colours[part] = part.isBack ? Look.backLimbTone(glow) : glow }
         } else {
             // The energy form: the body in the lighter colour of the earlier builds, the back
             // parts down its ramp as a human's back leg is; the sleeves and boots in the regular
@@ -127,7 +127,7 @@ struct Look: Hashable {
                 colours[part] = part.isBack ? Look.scaled(body, HumanLook.backLegShare) : body
             }
             for part in dressing.energyFormBare {
-                colours[part] = dressing.skin[part] ?? (part.isBack ? Look.scaled(glow, HumanLook.backLegShare) : glow)
+                colours[part] = dressing.skin[part] ?? (part.isBack ? Look.backLimbTone(glow) : glow)
             }
         }
         return Look(colours: colours, glow: glow, strokedGroups: Look.strokedGroups, energyForm: energyForm, body: body, dressing: dressing)
@@ -184,9 +184,24 @@ struct Look: Hashable {
         return channel(16) | channel(8) | channel(0)
     }
 
-    /// Orange and teal, as the two sides start, from `PixelPalette`.
-    static let orange: RGB = PixelPalette.orange
-    static let teal: RGB = PixelPalette.teal
+    /// The back sleeve, boot and shoe: the energy colour's own back tone, or for a colour not
+    /// among them (the ice's), two thirds of its brightness.
+    static func backLimbTone(_ glow: RGB) -> RGB {
+        EnergyColour.withGlow(glow)?.backLimbs ?? scaled(glow, HumanLook.backLegShare)
+    }
+
+    /// The hood's two tones: the energy colour where it's white, its hood shadow where it's grey.
+    /// A colour not among them (the ice's) is toned through its ramp.
+    var hoodTones: (plain: RGB, shadow: RGB) {
+        guard let colour = EnergyColour.withGlow(glow) else {
+            return (energyTone(luminance: SpriteLibrary.hoodLevel), energyTone(luminance: SpriteLibrary.hoodLevel * 0.75))
+        }
+        return (colour.glow, colour.hoodShadow)
+    }
+
+    /// Orange and light blue, as the two sides start.
+    static let orange: RGB = EnergyColour.orange.glow
+    static let teal: RGB = EnergyColour.teal.glow
     /// The bodies: the energy lifted two fifths of the way to white.
     static let lightOrange: RGB = lightened(orange, 0.4)
     static let lightTeal: RGB = lightened(teal, 0.4)
@@ -198,31 +213,40 @@ struct Look: Hashable {
     /// Frozen bodies and Frost Tea's ice clones: the front parts, the head and the torso's
     /// light in palette 57, the back parts and the torso's shadow (the pelvis) in 49, outlined in 22.
     static let ice: Look = {
-        let front = PixelPalette.colours[57], back = PixelPalette.colours[49]
+        let front = PixelPalette.aap64[57], back = PixelPalette.aap64[49]
         var colours: [BodyPart: RGB] = [:]
         for part in BodyPart.allCases { colours[part] = part.isBack || part == .pelvis ? back : front }
-        return Look(colours: colours, glow: front, outline: PixelPalette.colours[22], strokedGroups: Look.strokedGroups)
+        return Look(colours: colours, glow: front, outline: PixelPalette.aap64[22], strokedGroups: Look.strokedGroups)
     }()
 }
 
 /// The energy colours a player can pick on the title, each paired with its opposite: when
 /// two sides pick the same, the one that gives way takes the opposite.
 enum EnergyColour: String, CaseIterable, Codable {
-    case orange, teal, red, lime, pink, blue, gold, purple
+    /// Teal is light blue now (EDG64 has no teal), its name kept so saved picks still read.
+    case orange, teal, red, lime, green, pink, blue, gold, purple
 
-    /// The glow, from `PixelPalette`.
-    var glow: RGB {
+    /// Its three tones, `_Graphic Assets/Energy_Palette.png`: the glow, the hood's shadow, and
+    /// the back sleeve, boot and shoe.
+    var tones: (glow: RGB, hoodShadow: RGB, backLimbs: RGB) {
         switch self {
-        case .orange: PixelPalette.orange
-        case .teal: PixelPalette.teal
-        case .red: PixelPalette.red
-        case .lime: PixelPalette.lime
-        case .pink: PixelPalette.pink
-        case .blue: PixelPalette.blue
-        case .gold: PixelPalette.gold
-        case .purple: PixelPalette.colours[28]
+        case .red: (0xEA323C, 0xC42430, 0x891E2B)
+        case .orange: (0xFF5000, 0xC64524, 0x8E251D)
+        case .gold: (0xFFC825, 0xFFA214, 0xE07438)
+        case .lime: (0x99E65F, 0x5AC54F, 0x33984B)
+        case .green: (0x33984B, 0x1E6F50, 0x134C4C)
+        case .teal: (0x0CF1FF, 0x00CDF9, 0x0098DC)
+        case .blue: (0x0098DC, 0x0069AA, 0x00396D)
+        case .pink: (0xF389F5, 0xCA52C9, 0x93388F)
+        case .purple: (0x93388F, 0x622461, 0x3B1443)
         }
     }
+    var glow: RGB { tones.glow }
+    var hoodShadow: RGB { tones.hoodShadow }
+    var backLimbs: RGB { tones.backLimbs }
+
+    /// The colour a look's glow is, if it's one of these.
+    static func withGlow(_ glow: RGB) -> EnergyColour? { allCases.first { $0.glow == glow } }
 
     /// Its name, a gem's.
     var name: String {
@@ -233,6 +257,7 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .purple: "Amethyst"
         case .pink: "Morganite"
         case .lime: "Peridot"
+        case .green: "Emerald"
         case .teal: "Larimar"
         case .gold: "Citrine"
         }
@@ -242,22 +267,11 @@ enum EnergyColour: String, CaseIterable, Codable {
     var body: RGB { Look.lightened(glow, EnergyColour.bodyLift) }
     static let bodyLift = 0.33
 
-    /// The shade down its ramp in the pixel palette: the customize screen's second row.
-    var rampDown: RGB {
-        switch self {
-        case .red: PixelPalette.colours[4]
-        case .orange: PixelPalette.colours[5]
-        case .gold: PixelPalette.colours[6]
-        case .lime: PixelPalette.colours[12]
-        case .teal: PixelPalette.colours[19]
-        case .blue: PixelPalette.colours[17]
-        case .pink: PixelPalette.colours[28]
-        case .purple: PixelPalette.colours[29]
-        }
-    }
+    /// The shade down its ramp: the customize screen's second row, the hood's shadow.
+    var rampDown: RGB { hoodShadow }
 
     /// The customize screen's picker, round the colour wheel.
-    static let wheel: [EnergyColour] = [.red, .orange, .gold, .lime, .teal, .blue, .purple, .pink]
+    static let wheel: [EnergyColour] = [.red, .orange, .gold, .lime, .green, .teal, .blue, .purple, .pink]
 
     var opposite: EnergyColour {
         switch self {
@@ -269,6 +283,7 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .pink: .purple
         case .orange: .blue
         case .blue: .orange
+        case .green: .pink
         }
     }
 
@@ -290,7 +305,7 @@ enum EnergyColour: String, CaseIterable, Codable {
 enum BallLook {
     /// The loose ball is the neutral colour, palette 40, after a while in the colour of
     /// whoever last let it go.
-    static let neutral: RGB = PixelPalette.colours[40]
+    static let neutral: RGB = PixelPalette.aap64[40]
     /// Frames of the shift back to neutral once the ball has bounced and is nobody's.
     static let shiftFrames = 30
     /// The chevrons over a resting ball.
@@ -306,7 +321,7 @@ enum CourtLook {
     /// The floor and walls with nobody holding the ball; they take the holder's colour.
     static let neutral: RGB = shaded(BallLook.neutral)
     /// The one-way ledge in the middle: palette 39, shaded as the rest.
-    static let ledge: RGB = shaded(PixelPalette.colours[39])
+    static let ledge: RGB = shaded(PixelPalette.aap64[39])
 
     static func shaded(_ colour: RGB) -> RGB {
         func channel(_ shift: RGB) -> RGB {
@@ -329,21 +344,22 @@ enum CourtLook {
 enum HumanLook {
     /// The parts still in the energy's colours, which glow as energy does: the shoes.
     static let glowingParts: Set<BodyPart> = [.frontFoot, .backFoot]
-    /// The skins, as palette indexes: the lighter tone the front limbs', the darker the back's
-    /// (`_Design/skin-tones.md`). The hooded heads are drawn in the first and recoloured to each.
-    static let skinTones: [(front: Int, back: Int)] = [(36, 35), (24, 47), (47, 46), (35, 34), (34, 33), (33, 44), (38, 39)]
-    /// The fourth, the bodies' before the customize screen.
-    static let defaultSkinTone = 3
+    /// The skins, front and back (`_Design/notes.md`): the lighter tone the front limbs', the
+    /// darker the back's, each back the next skin's front. Three more are to be unlocked.
+    static let skinTones: [(front: RGB, back: RGB)] = [(0xF6CA9F, 0xE69C69), (0xE69C69, 0xBF6F4A), (0xBF6F4A, 0x8A4836),
+                                                       (0x8A4836, 0x5D2C28), (0x5D2C28, 0x391F21)]
+    /// The second, the bodies' before the customize screen.
+    static let defaultSkinTone = 1
     /// What shows bare with nothing over it: the head, the arms and hands, the lower legs.
     static let bareParts: Set<BodyPart> = [.head, .frontArm, .frontHand, .frontLeg, .backArm, .backHand, .backLeg]
     /// The back leg and foot's share of the energy colour's brightness.
     static let backLegShare = 0.66
-    /// The torso, pelvis and thighs, the same for every player: palette 41, the back thigh
-    /// the next down its ramp, 42.
+    /// The torso, pelvis and thighs, the same for every player, the bodysuit: #3D3D3D, the
+    /// back thigh the next down its ramp, #272727.
     static let clothed: Set<BodyPart> = [.torso, .pelvis, .frontThigh, .backThigh]
     /// What a human shows bare, but the head (the hooded head's own): in the energy form, the
     /// regular energy colour rather than the energy form's lighter one, glowing.
-    static let clothes = PixelPalette.colours[41], backClothes = PixelPalette.colours[42]
+    static let clothes: RGB = 0x3D3D3D, backClothes: RGB = 0x272727
 }
 
 /// What a player picked to wear on the customize screen: a skin tone, a frame of
@@ -379,13 +395,13 @@ struct Dressing: Hashable, Codable {
         return turned
     }
 
-    var tone: (front: Int, back: Int) { HumanLook.skinTones[min(max(skinTone, 0), HumanLook.skinTones.count - 1)] }
+    var tone: (front: RGB, back: RGB) { HumanLook.skinTones[min(max(skinTone, 0), HumanLook.skinTones.count - 1)] }
 
     /// The parts in skin, by the tone's front and back.
     var skin: [BodyPart: RGB] {
         var parts: [BodyPart: RGB] = [:]
         for part in HumanLook.bareParts.subtracting(covered) {
-            parts[part] = PixelPalette.colours[part.isBack ? tone.back : tone.front]
+            parts[part] = part.isBack ? tone.back : tone.front
         }
         return parts
     }

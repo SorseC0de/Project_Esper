@@ -347,7 +347,7 @@ final class GameScene: SKScene {
     private var lockoutClothes: [SKSpriteNode] = []
     private var lockoutHoods: [SKSpriteNode] = []
     private var greyedOut: Set<Int> = []
-    private static let lockoutGrey = PixelPalette.colours[39]
+    private static let lockoutGrey = PixelPalette.aap64[39]
     private var headShown: [CGPoint] = []
     /// Each body's lean in flight, radians, eased toward where it's going, and how much of
     /// the hover it's showing.
@@ -691,7 +691,7 @@ final class GameScene: SKScene {
     /// what glows through it; nil elsewhere (K&A's wash is under what it would touch).
     var waterTint: (top: RGB, bottom: RGB, alpha: CGFloat)? {
         switch match.stage.features.look {
-        case .hoopfishHideaway: (PixelPalette.colours[19], PixelPalette.colours[18], WaterTuning.overlayAlpha)
+        case .hoopfishHideaway: (PixelPalette.aap64[19], PixelPalette.aap64[18], WaterTuning.overlayAlpha)
         default: nil
         }
     }
@@ -1315,7 +1315,7 @@ final class GameScene: SKScene {
             glowers.addChild(chevron)
             chevrons.append(chevron)
         }
-        opponentChevron = SKSpriteNode(texture: sprites.outlinedSymbol("chevron.down", pointSize: 14, fill: .white, stroke: SKColor(rgb: PixelPalette.outline)))
+        opponentChevron = SKSpriteNode(texture: sprites.outlinedSymbol("chevron.down", pointSize: 14, fill: .white, stroke: SKColor(rgb: PixelPalette.aap64Outline)))
         opponentChevron.colorBlendFactor = 1
         opponentChevron.zPosition = 6
         opponentChevron.isHidden = true
@@ -2176,7 +2176,7 @@ final class GameScene: SKScene {
                 cover.anchorPoint = .zero
                 cover.position = CGPoint(x: -400, y: FieldArt.turfTop)
                 cover.size = CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 800, height: 2000)
-                cover.color = SKColor(rgb: PixelPalette.outline)
+                cover.color = SKColor(rgb: PixelPalette.aap64Outline)
                 cover.colorBlendFactor = 1
                 cover.zPosition = -12.5
                 stageGround.addChild(cover)
@@ -2282,7 +2282,7 @@ final class GameScene: SKScene {
         }
         // Under the floor's row, the outline black, all the way down and out.
         if !stage.features.scenic && !isElements {
-            let under = SKSpriteNode(color: SKColor(rgb: PixelPalette.outline), size: CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 4000, height: 2000))
+            let under = SKSpriteNode(color: SKColor(rgb: PixelPalette.aap64Outline), size: CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 4000, height: 2000))
             under.anchorPoint = CGPoint(x: 0.5, y: 1)
             under.position = CGPoint(x: CGFloat(stage.columns) * GameScene.pixelsPerTile / 2, y: 0)
             under.zPosition = -20
@@ -2562,7 +2562,7 @@ final class GameScene: SKScene {
         format.scale = 1
         let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
             for _ in 0..<streaks {
-                let colour = SKColor(rgb: PixelPalette.colours[Bool.random() ? 48 : 22])
+                let colour = SKColor(rgb: PixelPalette.aap64[Bool.random() ? 48 : 22])
                 colour.withAlphaComponent(.random(in: 0.2...1)).setFill()
                 let x = Int.random(in: 0..<side), y = Int.random(in: 0..<side)
                 let length = Int.random(in: 2...5)
@@ -2709,7 +2709,7 @@ final class GameScene: SKScene {
               Double.random(in: 0..<1) < GameScene.lightningDotsPerSecond * GameScene.stepSeconds else { return }
         let base = SpriteLibrary.point(warning.target)
         let dot = SKSpriteNode(texture: sprites.flatSquare(size: 4, alpha: 1))
-        dot.color = SKColor(rgb: PixelPalette.colours[22])
+        dot.color = SKColor(rgb: PixelPalette.aap64[22])
         dot.colorBlendFactor = 1
         dot.size = CGSize(width: 1, height: 1)
         dot.anchorPoint = .zero
@@ -2836,7 +2836,7 @@ final class GameScene: SKScene {
         format.scale = 1
         let height = 64
         let image = UIGraphicsImageRenderer(size: CGSize(width: 1, height: height), format: format).image { context in
-            let bottom = PixelPalette.colours[18], top = PixelPalette.colours[19]
+            let bottom = PixelPalette.aap64[18], top = PixelPalette.aap64[19]
             for row in 0..<height {
                 // Row 0 is the image's top.
                 let share = CGFloat(row) / CGFloat(height - 1)
@@ -8125,8 +8125,8 @@ final class GameScene: SKScene {
             // Taking a FLO orb, the whole body flashes its energy's own colour.
             let absorbing = floFlash.indices.contains(index) && floFlash[index] > 0
             let flashColour = absorbing ? SKColor(rgb: sprites.look(for: index).glow)
-                : parried ? SKColor(rgb: PixelPalette.colours[2])
-                : lockedOut ? SKColor(rgb: PixelPalette.outline) : SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
+                : parried ? SKColor(rgb: PixelPalette.aap64[2])
+                : lockedOut ? SKColor(rgb: PixelPalette.aap64Outline) : SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
             for (flash, source) in [(stunBodies[index], node), (stunHeads[index], headNodes[index])] {
                 flash.isHidden = !(stunned || lockedOut || absorbing) || source.isHidden
                 guard stunned || lockedOut || absorbing else { continue }
@@ -8343,9 +8343,8 @@ final class GameScene: SKScene {
                     : (player.power == .superSmoothie && player.state == .flying ? HoodStrings.streaming : HoodStrings.hanging)
                 // In the hood's colours: in FloState the energy form's, as its hood is.
                 let grey = SKColor(rgb: GameScene.lockoutGrey)
-                let plain = energyForm ? (look.body ?? look.glow) : look.energyTone(luminance: SpriteLibrary.hoodLevel)
-                let accent = energyForm ? Look.scaled(look.body ?? look.glow, GameScene.stringAccentLuminance)
-                    : look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel)
+                let plain = energyForm ? (look.body ?? look.glow) : look.hoodTones.plain
+                let accent = energyForm ? Look.scaled(look.body ?? look.glow, GameScene.stringAccentLuminance) : look.hoodTones.shadow
                 hoodStrings[index].step(anchors: HoodStrings.anchors(on: hood, scale: drawScale), style: style,
                                         facing: CGFloat(player.facing.sign), scale: drawScale, time: CACurrentMediaTime(),
                                         plain: lockoutOn ? grey : SKColor(rgb: plain),

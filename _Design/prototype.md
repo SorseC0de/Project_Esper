@@ -2712,3 +2712,15 @@ displays' white, #C7CFDD and #92A1B9 pixels are lit: tinted the court's colour b
 full brightness, so the neutral grey leaves them as drawn, and glowing; #657392, the pole, stays.
 The pieces are pictures only for now: what they do comes later, and the court's sim doesn't read
 the map's markers or walls yet.
+
+## The players on EDG64
+
+`PixelPalette.colours` is EDG64 in Aseprite's order (index 0 its transparent black); AAP-64 stays
+as `PixelPalette.aap64` (and `aap64Outline`) for the stages and effects not yet repainted, the
+Blazing Boba fireball's swaps among them. The players: outline #1A1932; bodysuit #3D3D3D, the
+back thigh #272727; five skins (`HumanLook.skinTones`, front and back, the second the default),
+the three locked ones left out; nine energy colours, each with three tones from
+`Energy_Palette.png` (`EnergyColour.tones`): the glow, the hood's shadow (the hood's greys, the
+strings' accent, the customize swatches' second tone) and the back sleeve, boot and shoe.
+Emerald (green) is new on the wheel between Peridot and Larimar, giving way to Morganite; teal is
+Larimar's light blue. The ice look keeps its AAP-64 colours.

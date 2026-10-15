@@ -193,7 +193,7 @@ enum ThreePointTuning {
 /// comes out in one of them at random.
 enum ZoneTuning {
     nonisolated(unsafe) static var inTheZone = false
-    static let colours: [RGB] = [7, 11, 19, 20, 27].map { PixelPalette.colours[$0] }
+    static let colours: [RGB] = [7, 11, 19, 20, 27].map { PixelPalette.aap64[$0] }
     static let stepSeconds = 0.25
 
     /// The outline's colour at `time`.
@@ -339,7 +339,7 @@ enum FloTuning {
     static let colours = Onomatopoeia.Colours(upper: EsperPalette.gold.highlight, lower: EsperPalette.blue.highlight,
                                               lineUpper: EsperPalette.plum.light, lineLower: EsperPalette.purple.shadow)
     /// Bar A's word short of full: palette 34 over 51, outlined as ever.
-    static let shortColours = Onomatopoeia.Colours(upper: PixelPalette.colours[34], lower: PixelPalette.colours[51],
+    static let shortColours = Onomatopoeia.Colours(upper: PixelPalette.aap64[34], lower: PixelPalette.aap64[51],
                                                    lineUpper: EsperPalette.plum.light, lineLower: EsperPalette.purple.shadow)
     /// The A/B test of the bar: A's missing FLO from the word's end on, MAX on the word's top
     /// outer corner, moved and sized on its sliders; B's missing from the far end back. Kept

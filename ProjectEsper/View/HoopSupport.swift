@@ -98,7 +98,7 @@ enum HoopSupport {
                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
               let pixels = context.data?.bindMemory(to: UInt8.self, capacity: width * height * 4) else { return nil }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let swaps = [PixelPalette.colours[40]: PixelPalette.colours[41], PixelPalette.colours[41]: PixelPalette.colours[42]]
+        let swaps = [PixelPalette.aap64[40]: PixelPalette.aap64[41], PixelPalette.aap64[41]: PixelPalette.aap64[42]]
         for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] == 255 {
             let index = pixel * 4
             let rgb = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])

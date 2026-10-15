@@ -5,12 +5,12 @@ import SpriteKit
 /// lava along the bottom, and a sprite for every tile the map has placed, cut from the tileset.
 enum ElementsArt {
     /// The flat colour behind everything: palette 29.
-    static let background: RGB = PixelPalette.colours[17]
+    static let background: RGB = PixelPalette.aap64[17]
     static let tileSide: CGFloat = 16
     static let lavaFrames = 8
     /// The lava's orange below its surface, and the deep purple inside the ceiling's rock.
-    static let lavaOrange: RGB = PixelPalette.colours[6]
-    static let ceilingPurple: RGB = PixelPalette.colours[30]
+    static let lavaOrange: RGB = PixelPalette.aap64[6]
+    static let ceilingPurple: RGB = PixelPalette.aap64[30]
     static let lavaSide: CGFloat = 48
     /// Seconds a lava frame shows.
     static let lavaFrameSeconds = 0.18

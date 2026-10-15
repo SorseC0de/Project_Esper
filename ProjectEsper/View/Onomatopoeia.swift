@@ -164,14 +164,14 @@ enum Onomatopoeia {
             let spelling = spelling
             let lettering = Onomatopoeia.lettering
             let japanese = lettering.plainBangs ? spelling.japanese.replacingOccurrences(of: "！", with: "!") : spelling.japanese
-            let line = PixelPalette.colours[Onomatopoeia.lineIndex]
+            let line = PixelPalette.aap64[Onomatopoeia.lineIndex]
             let text = switch Onomatopoeia.language {
             case .english: spelling.english
             case .japanese: japanese
             case .spanish: spelling.spanish
             }
             return Word(text: text, lettering: lettering,
-                        colours: Colours(upper: PixelPalette.colours[spelling.upper], lower: PixelPalette.colours[spelling.lower],
+                        colours: Colours(upper: PixelPalette.aap64[spelling.upper], lower: PixelPalette.aap64[spelling.lower],
                                          lineUpper: line, lineLower: line),
                         height: spelling.height, growsLeft: growsLeft)
         }

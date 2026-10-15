@@ -629,10 +629,10 @@ struct CustomizeScreen: View {
             // Ring 3 round a disc of the two tones, split corner to corner.
             let side = frame.height * CustomizeScreen.tickShare
             ZStack {
-                Color(rgb: PixelPalette.colours[pick.dressing.tone.back])
+                Color(rgb: pick.dressing.tone.back)
                     .overlay {
                         VStack(spacing: 0) {
-                            Color(rgb: PixelPalette.colours[pick.dressing.tone.front])
+                            Color(rgb: pick.dressing.tone.front)
                             Color.clear
                         }
                         .scaleEffect(1.5)
@@ -706,7 +706,7 @@ struct CustomizeScreen: View {
         .frame(width: side, height: side)
     }
     /// The tick's blip: teal, half the ring across, as the Rounds lights are in theirs.
-    static let tickBlip: RGB = PixelPalette.teal
+    static let tickBlip: RGB = EnergyColour.teal.glow
     static let tickBlipShare: CGFloat = 0.5
     /// The skin's disc inside ring 3, this share of the ring across.
     static let skinDiscShare: CGFloat = 0.6
@@ -805,7 +805,7 @@ struct CustomizeScreen: View {
         default: nil
         }
         let columns: [(top: RGB, accent: RGB)] = skin
-            ? HumanLook.skinTones.map { (PixelPalette.colours[$0.front], PixelPalette.colours[$0.back]) }
+            ? HumanLook.skinTones.map { ($0.front, $0.back) }
             : EnergyColour.wheel.map { ($0.glow, $0.rampDown) }
         let picked = skin ? pick.dressing.skinTone : (EnergyColour.wheel.firstIndex(of: flow.customizations[player].energy) ?? 0)
         let inner = CGSize(width: frame.width * 0.84, height: frame.height * 0.6)
@@ -1123,8 +1123,8 @@ struct CustomizeFigure: View {
                                  in: CGRect(x: at.x - side / 2, y: at.y - side / 2, width: side, height: side))
                 }
                 if let overBall { context.draw(Image(decorative: overBall, scale: 1).interpolation(.none), in: figureRect) }
-                let plain = Color(rgb: look.energyTone(luminance: SpriteLibrary.hoodLevel))
-                let accent = Color(rgb: look.energyTone(luminance: GameScene.stringAccentLuminance * SpriteLibrary.hoodLevel))
+                let plain = Color(rgb: look.hoodTones.plain)
+                let accent = Color(rgb: look.hoodTones.shadow)
                 for string in motion.strings {
                     let at = spot(string.point)
                     context.fill(Path(CGRect(x: at.x - pixel / 2, y: at.y - pixel / 2, width: pixel, height: pixel)), with: .color(string.accent ? accent : plain))

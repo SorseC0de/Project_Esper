@@ -361,20 +361,20 @@ final class ZonesPlay {
     /// The phantom colours: one a move.
     static func colour(of kind: ZoneAction.Kind) -> RGB {
         switch kind {
-        case .move: PixelPalette.colours[5]
-        case .jump: PixelPalette.colours[19]
-        case .doubleJump: PixelPalette.colours[20]
-        case .wallJump: PixelPalette.colours[18]
-        case .crouch: PixelPalette.colours[34]
-        case .slide: PixelPalette.colours[7]
-        case .taunt: PixelPalette.colours[27]
-        case .throwBall: PixelPalette.colours[8]
-        case .catchBall: PixelPalette.colours[10]
-        case .floStateOn: PixelPalette.colours[22]
-        case .floStateOff: PixelPalette.colours[39]
-        case .power: PixelPalette.colours[28]
-        case .shoot: PixelPalette.colours[12]
-        case .dunk: PixelPalette.colours[13]
+        case .move: PixelPalette.aap64[5]
+        case .jump: PixelPalette.aap64[19]
+        case .doubleJump: PixelPalette.aap64[20]
+        case .wallJump: PixelPalette.aap64[18]
+        case .crouch: PixelPalette.aap64[34]
+        case .slide: PixelPalette.aap64[7]
+        case .taunt: PixelPalette.aap64[27]
+        case .throwBall: PixelPalette.aap64[8]
+        case .catchBall: PixelPalette.aap64[10]
+        case .floStateOn: PixelPalette.aap64[22]
+        case .floStateOff: PixelPalette.aap64[39]
+        case .power: PixelPalette.aap64[28]
+        case .shoot: PixelPalette.aap64[12]
+        case .dunk: PixelPalette.aap64[13]
         }
     }
 

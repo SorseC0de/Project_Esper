@@ -92,7 +92,7 @@ enum KAndAArt {
         var cones: [SKSpriteNode] = []
     }
     /// Past the stage's edges: palette 30, the sky's own top.
-    static let beyond: RGB = PixelPalette.colours[30]
+    static let beyond: RGB = PixelPalette.aap64[30]
     static let backdropZ: CGFloat = -7.8
     /// The sky under it, and its clouds between the two.
     static let skyZ: CGFloat = backdropZ - 0.2
@@ -156,7 +156,7 @@ enum KAndAArt {
     static let coneAlpha: CGFloat = 0.12
     /// Each cone half an art pixel right of its lamp's middle, so it sits square under the drawn lamp.
     static let coneNudge: CGFloat = 0.5
-    static let coneColour = SKColor(rgb: PixelPalette.colours[7])
+    static let coneColour = SKColor(rgb: PixelPalette.aap64[7])
     /// The cones over the wash, so the lights shine through it, and under the players.
     static let coneZ: CGFloat = washZ + 0.1
     /// The wash over the stage's art: palette 30 at a tenth, on the camera, under the players
@@ -267,7 +267,7 @@ enum FlightB411Art {
     }
 
     /// Past the stage's edges, above, below and beside it as it leans: palette 30.
-    static let beyond: RGB = PixelPalette.colours[30]
+    static let beyond: RGB = PixelPalette.aap64[30]
     /// Under everything else on the stage; the pictures' pixels to an art pixel.
     static let backdropZ: CGFloat = -7.8
     static let backdropScale: CGFloat = 4
@@ -491,7 +491,7 @@ enum FlightB411Art {
         if let made = multiplierSigns[key] { return made }
         let text = "\(times)X" as NSString
         let font = UIFont(name: "AvenirNextCondensed-Heavy", size: 30) ?? UIFont.boldSystemFont(ofSize: 30)
-        let rgb = PixelPalette.colours[lit ? 7 : 33]
+        let rgb = PixelPalette.aap64[lit ? 7 : 33]
         let colour = UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255, blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colour]
         let measured = text.size(withAttributes: attributes)
@@ -520,7 +520,7 @@ enum FlightB411Art {
     static let seatbeltOff: SKTexture = {
         guard let image = UIImage(named: "FlightB411Seatbelt")?.cgImage else { return seatbelt }
         let width = image.width, height = image.height
-        let red = PixelPalette.colours[2], gold = PixelPalette.colours[33]
+        let red = PixelPalette.aap64[2], gold = PixelPalette.aap64[33]
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         let made: CGImage? = pixels.withUnsafeMutableBytes { bytes in
             guard let context = CGContext(data: bytes.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
@@ -618,8 +618,8 @@ enum FlightB411Art {
     static let planeAlpha: CGFloat = 0.2
     /// The hoopcase's suitcase in brown, anyone's: its light grey (palette 39) as palette 34, its
     /// dark grey (40) as 33.
-    static let caseLight: RGB = PixelPalette.colours[34]
-    static let caseDark: RGB = PixelPalette.colours[33]
+    static let caseLight: RGB = PixelPalette.aap64[34]
+    static let caseDark: RGB = PixelPalette.aap64[33]
     /// The plane's size against the stage's width, the PLANE SCALE slider's, kept; 3 baked.
     static let planeScaleKey = "esper.flightB411.planeScale"
     nonisolated(unsafe) static var planeScale: CGFloat = {

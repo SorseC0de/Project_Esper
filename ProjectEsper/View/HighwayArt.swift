@@ -89,7 +89,7 @@ enum HighwayArt {
         context.draw(source, in: CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight))
         guard let data = context.data?.bindMemory(to: UInt8.self, capacity: canvasWidth * canvasHeight * 4) else { return nil }
         let solid = (0..<(canvasWidth * canvasHeight)).map { data[$0 * 4 + 3] >= 128 }
-        let colour = PixelPalette.outline
+        let colour = PixelPalette.aap64Outline
         for pixel in 0..<(canvasWidth * canvasHeight) {
             let x = pixel % canvasWidth, y = pixel / canvasWidth
             var edge = false

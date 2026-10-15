@@ -127,7 +127,7 @@ struct SettingsScreen: View {
         case .daruma: .englishDarumadrop
         case .dela: .englishDela
         }
-        let line = PixelPalette.colours[Onomatopoeia.lineIndex]
+        let line = PixelPalette.aap64[Onomatopoeia.lineIndex]
         let word = Onomatopoeia.picture("STYLE " + String(UnicodeScalar(UInt8(65 + letter))), face: face,
                                         colours: Onomatopoeia.Colours(upper: 0xFFFFFF, lower: EsperPalette.blue.highlight, lineUpper: line, lineLower: line),
                                         growsLeft: false, height: height)

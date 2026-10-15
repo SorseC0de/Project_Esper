@@ -1,10 +1,27 @@
 import Foundation
 
-/// `_Graphic Assets/Pixel_Palette.png`, AAP-64: the game's pixel palette, for everything
-/// drawn in the world. The interface has its own, `EsperPalette`.
+/// EDG64 (`~/Library/Application Support/Aseprite/palettes/EDG64.aseprite`): the game's pixel
+/// palette, for everything drawn in the world. In Aseprite's order, index 0 its transparent
+/// black, so an index here is the one Aseprite shows (59, the Wreck Center's tiles, #5D5D5D).
 enum PixelPalette {
-    /// All 64, in the palette's order, left to right, top to bottom.
     static let colours: [RGB] = [
+        0x000000, 0xF9E6CF, 0xF6CA9F, 0xE69C69, 0xBF6F4A, 0x8A4836, 0x5D2C28, 0x391F21,
+        0x1C121C, 0x0E071B, 0x1A1932, 0x2A2F4E, 0x424C6E, 0x657392, 0x92A1B9, 0xC7CFDD,
+        0xFFFFFF, 0x94FDFF, 0x0CF1FF, 0x00CDF9, 0x0098DC, 0x0069AA, 0x00396D, 0x03193F,
+        0x0C2E44, 0x134C4C, 0x1E6F50, 0x33984B, 0x5AC54F, 0x99E65F, 0xD3FC7E, 0xFF5000,
+        0xED7614, 0xFFA214, 0xFFC825, 0xFFEB57, 0xEDAB50, 0xE07438, 0xC64524, 0x8E251D,
+        0x571C27, 0x891E2B, 0xC42430, 0xEA323C, 0xF5555D, 0xF68187, 0xC85086, 0xCA52C9,
+        0x93388F, 0x622461, 0x3B1443, 0x0C0293, 0x3003D9, 0x7A09FA, 0xDB3FFD, 0xF389F5,
+        0xFDD2ED, 0xB4B4B4, 0x858585, 0x5D5D5D, 0x3D3D3D, 0x272727, 0x1B1B1B, 0x131313,
+        0xFF0040,
+    ]
+
+    /// The players' outline.
+    static let outline: RGB = 0x1A1932
+
+    /// AAP-64 (`_Graphic Assets/Pixel_Palette.png`), the palette before: the stages not yet
+    /// repainted in EDG64 are still drawn in it, and so is what's drawn in code to match them.
+    static let aap64: [RGB] = [
         0x060608, 0x141013, 0x3B1725, 0x73172D, 0xB4202A, 0xDF3E23, 0xFA6A0A, 0xF9A31B,
         0xFFD541, 0xFFFC40, 0xD6F264, 0x9CDB43, 0x59C135, 0x14A02E, 0x1A7A3E, 0x24523B,
         0x122020, 0x143464, 0x285CC4, 0x249FDE, 0x20D6C7, 0xA6FCDB, 0xFFFFFF, 0xFEF3C0,
@@ -14,18 +31,8 @@ enum PixelPalette {
         0xE3E6FF, 0xB9BFFB, 0x849BE4, 0x588DBE, 0x477D85, 0x23674E, 0x328464, 0x5DAF8D,
         0x92DCBA, 0xCDF7E2, 0xE4D2AA, 0xC7B08B, 0xA08662, 0x796755, 0x5A4E44, 0x423934
     ]
-
-    static let teal: RGB = 0x20D6C7
-    static let pink: RGB = 0xBC4A9B
-    static let orange: RGB = 0xFA6A0A
-    static let lime: RGB = 0x9CDB43
-    static let blue: RGB = 0x285CC4
-    static let gold: RGB = 0xF9A31B
-    static let red: RGB = 0xDF3E23
-    /// The loose ball's purple.
-    static let purple: RGB = 0x793A80
-    /// Surf Soda's darker colour: its darker bubbles and the board's tail.
+    /// Outlines drawn in code in the AAP-64 stages.
+    static let aap64Outline: RGB = 0x242234
+    /// Surf Soda's darker colour, AAP-64's: its darker bubbles and the board's tail.
     static let plumDark: RGB = 0x403353
-    /// Outlines drawn in code in the world.
-    static let outline: RGB = 0x242234
 }

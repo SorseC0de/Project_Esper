@@ -264,9 +264,9 @@ final class SpriteLibrary {
     /// Blazing Boba's fireball: the basketball's every shade a step up the fire ramp, its seams
     /// gold and its outline orange, so it reads hot rather than as the ball.
     private(set) lazy var basketballFireFrames: [SKTexture] = basketballFrames.map { frame in
-        let swaps: [RGB: RGB] = [PixelPalette.colours[7]: PixelPalette.colours[9], PixelPalette.colours[6]: PixelPalette.colours[8],
-                                 PixelPalette.colours[5]: PixelPalette.colours[7], PixelPalette.colours[33]: PixelPalette.colours[7],
-                                 PixelPalette.colours[43]: PixelPalette.colours[6]]
+        let swaps: [RGB: RGB] = [PixelPalette.aap64[7]: PixelPalette.aap64[9], PixelPalette.aap64[6]: PixelPalette.aap64[8],
+                                 PixelPalette.aap64[5]: PixelPalette.aap64[7], PixelPalette.aap64[33]: PixelPalette.aap64[7],
+                                 PixelPalette.aap64[43]: PixelPalette.aap64[6]]
         let picture = frame.cgImage()
         let width = picture.width, height = picture.height
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
@@ -721,6 +721,8 @@ final class SpriteLibrary {
 
     /// The hood's greys a touch down the ramp, nearer the legs' plain colour.
     static let hoodLevel = 0.9
+    /// The skin `player_hoodheads_v2` is drawn in, AAP-64's first, swapped for the player's.
+    static let hoodHeadsSkin: (front: RGB, back: RGB) = (0xF4D29C, 0xDBA463)
 
     /// The hooded head, a frame of `player_hoodheads` for one skin: its hood, the white and the
     /// cool greys, toned through the player's energy ramp, the skin left as drawn; and the hood
@@ -737,13 +739,10 @@ final class SpriteLibrary {
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
         let source = flowing.map { atlas.textureNamed("player_flowing_hood_\($0)") } ?? SpriteLibrary.hoodSource(skin: skin, view: view)
-        // Every view drawn in the first skin: its two tones swapped for this one's.
-        var faceSwaps: [RGB: RGB] = [:]
-        let drawnFrom = HoodView.drawnInSkin
-        if drawnFrom != skin {
-            let from = HumanLook.skinTones[drawnFrom], to = HumanLook.skinTones[skin]
-            faceSwaps = [PixelPalette.colours[from.front]: PixelPalette.colours[to.front], PixelPalette.colours[from.back]: PixelPalette.colours[to.back]]
-        }
+        // Every view drawn in one skin, its two tones swapped for this one's: the flowing hood in
+        // the first, the turned heads still in AAP-64's first.
+        let from = flowing == nil ? SpriteLibrary.hoodHeadsSkin : HumanLook.skinTones[0], to = HumanLook.skinTones[min(max(skin, 0), HumanLook.skinTones.count - 1)]
+        let faceSwaps: [RGB: RGB] = from == to ? [:] : [from.front: to.front, from.back: to.back]
         let image = source.cgImage()
         let width = image.width, height = image.height
         let look = look(for: player)
@@ -775,8 +774,11 @@ final class SpriteLibrary {
             let grey = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
             if energy, let body = look.body {
                 paint(pixels, index, Look.scaled(body, min(grey, 1)))
-            } else {
+            } else if player == SpriteLibrary.icePlayer {
                 paint(pixels, index, look.energyTone(luminance: min(grey * SpriteLibrary.hoodLevel, 1)))
+            } else {
+                // White the energy colour, the greys its hood shadow.
+                paint(pixels, index, red == 255 && green == 255 && blue == 255 ? look.hoodTones.plain : look.hoodTones.shadow)
             }
         }
         let made = [context, hoodContext, faceContext].map { context -> SKTexture in
@@ -849,7 +851,7 @@ final class SpriteLibrary {
            let (sourceContext, sourcePixels) = makeCanvas(width: source.width, height: source.height) {
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
             sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: source.width, height: source.height))
-            let towel: Set<RGB> = [PixelPalette.colours[22], PixelPalette.colours[37]]
+            let towel: Set<RGB> = [0xFFFFFF, 0xC7CFDD]
             for pixel in 0..<(min(image.width, source.width) * min(image.height, source.height)) where sourcePixels[pixel * 4 + 3] == 255 {
                 let index = pixel * 4
                 let colour = RGB(sourcePixels[index]) << 16 | RGB(sourcePixels[index + 1]) << 8 | RGB(sourcePixels[index + 2])
@@ -1440,8 +1442,7 @@ final class SpriteLibrary {
             for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
                 // The back hand's colour: the skin's back tone, or the ice look's back colour; in
                 // FloState the skin's, as its face is.
-                paint(pixels, pixel * 4, look.energyForm ? PixelPalette.colours[look.dressing.tone.back]
-                      : look.colours[.backHand] ?? PixelPalette.colours[look.dressing.tone.back])
+                paint(pixels, pixel * 4, look.energyForm ? look.dressing.tone.back : look.colours[.backHand] ?? look.dressing.tone.back)
             }
         }
         if !look.energyForm, hood == nil {
@@ -1802,7 +1803,6 @@ enum EnergyEffect: CaseIterable {
 /// third frames, drawn in the first skin and swapped into the others'). Frames 0-based.
 enum HoodView {
     static let count = 3
-    static let drawnInSkin = 0
     static let frames: [Animation: [Int: Int]] = [
         .esperSlashFloState: [1: 1, 2: 2, 3: 2, 4: 1],
         .dunk: [0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1],

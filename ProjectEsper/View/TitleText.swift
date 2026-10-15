@@ -68,7 +68,7 @@ enum TitleText {
         if let texture = cache[key] { return texture }
         let font = UIFont(name: "AvenirNextCondensed-Heavy", size: size) ?? font(size: size, italic: false)
         func colour(_ index: Int) -> UIColor {
-            let rgb = PixelPalette.colours[index]
+            let rgb = PixelPalette.aap64[index]
             return UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255, blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
         }
         let line = (text as NSString).size(withAttributes: [.font: font]).height

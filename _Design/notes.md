@@ -20,12 +20,3 @@ choice of several colours, and above all the blues AAP-64 lacks.
   standing on the ground. Ground-only sheets (idle, walk, run, land, crouch) by a per-sheet list
   when the frame's recoloured; sheets used both standing and in the air (the layup, the slash)
   need a ground line and an air line, picked each frame by whether the body's grounded.
-
-## Next round of revisions (low priority)
-
-- **H.O.O.D lettering on the customize screen:** two tones of the side's energy colour, where
-  now it's teal over the energy colour for every side. The current bottom (the energy colour)
-  becomes the top, and a darker tone of it the bottom.
-- **Customize tick blips too small:** they're 0.4 of ring 8 across (`CustomizeScreen.tickBlipShare`);
-  the Rounds lights in the same ring are right at 0.5 (`GameScene.roundLightShare`, of the radius,
-  so half the ring across). Match them.

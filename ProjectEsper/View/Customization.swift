@@ -491,9 +491,12 @@ struct CustomizeScreen: View {
         FloText(text, height: height, fontName: ownFace ? font.fontName : nil, maxWidth: maxWidth, spacing: spacing, colours: colours)
     }
 
-    /// Bigdex as `title`, its lower half in `lower`.
-    private func twoTone(_ text: String, size: CGFloat, lower: RGB) -> some View {
-        title(text, size: size, face: .bigdex)
+    /// Bigdex as `title`, in `upper`, its lower half in `lower`.
+    private func twoTone(_ text: String, size: CGFloat, upper: RGB, lower: RGB) -> some View {
+        Text(text)
+            .font(.custom(CustomizeFont.bigdex.fontName, size: size))
+            .foregroundStyle(Color(rgb: upper))
+            .fixedSize()
             .overlay {
                 Text(text)
                     .font(.custom(CustomizeFont.bigdex.fontName, size: size))
@@ -674,7 +677,7 @@ struct CustomizeScreen: View {
                 ForEach(Array(CustomizeScreen.hoodWords.enumerated()), id: \.offset) { index, word in
                     VStack(spacing: size.height * 0.004) {
                         twoTone(String(word.prefix(1)) + (index < CustomizeScreen.hoodWords.count - 1 ? "." : ""), size: size.height * 0.08,
-                                lower: pick.look.bright)
+                                upper: pick.look.bright, lower: pick.energy.rampDown)
                         subtitle(word, size: size.height * CustomizeScreen.hoodWordShare)
                     }
                     .fixedSize()
@@ -702,9 +705,9 @@ struct CustomizeScreen: View {
         }
         .frame(width: side, height: side)
     }
-    /// The tick's blip: teal, this share of the ring across, inside its hole.
+    /// The tick's blip: teal, half the ring across, as the Rounds lights are in theirs.
     static let tickBlip: RGB = PixelPalette.teal
-    static let tickBlipShare: CGFloat = 0.4
+    static let tickBlipShare: CGFloat = 0.5
     /// The skin's disc inside ring 3, this share of the ring across.
     static let skinDiscShare: CGFloat = 0.6
 

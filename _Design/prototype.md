@@ -611,7 +611,10 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   energy colour; `GameScene.beamChargeSheet`), turns between the hands as the blast sheet draws
   them (their parts' middles) through the charge; the throw keeps `esper_charge`. It and the
   kept charge's hands glow over the body, cut out of the body's mask (`cutOutSnapshots`); the
-  hood tipped with the aim is moved BEAM HEAD X and Y art pixels at the full tip, in proportion. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
+  hood tips only while it fires, level through the charge; aimed down it turns `downTurn` (2)
+  times as far as up, and it's moved to sit on the neck in proportion to the tip, up 0 and 6
+  art pixels at the full tip, down 0 and -4 (`BeamHeadTuning`, on the BEAM UP and DOWN sliders).
+  The blast's arms are drawn in the figure over the hood, not on the body, under it. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
   firing, 3 to 7 round and round with `player_blast_arms` over them, turned with the aim about where the
   arms meet the body (31.5, 33.5 up on its canvas, 17.5 over the feet), aligned on 3 and a pixel
   right and two down on the even frames, 4 and 6; after, 8 and 9 (`recoveryFrames`), no beam,
@@ -2682,3 +2685,6 @@ Nothing on a menu grows under the cursor any more, the gold's enough (the Greate
 which don't change colour, still rise); the customize screen's START off the cursor is dimmed,
 its rings at half and still, its lettering in gold's and blue's shadows; the title's speaker
 wears the gear's frame turned round.
+The customize screen's boxes: ring 8 in each, a teal blip half its width when ticked (as the
+Rounds lights are); the skin's box ring 3 round a disc of its two tones split at 45 degrees; the
+H.O.O.D letters in the side's energy colour over its shade down the ramp.

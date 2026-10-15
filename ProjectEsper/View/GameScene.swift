@@ -372,13 +372,15 @@ final class GameScene: SKScene {
     private static let blastShoulder = CGSize(width: -0.5, height: 17.5)
     /// The firing loop's even frames, 4 and 6, have the body a pixel right and two down.
     private static let blastEvenFrameShift = CGPoint(x: 1, y: -2)
+    /// In the figure, over the hood: on the body itself they were drawn with it, under the hood.
     private func blastArms(_ index: Int, on body: SKSpriteNode) -> SKSpriteNode {
-        if let arms = blastArmNodes[index], arms.parent === body { return arms }
+        guard let figure = body.parent else { return SKSpriteNode() }
+        if let arms = blastArmNodes[index], arms.parent === figure { return arms }
         let arms = SKSpriteNode()
         arms.anchorPoint = GameScene.blastArmsAnchor
-        arms.zPosition = 0.2
+        arms.zPosition = GameScene.hoodUpZ + 0.002
         arms.isHidden = true
-        body.addChild(arms)
+        figure.addChild(arms)
         blastArmNodes[index] = arms
         return arms
     }
@@ -3550,8 +3552,11 @@ final class GameScene: SKScene {
         // The meters in the corners: how far in, and the whole meter's scale.
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "BEAM HEAD X", range: -12...12, notch: 1, value: Float(BeamHeadTuning.x)) { BeamHeadTuning.x = CGFloat($0) }
-        controls.addSlider(title: "BEAM HEAD Y", range: -12...12, notch: 1, value: Float(BeamHeadTuning.y)) { BeamHeadTuning.y = CGFloat($0) }
+        controls.addSlider(title: "BEAM UP X", range: -12...12, notch: 1, value: Float(BeamHeadTuning.upX)) { BeamHeadTuning.upX = CGFloat($0) }
+        controls.addSlider(title: "BEAM UP Y", range: -12...12, notch: 1, value: Float(BeamHeadTuning.upY)) { BeamHeadTuning.upY = CGFloat($0) }
+        controls.addSlider(title: "BEAM DOWN X", range: -12...12, notch: 1, value: Float(BeamHeadTuning.downX)) { BeamHeadTuning.downX = CGFloat($0) }
+        controls.addSlider(title: "BEAM DOWN Y", range: -12...12, notch: 1, value: Float(BeamHeadTuning.downY)) { BeamHeadTuning.downY = CGFloat($0) }
+        controls.addSlider(title: "BEAM DOWN TURN", range: 1...4, notch: 0.25, value: Float(BeamHeadTuning.downTurn)) { BeamHeadTuning.downTurn = CGFloat($0) }
         controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
         if !ParkedSliders.flo {
             controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
@@ -8025,8 +8030,12 @@ final class GameScene: SKScene {
                 arms.size = arms.texture!.size().scaled(by: drawScale)
                 // On the firing loop's even frames the body's shifted: the arms with it.
                 let shift = frame.frame % 2 == 0 ? GameScene.blastEvenFrameShift : .zero
-                arms.position = CGPoint(x: (GameScene.blastShoulder.width + shift.x) * drawScale, y: (GameScene.blastShoulder.height + shift.y) * drawScale)
-                arms.zRotation = CGFloat(player.beamAim)
+                // Where the body would put them, turned with its facing.
+                let facing = CGFloat(player.facing.sign)
+                arms.position = node.position + CGPoint(x: (GameScene.blastShoulder.width + shift.x) * drawScale * facing,
+                                                        y: (GameScene.blastShoulder.height + shift.y) * drawScale)
+                arms.xScale = facing
+                arms.zRotation = CGFloat(player.beamAim) * facing
             }
             // In the throw stance's parry frames, and growing, white.
             let tint: SKColor = .white
@@ -8226,8 +8235,10 @@ final class GameScene: SKScene {
                 let rising = player.velocity.y > FlightSheet.still || ahead > FlightSheet.still
                 // Z Tea's beam aimed up, the head tips back with it, down, forward: as far as
                 // flying's tip at the aim's limit.
-                let aiming = player.state == .beamCharging || player.state == .beamFiring
-                let wantedTip: CGFloat = aiming ? CGFloat(player.beamAim / ZRules.aimRange) * GameScene.flightHeadTip
+                // Only firing: through the charge it stays level.
+                let aiming = player.firingBeam
+                let aimShare = CGFloat(player.beamAim / ZRules.aimRange)
+                let wantedTip: CGFloat = aiming ? aimShare * GameScene.flightHeadTip * (aimShare < 0 ? BeamHeadTuning.downTurn : 1)
                     : player.state != .flying ? 0
                     : (diving ? -GameScene.flightHeadTip : (rising ? GameScene.flightHeadTip : 0))
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
@@ -8239,11 +8250,15 @@ final class GameScene: SKScene {
                     let tip = headTip[index, default: 0]
                     turn(hood, about: middle, by: (tip - sheetTurn) * CGFloat(player.facing.sign), scale: drawScale)
                     hood.position.y -= GameScene.flightHeadDrop * abs(tip) / GameScene.flightHeadTip * drawScale
-                    // Aiming the beam, moved to sit on the neck as it tips (`BeamHeadTuning`).
+                    // Firing the beam, moved to sit on the neck as it tips, up and down each their own
+                    // way (`BeamHeadTuning`), in proportion to the tip.
                     if aiming {
                         let share = tip / GameScene.flightHeadTip
-                        hood.position.x += BeamHeadTuning.x * share * CGFloat(player.facing.sign) * drawScale
-                        hood.position.y += BeamHeadTuning.y * share * drawScale
+                        let up = share >= 0
+                        let amount = up ? share : -share / BeamHeadTuning.downTurn
+                        let move = up ? CGPoint(x: BeamHeadTuning.upX, y: BeamHeadTuning.upY) : CGPoint(x: BeamHeadTuning.downX, y: BeamHeadTuning.downY)
+                        hood.position.x += move.x * amount * CGFloat(player.facing.sign) * drawScale
+                        hood.position.y += move.y * amount * drawScale
                     }
                 }
             } else {

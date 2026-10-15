@@ -153,6 +153,10 @@ public struct Stage: Equatable {
         features.dunks && hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
     }
 
+    /// The Wreck Center's belts, the top a body or the ball rides along and which way, and its
+    /// one-way platforms, standable only while they're still (`WreckCenter.swift`).
+    public var conveyors: [Conveyor] = []
+    public var dropPlatforms: [DropPlatform] = []
     /// Where Hoopfish Hideaway's Hoopfish starts, its picture's bottom left.
     public var hoopfishStart: Vec2?
     /// ZONES: the Hoopfish swims in place where it starts, the rim on its antenna from the off.
@@ -687,7 +691,7 @@ public struct Stage: Equatable {
         let rows = (8 + shift.up)...(9 + shift.up)
         stage.fill(.solid, columns: max(1 - shift.toWall, 1)...(4 - shift.toWall), rows: rows)
         stage.fill(.solid, columns: (29 + shift.toWall)...min(32 + shift.toWall, 32), rows: rows)
-        stage.fill(.oneWay, columns: 15...18, rows: 3...3)
+        stage.layWreckCenterPieces(StageMap.current[.wreckCenter].props)
         let underside = Double(rows.lowerBound) * tileSize
         for hoop in stage.hoops {
             let side = hoop.backboard.sign

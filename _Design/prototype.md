@@ -2711,8 +2711,26 @@ a 16-pixel cell: the one-way platform (8 frames), conveyor L, M and R, the same 
 (32 by 32), 4 frames each; all of them at 10 frames a second, in step, over the tiles. The
 displays' white, #C7CFDD and #92A1B9 pixels are lit: tinted the court's colour brought up to
 full brightness, so the neutral grey leaves them as drawn, and glowing; #657392, the pole, stays.
-The pieces are pictures only for now: what they do comes later, and the court's sim doesn't read
-the map's markers or walls yet.
+The court lays its one-way ledge and belts from the baked map's pieces (`WreckCenter.swift`);
+it doesn't read the map's markers or walls.
+- **One-way platforms:** still on their first frame till someone drops through one; that one
+  then plays its eight frames once (6 sim frames each), holding nobody till it's back on the first
+  (`Match.dropPlatformFrames`, its tiles emptied meanwhile).
+- **Conveyors**, on the backboard blocks: the left belt carries right, the right belt left (the
+  flipped pieces), bodies and the loose ball alike, as fast as the belt's drawn moving (2 art
+  pixels a frame at 10 a second: about 0.21 units a sim frame). The ball goes off the end into
+  the rim below, and scores. The 3-point line counts a platform mid-turn, so it never moves.
+- **Glow:** the possession pixels glow only while the court's held; the pieces never do but for
+  the displays' screens, which glow over them (the mask's front blue).
+- **The dimmer** (the map's Background Dimmer layer: #2A2F4E, Darken at 128): everything one
+  tile in from the walls but the back wall's art, so what's only to look at recedes. SpriteKit
+  has no Darken, so it's baked as Aseprite draws it: into the pictures by the importer
+  (`"darken"` in `import_stage_art.py`, its coverage written as `WreckCenterDarken`); into each
+  display's frames where it lies over them as they're placed; and each display's lit grey, and
+  the back wall's possession pixels under it, tinted their darkened colour. Its edge never shows,
+  as in Aseprite. The platforms and belts, in play, are over it.
+- **Backboard shake:** a bounce anywhere on the backboard's box, from under the rim up to its
+  block, shakes it, not only on the glass.
 
 ## The players on EDG64
 

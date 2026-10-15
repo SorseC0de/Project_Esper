@@ -72,6 +72,13 @@ on the customize picker. Light blue takes teal's place; its name, Larimar, is in
 
 ## Polish (low priority)
 
+- **Win portraits off the main thread:** `warmWinPoses` builds both sides' taunt portraits and
+  front legs synchronously (60-90 ms a piece) behind the curtain and on every look change. Build
+  them in the background rebuild with the other frames instead; `portrait()` reads and writes the
+  main-thread caches (`texture()`, `recolour`, `hoodHead`), which is the work.
+- **The stages' glow colours** look bad; to correct (the user's note, low priority).
+- **Backboard shake along K&A's walls**, as the Wreck Center's whole backboard box does, once K&A's turn comes.
+
 - **No line under the feet:** the outline left off the row of pixels under the feet for bodies
   standing on the ground. Ground-only sheets (idle, walk, run, land, crouch) by a per-sheet list
   when the frame's recoloured; sheets used both standing and in the air (the layup, the slash)

@@ -242,7 +242,7 @@ public struct StageMap: Equatable, Codable {
         switch stage {
         case .elements, .hoopfishHideaway: 5
         case .kAndA: 5
-        case .wreckCenter: 1
+        case .wreckCenter: 2
         }
     }
 
@@ -260,10 +260,21 @@ public struct StageMap: Equatable, Codable {
     private static let kAndABaked: StageMap = StageMap.kAndADefaultMap()
     private static let wreckCenterBaked: StageMap = StageMap.wreckCenterDefaultMap()
 
-    /// The Wreck Center's pieces as laid out in the map maker (none yet). Its markers stand where
-    /// the court's are; the court lays its own tiles, rims and starts, so they're only for show.
+    /// The Wreck Center's pieces as laid out in the map maker (the builder's COPY). Its markers stand
+    /// where the court's are; the court lays its own tiles, rims and starts, so they're only for show.
     private static func wreckCenterDefaultMap() -> StageMap {
-        StageMap(leftRim: Cell(4, 9), rightRim: Cell(29, 9), spawns: [Cell(8, 1), Cell(25, 1)], ball: Cell(17, 8), walls: [])
+        let tiles: [Placed] = []
+        let props: [Prop] = [
+            Prop(.displayFloor, at: Cell(10, 1)), Prop(.displayFloor, at: Cell(22, 1)),
+            Prop(.onewayPlatform, at: Cell(15, 2)), Prop(.onewayPlatform, at: Cell(17, 2)),
+            Prop(.displayWall, at: Cell(5, 5)), Prop(.displayWall, at: Cell(27, 5)),
+            Prop(.conveyorL, at: Cell(1, 12)), Prop(.conveyorR, at: Cell(3, 12)),
+            Prop(.flippedConveyorR, at: Cell(29, 12)), Prop(.flippedConveyorL, at: Cell(31, 12)),
+            Prop(.displayWall, at: Cell(2, 15)), Prop(.displayWall, at: Cell(30, 15)),
+        ]
+        return StageMap(tiles: tiles, props: props, leftRim: Cell(4, 9), rightRim: Cell(29, 9),
+                        spawns: [Cell(4, 1), Cell(29, 1)], ball: Cell(17, 8),
+                        tornados: [])
     }
 
     /// K&A as laid out in the map maker (the builder's COPY): three rows of ground, the two cars'

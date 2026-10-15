@@ -93,7 +93,9 @@ public enum FortySevenRules {
         if hoop.shared { return fallbackRadius }
         var nearest: Double?
         for column in 0..<stage.columns {
-            guard (0..<stage.rows).contains(where: { stage.tile(column: column, row: $0) == .oneWay }) else { continue }
+            // A platform mid-turn still counts: the line doesn't move while it's turning.
+            guard (0..<stage.rows).contains(where: { stage.tile(column: column, row: $0) == .oneWay })
+                || stage.dropPlatforms.contains(where: { $0.columns.contains(column) }) else { continue }
             for edge in [Double(column) * Stage.tileSize, Double(column + 1) * Stage.tileSize] {
                 let reach = abs(edge - hoop.position.x)
                 if reach < nearest ?? .infinity { nearest = reach }

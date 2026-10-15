@@ -5,7 +5,7 @@ import Foundation
 /// most this far past the last remote input it knows, predicting it as held; and every
 /// packet carries this many of the newest inputs, so a lost packet costs nothing.
 public enum NetRules {
-    public static let protocolVersion: UInt8 = 156
+    public static let protocolVersion: UInt8 = 158
     public static let inputDelay = 2
     public static let predictionWindow = 8
     public static let redundantInputs = 8
@@ -240,6 +240,7 @@ extension Match {
             mix(UInt32(truncatingIfNeeded: car.vehicle.rawValue))
         }
         if let helicopter { mix(helicopter.x) }
+        for frames in dropPlatformFrames { mix(UInt32(truncatingIfNeeded: frames)) }
         return hash
     }
 }

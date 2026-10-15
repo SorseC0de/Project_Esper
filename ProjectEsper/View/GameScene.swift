@@ -716,6 +716,8 @@ final class GameScene: SKScene {
 
     /// Hoopfish Hideaway's rims, in front of the Hoopfish, glowing through its mask.
     var glowThroughFrontSnapshots: [BodySnapshot] {
+        // The Wreck Center's display screens, over their pieces in the mask.
+        if let art = wreckCenterArt { return art.screens }
         guard hoopfishHideawayArt != nil else { return [] }
         return rimNodes.filter { !$0.isHidden }.compactMap { rim in
             rim.texture.map { BodySnapshot(texture: $0, position: rim.position, anchor: rim.anchorPoint, xScale: rim.xScale, size: rim.size, zRotation: rim.zRotation) }
@@ -3078,7 +3080,7 @@ final class GameScene: SKScene {
         }
         stepJellyfishNode()
         HoopfishHideawayArt.animate(hoopfishHideawayArt?.hoopfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
-        if let art = wreckCenterArt { WreckCenterArt.animate(art, at: CACurrentMediaTime()) }
+        if let art = wreckCenterArt { WreckCenterArt.animate(art, at: CACurrentMediaTime(), match: match) }
         HoopfishHideawayArt.sway(hoopfishHideawayArt?.props ?? [], at: CACurrentMediaTime())
         swimmers = swimmers.compactMap { swimmer in
             var swimmer = swimmer
@@ -6066,7 +6068,21 @@ final class GameScene: SKScene {
     }
 
     /// The hoop whose backboard a ball bounced against here (`Stage.backboard(at:)`), to shake it.
-    private func backboard(at position: Vec2) -> Int? { match.stage.backboard(at: position) }
+    /// The glass's, or on the Wreck Center its backboard's whole box, from under the rim up to its block.
+    private func backboard(at position: Vec2) -> Int? {
+        if let hoop = match.stage.backboard(at: position) { return hoop }
+        guard match.stage.features.look == .court else { return nil }
+        let slack = BallRules.radius + 1
+        return match.stage.hoops.indices.first { index in
+            let hoop = match.stage.hoops[index]
+            let face = hoop.position.x + hoop.backboard.sign * Stage.backboardFace
+            return match.stage.fixedExtras.contains { box in
+                box.min.x <= face + 0.01 && box.max.x >= face - 0.01 && abs(box.min.y - (hoop.position.y + Stage.backboardBottom)) < 0.01
+                    && position.x >= box.min.x - slack && position.x <= box.max.x + slack
+                    && position.y >= box.min.y - slack && position.y <= box.max.y + slack
+            }
+        }
+    }
 
     private func rimTurn(_ index: Int) -> CGFloat {
         guard index < rimDip.count, index < match.stage.hoops.count else { return 0 }
@@ -9641,12 +9657,14 @@ extension GameScene {
             match.ball.lastTouched = 0
         }
         floor.tick = { match, frame in if frame == 14 { match.ball.lastTouched = 1 } }
-        // The left hoop.
-        let leftRim = court.hoops.first { $0.backboard == .left }?.position ?? Vec2(x: 53, y: 95)
-        let arc = PreviewShot(at: leftRim + Vec2(x: -2, y: 8), view: CGSize(width: 56, height: 46), frames: 28)
-        // The platform in the middle, the view drawing back from it.
-        let platform = PreviewShot(at: Vec2(x: court.width / 2, y: 38), view: CGSize(width: 50, height: 30), zoom: 3.5, frames: 40)
-        return [hoop, floor, arc, platform]
+        // The right belt on its block, and the wall display over it.
+        let rightBelt = court.conveyors.filter { $0.way < 0 }
+        let beltLeft = rightBelt.map(\.box.min.x).min() ?? 290, beltRight = rightBelt.map(\.box.max.x).max() ?? 330
+        let beltTop = rightBelt.first?.box.max.y ?? 140
+        let belt = PreviewShot(at: Vec2(x: (beltLeft + beltRight) / 2, y: beltTop + 5), view: CGSize(width: 60, height: 60), frames: 40)
+        // The broom by the left wall and the black bench beside it.
+        let broom = PreviewShot(at: Vec2(x: 67, y: 22), view: CGSize(width: 60, height: 34), frames: 40)
+        return [hoop, floor, belt, broom]
     }
 
     private func elementsShots() -> [PreviewShot] {

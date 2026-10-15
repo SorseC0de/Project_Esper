@@ -50,6 +50,8 @@ public struct Match: Equatable {
     public var tiltTarget = 0.0
     public var tiltClock = 0
     public var cart: Cart?
+    /// The Wreck Center's one-way platforms: each one's frames left of its turn, 0 while it's still.
+    public var dropPlatformFrames: [Int] = []
     public var cartHitFrames: [Int] = []
     /// Its overhead bins, and the bin the ball waits in through the count.
     public var bins: [Bin] = []
@@ -182,6 +184,7 @@ public struct Match: Equatable {
         stepStageFireball()
         stepLightning()
         stepIcicles()
+        stepWreckCenter()
 
         for index in players.indices {
             let input = index < inputs.count ? inputs[index] : .idle
@@ -194,6 +197,7 @@ public struct Match: Equatable {
                                                    events: &events) else { continue }
             perform(action, by: index)
         }
+        turnDroppedPlatforms()
         burnInLava()
         burnDribbles()
         resolveSlashClash()

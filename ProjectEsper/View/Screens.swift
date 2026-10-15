@@ -223,7 +223,7 @@ final class PickScreen: Screen {
     /// `player_drink`'s head tipped back, degrees, frame by frame.
     static let drinkHeadTilts: [CGFloat] = [25, 35]
     /// The drinking arm, its hand and the bottle (its three greys), drawn again over the hood.
-    static let drinkOverHood: Set<RGB> = [0x93388F, 0xCA52C9, 0x4A5462, 0x6D758D, 0x8B93AF]
+    static let drinkOverHood: Set<RGB> = [0x93388F, 0xCA52C9, 0x424C6E, 0x657392, 0x92A1B9]
     static let fallSeconds = 0.5
     private var finishing = false
     /// Picked and playing the drink out: the clock's stopped and no other pick lands.

@@ -198,7 +198,7 @@ final class SpriteLibrary {
             }
             // The sheets' images read out one at a time first, so the cores share nothing of SpriteKit's.
             // And the hood shapes, read out here once rather than first on some core.
-            _ = (SpriteLibrary.hoodShapes, SpriteLibrary.turnedHoodShapes, SpriteLibrary.hoodDrawnForHead)
+            _ = (SpriteLibrary.plainHoodShape, SpriteLibrary.turnedHoodShapes, SpriteLibrary.hoodDrawnForHead)
             // Each sheet frame read out of the atlas once and kept for every look's rebuild, not
             // once a look: each read logs a context leak, and the launch runs several.
             func source(_ key: String, _ texture: SKTexture) -> CGImage {
@@ -737,10 +737,9 @@ final class SpriteLibrary {
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
         let source = flowing.map { atlas.textureNamed("player_flowing_hood_\($0)") } ?? SpriteLibrary.hoodSource(skin: skin, view: view)
-        // The robot's face: the frame it's drawn from with that frame's two tones in its own; a
-        // turned view's or a flowing one's, the first skin's two tones in this one's.
+        // Every view drawn in the first skin: its two tones swapped for this one's.
         var faceSwaps: [RGB: RGB] = [:]
-        let drawnFrom = view == 0 && flowing == nil ? HumanLook.hoodHeadFrame(skin) : HoodView.drawnInSkin
+        let drawnFrom = HoodView.drawnInSkin
         if drawnFrom != skin {
             let from = HumanLook.skinTones[drawnFrom], to = HumanLook.skinTones[skin]
             faceSwaps = [PixelPalette.colours[from.front]: PixelPalette.colours[to.front], PixelPalette.colours[from.back]: PixelPalette.colours[to.back]]
@@ -840,7 +839,7 @@ final class SpriteLibrary {
         let look = look(for: player)
         let source = texture(name, frame).cgImage()
         let body = recolour(texture(name, frame), look: look, holdsBall: false, detach: false,
-                            hoodShape: !look.energyForm ? SpriteLibrary.hoodShapes[HumanLook.hoodHeadFrame(look.dressing.skinTone)] : nil)
+                            hoodShape: !look.energyForm ? SpriteLibrary.plainHoodShape : nil)
         var made = body.texture
         let image = body.texture.cgImage()
         if let (context, pixels) = makeCanvas(width: image.width, height: image.height),
@@ -1039,12 +1038,11 @@ final class SpriteLibrary {
     }
 
     /// Where a glowing part is drawn in a player frame, from the feet in art pixels, if it's there.
-    /// `player_hoodheads`' frames, each the hood's shape for its skin, and where the head sits on
-    /// the idle frame the hood is drawn for, in its pixels from the top left: the sheets' alone,
-    /// read once.
+    /// The idle frame the hood is drawn for; and the plain view's shape, `player_hoodheads_v2`'s
+    /// first frame, every skin's (the faces are recoloured, the shape's the same), read once.
     static let hoodDrawnFor = AnimationFrame(.idle, 2)
-    static let hoodShapes: [CGImage] = (0..<6).map { SKTextureAtlas(named: "Sprites").textureNamed("player_hoodheads_\($0)").cgImage() }
-    /// A turned view's frames, `player_hoodheads_v2`'s second and third (its first is the plain view).
+    static let plainHoodShape: CGImage = SKTextureAtlas(named: "Sprites").textureNamed("player_hoodheads_v2_0").cgImage()
+    /// A turned view's frames, `player_hoodheads_v2`'s second and third.
     static let turnedHoodShapes: [Int: CGImage] = {
         let atlas = SKTextureAtlas(named: "Sprites")
         return Dictionary(uniqueKeysWithValues: (1..<HoodView.count).compactMap { view in
@@ -1053,7 +1051,7 @@ final class SpriteLibrary {
     }()
     /// The hooded head's outline for a skin and view: where the body's line and neck go round it.
     static func hoodShape(skin: Int, view: Int, flipped: Bool = false) -> CGImage {
-        let shape = view == 0 ? hoodShapes[HumanLook.hoodHeadFrame(skin)] : turnedHoodShapes[view] ?? hoodShapes[HumanLook.hoodHeadFrame(skin)]
+        let shape = view == 0 ? plainHoodShape : turnedHoodShapes[view] ?? plainHoodShape
         return flipped ? mirrored(shape) ?? shape : shape
     }
     /// A frame's hood shape: its view, mirrored where the head looks back.
@@ -1068,7 +1066,8 @@ final class SpriteLibrary {
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         return context.makeImage()
     }
-    /// The frame a skin and view's hooded head is drawn from.
+    /// The frame a view's hooded head is drawn from, every skin's: `player_hoodheads_v2`, in the
+    /// first skin, its two tones swapped for the skin's.
     /// FloState's hood blowing, held still: standing, crouching, taunting and skidding to a stop
     /// (on the move it flicked on and off): its frames, how fast they play, and the sheets it's worn on.
     static let flowingHoodFrames = SKTextureAtlas(named: "Sprites").textureNames.filter { $0.hasPrefix("player_flowing_hood_") }.count
@@ -1076,8 +1075,7 @@ final class SpriteLibrary {
     static let flowingHoodSheets: Set<Animation> = [.idle, .dribbleIdle, .crouch, .taunt, .skid, .skidBall]
     static func hoodSource(skin: Int, view: Int) -> SKTexture {
         let atlas = SKTextureAtlas(named: "Sprites")
-        return view == 0 || turnedHoodShapes[view] == nil ? atlas.textureNamed("player_hoodheads_\(HumanLook.hoodHeadFrame(skin))")
-            : atlas.textureNamed("player_hoodheads_v2_\(view)")
+        return atlas.textureNamed("player_hoodheads_v2_\(view == 0 || turnedHoodShapes[view] == nil ? 0 : view)")
     }
     static let hoodDrawnForHead: CGPoint? = {
         let image = SKTextureAtlas(named: "Sprites").textureNamed("\(hoodDrawnFor.animation.rawValue)_\(hoodDrawnFor.frame)").cgImage()

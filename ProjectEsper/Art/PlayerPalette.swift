@@ -35,7 +35,7 @@ enum BodyPart: CaseIterable {
         case .frontFoot: [0x94FDFF]
         case .backFoot: [0xF5555D]
         case .ball: [0xFFFFFF]                            // white
-        case .slash: [0xDAE0EA, 0xB3B9D1, 0x8B93AF]              // palette 37 to 39, the blade's greys
+        case .slash: [0xC7CFDD, 0x92A1B9]                 // EDG64, the blade's greys
         case .energy: []
         }
     }
@@ -329,14 +329,9 @@ enum CourtLook {
 enum HumanLook {
     /// The parts still in the energy's colours, which glow as energy does: the shoes.
     static let glowingParts: Set<BodyPart> = [.frontFoot, .backFoot]
-    /// The six skins of `player_hoodheads`, a frame each, as palette indexes: the lighter
-    /// tone the front limbs', the darker the back's (`_Design/skin-tones.md`).
+    /// The skins, as palette indexes: the lighter tone the front limbs', the darker the back's
+    /// (`_Design/skin-tones.md`). The hooded heads are drawn in the first and recoloured to each.
     static let skinTones: [(front: Int, back: Int)] = [(36, 35), (24, 47), (47, 46), (35, 34), (34, 33), (33, 44), (38, 39)]
-    /// The robot's, the seventh: no frame of its own, drawn from the fourth's with its two tones swapped for greys.
-    static let robotSkinTone = 6
-    static let robotDrawnFrom = 3
-    /// The `player_hoodheads` frame a skin is drawn from.
-    static func hoodHeadFrame(_ tone: Int) -> Int { tone == robotSkinTone ? robotDrawnFrom : tone }
     /// The fourth, the bodies' before the customize screen.
     static let defaultSkinTone = 3
     /// What shows bare with nothing over it: the head, the arms and hands, the lower legs.

@@ -3,8 +3,8 @@ import UIKit
 
 /// The hoops' supports: `hoop_support` pieces laid out free, as Hoopfish Hideaway's pile is,
 /// around the hoop whose backboard is on the right, and drawn as one picture at each hoop, the
-/// left one mirrored. A piece comes as painted, or dark: palette 40 and 41 ramped down to 41
-/// and 42. Built in the support builder on the Wreck Center; kept between launches, standing in
+/// left one mirrored. A piece comes as painted, or dark: palette 13 and 12 ramped down to 12
+/// and 11. Built in the support builder on the Wreck Center; kept between launches, standing in
 /// for the baked layout.
 enum HoopSupport {
     struct Piece: Codable, Equatable {
@@ -91,14 +91,14 @@ enum HoopSupport {
         return context.makeImage()
     }
 
-    /// Palette 40 to 41 and 41 to 42, the rest as it is.
+    /// Palette 13 to 12 and 12 to 11 (#657392 to #424C6E to #2A2F4E), the rest as it is.
     private static func rampedDown(_ image: CGImage) -> CGImage? {
         let width = image.width, height = image.height
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
               let pixels = context.data?.bindMemory(to: UInt8.self, capacity: width * height * 4) else { return nil }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let swaps = [PixelPalette.aap64[40]: PixelPalette.aap64[41], PixelPalette.aap64[41]: PixelPalette.aap64[42]]
+        let swaps = [PixelPalette.colours[13]: PixelPalette.colours[12], PixelPalette.colours[12]: PixelPalette.colours[11]]
         for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] == 255 {
             let index = pixel * 4
             let rgb = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])

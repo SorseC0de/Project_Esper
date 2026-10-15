@@ -1,7 +1,10 @@
 """A stage drawn whole in Aseprite into its imagesets: the layers under the players flattened into
 its backdrop, the layers over them into its front, by Tools/aseprite.py.
 
-Usage: import_stage_art.py flight|kanda [...]      (no name: every stage)
+A dict in place of a list, {"layers": [...], "only": 0xRRGGBB}, is those layers' pixels of the one
+colour alone, in white: what the game tints (the Wreck Center's possession colours).
+
+Usage: import_stage_art.py flight|kanda|wreck [...]      (no name: every stage)
 """
 import os, shutil, subprocess, sys
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -28,6 +31,18 @@ STAGES = {
                           "Back Pillar 1", "Extras", "Train Support 3", "Train Support 2", "Train Support 1", "Train Tracks"],
         "KAndAFront": ["Front Pillar 2", "Front Pillar 1"],
     },
+    "wreck": {
+        "file": "Wreck Center/Wreck_Center_Map.aseprite",
+        # Back to front: the background and the back wall; the back wall's palette 60 alone, the
+        # possession colour's; the tiles; their palette 59 alone; the extras. [DO NOT DRAW] marks
+        # the court's box (544 by 256 at 16, 80: the stage one tile in from the sides and the
+        # bottom) and where the animated tiles go.
+        "WreckCenterBack": ["Background", "Back Wall"],
+        "WreckCenterBackLit": {"layers": ["Back Wall"], "only": 0x3D3D3D},
+        "WreckCenterTiles": ["Tiles"],
+        "WreckCenterTilesLit": {"layers": ["Tiles"], "only": 0x5D5D5D},
+        "WreckCenterExtras": ["Extras", "Extras2"],
+    },
     "redcar": {
         "file": "K&A/red_car.aseprite",
         "KAndACarBody": ["Body"],
@@ -42,6 +57,15 @@ def write(name, layers, source):
     if isinstance(layers, str):
         shutil.copyfile(os.path.join(ART, layers), os.path.join(folder, name + ".png"))
         layers = [layers]
+    elif isinstance(layers, dict):
+        out = os.path.join(folder, name + ".png")
+        subprocess.run([sys.executable, ASEPRITE, source, out] + layers["layers"], check=True)
+        sys.path.insert(0, os.path.dirname(__file__))
+        from pngio import read_png, write_png
+        w, h, px = read_png(out)
+        only = layers["only"]
+        write_png(out, w, h, [(255, 255, 255, 255) if p[3] and (p[0] << 16 | p[1] << 8 | p[2]) == only else (0, 0, 0, 0) for p in px])
+        layers = layers["layers"]
     else:
         subprocess.run([sys.executable, ASEPRITE, source, os.path.join(folder, name + ".png")] + layers, check=True)
     contents = os.path.join(folder, "Contents.json")

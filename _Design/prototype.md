@@ -2692,3 +2692,16 @@ wears the gear's frame turned round.
 The customize screen's boxes: ring 8 in each, a teal blip half its width when ticked (as the
 Rounds lights are); the skin's box ring 3 round a disc of its two tones split at 45 degrees; the
 H.O.O.D letters in the side's energy colour over its shade down the ramp.
+
+## The Wreck Center's map (EDG64)
+
+Drawn from `Wreck Center/Wreck_Center_Map.aseprite` (`Tools/import_stage_art.py wreck`, `WreckCenterArt`)
+in place of the flat tiles, the sim's tiles the court's as ever. 576 by 352, the court's box (the
+[DO NOT DRAW] layer's yellow) 544 by 256 at 16, 80: the art's drawn from (-16, -16), the camera
+framing the court as before. Back to front: the background and the back wall; the back wall's
+palette 60 (#3D3D3D) alone, in white, tinted; 47's three-point lines; the tiles; their palette 59
+(#5D5D5D) alone, tinted; the extras. The painted pictures don't glow; the two tinted ones take
+the court's possession colour and glow as its tiles did: neutral #5D5D5D, held the holder's
+energy at the court's shade, white on a score, the back wall's at 60's share of 59's. Still to
+come: the animated tiles (one-way platform, conveyor L, M and R) and the two displays (floor and
+wall), placed in the map editor; the middle ledge has no art of its own till then.

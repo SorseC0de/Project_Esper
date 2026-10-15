@@ -1950,6 +1950,8 @@ final class GameScene: SKScene {
     private var elementsArt: ElementsArt.Handles?
     private var flightB411Art: FlightB411Art.Handles?
     private var kAndAArt: KAndAArt.Handles?
+    /// The Wreck Center's art, its possession pixels tinted the court's colour.
+    private var wreckCenterArt: WreckCenterArt.Handles?
     /// K&A's red car: how far its body sags, in art pixels, where it's going, the frames to its
     /// next pixel, and whether it's settled under someone; and each lamp's flicker, frames left.
     private var carSag: CGFloat = 0
@@ -2020,6 +2022,12 @@ final class GameScene: SKScene {
             }
         }
         if let art = hoopfishHideawayArt { flats += art.flats }
+        // The Wreck Center's pictures don't glow; its possession pixels do, as the court's tiles did.
+        if let art = wreckCenterArt {
+            flats += art.flats.compactMap { node in
+                node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
+            }
+        }
         // K&A's pictures don't glow either, nor its car.
         if let art = kAndAArt {
             flats += [art.backdrop, art.front, art.carBody, art.carWheels].compactMap { $0 }.compactMap { node in
@@ -2050,6 +2058,7 @@ final class GameScene: SKScene {
         hoopfishHideawayArt = nil
         flightB411Art = nil
         kAndAArt = nil
+        wreckCenterArt = nil
         cartNode = nil
         cartWheels = []
         openBinNodes = []
@@ -2209,7 +2218,17 @@ final class GameScene: SKScene {
             stageGlowers.addChild(backboards)
             buildBackboards()
         }
-        for row in 0..<(stage.rows + stage.skyRows) where !stage.features.scenic && !isElements {
+        // The Wreck Center from its map, in place of the flat tiles.
+        if stage.features.look == .court, let art = WreckCenterArt.build(into: stageGround) {
+            wreckCenterArt = art
+            backgroundColor = SKColor(rgb: WreckCenterArt.beyond)
+            if (match.ball.holder ?? match.ball.owner) == nil {
+                courtColour = SKColor(rgb: WreckCenterArt.tilesNeutral)
+                courtTarget = courtColour
+            }
+            WreckCenterArt.tint(art, courtColour)
+        }
+        for row in 0..<(stage.rows + stage.skyRows) where !stage.features.scenic && !isElements && wreckCenterArt == nil {
             for column in 0..<stage.columns {
                 // The side walls run on up through the sky, so a tall screen never sees their top.
                 let tile = row < stage.rows ? stage.tile(column: column, row: row) : ((column == 0 || column == stage.columns - 1) ? Tile.solid : Tile.empty)
@@ -2249,7 +2268,14 @@ final class GameScene: SKScene {
         // Not where the camera turns (the plane, which has no line anyway): a crop's mask is a
         // Metal scissor rect, and turned it runs off the pass.
         threePointArcs.maskNode = stage.features.tilts ? nil : mask
-        stageGlowers.addChild(threePointArcs)
+        // The Wreck Center's are on its back wall, under its tiles; elsewhere under everything.
+        threePointArcs.removeFromParent()
+        if wreckCenterArt != nil {
+            threePointArcs.zPosition = WreckCenterArt.threePointZ
+            stageGround.addChild(threePointArcs)
+        } else {
+            stageGlowers.addChild(threePointArcs)
+        }
         // Under the floor's row, the outline black, all the way down and out.
         if !stage.features.scenic && !isElements {
             let under = SKSpriteNode(color: SKColor(rgb: PixelPalette.outline), size: CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 4000, height: 2000))
@@ -2372,6 +2398,7 @@ final class GameScene: SKScene {
         hoopfishHideawayArt = nil
         flightB411Art = nil
         kAndAArt = nil
+        wreckCenterArt = nil
         cartNode = nil
         cartWheels = []
         openBinNodes = []
@@ -3259,7 +3286,9 @@ final class GameScene: SKScene {
     /// the bolt's flash and fade back.
     private func tickCourtColour() {
         let owner = match.ball.holder ?? match.ball.owner
-        let wanted = owner.map { SKColor(rgb: CourtLook.shaded(sprites.look(for: $0).glow)) } ?? SKColor(rgb: CourtLook.neutral)
+        // The Wreck Center's map is neutral in its own grey.
+        let neutral = wreckCenterArt == nil ? CourtLook.neutral : WreckCenterArt.tilesNeutral
+        let wanted = owner.map { SKColor(rgb: CourtLook.shaded(sprites.look(for: $0).glow)) } ?? SKColor(rgb: neutral)
         if wanted != courtTarget {
             courtTarget = wanted
             courtShift = CourtLook.shiftFrames
@@ -3290,6 +3319,7 @@ final class GameScene: SKScene {
         courtColour.getRed(&r, green: &g, blue: &b, alpha: &a)
         let shown = SKColor(red: r + (1 - r) * courtWhite, green: g + (1 - g) * courtWhite, blue: b + (1 - b) * courtWhite, alpha: 1)
         for tile in courtTiles { tile.color = shown }
+        if let art = wreckCenterArt { WreckCenterArt.tint(art, shown) }
         for bloom in fieldBlooms { bloom.color = shown }
         for panel in lightPanels { panel.fillColor = shown }
     }

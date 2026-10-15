@@ -3552,11 +3552,9 @@ final class GameScene: SKScene {
         // The meters in the corners: how far in, and the whole meter's scale.
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
-        controls.addSlider(title: "BEAM UP X", range: -12...12, notch: 1, value: Float(BeamHeadTuning.upX)) { BeamHeadTuning.upX = CGFloat($0) }
-        controls.addSlider(title: "BEAM UP Y", range: -12...12, notch: 1, value: Float(BeamHeadTuning.upY)) { BeamHeadTuning.upY = CGFloat($0) }
-        controls.addSlider(title: "BEAM DOWN X", range: -12...12, notch: 1, value: Float(BeamHeadTuning.downX)) { BeamHeadTuning.downX = CGFloat($0) }
-        controls.addSlider(title: "BEAM DOWN Y", range: -12...12, notch: 1, value: Float(BeamHeadTuning.downY)) { BeamHeadTuning.downY = CGFloat($0) }
-        controls.addSlider(title: "BEAM DOWN TURN", range: 1...4, notch: 0.25, value: Float(BeamHeadTuning.downTurn)) { BeamHeadTuning.downTurn = CGFloat($0) }
+        controls.addSlider(title: "BEAM LIFT", range: -12...12, notch: 1, value: Float(BeamHeadTuning.lift)) { BeamHeadTuning.lift = CGFloat($0) }
+        controls.addSlider(title: "BEAM SLIDE", range: -12...12, notch: 1, value: Float(BeamHeadTuning.slide)) { BeamHeadTuning.slide = CGFloat($0) }
+        controls.addSlider(title: "BEAM DOWN TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.downTurn)) { BeamHeadTuning.downTurn = CGFloat($0) }
         controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
         if !ParkedSliders.flo {
             controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
@@ -8253,12 +8251,11 @@ final class GameScene: SKScene {
                     // Firing the beam, moved to sit on the neck as it tips, up and down each their own
                     // way (`BeamHeadTuning`), in proportion to the tip.
                     if aiming {
+                        // The aim's share as the tip has it: down, its turn taken back out.
                         let share = tip / GameScene.flightHeadTip
-                        let up = share >= 0
-                        let amount = up ? share : -share / BeamHeadTuning.downTurn
-                        let move = up ? CGPoint(x: BeamHeadTuning.upX, y: BeamHeadTuning.upY) : CGPoint(x: BeamHeadTuning.downX, y: BeamHeadTuning.downY)
-                        hood.position.x += move.x * amount * CGFloat(player.facing.sign) * drawScale
-                        hood.position.y += move.y * amount * drawScale
+                        let aimed = share >= 0 ? share : share / BeamHeadTuning.downTurn
+                        hood.position.x -= BeamHeadTuning.slide * aimed * CGFloat(player.facing.sign) * drawScale
+                        hood.position.y += BeamHeadTuning.lift * abs(aimed) * drawScale
                     }
                 }
             } else {

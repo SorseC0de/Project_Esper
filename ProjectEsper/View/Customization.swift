@@ -669,18 +669,28 @@ struct CustomizeScreen: View {
         }
     }
 
-    /// A box's tick: empty, or Futuristic_UI's ring8 in its box's line's colour, the side's under the cursor.
+    /// A box's tick: empty, or Futuristic_UI's ring8 in its box's line's colour, the side's under the
+    /// cursor, a teal blip in its middle.
     @ViewBuilder
     private func tick(_ on: Bool, _ frame: CGRect, lit: Bool, glow: RGB) -> some View {
         if on {
-            Image(uiImage: Futuristic.image("ring8"))
-                .resizable()
-                .interpolation(.high)
-                .aspectRatio(contentMode: .fit)
-                .colorMultiply(Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine))
-                .frame(width: frame.height * CustomizeScreen.tickShare, height: frame.height * CustomizeScreen.tickShare)
+            let side = frame.height * CustomizeScreen.tickShare
+            ZStack {
+                Image(uiImage: Futuristic.image("ring8"))
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .colorMultiply(Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine))
+                Circle()
+                    .fill(Color(rgb: CustomizeScreen.tickBlip))
+                    .frame(width: side * CustomizeScreen.tickBlipShare, height: side * CustomizeScreen.tickBlipShare)
+            }
+            .frame(width: side, height: side)
         }
     }
+    /// The tick's blip: teal, this share of the ring across, inside its hole.
+    static let tickBlip: RGB = PixelPalette.teal
+    static let tickBlipShare: CGFloat = 0.4
 
     /// A line from a box to its spot on the player, as the screen's top and bottom lines run:
     /// level out of the box, then turning 45 degrees down or up onto the spot, after a `drop`

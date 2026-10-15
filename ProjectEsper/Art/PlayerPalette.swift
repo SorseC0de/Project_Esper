@@ -232,7 +232,7 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .purple: "Amethyst"
         case .pink: "Morganite"
         case .lime: "Peridot"
-        case .teal: "Zircon"
+        case .teal: "Larimar"
         case .gold: "Citrine"
         }
     }

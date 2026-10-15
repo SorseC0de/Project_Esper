@@ -29,13 +29,13 @@ the migration sets them to these exactly.
 | Gold | #FFC825 | #FFA214 | #E07438 |
 | Lime | #99E65F | #5AC54F | #33984B |
 | Green, Emerald (new) | #33984B | #1E6F50 | #134C4C |
-| Light blue (was teal) | #0CF1FF | #00CDF9 | #0098DC |
+| Light blue, Larimar (was teal) | #0CF1FF | #00CDF9 | #0098DC |
 | Blue | #0098DC | #0069AA | #00396D |
 | Pink | #F389F5 | #CA52C9 | #93388F |
 | Purple | #93388F | #622461 | #3B1443 |
 
 Green is a ninth hood colour, Emerald (`EnergyColour.name`): it needs a place in the wheel and
-on the customize picker. Light blue takes teal's place and name (Zircon) unless renamed.
+on the customize picker. Light blue takes teal's place; its name, Larimar, is in already.
 
 ## Polish (low priority)
 

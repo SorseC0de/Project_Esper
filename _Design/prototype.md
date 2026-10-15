@@ -1408,7 +1408,7 @@ ramp take that map (the rest to their nearest mapped colour); since moved up one
 `fire_explosion`, a different sheet, is left as the tool had it. The importer's `NOT_TONED` keeps the strike bolts,
 which the recolour took to pure white, drawn as painted. Each has an opposite: gold and teal,
 red and lime, purple and pink, orange and blue. Each has a gem's name (`EnergyColour.name`):
-Sapphire blue, Topaz orange, Ruby red, Amethyst purple, Quartz pink, Peridot lime, Zircon
+Sapphire blue, Topaz orange, Ruby red, Amethyst purple, Morganite pink, Peridot lime, Zircon
 teal, Citrine gold. Offline this phone's pick is player one and the other side teal,
 or the pick's opposite if the pick is teal. Online the colour rides in the hello: the
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two

@@ -566,7 +566,15 @@ final class GameScene: SKScene {
             node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
                                             size: node.size, zRotation: node.zRotation) }
         }
-        return strings + apart + strikes
+        // Z Tea's charge swirl, and the hands breathing white with a charge kept: over the body,
+        // which the mask otherwise keeps unglowing.
+        let zTea = match.players.indices.filter { match.players[$0].power == .zTea }
+        let beam = (zTea.compactMap { chargeNodes.indices.contains($0) ? chargeNodes[$0] : nil } + keptChargeHands)
+            .filter { !$0.isHidden && $0.parent != nil }.compactMap { node in
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
+                                            size: node.size, zRotation: node.zRotation) }
+        }
+        return strings + apart + strikes + beam
     }
     var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
     /// The players whose hooded head is FloState's, its face energy.
@@ -3542,6 +3550,8 @@ final class GameScene: SKScene {
         // The meters in the corners: how far in, and the whole meter's scale.
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "BEAM HEAD X", range: -12...12, notch: 1, value: Float(BeamHeadTuning.x)) { BeamHeadTuning.x = CGFloat($0) }
+        controls.addSlider(title: "BEAM HEAD Y", range: -12...12, notch: 1, value: Float(BeamHeadTuning.y)) { BeamHeadTuning.y = CGFloat($0) }
         controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
         if !ParkedSliders.flo {
             controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
@@ -8229,6 +8239,12 @@ final class GameScene: SKScene {
                     let tip = headTip[index, default: 0]
                     turn(hood, about: middle, by: (tip - sheetTurn) * CGFloat(player.facing.sign), scale: drawScale)
                     hood.position.y -= GameScene.flightHeadDrop * abs(tip) / GameScene.flightHeadTip * drawScale
+                    // Aiming the beam, moved to sit on the neck as it tips (`BeamHeadTuning`).
+                    if aiming {
+                        let share = tip / GameScene.flightHeadTip
+                        hood.position.x += BeamHeadTuning.x * share * CGFloat(player.facing.sign) * drawScale
+                        hood.position.y += BeamHeadTuning.y * share * drawScale
+                    }
                 }
             } else {
                 hood.isHidden = true

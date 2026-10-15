@@ -291,6 +291,13 @@ enum GoalpostTuning {
 /// The FLO meters' look, the whole meter's scale on a slider: the whole meter's scale, the bar's and
 /// the word's own, the word's left and right ends' heights over its middle's, and the word moved
 /// from its place, in points.
+/// Z Tea's beam: the hooded head moved this many art pixels, right and up facing right, at the
+/// aim's full tip, in proportion to it: up one way, down the other. On the BEAM HEAD sliders.
+enum BeamHeadTuning {
+    nonisolated(unsafe) static var x: CGFloat = 0
+    nonisolated(unsafe) static var y: CGFloat = 0
+}
+
 enum FloTuning {
     nonisolated(unsafe) static var meterScale: CGFloat = 1.25
     /// The whole meter moved up from level with the scoreboard, in points.

@@ -609,7 +609,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   tilt (`aimRate`), any angle up to 45 off level, through the charge and while it fires, the beam
   turning with it. Its own charge swirl, `charge` (12 frames, looped at 15 a second, at half its size, in the
   energy colour; `GameScene.beamChargeSheet`), turns between the hands as the blast sheet draws
-  them (their parts' middles) through the charge; the throw keeps `esper_charge`. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
+  them (their parts' middles) through the charge; the throw keeps `esper_charge`. It and the
+  kept charge's hands glow over the body, cut out of the body's mask (`cutOutSnapshots`); the
+  hood tipped with the aim is moved BEAM HEAD X and Y art pixels at the full tip, in proportion. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
   firing, 3 to 7 round and round with `player_blast_arms` over them, turned with the aim about where the
   arms meet the body (31.5, 33.5 up on its canvas, 17.5 over the feet), aligned on 3 and a pixel
   right and two down on the even frames, 4 and 6; after, 8 and 9 (`recoveryFrames`), no beam,

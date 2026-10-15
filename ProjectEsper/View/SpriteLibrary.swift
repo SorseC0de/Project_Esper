@@ -77,8 +77,8 @@ final class SpriteLibrary {
         }
     }
 
-    /// The toned sheets beyond the energy effects that a player's particles use.
-    static let tonedParticleSheets = ["lightning_particle", "lightning_particle2"]
+    /// The toned sheets beyond the energy effects: a player's particles' and Z Tea's beam charge.
+    static let tonedParticleSheets = ["lightning_particle", "lightning_particle2", GameScene.beamChargeSheet]
     private var rewarmGeneration: [Int: Int] = [:]
     private let rewarmQueue = DispatchQueue(label: "SpriteLibrary.rewarm", qos: .userInitiated)
     /// The sheets' frames as read out of the atlas, by name: touched only on `rewarmQueue`.

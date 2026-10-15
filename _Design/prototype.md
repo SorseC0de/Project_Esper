@@ -607,8 +607,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   without the lift so they stay in it, those hits earning no FLO and holding no hit-stop. Firing, it can't be stunned or knocked
   (`Player.knock`, `hitStun`). Up and down on the stick turn it, at every level, 2 degrees a frame at full
   tilt (`aimRate`), any angle up to 45 off level, through the charge and while it fires, the beam
-  turning with it. The throw's charge swirl (`esper_charge`) plays through the charge between the
-  hands as the blast sheet draws them (their parts' middles), its tail as the beam fires. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
+  turning with it. Its own charge swirl, `charge` (12 frames, looped at 15 a second, at half its size, in the
+  energy colour; `GameScene.beamChargeSheet`), turns between the hands as the blast sheet draws
+  them (their parts' middles) through the charge; the throw keeps `esper_charge`. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
   firing, 3 to 7 round and round with `player_blast_arms` over them, turned with the aim about where the
   arms meet the body (31.5, 33.5 up on its canvas, 17.5 over the feet), aligned on 3 and a pixel
   right and two down on the even frames, 4 and 6; after, 8 and 9 (`recoveryFrames`), no beam,

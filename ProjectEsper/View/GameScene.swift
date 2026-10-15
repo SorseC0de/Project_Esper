@@ -288,6 +288,10 @@ final class GameScene: SKScene {
     static let stringAccentLuminance = 0.876
     /// Over the body and under the head's own node, or behind the body.
     private static let hoodUpZ: CGFloat = 0.038
+    /// Z Tea's beam charging: `charge` between the hands, its frames a second, at half its size.
+    static let beamChargeSheet = "charge"
+    private static let beamChargeFramesPerSecond = 15
+    private static let beamChargeScale: CGFloat = 0.5
     /// Z Tea's kept charge: the hands from skin toward this white and back, over a breath of
     /// this many seconds, at most this far; over the body, and over the hood with the arm that crosses it.
     private var keptChargeHands: [SKSpriteNode] = []
@@ -8443,6 +8447,14 @@ final class GameScene: SKScene {
                     charge.size = charge.texture!.size()
                     charge.anchorPoint = Effect.fireCharge.anchor
                     charge.setScale(Effect.fireCharge.scale)
+                case .zTea where beaming:
+                    // Z Tea's own: `charge`, looped round between the hands in the energy colour.
+                    let count = max(EffectSheets.frames[GameScene.beamChargeSheet] ?? 1, 1)
+                    let frame = player.stateTimer * GameScene.beamChargeFramesPerSecond / 60 % count
+                    charge.texture = sprites.effectTexture(GameScene.beamChargeSheet, frame, player: index)
+                    charge.size = charge.texture!.size()
+                    charge.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+                    charge.setScale(GameScene.beamChargeScale)
                 case .voltaCola where !beaming:
                     let frame = player.stateTimer * Int(EnergyEffect.lightningCharge.fps) / 60 % EnergyEffect.lightningCharge.frameCount
                     charge.texture = sprites.effectTexture(EnergyEffect.lightningCharge.name, frame, player: index)
@@ -8477,7 +8489,7 @@ final class GameScene: SKScene {
             } else {
                 charge.isHidden = true
                 chargeOverlays[index].isHidden = true
-                if charging[index], player.power != .blazingBoba, player.power != .voltaCola,
+                if charging[index], player.power != .blazingBoba, player.power != .voltaCola, player.power != .zTea,
                    player.state == .throwing || player.state == .dunking || player.state == .beamFiring {
                     let tail = EnergyEffect.charge.node(sprites, player: index, at: charge.position,
                                                         frames: (EnergyEffect.chargeLoopEnd + 1)..<EnergyEffect.charge.frameCount,

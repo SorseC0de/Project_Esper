@@ -623,12 +623,27 @@ struct CustomizeScreen: View {
         // The controls go once the side's ready, shrinking away.
         if !ready {
         box(player, .skin, tag + "skin", label: "SKIN", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor, slide: slide) { frame in
-            VStack(spacing: 0) {
-                Color(rgb: PixelPalette.colours[pick.dressing.tone.front])
+            // Ring 3 round a disc of the two tones, split corner to corner.
+            let side = frame.height * CustomizeScreen.tickShare
+            ZStack {
                 Color(rgb: PixelPalette.colours[pick.dressing.tone.back])
+                    .overlay {
+                        VStack(spacing: 0) {
+                            Color(rgb: PixelPalette.colours[pick.dressing.tone.front])
+                            Color.clear
+                        }
+                        .scaleEffect(1.5)
+                        .rotationEffect(.degrees(-45))
+                    }
+                    .clipShape(Circle())
+                    .frame(width: side * CustomizeScreen.skinDiscShare, height: side * CustomizeScreen.skinDiscShare)
+                Image(uiImage: Futuristic.image("ring3"))
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .colorMultiply(Color(rgb: cursor == .skin ? glow : CustomizeScreen.smallBoxLine))
             }
-            .frame(width: frame.width * 0.5, height: frame.height * 0.5)
-            .clipShape(RoundedRectangle(cornerRadius: frame.width * 0.08))
+            .frame(width: side, height: side)
         }
         box(player, .arms, tag + "arms", label: "SLEEVE", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor, slide: slide) {
             tick(flow.customizeTicked(player, .arms), $0, lit: cursor == .arms, glow: glow)
@@ -669,28 +684,29 @@ struct CustomizeScreen: View {
         }
     }
 
-    /// A box's tick: empty, or Futuristic_UI's ring8 in its box's line's colour, the side's under the
-    /// cursor, a teal blip in its middle.
-    @ViewBuilder
+    /// A box's tick: Futuristic_UI's ring8 always, in its box's line's colour, the side's under the
+    /// cursor; ticked, a teal blip in its middle.
     private func tick(_ on: Bool, _ frame: CGRect, lit: Bool, glow: RGB) -> some View {
-        if on {
-            let side = frame.height * CustomizeScreen.tickShare
-            ZStack {
-                Image(uiImage: Futuristic.image("ring8"))
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
-                    .colorMultiply(Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine))
+        let side = frame.height * CustomizeScreen.tickShare
+        return ZStack {
+            Image(uiImage: Futuristic.image("ring8"))
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .colorMultiply(Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine))
+            if on {
                 Circle()
                     .fill(Color(rgb: CustomizeScreen.tickBlip))
                     .frame(width: side * CustomizeScreen.tickBlipShare, height: side * CustomizeScreen.tickBlipShare)
             }
-            .frame(width: side, height: side)
         }
+        .frame(width: side, height: side)
     }
     /// The tick's blip: teal, this share of the ring across, inside its hole.
     static let tickBlip: RGB = PixelPalette.teal
     static let tickBlipShare: CGFloat = 0.4
+    /// The skin's disc inside ring 3, this share of the ring across.
+    static let skinDiscShare: CGFloat = 0.6
 
     /// A line from a box to its spot on the player, as the screen's top and bottom lines run:
     /// level out of the box, then turning 45 degrees down or up onto the spot, after a `drop`

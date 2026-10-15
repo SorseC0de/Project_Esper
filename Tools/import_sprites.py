@@ -31,7 +31,7 @@ import zlib
 GMS2_PROJECT = os.path.expanduser("~/GameMakerStudio2/Project Esper")
 STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel Art")
 # The folders the strips are sorted into, besides the root.
-STRIP_FOLDERS = ["", "Effects", "Player"]
+STRIP_FOLDERS = ["", "Effects", "Effects_e64", "Player"]   # Effects_e64 last of the effects, over its AAP-64 originals
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
 STAGE_ART = ["Backboard", "Hoop", "Hoop_support", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/tornado_burst", "Elements/fire_tornado_burst", "Elements/fireball", "Elements/sizzle1", "Elements/sizzle2", "Elements/lava_splash", "Elements/wind", "Elements/splash", "Elements/small_lightning", "Elements/icicle_empty", "Elements/icicle_form", "Elements/icicle", "Hoopfish Hideaway/bubbles_jellyfish", "Hoopfish Hideaway/Hoopfish/Hoopfish_spin", "Hoopfish Hideaway/Backboards", "Hoopfish Hideaway/hoops", "Hoopfish Hideaway/fish", "Hoopfish Hideaway/shark", "Hoopfish Hideaway/crab", "Hoopfish Hideaway/jellyfish", "Wreck Center/oneway_platform", "Wreck Center/conveyor_L", "Wreck Center/conveyor_M", "Wreck Center/conveyor_R", "Wreck Center/display_floor", "Wreck Center/display_wall"]
 # Whole pictures, not strips: into the catalog's root as an image of this name.

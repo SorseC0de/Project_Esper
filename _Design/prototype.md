@@ -2716,8 +2716,10 @@ the map's markers or walls yet.
 ## The players on EDG64
 
 `PixelPalette.colours` is EDG64 in Aseprite's order (index 0 its transparent black); AAP-64 stays
-as `PixelPalette.aap64` (and `aap64Outline`) for the stages and effects not yet repainted, the
-Blazing Boba fireball's swaps among them. The players: outline #1A1932; bodysuit #3D3D3D, the
+as `PixelPalette.aap64` (and `aap64Outline`) for the stages and effects not yet repainted.
+Effects in `Pixel Art/Effects_e64` are imported over their AAP-64 originals; the fire ramp is
+`PixelPalette.fire` (35, 33, 31, 43, 42), and the Blazing Boba fireball takes the ball's shades a
+step up it. Progress is tracked in `_Design/edg64-conversion.md`. The players: outline #1A1932; bodysuit #3D3D3D, the
 back thigh #272727; five skins (`HumanLook.skinTones`, front and back, the second the default),
 the three locked ones left out; nine energy colours, each with three tones from
 `Energy_Palette.png` (`EnergyColour.tones`): the glow, the hood's shadow (the hood's greys, the

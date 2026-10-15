@@ -18,6 +18,8 @@ enum PixelPalette {
 
     /// The players' outline.
     static let outline: RGB = 0x1A1932
+    /// The fire ramp, lightest to darkest: 35, 33, 31, 43, 42.
+    static let fire: [RGB] = [35, 33, 31, 43, 42].map { colours[$0] }
 
     /// AAP-64 (`_Graphic Assets/Pixel_Palette.png`), the palette before: the stages not yet
     /// repainted in EDG64 are still drawn in it, and so is what's drawn in code to match them.

@@ -262,11 +262,10 @@ final class SpriteLibrary {
     private(set) lazy var basketballFrames: [SKTexture] = SpriteLibrary.cutBall("Basketball")
     private(set) lazy var basketballIceFrames: [SKTexture] = SpriteLibrary.cutBall("BasketballIce")
     /// Blazing Boba's fireball: the basketball's every shade a step up the fire ramp, its seams
-    /// gold and its outline orange, so it reads hot rather than as the ball.
+    /// with its shadow and its outline the red under them, so it reads hot rather than as the ball.
     private(set) lazy var basketballFireFrames: [SKTexture] = basketballFrames.map { frame in
-        let swaps: [RGB: RGB] = [PixelPalette.aap64[7]: PixelPalette.aap64[9], PixelPalette.aap64[6]: PixelPalette.aap64[8],
-                                 PixelPalette.aap64[5]: PixelPalette.aap64[7], PixelPalette.aap64[33]: PixelPalette.aap64[7],
-                                 PixelPalette.aap64[43]: PixelPalette.aap64[6]]
+        let swaps: [RGB: RGB] = [0xFFA214: PixelPalette.fire[0], 0xED7614: PixelPalette.fire[1], 0xC64524: PixelPalette.fire[2],
+                                 0x8A4836: PixelPalette.fire[2], 0x5D2C28: PixelPalette.fire[3]]
         let picture = frame.cgImage()
         let width = picture.width, height = picture.height
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,

@@ -20,19 +20,20 @@ enum BodyPart: CaseIterable {
     /// What the sheets paint this part with, as the artist named the colours.
     var sourceColours: [RGB] {
         switch self {
-        case .backHand: [0xBC4A9B]                        // AAP-64 27
-        case .backArm: [0x793A80]                         // 28
-        case .backLeg: [0xB4202A]                         // 4
-        case .backThigh: [0x73172D]                       // 3, darker than the leg as the others are
-        case .pelvis: [0xBB7547]                          // 34
-        case .torso: [0xFA6A0A]                           // 6
-        case .head: [0x20D6C7]                            // 20
-        case .frontThigh: [0xFFD541]                      // 8
-        case .frontLeg: [0xFFFC40]                        // 9
-        case .frontArm: [0x59C135]                        // 12
-        case .frontHand: [0x9CDB43]                       // 11
-        case .frontFoot: [0xA6FCDB]                       // 21
-        case .backFoot: [0xE86A73]                        // 26
+        // EDG64, the user's (AAP-64's before, in `Tools/recolour_players.py`).
+        case .backHand: [0xCA52C9]
+        case .backArm: [0x93388F]
+        case .backLeg: [0xC42430]
+        case .backThigh: [0x891E2B]                       // darker than the leg as the others are
+        case .pelvis: [0xBF6F4A]
+        case .torso: [0xED7614]
+        case .head: [0x00CDF9]
+        case .frontThigh: [0xFFC825]
+        case .frontLeg: [0xFFEB57]
+        case .frontArm: [0x5AC54F]
+        case .frontHand: [0x99E65F]
+        case .frontFoot: [0x94FDFF]
+        case .backFoot: [0xF5555D]
         case .ball: [0xFFFFFF]                            // white
         case .slash: [0xDAE0EA, 0xB3B9D1, 0x8B93AF]              // palette 37 to 39, the blade's greys
         case .energy: []

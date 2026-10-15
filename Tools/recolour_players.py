@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The player sheets onto the twelve AAP-64 colours the figure is drawn in, one per body
+"""The player sheets onto the EDG64 colours the figure is drawn in, one per body
 part, so every part is the same colour in every sheet. Each pixel goes to its part's
 colour by the part keys (within 2 a channel, as the game reads them); the ball's white and
 the slash's pinks are left as they are. The GMS2 sheets come out as vertical strips in
@@ -26,26 +26,26 @@ BACKUP = os.path.join(STRIPS, "Player Backup")
 GMS2_SPRITES = os.path.expanduser("~/GameMakerStudio2/Project Esper/sprites")
 ANIMATIONS = os.path.join(ROOT, "EsperSim", "Sources", "EsperSim", "Animation.swift")
 
-# Each part's colour on AAP-64 (the user's indexes, from 0), and the colours the sheets
-# painted it in before.
+# Each part's colour, and the colours the sheets painted it in before.
 PARTS = {
-    "head":       (0x20D6C7, [0x5FCDE4]),
-    "torso":      (0xFA6A0A, [0xDF7126, 0xDE7120]),
-    "pelvis":     (0xBB7547, [0xC46423, 0xB35B20, 0xC56520]),
-    "frontThigh": (0xFFD541, [0xD1CC60]),
-    "frontLeg":   (0xFFFC40, [0xFBF236]),
-    "frontArm":   (0x59C135, [0x6ABE30]),
-    "frontHand":  (0x9CDB43, [0x99E550, 0x9CE652]),
+    # EDG64, the user's, with what each part was painted in before: AAP-64's, then older.
+    "head":       (0x00CDF9, [0x20D6C7, 0x5FCDE4]),
+    "torso":      (0xED7614, [0xFA6A0A, 0xDF7126, 0xDE7120]),
+    "pelvis":     (0xBF6F4A, [0xBB7547, 0xC46423, 0xB35B20, 0xC56520]),
+    "frontThigh": (0xFFC825, [0xFFD541, 0xD1CC60]),
+    "frontLeg":   (0xFFEB57, [0xFFFC40, 0xFBF236]),
+    "frontArm":   (0x5AC54F, [0x59C135, 0x6ABE30]),
+    "frontHand":  (0x99E65F, [0x9CDB43, 0x99E550, 0x9CE652]),
     # The back limbs as they lie, read off the sheets: the darker purple sits by the
     # shoulder and the lighter at the hand; both light reds are the thigh, the dark red the
     # leg and foot.
-    "backArm":    (0x793A80, [0x951799, 0x94149C]),
-    "backHand":   (0xBC4A9B, [0xAF1AB2, 0xAC18B4, 0xAD54B0]),
-    "backThigh":  (0x73172D, [0xCE5050, 0xD95763]),
-    "backLeg":    (0xB4202A, [0xAC3232]),
-    # The feet, marked afterwards: palette 21 in front, 26 behind.
-    "frontFoot":  (0xA6FCDB, []),
-    "backFoot":   (0xE86A73, []),
+    "backArm":    (0x93388F, [0x793A80, 0x951799, 0x94149C]),
+    "backHand":   (0xCA52C9, [0xBC4A9B, 0xAF1AB2, 0xAC18B4, 0xAD54B0]),
+    "backThigh":  (0x891E2B, [0x73172D, 0xCE5050, 0xD95763]),
+    "backLeg":    (0xC42430, [0xB4202A, 0xAC3232]),
+    # The feet, marked afterwards.
+    "frontFoot":  (0x94FDFF, [0xA6FCDB]),
+    "backFoot":   (0xF5555D, [0xE86A73]),
 }
 KEPT = [0xFFFFFF, 0xF065C4, 0xF9ABFF, 0xFBC2FF, 0xEEA6F5, 0xF098F5, 0xFDD9FF, 0xEDCEF0]
 

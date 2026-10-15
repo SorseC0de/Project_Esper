@@ -1315,10 +1315,14 @@ Soda's darker bubbles and its board's tail #403353; outlines drawn in code in th
 sheets in `_Graphic Assets/Pixel Art` are recoloured to AAP-64's nearest by eye (CIE Lab),
 alpha kept, by `Tools/recolour_to_palette.py`, which leaves two kinds alone: all-grey
 sheets, the masks the energy colour tints, and the player sheets, which
-`Tools/recolour_players.py` puts on twelve AAP-64 colours, one a part, the same in every sheet:
-head #20D6C7, ball #FFFFFF, torso #FA6A0A and pelvis #BB7547, front thigh #FFD541 and leg
-#FFFC40, back thigh #73172D and leg #B4202A (the thigh the darker, as the arms and front leg
-go dark to light), front arm #59C135 and hand #9CDB43, back arm #793A80 and hand #BC4A9B; and the feet, the lower leg's last
+`Tools/recolour_players.py` puts on one colour a part, the same in every sheet, EDG64's since
+the palette's move (the user's, from a recoloured idle; AAP-64's, from before, kept as keys in
+the tool): head #00CDF9, ball #FFFFFF, torso #ED7614 and pelvis #BF6F4A, front thigh #FFC825 and leg
+#FFEB57, back thigh #891E2B and leg #C42430 (the thigh the darker, as the arms and front leg
+go dark to light), front arm #5AC54F and hand #99E65F, back arm #93388F and hand #CA52C9;
+the feet front #94FDFF and back #F5555D. The sheets as they were are in `_Backup/Pre-EDG64`.
+Before EDG64 (AAP-64): head #20D6C7, torso #FA6A0A and pelvis #BB7547, front thigh #FFD541 and leg
+#FFFC40, back thigh #73172D and leg #B4202A, front arm #59C135 and hand #9CDB43, back arm #793A80 and hand #BC4A9B; and the feet, the lower leg's last
 third (from the user's walk: the foot starts 70% down from the knee), front #A6FCDB (palette
 21) and back #E86A73 (26), drawn as shoes with the human look off, palette 22 #FFFFFF in front and 38 #B3B9D1 behind (`Look.frontShoe`, `backShoe`; `BodyPart.frontFoot`, `backFoot`;
 the sheets as they were before the feet are in `Player Backup/Pre-Feet`);

@@ -723,7 +723,7 @@ taken yet (a stage's first select before its preview has played); a shot's flat 
 cut off (`StageShots.trimmed`, K&A's colour beyond it over and under it), the window as tall as what's left is
 for its width; each stage in Futuristic_UI's box1
 in the menus' blue with its name in Upheaval, the blue too, in two lines, broken at the space
-nearest its middle (one line with no space), gold and a tenth bigger when a cursor or a pick is on
+nearest its middle (one line with no space), gold (no growth: the colour's enough) when a cursor or a pick is on
 it; more than four stages in two rows, the first the longer (`StageSelectScreen.lines`,
 `oneRowMost`). The Greateraid pick (`PickScreen`), on the pause's black and glass, in the new UI: "Greateraid"
 in FLO lettering on a banner across the top left corner at 30 degrees, its lettering 10.5 (`Screen.addCornerBanner`,
@@ -757,7 +757,7 @@ plum when on. The pause: the match under a third-black wash and a thin dark mate
 turned round both ways, sliding
 in and fading from the left, then the right, down the screen, 0.07 seconds apart; RESUME frame 1
 with arrow1 in its face on the pause icon's own place, as big, and the settings' gear in frame 9
-upside down under it; the cursor's choice gold and a tenth bigger (`Screen.addFramed`). Every one of them is on the tuning panel (STAGE, PICK, HUD, TOUCH), the dialogs
+upside down under it; the cursor's choice gold (no growth: the colour's enough) (`Screen.addFramed`). Every one of them is on the tuning panel (STAGE, PICK, HUD, TOUCH), the dialogs
 starting from the pause's and the win's sizes on each platform, the HUD and the pad at
 1 (the iPad's pad at buttons 0.75 and text 1.5, as tuned); the HUD and the pad are previewed over the court, as in play. The debug pickers and
 sliders keep their plain look.
@@ -2636,7 +2636,7 @@ confirmed; a coin flip rolls on the shared dice, so both land the same. Protocol
 matchmaker sheet, doing what it did, through GameKit's matchmaker): full screen in the menus' look,
 the grid on black and MULTIPLAYER lettered as FLO is (15 high), the modes as words with rule6 between
 them (the one asked for blue, the rest dim), each choice in frame 8 at 0.8 (a list's at 0.6), every
-other one turned round both ways, the cursor's gold and a tenth bigger: PLAY NOW (matched with anyone
+other one turned round both ways, the cursor's gold (no growth: the colour's enough): PLAY NOW (matched with anyone
 looking), INVITE A FRIEND (the Game Center friends list, pick one; the app asks for the list with
 `NSGKFriendListUsageDescription`); while matching, the caption, whoever was invited with their
 answer (invited, on their way, can't play; a decline ends the wait) and CANCEL. Back is the corner
@@ -2676,3 +2676,7 @@ for its late lifecycle handlers (the testers' launch crash, 0.2 (1)).
 Everything kept is wiped once on the first launch of a build whose saved data changed shape
 (`StorageReset.version`, 0.2-1 for 0.2's first build), so a tester never runs into an old shape.
 Modes not ready yet stay on the menus greyed and unpickable (`GameMode.parked`: ZONES).
+Nothing on a menu grows under the cursor any more, the gold's enough (the Greateraid bottles,
+which don't change colour, still rise); the customize screen's START off the cursor is dimmed,
+its rings at half and still, its lettering in gold's and blue's shadows; the title's speaker
+wears the gear's frame turned round.

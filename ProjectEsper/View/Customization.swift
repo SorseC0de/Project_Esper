@@ -322,6 +322,10 @@ struct CustomizeScreen: View {
     /// An art pixel as a share of the screen's width; the projector is drawn at a quarter of it,
     /// 7 down from the ring, and the player at twice it, 6 up from the lens.
     static let artPixelShare: CGFloat = 0.168 / 64
+    /// START off the cursor: its rings at this share, its lettering in gold's and blue's shadows.
+    static let startUnlitOpacity = 0.5
+    static let startUnlitColours = Onomatopoeia.Colours(upper: EsperPalette.gold.shadow, lower: EsperPalette.blue.shadow,
+                                                        lineUpper: EsperPalette.plum.light, lineLower: EsperPalette.purple.shadow)
     static let projectorScale: CGFloat = 0.25
     static let projectorY: CGFloat = -7
     static let playerScale: CGFloat = 2
@@ -816,13 +820,17 @@ struct CustomizeScreen: View {
         return TimelineView(.animation(paused: !lit)) { timeline in
             let seconds = spunSeconds + (spinningSince.map { timeline.date.timeIntervalSince($0) } ?? 0)
             ZStack(alignment: .topLeading) {
-                layer("customize_start", size)
-                spinning("customize_spin_ccw", size, about: start, degrees: -seconds * CustomizeScreen.spinSpeeds.ccw)
-                spinning("customize_spin_cw", size, about: start, degrees: seconds * CustomizeScreen.spinSpeeds.cw)
+                // Not the cursor's: the rings dimmed and still.
+                ZStack(alignment: .topLeading) {
+                    layer("customize_start", size)
+                    spinning("customize_spin_ccw", size, about: start, degrees: -seconds * CustomizeScreen.spinSpeeds.ccw)
+                    spinning("customize_spin_cw", size, about: start, degrees: seconds * CustomizeScreen.spinSpeeds.cw)
+                }
+                .opacity(lit ? 1 : CustomizeScreen.startUnlitOpacity)
                 if flow.customizeLaunch == nil {
-                    // Lettered as FLO is lit while START's lit, as it is short of full otherwise.
+                    // Lettered as FLO is lit while START's lit, in its two tones' darkest otherwise.
                     litTitle(flow.customizeOnline ? "READY" : "START", height: size.height * 0.035, ownFace: false,
-                             colours: lit ? FloTuning.colours : FloTuning.shortColours)
+                             colours: lit ? FloTuning.colours : CustomizeScreen.startUnlitColours)
                         .opacity(flow.customizeOnline && flow.customizeReady[flow.customizeLocal] ? 0.5 : 1)
                         .position(x: start.midX, y: start.midY)
                 }
@@ -830,7 +838,6 @@ struct CustomizeScreen: View {
             .frame(width: size.width, height: size.height)
         }
         .brightness(lit ? 0.15 : 0)
-        .scaleEffect(lit ? TitleOverlay.cursorGrowth : 1, anchor: UnitPoint(x: start.midX / size.width, y: start.midY / size.height))
         .contentShape(Rectangle().path(in: start))
         .onTapGesture { flow.activateCustomize(flow.customizeLocal, .start) }
         .onAppear { if lit { spinningSince = Date() } }
@@ -860,7 +867,6 @@ struct CustomizeScreen: View {
         return picture("customize_return").resizable()
             .colorMultiply(lit ? Futuristic.lit : Color(rgb: CustomizeScreen.returnLine))
             .frame(width: frame.width, height: frame.height)
-            .scaleEffect(lit ? Futuristic.litGrowth : 1)
             .contentShape(Rectangle())
             .onTapGesture { flow.activateCustomize(flow.customizeLocal, .back) }
             .position(x: frame.midX, y: frame.midY)

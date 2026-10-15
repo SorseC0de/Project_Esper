@@ -55,7 +55,6 @@ struct SettingsScreen: View {
                     .foregroundStyle(colour)
                     .fixedSize()
             }
-            .scaleEffect(onRow ? 1 / Futuristic.litGrowth : 1)
             // The choices as words, rule8 under the picked one, sliding to a new pick.
             HStack(spacing: 14 * scale(.buttons)) {
                 ForEach(Array(row.options.enumerated()), id: \.offset) { option, label in

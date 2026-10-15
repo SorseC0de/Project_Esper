@@ -457,8 +457,7 @@ enum TitleItem: Hashable {
 /// The title screen, in `Futuristic_UI.svg`'s pieces on the customize screen's ground: the gear in frame 1 in the
 /// upper right; the name over rule4; ROUNDS, 47 and ZONES in frames 7, 9 and 6; VS CPU and
 /// VS HUMAN between rule5s with rule6 between them; MULTIPLAYER in box4, which opens the
-/// multiplayer screen, with Game Center's word under it. What the cursor's on is gold and a
-/// tenth bigger.
+/// multiplayer screen, with Game Center's word under it. What the cursor's on is gold.
 struct TitleOverlay: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
@@ -495,7 +494,8 @@ struct TitleOverlay: View {
                 }
                 .overlay(alignment: .topLeading) {
                     Button { flow.activate(.mute) } label: {
-                        FuturisticFrame(name: "1", lit: flow.titleCursor == .mute, scale: TitleOverlay.settingsScale * scale(.buttons)) { colour in
+                        // The gear's frame turned round, its lead to the other side.
+                        FuturisticFrame(name: "1", lit: flow.titleCursor == .mute, scale: TitleOverlay.settingsScale * scale(.buttons), mirrored: true) { colour in
                             Image(systemName: GameSettings.muted ? "speaker.slash.fill" : "speaker.fill")
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
@@ -628,7 +628,6 @@ struct TitleOverlay: View {
         }
         .buttonStyle(.plain)
         .disabled(busy)
-        .scaleEffect(lit ? Futuristic.litGrowth : 1)
         .noSystemFocus()
     }
 
@@ -671,9 +670,6 @@ struct TitleOverlay: View {
     }
     #endif
 
-    /// Under the cursor, the other screens' plates grow this much.
-    static let cursorGrowth: CGFloat = 1.08
-
     /// A debug corner switch: its word over rule8, white when it's on, dim otherwise, gold under the cursor.
     private func debugSwitch(_ text: String, picked: Bool, item: TitleItem) -> some View {
         let lit = flow.titleCursor == item
@@ -688,7 +684,6 @@ struct TitleOverlay: View {
             }
         }
         .buttonStyle(.plain)
-        .scaleEffect(lit ? Futuristic.litGrowth : 1)
         .noSystemFocus()
     }
 

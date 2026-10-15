@@ -80,7 +80,7 @@ class Screen: SKNode {
 
     /// A choice in one of Futuristic_UI's frames at `scale` of the menus' size, turned round
     /// across or down as asked, and in its face its lettering in the menus' face or `icon`: all
-    /// in the menus' blue, gold and a tenth bigger under the cursor.
+    /// in the menus' blue, gold under the cursor.
     @discardableResult
     func addFramed(_ text: String?, frame name: String, scale: CGFloat, mirroredX: Bool = false, mirroredY: Bool = false,
                    icon: SKNode? = nil, textSize: CGFloat = 16, at point: CGPoint, sound: SoundBoard.Effect = SoundBoard.confirm,
@@ -132,7 +132,6 @@ class Screen: SKNode {
         for (index, choice) in choices.enumerated() {
             let lit = index == cursor && choice.enabled
             if let node = tinted[index] {
-                choice.node.setScale(lit ? Futuristic.litGrowth : 1)
                 Screen.colour(node, lit ? Futuristic.litColour : Futuristic.lineColour)
                 continue
             }
@@ -434,7 +433,6 @@ final class PickScreen: Screen {
         for (index, outline) in outlines.enumerated() { outline.isHidden = index != cursor }
         for (index, name) in names.enumerated() {
             Screen.colour(name, index == cursor ? Futuristic.litColour : Futuristic.lineColour)
-            name.setScale(index == cursor ? Futuristic.litGrowth : 1)
         }
         // In the system's italic: none of the menus' faces has one.
         comment.attributedText = NSAttributedString(string: "\u{201C}\(offer.comment)\u{201D}", attributes: [
@@ -600,8 +598,7 @@ final class WinScreen: Screen {
 /// voter shows only once their pick is in. Two different picks flip a coin between them,
 /// the light going back and forth before it lands.
 final class StageSelectScreen: Screen {
-    /// Each stage: Futuristic_UI's box1, in the menus' blue or gold when raised, in a container
-    /// that grows a tenth.
+    /// Each stage: Futuristic_UI's box1, in the menus' blue or gold when raised.
     private var tiles: [SKNode] = []
     private var tilePlates: [SKSpriteNode] = []
     /// Each stage's name in its lines, two when it has a space to break at, in the menus' face.
@@ -858,9 +855,8 @@ final class StageSelectScreen: Screen {
     private func refresh() {
         defer { tellRaised() }
         let raised: Set<Int> = flipLit.map { [$0] } ?? Set(voters.compactMap { picks[$0] ?? cursors[$0] })
-        for (index, tile) in tiles.enumerated() {
+        for index in tiles.indices {
             let lit = raised.contains(index)
-            tile.setScale(lit ? Futuristic.litGrowth : 1)
             tilePlates[index].color = lit ? Futuristic.litColour : Futuristic.lineColour
             for label in tileLabels[index] { label.fontColor = lit ? Futuristic.litColour : Futuristic.lineColour }
         }

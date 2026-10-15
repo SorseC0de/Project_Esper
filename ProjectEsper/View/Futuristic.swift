@@ -10,7 +10,6 @@ enum Futuristic {
     static let line = Color(rgb: lineRGB)
     /// The customize screen's top line.
     static let lit = Color(rgb: EsperPalette.gold.light)
-    static let litGrowth: CGFloat = 1.1
     /// The menus' face: the debug strip's UI FONT pick, A to K, Upheaval to start; kept.
     static let typefaces = ["UpheavalTT-BRK-", "InfiniumGuardian", "PlanetaryContact", "SadMachine", "BoldPixels", "Caja",
                         "7pixelsOfPerfect", "BoardofDirectors-Heavy", "BMarmyA12", "Kapel", "LongShot"]
@@ -162,7 +161,7 @@ struct FuturisticPiece: View {
     }
 }
 
-/// A frame with something centred on its face; cyan, or gold and a tenth bigger when lit.
+/// A frame with something centred on its face; cyan, or gold when lit.
 struct FuturisticFrame<Content: View>: View {
     let name: String
     let lit: Bool
@@ -187,7 +186,6 @@ struct FuturisticFrame<Content: View>: View {
                 content(lit ? Futuristic.lit : Futuristic.line)
                     .offset(x: (faceX - 0.5) * piece.size.width, y: (faceY - 0.5) * piece.size.height)
             }
-            .scaleEffect(lit ? Futuristic.litGrowth : 1)
     }
 }
 

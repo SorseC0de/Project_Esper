@@ -7,7 +7,7 @@ import SwiftUI
 /// list and hear back, and the wait for either, cancellable. Full screen in the menus' look:
 /// the grid on black, the name lettered as FLO is, the modes as words with rule6 between them,
 /// each choice in Futuristic_UI's frame 8, every other one turned round both ways, the cursor's
-/// gold and a tenth bigger; back is the corner arrow, or B.
+/// gold; back is the corner arrow, or B.
 struct MultiplayerScreen: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
@@ -131,7 +131,7 @@ struct MultiplayerScreen: View {
     }
 
     /// A mode as a word, as the title's VS CPU and VS HUMAN are: the one asked for in the blue, the
-    /// rest dim, gold and a tenth bigger under the cursor.
+    /// rest dim, gold under the cursor.
     private func modeSwitch(_ mode: GameMode) -> some View {
         let lit = flow.multiplayerSelection == .mode(mode)
         let picked = GameScene.savedOnlineMode == mode
@@ -146,7 +146,6 @@ struct MultiplayerScreen: View {
         .disabled(parked)
         .saturation(parked ? 0 : 1)
         .opacity(parked ? TitleOverlay.parkedOpacity : 1)
-        .scaleEffect(lit ? Futuristic.litGrowth : 1)
         .noSystemFocus()
     }
 

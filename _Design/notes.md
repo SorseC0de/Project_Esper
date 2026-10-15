@@ -46,7 +46,6 @@ the migration sets them to these exactly.
 | Skin, back | #BF6F4A | 32 |
 | Clothes, front | #424C6E | 60 |
 | Clothes, back | #2A2F4E | 20 |
-| #4A5462 (AAP-64's grey, 2 pixels): left over, or meant? | #4A5462 | 2 |
 
 Green is a ninth hood colour, Emerald (`EnergyColour.name`): it needs a place in the wheel and
 on the customize picker. Light blue takes teal's place; its name, Larimar, is in already.

@@ -44,8 +44,8 @@ the migration sets them to these exactly.
 | Energy, back limbs | #00396D | 16 |
 | Skin, front (the new default) | #E69C69 | 42 |
 | Skin, back | #BF6F4A | 32 |
-| Clothes, front | #424C6E | 60 |
-| Clothes, back | #2A2F4E | 20 |
+| Bodysuit, front | #3D3D3D | 60 |
+| Bodysuit, back | #272727 | 20 |
 
 Green is a ninth hood colour, Emerald (`EnergyColour.name`): it needs a place in the wheel and
 on the customize picker. Light blue takes teal's place; its name, Larimar, is in already.

@@ -26,3 +26,6 @@ choice of several colours, and above all the blues AAP-64 lacks.
 - **H.O.O.D lettering on the customize screen:** two tones of the side's energy colour, where
   now it's teal over the energy colour for every side. The current bottom (the energy colour)
   becomes the top, and a darker tone of it the bottom.
+- **Customize tick blips too small:** they're 0.4 of ring 8 across (`CustomizeScreen.tickBlipShare`);
+  the Rounds lights in the same ring are right at 0.5 (`GameScene.roundLightShare`, of the radius,
+  so half the ring across). Match them.

@@ -47,6 +47,27 @@ the migration sets them to these exactly.
 | Bodysuit, front | #3D3D3D | 60 |
 | Bodysuit, back | #272727 | 20 |
 
+### Skin tones (the user's, EDG64)
+
+Eight, each a front and a back tone, the back the next skin's front down the ramp. The second is
+the default. The last three are unlocked or bought, not open from the start: there's no
+unlocking yet, so the customize screen will need a locked state for them.
+
+| # | Skin | Front | Back |
+|---|---|---|---|
+| 1 | | #F6CA9F | #E69C69 |
+| 2 | Default | #E69C69 | #BF6F4A |
+| 3 | | #BF6F4A | #8A4836 |
+| 4 | | #8A4836 | #5D2C28 |
+| 5 | | #5D2C28 | #391F21 |
+| 6 | Silver (locked) | #B4B4B4 | #858585 |
+| 7 | Gold (locked) | #EDAB50 | #E07438 |
+| 8 | Onyx (locked) | #657392 | #424C6E |
+
+Today there are seven (`HumanLook.skinTones`, the hooded heads' six and the robot's); the hooded
+heads' sheet (`player_hoodheads`) has a frame a skin, so it needs the new eight, or the faces
+recoloured to these from one.
+
 Green is a ninth hood colour, Emerald (`EnergyColour.name`): it needs a place in the wheel and
 on the customize picker. Light blue takes teal's place; its name, Larimar, is in already.
 

@@ -2231,6 +2231,8 @@ final class GameScene: SKScene {
                 courtTarget = courtColour
             }
             WreckCenterArt.tint(art, courtColour)
+            // Built after the stage's flats were gathered: gathered again, so its pictures don't glow.
+            refreshStaticFlats()
         }
         for row in 0..<(stage.rows + stage.skyRows) where !stage.features.scenic && !isElements && wreckCenterArt == nil {
             for column in 0..<stage.columns {
@@ -3406,6 +3408,16 @@ final class GameScene: SKScene {
         controls.onToggleWalls = { [weak self] on in self?.showWalls = on }
         controls.aiOn = aiOn
         controls.onToggleAI = { [weak self] on in self?.aiOn = on }
+        // The map maker only means anything on a hand-laid stage, offline, with a mouse.
+        #if !os(tvOS)
+        controls.mapAvailable = [StageLook.elements, .hoopfishHideaway, .kAndA, .court].contains(match.stage.features.look) && online == nil
+        controls.mapOpen = mapEditor != nil
+        controls.onMap = { [weak self] in
+            guard let self else { return }
+            self.mapEditor == nil ? self.openMapEditor() : self.closeMapEditor(restart: true)
+            self.controls?.mapOpen = self.mapEditor != nil
+        }
+        #endif
         // The pickers and sliders for working on the game, in a debug build only.
         if DebugUI.enabled {
         controls.addPicker(title: "HEAD", options: HeadVariant.allCases.map(\.label), selected: headVariant.rawValue) { [weak self] index in
@@ -3436,14 +3448,6 @@ final class GameScene: SKScene {
             self?.powerLevelVariant = PowerLevelVariant(rawValue: index)!
             self?.applyPower()
         }
-        // The map maker only means anything on a hand-laid stage, offline, with a mouse.
-        #if !os(tvOS)
-        if [StageLook.elements, .hoopfishHideaway, .kAndA, .court].contains(match.stage.features.look), online == nil {
-            controls.addPicker(title: "MAP", options: ["OFF", "ON"], selected: mapEditor == nil ? 0 : 1) { [weak self] index in
-                index == 1 ? self?.openMapEditor() : self?.closeMapEditor(restart: true)
-            }
-        }
-        #endif
         // The hoop support builder, on the Wreck Center.
         #if !os(tvOS)
         if match.stage.features.look == .court, online == nil {
@@ -6989,6 +6993,7 @@ final class GameScene: SKScene {
         guard mapEditor != nil else { return }
         mapEditor?.removeFromParent()
         mapEditor = nil
+        controls?.mapOpen = false
         wholeStageView = false
         cameraBase = .zero
         layout(displayScale: framingScale)
@@ -9300,8 +9305,10 @@ final class GameScene: SKScene {
             return
         }
         // A tap on your own FLO meter: into FloState, or out of it, as throw and shoot together;
-        // when neither is open to it, the meter shakes and nothing's sent.
-        if GameScene.touchControlsShown, floMeters.indices.contains(localIndex), !floMeters[localIndex].isHidden,
+        // when neither is open to it, the meter shakes and nothing's sent. The debug UI first:
+        // the first meter sits in the corner under the pickers.
+        if GameScene.touchControlsShown, controls?.claims(hudPoint(point, viewSize: viewSize)) != true,
+           floMeters.indices.contains(localIndex), !floMeters[localIndex].isHidden,
            floMeters[localIndex].calculateAccumulatedFrame().insetBy(dx: -GameScene.floMeterTapSlack, dy: -GameScene.floMeterTapSlack)
             .contains(hudPoint(point, viewSize: viewSize)) {
             let player = match.players[localIndex]

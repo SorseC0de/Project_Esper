@@ -1994,8 +1994,8 @@ bottom of) and the ball's. `StageMap.baked` is what every phone plays, online in
 map kept by the map maker stands in for it offline only (`SavedStageMap`), unless a newer
 map has been baked since (`StageMap.bakedVersion`, up by one with each bake), when it's put
 aside under `esper.elementsMap.beforeBake` and the baked one shows. The map maker
-(`MapEditor`, for a mouse; not on the TV) is the MAP picker on the debug panel, on this stage
-offline: the match held still, the camera zoomed out to the whole stage at once (as big as it fits, not by whole pixels; back to play's zoom on close), a grid over the stage, a small panel in the upper right corner
+(`MapEditor`, for a mouse; not on the TV) is the MAP corner switch beside WALLS (a debug build, a
+map-laid stage, offline; the debug UI takes its touches before the FLO meter under it): the match held still, the camera zoomed out to the whole stage at once (as big as it fits, not by whole pixels; back to play's zoom on close), a grid over the stage, a small panel in the upper right corner
 with the tileset. Drag a tile
 from the panel onto the stage to drop it, and with a tile chosen press an empty cell and drag
 to paint; press a placed tile to pick it up and drop it elsewhere, or back on the panel to take
@@ -2703,7 +2703,8 @@ palette 60 (#3D3D3D) alone, in white, tinted; 47's three-point lines; the tiles;
 (#5D5D5D) alone, tinted; the extras. The painted pictures don't glow; the two tinted ones take
 the court's possession colour and glow as its tiles did: neutral #5D5D5D, held the holder's
 energy at the court's shade, white on a score, the back wall's at 60's share of 59's. Both glow
-through the flat art (the mask's blue), as the green under them would otherwise stop them.
+through the flat art (the mask's blue), as the green under them would otherwise stop them; the
+flats are gathered again once the art is built, as they're first gathered before it.
 Its pieces are laid in the map editor (`MapStage.wreckCenter`, MAP on the court), bottom left on
 a 16-pixel cell: the one-way platform (8 frames), conveyor L, M and R, the same three flipped
 (each strip mirrored in place), all 32 by 32, and the floor display (32 by 42) and wall display

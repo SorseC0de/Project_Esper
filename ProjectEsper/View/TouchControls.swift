@@ -69,6 +69,7 @@ final class TouchControls: SKNode {
     private let hitboxButton = TouchControls.cornerButton("HITBOX")
     private let aiButton = TouchControls.cornerButton("AI")
     private let wallsButton = TouchControls.cornerButton("WALLS")
+    private let mapButton = TouchControls.cornerButton("MAP")
     /// Pause, offline: frame 1 small, a pause sign in its face, in the top right corner over the FLO meter.
     private let pauseButton = TouchControls.pauseIcon()
     static let pauseScale: CGFloat = 0.3
@@ -120,6 +121,7 @@ final class TouchControls: SKNode {
             button.position = CGPoint(x: start - CGFloat(index) * step, y: rowY)
         }
         wallsButton.position = CGPoint(x: hitboxButton.position.x, y: hitboxButton.position.y - (TouchControls.cornerSize.height + 6) * k)
+        mapButton.position = CGPoint(x: aiButton.position.x, y: wallsButton.position.y)
     }
     /// Where pause is, in this node's space.
     var pauseFrame: CGRect { pauseButton.frame }
@@ -138,6 +140,11 @@ final class TouchControls: SKNode {
     /// The WALLS toggle under it: the stage's solids drawn over the world.
     var showWalls = false { didSet { TouchControls.light(wallsButton, on: showWalls) } }
     var onToggleWalls: ((Bool) -> Void)?
+    /// The MAP button beside it: the map editor, on a stage that has one, offline.
+    var mapOpen = false { didSet { TouchControls.light(mapButton, on: mapOpen) } }
+    var mapAvailable = false { didSet { refreshMapButton() } }
+    var onMap: (() -> Void)?
+    private func refreshMapButton() { mapButton.isHidden = !DebugUI.enabled || online || !mapAvailable }
     var onToggleHitboxes: ((Bool) -> Void)?
     /// The AI switch beside that: whether the computer plays the other side.
     var aiOn = true { didSet { TouchControls.light(aiButton, on: aiOn) } }
@@ -242,11 +249,12 @@ final class TouchControls: SKNode {
         addChild(sliderTab)
         refreshBenches()
         // The corner row along the top, right to left, till the FLO meter's laid out and it's put under it.
-        for button in [resetButton, hitboxButton, aiButton, wallsButton] as [SKNode] + [pauseButton] { addChild(button) }
+        for button in [resetButton, hitboxButton, aiButton, wallsButton, mapButton] as [SKNode] + [pauseButton] { addChild(button) }
         placeCornerRow(top: top, right: right)
         TouchControls.light(aiButton, on: aiOn)
         // The switches for working on the game, in a debug build only.
         for button in [hitboxButton, wallsButton, aiButton] { button.isHidden = !DebugUI.enabled }
+        refreshMapButton()
     }
 
     /// Online there's no reset, no pause, no computer and no tuning: only the pad and HITBOX.
@@ -255,6 +263,7 @@ final class TouchControls: SKNode {
         pauseButton.isHidden = online
         aiButton.isHidden = online || !DebugUI.enabled
         self.online = online
+        refreshMapButton()
         refreshBenches()
     }
 
@@ -375,6 +384,16 @@ final class TouchControls: SKNode {
 
     // MARK: Touches, in this node's space
 
+    /// Whether a point is on the debug UI: the benches' tabs, the corner switches, an open
+    /// picker or a slider. It goes here before anything else in the HUD can take it.
+    func claims(_ point: CGPoint) -> Bool {
+        let tabs = [pickerTab, sliderTab].contains { !$0.isHidden && $0.frame.insetBy(dx: -4, dy: -4).contains(point) }
+        let switches = [resetButton, hitboxButton, aiButton, wallsButton, mapButton].contains { !$0.isHidden && $0.frame.insetBy(dx: -8, dy: -3).contains(point) }
+        let benches = pickers.contains { !$0.isHidden && $0.calculateAccumulatedFrame().contains(point) }
+            || sliders.contains { !$0.isHidden && $0.covers(convert(point, to: $0)) }
+        return tabs || switches || benches
+    }
+
     func began(_ touch: UITouch, at point: CGPoint) {
         if !pickerTab.isHidden, pickerTab.frame.insetBy(dx: -4, dy: -4).contains(point) {
             pickersOpen.toggle()
@@ -400,6 +419,10 @@ final class TouchControls: SKNode {
         if !wallsButton.isHidden, wallsButton.frame.insetBy(dx: -8, dy: -3).contains(point) {
             showWalls.toggle()
             onToggleWalls?(showWalls)
+            return
+        }
+        if !mapButton.isHidden, mapButton.frame.insetBy(dx: -8, dy: -3).contains(point) {
+            onMap?()
             return
         }
         if !aiButton.isHidden, aiButton.frame.insetBy(dx: -8, dy: -8).contains(point) {

@@ -88,6 +88,7 @@ enum HoopfishHideawayArt {
                 return half
             }()
         case .hoopfish: picture("HoopfishBody")
+        default: SKTexture()
         }
     }
 

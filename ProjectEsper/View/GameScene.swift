@@ -699,6 +699,8 @@ final class GameScene: SKScene {
     /// What glows on Hoopfish Hideaway over its background, which doesn't: the Hoopfish's rings and eye.
     var glowThroughSnapshots: [BodySnapshot] {
         if let art = hoopfishHideawayArt { return art.fishGlowParts }
+        // The Wreck Center's possession pixels and its displays' lit ones, over its flat art.
+        if let art = wreckCenterArt { return art.glowing }
         // Flight B411's NO DUNKING sign and its red "no", glowing through the backdrop's flat;
         // the seatbelt sign, and the 2X or the 3X, while lit.
         guard let holder = noDunkingNode, !holder.isHidden else { return [] }
@@ -738,6 +740,7 @@ final class GameScene: SKScene {
 
     private var stageTornadoSnapshots: [BodySnapshot] {
         if let wet = hoopfishHideawayArt { return wet.fishFlats }
+        if let art = wreckCenterArt { return art.pieceFlats }
         // Only what's above the lava: sunk, the lava in front of them still glows.
         guard let art = elementsArt else { return [] }
         let hanging = hangingIcicles.values.compactMap { node in
@@ -2221,6 +2224,7 @@ final class GameScene: SKScene {
         // The Wreck Center from its map, in place of the flat tiles.
         if stage.features.look == .court, let art = WreckCenterArt.build(into: stageGround) {
             wreckCenterArt = art
+            art.setPieces(StageMap.current[.wreckCenter].props)
             backgroundColor = SKColor(rgb: WreckCenterArt.beyond)
             if (match.ball.holder ?? match.ball.owner) == nil {
                 courtColour = SKColor(rgb: WreckCenterArt.tilesNeutral)
@@ -3072,6 +3076,7 @@ final class GameScene: SKScene {
         }
         stepJellyfishNode()
         HoopfishHideawayArt.animate(hoopfishHideawayArt?.hoopfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
+        if let art = wreckCenterArt { WreckCenterArt.animate(art, at: CACurrentMediaTime()) }
         HoopfishHideawayArt.sway(hoopfishHideawayArt?.props ?? [], at: CACurrentMediaTime())
         swimmers = swimmers.compactMap { swimmer in
             var swimmer = swimmer
@@ -3433,7 +3438,7 @@ final class GameScene: SKScene {
         }
         // The map maker only means anything on a hand-laid stage, offline, with a mouse.
         #if !os(tvOS)
-        if [StageLook.elements, .hoopfishHideaway, .kAndA].contains(match.stage.features.look), online == nil {
+        if [StageLook.elements, .hoopfishHideaway, .kAndA, .court].contains(match.stage.features.look), online == nil {
             controls.addPicker(title: "MAP", options: ["OFF", "ON"], selected: mapEditor == nil ? 0 : 1) { [weak self] index in
                 index == 1 ? self?.openMapEditor() : self?.closeMapEditor(restart: true)
             }
@@ -6878,6 +6883,7 @@ final class GameScene: SKScene {
         case .elements: mapStage = .elements
         case .hoopfishHideaway: mapStage = .hoopfishHideaway
         case .kAndA: mapStage = .kAndA
+        case .court: mapStage = .wreckCenter
         default: return
         }
         guard mapEditor == nil, online == nil else { return }
@@ -6886,6 +6892,7 @@ final class GameScene: SKScene {
             case .elements: .elements
             case .hoopfishHideaway: .hoopfishHideaway
             case .kAndA: .kAndA
+            case .wreckCenter: .court
             }
         }
         wholeStageView = true
@@ -6925,6 +6932,7 @@ final class GameScene: SKScene {
                 // The Hoopfish carries the rim: the stage again, for where it now is.
                 self?.hoopfishHideawayArt?.setProps(StageMap.current[.hoopfishHideaway].props)
                 self?.hoopfishHideawayArt?.setPile(StageMap.current[.hoopfishHideaway].pile)
+                self?.wreckCenterArt?.setPieces(StageMap.current[.wreckCenter].props)
                 self?.refreshStaticFlats()
                 self?.session.mutate { $0.stage = rebuilt(); $0.refreshExtras() }
             },

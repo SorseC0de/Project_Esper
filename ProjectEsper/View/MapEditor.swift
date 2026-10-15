@@ -229,12 +229,22 @@ final class MapEditor: SKNode {
     required init?(coder: NSCoder) { fatalError() }
 
     /// What's in hand to start with, and back from walls mode: a tile, or Hoopfish Hideaway's first plant.
+    /// A prop's picture in the panel and in hand: the Hoopfish Hideaway's, or a Wreck Center piece's first frame.
+    private static func propTexture(_ kind: StageMap.PropKind) -> SKTexture {
+        WreckCenterArt.frames[kind]?.first ?? HoopfishHideawayArt.texture(kind)
+    }
+
+    /// The stages laid with props rather than tiles from a sheet.
+    private static func laysProps(_ stage: MapStage) -> Bool { [MapStage.hoopfishHideaway, .wreckCenter].contains(stage) }
+
     private static func firstTool(for stage: MapStage) -> Tool {
         switch stage {
         case .hoopfishHideaway: .prop(.plant1)
         case .elements: .brush(ElementsArt.filled.first { $0 == StageMap.Cell(3, 3) } ?? ElementsArt.filled[0])
         // K&A's picture is drawn whole: its markers and walls are what there is to lay.
         case .kAndA: .marker(.firstStart)
+        // The Wreck Center's picture is drawn whole too: its pieces are what there is to lay.
+        case .wreckCenter: .prop(.onewayPlatform)
         }
     }
 
@@ -281,18 +291,21 @@ final class MapEditor: SKNode {
         buttons = []
         let scale = paletteScale
         let sheetSize = tiles.sheets[sheetIndex].size()
-        let showsSheet = paletteShown && !wallsMode && stage != .hoopfishHideaway
-        let showsProps = paletteShown && !wallsMode && stage == .hoopfishHideaway
+        let hasProps = MapEditor.laysProps(stage)
+        let showsSheet = paletteShown && !wallsMode && !hasProps
+        let showsProps = paletteShown && !wallsMode && hasProps
+        let hasPile = stage == .hoopfishHideaway
+        let propKinds = StageMap.PropKind.kinds(for: stage)
         // The props in a row, each scaled to the row's height but no wider than it allows.
         let propHeight: CGFloat = 28
-        let propSizes = StageMap.PropKind.allCases.map { kind -> CGSize in
+        let propSizes = propKinds.map { kind -> CGSize in
             let pixels = kind.pixelSize
             let fit = min(propHeight / CGFloat(pixels.height), 48 / CGFloat(pixels.width))
             return CGSize(width: CGFloat(pixels.width) * fit, height: CGFloat(pixels.height) * fit)
         }
         let pileSide = propHeight
-        let pileWidth = (pileSide + 3) * CGFloat(StageMap.PilePiece.Kind.allCases.count)
-        let propsWidth = propSizes.reduce(CGFloat(0)) { $0 + $1.width } + 3 * CGFloat(propSizes.count - 1) + 6 + pileWidth
+        let pileWidth = hasPile ? (pileSide + 3) * CGFloat(StageMap.PilePiece.Kind.allCases.count) : 0
+        let propsWidth = propSizes.reduce(CGFloat(0)) { $0 + $1.width } + 3 * CGFloat(propSizes.count - 1) + (hasPile ? 6 : 0) + pileWidth
         let paletteSize = showsSheet ? CGSize(width: sheetSize.width * scale, height: sheetSize.height * scale)
             : (showsProps ? CGSize(width: propsWidth, height: propHeight) : .zero)
         let margin: CGFloat = 5, rowHeight: CGFloat = 15, gap: CGFloat = 3, fontSize: CGFloat = 7
@@ -334,7 +347,7 @@ final class MapEditor: SKNode {
         let rowWidths = rows.map { row in row.reduce(CGFloat(0)) { $0 + labelWidth($1.0) } + gap * CGFloat(max(row.count - 1, 0)) }
         let contentWidth = max(rowWidths.max() ?? 0, paletteSize.width)
         // Under the props, a slider each for the newest two pile pieces' turns.
-        let sliderRows = showsProps ? 2 : 0
+        let sliderRows = showsProps && hasPile ? 2 : 0
         let contentHeight = rowHeight * CGFloat(rows.count + sliderRows) + (showsSheet || showsProps ? paletteSize.height + margin : 0)
         let right = halfWidth - margin, top = halfHeight - margin
         let left = right - contentWidth
@@ -389,12 +402,13 @@ final class MapEditor: SKNode {
         if showsProps {
             var x = left
             let bottom = top - contentHeight
-            for (kind, size) in zip(StageMap.PropKind.allCases, propSizes) {
+            for (kind, size) in zip(propKinds, propSizes) {
                 let rect = CGRect(x: x, y: bottom, width: size.width, height: size.height)
-                let sprite = SKSpriteNode(texture: HoopfishHideawayArt.texture(kind))
+                let sprite = SKSpriteNode(texture: MapEditor.propTexture(kind))
                 sprite.anchorPoint = .zero
                 sprite.size = size
-                sprite.position = rect.origin
+                if WreckCenterArt.isFlipped(kind) { sprite.xScale = -1 }
+                sprite.position = WreckCenterArt.isFlipped(kind) ? CGPoint(x: rect.maxX, y: rect.minY) : rect.origin
                 sprite.zPosition = 1
                 panel.addChild(sprite)
                 if case .prop(let held) = tool, held == kind {
@@ -410,7 +424,7 @@ final class MapEditor: SKNode {
             // The pile's pieces after them.
             x += 6
             pileButtons = []
-            for kind in StageMap.PilePiece.Kind.allCases {
+            for kind in hasPile ? StageMap.PilePiece.Kind.allCases : [] {
                 let rect = CGRect(x: x, y: bottom, width: pileSide, height: pileSide)
                 let sprite = SKSpriteNode(texture: HoopfishHideawayArt.pileTexture(kind))
                 sprite.anchorPoint = .zero
@@ -430,7 +444,7 @@ final class MapEditor: SKNode {
             }
             // The turn sliders, newest piece first.
             turnSliders = []
-            for row in 0..<2 {
+            for row in 0..<(hasPile ? 2 : 0) {
                 let index = map.pile.count - 1 - row
                 let y = top - rowHeight * CGFloat(rows.count + row + 1)
                 let label = SKLabelNode(text: index >= 0 ? "TURN \(row == 0 ? "LAST" : "2ND") \(Int(map.pile[index].rotation.rounded()))\u{00B0}" : "TURN —")
@@ -519,7 +533,7 @@ final class MapEditor: SKNode {
     }
 
     private func paletteCell(at point: CGPoint) -> StageMap.Cell? {
-        guard paletteShown, !wallsMode, stage != .hoopfishHideaway, paletteRect.contains(point) else { return nil }
+        guard paletteShown, !wallsMode, !MapEditor.laysProps(stage), paletteRect.contains(point) else { return nil }
         let side = tiles.cellPixels(of: sheetIndex) * paletteScale
         let cell = StageMap.Cell(sheetIndex * tiles.stride + Int((point.x - paletteRect.minX) / side), Int((paletteRect.maxY - point.y) / side))
         return tiles.filled(sheet: sheetIndex).contains(cell) ? cell : nil
@@ -793,7 +807,7 @@ final class MapEditor: SKNode {
             showGhost(at: point)
             return
         }
-        if multiSelect, paletteShown, !wallsMode, stage != .hoopfishHideaway, paletteRect.contains(point) {
+        if multiSelect, paletteShown, !wallsMode, !MapEditor.laysProps(stage), paletteRect.contains(point) {
             // MULTI: a block of the sheet, from here to where the drag lets go.
             let corner = sheetCell(at: point)
             blockStart = corner
@@ -1079,13 +1093,14 @@ final class MapEditor: SKNode {
             ghost = sprite
         case .prop(let kind, _):
             // Held by its bottom left cell's middle.
-            let sprite = SKSpriteNode(texture: HoopfishHideawayArt.texture(kind))
+            let sprite = SKSpriteNode(texture: MapEditor.propTexture(kind))
             sprite.anchorPoint = .zero
             let pixels = kind.pixelSize
             sprite.size = CGSize(width: CGFloat(pixels.width) * cellSide / ElementsArt.tileSide, height: CGFloat(pixels.height) * cellSide / ElementsArt.tileSide)
+            if WreckCenterArt.isFlipped(kind) { sprite.xScale = -1 }
             sprite.alpha = 0.8
             sprite.zPosition = 10
-            sprite.position = CGPoint(x: point.x - cellSide / 2, y: point.y - cellSide / 2)
+            sprite.position = CGPoint(x: point.x - cellSide / 2 + (WreckCenterArt.isFlipped(kind) ? sprite.size.width : 0), y: point.y - cellSide / 2)
             addChild(sprite)
             ghost = sprite
         case .marker(let marker, _):

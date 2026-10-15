@@ -1,6 +1,7 @@
 /// The stages laid out by hand in the map maker.
 public enum MapStage: String, CaseIterable, Codable {
-    case elements, hoopfishHideaway, kAndA
+    /// The Wreck Center's is its pieces alone: its tiles are the court's, laid in code.
+    case elements, hoopfishHideaway, kAndA, wreckCenter
 
     /// Its size in tiles.
     public var columns: Int {
@@ -8,6 +9,7 @@ public enum MapStage: String, CaseIterable, Codable {
         case .elements: ElementsRules.columns
         case .hoopfishHideaway: HoopfishHideawayRules.columns
         case .kAndA: KAndARules.columns
+        case .wreckCenter: Stage.court.columns
         }
     }
     public var rows: Int {
@@ -15,6 +17,7 @@ public enum MapStage: String, CaseIterable, Codable {
         case .elements: ElementsRules.rows
         case .hoopfishHideaway: HoopfishHideawayRules.rows
         case .kAndA: KAndARules.rows
+        case .wreckCenter: Stage.court.rows
         }
     }
 }
@@ -87,6 +90,18 @@ public struct StageMap: Equatable, Codable {
     /// its Hoopfish, which carries the stage's one rim.
     public enum PropKind: String, Codable, CaseIterable {
         case plant1, plant2, plant3, plant4, plant5, rock1, rock2, hoopfish
+        /// The Wreck Center's: its animated tiles, two cells square (the conveyors again flipped,
+        /// running the other way), and its two displays.
+        case onewayPlatform, conveyorL, conveyorM, conveyorR, flippedConveyorL, flippedConveyorM, flippedConveyorR, displayFloor, displayWall
+
+        /// The props a stage's map maker offers.
+        public static func kinds(for stage: MapStage) -> [PropKind] {
+            switch stage {
+            case .wreckCenter: [.onewayPlatform, .conveyorL, .conveyorM, .conveyorR, .flippedConveyorL, .flippedConveyorM, .flippedConveyorR,
+                                .displayFloor, .displayWall]
+            default: [.plant1, .plant2, .plant3, .plant4, .plant5, .rock1, .rock2, .hoopfish]
+            }
+        }
 
         /// Maps saved before the Hoopfish was renamed call it the hooperfish.
         public init(from decoder: Decoder) throws {
@@ -109,6 +124,8 @@ public struct StageMap: Equatable, Codable {
             case .plant5: (80, 64)
             case .rock1, .rock2: (112, 112)
             case .hoopfish: (96, 48)
+            case .onewayPlatform, .conveyorL, .conveyorM, .conveyorR, .flippedConveyorL, .flippedConveyorM, .flippedConveyorR, .displayWall: (32, 32)
+            case .displayFloor: (32, 42)
             }
         }
     }
@@ -225,6 +242,7 @@ public struct StageMap: Equatable, Codable {
         switch stage {
         case .elements, .hoopfishHideaway: 5
         case .kAndA: 5
+        case .wreckCenter: 1
         }
     }
 
@@ -234,11 +252,19 @@ public struct StageMap: Equatable, Codable {
         case .elements: elementsBaked
         case .hoopfishHideaway: hoopfishHideawayBaked
         case .kAndA: kAndABaked
+        case .wreckCenter: wreckCenterBaked
         }
     }
     private static let elementsBaked: StageMap = StageMap.defaultMap()
     private static let hoopfishHideawayBaked: StageMap = StageMap.hoopfishHideawayDefaultMap()
     private static let kAndABaked: StageMap = StageMap.kAndADefaultMap()
+    private static let wreckCenterBaked: StageMap = StageMap.wreckCenterDefaultMap()
+
+    /// The Wreck Center's pieces as laid out in the map maker (none yet). Its markers stand where
+    /// the court's are; the court lays its own tiles, rims and starts, so they're only for show.
+    private static func wreckCenterDefaultMap() -> StageMap {
+        StageMap(leftRim: Cell(4, 9), rightRim: Cell(29, 9), spawns: [Cell(8, 1), Cell(25, 1)], ball: Cell(17, 8), walls: [])
+    }
 
     /// K&A as laid out in the map maker (the builder's COPY): three rows of ground, the two cars'
     /// roofs as one-ways (their ends one-way slopes), the rims, the starts and the ball where
@@ -283,6 +309,7 @@ public struct StageMap: Equatable, Codable {
         case .elements: "defaultMap"
         case .hoopfishHideaway: "hoopfishHideawayDefaultMap"
         case .kAndA: "kAndADefaultMap"
+        case .wreckCenter: "wreckCenterDefaultMap"
         }
         var lines = ["    private static func \(name)() -> StageMap {",
                      "        let tiles: [Placed] = ["]

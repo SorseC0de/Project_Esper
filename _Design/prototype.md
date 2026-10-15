@@ -2702,6 +2702,13 @@ framing the court as before. Back to front: the background and the back wall; th
 palette 60 (#3D3D3D) alone, in white, tinted; 47's three-point lines; the tiles; their palette 59
 (#5D5D5D) alone, tinted; the extras. The painted pictures don't glow; the two tinted ones take
 the court's possession colour and glow as its tiles did: neutral #5D5D5D, held the holder's
-energy at the court's shade, white on a score, the back wall's at 60's share of 59's. Still to
-come: the animated tiles (one-way platform, conveyor L, M and R) and the two displays (floor and
-wall), placed in the map editor; the middle ledge has no art of its own till then.
+energy at the court's shade, white on a score, the back wall's at 60's share of 59's. Both glow
+through the flat art (the mask's blue), as the green under them would otherwise stop them.
+Its pieces are laid in the map editor (`MapStage.wreckCenter`, MAP on the court), bottom left on
+a 16-pixel cell: the one-way platform (8 frames), conveyor L, M and R, the same three flipped
+(each strip mirrored in place), all 32 by 32, and the floor display (32 by 42) and wall display
+(32 by 32), 4 frames each; all of them at 10 frames a second, in step, over the tiles. The
+displays' white, #C7CFDD and #92A1B9 pixels are lit: tinted the court's colour brought up to
+full brightness, so the neutral grey leaves them as drawn, and glowing; #657392, the pole, stays.
+The pieces are pictures only for now: what they do comes later, and the court's sim doesn't read
+the map's markers or walls yet.

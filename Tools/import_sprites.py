@@ -33,7 +33,7 @@ STRIPS = os.path.join(os.path.dirname(__file__), "..", "_Graphic Assets", "Pixel
 # The folders the strips are sorted into, besides the root.
 STRIP_FOLDERS = ["", "Effects", "Player"]
 # Stage art in Pixel Art/Stages that the game draws; the rest of that folder isn't imported.
-STAGE_ART = ["Backboard", "Hoop", "Hoop_support", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/tornado_burst", "Elements/fire_tornado_burst", "Elements/fireball", "Elements/sizzle1", "Elements/sizzle2", "Elements/lava_splash", "Elements/wind", "Elements/splash", "Elements/small_lightning", "Elements/icicle_empty", "Elements/icicle_form", "Elements/icicle", "Hoopfish Hideaway/bubbles_jellyfish", "Hoopfish Hideaway/Hoopfish/Hoopfish_spin", "Hoopfish Hideaway/Backboards", "Hoopfish Hideaway/hoops", "Hoopfish Hideaway/fish", "Hoopfish Hideaway/shark", "Hoopfish Hideaway/crab", "Hoopfish Hideaway/jellyfish"]
+STAGE_ART = ["Backboard", "Hoop", "Hoop_support", "Backboard_straight", "Hoop_straight", "Elements/lava", "Elements/tornado", "Elements/fire_tornado", "Elements/tornado_burst", "Elements/fire_tornado_burst", "Elements/fireball", "Elements/sizzle1", "Elements/sizzle2", "Elements/lava_splash", "Elements/wind", "Elements/splash", "Elements/small_lightning", "Elements/icicle_empty", "Elements/icicle_form", "Elements/icicle", "Hoopfish Hideaway/bubbles_jellyfish", "Hoopfish Hideaway/Hoopfish/Hoopfish_spin", "Hoopfish Hideaway/Backboards", "Hoopfish Hideaway/hoops", "Hoopfish Hideaway/fish", "Hoopfish Hideaway/shark", "Hoopfish Hideaway/crab", "Hoopfish Hideaway/jellyfish", "Wreck Center/oneway_platform", "Wreck Center/conveyor_L", "Wreck Center/conveyor_M", "Wreck Center/conveyor_R", "Wreck Center/display_floor", "Wreck Center/display_wall"]
 # Whole pictures, not strips: into the catalog's root as an image of this name.
 # A list of places a picture may have been saved: the newest is taken.
 # HUD sheets in Pixel Art/UI.
@@ -73,7 +73,7 @@ BALL_MIN_PIXELS = 12
 REDUCE = {"esper_charge": 4, "flashspark": 4, "gemini_rift_v1": 4, "gemini_rift_v2": 4}
 # Strips whose frames aren't square: their frame height, after any reduction. The
 # flash's 256x144 frames come down to 64x36.
-FRAME_HEIGHT = {"player_esperslash_flostate": 64, "dust_skid": 48, "jellyfish": 32, "fish": 16, "shark": 32, "crab": 16, "flo_meter": 16, "flashspark": 36, "hoopfish_spin": 48, "icicle_empty": 48, "small_lightning": 96, "icicle_form": 48}
+FRAME_HEIGHT = {"player_esperslash_flostate": 64, "dust_skid": 48, "jellyfish": 32, "fish": 16, "shark": 32, "crab": 16, "flo_meter": 16, "flashspark": 36, "hoopfish_spin": 48, "icicle_empty": 48, "small_lightning": 96, "icicle_form": 48, "display_floor": 42}
 # Sheets that come out grey but are drawn as painted, never toned: the strike bolts, which
 # the palette's recolour took to pure white.
 NOT_TONED = {"lightning1", "lightning2", "lightning3", "lightning4"}

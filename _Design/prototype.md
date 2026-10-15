@@ -611,9 +611,9 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   energy colour; `GameScene.beamChargeSheet`), turns between the hands as the blast sheet draws
   them (their parts' middles) through the charge; the throw keeps `esper_charge`. It and the
   kept charge's hands glow over the body, cut out of the body's mask (`cutOutSnapshots`); the
-  hood tips only while it fires, level through the charge; aimed down it turns `downTurn` (3.5)
-  times as far as up, and in proportion to the aim it's lifted 6 art pixels whichever way and slid
-  2 back aimed up, 2 forward aimed down (`BeamHeadTuning`, on the BEAM LIFT, SLIDE and DOWN TURN sliders).
+  hood tips only while it fires, level through the charge; it turns `upTurn` (1) times flight's tip aimed up,
+  `downTurn` (3.5) aimed down, and in proportion to the aim it's lifted 6 art pixels whichever way and slid
+  2 back aimed up, 2 forward aimed down (`BeamHeadTuning`, on the BEAM LIFT, SLIDE, UP TURN and DOWN TURN sliders).
   The blast's arms are drawn in the figure over the hood, not on the body, under it. Drawn: `player_blast` at 12 a second: frame 0, frame 1 held through the charge and 2 as it ends;
   firing, 3 to 7 round and round with `player_blast_arms` over them, turned with the aim about where the
   arms meet the body (31.5, 33.5 up on its canvas, 17.5 over the feet), aligned on 3 and a pixel

@@ -3554,6 +3554,7 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "BEAM LIFT", range: -12...12, notch: 1, value: Float(BeamHeadTuning.lift)) { BeamHeadTuning.lift = CGFloat($0) }
         controls.addSlider(title: "BEAM SLIDE", range: -12...12, notch: 1, value: Float(BeamHeadTuning.slide)) { BeamHeadTuning.slide = CGFloat($0) }
+        controls.addSlider(title: "BEAM UP TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.upTurn)) { BeamHeadTuning.upTurn = CGFloat($0) }
         controls.addSlider(title: "BEAM DOWN TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.downTurn)) { BeamHeadTuning.downTurn = CGFloat($0) }
         controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
         if !ParkedSliders.flo {
@@ -8236,7 +8237,7 @@ final class GameScene: SKScene {
                 // Only firing: through the charge it stays level.
                 let aiming = player.firingBeam
                 let aimShare = CGFloat(player.beamAim / ZRules.aimRange)
-                let wantedTip: CGFloat = aiming ? aimShare * GameScene.flightHeadTip * (aimShare < 0 ? BeamHeadTuning.downTurn : 1)
+                let wantedTip: CGFloat = aiming ? aimShare * GameScene.flightHeadTip * (aimShare < 0 ? BeamHeadTuning.downTurn : BeamHeadTuning.upTurn)
                     : player.state != .flying ? 0
                     : (diving ? -GameScene.flightHeadTip : (rising ? GameScene.flightHeadTip : 0))
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
@@ -8251,9 +8252,9 @@ final class GameScene: SKScene {
                     // Firing the beam, moved to sit on the neck as it tips, up and down each their own
                     // way (`BeamHeadTuning`), in proportion to the tip.
                     if aiming {
-                        // The aim's share as the tip has it: down, its turn taken back out.
+                        // The aim's share as the tip has it, its turn taken back out.
                         let share = tip / GameScene.flightHeadTip
-                        let aimed = share >= 0 ? share : share / BeamHeadTuning.downTurn
+                        let aimed = share / (share >= 0 ? BeamHeadTuning.upTurn : BeamHeadTuning.downTurn)
                         hood.position.x -= BeamHeadTuning.slide * aimed * CGFloat(player.facing.sign) * drawScale
                         hood.position.y += BeamHeadTuning.lift * abs(aimed) * drawScale
                     }

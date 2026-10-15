@@ -815,7 +815,8 @@ struct CustomizeScreen: View {
 
     private func middle(_ size: CGSize) -> some View {
         let start = rect("customize_start", size)
-        let lit = flow.customizeCursors.contains(.start)
+        // The local side's cursor: the other side's waits on START, unmoved, unless a second pad drives it.
+        let lit = flow.customizeCursors[flow.customizeLocal] == .start
         // The rings turn only while START's lit, held where they stopped otherwise.
         return TimelineView(.animation(paused: !lit)) { timeline in
             let seconds = spunSeconds + (spinningSince.map { timeline.date.timeIntervalSince($0) } ?? 0)

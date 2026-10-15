@@ -295,9 +295,9 @@ enum GoalpostTuning {
 /// many art pixels whichever way it's aimed, slid this many back aimed up and forward aimed down;
 /// and turned this many times flight's tip, up and down. On the BEAM sliders.
 enum BeamHeadTuning {
-    nonisolated(unsafe) static var lift: CGFloat = 6
+    nonisolated(unsafe) static var lift: CGFloat = 8
     nonisolated(unsafe) static var slide: CGFloat = 2
-    nonisolated(unsafe) static var upTurn: CGFloat = 1
+    nonisolated(unsafe) static var upTurn: CGFloat = 2
     nonisolated(unsafe) static var downTurn: CGFloat = 3.5
 }
 

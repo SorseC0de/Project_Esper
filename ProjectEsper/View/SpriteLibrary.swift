@@ -833,13 +833,16 @@ final class SpriteLibrary {
     /// filled, as a body is in play. Its towel, palette 22 and 37, isn't energy: kept as drawn.
     /// `headTilt`, degrees, turns the hooded head back about its middle (facing right); the
     /// sheet's pixels in `overHood`'s colours are drawn again over the hood.
+    /// The sheets drawn with props in them, kept as drawn: the drink's bottle, the drink choice's towel.
+    static let propSheets: Set<String> = ["player_drink", "player_drinkchoice"]
     func standalone(_ name: String, frame: Int, player: Int, headTilt: CGFloat = 0, overHood: Set<RGB> = []) -> SKTexture {
         let key = "p\(player)_standalone_\(name)_\(frame)_\(headTilt)"
         if let made = cache[key] { return made }
         let look = look(for: player)
         let source = texture(name, frame).cgImage()
         let body = recolour(texture(name, frame), look: look, holdsBall: false, detach: false,
-                            hoodShape: !look.energyForm ? SpriteLibrary.plainHoodShape : nil)
+                            hoodShape: !look.energyForm ? SpriteLibrary.plainHoodShape : nil,
+                            keepsProps: SpriteLibrary.propSheets.contains(name))
         var made = body.texture
         let image = body.texture.cgImage()
         if let (context, pixels) = makeCanvas(width: image.width, height: image.height),
@@ -1254,15 +1257,18 @@ final class SpriteLibrary {
     /// the hood together, the hood's own pixels left clear for it to be drawn in.
     private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
-                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?)?) {
-        recolour(image: texture.cgImage(), look: look, holdsBall: holdsBall, detach: detach, hood: given, hoodShape: hoodShape, bareLine: bareLine)
+                          bareLine: Bool = false, keepsProps: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?)?) {
+        recolour(image: texture.cgImage(), look: look, holdsBall: holdsBall, detach: detach, hood: given, hoodShape: hoodShape, bareLine: bareLine,
+                 keepsProps: keepsProps)
     }
 
     /// The same from the sheet's image itself: what the rebuild's cores are handed, so none of them
     /// reads a texture back through SpriteKit (which opens a GPU context on each thread that does).
+    /// `keepsProps`: a sheet with things drawn in that aren't the body (the drink's bottle, the
+    /// towel): its whites and the blade's greys left as drawn, not taken for energy.
     private func recolour(image: CGImage, look: Look, holdsBall: Bool, detach: Bool,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
-                          bareLine: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?)?) {
+                          bareLine: Bool = false, keepsProps: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?)?) {
         let texture = SKTexture(cgImage: image)
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
@@ -1278,7 +1284,8 @@ final class SpriteLibrary {
         for pixel in 0..<count where pixels[pixel * 4 + 3] == 255 {
             let index = pixel * 4
             let colour = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
-            parts[pixel] = BodyPart.owning(colour)
+            let part = BodyPart.owning(colour)
+            parts[pixel] = keepsProps && (part == .ball || part == .slash) ? nil : part
         }
         markEnergy(&parts, holdsBall: holdsBall, width: width, height: height)
         // Where the hood will be drawn over this canvas, if it's given or its shape is.

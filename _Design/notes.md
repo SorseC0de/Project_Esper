@@ -34,6 +34,20 @@ the migration sets them to these exactly.
 | Pink | #F389F5 | #CA52C9 | #93388F |
 | Purple | #93388F | #622461 | #3B1443 |
 
+### A converted player (the user's reference: default skin, Sapphire)
+
+| Role | Colour | Pixels |
+|---|---|---|
+| Outline | #1A1932 | 148 |
+| Energy base (Sapphire) | #0098DC | 74 |
+| Energy, hood's shadow | #0069AA | 16 |
+| Energy, back limbs | #00396D | 16 |
+| Skin, front (the new default) | #E69C69 | 42 |
+| Skin, back | #BF6F4A | 32 |
+| Clothes, front | #424C6E | 60 |
+| Clothes, back | #2A2F4E | 20 |
+| #4A5462 (AAP-64's grey, 2 pixels): left over, or meant? | #4A5462 | 2 |
+
 Green is a ninth hood colour, Emerald (`EnergyColour.name`): it needs a place in the wheel and
 on the customize picker. Light blue takes teal's place; its name, Larimar, is in already.
 

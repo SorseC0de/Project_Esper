@@ -5448,10 +5448,8 @@ final class GameScene: SKScene {
     }
     /// A frame of a side's win pose: made once and kept, as the win screen asks for one every tick.
     func winPortrait(player: Int, pose: WinPose, frame: Int) -> WinFrame? {
-        let defaults = UserDefaults.standard
-        let headNudge = CGPoint(x: defaults.object(forKey: "esper.customize.headX") as? Double ?? 1,
-                                y: defaults.object(forKey: "esper.customize.headY") as? Double ?? 1)
-        let headScale = defaults.object(forKey: "esper.customize.headScale") as? Double ?? 1
+        let place = SpriteLibrary.customizeHeadPlace
+        let headNudge = place.nudge, headScale = Double(place.scale)
         let key = "\(player)_\(pose)_\(frame)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
         if let made = winFrames[key] { return made }
         let sheet = AnimationFrame(pose.animation, frame)
@@ -5462,7 +5460,7 @@ final class GameScene: SKScene {
             ball = (winBallImage, CGPoint(x: 24 + landmark.x, y: pose.animation.feetFromBottom + landmark.y))
         }
         let overBall = pose.holdsBall && GameScene.ballBehindLegSheets.contains(pose.animation)
-            ? sprites.frontLegTexture(sheet, player: player)?.cgImage() : nil
+            ? sprites.frontLegImage(sheet, player: player) : nil
         let made = WinFrame(portrait: portrait, headNudge: headNudge, headScale: CGFloat(headScale), ball: ball, overBall: overBall)
         winFrames[key] = made
         return made
@@ -5470,10 +5468,14 @@ final class GameScene: SKScene {
     private var winFrames: [String: WinFrame] = [:]
     private lazy var winBallImage: CGImage = sprites.basketballFrames[0].cgImage()
     /// Every frame of both sides' win pose, made with the stage and again as their looks change.
+    /// Once the looks' rebuild has landed, which made the portraits on its cores: here only gathered.
     private func warmWinPoses() {
         winFrames = [:]
-        for player in match.players.indices {
-            for frame in 0..<WinPose.taunt.animation.frameCount { _ = winPortrait(player: player, pose: .taunt, frame: frame) }
+        sprites.afterRebuilds { [weak self] in
+            guard let self else { return }
+            for player in self.match.players.indices {
+                for frame in 0..<WinPose.taunt.animation.frameCount { _ = self.winPortrait(player: player, pose: .taunt, frame: frame) }
+            }
         }
     }
 

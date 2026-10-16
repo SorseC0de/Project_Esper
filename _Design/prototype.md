@@ -2582,6 +2582,16 @@ shown, once, like the effects.
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,
   MULTIPLAYER. menu_back: RESUME, start to unpause, TITLE and TITLE SCREEN.
 
+## The rebuild's pieces
+
+A look's change rebuilds everything drawn in it on every core (`SpriteLibrary.rewarm`): the
+frames, the toned effects, and for a human the hooded heads (every view plain, in FloState and
+frozen, the flowing hood, each view's line and face) and, for a side, every frame of the win
+screen's pose as a portrait, the head placed by the customize sliders. Each sheet's image is
+read off the GPU once and kept; what's made keeps its pictures beside its textures
+(`keptImages`), so nothing is read back to be drawn again: each read opens a context and logs a
+leak. The win screen gathers its frames once the rebuild lands (`afterRebuilds`).
+
 ## Glow
 
 `GlowSettings` in `Tuning.swift`: brightness threshold 0.2 for the world and 0.8 for the

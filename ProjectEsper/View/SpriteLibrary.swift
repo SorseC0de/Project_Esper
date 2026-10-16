@@ -13,6 +13,10 @@ final class SpriteLibrary {
 
     private let atlas = SKTextureAtlas(named: "Sprites")
     private var cache: [String: SKTexture] = [:]
+    /// The pictures behind some of the cache's textures, kept as made, so what draws them again
+    /// (the win screen, a hood's line) never reads one back off the GPU, which opens a context and
+    /// logs a leak each time. Dropped with the player's cache.
+    private var keptImages: [String: CGImage] = [:]
     /// Where the glowing parts sit in each player frame, in art pixels from the feet.
     private var landmarks: [String: [BodyPart: CGPoint]] = [:]
     /// The two players' looks, then the ice look frozen bodies and ice clones are drawn in,
@@ -99,6 +103,8 @@ final class SpriteLibrary {
     private func dropPlayer(_ player: Int) {
         if reportsMisses, DebugUI.enabled { print("dropped p\(player)'s pieces") }
         cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
+        keptImages = keptImages.filter { !$0.key.hasPrefix("p\(player)_") }
+        portraits = portraits.filter { !$0.key.hasPrefix("p\(player)_") }
         emptyPieces = emptyPieces.filter { !$0.hasPrefix("p\(player)_") }
     }
     /// Each player's rebuild underway: its pieces made, of all of them, for the loading bar;
@@ -141,6 +147,17 @@ final class SpriteLibrary {
     }
     /// What waits for every rebuild underway to land: the launch's warm-up.
     private var whenRebuilt: [() -> Void] = []
+    /// Work run once every rebuild underway has landed, or now with none: what reads its pieces.
+    func afterRebuilds(_ work: @escaping () -> Void) {
+        if rebuilding.isEmpty { work() } else { whenRebuilt.append(work) }
+    }
+
+    /// The customize screen's hooded-head place, kept between launches by its sliders.
+    static var customizeHeadPlace: (nudge: CGPoint, scale: CGFloat) {
+        let defaults = UserDefaults.standard
+        return (CGPoint(x: defaults.object(forKey: "esper.customize.headX") as? Double ?? 1, y: defaults.object(forKey: "esper.customize.headY") as? Double ?? 1),
+                CGFloat(defaults.object(forKey: "esper.customize.headScale") as? Double ?? 1))
+    }
 
     /// Everything drawn in a player's look rebuilt off the main thread after their look
     /// changes, then kept and sent to the GPU, so no frame, head, energy or toned effect is
@@ -172,20 +189,57 @@ final class SpriteLibrary {
         for index in 0..<Effect.fireWallSpark.frameCount {
             silhouetteJobs.append(("p\(player)_sil_\(Effect.fireWallSpark.name)_\(index)", texture(Effect.fireWallSpark.name, index)))
         }
+        // A human's hooded heads, every view plain, in FloState and frozen, and FloState's flowing
+        // hood, with each view's line and face (`warmHoods`); and, for a side, every frame of the
+        // win screen's pose (`portrait`), the head placed as the customize screen's sliders have it.
+        var hoodJobs: [(key: String, sourceName: String, source: SKTexture, look: Look, ice: Bool, energy: Bool, flowing: Bool)] = []
+        var portraitJobs: [(key: String, name: String, frame: Int, source: SKTexture, view: Int, look: Look)] = []
+        let skin = look.dressing.skinTone
+        let humanHooded = !look.energyForm && player < SpriteLibrary.icePlayer
+        if humanHooded {
+            let iceLook = self.look(for: SpriteLibrary.icePlayer)
+            for view in 0..<HoodView.count {
+                let name = SpriteLibrary.hoodSourceName(view: view, flowing: nil)
+                let source = atlas.textureNamed(name)
+                hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: false, view: view, flowing: nil), name, source, look, false, false, false))
+                hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: true, view: view, flowing: nil), name, source, look, false, true, false))
+                hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: SpriteLibrary.icePlayer, energy: false, view: view, flowing: nil), name, source, iceLook, true, false, false))
+            }
+            for flowing in 0..<SpriteLibrary.flowingHoodFrames {
+                let name = SpriteLibrary.hoodSourceName(view: 0, flowing: flowing)
+                hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: true, view: 0, flowing: flowing), name, atlas.textureNamed(name), look, false, true, true))
+            }
+            if player < Look.byPlayer.count {
+                let place = SpriteLibrary.customizeHeadPlace
+                let pose = WinPose.taunt.animation
+                for frame in 0..<pose.frameCount {
+                    let sheet = AnimationFrame(pose, frame)
+                    portraitJobs.append((SpriteLibrary.portraitKey(pose.rawValue, frame: frame, player: player, headNudge: place.nudge, headScale: place.scale),
+                                         pose.rawValue, frame, texture(pose.rawValue, frame), HoodView.of(sheet), SpriteLibrary.look(look, for: sheet)))
+                }
+            }
+        }
+        let drawnForTexture = atlas.textureNamed("\(GameScene.hoodDrawnFor.animation.rawValue)_\(GameScene.hoodDrawnFor.frame)")
+        let headPlace = SpriteLibrary.customizeHeadPlace
         // Counted as pieces made, the last one the textures reaching the GPU.
-        beginRebuilding(player, pieces: frameJobs.count + tonedJobs.count + silhouetteJobs.count + 1)
+        beginRebuilding(player, pieces: frameJobs.count + tonedJobs.count + silhouetteJobs.count + hoodJobs.count + portraitJobs.count + 1)
         rewarmQueue.async { [weak self] in
             guard let self else { return }
             var built: [String: SKTexture] = [:]
             var builtLandmarks: [String: [BodyPart: CGPoint]] = [:]
             var builtEmpty: [String] = []
             var builtTops: [String: [BodyPart: CGPoint]] = [:]
+            var builtImages: [String: CGImage] = [:]
+            var builtHoods: [String: (drawn: CGImage, hood: CGImage, face: CGImage)] = [:]
+            var builtPortraits: [String: Portrait] = [:]
             var made = 0
             let lock = NSLock()
             /// One piece made, kept under the lock: the pieces are made on every core at once.
             func keep(_ textures: [String: SKTexture], landmarks: (key: String, marks: [BodyPart: CGPoint])? = nil, empty: [String] = [],
-                      tops: (key: String, marks: [BodyPart: CGPoint])? = nil) {
+                      tops: (key: String, marks: [BodyPart: CGPoint])? = nil, images: [String: CGImage] = [:], portrait: (key: String, made: Portrait)? = nil) {
                 lock.lock()
+                builtImages.merge(images) { _, new in new }
+                if let portrait { builtPortraits[portrait.key] = portrait.made }
                 if let tops { builtTops[tops.key] = tops.marks }
                 built.merge(textures) { _, new in new }
                 builtEmpty += empty
@@ -219,13 +273,41 @@ final class SpriteLibrary {
                     CGPoint(x: top.x - width / 2, y: size - top.y - job.frame.animation.feetFromBottom)
                 }
                 keep(Dictionary(uniqueKeysWithValues: frameMade.textures.map { (job.key + $0.key, $0.value) }), landmarks: (job.key, frameMade.landmarks),
-                     empty: frameMade.empty.map { job.key + $0 }, tops: ("\(job.frame.animation.rawValue)_\(job.frame.frame)", tops))
+                     empty: frameMade.empty.map { job.key + $0 }, tops: ("\(job.frame.animation.rawValue)_\(job.frame.frame)", tops),
+                     images: Dictionary(uniqueKeysWithValues: frameMade.images.map { (job.key + $0.key, $0.value) }))
             }
             DispatchQueue.concurrentPerform(iterations: tonedJobs.count) { index in
                 keep([tonedJobs[index].key: self.makeToned(image: tonedSources[index], look: look, capped: tonedJobs[index].capped)])
             }
             DispatchQueue.concurrentPerform(iterations: silhouetteJobs.count) { index in
                 keep([silhouetteJobs[index].key: self.makeSilhouette(image: silhouetteSources[index], look: look)])
+            }
+            // The hoods, then each view's line and face from its plain head, then the portraits wearing them.
+            let hoodSources = hoodJobs.map { source($0.sourceName, $0.source) }
+            for (job, image) in zip(hoodJobs, hoodSources) {
+                if let head = self.makeHoodHead(source: image, skin: skin, look: job.look, ice: job.ice, energy: job.energy, flowing: job.flowing) {
+                    builtHoods[job.key] = head
+                }
+                keep([:])
+            }
+            var hoodViews: [Int: (drawn: CGImage, hood: CGImage, line: CGImage?)] = [:]
+            if humanHooded {
+                for view in 0..<HoodView.count {
+                    guard let head = builtHoods[SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: false, view: view, flowing: nil)] else { continue }
+                    let line = self.makeHoodLine(drawn: head.drawn)
+                    hoodViews[view] = (head.drawn, head.hood, line)
+                    if let line { builtImages["hoodline_\(skin)_\(view)"] = line }
+                    if let face = self.makeHoodFace(drawn: head.drawn, face: head.face) { builtImages["p\(player)_hoodface_\(skin)_\(view)"] = face }
+                }
+            }
+            let portraitSources = portraitJobs.map { source("\($0.name)_\($0.frame)", $0.source) }
+            let drawnForSource = portraitJobs.isEmpty ? nil : source("\(GameScene.hoodDrawnFor.animation.rawValue)_\(GameScene.hoodDrawnFor.frame)", drawnForTexture)
+            DispatchQueue.concurrentPerform(iterations: portraitJobs.count) { index in
+                let job = portraitJobs[index]
+                guard let drawnForSource, let made = self.makePortrait(job.name, frame: job.frame, look: job.look, source: portraitSources[index], drawnFor: drawnForSource,
+                                                                      hood: hoodViews[job.view], headNudge: headPlace.nudge, headScale: headPlace.scale,
+                                                                      holdsBall: WinPose.taunt.holdsBall) else { keep([:]); return }
+                keep([:], portrait: (job.key, made))
             }
             DispatchQueue.main.async {
                 guard self.rewarmGeneration[player] == generation else { return }
@@ -238,6 +320,17 @@ final class SpriteLibrary {
                 for (key, marks) in builtLandmarks where self.landmarks[key] == nil { self.landmarks[key] = marks }
                 self.emptyPieces.formUnion(builtEmpty)
                 for (key, tops) in builtTops where self.partTops[key] == nil { self.partTops[key] = tops }
+                for (key, image) in builtImages where self.keptImages[key] == nil {
+                    self.keptImages[key] = image
+                    // The hood's lines and faces are textures of their own too.
+                    if key.hasPrefix("hoodline_") || key.contains("_hoodface_"), self.cache[key] == nil {
+                        let texture = SKTexture(cgImage: image)
+                        texture.filteringMode = .nearest
+                        self.cache[key] = texture
+                    }
+                }
+                for (key, head) in builtHoods where self.cache[key] == nil { self.keep(hoodHead: head, key: key) }
+                for (key, portrait) in builtPortraits where self.portraits[key] == nil { self.keep(portrait: portrait, key: key) }
                 for job in frameJobs { self.pairGlowMask(job.key) }
                 SKTexture.preload(Array(built.values) + self.warmHoods(player: player)) {
                     DispatchQueue.main.async { self.reportRebuilding(player, generation: generation, made: nil) }
@@ -320,6 +413,7 @@ final class SpriteLibrary {
                              look: look(for: player), holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted)
         for (suffix, texture) in made.textures { cache[key + suffix] = texture }
         for suffix in made.empty { emptyPieces.insert(key + suffix) }
+        for (suffix, image) in made.images { keptImages[key + suffix] = image }
         landmarks[key] = made.landmarks
         pairGlowMask(key)
         return cache[key]!
@@ -345,7 +439,8 @@ final class SpriteLibrary {
     }
 
     private func makeFrame(_ frame: AnimationFrame, source: CGImage, look: Look, holdsBall: Bool)
-        -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint], empty: [String]) {
+        -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint], empty: [String], images: [String: CGImage]) {
+        var madeImages: [String: CGImage] = [:]
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
         let look = SpriteLibrary.look(look, for: frame)
         let result = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
@@ -388,14 +483,19 @@ final class SpriteLibrary {
         // The front leg laid over the ball the sheet passes behind it (`GameScene.ballBehindLegSheets`).
         if GameScene.ballBehindLegSheets.contains(frame.animation), let images = result.images {
             let leg = SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: [.frontThigh, .frontLeg, .frontFoot])
-            if let leg { textures["_frontleg"] = SKTexture(cgImage: leg) } else { empty.append("_frontleg") }
+            if let leg {
+                textures["_frontleg"] = SKTexture(cgImage: leg)
+                madeImages["_frontleg"] = leg
+            } else {
+                empty.append("_frontleg")
+            }
         }
         for texture in textures.values { texture.filteringMode = .nearest }
         let size = frame.animation.pixelSize, width = frame.animation.pixelWidth
         let landmarks = result.centres.mapValues { centre in
             CGPoint(x: centre.x - width / 2, y: size - centre.y - frame.animation.feetFromBottom)
         }
-        return (textures, landmarks, empty)
+        return (textures, landmarks, empty, madeImages)
     }
 
     /// Each body texture's glow mask, where it has one, looked up by the texture a node shows.
@@ -463,8 +563,17 @@ final class SpriteLibrary {
         if let made = cache[key] { return made }
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
-        let head = hoodHead(skin: skin, player: player, view: view)
-        let drawn = head.drawn.cgImage(), face = head.face.cgImage()
+        let headKey = SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: false, view: view, flowing: nil)
+        _ = hoodHead(skin: skin, player: player, view: view)
+        guard let drawn = keptImages[headKey], let face = keptImages[headKey + "_face"], let image = makeHoodFace(drawn: drawn, face: face) else { return nil }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .nearest
+        cache[key] = made
+        return made
+    }
+
+    /// A hooded head's face alone, as drawn.
+    private func makeHoodFace(drawn: CGImage, face: CGImage) -> CGImage? {
         let width = drawn.width, height = drawn.height
         guard face.width == width, face.height == height,
               let (context, pixels) = makeCanvas(width: width, height: height),
@@ -474,11 +583,7 @@ final class SpriteLibrary {
         for pixel in 0..<(width * height) where maskPixels[pixel * 4 + 3] == 0 {
             for channel in 0..<4 { pixels[pixel * 4 + channel] = 0 }
         }
-        guard let image = context.makeImage() else { return nil }
-        let made = SKTexture(cgImage: image)
-        made.filteringMode = .nearest
-        cache[key] = made
-        return made
+        return context.makeImage()
     }
 
     /// The line round a human's frame without the hood's place in it, for a tipped hood that
@@ -507,7 +612,18 @@ final class SpriteLibrary {
         if let made = cache[key] { return made }
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
-        let image = hoodHead(skin: skin, player: 0, view: view).drawn.cgImage()
+        let headKey = SpriteLibrary.hoodHeadKey(skin: skin, player: 0, energy: false, view: view, flowing: nil)
+        _ = hoodHead(skin: skin, player: 0, view: view)
+        guard let drawn = keptImages[headKey], let image = makeHoodLine(drawn: drawn) else { return nil }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .nearest
+        cache[key] = made
+        keptImages[key] = image
+        return made
+    }
+
+    /// The line round a hooded head's picture, a pixel out from it, in white.
+    private func makeHoodLine(drawn image: CGImage) -> CGImage? {
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height),
               let (lineContext, linePixels) = makeCanvas(width: width, height: height) else { return nil }
@@ -519,10 +635,7 @@ final class SpriteLibrary {
                 for channel in 0..<4 { linePixels[(y * width + x) * 4 + channel] = 255 }
             }
         }
-        let made = lineContext.makeImage().map { SKTexture(cgImage: $0) }
-        made?.filteringMode = .nearest
-        cache[key] = made
-        return made
+        return lineContext.makeImage()
     }
 
     /// The line round a player frame at half its thickness, in white, on a canvas twice as fine.
@@ -543,6 +656,13 @@ final class SpriteLibrary {
     /// the ball behind that leg (the taunt's and the dribble walk's), the real ball drawn over the
     /// body otherwise. The sheet's front leg whichever way the body faces: turned round, the node's
     /// mirrored and only the clothes' colours swap. Nil with no front leg in the frame.
+    /// The front leg's picture as made, read back only if it wasn't kept.
+    func frontLegImage(_ frame: AnimationFrame, player: Int) -> CGImage? {
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: false) + "_frontleg"
+        if let kept = keptImages[key] { return kept }
+        return frontLegTexture(frame, player: player)?.cgImage()
+    }
+
     func frontLegTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
         partsTexture(frame, player: player, parts: [.frontThigh, .frontLeg, .frontFoot], suffix: "_frontleg", ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
     }
@@ -733,21 +853,44 @@ final class SpriteLibrary {
     /// in the first skin and swapped into this one's two tones.
     /// `flowing`: a frame of `player_flowing_hood`, FloState's idle hood blowing, drawn in the first skin too.
     func hoodHead(skin: Int, player: Int, energy: Bool = false, view: Int = 0, flowing: Int? = nil) -> (drawn: SKTexture, hood: SKTexture, face: SKTexture) {
-        let key = "p\(player)_hoodhead_\(skin)" + (view == 0 ? "" : "_v\(view)") + (flowing.map { "_flow\($0)" } ?? "") + (energy ? "_energy" : "")
+        let key = SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: energy, view: view, flowing: flowing)
         if let drawn = cache[key], let hood = cache[key + "_hood"], let face = cache[key + "_face"] { return (drawn, hood, face) }
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
-        let source = flowing.map { atlas.textureNamed("player_flowing_hood_\($0)") } ?? SpriteLibrary.hoodSource(skin: skin, view: view)
+        let source = atlas.textureNamed(SpriteLibrary.hoodSourceName(view: view, flowing: flowing))
+        guard let made = makeHoodHead(source: source.cgImage(), skin: skin, look: look(for: player), ice: player == SpriteLibrary.icePlayer,
+                                      energy: energy, flowing: flowing != nil) else { return (source, source, source) }
+        keep(hoodHead: made, key: key)
+        return (cache[key]!, cache[key + "_hood"]!, cache[key + "_face"]!)
+    }
+
+    static func hoodHeadKey(skin: Int, player: Int, energy: Bool, view: Int, flowing: Int?) -> String {
+        "p\(player)_hoodhead_\(skin)" + (view == 0 ? "" : "_v\(view)") + (flowing.map { "_flow\($0)" } ?? "") + (energy ? "_energy" : "")
+    }
+    static func hoodSourceName(view: Int, flowing: Int?) -> String {
+        flowing.map { "player_flowing_hood_\($0)" } ?? "player_hoodheads_v2_\(view == 0 || turnedHoodShapes[view] == nil ? 0 : view)"
+    }
+
+    private func keep(hoodHead made: (drawn: CGImage, hood: CGImage, face: CGImage), key: String) {
+        for (suffix, image) in [("", made.drawn), ("_hood", made.hood), ("_face", made.face)] {
+            let texture = SKTexture(cgImage: image)
+            texture.filteringMode = .nearest
+            cache[key + suffix] = texture
+            keptImages[key + suffix] = image
+        }
+    }
+
+    /// The hooded head's three pictures from its sheet's frame: as drawn, its hood alone and its
+    /// face alone in white. Touches nothing kept, so it can be made off the main thread.
+    private func makeHoodHead(source image: CGImage, skin: Int, look: Look, ice: Bool, energy: Bool, flowing: Bool) -> (drawn: CGImage, hood: CGImage, face: CGImage)? {
         // Every view drawn in one skin, its two tones swapped for this one's: the flowing hood in
         // the first, the turned heads still in AAP-64's first.
-        let from = flowing == nil ? SpriteLibrary.hoodHeadsSkin : HumanLook.skinTones[0], to = HumanLook.skinTones[min(max(skin, 0), HumanLook.skinTones.count - 1)]
+        let from = !flowing ? SpriteLibrary.hoodHeadsSkin : HumanLook.skinTones[0], to = HumanLook.skinTones[min(max(skin, 0), HumanLook.skinTones.count - 1)]
         let faceSwaps: [RGB: RGB] = from == to ? [:] : [from.front: to.front, from.back: to.back]
-        let image = source.cgImage()
         let width = image.width, height = image.height
-        let look = look(for: player)
         guard let (context, pixels) = makeCanvas(width: width, height: height),
               let (hoodContext, hoodPixels) = makeCanvas(width: width, height: height),
-              let (faceContext, facePixels) = makeCanvas(width: width, height: height) else { return (source, source, source) }
+              let (faceContext, facePixels) = makeCanvas(width: width, height: height) else { return nil }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         func level(_ index: Int) -> Double {
             (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / 255
@@ -763,7 +906,7 @@ final class SpriteLibrary {
             let mask = isHood ? hoodPixels : facePixels
             for channel in 0..<4 { mask[index + channel] = 255 }
             guard isHood else {
-                if player == SpriteLibrary.icePlayer {
+                if ice {
                     paint(pixels, index, Look.scaled(look.glow, min(level(index) / max(faceLightest, 0.01), 1)))
                 } else if let swap = faceSwaps[RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])] {
                     paint(pixels, index, swap)
@@ -773,22 +916,15 @@ final class SpriteLibrary {
             let grey = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
             if energy, let body = look.body {
                 paint(pixels, index, Look.scaled(body, min(grey, 1)))
-            } else if player == SpriteLibrary.icePlayer {
+            } else if ice {
                 paint(pixels, index, look.energyTone(luminance: min(grey * SpriteLibrary.hoodLevel, 1)))
             } else {
                 // White the energy colour, the greys its hood shadow.
                 paint(pixels, index, red == 255 && green == 255 && blue == 255 ? look.hoodTones.plain : look.hoodTones.shadow)
             }
         }
-        let made = [context, hoodContext, faceContext].map { context -> SKTexture in
-            let texture = context.makeImage().map { SKTexture(cgImage: $0) } ?? source
-            texture.filteringMode = .nearest
-            return texture
-        }
-        cache[key] = made[0]
-        cache[key + "_hood"] = made[1]
-        cache[key + "_face"] = made[2]
-        return (made[0], made[1], made[2])
+        guard let drawn = context.makeImage(), let hood = hoodContext.makeImage(), let face = faceContext.makeImage() else { return nil }
+        return (drawn, hood, face)
     }
 
     /// A one-frame figure, the customize screen's, in a player's look and lined, without its
@@ -907,32 +1043,63 @@ final class SpriteLibrary {
     /// `holdsBall`: the sheet draws the ball in hand, kept white rather than read as energy.
     func portrait(_ name: String, frame: Int = 0, player: Int, headDrawnFor: AnimationFrame, headNudge: CGPoint, headScale: CGFloat,
                   holdsBall: Bool = false) -> Portrait? {
-        let key = "p\(player)_portrait_\(name)_\(frame)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
+        let key = SpriteLibrary.portraitKey(name, frame: frame, player: player, headNudge: headNudge, headScale: headScale)
         if cache[key] != nil, let made = portraits[key] { return made }
-        // A game sheet's frame in the look it's drawn in, its arms swapped where they are.
         let playerLook = look(for: player)
         let sheetFrame = Animation(rawValue: name).map { AnimationFrame($0, frame) }
         let look = sheetFrame.map { SpriteLibrary.look(playerLook, for: $0) } ?? playerLook
         let view = sheetFrame.map(HoodView.of) ?? 0
+        var hood: (drawn: CGImage, hood: CGImage, line: CGImage?)?
+        if !look.energyForm {
+            let headKey = SpriteLibrary.hoodHeadKey(skin: look.dressing.skinTone, player: player, energy: false, view: view, flowing: nil)
+            _ = hoodHead(skin: look.dressing.skinTone, player: player, view: view)
+            if let drawn = keptImages[headKey], let mask = keptImages[headKey + "_hood"] {
+                hood = (drawn, mask, keptImages["hoodline_\(look.dressing.skinTone)_\(view)"] ?? hoodLine(skin: look.dressing.skinTone, view: view)?.cgImage())
+            }
+        }
+        guard let made = makePortrait(name, frame: frame, look: look, source: texture(name, frame).cgImage(),
+                                      drawnFor: atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)").cgImage(),
+                                      hood: hood, headNudge: headNudge, headScale: headScale, holdsBall: holdsBall) else { return nil }
+        keep(portrait: made, key: key)
+        return made
+    }
+
+    static func portraitKey(_ name: String, frame: Int, player: Int, headNudge: CGPoint, headScale: CGFloat) -> String {
+        "p\(player)_portrait_\(name)_\(frame)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
+    }
+
+    private func keep(portrait made: Portrait, key: String) {
+        // Kept in the cache too, so a new look drops it with the rest of the player's.
+        cache[key] = SKTexture(cgImage: made.image)
+        portraits[key] = made
+    }
+
+    /// A portrait from its sheet's frame, the frame the head's drawn for, and the hooded head as
+    /// this frame's view has it (its picture, its hood alone, its line). Touches nothing kept,
+    /// so it can be made off the main thread.
+    private func makePortrait(_ name: String, frame: Int, look: Look, source: CGImage, drawnFor drawnForSource: CGImage,
+                              hood givenHood: (drawn: CGImage, hood: CGImage, line: CGImage?)?, headNudge: CGPoint, headScale: CGFloat,
+                              holdsBall: Bool) -> Portrait? {
+        let sheetFrame = Animation(rawValue: name).map { AnimationFrame($0, frame) }
+        let view = sheetFrame.map(HoodView.of) ?? 0
         let flipped = sheetFrame.map(HoodView.isFlipped) ?? false
         /// The hooded head as this frame wears it: its view, mirrored where it looks back.
         func wornHood(_ image: CGImage) -> CGImage { flipped ? SpriteLibrary.mirrored(image) ?? image : image }
-        let plain = recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: false)
-        let drawnFor = recolour(atlas.textureNamed("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"), look: look, holdsBall: false, detach: false)
+        let plain = recolour(image: source, look: look, holdsBall: holdsBall, detach: false)
+        let drawnFor = recolour(image: drawnForSource, look: look, holdsBall: false, detach: false)
         var figure = plain
-        if !look.energyForm, let here = plain.centres[.head], let there = drawnFor.centres[.head] {
+        if !look.energyForm, let givenHood, let here = plain.centres[.head], let there = drawnFor.centres[.head] {
             let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             let place = SpriteLibrary.hoodPlace(head: here, offset: offset, nudge: headNudge, scale: headScale)
-            figure = recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: true,
-                              hood: (wornHood(hoodHead(skin: look.dressing.skinTone, player: player, view: view).drawn.cgImage()), place.origin, place.scale))
+            figure = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
+                              hood: (wornHood(givenHood.drawn), place.origin, place.scale))
         }
-        let body = figure.texture.cgImage()
+        guard let body = figure.images?.drawn else { return nil }
         let width = body.width, height = body.height
         guard let (glowContext, glowPixels) = makeCanvas(width: width, height: height),
               let (sourceContext, sourcePixels) = makeCanvas(width: width, height: height) else { return nil }
         // What glows: the figure's pixels of the parts that do, as drawn.
         glowContext.draw(body, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let source = texture(name, frame).cgImage()
         sourceContext.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
         for pixel in 0..<(width * height) {
             let index = pixel * 4
@@ -942,16 +1109,15 @@ final class SpriteLibrary {
         }
         var offset = CGPoint.zero
         var hood: CGImage?, hoodGlowing: CGImage?
-        if !look.energyForm, let here = figure.centres[.head], let there = drawnFor.centres[.head] {
-            let hoodHead = hoodHead(skin: look.dressing.skinTone, player: player, view: view)
-            let drawn = wornHood(hoodHead.drawn.cgImage())
+        if !look.energyForm, let givenHood, let here = figure.centres[.head], let there = drawnFor.centres[.head] {
+            let drawn = wornHood(givenHood.drawn)
             hood = drawn
             offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             // The hood glows; its face doesn't.
             if let (hoodContext, hoodPixels) = makeCanvas(width: drawn.width, height: drawn.height),
                let (maskContext, maskPixels) = makeCanvas(width: drawn.width, height: drawn.height) {
                 hoodContext.draw(drawn, in: CGRect(x: 0, y: 0, width: drawn.width, height: drawn.height))
-                maskContext.draw(wornHood(hoodHead.hood.cgImage()), in: CGRect(x: 0, y: 0, width: drawn.width, height: drawn.height))
+                maskContext.draw(wornHood(givenHood.hood), in: CGRect(x: 0, y: 0, width: drawn.width, height: drawn.height))
                 for pixel in 0..<(drawn.width * drawn.height) where maskPixels[pixel * 4 + 3] == 0 {
                     for channel in 0..<4 { hoodPixels[pixel * 4 + channel] = 0 }
                 }
@@ -959,18 +1125,14 @@ final class SpriteLibrary {
             }
         }
         guard let glowing = glowContext.makeImage() else { return nil }
-        let bare = !look.energyForm ? recolour(texture(name, frame), look: look, holdsBall: holdsBall, detach: true,
-                                         hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped), bareLine: true).bareOutline : nil
-        let made = Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
-                            centres: figure.centres, tops: SpriteLibrary.partTops(source),
-                            line: figure.outline?.cgImage(), frontArm: SpriteLibrary.partsImage(drawn: body, source: source, parts: [.frontArm, .frontHand]),
-                            frontArmLine: SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
-                                                                  hood: !look.energyForm ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped) : nil),
-                            bareLine: bare?.cgImage(), hoodLine: !look.energyForm ? hoodLine(skin: look.dressing.skinTone, view: view)?.cgImage() : nil)
-        // Kept in the cache too, so a new look drops it with the rest of the player's.
-        cache[key] = SKTexture(cgImage: body)
-        portraits[key] = made
-        return made
+        let bare = !look.energyForm ? recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
+                                         hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped), bareLine: true).images?.bareOutline : nil
+        return Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
+                        centres: figure.centres, tops: SpriteLibrary.partTops(source),
+                        line: figure.images?.outline, frontArm: SpriteLibrary.partsImage(drawn: body, source: source, parts: [.frontArm, .frontHand]),
+                        frontArmLine: SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
+                                                              hood: !look.energyForm ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped) : nil),
+                        bareLine: bare, hoodLine: !look.energyForm ? givenHood?.line : nil)
     }
 
     /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which
@@ -1077,10 +1239,6 @@ final class SpriteLibrary {
     static let flowingHoodFrames = SKTextureAtlas(named: "Sprites").textureNames.filter { $0.hasPrefix("player_flowing_hood_") }.count
     static let flowingHoodFramesPerSecond = 15
     static let flowingHoodSheets: Set<Animation> = [.idle, .dribbleIdle, .crouch, .taunt, .skid, .skidBall]
-    static func hoodSource(skin: Int, view: Int) -> SKTexture {
-        let atlas = SKTextureAtlas(named: "Sprites")
-        return atlas.textureNamed("player_hoodheads_v2_\(view == 0 || turnedHoodShapes[view] == nil ? 0 : view)")
-    }
     static let hoodDrawnForHead: CGPoint? = {
         let image = SKTextureAtlas(named: "Sprites").textureNamed("\(hoodDrawnFor.animation.rawValue)_\(hoodDrawnFor.frame)").cgImage()
         let width = image.width, height = image.height
@@ -1258,7 +1416,7 @@ final class SpriteLibrary {
     /// the hood together, the hood's own pixels left clear for it to be drawn in.
     private func recolour(_ texture: SKTexture, look: Look, holdsBall: Bool, detach: Bool,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
-                          bareLine: Bool = false, keepsProps: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?)?) {
+                          bareLine: Bool = false, keepsProps: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?, outline: CGImage?, bareOutline: CGImage?)?) {
         recolour(image: texture.cgImage(), look: look, holdsBall: holdsBall, detach: detach, hood: given, hoodShape: hoodShape, bareLine: bareLine,
                  keepsProps: keepsProps)
     }
@@ -1269,7 +1427,7 @@ final class SpriteLibrary {
     /// towel): its whites and the blade's greys left as drawn, not taken for energy.
     private func recolour(image: CGImage, look: Look, holdsBall: Bool, detach: Bool,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
-                          bareLine: Bool = false, keepsProps: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?)?) {
+                          bareLine: Bool = false, keepsProps: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?, outline: CGImage?, bareOutline: CGImage?)?) {
         let texture = SKTexture(cgImage: image)
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
@@ -1477,7 +1635,7 @@ final class SpriteLibrary {
 
         // With `detach`, the line comes off onto its own canvas in white, so the view can
         // draw it in any colour, frame by frame.
-        var outline: SKTexture?
+        var outline: SKTexture?, outlineImage: CGImage?
         if detach, lined.contains(true), let (lineContext, linePixels) = makeCanvas(width: width, height: height) {
             for pixel in 0..<count where lined[pixel] {
                 let index = pixel * 4
@@ -1490,15 +1648,17 @@ final class SpriteLibrary {
                 pixels[index + 2] = 0
                 pixels[index + 3] = 0
             }
-            outline = lineContext.makeImage().map { SKTexture(cgImage: $0) }
+            outlineImage = lineContext.makeImage()
+            outline = outlineImage.map { SKTexture(cgImage: $0) }
         }
 
-        var bareOutline: SKTexture?
+        var bareOutline: SKTexture?, bareOutlineImage: CGImage?
         if let bareLined, let (bareContext, barePixels) = makeCanvas(width: width, height: height) {
             for pixel in 0..<count where bareLined[pixel] {
                 for channel in 0..<4 { barePixels[pixel * 4 + channel] = 255 }
             }
-            bareOutline = bareContext.makeImage().map { SKTexture(cgImage: $0) }
+            bareOutlineImage = bareContext.makeImage()
+            bareOutline = bareOutlineImage.map { SKTexture(cgImage: $0) }
         }
 
         // The glowing parts alone, as drawn: over K&A's wash, so the night doesn't dim them.
@@ -1551,7 +1711,7 @@ final class SpriteLibrary {
         guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
         return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline, glowingParts,
-                (recoloured, glowingImage))
+                (recoloured, glowingImage, outlineImage, bareOutlineImage))
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

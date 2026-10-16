@@ -18,6 +18,10 @@ public struct Shield: Equatable {
     /// Its turn from upright, radians, anticlockwise: the tilt, mirrored for facing left.
     public let tilt: Double
     public var age = 0
+    /// It's turned the ball once already: each shield turns it once, off it or popped up, and
+    /// after that the ball passes it, so it can't bounce the ball between itself and the ground
+    /// or a body over and over.
+    public var turnedTheBall = false
 
     /// Its box's own axes: across it, and up it.
     var across: Vec2 { Vec2(x: Trig.cos(tilt), y: Trig.sin(tilt)) }
@@ -56,6 +60,8 @@ public struct Shield: Equatable {
 public enum ShieldRules {
     /// The stick past this along one way picks the shield over the snatch.
     public static let stickThreshold = 0.5
+    /// Back held turns the body round; a snatch within this many frames of the turn is still back's.
+    public static let turnFrames = 3
     /// Its box, in units: shield.png drawn at half its size.
     public static let size = Vec2(x: 12, y: 16)
     /// shield.png's 18 frames (48 by 64) at 15 a second, in sim frames: its whole life.
@@ -100,8 +106,8 @@ extension Match {
         let centre = player.handCatchPoint + Vec2(x: offset.x * side, y: offset.y)
         let shield = Shield(owner: index, centre: centre, normal: normal, tilt: radians * side)
         events.append(.shieldRaised(player: index, at: centre))
-        // Two in one place break each other.
-        if let met = shields.firstIndex(where: { $0.overlaps(shield) }) {
+        // Two in one place break each other: two of one player's don't.
+        if let met = shields.firstIndex(where: { $0.owner != index && $0.overlaps(shield) }) {
             let other = shields.remove(at: met)
             events.append(.shieldBroken(player: other.owner, at: other.centre))
             events.append(.shieldBroken(player: index, at: centre))
@@ -150,7 +156,8 @@ extension Match {
     /// or met in the shield's first frames it's stopped and popped up.
     mutating func shieldTheBall() {
         guard !shields.isEmpty, ball.isLive, ball.holder == nil, ball.tether == nil, ball.frozen == 0 else { return }
-        guard let number = shields.firstIndex(where: { $0.touches(ball.position, radius: BallRules.radius) && ball.velocity.dot($0.normal) < 0 }) else { return }
+        guard let number = shields.firstIndex(where: { !$0.turnedTheBall && $0.touches(ball.position, radius: BallRules.radius) && ball.velocity.dot($0.normal) < 0 }) else { return }
+        shields[number].turnedTheBall = true
         let shield = shields[number]
         if ball.thrown {
             shields.remove(at: number)

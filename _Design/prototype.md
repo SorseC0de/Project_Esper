@@ -2585,7 +2585,8 @@ shown, once, like the effects.
 ## Shielding (experimental)
 
 The snatch with no ball and the stick held a way (past 0.5): back raises it in front, as the
-body faces; up or down tilts it 45 degrees that way; forward is still the snatch, as it's pressed
+body faces (back held turns the body round, so a snatch within 3 frames of that turn is still
+back's: the body's turned back first); up or down tilts it 45 degrees that way; forward is still the snatch, as it's pressed
 running at someone. It plays the snatch's sheet; at the hand's full stretch it raises a shield in
 place of the reach (`Shield.swift`), which hangs where it's raised, apart from the body, for
 shield.png's 18 frames (48 by 64) at 15 a second (72 sim frames). Its box is 12 by 16 units; its
@@ -2598,7 +2599,9 @@ colours, added on, turned to its tilt; its box shows with HITBOX.
   twice its size, the slashclash's sound till its own).
 - A blade on it parries the swinger, as a snatch's parry does.
 - A snatch or a thrown ball breaks it (a burst of cubes in its raiser's colour), earning the
-  snatcher or thrower 10 FLO; two shields in one place break each other.
+  snatcher or thrower 10 FLO; two players' shields in one place break each other, one's own don't.
+- Each shield turns the ball once; after that it passes, so it can't be bounced between the
+  shield and the ground or a body over and over.
 - Raised on another body, it pushes it away (3, a unit up), unhit, as the change's burst does.
 - Down onto the ground or a body: a hop, half the double jump's height, in its look, no jump spent.
 - Its sound is shield.wav. The computer doesn't shield yet: its snatch presses let go of the stick.

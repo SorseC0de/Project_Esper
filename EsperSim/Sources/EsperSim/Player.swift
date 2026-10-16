@@ -292,8 +292,11 @@ public struct Player: Equatable {
     public var doubleJumpTimer = 0
     /// The shield's way, while this snatch raises one rather than reaching (`Shield.swift`).
     public var shieldAim: ShieldAim?
-    /// The stick this frame, for the snatch to read which way it was pressed.
+    /// The stick this frame, for the snatch to read which way it was pressed; and the way the
+    /// body faced at the start of each of the last few frames, so back + snatch still counts once
+    /// pressing back has turned it round (`ShieldRules.turnFrames`).
     private var stepStick = Vec2.zero
+    private var recentFacings: [Facing] = []
     /// Frames a jump press stays live waiting for something to spend it.
     public var jumpBuffer = 0
     /// Frames since the stick was near centre on x, for telling a smash from a tilt.
@@ -543,6 +546,8 @@ public struct Player: Equatable {
         // Parried: every input held off, stick and buttons, till the lockout's done.
         var input = parryLocked ? PlayerInput.idle : given
         stepStick = input.stick
+        recentFacings.append(facing)
+        if recentFacings.count > ShieldRules.turnFrames { recentFacings.removeFirst() }
         underwater = sharedStage.features.underwater
         tiltPull = sharedStage.tiltPull
         tiltDown = sharedStage.tiltDown
@@ -1796,8 +1801,14 @@ public struct Player: Equatable {
         // Parried a moment ago: the throw button does nothing yet.
         guard attackLockout == 0 else { return }
         fastFalling = false
-        // The stick held a way raises a shield instead; held back, the body turns round first.
-        let shield = ShieldRules.aim(stick: stepStick, facing: facing)
+        // The stick held a way raises a shield instead. Back just turned the body round: it's
+        // turned back, and the shield goes up in front of it.
+        var shield = ShieldRules.aim(stick: stepStick, facing: facing)
+        if shield == nil, let before = recentFacings.first(where: { $0 != facing }),
+           let back = ShieldRules.aim(stick: stepStick, facing: before), back.aim == .forward {
+            facing = before
+            shield = back
+        }
         if shield?.turns == true { facing = facing.flipped }
         enter(.snatching)
         shieldAim = shield?.aim

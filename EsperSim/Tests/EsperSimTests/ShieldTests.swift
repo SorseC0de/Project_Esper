@@ -51,6 +51,35 @@ final class ShieldTests: XCTestCase {
         XCTAssertEqual(up.shields.first?.normal.y ?? 0, Trig.sin(degrees(45)), accuracy: 0.001)
     }
 
+    func testBackJustTurnedRoundStillRaisesItTheWayItFaced() {
+        var match = court()
+        // Back held a frame turns the body round; the snatch the frame after is still back's.
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle])
+        XCTAssertEqual(match.players[0].facing, .left)
+        raise(&match, stick: Vec2(x: -1, y: 0))
+        XCTAssertEqual(match.players[0].facing, .right, "turned back")
+        XCTAssertGreaterThan(match.shields.first?.normal.x ?? 0, 0)
+    }
+
+    func testOnesOwnShieldsDontBreakEachOther() {
+        var match = court()
+        raise(&match, stick: Vec2(x: -1, y: 0))
+        for _ in 0..<SnatchRules.frames { match.advance(inputs: [.idle, .idle]) }
+        match.players[0].facing = .right
+        raise(&match, stick: Vec2(x: -1, y: 0))
+        XCTAssertEqual(match.shields.count, 2)
+    }
+
+    func testEachShieldTurnsTheBallOnce() {
+        var match = court()
+        raise(&match, stick: Vec2(x: -1, y: 0))
+        for _ in 0..<ShieldRules.perfectFrames { match.advance(inputs: [.idle, .idle]) }
+        match.shields[0].turnedTheBall = true
+        ballAt(&match, shield: match.shields[0], from: 1, speed: 4)
+        for _ in 0..<6 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertLessThan(match.ball.velocity.x, 0, "passed on through")
+    }
+
     func testItHangsWhereItWasRaisedAndGoesAfterItsArt() {
         var match = court()
         raise(&match, stick: Vec2(x: -1, y: 0))

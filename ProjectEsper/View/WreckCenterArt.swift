@@ -13,7 +13,7 @@ enum WreckCenterArt {
     /// Past the art: its background's colour.
     static let beyond: RGB = 0x2A2F4E
     /// The possession pixels unheld: the tiles' palette 59, the back wall's palette 60. Held, the
-    /// energy set's colour and hood shadow; a glow outside the sets, the back wall at 60's share of 59.
+    /// energy set's colour and its third tone (the back limbs'); a glow outside the sets, the back wall at 60's share of 59.
     static let tilesNeutral: RGB = 0x5D5D5D
     static let backNeutral: RGB = 0x3D3D3D
     static let backShare: CGFloat = CGFloat(0x3D) / CGFloat(0x5D)

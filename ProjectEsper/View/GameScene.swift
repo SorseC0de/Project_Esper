@@ -3347,12 +3347,12 @@ final class GameScene: SKScene {
     }
 
     /// The Wreck Center's possession colours: unheld its own greys; held, the holder's energy
-    /// set's first two, the floor's its colour and the back wall's its hood shadow.
+    /// set's colour on the floor and its third tone, the back limbs', on the back wall.
     private func wreckColours(_ owner: Int?) -> (tiles: SKColor, back: SKColor) {
         guard let owner else { return (SKColor(rgb: WreckCenterArt.tilesNeutral), SKColor(rgb: WreckCenterArt.backNeutral)) }
         let glow = sprites.look(for: owner).glow
-        let shadow = EnergyColour.withGlow(glow)?.hoodShadow ?? Look.scaled(glow, Double(WreckCenterArt.backShare))
-        return (SKColor(rgb: glow), SKColor(rgb: shadow))
+        let back = EnergyColour.withGlow(glow)?.backLimbs ?? Look.scaled(glow, Double(WreckCenterArt.backShare))
+        return (SKColor(rgb: glow), SKColor(rgb: back))
     }
 
     /// The streak a flying ball leaves: soft blobs dropped where it was, thinning out, so

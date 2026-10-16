@@ -131,8 +131,9 @@ final class MaskScene: SKScene {
                 node.shader = green ? MaskScene.flatGreen : MaskScene.flatWhite
                 node.zPosition = green ? 1 : 2
             } else if green {
-                node.color = SKColor(red: 0, green: 1, blue: 0, alpha: 1)
-                node.colorBlendFactor = 1
+                // Pure green through the art's alpha, as the static art is: a tint multiplies, so
+                // dark art came out a dark green the glow took for a body.
+                node.shader = MaskScene.flatGreen
                 node.zPosition = 1
             }
             if let depth { node.zPosition = depth }

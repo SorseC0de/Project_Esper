@@ -1,11 +1,12 @@
-/// Shielding: the snatch with the stick held up, down, forward or back, and no ball. Back turns
-/// the body round at once and raises it forward; up and down tilt it 45 degrees that way. Raised
+/// Shielding: the snatch with the stick held up, down or back, and no ball; held forward it's
+/// still the snatch, as pressed running at someone. Back raises it in front, as it faces; up
+/// and down tilt it 45 degrees that way. Raised
 /// at the hand's full stretch, it hangs where it was raised, apart from the body, for the art's
 /// length. A loose ball off it reflects; met in its first frames, the perfect shield, the ball's
 /// stopped and popped up a little to be caught. A blade on it parries the swinger. A snatch, a
 /// thrown ball or another shield where it is breaks it. Raised on another body, it pushes it
 /// away, as the change into FloState's burst does, without a hit.
-public enum ShieldAim: Equatable {
+public enum ShieldAim: Equatable, CaseIterable {
     case forward, up, down
 }
 
@@ -57,8 +58,8 @@ public enum ShieldRules {
     public static let stickThreshold = 0.5
     /// Its box, in units: shield.png drawn at half its size.
     public static let size = Vec2(x: 12, y: 16)
-    /// shield.png's 24 frames at 15 a second, in sim frames: its whole life.
-    public static let sheetFrames = 24
+    /// shield.png's 18 frames (48 by 64) at 15 a second, in sim frames: its whole life.
+    public static let sheetFrames = 18
     public static let sheetFramesPerSecond = 15
     public static var lifeFrames: Int { sheetFrames * 60 / sheetFramesPerSecond }
     /// Met in this many frames of its raising, the ball's stopped and popped up this fast.
@@ -72,14 +73,15 @@ public enum ShieldRules {
     public static let breakFlo = 10
     /// A down-shield on the ground or a body hops its raiser this share of the double jump's height.
     public static let hopHeightShare = 0.5
-    /// Its middle from the hand at full stretch, in units: along its face's way, and across it
-    /// (up, for one raised forward). On the debug sliders.
-    nonisolated(unsafe) public static var handOffset = Vec2(x: 0, y: 0)
+    /// Its middle from the hand at full stretch, in units, for each aim: x the way the body
+    /// faces, y up. On the debug sliders.
+    nonisolated(unsafe) public static var handOffsets: [ShieldAim: Vec2] = [.forward: .zero, .up: .zero, .down: .zero]
 
-    /// What a snatch press with this stick raises, if a shield: its aim, and whether the body turns round first.
+    /// What a snatch press with this stick raises, if a shield: its aim, and whether the body
+    /// turns round first. Forward is the snatch; back raises the shield in front.
     public static func aim(stick: Vec2, facing: Facing) -> (aim: ShieldAim, turns: Bool)? {
         let x = abs(stick.x), y = abs(stick.y)
-        if x >= y, x >= stickThreshold { return (.forward, stick.x * facing.sign < 0) }
+        if x >= y, x >= stickThreshold { return stick.x * facing.sign < 0 ? (.forward, false) : nil }
         if y > x, y >= stickThreshold { return (stick.y > 0 ? .up : .down, false) }
         return nil
     }
@@ -94,9 +96,8 @@ extension Match {
         let degrees = aim == .up ? ShieldRules.tiltDegrees : aim == .down ? -ShieldRules.tiltDegrees : 0
         let radians = degrees * .pi / 180
         let normal = Vec2(x: Trig.cos(radians) * side, y: Trig.sin(radians))
-        // Across its face, the way that's up for one raised forward, whichever way it faces.
-        let aside = Vec2(x: -normal.y * side, y: normal.x * side)
-        let centre = player.handCatchPoint + normal * ShieldRules.handOffset.x + aside * ShieldRules.handOffset.y
+        let offset = ShieldRules.handOffsets[aim] ?? .zero
+        let centre = player.handCatchPoint + Vec2(x: offset.x * side, y: offset.y)
         let shield = Shield(owner: index, centre: centre, normal: normal, tilt: radians * side)
         events.append(.shieldRaised(player: index, at: centre))
         // Two in one place break each other.

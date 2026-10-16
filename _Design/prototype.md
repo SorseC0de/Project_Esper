@@ -2584,12 +2584,14 @@ shown, once, like the effects.
 
 ## Shielding (experimental)
 
-The snatch with no ball and the stick held a way (past 0.5): forward, back (the body turns round
-at once, then forward), or up or down (tilted 45 degrees). It plays the snatch's sheet; at the
-hand's full stretch it raises a shield in place of the reach (`Shield.swift`), which hangs where
-it's raised, apart from the body, for shield.png's 24 frames at 15 a second (96 sim frames). Its
-box is 12 by 16 units; its middle is the hand's, moved by SHIELD X (out along its way) and
-SHIELD Y (across it), in art pixels. Drawn at half the sheet's size, in its raiser's energy
+The snatch with no ball and the stick held a way (past 0.5): back raises it in front, as the
+body faces; up or down tilts it 45 degrees that way; forward is still the snatch, as it's pressed
+running at someone. It plays the snatch's sheet; at the hand's full stretch it raises a shield in
+place of the reach (`Shield.swift`), which hangs where it's raised, apart from the body, for
+shield.png's 18 frames (48 by 64) at 15 a second (72 sim frames). Its box is 12 by 16 units; its
+middle is the hand's, moved for each aim by its own sliders (SHIELD FWD, UP and DOWN, X the way
+the body faces and Y up, in art pixels). Raised, the hands flash the bright energy colour, fading
+over 12 frames. Drawn at half the sheet's size, in its raiser's energy
 colours, added on, turned to its tilt; its box shows with HITBOX.
 - A shot or loose ball meeting its face reflects, nobody's shot any more; met within its first
   6 frames, the perfect shield, the ball's stopped and popped up at 3 to be caught (shine.png at

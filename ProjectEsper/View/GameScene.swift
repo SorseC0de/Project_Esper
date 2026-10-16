@@ -299,6 +299,9 @@ final class GameScene: SKScene {
     private static let keptChargeBreathSeconds = 1.0
     private static let keptChargeMost: CGFloat = 0.85
     private static let keptChargeZ: CGFloat = 0.032
+    /// The hands' flash as a shield's raised: frames, from full to none.
+    private static let shieldHandFlashFrames = 12
+    private var shieldHandFlash: [Int: Int] = [:]
     /// Over the body's flash (0.09).
     private static let hoodFlashZ: CGFloat = 0.091
     /// Super Smoothie's head tipped flying up or down: radians, eased in a share a frame, and how
@@ -3617,12 +3620,16 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "BEAM LIFT", range: -12...12, notch: 1, value: Float(BeamHeadTuning.lift)) { BeamHeadTuning.lift = CGFloat($0) }
-        // The shield's place from the hand, in art pixels: out along its way, and across it.
-        controls.addSlider(title: "SHIELD X", range: -24...24, notch: 1, value: Float(ShieldRules.handOffset.x * SpriteLibrary.pixelsPerUnit)) {
-            ShieldRules.handOffset.x = Double($0) / SpriteLibrary.pixelsPerUnit
-        }
-        controls.addSlider(title: "SHIELD Y", range: -24...24, notch: 1, value: Float(ShieldRules.handOffset.y * SpriteLibrary.pixelsPerUnit)) {
-            ShieldRules.handOffset.y = Double($0) / SpriteLibrary.pixelsPerUnit
+        // Each aim's shield from the hand, in art pixels: the way the body faces, and up. Back
+        // turns round and raises it forward, so it's forward's.
+        for (aim, name) in [(ShieldAim.forward, "FWD"), (.up, "UP"), (.down, "DOWN")] {
+            let offset = ShieldRules.handOffsets[aim] ?? .zero
+            controls.addSlider(title: "SHIELD \(name) X", range: -32...32, notch: 1, value: Float(offset.x * SpriteLibrary.pixelsPerUnit)) {
+                ShieldRules.handOffsets[aim, default: .zero].x = Double($0) / SpriteLibrary.pixelsPerUnit
+            }
+            controls.addSlider(title: "SHIELD \(name) Y", range: -32...32, notch: 1, value: Float(offset.y * SpriteLibrary.pixelsPerUnit)) {
+                ShieldRules.handOffsets[aim, default: .zero].y = Double($0) / SpriteLibrary.pixelsPerUnit
+            }
         }
         controls.addSlider(title: "BEAM SLIDE", range: -12...12, notch: 1, value: Float(BeamHeadTuning.slide)) { BeamHeadTuning.slide = CGFloat($0) }
         controls.addSlider(title: "BEAM UP TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.upTurn)) { BeamHeadTuning.upTurn = CGFloat($0) }
@@ -5644,7 +5651,9 @@ final class GameScene: SKScene {
             case .slashed(let index): play(.esperSlash, at: body(index))
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
             case .slashClashed(let at): play(.slashClash, at: at)
-            case .shieldRaised(_, let at): play(.shield, at: at)
+            case .shieldRaised(let index, let at):
+                play(.shield, at: at)
+                shieldHandFlash[index] = GameScene.shieldHandFlashFrames
             // The perfect shield's own sound to come; the clash's till then.
             case .shieldPerfect(_, let at): play(.slashClash, at: at)
             case .slid(let index): play(.slide, at: body(index))
@@ -8469,10 +8478,14 @@ final class GameScene: SKScene {
                                         accent: lockoutOn ? grey : SKColor(rgb: accent),
                                         z: energyForm ? GameScene.floatingStringZ : GameScene.hoodUpZ + 0.0005)
             }
-            // Z Tea's kept charge: the hands breathing from skin to near-white.
+            // Z Tea's kept charge: the hands breathing from skin to near-white. A shield raised:
+            // the hands a flash of the bright energy colour, fading.
+            let flash = shieldHandFlash[index, default: 0]
+            if flash > 0 { shieldHandFlash[index] = flash - 1 }
             if keptChargeHands.indices.contains(index) {
                 let hands = keptChargeHands[index]
-                let texture = player.beamStored && player.power == .zTea && !node.isHidden
+                let charged = player.beamStored && player.power == .zTea
+                let texture = (charged || flash > 0) && !node.isHidden
                     ? sprites.handsTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) : nil
                 hands.isHidden = texture == nil
                 if let texture {
@@ -8484,8 +8497,14 @@ final class GameScene: SKScene {
                     hands.yScale = node.yScale
                     hands.zRotation = node.zRotation
                     hands.zPosition = GameScene.frontArmOverHood(frame) && !hood.isHidden ? GameScene.hoodUpZ + 0.0011 : GameScene.keptChargeZ
-                    let breath = 0.5 - 0.5 * cos(CACurrentMediaTime() * 2 * .pi / GameScene.keptChargeBreathSeconds)
-                    hands.colorBlendFactor = GameScene.keptChargeMost * CGFloat(breath)
+                    if flash > 0 {
+                        hands.color = SKColor(rgb: sprites.look(for: index).bright)
+                        hands.colorBlendFactor = CGFloat(flash) / CGFloat(GameScene.shieldHandFlashFrames)
+                    } else {
+                        let breath = 0.5 - 0.5 * cos(CACurrentMediaTime() * 2 * .pi / GameScene.keptChargeBreathSeconds)
+                        hands.color = GameScene.keptChargeWhite
+                        hands.colorBlendFactor = GameScene.keptChargeMost * CGFloat(breath)
+                    }
                 }
             }
             // The front arm over the hood on the frames it crosses the head.

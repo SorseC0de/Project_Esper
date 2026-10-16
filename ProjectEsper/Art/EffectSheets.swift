@@ -79,7 +79,7 @@ enum EffectSheets {
         "lightning_spark2": 10,
         "score_strike": 13,
         "shark": 4,
-        "shield": 24,
+        "shield": 18,
         "shine": 5,
         "sizzle1": 6,
         "sizzle2": 6,

@@ -93,7 +93,7 @@ SKIP = {"Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",
         "spr_box", "spr_floor"}
 # Strips in _Graphic Assets that nothing draws yet, kept out of the app until they're wired.
-HELD_BACK = {"shield", "dust_run2"}
+HELD_BACK = {"dust_run2"}
 
 
 def load_yy(path):

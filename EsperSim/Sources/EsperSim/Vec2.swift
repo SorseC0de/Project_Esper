@@ -13,6 +13,7 @@ public struct Vec2: Equatable, Hashable, Codable {
     }
 
     public var length: Double { (x * x + y * y).squareRoot() }
+    public func dot(_ other: Vec2) -> Double { x * other.x + y * other.y }
     public var lengthSquared: Double { x * x + y * y }
     /// Radians, counter-clockwise from +x.
     public var angle: Double { Trig.atan2(y, x) }

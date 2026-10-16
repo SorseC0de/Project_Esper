@@ -290,6 +290,10 @@ public struct Player: Equatable {
     public var dunkFrom = Vec2.zero
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
+    /// The shield's way, while this snatch raises one rather than reaching (`Shield.swift`).
+    public var shieldAim: ShieldAim?
+    /// The stick this frame, for the snatch to read which way it was pressed.
+    private var stepStick = Vec2.zero
     /// Frames a jump press stays live waiting for something to spend it.
     public var jumpBuffer = 0
     /// Frames since the stick was near centre on x, for telling a smash from a tilt.
@@ -474,7 +478,7 @@ public struct Player: Equatable {
         state = next
         stateTimer = 0
         if next == .taunt { tauntPaid = false }
-        if next == .snatching { snatchSpent = false }
+        if next == .snatching { snatchSpent = false } else { shieldAim = nil }
         if next != .slide { forcedSlide = false }
         if next != .suspended { tornadoCentre = nil }
         // A fresh stance has its stepback; coming back out of one doesn't.
@@ -538,6 +542,7 @@ public struct Player: Equatable {
                               ballHolder: Int? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         // Parried: every input held off, stick and buttons, till the lockout's done.
         var input = parryLocked ? PlayerInput.idle : given
+        stepStick = input.stick
         underwater = sharedStage.features.underwater
         tiltPull = sharedStage.tiltPull
         tiltDown = sharedStage.tiltDown
@@ -1298,7 +1303,7 @@ public struct Player: Equatable {
             }
 
         case .snatching:
-            if inFloState {
+            if inFloState, shieldAim == nil {
                 // FloState's snatch steps through: the body carried forward its travel over the
                 // snatch, through the other, the reach taking the ball on the way. The travel
                 // goes by the snatch's clock, so a held clock (under water) moves the body as far.
@@ -1312,7 +1317,10 @@ public struct Player: Equatable {
                 velocity.x = approach(velocity.x, 0, attackBrake)
                 if !grounded { fall(.idle) }
             }
-            if reached(SnatchRules.sparkFrame) {
+            if reached(SnatchRules.sparkFrame), shieldAim != nil {
+                // The shield, at the hand's full stretch, where the reach would have been.
+                wanted = .raiseShield
+            } else if reached(SnatchRules.sparkFrame) {
                 events.append(.snatchReached(player: index))
                 if power == .voltaCola, powerLevel >= 2, strikeCooldown == 0 {
                     // Volta Cola: the strike down onto the hand at full stretch.
@@ -1788,7 +1796,21 @@ public struct Player: Equatable {
         // Parried a moment ago: the throw button does nothing yet.
         guard attackLockout == 0 else { return }
         fastFalling = false
+        // The stick held a way raises a shield instead; held back, the body turns round first.
+        let shield = ShieldRules.aim(stick: stepStick, facing: facing)
+        if shield?.turns == true { facing = facing.flipped }
         enter(.snatching)
+        shieldAim = shield?.aim
+    }
+
+    /// A down-shield meeting the ground or a body: a hop off it, half the double jump's height,
+    /// in its look, no jump spent.
+    public mutating func shieldHop() {
+        velocity.y = doubleJumpVelocity * ShieldRules.hopHeightShare.squareRoot()
+        grounded = false
+        fastFalling = false
+        doubleJumpTimer = 30
+        enter(.air)
     }
 
     /// A slashclash's hit stop over: out of the swing at once, back in neutral.
@@ -1927,12 +1949,12 @@ public struct Player: Equatable {
     var orbitHit = false
 
     public var snatchSteppingThrough: Bool {
-        state == .snatching && frozen == 0 && inFloState && stateTimer < SnatchRules.frames
+        state == .snatching && frozen == 0 && inFloState && shieldAim == nil && stateTimer < SnatchRules.frames
     }
 
     /// The body, the part of the snatch's reach that isn't the hand's ring, while the hand is out.
     public var snatchHitbox: Box? {
-        guard state == .snatching, frozen == 0, SnatchRules.activeFrames.contains(stateTimer) else { return nil }
+        guard state == .snatching, shieldAim == nil, frozen == 0, SnatchRules.activeFrames.contains(stateTimer) else { return nil }
         return body
     }
 

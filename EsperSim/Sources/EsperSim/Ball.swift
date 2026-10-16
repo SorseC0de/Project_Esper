@@ -344,6 +344,28 @@ public struct Ball: Equatable {
 
     /// Knocked out of a holder's hands: a short floater straight up, then a normal fall,
     /// nobody's to warp to.
+    /// Off a shield's face, its way across that face turned back, as off a wall but losing
+    /// nothing; nobody's shot any more.
+    public mutating func reflect(off normal: Vec2) {
+        leaveShieldAsLoose()
+        velocity = velocity - normal * (2 * velocity.dot(normal))
+    }
+
+    /// The perfect shield: stopped dead and popped straight up this fast, to be caught.
+    public mutating func popOffShield(up speed: Double) {
+        leaveShieldAsLoose()
+        velocity = Vec2(x: 0, y: speed)
+    }
+
+    private mutating func leaveShieldAsLoose() {
+        settlePace()
+        straight = false
+        floater = 0
+        steers = false
+        shotInFlight = false
+        resting = false
+    }
+
     public mutating func pop(from position: Vec2) {
         holder = nil
         launchPoint = position

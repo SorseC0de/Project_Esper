@@ -70,6 +70,14 @@ recoloured to each skin's two tones, so new skins need only these values in `Hum
 Green is a ninth hood colour, Emerald (`EnergyColour.name`): it needs a place in the wheel and
 on the customize picker. Light blue takes teal's place; its name, Larimar, is in already.
 
+## Shielding drinks (ideas, not to be added yet)
+
+If shielding earns its place, passive drinks to build on it (the user's):
+- Shield size up
+- Shield duration up
+- Shield travel
+- A second shield
+
 ## Polish (low priority)
 
 - **The stages' glow colours** look bad; to correct (the user's note, low priority). The Wreck

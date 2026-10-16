@@ -32,6 +32,7 @@ final class SoundBoard {
         case stagePreview = "stage_preview"
         case slashWallClank = "slash_wallclank"
         case slashClash = "slashclash"
+        case shield
         case dunkSlam = "dunk"
         case slide = "slide2"
         case flash

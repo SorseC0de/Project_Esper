@@ -192,6 +192,9 @@ public struct Opponent: Equatable {
             if journey?.started != true { keepTheDribbleOffTheLava(match, me: me, into: &input) }
             keepOffTheLava(match, me: me, into: &input)
         }
+        // It doesn't shield yet: a snatch press with the stick held would raise one, so the
+        // stick's let go that frame and the snatch stays a snatch.
+        if input.throwBall, !pressed.throwBall, !me.hasBall { input.stick = .zero }
         pressed = input
         return input
     }

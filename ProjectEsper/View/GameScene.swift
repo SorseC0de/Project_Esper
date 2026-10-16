@@ -3085,6 +3085,7 @@ final class GameScene: SKScene {
         stepJellyfishNode()
         HoopfishHideawayArt.animate(hoopfishHideawayArt?.hoopfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
         if let art = wreckCenterArt { WreckCenterArt.animate(art, at: CACurrentMediaTime(), match: match) }
+        drawShields()
         HoopfishHideawayArt.sway(hoopfishHideawayArt?.props ?? [], at: CACurrentMediaTime())
         swimmers = swimmers.compactMap { swimmer in
             var swimmer = swimmer
@@ -3616,6 +3617,13 @@ final class GameScene: SKScene {
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "BEAM LIFT", range: -12...12, notch: 1, value: Float(BeamHeadTuning.lift)) { BeamHeadTuning.lift = CGFloat($0) }
+        // The shield's place from the hand, in art pixels: out along its way, and across it.
+        controls.addSlider(title: "SHIELD X", range: -24...24, notch: 1, value: Float(ShieldRules.handOffset.x * SpriteLibrary.pixelsPerUnit)) {
+            ShieldRules.handOffset.x = Double($0) / SpriteLibrary.pixelsPerUnit
+        }
+        controls.addSlider(title: "SHIELD Y", range: -24...24, notch: 1, value: Float(ShieldRules.handOffset.y * SpriteLibrary.pixelsPerUnit)) {
+            ShieldRules.handOffset.y = Double($0) / SpriteLibrary.pixelsPerUnit
+        }
         controls.addSlider(title: "BEAM SLIDE", range: -12...12, notch: 1, value: Float(BeamHeadTuning.slide)) { BeamHeadTuning.slide = CGFloat($0) }
         controls.addSlider(title: "BEAM UP TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.upTurn)) { BeamHeadTuning.upTurn = CGFloat($0) }
         controls.addSlider(title: "BEAM DOWN TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.downTurn)) { BeamHeadTuning.downTurn = CGFloat($0) }
@@ -5636,6 +5644,9 @@ final class GameScene: SKScene {
             case .slashed(let index): play(.esperSlash, at: body(index))
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
             case .slashClashed(let at): play(.slashClash, at: at)
+            case .shieldRaised(_, let at): play(.shield, at: at)
+            // The perfect shield's own sound to come; the clash's till then.
+            case .shieldPerfect(_, let at): play(.slashClash, at: at)
             case .slid(let index): play(.slide, at: body(index))
             // Every one of Flash Fizz's teleports, with its flashspark.
             case .warped(_, let from, _), .flashed(_, let from, _): play(.flash, at: from)
@@ -5888,6 +5899,11 @@ final class GameScene: SKScene {
                 if let cart = match.cart { spawnHitSpark(player: index, at: cart.box.center) }
             case .swatted(let index, hit: true):
                 spawnHitSpark(player: index, at: match.ball.position)
+            case .shieldPerfect(let owner, let at):
+                // The perfect shield: the shine, twice its size, where the ball met it.
+                glowers.addChild(EnergyEffect.shine.node(sprites, player: owner, at: SpriteLibrary.point(at), scale: GameScene.perfectShineScale))
+            case .shieldBroken(let owner, let at):
+                shatterShield(owner: owner, at: SpriteLibrary.point(at))
             case .slashClashed(let at):
                 // The clash sheet where the blades meet, once in each slasher's colour, the second
                 // turned round; the sparks stand in until it's imported.
@@ -6353,6 +6369,55 @@ final class GameScene: SKScene {
         let position = player.position + Vec2(x: Double(offset.x) * player.facing.sign, y: Double(offset.y)) * Double(bodyScale(index)) / SpriteLibrary.pixelsPerUnit
         spawn(effect, at: position, flipped: player.facing == .left, player: index, scale: DustTuning.scale(effect) * bodyScale(index))
     }
+
+    /// The shields up, each where it was raised: its sheet by its age, in its owner's colours,
+    /// added on, at half the sheet's size and turned to its tilt.
+    static let shieldScale: CGFloat = 0.5
+    static let perfectShineScale: CGFloat = 2
+    private var shieldNodes: [SKSpriteNode] = []
+    private func drawShields() {
+        let shields = match.shields
+        while shieldNodes.count < shields.count {
+            let node = SKSpriteNode()
+            node.blendMode = .add
+            node.zPosition = 29
+            glowers.addChild(node)
+            shieldNodes.append(node)
+        }
+        let frames = EnergyEffect.shield.frameCount
+        for (index, node) in shieldNodes.enumerated() {
+            guard index < shields.count, frames > 0 else { node.isHidden = true; continue }
+            let shield = shields[index]
+            let frame = min(shield.age * ShieldRules.sheetFramesPerSecond / 60, frames - 1)
+            let texture = sprites.effectTexture(EnergyEffect.shield.name, frame, player: shield.owner)
+            node.texture = texture
+            node.size = CGSize(width: texture.size().width * GameScene.shieldScale, height: texture.size().height * GameScene.shieldScale)
+            node.position = SpriteLibrary.point(shield.centre)
+            node.zRotation = CGFloat(shield.tilt)
+            node.xScale = shield.normal.x < 0 ? -1 : 1
+            node.isHidden = false
+        }
+    }
+
+    /// A broken shield: an explosion of cubes in its owner's colour, out from where it was.
+    private func shatterShield(owner: Int, at point: CGPoint) {
+        var r: CGFloat = 1, g: CGFloat = 1, b: CGFloat = 1, a: CGFloat = 1
+        SKColor(rgb: sprites.look(for: owner).glow).getRed(&r, green: &g, blue: &b, alpha: &a)
+        for _ in 0..<GameScene.shieldShatterCubes {
+            let node = SKSpriteNode(color: .white, size: CGSize(width: 2, height: 2))
+            node.isHidden = true
+            node.position = CGPoint(x: point.x + CGFloat.random(in: -6...6), y: point.y + CGFloat.random(in: -8...8))
+            glowers.addChild(node)
+            let angle = Double.random(in: 0..<(2 * .pi)), speed = Double.random(in: 40...90)
+            let axis = simd_normalize(SIMD3<Float>.random(in: -1...1) + SIMD3<Float>(0, 0, 0.001))
+            let cube = (simd_quatf(angle: Float.random(in: 0..<(2 * .pi)), axis: axis),
+                        SIMD3<Float>.random(in: -ParticleLook.cubeSpin...ParticleLook.cubeSpin), SIMD4<Float>(Float(r), Float(g), Float(b), 1))
+            headParticles.append(HeadParticle(node: node, owner: owner, velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
+                                              age: 0, life: 0.5 + Double.random(in: -0.1...0.1), frames: [SKTexture()], startFrame: 0,
+                                              drifts: false, cube: cube))
+        }
+    }
+    static let shieldShatterCubes = 24
 
     private func spawn(_ effect: Effect, at position: Vec2, flipped: Bool, player: Int? = nil, scale: CGFloat = 1) {
         let node = effect.node(sprites, at: SpriteLibrary.point(position), flipped: flipped, player: player)
@@ -9265,6 +9330,16 @@ final class GameScene: SKScene {
     private func drawHitboxes() {
         hitboxLayer.removeAllChildren()
         guard showHitboxes else { return }
+        // The shields' boxes, turned as they are.
+        for shield in match.shields {
+            let path = CGMutablePath()
+            path.addLines(between: shield.corners.map(SpriteLibrary.point))
+            path.closeSubpath()
+            let node = SKShapeNode(path: path)
+            node.strokeColor = .yellow
+            node.lineWidth = 1
+            hitboxLayer.addChild(node)
+        }
         func outline(_ box: Box, _ colour: SKColor) {
             let low = SpriteLibrary.point(box.min), high = SpriteLibrary.point(box.max)
             let node = SKShapeNode(rect: CGRect(x: low.x, y: low.y, width: high.x - low.x, height: high.y - low.y))

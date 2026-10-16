@@ -1889,6 +1889,8 @@ enum EnergyEffect: CaseIterable {
     case beam, burst
     /// Two blades meeting.
     case slashClash
+    /// Shielding: the shield, and the perfect shield's shine.
+    case shield, shine
 
     /// The two sparks a hit ball throws, one or the other each time, and the four bolts.
     static let hitSparks: [EnergyEffect] = [.spark, .spark2]
@@ -1927,6 +1929,8 @@ enum EnergyEffect: CaseIterable {
         case .beam: "beam"
         case .burst: "burst"
         case .slashClash: "slashclash"
+        case .shield: "shield"
+        case .shine: "shine"
         }
     }
 
@@ -1936,7 +1940,7 @@ enum EnergyEffect: CaseIterable {
     var fps: Double {
         switch self {
         case .charge: 30
-        case .scoreStrike, .floAbsorb: 15
+        case .scoreStrike, .floAbsorb, .shield, .shine: 15
         default: 24
         }
     }

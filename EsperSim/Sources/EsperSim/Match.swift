@@ -50,6 +50,8 @@ public struct Match: Equatable {
     public var tiltTarget = 0.0
     public var tiltClock = 0
     public var cart: Cart?
+    /// The shields up (`Shield.swift`).
+    public var shields: [Shield] = []
     /// The Wreck Center's one-way platforms: each one's frames left of its turn, 0 while it's still.
     public var dropPlatformFrames: [Int] = []
     public var cartHitFrames: [Int] = []
@@ -198,6 +200,7 @@ public struct Match: Equatable {
             perform(action, by: index)
         }
         turnDroppedPlatforms()
+        stepShields()
         burnInLava()
         burnDribbles()
         resolveSlashClash()
@@ -235,7 +238,9 @@ public struct Match: Equatable {
             // The ball sees the stage's ball-only solids as well.
             var ballStage = stage
             ballStage.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
-            if let hoop = ball.step(stage: ballStage, events: &events), scoreLockout == 0 {
+            let scored = ball.step(stage: ballStage, events: &events)
+            shieldTheBall()
+            if let hoop = scored, scoreLockout == 0 {
                 // A few frames after a point no other counts: a rim on the move can take the
                 // same ball through twice.
                 scoreLockout = BallRules.scoreLockoutFrames
@@ -345,6 +350,8 @@ public struct Match: Equatable {
     private mutating func perform(_ action: PlayerAction, by index: Int) {
         let player = players[index]
         switch action {
+        case .raiseShield:
+            raiseShield(by: index)
         case .releaseShot(let velocity):
             // Cannon Cola's pace: the same arc run through that many times faster.
             // On a swimming rim, with the rim's motion too (`Stage.shotLead`).
@@ -674,16 +681,20 @@ public struct Match: Equatable {
                 : players[index].throwParrying && blade.overlaps(players[index].body)
             guard reaches else { continue }
             players[other].slashHit = true
-            let away = players[other].position.x >= players[index].position.x ? 1.0 : -1.0
-            strip(other, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), flo: 0)
-            // The one parried can't swing or snatch again until a while after the stun; the
-            // parrier is back in neutral at once.
-            players[other].attackLockout = players[other].hitStun + ParryRules.attackLockoutAfterStunFrames
-            players[index].recoverFromParry()
-            events.append(.parried(player: other, by: index))
-            earnFlo(FloRules.counter, by: index, at: players[other].chest)
-            holdHitStop(HitStopRules.counterFrames)
+            parry(other, by: index)
         }
+    }
+
+    /// `swinger` parried by `index`: knocked away and stunned, kept off their attacks a while
+    /// after; the parrier back in neutral at once.
+    mutating func parry(_ swinger: Int, by index: Int) {
+        let away = players[swinger].position.x >= players[index].position.x ? 1.0 : -1.0
+        strip(swinger, by: index, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), flo: 0)
+        players[swinger].attackLockout = players[swinger].hitStun + ParryRules.attackLockoutAfterStunFrames
+        players[index].recoverFromParry()
+        events.append(.parried(player: swinger, by: index))
+        earnFlo(FloRules.counter, by: index, at: players[swinger].chest)
+        holdHitStop(HitStopRules.counterFrames)
     }
 
     /// The ball knocked out of `victim`'s hands: it pops straight up, nobody's, and the
@@ -1087,7 +1098,7 @@ public struct Match: Equatable {
     /// `knock` is given. Without stunning, only the ball pops and the knock lands.
     /// `flo`: what the hit earns its striker, as every hit does but a parry's and the stage's.
     /// `pause`: the hit holds the game still a moment, as a hit does but a held beam's.
-    private mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, flo: Int = FloRules.hit,
+    mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, flo: Int = FloRules.hit,
                                 pause: Bool = true) {
         // The change into FloState is super armoured: nothing takes it.
         guard players[victim].state != .transforming else { return }
@@ -1112,7 +1123,7 @@ public struct Match: Equatable {
     }
 
     /// FLO earned by `earner`; never taken from anyone, so FloState stays a comeback.
-    private mutating func earnFlo(_ amount: Int, by earner: Int, at source: Vec2) {
+    mutating func earnFlo(_ amount: Int, by earner: Int, at source: Vec2) {
         players[earner].gainFlo(amount, at: source, events: &events)
     }
 

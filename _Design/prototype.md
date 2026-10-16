@@ -2582,6 +2582,25 @@ shown, once, like the effects.
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,
   MULTIPLAYER. menu_back: RESUME, start to unpause, TITLE and TITLE SCREEN.
 
+## Shielding (experimental)
+
+The snatch with no ball and the stick held a way (past 0.5): forward, back (the body turns round
+at once, then forward), or up or down (tilted 45 degrees). It plays the snatch's sheet; at the
+hand's full stretch it raises a shield in place of the reach (`Shield.swift`), which hangs where
+it's raised, apart from the body, for shield.png's 24 frames at 15 a second (96 sim frames). Its
+box is 12 by 16 units; its middle is the hand's, moved by SHIELD X (out along its way) and
+SHIELD Y (across it), in art pixels. Drawn at half the sheet's size, in its raiser's energy
+colours, added on, turned to its tilt; its box shows with HITBOX.
+- A shot or loose ball meeting its face reflects, nobody's shot any more; met within its first
+  6 frames, the perfect shield, the ball's stopped and popped up at 3 to be caught (shine.png at
+  twice its size, the slashclash's sound till its own).
+- A blade on it parries the swinger, as a snatch's parry does.
+- A snatch or a thrown ball breaks it (a burst of cubes in its raiser's colour), earning the
+  snatcher or thrower 10 FLO; two shields in one place break each other.
+- Raised on another body, it pushes it away (3, a unit up), unhit, as the change's burst does.
+- Down onto the ground or a body: a hop, half the double jump's height, in its look, no jump spent.
+- Its sound is shield.wav. The computer doesn't shield yet: its snatch presses let go of the stick.
+
 ## The rebuild's pieces
 
 A look's change rebuilds everything drawn in it on every core (`SpriteLibrary.rewarm`): the

@@ -160,9 +160,9 @@ final class ShieldTests: XCTestCase {
         var match = court()
         let jumps = match.players[0].jumpsLeft
         // Out along its way, down onto the floor.
-        let offsets = ShieldRules.handOffsets
-        ShieldRules.handOffsets[.down] = Vec2(x: 7, y: -7)
-        defer { ShieldRules.handOffsets = offsets }
+        let offsets = ShieldRules.handOffsetPixels
+        ShieldRules.handOffsetPixels[.down] = Vec2(x: 0, y: -14)
+        defer { ShieldRules.handOffsetPixels = offsets }
         raise(&match, stick: Vec2(x: 0, y: -1))
         XCTAssertEqual(match.shields.count, 1)
         XCTAssertGreaterThan(match.players[0].velocity.y, 0, "hopped")

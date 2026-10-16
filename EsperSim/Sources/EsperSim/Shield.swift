@@ -23,38 +23,25 @@ public struct Shield: Equatable {
     /// or a body over and over.
     public var turnedTheBall = false
 
-    /// Its box's own axes: across it, and up it.
-    var across: Vec2 { Vec2(x: Trig.cos(tilt), y: Trig.sin(tilt)) }
-    var up: Vec2 { Vec2(x: -Trig.sin(tilt), y: Trig.cos(tilt)) }
+    /// Its reach: a circle round its middle (`ShieldRules.diameter`).
+    public var radius: Double { ShieldRules.diameter / 2 }
 
     /// Whether a circle here this big touches it.
-    public func touches(_ point: Vec2, radius: Double) -> Bool {
-        let offset = point - centre
-        return abs(offset.dot(across)) <= ShieldRules.size.x / 2 + radius && abs(offset.dot(up)) <= ShieldRules.size.y / 2 + radius
+    public func touches(_ point: Vec2, radius other: Double) -> Bool {
+        (point - centre).length <= radius + other
     }
 
-    /// Its four corners, for drawing its box and for meeting other boxes.
-    public var corners: [Vec2] {
-        let a = across * (ShieldRules.size.x / 2), b = up * (ShieldRules.size.y / 2)
-        return [centre - a - b, centre + a - b, centre + a + b, centre - a + b]
-    }
-
-    /// Whether it meets a box: no line along either's axes parts them.
+    /// Whether it meets a box: the box's nearest point to its middle within its reach.
     public func overlaps(_ box: Box) -> Bool {
-        let boxCorners = [box.min, Vec2(x: box.max.x, y: box.min.y), box.max, Vec2(x: box.min.x, y: box.max.y)]
-        return Shield.parted(corners, boxCorners, along: [Vec2(x: 1, y: 0), Vec2(x: 0, y: 1), across, up]) == false
+        box.distance(to: centre) <= radius
     }
 
     public func overlaps(_ other: Shield) -> Bool {
-        Shield.parted(corners, other.corners, along: [across, up, other.across, other.up]) == false
+        (other.centre - centre).length <= radius + other.radius
     }
 
-    private static func parted(_ first: [Vec2], _ second: [Vec2], along axes: [Vec2]) -> Bool {
-        axes.contains { axis in
-            let a = first.map { $0.dot(axis) }, b = second.map { $0.dot(axis) }
-            return a.max()! < b.min()! || b.max()! < a.min()!
-        }
-    }
+    /// Its box round its reach, for the stage's solids.
+    public var bounds: Box { Box(center: centre, width: ShieldRules.diameter, height: ShieldRules.diameter) }
 }
 
 public enum ShieldRules {
@@ -62,8 +49,10 @@ public enum ShieldRules {
     public static let stickThreshold = 0.5
     /// Back held turns the body round; a snatch within this many frames of the turn is still back's.
     public static let turnFrames = 3
-    /// Its box, in units: shield.png drawn at half its size.
-    public static let size = Vec2(x: 12, y: 16)
+    /// Its reach, a circle this wide in units, round its middle.
+    public static let diameter = 16.0
+    /// Shielding drawn in the customize screen's pose rather than the snatch's, on trial: false undoes it.
+    nonisolated(unsafe) public static var customizePose = true
     /// shield.png's 18 frames (48 by 64) at 15 a second, in sim frames: its whole life.
     public static let sheetFrames = 18
     public static let sheetFramesPerSecond = 15
@@ -79,9 +68,11 @@ public enum ShieldRules {
     public static let breakFlo = 10
     /// A down-shield on the ground or a body hops its raiser this share of the double jump's height.
     public static let hopHeightShare = 0.5
-    /// Its middle from the hand at full stretch, in units, for each aim: x the way the body
-    /// faces, y up. On the debug sliders.
-    nonisolated(unsafe) public static var handOffsets: [ShieldAim: Vec2] = [.forward: .zero, .up: .zero, .down: .zero]
+    /// Its middle from the hand at full stretch, for each aim, in art pixels (whole, as the
+    /// sliders have them): x the way the body faces, y up. In units by `handOffset`.
+    nonisolated(unsafe) public static var handOffsetPixels: [ShieldAim: Vec2] = [.forward: Vec2(x: 8, y: 0), .up: Vec2(x: 0, y: 14), .down: Vec2(x: 0, y: -14)]
+    public static let pixelsPerUnit = 1.6
+    public static func handOffset(_ aim: ShieldAim) -> Vec2 { (handOffsetPixels[aim] ?? .zero) * (1 / pixelsPerUnit) }
 
     /// What a snatch press with this stick raises, if a shield: its aim, and whether the body
     /// turns round first. Forward is the snatch; back raises the shield in front.
@@ -102,7 +93,7 @@ extension Match {
         let degrees = aim == .up ? ShieldRules.tiltDegrees : aim == .down ? -ShieldRules.tiltDegrees : 0
         let radians = degrees * .pi / 180
         let normal = Vec2(x: Trig.cos(radians) * side, y: Trig.sin(radians))
-        let offset = ShieldRules.handOffsets[aim] ?? .zero
+        let offset = ShieldRules.handOffset(aim)
         let centre = player.handCatchPoint + Vec2(x: offset.x * side, y: offset.y)
         let shield = Shield(owner: index, centre: centre, normal: normal, tilt: radians * side)
         events.append(.shieldRaised(player: index, at: centre))
@@ -115,9 +106,7 @@ extension Match {
         }
         shields.append(shield)
         // Down onto the ground or a body: a hop off it, a jump to spare.
-        let corners = shield.corners
-        let bounds = Box(min: Vec2(x: corners.map(\.x).min()!, y: corners.map(\.y).min()!), max: Vec2(x: corners.map(\.x).max()!, y: corners.map(\.y).max()!))
-        if aim == .down, stage.overlapsSolid(bounds) || players.indices.contains(where: { $0 != index && shield.overlaps(players[$0].body) }) {
+        if aim == .down, stage.overlapsSolid(shield.bounds) || players.indices.contains(where: { $0 != index && shield.overlaps(players[$0].body) }) {
             players[index].shieldHop()
             events.append(.doubleJumped(player: index))
         }

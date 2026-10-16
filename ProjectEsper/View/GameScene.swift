@@ -3623,12 +3623,12 @@ final class GameScene: SKScene {
         // Each aim's shield from the hand, in art pixels: the way the body faces, and up. Back
         // turns round and raises it forward, so it's forward's.
         for (aim, name) in [(ShieldAim.forward, "FWD"), (.up, "UP"), (.down, "DOWN")] {
-            let offset = ShieldRules.handOffsets[aim] ?? .zero
-            controls.addSlider(title: "SHIELD \(name) X", range: -32...32, notch: 1, value: Float(offset.x * SpriteLibrary.pixelsPerUnit)) {
-                ShieldRules.handOffsets[aim, default: .zero].x = Double($0) / SpriteLibrary.pixelsPerUnit
+            let offset = ShieldRules.handOffsetPixels[aim] ?? .zero
+            controls.addSlider(title: "SHIELD \(name) X", range: -32...32, notch: 1, value: Float(offset.x)) {
+                ShieldRules.handOffsetPixels[aim, default: .zero].x = Double($0)
             }
-            controls.addSlider(title: "SHIELD \(name) Y", range: -32...32, notch: 1, value: Float(offset.y * SpriteLibrary.pixelsPerUnit)) {
-                ShieldRules.handOffsets[aim, default: .zero].y = Double($0) / SpriteLibrary.pixelsPerUnit
+            controls.addSlider(title: "SHIELD \(name) Y", range: -32...32, notch: 1, value: Float(offset.y)) {
+                ShieldRules.handOffsetPixels[aim, default: .zero].y = Double($0)
             }
         }
         controls.addSlider(title: "BEAM SLIDE", range: -12...12, notch: 1, value: Float(BeamHeadTuning.slide)) { BeamHeadTuning.slide = CGFloat($0) }
@@ -9349,12 +9349,10 @@ final class GameScene: SKScene {
     private func drawHitboxes() {
         hitboxLayer.removeAllChildren()
         guard showHitboxes else { return }
-        // The shields' boxes, turned as they are.
+        // The shields' reach.
         for shield in match.shields {
-            let path = CGMutablePath()
-            path.addLines(between: shield.corners.map(SpriteLibrary.point))
-            path.closeSubpath()
-            let node = SKShapeNode(path: path)
+            let node = SKShapeNode(circleOfRadius: CGFloat(shield.radius * SpriteLibrary.pixelsPerUnit))
+            node.position = SpriteLibrary.point(shield.centre)
             node.strokeColor = .yellow
             node.lineWidth = 1
             hitboxLayer.addChild(node)

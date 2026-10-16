@@ -38,6 +38,8 @@ public enum Animation: String, CaseIterable {
     case snatchAir = "player_snatch_air"
     /// In FloState, the snatch, on the ground or in the air, drawn in its own sheet.
     case snatchFloState = "player_snatch_flostate"
+    /// The customize screen's pose, one frame: shielding's, on trial (`ShieldRules.customizePose`).
+    case customize = "player_customize"
     /// In FloState on the ground, the slash's step through: both swings, one attack.
     case esperSlashFloState = "player_esperslash_flostate"
     case ledge = "player_ledge"
@@ -62,7 +64,7 @@ public enum Animation: String, CaseIterable {
         case .hurt: 4
         case .transform: 9
         case .blast: 10
-        case .blastArms: 1
+        case .blastArms, .customize: 1
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall, .fly, .flyBall: 3
         case .jumpSquat: 4
@@ -237,6 +239,9 @@ extension Player {
         case .rolling:
             // The double jump's somersault, run through in the roll's frames.
             return AnimationFrame(.doubleJump, t * SlashRules.sheetFramesPerSecond / 60)
+        case .snatching where shieldAim != nil && ShieldRules.customizePose:
+            // Shielding, on trial: the customize screen's pose, held.
+            return AnimationFrame(.customize, 0)
         case .snatching, .walling:
             // In FloState, on the ground or in the air, its own sheet at the same timing, its last frame held.
             if inFloState, state == .snatching {

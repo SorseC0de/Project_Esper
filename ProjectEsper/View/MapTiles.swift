@@ -91,8 +91,8 @@ enum KAndAArt {
         /// The street lights' cones, one a lamp.
         var cones: [SKSpriteNode] = []
     }
-    /// Past the stage's edges: palette 30, the sky's own top.
-    static let beyond: RGB = PixelPalette.aap64[30]
+    /// Past the stage's edges, and the wash's colour: EDG64's #1A1932, the art's darkest.
+    static let beyond: RGB = PixelPalette.colours[10]
     static let backdropZ: CGFloat = -7.8
     /// The sky under it, and its clouds between the two.
     static let skyZ: CGFloat = backdropZ - 0.2
@@ -156,10 +156,11 @@ enum KAndAArt {
     static let coneAlpha: CGFloat = 0.12
     /// Each cone half an art pixel right of its lamp's middle, so it sits square under the drawn lamp.
     static let coneNudge: CGFloat = 0.5
-    static let coneColour = SKColor(rgb: PixelPalette.aap64[7])
+    /// The lamps' gold, EDG64's #FFA214.
+    static let coneColour = SKColor(rgb: PixelPalette.colours[33])
     /// The cones over the wash, so the lights shine through it, and under the players.
     static let coneZ: CGFloat = washZ + 0.1
-    /// The wash over the stage's art: palette 30 at a tenth, on the camera, under the players
+    /// The wash over the stage's art: `beyond` at a tenth, on the camera, under the players
     /// (20), the effects and the rims' fronts (21); the players take it as a tint and their
     /// glowing parts don't, the front pillars (22) take it as a tint too, and the nets, drawn
     /// apart, never had it.

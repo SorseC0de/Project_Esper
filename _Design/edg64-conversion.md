@@ -45,7 +45,7 @@ reference player) are in `notes.md`. ✅ done, ⏳ to do.
 - ⏳ Flight B411's and Hoopfish Hideaway's own backboards and hoops
 - ⏳ The Elements (with its lava, tornados, fireballs and icicles)
 - ⏳ Hoopfish Hideaway
-- ⏳ K&A
+- ✅ K&A (map, clouds, broken car, red car; its edge and wash #1A1932, its cones #FFA214)
 - ⏳ Flight B411
 - ⏳ Longball Stadium
 - ⏳ Slamstill Traffic

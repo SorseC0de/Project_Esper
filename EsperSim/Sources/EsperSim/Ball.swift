@@ -30,6 +30,9 @@ public struct Ball: Equatable {
     public var scoring = false
     /// Who released or swatted it last.
     public var lastTouched: Int?
+    /// Counts every time it leaves a hand, is knocked or respawns: a flight's number, for what
+    /// turns it once a flight (a shield).
+    public var flight = 0
     /// Reeled in by a web: the player pulling it.
     public var tether: Int?
     /// Whether the ball still counts as `lastTouched`'s: from a release until its first
@@ -310,6 +313,7 @@ public struct Ball: Equatable {
     }
 
     public mutating func release(from position: Vec2, velocity: Vec2, by player: Int, straight: Bool, pace: Double = 1) {
+        flight &+= 1
         holder = nil
         self.position = position
         previousY = position.y
@@ -367,6 +371,7 @@ public struct Ball: Equatable {
     }
 
     public mutating func pop(from position: Vec2) {
+        flight &+= 1
         holder = nil
         launchPoint = position
         self.position = position
@@ -393,6 +398,7 @@ public struct Ball: Equatable {
 
     /// Spiked: sent along `direction`, at its own speed or the swat speed, whichever is more.
     public mutating func swat(along direction: Vec2, by player: Int) {
+        flight &+= 1
         settlePace()
         velocity = direction.normalized * max(velocity.length, SlashRules.swatSpeed)
         straight = false
@@ -405,6 +411,7 @@ public struct Ball: Equatable {
     }
 
     public mutating func respawn(at spawn: Vec2) {
+        flight &+= 1
         launchPoint = nil
         position = spawn
         previousY = spawn.y

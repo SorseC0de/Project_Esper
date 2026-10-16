@@ -2604,8 +2604,10 @@ colours, added on, turned to its tilt; its box shows with HITBOX.
   doesn't start through it: the body's path to the rim mustn't cross it.
 - A snatch or a thrown ball (not a floater, which bounces off) breaks it (a burst of cubes in its raiser's colour), earning the
   snatcher or thrower 10 FLO; two players' shields in one place break each other, one's own don't.
-- Each shield turns the ball once; after that it passes, so it can't be bounced between the
-  shield and the ground or a body over and over.
+- Each shield turns a flight of the ball once (`Ball.flight`, up on every release, knock and
+  respawn); that flight passes it after, so it can't be bounced between the shield and the ground
+  or a body over and over; the next shot it turns again. It's met along the ball's whole path
+  through the frame, so a fast one can't jump past it.
 - Raised on another body, it pushes it away (3, a unit up), unhit, as the change's burst does.
 - Up or down: its raiser hops the floater's half hop (the layup's), no jump spent, the pose kept.
 - Its sound is shield.wav. The computer doesn't shield yet: its snatch presses let go of the stick.

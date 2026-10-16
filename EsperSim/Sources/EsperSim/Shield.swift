@@ -19,10 +19,10 @@ public struct Shield: Equatable {
     /// Its turn from upright, radians, anticlockwise: the tilt, mirrored for facing left.
     public let tilt: Double
     public var age = 0
-    /// It's turned the ball once already: each shield turns it once, off it or popped up, and
-    /// after that the ball passes it, so it can't bounce the ball between itself and the ground
-    /// or a body over and over.
-    public var turnedTheBall = false
+    /// The ball's flight it last turned: each shield turns a flight once, off it or popped up,
+    /// and that flight passes it after, so it can't bounce the ball between itself and the
+    /// ground or a body over and over; the next shot or throw it turns again.
+    public var turnedFlight: Int?
 
     /// Its reach: a circle round its middle (`ShieldRules.diameter`).
     public var radius: Double { ShieldRules.diameter / 2 }
@@ -139,11 +139,24 @@ extension Match {
 
     /// The loose ball meeting a shield face on: a thrown one breaks it, but a floater; otherwise it reflects,
     /// or met in the shield's first frames it's stopped and popped up.
-    mutating func shieldTheBall() {
+    /// Along the ball's whole path this frame, from `from`, so a fast one can't jump past it.
+    mutating func shieldTheBall(from start: Vec2) {
         guard !shields.isEmpty, ball.isLive, ball.holder == nil, ball.tether == nil, ball.frozen == 0 else { return }
-        guard let number = shields.firstIndex(where: { !$0.turnedTheBall && $0.touches(ball.position, radius: BallRules.radius) && ball.velocity.dot($0.normal) < 0 }) else { return }
-        shields[number].turnedTheBall = true
+        let path = ball.position - start
+        /// Where along the path it comes nearest a shield's middle.
+        func nearest(_ shield: Shield) -> Vec2 {
+            let length = path.dot(path)
+            guard length > 1e-9 else { return ball.position }
+            let share = Swift.min(Swift.max((shield.centre - start).dot(path) / length, 0), 1)
+            return start + path * share
+        }
+        guard let number = shields.firstIndex(where: { shield in
+            shield.turnedFlight != ball.flight && shield.touches(nearest(shield), radius: BallRules.radius) && ball.velocity.dot(shield.normal) < 0
+        }) else { return }
+        shields[number].turnedFlight = ball.flight
         let shield = shields[number]
+        // Met where its path first touched: put back there to turn.
+        ball.position = nearest(shield)
         if ball.thrown, !ball.floaterShot {
             shields.remove(at: number)
             events.append(.shieldBroken(player: shield.owner, at: shield.centre))

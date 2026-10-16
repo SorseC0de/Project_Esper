@@ -245,8 +245,9 @@ public struct Match: Equatable {
             // The ball sees the stage's ball-only solids as well.
             var ballStage = stage
             ballStage.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
+            let before = ball.position
             let scored = ball.step(stage: ballStage, events: &events)
-            shieldTheBall()
+            shieldTheBall(from: before)
             if let hoop = scored, scoreLockout == 0 {
                 // A few frames after a point no other counts: a rim on the move can take the
                 // same ball through twice.

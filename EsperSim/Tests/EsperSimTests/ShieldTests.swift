@@ -74,7 +74,7 @@ final class ShieldTests: XCTestCase {
         var match = court()
         raise(&match, stick: Vec2(x: -1, y: 0))
         for _ in 0..<ShieldRules.perfectFrames { match.advance(inputs: [.idle, .idle]) }
-        match.shields[0].turnedTheBall = true
+        match.shields[0].turnedFlight = match.ball.flight
         ballAt(&match, shield: match.shields[0], from: 1, speed: 4)
         for _ in 0..<6 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertLessThan(match.ball.velocity.x, 0, "passed on through")

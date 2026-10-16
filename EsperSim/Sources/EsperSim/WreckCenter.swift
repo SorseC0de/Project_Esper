@@ -14,9 +14,9 @@ public struct DropPlatform: Equatable {
 }
 
 public enum WreckCenterRules {
-    /// The platform's eight art frames at the pieces' ten a second.
+    /// The platform's eight art frames, at twenty a second: twice the other pieces' pace.
     public static let platformArtFrames = 8
-    public static let platformFramesPerArtFrame = 6
+    public static let platformFramesPerArtFrame = 3
     public static var platformFrames: Int { platformArtFrames * platformFramesPerArtFrame }
     /// What a belt carries at, in units a frame: its art moves 2 pixels a frame at the pieces'
     /// 10 frames a second, 1.6 pixels a unit, over the sim's 60.

@@ -2715,7 +2715,7 @@ full brightness, so the neutral grey leaves them as drawn, and glowing; #657392,
 The court lays its one-way ledge and belts from the baked map's pieces (`WreckCenter.swift`);
 it doesn't read the map's markers or walls.
 - **One-way platforms:** still on their first frame till someone drops through one; that one
-  then plays its eight frames once (6 sim frames each), holding nobody till it's back on the first
+  then plays its eight frames once (3 sim frames each, 0.4 seconds), holding nobody till it's back on the first
   (`Match.dropPlatformFrames`, its tiles emptied meanwhile).
 - **Conveyors**, on the backboard blocks: the left belt carries right, the right belt left (the
   flipped pieces), bodies and the loose ball alike, as fast as the belt's drawn moving (2 art

@@ -379,6 +379,22 @@ enum ParkedSliders {
 }
 
 enum GlowSettings {
+    /// Each energy colour's glow, times this: the deep ones' brightest channel still reads darker
+    /// than the light ones'. On the debug sliders (GLOW and the gem), kept between launches.
+    static func energyGainKey(_ colour: EnergyColour) -> String { "esper.glow.gain.\(colour.rawValue)" }
+    static let energyGainDefaults: [EnergyColour: Float] = [.orange: 1.25, .blue: 1.25, .green: 1.25, .purple: 1.25, .red: 1.25]
+    nonisolated(unsafe) static var energyGains: [EnergyColour: Float] = Dictionary(uniqueKeysWithValues: EnergyColour.wheel.map { colour in
+        (colour, (UserDefaults.standard.object(forKey: energyGainKey(colour)) as? Double).map(Float.init) ?? energyGainDefaults[colour] ?? 1)
+    })
+    /// The nine for the glow pass, in the wheel's order: each colour over its brightest channel,
+    /// its gain in w.
+    static var energyUniforms: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) {
+        let packed = EnergyColour.wheel.map { colour -> SIMD4<Float> in
+            let rgb = SIMD3<Float>(Float((colour.glow >> 16) & 0xFF), Float((colour.glow >> 8) & 0xFF), Float(colour.glow & 0xFF)) / 255
+            return SIMD4(rgb / max(rgb.max(), 0.001), energyGains[colour] ?? 1)
+        }
+        return (packed[0], packed[1], packed[2], packed[3], packed[4], packed[5], packed[6], packed[7], packed[8])
+    }
     /// Luminance above which a pixel glows, and the higher bar the bodies have to clear.
     static let threshold: Float = 0.2
     static let bodyThreshold: Float = 0.8

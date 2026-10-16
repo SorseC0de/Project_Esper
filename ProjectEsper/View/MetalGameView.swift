@@ -97,6 +97,7 @@ struct GlowUniforms {
     var waterTop: SIMD4<Float> = .zero
     var waterBottom: SIMD4<Float> = .zero
     var hood = SIMD4<Float>(GlowSettings.hoodShare, 0, 0, 0)
+    var energy = GlowSettings.energyUniforms
 }
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.

@@ -3619,6 +3619,13 @@ final class GameScene: SKScene {
         // The meters in the corners: how far in, and the whole meter's scale.
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
+        // Each energy colour's glow, times.
+        for colour in EnergyColour.wheel {
+            controls.addSlider(title: "GLOW \(colour.name.uppercased())", range: 0.5...2.5, notch: 0.05, value: GlowSettings.energyGains[colour] ?? 1) { value in
+                GlowSettings.energyGains[colour] = value
+                UserDefaults.standard.set(Double(value), forKey: GlowSettings.energyGainKey(colour))
+            }
+        }
         controls.addSlider(title: "BEAM LIFT", range: -12...12, notch: 1, value: Float(BeamHeadTuning.lift)) { BeamHeadTuning.lift = CGFloat($0) }
         // Each aim's shield from the hand, in art pixels: the way the body faces, and up. Back
         // turns round and raises it forward, so it's forward's.

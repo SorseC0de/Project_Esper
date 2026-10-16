@@ -2626,7 +2626,10 @@ leak. The win screen gathers its frames once the rebuild lands (`afterRebuilds`)
 
 `GlowSettings` in `Tuning.swift`: brightness threshold 0.2 for the world and 0.8 for the
 bodies, brightness a colour's brightest channel rather than its luminance, so a deep colour at
-full strength (Ruby, Topaz, Emerald, Sapphire, Amethyst) glows as a light one does; what mustn't
+full strength (Ruby, Topaz, Emerald, Sapphire, Amethyst) glows as a light one does; and each
+energy colour's glow times its own gain (`GlowSettings.energyGains`, on the GLOW sliders, kept;
+1.25 for Topaz, Sapphire, Emerald, Amethyst and Ruby, 1 for the rest), a pixel taken for the
+colour nearest it in hue (its colour over its brightest channel), whites and greys for none; what mustn't
 glow is drawn in the mask pure green through its alpha (`MaskScene.flatGreen`), never tinted, which
 left dark art a dark green the bright pass took for a body; softness of the cut, blur passes at half size, intensity, tint. The passes are in
 `Glow.metal`. A second renderer draws a mirror scene holding only the two body sprites

@@ -23,6 +23,8 @@ struct GlowUniforms {
     float4 waterBottom;
     // x: the share of its glow a hood takes, marked magenta in the mask (the customize screen's 0.6).
     float4 hood;
+    // The nine energy colours, each over its brightest channel, its glow's gain in w.
+    float4 energy[9];
 };
 
 struct FullScreen {
@@ -81,6 +83,18 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
     float background = u.unglowed.a * step(distance(color.rgb, u.unglowed.rgb), 0.01);
     float amount = smoothstep(threshold - u.softness, threshold + u.softness, brightness) * (1 - flat) * (1 - background)
         * mix(1.0, u.hood.x, hood);
+    // An energy colour's own gain: the one nearest in hue, the colour over its brightest
+    // channel, if near enough; whites and greys are none of them.
+    if (brightness > 0.05) {
+        float3 hue = color.rgb / brightness;
+        float nearest = 1e9, gain = 1;
+        for (int index = 0; index < 9; index++) {
+            float3 apart = hue - u.energy[index].rgb;
+            float distance = dot(apart, apart);
+            if (distance < nearest) { nearest = distance; gain = u.energy[index].w; }
+        }
+        if (nearest < 0.1) amount *= gain;
+    }
     return float4(color.rgb * amount, 1);
 }
 

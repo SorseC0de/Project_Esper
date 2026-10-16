@@ -101,6 +101,9 @@ struct GlowUniforms {
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.
 final class GlowRenderer: NSObject, MTKViewDelegate {
+    /// Every node under one, for the readout: a count that only climbs is something left behind.
+    static func nodeCount(_ node: SKNode) -> Int { node.children.reduce(node.children.count) { $0 + nodeCount($1) } }
+
     private static func channels(_ colour: RGB) -> SIMD3<Float> {
         SIMD3(Float((colour >> 16) & 0xFF), Float((colour >> 8) & 0xFF), Float(colour & 0xFF)) / 255
     }
@@ -331,6 +334,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             let sections = scene.takeSectionTimes().sorted { $0.value > $1.value }.prefix(6)
                 .map { "\($0.key) \(String(format: "%.1f", $0.value * 1000 / frames))" }.joined(separator: "  ")
             scene.frameReadout = "cpu  \(line(cpuTotals))\nupdate  \(sections)\n\(readout)\ngpu  \(line(gpu))\ngpu frame \(span)  \n\(Int(view.drawableSize.width))x\(Int(view.drawableSize.height))  glow \(glowA.width)x\(glowA.height)"
+                + "\nnodes scene \(GlowRenderer.nodeCount(scene))  mask \(GlowRenderer.nodeCount(maskScene))  hud \(GlowRenderer.nodeCount(scene.hudScene))"
             cpuTotals = [:]
             framesDrawn = 0
             worstGap = 0

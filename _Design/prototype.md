@@ -2584,8 +2584,9 @@ shown, once, like the effects.
 
 ## Glow
 
-`GlowSettings` in `Tuning.swift`: luminance threshold 0.2 for the world and 0.8 for the
-bodies, softness of the cut, blur passes at half size, intensity, tint. The passes are in
+`GlowSettings` in `Tuning.swift`: brightness threshold 0.2 for the world and 0.8 for the
+bodies, brightness a colour's brightest channel rather than its luminance, so a deep colour at
+full strength (Ruby, Topaz, Emerald, Sapphire, Amethyst) glows as a light one does; softness of the cut, blur passes at half size, intensity, tint. The passes are in
 `Glow.metal`. A second renderer draws a mirror scene holding only the two body sprites
 on black (`MaskScene`), and that mask tells the bright pass which threshold applies. The
 game scene is never drawn twice in a frame: SpriteKit reuses its per-frame buffers
@@ -2720,6 +2721,9 @@ it doesn't read the map's markers or walls.
   flipped pieces), bodies and the loose ball alike, as fast as the belt's drawn moving (2 art
   pixels a frame at 10 a second: about 0.21 units a sim frame). The ball goes off the end into
   the rim below, and scores. The 3-point line counts a platform mid-turn, so it never moves.
+- **Possession colours:** unheld, the art's #5D5D5D and #3D3D3D; held, the holder's energy set's
+  first two, the floor and tiles its colour and the back wall its hood shadow, each shifting over
+  `CourtLook.shiftFrames`.
 - **Glow:** the possession pixels glow only while the court's held; the pieces never do but for
   the displays' screens, which glow over them (the mask's front blue).
 - **The dimmer** (the map's Background Dimmer layer: #2A2F4E, Darken at 128): everything one

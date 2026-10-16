@@ -464,6 +464,9 @@ final class GameScene: SKScene {
     private var courtColour = SKColor(rgb: CourtLook.neutral)
     private var courtTarget = SKColor(rgb: CourtLook.neutral)
     private var courtShift = 0
+    /// The Wreck Center's back wall, shifting with the floor in its own colour.
+    private var courtBackColour = SKColor(rgb: WreckCenterArt.backNeutral)
+    private var courtBackTarget = SKColor(rgb: WreckCenterArt.backNeutral)
     /// A score's flash on the floor and walls: frames until it, then how white they are, fading.
     private var courtWhiteIn = 0
     private var courtWhite: CGFloat = 0
@@ -2228,11 +2231,12 @@ final class GameScene: SKScene {
             wreckCenterArt = art
             art.setPieces(StageMap.current[.wreckCenter].props)
             backgroundColor = SKColor(rgb: WreckCenterArt.beyond)
-            if (match.ball.holder ?? match.ball.owner) == nil {
-                courtColour = SKColor(rgb: WreckCenterArt.tilesNeutral)
-                courtTarget = courtColour
-            }
-            WreckCenterArt.tint(art, courtColour)
+            let wreck = wreckColours(match.ball.holder ?? match.ball.owner)
+            courtColour = wreck.tiles
+            courtTarget = courtColour
+            courtBackColour = wreck.back
+            courtBackTarget = courtBackColour
+            WreckCenterArt.tint(art, courtColour, back: courtBackColour)
             // Built after the stage's flats were gathered: gathered again, so its pictures don't glow.
             refreshStaticFlats()
         }
@@ -3295,11 +3299,12 @@ final class GameScene: SKScene {
     /// the bolt's flash and fade back.
     private func tickCourtColour() {
         let owner = match.ball.holder ?? match.ball.owner
-        // The Wreck Center's map is neutral in its own grey.
-        let neutral = wreckCenterArt == nil ? CourtLook.neutral : WreckCenterArt.tilesNeutral
-        let wanted = owner.map { SKColor(rgb: CourtLook.shaded(sprites.look(for: $0).glow)) } ?? SKColor(rgb: neutral)
-        if wanted != courtTarget {
+        // The Wreck Center's map in its own colours.
+        let wreck = wreckCenterArt == nil ? nil : wreckColours(owner)
+        let wanted = wreck?.tiles ?? owner.map { SKColor(rgb: CourtLook.shaded(sprites.look(for: $0).glow)) } ?? SKColor(rgb: CourtLook.neutral)
+        if wanted != courtTarget || (wreck != nil && wreck?.back != courtBackTarget) {
             courtTarget = wanted
+            if let wreck { courtBackTarget = wreck.back }
             courtShift = CourtLook.shiftFrames
         }
         var changed = false
@@ -3311,6 +3316,9 @@ final class GameScene: SKScene {
             courtColour.getRed(&cr, green: &cg, blue: &cb, alpha: &ca)
             courtTarget.getRed(&tr, green: &tg, blue: &tb, alpha: &ta)
             courtColour = SKColor(red: cr + (tr - cr) * share, green: cg + (tg - cg) * share, blue: cb + (tb - cb) * share, alpha: 1)
+            courtBackColour.getRed(&cr, green: &cg, blue: &cb, alpha: &ca)
+            courtBackTarget.getRed(&tr, green: &tg, blue: &tb, alpha: &ta)
+            courtBackColour = SKColor(red: cr + (tr - cr) * share, green: cg + (tg - cg) * share, blue: cb + (tb - cb) * share, alpha: 1)
             changed = true
         }
         if courtWhiteIn > 0 {
@@ -3328,9 +3336,23 @@ final class GameScene: SKScene {
         courtColour.getRed(&r, green: &g, blue: &b, alpha: &a)
         let shown = SKColor(red: r + (1 - r) * courtWhite, green: g + (1 - g) * courtWhite, blue: b + (1 - b) * courtWhite, alpha: 1)
         for tile in courtTiles { tile.color = shown }
-        if let art = wreckCenterArt { WreckCenterArt.tint(art, shown) }
+        if let art = wreckCenterArt {
+            var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
+            courtBackColour.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
+            let back = SKColor(red: br + (1 - br) * courtWhite, green: bg + (1 - bg) * courtWhite, blue: bb + (1 - bb) * courtWhite, alpha: 1)
+            WreckCenterArt.tint(art, shown, back: back)
+        }
         for bloom in fieldBlooms { bloom.color = shown }
         for panel in lightPanels { panel.fillColor = shown }
+    }
+
+    /// The Wreck Center's possession colours: unheld its own greys; held, the holder's energy
+    /// set's first two, the floor's its colour and the back wall's its hood shadow.
+    private func wreckColours(_ owner: Int?) -> (tiles: SKColor, back: SKColor) {
+        guard let owner else { return (SKColor(rgb: WreckCenterArt.tilesNeutral), SKColor(rgb: WreckCenterArt.backNeutral)) }
+        let glow = sprites.look(for: owner).glow
+        let shadow = EnergyColour.withGlow(glow)?.hoodShadow ?? Look.scaled(glow, Double(WreckCenterArt.backShare))
+        return (SKColor(rgb: glow), SKColor(rgb: shadow))
     }
 
     /// The streak a flying ball leaves: soft blobs dropped where it was, thinning out, so

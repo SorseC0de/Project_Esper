@@ -39,7 +39,7 @@ vertex FullScreen glowVertex(uint id [[vertex_id]]) {
     return out;
 }
 
-// What glows: everything above the luminance threshold, eased in over `softness`. Where
+// What glows: everything above the brightness threshold (its brightest channel), eased in over `softness`. Where
 // the body mask is set the body's own, higher threshold applies instead.
 fragment float4 glowBright(FullScreen in [[stage_in]],
                            texture2d<float> scene [[texture(0)]],
@@ -71,13 +71,15 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
                 float3 water = mix(u.waterTop.rgb, u.waterBottom.rgb, in.uv.y);
                 sampled = saturate((sampled - water * u.waterTop.a) / (1 - u.waterTop.a));
             }
-            float sampledLuminance = dot(sampled, float3(0.2126, 0.7152, 0.0722));
-            if (sampledLuminance > brightest) { brightest = sampledLuminance; color.rgb = sampled; }
+            float sampledBrightness = max(sampled.r, max(sampled.g, sampled.b));
+            if (sampledBrightness > brightest) { brightest = sampledBrightness; color.rgb = sampled; }
         }
     }
-    float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+    // By its brightest channel, not its luminance: a deep blue, purple, green, orange or red at
+    // full strength glows as a light one does.
+    float brightness = max(color.r, max(color.g, color.b));
     float background = u.unglowed.a * step(distance(color.rgb, u.unglowed.rgb), 0.01);
-    float amount = smoothstep(threshold - u.softness, threshold + u.softness, luminance) * (1 - flat) * (1 - background)
+    float amount = smoothstep(threshold - u.softness, threshold + u.softness, brightness) * (1 - flat) * (1 - background)
         * mix(1.0, u.hood.x, hood);
     return float4(color.rgb * amount, 1);
 }

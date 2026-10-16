@@ -12,9 +12,10 @@ enum WreckCenterArt {
     static let origin = CGPoint(x: -16, y: -16)
     /// Past the art: its background's colour.
     static let beyond: RGB = 0x2A2F4E
-    /// The possession pixels unheld: the tiles' palette 59; the back wall's, palette 60, this
-    /// share of the tiles' colour, neutral or held.
+    /// The possession pixels unheld: the tiles' palette 59, the back wall's palette 60. Held, the
+    /// energy set's colour and hood shadow; a glow outside the sets, the back wall at 60's share of 59.
     static let tilesNeutral: RGB = 0x5D5D5D
+    static let backNeutral: RGB = 0x3D3D3D
     static let backShare: CGFloat = CGFloat(0x3D) / CGFloat(0x5D)
     /// 47's three-point lines drawn on the back wall: over its possession pixels, under the tiles.
     static let threePointZ: CGFloat = -7.85
@@ -312,15 +313,17 @@ enum WreckCenterArt {
         return Handles(flats: [back, tiles, extras], backLit: backLit, backLitDarkened: backLitDarkened, tilesLit: tilesLit, parent: parent)
     }
 
-    /// The possession pixels in the court's colour: the tiles' as it is, the back wall's its
-    /// share; the displays' at full brightness, so the neutral grey leaves them as drawn.
-    static func tint(_ handles: Handles, _ colour: SKColor) {
+    /// The possession pixels in the court's colours: the tiles' and the back wall's each their
+    /// own; the displays' at the tiles' at full brightness, so the neutral grey leaves them as drawn.
+    static func tint(_ handles: Handles, _ colour: SKColor, back: SKColor) {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         colour.getRed(&r, green: &g, blue: &b, alpha: &a)
         handles.tilesLit.color = colour
-        handles.backLit.color = SKColor(red: r * backShare, green: g * backShare, blue: b * backShare, alpha: 1)
+        handles.backLit.color = back
+        var backRed: CGFloat = 0, backGreen: CGFloat = 0, backBlue: CGFloat = 0
+        back.getRed(&backRed, green: &backGreen, blue: &backBlue, alpha: &a)
         if let wash, let darkened = handles.backLitDarkened {
-            let dark = wash.darkened(r * backShare, g * backShare, b * backShare)
+            let dark = wash.darkened(backRed, backGreen, backBlue)
             darkened.color = SKColor(red: dark.0, green: dark.1, blue: dark.2, alpha: 1)
         }
         let neutral = CGFloat(0x5D) / 255

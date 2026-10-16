@@ -76,7 +76,8 @@ on the customize picker. Light blue takes teal's place; its name, Larimar, is in
   front legs synchronously (60-90 ms a piece) behind the curtain and on every look change. Build
   them in the background rebuild with the other frames instead; `portrait()` reads and writes the
   main-thread caches (`texture()`, `recolour`, `hoodHead`), which is the work.
-- **The stages' glow colours** look bad; to correct (the user's note, low priority).
+- **The stages' glow colours** look bad; to correct (the user's note, low priority). The Wreck
+  Center's are its holder's energy set now; the other stages still shade the glow.
 - **Backboard shake along K&A's walls**, as the Wreck Center's whole backboard box does, once K&A's turn comes.
 
 - **No line under the feet:** the outline left off the row of pixels under the feet for bodies

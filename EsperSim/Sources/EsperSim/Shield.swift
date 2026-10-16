@@ -4,8 +4,9 @@
 /// at the hand's full stretch, it hangs where it was raised, apart from the body, for the art's
 /// length. A loose ball off it reflects; met in its first frames, the perfect shield, the ball's
 /// stopped and popped up a little to be caught. A blade on it parries the swinger. A snatch, a
-/// thrown ball or another shield where it is breaks it. Raised on another body, it pushes it
-/// away, as the change into FloState's burst does, without a hit.
+/// thrown ball (not a floater) or another player's shield where it is breaks it. Raised on another
+/// body, it pushes it away, as the change into FloState's burst does, without a hit. It's solid to
+/// the other's body, so they can't dunk through it. Up or down, its raiser hops the floater's half hop.
 public enum ShieldAim: Equatable, CaseIterable {
     case forward, up, down
 }
@@ -50,7 +51,7 @@ public enum ShieldRules {
     /// Back held turns the body round; a snatch within this many frames of the turn is still back's.
     public static let turnFrames = 3
     /// Its reach, a circle this wide in units, round its middle.
-    public static let diameter = 16.0
+    public static let diameter = 24.0
     /// Shielding drawn in the customize screen's pose rather than the snatch's, on trial: false undoes it.
     nonisolated(unsafe) public static var customizePose = true
     /// shield.png's 18 frames (48 by 64) at 15 a second, in sim frames: its whole life.
@@ -66,8 +67,6 @@ public enum ShieldRules {
     public static let bodyPush = 3.0
     /// Breaking another's shield with a snatch or a throw earns this much FLO.
     public static let breakFlo = 10
-    /// A down-shield on the ground or a body hops its raiser this share of the double jump's height.
-    public static let hopHeightShare = 0.5
     /// Its middle from the hand at full stretch, for each aim, in art pixels (whole, as the
     /// sliders have them): x the way the body faces, y up. In units by `handOffset`.
     nonisolated(unsafe) public static var handOffsetPixels: [ShieldAim: Vec2] = [.forward: Vec2(x: 8, y: 0), .up: Vec2(x: 0, y: 14), .down: Vec2(x: 0, y: -14)]
@@ -105,11 +104,8 @@ extension Match {
             return
         }
         shields.append(shield)
-        // Down onto the ground or a body: a hop off it, a jump to spare.
-        if aim == .down, stage.overlapsSolid(shield.bounds) || players.indices.contains(where: { $0 != index && shield.overlaps(players[$0].body) }) {
-            players[index].shieldHop()
-            events.append(.doubleJumped(player: index))
-        }
+        // Up or down: the floater's half hop, a jump to spare.
+        if aim != .forward { players[index].shieldHop() }
         // Raised on another body, it pushes it away, unhit.
         for other in players.indices where other != index && shield.overlaps(players[other].body) {
             let away = players[other].body.center - centre
@@ -141,14 +137,14 @@ extension Match {
         }
     }
 
-    /// The loose ball meeting a shield face on: a thrown one breaks it; otherwise it reflects,
+    /// The loose ball meeting a shield face on: a thrown one breaks it, but a floater; otherwise it reflects,
     /// or met in the shield's first frames it's stopped and popped up.
     mutating func shieldTheBall() {
         guard !shields.isEmpty, ball.isLive, ball.holder == nil, ball.tether == nil, ball.frozen == 0 else { return }
         guard let number = shields.firstIndex(where: { !$0.turnedTheBall && $0.touches(ball.position, radius: BallRules.radius) && ball.velocity.dot($0.normal) < 0 }) else { return }
         shields[number].turnedTheBall = true
         let shield = shields[number]
-        if ball.thrown {
+        if ball.thrown, !ball.floaterShot {
             shields.remove(at: number)
             events.append(.shieldBroken(player: shield.owner, at: shield.centre))
             if let thrower = ball.lastTouched, thrower != shield.owner { earnFlo(ShieldRules.breakFlo, by: thrower, at: shield.centre) }

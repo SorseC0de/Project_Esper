@@ -156,6 +156,29 @@ public struct Stage: Equatable {
     /// The Wreck Center's belts, the top a body or the ball rides along and which way, and its
     /// one-way platforms, standable only while they're still (`WreckCenter.swift`).
     public var conveyors: [Conveyor] = []
+    /// The other's shields, solid to this body as it steps (`Shield.swift`): in its extras too,
+    /// and apart, for a dunk's path to the rim.
+    public var shieldWalls: [Box] = []
+
+    /// Whether a straight path crosses a shield wall.
+    public func shieldBlocks(from start: Vec2, to end: Vec2) -> Bool {
+        shieldWalls.contains { box in
+            var low = 0.0, high = 1.0
+            for (from, to, min, max) in [(start.x, end.x, box.min.x, box.max.x), (start.y, end.y, box.min.y, box.max.y)] {
+                let along = to - from
+                if abs(along) < 1e-9 {
+                    if from < min || from > max { return false }
+                    continue
+                }
+                var near = (min - from) / along, far = (max - from) / along
+                if near > far { swap(&near, &far) }
+                low = Swift.max(low, near)
+                high = Swift.min(high, far)
+                if low > high { return false }
+            }
+            return true
+        }
+    }
     public var dropPlatforms: [DropPlatform] = []
     /// Where Hoopfish Hideaway's Hoopfish starts, its picture's bottom left.
     public var hoopfishStart: Vec2?

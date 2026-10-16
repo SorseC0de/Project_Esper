@@ -1113,7 +1113,9 @@ public struct Player: Equatable {
                     ?? Vec2(x: chest.x - facing.sign * 5, y: chest.y + 3)
                 wanted = .strikeBolt(x: ball.x, bottom: ball.y)
             }
-            if hasBall, stateTimer >= BallRules.dunkStanceFrames, let hoop = stage.hoops.indices.first(where: { !stage.hoops[$0].rimless && stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius * spec.scale && stage.dunkable(stage.hoops[$0]) }) {
+            if hasBall, stateTimer >= BallRules.dunkStanceFrames, let hoop = stage.hoops.indices.first(where: { !stage.hoops[$0].rimless && stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius * spec.scale && stage.dunkable(stage.hoops[$0])
+                // The body glides there: not through the other's shield.
+                && !stage.shieldBlocks(from: chest, to: dunkPlace(on: stage.hoops[$0])) }) {
                 // Onto the rim: the feet at the dunk's place on it, facing the backboard.
                 // Turned to the backboard; the body glides to its place on the rim through
                 // the wind-up, so it never jumps there.
@@ -1162,7 +1164,7 @@ public struct Player: Equatable {
             velocity = .zero
             let rim = stage.hoops[dunkHoop]
             // The feet's place off the rim, at the body's size, so the hands still meet it.
-            let place = rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y) * spec.scale
+            let place = dunkPlace(on: rim)
             let slam = BallRules.dunkFrames / 2
             let share = min(Double(stateTimer) / Double(slam), 1)
             position = dunkFrom + (place - dunkFrom) * share
@@ -1814,14 +1816,17 @@ public struct Player: Equatable {
         shieldAim = shield?.aim
     }
 
-    /// A down-shield meeting the ground or a body: a hop off it, half the double jump's height,
-    /// in its look, no jump spent.
+    /// The feet's place off a rim for the dunk, at the body's size, so the hands still meet it.
+    func dunkPlace(on rim: Hoop) -> Vec2 {
+        rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y) * spec.scale
+    }
+
+    /// An up or down shield raised: the floater's half hop off it, no jump spent, the shield's
+    /// pose kept through it.
     public mutating func shieldHop() {
-        velocity.y = doubleJumpVelocity * ShieldRules.hopHeightShare.squareRoot()
+        velocity.y = fullHopVelocity * BallRules.layupHopShare
         grounded = false
         fastFalling = false
-        doubleJumpTimer = 30
-        enter(.air)
     }
 
     /// A slashclash's hit stop over: out of the swing at once, back in neutral.

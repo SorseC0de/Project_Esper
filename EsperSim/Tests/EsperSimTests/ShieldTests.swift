@@ -156,18 +156,36 @@ final class ShieldTests: XCTestCase {
         XCTAssertEqual(match.players[1].flo, flo + ShieldRules.breakFlo)
     }
 
-    func testADownShieldOnTheGroundHopsWithAJumpToSpare() {
+    func testUpAndDownShieldsHopTheFloatersHalfHopWithAJumpToSpare() {
+        for stick in [Vec2(x: 0, y: 1), Vec2(x: 0, y: -1)] {
+            var match = court()
+            let jumps = match.players[0].jumpsLeft
+            raise(&match, stick: stick)
+            XCTAssertEqual(match.shields.count, 1)
+            XCTAssertGreaterThan(match.players[0].velocity.y, 0, "hopped")
+            XCTAssertEqual(match.players[0].jumpsLeft, jumps)
+        }
+    }
+
+    func testAFloaterBouncesOffRatherThanBreakingIt() {
         var match = court()
-        let jumps = match.players[0].jumpsLeft
-        // Out along its way, down onto the floor.
-        let offsets = ShieldRules.handOffsetPixels
-        ShieldRules.handOffsetPixels[.down] = Vec2(x: 0, y: -14)
-        defer { ShieldRules.handOffsetPixels = offsets }
-        raise(&match, stick: Vec2(x: 0, y: -1))
+        raise(&match, stick: Vec2(x: -1, y: 0))
+        for _ in 0..<ShieldRules.perfectFrames { match.advance(inputs: [.idle, .idle]) }
+        ballAt(&match, shield: match.shields[0], from: 1, speed: 4)
+        match.ball.thrown = true
+        match.ball.floaterShot = true
+        for _ in 0..<6 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.shields.count, 1)
-        XCTAssertGreaterThan(match.players[0].velocity.y, 0, "hopped")
-        XCTAssertEqual(match.players[0].jumpsLeft, jumps)
-        XCTAssertGreaterThan(match.players[0].doubleJumpTimer, 0)
+        XCTAssertGreaterThan(match.ball.velocity.x, 0)
+    }
+
+    func testTheOthersShieldIsSolidToTheirBody() {
+        var match = court()
+        raise(&match, stick: Vec2(x: -1, y: 0))
+        let wall = match.shields[0].bounds
+        match.players[1].position = Vec2(x: wall.max.x + 20, y: 10)
+        for _ in 0..<60 { match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: -1, y: 0))]) }
+        XCTAssertGreaterThanOrEqual(match.players[1].body.min.x, wall.max.x - 0.01)
     }
 
     func testABladeOnItParriesTheSwinger() {

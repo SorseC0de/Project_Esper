@@ -194,7 +194,14 @@ public struct Match: Equatable {
                 * (players[index].power == .surfSoda ? SurfRules.speedShare : 1)
                 * (players[index].inFloState ? FloStateRules.speedShare : 1)
             let opponentX = players.indices.first { $0 != index }.map { players[$0].position.x }
-            guard let action = players[index].step(input: input, stage: stage, opponentX: opponentX,
+            // The other's shields are solid to this body, but any it's already in.
+            var bodyStage = stage
+            let walls = shields.filter { $0.owner != index }.map(\.bounds).filter { !$0.overlaps(players[index].body) }
+            if !walls.isEmpty {
+                bodyStage.shieldWalls = walls
+                bodyStage.extras += walls
+            }
+            guard let action = players[index].step(input: input, stage: bodyStage, opponentX: opponentX,
                                                    ballHolder: ball.holder, ballOwner: ball.isLive ? ball.owner : nil,
                                                    events: &events) else { continue }
             perform(action, by: index)

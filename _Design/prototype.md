@@ -2589,7 +2589,7 @@ body faces (back held turns the body round, so a snatch within 3 frames of that 
 back's: the body's turned back first); up or down tilts it 45 degrees that way; forward is still the snatch, as it's pressed
 running at someone. It plays the snatch's sheet; at the hand's full stretch it raises a shield in
 place of the reach (`Shield.swift`), which hangs where it's raised, apart from the body, for
-shield.png's 18 frames (48 by 64) at 15 a second (72 sim frames). Its reach is a circle 16 units
+shield.png's 18 frames (48 by 64) at 15 a second (72 sim frames). Its reach is a circle 24 units
 across; its middle is the hand's, moved for each aim by its own sliders (SHIELD FWD, UP and DOWN,
 X the way the body faces and Y up, in art pixels: forward 8, 0; up 0, 14; down 0, -14, not final).
 On trial, shielding shows the customize screen's pose (`player_customize`) held through the
@@ -2600,12 +2600,14 @@ colours, added on, turned to its tilt; its box shows with HITBOX.
   6 frames, the perfect shield, the ball's stopped and popped up at 3 to be caught (shine.png at
   twice its size, the slashclash's sound till its own).
 - A blade on it parries the swinger, as a snatch's parry does.
-- A snatch or a thrown ball breaks it (a burst of cubes in its raiser's colour), earning the
+- Solid to the other's body (its reach's square, but where they already stand in it), and a dunk
+  doesn't start through it: the body's path to the rim mustn't cross it.
+- A snatch or a thrown ball (not a floater, which bounces off) breaks it (a burst of cubes in its raiser's colour), earning the
   snatcher or thrower 10 FLO; two players' shields in one place break each other, one's own don't.
 - Each shield turns the ball once; after that it passes, so it can't be bounced between the
   shield and the ground or a body over and over.
 - Raised on another body, it pushes it away (3, a unit up), unhit, as the change's burst does.
-- Down onto the ground or a body: a hop, half the double jump's height, in its look, no jump spent.
+- Up or down: its raiser hops the floater's half hop (the layup's), no jump spent, the pose kept.
 - Its sound is shield.wav. The computer doesn't shield yet: its snatch presses let go of the stick.
 
 ## The rebuild's pieces

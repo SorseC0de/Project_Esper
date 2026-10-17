@@ -111,8 +111,10 @@ final class FlowState: ObservableObject {
     func transition(_ style: ScreenTransition = .fade, holdsForLoading: Bool = false, _ change: @escaping () -> Void) {
         guard !curtainBusy else {
             curtainQueue.append((style, holdsForLoading, change))
+            if DebugUI.enabled { print("curtain: queued, \(curtainQueue.count) waiting") }
             return
         }
+        if DebugUI.enabled { print("curtain: down (\(style)), holds \(holdsForLoading), \(curtainQueue.count) waiting") }
         curtainBusy = true
         curtainStyle = style
         withAnimation(.easeIn(duration: style.downSeconds)) { curtain = 1 }
@@ -123,6 +125,11 @@ final class FlowState: ObservableObject {
             let lift = { [weak self] in
                 guard let self else { return }
                 withAnimation(.easeOut(duration: style.upSeconds)) { self.curtain = 0 }
+                if DebugUI.enabled { print("curtain: up, \(self.curtainQueue.count) waiting") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds + 1) { [weak self] in
+                    guard DebugUI.enabled, let self else { return }
+                    print("curtain: a second after up, \(String(format: "%.2f", self.curtain)), busy \(self.curtainBusy), \(self.curtainQueue.count) waiting")
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds) { [weak self] in
                     guard let self else { return }
                     self.curtainBusy = false
@@ -573,6 +580,8 @@ struct TitleOverlay: View {
     static let fortySevenScale: CGFloat = 0.66
     static let arrowScale: CGFloat = 0.6
     /// MULTIPLAYER's icon moved and sized on the debug sliders, bottom right, kept between launches.
+    /// The icon's place, in points at the button scale it was tuned at, the iPad's and Mac's.
+    static let iconPlaceTunedAt: CGFloat = 2.5
     @AppStorage("titleMultiplayerIconX") private var multiplayerIconX = 60.0
     @AppStorage("titleMultiplayerIconY") private var multiplayerIconY = 0.0
     @AppStorage("titleMultiplayerIconScale") private var multiplayerIconScale = 1.75
@@ -599,7 +608,9 @@ struct TitleOverlay: View {
                             .aspectRatio(contentMode: .fit)
                             .colorMultiply(colour)
                             .frame(height: TitleOverlay.iconHeight * iconScale * scale(.buttons))
-                            .offset(iconPlace)
+                            // Tuned at the Mac's and iPad's button scale: as big a share of the frame at any.
+                            .offset(CGSize(width: iconPlace.width * scale(.buttons) / TitleOverlay.iconPlaceTunedAt,
+                                           height: iconPlace.height * scale(.buttons) / TitleOverlay.iconPlaceTunedAt))
                     }
                     Text(text)
                         .font(Futuristic.font(size: textSize * scale(.text)))

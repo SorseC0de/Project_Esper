@@ -96,12 +96,18 @@ final class UITuning: ObservableObject {
         case (.phone, .title, .buttons): 1.1
         case (.phone, .title, .titles): 0.8
         case (.phone, .title, _): 1
-        case (.phone, _, .text) where screen.isDialog, (.phone, _, .titles) where screen.isDialog: 0.8
+        // The dialogs are laid out in the HUD's points, already scaled to the screen's height:
+        // their lettering is the same share of their plates on every platform, and on a phone and
+        // the TV, seen small or far, their plates are bigger.
+        case (.phone, .pause, .buttons): 1.5
+        case (.phone, .win, .buttons): 1.4
+        case (.tv, .pause, .buttons), (.tv, .win, .buttons): 1.25
+        case (.phone, _, .text) where screen.isDialog, (.phone, _, .titles) where screen.isDialog: 1.5
         case (.phone, _, .panels) where screen.isDialog: 0.9
         case (.pad, .title, _), (.tv, .title, _): 2.5
         case (.pad, _, .text) where screen.isDialog, (.pad, _, .titles) where screen.isDialog: 1.5
         case (.pad, _, .panels) where screen.isDialog: 0.9
-        case (.tv, _, .text) where screen.isDialog: 1.5
+        case (.tv, _, .text) where screen.isDialog, (.tv, _, .titles) where screen.isDialog: 1.5
         case (.pad, .touch, .buttons): 0.75
         case (.pad, .touch, .text): 1.5
         default: 1

@@ -2592,6 +2592,17 @@ size; each kept whole on the screen's right half inside the safe area. The shiel
 with the shoot button, at its size. DONE keeps the layout on the device (`touch.buttonPlaces`) and
 brings the pause back; RESET puts every button home.
 
+## The screens' sizes
+
+The dialogs (pause, win, stage select, pick) are laid out in the HUD's points, which scale with the
+screen's height (`HudScene.scale`); their lettering's UI tuning is a share on top of that, the same
+×1.5 on the phone, iPad and TV, so it's the same share of its plates everywhere. The pause's and the
+win's plates take their BUTTONS tuning (×1.5 and ×1.4 on a phone, ×1.25 on the TV, ×1 on an iPad
+or Mac to start), the pause's column fitted to 85% of the height, the win's whole layout, its
+figure on the SwiftUI layer included, by it. A stage's name on the select shrinks as one, its
+lines one size, their spacing with them. The title's multiplayer icon's place is tuned at the
+iPad's and Mac's button scale (2.5) and taken at any as the same share of its frame.
+
 ## The win screen's score
 
 The score stays up on the HUD's scoreboard over the win screen's veil (`circlesOverCam`, the ball

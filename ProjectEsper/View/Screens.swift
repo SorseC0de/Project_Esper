@@ -549,15 +549,17 @@ final class WinScreen: Screen {
     /// winner stands on the projector under it, `figurePixel` points an art pixel), the winner's
     /// hood in FLO lettering, and the two options side by side in frame 4, the final score in box 2
     /// between them.
-    static let ringY: CGFloat = 20
-    static let figurePixel: CGFloat = 2
-    static let nameY: CGFloat = -40
-    static let nameHeight: CGFloat = 26
-    static let optionsY: CGFloat = -105
-    static let optionScale: CGFloat = 0.75
+    /// All of it times its BUTTONS scale (`layout`), the figure on the SwiftUI layer too.
+    static var layout: CGFloat { UITuning.shared.scale(.win, .buttons) }
+    static var ringY: CGFloat { 20 * layout }
+    static var figurePixel: CGFloat { 2 * layout }
+    static var nameY: CGFloat { -40 * layout }
+    static var nameHeight: CGFloat { 26 * layout }
+    static var optionsY: CGFloat { -105 * layout }
+    static var optionScale: CGFloat { 0.75 * layout }
     static let optionTextSize: CGFloat = 10
-    static let optionGap: CGFloat = 6
-    static let scoreScale: CGFloat = 0.4
+    static var optionGap: CGFloat { 6 * layout }
+    static var scoreScale: CGFloat { 0.4 * layout }
     static let scoreTextSize: CGFloat = 16
 
     /// `score` is each side's, player one's first, as the match ended.
@@ -588,7 +590,7 @@ final class WinScreen: Screen {
 
     /// The rematch is asked for; now the other side has to.
     func showWaiting() {
-        TitleText.set(waiting, to: "WAITING FOR THEM", size: 14)
+        TitleText.set(waiting, to: "WAITING FOR THEM", size: 14 * tuned(.text))
         waiting.isHidden = false
     }
 }
@@ -699,10 +701,13 @@ final class StageSelectScreen: Screen {
             let textSize = 18 * tuned(.text)
             let lines = StageSelectScreen.lines(of: name)
             var labels: [SKLabelNode] = []
+            // One size for all of a name's lines, as small as its widest needs, the spacing with it.
+            let widest = lines.map { Futuristic.label($0, size: textSize).frame.width }.max() ?? 1
+            let shrink = min(1, (width * 0.82) / max(widest, 1))
             for (number, line) in lines.enumerated() {
                 let label = Futuristic.label(line, size: textSize)
-                label.setScale(min(1, (width * 0.82) / max(label.frame.width, 1)))
-                let step = textSize * StageSelectScreen.lineShare
+                label.setScale(shrink)
+                let step = textSize * shrink * StageSelectScreen.lineShare
                 label.position = CGPoint(x: 0, y: (CGFloat(lines.count - 1) / 2 - CGFloat(number)) * step)
                 tile.addChild(label)
                 labels.append(label)
@@ -892,6 +897,8 @@ final class PauseScreen: Screen {
     /// The choices' lettering, small enough to sit inside the frame.
     static let optionTextSize: CGFloat = 12
     static let optionGap: CGFloat = 8
+    /// The most of the screen's height the column takes.
+    static let columnShare: CGFloat = 0.85
     static let slideDistance: CGFloat = 120
     static let slideSeconds = 0.3
     static let slideStagger = 0.07
@@ -908,13 +915,19 @@ final class PauseScreen: Screen {
         let options: [(text: String, sound: SoundBoard.Effect, action: () -> Void)] =
             extras.map { ($0.0, SoundBoard.confirm, $0.1) } + [("RESTART MATCH", SoundBoard.confirm, onRestart), ("TITLE SCREEN", .menuBack, onTitle)]
         let image = Futuristic.image("8")
-        let height = image.size.height * image.scale * Futuristic.pointsPerPixel * PauseScreen.optionScale
+        // The BUTTONS scale, no taller as a column than most of the screen.
+        let natural = image.size.height * image.scale * Futuristic.pointsPerPixel * PauseScreen.optionScale
+        let wanted = tuned(.buttons)
+        let room = halfHeight * 2 * PauseScreen.columnShare - CGFloat(options.count - 1) * PauseScreen.optionGap
+        let size = min(wanted, room / (CGFloat(options.count) * natural))
+        let plateScale = PauseScreen.optionScale * size
+        let height = natural * size
         let total = CGFloat(options.count) * height + CGFloat(options.count - 1) * PauseScreen.optionGap
         for (index, option) in options.enumerated() {
             let place = CGPoint(x: 0, y: total / 2 - height / 2 - CGFloat(index) * (height + PauseScreen.optionGap))
             // The second, fourth and so on turned round both ways.
             let turned = index % 2 == 1
-            let node = addFramed(option.text, frame: "8", scale: PauseScreen.optionScale, mirroredX: turned, mirroredY: turned,
+            let node = addFramed(option.text, frame: "8", scale: plateScale, mirroredX: turned, mirroredY: turned,
                                  textSize: PauseScreen.optionTextSize, at: place, sound: option.sound, action: option.action)
             // In from the left, then the right, each a beat after the one over it.
             let side: CGFloat = index % 2 == 0 ? -1 : 1

@@ -3002,7 +3002,10 @@ final class GameScene: SKScene {
             world.addChild(washOverlay)
         }
         washOverlay.isHidden = !washed
-        washOverlay.alpha = KAndAArt.washAlpha
+        let wash = KAndAArt.washOverlay(strength: KAndAArt.washAlpha)
+        washOverlay.color = wash.colour
+        washOverlay.alpha = wash.alpha
+        washOverlay.blendMode = wash.mode
         washOverlay.size = CGSize(width: halfWidth * 2, height: halfHeight * 2)
         washOverlay.position = cameraNode.position
         // The ball's and the hoop's chevrons stay clear of the water and the wash, over them (glowers sit at 21).
@@ -3530,8 +3533,12 @@ final class GameScene: SKScene {
                 controls.addSlider(title: "LIGHT DROP", range: 8...256, notch: 2, value: Float(KAndAArt.Light.drop)) { KAndAArt.Light.drop = CGFloat($0); relay($0) }
                 controls.addSlider(title: "LIGHT FADE FROM", range: 0...1, notch: 0.05, value: Float(KAndAArt.Light.fadeFrom)) { KAndAArt.Light.fadeFrom = CGFloat($0); relay($0) }
             }
-            // The wash over the whole stage, palette 30, how much of it.
-            controls.addSlider(title: "WASH", range: 0...0.6, notch: 0.02, value: Float(KAndAArt.washAlpha)) { value in
+            // The wash over the whole stage, `KAndAArt.beyond`, how much of it, and how it lays on.
+            controls.addPicker(title: "WASH MODE", options: KAndAArt.washModes.map(\.name), selected: KAndAArt.washMode, perRow: 3) { index in
+                KAndAArt.washMode = index
+                UserDefaults.standard.set(index, forKey: KAndAArt.washModeKey)
+            }
+            controls.addSlider(title: "WASH", range: 0...1, notch: 0.02, value: Float(KAndAArt.washAlpha)) { value in
                 KAndAArt.washAlpha = CGFloat(value)
                 UserDefaults.standard.set(Double(value), forKey: KAndAArt.washAlphaKey)
             }

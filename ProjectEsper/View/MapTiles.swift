@@ -166,6 +166,29 @@ enum KAndAArt {
     /// apart, never had it.
     /// A tenth, WASH on the strip moving it, kept.
     static let washAlphaKey = "esper.kAndA.washAlpha"
+    /// How the wash lays over the art (the WASH MODE picker, kept): its blend, its colour fed in
+    /// so the strength's 0 leaves the art as it is in each, a mix from white for multiply, from
+    /// mid grey for multiply twice; the players and front pillars take its colour as a tint in any.
+    static let washModes: [(name: String, mode: SKBlendMode)] = [("ALPHA", .alpha), ("MULTIPLY", .multiply), ("MULT X2", .multiplyX2),
+                                                                  ("SCREEN", .screen), ("ADD", .add), ("SUBTRACT", .subtract)]
+    static let washModeKey = "esper.kAndA.washMode"
+    nonisolated(unsafe) static var washMode: Int = {
+        let saved = UserDefaults.standard.integer(forKey: washModeKey)
+        return washModes.indices.contains(saved) ? saved : 0
+    }()
+    /// The overlay's colour, alpha and blend at the wash's strength in its mode.
+    static func washOverlay(strength: CGFloat) -> (colour: SKColor, alpha: CGFloat, mode: SKBlendMode) {
+        let mode = washModes[washMode].mode
+        let rgb = (CGFloat((beyond >> 16) & 0xFF) / 255, CGFloat((beyond >> 8) & 0xFF) / 255, CGFloat(beyond & 0xFF) / 255)
+        func from(_ base: CGFloat) -> SKColor {
+            SKColor(red: base + (rgb.0 - base) * strength, green: base + (rgb.1 - base) * strength, blue: base + (rgb.2 - base) * strength, alpha: 1)
+        }
+        switch mode {
+        case .multiply: return (from(1), 1, mode)
+        case .multiplyX2: return (from(0.5), 1, mode)
+        default: return (SKColor(rgb: beyond), strength, mode)
+        }
+    }
     nonisolated(unsafe) static var washAlpha: CGFloat = {
         CGFloat(UserDefaults.standard.object(forKey: washAlphaKey) as? Double ?? 0.1)
     }()

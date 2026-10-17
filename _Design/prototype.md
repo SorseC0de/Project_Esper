@@ -2311,7 +2311,9 @@ fading to clear from halfway down, palette 7 at 0.12, added, over the backdrop; 
 LIGHT BOTTOM W, LIGHT DROP and LIGHT FADE FROM sliders are parked (`ParkedSliders`), as the nets'
 and the FLO meters' are.
 Now and then (one chance in 600 a frame, every ten seconds or so) one flickers for 6 to 20 frames,
-dimming to a third every other pair of frames. Over the stage's art lies a wash of EDG64 #1A1932 (once AAP-64 palette 30) at a
+dimming to a third every other pair of frames. Over the stage's art lies a wash of EDG64 #1A1932 (once AAP-64 palette 30), laid on in the WASH
+MODE picker's blend (alpha, multiply, multiply twice, screen, add or subtract; its colour fed in
+so no strength leaves the art as it is), at a
 tenth (`KAndAArt.washAlpha`, the strip's WASH, kept, `washOverlay`, a flat sprite on the camera at
 18.5, `washZ`, the chevrons lifted over it): under the lights' cones (`coneZ`, just over it), the
 sound words (19), the players (20), the effects, the rims' fronts and the score lightning (21; the

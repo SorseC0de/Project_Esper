@@ -40,6 +40,8 @@ public enum Animation: String, CaseIterable {
     case snatchFloState = "player_snatch_flostate"
     /// Shielding's: forward (and back, turned round), up and down.
     case shield = "player_shield"
+    /// Knocked into the air, stunned: one frame, held.
+    case stunnedAir = "player_stunned_air"
     /// In FloState on the ground, the slash's step through: both swings, one attack.
     case esperSlashFloState = "player_esperslash_flostate"
     case ledge = "player_ledge"
@@ -64,7 +66,7 @@ public enum Animation: String, CaseIterable {
         case .hurt: 4
         case .transform: 9
         case .blast: 10
-        case .blastArms: 1
+        case .blastArms, .stunnedAir: 1
         case .shield: 3
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall, .fly, .flyBall: 3
@@ -162,6 +164,8 @@ extension Player {
         if webLinePose > 0, state != .webSwing, state != .webPull, state != .webbed {
             return AnimationFrame(.throwForward, 4)
         }
+        // Stunned in the air: its own pose, till the stun's done or it lands.
+        if hitStun > 0, !grounded, state == .air { return AnimationFrame(.stunnedAir, 0) }
         switch state {
         case .idle:
             if previousState == .run || previousState == .dash || previousState == .slide, t < 15 {

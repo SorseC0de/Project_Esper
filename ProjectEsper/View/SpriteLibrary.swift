@@ -1968,6 +1968,8 @@ enum HoodView {
     static let count = 3
     static let frames: [Animation: [Int: Int]] = [
         .esperSlashFloState: [1: 1, 2: 2, 3: 2, 4: 1],
+        // The up shield looks up its arm: the side-on view.
+        .shield: [1: 1],
         .dunk: [0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1],
         .blast: [3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
         .ledge: [0: 1, 1: 1, 2: 1, 3: 2, 4: 1],

@@ -2584,6 +2584,12 @@ shown, once, like the effects.
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,
   MULTIPLAYER. menu_back: RESUME, start to unpause, TITLE and TITLE SCREEN.
 
+## Stunned in the air
+
+Knocked into the air and stunned, the body shows `player_stunned_air`, held, till the stun's done
+or it lands; its head tilted back by the STUN HEAD sliders (tilt, then X and Y to sit it on the
+neck again; -20, 0, 0 to start), kept between launches.
+
 ## Shielding (experimental)
 
 Its own button: I or O on a keyboard, either trigger on a controller (the right trigger no longer
@@ -2599,6 +2605,8 @@ across; its middle is the hand's, moved for each aim by its own sliders (SHIELD 
 X the way the body faces and Y up, in art pixels: forward 8, 0; up 0, 14; down 0, -14, not final).
 Raised, the hands flash the bright energy colour, fading over 12 frames. Drawn at half the sheet's
 size, in its raiser's energy colours, added on, turned to its tilt; its reach shows with HITBOX.
+- The up shield's head is the side-on view (`player_hoodheads_v2`'s second), tilted back with the
+  UP SHIELD HEAD sliders (tilt, then X and Y to sit it on the neck again; -20, 0, 0 to start).
 - An up shield sends the ball it turns at least 5 degrees out its raiser's way from straight up,
   so a ball falling into a rim under it goes out, not back down through it.
 - A shot or loose ball meeting its face reflects, nobody's shot any more; met within its first

@@ -3626,6 +3626,13 @@ final class GameScene: SKScene {
         // The meters in the corners: how far in, and the whole meter's scale.
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
+        // The heads on their own poses: tilt, then the nudge back onto the neck.
+        for name in GameScene.headPoseNames {
+            let pose = GameScene.headPoses[name] ?? GameScene.HeadPose(tilt: 0, x: 0, y: 0)
+            controls.addSlider(title: "\(name) HEAD TILT", range: -90...90, notch: 1, value: Float(pose.tilt)) { GameScene.headPoses[name]?.tilt = CGFloat($0); GameScene.keepHeadPoses() }
+            controls.addSlider(title: "\(name) HEAD X", range: -12...12, notch: 1, value: Float(pose.x)) { GameScene.headPoses[name]?.x = CGFloat($0); GameScene.keepHeadPoses() }
+            controls.addSlider(title: "\(name) HEAD Y", range: -12...12, notch: 1, value: Float(pose.y)) { GameScene.headPoses[name]?.y = CGFloat($0); GameScene.keepHeadPoses() }
+        }
         // How many times the shield runs round its loop, keeping it up longer.
         controls.addSlider(title: "SHIELD LOOPS", range: 0...12, notch: 1, value: Float(ShieldRules.extraLoops)) { ShieldRules.extraLoops = Int($0) }
         // Each energy colour's glow, times.
@@ -6198,8 +6205,37 @@ final class GameScene: SKScene {
         .doubleJump: [0: 30, 1: 90, 2: 135, 3: -90, 4: -90],
         .doubleJumpBall: [0: 30, 1: 90, 2: 135, 3: -90, 4: -90],
     ]
-    /// A frame's hood turn in radians, clockwise facing right.
-    static func hoodTurn(_ frame: AnimationFrame) -> CGFloat { (hoodTurnDegrees[frame.animation]?[frame.frame] ?? 0) * .pi / 180 }
+    /// A frame's hood turn in radians, clockwise facing right: the sheet's, and a tuned pose's.
+    static func hoodTurn(_ frame: AnimationFrame) -> CGFloat {
+        ((hoodTurnDegrees[frame.animation]?[frame.frame] ?? 0) + (headPose(frame)?.tilt ?? 0)) * .pi / 180
+    }
+
+    /// Heads tilted on poses of their own, back for a negative tilt (degrees clockwise facing
+    /// right), then moved to sit on the neck again, art pixels the way it faces and up: on the
+    /// HEAD sliders, kept between launches. Knocked into the air, stunned; and the up shield.
+    struct HeadPose: Codable { var tilt: CGFloat; var x: CGFloat; var y: CGFloat }
+    static let headPoseNames = ["STUN", "UP SHIELD"]
+    nonisolated(unsafe) static var headPoses: [String: HeadPose] = {
+        var poses: [String: HeadPose] = ["STUN": HeadPose(tilt: -20, x: 0, y: 0), "UP SHIELD": HeadPose(tilt: -20, x: 0, y: 0)]
+        for name in headPoseNames {
+            if let data = UserDefaults.standard.data(forKey: "esper.headPose.\(name)"), let saved = try? JSONDecoder().decode(HeadPose.self, from: data) {
+                poses[name] = saved
+            }
+        }
+        return poses
+    }()
+    static func keepHeadPoses() {
+        for (name, pose) in headPoses {
+            if let data = try? JSONEncoder().encode(pose) { UserDefaults.standard.set(data, forKey: "esper.headPose.\(name)") }
+        }
+    }
+    static func headPose(_ frame: AnimationFrame) -> HeadPose? {
+        switch (frame.animation, frame.frame) {
+        case (.stunnedAir, _): headPoses["STUN"]
+        case (.shield, 1): headPoses["UP SHIELD"]
+        default: nil
+        }
+    }
 
     static func stringsUnderArms(_ frame: AnimationFrame) -> Bool {
         stringless[frame.animation]?.contains(frame.frame) ?? false
@@ -8429,6 +8465,10 @@ final class GameScene: SKScene {
                     let middle = CGPoint(x: anim.pixelSize / 2 + head.x, y: anim.pixelSize - anim.feetFromBottom - head.y)
                     let tip = headTip[index, default: 0]
                     turn(hood, about: middle, by: (tip - sheetTurn) * CGFloat(player.facing.sign), scale: drawScale)
+                    if let pose = GameScene.headPose(frame) {
+                        hood.position.x += pose.x * CGFloat(player.facing.sign) * drawScale
+                        hood.position.y += pose.y * drawScale
+                    }
                     hood.position.y -= GameScene.flightHeadDrop * abs(tip) / GameScene.flightHeadTip * drawScale
                     // Firing the beam, moved to sit on the neck as it tips, up and down each their own
                     // way (`BeamHeadTuning`), in proportion to the tip.

@@ -209,6 +209,7 @@ final class TouchControls: SKNode {
         let right = halfWidth - insets.right - TouchControls.padding
         let top = halfHeight - insets.top - TouchControls.padding
         let bottom = -halfHeight + insets.bottom + TouchControls.padding
+        safeBounds = CGRect(x: left, y: bottom, width: right - left, height: top - bottom)
         pickerOrigin = CGPoint(x: left, y: top)
         topCentre = CGPoint(x: 0, y: top)
         super.init()
@@ -238,13 +239,11 @@ final class TouchControls: SKNode {
         }
         buttons = [jump.button, shoot.button, throwButton.button]
         buttonSets = [jump.set, shoot.set, throwButton.set]
+        homes = buttons.map(\.node.position)
         // The shield's: a capsule round the shoot button's upper side, a small gap off its ring,
-        // as the GameCube's X round its A.
-        shieldCentre = shoot.button.node.position
-        shieldBandRadius = shoot.button.radius + TouchControls.shieldGap * k + TouchControls.shieldThickness * k / 2
-        shieldThickness = TouchControls.shieldThickness * k
+        // as the GameCube's X round its A; it goes where the shoot button goes, at its size.
         addChild(shieldButton)
-        drawShieldButton(lit: false)
+        applyPlaces()
 
         pickerTab.position = CGPoint(x: left + TouchControls.benchTabSize.width / 2, y: top - TouchControls.benchTabSize.height / 2)
         sliderTab.position = CGPoint(x: 0, y: top - 30)
@@ -300,6 +299,165 @@ final class TouchControls: SKNode {
         node.addChild(text)
         addChild(node)
         return (Button(node: node, ring: ring, label: text, text: label, radius: radius), set)
+    }
+
+    // MARK: The player's layout
+
+    /// Each round button moved from its home and sized, as the player left it in the layout
+    /// editor (BUTTON LAYOUT on the pause), kept on this device; the shield's goes with the shoot's.
+    struct ButtonPlace: Codable, Equatable {
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var scale: CGFloat = 1
+    }
+    static let placesKey = "touch.buttonPlaces"
+    static let placeNames = ["jump", "shoot", "throw"]
+    static let scaleRange: ClosedRange<CGFloat> = 0.5...2
+    private static func savedPlaces() -> [String: ButtonPlace] {
+        UserDefaults.standard.data(forKey: placesKey).flatMap { try? JSONDecoder().decode([String: ButtonPlace].self, from: $0) } ?? [:]
+    }
+    private var places = TouchControls.savedPlaces()
+    private var homes: [CGPoint] = []
+    /// Inside the safe area and the padding, in this node's space.
+    private let safeBounds: CGRect
+
+    private func place(_ index: Int) -> ButtonPlace { places[TouchControls.placeNames[index]] ?? ButtonPlace() }
+
+    /// Every button where and how big its place has it, and the shield's round the shoot's.
+    private func applyPlaces() {
+        for index in buttons.indices where homes.indices.contains(index) {
+            let place = place(index)
+            buttons[index].node.position = CGPoint(x: homes[index].x + place.x, y: homes[index].y + place.y)
+            buttons[index].node.setScale(place.scale)
+        }
+        let k = TouchControls.scale
+        let shoot = buttons[1], size = place(1).scale
+        shieldCentre = shoot.node.position
+        shieldThickness = TouchControls.shieldThickness * k * size
+        shieldBandRadius = shoot.radius * size + TouchControls.shieldGap * k * size + shieldThickness / 2
+        drawShieldButton(lit: shieldTouch != nil)
+    }
+
+    /// The nearest button whose halo a point's in, at the size it's drawn.
+    private func button(at point: CGPoint) -> (index: Int, distance: CGFloat)? {
+        buttons.enumerated()
+            .map { (index: $0.offset, distance: hypot(point.x - $0.element.node.position.x, point.y - $0.element.node.position.y)) }
+            .filter { $0.distance <= buttons[$0.index].radius * buttons[$0.index].node.xScale + 8 }
+            .min { $0.distance < $1.distance }
+    }
+
+    // MARK: The layout editor
+
+    /// Laying the buttons out: drag one to move it, pinch it (or a second finger down) to size it,
+    /// kept to the screen's right half; DONE keeps it, RESET puts every one home.
+    private(set) var editing = false
+    private var editOverlay: SKNode?
+    private var editDone: SKShapeNode?
+    private var editReset: SKShapeNode?
+    private var editPoints: [UITouch: CGPoint] = [:]
+    private var editTarget: (index: Int, grab: CGPoint, scale: CGFloat, spread: CGFloat?)?
+    private var onEditDone: (() -> Void)?
+
+    func beginEditing(onDone: @escaping () -> Void) {
+        editing = true
+        onEditDone = onDone
+        input = .idle
+        latched = .idle
+        let overlay = SKNode()
+        overlay.zPosition = 50
+        let hint = Futuristic.label("DRAG TO MOVE · PINCH TO RESIZE", size: 10 * TouchControls.textScale)
+        hint.position = CGPoint(x: safeBounds.midX, y: safeBounds.maxY - 50 * TouchControls.scale)
+        overlay.addChild(hint)
+        let done = TouchControls.cornerButton("DONE"), reset = TouchControls.cornerButton("RESET")
+        done.position = CGPoint(x: safeBounds.midX + 40 * TouchControls.scale, y: safeBounds.maxY - 22 * TouchControls.scale)
+        reset.position = CGPoint(x: safeBounds.midX - 40 * TouchControls.scale, y: safeBounds.maxY - 22 * TouchControls.scale)
+        overlay.addChild(done)
+        overlay.addChild(reset)
+        // The half the buttons keep to, outlined.
+        let half = SKShapeNode(rect: CGRect(x: 0, y: safeBounds.minY, width: safeBounds.maxX, height: safeBounds.height))
+        half.strokeColor = TouchControls.line.withAlphaComponent(0.35)
+        half.lineWidth = 1
+        overlay.addChild(half)
+        addChild(overlay)
+        editOverlay = overlay
+        editDone = done
+        editReset = reset
+        for index in buttons.indices { buttons[index].ring.color = TouchControls.lit }
+    }
+
+    private func endEditing() {
+        editing = false
+        editOverlay?.removeFromParent()
+        editOverlay = nil
+        editPoints = [:]
+        editTarget = nil
+        for index in buttons.indices { buttons[index].ring.color = TouchControls.line }
+        if let data = try? JSONEncoder().encode(places) { UserDefaults.standard.set(data, forKey: TouchControls.placesKey) }
+        let done = onEditDone
+        onEditDone = nil
+        done?()
+    }
+
+    private func editBegan(_ touch: UITouch, at point: CGPoint) {
+        if let done = editDone, done.frame.insetBy(dx: -8, dy: -6).contains(point) { endEditing(); return }
+        if let reset = editReset, reset.frame.insetBy(dx: -8, dy: -6).contains(point) {
+            places = [:]
+            applyPlaces()
+            return
+        }
+        editPoints[touch] = point
+        if var target = editTarget {
+            // A second finger: from here, the two pinch the button.
+            let fingers = Array(editPoints.values)
+            if fingers.count == 2 {
+                target.scale = place(target.index).scale
+                target.spread = max(hypot(fingers[0].x - fingers[1].x, fingers[0].y - fingers[1].y), 1)
+                editTarget = target
+            }
+            return
+        }
+        let onShield = onShieldButton(point)
+        guard let hit = onShield ? (1, 0) : button(at: point) else { return }
+        let node = buttons[hit.index].node
+        editTarget = (hit.index, CGPoint(x: point.x - node.position.x, y: point.y - node.position.y), place(hit.index).scale, nil)
+    }
+
+    private func editMoved(_ touch: UITouch, to point: CGPoint) {
+        guard editPoints[touch] != nil, let target = editTarget else { return }
+        editPoints[touch] = point
+        var place = place(target.index)
+        let fingers = Array(editPoints.values)
+        if let spread = target.spread, fingers.count >= 2 {
+            let now = hypot(fingers[0].x - fingers[1].x, fingers[0].y - fingers[1].y)
+            place.scale = min(max(target.scale * now / spread, TouchControls.scaleRange.lowerBound), TouchControls.scaleRange.upperBound)
+        } else if target.spread == nil {
+            let home = homes[target.index]
+            place.x = point.x - target.grab.x - home.x
+            place.y = point.y - target.grab.y - home.y
+        }
+        // Kept whole on the right half, inside the safe area.
+        let reach = buttons[target.index].radius * place.scale
+        let x = min(max(homes[target.index].x + place.x, reach), safeBounds.maxX - reach)
+        let y = min(max(homes[target.index].y + place.y, safeBounds.minY + reach), safeBounds.maxY - reach)
+        place.x = x - homes[target.index].x
+        place.y = y - homes[target.index].y
+        places[TouchControls.placeNames[target.index]] = place
+        applyPlaces()
+    }
+
+    private func editEnded(_ touch: UITouch) {
+        editPoints.removeValue(forKey: touch)
+        if editPoints.isEmpty {
+            editTarget = nil
+        } else if var target = editTarget, target.spread != nil {
+            // Down to one finger: it drags from where it is.
+            if let finger = editPoints.values.first {
+                let node = buttons[target.index].node
+                target.grab = CGPoint(x: finger.x - node.position.x, y: finger.y - node.position.y)
+            }
+            target.spread = nil
+            editTarget = target
+        }
     }
 
     // MARK: The shield's button
@@ -451,6 +609,7 @@ final class TouchControls: SKNode {
     }
 
     func began(_ touch: UITouch, at point: CGPoint) {
+        if editing { editBegan(touch, at: point); return }
         if !pickerTab.isHidden, pickerTab.frame.insetBy(dx: -4, dy: -4).contains(point) {
             pickersOpen.toggle()
             return
@@ -513,10 +672,7 @@ final class TouchControls: SKNode {
             return
         }
         // The nearest button whose halo the touch is in, so a thumb between two goes to the closer one.
-        let reach = buttons.enumerated()
-            .map { (index: $0.offset, distance: hypot(point.x - $0.element.node.position.x, point.y - $0.element.node.position.y)) }
-            .filter { $0.distance <= buttons[$0.index].radius + 8 }
-            .min { $0.distance < $1.distance }
+        let reach = button(at: point)
         if let reach {
             buttonTouches[touch] = (reach.index, point)
             press(reach.index, down: true)
@@ -526,6 +682,7 @@ final class TouchControls: SKNode {
     }
 
     func moved(_ touch: UITouch, to point: CGPoint) {
+        if editing { editMoved(touch, to: point); return }
         if let slider = sliderTouches[touch] {
             slider.drag(to: convert(point, to: slider))
             return
@@ -547,6 +704,7 @@ final class TouchControls: SKNode {
     }
 
     func ended(_ touch: UITouch) {
+        if editing { editEnded(touch); return }
         if sliderTouches.removeValue(forKey: touch) != nil { return }
         if touch == stickTouch {
             stickTouch = nil

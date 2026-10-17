@@ -5173,6 +5173,10 @@ final class GameScene: SKScene {
                     extras.append(("REWIND", { [weak self] in self?.enter(.playing); self?.zonesRequest(.rewind) }))
                 }
             }
+            // A touch screen's own: the buttons laid out where the player wants them.
+            if GameScene.touchControlsShown, !InputHub.onMac {
+                extras.append(("BUTTON LAYOUT", { [weak self] in self?.editButtonLayout() }))
+            }
             let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame,
                                     onRestart: { [weak self] in self?.restartMatch() },
                                     onSettings: { [weak self] in self?.flowState?.openSettings() },
@@ -5196,9 +5200,12 @@ final class GameScene: SKScene {
             break
         }
         if let screen { hud.addChild(screen) }
+        if DebugUI.enabled, flow == .stageSelect { print("stage select added: \(screen?.parent != nil), hud alpha \(hud.alpha), hud scene \(hud.scene != nil)") }
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
         flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen || screen is WaitScreen
         flowState?.gridGround = screen is StageSelectScreen
+        // The score kept on the win screen, over its veil.
+        circlesOverCam.isHidden = !ballCamEnabled && flow != .won
         flowState?.winFigure = (screen as? WinScreen)?.figure
         flowState?.veiled = screen != nil
     }
@@ -5260,6 +5267,7 @@ final class GameScene: SKScene {
                 number.anchorPoint = CGPoint(x: index == 0 ? (digits.size.width - digits.pad) / digits.size.width : digits.pad / digits.size.width, y: 0.5)
                 number.position = CGPoint(x: index == 0 ? -12 : 12, y: 0)
                 circles.addChild(number)
+                circlesOverCam.addChild(number.copy() as! SKSpriteNode)
             }
             addHUDPlate(width: 120)
             let target = SKLabelNode(text: "\(FortySevenRules.target)")
@@ -9006,7 +9014,8 @@ final class GameScene: SKScene {
         // The camera on a scrolling stage: level, gliding after the local player and leading them.
         if !wholeStageView, [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }
         placeBallCamFrame()
-        circlesOverCam.isHidden = !ballCamEnabled
+        // Over the ball cam, and on the win screen, whose veil covers the glowing ones.
+        circlesOverCam.isHidden = !ballCamEnabled && flow != .won
         // 47's lines breathe, slowly, between gone and a quarter.
         drawPortableThreeLine()
         if !threePointArcs.isHidden {
@@ -9481,7 +9490,20 @@ final class GameScene: SKScene {
         CGPoint(x: (point.x - viewSize.width / 2) / hudScale, y: (viewSize.height / 2 - point.y) / hudScale)
     }
 
+    /// The pause's BUTTON LAYOUT: the pause put away, the buttons out to be moved and sized,
+    /// and back to the pause once they're done.
+    private func editButtonLayout() {
+        screen?.removeFromParent()
+        screen = nil
+        controls?.isHidden = false
+        controls?.beginEditing { [weak self] in self?.presentScreen() }
+    }
+
     func touchBegan(_ touch: UITouch, at point: CGPoint, viewSize: CGSize) {
+        if controls?.editing == true {
+            controls?.began(touch, at: hudPoint(point, viewSize: viewSize))
+            return
+        }
         #if !os(tvOS)
         if let editor = mapEditor {
             editor.began(at: hudPoint(point, viewSize: viewSize))

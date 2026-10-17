@@ -2584,6 +2584,19 @@ shown, once, like the effects.
   unused). menu_select_v2, played reversed: a choice or a stage picked, BEST OF 7,
   MULTIPLAYER. menu_back: RESUME, start to unpause, TITLE and TITLE SCREEN.
 
+## The touch buttons' layout
+
+On a touch screen the pause has BUTTON LAYOUT: the pause put away, the buttons lit, drag one to
+move it and pinch it (or a second finger down while dragging) to size it, from half to twice its
+size; each kept whole on the screen's right half inside the safe area. The shield's capsule goes
+with the shoot button, at its size. DONE keeps the layout on the device (`touch.buttonPlaces`) and
+brings the pause back; RESET puts every button home.
+
+## The win screen's score
+
+The score stays up on the HUD's scoreboard over the win screen's veil (`circlesOverCam`, the ball
+cam's copy, shown on the win screen too); the win screen's own score frame is left empty for now.
+
 ## Stunned in the air
 
 Knocked into the air and stunned, the body shows `player_stunned_air`, held, till the stun's done

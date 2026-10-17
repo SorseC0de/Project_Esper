@@ -570,7 +570,8 @@ final class WinScreen: Screen {
         addChild(name)
         let width = Futuristic.sprite("4", scale: WinScreen.optionScale).size.width
         let scoreWidth = Futuristic.sprite("box2", scale: WinScreen.scoreScale).size.width
-        addPlate(score.map(String.init).joined(separator: " - "), frame: "box2", scale: WinScreen.scoreScale,
+        // The score's frame, empty: the score stays up on the HUD's scoreboard.
+        addPlate("", frame: "box2", scale: WinScreen.scoreScale,
                  textSize: WinScreen.scoreTextSize, at: CGPoint(x: 0, y: WinScreen.optionsY))
         let across = scoreWidth / 2 + WinScreen.optionGap + width / 2
         // The left one turned round, its lead out to the right.

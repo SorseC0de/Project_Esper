@@ -61,18 +61,13 @@ enum UIPiece: String {
     // MARK: Recoloured pieces
 
     /// The shades a piece is drawn in, and what each becomes: the plum pieces' tones for
-    /// good (the bottom edge's lip and shadow both one), the black and blue buttons' as
-    /// picked on the title (a tone unpicked is left), the menus' card on purple, its rims
+    /// good (the bottom edge's lip and shadow both one), the menus' card on purple, its rims
     /// lightened and darkened from it as they are from its face. Nil, drawn as it is.
     private var toneMap: (sources: [RGB], targets: [RGB])? {
         switch self {
         case .buttonPlum, .circlePlum:
             // Main black's second, top blue's third, bottom gold's last.
             return (EsperPalette.plum.shades, [EsperPalette.blue.body, EsperPalette.black.light, EsperPalette.gold.shadow, EsperPalette.gold.shadow])
-        case .buttonBlack, .circleBlack:
-            return UIPiece.picked(.nonSelected, sources: [0x433F56, 0x262634, 0x17171F])
-        case .buttonBlue, .circleBlue:
-            return UIPiece.picked(.blue, sources: [0x6C8DFF, 0x466DF9, 0x183EAD])
         case .cardPurple:
             let sources: [RGB] = [0x615C69, 0x262634, 0x1A1A24]
             return (sources, UIPiece.shades(of: UIColourPicks.menuCard, like: sources, face: 1))
@@ -81,12 +76,6 @@ enum UIPiece: String {
         }
     }
 
-    /// A grid's picks as targets for a piece's top, main and bottom shades.
-    private static func picked(_ grid: UIColourPicks.Grid, sources: [RGB]) -> (sources: [RGB], targets: [RGB])? {
-        let top = UIColourPicks.colour(grid, .top), main = UIColourPicks.colour(grid, .main), bottom = UIColourPicks.colour(grid, .bottom)
-        guard top != nil || main != nil || bottom != nil else { return nil }
-        return (sources, [top ?? sources[0], main ?? sources[1], bottom ?? sources[2]])
-    }
 
     /// `colour` as the face, with the other shades lightened or darkened from it by as much
     /// as `sources`' are from the face at `face`.

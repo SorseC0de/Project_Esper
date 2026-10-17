@@ -29,9 +29,6 @@ final class FlowState: ObservableObject {
     /// The title's cursor, the game's own on every platform: a pad moves it and A picks,
     /// and a tap picks straight away and moves it there.
     @Published var titleCursor = TitleItem.bestOfSeven
-    /// Which tone each grid picks.
-    @Published var tones: [UIColourPicks.Grid: UIColourPicks.Tone] = [:]
-    func tone(for grid: UIColourPicks.Grid) -> UIColourPicks.Tone { tones[grid] ?? .main }
 
     init() {
         scene.flowState = self
@@ -413,15 +410,6 @@ final class FlowState: ObservableObject {
             Ambience.shared.applySetting()
             SoundBoard.shared.play(SoundBoard.navigate)
             objectWillChange.send()
-        case .toneTab(let grid, let tone):
-            tones[grid] = tone
-            SoundBoard.shared.play(SoundBoard.navigate)
-        case .swatch(let grid, let index):
-            // Picking the one picked takes the pack's own tone back.
-            UIColourPicks.toggle(grid, tone(for: grid), index)
-            SoundBoard.shared.play(SoundBoard.navigate)
-            UITuning.shared.touch()
-            scene.refreshPreview()
         }
     }
 }
@@ -434,13 +422,6 @@ enum TitleItem: Hashable {
     case titleFont
     /// The gear in the upper right corner, opening the settings; the speaker in the upper left, muting everything.
     case settings, mute
-    /// A swatch on one of the grids, by its index in `EsperPalette.swatches`, and the tabs
-    /// that say which tone each grid picks.
-    case swatch(UIColourPicks.Grid, Int)
-    case toneTab(UIColourPicks.Grid, UIColourPicks.Tone)
-
-    /// The grids' swatches a row: two ramps of four.
-    static let swatchesPerRow = 8
 
     static let rows: [[TitleItem]] = [
         [.mute, .settings],
@@ -450,13 +431,8 @@ enum TitleItem: Hashable {
         [.multiplayer],
     ] + (DebugUI.enabled ? debugRows : [])
 
-    /// The colour grids' tabs and swatches and the UI and FONT switches, in a debug build.
+    /// The UI and FONT switches, in a debug build.
     static let debugRows: [[TitleItem]] = [
-        UIColourPicks.Grid.allCases.flatMap { grid in UIColourPicks.Tone.allCases.map { TitleItem.toneTab(grid, $0) } },
-    ] + stride(from: 0, to: EsperPalette.swatches.count, by: swatchesPerRow).map { start in
-        // The grids side by side, bottom left.
-        UIColourPicks.Grid.allCases.flatMap { grid in (start..<start + swatchesPerRow).map { TitleItem.swatch(grid, $0) } }
-    } + [
         [.tuning, .titleFont],
     ]
 }
@@ -516,7 +492,7 @@ struct TitleOverlay: View {
                     .padding(.leading, 18)
                 }
                 .overlay(alignment: .bottomLeading) {
-                    if DebugUI.enabled { colourGrids }
+                    if DebugUI.enabled { debugSwitches }
                 }
                 .overlay(alignment: .bottomTrailing) {
                     if DebugUI.enabled { frameSliders }
@@ -700,20 +676,9 @@ struct TitleOverlay: View {
 
     static let debugRuleWidth: CGFloat = 80
 
-    /// The UI's colour grids and the UI and FONT switches, bottom left: for working on the game.
-    private var colourGrids: some View {
+    /// The UI and FONT switches, bottom left: for working on the game.
+    private var debugSwitches: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .bottom, spacing: 8) {
-                ForEach(UIColourPicks.Grid.allCases, id: \.self) { grid in
-                    VStack(alignment: .leading, spacing: 4) {
-                        pickerLabel(grid.label)
-                        HStack(spacing: 4) {
-                            ForEach(UIColourPicks.Tone.allCases, id: \.self) { tone in toneTab(grid, tone) }
-                        }
-                        SwatchGrid(flow: flow, grid: grid)
-                    }
-                }
-            }
             HStack(spacing: 16) {
                 debugSwitch("UI", picked: flow.tuningOpen, item: .tuning)
                 debugSwitch("FONT " + String(UnicodeScalar(UInt8(65 + Futuristic.typefacePick))), picked: true, item: .titleFont)
@@ -728,22 +693,6 @@ struct TitleOverlay: View {
             .font(TitleText.switchFont(size: 10))
             .foregroundStyle(.white)
             .shadow(color: .black, radius: 0, x: 1, y: 1)
-    }
-
-    /// Which of a grid's three tones it picks: gold under the cursor, plum when it's the grid's.
-    private func toneTab(_ grid: UIColourPicks.Grid, _ tone: UIColourPicks.Tone) -> some View {
-        let piece = flow.titleCursor == .toneTab(grid, tone) ? UIPiece.buttonGold : (flow.tone(for: grid) == tone ? UIPiece.buttonPlum : UIPiece.buttonBlack)
-        return Button { flow.activate(.toneTab(grid, tone)) } label: {
-            Text(tone.label)
-                .font(TitleText.switchFont(size: 9))
-                .foregroundStyle(.white)
-                .shadow(color: .black, radius: 0, x: 1, y: 1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(piece.image(corners: 0.5))
-        }
-        .buttonStyle(.plain)
-        .noSystemFocus()
     }
 }
 

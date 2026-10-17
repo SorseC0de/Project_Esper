@@ -3626,6 +3626,8 @@ final class GameScene: SKScene {
         // The meters in the corners: how far in, and the whole meter's scale.
         controls.addSlider(title: "FLO INSET X", range: -40...120, notch: 1, value: Float(FloTuning.cornerInsetX)) { FloTuning.cornerInsetX = CGFloat($0); relayoutFlo() }
         controls.addSlider(title: "FLO INSET Y", range: -40...80, notch: 1, value: Float(FloTuning.cornerInsetY)) { FloTuning.cornerInsetY = CGFloat($0); relayoutFlo() }
+        // How many times the shield runs round its loop, keeping it up longer.
+        controls.addSlider(title: "SHIELD LOOPS", range: 0...12, notch: 1, value: Float(ShieldRules.extraLoops)) { ShieldRules.extraLoops = Int($0) }
         // Each energy colour's glow, times.
         for colour in EnergyColour.wheel {
             controls.addSlider(title: "GLOW \(colour.name.uppercased())", range: 0.5...2.5, notch: 0.05, value: GlowSettings.energyGains[colour] ?? 1) { value in
@@ -6411,7 +6413,7 @@ final class GameScene: SKScene {
         for (index, node) in shieldNodes.enumerated() {
             guard index < shields.count, frames > 0 else { node.isHidden = true; continue }
             let shield = shields[index]
-            let frame = min(shield.age * ShieldRules.sheetFramesPerSecond / 60, frames - 1)
+            let frame = min(ShieldRules.sheetFrame(atAge: shield.age), frames - 1)
             let texture = sprites.effectTexture(EnergyEffect.shield.name, frame, player: shield.owner)
             node.texture = texture
             node.size = CGSize(width: texture.size().width * GameScene.shieldScale, height: texture.size().height * GameScene.shieldScale)

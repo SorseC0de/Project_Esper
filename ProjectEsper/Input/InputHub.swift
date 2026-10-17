@@ -25,7 +25,6 @@ final class InputHub {
     private var menuWasDown = false
     private var bumperWasDown = false
     private var stickClickWasDown = false
-    private var leftTriggerWasDown = false
     private var deleteWasDown = false
     private var hitboxKeyWasDown = false
     /// Testing FLO: 1 fills the first player's, 2 sets it to half, 3 empties it; 4, 5 and 6 the
@@ -110,9 +109,6 @@ final class InputHub {
             if down, !floKeysWereDown.contains(code) { floSetPressed = (player, flo) }
             if down { floKeysWereDown.insert(code) } else { floKeysWereDown.remove(code) }
         }
-        let leftTriggerDown = controllers.contains { $0.extendedGamepad?.leftTrigger.isPressed ?? false }
-        if leftTriggerDown, !leftTriggerWasDown { hitboxTogglePressed = true }
-        leftTriggerWasDown = leftTriggerDown
         return (0..<players).map { index in
             let pad = controller(for: index).map { read($0.extendedGamepad!) } ?? PlayerInput.idle
             switch index {
@@ -123,7 +119,7 @@ final class InputHub {
         }
     }
 
-    /// The keyboard as a pad: WASD the stick, space jump, J shoot, K throw. Esc quits,
+    /// The keyboard as a pad: WASD the stick, space jump, J shoot, K throw, I or O shield. Esc quits,
     /// on a Mac or the simulator only.
     private func keyboard() -> PlayerInput {
         guard let keys = GCKeyboard.coalesced?.keyboardInput else { return .idle }
@@ -137,6 +133,7 @@ final class InputHub {
         input.jump = down(.spacebar)
         input.shoot = down(.keyJ)
         input.throwBall = down(.keyK)
+        input.shield = down(.keyI) || down(.keyO)
         return input
     }
 
@@ -197,16 +194,15 @@ final class InputHub {
         return floSetPressed
     }
 
-    /// True once per left trigger press.
+    /// True once per M press.
     func consumeHitboxToggle() -> Bool {
         defer { hitboxTogglePressed = false }
         return hitboxTogglePressed
     }
 
-    /// A: jump. B, the right bumper and the right trigger: shoot, each its own button so a
-    /// second one cancels a shot. X: throw. Y: taunt. The left bumper steps the POWER
-    /// picker, the menu button pauses, the left trigger shows the hitboxes, and clicking
-    /// the right stick switches the computer.
+    /// A: jump. B and the right bumper: shoot, each its own button so a second one cancels a
+    /// shot. X: throw. Y: taunt. Either trigger: shield. The left bumper steps the POWER
+    /// picker, the menu button pauses, and clicking the right stick switches the computer.
     /// The right stick aims a stance; failing that, the left stick does.
     private func read(_ pad: GCExtendedGamepad) -> PlayerInput {
         var stick = deadzoned(Vec2(x: Double(pad.leftThumbstick.xAxis.value), y: Double(pad.leftThumbstick.yAxis.value)))
@@ -216,9 +212,10 @@ final class InputHub {
         var input = PlayerInput(stick: stick)
         input.aim = rightStick.length >= BallRules.flickThreshold ? rightStick : stick
         input.jump = pad.buttonA.isPressed
-        input.shootButtons = (pad.buttonB.isPressed ? 1 : 0) | (pad.rightShoulder.isPressed ? 2 : 0) | (pad.rightTrigger.isPressed ? 4 : 0)
+        input.shootButtons = (pad.buttonB.isPressed ? 1 : 0) | (pad.rightShoulder.isPressed ? 2 : 0)
         input.throwBall = pad.buttonX.isPressed
         input.taunt = pad.buttonY.isPressed
+        input.shield = pad.leftTrigger.isPressed || pad.rightTrigger.isPressed
         return input
     }
 
@@ -228,7 +225,8 @@ final class InputHub {
                     jump: a.jump || b.jump,
                     shootButtons: a.shootButtons | b.shootButtons,
                     throwBall: a.throwBall || b.throwBall,
-                    taunt: a.taunt || b.taunt)
+                    taunt: a.taunt || b.taunt,
+                    shield: a.shield || b.shield)
     }
 
     static func deadzoned(_ raw: Vec2) -> Vec2 {

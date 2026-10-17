@@ -37,32 +37,28 @@ final class TouchControls: SKNode {
     private static var textScale: CGFloat { UITuning.shared.scale(.touch, .text) }
 
     private var buttons: [Button] = []
-    /// The stick: ring 3 its base, a small arrow 2 out from it each of the four ways, and ring 7
-    /// the knob that moves inside it, all in the menus' blue.
+    /// The stick: ring 3 its base and ring 7 the knob that moves inside it, both in the menus'
+    /// blue. It reads one of eight ways, the knob shown on it.
     private let stickBase: SKNode = {
         let base = SKNode()
         let ring = Futuristic.sprite("ring3", scale: 1)
         ring.size = CGSize(width: stickRadius * 2, height: stickRadius * 2)
         base.addChild(ring)
-        for quarter in 0..<4 {
-            let arrow = Futuristic.sprite("arrow2", scale: 1)
-            let image = Futuristic.image("arrow2")
-            arrow.size = CGSize(width: stickArrowSize * image.size.width / max(image.size.height, 1), height: stickArrowSize)
-            let angle = CGFloat(quarter) * .pi / 2
-            let out = stickRadius + stickArrowSize / 2 + stickArrowGap
-            arrow.position = CGPoint(x: cos(angle) * out, y: sin(angle) * out)
-            arrow.zRotation = angle
-            base.addChild(arrow)
-        }
         return base
     }()
+    /// The stick on the nearest of its eight ways, its length kept.
+    static func eightWays(_ stick: Vec2) -> Vec2 {
+        let length = stick.length
+        guard length > 0 else { return .zero }
+        let eighth = Double.pi / 4
+        let angle = (atan2(stick.y, stick.x) / eighth).rounded() * eighth
+        return Vec2(x: cos(angle) * length, y: sin(angle) * length)
+    }
     private let stickKnob: SKSpriteNode = {
         let knob = Futuristic.sprite("ring7", scale: 1)
         knob.size = CGSize(width: stickKnobSize, height: stickKnobSize)
         return knob
     }()
-    private static let stickArrowSize: CGFloat = 10
-    private static let stickArrowGap: CGFloat = 2
     private static let stickKnobSize: CGFloat = 32
     /// The corner switches: an invisible rect for the touch, a black plate on it, plum when on.
     private let resetButton = TouchControls.cornerButton("RESET")
@@ -242,6 +238,13 @@ final class TouchControls: SKNode {
         }
         buttons = [jump.button, shoot.button, throwButton.button]
         buttonSets = [jump.set, shoot.set, throwButton.set]
+        // The shield's: a capsule round the shoot button's upper side, a small gap off its ring,
+        // as the GameCube's X round its A.
+        shieldCentre = shoot.button.node.position
+        shieldBandRadius = shoot.button.radius + TouchControls.shieldGap * k + TouchControls.shieldThickness * k / 2
+        shieldThickness = TouchControls.shieldThickness * k
+        addChild(shieldButton)
+        drawShieldButton(lit: false)
 
         pickerTab.position = CGPoint(x: left + TouchControls.benchTabSize.width / 2, y: top - TouchControls.benchTabSize.height / 2)
         sliderTab.position = CGPoint(x: 0, y: top - 30)
@@ -299,6 +302,58 @@ final class TouchControls: SKNode {
         return (Button(node: node, ring: ring, label: text, text: label, radius: radius), set)
     }
 
+    // MARK: The shield's button
+
+    /// The capsule: its band this far off the shoot ring, this thick, over these angles from the right.
+    private static let shieldGap: CGFloat = 5
+    private static let shieldThickness: CGFloat = 16
+    private static let shieldArc: ClosedRange<CGFloat> = (20 * .pi / 180)...(140 * .pi / 180)
+    private let shieldButton = SKShapeNode()
+    private let shieldLabel = Futuristic.label("SHIELD", size: 8)
+    private var shieldCentre = CGPoint.zero
+    private var shieldBandRadius: CGFloat = 0
+    private var shieldThickness: CGFloat = 0
+    private var shieldTouch: UITouch?
+
+    /// The band's outline, round at both ends: gold and filled while held.
+    private func drawShieldButton(lit: Bool) {
+        let arc = TouchControls.shieldArc, half = shieldThickness / 2
+        let outer = shieldBandRadius + half, inner = shieldBandRadius - half
+        func point(_ angle: CGFloat, _ radius: CGFloat) -> CGPoint {
+            CGPoint(x: shieldCentre.x + cos(angle) * radius, y: shieldCentre.y + sin(angle) * radius)
+        }
+        let path = CGMutablePath()
+        path.addArc(center: shieldCentre, radius: outer, startAngle: arc.lowerBound, endAngle: arc.upperBound, clockwise: false)
+        path.addArc(center: point(arc.upperBound, shieldBandRadius), radius: half, startAngle: arc.upperBound, endAngle: arc.upperBound + .pi, clockwise: false)
+        path.addArc(center: shieldCentre, radius: inner, startAngle: arc.upperBound, endAngle: arc.lowerBound, clockwise: true)
+        path.addArc(center: point(arc.lowerBound, shieldBandRadius), radius: half, startAngle: arc.lowerBound + .pi, endAngle: arc.lowerBound + 2 * .pi, clockwise: false)
+        path.closeSubpath()
+        shieldButton.path = path
+        shieldButton.lineWidth = 2 * TouchControls.scale
+        shieldButton.strokeColor = lit ? TouchControls.lit : TouchControls.line
+        shieldButton.fillColor = lit ? TouchControls.lit.withAlphaComponent(0.3) : .clear
+        if shieldLabel.parent == nil {
+            shieldLabel.setScale(TouchControls.textScale)
+            shieldButton.addChild(shieldLabel)
+        }
+        let middle = (arc.lowerBound + arc.upperBound) / 2
+        shieldLabel.position = point(middle, shieldBandRadius)
+        shieldLabel.verticalAlignmentMode = .center
+        shieldLabel.zRotation = middle - .pi / 2
+        shieldLabel.fontColor = lit ? TouchControls.lit : TouchControls.line
+    }
+
+    /// Whether a point's on the band, a little over its edges and ends to spare.
+    private func onShieldButton(_ point: CGPoint) -> Bool {
+        guard !shieldButton.isHidden else { return false }
+        let dx = point.x - shieldCentre.x, dy = point.y - shieldCentre.y
+        var angle = atan2(dy, dx)
+        if angle < -.pi / 2 { angle += 2 * .pi }
+        let spare: CGFloat = 4 * TouchControls.scale, angleSpare: CGFloat = 8 * .pi / 180
+        return abs(hypot(dx, dy) - shieldBandRadius) <= shieldThickness / 2 + spare
+            && angle >= TouchControls.shieldArc.lowerBound - angleSpare && angle <= TouchControls.shieldArc.upperBound + angleSpare
+    }
+
     /// A round button held or let go: gold while held, its ring turning a full circle as it goes down.
     private func press(_ index: Int, down: Bool) {
         let button = buttons[index]
@@ -325,6 +380,7 @@ final class TouchControls: SKNode {
         frame.jump = frame.jump || latched.jump
         frame.shoot = frame.shoot || latched.shoot
         frame.throwBall = frame.throwBall || latched.throwBall
+        frame.shield = frame.shield || latched.shield
         if latched.aim != .zero, frame.aim == .zero { frame.aim = latched.aim }
         latched = .idle
         return frame
@@ -449,6 +505,13 @@ final class TouchControls: SKNode {
             input.stick = .zero
             return
         }
+        if shieldTouch == nil, onShieldButton(point) {
+            shieldTouch = touch
+            input.shield = true
+            latched.shield = true
+            drawShieldButton(lit: true)
+            return
+        }
         // The nearest button whose halo the touch is in, so a thumb between two goes to the closer one.
         let reach = buttons.enumerated()
             .map { (index: $0.offset, distance: hypot(point.x - $0.element.node.position.x, point.y - $0.element.node.position.y)) }
@@ -468,8 +531,8 @@ final class TouchControls: SKNode {
             return
         }
         if touch == stickTouch {
-            let raw = Vec2(x: (point.x - stickCenter.x) / TouchControls.stickRadius,
-                           y: (point.y - stickCenter.y) / TouchControls.stickRadius).clamped(to: 1)
+            let raw = TouchControls.eightWays(Vec2(x: (point.x - stickCenter.x) / TouchControls.stickRadius,
+                                                   y: (point.y - stickCenter.y) / TouchControls.stickRadius).clamped(to: 1))
             input.stick = InputHub.deadzoned(raw)
             stickKnob.position = CGPoint(x: stickCenter.x + raw.x * TouchControls.stickRadius,
                                          y: stickCenter.y + raw.y * TouchControls.stickRadius)
@@ -490,6 +553,12 @@ final class TouchControls: SKNode {
             input.stick = .zero
             stickBase.isHidden = true
             stickKnob.isHidden = true
+            return
+        }
+        if touch == shieldTouch {
+            shieldTouch = nil
+            input.shield = false
+            drawShieldButton(lit: false)
             return
         }
         if let held = buttonTouches.removeValue(forKey: touch) {

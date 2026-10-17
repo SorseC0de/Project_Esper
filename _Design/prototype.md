@@ -2586,18 +2586,21 @@ shown, once, like the effects.
 
 ## Shielding (experimental)
 
-The snatch with no ball and the stick held a way (past 0.5): back raises it in front, as the
-body faces (back held turns the body round, so a snatch within 3 frames of that turn is still
-back's: the body's turned back first); up or down tilts it 45 degrees that way; forward is still the snatch, as it's pressed
-running at someone. It plays the snatch's sheet; at the hand's full stretch it raises a shield in
-place of the reach (`Shield.swift`), which hangs where it's raised, apart from the body, for
-shield.png's 18 frames (48 by 64) at 15 a second (72 sim frames). Its reach is a circle 24 units
+Its own button: I or O on a keyboard, either trigger on a controller (the right trigger no longer
+shoots, the left no longer shows the hitboxes: M still does), and on a touch screen a capsule
+round the shoot button's upper side, a small gap off its ring, as the GameCube's X round its A.
+With no ball, out of anything the ball can be caught in: forward with the stick still or
+forward; back, the body turned round first, then forward; up or down, tilted 45 degrees. The snatch
+is always the snatch. It runs the snatch's timing in `player_shield`'s pose (frame 1 forward and
+back, 2 up, 3 down), and at the hand's full stretch raises a shield (`Shield.swift`), which hangs
+where it's raised, apart from the body: shield.png's 18 frames (48 by 64) at 15 a second, its
+11th to 14th looped SHIELD LOOPS times more (none to start). Its reach is a circle 24 units
 across; its middle is the hand's, moved for each aim by its own sliders (SHIELD FWD, UP and DOWN,
 X the way the body faces and Y up, in art pixels: forward 8, 0; up 0, 14; down 0, -14, not final).
-On trial, shielding shows the customize screen's pose (`player_customize`) held through the
-snatch, in place of the snatch's sheet; `ShieldRules.customizePose` false undoes it. Raised, the hands flash the bright energy colour, fading
-over 12 frames. Drawn at half the sheet's size, in its raiser's energy
-colours, added on, turned to its tilt; its box shows with HITBOX.
+Raised, the hands flash the bright energy colour, fading over 12 frames. Drawn at half the sheet's
+size, in its raiser's energy colours, added on, turned to its tilt; its reach shows with HITBOX.
+- An up shield sends the ball it turns at least 5 degrees out its raiser's way from straight up,
+  so a ball falling into a rim under it goes out, not back down through it.
 - A shot or loose ball meeting its face reflects, nobody's shot any more; met within its first
   6 frames, the perfect shield, the ball's stopped and popped up at 3 to be caught (shine.png at
   twice its size, the slashclash's sound till its own).

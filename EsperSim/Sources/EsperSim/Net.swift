@@ -5,7 +5,7 @@ import Foundation
 /// most this far past the last remote input it knows, predicting it as held; and every
 /// packet carries this many of the newest inputs, so a lost packet costs nothing.
 public enum NetRules {
-    public static let protocolVersion: UInt8 = 165
+    public static let protocolVersion: UInt8 = 166
     public static let inputDelay = 2
     public static let predictionWindow = 8
     public static let redundantInputs = 8
@@ -23,19 +23,19 @@ extension PlayerInput {
     public var quantized: PlayerInput {
         func step(_ value: Double) -> Double { Double(Int8(clamping: Int((value * 127).rounded()))) / 127 }
         return PlayerInput(stick: Vec2(x: step(stick.x), y: step(stick.y)), aim: Vec2(x: step(aim.x), y: step(aim.y)),
-                           jump: jump, shootButtons: shootButtons & 0x7, throwBall: throwBall, taunt: taunt)
+                           jump: jump, shootButtons: shootButtons & 0x7, throwBall: throwBall, taunt: taunt, shield: shield)
     }
 
     static let wireBytes = 5
 
-    /// Five bytes: the stick, the aim, the buttons.
+    /// Five bytes: the stick, the aim, the buttons (jump, three shoots, throw, taunt, shield).
     func encode(into data: inout Data) {
         func byte(_ value: Double) -> UInt8 { UInt8(bitPattern: Int8(clamping: Int((value * 127).rounded()))) }
         data.append(byte(stick.x))
         data.append(byte(stick.y))
         data.append(byte(aim.x))
         data.append(byte(aim.y))
-        let buttons: UInt8 = (jump ? 1 : 0) | ((shootButtons & 0x7) << 1) | (throwBall ? 1 << 4 : 0) | (taunt ? 1 << 5 : 0)
+        let buttons: UInt8 = (jump ? 1 : 0) | ((shootButtons & 0x7) << 1) | (throwBall ? 1 << 4 : 0) | (taunt ? 1 << 5 : 0) | (shield ? 1 << 6 : 0)
         data.append(buttons)
     }
 
@@ -45,7 +45,7 @@ extension PlayerInput {
         return PlayerInput(stick: Vec2(x: axis(bytes[offset]), y: axis(bytes[offset + 1])),
                            aim: Vec2(x: axis(bytes[offset + 2]), y: axis(bytes[offset + 3])),
                            jump: buttons & 1 != 0, shootButtons: (buttons >> 1) & 0x7,
-                           throwBall: buttons & (1 << 4) != 0, taunt: buttons & (1 << 5) != 0)
+                           throwBall: buttons & (1 << 4) != 0, taunt: buttons & (1 << 5) != 0, shield: buttons & (1 << 6) != 0)
     }
 }
 

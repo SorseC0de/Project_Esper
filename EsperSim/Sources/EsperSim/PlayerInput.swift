@@ -15,17 +15,33 @@ public struct PlayerInput: Equatable, Hashable, Codable {
     public var shootButtons: UInt8 = 0
     public var throwBall = false
     public var taunt = false
+    /// The shield's own button (`Shield.swift`).
+    public var shield = false
 
     public static let idle = PlayerInput()
 
     public init(stick: Vec2 = .zero, aim: Vec2 = .zero, jump: Bool = false,
-                shoot: Bool = false, shootButtons: UInt8? = nil, throwBall: Bool = false, taunt: Bool = false) {
+                shoot: Bool = false, shootButtons: UInt8? = nil, throwBall: Bool = false, taunt: Bool = false, shield: Bool = false) {
         self.stick = stick
         self.aim = aim
         self.jump = jump
         self.shootButtons = shootButtons ?? (shoot ? 1 : 0)
         self.throwBall = throwBall
         self.taunt = taunt
+        self.shield = shield
+    }
+
+    /// Kept inputs from before the shield's button (ZONES' recorded runs and turns) read with it up.
+    private enum CodingKeys: String, CodingKey { case stick, aim, jump, shootButtons, throwBall, taunt, shield }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        stick = try values.decode(Vec2.self, forKey: .stick)
+        aim = try values.decode(Vec2.self, forKey: .aim)
+        jump = try values.decode(Bool.self, forKey: .jump)
+        shootButtons = try values.decode(UInt8.self, forKey: .shootButtons)
+        throwBall = try values.decode(Bool.self, forKey: .throwBall)
+        taunt = try values.decode(Bool.self, forKey: .taunt)
+        shield = try values.decodeIfPresent(Bool.self, forKey: .shield) ?? false
     }
 
     public var shoot: Bool {

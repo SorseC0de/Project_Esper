@@ -1,6 +1,6 @@
-/// Shielding: the snatch with the stick held up, down or back, and no ball; held forward it's
-/// still the snatch, as pressed running at someone. Back raises it in front, as it faces; up
-/// and down tilt it 45 degrees that way. Raised
+/// Shielding: its own button, with no ball, out of anything neutral: forward with the stick
+/// still or forward, back turning the body round first, up and down tilted 45 degrees that way.
+/// It runs the snatch's timing in its own pose. Raised
 /// at the hand's full stretch, it hangs where it was raised, apart from the body, for the art's
 /// length. A loose ball off it reflects; met in its first frames, the perfect shield, the ball's
 /// stopped and popped up a little to be caught. A blade on it parries the swinger. A snatch, a
@@ -18,6 +18,7 @@ public struct Shield: Equatable {
     public let normal: Vec2
     /// Its turn from upright, radians, anticlockwise: the tilt, mirrored for facing left.
     public let tilt: Double
+    public var aim: ShieldAim = .forward
     public var age = 0
     /// The ball's flight it last turned: each shield turns a flight once, off it or popped up,
     /// and that flight passes it after, so it can't bounce the ball between itself and the
@@ -48,16 +49,26 @@ public struct Shield: Equatable {
 public enum ShieldRules {
     /// The stick past this along one way picks the shield over the snatch.
     public static let stickThreshold = 0.5
-    /// Back held turns the body round; a snatch within this many frames of the turn is still back's.
-    public static let turnFrames = 3
     /// Its reach, a circle this wide in units, round its middle.
     public static let diameter = 24.0
-    /// Shielding drawn in the customize screen's pose rather than the snatch's, on trial: false undoes it.
-    nonisolated(unsafe) public static var customizePose = true
-    /// shield.png's 18 frames (48 by 64) at 15 a second, in sim frames: its whole life.
+    /// shield.png's 18 frames (48 by 64) at 15 a second, in sim frames: its whole life, its 11th to
+    /// 14th looped this many times more on the way (the LOOPS slider; none to start).
     public static let sheetFrames = 18
     public static let sheetFramesPerSecond = 15
-    public static var lifeFrames: Int { sheetFrames * 60 / sheetFramesPerSecond }
+    public static let loopFrames = 10..<14
+    nonisolated(unsafe) public static var extraLoops = 0
+    public static var simFramesPerSheetFrame: Int { 60 / sheetFramesPerSecond }
+    public static var lifeFrames: Int { (sheetFrames + loopFrames.count * extraLoops) * simFramesPerSheetFrame }
+    /// The sheet's frame showing at this age: up to the loop's end, round the loop, then on out.
+    public static func sheetFrame(atAge age: Int) -> Int {
+        let played = age / simFramesPerSheetFrame
+        let looped = loopFrames.count * extraLoops
+        if played < loopFrames.upperBound { return played }
+        if played < loopFrames.upperBound + looped { return loopFrames.lowerBound + (played - loopFrames.upperBound) % loopFrames.count }
+        return min(played - looped, sheetFrames - 1)
+    }
+    /// The ball off an up shield goes out at least this far from straight up, the raiser's way.
+    public static let upOutwardDegrees = 5.0
     /// Met in this many frames of its raising, the ball's stopped and popped up this fast.
     public static let perfectFrames = 6
     public static let perfectPop = 3.0
@@ -73,13 +84,11 @@ public enum ShieldRules {
     public static let pixelsPerUnit = 1.6
     public static func handOffset(_ aim: ShieldAim) -> Vec2 { (handOffsetPixels[aim] ?? .zero) * (1 / pixelsPerUnit) }
 
-    /// What a snatch press with this stick raises, if a shield: its aim, and whether the body
-    /// turns round first. Forward is the snatch; back raises the shield in front.
-    public static func aim(stick: Vec2, facing: Facing) -> (aim: ShieldAim, turns: Bool)? {
+    /// The shield this stick raises: its aim, and whether the body turns round first (back).
+    public static func aim(stick: Vec2, facing: Facing) -> (aim: ShieldAim, turns: Bool) {
         let x = abs(stick.x), y = abs(stick.y)
-        if x >= y, x >= stickThreshold { return stick.x * facing.sign < 0 ? (.forward, false) : nil }
         if y > x, y >= stickThreshold { return (stick.y > 0 ? .up : .down, false) }
-        return nil
+        return (.forward, x >= stickThreshold && stick.x * facing.sign < 0)
     }
 }
 
@@ -94,7 +103,7 @@ extension Match {
         let normal = Vec2(x: Trig.cos(radians) * side, y: Trig.sin(radians))
         let offset = ShieldRules.handOffset(aim)
         let centre = player.handCatchPoint + Vec2(x: offset.x * side, y: offset.y)
-        let shield = Shield(owner: index, centre: centre, normal: normal, tilt: radians * side)
+        let shield = Shield(owner: index, centre: centre, normal: normal, tilt: radians * side, aim: aim)
         events.append(.shieldRaised(player: index, at: centre))
         // Two in one place break each other: two of one player's don't.
         if let met = shields.firstIndex(where: { $0.owner != index && $0.overlaps(shield) }) {
@@ -167,6 +176,15 @@ extension Match {
         } else {
             ball.reflect(off: shield.normal)
             events.append(.shieldReflected(player: shield.owner, at: ball.position))
+        }
+        // An up shield sends it out its raiser's way, never straight up and back through a rim under it.
+        if shield.aim == .up {
+            let side = shield.normal.x < 0 ? -1.0 : 1.0
+            let speed = ball.velocity.length
+            let least = Trig.sin(degrees(ShieldRules.upOutwardDegrees))
+            if speed > 1e-6, ball.velocity.x * side < speed * least {
+                ball.velocity = Vec2(x: side * speed * least, y: (ball.velocity.y < 0 ? -1 : 1) * speed * Trig.cos(degrees(ShieldRules.upOutwardDegrees)))
+            }
         }
     }
 }

@@ -105,28 +105,43 @@ final class FlowState: ObservableObject {
     private var curtainBusy = false
     private var curtainQueue: [(ScreenTransition, Bool, () -> Void)] = []
 
+    /// The curtain stepped to `target` a display frame at a time, each step its own plain change:
+    /// a SwiftUI animation of it could be dropped with the screen change made under it (NEW MATCH
+    /// off the win screen), leaving the curtain drawn down, black and taking every touch, though
+    /// its value was back at 0.
+    private var curtainTimer: Timer?
+    private func moveCurtain(to target: Double, over seconds: Double, easeIn: Bool) {
+        curtainTimer?.invalidate()
+        let from = curtain, start = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+            guard let self else { return timer.invalidate() }
+            let share = seconds > 0 ? min((CACurrentMediaTime() - start) / seconds, 1) : 1
+            let eased = easeIn ? share * share : 1 - (1 - share) * (1 - share)
+            self.curtain = from + (target - from) * eased
+            if share >= 1 {
+                timer.invalidate()
+                self.curtainTimer = nil
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        curtainTimer = timer
+    }
+
     func transition(_ style: ScreenTransition = .fade, holdsForLoading: Bool = false, _ change: @escaping () -> Void) {
         guard !curtainBusy else {
             curtainQueue.append((style, holdsForLoading, change))
-            if DebugUI.enabled { print("curtain: queued, \(curtainQueue.count) waiting") }
             return
         }
-        if DebugUI.enabled { print("curtain: down (\(style)), holds \(holdsForLoading), \(curtainQueue.count) waiting") }
         curtainBusy = true
         curtainStyle = style
-        withAnimation(.easeIn(duration: style.downSeconds)) { curtain = 1 }
+        moveCurtain(to: 1, over: style.downSeconds, easeIn: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + style.downSeconds + 0.05) { [weak self] in
             guard let self else { return }
             change()
             // Held down over anything the change set loading, the bar filling on it, if it's to be.
             let lift = { [weak self] in
                 guard let self else { return }
-                withAnimation(.easeOut(duration: style.upSeconds)) { self.curtain = 0 }
-                if DebugUI.enabled { print("curtain: up, \(self.curtainQueue.count) waiting") }
-                DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds + 1) { [weak self] in
-                    guard DebugUI.enabled, let self else { return }
-                    print("curtain: a second after up, \(String(format: "%.2f", self.curtain)), busy \(self.curtainBusy), \(self.curtainQueue.count) waiting")
-                }
+                self.moveCurtain(to: 0, over: style.upSeconds, easeIn: false)
                 DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds) { [weak self] in
                     guard let self else { return }
                     self.curtainBusy = false

@@ -44,6 +44,13 @@ struct AssembledFrame: View {
     var headNudge: CGPoint = .zero
     /// The ball drawn where the game draws it in the hand.
     var ball = false
+    /// Arms drawn apart in play, Z Tea's beam's and blast's, laid on as play lays them.
+    var armsBehind: [FigureLayer] = []
+    var armsOver: [FigureLayer] = []
+    /// The hooded head tipped back (anticlockwise, facing right) and moved, art pixels the way it
+    /// faces and up, as play does firing Z Tea up.
+    var headTip: CGFloat = 0
+    var headShift: CGPoint = .zero
     let motion: CustomizeFigureMotion
     let time: Double
 
@@ -55,7 +62,8 @@ struct AssembledFrame: View {
 
     var body: some View {
         Canvas { context, size in
-            let turn = GameScene.hoodTurn(frame)
+            // The sheet's turn, clockwise, less any tip back.
+            let turn = GameScene.hoodTurn(frame) - headTip
             motion.advance(to: time, portrait: portrait, look: look, headNudge: headNudge, headScale: 1, canvas: canvas, style: HoodStrings.hanging, turn: turn)
             var context = context
             if mirrored {
@@ -68,10 +76,10 @@ struct AssembledFrame: View {
             }
             let figureRect = CGRect(x: pad * pixel, y: pad * pixel, width: canvasWidth * pixel, height: canvas * pixel)
             let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: 1)
-            let hoodRect = CGRect(x: (pad + place.origin.x) * pixel, y: (pad + place.origin.y) * pixel, width: 48 * pixel, height: 48 * pixel)
+            let hoodRect = CGRect(x: (pad + place.origin.x + headShift.x) * pixel, y: (pad + place.origin.y - headShift.y) * pixel, width: 48 * pixel, height: 48 * pixel)
             /// The hood drawn turned about the head's middle, where the sheet turns it.
             func drawHood(_ image: CGImage, in context: GraphicsContext) {
-                guard turn != 0, let head = portrait.centres[.head].map({ CGPoint(x: $0.x + headNudge.x, y: $0.y - headNudge.y) }) else {
+                guard turn != 0, let head = portrait.centres[.head].map({ CGPoint(x: $0.x + headNudge.x + headShift.x, y: $0.y - headNudge.y - headShift.y) }) else {
                     return context.draw(Image(decorative: image, scale: 1).interpolation(.none), in: hoodRect)
                 }
                 let middle = CGPoint(x: (pad + head.x) * pixel, y: (pad + head.y) * pixel)
@@ -103,7 +111,7 @@ struct AssembledFrame: View {
             }
             // Turned, the hood carries its own line, under the body so only what's outside it shows,
             // and the body's line is drawn without the hood's place; else one line runs round both.
-            let hoodTurned = (turn != 0 || headNudge != .zero) && portrait.bareLine != nil && portrait.hoodLine != nil
+            let hoodTurned = (turn != 0 || headNudge != .zero || headShift != .zero) && portrait.bareLine != nil && portrait.hoodLine != nil
             // The ball where the game has it in the hand, behind the body on the frames that tuck it there.
             let ballAt = ball ? BallLandmarks.table["\(frame.animation.rawValue)_\(frame.frame)"].map {
                 spot(CGPoint(x: canvasWidth / 2 + $0.x, y: frame.animation.feetFromBottom + $0.y))
@@ -113,6 +121,18 @@ struct AssembledFrame: View {
                 let side = GalleryDrawing.ballPixels * pixel
                 context.draw(Image(decorative: image, scale: 1).interpolation(.none), in: CGRect(x: at.x - side / 2, y: at.y - side / 2, width: side, height: side))
             }
+            /// An arm of its own, its line under it, moved and turned about its pivot.
+            func drawArms(_ layer: FigureLayer) {
+                var turned = context
+                turned.translateBy(x: layer.offset.x * pixel, y: -layer.offset.y * pixel)
+                let pivot = spot(layer.pivot)
+                turned.translateBy(x: pivot.x, y: pivot.y)
+                turned.rotate(by: .radians(-layer.turn))
+                turned.translateBy(x: -pivot.x, y: -pivot.y)
+                if let line = layer.line { drawLine(line, in: turned, turned: false) }
+                turned.draw(Image(decorative: layer.image, scale: 1).interpolation(.none), in: figureRect)
+            }
+            for layer in armsBehind { drawArms(layer) }
             let ballBehind = GameScene.ballBehindBody(frame)
             if ballBehind { drawBall() }
             if hoodTurned, let hoodLine = portrait.hoodLine { drawLine(hoodLine, in: context, turned: true) }
@@ -127,6 +147,7 @@ struct AssembledFrame: View {
                 if let armLine = portrait.frontArmLine { drawLine(armLine, in: context, turned: false) }
                 context.draw(Image(decorative: arm, scale: 1).interpolation(.none), in: figureRect)
             }
+            for layer in armsOver { drawArms(layer) }
             if cubes { for cube in motion.cubes where !cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) } }
             // The glow: what's energy again, blurred and added, as the customize screen draws it.
             guard glow else { return }
@@ -154,6 +175,10 @@ struct GalleryDrawing {
     var cubes = true
     var glow = true
     var ball = true
+    /// The blast fired up off the ground: its arms 45 degrees up and the head tipped back, as play has it.
+    var blastUp = false
+    func headTip(_ frame: AnimationFrame) -> CGFloat { blastUp && frame.animation == .blast ? GameScene.blastUpTip : 0 }
+    func headShift(_ frame: AnimationFrame) -> CGPoint { blastUp && frame.animation == .blast ? GameScene.aimedHeadShift(tip: GameScene.blastUpTip, blast: true) : .zero }
     /// The hooded heads moved, by sheet and frame: the game's table to start, changed here.
     var headNudges: [EsperSim.Animation: [Int: CGPoint]] = GameScene.headNudges
     func headNudge(_ frame: AnimationFrame) -> CGPoint { headNudges[frame.animation]?[frame.frame] ?? .zero }
@@ -183,6 +208,14 @@ final class PlayerGallerySheets: ObservableObject {
                                 headDrawnFor: SpriteLibrary.hoodDrawnFor, headNudge: .zero, headScale: 1, holdsBall: frame.animation.holdsBall)
     }
 
+    /// Z Tea's arms for a frame of the beam or the blast as play lays them on the body: the blast's
+    /// level in the air, 45 degrees up off the ground.
+    func arms(_ frame: AnimationFrame, blastUp: Bool) -> (behind: [FigureLayer], over: [FigureLayer]) {
+        sprites.setCustomizeLook(look, for: 0)
+        return GameScene.zTeaArms(frame, sprites: sprites, player: SpriteLibrary.customizePlayer(0), blastTurn: blastUp ? .pi / 4 : 0,
+                                  image: { _, make in make()?.cgImage() })
+    }
+
     /// Which way a sheet's frames run.
     enum Strip: String, CaseIterable {
         case down = "DOWN", across = "ACROSS"
@@ -203,9 +236,11 @@ final class PlayerGallerySheets: ObservableObject {
         for index in 0..<count {
             let frame = GallerySheets.frame(animation, index)
             guard let portrait = portrait(frame) else { return nil }
+            let arms = arms(frame, blastUp: drawing.blastUp)
             let view = AssembledFrame(portrait: portrait, look: look, frame: frame, pixel: scale, pad: drawing.pad, mirrored: drawing.mirrored,
                                       strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
-                                      headNudge: drawing.headNudge(frame), ball: drawing.ball,
+                                      headNudge: drawing.headNudge(frame), ball: drawing.ball, armsBehind: arms.behind, armsOver: arms.over,
+                                      headTip: drawing.headTip(frame), headShift: drawing.headShift(frame),
                                       motion: motion, time: start + Double(index) / drawing.fps)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 1
@@ -243,7 +278,9 @@ final class PlayerGallerySheets: ObservableObject {
 /// The sheets as the gallery lists them: by name in words, the idles first.
 enum GallerySheets {
     static let first: [EsperSim.Animation] = [.idle, .dribbleIdle]
-    static let listed: [EsperSim.Animation] = first + EsperSim.Animation.allCases.filter { !first.contains($0) }
+    /// Z Tea's arms' sheets aren't listed: the beam and the blast are drawn with theirs on.
+    static let armsAlone: [EsperSim.Animation] = [.beamArms, .blastArms]
+    static let listed: [EsperSim.Animation] = first + EsperSim.Animation.allCases.filter { !first.contains($0) && !armsAlone.contains($0) }
         .sorted { name($0).localizedStandardCompare(name($1)) == .orderedAscending }
 
     /// The shield's old sheet stands in for the shield's backflip now: the double jump backward.
@@ -259,6 +296,7 @@ enum GallerySheets {
     /// A sheet's name in words: `player_dbl_jump` as Double Jump.
     static func name(_ animation: EsperSim.Animation) -> String {
         if animation == .shield { return "Shield Backflip" }
+        if animation == .blast { return "Blast" }
         let words: [String: String] = ["dbl": "Double", "esperslash": "Esper Slash", "flostate": "FloState"]
         return animation.rawValue.replacingOccurrences(of: "player_", with: "").split(separator: "_")
             .map { words[String($0)] ?? $0.prefix(1).uppercased() + $0.dropFirst() }
@@ -301,9 +339,12 @@ struct PlayerGallery: View {
                 ZStack {
                     Color(rgb: PlayerGalleryOutput.background)
                     if let portrait = sheets.portrait(frame) {
+                        let arms = sheets.arms(frame, blastUp: drawing.blastUp)
                         AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: pixel, pad: drawing.pad, mirrored: drawing.mirrored,
                                        strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
-                                       headNudge: drawing.headNudge(frame), ball: drawing.ball, motion: motion, time: time)
+                                       headNudge: drawing.headNudge(frame), ball: drawing.ball, armsBehind: arms.behind, armsOver: arms.over,
+                                       headTip: drawing.headTip(frame), headShift: drawing.headShift(frame),
+                                       motion: motion, time: time)
                     }
                 }
                 .frame(width: (CGFloat(animation.pixelWidth) + 2 * drawing.pad) * pixel, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel)
@@ -404,6 +445,7 @@ struct PlayerGallery: View {
                 Toggle("CUBES", isOn: $drawing.cubes)
                 Toggle("GLOW", isOn: $drawing.glow)
                 Toggle("BALL", isOn: $drawing.ball)
+                if animation == .blast { Toggle("UP", isOn: $drawing.blastUp) }
             }
             .toggleStyle(.button)
             HStack {
@@ -424,7 +466,7 @@ struct PlayerGallery: View {
             }
             HStack(spacing: 12) {
                 Button("SAVE THIS SHEET") { sheets.save([animation], scale: saveScale, strip: strip, drawing: drawing) }
-                Button("SAVE ALL \(EsperSim.Animation.allCases.count)") { sheets.save(EsperSim.Animation.allCases, scale: saveScale, strip: strip, drawing: drawing) }
+                Button("SAVE ALL \(GallerySheets.listed.count)") { sheets.save(GallerySheets.listed, scale: saveScale, strip: strip, drawing: drawing) }
             }
             .buttonStyle(.borderedProminent)
         }

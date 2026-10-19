@@ -9,11 +9,30 @@ enum UpdatesNotes {
     static let seenKey = "esper.updates.seen"
     static var unseen: Bool { UserDefaults.standard.string(forKey: seenKey) != id }
 
-    enum Icon { case shield, spin }
-    enum Line: Hashable {
+    enum Icon {
+        case shield, spin
+        /// A figure as play draws it (`GameScene.updatesPose`).
+        case pose(Pose)
+    }
+    enum Pose { case blast, flight, snipe }
+    /// A line's lettering: the list's blue, or a buff's or a nerf's.
+    enum Tone {
+        case plain, buff, nerf
+        var colour: Color {
+            switch self {
+            case .plain: Futuristic.line
+            case .buff: Color(rgb: PixelPalette.colours[29])
+            case .nerf: Color(rgb: PixelPalette.colours[64])
+            }
+        }
+    }
+    /// Lines' words in brackets are keywords, gold; [Up] and [Down] the fat arrow (`PickScreen.blurbPieces`).
+    enum Line {
         case title(String)
         /// A bullet, indented `depth` levels, maybe with its icon.
-        case bullet(String, depth: Int, icon: Icon?)
+        case bullet(String, depth: Int = 0, icon: Icon? = nil, tone: Tone = .plain)
+        /// A Greateraid's name, its bottle tilted in place of the bullet.
+        case drink(String, Greateraid)
         case divider
     }
 
@@ -22,33 +41,53 @@ enum UpdatesNotes {
 
     static let lines: [Line] = [
         .title("Core Changes"),
-        .bullet("Press Up + Slash to shieldflip. Shield can be used to reflect the ball or powers. Parries Slash, loses to Snatch and Throw.", depth: 0, icon: .shield),
-        .bullet("Press Down + Throw with the ball to perform a Spin Move. Attacks go through you while spinning, however you only get one per airtime.", depth: 0, icon: .spin),
-        .bullet("You can now select a Greateraid power to have during FloState in 47 Mode", depth: 0, icon: nil),
-        .bullet("Increased Stun time 1.5s ➜ 2s", depth: 0, icon: nil),
+        .bullet("Press [Up] + [Slash] to [Shieldflip]. [Shield] can be used to reflect the ball or powers. [Parries] [Slash], loses to [Snatch] and [Throw].", icon: .shield),
+        .bullet("Press [Down] + [Throw] with the ball to perform a [Spin Move]. Attacks go through you while spinning, however you only get one per airtime.", icon: .spin),
+        .bullet("You can now select a [Greateraid] power to have during [FloState] in [47 Mode]"),
+        .bullet("Increased [Stun] time 1.5s ➜ 2s", tone: .nerf),
         .divider,
         .title("Greateraid Changes"),
-        .bullet("Z-Tea", depth: 0, icon: nil),
-        .bullet("Press Up + Slash to fire an Esper Blast", depth: 1, icon: nil),
-        .bullet("Platform Protein Shake", depth: 0, icon: nil),
-        .bullet("Increased Platform duration 60 ➜ 120 frames", depth: 1, icon: nil),
-        .bullet("Super Smoothie", depth: 0, icon: nil),
-        .bullet("Hold Up + Jump while grounded to super jump into flight", depth: 1, icon: nil),
-        .bullet("Pulsepistol Punch", depth: 0, icon: nil),
-        .bullet("Press Up+Slash to Pull, Down+Slash to Repel.", depth: 1, icon: nil),
-        .bullet("Increased Pull on players and ball", depth: 1, icon: nil),
-        .bullet("Snipe Repel shot now stuns", depth: 1, icon: nil),
-        .bullet("Cannon Cola", depth: 0, icon: nil),
-        .bullet("Increased shot animation speed", depth: 1, icon: nil),
-        .bullet("Slide Cider", depth: 0, icon: nil),
-        .bullet("Level 2 now stuns", depth: 1, icon: nil),
-        .bullet("Guarderade (New Booster)", depth: 0, icon: nil),
-        .bullet("Level 1: Bigger Shield", depth: 1, icon: nil),
-        .bullet("Level 2: Shield a second time before you land", depth: 1, icon: nil),
-        .bullet("Shelter Seltzer (New Booster)", depth: 0, icon: nil),
-        .bullet("Level 1: Your Shield lingers where it ends for a second", depth: 1, icon: nil),
-        .bullet("Level 2: Your Snatches raise a Shield where your hand is", depth: 1, icon: nil),
+        .drink("Z-Tea", .zTea),
+        .bullet("Press [Up] + [Slash] to fire an [Esper Blast]", depth: 1, icon: .pose(.blast), tone: .buff),
+        .drink("Platform Protein Shake", .platformShake),
+        .bullet("Increased [Platform] duration 60 ➜ 120 frames", depth: 1),
+        .drink("Super Smoothie", .superSmoothie),
+        .bullet("Hold [Up] + [Jump] while grounded to [Super Jump] into [Flight]", depth: 1, icon: .pose(.flight), tone: .buff),
+        .drink("Pulsepistol Punch", .pulsepistol),
+        .bullet("Press [Up] + [Slash] to [Pull], [Down] + [Slash] to [Repel].", depth: 1),
+        .bullet("Increased [Pull] on players and ball", depth: 1),
+        .bullet("[Snipe] [Repel] shot now [Stuns]", depth: 1, icon: .pose(.snipe), tone: .buff),
+        .drink("Cannon Cola", .cannonCola),
+        .bullet("Increased [Shot] animation speed", depth: 1, tone: .buff),
+        .drink("Slide Cider", .slideCider),
+        .bullet("Level 2 now [Stuns]", depth: 1, tone: .buff),
+        .drink("Guarderade (New Booster)", .guarderade),
+        .bullet("Level 1: Bigger [Shield]", depth: 1),
+        .bullet("Level 2: [Shield] a second time before you land", depth: 1),
+        .drink("Shelter Seltzer (New Booster)", .shelterSeltzer),
+        .bullet("Level 1: Your [Shield] lingers where it ends for a second", depth: 1),
+        .bullet("Level 2: Your [Snatches] raise a [Shield] where your hand is", depth: 1),
     ]
+
+    /// The screen's face whatever the menus' is: E.
+    static let face = 4
+
+    /// A line's lettering in the screen's face: its words in its tone, keywords gold, [Up] and
+    /// [Down] the fat arrow turned that way, gold.
+    static func text(_ text: String, size: CGFloat, tone: Tone) -> Text {
+        let shownSize = Futuristic.fontSize(size, face: face)
+        var made = Text("")
+        for (index, piece) in PickScreen.blurbPieces(text).enumerated() {
+            if index > 0, piece.spaced { made = made + Text(" ") }
+            switch piece.kind {
+            case .word(let word, let lit):
+                made = made + Text(word).foregroundColor(lit ? DrinkPick.litColour : tone.colour)
+            case .arrow(let turn):
+                made = made + Text(Image(uiImage: DrinkPick.arrow(turn: turn, side: shownSize)).renderingMode(.template)).foregroundColor(DrinkPick.litColour)
+            }
+        }
+        return made.font(Futuristic.font(size: size, face: face))
+    }
 }
 
 struct UpdatesView: View {
@@ -66,6 +105,10 @@ struct UpdatesView: View {
     static let bulletShare: CGFloat = 0.036
     static let iconLines: CGFloat = 2.6
     static let iconFramesPerSecond = 15.0
+    /// The divider against the box's width; a bottle against a bullet's line, and its tilt anticlockwise in degrees.
+    static let ruleShare: CGFloat = 0.3
+    static let bottleLines: CGFloat = 1.8
+    static let bottleTilt = 20.0
 
     var body: some View {
         GeometryReader { geometry in
@@ -78,7 +121,7 @@ struct UpdatesView: View {
                 list(width: width, height: height)
                     .frame(width: width * (1 - 2 * UpdatesView.insetAcross), height: height * (1 - 2 * UpdatesView.insetDown))
                 Text("TAP OR PRESS A TO CONTINUE")
-                    .font(Futuristic.font(size: height * 0.03))
+                    .font(Futuristic.font(size: height * 0.03, face: UpdatesNotes.face))
                     .foregroundStyle(Futuristic.line.opacity(0.7))
                     .position(x: geometry.size.width / 2, y: geometry.size.height / 2 + height / 2 + height * 0.04)
             }
@@ -113,25 +156,33 @@ struct UpdatesView: View {
         switch line {
         case .title(let text):
             Text(text.uppercased())
-                .font(Futuristic.font(size: titleSize))
+                .font(Futuristic.font(size: titleSize, face: UpdatesNotes.face))
                 .foregroundStyle(Futuristic.lit)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.top, bulletSize * 0.4)
         case .divider:
             Image(uiImage: Futuristic.image("rule6")).resizable().aspectRatio(contentMode: .fit)
                 .colorMultiply(Futuristic.line)
-                .frame(width: width * 0.5)
+                .frame(width: width * UpdatesView.ruleShare)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, bulletSize * 0.5)
-        case .bullet(let text, let depth, let icon):
+        case .drink(let name, let drink):
             HStack(alignment: .center, spacing: bulletSize * 0.5) {
-                Text("•").font(Futuristic.font(size: bulletSize)).foregroundStyle(Futuristic.line)
+                Image(uiImage: DrinkPick.bottleImage(drink)).resizable().aspectRatio(contentMode: .fit)
+                    .frame(height: bulletSize * UpdatesView.bottleLines)
+                    .rotationEffect(.degrees(-UpdatesView.bottleTilt))
+                UpdatesNotes.text(name, size: bulletSize, tone: .plain)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        case .bullet(let text, let depth, let icon, let tone):
+            HStack(alignment: .center, spacing: bulletSize * 0.5) {
+                Text("•").font(Futuristic.font(size: bulletSize, face: UpdatesNotes.face)).foregroundStyle(tone.colour)
                 if let icon {
                     UpdatesIcon(flow: flow, icon: icon)
                         .frame(width: bulletSize * UpdatesView.iconLines, height: bulletSize * UpdatesView.iconLines)
                 }
-                Text(text)
-                    .font(Futuristic.font(size: bulletSize))
-                    .foregroundStyle(Futuristic.line)
+                UpdatesNotes.text(text, size: bulletSize, tone: tone)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -140,8 +191,8 @@ struct UpdatesView: View {
     }
 }
 
-/// A bullet's moving icon: the shield's whole frames round and round, or the player spinning
-/// with the ball, in the first side's look.
+/// A bullet's moving icon: the shield's whole frames round and round, or the player as play
+/// draws them (spinning with the ball, firing, flying, sniping), in the first side's look.
 struct UpdatesIcon: View {
     @ObservedObject var flow: FlowState
     let icon: UpdatesNotes.Icon
@@ -151,6 +202,9 @@ struct UpdatesIcon: View {
         GeometryReader { geometry in
             TimelineView(.animation) { timeline in
                 let time = timeline.date.timeIntervalSinceReferenceDate
+                // The figure's canvas with its margin, its 48 pixels most of the icon's height.
+                let canvas = 48 + 2 * CustomizeFigure.margin
+                let pixel = geometry.size.height / canvas * UpdatesIcon.figureShare * canvas / 48
                 switch icon {
                 case .shield:
                     if !shieldFrames.isEmpty {
@@ -162,16 +216,26 @@ struct UpdatesIcon: View {
                     let pose = WinPose.spin
                     let frame = Int(time * pose.framesPerSecond) % max(pose.animation.frameCount, 1)
                     if let shown = flow.scene.winPortrait(player: 0, pose: pose, frame: frame) {
-                        // The figure's canvas with its margin, fitted to the icon.
-                        let pixel = geometry.size.height / (48 + 2 * CustomizeFigure.margin) * 1.6
                         CustomizeFigure(portrait: shown.portrait, look: flow.scene.playerLook(0), pixel: pixel, mirrored: false,
                                         headNudge: shown.headNudge, headScale: shown.headScale, ball: shown.ball, overBall: shown.overBall)
-                            .frame(width: (48 + 2 * CustomizeFigure.margin) * pixel, height: (48 + 2 * CustomizeFigure.margin) * pixel)
+                            .frame(width: canvas * pixel, height: canvas * pixel)
+                            .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                    }
+                case .pose(let pose):
+                    if let shown = flow.scene.updatesPose(pose, tick: Int(time * 60)) {
+                        CustomizeFigure(portrait: shown.portrait, look: flow.scene.playerLook(0), pixel: pixel, mirrored: false,
+                                        headNudge: shown.headNudge, headScale: shown.headScale, extras: shown.extras)
+                            .frame(width: canvas * pixel, height: canvas * pixel)
                             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     }
                 }
             }
         }
-        .onAppear { if icon == .shield, shieldFrames.isEmpty { shieldFrames = flow.scene.updatesShieldFrames() } }
+        .onAppear {
+            if case .shield = icon, shieldFrames.isEmpty { shieldFrames = flow.scene.updatesShieldFrames() }
+        }
     }
+
+    /// The figure's 48 pixels against the icon's height.
+    static let figureShare: CGFloat = 0.8
 }

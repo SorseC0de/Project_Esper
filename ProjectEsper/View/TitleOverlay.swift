@@ -379,6 +379,13 @@ final class FlowState: ObservableObject {
     }
 
     /// The cursor a row up or down, to the item nearest across, or along its row.
+    /// The updates screen up again from the title, at its top.
+    func openUpdates() {
+        scene.resetUpdatesIcons()
+        updatesLine = 0
+        updatesOpen = true
+    }
+
     /// The updates screen put away, its notes marked seen.
     func closeUpdates() {
         guard updatesOpen else { return }
@@ -435,6 +442,9 @@ final class FlowState: ObservableObject {
             guard !busy else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
             transition { [weak self] in self?.openMultiplayer() }
+        case .updates:
+            SoundBoard.shared.play(SoundBoard.confirm)
+            openUpdates()
         case .tuning:
             tuningOpen.toggle()
         case .titleFont:
@@ -459,6 +469,8 @@ final class FlowState: ObservableObject {
 /// Everything on the title the cursor can land on, row by row as they're laid out.
 enum TitleItem: Hashable {
     case bestOfSeven, fortySeven, zones, vsCPU, vsHuman, multiplayer
+    /// What's new for testers, opened again.
+    case updates
     case tuning
     /// The menus' face, stepped on A to K.
     case titleFont
@@ -470,7 +482,7 @@ enum TitleItem: Hashable {
         // A parked mode stays shown, greyed, but the cursor passes it by.
         [.bestOfSeven, .fortySeven] + (GameMode.parked.contains(.zones) ? [] : [.zones]),
         [.vsCPU, .vsHuman],
-        [.multiplayer],
+        [.updates, .multiplayer],
     ] + (DebugUI.enabled ? debugRows : [])
 
     /// The UI and FONT switches, in a debug build.
@@ -571,10 +583,20 @@ struct TitleOverlay: View {
                     rule("rule5", width: TitleOverlay.endRuleWidth)
                 }
                 VStack(spacing: 6) {
-                    framed("MULTIPLAYER", in: "box4", item: .multiplayer, textSize: TitleOverlay.multiplayerTextSize,
-                           icon: "futuristic_icon_multiplayer",
-                           iconPlace: CGSize(width: multiplayerIconX, height: multiplayerIconY), iconScale: multiplayerIconScale)
-                        .opacity(busy ? 0.5 : 1)
+                    // UPDATES left of MULTIPLAYER, its lettering fitted to its box, and room as wide on
+                    // MULTIPLAYER's right, so it stays in the middle.
+                    let updatesWidth = FuturisticPiece(image: Futuristic.taillessTwo, scale: TitleOverlay.updatesScale * scale(.buttons)).size.width
+                    let updatesGap = TitleOverlay.updatesGap * scale(.buttons)
+                    HStack(spacing: 12 * scale(.buttons)) {
+                        framed("UPDATES", in: "2", item: .updates, frameScale: TitleOverlay.updatesScale, textSize: TitleOverlay.updatesTextSize,
+                               frameImage: Futuristic.taillessTwo, fitWidth: updatesWidth * TitleOverlay.updatesTextShare, waitsOnNet: false)
+                            .padding(.trailing, updatesGap)
+                        framed("MULTIPLAYER", in: "box4", item: .multiplayer, textSize: TitleOverlay.multiplayerTextSize,
+                               icon: "futuristic_icon_multiplayer",
+                               iconPlace: CGSize(width: multiplayerIconX, height: multiplayerIconY), iconScale: multiplayerIconScale)
+                            .opacity(busy ? 0.5 : 1)
+                        Spacer(minLength: updatesWidth + updatesGap).frame(width: updatesWidth + updatesGap)
+                    }
                     if let caption = net.state.caption {
                         Text(caption)
                             .font(Futuristic.font(size: 12 * scale(.text)))
@@ -610,14 +632,21 @@ struct TitleOverlay: View {
 
     /// MULTIPLAYER's lettering, a little smaller than the modes', under its icon.
     static let multiplayerTextSize: CGFloat = 20
+    /// UPDATES' frame, tailless frame 2, smaller than ROUNDS' and ZONES', and its lettering.
+    static let updatesScale: CGFloat = 0.5
+    static let updatesTextSize: CGFloat = 24
+    /// The lettering's widest, against the frame's; and the room between it and MULTIPLAYER, in points.
+    static let updatesTextShare: CGFloat = 0.7
+    static let updatesGap: CGFloat = 24
     static let iconHeight: CGFloat = 26
 
     /// A lettered button in one of the vector's frames, an icon over the lettering if it has one.
     private func framed(_ text: String, in frame: String, mirrored: Bool = false, item: TitleItem, frameScale: CGFloat = 1,
                         textSize: CGFloat = 24, icon: String? = nil, iconPlace: CGSize = .zero, iconScale: CGFloat = 1,
-                        available: Bool = true) -> some View {
+                        available: Bool = true, frameImage: UIImage? = nil, fitWidth: CGFloat? = nil, waitsOnNet: Bool = true) -> some View {
         Button { flow.activate(item) } label: {
-            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons), frameScale: frameScale, mirrored: mirrored) { colour in
+            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons), frameScale: frameScale, mirrored: mirrored,
+                            image: frameImage) { colour in
                 VStack(spacing: 4 * scale(.buttons)) {
                     if let icon {
                         Image(uiImage: UIImage(named: icon) ?? UIImage())
@@ -630,15 +659,25 @@ struct TitleOverlay: View {
                             .offset(CGSize(width: iconPlace.width * scale(.buttons) / TitleOverlay.iconPlaceTunedAt,
                                            height: iconPlace.height * scale(.buttons) / TitleOverlay.iconPlaceTunedAt))
                     }
-                    Text(text)
-                        .font(Futuristic.font(size: textSize * scale(.text)))
-                        .foregroundStyle(colour)
-                        .fixedSize()
+                    if let fitWidth {
+                        // Shrunk to fit inside its box.
+                        Text(text)
+                            .font(Futuristic.font(size: textSize * scale(.text)))
+                            .foregroundStyle(colour)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.2)
+                            .frame(width: fitWidth)
+                    } else {
+                        Text(text)
+                            .font(Futuristic.font(size: textSize * scale(.text)))
+                            .foregroundStyle(colour)
+                            .fixedSize()
+                    }
                 }
             }
         }
         .buttonStyle(.plain)
-        .disabled(busy || !available)
+        .disabled((waitsOnNet && busy) || !available)
         // Not open yet: greyed, and nothing happens.
         .saturation(available ? 1 : 0)
         .opacity(available ? 1 : TitleOverlay.parkedOpacity)

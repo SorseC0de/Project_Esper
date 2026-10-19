@@ -21,11 +21,13 @@ enum Futuristic {
         set { UserDefaults.standard.set(newValue, forKey: typefaceKey) }
     }
     static var fontName: String { typefaces[typefacePick] }
-    /// Every face drawn so its capitals stand as tall as Upheaval's at the same size.
-    static func fontSize(_ size: CGFloat) -> CGFloat {
+    /// Every face drawn so its capitals stand as tall as Upheaval's at the same size: the picked
+    /// one, or one by its place in `typefaces`.
+    static func fontSize(_ size: CGFloat, face faceIndex: Int? = nil) -> CGFloat {
         _ = Onomatopoeia.registered
         let probe: CGFloat = 100
-        guard let reference = UIFont(name: typefaces[0], size: probe), let face = UIFont(name: fontName, size: probe), face.capHeight > 0 else { return size }
+        let name = faceIndex.map { typefaces[$0] } ?? fontName
+        guard let reference = UIFont(name: typefaces[0], size: probe), let face = UIFont(name: name, size: probe), face.capHeight > 0 else { return size }
         return size * reference.capHeight / face.capHeight
     }
     /// Every piece at the same points per pixel of its import, so they keep their sizes in the vector.
@@ -42,6 +44,11 @@ enum Futuristic {
 
     static func font(size: CGFloat) -> Font {
         .custom(fontName, size: fontSize(size))
+    }
+
+    /// A face of its own whatever's picked, by its place in `typefaces`: E is 4.
+    static func font(size: CGFloat, face: Int) -> Font {
+        .custom(typefaces[face], size: fontSize(size, face: face))
     }
 
     /// A line in the menus' face for SpriteKit, centred on its position, in the blue.
@@ -68,6 +75,37 @@ enum Futuristic {
         return UIImage(cgImage: cut, scale: whole.scale, orientation: whole.imageOrientation)
     }()
     static var taillessEightFaceY: CGFloat { (faces["8"]?.y ?? 0.5) / taillessEightRows }
+
+    /// Frame 2 without the tail into its top left, the title's UPDATES: its picture from the thin
+    /// line beside its left wall, and that line carried straight on where the tail crossed it.
+    static let taillessTwoLeft = 334
+    static let taillessTwoWidth = 18
+    static let taillessTwoCrossed = 309...366
+    static let taillessTwoClearRow = 420
+    @MainActor static let taillessTwo: UIImage = {
+        let whole = image("2")
+        guard let picture = whole.cgImage,
+              let cut = picture.cropping(to: CGRect(x: taillessTwoLeft, y: 0, width: picture.width - taillessTwoLeft, height: picture.height)),
+              let clearRow = picture.cropping(to: CGRect(x: taillessTwoLeft, y: taillessTwoClearRow, width: taillessTwoWidth, height: 1))
+        else { return whole }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let size = CGSize(width: cut.width, height: cut.height)
+        let mended = UIGraphicsImageRenderer(size: size, format: format).image { renderer in
+            let context = renderer.cgContext
+            // Back to y up, so the picture draws upright; a row from the top is then the height less it.
+            context.translateBy(x: 0, y: size.height)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(cut, in: CGRect(origin: .zero, size: size))
+            for row in taillessTwoCrossed {
+                let band = CGRect(x: 0, y: size.height - CGFloat(row) - 1, width: CGFloat(taillessTwoWidth), height: 1)
+                context.clear(band)
+                context.draw(clearRow, in: band)
+            }
+        }
+        guard let mendedPicture = mended.cgImage else { return whole }
+        return UIImage(cgImage: mendedPicture, scale: whole.scale, orientation: whole.imageOrientation)
+    }()
 
     /// The same for SpriteKit: the blue and the gold, and a piece as a sprite at `scale` of the
     /// menus' size, in the blue.
@@ -124,6 +162,8 @@ enum Futuristic {
         "12": CGPoint(x: 0.48, y: 0.38),
         "4": CGPoint(x: 0.60, y: 0.38),
         "box4": CGPoint(x: 0.38, y: 0.50),
+        // Frame 2 without its tail (`taillessTwo`).
+        "2": CGPoint(x: 0.52, y: 0.65),
     ]
 }
 
@@ -173,10 +213,14 @@ struct FuturisticFrame<Content: View>: View {
     var upsideDown = false
     /// The frame stretched to this size outright, as another frame's.
     var stretched: CGSize?
+    /// A picture of the frame made from its own, `taillessTwo`'s, in place of the piece by its name.
+    var image: UIImage?
     @ViewBuilder let content: (Color) -> Content
 
     var body: some View {
-        let piece = FuturisticPiece(name: name, colour: lit ? Futuristic.lit : Futuristic.line, scale: scale * frameScale, stretched: stretched)
+        let colour = lit ? Futuristic.lit : Futuristic.line
+        let piece = image.map { FuturisticPiece(image: $0, colour: colour, scale: scale * frameScale, stretched: stretched) }
+            ?? FuturisticPiece(name: name, colour: colour, scale: scale * frameScale, stretched: stretched)
         let face = Futuristic.faces[name] ?? CGPoint(x: 0.5, y: 0.5)
         let faceX = mirrored ? 1 - face.x : face.x
         let faceY = upsideDown ? 1 - face.y : face.y

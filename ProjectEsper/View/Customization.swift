@@ -1252,6 +1252,50 @@ struct LeaningBand: Shape {
     }
 }
 
+/// What a pose in play draws round the body that a portrait hasn't, for `CustomizeFigure`: the
+/// hooded head tipped (anticlockwise, facing right) about its pivot on its own canvas and moved,
+/// art pixels right and up; arms of their own behind and over; the front arm over the hood;
+/// afterimages; effects.
+struct FigureExtras {
+    var headTurn: CGFloat = 0
+    var headShift: CGPoint = .zero
+    var hoodPivot: CGPoint = CGPoint(x: 24, y: 24)
+    var behind: [FigureLayer] = []
+    var over: [FigureLayer] = []
+    var frontArmOverHood = false
+    var ghosts: [FigureGhost] = []
+    var effects: [FigureEffect] = []
+}
+
+/// A picture on the figure's 48-pixel canvas, its white line in the look's line colour under it,
+/// turned anticlockwise about a point in art pixels from the canvas's bottom left.
+struct FigureLayer {
+    let image: CGImage
+    let line: CGImage?
+    let pivot: CGPoint
+    let turn: CGFloat
+    /// Moved off the canvas, art pixels right and up.
+    var offset: CGPoint = .zero
+}
+
+/// The figure flat in a colour, moved art pixels right and up, at an opacity.
+struct FigureGhost {
+    let offset: CGPoint
+    let opacity: Double
+    let colour: RGB
+}
+
+/// An effect's frame at its own size, its middle in art pixels from the canvas's bottom left,
+/// turned anticlockwise, with a halo of a diameter in art pixels added under it.
+struct FigureEffect {
+    let image: CGImage
+    let centre: CGPoint
+    let turn: CGFloat
+    let haloColour: RGB
+    let haloDiameter: CGFloat
+    let haloOpacity: Double
+}
+
 /// A side's player on the customize screen, drawn a frame at a time: the figure, its strings
 /// floating off the hood as FloState's do, one back and the shorter forward, and the cubes off
 /// its head and shoes, as in play; what's energy glowing. In art pixels, `margin` round the figure's 48 for the strings and cubes.
@@ -1269,6 +1313,9 @@ struct CustomizeFigure: View {
     /// and the front leg drawn again over it where the sheet passes it behind (the win screen's).
     var ball: (image: CGImage, centre: CGPoint)? = nil
     var overBall: CGImage? = nil
+    /// What play draws round the body that a portrait hasn't: the head tipped, arms of their own,
+    /// afterimages, effects (the updates screen's poses).
+    var extras: FigureExtras? = nil
     @State private var motion = CustomizeFigureMotion()
     /// The figure as last drawn, and, a pick having changed its look, the one before it, left
     /// under the new one while that fades in over it.
@@ -1310,21 +1357,72 @@ struct CustomizeFigure: View {
                 let figureRect = CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel)
                 func hoodRect(_ shown: SpriteLibrary.Portrait) -> CGRect {
                     let place = CustomizeFigure.hoodPlace(shown, nudge: headNudge, scale: headScale)
-                    return CGRect(x: (margin + place.origin.x) * pixel, y: (margin + place.origin.y) * pixel,
+                    let shift = extras?.headShift ?? .zero
+                    return CGRect(x: (margin + place.origin.x + shift.x) * pixel, y: (margin + place.origin.y - shift.y) * pixel,
                                   width: 48 * place.scale * pixel, height: 48 * place.scale * pixel)
                 }
+                let headTurned = (extras?.headTurn ?? 0) != 0 || (extras?.headShift ?? .zero) != .zero
+                /// The context the hooded head draws in: turned about its pivot when the extras tip it.
+                func hoodContext(_ base: GraphicsContext, _ shown: SpriteLibrary.Portrait) -> GraphicsContext {
+                    guard let extras, extras.headTurn != 0 else { return base }
+                    var turned = base
+                    let rect = hoodRect(shown)
+                    let share = rect.width / 48
+                    let pivot = CGPoint(x: rect.minX + extras.hoodPivot.x * share, y: rect.minY + extras.hoodPivot.y * share)
+                    turned.translateBy(x: pivot.x, y: pivot.y)
+                    // Anticlockwise on the figure is the other way with y down.
+                    turned.rotate(by: .radians(-extras.headTurn))
+                    turned.translateBy(x: -pivot.x, y: -pivot.y)
+                    return turned
+                }
+                /// A white line drawn in a colour.
+                func drawLine(_ line: CGImage, in rect: CGRect, colour: RGB, on base: GraphicsContext) {
+                    base.drawLayer { layer in
+                        layer.addFilter(.colorMultiply(Color(rgb: colour)))
+                        layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: rect)
+                    }
+                }
+                /// One of the extras' pictures on the figure's canvas, its line under it, turned about its pivot.
+                func drawLayer(_ layer: FigureLayer, on base: GraphicsContext) {
+                    var turned = base
+                    turned.translateBy(x: layer.offset.x * pixel, y: -layer.offset.y * pixel)
+                    let pivot = spot(layer.pivot)
+                    turned.translateBy(x: pivot.x, y: pivot.y)
+                    turned.rotate(by: .radians(-layer.turn))
+                    turned.translateBy(x: -pivot.x, y: -pivot.y)
+                    if let line = layer.line { drawLine(line, in: figureRect, colour: look.outline, on: turned) }
+                    turned.draw(Image(decorative: layer.image, scale: 1).interpolation(.none), in: figureRect)
+                }
+                // Afterimages: the body and its hood flat in a colour, where it was.
+                for ghost in extras?.ghosts ?? [] {
+                    var faded = context
+                    faded.opacity = ghost.opacity
+                    faded.translateBy(x: ghost.offset.x * pixel, y: -ghost.offset.y * pixel)
+                    faded.drawLayer { layer in
+                        layer.draw(Image(decorative: portrait.image, scale: 1).interpolation(.none), in: figureRect)
+                        if let hood = portrait.hood { hoodContext(layer, portrait).draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(portrait)) }
+                        layer.blendMode = .sourceAtop
+                        layer.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(rgb: ghost.colour)))
+                    }
+                }
+                for layer in extras?.behind ?? [] { drawLayer(layer, on: context) }
                 /// A figure, its line in its look's colour, and its hooded head.
                 func drawFigure(_ shown: SpriteLibrary.Portrait, _ shownLook: Look, opacity: Double) {
                     var figure = context
                     figure.opacity = opacity
                     figure.draw(Image(decorative: shown.image, scale: 1).interpolation(.none), in: figureRect)
-                    if let line = shown.line {
-                        figure.drawLayer { layer in
-                            layer.addFilter(.colorMultiply(Color(rgb: shownLook.outline)))
-                            layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect)
-                        }
+                    // Tipped, the hood carries its own line, the body's drawn without the hood's place.
+                    if let line = headTurned ? (shown.bareLine ?? shown.line) : shown.line {
+                        drawLine(line, in: figureRect, colour: shownLook.outline, on: figure)
                     }
-                    if let hood = shown.hood { figure.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(shown)) }
+                    let hooded = hoodContext(figure, shown)
+                    if headTurned, let line = shown.hoodLine { drawLine(line, in: hoodRect(shown), colour: shownLook.outline, on: hooded) }
+                    if let hood = shown.hood { hooded.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(shown)) }
+                    // The front arm over the hood where it crosses the head.
+                    if extras?.frontArmOverHood == true, let arm = shown.frontArm {
+                        if let line = shown.frontArmLine { drawLine(line, in: figureRect, colour: shownLook.outline, on: figure) }
+                        figure.draw(Image(decorative: arm, scale: 1).interpolation(.none), in: figureRect)
+                    }
                 }
                 let fade = crossfade(at: timeline.date)
                 if let previous, fade < 1 { drawFigure(previous.portrait, previous.look, opacity: 1) }
@@ -1336,6 +1434,23 @@ struct CustomizeFigure: View {
                                  in: CGRect(x: at.x - side / 2, y: at.y - side / 2, width: side, height: side))
                 }
                 if let overBall { context.draw(Image(decorative: overBall, scale: 1).interpolation(.none), in: figureRect) }
+                for layer in extras?.over ?? [] { drawLayer(layer, on: context) }
+                // Effects, a soft halo in their glow colour added under each.
+                for effect in extras?.effects ?? [] {
+                    let at = spot(effect.centre)
+                    var halo = context
+                    halo.blendMode = .plusLighter
+                    halo.opacity = effect.haloOpacity
+                    let radius = effect.haloDiameter / 2 * pixel
+                    halo.fill(Path(ellipseIn: CGRect(x: at.x - radius, y: at.y - radius, width: radius * 2, height: radius * 2)),
+                              with: .radialGradient(Gradient(colors: [Color(rgb: effect.haloColour), Color(rgb: effect.haloColour).opacity(0)]),
+                                                    center: at, startRadius: 0, endRadius: radius))
+                    var turned = context
+                    turned.translateBy(x: at.x, y: at.y)
+                    turned.rotate(by: .radians(-effect.turn))
+                    let width = CGFloat(effect.image.width) * pixel, height = CGFloat(effect.image.height) * pixel
+                    turned.draw(Image(decorative: effect.image, scale: 1).interpolation(.none), in: CGRect(x: -width / 2, y: -height / 2, width: width, height: height))
+                }
                 let plain = Color(rgb: look.hoodTones.plain)
                 let accent = Color(rgb: look.hoodTones.shadow)
                 for string in motion.strings {
@@ -1354,7 +1469,7 @@ struct CustomizeFigure: View {
                         var glow = layer
                         glow.opacity = opacity
                         glow.draw(Image(decorative: shown.glowing, scale: 1).interpolation(.none), in: figureRect)
-                        if let hood = shown.hoodGlowing { glow.draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(shown)) }
+                        if let hood = shown.hoodGlowing { hoodContext(glow, shown).draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(shown)) }
                     }
                     if let previous, fade < 1 { drawGlow(previous.portrait, opacity: 1 - fade) }
                     drawGlow(portrait, opacity: fade)

@@ -180,7 +180,7 @@ struct DrinkPick: View {
     }
 
     /// The fat arrow at a size, turned from pointing right.
-    private static func arrow(turn: CGFloat, side: CGFloat) -> UIImage {
+    static func arrow(turn: CGFloat, side: CGFloat) -> UIImage {
         let key = "\(turn)|\(side)"
         if let made = arrows[key] { return made }
         let source = UIImage(named: "FatArrow") ?? UIImage()

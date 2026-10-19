@@ -285,10 +285,11 @@ public enum ZRules {
     public static let blastBackArmRelease = 4
     public static let blastFrontArmRelease = 9
     public static let blastNeutralHoldFrames = 10
-    /// The shoulder the arms turn about, art pixels from the feet facing right, and the arm's
-    /// reach out of it to where the blast leaves; the blast's box.
-    public static let blastShoulderPixels = Vec2(x: -8, y: 18)
-    public static let blastArmPixels = 25.0
+    /// The shoulder the arms turn about, the beam's and the blast's, art pixels from the feet
+    /// facing right (the middle of the pixel where the arms meet the torso), and the arm's reach
+    /// out of it to where the blast leaves, just past the hand; the blast's box.
+    public static let blastShoulderPixels = Vec2(x: -0.5, y: 17.5)
+    public static let blastArmPixels = 18.0
     public static let blastSize = Vec2(x: 14, y: 10)
     public static let blastSpeed = 6.0
     public static let blastFrames = 60

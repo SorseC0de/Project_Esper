@@ -1382,7 +1382,7 @@ a point carried on by its own motion and held a pixel from the last, drawn snapp
 none drawn where the arms or the pose would cover them (`GameScene.stringless`, a sheet a line and its
 stringless frames, 0-based: both shot sheets whole, the throws and the layup from frame 4, the ledge whole,
 the dunk from frame 1, both catches whole, the slash's 2 to 4, FloState's snatch from 2, the change's 0 to 2,
-the snipe whole),
+the snipe whole, the spin ball whole, the beam from 3),
 the second from the tip in palette 37's grey and the rest in white's, toned as the hood is. Up, five
 each from columns 23 and 26 of row 23, hanging under gravity and swinging; Super Smoothie flying,
 twenty each streaming straight back as FloState's near one does (`HoodStrings.streaming`); in FloState,

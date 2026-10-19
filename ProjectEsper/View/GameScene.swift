@@ -382,10 +382,63 @@ final class GameScene: SKScene {
     /// Z Tea's blast arms over each body, turned about the shoulder: where the arms meet the body
     /// on their canvas, and that point from the feet, in art pixels.
     private var blastArmNodes: [Int: SKSpriteNode] = [:]
-    private static let blastArmsAnchor = CGPoint(x: 31.5 / 64, y: 33.5 / 64)
-    private static let blastShoulder = CGSize(width: -0.5, height: 17.5)
+    /// Z Tea fired up off the ground: the hooded head's tip back once eased in, and where a tip
+    /// moves it, as play moves it: let down to sit on the neck, slid back and lifted with the aim.
+    /// Art pixels the way it faces and up.
+    static var blastUpTip: CGFloat { flightHeadTip * BeamHeadTuning.upTurn }
+    static func aimedHeadShift(tip: CGFloat, blast: Bool) -> CGPoint {
+        let share = tip / flightHeadTip
+        let aimed = share / (share >= 0 ? BeamHeadTuning.upTurn : BeamHeadTuning.downTurn)
+        let nudge = blast ? blastUpHeadNudge : .zero
+        return CGPoint(x: (nudge.x - BeamHeadTuning.slide) * aimed, y: (BeamHeadTuning.lift * abs(aimed)) + nudge.y * aimed - flightHeadDrop * abs(share))
+    }
+
+    static let blastArmsAnchor = CGPoint(x: 31.5 / 64, y: 33.5 / 64)
+    static let blastShoulder = CGSize(width: ZRules.blastShoulderPixels.x, height: ZRules.blastShoulderPixels.y)
+    /// The blast's arms' shoulder, what they turn about up off the ground, art pixels from the feet;
+    /// and the front arm moved besides once turned up, art pixels the way it faces and up.
+    static let blastArmShoulder = CGPoint(x: ZRules.blastShoulderPixels.x, y: ZRules.blastShoulderPixels.y)
+    static let blastUpFrontArmNudge = CGPoint(x: -1, y: 3)
+    /// Fired up off the ground, the hooded head moved on the blast besides its tip, art pixels the
+    /// way it faces and up: in with the tip.
+    static let blastUpHeadNudge = CGPoint(x: 2, y: -3)
     /// The firing loop's even frames, 4 and 6, have the body a pixel right and two down.
-    private static let blastEvenFrameShift = CGPoint(x: 1, y: -2)
+    static let blastEvenFrameShift = CGPoint(x: 1, y: -2)
+
+    /// Z Tea's arms on a frame of the beam's sheet or the blast's, laid on the body's canvas as
+    /// play lays them, for a picture of the whole figure: the beam's over everything while it
+    /// fires (frames 3 to 7), turned by `beamAim`; the blast's back arm behind, front over, each
+    /// with its line, turned by `blastTurn`. Anticlockwise, facing right. `image` makes or
+    /// keeps a texture's picture.
+    static func zTeaArms(_ frame: AnimationFrame, sprites: SpriteLibrary, player: Int, beamAim: CGFloat = 0, blastTurn: CGFloat = 0,
+                         image: (String, () -> SKTexture?) -> CGImage?) -> (behind: [FigureLayer], over: [FigureLayer]) {
+        switch frame.animation {
+        case .beam where (3...7).contains(frame.frame):
+            let side = Animation.beamArms.pixelSize
+            // Hung by its anchor at the shoulder off the feet: its canvas's place on the body's.
+            let shoulder = CGPoint(x: side / 2 + blastShoulder.width, y: Animation.beam.feetFromBottom + blastShoulder.height)
+            let shift = frame.frame % 2 == 0 ? blastEvenFrameShift : .zero
+            let offset = CGPoint(x: shoulder.x - blastArmsAnchor.x * side + shift.x, y: shoulder.y - blastArmsAnchor.y * side + shift.y)
+            guard let arms = image("beamArms", { sprites.texture(AnimationFrame(.beamArms, 0), player: player) }) else { return ([], []) }
+            let line = image("beamArmsLine", { sprites.outlineTexture(AnimationFrame(.beamArms, 0), player: player) })
+            return ([], [FigureLayer(image: arms, line: line, pivot: CGPoint(x: blastArmsAnchor.x * side, y: blastArmsAnchor.y * side), turn: beamAim, offset: offset)])
+        case .blast:
+            let armsFrame = AnimationFrame(.blastArms, frame.frame)
+            _ = sprites.texture(armsFrame, player: player)
+            let shoulder = CGPoint(x: Animation.blastArms.pixelSize / 2 + blastArmShoulder.x, y: Animation.blastArms.feetFromBottom + blastArmShoulder.y)
+            let back = image("blastBack_\(frame.frame)", { sprites.backArmTexture(armsFrame, player: player) }).map {
+                FigureLayer(image: $0, line: image("blastBackLine_\(frame.frame)", { sprites.blastArmOutlineTexture(armsFrame, player: player, front: false) }),
+                            pivot: shoulder, turn: blastTurn)
+            }
+            let front = image("blastFront_\(frame.frame)", { sprites.frontArmTexture(armsFrame, player: player) }).map {
+                FigureLayer(image: $0, line: image("blastFrontLine_\(frame.frame)", { sprites.blastArmOutlineTexture(armsFrame, player: player, front: true) }),
+                            pivot: shoulder, turn: blastTurn, offset: blastTurn != 0 ? blastUpFrontArmNudge : .zero)
+            }
+            return (back.map { [$0] } ?? [], front.map { [$0] } ?? [])
+        default:
+            return ([], [])
+        }
+    }
     /// In the figure, over the hood: on the body itself they were drawn with it, under the hood.
     private func blastArms(_ index: Int, on body: SKSpriteNode) -> SKSpriteNode {
         guard let figure = body.parent else { return SKSpriteNode() }
@@ -394,6 +447,13 @@ final class GameScene: SKScene {
         arms.anchorPoint = GameScene.blastArmsAnchor
         arms.zPosition = GameScene.hoodUpZ + 0.002
         arms.isHidden = true
+        // Its line, in the body's line's colour, under it.
+        let line = SKSpriteNode()
+        line.name = "line"
+        line.anchorPoint = GameScene.blastArmsAnchor
+        line.colorBlendFactor = 1
+        line.zPosition = -0.0005
+        arms.addChild(line)
         figure.addChild(arms)
         blastArmNodes[index] = arms
         return arms
@@ -406,10 +466,10 @@ final class GameScene: SKScene {
         if let arms = blastPoseArmNodes[index], arms.front.parent === figure { return arms }
         // The shoulder on the 48-pixel canvas: its feet 8 up from the bottom, centred across.
         let side = CGFloat(Animation.blastArms.pixelSize)
-        let shoulder = ZRules.blastShoulderPixels
-        let anchor = CGPoint(x: (side / 2 + CGFloat(shoulder.x)) / side, y: (CGFloat(Animation.blastArms.feetFromBottom) + CGFloat(shoulder.y)) / side)
         let arms = (front: SKSpriteNode(), back: SKSpriteNode())
+        let shoulder = GameScene.blastArmShoulder
         for arm in [arms.front, arms.back] {
+            let anchor = CGPoint(x: (side / 2 + shoulder.x) / side, y: (CGFloat(Animation.blastArms.feetFromBottom) + shoulder.y) / side)
             arm.anchorPoint = anchor
             arm.isHidden = true
             figure.addChild(arm)
@@ -5747,6 +5807,127 @@ final class GameScene: SKScene {
     func updatesShieldFrames() -> [UIImage] {
         UpdatesNotes.shieldIconFrames.map { UIImage(cgImage: sprites.effectTexture(EnergyEffect.shield.name, $0, player: 0).cgImage()) }
     }
+    /// A figure on the updates screen as play draws it, a frame at a time in the first side's look:
+    /// Z Tea's blasts fired up, Super Smoothie's launch with its afterimages, the snipe.
+    struct UpdatesPoseFrame {
+        let portrait: SpriteLibrary.Portrait
+        let headNudge: CGPoint
+        let headScale: CGFloat
+        let extras: FigureExtras
+    }
+
+    /// Z Tea's run of blasts at level two's pace: opened, back arm, front, back, front, the neutral
+    /// held, then standing a moment. A blast leaves as the back arm's or the front's let-go frame begins.
+    static let updatesBlastSheetFrames: [Int] = ZRules.blastOpening + ZRules.blastBackArm + ZRules.blastFrontArm + ZRules.blastBackArm + ZRules.blastFrontArm
+    static let updatesBlastStanding = 40
+    static var updatesBlastFiringFrames: Int { updatesBlastSheetFrames.count * ZRules.blastSheetFrameLengthLevelTwo + ZRules.blastNeutralHoldFrames }
+    /// The snipe: aimed still, fired through its sheet at 15 a second, held on the last.
+    static let updatesSnipeAim = 30
+    static let updatesSnipeHold = 20
+    static var updatesSnipeFiring: Int { Animation.gunSnipe.frameCount * 4 }
+    /// Super Smoothie's launch leaves an afterimage every other frame, held a tenth, faded over three.
+    static let updatesGhostEvery = 2
+    static var updatesGhostHold: Int { Int(GameScene.afterimageHold * 60) }
+    static var updatesGhostFade: Int { Int(GameScene.afterimageFade * 60) }
+
+    func updatesPose(_ pose: UpdatesNotes.Pose, tick: Int) -> UpdatesPoseFrame? {
+        let place = SpriteLibrary.customizeHeadPlace
+        var sheetFrame = GameScene.hoodDrawnFor
+        func portrait(_ animation: Animation, _ frame: Int) -> SpriteLibrary.Portrait? {
+            sheetFrame = AnimationFrame(animation, frame)
+            return sprites.portrait(animation.rawValue, frame: frame, player: 0, headDrawnFor: GameScene.hoodDrawnFor, headNudge: place.nudge, headScale: place.scale)
+        }
+        var extras = FigureExtras()
+        if let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: 0) {
+            let anim = GameScene.hoodDrawnFor.animation
+            extras.hoodPivot = CGPoint(x: anim.pixelSize / 2 + head.x, y: anim.pixelSize - anim.feetFromBottom - head.y)
+        }
+        let look = sprites.look(for: 0)
+        let shown: SpriteLibrary.Portrait?
+        switch pose {
+        case .blast:
+            let length = ZRules.blastSheetFrameLengthLevelTwo
+            let cycle = GameScene.updatesBlastFiringFrames + GameScene.updatesBlastStanding
+            let now = tick % cycle
+            let sheet = GameScene.updatesBlastSheetFrames
+            /// The sheet frame a frame of the run shows, nil standing.
+            func sheetFrame(_ at: Int) -> Int? {
+                guard at < GameScene.updatesBlastFiringFrames else { return nil }
+                return sheet[min(at / length, sheet.count - 1)]
+            }
+            // The head tips back the whole run and eases down after, as in play: stepped through the cycle.
+            let upTip = GameScene.blastUpTip
+            var tip: CGFloat = 0
+            for step in 0...now { tip += ((sheetFrame(step) != nil ? upTip : 0) - tip) * GameScene.headTipEase }
+            if let blastFrame = sheetFrame(now) {
+                shown = portrait(.blast, blastFrame)
+                let arms = GameScene.zTeaArms(AnimationFrame(.blast, blastFrame), sprites: sprites, player: 0, blastTurn: .pi / 4,
+                                              image: { key, make in self.updatesImage(key, make) })
+                extras.behind = arms.behind
+                extras.over = arms.over
+            } else {
+                shown = portrait(.idle, ((now - GameScene.updatesBlastFiringFrames) * 12 / 60) % Animation.idle.frameCount)
+            }
+            extras.headTurn = tip
+            extras.headShift = GameScene.aimedHeadShift(tip: tip, blast: true)
+            // The blasts in flight, from the fingertips 45 degrees up, as long as they're near.
+            let pixelsPerFrame = CGFloat(ZRules.blastSpeed * SpriteLibrary.pixelsPerUnit)
+            let fingertips = CGPoint(x: Animation.blastArms.pixelSize / 2 + ZRules.blastShoulderPixels.x + ZRules.blastArmPixels / 2.squareRoot(),
+                                     y: Animation.blastArms.feetFromBottom + ZRules.blastShoulderPixels.y + ZRules.blastArmPixels / 2.squareRoot())
+            let blastFrames = max(EnergyEffect.zBlast.frameCount, 1)
+            let effectFrame = (tick * Int(EnergyEffect.zBlast.fps) / 60) % blastFrames
+            for release in 0..<GameScene.updatesBlastFiringFrames where release % length == 0 {
+                let frame = sheet[min(release / length, sheet.count - 1)]
+                guard frame == ZRules.blastBackArmRelease || frame == ZRules.blastFrontArmRelease, release <= now else { continue }
+                let travelled = CGFloat(now - release) * pixelsPerFrame
+                guard travelled < GameScene.updatesBlastReach,
+                      let image = updatesImage("blastShot_\(effectFrame)", { self.sprites.effectTexture(EnergyEffect.zBlast.name, effectFrame, player: 0) }) else { continue }
+                let along = travelled / 2.squareRoot()
+                extras.effects.append(FigureEffect(image: image, centre: CGPoint(x: fingertips.x + along, y: fingertips.y + along), turn: .pi / 4,
+                                                   haloColour: look.glow, haloDiameter: CGFloat(max(image.width, image.height)) * GameScene.beamGlowWidth,
+                                                   haloOpacity: Double(GameScene.beamGlow)))
+            }
+        case .flight:
+            // Launched straight up: the sheet's up frame, the head tipped back and let down a little.
+            shown = portrait(.fly, 1)
+            extras.headTurn = GameScene.flightHeadTip
+            extras.headShift = CGPoint(x: 0, y: -GameScene.flightHeadDrop)
+            // The afterimages left behind it, falling away at the launch's speed as the body climbs.
+            let climb = CGFloat(SmoothieRules.launchSpeed * SpriteLibrary.pixelsPerUnit)
+            let life = GameScene.updatesGhostHold + GameScene.updatesGhostFade
+            let sinceLast = tick % GameScene.updatesGhostEvery
+            for age in stride(from: sinceLast, to: life, by: GameScene.updatesGhostEvery) {
+                let fade = age < GameScene.updatesGhostHold ? 1 : 1 - Double(age - GameScene.updatesGhostHold) / Double(GameScene.updatesGhostFade)
+                extras.ghosts.append(FigureGhost(offset: CGPoint(x: 0, y: -climb * CGFloat(age)), opacity: Double(GameScene.afterimageAlpha) * fade, colour: look.bright))
+            }
+        case .snipe:
+            let cycle = GameScene.updatesSnipeAim + GameScene.updatesSnipeFiring + GameScene.updatesSnipeHold
+            let now = tick % cycle
+            let firing = now - GameScene.updatesSnipeAim
+            shown = portrait(.gunSnipe, firing < 0 ? 0 : min(firing * 15 / 60, Animation.gunSnipe.frameCount - 1))
+            extras.frontArmOverHood = GameScene.frontArmOverHood(AnimationFrame(.gunSnipe, 0))
+        }
+        guard let shown else { return nil }
+        // The sheet's own turn and the head moved on its frame, as play has them.
+        extras.headTurn -= GameScene.hoodTurn(sheetFrame)
+        if let headPose = GameScene.headPose(sheetFrame) {
+            extras.headShift = CGPoint(x: extras.headShift.x + headPose.x, y: extras.headShift.y + headPose.y)
+        }
+        return UpdatesPoseFrame(portrait: shown, headNudge: place.nudge, headScale: place.scale, extras: extras)
+    }
+    /// How far a blast flies on the updates screen before it's gone, in art pixels.
+    static let updatesBlastReach: CGFloat = 40
+    /// The updates screen's pictures, made once from their textures: dropped with the looks.
+    private var updatesImages: [String: CGImage] = [:]
+    private func updatesImage(_ key: String, _ make: () -> SKTexture?) -> CGImage? {
+        if let made = updatesImages[key] { return made }
+        guard let texture = make() else { return nil }
+        let image = texture.cgImage()
+        updatesImages[key] = image
+        return image
+    }
+    /// The updates screen's figures made again in the look as it is now.
+    func resetUpdatesIcons() { updatesImages = [:] }
     private lazy var winBallImage: CGImage = sprites.basketballFrames[0].cgImage()
     /// Every frame of both sides' win pose, made with the stage and again as their looks change.
     /// Once the looks' rebuild has landed, which made the portraits on its cores: here only gathered.
@@ -6690,6 +6871,7 @@ final class GameScene: SKScene {
         .transform: 0...2,
         .gunSnipe: 0...9,
         .spinBall: 0...3,
+        .beam: 3...9,
     ]
     /// The frames where the front arm crosses the hooded head, so the sheet's front arm and hand
     /// are drawn again over the hood: each sheet's frames, picked in the player gallery
@@ -6750,6 +6932,7 @@ final class GameScene: SKScene {
     static let headNudges: [Animation: [Int: CGPoint]] = [
         .spinBall: [1: CGPoint(x: 1, y: -1), 3: CGPoint(x: 1, y: -1)],
         .pivot: [1: CGPoint(x: 0, y: 1), 2: CGPoint(x: 1, y: 0)],
+        .beam: Dictionary(uniqueKeysWithValues: (3...8).map { ($0, CGPoint(x: 1, y: 1)) }),
     ]
     /// Whether a frame's hood is moved or turned off its place, so it carries its own line.
     static func hoodMoved(_ frame: AnimationFrame) -> Bool {
@@ -8870,6 +9053,12 @@ final class GameScene: SKScene {
             if !arms.isHidden {
                 arms.texture = sprites.texture(AnimationFrame(.beamArms, 0), player: drawnAs)
                 arms.size = arms.texture!.size().scaled(by: drawScale)
+                if let line = arms.childNode(withName: "line") as? SKSpriteNode {
+                    line.texture = sprites.outlineTexture(AnimationFrame(.beamArms, 0), player: drawnAs)
+                    line.isHidden = line.texture == nil
+                    line.size = arms.size
+                    line.color = outlineNodes[index].isHidden ? SKColor(rgb: sprites.look(for: index).outline) : outlineNodes[index].color
+                }
                 // On the firing loop's even frames the body's shifted: the arms with it.
                 let shift = frame.frame % 2 == 0 ? GameScene.blastEvenFrameShift : .zero
                 // Where the body would put them, turned with its facing.
@@ -8900,8 +9089,10 @@ final class GameScene: SKScene {
                 line?.size = arm.size
                 line?.color = outlineNodes[index].isHidden ? SKColor(rgb: sprites.look(for: index).outline) : outlineNodes[index].color
                 let facing = CGFloat(player.facing.sign)
-                let shoulder = ZRules.blastShoulderPixels
-                arm.position = node.position + CGPoint(x: CGFloat(shoulder.x) * drawScale * facing, y: CGFloat(shoulder.y) * drawScale)
+                // Turned up, the front arm moved besides.
+                let nudge = front && player.blastUp ? GameScene.blastUpFrontArmNudge : .zero
+                let shoulder = GameScene.blastArmShoulder + nudge
+                arm.position = node.position + CGPoint(x: shoulder.x * drawScale * facing, y: shoulder.y * drawScale)
                 arm.xScale = facing
                 arm.zRotation = player.blastUp ? .pi / 4 * facing : 0
                 if !front { arm.zPosition = node.zPosition - 0.001 }
@@ -9143,6 +9334,11 @@ final class GameScene: SKScene {
                         let aimed = share / (share >= 0 ? BeamHeadTuning.upTurn : BeamHeadTuning.downTurn)
                         hood.position.x -= BeamHeadTuning.slide * aimed * CGFloat(player.facing.sign) * drawScale
                         hood.position.y += BeamHeadTuning.lift * abs(aimed) * drawScale
+                        // Z Tea's blasts fired up: the head's own place on the blast, in with the tip.
+                        if blastFiring {
+                            hood.position.x += GameScene.blastUpHeadNudge.x * aimed * CGFloat(player.facing.sign) * drawScale
+                            hood.position.y += GameScene.blastUpHeadNudge.y * aimed * drawScale
+                        }
                     }
                 }
             } else {

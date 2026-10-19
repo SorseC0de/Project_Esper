@@ -18,3 +18,8 @@ xcuserdata/
 
 # Swift Package
 EsperSim/.build/
+
+# The user's working material, never tracked
+_Graphic Assets/Screengrabs/
+_Backup/
+Asset Packs 1-5/

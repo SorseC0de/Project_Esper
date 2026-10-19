@@ -974,12 +974,17 @@ public struct Match: Equatable {
                 if holding, ball.holder == nil {
                     beam.hitBall = true
                     ball.release(from: ball.position, velocity: beam.direction * ZRules.ballSpeed, by: beam.owner, straight: false)
+                    // A shot of the firer's: it scores, and the rims draw it in.
+                    ball.scoring = true
                 }
             }
             if !beam.hitBall, ball.isLive, ball.isOpen(to: beam.owner), along(ball.box) {
                 beam.hitBall = true
                 ball.tornadoCentre = nil
                 ball.release(from: ball.position, velocity: beam.direction * ZRules.ballSpeed, by: beam.owner, straight: false)
+                // A shot of the firer's: it scores, and the rims draw it in, so a beam waved well
+                // can push the ball home.
+                ball.scoring = true
             }
             kept.append(beam)
         }

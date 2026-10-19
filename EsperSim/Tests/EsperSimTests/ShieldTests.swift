@@ -39,6 +39,9 @@ final class ShieldTests: XCTestCase {
         var upLoose = court()
         upLoose.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
         XCTAssertEqual(upLoose.players[0].state, .flipJump)
+        var downLoose = court()
+        downLoose.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+        XCTAssertEqual(downLoose.players[0].state, .flipJump, "down asks for it as up does")
         var defence = court()
         defence.ball.holder = 1
         defence.players[1].hasBall = true

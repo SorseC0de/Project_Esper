@@ -51,6 +51,9 @@ struct AssembledFrame: View {
     /// faces and up, as play does firing Z Tea up.
     var headTip: CGFloat = 0
     var headShift: CGPoint = .zero
+    /// What play draws round the figure on this sheet: the shield on its arc. Added over
+    /// everything, as play adds it, and glowing.
+    var props: [GalleryProp] = []
     let motion: CustomizeFigureMotion
     let time: Double
 
@@ -148,6 +151,19 @@ struct AssembledFrame: View {
                 context.draw(Image(decorative: arm, scale: 1).interpolation(.none), in: figureRect)
             }
             for layer in armsOver { drawArms(layer) }
+            /// A prop at its place, turned, added on.
+            func drawProps(in context: GraphicsContext) {
+                for prop in props {
+                    var placed = context
+                    placed.blendMode = .plusLighter
+                    let at = spot(prop.centre)
+                    placed.translateBy(x: at.x, y: at.y)
+                    placed.rotate(by: .radians(-prop.turn))
+                    let width = CGFloat(prop.image.width) * prop.scale * pixel, height = CGFloat(prop.image.height) * prop.scale * pixel
+                    placed.draw(Image(decorative: prop.image, scale: 1).interpolation(.none), in: CGRect(x: -width / 2, y: -height / 2, width: width, height: height))
+                }
+            }
+            drawProps(in: context)
             if cubes { for cube in motion.cubes where !cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) } }
             // The glow: what's energy again, blurred and added, as the customize screen draws it.
             guard glow else { return }
@@ -160,15 +176,28 @@ struct AssembledFrame: View {
                 if let hood = portrait.hoodGlowing { drawHood(hood, in: layer) }
                 drawStrings(in: layer)
                 if cubes { for cube in motion.cubes { CustomizeFigure.drawCube(cube, in: layer, at: spot(cube.position), pixel: pixel) } }
+                drawProps(in: layer)
             }
         }
         .frame(width: pictureSize.width, height: pictureSize.height)
     }
 }
 
+/// A picture play draws round the figure, its middle in art pixels from the canvas's bottom
+/// left, turned anticlockwise, at a share of its own size.
+struct GalleryProp {
+    let image: CGImage
+    let centre: CGPoint
+    let turn: CGFloat
+    let scale: CGFloat
+}
+
 /// How a sheet is drawn and saved: the look's dressing aside, everything the gallery's controls set.
 struct GalleryDrawing {
     var pad: CGFloat = 8
+    /// The pad round a sheet: room enough for what's drawn round the figure (the shield's arc),
+    /// the figure kept its size in a saved sheet.
+    func pad(for animation: EsperSim.Animation) -> CGFloat { pad + (animation == .shield ? GallerySheets.shieldRoom : 0) }
     var fps = 12.0
     var mirrored = false
     var strings = true
@@ -208,6 +237,21 @@ final class PlayerGallerySheets: ObservableObject {
                                 headDrawnFor: SpriteLibrary.hoodDrawnFor, headNudge: .zero, headScale: 1, holdsBall: frame.animation.holdsBall)
     }
 
+    /// What play draws round the figure on a sheet's frame: the shield on its arc for the shield's
+    /// backflip, the frame's share of the flip, at its place round the body's middle, turned to its face.
+    func props(_ animation: EsperSim.Animation, _ index: Int) -> [GalleryProp] {
+        guard animation == .shield else { return [] }
+        sprites.setCustomizeLook(look, for: 0)
+        let count = GallerySheets.frameCount(animation)
+        let age = Int((Double(index) / Double(max(count - 1, 1)) * Double(ShieldRules.flipFrames - 1)).rounded())
+        guard let image = sprites.effectImage(EnergyEffect.shield.name, ShieldRules.sheetFrame(atAge: age), player: SpriteLibrary.customizePlayer(0)) else { return [] }
+        let unit = SpriteLibrary.pixelsPerUnit
+        let middle = CGPoint(x: animation.pixelWidth / 2, y: animation.feetFromBottom + FighterSpec.meleeMario.bodyHeight / 2 * unit)
+        let place = Shield.place(atAge: age)
+        let centre = CGPoint(x: middle.x + cos(place) * ShieldRules.arcRadius * unit, y: middle.y + sin(place) * ShieldRules.arcRadius * unit)
+        return [GalleryProp(image: image, centre: centre, turn: Shield.faceAngle(atAge: age), scale: GameScene.shieldScale)]
+    }
+
     /// Z Tea's arms for a frame of the beam or the blast as play lays them on the body: the blast's
     /// level in the air, 45 degrees up off the ground.
     func arms(_ frame: AnimationFrame, blastUp: Bool) -> (behind: [FigureLayer], over: [FigureLayer]) {
@@ -225,7 +269,8 @@ final class PlayerGallerySheets: ObservableObject {
     /// strings and cubes moved on between frames as the frames play at the drawing's rate.
     func sheet(_ animation: EsperSim.Animation, scale: CGFloat, strip: Strip, drawing: GalleryDrawing) -> UIImage? {
         let motion = CustomizeFigureMotion()
-        let cell = CGSize(width: (CGFloat(animation.pixelWidth) + 2 * drawing.pad) * scale, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * scale)
+        let pad = drawing.pad(for: animation)
+        let cell = CGSize(width: (CGFloat(animation.pixelWidth) + 2 * pad) * scale, height: (CGFloat(animation.pixelSize) + 2 * pad) * scale)
         let count = GallerySheets.frameCount(animation)
         let size = strip == .across ? CGSize(width: cell.width * CGFloat(count), height: cell.height) : CGSize(width: cell.width, height: cell.height * CGFloat(count))
         let format = UIGraphicsImageRendererFormat()
@@ -237,10 +282,11 @@ final class PlayerGallerySheets: ObservableObject {
             let frame = GallerySheets.frame(animation, index)
             guard let portrait = portrait(frame) else { return nil }
             let arms = arms(frame, blastUp: drawing.blastUp)
-            let view = AssembledFrame(portrait: portrait, look: look, frame: frame, pixel: scale, pad: drawing.pad, mirrored: drawing.mirrored,
+            let view = AssembledFrame(portrait: portrait, look: look, frame: frame, pixel: scale, pad: pad, mirrored: drawing.mirrored,
                                       strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
                                       headNudge: drawing.headNudge(frame), ball: drawing.ball, armsBehind: arms.behind, armsOver: arms.over,
                                       headTip: drawing.headTip(frame), headShift: drawing.headShift(frame),
+                                      props: props(animation, index),
                                       motion: motion, time: start + Double(index) / drawing.fps)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 1
@@ -293,6 +339,9 @@ enum GallerySheets {
         return AnimationFrame(.doubleJump, count - 1 - index % count)
     }
 
+    /// Room added round the shield's sheet for the shield on its arc, art pixels each side.
+    static let shieldRoom: CGFloat = 20
+
     /// A sheet's name in words: `player_dbl_jump` as Double Jump.
     static func name(_ animation: EsperSim.Animation) -> String {
         if animation == .shield { return "Shield Backflip" }
@@ -336,18 +385,22 @@ struct PlayerGallery: View {
                 let index = paused ? held : Int(time * drawing.fps) % GallerySheets.frameCount(animation)
                 let frame = GallerySheets.frame(animation, index)
                 let _ = playhead.shown = index
+                // Room for what's round the figure, the figure shrunk to keep the view's size.
+                let pad = drawing.pad(for: animation)
+                let shown = pixel * (CGFloat(animation.pixelSize) + 2 * drawing.pad) / (CGFloat(animation.pixelSize) + 2 * pad)
                 ZStack {
                     Color(rgb: PlayerGalleryOutput.background)
                     if let portrait = sheets.portrait(frame) {
                         let arms = sheets.arms(frame, blastUp: drawing.blastUp)
-                        AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: pixel, pad: drawing.pad, mirrored: drawing.mirrored,
+                        AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: shown, pad: pad, mirrored: drawing.mirrored,
                                        strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
                                        headNudge: drawing.headNudge(frame), ball: drawing.ball, armsBehind: arms.behind, armsOver: arms.over,
                                        headTip: drawing.headTip(frame), headShift: drawing.headShift(frame),
+                                       props: sheets.props(animation, index),
                                        motion: motion, time: time)
                     }
                 }
-                .frame(width: (CGFloat(animation.pixelWidth) + 2 * drawing.pad) * pixel, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel)
+                .frame(width: (CGFloat(animation.pixelWidth) + 2 * pad) * shown, height: (CGFloat(animation.pixelSize) + 2 * pad) * shown)
                 .overlay(alignment: .bottomTrailing) {
                     Text("\(GallerySheets.name(animation))  \(index + 1)/\(GallerySheets.frameCount(animation))")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))

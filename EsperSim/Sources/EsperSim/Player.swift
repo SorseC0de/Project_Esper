@@ -802,10 +802,10 @@ public struct Player: Equatable {
             velocity.y = 0
             enter(.air)
         }
-        // The shield, any time without the ball, from anything neutral: the up-snatch, or the touch
+        // The shield, any time without the ball, from anything neutral: the up- or down-snatch, or the touch
         // pad's shortcut.
-        let upSnatch = input.throwBall && !lastInput.throwBall && ShieldRules.asked(stick: input.stick)
-        let shieldAsked = upSnatch || (input.shield && !lastInput.shield)
+        let shieldSnatch = input.throwBall && !lastInput.throwBall && ShieldRules.asked(stick: input.stick)
+        let shieldAsked = shieldSnatch || (input.shield && !lastInput.shield)
         var shieldRaised = false
         if shieldAsked, !holding, state.canCatch, frozen == 0, attackLockout == 0 {
             startShield()
@@ -1815,17 +1815,12 @@ public struct Player: Equatable {
             velocity = .zero
             if firingBeam {
                 turnBeam(input)
-                // It fires on past its time while there's FLO to burn, a FLO gone every
-                // `holdDrainFrames`, till the slash is pressed again: a press, not a hold, so
-                // it's the same on both phones whatever the lag.
-                if shootPressed { beamStopped = true }
-                if stateTimer == beamFiringFrames - 1, !beamStopped, flo > 0 {
+                // It fires on past its own time up to `beamMaxFrames`, costing nothing, till the
+                // slash or the snatch is pressed, any time after `beamCancelFrames`: a press, not a
+                // hold, so it's the same on both phones whatever the lag.
+                if shootPressed || throwPressed, stateTimer >= ZRules.beamCancelFrames { beamStopped = true }
+                if stateTimer == beamFiringFrames - 1, !beamStopped, beamFiringFrames < ZRules.beamMaxFrames {
                     beamHeld += 1
-                    beamDrainClock += 1
-                    if beamDrainClock >= ZRules.holdDrainFrames {
-                        beamDrainClock = 0
-                        flo -= 1
-                    }
                 }
             }
             if stateTimer >= beamFiringFrames + ZRules.recoveryFrames { enter(grounded ? .idle : .air) }
@@ -2282,10 +2277,9 @@ public struct Player: Equatable {
         enter(grounded ? .idle : .air)
     }
 
-    /// The beam fired: on for its time, and on past it while FLO lasts.
+    /// The beam fired: on for its time, and on past it till it's called off or its most is up.
     private mutating func fireBeam() {
         beamHeld = 0
-        beamDrainClock = 0
         beamStopped = false
         enter(.beamFiring)
         wanted = .fireBeam
@@ -2301,10 +2295,9 @@ public struct Player: Equatable {
     public var firingBeam: Bool { state == .beamFiring && stateTimer < beamFiringFrames }
     /// How long the beam fires: its own half second and however long it's been held on.
     public var beamFiringFrames: Int { ZRules.fireFrames + beamHeld }
-    /// Frames the beam has fired on past its own, burning FLO, the clock to the next FLO, and
-    /// whether the slash has been pressed to stop it.
+    /// Frames the beam has fired on past its own, and whether the slash or the snatch has been
+    /// pressed to stop it.
     public var beamHeld = 0
-    var beamDrainClock = 0
     var beamStopped = false
 
     /// Z Tea's beam's aim, off straight ahead the way it faces, up positive; and at level two a

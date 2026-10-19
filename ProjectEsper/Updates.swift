@@ -45,7 +45,7 @@ enum UpdatesNotes {
 
     static let lines: [Line] = [
         .title("Core Changes"),
-        .bullet("Press [Up] + [Slash] to [Shieldflip]. [Shield] can be used to reflect the ball or powers. [Parries] [Slash], loses to [Snatch] and [Throw].", icon: .shield),
+        .bullet("Press [Up] or [Down] + [Slash] to [Shieldflip]. [Shield] can be used to reflect the ball or powers. [Parries] [Slash], loses to [Snatch] and [Throw].", icon: .shield),
         .bullet("Press [Down] + [Throw] with the ball to perform a [Spin Move]. Attacks go through you while spinning, however you only get one per airtime.", icon: .spin),
         .bullet("You can now select a [Greateraid] power to have during [FloState] in [47 Mode]"),
         .bullet("Increased [Stun] time 1.5s ➜ 2s", tone: .nerf),
@@ -53,6 +53,7 @@ enum UpdatesNotes {
         .title("Greateraid Changes"),
         .drink("Z-Tea", .zTea),
         .bullet("Press [Up] + [Slash] to fire an [Esper Blast]", depth: 1, icon: .pose(.blast), tone: .buff),
+        .bullet("[Beam] no longer consumes [Flo] to fire.", depth: 1, tone: .buff),
         .drink("Platform Protein Shake", .platformShake),
         .bullet("Increased [Platform] duration 60 ➜ 120 frames", depth: 1),
         .drink("Super Smoothie", .superSmoothie),

@@ -57,6 +57,10 @@ final class GameScene: SKScene {
     /// The grid behind the Test Center, on the camera; and whether the second side's in the dummy's look.
     private var testCenterGrid: SKSpriteNode?
     private var dummyDressed = false
+    /// Flash Fizz's flash: till this match frame, the body where it landed silhouetted in its
+    /// energy colour, this much of it.
+    private var reappearUntil: [Int: Int] = [:]
+    static let reappearTint: CGFloat = 0.9
     /// VS CPU: the computer plays player 2, whatever pads are in; off, player 2 is the
     /// second pad. The title's toggle, the AI button and R3 all set it, kept between launches.
     static let vsCPUKey = InputHub.vsCPUKey
@@ -5805,7 +5809,7 @@ final class GameScene: SKScene {
     /// The updates screen's shield icon: the shield's sheet's whole frames that loop, in the first
     /// side's energy.
     func updatesShieldFrames() -> [UIImage] {
-        UpdatesNotes.shieldIconFrames.map { UIImage(cgImage: sprites.effectTexture(EnergyEffect.shield.name, $0, player: 0).cgImage()) }
+        UpdatesNotes.shieldIconFrames.compactMap { sprites.effectImage(EnergyEffect.shield.name, $0, player: 0).map(UIImage.init(cgImage:)) }
     }
     /// A figure on the updates screen as play draws it, a frame at a time in the first side's look:
     /// Z Tea's blasts fired up, Super Smoothie's launch with its afterimages, the snipe.
@@ -6483,13 +6487,10 @@ final class GameScene: SKScene {
                 // A three is a three before any doubling.
                 let shotPoints = gameMode == .fortySeven && match.stage.features.doublePoints ? points / 2 : points
                 strike(hoop: hoop, by: scorer, entry: entry)
+                // No banner across the screen: the word at the hoop says it.
                 if gameMode == .fortySeven {
-                    showBanner(shotPoints >= 3 ? "THREE!!" : "BUCKET!!", size: 48)
                     fortySevenScored(by: scorer, points: points, at: frameEvents.frame)
-                } else if gameMode == .zones {
-                    showBanner("BUCKET!!", size: 48)
-                } else {
-                    showBanner("BUCKET!!", size: 48)
+                } else if gameMode != .zones {
                     pointScored(by: scorer, at: frameEvents.frame)
                 }
                 if gameMode == .fortySeven, match.stage.features.doublePoints { showDoubleMark(at: hoop) }
@@ -6678,12 +6679,15 @@ final class GameScene: SKScene {
                 let player = match.players[index]
                 spawnJumpRings(at: SpriteLibrary.point(player.position), colour: SKColor(rgb: sprites.look(for: index).glow), scale: bodyScale(index))
             case .warped(let flasher, let from, let to), .flashed(let flasher, let from, let to):
-                // The flash sheet at both ends, in the energy colour, at its own size.
-                // Drawn over rather than added, or the white saturates past the tone.
+                // The flash sheet where it left, in the energy colour, at its own size, drawn over
+                // rather than added, or the white saturates past the tone; where it lands, the
+                // body itself flat in its energy colour for as long as the flash plays.
+                let exit = SpriteLibrary.point(from + Vec2(x: 0, y: BallRules.chestHeight))
+                glowers.addChild(EnergyEffect.flashSpark3.node(sprites, player: flasher, at: exit))
+                let flashFrames = Int((Double(EnergyEffect.flashSpark3.frameCount) / EnergyEffect.flashSpark3.fps * 60).rounded())
+                reappearUntil[flasher] = match.frame + flashFrames
                 for end in [from, to] {
                     let point = SpriteLibrary.point(end + Vec2(x: 0, y: BallRules.chestHeight))
-                    let flash = EnergyEffect.flashSpark3.node(sprites, player: flasher, at: point)
-                    glowers.addChild(flash)
                     if showHitboxes {
                         // The tear's reach at each end, where a held ball is popped.
                         let ring = SKShapeNode(circleOfRadius: CGFloat(FizzRules.tearRadius * SpriteLibrary.pixelsPerUnit))
@@ -7956,8 +7960,7 @@ final class GameScene: SKScene {
     /// helicopter in its rims' colours. Each is drawn once and kept, not on its first appearance.
     private func warmDrawnArt() {
         var made: [SKTexture] = Onomatopoeia.warmed()
-        // A basket's banners, and the stages' own pictures drawn on first showing.
-        made += ["BUCKET!!", "THREE!!"].map { TitleText.texture($0, size: 48) }
+        // The stages' own pictures drawn on first showing.
         made.append(TitleText.texture("Points Are Worth Double!", size: 26))
         for side in match.players.indices {
             made += Greateraid.allCases.map { TitleText.texture("\(sideName(side)) DRINKS \($0.name.uppercased())", size: 26) }
@@ -9099,12 +9102,18 @@ final class GameScene: SKScene {
             // In the throw stance's parry frames, and growing, white; spinning with the FLO paid,
             // flashing the energy colour.
             let spinFlash = player.spinPhasing && match.frame / GameScene.spinFlashFrames % 2 == 0
-            let tint: SKColor = spinFlash ? SKColor(rgb: sprites.look(for: index).glow) : .white
+            // Just flashed in, silhouetted in the energy colour (`reappearUntil`).
+            let reappearing = match.frame < reappearUntil[index, default: 0]
+            let tint: SKColor = spinFlash || reappearing ? SKColor(rgb: sprites.look(for: index).glow) : .white
             // And all white, glowing, on the change's fifth frame.
             let flashWhite = changing && frame.frame == GameScene.transformWhiteFrame
-            let tintShare: CGFloat = growing || flashWhite ? 1 : (player.throwParrying || spinFlash ? 0.85 : 0)
+            let tintShare: CGFloat = growing || flashWhite ? 1 : (reappearing ? GameScene.reappearTint : (player.throwParrying || spinFlash ? 0.85 : 0))
             node.color = tint
             node.colorBlendFactor = tintShare
+            if hoodNodes.indices.contains(index) {
+                hoodNodes[index].color = tint
+                hoodNodes[index].colorBlendFactor = reappearing ? GameScene.reappearTint : 0
+            }
             // K&A: the body under the night's wash, as the stage is, its glowing parts drawn
             // again over it without.
             let washed = kAndAArt != nil && tintShare == 0

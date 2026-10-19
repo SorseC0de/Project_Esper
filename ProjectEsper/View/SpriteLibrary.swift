@@ -1146,7 +1146,11 @@ final class SpriteLibrary {
             figure = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
                               hood: (wornHood(givenHood.drawn), place.origin, place.scale))
         }
-        guard let body = figure.images?.drawn else { return nil }
+        guard var body = figure.images?.drawn else { return nil }
+        // What play draws apart from the body, over it and under the hood: the blade, the gun,
+        // the puffs and streaks, toned in the energy colour as play tones them (`Look.sparkTone`).
+        let energy = figure.images?.energy.flatMap { SpriteLibrary.toned($0, look.sparkTone) }
+        if let energy, let over = SpriteLibrary.drawn(energy, over: body) { body = over }
         let width = body.width, height = body.height
         guard let (glowContext, glowPixels) = makeCanvas(width: width, height: height),
               let (sourceContext, sourcePixels) = makeCanvas(width: width, height: height) else { return nil }
@@ -1176,6 +1180,8 @@ final class SpriteLibrary {
                 hoodGlowing = hoodContext.makeImage()
             }
         }
+        // The energy glows, as it does in play.
+        if let energy { glowContext.draw(energy, in: CGRect(x: 0, y: 0, width: width, height: height)) }
         guard let glowing = glowContext.makeImage() else { return nil }
         let bare = !look.energyForm ? recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
                                          hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped), bareLine: true).images?.bareOutline : nil
@@ -1185,6 +1191,40 @@ final class SpriteLibrary {
                         frontArmLine: SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
                                                               hood: !look.energyForm ? SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped) : nil),
                         bareLine: bare, hoodLine: !look.energyForm ? givenHood?.line : nil)
+    }
+
+    /// A grey picture toned through `tone`, its alpha kept.
+    static func toned(_ image: CGImage, _ tone: (Double) -> RGB) -> CGImage? {
+        let width = image.width, height = image.height
+        guard let (context, pixels) = canvas(width: width, height: height) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        for pixel in 0..<(width * height) {
+            let index = pixel * 4
+            let alpha = Int(pixels[index + 3])
+            guard alpha > 0 else { continue }
+            // The canvas is premultiplied: the grey level is the colour over the alpha.
+            let grey = (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / Double(alpha)
+            let colour = tone(min(grey, 1))
+            pixels[index] = UInt8(Int((colour >> 16) & 0xFF) * alpha / 255)
+            pixels[index + 1] = UInt8(Int((colour >> 8) & 0xFF) * alpha / 255)
+            pixels[index + 2] = UInt8(Int(colour & 0xFF) * alpha / 255)
+        }
+        return context.makeImage()
+    }
+
+    /// An effect's frame in a player's energy colour as a picture, as `effectTexture` tones it,
+    /// made on the CPU: for SwiftUI and the gallery, never read back off the GPU.
+    func effectImage(_ name: String, _ frame: Int, player: Int) -> CGImage? {
+        SpriteLibrary.toned(sourceImage("\(name)_\(frame)"), look(for: player).energyTone)
+    }
+
+    /// One picture drawn over another the same size.
+    static func drawn(_ top: CGImage, over bottom: CGImage) -> CGImage? {
+        guard let (context, _) = canvas(width: bottom.width, height: bottom.height) else { return nil }
+        let rect = CGRect(x: 0, y: 0, width: bottom.width, height: bottom.height)
+        context.draw(bottom, in: rect)
+        context.draw(top, in: rect)
+        return context.makeImage()
     }
 
     /// A grey frame through a look's energy ramp, or with `capped` the sparks' ramp, which
@@ -1467,7 +1507,7 @@ final class SpriteLibrary {
     /// the hood together, the hood's own pixels left clear for it to be drawn in.
     private func recolour(image: CGImage, look: Look, holdsBall: Bool, detach: Bool, tucked: Bool = false,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
-                          bareLine: Bool = false, keepsProps: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?, outline: CGImage?, bareOutline: CGImage?)?) {
+                          bareLine: Bool = false, keepsProps: Bool = false) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?, outline: CGImage?, bareOutline: CGImage?, energy: CGImage?)?) {
         let texture = SKTexture(cgImage: image)
         let width = image.width, height = image.height
         guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
@@ -1539,6 +1579,7 @@ final class SpriteLibrary {
         // this one too, since it's drawn as its own sprite wherever the frame puts it.
         var head: SKTexture?
         var energy: SKTexture?
+        var energyImage: CGImage?
         if detach {
             let headCanvas = sums[.head] != nil && look.headApart ? makeCanvas(width: width, height: height) : nil
             let energyCanvas = parts.contains { $0?.isEnergy == true } ? makeCanvas(width: width, height: height) : nil
@@ -1564,7 +1605,8 @@ final class SpriteLibrary {
                 parts[pixel] = nil
             }
             head = headCanvas?.0.makeImage().map { SKTexture(cgImage: $0) }
-            energy = energyCanvas?.0.makeImage().map { SKTexture(cgImage: $0) }
+            energyImage = energyCanvas?.0.makeImage()
+            energy = energyImage.map { SKTexture(cgImage: $0) }
         }
 
         func neighbours(_ pixel: Int, _ body: (Int) -> Bool) -> Bool {
@@ -1751,7 +1793,7 @@ final class SpriteLibrary {
         guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
         return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline, glowingParts,
-                (recoloured, glowingImage, outlineImage, bareOutlineImage))
+                (recoloured, glowingImage, outlineImage, bareOutlineImage, energyImage))
     }
 
     /// The sheets' white is the ball only on a sheet that holds it, and there only where

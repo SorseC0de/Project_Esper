@@ -43,6 +43,7 @@ VOCALS = {
         "ballout", "ballout2",
         "thatlldoit", "thatlldoit-2", "thatdecidesit",
         "score", "score-2", "score-3", "whatascore",
+        "bucket", "bucket2", "nicebucket", "whatabucket",
         "slamdunk", "slamdunk-2", "slamdunk-3", "dunk",
         "watchthewristwork", "watchthewristwork-2",
         "itsathree",

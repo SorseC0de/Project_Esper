@@ -238,8 +238,17 @@ public struct Opponent: Equatable {
         }
         settleAfterStun(me: me, human: human, into: &input)
         unstick(match, me: me, human: human, into: &input)
+        aimTheFlash(me: me, into: &input)
         pressed = input
         return input
+    }
+
+    /// Flash Fizz's double jump is a flash along the stick: a jump pressed in the air, where it
+    /// stands for the climb a double jump gives, flashes up and the way the stick already leans.
+    private func aimTheFlash(me: Player, into input: inout PlayerInput) {
+        guard me.power == .flashFizz, !me.grounded, input.jump, !pressed.jump else { return }
+        let across = abs(input.stick.x) > 0.3 ? (input.stick.x > 0 ? 1.0 : -1.0) : 0
+        input.stick = Vec2(x: across, y: 1).normalized
     }
 
     // MARK: Helmets

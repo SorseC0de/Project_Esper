@@ -60,6 +60,7 @@ final class SoundBoard {
         case ballOut = "announcer_ballout", ballOut2 = "announcer_ballout2"
         case thatllDoIt = "announcer_thatlldoit", thatllDoIt2 = "announcer_thatlldoit-2", thatDecidesIt = "announcer_thatdecidesit"
         case score = "announcer_score", score2 = "announcer_score-2", score3 = "announcer_score-3", whatAScore = "announcer_whatascore"
+        case bucket = "announcer_bucket", bucket2 = "announcer_bucket2", niceBucket = "announcer_nicebucket", whatABucket = "announcer_whatabucket"
         case slamDunk = "announcer_slamdunk", slamDunk2 = "announcer_slamdunk-2", slamDunk3 = "announcer_slamdunk-3", dunk = "announcer_dunk"
         case wristWork = "announcer_watchthewristwork", wristWork2 = "announcer_watchthewristwork-2"
         case itsAThree = "announcer_itsathree"
@@ -74,7 +75,7 @@ final class SoundBoard {
 
     /// The announcer's lines by what they're for.
     static let gameWinners: [Effect] = [.thatllDoIt, .thatllDoIt2, .thatDecidesIt]
-    static let scores: [Effect] = [.score, .score2, .score3, .whatAScore]
+    static let scores: [Effect] = [.score, .score2, .score3, .whatAScore, .bucket, .bucket2, .niceBucket, .whatABucket]
     static let dunks: [Effect] = [.slamDunk, .slamDunk2, .slamDunk3, .dunk]
     static let wristWorks: [Effect] = [.wristWork, .wristWork2]
     static let winners: [Effect] = [.winner, .winner2, .whatAWin]

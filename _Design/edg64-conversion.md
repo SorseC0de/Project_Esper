@@ -42,11 +42,12 @@ reference player) are in `notes.md`. ✅ done, ⏳ to do.
 ## Stages
 - ✅ The Wreck Center (map, possession pixels, its animated pieces)
 - ✅ Hoop, Hoop_straight, Backboard, Backboard_straight, Hoop_support (and the dark and half-length supports made from it)
-- ⏳ Flight B411's and Hoopfish Hideaway's own backboards and hoops
+- ✅ Flight B411's hoopcase
+- ⏳ Hoopfish Hideaway's own backboards and hoops
 - ⏳ The Elements (with its lava, tornados, fireballs and icicles)
 - ⏳ Hoopfish Hideaway
 - ✅ K&A (map, clouds, broken car, red car; its edge and wash #1A1932, its cones #FFA214)
-- ⏳ Flight B411
+- ✅ Flight B411 (hoopcase, cloud, cart; its other sprites kept as they are, by choice)
 - ⏳ Longball Stadium
 - ⏳ Slamstill Traffic
 

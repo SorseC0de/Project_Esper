@@ -298,10 +298,11 @@ public enum ZRules {
     public static let blastFrames = 60
     public static let chargeFrames = 60
     public static let fireFrames = 30
-    /// On past that while FLO lasts, till the slash is pressed again: a FLO gone every three
-    /// frames (a full bar in five seconds), and whoever and whatever is along it hit again every
-    /// 15, those hits earning nothing and holding nothing still.
-    public static let holdDrainFrames = 3
+    /// On past that, costing nothing, three seconds at most; the slash or the snatch calls it off
+    /// any time after the first second. Whoever and whatever is along it past its own time is hit
+    /// again every 15, those hits earning nothing and holding nothing still.
+    public static let beamMaxFrames = 180
+    public static let beamCancelFrames = 60
     public static let holdRehitFrames = 15
     public static let length = 400.0
     /// How fast it grows out to that, a frame: the whole of it in ten.

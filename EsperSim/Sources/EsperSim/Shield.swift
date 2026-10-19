@@ -81,11 +81,12 @@ public struct Shield: Equatable {
     }
     /// The way its face points: the way the ball off it goes.
     public var normal: Vec2 {
-        let angle = Shield.faceAngle(atAge: arcAge)
+        // A snatch's guard stands upright, facing straight out, the whole time.
+        let angle = guardOnly ? 0 : Shield.faceAngle(atAge: arcAge)
         return Vec2(x: Trig.cos(angle) * side, y: Trig.sin(angle))
     }
     /// Its turn from upright, radians, anticlockwise, mirrored for facing left.
-    public var tilt: Double { Shield.faceAngle(atAge: arcAge) * side }
+    public var tilt: Double { guardOnly ? 0 : Shield.faceAngle(atAge: arcAge) * side }
 
     /// Whether a circle here this big touches its reach.
     public func touches(_ point: Vec2, radius other: Double) -> Bool {
@@ -160,9 +161,9 @@ public enum ShieldRules {
     /// A beam turned back off a perfect shield fires this long.
     public static let turnedBeamFrames = 30
 
-    /// Whether the stick asks for the shield with the snatch: up, at least as much as across.
+    /// Whether the stick asks for the shield with the snatch: up or down, at least as much as across.
     public static func asked(stick: Vec2) -> Bool {
-        stick.y >= stickThreshold && stick.y >= abs(stick.x)
+        abs(stick.y) >= stickThreshold && abs(stick.y) >= abs(stick.x)
     }
 }
 

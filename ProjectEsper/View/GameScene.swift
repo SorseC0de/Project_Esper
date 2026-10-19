@@ -1648,7 +1648,7 @@ final class GameScene: SKScene {
         let variant = FloTuning.variant
         let key = (variant == .fillsFromWord ? 100_000 : 0) + frame * 1000 + flo
         if let made = floBarTextures[key] { return made }
-        let sheet = floSheetImages[frame] ?? sprites.texture("flo_meter", frame).cgImage()
+        let sheet = floSheetImages[frame] ?? sprites.sourceImage("flo_meter_\(frame)")
         floSheetImages[frame] = sheet
         let width = sheet.width, height = sheet.height
         let empty = FloRules.full - min(max(flo, 0), FloRules.full)
@@ -6109,7 +6109,7 @@ final class GameScene: SKScene {
             // Every one of Flash Fizz's teleports, with its flashspark.
             case .warped(_, let from, _), .flashed(_, let from, _): play(.flash, at: from)
             // Gale Ale's thrown tornado goes out of a snatch: the tornado's sound, not the snatch's.
-            case .snatchReached(let index) where !match.players[index].galeCast: play(.snatch, at: body(index))
+            case .snatchReached(let index): play(.snatch, at: body(index))
             case .galeMade(let at, _): play(.gale, at: at)
             case .blastFired(let index, _): play(.blast, at: body(index))
             case .webLine(let index, _): play(.webLine, at: body(index))
@@ -6564,8 +6564,7 @@ final class GameScene: SKScene {
                     }
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
-            // Not Gale Ale's tornado cast, which goes out of a snatch but isn't one.
-            case .snatchReached(let index) where !match.players[index].galeCast:
+            case .snatchReached(let index):
                 let player = match.players[index]
                 let offset = Vec2(x: GameScene.snatchSparkOffset.x * player.facing.sign, y: GameScene.snatchSparkOffset.y) / SpriteLibrary.pixelsPerUnit
                 switch player.power {

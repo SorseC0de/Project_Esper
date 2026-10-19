@@ -324,8 +324,6 @@ public struct Player: Equatable {
     public var dunkFrom = Vec2.zero
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
-    /// Gale Ale at level two: this snatch's reach is the moving tornado's cast, not a reach.
-    public var galeCast = false
     /// Cannon Cola's spare clock: the share of a frame the shot's pose is ahead.
     public var shotClockCarry = 0.0
     /// Super Smoothie's launch: frames left of the climb straight up into flight.
@@ -603,7 +601,7 @@ public struct Player: Equatable {
         state = next
         stateTimer = 0
         if next == .taunt { tauntPaid = false }
-        if next == .snatching { snatchSpent = false } else { galeCast = false }
+        if next == .snatching { snatchSpent = false }
         if next != .flying { launchLeft = 0 }
         if next == .shootStance { shotClockCarry = 0 }
         if next != .spinning { spinPhasing = false }
@@ -1160,9 +1158,8 @@ public struct Player: Equatable {
                 summonFireball(events: &events)
             } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
                 startSnatch()
-            } else if !holding, shootPressed, power == .galeAle, powerLevel >= 2, Player.verticalAsked(input), snatchCooldown == 0 {
-                startSnatch()
-                galeCast = true
+            } else if !holding, shootPressed, power == .galeAle, powerLevel >= 2, Player.verticalAsked(input) {
+                fireBlast()
             } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, Player.verticalAsked(input), wallCooldown == 0 {
                 startWall()
             } else if !holding, shootPressed, power == .voltaCola, boltCooldown == 0 {
@@ -1630,8 +1627,6 @@ public struct Player: Equatable {
                     strikeCooldown = VoltaRules.strikeCooldownFrames
                     wanted = .strikeBolt(x: handCatchPoint.x, bottom: handCatchPoint.y)
                 }
-                // Gale Ale at level two: a tornado off the snatch's spark, the way it faces.
-                if galeCast { wanted = .sendGale(at: handCatchPoint, heading: facing) }
             }
             if stateTimer >= SnatchRules.frames {
                 snatchCooldown = SnatchRules.cooldownFrames
@@ -2004,18 +1999,21 @@ public struct Player: Equatable {
     /// faces; one a cooldown, half as long at level two. Out of the pose, it opens on the sheet's
     /// first two frames and the back arm fires; in it, the next waits for this one's neutral
     /// frame and goes off the other arm.
+    /// Gale Ale's moving tornado (level two) is thrown in the same pose, straight ahead, each off
+    /// the arm the last one wasn't, in the pose or not, so a run of them alternates.
     private mutating func fireBlast() {
+        let gale = power == .galeAle
         guard blastCooldown == 0 else { return }
-        blastCooldown = powerLevel >= 2 ? ZRules.blastCooldownFramesLevelTwo : ZRules.blastCooldownFrames
+        blastCooldown = gale ? GaleRules.castCooldownFrames : (powerLevel >= 2 ? ZRules.blastCooldownFramesLevelTwo : ZRules.blastCooldownFrames)
         if blastStep != nil {
             blastQueued = true
             return
         }
         blastStep = 0
         blastOpened = true
-        blastHand = 0
+        blastHand = gale ? 1 - blastHand : 0
         blastReleased = false
-        blastUp = grounded
+        blastUp = !gale && grounded
     }
 
     /// The blast's pose a frame on: the blast let go as the arm's fully out; at its neutral, the
@@ -2035,15 +2033,20 @@ public struct Player: Equatable {
         let release = blastHand == 0 ? ZRules.blastBackArmRelease : ZRules.blastFrontArmRelease
         if !blastReleased, at < sequence.count, sequence[at] == release, wanted == nil {
             blastReleased = true
-            let angle = blastUp ? degrees(45) : 0
-            wanted = .zBlast(direction: Vec2(x: Trig.cos(angle) * facing.sign, y: Trig.sin(angle)), hand: blastHand)
+            if power == .galeAle {
+                // The tornado from the hand at the end of the arm, straight ahead.
+                wanted = .sendGale(at: blastShoulder + Vec2(x: facing.sign, y: 0) * (ZRules.blastArmPixels * spec.scale / 1.6), heading: facing)
+            } else {
+                let angle = blastUp ? degrees(45) : 0
+                wanted = .zBlast(direction: Vec2(x: Trig.cos(angle) * facing.sign, y: Trig.sin(angle)), hand: blastHand)
+            }
         }
         if at >= sequence.count - 1, blastQueued {
             blastQueued = false
             blastOpened = false
             blastHand = 1 - blastHand
             blastReleased = false
-            blastUp = grounded
+            blastUp = power != .galeAle && grounded
             blastStep = 0
         } else if step >= sequence.count * blastFrameLength + ZRules.blastNeutralHoldFrames {
             blastStep = nil
@@ -2132,9 +2135,8 @@ public struct Player: Equatable {
             enter(.taunt)
         } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
             startSnatch()
-        } else if !holding, shootPressed, power == .galeAle, powerLevel >= 2, Player.verticalAsked(input), snatchCooldown == 0 {
-            startSnatch()
-            galeCast = true
+        } else if !holding, shootPressed, power == .galeAle, powerLevel >= 2, Player.verticalAsked(input) {
+            fireBlast()
         } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, Player.verticalAsked(input), wallCooldown == 0 {
             startWall()
         } else if !holding, shootPressed, power == .voltaCola, boltCooldown == 0 {
@@ -2202,7 +2204,6 @@ public struct Player: Equatable {
     }
 
     private mutating func startSnatch() {
-        galeCast = false
         // Parried a moment ago: the throw button does nothing yet.
         guard attackLockout == 0 else { return }
         fastFalling = false
@@ -2406,7 +2407,7 @@ public struct Player: Equatable {
 
     /// The body, the part of the snatch's reach that isn't the hand's ring, while the hand is out.
     public var snatchHitbox: Box? {
-        guard state == .snatching, !galeCast, frozen == 0, SnatchRules.activeFrames.contains(stateTimer) else { return nil }
+        guard state == .snatching, frozen == 0, SnatchRules.activeFrames.contains(stateTimer) else { return nil }
         return body
     }
 

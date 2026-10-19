@@ -239,6 +239,9 @@ public enum GaleRules {
     public static let stillFrames = 120
     public static let snatchFrames = 240
     public static let snatchSpeed = 3.0
+    /// Level two's moving tornados, thrown in Z Tea's blast pose: one this often, the snatch's
+    /// length that threw them before.
+    public static var castCooldownFrames: Int { SnatchRules.frames }
 }
 
 /// Z Tea. On the ground the slash charges for a second, committed, only the jump

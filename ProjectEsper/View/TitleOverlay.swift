@@ -279,6 +279,7 @@ final class FlowState: ObservableObject {
         multiplayerPage = .menu
         // On PLAY NOW, past the modes.
         multiplayerCursor = FlowState.onlineModes.count
+        // Game Center's sign-in, first asked for here, not at launch.
         net.signIn()
         if zonesOnlinePicked { net.loadTurnMatches() }
     }
@@ -424,7 +425,8 @@ final class FlowState: ObservableObject {
         titleCursor = item
         let busy: Bool
         switch net.state {
-        case .signingIn, .finding, .connecting, .connected: busy = true
+        // Signing in holds nothing up: it only starts from the multiplayer screen.
+        case .finding, .connecting, .connected: busy = true
         default: busy = false
         }
         let defaults = UserDefaults.standard
@@ -505,7 +507,7 @@ struct TitleOverlay: View {
 
     private var busy: Bool {
         switch net.state {
-        case .signingIn, .finding, .connecting, .connected: true
+        case .finding, .connecting, .connected: true
         default: false
         }
     }
@@ -606,7 +608,6 @@ struct TitleOverlay: View {
             }
         }
         .environment(\.colorScheme, .dark)
-        .onAppear { net.signIn() }
     }
 
     /// The Variaball logo standing in for the name in a debug build.

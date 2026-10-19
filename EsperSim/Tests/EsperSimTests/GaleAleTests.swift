@@ -92,4 +92,24 @@ final class GaleAleTests: XCTestCase {
         // Let go by the wall, on the right.
         XCTAssertGreaterThan(match.ball.position.x, 250)
     }
+
+    func testLevelTwosTornadosAreThrownInTheBlastPoseOffEachArmInTurn() {
+        var match = court(level: 2)
+        match.players[0].facing = .right
+        var hands: [Int] = []
+        // Three separate presses, each after the last pose has ended.
+        for press in 0..<3 {
+            for frame in 0..<120 {
+                match.advance(inputs: [frame == 0 ? PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true) : .idle, .idle])
+                if frame == 0 { XCTAssertNotNil(match.players[0].blastStep, "press \(press): the blast pose") }
+                if frame == 0 { XCTAssertNotEqual(match.players[0].state, .snatching) }
+                if match.events.contains(where: { if case .galeMade(_, true) = $0 { return true } else { return false } }) {
+                    hands.append(match.players[0].blastHand)
+                }
+            }
+        }
+        XCTAssertEqual(hands.count, 3)
+        XCTAssertEqual(hands, [1, 0, 1], "each tornado off the other arm from the last")
+        XCTAssertTrue(match.gales.allSatisfy { $0.velocity.y == 0 }, "straight ahead")
+    }
 }

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder.AppleTV.Storyboard" version="3.0" toolsVersion="23504" targetRuntime="AppleTV" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="LaunchTV">
+    <device id="appleTV" appearance="dark"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23506"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--The TV's splash screen: the background stretched to 16:9 and the emblem kept round, made for the screen whole.-->
+        <scene sceneID="LaunchTVScene">
+            <objects>
+                <viewController id="LaunchTV" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="LaunchTVView">
+                        <rect key="frame" x="0.0" y="0.0" width="1920" height="1080"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="SplashscreenTV" translatesAutoresizingMaskIntoConstraints="NO" id="LaunchTVImage">
+                                <rect key="frame" x="0.0" y="0.0" width="1920" height="1080"/>
+                            </imageView>
+                        </subviews>
+                        <color key="backgroundColor" red="0.13725490196078433" green="0.12156862745098039" blue="0.12549019607843137" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="LaunchTVImage" firstAttribute="top" secondItem="LaunchTVView" secondAttribute="top" id="LaunchTVTop"/>
+                            <constraint firstItem="LaunchTVImage" firstAttribute="bottom" secondItem="LaunchTVView" secondAttribute="bottom" id="LaunchTVBottom"/>
+                            <constraint firstItem="LaunchTVImage" firstAttribute="leading" secondItem="LaunchTVView" secondAttribute="leading" id="LaunchTVLeading"/>
+                            <constraint firstItem="LaunchTVImage" firstAttribute="trailing" secondItem="LaunchTVView" secondAttribute="trailing" id="LaunchTVTrailing"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="LaunchTVResponder" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0" y="0"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="SplashscreenTV" width="1920" height="1080"/>
+    </resources>
+</document>

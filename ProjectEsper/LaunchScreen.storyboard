@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="Launch">
+    <device id="retina6_12" orientation="landscape" appearance="dark"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23506"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--The splash screen, whole on any screen: fitted, never cropped, on its own ground's colour.-->
+        <scene sceneID="LaunchScene">
+            <objects>
+                <viewController id="Launch" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="LaunchView">
+                        <rect key="frame" x="0.0" y="0.0" width="852" height="393"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="Splashscreen" translatesAutoresizingMaskIntoConstraints="NO" id="LaunchImage">
+                                <rect key="frame" x="0.0" y="0.0" width="852" height="393"/>
+                            </imageView>
+                        </subviews>
+                        <color key="backgroundColor" red="0.13725490196078433" green="0.12156862745098039" blue="0.12549019607843137" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="LaunchImage" firstAttribute="top" secondItem="LaunchView" secondAttribute="top" id="LaunchTop"/>
+                            <constraint firstItem="LaunchImage" firstAttribute="bottom" secondItem="LaunchView" secondAttribute="bottom" id="LaunchBottom"/>
+                            <constraint firstItem="LaunchImage" firstAttribute="leading" secondItem="LaunchView" secondAttribute="leading" id="LaunchLeading"/>
+                            <constraint firstItem="LaunchImage" firstAttribute="trailing" secondItem="LaunchView" secondAttribute="trailing" id="LaunchTrailing"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="LaunchResponder" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0" y="0"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="Splashscreen" width="4396" height="2101"/>
+    </resources>
+</document>

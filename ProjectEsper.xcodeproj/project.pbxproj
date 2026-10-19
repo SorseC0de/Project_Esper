@@ -16,9 +16,30 @@
 		E5FE00000000000000000117 /* ProjectEsperTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ProjectEsperTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E5FE0000000000000000F001 /* Exceptions for "ProjectEsper" folder in "ProjectEsperTV" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				LaunchScreen.storyboard,
+			);
+			target = E5FE00000000000000000111 /* ProjectEsperTV */;
+		};
+		E5FE0000000000000000F002 /* Exceptions for "ProjectEsper" folder in "ProjectEsper" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				LaunchScreenTV.storyboard,
+			);
+			target = E5FE000000000000000000E1 /* ProjectEsper */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E5FE000000000000000000B1 /* ProjectEsper */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E5FE0000000000000000F002 /* Exceptions for "ProjectEsper" folder in "ProjectEsper" target */,
+				E5FE0000000000000000F001 /* Exceptions for "ProjectEsper" folder in "ProjectEsperTV" target */,
+			);
 			path = ProjectEsper;
 			sourceTree = "<group>";
 		};
@@ -274,7 +295,7 @@
 				INFOPLIST_KEY_NSGKFriendListUsageDescription = "Your Game Center friends, to invite one to a match.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -310,7 +331,7 @@
 				INFOPLIST_KEY_NSGKFriendListUsageDescription = "Your Game Center friends, to invite one to a match.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -346,6 +367,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSGKFriendListUsageDescription = "Your Game Center friends, to invite one to a match.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreenTV;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -379,6 +401,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSGKFriendListUsageDescription = "Your Game Center friends, to invite one to a match.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreenTV;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

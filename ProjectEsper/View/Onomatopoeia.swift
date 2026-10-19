@@ -236,10 +236,11 @@ enum Onomatopoeia {
     private static let tuck: CGFloat = 0.1
     private static let stroke: CGFloat = 0.1
     private static let drop: CGFloat = 0.12
-    private static let steps = 16
     /// Pixels a point the lettering is drawn at, so it stays crisp scaled up into the world.
     private static let renderScale: CGFloat = 3
     nonisolated(unsafe) private static var cache: [Word: (texture: SKTexture, capShare: CGFloat)] = [:]
+    /// The same pictures for SwiftUI, kept as drawn: never copied back off the GPU.
+    nonisolated(unsafe) private static var pictures: [Word: UIImage] = [:]
 
     /// Every word drawn ahead in the picked face, so none is first drawn mid-match.
     static func warmed() -> [SKTexture] {
@@ -309,8 +310,8 @@ enum Onomatopoeia {
     static func picture(_ text: String, face: Lettering, colours: Colours, growsLeft: Bool, height: CGFloat,
                         spacing: CGFloat = 0, fontName: String? = nil) -> (image: UIImage, height: CGFloat) {
         let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft, spacing: spacing, face: fontName)
-        let (texture, capShare) = rendered(word)
-        return (UIImage(cgImage: texture.cgImage()), height * face.scale / capShare)
+        let (_, capShare) = rendered(word)
+        return (pictures[word] ?? UIImage(), height * face.scale / capShare)
     }
 
     /// A sprite's warp: its left and right ends `left` and `right` times its middle's height,
@@ -420,11 +421,18 @@ enum Onomatopoeia {
             for shift in [layout.shadow, 0] {
                 eachLetter(shift: shift) { letter, size, origin in
                     let letterRing = layout.ring * size / layout.largest
+                    // The glyph's own outline stroked round, its inside filled: smooth at every corner.
+                    let path = glyphPath(letter, at: origin)
                     split(cg, size: size, upper: lineUpper, lower: lineLower) { colour in
-                        for step in 0..<steps {
-                            let angle = CGFloat(step) * 2 * .pi / CGFloat(steps)
-                            text(letter, colour, at: CGPoint(x: origin.x + cos(angle) * letterRing, y: origin.y + sin(angle) * letterRing))
-                        }
+                        cg.addPath(path)
+                        cg.setFillColor(colour.cgColor)
+                        cg.fillPath()
+                        cg.addPath(path)
+                        cg.setStrokeColor(colour.cgColor)
+                        cg.setLineWidth(letterRing * 2)
+                        cg.setLineJoin(.round)
+                        cg.setLineCap(.round)
+                        cg.strokePath()
                     }
                 }
             }
@@ -448,6 +456,7 @@ enum Onomatopoeia {
         }
         let result = (SKTexture(image: image), laid.capShare)
         cache[word] = result
+        pictures[word] = image
         return result
     }
 
@@ -493,6 +502,30 @@ enum Onomatopoeia {
     }
 
     /// The fill drawn twice, `upper` above the letter's middle and `lower` under it.
+    /// A letter's glyphs as a path, set as `NSString.draw(at:)` sets them at `origin` (the line's
+    /// top left, y down), for its outline to be stroked.
+    private static func glyphPath(_ letter: Letter, at origin: CGPoint) -> CGPath {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: letter.text, attributes: [.font: letter.font]))
+        let path = CGMutablePath()
+        for run in CTLineGetGlyphRuns(line) as? [CTRun] ?? [] {
+            let count = CTRunGetGlyphCount(run)
+            var glyphs = [CGGlyph](repeating: 0, count: count)
+            var positions = [CGPoint](repeating: .zero, count: count)
+            CTRunGetGlyphs(run, CFRange(), &glyphs)
+            CTRunGetPositions(run, CFRange(), &positions)
+            let attributes = CTRunGetAttributes(run) as NSDictionary
+            let runFont = attributes[kCTFontAttributeName] as! CTFont
+            for index in 0..<count {
+                guard let glyph = CTFontCreatePathForGlyph(runFont, glyphs[index], nil) else { continue }
+                // Glyphs are y up from the baseline; the line's baseline is its ascender down.
+                let place = CGAffineTransform(translationX: origin.x + positions[index].x, y: origin.y + letter.font.ascender + positions[index].y)
+                    .scaledBy(x: 1, y: -1)
+                path.addPath(glyph, transform: place)
+            }
+        }
+        return path
+    }
+
     private static func split(_ cg: CGContext, size: CGFloat, upper: UIColor, lower: UIColor, draw: (UIColor) -> Void) {
         for (colour, rect) in [(upper, CGRect(x: -size * 2, y: -size * 2, width: size * 4, height: size * 2)),
                                (lower, CGRect(x: -size * 2, y: 0, width: size * 4, height: size * 2))] {

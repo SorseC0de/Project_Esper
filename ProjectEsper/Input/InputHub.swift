@@ -1,6 +1,7 @@
 import EsperSim
 import Foundation
 import GameController
+import UIKit
 
 /// Where each player's input comes from: see `controller(for:)`. By default a controller
 /// plays player 0 alongside touch and the keyboard; VS HUMAN on a phone or iPad makes a
@@ -57,13 +58,28 @@ final class InputHub {
 
     func activate() {
         guard observers.isEmpty else { return }
+        // On a Mac the pads otherwise go quiet whenever the window isn't the key one, and come
+        // back only once it's made key again; read them whatever has the focus.
+        GCController.shouldMonitorBackgroundEvents = true
         let center = NotificationCenter.default
-        for name in [Notification.Name.GCControllerDidConnect, .GCControllerDidDisconnect] {
+        // The pads looked for again on coming back to the front, as well as as they come and go.
+        for name in [Notification.Name.GCControllerDidConnect, .GCControllerDidDisconnect, UIApplication.didBecomeActiveNotification] {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refresh() }
             })
         }
         refresh()
+    }
+
+    /// Frames since the pads were last looked for: a pad the system has that the list missed
+    /// (a connect never announced) is picked up within a second.
+    private var framesSinceLook = 0
+    private func lookForMissedPads() {
+        framesSinceLook += 1
+        guard framesSinceLook >= 60 else { return }
+        framesSinceLook = 0
+        let present = GCController.controllers().filter { $0.extendedGamepad != nil }
+        if present.count != controllers.count || zip(present, controllers).contains(where: { $0 !== $1 }) { refresh() }
     }
 
     private func refresh() {
@@ -83,6 +99,7 @@ final class InputHub {
 
     /// This frame's input for every player.
     func frames(players: Int) -> [PlayerInput] {
+        lookForMissedPads()
         #if !os(tvOS)
         let menuDown = controllers.contains { $0.extendedGamepad?.buttonMenu.isPressed ?? false }
         if menuDown, !menuWasDown { pausePressed = true }
@@ -119,7 +136,7 @@ final class InputHub {
         }
     }
 
-    /// The keyboard as a pad: WASD the stick, space jump, J shoot, K throw, I or O shield. Esc quits,
+    /// The keyboard as a pad: WASD the stick, space jump, J shoot, K throw (up and K, on defence, the shield). Esc quits,
     /// on a Mac or the simulator only.
     private func keyboard() -> PlayerInput {
         guard let keys = GCKeyboard.coalesced?.keyboardInput else { return .idle }
@@ -133,7 +150,6 @@ final class InputHub {
         input.jump = down(.spacebar)
         input.shoot = down(.keyJ)
         input.throwBall = down(.keyK)
-        input.shield = down(.keyI) || down(.keyO)
         return input
     }
 
@@ -201,7 +217,7 @@ final class InputHub {
     }
 
     /// A: jump. B and the right bumper: shoot, each its own button so a second one cancels a
-    /// shot. X: throw. Y: taunt. Either trigger: shield. The left bumper steps the POWER
+    /// shot. X: throw. Y: taunt. Up and X, on defence: the shield. The left bumper steps the POWER
     /// picker, the menu button pauses, and clicking the right stick switches the computer.
     /// The right stick aims a stance; failing that, the left stick does.
     private func read(_ pad: GCExtendedGamepad) -> PlayerInput {
@@ -215,7 +231,6 @@ final class InputHub {
         input.shootButtons = (pad.buttonB.isPressed ? 1 : 0) | (pad.rightShoulder.isPressed ? 2 : 0)
         input.throwBall = pad.buttonX.isPressed
         input.taunt = pad.buttonY.isPressed
-        input.shield = pad.leftTrigger.isPressed || pad.rightTrigger.isPressed
         return input
     }
 

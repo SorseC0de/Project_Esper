@@ -119,7 +119,8 @@ enum Onomatopoeia {
             case .hit: ("WHAM!", "ドゴッ！", "¡ZAS!", 22, 5, 16)
             case .steal: ("SMACK!", "バシッ！", "¡PAF!", 22, 26, 16)
             case .spike: ("THWACK!", "バチィン！", "¡ZASCA!", 9, 5, 16)
-            case .parry: ("TING!", "キィン！", "¡CLING!", 22, 39, 16)
+            // Any counter, the biggest word, teal over blue.
+            case .parry: ("COUNTER!!", "カウンター！！", "¡¡CONTRA!!", 20, 18, 20)
             case .clang: ("CLANG", "ガキン", "CLANC", 39, 41, 14)
             case .squeak: ("SQUEAK", "キュッ", "ÑIC", 22, 37, 5)
             // Footsteps, small by the feet.
@@ -146,7 +147,7 @@ enum Onomatopoeia {
         /// A power's or a stage's own word: said with a generic one on the same action, it's the one shown.
         var isSpecial: Bool { [.beam, .quake, .freeze, .explosion, .sizzle, .shatter, .thunder].contains(self) }
         /// Which word an action says when it makes several at once: a power's or a stage's over the
-        /// outcome of a contest (TING!, CLANG), over a blow (WHAM!, SMACK!, THWACK!), over the rest.
+        /// outcome of a contest (COUNTER!!, CLANG), over a blow (WHAM!, SMACK!, THWACK!), over the rest.
         var rank: Int {
             if isSpecial { return 3 }
             switch self {

@@ -348,6 +348,11 @@ enum HumanLook {
     /// darker the back's, each back the next skin's front. Three more are to be unlocked.
     static let skinTones: [(front: RGB, back: RGB)] = [(0xF6CA9F, 0xE69C69), (0xE69C69, 0xBF6F4A), (0xBF6F4A, 0x8A4836),
                                                        (0x8A4836, 0x5D2C28), (0x5D2C28, 0x391F21)]
+    /// The three to be unlocked, after them: silver, gold and onyx. Not on the customize screen yet.
+    static let lockedSkinTones: [(front: RGB, back: RGB)] = [(0xB4B4B4, 0x858585), (0xEDAB50, 0xE07438), (0x657392, 0x424C6E)]
+    static var everySkinTone: [(front: RGB, back: RGB)] { skinTones + lockedSkinTones }
+    /// Onyx: the Test Center's dummy's.
+    static var onyxSkinTone: Int { skinTones.count + 2 }
     /// The second, the bodies' before the customize screen.
     static let defaultSkinTone = 1
     /// What shows bare with nothing over it: the head, the arms and hands, the lower legs.
@@ -395,7 +400,7 @@ struct Dressing: Hashable, Codable {
         return turned
     }
 
-    var tone: (front: RGB, back: RGB) { HumanLook.skinTones[min(max(skinTone, 0), HumanLook.skinTones.count - 1)] }
+    var tone: (front: RGB, back: RGB) { HumanLook.everySkinTone[min(max(skinTone, 0), HumanLook.everySkinTone.count - 1)] }
 
     /// The parts in skin, by the tone's front and back.
     var skin: [BodyPart: RGB] {

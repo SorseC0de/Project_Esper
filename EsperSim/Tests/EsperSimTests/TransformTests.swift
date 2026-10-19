@@ -220,7 +220,7 @@ final class TransformTests: XCTestCase {
         XCTAssertGreaterThan(match.players[0].floStateLockout, 0)
     }
 
-    func testItRunsATenthFaster() {
+    func testItRunsNoFasterOnItsOwn() {
         var plain = standing(), flo = standing()
         flo.players[0].inFloState = true
         flo.players[0].flo = 100
@@ -228,6 +228,6 @@ final class TransformTests: XCTestCase {
             plain.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle])
             flo.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle])
         }
-        XCTAssertEqual(flo.players[0].velocity.x, plain.players[0].velocity.x * FloStateRules.speedShare, accuracy: 0.001)
+        XCTAssertEqual(flo.players[0].velocity.x, plain.players[0].velocity.x, accuracy: 0.001, "the speed's Hasty Horchata's now")
     }
 }

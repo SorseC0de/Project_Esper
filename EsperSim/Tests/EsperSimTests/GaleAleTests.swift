@@ -78,7 +78,8 @@ final class GaleAleTests: XCTestCase {
         match.ball.holder = 1
         var sent = false, carried = false, burst = false
         for frame in 0..<200 where !burst {
-            match.advance(inputs: [PlayerInput(throwBall: frame == 0), .idle])
+            // Up and shoot casts it.
+            match.advance(inputs: [frame == 0 ? PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true) : .idle, .idle])
             if match.gales.contains(where: \.snatching) { sent = true }
             if match.gales.contains(where: \.carrying) { carried = true }
             burst = match.events.contains { if case .galeBurst = $0 { return true } else { return false } }

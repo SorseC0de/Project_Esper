@@ -240,8 +240,9 @@ final class TouchControls: SKNode {
         buttons = [jump.button, shoot.button, throwButton.button]
         buttonSets = [jump.set, shoot.set, throwButton.set]
         homes = buttons.map(\.node.position)
-        // The shield's: a capsule round the shoot button's upper side, a small gap off its ring,
-        // as the GameCube's X round its A; it goes where the shoot button goes, at its size.
+        // The shield's: a capsule round the throw (snatch) button, a small gap off its ring, shown
+        // only on defence; it goes where the throw button goes, at its size.
+        shieldButton.isHidden = true
         addChild(shieldButton)
         applyPlaces()
 
@@ -304,7 +305,7 @@ final class TouchControls: SKNode {
     // MARK: The player's layout
 
     /// Each round button moved from its home and sized, as the player left it in the layout
-    /// editor (BUTTON LAYOUT on the pause), kept on this device; the shield's goes with the shoot's.
+    /// editor (BUTTON LAYOUT on the pause), kept on this device; the shield's goes with the throw's.
     struct ButtonPlace: Codable, Equatable {
         var x: CGFloat = 0
         var y: CGFloat = 0
@@ -323,7 +324,7 @@ final class TouchControls: SKNode {
 
     private func place(_ index: Int) -> ButtonPlace { places[TouchControls.placeNames[index]] ?? ButtonPlace() }
 
-    /// Every button where and how big its place has it, and the shield's round the shoot's.
+    /// Every button where and how big its place has it, and the shield's round the throw's.
     private func applyPlaces() {
         for index in buttons.indices where homes.indices.contains(index) {
             let place = place(index)
@@ -331,10 +332,10 @@ final class TouchControls: SKNode {
             buttons[index].node.setScale(place.scale)
         }
         let k = TouchControls.scale
-        let shoot = buttons[1], size = place(1).scale
-        shieldCentre = shoot.node.position
+        let snatch = buttons[TouchControls.shieldHost], size = place(TouchControls.shieldHost).scale
+        shieldCentre = snatch.node.position
         shieldThickness = TouchControls.shieldThickness * k * size
-        shieldBandRadius = shoot.radius * size + TouchControls.shieldGap * k * size + shieldThickness / 2
+        shieldBandRadius = snatch.radius * size + TouchControls.shieldGap * k * size + shieldThickness / 2
         drawShieldButton(lit: shieldTouch != nil)
     }
 
@@ -383,6 +384,7 @@ final class TouchControls: SKNode {
         editDone = done
         editReset = reset
         for index in buttons.indices { buttons[index].ring.color = TouchControls.lit }
+        setShieldShown(shieldWanted)
     }
 
     private func endEditing() {
@@ -392,6 +394,7 @@ final class TouchControls: SKNode {
         editPoints = [:]
         editTarget = nil
         for index in buttons.indices { buttons[index].ring.color = TouchControls.line }
+        setShieldShown(shieldWanted)
         if let data = try? JSONEncoder().encode(places) { UserDefaults.standard.set(data, forKey: TouchControls.placesKey) }
         let done = onEditDone
         onEditDone = nil
@@ -417,7 +420,7 @@ final class TouchControls: SKNode {
             return
         }
         let onShield = onShieldButton(point)
-        guard let hit = onShield ? (1, 0) : button(at: point) else { return }
+        guard let hit = onShield ? (TouchControls.shieldHost, 0) : button(at: point) else { return }
         let node = buttons[hit.index].node
         editTarget = (hit.index, CGPoint(x: point.x - node.position.x, y: point.y - node.position.y), place(hit.index).scale, nil)
     }
@@ -462,16 +465,39 @@ final class TouchControls: SKNode {
 
     // MARK: The shield's button
 
-    /// The capsule: its band this far off the shoot ring, this thick, over these angles from the right.
-    private static let shieldGap: CGFloat = 5
+    /// The button the capsule goes round: throw, the snatch on defence.
+    private static let shieldHost = 2
+    /// The capsule (SHIELD GAP, LENGTH, ANGLE): its band this far off the throw ring, this many
+    /// degrees long, its middle this many degrees round from the right; this thick.
+    static var shieldGap: CGFloat = 5
+    static var shieldLengthDegrees: CGFloat = 120
+    static var shieldAngleDegrees: CGFloat = 80
     private static let shieldThickness: CGFloat = 16
-    private static let shieldArc: ClosedRange<CGFloat> = (20 * .pi / 180)...(140 * .pi / 180)
+    private static var shieldArc: ClosedRange<CGFloat> {
+        let middle = shieldAngleDegrees * .pi / 180, half = shieldLengthDegrees * .pi / 360
+        return (middle - half)...(middle + half)
+    }
+    /// The capsule redrawn after its sliders move.
+    func relayoutShield() { applyPlaces() }
+    /// The capsule shown only while the other player has the ball.
+    func setShieldShown(_ shown: Bool) {
+        shieldWanted = shown
+        let visible = shown || editing
+        guard shieldButton.isHidden == visible else { return }
+        shieldButton.isHidden = !visible
+        if !visible, shieldTouch != nil {
+            shieldTouch = nil
+            input.shield = false
+            drawShieldButton(lit: false)
+        }
+    }
     private let shieldButton = SKShapeNode()
     private let shieldLabel = Futuristic.label("SHIELD", size: 8)
     private var shieldCentre = CGPoint.zero
     private var shieldBandRadius: CGFloat = 0
     private var shieldThickness: CGFloat = 0
     private var shieldTouch: UITouch?
+    private var shieldWanted = false
 
     /// The band's outline, round at both ends: gold and filled while held.
     private func drawShieldButton(lit: Bool) {
@@ -505,11 +531,13 @@ final class TouchControls: SKNode {
     private func onShieldButton(_ point: CGPoint) -> Bool {
         guard !shieldButton.isHidden else { return false }
         let dx = point.x - shieldCentre.x, dy = point.y - shieldCentre.y
-        var angle = atan2(dy, dx)
-        if angle < -.pi / 2 { angle += 2 * .pi }
+        // The angle off the band's middle, either way round.
+        let middle = TouchControls.shieldAngleDegrees * .pi / 180
+        var off = atan2(dy, dx) - middle
+        off = atan2(sin(off), cos(off))
         let spare: CGFloat = 4 * TouchControls.scale, angleSpare: CGFloat = 8 * .pi / 180
         return abs(hypot(dx, dy) - shieldBandRadius) <= shieldThickness / 2 + spare
-            && angle >= TouchControls.shieldArc.lowerBound - angleSpare && angle <= TouchControls.shieldArc.upperBound + angleSpare
+            && abs(off) <= TouchControls.shieldLengthDegrees * .pi / 360 + angleSpare
     }
 
     /// A round button held or let go: gold while held, its ring turning a full circle as it goes down.
@@ -559,8 +587,9 @@ final class TouchControls: SKNode {
         let slider = Slider(title: title, range: range, notch: notch, value: value, onChange: onChange)
         addChild(slider)
         sliders.append(slider)
-        // Eight to a column, the columns side by side about the middle, so a long set fits.
-        let perColumn = 8
+        // As many to a column as fit down the screen above the pad (eight at least), the columns
+        // side by side about the middle, so a long set stays clear of the pickers at the left.
+        let perColumn = sliderRows
         let columns = (sliders.count + perColumn - 1) / perColumn
         for (index, placed) in sliders.enumerated() {
             let column = CGFloat(index / perColumn) - CGFloat(columns - 1) / 2
@@ -584,8 +613,10 @@ final class TouchControls: SKNode {
     /// Under the sliders across the top, or under the score with none.
     var slidersBottom: CGFloat {
         guard slidersOpen else { return topCentre.y - 30 - TouchControls.benchTabSize.height }
-        return topCentre.y - TouchControls.slidersTop - CGFloat(max(min(sliders.count, 8) - 1, 0)) * 16 - 10
+        return topCentre.y - TouchControls.slidersTop - CGFloat(max(min(sliders.count, sliderRows) - 1, 0)) * 16 - 10
     }
+    /// Sliders to a column: down to the pad's height, above the buttons.
+    private var sliderRows: Int { max(8, Int((safeBounds.height - TouchControls.slidersTop - 130) / 16)) }
 
     /// Where the next picker goes, under the tab and the ones there.
     private var pickersBottom: CGFloat {

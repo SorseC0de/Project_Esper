@@ -54,6 +54,8 @@ public enum MatchEvent: Equatable {
     case slashClanked(player: Int)
     /// Both blades met each other: a slashclash, where they met.
     case slashClashed(at: Vec2)
+    /// Two snatches' reaches meeting.
+    case snatchClashed(at: Vec2)
     /// The snatch's hand is at full stretch.
     case snatchReached(player: Int)
     /// FLO earned, this much, from a play there: the rim of a basket, a counter, a snatch, a
@@ -72,6 +74,8 @@ public enum MatchEvent: Equatable {
     case struck(player: Int, by: Int)
     /// A snatch met a live blade: the slasher is the one stripped.
     case parried(player: Int, by: Int)
+    /// `player` countered by `by`: a parry, a snatch on a shield, a throw into one, a slash on a snatch.
+    case countered(player: Int, by: Int, at: Vec2)
     /// Someone's feet went into the lava and they went back to their start.
     case lavaBurned(player: Int)
     /// Something fell into the lava here: a body, or the ball.
@@ -99,6 +103,8 @@ public enum MatchEvent: Equatable {
     case cloneShattered(at: Vec2)
     case flameLeft(player: Int, at: Vec2)
     case fireballMade(player: Int)
+    /// A fireball in flight snatched or caught, held now as if made.
+    case fireballTaken(player: Int)
     case fireballThrown(player: Int)
     case fireballBurst(at: Vec2)
     case pulsed(player: Int, pull: Bool)
@@ -107,9 +113,19 @@ public enum MatchEvent: Equatable {
     case pushed(player: Int, by: Int, ball: Bool)
     /// Shielding (`Shield.swift`): one raised, one broken, the ball off one, and a perfect one.
     case shieldRaised(player: Int, at: Vec2)
+    case blastFired(player: Int, hand: Int)
+    case blastBurst(at: Vec2)
+    /// The Spin Move, with the FLO for its phasing or without.
+    case spun(player: Int, phasing: Bool)
+    /// The Spin Move asked for again in the same airtime: nothing happens (its "can't" sound to come).
+    case spinRefused(player: Int)
     case shieldBroken(player: Int, at: Vec2)
     case shieldReflected(player: Int, at: Vec2)
     case shieldPerfect(player: Int, at: Vec2)
+    /// A thrown power stopped on `player`'s shield, not turned back.
+    case powerBlocked(player: Int, at: Vec2)
+    /// Two shields raised into each other, as they were when they met.
+    case shieldClashed(at: Vec2, first: Shield, second: Shield)
 }
 
 /// What a player's step asks the match to do with the ball.
@@ -140,4 +156,10 @@ public enum PlayerAction: Equatable {
     case snipe(at: Vec2, pull: Bool)
     /// The snatch with the stick held a way: a shield at the hand.
     case raiseShield
+    /// Z Tea's blast, off this hand (0 or 1, by turns through a run of them).
+    case zBlast(direction: Vec2, hand: Int)
+    /// The Spin Move under way: its foot, where it is, kicks off a body it touches.
+    case spin
+    /// A down throw with the Spin Move already spent this airtime: nothing, for its sound.
+    case spinRefused
 }

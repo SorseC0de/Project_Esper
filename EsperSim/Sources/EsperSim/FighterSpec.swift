@@ -66,6 +66,15 @@ public struct FighterSpec: Equatable {
     /// A slide lasts this many frames and bleeds only this much a frame, so it carries
     /// the burst it started with; Slide Cider adds frames.
     public var slideFrames = 20
+    /// Slide Cider's level: one, the slide knocks harder and catches the ball; two, it stuns too.
+    public var slideCiderLevel = 0
+    /// Guarderade: a bigger shield, and at level two a second before landing. Shelter Seltzer:
+    /// the shield lingers where it ends, and at level two every snatch raises one.
+    public var guarderadeLevel = 0
+    public var shelterSeltzerLevel = 0
+    /// Quake-Up Coffee's level: one, a fast fall's landing quakes the floor it's on and falls
+    /// faster; two, the quake shakes every floor.
+    public var quakeLevel = 0
     public var slideFriction = 0.02
     /// A third jump's speed, when there is one: Jumper Juice's second drink.
     public var thirdJumpVelocity = 0.0
@@ -278,6 +287,47 @@ public enum BallRules {
     public static let shotAngleMin = degrees(25)
     public static let shotAngleMax = degrees(80)
     public static let shotAngleDefault = degrees(53)
+    /// The preset arc, a shot with no flick (ARC HEIGHT, ARC DISTANCE): its peak this high over
+    /// the release, back down to the release's height this far ahead, in units.
+    public static var presetArcHeight = 50.0
+    public static var presetArcDistance = 150.0
+    /// The preset arc aimed at the shooter's own rim: its peak ARC HEIGHT over the higher of the
+    /// release and the rim, coming down onto the rim from wherever it's let go. Off (the ARC AIM
+    /// picker's FIXED), it peaks ARC HEIGHT over the release and goes ARC DISTANCE the way the body faces.
+    public static var presetAimsAtRim = true
+    /// The auto-aim only within this far across of the rim (AIM RANGE), and only facing it;
+    /// otherwise the fixed arc the way the body faces. Never closer than three tiles: nearer, its
+    /// arc goes up high and narrow, and it's the floater's and the layup's ground.
+    public static var autoAimRange = 160.0
+    public static let autoAimMinimum = 3 * Stage.tileSize
+    /// The preset arc's release from `from`, peaking ARC HEIGHT over the higher of it and `rim`
+    /// and coming down at `rim`: up fast enough for the peak, across fast enough to be over the
+    /// rim as it falls to its height.
+    /// `gravityShare`: the pull the ball's under there (half under water, leaned on a pitched stage).
+    public static func presetArcVelocity(from: Vec2, to rim: Vec2, gravityShare: Double = 1, height: Double = presetArcHeight) -> Vec2 {
+        presetArc(from: from, to: rim, gravityShare: gravityShare, height: height).velocity
+    }
+    /// The same, and how many frames it takes to come down to the rim.
+    public static func presetArc(from: Vec2, to rim: Vec2, gravityShare: Double = 1, height: Double = presetArcHeight) -> (velocity: Vec2, frames: Double) {
+        let pull = gravity * gravityShare
+        let rise = rim.y - from.y
+        let peak = max(rise, 0) + max(height, 1)
+        let up = (pull + (pull * pull + 8 * pull * peak).squareRoot()) / 2
+        // Frames to come back down to the rim's height: y(t) = up·t − g·t(t+1)/2, the later root.
+        let b = up - pull / 2
+        let frames = max((b + max(b * b - 2 * pull * rise, 0).squareRoot()) / pull, 1)
+        return (Vec2(x: (rim.x - from.x) / frames, y: up), frames)
+    }
+    /// The preset arc's release, the way the body faces: up fast enough to peak at its height,
+    /// across fast enough to come back down to the release's height at its distance.
+    public static func presetArcVelocity(sign: Double) -> Vec2 {
+        // A frame's fall comes off before each step: the peak is n·vy − g·n(n+1)/2.
+        let up = (gravity + (gravity * gravity + 8 * gravity * max(presetArcHeight, 1)).squareRoot()) / 2
+        let frames = max(2 * up / gravity - 1, 1)
+        return Vec2(x: presetArcDistance / frames * sign, y: up)
+    }
+    /// A way aimed this many frames before the throw's press still sets the throw's way.
+    public static let throwAimBufferFrames = 6
     /// Aim length the flick has to reach to count.
     public static let flickThreshold = 0.5
     /// Frames from taking the stance to being able to release. Letting go always follows
@@ -291,11 +341,24 @@ public enum BallRules {
     public static let shotReleaseFrames = 5
     public static let shotRecoveryFrames = 10
     public static let shotHangFrames = 18
+    /// The floater's pose held this long after the ball leaves the hand (0.8 s), so it can be seen,
+    /// and so the ball can't be had back and scored again straight away.
+    public static let shotPoseHoldFrames = 48
+    /// A shot's pose is held as long as its ball takes to reach the rim (to go in, or first touch
+    /// anything), and this much more, so a game-winner freezes on it; within these bounds. Past
+    /// the hang, a shot in the air falls in it.
+    public static let shotPoseAfterFlightFrames = 6
+    public static let shotPoseHoldRange = 10...120
+    /// The pull on a body held in a shot's or a floater's pose in the air, a share of its gravity;
+    /// landing ends the pose.
+    public static let poseHoldGravityShare = 0.5
     /// Frames after any release before the same player can catch it back.
     public static let catchCooldownFrames = 15
     /// In the air the stance holds the fall to this.
     public static let stanceFallSpeed = 0.5
 
+    /// A thrown ball hitting the other knocks them this hard, half again the slash's.
+    public static let thrownHitKnock = Vec2(x: 6, y: 3)
     /// A throw goes straight at this speed, with no gravity until its first bounce.
     public static let throwSpeed = 7.0
     /// An up throw is the floater: it drifts up this fast, gravity off, for this many
@@ -433,6 +496,9 @@ public enum SmoothieRules {
     public static func glideSpeed(withBall: Bool) -> Double { withBall ? 2.5 : 3.5 }
     public static let glideSink = 0.8
     public static let diveSpeed = 3.0
+    /// Level two, from the ground with up held: the launch, straight up this fast into flight,
+    /// as high as a full jump and a double jump together.
+    public static let launchSpeed = 6.0
 }
 
 /// Flash Fizz's numbers. Without the ball, shoot is the warp to the ball while it's still
@@ -460,7 +526,7 @@ public enum FizzRules {
 public enum ShakeRules {
     public static let platformWidth = 30.0
     public static let platformThickness = 10.0
-    public static let platformFrames = 60
+    public static let platformFrames = 120
     public static let cooldownFrames = 75
     public static let wallWidth = 10.0
     public static let wallHeight = 30.0
@@ -478,6 +544,8 @@ public enum SlideRules {
     public static let legHeight = 6.0
     /// A loose ball the slide meets is kicked on ahead, this far up from level, at the swat's speed.
     public static let kickAngle = degrees(30)
+    /// Slide Cider: the leg's knock on a body it meets, the way the slide goes and up.
+    public static let ciderKnock = Vec2(x: 4, y: 2)
 }
 
 /// The Esper Slash's numbers: shoot without the ball, in neutral or on defence. On the
@@ -526,9 +594,9 @@ public enum ThrowParryRules {
 
 /// A parry's reward: the parrier back in neutral at once, free to do anything, while the one
 /// parried is locked out of every input, reeling, through the stun (`BallRules.hitStunFrames`)
-/// and this long more, so the parry can be made something of.
+/// and this long more, so the parry can be made something of: two seconds in all, every counter's.
 public enum ParryRules {
-    public static let attackLockoutAfterStunFrames = 30
+    public static let attackLockoutAfterStunFrames = 60
 }
 
 /// The stepback: down on the ground in a shot's or throw's stance once it's held, once a
@@ -556,9 +624,18 @@ public enum RimRules {
 /// none for a basket.
 public enum HitStopRules {
     public static let hitFrames = 8
-    public static let counterFrames = 16
-    /// A slashclash's, held long.
-    public static let slashClashFrames = 24
+    /// A counter's: the rock-paper-scissors won, a parry among them.
+    public static let counterFrames = 24
+    /// A slashclash's, a snatchclash's and a shieldclash's, held long.
+    public static let slashClashFrames = 32
+    public static let shieldClashFrames = 40
+}
+
+/// A clash over: both bodies pushed hard down and away from where they met, nothing answering
+/// till they've landed and slid to a stop, braking this much a frame along the ground.
+public enum ClashRules {
+    public static let knock = Vec2(x: 6, y: -4)
+    public static let slideBrake = 0.3
 }
 
 /// FloState's slash, on the ground or in the air: one attack, a step through forward the FloState snatch's

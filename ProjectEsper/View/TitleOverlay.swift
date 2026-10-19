@@ -204,10 +204,16 @@ final class FlowState: ObservableObject {
     /// The customize screen, between the title and the stage select: each side's cursor and
     /// picks, and the mode it starts.
     @Published var customizeOpen = false
+    /// What's new for testers (`UpdatesView`), over everything until it's dismissed, once a set of
+    /// notes; and the line the pad has scrolled it to.
+    @Published var updatesOpen = UpdatesNotes.unseen
+    @Published var updatesLine = 0
     /// ZONES' screen over play, while a game's on.
     @Published var zonesHud: ZonesHud?
     @Published var customizeCursors: [CustomizeSpot] = [.skin, .skin]
     @Published var customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
+    /// Against the computer, its drink tapped for it by hand on the bottles: kept as tapped.
+    var computerDrinkByHand = false
     var customizeMode = GameMode.rounds
     /// Online: both sides on the screen at once, this phone editing only its own side
     /// (`customizeLocal`), the other's picks arriving as they're made.
@@ -217,6 +223,14 @@ final class FlowState: ObservableObject {
     var customizeLocal = 0
     /// Each side's READY, and the moment both were, when the launch animation starts.
     @Published var customizeReady = [false, false]
+    /// A mode that picks its drink before play (47): after START, each side's bottles (`DrinkPick`);
+    /// each side's cursor on its bottles in the order shown (-1 its sort button) and that order.
+    @Published var customizeDrinkPhase = false
+    @Published var drinkCursors = [0, 0]
+    /// Each side's Random bottle picked: a Greateraid drawn for it as it locks in.
+    @Published var drinkRandom = [false, false]
+    @Published var drinkSorts: [DrinkSort] = [.aToZ, .aToZ]
+    var customizePicksDrink: Bool { customizeMode == .fortySeven }
     @Published var customizeLaunch: Date?
     /// Online: the launch animation's played through; the series can start.
     var customizeLaunched = false
@@ -365,6 +379,19 @@ final class FlowState: ObservableObject {
     }
 
     /// The cursor a row up or down, to the item nearest across, or along its row.
+    /// The updates screen put away, its notes marked seen.
+    func closeUpdates() {
+        guard updatesOpen else { return }
+        UserDefaults.standard.set(UpdatesNotes.id, forKey: UpdatesNotes.seenKey)
+        SoundBoard.shared.play(SoundBoard.confirm)
+        updatesOpen = false
+    }
+
+    /// The updates screen's list stepped a line by the pad.
+    func scrollUpdates(_ by: Int) {
+        updatesLine = min(max(updatesLine + by, 0), UpdatesNotes.lines.count - 1)
+    }
+
     func moveTitleCursor(across: Int, down: Int) {
         let rows = TitleItem.rows
         guard let row = rows.firstIndex(where: { $0.contains(titleCursor) }), let column = rows[row].firstIndex(of: titleCursor) else {

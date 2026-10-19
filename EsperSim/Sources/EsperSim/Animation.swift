@@ -40,6 +40,8 @@ public enum Animation: String, CaseIterable {
     case snatchFloState = "player_snatch_flostate"
     /// Shielding's: forward (and back, turned round), up and down.
     case shield = "player_shield"
+    /// The Spin Move, the ball held round in it.
+    case spinBall = "player_spin_ball"
     /// Knocked into the air, stunned: one frame, held.
     case stunnedAir = "player_stunned_air"
     /// In FloState on the ground, the slash's step through: both swings, one attack.
@@ -51,26 +53,28 @@ public enum Animation: String, CaseIterable {
     case gunSnipe = "player_gun_snipe"
     case gunRun = "player_gun_run"
     case gunRunShoot = "player_gun_run_shoot"
-    case hurt = "player_hurt"
     case transform = "player_transform"
     /// Super Smoothie's flight: hovering or going back, going forward or up, going down.
     case fly = "player_fly"
     case flyBall = "player_fly_ball"
     /// Z Tea's beam: the body, and its arms drawn over it apart so they turn with the aim.
-    case blast = "player_blast"
+    case beam = "player_beam"
+    case beamArms = "player_beam_arms"
+    /// Z Tea's blast: the body, and its arms drawn over it apart so they turn 45 degrees up on the ground.
+    case blast = "player_blast_body"
     case blastArms = "player_blast_arms"
 
     public var frameCount: Int {
         switch self {
         case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir, .gunSnipe: 10
-        case .hurt: 4
         case .transform: 9
-        case .blast: 10
-        case .blastArms, .stunnedAir: 1
+        case .beam: 10
+        case .beamArms, .stunnedAir: 1
+        case .blast, .blastArms: 12
         case .shield: 3
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall, .fly, .flyBall: 3
-        case .jumpSquat: 4
+        case .jumpSquat, .spinBall: 4
         case .doubleJump, .doubleJumpBall, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
         case .snatchFloState: 7
         case .esperSlashFloState: 9
@@ -88,7 +92,7 @@ public enum Animation: String, CaseIterable {
     public var holdsBall: Bool {
         switch self {
         case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .flyBall, .wallLandBall, .shoot, .shootAir, .throwForward,
-             .catchGround, .catchAir, .skidBall, .taunt, .layup, .doubleJumpBall: true
+             .catchGround, .catchAir, .skidBall, .taunt, .layup, .doubleJumpBall, .spinBall: true
         default: false
         }
     }
@@ -101,7 +105,7 @@ public enum Animation: String, CaseIterable {
     /// The sheet's cell, its height; and its width, which is the same but on FloState's slash,
     /// wider for its reach.
     public var pixelSize: Double {
-        [.throwForward, .throwAir, .esperSlash, .esperSlashFloState, .blast, .blastArms].contains(self) ? 64 : 48
+        [.throwForward, .throwAir, .esperSlash, .esperSlashFloState, .beam, .beamArms].contains(self) ? 64 : 48
     }
     public var pixelWidth: Double { self == .esperSlashFloState ? 80 : pixelSize }
 }
@@ -151,8 +155,13 @@ extension Player {
     /// the sim, so the drawing can never change the game.
     public var animationFrame: AnimationFrame {
         let t = stateTimer
-        // Parried: reeling, the ledge sheet's last frame, the whole lockout.
-        if parryLocked { return AnimationFrame(.ledge, Animation.ledge.frameCount - 1) }
+        // Parried: reeling, the whole lockout; on the ground the ledge sheet's last frame, in the
+        // air the stunned pose, looked at again every frame so a fall or a landing changes it.
+        if parryLocked || clashPushed { return grounded ? AnimationFrame(.ledge, Animation.ledge.frameCount - 1) : AnimationFrame(.stunnedAir, 0) }
+        if let blast = blastSheetFrame, Player.blastPoseStates.contains(state) {
+            // Z Tea's blast: its own sheet, the arm firing drawn over it apart (`blastArms`).
+            return AnimationFrame(.blast, blast)
+        }
         if boltPose > 0, state != .webSwing, state != .webPull, state != .webbed {
             // Volta Cola's bolt: the whole throw sheet at 15 a second, ground or air.
             return AnimationFrame(grounded ? .throwForward : .throwAir, (VoltaRules.boltPoseFrames - boltPose) * 15 / 60)
@@ -206,6 +215,11 @@ extension Player {
             return AnimationFrame(holding ? .skidBall : .skid, 0)
         case .air:
             if doubleJumpTimer > 0 {
+                // Gale Ale at level two: the Spin Move's spin in place of the flip, at its pace, the
+                // ball lifted off without one.
+                if power == .galeAle, powerLevel >= 2 {
+                    return AnimationFrame(.spinBall, ((30 - doubleJumpTimer) * SpinRules.sheetFramesPerSecond / 60) % Animation.spinBall.frameCount)
+                }
                 return AnimationFrame(hasBall ? .doubleJumpBall : .doubleJump, (30 - doubleJumpTimer) * 12 / 60)
             }
             let phase = velocity.y > 0.3 ? 0 : (abs(velocity.y) <= 0.3 ? 1 : 2)
@@ -219,7 +233,9 @@ extension Player {
             return grounded ? AnimationFrame(.shoot, min(t * 12 / 60, 4)) : AnimationFrame(.shootAir, min(t * 12 / 60, 3))
         case .shooting:
             // Both sheets smear the release on frame 6, where the ball leaves.
-            return grounded ? AnimationFrame(.shoot, 4 + t * 24 / 60) : AnimationFrame(.shootAir, 3 + t * 30 / 60)
+            // Held on the last while the shot's watched.
+            return grounded ? AnimationFrame(.shoot, min(4 + t * 24 / 60, Animation.shoot.frameCount - 1))
+                : AnimationFrame(.shootAir, min(3 + t * 30 / 60, Animation.shootAir.frameCount - 1))
         case .throwStance:
             // Frame 3 is the set pose with the ring on the ball; 4 is the release smear.
             return AnimationFrame(grounded ? .throwForward : .throwAir, min(t * BallRules.throwSheetFramesPerSecond / 60, 3))
@@ -244,9 +260,16 @@ extension Player {
         case .rolling:
             // The double jump's somersault, run through in the roll's frames.
             return AnimationFrame(.doubleJump, t * SlashRules.sheetFramesPerSecond / 60)
-        case .snatching where shieldAim != nil:
-            // Shielding: its sheet's frame for the aim, held through.
-            return AnimationFrame(.shield, shieldAim == .up ? 1 : shieldAim == .down ? 2 : 0)
+        case .spinning:
+            let count = Animation.spinBall.frameCount
+            return AnimationFrame(.spinBall, min(t * SpinRules.sheetFramesPerSecond / 60, count * SpinRules.turns - 1) % count)
+        case .flipJump, .tumbling:
+            // The double jump's somersault backward over the flip, and on round it, the same
+            // way at the same pace, through the tumble.
+            let count = Animation.doubleJump.frameCount
+            let played = (state == .tumbling ? ShieldRules.flipFrames : 0) + t
+            let step = state == .flipJump ? min(played * count / max(ShieldRules.flipFrames, 1), count - 1) : played * count / max(ShieldRules.flipFrames, 1) % count
+            return AnimationFrame(.doubleJump, count - 1 - step)
         case .snatching, .walling:
             // In FloState, on the ground or in the air, its own sheet at the same timing, its last frame held.
             if inFloState, state == .snatching {
@@ -275,12 +298,12 @@ extension Player {
         case .beamCharging:
             // Its first frame, then the second held through the charge, the third as it ends.
             let each = ZRules.blastSheetFrameLength
-            return AnimationFrame(.blast, t < each ? 0 : (t < ZRules.chargeFrames - each ? 1 : 2))
+            return AnimationFrame(.beam, t < each ? 0 : (t < ZRules.chargeFrames - each ? 1 : 2))
         case .beamFiring:
             // Firing, frames 3 to 7 round and round under the arms; then the last two.
             let each = ZRules.blastSheetFrameLength
-            if t < beamFiringFrames { return AnimationFrame(.blast, 3 + (t / each) % 5) }
-            return AnimationFrame(.blast, min(8 + (t - beamFiringFrames) / each, 9))
+            if t < beamFiringFrames { return AnimationFrame(.beam, 3 + (t / each) % 5) }
+            return AnimationFrame(.beam, min(8 + (t - beamFiringFrames) / each, 9))
         case .suspended:
             // Falling, as it hangs.
             return AnimationFrame(hasBall ? .airBall : .air, 2)

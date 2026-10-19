@@ -38,6 +38,15 @@ public struct Ball: Equatable {
     /// Whether the ball still counts as `lastTouched`'s: from a release until its first
     /// bounce off anything.
     public var owned = false
+    /// Exclusion (`ExclusionRules`): only this player's to take, by hand or snatch, and nobody's
+    /// to slash, for `exclusionFrames` more frames loose.
+    public var exclusiveTo: Int?
+    /// Whether `player` may touch it at all, by hand or by anything they do: under Exclusion, only
+    /// the one it's exclusive to.
+    public func isOpen(to player: Int) -> Bool { exclusiveTo == nil || exclusiveTo == player }
+    public var exclusionFrames = 0
+    /// Drawn out of a tornado by a rim: no tornado takes it back till a hand or a release does.
+    public var drawnFromTornado = false
     /// How many times faster than an ordinary ball a shot runs its arc, Cannon Cola's
     /// doing: the velocity is this much more and gravity this much squared, so the path is
     /// the same. It's an ordinary ball again from its first bounce.
@@ -94,6 +103,10 @@ public struct Ball: Equatable {
     public mutating func step(stage: Stage, events: inout [MatchEvent]) -> Int? {
         previousY = position.y
         var scoredHoop: Int?
+        if exclusiveTo != nil {
+            exclusionFrames -= 1
+            if exclusionFrames <= 0 { exclusiveTo = nil }
+        }
 
         // Only the rim it's meant for pulls it in: the one whoever last touched it scores on. An
         // own basket can still drop, but nothing draws it there.
@@ -103,8 +116,18 @@ public struct Ball: Equatable {
         }
 
         if let centre = tornadoCentre {
-            // Held in a tornado: drawn to its middle, gravity off.
+            // Held in a tornado: drawn to its middle, gravity off. Carried over a rim it scores
+            // on, the rim draws it out and down into it, a shot again.
             velocity = (centre - position) * TornadoRules.pullShare
+            if let hoop = stage.hoops.first(where: { !$0.rimless && ($0.shared || lastTouched == nil || $0.owner == lastTouched)
+                && abs($0.position.x - position.x) <= BallRules.hoopReach && position.y > $0.position.y && position.y - $0.position.y <= BallRules.hoopReach }) {
+                tornadoCentre = nil
+                drawnFromTornado = true
+                steers = true
+                scoring = true
+                velocity = Vec2(x: 0, y: -0.5)
+                steer(toward: hoop, gravityShare: Ball.gravityShare(stage))
+            }
         } else if floater > 0 {
             floater -= 1
         } else if !straight {
@@ -333,6 +356,8 @@ public struct Ball: Equatable {
         lastTouched = player
         launchPoint = position
         owned = true
+        exclusiveTo = nil
+        drawnFromTornado = false
         resting = false
     }
 
@@ -353,6 +378,13 @@ public struct Ball: Equatable {
     public mutating func reflect(off normal: Vec2) {
         leaveShieldAsLoose()
         velocity = velocity - normal * (2 * velocity.dot(normal))
+    }
+
+    /// Off a shield: sent along its face, as fast as it came or the flick's speed, whichever is more.
+    public mutating func flick(along direction: Vec2, speed: Double) {
+        let going = max(velocity.length, speed)
+        leaveShieldAsLoose()
+        velocity = direction.normalized * going
     }
 
     /// The perfect shield: stopped dead and popped straight up this fast, to be caught.
@@ -393,6 +425,8 @@ public struct Ball: Equatable {
         tether = nil
         lastTouched = nil
         owned = false
+        exclusiveTo = nil
+        drawnFromTornado = false
         resting = false
     }
 
@@ -434,6 +468,8 @@ public struct Ball: Equatable {
         tether = nil
         lastTouched = nil
         owned = false
+        exclusiveTo = nil
+        drawnFromTornado = false
         resting = false
         respawnTimer = 0
         tornadoCentre = nil

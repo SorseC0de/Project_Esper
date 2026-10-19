@@ -799,7 +799,7 @@ struct CoinFlipDisc: View {
 
 extension Power {
     /// The powers to pick from for FloState: all but none.
-    static let allPicks: [Power] = [.webWater, .superSmoothie, .flashFizz, .platformShake, .quakeUp, .voltaCola, .frostTea,
+    static let allPicks: [Power] = [.webWater, .superSmoothie, .flashFizz, .platformShake, .voltaCola, .frostTea,
                                     .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle, .zTea]
 
     /// Its drink's name, short.

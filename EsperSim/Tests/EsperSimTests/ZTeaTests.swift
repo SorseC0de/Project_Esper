@@ -18,7 +18,7 @@ final class ZTeaTests: XCTestCase {
 
     func testTheChargedBeamStripsAndKnocksAlongItAndSendsTheBall() {
         var match = court(level: 1)
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .beamCharging)
         var fired = false, struck = false
         for _ in 0..<(ZRules.chargeFrames + ZRules.fireFrames) {
@@ -35,7 +35,7 @@ final class ZTeaTests: XCTestCase {
 
     func testTheStickTurnsItWhileFiringToAnyAngleWithin45Degrees() {
         var match = court(level: 1)
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         for _ in 0..<5 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1)), .idle]) }
         XCTAssertEqual(match.players[0].beamAim, ZRules.aimRate * 5, accuracy: 1e-9, "a little way up, not snapped")
         for _ in 0..<ZRules.chargeFrames { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1)), .idle]) }
@@ -55,7 +55,7 @@ final class ZTeaTests: XCTestCase {
         // Clear of the court's ledge, which the knock would put them on.
         match.players[0].position.x = 300
         match.players[1].position.x = 360
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         var strikes = 0, held = 0
         for _ in 0..<400 {
             match.advance(inputs: [.idle, .idle])
@@ -71,10 +71,10 @@ final class ZTeaTests: XCTestCase {
         var stopped = court(level: 1)
         stopped.players[0].flo = 50
         stopped.players[1].position.x = 600
-        stopped.advance(inputs: [PlayerInput(shoot: true), .idle])
+        stopped.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         for _ in 0..<(ZRules.chargeFrames + 10) { stopped.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(stopped.players[0].firingBeam)
-        stopped.advance(inputs: [PlayerInput(shoot: true), .idle])
+        stopped.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         for _ in 0..<ZRules.fireFrames { stopped.advance(inputs: [.idle, .idle]) }
         XCTAssertFalse(stopped.players[0].firingBeam)
         XCTAssertEqual(stopped.players[0].flo, 50)
@@ -82,7 +82,7 @@ final class ZTeaTests: XCTestCase {
 
     func testTheJumpCallsTheChargeOff() {
         var match = court(level: 1)
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         for _ in 0..<20 { match.advance(inputs: [.idle, .idle]) }
         match.advance(inputs: [PlayerInput(jump: true), .idle])
         XCTAssertNotEqual(match.players[0].state, .beamCharging)
@@ -97,7 +97,7 @@ final class ZTeaTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .beamFiring)
         XCTAssertEqual(match.players[0].hitStun, 0)
         var charging = court(level: 1)
-        charging.advance(inputs: [PlayerInput(shoot: true), .idle])
+        charging.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         charging.players[0].hitStun = 30
         charging.advance(inputs: [.idle, .idle])
         XCTAssertNotEqual(charging.players[0].state, .beamCharging)
@@ -108,7 +108,7 @@ final class ZTeaTests: XCTestCase {
         match.players[0].position = Vec2(x: 200, y: 120)
         match.players[0].grounded = false
         match.players[0].enter(.air)
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .beamCharging)
         var fired = false
         for _ in 0..<(ZRules.chargeFrames + 2) {
@@ -121,7 +121,7 @@ final class ZTeaTests: XCTestCase {
     func testAtLevelTwoAFullChargeIsKeptTillTheNextSlashFiresIt() {
         var match = court(level: 2)
         match.players[1].position.x = 600
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         for _ in 0..<(ZRules.chargeFrames + 1) { match.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(match.players[0].beamStored)
         XCTAssertNotEqual(match.players[0].state, .beamFiring, "kept, not fired")
@@ -129,8 +129,48 @@ final class ZTeaTests: XCTestCase {
         // Free to move with it, then a slash fires it at once.
         for _ in 0..<20 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
         match.advance(inputs: [.idle, .idle])
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .beamFiring)
         XCTAssertFalse(match.players[0].beamStored)
+    }
+
+    func testTheBlastPoseOpensFiresOffEachArmInTurnAndEndsOnANeutralFrame() {
+        var match = court(level: 2)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true), .idle])
+        var frames: [Int] = []
+        var fired: [(frame: Int, hand: Int)] = []
+        var pressedAgain = false
+        for _ in 0..<160 {
+            // The next pressed as soon as the cooldown allows, while the first's pose is on.
+            let again = !pressedAgain && match.players[0].blastCooldown == 0
+            if again { pressedAgain = true }
+            match.advance(inputs: [again ? PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true) : .idle, .idle])
+            if let frame = match.players[0].blastSheetFrame, frames.last != frame { frames.append(frame) }
+            for event in match.events { if case .blastFired(player: 0, let hand) = event { fired.append((frames.last ?? -1, hand)) } }
+            if match.players[0].blastStep == nil, pressedAgain, fired.count == 2 { break }
+        }
+        XCTAssertEqual(Array(frames.prefix(5)), [0, 1, 2, 3, 4], "opened, then the back arm")
+        XCTAssertEqual(fired.map(\.hand), [0, 1], "each arm in turn")
+        XCTAssertEqual(fired.map(\.frame), [ZRules.blastBackArmRelease, ZRules.blastFrontArmRelease], "let go fully out")
+        XCTAssertEqual(frames.last, 2, "ends on the neutral frame")
+        XCTAssertNil(match.players[0].blastStep)
+        // Grounded, it went 45 degrees up.
+        XCTAssertGreaterThan(match.blasts.first?.velocity.y ?? 0, 0)
+    }
+
+    func testAShieldFlipMidWindupLetsNoBlastGo() {
+        var match = court(level: 1)
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        match.ball.respawn(at: Vec2(x: 30, y: 200))
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true), .idle])
+        XCTAssertNotNil(match.players[0].blastStep)
+        match.advance(inputs: [PlayerInput(shield: true), .idle])
+        var fired = false
+        for _ in 0..<60 {
+            match.advance(inputs: [.idle, .idle])
+            if match.events.contains(where: { if case .blastFired = $0 { return true } else { return false } }) { fired = true }
+        }
+        XCTAssertFalse(fired)
     }
 }

@@ -132,12 +132,18 @@ struct GameView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .allowsHitTesting(false)
             }
+            // What's new for testers, over everything, once a set of notes.
+            if flow.updatesOpen {
+                UpdatesView(flow: flow)
+                    .transition(.opacity)
+            }
         }
         .animation(.easeOut(duration: 0.25), value: flow.showsTitle)
         .animation(.spring(response: 0.35, dampingFraction: 0.6), value: flow.previewTitle)
         .animation(.easeOut(duration: 0.25), value: flow.veiled)
         .animation(.easeOut(duration: 0.2), value: flow.multiplayerOpen)
         .animation(.easeOut(duration: 0.2), value: flow.settingsOpen)
+        .animation(.easeOut(duration: 0.25), value: flow.updatesOpen)
         .animation(.easeOut(duration: 0.2), value: flow.customizeOpen)
     }
 }

@@ -52,6 +52,11 @@ final class GameScene: SKScene {
     private var match = GameScene.startingMatch
     /// The computer on the other side, when the AI switch is on; never online.
     private var opponent = Opponent(index: 1)
+    /// The Test Center's other side, its move picked on the bench (DUMMY).
+    private var trainingDummy = TrainingDummy(index: 1)
+    /// The grid behind the Test Center, on the camera; and whether the second side's in the dummy's look.
+    private var testCenterGrid: SKSpriteNode?
+    private var dummyDressed = false
     /// VS CPU: the computer plays player 2, whatever pads are in; off, player 2 is the
     /// second pad. The title's toggle, the AI button and R3 all set it, kept between launches.
     static let vsCPUKey = InputHub.vsCPUKey
@@ -281,8 +286,13 @@ final class GameScene: SKScene {
     private var armLinesOverHood: [SKSpriteNode] = []
     private var hoodFaceWashes: [SKSpriteNode] = []
     static let ballBehindLegSheets: Set<Animation> = [.taunt, .dribbleWalk]
-    /// The sheets that hold the ball behind the whole body, every frame: the double jump's.
+    /// The sheets that hold the ball behind the whole body, every frame: the double jump's; and
+    /// single frames that tuck it there: the spin's last.
     static let ballBehindBodySheets: Set<Animation> = [.doubleJumpBall]
+    static let ballBehindBodyFrames: [Animation: Set<Int>] = [.spinBall: [3]]
+    static func ballBehindBody(_ frame: AnimationFrame) -> Bool {
+        ballBehindBodySheets.contains(frame.animation) || ballBehindBodyFrames[frame.animation]?.contains(frame.frame) == true
+    }
     static let hoodDrawnFor = SpriteLibrary.hoodDrawnFor
     /// Palette 37's grey level (#DAE0EA), the strings' second pixel from the tip.
     static let stringAccentLuminance = 0.876
@@ -359,6 +369,7 @@ final class GameScene: SKScene {
     /// What the powers leave in the world, by the sim's ids: bolts, ice clones, flames,
     /// fireballs.
     private var boltNodes: [Int: SKSpriteNode] = [:]
+    private var blastNodes: [Int: SKSpriteNode] = [:]
     private var cloneNodes: [Int: SKSpriteNode] = [:]
     /// Gale Ale's tornados as drawn, by id, and their bursts playing out.
     private var galeNodes: [Int: SKSpriteNode] = [:]
@@ -387,6 +398,33 @@ final class GameScene: SKScene {
         blastArmNodes[index] = arms
         return arms
     }
+    /// Z Tea's blast's arms on each body, front over it and back behind: their canvas hung by the
+    /// shoulder, so they turn about it.
+    private var blastPoseArmNodes: [Int: (front: SKSpriteNode, back: SKSpriteNode)] = [:]
+    private func blastPoseArms(_ index: Int, on body: SKSpriteNode) -> (front: SKSpriteNode, back: SKSpriteNode) {
+        guard let figure = body.parent else { return (SKSpriteNode(), SKSpriteNode()) }
+        if let arms = blastPoseArmNodes[index], arms.front.parent === figure { return arms }
+        // The shoulder on the 48-pixel canvas: its feet 8 up from the bottom, centred across.
+        let side = CGFloat(Animation.blastArms.pixelSize)
+        let shoulder = ZRules.blastShoulderPixels
+        let anchor = CGPoint(x: (side / 2 + CGFloat(shoulder.x)) / side, y: (CGFloat(Animation.blastArms.feetFromBottom) + CGFloat(shoulder.y)) / side)
+        let arms = (front: SKSpriteNode(), back: SKSpriteNode())
+        for arm in [arms.front, arms.back] {
+            arm.anchorPoint = anchor
+            arm.isHidden = true
+            figure.addChild(arm)
+            let line = SKSpriteNode()
+            line.name = "line"
+            line.anchorPoint = anchor
+            line.colorBlendFactor = 1
+            line.zPosition = -0.0005
+            arm.addChild(line)
+        }
+        arms.front.zPosition = GameScene.hoodUpZ + 0.002
+        blastPoseArmNodes[index] = arms
+        return arms
+    }
+
     /// The tornado's sheet squeezed to the gale's shape: two thirds as high, a third wider.
     private static let galeScale = CGSize(width: 4.0 / 3, height: 2.0 / 3)
     private var flameNodes: [Int: SKSpriteNode] = [:]
@@ -398,6 +436,21 @@ final class GameScene: SKScene {
     private var riders: [(node: SKSpriteNode, player: Int, offset: Vec2)] = []
     /// Frames of screenshake left, and where the camera sits unshaken.
     private var shake = 0
+    /// A slashclash's or a shieldclash's look while its hit stop holds: the camera in a little on
+    /// where they met, the screen's colours split in the two energies; eased in and back out.
+    private var clashAt: Vec2?
+    private var clashShare: CGFloat = 0
+    private var clashLastTime: CFTimeInterval?
+    private static let clashZoom: CGFloat = 0.9
+    /// The share of the way the camera leans to where they met.
+    private static let clashLean: CGFloat = 0.3
+    private static let clashEaseSeconds: CFTimeInterval = 0.1
+    /// The colours' split at the screen's edge, a share of it, and how strong the fringes are.
+    private static let clashSplit: Float = 0.02
+    private static let clashFringe: Float = 1.5
+    /// The clash's lightning: each bolt this far off upright, its foot this far past where they met.
+    private static let clashBoltLean: CGFloat = 30 * .pi / 180
+    private static let clashBoltPast: CGFloat = 12
     /// Titan Tea's running steps shake the screen this much.
     private static let titanStepShake = 3
     /// Titan Tea after its port-in: frames before it grows, and its growth from the
@@ -507,6 +560,68 @@ final class GameScene: SKScene {
         texture.filteringMode = .nearest
         return texture
     }
+    /// Each rim's outline for a shot that would score: a pixel round it in EDG64's 29 green, on
+    /// the shooter's screen while the aim would go in. Sized as a share of its rim, art pixels over.
+    private var rimOutlines: [(node: SKSpriteNode, widthShare: CGFloat, heightShare: CGFloat)?] = []
+    static let madeShotOutlineColour = PixelPalette.colours[29]
+
+    /// Made from the rim's picture in the catalog, not read back off its atlas texture, which
+    /// stalls on the atlas's whole page.
+    private func madeShotOutline(rim name: String) -> (node: SKSpriteNode, widthShare: CGFloat, heightShare: CGFloat)? {
+        let rim = sprites.texture(name, 0)
+        guard let image = UIImage(named: "\(name)_0")?.cgImage ?? Optional(rim.cgImage()) else { return nil }
+        let width = image.width, height = image.height
+        guard width > 0, height > 0, let source = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                                              space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let sourceData = source.data else { return nil }
+        source.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = sourceData.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        // The art's pixels, however many image pixels each is drawn at.
+        let pixelSize = max(Int((CGFloat(width) / max(rim.size().width, 1)).rounded()), 1)
+        let artWidth = width / pixelSize, artHeight = height / pixelSize
+        func solid(_ column: Int, _ row: Int) -> Bool {
+            guard column >= 0, row >= 0, column < artWidth, row < artHeight else { return false }
+            return pixels[((row * pixelSize + pixelSize / 2) * width + column * pixelSize + pixelSize / 2) * 4 + 3] != 0
+        }
+        // A pixel larger all round; each empty pixel beside a solid one, straight across or up, is outline.
+        let outWidth = artWidth + 2, outHeight = artHeight + 2
+        var outline = [UInt8](repeating: 0, count: outWidth * outHeight * 4)
+        let rgb = GameScene.madeShotOutlineColour
+        for row in 0..<outHeight {
+            for column in 0..<outWidth {
+                let x = column - 1, y = row - 1
+                guard !solid(x, y), solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1) else { continue }
+                let at = (row * outWidth + column) * 4
+                outline[at] = UInt8((rgb >> 16) & 0xFF)
+                outline[at + 1] = UInt8((rgb >> 8) & 0xFF)
+                outline[at + 2] = UInt8(rgb & 0xFF)
+                outline[at + 3] = 255
+            }
+        }
+        guard let provider = CGDataProvider(data: Data(outline) as CFData),
+              let made = CGImage(width: outWidth, height: outHeight, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: outWidth * 4,
+                                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                 bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+                                 provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else { return nil }
+        let texture = SKTexture(cgImage: made)
+        texture.filteringMode = .nearest
+        return (SKSpriteNode(texture: texture), CGFloat(outWidth) / CGFloat(artWidth), CGFloat(outHeight) / CGFloat(artHeight))
+    }
+
+    /// The outline on the hoop a shot would score on, the others' off; laid over its rim as it is.
+    private func showMadeShotOutline(on hoop: Int?) {
+        for (index, entry) in rimOutlines.enumerated() {
+            guard let entry else { continue }
+            let rim = rimNodes[index]
+            entry.node.isHidden = index != hoop || rim.isHidden
+            guard !entry.node.isHidden else { continue }
+            let size = rim.size
+            entry.node.size = CGSize(width: size.width * entry.widthShare, height: size.height * entry.heightShare)
+            entry.node.position = CGPoint(x: (0.5 - rim.anchorPoint.x) * size.width, y: (0.5 - rim.anchorPoint.y) * size.height)
+        }
+    }
+
     /// Frames left of a hoop's shake: the rim's, off the ball on it, and the backboard's,
     /// off the ball against it, the rim riding it.
     private var rimJitter: [Int] = []
@@ -775,11 +890,19 @@ final class GameScene: SKScene {
         }
     }
 
-    /// The hoop supports and the sound words, drawn as they are: for the mask under the bodies,
-    /// as they're drawn behind them.
+    /// The hoop supports, K&A's clouds and broken car, and the sound words, drawn as they are:
+    /// for the mask under the bodies, as they're drawn behind them.
     var soundWordSnapshots: [BodySnapshot] {
         var flat: [BodySnapshot] = supportNodes.filter { !$0.isHidden }.compactMap { node in
             node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
+        }
+        // K&A's drifting clouds and its broken car, whose hood springs: night, not lit; behind the bodies.
+        if let art = kAndAArt {
+            for node in kAndAClouds.map(\.node) + [art.brokenCar].compactMap({ $0 }) where !node.isHidden {
+                if let texture = node.texture {
+                    flat.append(BodySnapshot(texture: texture, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size))
+                }
+            }
         }
         for holder in soundWords where holder.parent != nil {
             guard let sprite = holder.children.first as? SKSpriteNode, let texture = sprite.texture else { continue }
@@ -1337,10 +1460,12 @@ final class GameScene: SKScene {
             targetChevrons.append(chevron)
         }
 
-        // The aiming arc's dots, made once and moved.
+        // The aiming arc's dots, made once and moved: in the aimer's energy colour, added on as the shield is.
         for _ in 0..<30 {
             let dot = SKSpriteNode(texture: sprites.softGlow(diameter: 8))
             dot.size = CGSize(width: 3, height: 3)
+            dot.colorBlendFactor = 1
+            dot.blendMode = .add
             dot.zPosition = 3
             dot.isHidden = true
             glowers.addChild(dot)
@@ -2039,9 +2164,9 @@ final class GameScene: SKScene {
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
         }
-        // K&A's pictures don't glow either, nor its car.
+        // K&A's pictures don't glow either, its sky behind them nor its car: it's night there.
         if let art = kAndAArt {
-            flats += [art.backdrop, art.front, art.carBody, art.carWheels].compactMap { $0 }.compactMap { node in
+            flats += [art.sky, art.backdrop, art.front, art.carBody, art.carWheels].compactMap { $0 }.compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
         }
@@ -2055,10 +2180,20 @@ final class GameScene: SKScene {
         staticFlatsVersion += 1
     }
 
+    /// Debug: how long each stretch of building a stage took, the slow ones printed.
+    private var loadMarkAt: CFTimeInterval = 0
+    private func loadMarkStart() { loadMarkAt = CACurrentMediaTime() }
+    private func loadMark(_ stretch: String) {
+        let now = CACurrentMediaTime()
+        if DebugUI.enabled, now - loadMarkAt > 0.008 { print(String(format: "stage build: %@ %.0f ms", stretch, (now - loadMarkAt) * 1000)) }
+        loadMarkAt = now
+    }
+
     private func buildStage() {
         // The floor and walls take the holder's colour, the backboard blocks keep their rim's
         // owner's, and the ledge is magenta.
         let stage = match.stage
+        loadMarkStart()
         let isElements = stage.features.look == .elements
         Ambience.shared.play(isElements ? "thunderstorm" : nil)
         let isHoopfishHideaway = stage.features.look == .hoopfishHideaway
@@ -2087,6 +2222,7 @@ final class GameScene: SKScene {
         edgeVeil = []
         fallingIcicles = [:]
         hangingIcicles = [:]
+        loadMark("start→art pick")
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
         tornadoOverlays.removeAllChildren()
         tornadoOverlays.maskNode = isElements ? overLava : nil
@@ -2159,11 +2295,14 @@ final class GameScene: SKScene {
             edgeVeil = FlightB411Art.edgeVeil(into: stageGround)
             turbulenceIn = Int.random(in: GameScene.turbulenceGap)
         }
+        loadMark("stage art")
         if isElements {
             elementsArt = ElementsArt.build(stage: stage, map: StageMap.current[.elements], into: stageGround, overlayParent: tornadoOverlays, sprites: sprites)
         }
+        loadMark("elements")
         refreshStaticFlats()
         findRainSplashSpots()
+        loadMark("flats & rain spots")
         if stage.features.look == .highway {
             HighwayArt.build(for: stage, into: stageGround) { [sprites] size in sprites.flatSquare(size: Int(size), alpha: 1) }
         }
@@ -2229,11 +2368,12 @@ final class GameScene: SKScene {
             stageGlowers.addChild(backboards)
             buildBackboards()
         }
+        loadMark("highway & field")
         // The Wreck Center from its map, in place of the flat tiles.
-        if stage.features.look == .court, let art = WreckCenterArt.build(into: stageGround) {
+        if stage.features.look == .court, let art = WreckCenterArt.build(into: stageGround, bare: stage.features.testCenter) {
             wreckCenterArt = art
             art.setPieces(StageMap.current[.wreckCenter].props)
-            backgroundColor = SKColor(rgb: WreckCenterArt.beyond)
+            backgroundColor = stage.features.testCenter ? .black : SKColor(rgb: WreckCenterArt.beyond)
             let wreck = wreckColours(match.ball.holder ?? match.ball.owner)
             courtColour = wreck.tiles
             courtTarget = courtColour
@@ -2243,6 +2383,8 @@ final class GameScene: SKScene {
             // Built after the stage's flats were gathered: gathered again, so its pictures don't glow.
             refreshStaticFlats()
         }
+        loadMark("wreck center")
+        layTestCenter(stage.features.testCenter)
         for row in 0..<(stage.rows + stage.skyRows) where !stage.features.scenic && !isElements && wreckCenterArt == nil {
             for column in 0..<stage.columns {
                 // The side walls run on up through the sky, so a tall screen never sees their top.
@@ -2268,6 +2410,7 @@ final class GameScene: SKScene {
             }
         }
 
+        loadMark("tiles")
         // 47's three-point lines: the half of a circle round each rim that faces the middle,
         // dim, glowing, in the colour of the side guarding that rim. Shown in 47 only.
         threePointArcs.removeAllChildren()
@@ -2299,6 +2442,7 @@ final class GameScene: SKScene {
             under.zPosition = -20
             stageGround.addChild(under)
         }
+        loadMark("lines")
         for hoop in stage.hoops {
             let radius = CGFloat(FortySevenRules.threePointRadius(for: hoop, on: stage) * SpriteLibrary.pixelsPerUnit)
             let facingMiddle: CGFloat = hoop.backboard == .left ? 0 : .pi
@@ -2319,6 +2463,7 @@ final class GameScene: SKScene {
             threePointArcs.addChild(arc)
             threePointArcSides.append((arc, 1 - hoop.owner))
         }
+        loadMark("arcs")
         for hoop in stage.hoops {
             // `backboard`, the net, then `hoop`, the rim, all under the bodies, drawn to the
             // players' scale on one canvas that keeps them together, the backboard on the right.
@@ -2348,6 +2493,14 @@ final class GameScene: SKScene {
             rim.isHidden = hoop.rimless || stage.features.look == .flightB411
             stageGround.addChild(rim)
             rimNodes.append(rim)
+            if let outline = madeShotOutline(rim: art.rim) {
+                outline.node.zPosition = -0.01
+                outline.node.isHidden = true
+                rim.addChild(outline.node)
+                rimOutlines.append(outline)
+            } else {
+                rimOutlines.append(nil)
+            }
             // A straight rim's front lip again over the ball, so the ball goes down through it.
             let front = SKSpriteNode(texture: art.rim == "hoop_straight" ? frontLip(of: sprites.texture(art.rim, 0)) : nil)
             front.zPosition = GameScene.rimFrontZ
@@ -2363,10 +2516,15 @@ final class GameScene: SKScene {
                                 into: stageGround, depth: 5.5))
             nets[nets.count - 1].hidden = hoop.rimless || netless
         }
+        loadMark("hoops")
         refreshSupports(HoopSupport.pieces)
+        loadMark("supports")
         warmDrawnArt()
+        loadMark("warm drawn art")
         SKTexture.preload(pickScreenFrames()) {}
+        loadMark("pick frames")
         warmWinPoses()
+        loadMark("win poses")
     }
 
     /// The supports' picture again, for a layout.
@@ -2401,6 +2559,7 @@ final class GameScene: SKScene {
         backboardNodes = []
         supportNodes = []
         rimNodes = []
+        rimOutlines = []
         rimFronts.forEach { $0.removeFromParent() }
         rimFronts = []
         rimFlash = []
@@ -2445,7 +2604,9 @@ final class GameScene: SKScene {
         riftPlates = []
         downMarker = nil
         closeBoundsGallery()
+        let buildStart = CACurrentMediaTime()
         buildStage()
+        if DebugUI.enabled { print(String(format: "stage build: %.0f ms", (CACurrentMediaTime() - buildStart) * 1000)) }
         builtStage = series.stage
         ballCamStale = true
         cameraBase = .zero
@@ -3260,6 +3421,9 @@ final class GameScene: SKScene {
     /// On the antenna, the halo's size over its usual and its share of the way to white.
     private static let antennaBallHaloScale: CGFloat = 2
     private static let antennaBallLighten: CGFloat = 0.5
+    /// Off a perfect shield: the halo white, this strong and this much bigger.
+    private static let exclusionGlow: CGFloat = 1
+    private static let exclusionHaloScale: CGFloat = 1.5
 
     private func makeHalo(_ colour: SKColor) -> SKSpriteNode {
         let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
@@ -3358,8 +3522,11 @@ final class GameScene: SKScene {
     private func wreckColours(_ owner: Int?) -> (tiles: SKColor, back: SKColor) {
         guard let owner else { return (SKColor(rgb: WreckCenterArt.tilesNeutral), SKColor(rgb: WreckCenterArt.backNeutral)) }
         let glow = sprites.look(for: owner).glow
-        let back = EnergyColour.withGlow(glow)?.backLimbs ?? Look.scaled(glow, Double(WreckCenterArt.backShare))
-        return (SKColor(rgb: glow), SKColor(rgb: back))
+        let energy = EnergyColour.withGlow(glow)
+        let back = energy?.backLimbs ?? Look.scaled(glow, Double(WreckCenterArt.backShare))
+        // Some colours read too bright on the floor's stripe and the back wall: taken down a share.
+        let share = energy.flatMap { WreckCenterArt.possessionShare[$0] } ?? 1
+        return (SKColor(rgb: Look.scaled(glow, share)), SKColor(rgb: Look.scaled(back, share)))
     }
 
     /// The streak a flying ball leaves: soft blobs dropped where it was, thinning out, so
@@ -3457,6 +3624,13 @@ final class GameScene: SKScene {
         controls.addPicker(title: "POWER", options: PowerVariant.allCases.map(\.label), selected: powerVariant.rawValue, perRow: 7) { [weak self] index in
             self?.powerVariant = PowerVariant(rawValue: index)!
             self?.applyPower()
+        }
+        // The shield added on, or drawn over plain, to compare.
+        controls.addPicker(title: "DUMMY", options: TrainingDummy.Routine.allCases.map(\.label), selected: trainingDummy.routine.rawValue) { [weak self] index in
+            self?.trainingDummy.routine = TrainingDummy.Routine(rawValue: index) ?? .idle
+        }
+        controls.addPicker(title: "SHIELD BM", options: ShieldLook.allCases.map(\.label), selected: GameScene.shieldLook.rawValue) { index in
+            GameScene.shieldLook = ShieldLook(rawValue: index) ?? .add
         }
         controls.addPicker(title: "COUNT", options: ["A", "B"], selected: UserDefaults.standard.integer(forKey: SoundBoard.countSetKey)) { index in
             UserDefaults.standard.set(index, forKey: SoundBoard.countSetKey)
@@ -3633,30 +3807,50 @@ final class GameScene: SKScene {
             controls.addSlider(title: "\(name) HEAD X", range: -12...12, notch: 1, value: Float(pose.x)) { GameScene.headPoses[name]?.x = CGFloat($0); GameScene.keepHeadPoses() }
             controls.addSlider(title: "\(name) HEAD Y", range: -12...12, notch: 1, value: Float(pose.y)) { GameScene.headPoses[name]?.y = CGFloat($0); GameScene.keepHeadPoses() }
         }
-        // How many times the shield runs round its loop, keeping it up longer.
-        controls.addSlider(title: "SHIELD LOOPS", range: 0...12, notch: 1, value: Float(ShieldRules.extraLoops)) { ShieldRules.extraLoops = Int($0) }
+        // The touch pad's shield capsule round the throw button: its gap, its length and where round.
+        if GameScene.touchControlsShown {
+            controls.addSlider(title: "SHIELD BTN GAP", range: 0...40, notch: 1, value: Float(TouchControls.shieldGap)) { [weak controls] in
+                TouchControls.shieldGap = CGFloat($0); controls?.relayoutShield()
+            }
+            controls.addSlider(title: "SHIELD BTN LENGTH", range: 20...340, notch: 5, value: Float(TouchControls.shieldLengthDegrees)) { [weak controls] in
+                TouchControls.shieldLengthDegrees = CGFloat($0); controls?.relayoutShield()
+            }
+            controls.addSlider(title: "SHIELD BTN ANGLE", range: 0...360, notch: 5, value: Float(TouchControls.shieldAngleDegrees)) { [weak controls] in
+                TouchControls.shieldAngleDegrees = CGFloat($0); controls?.relayoutShield()
+            }
+        }
+        // The preset arc, a shot with no flick: its peak over the release and its length, in units.
+        // Aimed at the shooter's rim (ARC DISTANCE unused), or fixed the way the body faces.
+        controls.addPicker(title: "ARC AIM", options: ["RIM", "FIXED"], selected: BallRules.presetAimsAtRim ? 0 : 1) { index in
+            BallRules.presetAimsAtRim = index == 0
+        }
+        controls.addSlider(title: "AIM RANGE", range: 40...400, notch: 5, value: Float(BallRules.autoAimRange)) { BallRules.autoAimRange = Double($0) }
+        controls.addSlider(title: "ARC HEIGHT", range: 10...120, notch: 1, value: Float(BallRules.presetArcHeight)) { BallRules.presetArcHeight = Double($0) }
+        controls.addSlider(title: "ARC DISTANCE", range: 40...300, notch: 1, value: Float(BallRules.presetArcDistance)) { BallRules.presetArcDistance = Double($0) }
+        // The shield's flipjump, in frames and units, and its arc and curved reach.
+        controls.addSlider(title: "FLIP FRAMES", range: 10...60, notch: 1, value: Float(ShieldRules.flipFrames)) { ShieldRules.flipFrames = Int($0) }
+        controls.addSlider(title: "FLIP BACK", range: 0...120, notch: 1, value: Float(ShieldRules.flipBack)) { ShieldRules.flipBack = Double($0) }
+        controls.addSlider(title: "FLIP HEIGHT", range: 0...120, notch: 1, value: Float(ShieldRules.flipHeight)) { ShieldRules.flipHeight = Double($0) }
+        // How far out from the body's middle the shield goes round, in units.
+        controls.addSlider(title: "SHIELD DISTANCE", range: 4...48, notch: 1, value: Float(ShieldRules.arcRadius)) { ShieldRules.arcRadius = Double($0) }
+        // Its reach, a circle round the body's middle; how fast a ball's flicked off; its sheet's rate.
+        controls.addSlider(title: "SHIELD REACH", range: 4...60, notch: 1, value: Float(ShieldRules.reach)) { ShieldRules.reach = Double($0) }
+        controls.addSlider(title: "SHIELD FLICK", range: 2...12, notch: 0.25, value: Float(ShieldRules.flickSpeed)) { ShieldRules.flickSpeed = Double($0) }
+        // The still afterimages: how many, and how many frames of the shield's arc apart.
+        controls.addSlider(title: "SHIELD FPS", range: 6...36, notch: 1, value: Float(ShieldRules.sheetFramesPerSecond)) { ShieldRules.sheetFramesPerSecond = Double($0) }
         // Each energy colour's glow, times.
-        for colour in EnergyColour.wheel {
+        for colour in EnergyColour.wheel where !ParkedSliders.gemGlow {
             controls.addSlider(title: "GLOW \(colour.name.uppercased())", range: 0.5...2.5, notch: 0.05, value: GlowSettings.energyGains[colour] ?? 1) { value in
                 GlowSettings.energyGains[colour] = value
                 UserDefaults.standard.set(Double(value), forKey: GlowSettings.energyGainKey(colour))
             }
         }
-        controls.addSlider(title: "BEAM LIFT", range: -12...12, notch: 1, value: Float(BeamHeadTuning.lift)) { BeamHeadTuning.lift = CGFloat($0) }
-        // Each aim's shield from the hand, in art pixels: the way the body faces, and up. Back
-        // turns round and raises it forward, so it's forward's.
-        for (aim, name) in [(ShieldAim.forward, "FWD"), (.up, "UP"), (.down, "DOWN")] {
-            let offset = ShieldRules.handOffsetPixels[aim] ?? .zero
-            controls.addSlider(title: "SHIELD \(name) X", range: -32...32, notch: 1, value: Float(offset.x)) {
-                ShieldRules.handOffsetPixels[aim, default: .zero].x = Double($0)
-            }
-            controls.addSlider(title: "SHIELD \(name) Y", range: -32...32, notch: 1, value: Float(offset.y)) {
-                ShieldRules.handOffsetPixels[aim, default: .zero].y = Double($0)
-            }
+        if !ParkedSliders.beam {
+            controls.addSlider(title: "BEAM LIFT", range: -12...12, notch: 1, value: Float(BeamHeadTuning.lift)) { BeamHeadTuning.lift = CGFloat($0) }
+            controls.addSlider(title: "BEAM SLIDE", range: -12...12, notch: 1, value: Float(BeamHeadTuning.slide)) { BeamHeadTuning.slide = CGFloat($0) }
+            controls.addSlider(title: "BEAM UP TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.upTurn)) { BeamHeadTuning.upTurn = CGFloat($0) }
+            controls.addSlider(title: "BEAM DOWN TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.downTurn)) { BeamHeadTuning.downTurn = CGFloat($0) }
         }
-        controls.addSlider(title: "BEAM SLIDE", range: -12...12, notch: 1, value: Float(BeamHeadTuning.slide)) { BeamHeadTuning.slide = CGFloat($0) }
-        controls.addSlider(title: "BEAM UP TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.upTurn)) { BeamHeadTuning.upTurn = CGFloat($0) }
-        controls.addSlider(title: "BEAM DOWN TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.downTurn)) { BeamHeadTuning.downTurn = CGFloat($0) }
         controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
         if !ParkedSliders.flo {
             controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
@@ -3823,7 +4017,15 @@ final class GameScene: SKScene {
             let backed = backDown && !backWasDown && !menuNeedsRelease
             let right = pad.stick.x >= 0.5 && menuLast.stick.x < 0.5, left = pad.stick.x <= -0.5 && menuLast.stick.x > -0.5
             let down = pad.stick.y <= -0.5 && menuLast.stick.y > -0.5, up = pad.stick.y >= 0.5 && menuLast.stick.y < 0.5
-            if let flowState, flowState.settingsOpen {
+            if let flowState, flowState.updatesOpen {
+                // What's new, over everything: up and down scroll it, jump or back puts it away.
+                if down { flowState.scrollUpdates(1) }
+                if up { flowState.scrollUpdates(-1) }
+                if picked || backed {
+                    menuNeedsRelease = true
+                    flowState.closeUpdates()
+                }
+            } else if let flowState, flowState.settingsOpen {
                 // The settings, over the title or the pause: up and down a row, left and right
                 // its choice, jump on BACK or B to shut them.
                 if down { flowState.moveSettingsCursor(1) }
@@ -3934,9 +4136,11 @@ final class GameScene: SKScene {
             render()
             return
         }
+        // The game-winner's freeze: nothing steps, the camera cutting round it.
+        if finale != nil, holdFinale(currentTime) { return }
         var steps = 0
         sectionMark = CACurrentMediaTime()
-        while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame {
+        while accumulator >= GameScene.stepSeconds, steps < GameScene.maxStepsPerFrame, finale == nil {
             let tick: SessionTick
             if online != nil {
                 tick = session.tick(local: inputs[0])
@@ -3944,6 +4148,19 @@ final class GameScene: SKScene {
             } else {
                 var remote = inputs.count > 1 ? inputs[1] : .idle
                 if aiOn { remote = opponent.decide(match) }
+                if match.stage.features.testCenter {
+                    var dummyInput = PlayerInput.idle
+                    session.mutate { dummyInput = trainingDummy.decide(&$0) }
+                    // The second side's own keys still drive it, over its routine: the stick theirs
+                    // while it's pushed, the buttons added.
+                    let keys = inputs.count > 1 ? inputs[1] : .idle
+                    if keys.stick != .zero { dummyInput.stick = keys.stick }
+                    dummyInput.jump = dummyInput.jump || keys.jump
+                    dummyInput.shootButtons |= keys.shootButtons
+                    dummyInput.throwBall = dummyInput.throwBall || keys.throwBall
+                    dummyInput.shield = dummyInput.shield || keys.shield
+                    remote = dummyInput
+                }
                 section("ai")
                 tick = session.tick(local: inputs[0], remote: remote)
             }
@@ -4055,6 +4272,8 @@ final class GameScene: SKScene {
         heldBanner = nil
         previewedStage = nil
         series = Series(seed: seed)
+        // A fresh mind for the computer each series, its gameplan rolled anew.
+        opponent = Opponent(index: 1, seed: seed | 1)
         if gameMode == .zones {
             // Who leads is the coin's; two people pass the device, or one plays both sides, or
             // another phone takes turns. The last game's lines and phantoms go first.
@@ -4393,6 +4612,8 @@ final class GameScene: SKScene {
         for index in fresh.players.indices {
             fresh.players[index].power = drinks[index].power
             fresh.players[index].powerLevel = drinks[index].powerLevel
+            // 47: the drink picked on the customize screen, dormant till FloState.
+            if gameMode == .fortySeven, pickedDrinks.indices.contains(index) { fresh.players[index].floStateDrink = pickedDrinks[index] }
         }
         return fresh
     }
@@ -4476,9 +4697,10 @@ final class GameScene: SKScene {
     /// The stages on the select: 47 plays on the Wreck Center or Hoopfish Hideaway.
     private var stageList: [StageChoice] {
         switch gameMode {
-        case .fortySeven: StageChoice.fortySeven
+        case .fortySeven: StageChoice.fortySeven + (DebugUI.enabled ? [.testCenter] : [])
         case .zones: ZonesRules.stages
-        case .rounds: StageChoice.selectable
+        // The Test Center on the end, debug only.
+        case .rounds: StageChoice.selectable + (DebugUI.enabled ? [.testCenter] : [])
         }
     }
 
@@ -4812,14 +5034,13 @@ final class GameScene: SKScene {
             case .swatted(let index, hit: true):
                 let at = match.ball.position
                 say(.spike, at: at, away: side(at, from: players[index].chest), rise: -15)
-            case .parried(let victim, let by):
-                let at = players[victim].chest
+            case .countered(_, let by, let at):
                 say(.parry, at: at, away: side(at, from: players[by].chest), rise: 25)
             case .slashClanked(let index):
                 // Where the blade meets the wall, back off it.
                 let player = players[index]
                 say(.clang, at: player.chest + Vec2(x: player.facing.sign * GameScene.bladeReach, y: 0), away: -player.facing.sign, rise: 30)
-            case .slashClashed(let at):
+            case .slashClashed(let at), .snatchClashed(let at):
                 say(.clang, at: at, away: 0, rise: 30)
             case .rimBounced(let hoop, let speed, _) where speed > GameScene.bounceSoundFloor:
                 // Off the rim's top, up from it, away from its backboard; a rim's once a while at most,
@@ -4915,6 +5136,11 @@ final class GameScene: SKScene {
 
     private func enter(_ next: Flow) {
         headingToWin = false
+        // Off the match, a game-winner's freeze cut short: the world moving again.
+        if next != .playing, next != .paused, finale != nil {
+            finale = nil
+            world.isPaused = false
+        }
         flowState?.stageSelectBack = next == .stageSelect && zonesOnline == nil && (online != nil || series.rounds.isEmpty)
         // A stage's first count waits for its preview.
         if next == .playing, previewDue, startPreview() { return }
@@ -5029,7 +5255,7 @@ final class GameScene: SKScene {
         flowState?.transition { [weak self] in
             guard let self else { return }
             self.enter(.title)
-            self.flowState?.openCustomize(mode)
+            self.flowState?.openCustomize(mode, atDrinks: true)
         }
     }
 
@@ -5155,7 +5381,7 @@ final class GameScene: SKScene {
                     let mode = self.gameMode
                     flowState.transition { [weak self] in
                         self?.enter(.title)
-                        flowState.openCustomize(mode)
+                        flowState.openCustomize(mode, atDrinks: true)
                     }
                 }
             }
@@ -5200,7 +5426,6 @@ final class GameScene: SKScene {
             break
         }
         if let screen { hud.addChild(screen) }
-        if DebugUI.enabled, flow == .stageSelect { print("stage select added: \(screen?.parent != nil), hud alpha \(hud.alpha), hud scene \(hud.scene != nil)") }
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
         flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen || screen is WaitScreen
         flowState?.gridGround = screen is StageSelectScreen
@@ -5460,7 +5685,10 @@ final class GameScene: SKScene {
     func applySavedColours() {
         let sides = PlayerCustomization.sides
         applyColours(sides.map(\.energy), looks: sides.map(\.look))
+        pickedDrinks = sides.map(\.drink)
     }
+    /// Each side's drink picked on the customize screen, for a mode that drinks before play (47).
+    private var pickedDrinks: [Greateraid?] = [nil, nil]
 
     /// The customize screen's player in a pick's look with its hooded head, made apart from
     /// the game's frames: they're rebuilt in the picks as the match starts.
@@ -5502,7 +5730,8 @@ final class GameScene: SKScene {
         guard let portrait = sprites.portrait(pose.animation.rawValue, frame: frame, player: player, headDrawnFor: GameScene.hoodDrawnFor,
                                               headNudge: headNudge, headScale: CGFloat(headScale), holdsBall: pose.holdsBall) else { return nil }
         var ball: (image: CGImage, centre: CGPoint)?
-        if pose.holdsBall, let landmark = BallLandmarks.table["\(pose.animation.rawValue)_\(frame)"] {
+        // Where the sheet has it, or where it's tucked behind the body and too little of it shows to find.
+        if pose.holdsBall, let landmark = BallLandmarks.table["\(pose.animation.rawValue)_\(frame)"] ?? SpriteLibrary.tuckedBall(sheet).map({ Vec2(x: Double($0.x), y: Double($0.y)) }) {
             ball = (winBallImage, CGPoint(x: 24 + landmark.x, y: pose.animation.feetFromBottom + landmark.y))
         }
         let overBall = pose.holdsBall && GameScene.ballBehindLegSheets.contains(pose.animation)
@@ -5512,6 +5741,12 @@ final class GameScene: SKScene {
         return made
     }
     private var winFrames: [String: WinFrame] = [:]
+
+    /// The updates screen's shield icon: the shield's sheet's whole frames that loop, in the first
+    /// side's energy.
+    func updatesShieldFrames() -> [UIImage] {
+        UpdatesNotes.shieldIconFrames.map { UIImage(cgImage: sprites.effectTexture(EnergyEffect.shield.name, $0, player: 0).cgImage()) }
+    }
     private lazy var winBallImage: CGImage = sprites.basketballFrames[0].cgImage()
     /// Every frame of both sides' win pose, made with the stage and again as their looks change.
     /// Once the looks' rebuild has landed, which made the portraits on its cores: here only gathered.
@@ -5529,6 +5764,7 @@ final class GameScene: SKScene {
     func applyCustomizations(_ sides: [PlayerCustomization]) {
         guard sides.count == 2 else { return }
         applyColours(sides.map(\.energy), looks: sides.map(\.look))
+        pickedDrinks = sides.map(\.drink)
     }
 
     // MARK: Online customize
@@ -5682,6 +5918,7 @@ final class GameScene: SKScene {
             case .slashed(let index): play(.esperSlash, at: body(index))
             case .slashClanked(let index): play(.slashWallClank, at: body(index))
             case .slashClashed(let at): play(.slashClash, at: at)
+            case .spun(let index, _): play(.spin, at: body(index))
             case .shieldRaised(let index, let at):
                 play(.shield, at: at)
                 shieldHandFlash[index] = GameScene.shieldHandFlashFrames
@@ -5690,11 +5927,23 @@ final class GameScene: SKScene {
             case .slid(let index): play(.slide, at: body(index))
             // Every one of Flash Fizz's teleports, with its flashspark.
             case .warped(_, let from, _), .flashed(_, let from, _): play(.flash, at: from)
-            case .snatchReached(let index): play(.snatch, at: body(index))
+            // Gale Ale's thrown tornado goes out of a snatch: the tornado's sound, not the snatch's.
+            case .snatchReached(let index) where !match.players[index].galeCast: play(.snatch, at: body(index))
+            case .galeMade(let at, _): play(.gale, at: at)
+            case .blastFired(let index, _): play(.blast, at: body(index))
+            case .webLine(let index, _): play(.webLine, at: body(index))
+            case .webSwung(let index): play(.webSwing, at: body(index))
+            case .fireballMade(let index): play(.fireballMake, at: body(index))
+            case .platformMade(let index): play(.platformMake, at: body(index))
+            // Super Smoothie's launch off the ground, its level two's rocket jump.
+            case .flew(let index) where match.players[index].launchLeft > 0: play(.flyJump, at: body(index))
             case .caught(let index): play(.catchBall, at: body(index))
+            case .fireballTaken(let index): play(.catchBall, at: body(index))
             case .struck(let victim, _), .popped(let victim, _), .cartHit(let victim, _): play(.playerHit, at: body(victim))
             case .cartSlashed(let index): play(.slashWallClank, at: body(index))
-            case .parried(let victim, _): play(.parry, at: body(victim))
+            // Every counter's sound is the slashclash's.
+            case .countered(_, _, let at): play(.slashClash, at: at)
+            case .shieldClashed(let at, _, _), .snatchClashed(let at): play(.slashClash, at: at)
             case .dunked: dunkScoring = true
             // Quiet for a soft bounce, silent once it's only settling.
             case .ballBounced(let position, let speed) where speed > GameScene.bounceSoundFloor:
@@ -5773,8 +6022,224 @@ final class GameScene: SKScene {
     private var finishTarget: CGPoint?
     private func startFinish() { finishFrames = 1 }
 
+    /// The game-winner's freeze: who scored, and when it began. Offline only; online both sides
+    /// must keep time, and the slow finish plays alone.
+    private var finale: (scorer: Int, started: CFTimeInterval?)?
+    /// How long the camera rests on each: the scorer, the other, the ball.
+    private static let finaleBeatSeconds = 0.7
+    private static let finaleBeats = 3
+    private func startFinale(scorer: Int) { finale = (scorer, nil) }
+
+    /// The freeze's frame: the world's motion stopped and the camera cut to this beat's subject,
+    /// close in. True while it holds; once its beats are done the world moves again and the slow
+    /// finish carries on from the ball, already close.
+    private func holdFinale(_ now: CFTimeInterval) -> Bool {
+        guard var held = finale else { return false }
+        if held.started == nil {
+            held.started = now
+            finale = held
+        }
+        let beat = Int((now - (held.started ?? now)) / GameScene.finaleBeatSeconds)
+        guard beat < GameScene.finaleBeats else {
+            world.isPaused = false
+            finale = nil
+            finishFrames = GameScene.finishZoomFrames
+            finishTarget = ballNode.position
+            return false
+        }
+        world.isPaused = true
+        accumulator = 0
+        let other = match.players.indices.first { $0 != held.scorer } ?? held.scorer
+        let subject: CGPoint
+        switch beat {
+        case 0: subject = SpriteLibrary.point(match.players[held.scorer].chest)
+        case 1: subject = SpriteLibrary.point(match.players[other].chest)
+        default: subject = ballNode.isHidden ? SpriteLibrary.point(match.ball.position) : ballNode.position
+        }
+        placeCloseCamera(on: subject, scale: cameraBaseScale * GameScene.finishZoom)
+        return true
+    }
+
+    /// The camera on a point at a closer scale, kept inside the stage's sides and inside what the
+    /// plain view showed up and down; the HUD's glow and the sky with it.
+    private func placeCloseCamera(on point: CGPoint, scale: CGFloat) {
+        cameraNode.setScale(scale)
+        cameraNode.position = point
+        let halfSeen = size.width * cameraNode.xScale / 2, stageWidth = SpriteLibrary.point(Vec2(x: match.stage.width, y: 0)).x
+        cameraNode.position.x = min(max(cameraNode.position.x, halfSeen), max(stageWidth - halfSeen, halfSeen))
+        let spareY = size.height * (cameraBaseScale - cameraNode.yScale) / 2
+        cameraNode.position.y = min(max(cameraNode.position.y, cameraBase.y - spareY), cameraBase.y + spareY)
+        glowHud.setScale(cameraNode.xScale * hudScale)
+        glowHud.position = cameraNode.position
+        if !skyNode.isHidden { skyNode.position = cameraNode.position }
+    }
+
+    /// The clash's close-in: eased in while the hit stop holds, back out after, the HUD kept its size.
+    private func stepClashCamera() {
+        if match.hitStop == 0, !clashHeld.isEmpty || !clashShields.isEmpty || !clashSlashers.isEmpty { releaseClash() }
+        guard let at = clashAt else { return }
+        let now = CACurrentMediaTime()
+        let step = CGFloat(min(now - (clashLastTime ?? now), 0.1) / GameScene.clashEaseSeconds)
+        clashLastTime = now
+        clashShare = match.hitStop > 0 ? min(clashShare + step, 1) : max(clashShare - step, 0)
+        if clashShare == 0, match.hitStop == 0 {
+            clashAt = nil
+            clashLastTime = nil
+            cameraNode.setScale(cameraBaseScale)
+            glowHud.setScale(cameraNode.xScale * hudScale)
+            return
+        }
+        guard finishFrames == 0, finale == nil, previewFraming == nil else { return }
+        let eased = clashShare * clashShare * (3 - 2 * clashShare)
+        let point = cameraNode.position + (SpriteLibrary.point(at) - cameraNode.position) * (GameScene.clashLean * eased)
+        placeCloseCamera(on: point, scale: cameraBaseScale * (1 - (1 - GameScene.clashZoom) * eased))
+    }
+
+    /// The colours split for the clash, for the glow's composite: where they met on the screen, as
+    /// a share of it, y down; the split's reach and strength; the two players' energy colours.
+    var clashAberration: (centre: SIMD2<Float>, split: Float, fringe: Float, first: RGB, second: RGB)? {
+        guard let at = clashAt, clashShare > 0, match.players.count >= 2 else { return nil }
+        let point = SpriteLibrary.point(at)
+        let seenWidth = max(size.width * cameraNode.xScale, 1), seenHeight = max(size.height * cameraNode.yScale, 1)
+        let centre = SIMD2(Float(0.5 + (point.x - cameraNode.position.x) / seenWidth), Float(0.5 - (point.y - cameraNode.position.y) / seenHeight))
+        let eased = Float(clashShare * clashShare * (3 - 2 * clashShare))
+        return (centre, GameScene.clashSplit * eased, GameScene.clashFringe * eased, sprites.look(for: 0).glow, sprites.look(for: 1).glow)
+    }
+
+    /// The clash's lightning: a bolt from above in each player's energy colour, the two crossing
+    /// in an X where they met; and the camera's close-in begun.
+    private func strikeClash(at contact: Vec2) {
+        clashAt = contact
+        clashLastTime = nil
+        let point = SpriteLibrary.point(contact)
+        let top = cameraBase.y + size.height * cameraBaseScale / 2
+        for (slot, index) in match.players.indices.prefix(2).enumerated() {
+            let lean = slot == 0 ? GameScene.clashBoltLean : -GameScene.clashBoltLean
+            let foot = CGPoint(x: point.x + sin(lean) * GameScene.clashBoltPast, y: point.y - cos(lean) * GameScene.clashBoltPast)
+            let bolt = EnergyEffect.strikes.randomElement()!
+            let node = holdForClash(bolt, player: index, at: foot, from: GameScene.strikeLandsFrame)
+            node.zPosition = 45
+            node.xScale = 1.0 / 6
+            node.yScale = (top - foot.y) / cos(lean) * 1.1 / max(node.size.height, 1)
+            node.zRotation = lean
+        }
+    }
+
+    /// An effect's node held on one frame through a clash's hit stop, the frame that shows the
+    /// contact, then played on from there as it ends (`releaseClash`).
+    @discardableResult
+    private func holdForClash(_ effect: EnergyEffect, player: Int, at point: CGPoint, from: Int) -> SKSpriteNode {
+        let frames = sprites.effectFrames(effect, player: player)
+        let start = min(max(from, 0), max(frames.count - 1, 0))
+        let node = SKSpriteNode(texture: frames.isEmpty ? nil : frames[start])
+        node.anchorPoint = effect.anchor
+        node.position = point
+        node.zPosition = 30
+        glowers.addChild(node)
+        clashHeld.append((node, Array(frames.dropFirst(start)), effect.fps))
+        return node
+    }
+
+    /// The hit stop over: the held effects played on, the held shields shattered, and the slashers'
+    /// swings set to play out as the push carries them.
+    private func releaseClash() {
+        for held in clashHeld {
+            held.node.run(.sequence([.animate(with: held.frames, timePerFrame: 1 / held.fps), .removeFromParent()]))
+        }
+        clashHeld = []
+        for held in clashShields {
+            held.node.removeFromParent()
+            shatterShield(owner: held.owner, at: SpriteLibrary.point(held.at))
+        }
+        clashShields = []
+        for index in clashSlashers { clashPlayout[index] = match.frame }
+        clashSlashers = []
+    }
+
+    /// The body's frame as drawn: through a slashclash's hit stop the swing at its contact frame,
+    /// and after, the rest of the swing played out from there while the push carries the body,
+    /// till the sheet ends or the body does something else.
+    private func shownFrame(_ index: Int, _ player: Player) -> AnimationFrame {
+        if match.hitStop > 0, clashSlashers.contains(index), player.state == .slashing {
+            return AnimationFrame(.esperSlash, GameScene.slashContactSheetFrame)
+        }
+        if let start = clashPlayout[index] {
+            let sheet = GameScene.slashContactSheetFrame + (match.frame - start) * SlashRules.sheetFramesPerSecond / 60
+            // Grounded, the push's slide shows the stun's pose instead.
+            if sheet < Animation.esperSlash.frameCount, !player.grounded, [.air, .idle, .land, .run].contains(player.state) {
+                return AnimationFrame(.esperSlash, sheet)
+            }
+            clashPlayout[index] = nil
+        }
+        return player.animationFrame
+    }
+    /// Sliding back off a clash along the ground: a trail of dash sparks, in the energy's colour,
+    /// one every `clashSparkEvery` frames, turned the way it's sliding.
+    private func trailClashSlide(_ index: Int, _ player: Player) {
+        guard player.clashPushed, player.grounded, abs(player.velocity.x) > 0.1 else { return }
+        guard match.frame - (clashSparkFrames[index] ?? Int.min / 2) >= GameScene.clashSparkEvery else { return }
+        clashSparkFrames[index] = match.frame
+        let effect = Effect.fireDash
+        let frames = (0..<effect.frameCount).map { sprites.silhouetteTexture(effect.name, $0, player: index) }
+        guard !frames.isEmpty else { return }
+        let spark = SKSpriteNode(texture: frames[0])
+        spark.anchorPoint = effect.anchor
+        spark.position = SpriteLibrary.point(player.position)
+        spark.xScale = (player.velocity.x < 0 ? -1 : 1) * effect.scale * bodyScale(index)
+        spark.yScale = effect.scale * bodyScale(index)
+        spark.zPosition = 30
+        spark.run(.sequence([.animate(with: frames, timePerFrame: 1 / effect.fps), .removeFromParent()]))
+        glowers.addChild(spark)
+    }
+    static let clashSparkEvery = 4
+    private var clashSparkFrames: [Int: Int] = [:]
+
+    /// The frames that show contact: the slash's blade at full swing, the strike's bolt reaching
+    /// its foot, the clash sheet's first full burst, the shield whole.
+    static let slashContactSheetFrame = 3
+    static let strikeLandsFrame = 3
+    static let slashClashBurstFrame = 1
+    static let shieldWholeFrame = 6
+    private var clashHeld: [(node: SKSpriteNode, frames: [SKTexture], fps: Double)] = []
+    private var clashShields: [(node: SKSpriteNode, owner: Int, at: Vec2)] = []
+    private var clashSlashers: Set<Int> = []
+    private var clashPlayout: [Int: Int] = [:]
+
+    /// The Test Center: the menus' grid on black behind the court, on the camera so it stays put,
+    /// and the second side the dummy, onyx in a random energy colour not the first's; anywhere
+    /// else, the grid gone and the second side back in its own look.
+    private func layTestCenter(_ on: Bool) {
+        testCenterGrid?.removeFromParent()
+        testCenterGrid = nil
+        guard on else {
+            if dummyDressed {
+                dummyDressed = false
+                applySavedColours()
+            }
+            return
+        }
+        if let image = MenuGround.gridOnBlack(size: size, scale: displayScale) {
+            let grid = SKSpriteNode(texture: SKTexture(cgImage: image))
+            grid.size = size
+            grid.zPosition = -100
+            cameraNode.addChild(grid)
+            testCenterGrid = grid
+        }
+        var colours = PlayerCustomization.sides.map(\.energy)
+        var looks = PlayerCustomization.sides.map(\.look)
+        guard colours.count == 2 else { return }
+        var dummy = PlayerCustomization(energy: EnergyColour.allCases.filter { $0 != colours[0] }.randomElement() ?? .teal)
+        dummy.dressing.skinTone = HumanLook.onyxSkinTone
+        colours[1] = dummy.energy
+        looks[1] = dummy.look
+        applyColours(colours, looks: looks)
+        dummyDressed = true
+    }
+
     /// The close-in let go of: the camera back at its base.
     private func endFinish() {
+        finale = nil
+        world.isPaused = false
         finishFrames = 0
         finishTarget = nil
         cameraNode.setScale(cameraBaseScale)
@@ -5849,6 +6314,9 @@ final class GameScene: SKScene {
                 if gameMode == .fortySeven, match.stage.features.doublePoints { showDoubleMark(at: hoop) }
                 exclaimBasket(at: hoop, dunk: dunk, three: shotPoints >= 3)
                 announce(dunk: dunk, three: gameMode == .fortySeven && shotPoints >= 3, floater: floater, winning: pendingFlow == .won)
+                // The game's last basket, offline: everything held where it is, the camera cutting
+                // to the scorer, the other and the ball, then the slow finish through the net.
+                if pendingFlow == .won, online == nil { startFinale(scorer: match.ball.lastTouched ?? scorer) }
             }
         }
     }
@@ -5915,13 +6383,14 @@ final class GameScene: SKScene {
                     }
                 }
                 if player.power == .frostTea { spawnSnowflakes(at: SpriteLibrary.point(player.position), count: 3, spread: 10) }
-            case .snatchReached(let index):
+            // Not Gale Ale's tornado cast, which goes out of a snatch but isn't one.
+            case .snatchReached(let index) where !match.players[index].galeCast:
                 let player = match.players[index]
                 let offset = Vec2(x: GameScene.snatchSparkOffset.x * player.facing.sign, y: GameScene.snatchSparkOffset.y) / SpriteLibrary.pixelsPerUnit
                 switch player.power {
                 case .frostTea:
                     // A sphere of snowflakes off the hand.
-                    spawnSnowflakes(at: SpriteLibrary.point(player.handCatchPoint), count: 14, spread: 20)
+                    spawnSnowflakeSphere(at: SpriteLibrary.point(player.handCatchPoint), count: GameScene.snowSphereCount, radius: GameScene.snowSphereRadius)
                 case .voltaCola where player.powerLevel >= 2:
                     spawnHitSpark(player: index, at: player.handCatchPoint)
                 default:
@@ -5939,23 +6408,55 @@ final class GameScene: SKScene {
                 if let cart = match.cart { spawnHitSpark(player: index, at: cart.box.center) }
             case .swatted(let index, hit: true):
                 spawnHitSpark(player: index, at: match.ball.position)
-            case .shieldPerfect(let owner, let at):
-                // The perfect shield: the shine, twice its size, where the ball met it.
-                glowers.addChild(EnergyEffect.shine.node(sprites, player: owner, at: SpriteLibrary.point(at), scale: GameScene.perfectShineScale))
-            case .shieldBroken(let owner, let at):
+            case .shieldPerfect(_, let at):
+                // The perfect shield: the shine, white as drawn (not in the energy's colour), twice
+                // its size, where the ball met it.
+                let shine = EnergyEffect.shine
+                let frames = sprites.frames(shine.name, count: shine.frameCount)
+                let node = SKSpriteNode(texture: frames.first)
+                node.anchorPoint = shine.anchor
+                node.position = SpriteLibrary.point(at)
+                node.zPosition = 30
+                node.setScale(GameScene.perfectShineScale)
+                node.run(.sequence([.animate(with: frames, timePerFrame: 1 / shine.fps), .removeFromParent()]))
+                glowers.addChild(node)
+            // A shieldclash's shields shatter as its hit stop ends, not as they meet.
+            case .shieldBroken(let owner, let at) where !events.contains(where: { if case .shieldClashed = $0 { true } else { false } }):
                 shatterShield(owner: owner, at: SpriteLibrary.point(at))
             case .slashClashed(let at):
                 // The clash sheet where the blades meet, once in each slasher's colour, the second
-                // turned round; the sparks stand in until it's imported.
+                // turned round, held on its burst through the hit stop; the sparks stand in until it's imported.
                 if EffectSheets.frames[EnergyEffect.slashClash.name] != nil {
                     for (slot, index) in match.players.indices.enumerated() {
-                        let clash = EnergyEffect.slashClash.node(sprites, player: index, at: SpriteLibrary.point(at))
+                        let clash = holdForClash(.slashClash, player: index, at: SpriteLibrary.point(at), from: GameScene.slashClashBurstFrame)
                         clash.xScale = slot == 0 ? 1 : -1
-                        glowers.addChild(clash)
                     }
                 } else {
                     for index in match.players.indices { spawnHitSpark(player: index, at: at) }
                 }
+                clashSlashers = Set(match.players.indices.filter { match.players[$0].state == .slashing && !match.players[$0].floSlash })
+                strikeClash(at: at)
+            case .snatchClashed(let at):
+                // As the slashclash: the clash sheet held on its burst, the lightning.
+                if EffectSheets.frames[EnergyEffect.slashClash.name] != nil {
+                    for (slot, index) in match.players.indices.enumerated() {
+                        let clash = holdForClash(.slashClash, player: index, at: SpriteLibrary.point(at), from: GameScene.slashClashBurstFrame)
+                        clash.xScale = slot == 0 ? 1 : -1
+                    }
+                }
+                strikeClash(at: at)
+            case .shieldClashed(let at, let first, let second):
+                // Both shields held whole where they met, shattering as the hit stop ends.
+                for shield in [first, second] {
+                    let node = SKSpriteNode()
+                    node.blendMode = .add
+                    node.zPosition = 29
+                    styleShield(node)
+                    place(node, shield: shield, frame: min(GameScene.shieldWholeFrame, EnergyEffect.shield.frameCount - 1))
+                    glowers.addChild(node)
+                    clashShields.append((node, shield.owner, shield.centre))
+                }
+                strikeClash(at: at)
             case .slashClanked(let index):
                 // The blade against a backboard shakes it.
                 let player = match.players[index]
@@ -6020,7 +6521,7 @@ final class GameScene: SKScene {
                 spawnHitSpark(player: by, at: match.players[victim].chest)
                 spawnHitSpark(player: by, at: match.players[by].handCatchPoint)
             case .quaked(let index):
-                let whole = match.players[index].power == .quakeUp && match.players[index].powerLevel >= 2
+                let whole = match.players[index].spec.quakeLevel >= 2
                 shake = whole ? 18 : 14
                 spawnRocks(at: SpriteLibrary.point(match.players[index].position), whole: whole)
             case .boltLanded(let at):
@@ -6188,6 +6689,7 @@ final class GameScene: SKScene {
         .snatchFloState: 2...6,
         .transform: 0...2,
         .gunSnipe: 0...9,
+        .spinBall: 0...3,
     ]
     /// The frames where the front arm crosses the hooded head, so the sheet's front arm and hand
     /// are drawn again over the hood: each sheet's frames, picked in the player gallery
@@ -6220,11 +6722,11 @@ final class GameScene: SKScene {
 
     /// Heads tilted on poses of their own, back for a negative tilt (degrees clockwise facing
     /// right), then moved to sit on the neck again, art pixels the way it faces and up: on the
-    /// HEAD sliders, kept between launches. Knocked into the air, stunned; and the up shield.
+    /// HEAD sliders, kept between launches. Knocked into the air, stunned.
     struct HeadPose: Codable { var tilt: CGFloat; var x: CGFloat; var y: CGFloat }
-    static let headPoseNames = ["STUN", "UP SHIELD"]
+    static let headPoseNames = ["STUN"]
     nonisolated(unsafe) static var headPoses: [String: HeadPose] = {
-        var poses: [String: HeadPose] = ["STUN": HeadPose(tilt: -20, x: 0, y: 0), "UP SHIELD": HeadPose(tilt: -20, x: 0, y: 0)]
+        var poses: [String: HeadPose] = ["STUN": HeadPose(tilt: -20, x: 0, y: 0)]
         for name in headPoseNames {
             if let data = UserDefaults.standard.data(forKey: "esper.headPose.\(name)"), let saved = try? JSONDecoder().decode(HeadPose.self, from: data) {
                 poses[name] = saved
@@ -6240,9 +6742,18 @@ final class GameScene: SKScene {
     static func headPose(_ frame: AnimationFrame) -> HeadPose? {
         switch (frame.animation, frame.frame) {
         case (.stunnedAir, _): headPoses["STUN"]
-        case (.shield, 1): headPoses["UP SHIELD"]
-        default: nil
+        default: headNudges[frame.animation]?[frame.frame].map { HeadPose(tilt: 0, x: $0.x, y: $0.y) }
         }
+    }
+    /// Hooded heads moved on single frames, art pixels the way the body faces and up: set in the
+    /// player gallery's HEAD X and Y (`PlayerGallery`), frames 0-based.
+    static let headNudges: [Animation: [Int: CGPoint]] = [
+        .spinBall: [1: CGPoint(x: 1, y: -1), 3: CGPoint(x: 1, y: -1)],
+        .pivot: [1: CGPoint(x: 0, y: 1), 2: CGPoint(x: 1, y: 0)],
+    ]
+    /// Whether a frame's hood is moved or turned off its place, so it carries its own line.
+    static func hoodMoved(_ frame: AnimationFrame) -> Bool {
+        hoodTurn(frame) != 0 || headPose(frame).map { $0.x != 0 || $0.y != 0 } ?? false
     }
 
     static func stringsUnderArms(_ frame: AnimationFrame) -> Bool {
@@ -6439,9 +6950,36 @@ final class GameScene: SKScene {
         spawn(effect, at: position, flipped: player.facing == .left, player: index, scale: DustTuning.scale(effect) * bodyScale(index))
     }
 
-    /// The shields up, each where it was raised: its sheet by its age, in its owner's colours,
-    /// added on, at half the sheet's size and turned to its tilt.
+    /// The shields up, each round its arc: its sheet by its age, in its owner's colours, added
+    /// on, at half the sheet's size and turned to its tilt, an afterimage of it left every frame.
     static let shieldScale: CGFloat = 0.5
+    /// The Wreck Center preview's belt panel: its camera this many units left of the belt's middle.
+    static let beltPanelLeft = 12.0
+    /// The shield and its afterimages (the SHIELD BM picker): added on, drawn plain over, or
+    /// opaque, every pixel of its art solid, drawn over normally, glowing as anything does.
+    enum ShieldLook: Int, CaseIterable {
+        case add, alpha, opaque
+        var label: String { ["ADD", "ALPHA", "OPAQUE"][rawValue] }
+    }
+    nonisolated(unsafe) static var shieldLook = ShieldLook.add
+    /// Any pixel of the art at all, made solid in its own colour; the node's alpha kept.
+    private lazy var opaqueShader = SKShader(source: """
+    void main() {
+        vec4 texel = texture2D(u_texture, v_tex_coord);
+        float solid = texel.a > 0.02 ? 1.0 : 0.0;
+        vec3 colour = texel.a > 0.0 ? texel.rgb / texel.a : vec3(0.0);
+        gl_FragColor = vec4(colour * solid, solid) * v_color_mix.a;
+    }
+    """)
+    private func styleShield(_ node: SKSpriteNode) {
+        node.blendMode = GameScene.shieldLook == .add ? .add : .alpha
+        node.shader = GameScene.shieldLook == .opaque ? opaqueShader : nil
+    }
+    /// The Spin Move: tilted back this far, and with the FLO paid flashing the energy colour, this many frames on and off.
+    static let spinTilt: CGFloat = 10 * .pi / 180
+    static let spinFlashFrames = 4
+    /// Tumbling's outline: black and bright by turns, this many frames each.
+    static let tumbleFlashFrames = 4
     static let perfectShineScale: CGFloat = 2
     private var shieldNodes: [SKSpriteNode] = []
     private func drawShields() {
@@ -6455,17 +6993,24 @@ final class GameScene: SKScene {
         }
         let frames = EnergyEffect.shield.frameCount
         for (index, node) in shieldNodes.enumerated() {
+            styleShield(node)
             guard index < shields.count, frames > 0 else { node.isHidden = true; continue }
             let shield = shields[index]
-            let frame = min(ShieldRules.sheetFrame(atAge: shield.age), frames - 1)
-            let texture = sprites.effectTexture(EnergyEffect.shield.name, frame, player: shield.owner)
-            node.texture = texture
-            node.size = CGSize(width: texture.size().width * GameScene.shieldScale, height: texture.size().height * GameScene.shieldScale)
-            node.position = SpriteLibrary.point(shield.centre)
-            node.zRotation = CGFloat(shield.tilt)
-            node.xScale = shield.normal.x < 0 ? -1 : 1
-            node.isHidden = false
+            let frame = min(shield.sheetFrame, frames - 1)
+            place(node, shield: shield, frame: frame)
         }
+    }
+
+    /// A shield's picture at its place round the arc: its sheet's frame, turned to its tilt, mirrored facing left.
+    private func place(_ node: SKSpriteNode, shield: Shield, frame: Int) {
+        let texture = sprites.effectTexture(EnergyEffect.shield.name, frame, player: shield.owner)
+        node.texture = texture
+        let scale = GameScene.shieldScale * CGFloat(shield.pictureScale)
+        node.size = CGSize(width: texture.size().width * scale, height: texture.size().height * scale)
+        node.position = SpriteLibrary.point(shield.centre)
+        node.zRotation = CGFloat(shield.tilt)
+        node.xScale = shield.side < 0 ? -1 : 1
+        node.isHidden = false
     }
 
     /// A broken shield: an explosion of cubes in its owner's colour, out from where it was.
@@ -7908,6 +8453,38 @@ final class GameScene: SKScene {
         }
     }
 
+    /// Frost Tea's snatch: snowflakes out over a sphere, not a ring: spread evenly round it (the
+    /// golden angle), each flying out along its own way, nearer ones bigger and in front, further
+    /// ones smaller, dimmer and behind.
+    static let snowSphereCount = 26
+    static let snowSphereRadius: CGFloat = 20
+    private func spawnSnowflakeSphere(at point: CGPoint, count: Int, radius: CGFloat) {
+        let texture = sprites.snowflake
+        let golden = CGFloat.pi * (3 - sqrt(5))
+        for step in 0..<count {
+            // Evenly over the sphere: down the height a step at a time, round it by the golden angle.
+            let y = 1 - 2 * (CGFloat(step) + 0.5) / CGFloat(count)
+            let ring = sqrt(max(1 - y * y, 0))
+            let turn = golden * CGFloat(step)
+            let x = cos(turn) * ring, z = sin(turn) * ring
+            let near = (z + 1) / 2
+            let flake = SKSpriteNode(texture: texture)
+            let size = 3 + 3 * near
+            flake.size = CGSize(width: size, height: size * 381 / 333)
+            flake.position = point
+            flake.zPosition = 31 + (z > 0 ? 0.5 : -1.5)
+            flake.color = GameScene.ice
+            flake.colorBlendFactor = 0.5
+            flake.blendMode = .add
+            flake.alpha = 0.45 + 0.55 * near
+            glowers.addChild(flake)
+            let fly = SKAction.move(by: CGVector(dx: x * radius, dy: y * radius), duration: 0.35)
+            fly.timingMode = .easeOut
+            let spin = SKAction.rotate(byAngle: .pi * (step % 2 == 0 ? 1 : -1), duration: 0.5)
+            flake.run(.sequence([.group([fly, spin, .sequence([.wait(forDuration: 0.2), .fadeOut(withDuration: 0.3)])]), .removeFromParent()]))
+        }
+    }
+
     /// Quake-Up Coffee's rocks: little squares of floor thrown up and falling back.
     private func spawnRocks(at point: CGPoint, whole: Bool) {
         let count = whole ? 24 : 10
@@ -8001,6 +8578,40 @@ final class GameScene: SKScene {
         for (id, node) in boltNodes where !seen.contains(id) {
             node.removeFromParent()
             boltNodes[id] = nil
+        }
+        // Z Tea's blasts: its sheet in the owner's energy, turned the way it flies.
+        var blastSeen = Set<Int>()
+        for blast in match.blasts {
+            blastSeen.insert(blast.id)
+            let node = blastNodes[blast.id] ?? {
+                let node = SKSpriteNode()
+                node.zPosition = 8
+                // A soft halo in the owner's glow colour under it, as the beam has.
+                let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
+                halo.color = SKColor(rgb: sprites.look(for: blast.owner).glow)
+                halo.colorBlendFactor = 1
+                halo.alpha = GameScene.beamGlow
+                halo.blendMode = .add
+                halo.zPosition = -0.1
+                halo.name = "halo"
+                node.addChild(halo)
+                glowers.addChild(node)
+                blastNodes[blast.id] = node
+                return node
+            }()
+            let blastFrames = EnergyEffect.zBlast.frameCount
+            node.texture = sprites.effectTexture(EnergyEffect.zBlast.name, (match.frame * Int(EnergyEffect.zBlast.fps) / 60) % max(blastFrames, 1), player: blast.owner)
+            node.size = node.texture?.size() ?? .zero
+            if let halo = node.childNode(withName: "halo") as? SKSpriteNode {
+                let side = max(node.size.width, node.size.height) * GameScene.beamGlowWidth
+                halo.size = CGSize(width: side, height: side)
+            }
+            node.position = SpriteLibrary.point(blast.position)
+            node.zRotation = CGFloat(Trig.atan2(blast.velocity.y, blast.velocity.x))
+        }
+        for (id, node) in blastNodes where !blastSeen.contains(id) {
+            node.removeFromParent()
+            blastNodes[id] = nil
         }
 
         seen = []
@@ -8198,7 +8809,14 @@ final class GameScene: SKScene {
         for (index, figure) in figureLayers.enumerated() { figure.zPosition = index == frontFigure ? 0.5 : 0 }
         for (index, player) in match.players.enumerated() {
             let node = playerNodes[index]
-            let frame = player.animationFrame
+            let frame = shownFrame(index, player)
+            trailClashSlide(index, player)
+            // Z Tea's beam's sound round and round while it fires, as loud as it's near the view.
+            if flow == .playing, player.firingBeam {
+                SoundBoard.shared.loop(.beam, key: index, volume: audibility(at: player.position))
+            } else {
+                SoundBoard.shared.endLoop(key: index)
+            }
             section("bodies")
             playFrameSounds(index, frame: frame, grounded: player.grounded, at: player.position)
             section("sounds")
@@ -8250,7 +8868,7 @@ final class GameScene: SKScene {
             let arms = blastArms(index, on: node)
             arms.isHidden = !player.firingBeam
             if !arms.isHidden {
-                arms.texture = sprites.texture(AnimationFrame(.blastArms, 0), player: drawnAs)
+                arms.texture = sprites.texture(AnimationFrame(.beamArms, 0), player: drawnAs)
                 arms.size = arms.texture!.size().scaled(by: drawScale)
                 // On the firing loop's even frames the body's shifted: the arms with it.
                 let shift = frame.frame % 2 == 0 ? GameScene.blastEvenFrameShift : .zero
@@ -8261,11 +8879,40 @@ final class GameScene: SKScene {
                 arms.xScale = facing
                 arms.zRotation = CGFloat(player.beamAim) * facing
             }
-            // In the throw stance's parry frames, and growing, white.
-            let tint: SKColor = .white
+            // Z Tea's blast: its arms, both on one sheet, cut apart, the back behind the body and the
+            // front over it, turned 45 degrees up about the shoulder off the ground.
+            let blastArms = blastPoseArms(index, on: node)
+            let blastFrame = Player.blastPoseStates.contains(player.state) ? player.blastSheetFrame : nil
+            for (arm, front) in [(blastArms.front, true), (blastArms.back, false)] {
+                guard let blastFrame,
+                      let texture = front ? sprites.frontArmTexture(AnimationFrame(.blastArms, blastFrame), player: drawnAs)
+                        : sprites.backArmTexture(AnimationFrame(.blastArms, blastFrame), player: drawnAs) else {
+                    arm.isHidden = true
+                    continue
+                }
+                arm.isHidden = false
+                arm.texture = texture
+                arm.size = texture.size().scaled(by: drawScale)
+                // Its line, in the body's line's colour, under it.
+                let line = arm.childNode(withName: "line") as? SKSpriteNode
+                line?.texture = sprites.blastArmOutlineTexture(AnimationFrame(.blastArms, blastFrame), player: drawnAs, front: front)
+                line?.isHidden = line?.texture == nil
+                line?.size = arm.size
+                line?.color = outlineNodes[index].isHidden ? SKColor(rgb: sprites.look(for: index).outline) : outlineNodes[index].color
+                let facing = CGFloat(player.facing.sign)
+                let shoulder = ZRules.blastShoulderPixels
+                arm.position = node.position + CGPoint(x: CGFloat(shoulder.x) * drawScale * facing, y: CGFloat(shoulder.y) * drawScale)
+                arm.xScale = facing
+                arm.zRotation = player.blastUp ? .pi / 4 * facing : 0
+                if !front { arm.zPosition = node.zPosition - 0.001 }
+            }
+            // In the throw stance's parry frames, and growing, white; spinning with the FLO paid,
+            // flashing the energy colour.
+            let spinFlash = player.spinPhasing && match.frame / GameScene.spinFlashFrames % 2 == 0
+            let tint: SKColor = spinFlash ? SKColor(rgb: sprites.look(for: index).glow) : .white
             // And all white, glowing, on the change's fifth frame.
             let flashWhite = changing && frame.frame == GameScene.transformWhiteFrame
-            let tintShare: CGFloat = growing || flashWhite ? 1 : (player.throwParrying ? 0.85 : 0)
+            let tintShare: CGFloat = growing || flashWhite ? 1 : (player.throwParrying || spinFlash ? 0.85 : 0)
             node.color = tint
             node.colorBlendFactor = tintShare
             // K&A: the body under the night's wash, as the stage is, its glowing parts drawn
@@ -8295,6 +8942,8 @@ final class GameScene: SKScene {
                 wantedTilt = -CGFloat(min(max(ahead, -1), 1)) * GameScene.flightTilt * CGFloat(player.facing.sign)
             }
             bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
+            // The Spin Move tilts back, at once.
+            if player.state == .spinning { bodyTilt[index] = GameScene.spinTilt * CGFloat(player.facing.sign) }
             node.zRotation = bodyTilt[index]
             // Hanging on a rim the body turns with it, about the rim's back.
             if player.state == .dunking, player.dunkHoop < rimDip.count, player.dunkHoop < match.stage.hoops.count {
@@ -8389,9 +9038,14 @@ final class GameScene: SKScene {
                 let cycling = ZoneTuning.inTheZone || floStateLine
                 let lineColour = cycling ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
                 // In the parry frames the line goes the bright version of the body's colour.
+                // Tumbling, it flashes black against the bright version of the body's colour; in the
+                // shield's backflip it's the energy's colour.
+                let tumbleFlash = player.state == .tumbling
+                    ? (match.frame / GameScene.tumbleFlashFrames % 2 == 0 ? SKColor.black : SKColor(rgb: sprites.look(for: index).bright))
+                    : player.state == .flipJump ? SKColor(rgb: sprites.look(for: index).glow) : nil
                 outlineNode.color = growing ? .white
-                    : player.throwParrying ? SKColor(rgb: sprites.look(for: index).bright)
-                    : (player.frozen > 0 ? SKColor(rgb: Look.ice.outline) : lineColour)
+                    : tumbleFlash ?? (player.throwParrying ? SKColor(rgb: sprites.look(for: index).bright)
+                    : (player.frozen > 0 ? SKColor(rgb: Look.ice.outline) : lineColour))
             } else {
                 outlineNode.isHidden = true
             }
@@ -8460,15 +9114,18 @@ final class GameScene: SKScene {
                 // Z Tea's beam aimed up, the head tips back with it, down, forward: as far as
                 // flying's tip at the aim's limit.
                 // Only firing: through the charge it stays level.
-                let aiming = player.firingBeam
-                let aimShare = CGFloat(player.beamAim / ZRules.aimRange)
+                // Z Tea's blasts fired off the ground, 45 degrees up: the head tips as the beam's aimed full
+                // up, held through a run of them and let back down as the pose ends.
+                let blastFiring = player.blastUp && Player.blastPoseStates.contains(player.state) && player.blastStep != nil
+                let aiming = player.firingBeam || blastFiring
+                let aimShare = player.firingBeam ? CGFloat(player.beamAim / ZRules.aimRange) : 1
                 let wantedTip: CGFloat = aiming ? aimShare * GameScene.flightHeadTip * (aimShare < 0 ? BeamHeadTuning.downTurn : BeamHeadTuning.upTurn)
                     : player.state != .flying ? 0
                     : (diving ? -GameScene.flightHeadTip : (rising ? GameScene.flightHeadTip : 0))
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
                 // And the sheet's own turn, the double jump's tumble, clockwise facing right.
                 let sheetTurn = GameScene.hoodTurn(frame)
-                if abs(headTip[index, default: 0]) > 0.001 || sheetTurn != 0, let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
+                if abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame), let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
                     let anim = GameScene.hoodDrawnFor.animation
                     let middle = CGPoint(x: anim.pixelSize / 2 + head.x, y: anim.pixelSize - anim.feetFromBottom - head.y)
                     let tip = headTip[index, default: 0]
@@ -8494,7 +9151,7 @@ final class GameScene: SKScene {
             }
             // Tipped, the hood carries its own line: the body's is drawn without the hood's place.
             let hoodLine = hoodLineNodes[index]
-            let tipped = !hood.isHidden && (abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodTurn(frame) != 0) && !outlineNode.isHidden && !floStateLine
+            let tipped = !hood.isHidden && (abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame)) && !outlineNode.isHidden && !floStateLine
             if tipped, let bare = sprites.bareOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted),
                let line = sprites.hoodLine(skin: sprites.look(for: index).dressing.skinTone, view: HoodView.of(frame)) {
                 outlineNode.texture = bare
@@ -8525,7 +9182,7 @@ final class GameScene: SKScene {
             // Its strings, off the hood, over the body: behind it, the hood down's were lost under
             // the torso. Toned as the hood's white and its palette 37 are. None where the arms
             // would cover them (`stringsUnderArms`).
-            if hood.isHidden || player.frozen > 0 || GameScene.stringsUnderArms(player.animationFrame) {
+            if hood.isHidden || player.frozen > 0 || GameScene.stringsUnderArms(frame) {
                 hoodStrings[index].hide()
             } else if !held {
                 let look = sprites.look(for: index)
@@ -8673,7 +9330,7 @@ final class GameScene: SKScene {
                 handBall.texture = (player.hasFireball ? sprites.basketballFireFrames : sprites.basketballFrames)[0]
             } else if player.holding, let landmark = sprites.landmark(.ball, in: frame, player: index) {
                 // Behind the body on the sheets that tuck it there, else in front.
-                let behind = GameScene.ballBehindBodySheets.contains(frame.animation)
+                let behind = GameScene.ballBehindBody(frame)
                 handBall.zPosition = behind ? -0.002 : 0.03
                 halo.zPosition = behind ? -0.003 : 0.02
                 let inHand = landmark * drawScale
@@ -8829,7 +9486,8 @@ final class GameScene: SKScene {
             // colour, and cubes swirling round a while (going in, the change's own spiral as well).
             let changeBurstDue = changing && frame.frame >= GameScene.transformBurstFrame
             let goingIn = changeBurstDue && lastChangeBurstDue[index] != true
-            let goingOut = wasInFloState[index] == true && !player.inFloState
+            // Only in play: off the win screen the next match's fresh bodies aren't a way out of it.
+            let goingOut = flow == .playing && wasInFloState[index] == true && !player.inFloState
             // Out of FloState: the change's sound backward.
             if goingOut { play(.floStateExit, at: player.chest) }
             if goingIn {
@@ -8892,7 +9550,9 @@ final class GameScene: SKScene {
                 castShadow(shadowHeads[index], of: headNode, anchorY: feet, facing: headNode.xScale, ground: feet - drop, rise: drop)
             }
             // The stepback, a jump out of the shooting stance, the throw and the slash leave the trail.
-            let trailing = player.state == .stepback || player.state == .throwing || (player.state == .shootStance && !player.grounded)
+            let trailing = player.state == .stepback || player.state == .throwing || player.state == .flipJump || player.state == .spinning
+                || (player.state == .flying && player.launchLeft > 0)
+                || (player.state == .shootStance && !player.grounded)
             if trailing, match.frame % 2 == 0 { spawnHoodedAfterimage(of: node, player: index) }
             // The slash's trail is the body and its blade; in FloState each one the next of the zone's colours.
             if player.state == .slashing, match.frame % 2 == 0 {
@@ -9010,6 +9670,13 @@ final class GameScene: SKScene {
         }
         ballHalo.alpha = onAntenna ? GameScene.ballGlow + (GameScene.antennaBallGlow - GameScene.ballGlow) * swell : GameScene.ballGlow
         ballHalo.setScale(onAntenna ? GameScene.antennaBallHaloScale : 1)
+        // Off a perfect shield, the shielder's alone till it bounces: a bright white glow.
+        let excluded = ball.exclusiveTo != nil && ball.holder == nil
+        if excluded {
+            ballHalo.color = .white
+            ballHalo.alpha = GameScene.exclusionGlow
+            ballHalo.setScale(GameScene.exclusionHaloScale)
+        }
         spinBall(ball)
         // The camera on a scrolling stage: level, gliding after the local player and leading them.
         if !wholeStageView, [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }
@@ -9058,6 +9725,7 @@ final class GameScene: SKScene {
         } else {
             cameraNode.position = cameraBase
         }
+        stepClashCamera()
         // The game-winner's finish, easing in on the ball; the HUD kept its size.
         if finishFrames > 0 {
             if flow == .playing {
@@ -9098,8 +9766,9 @@ final class GameScene: SKScene {
         }
         glowHud.position = cameraNode.position
         ballTrail.position = ballNode.position
-        ballTrail.particleColor = colour
-        ballTrail.particleBirthRate = ball.isLive && !ball.resting && ball.velocity.length > 1 ? 90 : 0
+        // A perfect-shielded ball trails white the whole way down.
+        ballTrail.particleColor = excluded ? .white : colour
+        ballTrail.particleBirthRate = ball.isLive && !ball.resting && (ball.velocity.length > 1 || excluded) ? 90 : 0
         // Blazing Boba's burning shot trails the head's fire as well.
         if ball.burning, ball.holder == nil, ball.isLive, !ball.resting, ball.velocity.length > 1 {
             emitHeadParticles(ball.lastTouched ?? 0, power: .blazingBoba, at: ballNode.position,
@@ -9233,15 +9902,22 @@ final class GameScene: SKScene {
         section("net")
 
         var shownDots = 0
-        for player in match.players where player.state == .shootStance && player.shotAim != .zero {
-            for (step, point) in match.shotPreview(for: player.index).enumerated() where shownDots < previewDots.count {
+        var madeHoop: Int?
+        // The stance's arc: the flick's, or with none yet the preset's.
+        for player in match.players where player.state == .shootStance {
+            let colour = SKColor(rgb: sprites.look(for: player.index).glow)
+            for point in match.shotPreview(for: player.index) where shownDots < previewDots.count {
                 let dot = previewDots[shownDots]
                 dot.isHidden = false
-                dot.alpha = step == 0 ? 0.9 : 0.35
+                dot.color = colour
+                dot.alpha = 1
                 dot.position = SpriteLibrary.point(point)
                 shownDots += 1
             }
+            // The shooter's own screen only: the hoop the aim would score on, outlined.
+            if player.index == localIndex { madeHoop = match.shotPreviewScores(for: player.index) }
         }
+        showMadeShotOutline(on: madeHoop)
         // Web Water's aim, held: dots out along it to the line's reach, like the shot's.
         for player in match.players where player.webAiming {
             let spacing = WebRules.lineRange / Double(GameScene.webAimDots)
@@ -9253,7 +9929,7 @@ final class GameScene: SKScene {
                 shownDots += 1
             }
         }
-        for dot in previewDots[shownDots...] { dot.isHidden = true }
+        for dot in previewDots[shownDots...] { dot.isHidden = true; dot.color = .white }
         section("ball")
 
         drawHitboxes()
@@ -9332,6 +10008,8 @@ final class GameScene: SKScene {
         }
         let labels = buttonLabels(for: p)
         controls?.setLabels(jump: labels.jump, shoot: labels.shoot, throwBall: labels.throwBall)
+        // The shield's there whenever the ball's not in hand.
+        controls?.setShieldShown(!p.holding)
         let powerName = Greateraid.biomorphs.first { $0.power == p.power }?.name.uppercased() ?? "NO POWER"
         TitleText.set(powerLabel, to: p.power == .none ? powerName : "\(powerName) L\(p.powerLevel)", size: 12)
     }
@@ -9414,10 +10092,19 @@ final class GameScene: SKScene {
     private func drawHitboxes() {
         hitboxLayer.removeAllChildren()
         guard showHitboxes else { return }
-        // The shields' reach.
+        // The Spin Move's foot through the spin, where it kicks on the spin's first frame.
+        for player in match.players where player.state == .spinning {
+            let foot = player.spinFoot
+            let node = SKShapeNode(circleOfRadius: CGFloat(foot.radius * SpriteLibrary.pixelsPerUnit))
+            node.position = SpriteLibrary.point(foot.centre)
+            node.strokeColor = .orange
+            node.lineWidth = 1
+            hitboxLayer.addChild(node)
+        }
+        // The shields' reach: a circle round the body's middle.
         for shield in match.shields {
-            let node = SKShapeNode(circleOfRadius: CGFloat(shield.radius * SpriteLibrary.pixelsPerUnit))
-            node.position = SpriteLibrary.point(shield.centre)
+            let node = SKShapeNode(circleOfRadius: CGFloat(shield.reach * SpriteLibrary.pixelsPerUnit))
+            node.position = SpriteLibrary.point(shield.pivot)
             node.strokeColor = .yellow
             node.lineWidth = 1
             hitboxLayer.addChild(node)
@@ -9862,7 +10549,8 @@ extension GameScene {
         let rightBelt = court.conveyors.filter { $0.way < 0 }
         let beltLeft = rightBelt.map(\.box.min.x).min() ?? 290, beltRight = rightBelt.map(\.box.max.x).max() ?? 330
         let beltTop = rightBelt.first?.box.max.y ?? 140
-        let belt = PreviewShot(at: Vec2(x: (beltLeft + beltRight) / 2, y: beltTop + 5), view: CGSize(width: 60, height: 60), frames: 40)
+        // A little left of the belt's middle.
+        let belt = PreviewShot(at: Vec2(x: (beltLeft + beltRight) / 2 - GameScene.beltPanelLeft, y: beltTop + 5), view: CGSize(width: 60, height: 60), frames: 40)
         // The broom by the left wall and the black bench beside it.
         let broom = PreviewShot(at: Vec2(x: 67, y: 22), view: CGSize(width: 60, height: 34), frames: 40)
         return [hoop, floor, belt, broom]

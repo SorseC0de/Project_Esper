@@ -57,7 +57,7 @@ ROOT_IMAGES = {
     "HoopfishTopfin": ["Stages/Hoopfish Hideaway/Hoopfish/Hoopfish_topfin.png"],
     "ElementsMountains": ["Stages/Elements/mountains_bkg.png", "Stages/mountains_bkg.png"],
     "HoloProjector": ["UI/Holo-Projector_v2.png"],
-    "Cart": ["Stages/Flight/Cart.png"],
+    "Cart": ["Stages/Flight/Cart_e64.png"],
     "FlightB411Cloud": ["Stages/Flight/cloud.png"],
     "FlightB411Plane": ["Stages/Flight/plane.png"],
     "Hoopcase": ["Stages/Flight/Hoopcase.png"],
@@ -87,13 +87,17 @@ ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball", "player_fly_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk",
-               "player_throw", "player_throw_air", "player_layup", "player_dbl_jump_ball"}
+               "player_throw", "player_throw_air", "player_layup", "player_dbl_jump_ball", "player_spin_ball"}
 
-SKIP = {"Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
+# Frames whose ball is tucked behind the body, too little of it showing to find: its centre
+# given, art pixels from the feet, facing right. SpriteLibrary.tuckedBalls has to agree.
+TUCKED_BALLS = {"player_spin_ball_3": (-3.5, 20.5)}
+
+SKIP = {"spr_player_hurt", "Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",
         "spr_box", "spr_floor"}
 # Strips in _Graphic Assets that nothing draws yet, kept out of the app until they're wired.
-HELD_BACK = {"dust_run2"}
+HELD_BACK = {"dust_run2", "player_hurt"}   # player_hurt: taken out of the game
 
 
 def load_yy(path):
@@ -468,7 +472,7 @@ def main():
             frame_rows = rows[index * tall:(index + 1) * tall]
             write_imageset(short, index, png_writer=lambda path, r=frame_rows: write_png(path, size, tall, ctype, r))
             if short in BALL_SHEETS:
-                centre = ball_centre(size, tall, bpp, frame_rows, feet)
+                centre = TUCKED_BALLS.get(f"{short}_{index}") or ball_centre(size, tall, bpp, frame_rows, feet)
                 if centre:
                     landmarks.append((f"{short}_{index}", centre))
         table[short] = (size, tall, count, size // 2, tall - feet, STRIP_FPS)

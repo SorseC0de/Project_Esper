@@ -20,8 +20,8 @@ import Foundation
 public struct Opponent: Equatable {
     public let index: Int
     private var random: UInt32
-    private var plan = Plan.none
-    private var planFrames = 0
+    var plan = Plan.none
+    var planFrames = 0
     private var shuffleDirection = 1.0
     /// How far off the rim it hangs back while hovering, picked as the hover starts.
     private var hoverOffset = 55.0
@@ -61,10 +61,34 @@ public struct Opponent: Equatable {
     private var throwRead: Bool?
     /// Last frame's output, to make a press an edge.
     var pressed = PlayerInput.idle
-    /// The frames the other's last slashes started on, to tell spam from a one-off, and
-    /// whether the throw stance it's in is a parry, to be cancelled once it's done.
-    private var slashStarts: [Int] = []
-    private var parrying = false
+    /// The frames the other's last slashes, snatches and shields started on, to tell spam from a
+    /// one-off (`OpponentCounters`).
+    var starts: [Read: [Int]] = [:]
+    /// The counter it's going for, read off spam or reacted to, and when.
+    var counterPlan: CounterPlan?
+    /// The other's move it's reacting to: the frame it started and how long after it's seen,
+    /// rolled once a move; and the frames still backing off out of its way.
+    var reactingTo: Reaction?
+    var backingOff = 0
+    /// The thrown ball's snatch timed this many frames early or late, rolled once a throw.
+    private var snatchSlop = 0
+    /// A loose ball's chase decided once a flight, not every frame: the flight, whether it slides
+    /// for it, spikes it (with the slash or the shield) and snatches it.
+    var race: Race?
+    /// Out of a stun: frames still settling before it attacks again, and whether it backs off meanwhile.
+    var settling = 0
+    var settlesAway = false
+    var wasStunned = false
+    /// Getting unstuck (`unstick`): where it stood last frame, frames pushing without moving, tries
+    /// at a hop out, frames backing away after giving up, and frames stood still on defence.
+    var lastPosition: Vec2?
+    var pushedStill = 0
+    var unstickTries = 0
+    var backingAway = 0
+    var idleFrames = 0
+    var reachFrames = 0
+    /// The other's shot or approach it last decided on shielding: decided once each.
+    var shieldIntent: ShieldIntent?
     /// Off the court: the stage as read, the link being taken, links given up on a while, the
     /// search for a still rim's shot spots, and the spot it's making for.
     var terrain: Terrain?
@@ -80,13 +104,30 @@ public struct Opponent: Equatable {
     private var lastHolder: Int?
     private var watchingHolder = false
     private var chaseFrames = 0
-    /// The other's slash it last answered (the frame it started), so each is answered once.
-    private var answeredSlash = -1
     /// Frames still to wait before going into FloState once the meter's full: a beat, as a person
     /// takes, unless there's something to fight for.
     private var floStateWait: Int?
+    /// The match's gameplan for FloState, rolled once (`FloPlan`), and how long the other's been in theirs.
+    public internal(set) var floPlan: FloPlan?
+    private var humanFloFrames = 0
     /// Whether this run at the rim takes the floater with nobody on it: rolled once a run.
     private var floaterAnyway: Bool?
+
+    /// When it goes into FloState, decided for a whole match: as soon as it can; answering the
+    /// other's, after; kept to break out of a stun or a tumble; kept till it's behind; whenever, at
+    /// random; or kept for an opening, their ball near their rim or a loose one up for grabs.
+    public enum FloPlan: CaseIterable, Equatable {
+        case atOnce, answer, breakout, behind, whenever, opening
+    }
+    /// Behind by this many points (Rounds) or this many (47) before the plan that waits for it goes.
+    static let behindPoints = 2
+    /// A dunk's stance held this long past the dunk's own frames without it coming: given up.
+    static let dunkStanceGrace = 20
+    /// The other this far off, across or up, can't get back in time: it goes straight to score.
+    static let rushDistance = 140.0
+    static let behindPoints47 = 10
+    /// One in this many frames, the plan that goes whenever: about every seven seconds.
+    static let wheneverOdds: UInt32 = 400
 
     /// What it's up to.
     public enum Plan: Equatable {
@@ -117,9 +158,10 @@ public struct Opponent: Equatable {
     /// A fresh mind for a new point that keeps what it read of the stage and the shot spots it
     /// found: they're re-read only when the stage or the body changes (`Terrain.signature`).
     public func forNewRound() -> Opponent {
-        var fresh = Opponent(index: index)
+        var fresh = Opponent(index: index, seed: random)
         fresh.terrain = terrain
         fresh.spotSearch = spotSearch
+        fresh.floPlan = floPlan
         return fresh
     }
 
@@ -131,6 +173,7 @@ public struct Opponent: Equatable {
         // Every stage is read, the court too, for what its own play can't reach: over the
         // countdown, while nothing moves, rather than in the first seconds of play.
         readStage(match, me: me)
+        if floPlan == nil { floPlan = FloPlan.allCases[Int(roll(UInt32(FloPlan.allCases.count)))] }
         if match.countdown > 0 {
             plan = .none
             planFrames = 0
@@ -141,8 +184,7 @@ public struct Opponent: Equatable {
             return .idle
         }
         humanStill = abs(human.velocity.x) < 0.2 && (human.state == .idle || human.state == .crouch) ? humanStill + 1 : 0
-        if human.state == .slashing, human.stateTimer == 0 { slashStarts.append(match.frame) }
-        slashStarts.removeAll { match.frame - $0 > Opponent.slashSpamFrames }
+        noteStarts(match, me: me, human: human)
         if human.state == .throwStance {
             humanThrowCharge = human.stateTimer
         } else if human.state == .throwing {
@@ -177,6 +219,8 @@ public struct Opponent: Equatable {
             // A helmet bearing down: up and onto it, whatever else it was doing.
         } else if askForFloState(match, me: me, human: human, into: &input) {
             // Into FloState: throw and shoot together.
+        } else if counter(match, me: me, human: human, into: &input) {
+            // The rock-paper-scissors: spam punished, a move answered once it's seen.
         } else if me.hasBall {
             offence(match, me: me, human: human, into: &input)
         } else if human.hasBall {
@@ -192,13 +236,11 @@ public struct Opponent: Equatable {
             if journey?.started != true { keepTheDribbleOffTheLava(match, me: me, into: &input) }
             keepOffTheLava(match, me: me, into: &input)
         }
+        settleAfterStun(me: me, human: human, into: &input)
+        unstick(match, me: me, human: human, into: &input)
         pressed = input
         return input
     }
-
-    /// Two slashes inside this many frames is spam, and the next is met with the throw
-    /// stance's parry.
-    private static let slashSpamFrames = 90
 
     // MARK: Helmets
 
@@ -295,7 +337,7 @@ public struct Opponent: Equatable {
         input.jump = true
     }
 
-    private func hoop(scoredOnBy player: Int, in match: Match) -> Hoop {
+    func hoop(scoredOnBy player: Int, in match: Match) -> Hoop {
         match.stage.hoops.first { $0.owner == player } ?? match.stage.hoops[0]
     }
 
@@ -355,33 +397,8 @@ public struct Opponent: Equatable {
         let near = abs(gap) < 50 && level
         let inReach = abs(gap) < 26 && level
 
-        // The parry: held through its frames, then the shoot button cancels it, ball kept.
-        if parrying {
-            if me.state == .throwStance {
-                if me.stateTimer >= ThrowParryRules.frames {
-                    input.shoot = true
-                    parrying = false
-                } else {
-                    input.throwBall = true
-                }
-                return
-            }
-            parrying = false
-        }
-        // A slash starting in reach, at it: met with the throw stance's parry, every time it's spam,
-        // else about half the time; decided once a slash.
-        let facingMe = (me.position.x - human.position.x) * human.facing.sign > 0
-        if human.state == .slashing, human.stateTimer < SlashRules.liveFrames.lowerBound, Opponent.bladeReaches(human, me), level, facingMe,
-           [.idle, .walk, .run, .dash, .air].contains(me.state), answeredSlash != match.frame - human.stateTimer {
-            answeredSlash = match.frame - human.stateTimer
-            if slashStarts.count >= 2 || chance(50) {
-                input.throwBall = true
-                parrying = true
-                return
-            }
-        }
-        // In the air by the rim: the dunk, whatever the plan was.
-        if !rimOut, !me.grounded, me.state == .air, hoop.position.distance(to: me.chest) < 60, me.chest.y > hoop.position.y - 40 {
+        // In the air by the rim: the dunk, whatever the plan was, where a rim takes a dunk.
+        if !rimOut, match.stage.dunkable(hoop), !me.grounded, me.state == .air, hoop.position.distance(to: me.chest) < 60, me.chest.y > hoop.position.y - 40 {
             plan = .dunk
             planFrames = max(planFrames, 20)
         }
@@ -391,6 +408,16 @@ public struct Opponent: Equatable {
         // Behind the block: on the backboard's side of the rim, past the block's face.
         let behind = !readsStage && (me.position.x - hoop.position.x) * hoop.backboard.sign > 5 && me.position.y < 100
 
+        // The other stunned, parried, frozen, tumbling or pushed off a clash, or too far off to get
+        // back in time: straight for a basket, every time, while they can't stop it (`rushing`).
+        // A fake in the stance becomes the shot.
+        let helpless = human.hitStun > 0 || human.parryLocked || human.clashPushed || human.frozen > 0 || human.state == .tumbling
+        let farOff = abs(gap) > Opponent.rushDistance || abs(human.position.y - me.position.y) > Opponent.rushDistance
+        let rushing = (helpless || farOff) && rimPath == nil
+        if rushing, plan == .fake {
+            plan = .shoot
+            planFrames = 90
+        }
         // In the stance: a fake is called off with the throw (letting go of shoot always shoots,
         // and down is the stepback); a shot holds through the windup with the aim on the rim,
         // then lets go, sooner if they're closing in; a jump shot hops out of the stance after
@@ -449,6 +476,18 @@ public struct Opponent: Equatable {
         }
         stanceFrames = 0
         if me.state == .throwStance {
+            // Going for the dunk: the stance held, the stick off it, so it carries onto the rim; held
+            // past the dunk's window without getting there, called off with shoot, the ball kept.
+            if plan == .dunk {
+                if me.stateTimer > BallRules.dunkStanceFrames + Opponent.dunkStanceGrace {
+                    input.shoot = !pressed.shoot
+                    plan = .none
+                    planFrames = 0
+                } else {
+                    input.throwBall = true
+                }
+                return
+            }
             // The lob: up, and let go once the windup has passed.
             input.stick = Vec2(x: 0, y: 1)
             input.throwBall = me.stateTimer < BallRules.throwWindupFrames + 1
@@ -508,8 +547,7 @@ public struct Opponent: Equatable {
         let lobs = match.stage.features.lavaSurface == nil
 
         // Near enough the rim and level with its floor: the dunk, up and onto it.
-        let rimClose = readsStage ? !rimOut && abs(toHoop) < 55 && dunkReach(match, rim: hoop.position)
-            : abs(toHoop) < 55 && me.position.y < hoop.position.y && hoop.position.y - me.position.y < 60
+        let rimClose = rimClose(match, me: me, hoop: hoop, toHoop: toHoop, rimOut: rimOut)
         if behind, plan != .dunk {
             plan = .climb
             planFrames = 1
@@ -623,6 +661,15 @@ public struct Opponent: Equatable {
             planFrames = 30
         }
 
+        // Rushing: no footwork. The dunk under the rim, the shot on its spot, else straight to the
+        // spot; the floater still taken on the way when it goes in.
+        if rushing, [.none, .hold, .shuffle, .fake, .dashDance, .lob, .over, .retreat].contains(plan) {
+            plan = rimClose ? .dunk : atSpot ? .shoot : .travel
+            planFrames = plan == .dunk ? 60 : plan == .shoot ? 90 : 20
+            jumpShot = readSpot?.jumpShot ?? true
+            dances = 0
+            dashDanceLeft = 0
+        }
         switch plan {
         case .hold:
             break
@@ -676,9 +723,10 @@ public struct Opponent: Equatable {
                 tapShoot(&input)
             }
         case .lob, .floater:
-            // The throw stance with up; the stance handler lets it go: over them, or the layup.
+            // The throw stance with up, the layup at once: on a fresh press, let go a frame first if
+            // the button's still down from something else (a fake called off with it).
             input.stick = Vec2(x: 0, y: 1)
-            input.throwBall = true
+            input.throwBall = me.state == .throwStance || !pressed.throwBall
         case .over:
             // Up and over toward the rim: a full hop, the double jump at the top.
             if abs(toRush) < 1 { break }
@@ -710,6 +758,12 @@ public struct Opponent: Equatable {
         default:
             plan = .none
         }
+    }
+
+    /// Near enough the rim and level with its floor for the dunk, up and onto it.
+    private func rimClose(_ match: Match, me: Player, hoop: Hoop, toHoop: Double, rimOut: Bool) -> Bool {
+        Opponent.readsStage(match) ? !rimOut && abs(toHoop) < 55 && dunkReach(match, rim: hoop.position)
+            : abs(toHoop) < 55 && me.position.y < hoop.position.y && hoop.position.y - me.position.y < 60
     }
 
     /// Along the floor to under the target, then up onto it if it's the ledge: a full hop
@@ -780,9 +834,8 @@ public struct Opponent: Equatable {
         if rest > 0 { rest -= 1 }
         if Opponent.committedStates.contains(me.state) { return }
         if planFrames > 0 { planFrames -= 1 } else if plan != .none { plan = .none }
+        if contestWithShield(match, me: me, human: human, into: &input) { return }
 
-        // Their swing just started within reach: the parry, the clash, or out of reach.
-        if answerSlash(match, me: me, human: human, into: &input) { return }
         // A throw charged at it for more than a few frames is telegraphed: it squares up
         // to them and stands ready, and the snatch comes as the ball does.
         let charged = human.state == .throwStance ? humanThrowCharge : (human.state == .throwing ? lastThrowCharge : 0)
@@ -921,34 +974,6 @@ public struct Opponent: Equatable {
     static let floaterRange = 90.0
     static let floaterAnywayChance: UInt32 = 35
 
-    /// The other's slash starting in reach, met once: the snatch to parry it (the slasher's the one
-    /// stripped), its own slash to clash with it (both spent, nobody struck), or out of its reach.
-    /// True while it's answering.
-    private mutating func answerSlash(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) -> Bool {
-        let gap = human.position.x - me.position.x
-        guard human.state == .slashing, human.stateTimer < SlashRules.liveFrames.lowerBound, Opponent.bladeReaches(human, me),
-              abs(human.position.y - me.position.y) < 20 else { return false }
-        let started = match.frame - human.stateTimer
-        guard answeredSlash != started else {
-            // Backing off this one: still out of its way.
-            if plan == .retreat { input.stick = Vec2(x: gap > 0 ? -1 : 1, y: 0) }
-            return plan == .retreat
-        }
-        answeredSlash = started
-        let free = [.idle, .walk, .dash, .run, .pivot, .air, .crouch].contains(me.state)
-        if me.snatchCooldown == 0, chance(Opponent.parryChance) {
-            tapThrow(&input)
-            rest = 30
-        } else if free, chance(Opponent.clashChance) {
-            tapShoot(&input)
-            rest = 30
-        } else {
-            plan = .retreat
-            planFrames = 12
-            input.stick = Vec2(x: gap > 0 ? -1 : 1, y: 0)
-        }
-        return true
-    }
     /// Whether a slash just started can reach it: its blade's box against the body, now or as far
     /// as the slash's carry takes it over its live frames. One that can't is let go by, and gone
     /// past once spent, rather than answered.
@@ -959,26 +984,55 @@ public struct Opponent: Equatable {
         return near <= reach
     }
 
-    /// A slash met with the snatch's parry this often; of the rest, with a slash to clash.
-    static let parryChance: UInt32 = 50
-    static let clashChance: UInt32 = 60
 
-    /// Into FloState once the meter's full: after a beat, or at once with their ball or a loose one
-    /// close; out of anything free, both buttons pressed on one frame. True on the frame it asks
-    /// (and the frame before, that lets go of either if it was down).
+    /// Into FloState once the meter's full, as its gameplan for the match has it (`FloPlan`); out
+    /// of anything free, or as its plan has it out of a stun, both buttons pressed on one frame. True
+    /// on the frame it asks (and the frame before, that lets go of either if it was down).
     private mutating func askForFloState(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) -> Bool {
         let free: [PlayerState] = [.idle, .walk, .dash, .run, .pivot, .land, .crouch, .crouchWalk, .air]
-        guard me.floStateReady, !me.inFloState, me.hitStun == 0, free.contains(me.state) else {
+        humanFloFrames = human.inFloState ? humanFloFrames + 1 : 0
+        guard me.floStateReady, !me.inFloState else {
             if !me.floStateReady { floStateWait = nil }
             return false
         }
-        if floStateWait == nil { floStateWait = Int(roll(Opponent.floStateWaitMost)) }
-        let close = abs(human.position.x - me.position.x) < 120
-        let urgent = (human.hasBall && close) || (match.ball.holder == nil && match.ball.isLive && close)
-        if let wait = floStateWait, wait > 0, !urgent {
-            floStateWait = wait - 1
-            return false
+        let plan = floPlan ?? .atOnce
+        let helpless = me.hitStun > 0 || me.parryLocked || me.clashPushed || me.state == .tumbling
+        let wants: Bool
+        if plan == .breakout {
+            wants = helpless
+        } else {
+            guard me.hitStun == 0, free.contains(me.state) else { return false }
+            switch plan {
+            case .atOnce:
+                // After a beat, as a person takes: at once with their ball or a loose one close.
+                if floStateWait == nil { floStateWait = Int(roll(Opponent.floStateWaitMost)) }
+                let close = abs(human.position.x - me.position.x) < 120
+                let urgent = (human.hasBall && close) || (match.ball.holder == nil && match.ball.isLive && close)
+                if let wait = floStateWait, wait > 0, !urgent {
+                    floStateWait = wait - 1
+                    return false
+                }
+                wants = true
+            case .answer:
+                // Theirs seen, a reaction time on.
+                wants = humanFloFrames >= Opponent.reactionFrames.upperBound
+            case .behind:
+                let behindBy = match.scores[human.index] - match.scores[index]
+                wants = behindBy >= (match.mode == .fortySeven ? Opponent.behindPoints47 : Opponent.behindPoints)
+            case .whenever:
+                wants = roll(Opponent.wheneverOdds) == 0
+            case .opening:
+                // When it counts: their ball near their rim, or a loose one they're as near as it is.
+                let theirRim = hoop(scoredOnBy: human.index, in: match).position
+                let threat = human.hasBall && abs(human.position.x - theirRim.x) < 100
+                let contested = match.ball.holder == nil && match.ball.isLive
+                    && abs(match.ball.position.x - human.position.x) < 60 && abs(match.ball.position.x - me.position.x) < 60
+                wants = threat || contested
+            case .breakout:
+                wants = false
+            }
         }
+        guard wants else { return false }
         // A press is an edge: a frame with both up first if either was down.
         if pressed.shoot || pressed.throwBall { return true }
         input.shoot = true
@@ -1008,13 +1062,21 @@ public struct Opponent: Equatable {
             if abs(toSpot) > 6 { input.stick = Vec2(x: toSpot > 0 ? 0.5 : -0.5, y: 0) }
             return
         }
-        if answerSlash(match, me: me, human: human, into: &input) { return }
+        if blockShot(match, me: me, human: human, into: &input) { return }
+        // Their shot from the ground: in snatchOrSpike's reach it's played there and then;
+        // otherwise gone after.
+        if match.ball.shotInFlight, match.ball.lastTouched == human.index, snatchOrSpike(match.ball, me: me, human: human, into: &input) { return }
+        if goaltend(match, me: me, human: human, into: &input) { return }
+        if contestWithShield(match, me: me, human: human, into: &input) { return }
         // A throw coming at it: it stands its ground, facing it, and the snatch goes out so
         // the hand is live as the ball arrives. Charged more than a few frames it was
         // telegraphed and the snatch comes every time; a quick throw gets by seven in ten.
         if ball.strikes, ball.velocity.x != 0, abs(ball.position.y - me.chest.y) < 14,
            (ball.position.x < me.position.x) == (ball.velocity.x > 0) {
-            if throwRead == nil { throwRead = lastThrowCharge > 6 || chance(30) }
+            if throwRead == nil {
+                throwRead = lastThrowCharge > 6 || chance(30)
+                snatchSlop = Int(roll(5)) - 2
+            }
             let toward: Facing = ball.position.x < me.position.x ? .left : .right
             if me.facing != toward, me.grounded {
                 input.stick = Vec2(x: toward.sign * 0.5, y: 0)
@@ -1022,7 +1084,8 @@ public struct Opponent: Equatable {
             }
             let reach = abs(ball.position.x - me.handCatchPoint.x) - BallRules.handCatchRadius - BallRules.radius
             let framesAway = reach / abs(ball.velocity.x)
-            if throwRead == true, me.snatchCooldown == 0, framesAway <= Double(SnatchRules.activeFrames.lowerBound + 1) {
+            // Timed as a person times it: a frame or two early or late.
+            if throwRead == true, me.snatchCooldown == 0, framesAway <= Double(SnatchRules.activeFrames.lowerBound + 1 + snatchSlop) {
                 tapThrow(&input)
             }
             return
@@ -1039,13 +1102,23 @@ public struct Opponent: Equatable {
         let toBall = target - me.position.x
         let above = ball.position.y - me.position.y
         if snatchOrSpike(ball, me: me, human: human, into: &input) { return }
+        // Right under it, below what it stands on: down through a one-way, or off the side of
+        // anything else, the way to the middle.
+        if abs(toBall) <= 5, above < -12, me.grounded {
+            if match.stage.standsOnlyOnOneWays(me.body) {
+                input.stick = Vec2(x: 0, y: -1)
+            } else {
+                input.stick = Vec2(x: me.position.x < match.stage.width / 2 ? 1 : -1, y: 0)
+            }
+            return
+        }
         if abs(toBall) > 30 {
             input.stick = Vec2(x: toBall > 0 ? 1 : -1, y: 0)
         } else if abs(toBall) > 5 {
             input.stick = Vec2(x: toBall > 0 ? 0.5 : -0.5, y: 0)
         }
-        // A race for it: the slide.
-        if me.state == .run, abs(toBall) < 40, abs(human.position.x - target) < abs(toBall) + 15, chance(15) {
+        // A race for it: the slide, if it's the kind of race it slides in.
+        if me.state == .run, abs(toBall) < 40, abs(human.position.x - target) < abs(toBall) + 15, raceFor(ball).slide {
             input.stick = Vec2(x: input.stick.x * 0.7, y: -0.8)
         }
         // Over its head and staying there: up for it, both jumps if it's high.
@@ -1085,18 +1158,22 @@ public struct Opponent: Equatable {
         let inHand = soon.distance(to: me.handCatchPoint) <= BallRules.handCatchRadius || soon.distance(to: me.chest) <= BallRules.catchRadius
         let inBlade = abs(soon.x - me.bladeCentre.x) <= SlashRules.reach && abs(soon.y - me.bladeCentre.y) <= SlashRules.reach
         let contested = soon.distance(to: human.chest) < min(soon.distance(to: me.chest) + 20, Opponent.contestReach)
-        if inHand, me.snatchCooldown == 0, chance(70) {
+        var race = raceFor(ball)
+        if inHand, me.snatchCooldown == 0, race.snatch {
             tapThrow(&input)
             return true
-        } else if inBlade, contested, chance(50) {
-            tapShoot(&input)
+        } else if inBlade, contested || (ball.shotInFlight && ball.lastTouched != index), let spike = race.spike {
+            // The spike: the slash, or the shield's face to flick it off.
+            if spike == .shield, !me.holding { input.shield = !pressed.shield } else { tapShoot(&input) }
+            race.spiked()
+            self.race = race
             return true
         }
         return false
     }
 
     /// Where the ball will be this many frames on, falling as it does.
-    private func ballPosition(_ ball: Ball, after frames: Int) -> Vec2 {
+    func ballPosition(_ ball: Ball, after frames: Int) -> Vec2 {
         var position = ball.position
         var velocity = ball.velocity
         for _ in 0..<frames {

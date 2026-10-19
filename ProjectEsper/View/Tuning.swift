@@ -24,9 +24,9 @@ enum PowerLevelVariant: Int, CaseIterable {
 
 /// The powers on the picker. A is none.
 enum PowerVariant: Int, CaseIterable {
-    case none, webWater, superSmoothie, flashFizz, platformShake, quakeUp, voltaCola, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
+    case none, webWater, superSmoothie, flashFizz, platformShake, voltaCola, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
 
-    var label: String { ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N"][rawValue] }
+    var label: String { ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M"][rawValue] }
 
     var power: Power {
         switch self {
@@ -35,7 +35,6 @@ enum PowerVariant: Int, CaseIterable {
         case .superSmoothie: .superSmoothie
         case .flashFizz: .flashFizz
         case .platformShake: .platformShake
-        case .quakeUp: .quakeUp
         case .voltaCola: .voltaCola
         case .frostTea: .frostTea
         case .blazingBoba: .blazingBoba
@@ -295,7 +294,7 @@ enum GoalpostTuning {
 /// many art pixels whichever way it's aimed, slid this many back aimed up and forward aimed down;
 /// and turned this many times flight's tip, up and down. On the BEAM sliders.
 enum BeamHeadTuning {
-    nonisolated(unsafe) static var lift: CGFloat = 8
+    nonisolated(unsafe) static var lift: CGFloat = 7
     nonisolated(unsafe) static var slide: CGFloat = 2
     nonisolated(unsafe) static var upTurn: CGFloat = 2
     nonisolated(unsafe) static var downTurn: CGFloat = 3.5
@@ -376,13 +375,16 @@ enum ParkedSliders {
     static let net = true
     static let flo = true
     static let kAndALights = true
+    static let gemGlow = true
+    static let beam = true
 }
 
 enum GlowSettings {
     /// Each energy colour's glow, times this: the deep ones' brightest channel still reads darker
     /// than the light ones'. On the debug sliders (GLOW and the gem), kept between launches.
-    static func energyGainKey(_ colour: EnergyColour) -> String { "esper.glow.gain.\(colour.rawValue)" }
-    static let energyGainDefaults: [EnergyColour: Float] = [.orange: 1.25, .blue: 1.25, .green: 1.25, .purple: 1.25, .red: 1.25]
+    /// Kept under a second key since the tuned values became the defaults, so the old ones don't stand.
+    static func energyGainKey(_ colour: EnergyColour) -> String { "esper.glow.gain2.\(colour.rawValue)" }
+    static let energyGainDefaults: [EnergyColour: Float] = [.orange: 1.75, .blue: 1.25, .green: 1.75, .purple: 1.75, .red: 1.25]
     nonisolated(unsafe) static var energyGains: [EnergyColour: Float] = Dictionary(uniqueKeysWithValues: EnergyColour.wheel.map { colour in
         (colour, (UserDefaults.standard.object(forKey: energyGainKey(colour)) as? Double).map(Float.init) ?? energyGainDefaults[colour] ?? 1)
     })

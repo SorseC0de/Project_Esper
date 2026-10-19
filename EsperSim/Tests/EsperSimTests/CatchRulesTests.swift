@@ -27,7 +27,7 @@ final class CatchRulesTests: XCTestCase {
         match.players[0].power = .zTea
         match.players[0].powerLevel = 1
         match.ball.respawn(at: Vec2(x: 300, y: 30))
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .beamCharging)
         // The ball dropped right on the hand, coming back as a throw would.
         match.ball.position = match.players[0].chest

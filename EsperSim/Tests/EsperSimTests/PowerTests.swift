@@ -53,7 +53,7 @@ final class PowerTests: XCTestCase {
         XCTAssertEqual(match.players[1].state, .air)
     }
 
-    func testSnatchParriesALiveBlade() {
+    func testASlashCountersASnatch() {
         var match = with(.none)
         match.players[1].position.x = match.players[0].position.x + 12
         match.players[1].facing = .left
@@ -61,10 +61,39 @@ final class PowerTests: XCTestCase {
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         run(&match, frames: 6, input: { _ in .idle })
         match.advance(inputs: [.idle, PlayerInput(shoot: true)])
-        let parried = run(&match, frames: 20, input: { _ in .idle }) { $0.events.contains(.parried(player: 1, by: 0)) }
-        XCTAssertLessThan(parried, 20)
-        XCTAssertGreaterThan(match.players[1].hitStun, 0, "the slasher is the one stripped")
-        XCTAssertEqual(match.players[0].hitStun, 0)
+        let countered = run(&match, frames: 20, input: { _ in .idle }) {
+            $0.events.contains { if case .countered(player: 0, by: 1, _) = $0 { return true } else { return false } }
+        }
+        XCTAssertLessThan(countered, 20)
+        XCTAssertTrue(match.players[0].parryLocked, "the snatcher stunned, nothing answering")
+        XCTAssertEqual(match.players[1].hitStun, 0)
+        XCTAssertEqual(match.hitStop, HitStopRules.counterFrames)
+        XCTAssertTrue(match.events.contains { if case .floGained(player: 1, amount: FloRules.counter, _) = $0 { return true } else { return false } },
+                      "the counter's FLO to the slasher")
+    }
+
+    func testTwoSnatchesMeetingClashThenSlideApartLockedOut() {
+        var match = with(.none)
+        match.players[1].position.x = match.players[0].position.x + 14
+        match.players[1].facing = .left
+        match.advance(inputs: [PlayerInput(throwBall: true), PlayerInput(throwBall: true)])
+        let clashed = run(&match, frames: 20, input: { _ in .idle }) {
+            $0.events.contains { if case .snatchClashed = $0 { return true } else { return false } }
+        }
+        XCTAssertLessThan(clashed, 20)
+        XCTAssertEqual(match.hitStop, HitStopRules.slashClashFrames)
+        run(&match, frames: HitStopRules.slashClashFrames, input: { _ in .idle })
+        XCTAssertTrue(match.players[0].clashPushed)
+        XCTAssertLessThan(match.players[0].velocity.x, 0)
+        XCTAssertGreaterThan(match.players[1].velocity.x, 0)
+        // Nothing answers through the push: a jump pressed does nothing.
+        let before = match.players[0].position.x
+        run(&match, frames: 6, input: { _ in PlayerInput(jump: true) })
+        XCTAssertNotEqual(match.players[0].state, .jumpSquat)
+        XCTAssertLessThan(match.players[0].position.x, before, "still sliding back")
+        run(&match, frames: 120, input: { _ in .idle }) { !$0.players[0].clashPushed }
+        XCTAssertFalse(match.players[0].clashPushed, "slid to a stop")
+        XCTAssertTrue(match.players[0].grounded)
     }
 
     func testJumpAndShootTogetherIsARisingSlash() {
@@ -131,7 +160,7 @@ final class PowerTests: XCTestCase {
             match.players[1].position.x = match.players[0].position.x + 60
             match.players[1].facing = .left
             // Charged well past a few frames, long enough to turn out of a run, then let go.
-            for _ in 0..<32 { match.advance(inputs: [PlayerInput(throwBall: true), brain.decide(match)]) }
+            for _ in 0..<40 { match.advance(inputs: [PlayerInput(throwBall: true), brain.decide(match)]) }
             XCTAssertEqual(match.players[1].facing, .left, "seed \(seed): squared up to the charge")
             var frames = 0
             while frames < 60, match.ball.holder != 1, match.players[1].hitStun == 0 {
@@ -142,7 +171,7 @@ final class PowerTests: XCTestCase {
         }
     }
 
-    func testADownThrowAgainstAWallComesOutOfIt() {
+    func testAThrowIntoAWallComesOutOfIt() {
         var match = Match()
         match.players[0].hasBall = true
         match.ball.holder = 0
@@ -152,7 +181,7 @@ final class PowerTests: XCTestCase {
         match.players[0].grounded = false
         match.players[0].state = .air
         for _ in 0..<BallRules.throwWindupFrames + 2 {
-            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), throwBall: true), .idle])
         }
         run(&match, frames: BallRules.throwReleaseFrames + 1, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
@@ -180,7 +209,7 @@ final class PowerTests: XCTestCase {
         match.players[0].position.y = 90
         match.players[0].grounded = false
         match.players[0].state = .air
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true), .idle])
         run(&match, frames: 2, input: { _ in .idle })
         XCTAssertEqual(match.platforms.count, 0)
         run(&match, frames: ShakeRules.wallFrames, input: { _ in .idle })
@@ -189,7 +218,7 @@ final class PowerTests: XCTestCase {
         run(&match, frames: ShakeRules.cooldownFrames, input: { _ in .idle })
         match.players[0].position.y = max(match.players[0].position.y, 60)
         match.players[0].velocity = .zero
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true), .idle])
         run(&match, frames: ShakeRules.wallFrames, input: { _ in .idle })
         XCTAssertTrue(match.events.contains(.platformMade(player: 0)) || match.platforms.count >= 1)
         XCTAssertEqual(match.players[0].state == .walling || match.platforms.contains { $0.framesLeft > ShakeRules.platformFrames - ShakeRules.wallFrames - 2 }, true, "a second wall with no landing between")
@@ -351,7 +380,8 @@ final class PowerTests: XCTestCase {
     // MARK: Quake-Up Coffee
 
     func testQuakeStripsWhoeverStandsOnTheFloorAndHopsTheBall() {
-        var match = with(.quakeUp)
+        var match = with(.none)
+        match.players[0].spec.quakeLevel = 1
         match.players[1].position.x = 250
         match.players[1].hasBall = true
         match.ball.holder = 1
@@ -366,7 +396,8 @@ final class PowerTests: XCTestCase {
 
     func testQuakeAtLevelOneLeavesAHigherFloorAlone() {
         // The court as it was, its blocks a higher floor in reach.
-        var match = with(.quakeUp)
+        var match = with(.none)
+        match.players[0].spec.quakeLevel = 1
         match.stage = .formerCourt
         match.players[1].position = Vec2(x: 250, y: 90)
         match.players[1].hasBall = true
@@ -375,7 +406,8 @@ final class PowerTests: XCTestCase {
         run(&match, frames: 12, input: { _ in .idle })
         run(&match, frames: 90, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) }) { $0.events.contains(.quaked(player: 0)) }
         XCTAssertTrue(match.players[1].hasBall || !match.players[1].grounded)
-        var whole = with(.quakeUp, level: 2)
+        var whole = with(.none)
+        whole.players[0].spec.quakeLevel = 2
         whole.stage = .formerCourt
         whole.players[1].position = Vec2(x: 290, y: 90)
         whole.players[1].hasBall = true
@@ -548,19 +580,20 @@ final class PowerTests: XCTestCase {
         XCTAssertNil(match.ball.holder)
     }
 
-    func testLevelTwoDownAndThrowMakeAFireballThatBursts() {
+    func testLevelTwoDownAndShootMakeAFireballThatBursts() {
         var match = with(.blazingBoba, level: 2)
         match.players[1].position.x = 60
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .slashing, "shoot alone is still the slash")
         var summon = with(.blazingBoba, level: 2)
         summon.players[1].position.x = 60
-        summon.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+        summon.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         XCTAssertTrue(summon.players[0].hasFireball)
         XCTAssertTrue(summon.events.contains(.fireballMade(player: 0)))
         match = summon
-        // Thrown: it flies dead straight and bursts on the wall.
-        run(&match, frames: 2, input: { _ in .idle })
+        // Thrown: it flies dead straight and bursts on the wall. (Long enough after the down that
+        // summoned it that the throw's way doesn't take that down.)
+        run(&match, frames: BallRules.throwAimBufferFrames + 2, input: { _ in .idle })
         match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         run(&match, frames: BallRules.throwWindupFrames + 2, input: { _ in PlayerInput(throwBall: true) })
         run(&match, frames: 3, input: { _ in .idle })
@@ -575,13 +608,13 @@ final class PowerTests: XCTestCase {
         XCTAssertLessThan(burst, 120)
     }
 
-    func testDownHeldIntoACrouchThenThrowStillSummonsTheFireballAndItsThrowIsNoBallThrow() {
+    func testDownHeldIntoACrouchThenShootStillSummonsTheFireballAndItsThrowIsNoBallThrow() {
         var match = with(.blazingBoba, level: 2)
         match.players[1].position.x = 60
         // Down a few frames first: a crouch.
         run(&match, frames: 4, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1)) })
         XCTAssertEqual(match.players[0].state, .crouch)
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
         XCTAssertTrue(match.players[0].hasFireball)
         // Thrown: the fireball's own release, not the ball's.
         run(&match, frames: 4, input: { _ in .idle })
@@ -604,8 +637,8 @@ final class PowerTests: XCTestCase {
         match.players[1].position.x = match.players[0].position.x + 80
         match.players[1].hasBall = true
         match.ball.holder = 1
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        XCTAssertEqual(match.players[0].state, .gunShoot)
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .gunShoot, "down and shoot is the push")
         let pulsed = run(&match, frames: PulseRules.shotFrames, input: { _ in .idle }) { $0.events.contains(.pulsed(player: 0, pull: false)) }
         XCTAssertLessThan(pulsed, PulseRules.shotFrames)
         XCTAssertFalse(match.players[1].hasBall, "popped free")
@@ -613,11 +646,11 @@ final class PowerTests: XCTestCase {
         XCTAssertGreaterThan(match.players[1].velocity.x, 0)
     }
 
-    func testLevelTwoThrowPullsTheBallIn() {
-        var match = with(.pulsepistol, level: 2)
+    func testUpAndShootPullsTheBallIn() {
+        var match = with(.pulsepistol, level: 1)
         match.ball.respawn(at: Vec2(x: match.players[0].position.x + 100, y: match.players[0].position.y + PulseRules.handHeight))
-        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
-        XCTAssertEqual(match.players[0].state, .gunShoot, "throw is the pull, not the snatch")
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true), .idle])
+        XCTAssertEqual(match.players[0].state, .gunShoot, "up and shoot is the pull")
         run(&match, frames: PulseRules.shotFrames, input: { _ in .idle }) { $0.events.contains(.pulsed(player: 0, pull: true)) }
         XCTAssertLessThan(match.ball.velocity.x, 0, "toward the body")
     }
@@ -787,6 +820,30 @@ final class PowerTests: XCTestCase {
         XCTAssertNotEqual(match.players[0].state, .gunSnipe)
     }
 
+    func testARepellingSnipeStunsAsAParryDoes() {
+        var match = with(.pulsepistol, level: 2)
+        match.players[1].position = Vec2(x: match.players[0].position.x + 80, y: match.players[0].position.y)
+        match.snipe(by: 0, at: match.players[1].chest, pull: false)
+        XCTAssertTrue(match.players[1].parryLocked, "nothing answers: the parry's stun")
+        XCTAssertGreaterThan(match.players[1].attackLockout, BallRules.hitStunFrames)
+    }
+
+    func testAnAttractingSnipeFlingsThemAllTheWayOverTheSniper() {
+        for gap in [60.0, 100.0, 140.0] {
+            var match = with(.pulsepistol, level: 2)
+            let sniper = match.players[0].position
+            match.players[1].position = Vec2(x: sniper.x + gap, y: sniper.y)
+            match.snipe(by: 0, at: match.players[1].chest, pull: true)
+            var top = match.players[1].position.y
+            for _ in 0..<180 where !(match.players[1].grounded && match.players[1].flungFrames == 0 && match.frame > 3) {
+                match.advance(inputs: [.idle, .idle])
+                top = max(top, match.players[1].position.y)
+            }
+            XCTAssertLessThan(match.players[1].position.x, sniper.x - SnipeRules.flingPast / 2, "gap \(gap): landed past the sniper")
+            XCTAssertGreaterThan(top - sniper.y, SnipeRules.flingHeight / 2, "gap \(gap): up and over")
+        }
+    }
+
     // MARK: The finish
 
     func testAFinishedMatchTakesNoInputAndNoCatches() {
@@ -812,7 +869,8 @@ final class KnockCoastTests: XCTestCase {
         match.players[1].position = Vec2(x: 150, y: 10)
         var most = 0.0
         for frame in 0..<120 {
-            match.advance(inputs: [PlayerInput(shoot: frame < 2), .idle])
+            // Down and shoot pushes.
+            match.advance(inputs: [frame == 0 ? PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true) : .idle, .idle])
             most = max(most, match.players[1].position.x - 150)
         }
         XCTAssertGreaterThan(most, 20, "coasting on the push, not braked off it in a frame")

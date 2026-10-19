@@ -99,8 +99,10 @@ public enum TransformRules {
 
 public enum SlopeRules {
     public static let step = 5.5
-    /// A slide down a slope speeds up to the slide's burst by this much a frame.
+    /// A slide down a slope speeds up to the slide's burst by this much a frame; wedged this many
+    /// frames without moving, it's over.
     public static let slideGain = 0.15
+    public static let stalledSlideFrames = 6
     public static let diagonal = 0.7071067811865476
     /// Held uphill on a slide slope, the walk comes out as a drift back down at this share of walking speed.
     public static let slideSlopePushBack = 0.25
@@ -180,6 +182,10 @@ public enum BlazeRules {
 /// reaching this far round it, with the pulse's cooldown. The sheet's ten frames at 15 a
 /// second, the shot on its third. Jump, or being hit, ends it.
 public enum SnipeRules {
+    /// The other sniped with the pull: flung over the sniper on an arc peaking this high over the
+    /// higher of its ends, coming down this far past them.
+    public static let flingHeight = 45.0
+    public static let flingPast = 40.0
     public static let holdFrames = 30
     public static let cursorStart = 60.0
     public static let cursorSpeed = 3.0
@@ -194,6 +200,8 @@ public enum SnipeRules {
 }
 
 public enum PulseRules {
+    /// The pull's arc back to the shooter's hand, peaking this far over the higher end of it.
+    public static let pullArcHeight = 20.0
     public static let halfHeight = 5.0
     public static let handHeight = 11.0
     public static let ballPush = Vec2(x: 5, y: 1)
@@ -253,9 +261,37 @@ public struct Beam: Equatable {
     public var hitPlayer = false
     public var hitBall = false
     public var sinceHit = 0
+    /// Turned back off a perfect shield: the shielder's, fired from where it met, its own time;
+    /// it hits once, a stun, and its firer's beam ends.
+    public var turned = false
 }
 
 public enum ZRules {
+    /// The blast: a cooldown between them (halved at level two), the frames after which a run of
+    /// them is over and the next is off the first hand again, the pose's frames, its speed and
+    /// how long it flies.
+    public static let blastCooldownFrames = 60
+    /// At level two, a touch quicker than Volta Cola's bolts (`VoltaRules.boltCooldownFrames`), its
+    /// sheet played at 15 a second so a run of them keeps up.
+    public static let blastCooldownFramesLevelTwo = 20
+    public static let blastSheetFrameLengthLevelTwo = 4
+    /// The blast's pose (`player_blast`), 0-based sheet frames: its opening, then the back arm
+    /// (the fifth to eighth, 1-based) and its neutral, or the front arm (the tenth to thirteenth)
+    /// and its neutral, the third; the blast let go on each arm's first frame fully out, and the
+    /// last neutral held this long before the pose is over.
+    public static let blastOpening = [0, 1, 2]
+    public static let blastBackArm = [3, 4, 5, 6, 7]
+    public static let blastFrontArm = [8, 9, 10, 11, 2]
+    public static let blastBackArmRelease = 4
+    public static let blastFrontArmRelease = 9
+    public static let blastNeutralHoldFrames = 10
+    /// The shoulder the arms turn about, art pixels from the feet facing right, and the arm's
+    /// reach out of it to where the blast leaves; the blast's box.
+    public static let blastShoulderPixels = Vec2(x: -8, y: 18)
+    public static let blastArmPixels = 25.0
+    public static let blastSize = Vec2(x: 14, y: 10)
+    public static let blastSpeed = 6.0
+    public static let blastFrames = 60
     public static let chargeFrames = 60
     public static let fireFrames = 30
     /// On past that while FLO lasts, till the slash is pressed again: a FLO gone every three

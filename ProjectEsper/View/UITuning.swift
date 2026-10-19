@@ -18,6 +18,9 @@ enum UIPlatform: String {
 /// The screens whose sizes are tuned, and what in them scales.
 enum UIScreenKind: String, CaseIterable {
     case title, pause, win, stageSelect, pick, hud, touch
+    /// The drink pick on the customize screen: laid out by the screen's own shares, the same on
+    /// every platform, so seen small on a phone or far off on the TV its words are bigger.
+    case drinks
 
     /// Shown on the tuning panel.
     var label: String {
@@ -108,6 +111,7 @@ final class UITuning: ObservableObject {
         case (.pad, _, .text) where screen.isDialog, (.pad, _, .titles) where screen.isDialog: 1.5
         case (.pad, _, .panels) where screen.isDialog: 0.9
         case (.tv, _, .text) where screen.isDialog, (.tv, _, .titles) where screen.isDialog: 1.5
+        case (.phone, .drinks, .text), (.tv, .drinks, .text): 1.3
         case (.pad, .touch, .buttons): 0.75
         case (.pad, .touch, .text): 1.5
         default: 1

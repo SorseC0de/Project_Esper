@@ -3,22 +3,25 @@ import EsperSim
 import SwiftUI
 
 /// What the winner does on the win screen, looping. More to come; the taunt with the ball first.
+/// The Spin Move's, for the updates screen's icon.
 enum WinPose: Equatable {
-    case taunt
+    case taunt, spin
 
     var animation: EsperSim.Animation {
         switch self {
         case .taunt: .taunt
+        case .spin: .spinBall
         }
     }
     var framesPerSecond: Double {
         switch self {
         case .taunt: 15
+        case .spin: Double(SpinRules.sheetFramesPerSecond)
         }
     }
     var holdsBall: Bool {
         switch self {
-        case .taunt: true
+        case .taunt, .spin: true
         }
     }
 }

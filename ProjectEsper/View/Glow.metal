@@ -25,6 +25,11 @@ struct GlowUniforms {
     float4 hood;
     // The nine energy colours, each over its brightest channel, its glow's gain in w.
     float4 energy[9];
+    // A clash's colour split: xy its centre in uv, z its reach at the screen's edge, w the
+    // fringes' strength; then the two energy colours they take. None at z 0.
+    float4 aberration;
+    float4 aberrationFirst;
+    float4 aberrationSecond;
 };
 
 struct FullScreen {
@@ -124,6 +129,17 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
     float2 uv = in.uv;
     uv.x += u.wave.x * sin(uv.y * u.wave.y * 6.2831853 + u.wave.z) * smoothstep(u.wave.w, u.wave.w + 0.04, uv.y);
     float4 color = scene.sample(linear, uv);
+    // A clash: the scene's edges fringed out from its centre, one way in one player's energy,
+    // the other way in the other's.
+    if (u.aberration.z > 0) {
+        float2 offset = (uv - u.aberration.xy) * u.aberration.z;
+        const float3 weights = float3(0.2126, 0.7152, 0.0722);
+        float here = dot(color.rgb, weights);
+        float inward = dot(scene.sample(linear, uv - offset).rgb, weights);
+        float outward = dot(scene.sample(linear, uv + offset).rgb, weights);
+        color.rgb = saturate(color.rgb + (max(inward - here, 0.0) * u.aberrationFirst.rgb
+                                          + max(outward - here, 0.0) * u.aberrationSecond.rgb) * u.aberration.w);
+    }
     float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
     // None spreads onto what's shielded: the face in a hood's opening.
     float3 mask = bodies.sample(linear, uv).rgb;

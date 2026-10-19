@@ -40,6 +40,10 @@ struct AssembledFrame: View {
     let cubes: Bool
     let glow: Bool
     let armOverHood: Bool
+    /// The hooded head moved off its place, art pixels the way it faces and up (HEAD X, HEAD Y).
+    var headNudge: CGPoint = .zero
+    /// The ball drawn where the game draws it in the hand.
+    var ball = false
     let motion: CustomizeFigureMotion
     let time: Double
 
@@ -52,7 +56,7 @@ struct AssembledFrame: View {
     var body: some View {
         Canvas { context, size in
             let turn = GameScene.hoodTurn(frame)
-            motion.advance(to: time, portrait: portrait, look: look, headNudge: .zero, headScale: 1, canvas: canvas, style: HoodStrings.hanging, turn: turn)
+            motion.advance(to: time, portrait: portrait, look: look, headNudge: headNudge, headScale: 1, canvas: canvas, style: HoodStrings.hanging, turn: turn)
             var context = context
             if mirrored {
                 context.translateBy(x: size.width, y: 0)
@@ -63,11 +67,11 @@ struct AssembledFrame: View {
                 CGPoint(x: (pad + point.x) * pixel, y: (pad + canvas - point.y) * pixel)
             }
             let figureRect = CGRect(x: pad * pixel, y: pad * pixel, width: canvasWidth * pixel, height: canvas * pixel)
-            let place = CustomizeFigure.hoodPlace(portrait, nudge: .zero, scale: 1)
+            let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: 1)
             let hoodRect = CGRect(x: (pad + place.origin.x) * pixel, y: (pad + place.origin.y) * pixel, width: 48 * pixel, height: 48 * pixel)
             /// The hood drawn turned about the head's middle, where the sheet turns it.
             func drawHood(_ image: CGImage, in context: GraphicsContext) {
-                guard turn != 0, let head = portrait.centres[.head] else {
+                guard turn != 0, let head = portrait.centres[.head].map({ CGPoint(x: $0.x + headNudge.x, y: $0.y - headNudge.y) }) else {
                     return context.draw(Image(decorative: image, scale: 1).interpolation(.none), in: hoodRect)
                 }
                 let middle = CGPoint(x: (pad + head.x) * pixel, y: (pad + head.y) * pixel)
@@ -99,13 +103,25 @@ struct AssembledFrame: View {
             }
             // Turned, the hood carries its own line, under the body so only what's outside it shows,
             // and the body's line is drawn without the hood's place; else one line runs round both.
-            let hoodTurned = turn != 0 && portrait.bareLine != nil && portrait.hoodLine != nil
+            let hoodTurned = (turn != 0 || headNudge != .zero) && portrait.bareLine != nil && portrait.hoodLine != nil
+            // The ball where the game has it in the hand, behind the body on the frames that tuck it there.
+            let ballAt = ball ? BallLandmarks.table["\(frame.animation.rawValue)_\(frame.frame)"].map {
+                spot(CGPoint(x: canvasWidth / 2 + $0.x, y: frame.animation.feetFromBottom + $0.y))
+            } : nil
+            func drawBall() {
+                guard let at = ballAt, let image = GalleryDrawing.ballImage else { return }
+                let side = GalleryDrawing.ballPixels * pixel
+                context.draw(Image(decorative: image, scale: 1).interpolation(.none), in: CGRect(x: at.x - side / 2, y: at.y - side / 2, width: side, height: side))
+            }
+            let ballBehind = GameScene.ballBehindBody(frame)
+            if ballBehind { drawBall() }
             if hoodTurned, let hoodLine = portrait.hoodLine { drawLine(hoodLine, in: context, turned: true) }
             // The figure, its line in its look's colour, and its hooded head.
             context.draw(Image(decorative: portrait.image, scale: 1).interpolation(.none), in: figureRect)
             if let line = hoodTurned ? portrait.bareLine : portrait.line { drawLine(line, in: context, turned: false) }
             if let hood = portrait.hood { drawHood(hood, in: context) }
             drawStrings(in: context)
+            if !ballBehind { drawBall() }
             // The front arm over the hood and the strings, as in play, with its own line.
             if armOverHood, let arm = portrait.frontArm {
                 if let armLine = portrait.frontArmLine { drawLine(armLine, in: context, turned: false) }
@@ -137,6 +153,13 @@ struct GalleryDrawing {
     var strings = true
     var cubes = true
     var glow = true
+    var ball = true
+    /// The hooded heads moved, by sheet and frame: the game's table to start, changed here.
+    var headNudges: [EsperSim.Animation: [Int: CGPoint]] = GameScene.headNudges
+    func headNudge(_ frame: AnimationFrame) -> CGPoint { headNudges[frame.animation]?[frame.frame] ?? .zero }
+    /// The ball's first frame, and its size in art pixels.
+    static let ballImage: CGImage? = UIImage(named: "Basketball")?.cgImage?.cropping(to: CGRect(x: 0, y: 0, width: 8, height: 8))
+    static let ballPixels: CGFloat = 8
     /// The frames whose front arm goes over the hood, by sheet: the game's table to start,
     /// changed frame by frame here.
     var armOverHood: [EsperSim.Animation: Set<Int>] = Dictionary(uniqueKeysWithValues: GameScene.frontArmOverHood.map { ($0.key, Set($0.value)) })
@@ -170,7 +193,7 @@ final class PlayerGallerySheets: ObservableObject {
     func sheet(_ animation: EsperSim.Animation, scale: CGFloat, strip: Strip, drawing: GalleryDrawing) -> UIImage? {
         let motion = CustomizeFigureMotion()
         let cell = CGSize(width: (CGFloat(animation.pixelWidth) + 2 * drawing.pad) * scale, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * scale)
-        let count = animation.frameCount
+        let count = GallerySheets.frameCount(animation)
         let size = strip == .across ? CGSize(width: cell.width * CGFloat(count), height: cell.height) : CGSize(width: cell.width, height: cell.height * CGFloat(count))
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -178,10 +201,11 @@ final class PlayerGallerySheets: ObservableObject {
         let start = Date().timeIntervalSinceReferenceDate
         var frames: [UIImage] = []
         for index in 0..<count {
-            let frame = AnimationFrame(animation, index)
+            let frame = GallerySheets.frame(animation, index)
             guard let portrait = portrait(frame) else { return nil }
             let view = AssembledFrame(portrait: portrait, look: look, frame: frame, pixel: scale, pad: drawing.pad, mirrored: drawing.mirrored,
                                       strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
+                                      headNudge: drawing.headNudge(frame), ball: drawing.ball,
                                       motion: motion, time: start + Double(index) / drawing.fps)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 1
@@ -222,8 +246,19 @@ enum GallerySheets {
     static let listed: [EsperSim.Animation] = first + EsperSim.Animation.allCases.filter { !first.contains($0) }
         .sorted { name($0).localizedStandardCompare(name($1)) == .orderedAscending }
 
+    /// The shield's old sheet stands in for the shield's backflip now: the double jump backward.
+    static func frameCount(_ animation: EsperSim.Animation) -> Int {
+        animation == .shield ? EsperSim.Animation.doubleJump.frameCount : animation.frameCount
+    }
+    static func frame(_ animation: EsperSim.Animation, _ index: Int) -> AnimationFrame {
+        guard animation == .shield else { return AnimationFrame(animation, index) }
+        let count = EsperSim.Animation.doubleJump.frameCount
+        return AnimationFrame(.doubleJump, count - 1 - index % count)
+    }
+
     /// A sheet's name in words: `player_dbl_jump` as Double Jump.
     static func name(_ animation: EsperSim.Animation) -> String {
+        if animation == .shield { return "Shield Backflip" }
         let words: [String: String] = ["dbl": "Double", "esperslash": "Esper Slash", "flostate": "FloState"]
         return animation.rawValue.replacingOccurrences(of: "player_", with: "").split(separator: "_")
             .map { words[String($0)] ?? $0.prefix(1).uppercased() + $0.dropFirst() }
@@ -260,20 +295,20 @@ struct PlayerGallery: View {
                 .foregroundStyle(.secondary)
             TimelineView(.animation(paused: paused)) { timeline in
                 let time = timeline.date.timeIntervalSinceReferenceDate
-                let index = paused ? held : Int(time * drawing.fps) % animation.frameCount
-                let frame = AnimationFrame(animation, index)
+                let index = paused ? held : Int(time * drawing.fps) % GallerySheets.frameCount(animation)
+                let frame = GallerySheets.frame(animation, index)
                 let _ = playhead.shown = index
                 ZStack {
                     Color(rgb: PlayerGalleryOutput.background)
                     if let portrait = sheets.portrait(frame) {
                         AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: pixel, pad: drawing.pad, mirrored: drawing.mirrored,
                                        strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
-                                       motion: motion, time: time)
+                                       headNudge: drawing.headNudge(frame), ball: drawing.ball, motion: motion, time: time)
                     }
                 }
                 .frame(width: (CGFloat(animation.pixelWidth) + 2 * drawing.pad) * pixel, height: (CGFloat(animation.pixelSize) + 2 * drawing.pad) * pixel)
                 .overlay(alignment: .bottomTrailing) {
-                    Text("\(GallerySheets.name(animation))  \(index + 1)/\(animation.frameCount)")
+                    Text("\(GallerySheets.name(animation))  \(index + 1)/\(GallerySheets.frameCount(animation))")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .padding(4)
                         .background(.black.opacity(0.6))
@@ -295,7 +330,7 @@ struct PlayerGallery: View {
     /// Play or pause, and a frame back or on (which pauses); the arm over the hood for this frame.
     private var transport: some View {
         let shown = paused ? held : playhead.shown
-        let frame = AnimationFrame(animation, shown)
+        let frame = GallerySheets.frame(animation, shown)
         return VStack(spacing: 8) {
             HStack(spacing: 12) {
                 Button("\u{25C0}") { step(-1) }
@@ -315,23 +350,42 @@ struct PlayerGallery: View {
                     drawing.armOverHood[animation] = frames.isEmpty ? nil : frames
                 }))
             .toggleStyle(.button)
-            Text(armOverHoodSummary)
+            // The hooded head moved on this frame, and every move so far, frames from 1, to report.
+            HStack(spacing: 12) {
+                Stepper("HEAD X \(Int(drawing.headNudge(frame).x))", value: headNudgeBinding(frame, \.x), in: -12...12)
+                Stepper("HEAD Y \(Int(drawing.headNudge(frame).y))", value: headNudgeBinding(frame, \.y), in: -12...12)
+            }
+            Text(headNudgeSummary)
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.secondary)
+                .textSelection(.enabled)
         }
         .font(.system(size: 12, weight: .bold, design: .monospaced))
     }
 
-    /// The frames whose arm is over the hood, sheet by sheet, as the game's table would read.
-    private var armOverHoodSummary: String {
-        let lines = drawing.armOverHood.sorted { $0.key.rawValue < $1.key.rawValue }
-            .map { "\(GallerySheets.name($0.key)): \($0.value.sorted().map { String($0 + 1) }.joined(separator: ", "))" }
-        return lines.isEmpty ? "arm over hood: none" : "arm over hood (frames from 1): " + lines.joined(separator: "  ·  ")
+    private func headNudgeBinding(_ frame: AnimationFrame, _ axis: WritableKeyPath<CGPoint, CGFloat>) -> Binding<CGFloat> {
+        Binding(get: { drawing.headNudge(frame)[keyPath: axis] }, set: { value in
+            var point = drawing.headNudge(frame)
+            point[keyPath: axis] = value
+            var frames = drawing.headNudges[frame.animation] ?? [:]
+            frames[frame.frame] = point == .zero ? nil : point
+            drawing.headNudges[frame.animation] = frames.isEmpty ? nil : frames
+        })
+    }
+
+    /// Every head moved, sheet by sheet, frames from 1, x the way it faces and y up.
+    private var headNudgeSummary: String {
+        let lines = drawing.headNudges.sorted { $0.key.rawValue < $1.key.rawValue }.map { sheet in
+            "\(GallerySheets.name(sheet.key)): " + sheet.value.sorted { $0.key < $1.key }
+                .map { "\($0.key + 1) (\(Int($0.value.x)), \(Int($0.value.y)))" }.joined(separator: ", ")
+        }
+        return lines.isEmpty ? "head: none moved" : "head x, y (frames from 1): " + lines.joined(separator: "  ·  ")
     }
 
     private func step(_ by: Int) {
         if !paused { held = playhead.shown; paused = true }
-        held = (held + by + animation.frameCount) % animation.frameCount
+        let count = GallerySheets.frameCount(animation)
+        held = (held + by + count) % count
     }
 
     private var controls: some View {
@@ -349,6 +403,7 @@ struct PlayerGallery: View {
                 Toggle("STRINGS", isOn: $drawing.strings)
                 Toggle("CUBES", isOn: $drawing.cubes)
                 Toggle("GLOW", isOn: $drawing.glow)
+                Toggle("BALL", isOn: $drawing.ball)
             }
             .toggleStyle(.button)
             HStack {

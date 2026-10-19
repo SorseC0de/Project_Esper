@@ -444,41 +444,134 @@ final class PickScreen: Screen {
     }
 
     /// What the drink does in the menus' face, in as many lines as it needs, at the largest of its
-    /// sizes whose lines all fit across and stack within its room.
+    /// sizes whose lines all fit across and stack within its room. A word in brackets is lit, in
+    /// the menus' gold, the brackets not drawn; [Up], [Down], [Left] and [Right] are the fat arrow
+    /// (`fat_arrow.svg`) turned that way, in gold.
     private func layBlurb(_ text: String) {
         blurb.removeAllChildren()
         let room = CGSize(width: min(PickScreen.blurbRoom.width, halfWidth * 1.6), height: PickScreen.blurbRoom.height)
-        func wrapped(_ size: CGFloat) -> [String] {
-            let font = UIFont(name: Futuristic.fontName, size: Futuristic.fontSize(size)) ?? .systemFont(ofSize: size)
-            func fits(_ line: String) -> Bool { (line as NSString).size(withAttributes: [.font: font]).width <= room.width }
-            var lines: [String] = []
-            var line = ""
-            for word in text.split(separator: " ").map(String.init) {
-                let tried = line.isEmpty ? word : line + " " + word
-                if line.isEmpty || fits(tried) { line = tried } else { lines.append(line); line = word }
+        let pieces = PickScreen.blurbPieces(text)
+        func font(_ size: CGFloat) -> UIFont { UIFont(name: Futuristic.fontName, size: Futuristic.fontSize(size)) ?? .systemFont(ofSize: size) }
+        func width(_ piece: BlurbPiece, _ size: CGFloat) -> CGFloat {
+            switch piece.kind {
+            case .word(let word, _): (word as NSString).size(withAttributes: [.font: font(size)]).width
+            case .arrow: Futuristic.fontSize(size) * PickScreen.arrowShare
+            }
+        }
+        func space(_ size: CGFloat) -> CGFloat { (" " as NSString).size(withAttributes: [.font: font(size)]).width }
+        func wrapped(_ size: CGFloat) -> [[BlurbPiece]] {
+            var lines: [[BlurbPiece]] = []
+            var line: [BlurbPiece] = []
+            var used: CGFloat = 0
+            for piece in pieces {
+                let gap = line.isEmpty || !piece.spaced ? 0 : space(size)
+                let wide = width(piece, size)
+                if !line.isEmpty, piece.spaced, used + gap + wide > room.width {
+                    lines.append(line)
+                    line = [piece]
+                    used = wide
+                } else {
+                    line.append(piece)
+                    used += gap + wide
+                }
             }
             if !line.isEmpty { lines.append(line) }
             return lines
         }
-        var chosen: (lines: [String], size: CGFloat) = ([text], PickScreen.blurbSizes.last! * tuned(.text))
+        var chosen: (lines: [[BlurbPiece]], size: CGFloat) = (wrapped(PickScreen.blurbSizes.last! * tuned(.text)), PickScreen.blurbSizes.last! * tuned(.text))
         for base in PickScreen.blurbSizes {
             let size = base * tuned(.text)
             chosen = (wrapped(size), size)
             if CGFloat(chosen.lines.count) * Futuristic.fontSize(size) * PickScreen.lineShare <= room.height { break }
         }
-        let lineHeight = Futuristic.fontSize(chosen.size) * PickScreen.lineShare
+        let size = chosen.size
+        let lineHeight = Futuristic.fontSize(size) * PickScreen.lineShare
         for (index, line) in chosen.lines.enumerated() {
-            let label = Futuristic.label(line, size: chosen.size)
-            label.position = CGPoint(x: 0, y: PickScreen.blurbTop - lineHeight / 2 - CGFloat(index) * lineHeight)
-            blurb.addChild(label)
+            let total = line.enumerated().reduce(CGFloat(0)) { sum, entry in
+                sum + (entry.offset == 0 || !entry.element.spaced ? 0 : space(size)) + width(entry.element, size)
+            }
+            var x = -total / 2
+            let y = PickScreen.blurbTop - lineHeight / 2 - CGFloat(index) * lineHeight
+            for (number, piece) in line.enumerated() {
+                if number > 0, piece.spaced { x += space(size) }
+                let wide = width(piece, size)
+                switch piece.kind {
+                case .word(let word, let lit):
+                    let label = Futuristic.label(word, size: size)
+                    label.horizontalAlignmentMode = .left
+                    label.fontColor = lit ? Futuristic.litColour : Futuristic.lineColour
+                    label.position = CGPoint(x: x, y: y)
+                    blurb.addChild(label)
+                case .arrow(let turn):
+                    let arrow = SKSpriteNode(texture: PickScreen.arrowTexture)
+                    arrow.size = CGSize(width: wide, height: wide)
+                    arrow.color = Futuristic.litColour
+                    arrow.colorBlendFactor = 1
+                    arrow.zRotation = turn
+                    arrow.position = CGPoint(x: x + wide / 2, y: y)
+                    blurb.addChild(arrow)
+                }
+                x += wide
+            }
         }
     }
 
+    /// A piece of a blurb: a word, lit or not, or an arrow turned from pointing right; and
+    /// whether a space comes before it ("[Stun]." has none before its stop).
+    struct BlurbPiece {
+        enum Kind { case word(String, lit: Bool), arrow(CGFloat) }
+        let kind: Kind
+        let spaced: Bool
+    }
+    /// The arrow's size against the lettering's.
+    static let arrowShare: CGFloat = 0.9
+    static let arrowTurns: [String: CGFloat] = ["Right": 0, "Up": .pi / 2, "Left": .pi, "Down": -.pi / 2]
+    /// The fat arrow, white, for the blurb to colour.
+    static let arrowTexture: SKTexture = {
+        let source = UIImage(named: "FatArrow") ?? UIImage()
+        let side: CGFloat = 64
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in
+            source.withTintColor(.white).draw(in: CGRect(x: 0, y: 0, width: side, height: side))
+        }
+        return SKTexture(image: image)
+    }()
+
+    /// A blurb's pieces: its words, the bracketed ones lit and the arrows' names arrows.
+    static func blurbPieces(_ text: String) -> [BlurbPiece] {
+        var pieces: [BlurbPiece] = []
+        var rest = Substring(text)
+        var spaced = false
+        func words(_ run: Substring, lit: Bool) {
+            var first = true
+            for part in run.split(separator: " ", omittingEmptySubsequences: false) {
+                if part.isEmpty { spaced = true; first = false; continue }
+                pieces.append(BlurbPiece(kind: .word(String(part), lit: lit), spaced: first ? spaced : true))
+                spaced = false
+                first = false
+            }
+            if run.hasSuffix(" ") { spaced = true }
+        }
+        while let open = rest.firstIndex(of: "[") {
+            words(rest[..<open], lit: false)
+            guard let close = rest[open...].firstIndex(of: "]") else { break }
+            let inside = rest[rest.index(after: open)..<close]
+            if let turn = arrowTurns[String(inside)] {
+                pieces.append(BlurbPiece(kind: .arrow(turn), spaced: spaced || pieces.isEmpty == false && spaced))
+                spaced = false
+            } else {
+                words(inside, lit: true)
+            }
+            rest = rest[rest.index(after: close)...]
+        }
+        words(rest, lit: false)
+        return pieces
+    }
+
     /// The bottle, the user's vector from the catalog, `height` points tall and anchored at its
-    /// bottom so that runs off the screen: blue for a booster, gold for a biomorph or
-    /// Bio-Boba.
+    /// bottom so that runs off the screen: the drink's own (`Greateraid.bottleArt`) once it's in
+    /// the catalog, else blue for a booster, gold for a biomorph or Bio-Boba.
     static func bottle(for drink: Greateraid, colour: SKColor, height: CGFloat) -> SKSpriteNode {
-        let name = drink.kind == .booster ? "Greateraid" : "Greateraid-Gold"
+        let name = UIImage(named: drink.bottleArt) != nil ? drink.bottleArt : (drink.kind == .booster ? "Greateraid" : "Greateraid-Gold")
         // The vector drawn once at the size it's shown, at the screen's scale, crisp, and kept
         // for its outline.
         let key = "\(name)|\(height)"

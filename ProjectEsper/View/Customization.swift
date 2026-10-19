@@ -7,6 +7,8 @@ import SwiftUI
 struct PlayerCustomization: Codable, Equatable {
     var energy: EnergyColour
     var dressing = Dressing()
+    /// The drink picked for a mode that picks one before play (47), at its second level; none, none.
+    var drink: Greateraid?
 
     var glow: RGB { energy.glow }
     var look: Look { Look.team(glow, body: Look.lightened(glow, EnergyColour.bodyLift), dressing: dressing) }
@@ -58,7 +60,9 @@ extension FlowState {
     /// Online, this phone's side is `local`; its own pick goes there, the other side's arrives.
     /// ZONES turn by turn, `turnBased`: this phone's side only, the other's as `other`, their
     /// last turn's look, or the opposite colour before they've sent one.
-    func openCustomize(_ mode: GameMode, online: Bool = false, local: Int = 0, turnBased: Bool = false, other: PlayerCustomization? = nil) {
+    /// `atDrinks`: straight onto the drink pick, coming back to it from the stage select.
+    func openCustomize(_ mode: GameMode, online: Bool = false, local: Int = 0, turnBased: Bool = false, other: PlayerCustomization? = nil,
+                       atDrinks: Bool = false) {
         customizeMode = mode
         customizeOnline = online
         customizeTurnBased = turnBased
@@ -66,6 +70,14 @@ extension FlowState {
         customizeReady = [false, false]
         customizeLaunch = nil
         customizeLaunched = false
+        customizeDrinkPhase = false
+        drinkCursors = [0, 0]
+        if atDrinks, customizePicksDrink, !online {
+            customizeDrinkPhase = true
+            drinkCursors = customizations.indices.map { player in
+                customizations[player].drink.flatMap { sortedDrinks(player).firstIndex(of: $0) } ?? 0
+            }
+        }
         if online || turnBased {
             var sides = [PlayerCustomization.saved(0), PlayerCustomization.saved(0)]
             sides[1 - local] = other ?? PlayerCustomization(energy: sides[local].energy.opposite)
@@ -80,6 +92,13 @@ extension FlowState {
     /// RETURN: back to the title; online, out of the match.
     func closeCustomize() {
         guard customizeLaunch == nil else { return }
+        // On the drink pick, RETURN is back a step, to the customize screen.
+        if customizeDrinkPhase, !customizeOnline {
+            customizeDrinkPhase = false
+            customizeReady = [false, false]
+            SoundBoard.shared.play(.menuBack)
+            return
+        }
         SoundBoard.shared.play(.menuBack)
         if customizeOnline {
             scene.leaveOnlineCustomize()
@@ -97,6 +116,11 @@ extension FlowState {
     /// controls go; online READY can be taken back until both are ready. Both ready, the launch.
     func pressReady(_ player: Int) {
         guard customizeLaunch == nil, customizeOwns(player) else { return }
+        // Random picked: its Greateraid drawn now, as it locks in, so the other phone gets the drink.
+        for side in customizations.indices where drinkRandom[side] && customizeOwns(side) && customizeDrinkPhase {
+            drinkRandom[side] = false
+            update(side, sound: false) { $0.drink = Greateraid.offered.randomElement() }
+        }
         // No confirm on Start here: the port-in plays as both are ready and the launch begins.
         // Taking READY back, the back.
         if customizeOnline {
@@ -125,8 +149,42 @@ extension FlowState {
     /// Seconds the launch plays before the curtain: the snatch's two frames on, the drift to the middle.
     static let launchSeconds = 1.4
 
+    /// Offline against the computer: the second side is its.
+    private var vsComputer: Bool {
+        !customizeOnline && (UserDefaults.standard.object(forKey: GameScene.vsCPUKey) as? Bool ?? true)
+    }
+
+    /// The computer's drink, kept as a pick is.
+    private func pickForComputer(_ drink: Greateraid?) {
+        customizations[1].drink = drink
+        customizations[1].save(as: 1)
+    }
+
     private func checkLaunch() {
         guard customizeReady.allSatisfy({ $0 }), customizeLaunch == nil else { return }
+        // A mode that picks its drink: START first opens the bottles, the figures off to the
+        // corners; ready again there, the launch.
+        if customizePicksDrink, !customizeDrinkPhase {
+            customizeDrinkPhase = true
+            customizeReady = [false, false]
+            // Against the computer, its side's drink is picked for it: a Greateraid at random.
+            computerDrinkByHand = false
+            drinkRandom = [false, false]
+            if vsComputer { pickForComputer(Greateraid.offered.randomElement()) }
+            drinkCursors = customizations.indices.map { player in
+                customizations[player].drink.flatMap { sortedDrinks(player).firstIndex(of: $0) } ?? 0
+            }
+            SoundBoard.shared.play(SoundBoard.navigate)
+            return
+        }
+        // The computer goes without only if the first side does; a drink tapped for it stands.
+        if customizeDrinkPhase, vsComputer, !computerDrinkByHand {
+            if customizations[0].drink == nil {
+                pickForComputer(nil)
+            } else if customizations[1].drink == nil {
+                pickForComputer(Greateraid.offered.randomElement())
+            }
+        }
         customizeLaunch = Date()
         // Both ready: the figures set off for the ball, and the port-in with them.
         SoundBoard.shared.play(.portIn)
@@ -173,6 +231,7 @@ extension FlowState {
     /// end back to its box) and up back to its box.
     func moveCustomize(_ player: Int, across: Int, down: Int) {
         guard customizeOwns(player), !customizeReady[player] else { return }
+        if customizeDrinkPhase { return moveDrinkCursor(player, across: across, down: down) }
         let spot = customizeCursors[player]
         // Toward the middle: right for the first side, left for the second.
         let inward = player == 0 ? across : -across
@@ -221,6 +280,18 @@ extension FlowState {
     /// Out of a picker, back to its box: B there.
     func leaveCustomizePicker(_ player: Int) -> Bool {
         guard customizeOwns(player) else { return false }
+        // B on the bottles: back to the customize screen offline; online, READY taken back.
+        if customizeDrinkPhase, customizeLaunch == nil {
+            if customizeOnline {
+                guard customizeReady[player] else { return true }
+                pressReady(player)
+            } else {
+                customizeDrinkPhase = false
+                customizeReady = [false, false]
+                SoundBoard.shared.play(.menuBack)
+            }
+            return true
+        }
         let spot = customizeCursors[player]
         guard spot.owner != spot else { return false }
         customizeCursors[player] = spot.owner
@@ -237,6 +308,10 @@ extension FlowState {
     /// inner the back's.
     func activateCustomize(_ player: Int, _ spot: CustomizeSpot) {
         guard customizeOwns(player), customizeLaunch == nil else { return }
+        // On the bottles, the pad's pick is the bottle (or the sort) under its cursor; START confirms.
+        if customizeDrinkPhase, spot != .back {
+            return activateDrinkCursor(player)
+        }
         // Ready, only START (to take it back) and RETURN still answer.
         if customizeReady[player], spot != .start, spot != .back { return }
         customizeCursors[player] = spot
@@ -267,13 +342,127 @@ extension FlowState {
         }
     }
 
+    /// The middle button tapped: START (READY online), and on the bottles the confirm.
+    func customizeStartTapped(_ player: Int) {
+        guard customizeOwns(player), customizeLaunch == nil else { return }
+        pressReady(player)
+    }
+
+    // MARK: The drink pick
+
+    /// A side's bottles in the order its sort shows them.
+    func sortedDrinks(_ player: Int) -> [Greateraid] { drinkSorts[player].sorted(Greateraid.offered) }
+
+    /// A bottle tapped: the cursor onto it, and up out of its row, or back down if it was up
+    /// (none picked).
+    func tapDrink(_ player: Int, _ drink: Greateraid) {
+        guard customizeOwns(player), customizeLaunch == nil, customizeDrinkPhase, !customizeReady[player] else { return }
+        if let at = sortedDrinks(player).firstIndex(of: drink) { drinkCursors[player] = at }
+        drinkRandom[player] = false
+        update(player) { $0.drink = $0.drink == drink ? nil : drink }
+    }
+
+    /// The small bottles over the back row: No Power, and Random, a Greateraid drawn as it locks in.
+    func tapNoPower(_ player: Int) {
+        guard customizeOwns(player), customizeLaunch == nil, customizeDrinkPhase, !customizeReady[player] else { return }
+        drinkCursors[player] = DrinkPick.noPowerCursor
+        drinkRandom[player] = false
+        update(player) { $0.drink = nil }
+    }
+
+    func tapRandom(_ player: Int) {
+        guard customizeOwns(player), customizeLaunch == nil, customizeDrinkPhase, !customizeReady[player] else { return }
+        drinkCursors[player] = DrinkPick.randomCursor
+        drinkRandom[player] = true
+        update(player) { $0.drink = nil }
+    }
+
+    /// The sort cycled: A to Z, Z to A, biomorphs first, boosters first; the cursor kept on its bottle.
+    func cycleDrinkSort(_ player: Int) {
+        guard customizeOwns(player), customizeLaunch == nil, customizeDrinkPhase, !customizeReady[player] else { return }
+        let was = drinkCursors[player] >= 0 ? sortedDrinks(player)[drinkCursors[player]] : nil
+        drinkSorts[player] = drinkSorts[player].next
+        if let was, let at = sortedDrinks(player).firstIndex(of: was) { drinkCursors[player] = at }
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
+    private func activateDrinkCursor(_ player: Int) {
+        let at = drinkCursors[player]
+        if at == DrinkPick.startCursor || at == DrinkPick.noPowerCursor || at == DrinkPick.randomCursor { return pressReady(player) }
+        if at < 0 { return cycleDrinkSort(player) }
+        // On a bottle the cursor's already picked it: the button locks it in.
+        if sortedDrinks(player).indices.contains(at) { pressReady(player) }
+    }
+
+    /// The pad's cursor on the bottles: across along a row, up a row behind, down a row in front;
+    /// up past the back row onto the sort, down off it onto the back row; out past a row's outer
+    /// end onto the small bottles in the gutter under the figure, Random off the front row and No
+    /// Power off the rest, up and down between them, and back in onto the rows.
+    private func moveDrinkCursor(_ player: Int, across: Int, down: Int) {
+        let count = sortedDrinks(player).count
+        let perRow = DrinkPick.perRow
+        var at = drinkCursors[player]
+        // Toward the middle: right for the first side, left for the second; the bottles run left to right.
+        let inward = player == 0 ? across : -across
+        if at == DrinkPick.startCursor {
+            // Off START, back onto the front row's inner end.
+            guard inward < 0 else { return }
+            at = player == 0 ? min(perRow, count) - 1 : 0
+        } else if at >= 0, across != 0, inward > 0, player == 0 ? (at % perRow == perRow - 1 || at == count - 1) : at % perRow == 0 {
+            // Past a row's inner end: START.
+            at = DrinkPick.startCursor
+        } else if at == DrinkPick.noPowerCursor || at == DrinkPick.randomCursor {
+            // The small bottles: No Power over Random; up off No Power onto the sort; in onto the
+            // outer end of the back row (from No Power) or the front row (from Random).
+            let backRow = (count - 1) / perRow
+            func outerEnd(_ row: Int) -> Int { player == 0 ? row * perRow : min(row * perRow + perRow - 1, count - 1) }
+            if down > 0 {
+                at = DrinkPick.randomCursor
+            } else if down < 0 {
+                at = at == DrinkPick.randomCursor ? DrinkPick.noPowerCursor : -1
+            } else if inward > 0 {
+                at = outerEnd(at == DrinkPick.noPowerCursor ? backRow : 0)
+            }
+        } else if at >= 0, across != 0, inward < 0, player == 0 ? at % perRow == 0 : (at % perRow == perRow - 1 || at == count - 1) {
+            // Out past a row's outer end: the small bottles, Random off the front row.
+            at = at / perRow == 0 ? DrinkPick.randomCursor : DrinkPick.noPowerCursor
+        } else if at < 0 {
+            guard down > 0 else { return }
+            at = min(((count - 1) / perRow) * perRow, count - 1)
+        } else if across != 0 {
+            let row = at / perRow
+            at = min(max(at + across, row * perRow), min(row * perRow + perRow - 1, count - 1))
+        } else if down < 0 {
+            at = at + perRow < count ? at + perRow : -1
+        } else if down > 0 {
+            at = max(at - perRow, at % perRow)
+        }
+        guard at != drinkCursors[player] else { return }
+        drinkCursors[player] = at
+        SoundBoard.shared.play(SoundBoard.navigate)
+        // Onto a bottle, it's picked: its words read as the cursor runs along the rows.
+        let drinks = sortedDrinks(player)
+        guard customizeOwns(player), !customizeReady[player] else { return }
+        if drinks.indices.contains(at), customizations[player].drink != drinks[at] || drinkRandom[player] {
+            drinkRandom[player] = false
+            update(player, sound: false) { $0.drink = drinks[at] }
+        } else if at == DrinkPick.noPowerCursor, customizations[player].drink != nil || drinkRandom[player] {
+            drinkRandom[player] = false
+            update(player, sound: false) { $0.drink = nil }
+        } else if at == DrinkPick.randomCursor, !drinkRandom[player] {
+            drinkRandom[player] = true
+            update(player, sound: false) { $0.drink = nil }
+        }
+    }
+
     /// A pick changed: kept, and the screen's figures drawn in it. The game's own frames are
     /// rebuilt in the picks once, as the match starts, behind the curtain.
-    private func update(_ player: Int, _ change: (inout PlayerCustomization) -> Void) {
+    private func update(_ player: Int, sound: Bool = true, _ change: (inout PlayerCustomization) -> Void) {
         change(&customizations[player])
+        if customizeDrinkPhase, player == 1 { computerDrinkByHand = true }
         // Online this phone's pick is kept as its own, whichever side it's on, and sent.
         customizations[player].save(as: customizeOnline || customizeTurnBased ? 0 : player)
-        SoundBoard.shared.play(SoundBoard.navigate)
+        if sound { SoundBoard.shared.play(SoundBoard.navigate) }
         if customizeOnline { scene.sendCustomization(customizations[player]) }
     }
 }
@@ -426,6 +615,9 @@ struct CustomizeScreen: View {
                     .frame(width: size.width, height: size.height)
                     .offset(y: intro.linesAway * size.height * CustomizeIntro.linesDistanceShare)
                     ForEach(0..<2, id: \.self) { player in side(player, size, intro: intro, boxesAway: geometry.size.width) }
+                    if flow.customizeDrinkPhase, flow.customizeLaunch == nil {
+                        ForEach(0..<2, id: \.self) { player in DrinkPick(flow: flow, player: player, size: size) }
+                    }
                     middle(size)
                     if DebugUI.enabled { tuning(size) }
                 }
@@ -542,6 +734,8 @@ struct CustomizeScreen: View {
         let projectorAt = CGPoint(x: ring.x, y: ring.y - CustomizeScreen.projectorY * base)
         // The boxes slide in from the side's own edge of the screen.
         let slide = intro.boxesAway * away * (player == 0 ? -1 : 1)
+        // On the bottles (`DrinkPick`), the projector and the halo gone, the figure off in the corner.
+        let picking = flow.customizeDrinkPhase && flow.customizeLaunch == nil
         // The first side's front limbs are its right; the second, facing the other way, its left.
         // The projector under the halo.
         if let projector = CustomizeArt.projector(glow), let lit = CustomizeArt.projectorEnergy(glow) {
@@ -554,6 +748,8 @@ struct CustomizeScreen: View {
             }
             .frame(width: 64 * projectorPixel, height: 64 * projectorPixel)
             .position(projectorAt)
+            .opacity(picking ? 0 : 1)
+            .animation(.easeOut(duration: DrinkPick.cornerSeconds), value: picking)
         }
         // The beam fading out to nothing at its top.
         picture(tag + "halo").resizable()
@@ -562,12 +758,14 @@ struct CustomizeScreen: View {
             .energyGlow(radius: halo.width * 0.02)
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: CustomizeScreen.haloFadeEnd)],
                                  startPoint: .top, endPoint: .bottom))
-            .opacity(intro.haloOn)
+            .opacity(picking ? 0 : intro.haloOn)
+            .animation(.easeOut(duration: DrinkPick.cornerSeconds), value: picking)
             .position(x: halo.midX, y: halo.midY)
         // Standing on the lens, the second side facing the first.
         let lens = projectorAt.y + (CustomizeScreen.lensRow - 32) * projectorPixel
         let figureMiddle = lens - (CustomizeScreen.feetRow - 24) * playerPixel - CustomizeScreen.playerY * base
-        let ready = flow.customizeReady[player]
+        // On the bottles the controls stay away as they do once ready.
+        let ready = flow.customizeReady[player] || flow.customizeDrinkPhase
         let launched = flow.customizeLaunch != nil
         let figureFrame = flow.customizeFigureFrame(player)
         let start = rect("customize_start", size)
@@ -580,11 +778,14 @@ struct CustomizeScreen: View {
                             headNudge: CGPoint(x: headX, y: headY), headScale: headScale)
                 .frame(width: side, height: side)
                 .opacity(intro.figuresIn)
-                .scaleEffect(ready ? CustomizeScreen.readyGrowth : 1)
-                .animation(.easeOut(duration: 0.2), value: ready)
+                .scaleEffect(picking ? DrinkPick.cornerScale : ready ? CustomizeScreen.readyGrowth : 1)
+                .animation(.easeOut(duration: picking ? DrinkPick.cornerSeconds : 0.2), value: ready)
+                .animation(.easeOut(duration: DrinkPick.cornerSeconds), value: picking)
                 .allowsHitTesting(false)
-                .position(x: launched ? CustomizeScreen.driftX(for: player, portrait: portrait, start: start, pixel: playerPixel) : ring.x,
-                          y: launched ? start.midY - (CustomizeScreen.feetRow - 24 + driftY) * playerPixel : figureMiddle)
+                .position(x: launched ? CustomizeScreen.driftX(for: player, portrait: portrait, start: start, pixel: playerPixel)
+                            : picking ? DrinkPick.corner(player, size).x : ring.x,
+                          y: launched ? start.midY - (CustomizeScreen.feetRow - 24 + driftY) * playerPixel
+                            : picking ? DrinkPick.corner(player, size).y : figureMiddle)
                 .animation(.easeIn(duration: CustomizeScreen.driftSeconds).delay(CustomizeScreen.driftDelaySeconds), value: launched)
             // From each arm and leg box to its limb on the player: the outer boxes the shown
             // front limbs', the inner the back's, as the boxes tick them. The bracers' leave the
@@ -609,8 +810,8 @@ struct CustomizeScreen: View {
             }
         }
         // The colour's name over the player, lettered as CUSTOMIZE is, a period between its letters,
-        // While the hood's colours are being picked.
-        if cursor.owner == .hood {
+        // While the hood's colours are being picked; gone with the controls once the side's ready or on the bottles.
+        if cursor.owner == .hood, !ready {
             // MODEL, as the words under H.O.O.D. are, centred against it.
             HStack(alignment: .center, spacing: size.height * 0.01) {
                 subtitle("MODEL", size: size.height * CustomizeScreen.hoodWordShare)
@@ -845,7 +1046,9 @@ struct CustomizeScreen: View {
     private func middle(_ size: CGSize) -> some View {
         let start = rect("customize_start", size)
         // The local side's cursor: the other side's waits on START, unmoved, unless a second pad drives it.
-        let lit = flow.customizeCursors[flow.customizeLocal] == .start
+        // On the drink pick it's lit with the drink cursor on it.
+        let lit = flow.customizeDrinkPhase ? flow.drinkCursors[flow.customizeLocal] == DrinkPick.startCursor
+            : flow.customizeCursors[flow.customizeLocal] == .start
         // The rings turn only while START's lit, held where they stopped otherwise.
         return TimelineView(.animation(paused: !lit)) { timeline in
             let seconds = spunSeconds + (spinningSince.map { timeline.date.timeIntervalSince($0) } ?? 0)
@@ -857,7 +1060,17 @@ struct CustomizeScreen: View {
                     spinning("customize_spin_cw", size, about: start, degrees: seconds * CustomizeScreen.spinSpeeds.cw)
                 }
                 .opacity(lit ? 1 : CustomizeScreen.startUnlitOpacity)
-                if flow.customizeLaunch == nil {
+                if flow.customizeLaunch == nil, flow.customizePicksDrink, !flow.customizeDrinkPhase {
+                    // A mode that picks its drink: the Greateraid bottle on the ball, not START, which
+                    // waits for the drink pick.
+                    Image(uiImage: UIImage(named: "Greateraid") ?? UIImage())
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: size.height * DrinkPick.startBottleShare)
+                        .rotationEffect(.degrees(DrinkPick.startBottleLean))
+                        .opacity(flow.customizeReady[flow.customizeLocal] ? 0.5 : (lit ? 1 : 0.6))
+                        .position(x: start.midX, y: start.midY)
+                } else if flow.customizeLaunch == nil {
                     // Lettered as FLO is lit while START's lit, in its two tones' darkest otherwise.
                     litTitle(flow.customizeOnline ? "READY" : "START", height: size.height * 0.035, ownFace: false,
                              colours: lit ? FloTuning.colours : CustomizeScreen.startUnlitColours)
@@ -869,7 +1082,7 @@ struct CustomizeScreen: View {
         }
         .brightness(lit ? 0.15 : 0)
         .contentShape(Rectangle().path(in: start))
-        .onTapGesture { flow.activateCustomize(flow.customizeLocal, .start) }
+        .onTapGesture { flow.customizeStartTapped(flow.customizeLocal) }
         .onAppear { if lit { spinningSince = Date() } }
         .onChange(of: lit) {
             if lit {
@@ -1376,6 +1589,13 @@ enum CustomizeArt {
 struct MenuGround: View {
     /// The gradient and its glows; without, the grid on black alone.
     var glows = true
+
+    /// The grid on black as a picture this size, for the Test Center's backdrop.
+    @MainActor static func gridOnBlack(size: CGSize, scale: CGFloat) -> CGImage? {
+        let renderer = ImageRenderer(content: MenuGround(glows: false).frame(width: size.width, height: size.height))
+        renderer.scale = scale
+        return renderer.cgImage
+    }
 
     var body: some View {
         GeometryReader { geometry in

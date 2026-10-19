@@ -525,7 +525,7 @@ extension Opponent {
                 input.shoot = frame % 2 == 0
             }
             if case .releaseShot(let velocity) = body.step(input: input, stage: stage, events: &events) {
-                return (body.position + Vec2(x: 0, y: BallRules.shotReleaseHeight * body.spec.scale), velocity * body.spec.shotPace, frame + 1)
+                return (body.shotReleasePoint, velocity * body.spec.shotPace, frame + 1)
             }
         }
         return nil

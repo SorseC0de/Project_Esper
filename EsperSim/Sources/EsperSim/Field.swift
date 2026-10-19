@@ -64,6 +64,12 @@ public struct StageFeatures: Equatable {
     /// Whether a rim's top turns back a ball not scoring and a body coming down on it: not the
     /// plane's, whose rims hang in their cases with no net.
     public var rimBounce = true
+    /// How far under the rim the ball can be let go for the auto-aimed shot, if there's a limit:
+    /// Longball's rims are reached off a helmet, so the aim only helps from up there.
+    public var autoAimMaxRise: Double?
+    /// The Test Center, debug only: the Wreck Center's court with no back wall or extras drawn,
+    /// and the training dummy as the other side.
+    public var testCenter = false
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets
@@ -94,6 +100,8 @@ extension StageFeatures {
 /// seconds each, the next as soon as it goes; a shot or throw through it comes out ten
 /// yards toward the shooter's rim with a lift.
 public enum FieldRules {
+    /// The auto-aimed shot only from no more than this far under the rim: up off a helmet.
+    public static let autoAimMaxRise = 30.0
     public static let helmetSize = 40.0
     public static let helmetSpawnFrames = 150
     public static let helmetSpeed = 2.0

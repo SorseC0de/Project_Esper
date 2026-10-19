@@ -49,3 +49,31 @@ final class FloStateRulesTests: XCTestCase {
         XCTAssertEqual(match.players[1].floStateLockout, 0, "no lockout: it wasn't left")
     }
 }
+
+/// The change into FloState breaks out of a stun, a parry's lockout, a clash's push or the tumble.
+final class FloStateBreakoutTests: XCTestCase {
+    func testThrowAndShootTogetherBreakOutOfAStunIntoTheChange() {
+        for setUp in 0..<3 {
+            var match = Match(countdown: 0)
+            match.players[0].flo = FloRules.full
+            match.players[0].knock(Vec2(x: 3, y: 2))
+            match.players[0].hitStun = BallRules.hitStunFrames
+            if setUp == 1 { match.players[0].attackLockout = 90 }
+            if setUp == 2 { match.players[0].startClashPush() }
+            match.advance(inputs: [.idle, .idle])
+            match.advance(inputs: [PlayerInput(shoot: true, throwBall: true), .idle])
+            XCTAssertEqual(match.players[0].state, .transforming, "case \(setUp)")
+            XCTAssertEqual(match.players[0].hitStun, 0)
+            XCTAssertFalse(match.players[0].parryLocked)
+        }
+    }
+
+    func testWithoutAFullMeterTheStunHolds() {
+        var match = Match(countdown: 0)
+        match.players[0].flo = FloRules.full - 1
+        match.players[0].hitStun = BallRules.hitStunFrames
+        match.advance(inputs: [PlayerInput(shoot: true, throwBall: true), .idle])
+        XCTAssertNotEqual(match.players[0].state, .transforming)
+        XCTAssertGreaterThan(match.players[0].hitStun, 0)
+    }
+}

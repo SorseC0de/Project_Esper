@@ -190,7 +190,7 @@ enum KAndAArt {
         }
     }
     nonisolated(unsafe) static var washAlpha: CGFloat = {
-        CGFloat(UserDefaults.standard.object(forKey: washAlphaKey) as? Double ?? 0.1)
+        CGFloat(UserDefaults.standard.object(forKey: washAlphaKey) as? Double ?? 0.5)
     }()
     /// Under the sound words (19) too.
     static let washZ: CGFloat = 18.5

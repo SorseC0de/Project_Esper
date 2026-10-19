@@ -17,6 +17,9 @@ enum WreckCenterArt {
     static let tilesNeutral: RGB = 0x5D5D5D
     static let backNeutral: RGB = 0x3D3D3D
     static let backShare: CGFloat = CGFloat(0x3D) / CGFloat(0x5D)
+    /// Possession colours that read too bright on the floor's stripe and the back wall, taken down
+    /// to this share of their brightness.
+    static let possessionShare: [EnergyColour: Double] = [.pink: 0.8]
     /// 47's three-point lines drawn on the back wall: over its possession pixels, under the tiles.
     static let threePointZ: CGFloat = -7.85
 
@@ -288,7 +291,8 @@ enum WreckCenterArt {
         }
     }
 
-    static func build(into parent: SKNode) -> Handles? {
+    /// `bare`: the Test Center's, the tiles alone, no back wall, its possession pixels or the extras.
+    static func build(into parent: SKNode, bare: Bool = false) -> Handles? {
         guard UIImage(named: "WreckCenterBack") != nil else { return nil }
         func picture(_ name: String, z: CGFloat) -> SKSpriteNode {
             let texture = SKTexture(imageNamed: name)
@@ -309,6 +313,7 @@ enum WreckCenterArt {
         let tilesLit = picture("WreckCenterTilesLit", z: -7.7)
         tilesLit.colorBlendFactor = 1
         let extras = picture("WreckCenterExtras", z: -7.6)
+        if bare { [back, backLit, extras].forEach { $0.isHidden = true }; backLitDarkened?.isHidden = true }
         _ = (sources, wash)
         return Handles(flats: [back, tiles, extras], backLit: backLit, backLitDarkened: backLitDarkened, tilesLit: tilesLit, parent: parent)
     }

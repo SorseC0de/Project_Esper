@@ -278,6 +278,18 @@ public struct Stage: Equatable {
         return extras.contains { $0.overlaps(box) } || slopes.contains { !$0.oneWay && $0.overlaps(box) } || ceilingSlopes.contains { $0.ceilingOverlaps(box) }
     }
 
+    /// Debug: what of the stage's solids a box overlaps, named, for a log.
+    public func solidsOverlapping(_ box: Box) -> [String] {
+        var found: [String] = []
+        for row in rows(of: box) {
+            for column in columns(of: box) where tile(column: column, row: row) == .solid { found.append("tile \(column),\(row)") }
+        }
+        found += extras.filter { $0.overlaps(box) }.map { "extra \($0)" }
+        found += slopes.filter { !$0.oneWay && $0.overlaps(box) }.map { "slope \($0)" }
+        found += ceilingSlopes.filter { $0.ceilingOverlaps(box) }.map { "ceiling slope \($0)" }
+        return found
+    }
+
     /// The top of the highest exposed solid block under the box's span whose top is within
     /// `reach` of `y`, above or below: a step to climb onto or down from. With `oneWays`, a
     /// one-way's top too: the roof a car's slope climbs onto.
@@ -693,6 +705,13 @@ public struct Stage: Equatable {
         }
     }
 
+    /// The Wreck Center's court, marked for the Test Center's drawing and dummy.
+    public static var testCenter: Stage {
+        var stage = court
+        stage.features.testCenter = true
+        return stage
+    }
+
     public static var court: Stage {
         let shift = courtBlockShift
         let rim = courtRimHeight + Double(shift.up) * tileSize - courtRimDrop
@@ -787,6 +806,7 @@ public struct Stage: Equatable {
         // No wall landing on its end walls: up to a rim is off a helmet.
         stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true, ballCam: true, look: .footballField,
                                        tileWallsHold: false)
+        stage.features.autoAimMaxRise = FieldRules.autoAimMaxRise
         // The backboards: behind each rim and above it, solid to the ball up to the energy fence's
         // top, and on back to the end wall so nothing gets in behind them.
         stage.ballBlockers = stage.hoops.map { hoop in
@@ -1016,6 +1036,8 @@ public struct Stage: Equatable {
 /// the raw value.
 public enum StageChoice: Int, CaseIterable, Codable {
     case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flightB411, kAndA
+    /// Debug only, never on the select's own lists.
+    case testCenter
 
     /// The stages on the select, in its order: Slamstill Traffic and Sky Net (not made yet) parked off it.
     public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .hoopfishHideaway, .flightB411, .kAndA]
@@ -1032,6 +1054,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .hoopfishHideaway: "Hoopfish Hideaway"
         case .flightB411: "Flight B411"
         case .kAndA: "K&A"
+        case .testCenter: "Test Center"
         }
     }
 
@@ -1046,6 +1069,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .hoopfishHideaway: .hoopfishHideaway
         case .flightB411: .flightB411
         case .kAndA: .kAndA
+        case .testCenter: .testCenter
         }
     }
 }

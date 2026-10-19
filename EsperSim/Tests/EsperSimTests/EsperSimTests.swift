@@ -126,7 +126,8 @@ final class MovementTests: XCTestCase {
         aiming.players[0].hasBall = true
         aiming.ball.holder = 0
         run(&aiming, frames: 6, input: { _ in PlayerInput(jump: true) })
-        run(&aiming, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true) }) { $0.players[0].fastFalling || $0.players[0].grounded }
+        // Down and across: straight down with the button held would be the Spin Move.
+        run(&aiming, frames: 60, input: { _ in PlayerInput(stick: Vec2(x: 1, y: -0.7), throwBall: true) }) { $0.players[0].fastFalling || $0.players[0].grounded }
         XCTAssertFalse(aiming.players[0].fastFalling)
         XCTAssertEqual(aiming.players[0].state, .throwStance)
     }
@@ -439,7 +440,8 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .shooting)
         run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
-        XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * FighterSpec.baseline.shotSpeed, accuracy: 0.001)
+        XCTAssertTrue(match.players[0].presetShot, "on the preset arc")
+        XCTAssertGreaterThan(match.ball.velocity.x * match.players[0].facing.sign, 0)
     }
 
     func testDownOnTheGroundDoesntCancelTheShot() {
@@ -461,7 +463,7 @@ final class BallTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .shooting)
         run(&match, frames: BallRules.shotReleaseFrames, input: { _ in .idle })
         XCTAssertNil(match.ball.holder)
-        XCTAssertEqual(match.ball.velocity.x, cos(BallRules.shotAngleDefault) * FighterSpec.baseline.shotSpeed, accuracy: 0.001)
+        XCTAssertTrue(match.players[0].presetShot, "on the preset arc")
         XCTAssertGreaterThan(match.ball.velocity.y, 0)
     }
 
@@ -616,12 +618,10 @@ final class BallTests: XCTestCase {
 
     func testUpThrowIsALayupThatLetsGoOnItsSixthFrame() {
         var match = matchWithBallHeld()
-        for _ in 0..<BallRules.throwWindupFrames + 2 {
-            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
-        }
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
         XCTAssertEqual(match.players[0].animationFrame.animation, .throwForward, "the stance holds the throw's frame")
-        // Into the layup, the ball in hand through its first five frames.
-        match.advance(inputs: [.idle, .idle])
+        // Up with the button still held: into the layup at once, the ball in hand through its first five frames.
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
         XCTAssertEqual(match.players[0].state, .throwing)
         XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.layup, 0))
         run(&match, frames: BallRules.layupReleaseFrames - 2, input: { _ in .idle })
@@ -633,8 +633,8 @@ final class BallTests: XCTestCase {
         let body = match.players[0].body
         XCTAssertEqual(match.ball.position.x, match.players[0].layupReleasePoint.x, accuracy: 0.01)
         XCTAssertEqual(match.ball.position.x, match.players[0].facing == .right ? body.max.x - BallRules.radius : body.min.x + BallRules.radius, accuracy: 0.01)
-        // Acting again once the last frame's done.
-        run(&match, frames: BallRules.layupRecoveryFrames - BallRules.layupReleaseFrames, input: { _ in .idle })
+        // Acting again once the pose's held its while, or it's landed.
+        run(&match, frames: BallRules.shotPoseHoldFrames + 1, input: { _ in .idle })
         XCTAssertNotEqual(match.players[0].state, .throwing)
     }
 
@@ -643,7 +643,8 @@ final class BallTests: XCTestCase {
         var match = matchWithBallHeld()
         match.players[0].facing = .left
         for _ in 0..<40 { match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0)), .idle]) }
-        for _ in 0..<BallRules.throwWindupFrames + 2 {
+        // The stance, then up with the button held: the layup.
+        for _ in 0..<2 {
             match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
         }
         run(&match, frames: BallRules.layupReleaseFrames + 1, input: { _ in .idle })
@@ -660,7 +661,8 @@ final class BallTests: XCTestCase {
         match.players[0].facing = hoop.backboard
         for _ in 0..<5 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(match.players[0].grounded)
-        for _ in 0..<BallRules.throwWindupFrames + 2 {
+        // The stance, then up with the button held: the layup.
+        for _ in 0..<2 {
             match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
         }
         let scored = run(&match, frames: 200, input: { _ in .idle }) { match in
@@ -673,7 +675,8 @@ final class BallTests: XCTestCase {
         var match = matchWithBallHeld()
         XCTAssertTrue(match.players[0].grounded)
         let ground = match.players[0].position.y
-        for _ in 0..<BallRules.throwWindupFrames + 2 {
+        // The stance, then up with the button held: the layup.
+        for _ in 0..<2 {
             match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
         }
         match.advance(inputs: [.idle, .idle])
@@ -690,7 +693,8 @@ final class BallTests: XCTestCase {
 
     func testUpThrowIsAFloater() {
         var match = matchWithBallHeld()
-        for _ in 0..<BallRules.throwWindupFrames + 2 {
+        // The stance, then up with the button held: the layup.
+        for _ in 0..<2 {
             match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
         }
         run(&match, frames: BallRules.layupReleaseFrames + 1, input: { _ in .idle })
@@ -1452,7 +1456,7 @@ final class SodaAndFizzTests: XCTestCase {
         run(&match, frames: BallRules.throwReleaseFrames + 8, input: { _ in .idle })
         XCTAssertEqual(match.ball.owner, 0)
         let ballWas = match.ball.position
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true), .idle])
         XCTAssertTrue(match.events.contains { if case .warped(player: 0, _, _) = $0 { return true } else { return false } })
         XCTAssertEqual(match.ball.holder, 0)
         XCTAssertEqual(match.players[0].position.x, ballWas.x, accuracy: 0.001)
@@ -1628,9 +1632,9 @@ final class ShakeTests: XCTestCase {
         XCTAssertEqual(match.platforms.count, 1)
     }
 
-    func testShootWithoutTheBallMakesAWallInFront() {
+    func testUpOrDownAndShootWithoutTheBallMakesAWallInFront() {
         var match = shaken()
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .walling)
         run(&match, frames: ShakeRules.wallAppearFrame, input: { _ in .idle }) { !$0.platforms.isEmpty }
         XCTAssertEqual(match.platforms.count, 1)
@@ -1744,12 +1748,12 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.players[0].state, .run)
     }
 
-    func testShootWhileCrouchedIsASlide() {
+    func testShootWhileCrouchedIsWhatItIsStandingNotASlide() {
         var match = neutral()
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
-        XCTAssertEqual(match.players[0].state, .slide)
-        XCTAssertEqual(match.players[0].velocity.x, match.players[0].spec.dashInitialVelocity, accuracy: 0.001)
+        XCTAssertNotEqual(match.players[0].state, .slide, "the slide is down at a run alone")
+        XCTAssertEqual(match.players[0].state, .slashing)
     }
 
     func testSlideKnocksTheBallOutOfAGroundedHoldersHands() {
@@ -1768,15 +1772,15 @@ final class FootsiesTests: XCTestCase {
     }
 
     func testSlideLeavesAnAirborneHolderAlone() {
-        var match = defending(otherAt: 142)
-        // Just off the ground and rising, over the leg's height.
-        match.players[1].position.y = 10.5
+        var match = defending(otherAt: 300)
+        run(&match, frames: 20, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0.7, y: -0.7)), .idle])
+        XCTAssertEqual(match.players[0].state, .slide)
+        // Just ahead, off the ground and rising, over the leg's height.
+        match.players[1].position = Vec2(x: match.players[0].position.x + 12, y: 10.5)
         match.players[1].velocity.y = 1
         match.players[1].grounded = false
         match.players[1].enter(.air)
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
-        XCTAssertEqual(match.players[0].state, .slide)
         let popped = run(&match, frames: 4, input: { _ in .idle }) { $0.events.contains(.popped(player: 1, by: 0)) }
         XCTAssertEqual(popped, 4)
         XCTAssertTrue(match.players[1].hasBall)
@@ -1916,7 +1920,7 @@ final class FootsiesTests: XCTestCase {
         // The slasher: stunned, then locked out of everything for half a second more, reeling.
         XCTAssertGreaterThan(match.players[0].hitStun, 0)
         XCTAssertTrue(match.players[0].parryLocked)
-        XCTAssertEqual(match.players[0].animationFrame, AnimationFrame(.ledge, Animation.ledge.frameCount - 1))
+        XCTAssertEqual(match.players[0].animationFrame, match.players[0].grounded ? AnimationFrame(.ledge, Animation.ledge.frameCount - 1) : AnimationFrame(.stunnedAir, 0))
         // Run out the stun (the parry's hit-stop holds it a while first).
         for _ in 0..<200 where match.players[0].hitStun > 0 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.players[0].hitStun, 0)
@@ -2287,34 +2291,192 @@ final class OpponentTests: XCTestCase {
         XCTAssertLessThan(dunked, 40, "up and onto the rim, not off to a shooting spot")
     }
 
-    func testItParriesSlashSpamWithTheThrowStance() {
+    /// The two of them set up close on the floor, facing, the computer with the ball or without.
+    private func closeQuarters(_ match: inout Match, computerHolds: Bool) {
+        match.ball.holder = computerHolds ? 1 : nil
+        match.players[1].hasBall = computerHolds
+        match.players[0].hasBall = false
+        if !computerHolds { match.ball.respawn(at: Vec2(x: 40, y: 150)) }
+        for index in 0..<2 {
+            match.players[index].position = Vec2(x: index == 0 ? 178 : 200, y: 10)
+            match.players[index].velocity = .zero
+            match.players[index].grounded = true
+            match.players[index].enter(.idle)
+            match.players[index].facing = index == 0 ? .right : .left
+            match.players[index].hitStun = 0
+            match.players[index].attackLockout = 0
+        }
+        match.shields = []
+        match.hitStop = 0
+    }
+
+    /// Slashes every `every` frames at it, set up close each time; the computer's counters counted.
+    private func spamSlashes(computerHolds: Bool, count: Int, every: Int = 30) -> (spins: Int, shields: Int) {
         var match = Match(stage: .court, specs: [.starting, .starting])
+        match.countdown = 0
+        var brain = Opponent(index: 1)
+        var spins = 0, shields = 0
+        for _ in 0..<count {
+            closeQuarters(&match, computerHolds: computerHolds)
+            for frame in 0..<every {
+                match.advance(inputs: [PlayerInput(shoot: frame == 0), brain.decide(match)])
+                spins += match.events.filter { if case .spun(player: 1, _) = $0 { return true } else { return false } }.count
+                shields += match.events.filter { if case .shieldRaised(player: 1, _) = $0 { return true } else { return false } }.count
+            }
+        }
+        return (spins, shields)
+    }
+
+    func testSlashSpamIsMetWithTheSpinWithTheBallAndTheShieldWithout() {
+        let holding = spamSlashes(computerHolds: true, count: 10)
+        XCTAssertGreaterThan(holding.spins, 0, "spammed, it spins through with the ball")
+        XCTAssertLessThan(holding.spins, 10, "not every time: a person's guess")
+        let empty = spamSlashes(computerHolds: false, count: 10)
+        XCTAssertGreaterThan(empty.shields, 0, "spammed, it shields without the ball")
+        XCTAssertLessThan(empty.shields, 10)
+    }
+
+    func testASingleSlashIsntAnsweredBeforeAReactionTime() {
+        for seed: UInt32 in 1...20 {
+            var match = Match(stage: .court, specs: [.starting, .starting])
+            match.countdown = 0
+            var brain = Opponent(index: 1, seed: seed)
+            closeQuarters(&match, computerHolds: false)
+            for frame in 0..<Opponent.reactionFrames.lowerBound {
+                let theirs = brain.decide(match)
+                XCTAssertFalse(theirs.shield || theirs.shoot || theirs.throwBall, "seed \(seed): answered on frame \(frame), before it could have seen it")
+                match.advance(inputs: [PlayerInput(shoot: frame == 0), theirs])
+            }
+        }
+    }
+
+    func testABallRightUnderAOneWayItStandsOnIsGoneDownFor() {
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        match.countdown = 0
+        var brain = Opponent(index: 1)
+        guard let platform = match.stage.dropPlatforms.first else { return XCTFail("no one-way on the court") }
+        let x = (Double(platform.columns.lowerBound) + Double(platform.columns.count) / 2) * Stage.tileSize
+        let top = platform.top
+        match.players[1].position = Vec2(x: x, y: top)
+        match.players[0].position = Vec2(x: 300, y: 10)
+        match.ball.respawn(at: Vec2(x: x, y: 10 + BallRules.radius))
+        match.ball.position = Vec2(x: x, y: 10 + BallRules.radius)
+        match.ball.velocity = .zero
+        match.ball.resting = true
+        let took = play(&match, &brain, frames: 180, input: { _ in .idle }) { $0.ball.holder == 1 }
+        XCTAssertLessThan(took, 180, "down through the one-way for it")
+    }
+
+    func testAShotComingThroughItIsSometimesShieldedNotAlways() {
+        var blocked = 0
+        for seed: UInt32 in 1...20 {
+            var match = Match(stage: .court, specs: [.starting, .starting])
+            match.countdown = 0
+            var brain = Opponent(index: 1, seed: seed)
+            match.players[0].hasBall = false
+            match.players[1].hasBall = false
+            match.players[0].position = Vec2(x: 120, y: 10)
+            match.players[1].position = Vec2(x: 200, y: 10)
+            match.ball.holder = nil
+            match.ball.position = Vec2(x: 150, y: match.players[1].body.center.y)
+            match.ball.velocity = Vec2(x: 3, y: 0)
+            match.ball.shotInFlight = true
+            match.ball.scoring = true
+            match.ball.lastTouched = 0
+            for _ in 0..<20 {
+                match.advance(inputs: [.idle, brain.decide(match)])
+                if match.events.contains(where: { if case .shieldRaised(player: 1, _) = $0 { return true } else { return false } }) { blocked += 1; break }
+            }
+        }
+        XCTAssertGreaterThan(blocked, 0, "it blocks shots with the shield")
+        XCTAssertLessThan(blocked, 20, "but not every one")
+    }
+
+    func testWithTheOtherStunnedItGoesStraightForTheBasket() {
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        match.countdown = 0
         var brain = Opponent(index: 1)
         match.players[1].hasBall = true
         match.ball.holder = 1
         match.players[1].position = Vec2(x: 200, y: 10)
-        match.players[0].position = Vec2(x: 110, y: 10)
-        match.players[0].facing = .right
-        // Two swings at the air, well out of reach: spam, as it reads it.
-        for frame in 0..<60 { match.advance(inputs: [PlayerInput(shoot: frame % 30 == 0), brain.decide(match)]) }
-        // Then, with the ball (it may have taken a shot meanwhile), free on the floor, in close facing it, and the swing.
-        match.ball.holder = 1
-        match.players[1].hasBall = true
-        match.players[1].position = Vec2(x: 200, y: 10)
-        match.players[1].velocity = .zero
-        match.players[1].grounded = true
-        match.players[1].enter(.idle)
-        match.players[0].position = Vec2(x: match.players[1].position.x - 22, y: 10)
-        match.players[0].facing = .right
-        match.players[0].velocity = .zero
-        match.players[0].enter(.idle)
-        var parried = false
-        for frame in 0..<30 where !parried {
-            match.advance(inputs: [PlayerInput(shoot: frame == 0), brain.decide(match)])
-            if match.events.contains(.parried(player: 0, by: 1)) { parried = true }
+        match.players[0].position = Vec2(x: 230, y: 10)
+        match.players[0].hitStun = 40
+        match.players[0].attackLockout = 60
+        var plans: [Opponent.Plan] = []
+        for _ in 0..<6 {
+            match.advance(inputs: [.idle, brain.decide(match)])
+            plans.append(brain.current)
         }
-        XCTAssertTrue(parried, "spammed, it meets the slash with the stance")
-        XCTAssertTrue(match.players[1].hasBall, "and keeps the ball")
+        XCTAssertTrue(plans.allSatisfy { [.dart, .dunk, .shoot, .floater, .travel].contains($0) }, "for a basket at once, no footwork: \(plans)")
+    }
+
+    func testWithTheOtherFarOffItGoesStraightForTheBasket() {
+        var match = Match(stage: .court, specs: [.starting, .starting])
+        match.countdown = 0
+        var brain = Opponent(index: 1)
+        match.players[1].hasBall = true
+        match.ball.holder = 1
+        match.players[1].position = Vec2(x: 200, y: 10)
+        match.players[0].position = Vec2(x: 20, y: 10)
+        var plans: [Opponent.Plan] = []
+        for _ in 0..<60 {
+            match.advance(inputs: [.idle, brain.decide(match)])
+            plans.append(brain.current)
+        }
+        XCTAssertFalse(plans.contains { [.hold, .shuffle, .fake, .dashDance].contains($0) }, "no footwork with nobody near: \(plans)")
+    }
+
+    func testOutOfAStunItSettlesBeforeAttacking() {
+        for seed: UInt32 in 1...10 {
+            var match = Match(stage: .court, specs: [.starting, .starting])
+            match.countdown = 0
+            var brain = Opponent(index: 1, seed: seed)
+            match.players[0].hasBall = false
+            match.players[1].hasBall = false
+            match.ball.respawn(at: Vec2(x: 40, y: 150))
+            match.players[0].position = Vec2(x: 180, y: 10)
+            match.players[1].position = Vec2(x: 200, y: 10)
+            match.players[1].hitStun = 10
+            for _ in 0..<10 { match.advance(inputs: [.idle, brain.decide(match)]) }
+            for frame in 0..<Opponent.settleFrames.lowerBound {
+                let theirs = brain.decide(match)
+                XCTAssertFalse(theirs.shoot || theirs.throwBall, "seed \(seed): attacked \(frame) frames out of the stun")
+                match.advance(inputs: [.idle, theirs])
+            }
+        }
+    }
+
+    func testFromTheGroundItGoesAfterTheirShot() {
+        var tried = 0
+        for seed: UInt32 in 1...20 {
+            var match = Match(stage: .court, specs: [.starting, .starting])
+            match.countdown = 0
+            var brain = Opponent(index: 1, seed: seed)
+            let rim = match.stage.hoops.first { $0.owner == 0 }!.position
+            // Their shot from a way out, it grounded in front of them.
+            let from = Vec2(x: rim.x + (rim.x < 170 ? 150 : -150), y: 30)
+            match.players[0].position = Vec2(x: from.x, y: 10)
+            // A defender's spot: a step in front of them, toward the rim.
+            match.players[1].position = Vec2(x: from.x + (rim.x < from.x ? -25 : 25), y: 10)
+            match.players.indices.forEach { match.players[$0].hasBall = false }
+            match.ball.holder = nil
+            match.ball.position = from
+            match.ball.velocity = BallRules.presetArcVelocity(from: from, to: rim)
+            match.ball.shotInFlight = true
+            match.ball.scoring = true
+            match.ball.lastTouched = 0
+            for _ in 0..<90 where match.ball.shotInFlight {
+                match.advance(inputs: [.idle, brain.decide(match)])
+                let acted = match.events.contains { event in
+                    switch event {
+                    case .shieldRaised(player: 1, _), .slashed(player: 1), .snatchReached(player: 1): true
+                    default: false
+                    }
+                }
+                if acted { tried += 1; break }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(tried, 14, "it goes after nearly every shot from the ground")
     }
 
     func testTheOpponentIsDeterministic() {
@@ -2353,19 +2515,23 @@ final class OpponentTests: XCTestCase {
         match.players[0].position.x = 180
         match.players[1].position.x = 205
         match.players[0].enter(.slashing)
-        // While the blade is live it never pushes toward them: it parries it with the throw stance,
-        // or stays out of its reach.
-        var parried = false
+        // While the blade is live it never pushes toward them: it spins through it once it's seen
+        // it, or stays out of its reach.
+        var spun = false
         for _ in 0..<SlashRules.liveFrames.upperBound - 1 {
             let theirs = brain.decide(match)
             XCTAssertGreaterThanOrEqual(theirs.stick.x, 0, "pushed into a live blade")
             match.advance(inputs: [.idle, theirs])
-            if match.events.contains(.parried(player: 0, by: 1)) { parried = true }
+            if match.events.contains(where: { if case .spun(player: 1, _) = $0 { return true } else { return false } }) { spun = true }
         }
         XCTAssertTrue(match.players[1].hasBall)
-        // Spent, or stripped by the parry: past them inside a second.
-        let past = play(&match, &brain, frames: 60, input: { _ in .idle }) { $0.players[1].position.x < 170 }
-        XCTAssertTrue(parried || past < 60, "never darted past the spent swing")
+        // Spent, or spun through: past them before long, on foot, the ball lobbed over, or a shot.
+        var lobbed = false
+        let past = play(&match, &brain, frames: 180, input: { _ in .idle }) { match in
+            if match.events.contains(.thrown(player: 1)) || match.events.contains(.shot(player: 1)) { lobbed = true }
+            return match.players[1].position.x < 170 || lobbed
+        }
+        XCTAssertTrue(spun || past < 180, "never got past the spent swing")
     }
 
     func testOnDefenceItGuardsTheRimAndSwingsInReach() {

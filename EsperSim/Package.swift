@@ -8,7 +8,10 @@ let package = Package(
         .library(name: "EsperSim", targets: ["EsperSim"]),
     ],
     targets: [
-        .target(name: "EsperSim", swiftSettings: [.swiftLanguageMode(.v5)]),
-        .testTarget(name: "EsperSimTests", dependencies: ["EsperSim"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        // The drinks (`Greateraid.swift`) sit beside this file, out of Sources, to be easy to find and edit.
+        .target(name: "EsperSim", path: ".", sources: ["Sources/EsperSim", "Greateraid.swift"],
+                swiftSettings: [.swiftLanguageMode(.v5)]),
+        .testTarget(name: "EsperSimTests", dependencies: ["EsperSim"], path: "Tests/EsperSimTests",
+                    swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

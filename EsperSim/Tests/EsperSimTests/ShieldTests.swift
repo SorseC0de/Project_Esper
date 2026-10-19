@@ -1,7 +1,7 @@
 import XCTest
 @testable import EsperSim
 
-/// Shielding: the snatch with the stick held a way raises a shield at the hand.
+/// Shielding: the up-snatch on defence, the flipjump back and the tumble, the shield round its arc.
 final class ShieldTests: XCTestCase {
     private func court() -> Match {
         var match = Match(stage: .court, specs: [.starting, .starting])
@@ -18,192 +18,385 @@ final class ShieldTests: XCTestCase {
         return match
     }
 
-    /// Snatch pressed with the stick held, then the stick let go, till the shield's up.
-    private func raise(_ match: inout Match, stick: Vec2, player: Int = 0) {
+    /// The shield's shortcut pressed on defence (the other holding the ball for that frame, the
+    /// ball then put back as it was): the flip starts and the shield's up at once.
+    private func raise(_ match: inout Match, player: Int = 0) {
         var inputs: [PlayerInput] = [.idle, .idle]
-        inputs[player] = PlayerInput(stick: stick, shield: true)
-        func raised() -> Bool { match.events.contains { if case .shieldRaised = $0 { return true } else { return false } } }
+        inputs[player] = PlayerInput(shield: true)
+        let loose = match.ball, other = 1 - player
+        match.ball.holder = other
+        match.players[other].hasBall = true
         match.advance(inputs: inputs)
-        for _ in 0..<SnatchRules.sparkFrame where !raised() { match.advance(inputs: [.idle, .idle]) }
+        match.ball = loose
+        match.players[other].hasBall = false
     }
 
-    func testTheButtonRaisesOneStillOrForwardAndTheSnatchStaysASnatch() {
-        for stick in [Vec2.zero, Vec2(x: 1, y: 0)] {
-            var match = court()
-            raise(&match, stick: stick)
-            XCTAssertEqual(match.shields.count, 1)
-            XCTAssertEqual(match.shields.first?.normal.x ?? 0, 1, accuracy: 0.001)
-        }
-        var snatch = court()
-        snatch.advance(inputs: [PlayerInput(stick: Vec2(x: -1, y: 0), throwBall: true), .idle])
-        for _ in 0..<SnatchRules.frames { snatch.advance(inputs: [.idle, .idle]) }
-        XCTAssertTrue(snatch.shields.isEmpty)
+    func testAnyTimeWithoutTheBallTheUpSnatchFlipsAndRaisesOne() {
+        var loose = court()
+        loose.advance(inputs: [PlayerInput(shield: true), .idle])
+        XCTAssertEqual(loose.players[0].state, .flipJump, "the ball loose")
+        XCTAssertEqual(loose.shields.count, 1)
+        var upLoose = court()
+        upLoose.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        XCTAssertEqual(upLoose.players[0].state, .flipJump)
+        var defence = court()
+        defence.ball.holder = 1
+        defence.players[1].hasBall = true
+        defence.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), throwBall: true), .idle])
+        XCTAssertEqual(defence.players[0].state, .flipJump)
+        var holding = court()
+        holding.ball.holder = 0
+        holding.players[0].hasBall = true
+        holding.advance(inputs: [PlayerInput(shield: true), .idle])
+        XCTAssertTrue(holding.shields.isEmpty, "not with the ball")
     }
-    func testBackTurnsRoundFirstAndUpTilts() {
+
+    func testItGoesFromStraightBelowToStraightAboveItsFaceSixtyEitherWay() {
         var match = court()
-        raise(&match, stick: Vec2(x: -1, y: 0))
-        XCTAssertEqual(match.players[0].facing, .left)
-        XCTAssertLessThan(match.shields.first?.normal.x ?? 0, 0)
-        var up = court()
-        raise(&up, stick: Vec2(x: 0, y: 1))
-        XCTAssertEqual(up.shields.first?.normal.y ?? 0, Trig.sin(degrees(45)), accuracy: 0.001)
+        raise(&match)
+        var shield = match.shields[0]
+        shield.age = 0
+        XCTAssertEqual(shield.centre.x, shield.pivot.x, accuracy: 0.001)
+        XCTAssertLessThan(shield.centre.y, shield.pivot.y)
+        XCTAssertEqual(shield.normal.y, -Trig.sin(degrees(60)), accuracy: 0.001)
+        XCTAssertGreaterThan(shield.normal.x, 0, "out the way it faced")
+        shield.age = ShieldRules.flipFrames - 1
+        XCTAssertEqual(shield.centre.x, shield.pivot.x, accuracy: 0.001)
+        XCTAssertGreaterThan(shield.centre.y, shield.pivot.y)
+        XCTAssertEqual(shield.normal.y, Trig.sin(degrees(60)), accuracy: 0.001)
     }
+
+    func testTheFlipIgnoresTheStickAndGravityThenTumblesOnTillItLands() {
+        var match = court()
+        let from = match.players[0].position
+        raise(&match)
+        for frame in 1..<ShieldRules.flipFrames {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: -1), jump: true), .idle])
+            let expected = from + ShieldRules.flipOffset(share: Double(frame + 1) / Double(ShieldRules.flipFrames), side: 1)
+            if match.players[0].state != .flipJump { break }
+            XCTAssertEqual(match.players[0].position.x, expected.x, accuracy: 0.001, "frame \(frame)")
+        }
+        // In the air at the flip's end: the tumble, left and right its only say, till it lands.
+        var aloft = court()
+        aloft.players[0].position = Vec2(x: 120, y: 120)
+        aloft.players[0].grounded = false
+        aloft.players[0].enter(.air)
+        raise(&aloft)
+        for _ in 0..<ShieldRules.flipFrames { aloft.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(aloft.players[0].state, .tumbling)
+        let drift = aloft.players[0].velocity.x
+        aloft.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0), shoot: true), .idle])
+        XCTAssertEqual(aloft.players[0].state, .tumbling, "no button answers")
+        XCTAssertGreaterThan(aloft.players[0].velocity.x, drift, "steered")
+        for _ in 0..<240 where aloft.players[0].state == .tumbling { aloft.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(aloft.players[0].state, .land)
+    }
+
     func testOnesOwnShieldsDontBreakEachOther() {
         var match = court()
-        raise(&match, stick: Vec2(x: 1, y: 0))
-        for _ in 0..<SnatchRules.frames { match.advance(inputs: [.idle, .idle]) }
-        match.players[0].facing = .right
-        raise(&match, stick: Vec2(x: 1, y: 0))
+        match.shields.append(Shield(owner: 0, pivot: match.players[0].body.center, side: 1))
+        raise(&match)
         XCTAssertEqual(match.shields.count, 2)
+    }
+
+    func testTwoInOnePlaceClashThenPushBothAway() {
+        var match = court()
+        match.players[1].position = Vec2(x: 140, y: 10)
+        match.shields.append(Shield(owner: 1, pivot: match.players[1].body.center, side: -1))
+        raise(&match)
+        XCTAssertTrue(match.shields.isEmpty, "both broken")
+        XCTAssertTrue(match.events.contains { if case .shieldClashed = $0 { return true } else { return false } })
+        XCTAssertEqual(match.hitStop, HitStopRules.shieldClashFrames)
+        for _ in 0..<HitStopRules.shieldClashFrames { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertLessThan(match.players[0].velocity.x, 0)
+        XCTAssertGreaterThan(match.players[1].velocity.x, 0)
+        XCTAssertEqual(match.players[0].state, .air, "off the flip")
+    }
+
+    /// The ball coming at the shielder across, from the side the shield's on.
+    private func ballAt(_ match: inout Match, shield: Shield, speed: Double) {
+        // Level with its raiser's middle, just outside its reach, coming at them across.
+        match.ball.respawnTimer = 0
+        match.ball.position = shield.pivot + Vec2(x: shield.side * (ShieldRules.reach + BallRules.radius + 1), y: 0)
+        match.ball.velocity = Vec2(x: -shield.side * speed, y: 0)
+        match.ball.thrown = false
     }
 
     func testEachShieldTurnsTheBallOnce() {
         var match = court()
-        raise(&match, stick: Vec2(x: 1, y: 0))
+        raise(&match)
         for _ in 0..<ShieldRules.perfectFrames { match.advance(inputs: [.idle, .idle]) }
         match.shields[0].turnedFlight = match.ball.flight
-        ballAt(&match, shield: match.shields[0], from: 1, speed: 4)
-        for _ in 0..<6 { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertLessThan(match.ball.velocity.x, 0, "passed on through")
-    }
-
-    func testTheLoopKeepsItUpAFrameEachTime() {
-        let loops = ShieldRules.extraLoops
-        defer { ShieldRules.extraLoops = loops }
-        ShieldRules.extraLoops = 2
-        XCTAssertEqual(ShieldRules.lifeFrames, (18 + 8) * 4)
-        XCTAssertEqual(ShieldRules.sheetFrame(atAge: 14 * 4), 10, "round to the loop's start")
-        XCTAssertEqual(ShieldRules.sheetFrame(atAge: (14 + 8) * 4), 14, "then on out")
-    }
-
-    func testAnUpShieldSendsAFallingBallOutNotStraightUp() {
-        var match = court()
-        raise(&match, stick: Vec2(x: 0, y: 1))
-        let shield = match.shields[0]
-        match.ball.position = shield.centre + Vec2(x: 0, y: 12)
-        match.ball.velocity = Vec2(x: 0, y: -4)
-        match.ball.thrown = false
-        for _ in 0..<6 { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertGreaterThan(match.ball.velocity.x, 0)
-    }
-
-    func testItHangsWhereItWasRaisedAndGoesAfterItsArt() {
-        var match = court()
-        raise(&match, stick: Vec2(x: 1, y: 0))
-        let at = match.shields[0].centre
-        for _ in 0..<20 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
-        XCTAssertEqual(match.shields.first?.centre, at)
-        for _ in 0..<ShieldRules.lifeFrames { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertTrue(match.shields.isEmpty)
-    }
-
-    private func ballAt(_ match: inout Match, shield: Shield, from side: Double, speed: Double) {
-        match.ball.position = shield.centre + Vec2(x: side * 12, y: 0)
-        match.ball.velocity = Vec2(x: -side * speed, y: 0)
-        match.ball.thrown = false
+        ballAt(&match, shield: match.shields[0], speed: 4)
+        let inward = match.ball.velocity
+        for _ in 0..<3 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertGreaterThan(match.ball.velocity.dot(inward), 0, "passed on through")
     }
 
     func testALateBallReflectsAndAPerfectOneIsPoppedUp() {
         var match = court()
-        raise(&match, stick: Vec2(x: 1, y: 0))
+        raise(&match)
         for _ in 0..<ShieldRules.perfectFrames { match.advance(inputs: [.idle, .idle]) }
-        ballAt(&match, shield: match.shields[0], from: 1, speed: 4)
-        for _ in 0..<6 { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertGreaterThan(match.ball.velocity.x, 0, "back the way it came")
+        ballAt(&match, shield: match.shields[0], speed: 4)
+        let inward = match.ball.velocity
+        var reflected = false
+        for _ in 0..<4 {
+            match.advance(inputs: [.idle, .idle])
+            if match.events.contains(where: { if case .shieldReflected = $0 { return true } else { return false } }) { reflected = true }
+        }
+        XCTAssertTrue(reflected)
+        XCTAssertLessThan(match.ball.velocity.dot(inward), 0, "back the way it came")
 
         var perfect = court()
-        raise(&perfect, stick: Vec2(x: 1, y: 0))
-        ballAt(&perfect, shield: perfect.shields[0], from: 1, speed: 4)
+        raise(&perfect)
+        ballAt(&perfect, shield: perfect.shields[0], speed: 4)
         var popped = false
         for _ in 0..<4 {
             perfect.advance(inputs: [.idle, .idle])
             if perfect.events.contains(where: { if case .shieldPerfect = $0 { return true } else { return false } }) { popped = true }
         }
         XCTAssertTrue(popped)
-        XCTAssertEqual(perfect.ball.velocity.x, 0)
+        XCTAssertTrue(perfect.players[0].shieldParried, "as a parry: the flip ends in the air, not the tumble")
     }
 
-    func testAThrownBallBreaksIt() {
+    func testAThrownBallBreaksItAndAFloaterBouncesOff() {
         var match = court()
-        raise(&match, stick: Vec2(x: 1, y: 0))
+        raise(&match)
         for _ in 0..<ShieldRules.perfectFrames { match.advance(inputs: [.idle, .idle]) }
-        ballAt(&match, shield: match.shields[0], from: 1, speed: 4)
+        ballAt(&match, shield: match.shields[0], speed: 4)
         match.ball.thrown = true
-        for _ in 0..<6 { match.advance(inputs: [.idle, .idle]) }
+        match.ball.lastTouched = 1
+        var countered = false
+        for _ in 0..<4 {
+            match.advance(inputs: [.idle, .idle])
+            countered = countered || match.events.contains { if case .countered(player: 0, by: 1, _) = $0 { return true } else { return false } }
+        }
         XCTAssertTrue(match.shields.isEmpty)
+        XCTAssertTrue(countered)
+        XCTAssertGreaterThan(match.players[0].hitStun, 0, "the shielder struck")
+
+        var floater = court()
+        raise(&floater)
+        for _ in 0..<ShieldRules.perfectFrames { floater.advance(inputs: [.idle, .idle]) }
+        ballAt(&floater, shield: floater.shields[0], speed: 4)
+        floater.ball.thrown = true
+        floater.ball.floaterShot = true
+        for _ in 0..<4 { floater.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(floater.shields.count, 1)
     }
 
-    func testTwoInOnePlaceBreakEachOther() {
+    func testItGoesAtTheArcsEnd() {
         var match = court()
-        match.players[1].position = Vec2(x: 150, y: 10)
-        match.players[1].facing = .left
-        raise(&match, stick: Vec2(x: 1, y: 0))
-        // The other's where this one goes, this one taken down to raise it again.
-        let first = match.shields.removeFirst()
-        match.shields.append(Shield(owner: 1, centre: first.centre, normal: Vec2(x: -1, y: 0), tilt: 0))
-        for _ in 0..<SnatchRules.frames { match.advance(inputs: [.idle, .idle]) }
-        match.players[0].position = Vec2(x: 120, y: 10)
-        match.players[0].facing = .right
-        raise(&match, stick: Vec2(x: 1, y: 0))
-        XCTAssertTrue(match.shields.isEmpty, "both broken")
-    }
-
-    func testASnatchOnItBreaksItForTenFlo() {
-        var match = court()
-        match.players[1].position = Vec2(x: 145, y: 10)
-        match.players[1].facing = .left
-        raise(&match, stick: Vec2(x: 1, y: 0))
-        let flo = match.players[1].flo
-        var broke = false
-        for frame in 0..<SnatchRules.frames {
-            match.advance(inputs: [.idle, PlayerInput(throwBall: frame == 0)])
-            if match.events.contains(where: { if case .shieldBroken(player: 0, _) = $0 { return true } else { return false } }) { broke = true }
-        }
-        XCTAssertTrue(broke)
-        XCTAssertEqual(match.players[1].flo, flo + ShieldRules.breakFlo)
-    }
-
-    func testUpAndDownShieldsHopTheFloatersHalfHopWithAJumpToSpare() {
-        for stick in [Vec2(x: 0, y: 1), Vec2(x: 0, y: -1)] {
-            var match = court()
-            let jumps = match.players[0].jumpsLeft
-            raise(&match, stick: stick)
-            XCTAssertEqual(match.shields.count, 1)
-            XCTAssertGreaterThan(match.players[0].velocity.y, 0, "hopped")
-            XCTAssertEqual(match.players[0].jumpsLeft, jumps)
-        }
-    }
-
-    func testAFloaterBouncesOffRatherThanBreakingIt() {
-        var match = court()
-        raise(&match, stick: Vec2(x: 1, y: 0))
-        for _ in 0..<ShieldRules.perfectFrames { match.advance(inputs: [.idle, .idle]) }
-        ballAt(&match, shield: match.shields[0], from: 1, speed: 4)
-        match.ball.thrown = true
-        match.ball.floaterShot = true
-        for _ in 0..<6 { match.advance(inputs: [.idle, .idle]) }
-        XCTAssertEqual(match.shields.count, 1)
-        XCTAssertGreaterThan(match.ball.velocity.x, 0)
+        raise(&match)
+        for _ in 0..<ShieldRules.lifeFrames { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.shields.isEmpty)
     }
 
     func testTheOthersShieldIsSolidToTheirBody() {
         var match = court()
-        raise(&match, stick: Vec2(x: 1, y: 0))
-        let wall = match.shields[0].bounds
-        match.players[1].position = Vec2(x: wall.max.x + 20, y: 10)
-        for _ in 0..<60 { match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: -1, y: 0))]) }
-        XCTAssertGreaterThanOrEqual(match.players[1].body.min.x, wall.max.x - 0.01)
+        raise(&match)
+        let start = match.shields[0].pivot
+        match.players[1].position = Vec2(x: start.x + ShieldRules.reach + 8, y: 10)
+        for _ in 0..<5 { match.advance(inputs: [.idle, PlayerInput(stick: Vec2(x: -1, y: 0))]) }
+        // Walking into its reach, the body's held at its edge.
+        guard let pivot = match.shields.first?.pivot else { return XCTFail("gone") }
+        XCTAssertGreaterThanOrEqual(match.players[1].body.min.x, pivot.x + ShieldRules.reach - 0.5)
     }
 
     func testABladeOnItParriesTheSwinger() {
+        // A shield up on someone standing still, the other swinging into it.
         var match = court()
-        match.players[1].position = Vec2(x: 150, y: 10)
+        match.players[1].position = Vec2(x: 140, y: 10)
         match.players[1].facing = .left
-        raise(&match, stick: Vec2(x: 1, y: 0))
-        let parried = (0..<30).contains { _ in
+        match.shields.append(Shield(owner: 0, pivot: match.players[0].body.center, side: 1))
+        let parried = (0..<20).contains { _ in
             match.advance(inputs: [.idle, PlayerInput(shoot: !match.players[1].lastInput.shoot)])
             return match.events.contains { if case .parried(player: 1, by: 0) = $0 { return true } else { return false } }
         }
         XCTAssertTrue(parried)
+    }
+
+    func testASnatchOnItBreaksItAndStunsTheShielder() {
+        var match = court()
+        // A shield up on someone standing still, the other snatching into it.
+        match.players[1].position = Vec2(x: 140, y: 10)
+        match.players[1].facing = .left
+        match.shields.append(Shield(owner: 0, pivot: match.players[0].body.center, side: 1))
+        var countered = false
+        for _ in 0..<20 where !countered {
+            match.advance(inputs: [.idle, PlayerInput(throwBall: !match.players[1].lastInput.throwBall)])
+            countered = match.events.contains { if case .countered(player: 0, by: 1, _) = $0 { return true } else { return false } }
+        }
+        XCTAssertTrue(countered)
+        XCTAssertTrue(match.shields.isEmpty)
+        XCTAssertGreaterThan(match.players[0].hitStun, 0)
+        XCTAssertEqual(match.hitStop, HitStopRules.counterFrames)
+    }
+
+    func testParryingWithTheFlipsShieldEndsItInTheAir() {
+        var match = court()
+        match.players[1].position = Vec2(x: 140, y: 10)
+        match.players[1].facing = .left
+        match.players[0].enter(.flipJump)
+        match.shields.append(Shield(owner: 0, pivot: match.players[0].body.center, side: 1))
+        let parried = (0..<20).contains { _ in
+            match.advance(inputs: [.idle, PlayerInput(shoot: !match.players[1].lastInput.shoot)])
+            return match.events.contains { if case .parried(player: 1, by: 0) = $0 { return true } else { return false } }
+        }
+        XCTAssertTrue(parried)
+        XCTAssertTrue(match.players[0].shieldParried)
+
+        var aloft = court()
+        aloft.players[0].position = Vec2(x: 120, y: 120)
+        aloft.players[0].grounded = false
+        aloft.players[0].enter(.air)
+        raise(&aloft)
+        aloft.players[0].shieldParried = true
+        for _ in 0..<ShieldRules.flipFrames { aloft.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(aloft.players[0].state, .air, "every move back, no tumble")
+    }
+
+    func testAPowerStopsOnItAndPerfectlyMetTurnsBack() {
+        var perfect = court()
+        raise(&perfect)
+        let pivot = perfect.shields[0].pivot
+        perfect.bolts.append(Bolt(id: 900, owner: 1, position: pivot + Vec2(x: ShieldRules.reach + 5, y: 0), velocity: Vec2(x: -4, y: 0),
+                                  framesLeft: VoltaRules.boltFrames))
+        for _ in 0..<2 { perfect.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(perfect.bolts.first?.owner, 0, "the shielder's now")
+        XCTAssertGreaterThan(perfect.bolts.first?.velocity.x ?? 0, 0, "back the way it came")
+
+        var late = court()
+        raise(&late)
+        for _ in 0..<ShieldRules.perfectFrames { late.advance(inputs: [.idle, .idle]) }
+        let latePivot = late.shields[0].pivot
+        late.bolts.append(Bolt(id: 900, owner: 1, position: latePivot + Vec2(x: ShieldRules.reach + 5, y: 0), velocity: Vec2(x: -4, y: 0),
+                               framesLeft: VoltaRules.boltFrames))
+        var blocked = false
+        for _ in 0..<3 {
+            late.advance(inputs: [.idle, .idle])
+            blocked = blocked || late.events.contains { if case .powerBlocked(player: 0, _) = $0 { return true } else { return false } }
+        }
+        XCTAssertTrue(blocked)
+        XCTAssertTrue(late.bolts.isEmpty)
+        XCTAssertEqual(late.players[0].hitStun, 0)
+    }
+
+    func testABeamOffAPerfectShieldTurnsBackAndStunsItsFirerOnce() {
+        var match = court()
+        match.players[1].position = Vec2(x: 220, y: 10)
+        match.players[1].facing = .left
+        match.players[1].enter(.beamFiring)
+        match.beams.append(Beam(id: 901, owner: 1, origin: match.players[1].beamOrigin, direction: Vec2(x: -1, y: 0), framesLeft: ZRules.fireFrames))
+        raise(&match)
+        var struck = 0
+        for _ in 0..<40 {
+            match.advance(inputs: [.idle, .idle])
+            struck += match.events.filter { if case .struck(player: 1, by: 0) = $0 { return true } else { return false } }.count
+        }
+        XCTAssertEqual(struck, 1)
+        XCTAssertNotEqual(match.players[1].state, .beamFiring, "its firing ended")
+        XCTAssertEqual(match.players[0].hitStun, 0, "the shielder untouched")
+    }
+
+    func testABodyInsideItIsShovedOut() {
+        var match = court()
+        match.players[1].position = Vec2(x: 130, y: 10)
+        match.shields.append(Shield(owner: 0, pivot: match.players[0].body.center, side: 1))
+        for _ in 0..<10 { match.advance(inputs: [.idle, .idle]) }
+        guard let shield = match.shields.first else { return XCTFail("gone") }
+        XCTAssertGreaterThanOrEqual(match.players[1].body.distance(to: shield.pivot), ShieldRules.reach, "out to the reach's edge")
+        XCTAssertGreaterThan(match.players[1].position.x, 130)
+    }
+
+    // MARK: Guarderade and Shelter Seltzer
+
+    private func drinking(_ drink: Greateraid, level: Int) -> Match {
+        var drinks = Drinks()
+        for _ in 0..<level { drinks.drink(drink) }
+        var match = Match(stage: .court, specs: [drinks.spec(), .starting])
+        match.countdown = 0
+        match.players[0].position = Vec2(x: 120, y: 10)
+        match.players[0].facing = .right
+        match.players[1].position = Vec2(x: 300, y: 10)
+        match.ball.holder = nil
+        match.players.indices.forEach { match.players[$0].hasBall = false }
+        match.ball.respawn(at: Vec2(x: 200, y: 150))
+        match.ball.position = Vec2(x: 30, y: 200)
+        match.ball.velocity = .zero
+        for _ in 0..<5 { match.advance(inputs: [.idle, .idle]) }
+        return match
+    }
+
+    func testGuarderadeMakesTheShieldBigger() {
+        var match = drinking(.guarderade, level: 1)
+        match.advance(inputs: [PlayerInput(shield: true), .idle])
+        XCTAssertEqual(match.shields.first?.reach, ShieldRules.guarderadeReach)
+        XCTAssertEqual(match.shields.first?.pictureScale, ShieldRules.guarderadePictureScale)
+    }
+
+    func testGuarderadeAtLevelTwoShieldsAgainOutOfTheTumbleOnce() {
+        for level in 1...2 {
+            var match = drinking(.guarderade, level: level)
+            match.players[0].position = Vec2(x: 160, y: 120)
+            match.players[0].grounded = false
+            match.players[0].enter(.air)
+            match.advance(inputs: [PlayerInput(shield: true), .idle])
+            for _ in 0..<ShieldRules.flipFrames + 1 { match.advance(inputs: [.idle, .idle]) }
+            XCTAssertEqual(match.players[0].state, .tumbling)
+            match.advance(inputs: [PlayerInput(shield: true), .idle])
+            XCTAssertEqual(match.players[0].state == .flipJump, level == 2, "level \(level)")
+            if level == 2 {
+                for _ in 0..<ShieldRules.flipFrames + 1 { match.advance(inputs: [.idle, .idle]) }
+                match.advance(inputs: [PlayerInput(shield: true), .idle])
+                XCTAssertNotEqual(match.players[0].state, .flipJump, "only once before landing")
+            }
+        }
+    }
+
+    func testShelterSeltzerLeavesTheShieldWhereItEndedASecond() {
+        var match = drinking(.shelterSeltzer, level: 1)
+        match.advance(inputs: [PlayerInput(shield: true), .idle])
+        for _ in 0..<ShieldRules.flipFrames + 5 { match.advance(inputs: [.idle, .idle]) }
+        guard let shield = match.shields.first else { return XCTFail("gone with the arc") }
+        XCTAssertTrue(shield.lingering)
+        let left = shield.pivot
+        for _ in 0..<20 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
+        XCTAssertEqual(match.shields.first?.pivot, left, "left where it was")
+        XCTAssertTrue((ShieldRules.loopFrames.lowerBound...ShieldRules.sheetFrames - 1).contains(match.shields.first!.sheetFrame))
+        for _ in 0..<ShieldRules.shelterLingerFrames { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertTrue(match.shields.isEmpty, "gone after its second")
+    }
+
+    func testShelterSeltzerAtLevelTwoSnatchesRaiseAGuardAtTheHandThatParriesASlash() {
+        var match = drinking(.shelterSeltzer, level: 2)
+        match.players[1].position = Vec2(x: 140, y: 10)
+        match.players[1].facing = .left
+        match.advance(inputs: [PlayerInput(throwBall: true), .idle])
+        guard let guardShield = match.shields.first else { return XCTFail("no guard") }
+        XCTAssertTrue(guardShield.guardOnly)
+        XCTAssertEqual(guardShield.pivot.x, match.players[0].handCatchPoint.x, accuracy: 3)
+        let parried = (0..<20).contains { _ in
+            match.advance(inputs: [.idle, PlayerInput(shoot: !match.players[1].lastInput.shoot)])
+            return match.events.contains { if case .parried(player: 1, by: 0) = $0 { return true } else { return false } }
+        }
+        XCTAssertTrue(parried, "the slash parried by the snatch's guard")
+    }
+
+    func testAnExcludedBallPassesTheOthersShieldUntouched() {
+        var match = court()
+        raise(&match)
+        ballAt(&match, shield: match.shields[0], speed: 4)
+        match.ball.exclusiveTo = 1
+        match.ball.exclusionFrames = ExclusionRules.frames
+        let velocity = match.ball.velocity
+        var touched = false
+        for _ in 0..<4 {
+            match.advance(inputs: [.idle, .idle])
+            if match.events.contains(where: { if case .shieldPerfect = $0 { return true }; if case .shieldReflected = $0 { return true }; return false }) { touched = true }
+        }
+        XCTAssertFalse(touched, "not theirs to shield")
+        XCTAssertEqual(match.ball.exclusiveTo, 1, "still the other's")
+        XCTAssertEqual(match.ball.velocity.x, velocity.x, accuracy: 0.5)
     }
 }

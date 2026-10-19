@@ -98,10 +98,35 @@ struct GlowUniforms {
     var waterBottom: SIMD4<Float> = .zero
     var hood = SIMD4<Float>(GlowSettings.hoodShare, 0, 0, 0)
     var energy = GlowSettings.energyUniforms
+    /// A clash's colour split: where it's centred, as a share of the screen, its reach and strength;
+    /// and the two colours the fringes take. None at a reach of 0.
+    var aberration: SIMD4<Float> = .zero
+    var aberrationFirst: SIMD4<Float> = .zero
+    var aberrationSecond: SIMD4<Float> = .zero
 }
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.
 final class GlowRenderer: NSObject, MTKViewDelegate {
+    /// The machine as the readout shows it: its thermal state, Low Power Mode, and this app's memory
+    /// footprint. Every CPU section and GPU pass slowing together at once is the machine, not the
+    /// game: throttled hot, saving power, or short of memory.
+    static func machineReadout() -> String {
+        let thermal = switch ProcessInfo.processInfo.thermalState {
+        case .nominal: "nominal"
+        case .fair: "fair"
+        case .serious: "SERIOUS"
+        case .critical: "CRITICAL"
+        @unknown default: "?"
+        }
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
+        }
+        let footprint = result == KERN_SUCCESS ? "\(info.phys_footprint / 1_048_576) MB" : "?"
+        return "thermal \(thermal)  low power \(ProcessInfo.processInfo.isLowPowerModeEnabled ? "ON" : "off")  memory \(footprint)"
+    }
+
     /// Every node under one, for the readout: a count that only climbs is something left behind.
     static func nodeCount(_ node: SKNode) -> Int { node.children.reduce(node.children.count) { $0 + nodeCount($1) } }
 
@@ -336,6 +361,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
                 .map { "\($0.key) \(String(format: "%.1f", $0.value * 1000 / frames))" }.joined(separator: "  ")
             scene.frameReadout = "cpu  \(line(cpuTotals))\nupdate  \(sections)\n\(readout)\ngpu  \(line(gpu))\ngpu frame \(span)  \n\(Int(view.drawableSize.width))x\(Int(view.drawableSize.height))  glow \(glowA.width)x\(glowA.height)"
                 + "\nnodes scene \(GlowRenderer.nodeCount(scene))  mask \(GlowRenderer.nodeCount(maskScene))  hud \(GlowRenderer.nodeCount(scene.hudScene))"
+                + "\n\(GlowRenderer.machineReadout())"
             cpuTotals = [:]
             framesDrawn = 0
             worstGap = 0
@@ -440,6 +466,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         if let wave = scene.screenWave {
             // A share of a screen pixel's width per game pixel of reach.
             uniforms.wave = SIMD4(Float(wave.reach) / Float(max(view.drawableSize.width, 1)), Float(wave.waves), Float(wave.phase), Float(wave.calmTop))
+        }
+        if let split = scene.clashAberration {
+            uniforms.aberration = SIMD4(split.centre.x, split.centre.y, split.split, split.fringe)
+            uniforms.aberrationFirst = SIMD4(GlowRenderer.channels(split.first), 0)
+            uniforms.aberrationSecond = SIMD4(GlowRenderer.channels(split.second), 0)
         }
         if let page = scene.mangaPage, let shotTexture, panelTextures.count == MangaPage.panels.count {
             // The stage preview: the frame drawn off the screen, the playing panel's cut taken

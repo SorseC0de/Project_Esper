@@ -33,6 +33,7 @@ final class SoundBoard {
         case slashWallClank = "slash_wallclank"
         case slashClash = "slashclash"
         case shield
+        case spin = "player_spin"
         case dunkSlam = "dunk"
         case slide = "slide2"
         case flash
@@ -42,6 +43,17 @@ final class SoundBoard {
         case floStateExit = "flo_state_exit"
         case boing
         case step
+        /// The powers': Super Smoothie's launch, Z Tea's blast and beam (looped while it fires),
+        /// Gale Ale's tornado, Web Water's line and swing, Blazing Boba's fireball, Platform
+        /// Protein Shake's slab.
+        case flyJump = "fly_jump"
+        case blast
+        case beam
+        case gale
+        case webLine = "web_line"
+        case webSwing = "web_swing"
+        case fireballMake = "fireball_make"
+        case platformMake = "platform_make"
         // The announcer, levelled by the importer.
         case countA1 = "announcer_1", countA2 = "announcer_2", countA3 = "announcer_3"
         case countB1 = "announcer_1-2", countB2 = "announcer_2-2", countB3 = "announcer_3-2"
@@ -77,6 +89,11 @@ final class SoundBoard {
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
     private var buffers: [Effect: AVAudioPCMBuffer] = [:]
     private var voices: [AVAudioPlayerNode] = []
+    /// Voices kept for sounds that loop, one a player, by key: a loop lined up on one plays round
+    /// till it's ended.
+    private static let loopVoiceCount = 2
+    private var loopVoices: [AVAudioPlayerNode] = []
+    private var looping: [Int: Effect] = [:]
     /// When each voice's last sound ends.
     private var busyUntil: [CFTimeInterval] = []
     /// The sounds are in memory and the engine has been started once.
@@ -110,6 +127,12 @@ final class SoundBoard {
             voices.append(voice)
             busyUntil.append(0)
         }
+        for _ in 0..<SoundBoard.loopVoiceCount {
+            let voice = AVAudioPlayerNode()
+            engine.attach(voice)
+            engine.connect(voice, to: engine.mainMixerNode, format: format)
+            loopVoices.append(voice)
+        }
         // A route change (the TV's HDMI resetting, headphones) or an interruption stops the
         // engine and its voices: they're started again, away from any frame being drawn.
         NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { _ in
@@ -140,6 +163,8 @@ final class SoundBoard {
             voices[index].play()
             busyUntil[index] = 0
         }
+        for voice in loopVoices { voice.play() }
+        looping = [:]
     }
 
     /// Every voice plays a moment of silence once, so the first real sound on each doesn't
@@ -174,6 +199,7 @@ final class SoundBoard {
                 busyUntil[index] = 0
             }
         }
+        if engine.isRunning { for voice in loopVoices where !voice.isPlaying { voice.play() } }
     }
 
     private func scheduleRestart() {
@@ -271,5 +297,31 @@ final class SoundBoard {
         voice.volume = volume
         voice.pan = pan
         voice.scheduleBuffer(buffer, at: nil, options: interrupting ? .interrupts : [])
+    }
+
+    /// A sound played round and round on `key`'s loop voice until `endLoop`; asked again while it
+    /// loops, only its loudness changes.
+    func loop(_ effect: Effect, key: Int, volume: Float = 1) {
+        guard SoundBoard.enabled, ready, loopVoices.indices.contains(key), let buffer = buffers[effect] else { return }
+        guard engine.isRunning else {
+            scheduleRestart()
+            return
+        }
+        let voice = loopVoices[key]
+        voice.volume = volume
+        guard looping[key] != effect, voice.isPlaying else { return }
+        looping[key] = effect
+        voice.scheduleBuffer(buffer, at: nil, options: [.loops, .interrupts])
+    }
+
+    /// `key`'s loop cut off: a moment's silence scheduled to interrupt it, never a stop, which
+    /// waits on the audio thread.
+    func endLoop(key: Int) {
+        guard looping[key] != nil, loopVoices.indices.contains(key), engine.isRunning,
+              let silence = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1) else { return }
+        looping[key] = nil
+        silence.frameLength = 1
+        if let samples = silence.floatChannelData?[0] { samples[0] = 0 }
+        loopVoices[key].scheduleBuffer(silence, at: nil, options: .interrupts)
     }
 }

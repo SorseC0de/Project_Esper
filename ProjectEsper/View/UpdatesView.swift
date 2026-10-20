@@ -88,7 +88,7 @@ struct UpdatesView: View {
             }
         case .bullet(let text, let depth, let icon, let tone):
             HStack(alignment: .center, spacing: bulletSize * 0.5) {
-                Text("•").font(Futuristic.font(size: bulletSize, face: UpdatesNotes.face)).foregroundStyle(tone.colour)
+                Text(Futuristic.bullet(face: UpdatesNotes.face)).font(Futuristic.font(size: bulletSize, face: UpdatesNotes.face)).foregroundStyle(tone.colour)
                 if let icon {
                     UpdatesIcon(flow: flow, icon: icon)
                         .frame(width: bulletSize * UpdatesView.iconLines, height: bulletSize * UpdatesView.iconLines)

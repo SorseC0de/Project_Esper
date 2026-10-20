@@ -17,6 +17,25 @@ final class SpriteLibrary {
     static func tuckedBall(_ frame: AnimationFrame) -> CGPoint? { tuckedBalls["\(frame.animation.rawValue)_\(frame.frame)"] }
 
     private let atlas = SKTextureAtlas(named: "Sprites")
+    /// The atlas's sprites by name, each looked up once and kept: SpriteKit's own lookup compares
+    /// the name against every one in the atlas, making temporary strings each time, and a
+    /// rebuild asks for thousands, so asked again it held the main thread seconds and its
+    /// temporaries ran the TV out of memory. Looked up inside a pool, the temporaries go at once.
+    private var atlasNames: Set<String> { SpriteLibrary.atlasNames }
+    private static let atlasNames: Set<String> = Set(SKTextureAtlas(named: "Sprites").textureNames.map { ($0 as NSString).deletingPathExtension })
+    private var atlasTextures: [String: SKTexture] = [:]
+    private let atlasLock = NSLock()
+    func atlasTexture(_ name: String) -> SKTexture {
+        atlasLock.lock()
+        let kept = atlasTextures[name]
+        atlasLock.unlock()
+        if let kept { return kept }
+        let found = autoreleasepool { atlas.textureNamed(name) }
+        atlasLock.lock()
+        atlasTextures[name] = found
+        atlasLock.unlock()
+        return found
+    }
     private var cache: [String: SKTexture] = [:]
     /// The pictures behind some of the cache's textures, kept as made, so what draws them again
     /// (the win screen, a hood's line) never reads one back off the GPU, which opens a context and
@@ -100,10 +119,16 @@ final class SpriteLibrary {
     /// `texture`: the frame's own, where the key isn't its name in the atlas (a toned effect's).
     func sourceImage(_ key: String, texture given: SKTexture? = nil) -> CGImage {
         sourceImageLock.lock()
-        defer { sourceImageLock.unlock() }
-        if let kept = sourceImages[key] { return kept }
-        let texture = given ?? (atlas.textureNames.contains(key) ? atlas.textureNamed(key) : SKTexture(imageNamed: key))
+        let kept = sourceImages[key]
+        sourceImageLock.unlock()
+        if let kept { return kept }
+        // Read with the lock let go: the read goes through SpriteKit's renderer, which the main
+        // thread may be holding mid-render while it asks for a frame here. Held across it, the two wait on each other.
+        let texture = given ?? (atlasNames.contains(key) ? atlasTexture(key) : SKTexture(imageNamed: key))
         let image = texture.cgImage()
+        sourceImageLock.lock()
+        defer { sourceImageLock.unlock() }
+        if let raced = sourceImages[key] { return raced }
         sourceImages[key] = image
         return image
     }
@@ -192,7 +217,7 @@ final class SpriteLibrary {
         for animation in Animation.allCases {
             for index in 0..<animation.frameCount {
                 let frame = AnimationFrame(animation, index)
-                let source = atlas.textureNamed("\(animation.rawValue)_\(index)")
+                let source = atlasTexture("\(animation.rawValue)_\(index)")
                 let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: false)
                 frameJobs.append((key, frame, source, animation.holdsBall))
                 if animation.holdsBall { frameJobs.append((SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: true, ballLifted: false), frame, source, false)) }
@@ -224,14 +249,14 @@ final class SpriteLibrary {
             let iceLook = self.look(for: SpriteLibrary.icePlayer)
             for view in 0..<HoodView.count {
                 let name = SpriteLibrary.hoodSourceName(view: view, flowing: nil)
-                let source = atlas.textureNamed(name)
+                let source = atlasTexture(name)
                 hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: false, view: view, flowing: nil), name, source, look, false, false, false))
                 hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: true, view: view, flowing: nil), name, source, look, false, true, false))
                 hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: SpriteLibrary.icePlayer, energy: false, view: view, flowing: nil), name, source, iceLook, true, false, false))
             }
             for flowing in 0..<SpriteLibrary.flowingHoodFrames {
                 let name = SpriteLibrary.hoodSourceName(view: 0, flowing: flowing)
-                hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: true, view: 0, flowing: flowing), name, atlas.textureNamed(name), look, false, true, true))
+                hoodJobs.append((SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: true, view: 0, flowing: flowing), name, atlasTexture(name), look, false, true, true))
             }
             if player < Look.byPlayer.count {
                 let place = SpriteLibrary.customizeHeadPlace
@@ -243,7 +268,7 @@ final class SpriteLibrary {
                 }
             }
         }
-        let drawnForTexture = atlas.textureNamed("\(GameScene.hoodDrawnFor.animation.rawValue)_\(GameScene.hoodDrawnFor.frame)")
+        let drawnForTexture = atlasTexture("\(GameScene.hoodDrawnFor.animation.rawValue)_\(GameScene.hoodDrawnFor.frame)")
         let headPlace = SpriteLibrary.customizeHeadPlace
         // Counted as pieces made, the last one the textures reaching the GPU.
         beginRebuilding(player, pieces: frameJobs.count + tonedJobs.count + silhouetteJobs.count + hoodJobs.count + portraitJobs.count + 1)
@@ -364,7 +389,7 @@ final class SpriteLibrary {
     func texture(_ name: String, _ frame: Int) -> SKTexture {
         let key = "\(name)_\(frame)"
         if let texture = cache[key] { return texture }
-        let texture = atlas.textureNames.contains(key) ? atlas.textureNamed(key) : SKTexture(imageNamed: key)
+        let texture = atlasNames.contains(key) ? atlasTexture(key) : SKTexture(imageNamed: key)
         texture.filteringMode = .nearest
         cache[key] = texture
         return texture
@@ -909,7 +934,7 @@ final class SpriteLibrary {
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
         let sourceName = SpriteLibrary.hoodSourceName(view: view, flowing: flowing)
-        let source = atlas.textureNamed(sourceName)
+        let source = atlasTexture(sourceName)
         guard let made = makeHoodHead(source: sourceImage(sourceName, texture: source), skin: skin, look: look(for: player), ice: player == SpriteLibrary.icePlayer,
                                       energy: energy, flowing: flowing != nil) else { return (source, source, source) }
         keep(hoodHead: made, key: key)

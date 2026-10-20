@@ -80,6 +80,8 @@ struct DrinkPick: View {
     /// The cursor's bottle outlined, solid, this share of its height thick (the silhouette's pad over its side).
     static let outlineShare: CGFloat = 8.0 / 200
     static let textSize: CGFloat = 11
+    /// The description's face, whatever the menus' is.
+    static let face = Futuristic.listFace
     static let flavourSize: CGFloat = 9
     static let nameSize: CGFloat = 16
     static let lineColour = Color(rgb: Futuristic.lineRGB)
@@ -133,10 +135,23 @@ struct DrinkPick: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 rule(width: width - inset * 2)
-                DrinkPick.blurbText(random ? DrinkPick.randomText : drink.map { $0.blurbs.first + " " + $0.blurbs.second } ?? DrinkPick.noDrinkText,
-                                    size: Futuristic.fontSize(DrinkPick.textSize) * scale)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.6)
+                // What it does, a bulleted line a level, left-aligned, in face E.
+                let lines = random ? [DrinkPick.randomText] : drink.map { [$0.blurbs.first, $0.blurbs.second] } ?? [DrinkPick.noDrinkText]
+                let textSize = Futuristic.fontSize(DrinkPick.textSize, face: DrinkPick.face) * scale
+                VStack(alignment: .leading, spacing: textSize * 0.4) {
+                    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                        HStack(alignment: .firstTextBaseline, spacing: textSize * 0.4) {
+                            Text(Futuristic.bullet(face: DrinkPick.face))
+                                .font(.custom(Futuristic.typefaces[DrinkPick.face], size: textSize))
+                                .foregroundStyle(DrinkPick.lineColour)
+                            DrinkPick.blurbText(line, size: textSize, face: DrinkPick.face)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+                .minimumScaleFactor(0.6)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, inset)
@@ -165,7 +180,7 @@ struct DrinkPick: View {
 
     /// A blurb in the menus' face: bracketed words in gold, [Up], [Down], [Left] and [Right] the
     /// fat arrow turned that way, in gold.
-    static func blurbText(_ text: String, size: CGFloat) -> Text {
+    static func blurbText(_ text: String, size: CGFloat, face: Int? = nil) -> Text {
         var made = Text("")
         for (index, piece) in PickScreen.blurbPieces(text).enumerated() {
             if index > 0, piece.spaced { made = made + Text(" ") }
@@ -176,7 +191,7 @@ struct DrinkPick: View {
                 made = made + Text(Image(uiImage: arrow(turn: turn, side: size)).renderingMode(.template)).foregroundColor(litColour)
             }
         }
-        return made.font(.custom(Futuristic.fontName, size: size))
+        return made.font(.custom(face.map { Futuristic.typefaces[$0] } ?? Futuristic.fontName, size: size))
     }
 
     /// The fat arrow at a size, turned from pointing right.

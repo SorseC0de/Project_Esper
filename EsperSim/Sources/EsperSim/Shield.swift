@@ -26,9 +26,14 @@ public struct Shield: Equatable {
     /// Its reach, and its picture's size against the plain one's: Guarderade's bigger.
     public var reach = ShieldRules.reach
     public var pictureScale = 1.0
-    /// Shelter Seltzer: frames it lingers on where its arc ended once the arc's done, left there
-    /// as the raiser goes on, still a shield.
+    /// Shelter Seltzer's snatch's guard: frames it lingers on once the arc's time is done, left
+    /// at the hand, still a shield.
     public var lingerFrames = 0
+    /// Shelter Seltzer's shieldflip: as this one leaves, a planted one is left where it ended.
+    public var leavesPlanted = false
+    /// That planted one: already whole, at the arc's end and its last angle, still, for
+    /// `ShieldRules.shelterLingerFrames`, then it plays out. No perfect window of its own.
+    public var planted = false
     /// Shelter Seltzer's raised by a snatch: a guard only, neither solid to the other's body nor
     /// shoving it, nor pushing it as it goes up, so the snatch can still reach them; raised where
     /// the hand was as the snatch went out, and left there, its picture on that spot.
@@ -40,23 +45,40 @@ public struct Shield: Equatable {
         self.side = side
     }
 
-    /// Its whole life: the arc, then any linger.
-    public var lifeFrames: Int { ShieldRules.flipFrames + lingerFrames }
+    /// Its whole life: the arc, then any linger; a planted one's, its linger alone.
+    public var lifeFrames: Int { planted ? ShieldRules.shelterLingerFrames : ShieldRules.flipFrames + lingerFrames }
     /// Whether it's lingering: the arc done, left where it ended.
-    public var lingering: Bool { age >= ShieldRules.flipFrames }
-    /// The age its place and face are read at: held at the arc's end while it lingers.
-    private var arcAge: Int { min(age, ShieldRules.flipFrames - 1) }
+    public var lingering: Bool { planted || age >= ShieldRules.flipFrames }
+    /// Whether it's still in its first frames, where a ball's stopped and popped up.
+    public var inPerfectWindow: Bool { !planted && age < ShieldRules.perfectFrames }
+    /// The age its place and face are read at: held at the arc's end while it lingers, and
+    /// there all along when it's planted.
+    private var arcAge: Int { planted ? ShieldRules.flipFrames - 1 : min(age, ShieldRules.flipFrames - 1) }
+
+    /// The planted shield a Shelter Seltzer shieldflip leaves where it ended.
+    public var plantedCopy: Shield {
+        var copy = Shield(owner: owner, pivot: pivot, side: side)
+        copy.reach = reach
+        copy.pictureScale = pictureScale
+        copy.planted = true
+        return copy
+    }
 
     /// Its sheet's frame now. Lingering, the whole shield's frames loop (`ShieldRules.loopFrames`)
     /// till its last few, then the sheet plays out to its end.
     public var sheetFrame: Int {
         let plain = ShieldRules.sheetFrame(atAge: age)
-        guard lingerFrames > 0 else { return plain }
+        guard lingerFrames > 0 || planted else { return plain }
         let endFrames = ShieldRules.sheetFrames - ShieldRules.loopFrames.upperBound
         let endSimFrames = Int((Double(endFrames) * 60 / ShieldRules.sheetFramesPerSecond).rounded(.up))
         if age >= lifeFrames - endSimFrames {
             let into = Int(Double(age - (lifeFrames - endSimFrames)) * ShieldRules.sheetFramesPerSecond / 60)
             return min(ShieldRules.loopFrames.upperBound + into, ShieldRules.sheetFrames - 1)
+        }
+        // Planted, it's whole from its first frame: the loop from the start.
+        if planted {
+            let into = Int(Double(age) * ShieldRules.sheetFramesPerSecond / 60)
+            return ShieldRules.loopFrames.lowerBound + into % ShieldRules.loopFrames.count
         }
         guard plain >= ShieldRules.loopFrames.lowerBound else { return plain }
         let loopStartAge = Int((Double(ShieldRules.loopFrames.lowerBound) * 60 / ShieldRules.sheetFramesPerSecond).rounded(.up))
@@ -176,10 +198,12 @@ extension Match {
             shield.reach = ShieldRules.guarderadeReach
             shield.pictureScale = ShieldRules.guarderadePictureScale
         }
-        if player.spec.shelterSeltzerLevel >= 1 { shield.lingerFrames = ShieldRules.shelterLingerFrames }
         if player.state == .snatching {
             shield.guardOnly = true
             shield.pivot = player.handCatchPoint
+            if player.spec.shelterSeltzerLevel >= 1 { shield.lingerFrames = ShieldRules.shelterLingerFrames }
+        } else if player.spec.shelterSeltzerLevel >= 1 {
+            shield.leavesPlanted = true
         }
         let centre = shield.centre
         events.append(.shieldRaised(player: index, at: centre))
@@ -212,9 +236,15 @@ extension Match {
             // Its clock is its raiser's: held as theirs is under water, so it keeps pace with the flip.
             // Lingering, it's left where it was and keeps the match's time.
             if !players.indices.contains(owner) || players[owner].clockTicked || shields[index].lingering { shields[index].age += 1 }
-            if players.indices.contains(owner), !shields[index].lingering, !shields[index].guardOnly { shields[index].pivot = players[owner].body.center }
+            // Carried round the body, but not on the frame it leaves: left where it was last drawn.
+            if players.indices.contains(owner), !shields[index].planted, !shields[index].guardOnly, shields[index].age < shields[index].lifeFrames {
+                shields[index].pivot = players[owner].body.center
+            }
         }
+        // A Shelter Seltzer shieldflip leaving leaves its planted shield where it ended.
+        let planting = shields.filter { $0.leavesPlanted && $0.age >= $0.lifeFrames }.map(\.plantedCopy)
         shields.removeAll { $0.age >= $0.lifeFrames }
+        shields += planting
         shoveOutOfShields()
         var broken: [(number: Int, by: Int)] = []
         for (number, shield) in shields.enumerated() {
@@ -274,7 +304,7 @@ extension Match {
     /// whether met in its first frames, to be turned back.
     mutating func shieldMeets(_ point: Vec2, radius: Double, firedBy firer: Int) -> (owner: Int, perfect: Bool)? {
         guard let shield = shields.first(where: { $0.owner != firer && $0.touches(point, radius: radius) }) else { return nil }
-        let perfect = shield.age < ShieldRules.perfectFrames
+        let perfect = shield.inPerfectWindow
         events.append(perfect ? .shieldPerfect(player: shield.owner, at: point) : .powerBlocked(player: shield.owner, at: point))
         return (shield.owner, perfect)
     }
@@ -289,7 +319,7 @@ extension Match {
                 let shield = shields[number]
                 if !shield.metBeams.contains(beam.id) {
                     shields[number].metBeams.append(beam.id)
-                    if shield.age < ShieldRules.perfectFrames, !beam.turned {
+                    if shield.inPerfectWindow, !beam.turned {
                         var turned = Beam(id: stampId(), owner: shield.owner, origin: at, direction: -beam.direction,
                                           framesLeft: ShieldRules.turnedBeamFrames)
                         turned.turned = true
@@ -337,7 +367,7 @@ extension Match {
                 counter(shield.owner, by: thrower)
                 returnThrow(to: thrower)
             }
-        } else if shield.age < ShieldRules.perfectFrames {
+        } else if shield.inPerfectWindow {
             ball.popOffShield(up: ShieldRules.perfectPop)
             // The shielder's now, in their colour, and theirs alone to take for a while; and no
             // basket any more: a rim turns it back rather than letting it drop in.

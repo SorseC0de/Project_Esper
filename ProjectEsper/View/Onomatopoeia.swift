@@ -240,7 +240,7 @@ enum Onomatopoeia {
     private static let renderScale: CGFloat = 3
     nonisolated(unsafe) private static var cache: [Word: (texture: SKTexture, capShare: CGFloat)] = [:]
     /// The same pictures for SwiftUI, kept as drawn: never copied back off the GPU.
-    nonisolated(unsafe) private static var pictures: [Word: UIImage] = [:]
+    nonisolated(unsafe) private static var pictures: [Word: (image: UIImage, capShare: CGFloat)] = [:]
 
     /// Every word drawn ahead in the picked face, so none is first drawn mid-match.
     static func warmed() -> [SKTexture] {
@@ -310,8 +310,11 @@ enum Onomatopoeia {
     static func picture(_ text: String, face: Lettering, colours: Colours, growsLeft: Bool, height: CGFloat,
                         spacing: CGFloat = 0, fontName: String? = nil) -> (image: UIImage, height: CGFloat) {
         let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft, spacing: spacing, face: fontName)
-        let (_, capShare) = rendered(word)
-        return (pictures[word] ?? UIImage(), height * face.scale / capShare)
+        // Kept apart from the sprites' textures: only what SwiftUI shows keeps a picture.
+        if let kept = pictures[word] { return (kept.image, height * face.scale / kept.capShare) }
+        let made = autoreleasepool { drawn(word) }
+        pictures[word] = made
+        return (made.image, height * face.scale / made.capShare)
     }
 
     /// A sprite's warp: its left and right ends `left` and `right` times its middle's height,
@@ -444,8 +447,8 @@ enum Onomatopoeia {
         }
     }
 
-    private static func rendered(_ word: Word) -> (texture: SKTexture, capShare: CGFloat) {
-        if let cached = cache[word] { return cached }
+    /// A word drawn: its picture and its capitals' share of the canvas's height.
+    private static func drawn(_ word: Word) -> (image: UIImage, capShare: CGFloat) {
         let laid = layout(word)
         let format = UIGraphicsImageRendererFormat()
         format.scale = renderScale
@@ -454,9 +457,17 @@ enum Onomatopoeia {
             draw(laid.letters, of: word, laid: laid, into: context.cgContext, offset: .zero, outline: true, fill: false)
             draw(laid.letters, of: word, laid: laid, into: context.cgContext, offset: .zero, outline: false, fill: true)
         }
-        let result = (SKTexture(image: image), laid.capShare)
+        return (image, laid.capShare)
+    }
+
+    /// A word's sprite texture, drawn once and kept; its drawing's temporaries let go at once.
+    private static func rendered(_ word: Word) -> (texture: SKTexture, capShare: CGFloat) {
+        if let cached = cache[word] { return cached }
+        let result = autoreleasepool { () -> (texture: SKTexture, capShare: CGFloat) in
+            let made = drawn(word)
+            return (SKTexture(image: made.image), made.capShare)
+        }
         cache[word] = result
-        pictures[word] = image
         return result
     }
 

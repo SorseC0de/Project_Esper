@@ -1,4 +1,5 @@
 import SpriteKit
+import CoreText
 import SwiftUI
 
 /// The menus' look from `Futuristic_UI.svg` (brought in by Tools/import_futuristic.py): its
@@ -45,6 +46,25 @@ enum Futuristic {
     static func font(size: CGFloat) -> Font {
         .custom(fontName, size: fontSize(size))
     }
+
+    /// The bullet every list uses: ◈ where the face has it, else the plain dot. By its place in
+    /// `typefaces`, or the picked one.
+    static func bullet(face faceIndex: Int? = nil) -> String {
+        let name = faceIndex.map { typefaces[$0] } ?? fontName
+        if let known = bullets[name] { return known }
+        _ = Onomatopoeia.registered
+        var character: [UniChar] = [0x25C8]
+        var glyph: [CGGlyph] = [0]
+        let has = UIFont(name: name, size: 12).map { CTFontGetGlyphsForCharacters($0 as CTFont, &character, &glyph, 1) } ?? false
+        let bullet = has ? "\u{25C8}" : "\u{2022}"
+        bullets[name] = bullet
+        return bullet
+    }
+    nonisolated(unsafe) private static var bullets: [String: String] = [:]
+
+    /// Face E, BoldPixels: the lists' and descriptions' whatever the menus' face is (the updates
+    /// screen, the power pick's description).
+    static let listFace = 4
 
     /// A face of its own whatever's picked, by its place in `typefaces`: E is 4.
     static func font(size: CGFloat, face: Int) -> Font {

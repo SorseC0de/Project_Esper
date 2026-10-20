@@ -371,6 +371,29 @@ final class ShieldTests: XCTestCase {
         XCTAssertTrue(match.shields.isEmpty, "gone after its second")
     }
 
+    func testShelterSeltzerPlantsAStillShieldOnlyAsTheFlipsLeaves() {
+        var match = drinking(.shelterSeltzer, level: 1)
+        match.advance(inputs: [PlayerInput(shield: true), .idle])
+        XCTAssertEqual(match.shields.count, 1)
+        XCTAssertFalse(match.shields[0].planted, "the flip's own shield first, sweeping as ever")
+        var last: Shield?
+        while let flip = match.shields.first, !flip.planted {
+            last = flip
+            match.advance(inputs: [.idle, .idle])
+        }
+        guard let ended = last, let planted = match.shields.first else { return XCTFail("planted as the flip's left") }
+        XCTAssertEqual(match.shields.count, 1, "the flip's gone as the planted one comes")
+        XCTAssertTrue(planted.planted)
+        XCTAssertEqual(planted.tilt, ended.tilt, accuracy: 0.0001, "at the flip's last angle")
+        XCTAssertEqual(planted.centre.x, ended.centre.x, accuracy: 0.0001)
+        XCTAssertEqual(planted.centre.y, ended.centre.y, accuracy: 0.0001)
+        XCTAssertFalse(planted.inPerfectWindow, "no perfect window of its own")
+        let centre = planted.centre
+        for _ in 0..<20 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 1, y: 0)), .idle]) }
+        XCTAssertEqual(match.shields.first?.centre, centre, "still")
+        XCTAssertEqual(match.shields.first?.tilt ?? 0, ended.tilt, accuracy: 0.0001, "never turning")
+    }
+
     func testShelterSeltzerAtLevelTwoSnatchesRaiseAGuardAtTheHandThatParriesASlash() {
         var match = drinking(.shelterSeltzer, level: 2)
         match.players[1].position = Vec2(x: 140, y: 10)

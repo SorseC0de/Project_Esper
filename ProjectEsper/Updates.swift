@@ -45,7 +45,7 @@ enum UpdatesNotes {
 
     static let lines: [Line] = [
         .title("Core Changes"),
-        .bullet("Press [Up] or [Down] + [Slash] to [Shieldflip]. [Shield] can be used to reflect the ball or powers. [Parries] [Slash], loses to [Snatch] and [Throw].", icon: .shield),
+        .bullet("Press [Up] or [Down] + [Snatch] to [Shieldflip]. [Shield] can be used to reflect the ball or powers. [Parries] [Slash], loses to [Snatch] and [Throw].", icon: .shield),
         .bullet("Press [Down] + [Throw] with the ball to perform a [Spin Move]. Attacks go through you while spinning, however you only get one per airtime.", icon: .spin),
         .bullet("You can now select a [Greateraid] power to have during [FloState] in [47 Mode]"),
         .bullet("Increased [Stun] time 1.5s ➜ 2s", tone: .nerf),
@@ -75,7 +75,7 @@ enum UpdatesNotes {
     ]
 
     /// The screen's face whatever the menus' is: E.
-    static let face = 4
+    static let face = Futuristic.listFace
 
     /// A line's lettering in the screen's face: its words in its tone, keywords gold, [Up] and
     /// [Down] the fat arrow turned that way, gold.

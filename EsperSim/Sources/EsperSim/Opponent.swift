@@ -25,6 +25,10 @@ public struct Opponent: Equatable {
     private var shuffleDirection = 1.0
     /// How far off the rim it hangs back while hovering, picked as the hover starts.
     private var hoverOffset = 55.0
+    /// The other's possession, decided as they get the ball, a coin flip: after them to take it
+    /// back, or back under its rim, up in the air there, for the block and the rebound.
+    private var protectsRim = false
+    private var rimHopFrames = 0
     /// The dash dance before a shot: dashes still to go, which way the next goes, frames into this
     /// one; and whether this shot has had its dance, so it isn't rolled for again until the stance.
     private var dashDanceLeft = 0
@@ -72,6 +76,14 @@ public struct Opponent: Equatable {
     var backingOff = 0
     /// The thrown ball's snatch timed this many frames early or late, rolled once a throw.
     private var snatchSlop = 0
+    /// A belt's drop being guarded: what it'll meet the ball with (`guardTheBeltDrop`), and the
+    /// frames early or late it goes up, decided once a drop.
+    var beltPick: UInt32?
+    var beltSlop = 0
+    /// Up to a belt for the ball riding it (`climbToTheBelt`): onto the middle platform, then up
+    /// the wall under the belt, and the frames into that.
+    var beltClimb: BeltClimb?
+    enum BeltClimb: Equatable { case mounting, climbing(frames: Int) }
     /// A loose ball's chase decided once a flight, not every frame: the flight, whether it slides
     /// for it, spikes it (with the slash or the shield) and snatches it.
     var race: Race?
@@ -201,7 +213,10 @@ public struct Opponent: Equatable {
             lastHolder = holder
         }
         if holder == human.index, lastHolder != human.index {
-            if lastHolder == index { chaseFrames = Opponent.chaseAfterSteal }
+            // On the court, where the rim's to be guarded; the stages it reads keep their own defence.
+            protectsRim = !Opponent.readsStage(match) && chance(50)
+            if protectsRim {
+            } else if lastHolder == index { chaseFrames = Opponent.chaseAfterSteal }
             else if abs(human.position.x - me.position.x) < Opponent.contestedPickup { chaseFrames = Opponent.chaseAfterPickup }
         }
         if holder != human.index { chaseFrames = 0 }
@@ -856,6 +871,7 @@ public struct Opponent: Equatable {
         }
         let winding = human.state == .shootStance || (human.state == .throwStance && abs(gap) < 30)
         let humanOpen = Opponent.open(human)
+        if protectsRim, protectTheRim(match, me: me, human: human, hoop: hoop, side: side, gap: gap, open: humanOpen, into: &input) { return }
         if winding || plan == .strike || (humanOpen && abs(gap) < 45) || (rest == 0 && abs(gap) < 45 && humanStill > 20 && chance(4)) {
             // The strike: in at them and the swing when the blade will reach, up first if
             // they're above. In reach, the slash, or the snatch up close.
@@ -873,7 +889,7 @@ public struct Opponent: Equatable {
                     input.stick = Vec2(x: gap > 0 ? 1 : -1, y: 0)
                     return
                 }
-                if abs(gap) <= 12, chance(40) { tapThrow(&input) } else { tapShoot(&input) }
+                defensiveSwing(gap: gap, into: &input)
                 rest = 40
                 plan = .none
                 planFrames = 0
@@ -884,7 +900,7 @@ public struct Opponent: Equatable {
             return
         }
         if rest == 0, abs(gap) <= 22, level, chance(3) {
-            if abs(gap) <= 12, chance(40) { tapThrow(&input) } else { tapShoot(&input) }
+            defensiveSwing(gap: gap, into: &input)
             rest = 40
             return
         }
@@ -933,10 +949,12 @@ public struct Opponent: Equatable {
         // Mostly between them and the rim; now and then up to them, or hanging back a
         // way off the rim, so it isn't always in the same place.
         // Near their own rim it mostly guards it; anywhere else it mostly goes at them.
+        // Going to take it back: at them, or now and then hanging back a way off the rim. On the
+        // stages it reads, near their own rim it mostly guards it.
         if plan == .none {
-            let nearTheirRim = abs(human.position.x - hoop.position.x) < Opponent.guardsWithin
+            let nearTheirRim = readsStage && abs(human.position.x - hoop.position.x) < Opponent.guardsWithin
             let pick = roll(20)
-            if nearTheirRim ? pick < 10 : pick < 4 {
+            if nearTheirRim ? pick < 10 : (readsStage && pick < 4) {
                 plan = .guardSpot
             } else if pick < 18 {
                 plan = .pressure
@@ -978,7 +996,51 @@ public struct Opponent: Equatable {
     static let chaseDistance = 22.0
     static let contestedPickup = 100.0
     /// How near their rim the other must be for it to guard the rim more than go at them.
+    /// Under its rim, on the side they come from, and up in the air there: a hop now and then,
+    /// both jumps when they wind up near, so it's in the air as their shot or layup goes up. The
+    /// swing when they walk into it; their shot in flight is the goaltend's, the miss the
+    /// rebound's. Nothing, so the reach's own rules run, when they're on top of it.
+    private mutating func protectTheRim(_ match: Match, me: Player, human: Player, hoop: Hoop, side: Double, gap: Double,
+                                        open: Bool, into input: inout PlayerInput) -> Bool {
+        let rise = human.position.y - me.position.y
+        if abs(gap) <= 24, abs(rise) < 20 { return false }
+        // Standing about far from the rim, they're not coming: out after them after all.
+        if humanStill > Opponent.rimWaitsForStill, abs(human.position.x - hoop.position.x) > Opponent.rimShotReach {
+            protectsRim = false
+            return false
+        }
+        let spotX = hoop.position.x + side * Opponent.rimGuardInset
+        let toSpot = spotX - me.position.x
+        let near = abs(human.position.x - hoop.position.x) < Opponent.rimShotReach
+        let windingNear = near && (human.state == .shootStance || human.state == .jumpSquat || (!human.grounded && human.velocity.y > 0))
+        if !me.grounded {
+            // Both jumps: the second at the top of the first.
+            if me.jumpsLeft > 0, me.velocity.y < Opponent.doubleJumpBelow, windingNear || rimHopFrames > Opponent.rimHopEvery.lowerBound / 2 { tapJump(&input) }
+            if abs(toSpot) > 4 { input.stick = Vec2(x: toSpot > 0 ? 0.5 : -0.5, y: 0) }
+            return true
+        }
+        if Opponent.readsStage(match), !go(to: Vec2(x: spotX, y: hoop.position.y - 40), match: match, me: me, into: &input, near: 6) { return true }
+        if abs(toSpot) > 6 {
+            let speed = abs(toSpot) > 50 ? 1.0 : 0.5
+            input.stick = Vec2(x: toSpot > 0 ? speed : -speed, y: 0)
+            return true
+        }
+        if me.facing != (gap > 0 ? .right : .left) { input.stick = Vec2(x: gap > 0 ? 0.5 : -0.5, y: 0) }
+        if rimHopFrames > 0 { rimHopFrames -= 1 }
+        if windingNear || (near && rimHopFrames == 0) {
+            fullHop(&input)
+            rimHopFrames = Opponent.rimHopEvery.lowerBound + Int(roll(UInt32(Opponent.rimHopEvery.count)))
+        }
+        return true
+    }
+    /// Where it waits, in from the rim toward them; how near the rim they must be for it to go
+    /// up; the frames between its hops there; and how long they stand about before it goes out.
+    static let rimGuardInset = 15.0
+    static let rimShotReach = 100.0
+    static let rimHopEvery = 30...80
+    static let rimWaitsForStill = 90
     static let guardsWithin = 120.0
+
     /// The floater's reach from the rim, and how often it's taken with nobody on it.
     static let floaterRange = 90.0
     static let floaterAnywayChance: UInt32 = 35
@@ -1076,6 +1138,7 @@ public struct Opponent: Equatable {
         // otherwise gone after.
         if match.ball.shotInFlight, match.ball.lastTouched == human.index, snatchOrSpike(match.ball, me: me, human: human, into: &input) { return }
         if goaltend(match, me: me, human: human, into: &input) { return }
+        if guardTheBeltDrop(match, me: me, human: human, into: &input) { return }
         if contestWithShield(match, me: me, human: human, into: &input) { return }
         // A throw coming at it: it stands its ground, facing it, and the snatch goes out so
         // the hand is live as the ball arrives. Charged more than a few frames it was

@@ -167,10 +167,9 @@ public struct Match: Equatable {
             }
             if hitStop == 0, let at = clashAt {
                 clashAt = nil
+                let sides = clashSides(at: at)
                 for index in players.indices {
-                    let away = players[index].body.center.x - at.x
-                    let side = Swift.abs(away) > 0.01 ? (away > 0 ? 1.0 : -1.0) : -players[index].facing.sign
-                    players[index].knock(Vec2(x: ClashRules.knock.x * side, y: ClashRules.knock.y))
+                    players[index].knock(Vec2(x: ClashRules.knock.x * sides[index], y: ClashRules.knock.y))
                     players[index].startClashPush()
                 }
             }
@@ -567,12 +566,12 @@ public struct Match: Equatable {
         // Slide Cider: the leg knocks the body along the slide, and at level two stuns a holder too.
         let cider = player.spec.slideCiderLevel
         let legKnock = cider >= 1 ? Vec2(x: SlideRules.ciderKnock.x * player.facing.sign, y: SlideRules.ciderKnock.y) : nil
-        if let leg = player.slideHitbox, let other, players[other].hasBall, players[other].grounded, players[other].body.overlaps(leg) {
+        if let leg = player.slideHitbox, let other, !untouchable(other), players[other].hasBall, players[other].grounded, players[other].body.overlaps(leg) {
             players[index].slideHit = true
             pop(from: other, by: index)
             if let legKnock { players[other].knock(legKnock) }
             if cider >= 2 { players[other].hitStun = BallRules.hitStunFrames }
-        } else if let leg = player.slideHitbox, let other, !players[other].hasBall, players[other].frozen == 0,
+        } else if let leg = player.slideHitbox, let other, !untouchable(other), !players[other].hasBall, players[other].frozen == 0,
                   players[other].hitStun == 0, players[other].body.overlaps(leg) {
             // Without the ball the leg stuns, as every other attack does.
             players[index].slideHit = true
@@ -618,7 +617,7 @@ public struct Match: Equatable {
                     #endif
                 }
             }
-            if let other, players[other].body.overlaps(blade), players[other].frozen == 0, !players[other].spinPhasing {
+            if let other, players[other].body.overlaps(blade), players[other].frozen == 0, !untouchable(other) {
                 // The body, ball or no ball: stripped and knocked along the swing.
                 players[index].slashHit = true
                 // The ball pops back to the slasher, away from the one who had it, coming down
@@ -649,7 +648,7 @@ public struct Match: Equatable {
             // A stepback's ball can't be snatched.
             // Nor one mid-change into FloState, super armoured.
             // Nor one spinning with the FLO for it, phased through.
-            let held = ball.holder.flatMap { $0 == index || players[$0].state == .stepback || players[$0].state == .transforming || players[$0].spinPhasing ? nil : $0 }
+            let held = ball.holder.flatMap { $0 == index || players[$0].state == .stepback || untouchable($0) ? nil : $0 }
             // A held ball is where the holder's sheet draws it this frame, so the hand can
             // take it off the dribble; failing a landmark, the chest.
             let at = held.map { holder -> Vec2 in
@@ -664,7 +663,7 @@ public struct Match: Equatable {
             // A burning ball is the thrower's alone, but to another Blazing Boba drinker.
             let allowed = (!ball.burning || ball.lastTouched == index || player.power == .blazingBoba || held != nil) && (held != nil || player.pickupLockout == 0)
                 && (held != nil || ball.exclusiveTo == nil || ball.exclusiveTo == index)
-            if player.power == .frostTea, let other, players[other].frozen == 0, players[other].state != .stepback, !players[other].spinPhasing,
+            if player.power == .frostTea, let other, players[other].frozen == 0, players[other].state != .stepback, !untouchable(other),
                player.snatchReaches(box: players[other].body),
                (players[other].body.center.x - player.position.x) * player.facing.sign >= -1 || players[other].body.overlaps(player.body) {
                 // Frost Tea's upgrade, on the snatch's own reach: the body it reaches is frozen
@@ -726,7 +725,7 @@ public struct Match: Equatable {
         let at = (first.center + second.center) * 0.5
         clashAt = at
         events.append(.slashClashed(at: at))
-        holdHitStop(HitStopRules.slashClashFrames)
+        holdHitStop(HitStopRules.clashFrames)
     }
 
     /// Two snatches' reaches meeting, neither spent: a snatchclash, as the slashclash is. Both
@@ -741,22 +740,33 @@ public struct Match: Equatable {
         let at = (players[0].handCatchPoint + players[1].handCatchPoint) * 0.5
         clashAt = at
         events.append(.snatchClashed(at: at))
-        holdHitStop(HitStopRules.slashClashFrames)
+        holdHitStop(HitStopRules.clashFrames)
     }
 
-    /// A throw stance in its opening frames, or the change into FloState from its first frame to
-    /// its burst, its reach the burst's, meeting a live blade: the slasher is the one stripped
-    /// and knocked back, and the blade is spent. Before the blades are resolved, so it wins.
-    /// Not a snatch: the slash beats it.
+    /// The change into FloState from its first frame to its burst, its reach the burst's, meeting
+    /// any of the four (a live blade, a snatch's reach, a thrown ball, a shield): the one behind it
+    /// is stripped and knocked back, and it's spent; a shield left behind only breaks. Before the blades and snatches are resolved, so
+    /// it wins. (The shield is what beats a slash otherwise.)
     private mutating func resolveParries() {
         for index in players.indices {
-            guard let other = players.indices.first(where: { $0 != index }), let blade = players[other].slashHitbox else { continue }
-            let changing = players[index].state == .transforming && players[index].stateTimer <= TransformRules.burstFrame
-            let reaches = changing ? blade.distance(to: players[index].body.center) <= TransformRules.burstRadius
-                : players[index].throwParrying && blade.overlaps(players[index].body)
-            guard reaches else { continue }
-            players[other].slashHit = true
-            parry(other, by: index)
+            guard let other = players.indices.first(where: { $0 != index }),
+                  players[index].state == .transforming, players[index].stateTimer <= TransformRules.burstFrame else { continue }
+            let middle = players[index].body.center
+            if let blade = players[other].slashHitbox, blade.distance(to: middle) <= TransformRules.burstRadius {
+                players[other].slashHit = true
+                parry(other, by: index)
+            } else if let reach = players[other].snatchHitbox, !players[other].snatchSpent, reach.distance(to: middle) <= TransformRules.burstRadius {
+                players[other].snatchSpent = true
+                parry(other, by: index)
+            } else if ball.strikes, ball.holder == nil, ball.lastTouched == other, ball.position.distance(to: middle) <= TransformRules.burstRadius {
+                // The throw turned away: the ball up off the burst, nobody's.
+                ball.pop(from: ball.position)
+                parry(other, by: index)
+            } else if let met = shields.firstIndex(where: { $0.owner == other && $0.touches(middle, radius: TransformRules.burstRadius) }) {
+                let shield = shields.remove(at: met)
+                events.append(.shieldBroken(player: other, at: shield.centre))
+                if shield.isShieldflips { parry(other, by: index) }
+            }
         }
     }
 
@@ -773,7 +783,7 @@ public struct Match: Equatable {
     /// `carry`: sideways speed for the ball: a slash sends it back toward the slasher.
     private mutating func pop(from victim: Int, by popper: Int, carry: Double = 0, flo: Int = FloRules.hit) {
         let from = players[victim].heldBallPoint
-        guard players[victim].state != .transforming else { return }
+        guard !untouchable(victim) else { return }
         players[victim].loseBall()
         players[victim].hitStun = BallRules.hitStunFrames
         ball.pop(from: from)
@@ -1186,10 +1196,15 @@ public struct Match: Equatable {
     /// `knock` is given. Without stunning, only the ball pops and the knock lands.
     /// `flo`: what the hit earns its striker, as every hit does but a parry's and the stage's.
     /// `pause`: the hit holds the game still a moment, as a hit does but a held beam's.
+    /// Whether nothing can touch a body: the change into FloState is super armoured, and the Spin
+    /// Move phases through every attack, every hit and power, the whole spin.
+    func untouchable(_ index: Int) -> Bool {
+        players[index].state == .transforming || players[index].spinPhasing
+    }
+
     mutating func strip(_ victim: Int, by striker: Int, knock: Vec2?, stun: Bool = true, carry: Double = 0, flo: Int = FloRules.hit,
                                 pause: Bool = true) {
-        // The change into FloState is super armoured: nothing takes it.
-        guard players[victim].state != .transforming else { return }
+        guard !untouchable(victim) else { return }
         if !stun {
             // A push, not a hit: no stun and no spark, the ball let go of if held.
             let held = players[victim].hasBall
@@ -1230,7 +1245,7 @@ public struct Match: Equatable {
 
     /// Frost Tea's drinker never freezes, whoever's ice it is: two of them can't freeze each other.
     private mutating func freeze(_ index: Int) {
-        guard players[index].frozen == 0, players[index].power != .frostTea else { return }
+        guard players[index].frozen == 0, players[index].power != .frostTea, !untouchable(index) else { return }
         players[index].frozen = FrostRules.freezeFrames
         events.append(.frozen(player: index))
     }
@@ -1362,6 +1377,7 @@ public struct Match: Equatable {
     /// enough to peak `flingHeight` over the higher end on its own rise, across fast enough to get
     /// there by the time its own fall brings it down.
     private mutating func fling(_ flung: Int, over sniper: Int) {
+        guard !untouchable(flung) else { return }
         let from = players[flung].position
         let side: Double = players[sniper].position.x >= from.x ? 1 : -1
         let to = players[sniper].position + Vec2(x: side * SnipeRules.flingPast, y: 0)
@@ -1896,5 +1912,23 @@ extension Match {
             let knock = players[other].grounded ? Vec2(x: player.facing.sign * SpinRules.push, y: 0) : Vec2(x: 0, y: -SpinRules.push)
             strip(other, by: index, knock: knock, stun: false)
         }
+    }
+}
+
+extension Match {
+    /// Which way each player's pushed off a clash: always apart, toward opposite sides. The one
+    /// further left goes left, the other right; level, each back from the way it faces, or by
+    /// order if they face the same way. With more than two, each off the clash's point.
+    func clashSides(at point: Vec2) -> [Double] {
+        guard players.count == 2 else {
+            return players.map { player in
+                let away = player.body.center.x - point.x
+                return Swift.abs(away) > 0.01 ? (away > 0 ? 1.0 : -1.0) : -player.facing.sign
+            }
+        }
+        let apart = players[1].body.center.x - players[0].body.center.x
+        if Swift.abs(apart) > 0.01 { return apart > 0 ? [-1, 1] : [1, -1] }
+        if players[0].facing != players[1].facing { return [-players[0].facing.sign, -players[1].facing.sign] }
+        return [-1, 1]
     }
 }

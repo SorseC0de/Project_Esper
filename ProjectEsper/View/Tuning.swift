@@ -372,6 +372,9 @@ enum DunkTuning {
 /// how far it spreads, how strong it comes back, and its colour.
 /// Debug strip sliders put away once tuned; their values stay as baked.
 enum ParkedSliders {
+    /// Only these sliders on the debug bench for now: FloState's strings' and the shot arc's.
+    static let showing = ["STRING", "DIAMOND", "ARC HEIGHT", "ARC DISTANCE", "AIM RANGE"]
+    static func shown(_ title: String) -> Bool { showing.contains { title.hasPrefix($0) } }
     static let net = true
     static let flo = true
     static let kAndALights = true
@@ -384,10 +387,18 @@ enum GlowSettings {
     /// than the light ones'. On the debug sliders (GLOW and the gem), kept between launches.
     /// Kept under a second key since the tuned values became the defaults, so the old ones don't stand.
     static func energyGainKey(_ colour: EnergyColour) -> String { "esper.glow.gain2.\(colour.rawValue)" }
-    static let energyGainDefaults: [EnergyColour: Float] = [.orange: 1.75, .blue: 1.25, .green: 1.75, .purple: 1.75, .red: 1.25]
-    nonisolated(unsafe) static var energyGains: [EnergyColour: Float] = Dictionary(uniqueKeysWithValues: EnergyColour.wheel.map { colour in
-        (colour, (UserDefaults.standard.object(forKey: energyGainKey(colour)) as? Double).map(Float.init) ?? energyGainDefaults[colour] ?? 1)
-    })
+    static let energyGainDefaults: [EnergyColour: Float] = [.orange: 1.75, .blue: 1.25, .green: 1.75, .purple: 1.75, .red: 1.25, .teal: 0.75, .lime: 0.75]
+    nonisolated(unsafe) static var energyGains: [EnergyColour: Float] = {
+        // Teal's and lime's tuned values (0.75 each) over whatever their sliders were left at, once.
+        let resetKey = "esper.glow.reset.tealLime2"
+        if !UserDefaults.standard.bool(forKey: resetKey) {
+            for colour in [EnergyColour.teal, .lime] { UserDefaults.standard.removeObject(forKey: energyGainKey(colour)) }
+            UserDefaults.standard.set(true, forKey: resetKey)
+        }
+        return Dictionary(uniqueKeysWithValues: EnergyColour.wheel.map { colour in
+            (colour, (UserDefaults.standard.object(forKey: energyGainKey(colour)) as? Double).map(Float.init) ?? energyGainDefaults[colour] ?? 1)
+        })
+    }()
     /// The nine for the glow pass, in the wheel's order: each colour over its brightest channel,
     /// its gain in w.
     static var energyUniforms: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) {

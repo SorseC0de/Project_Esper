@@ -171,6 +171,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let sphereVertices: MTLBuffer?
     private var sphereInstanceBuffers: [MTLBuffer] = []
     private static let sphereCapacity = 512
+    /// FloState's strings' diamonds, drawn by the cubes' pipeline.
+    private let diamondVertices: MTLBuffer?
+    private var diamondInstanceBuffers: [MTLBuffer] = []
+    private static let diamondCapacity = 128
     private static let cubeCapacity = 2048
     /// The players' bodies and lines in white and the rims' art in green, on black, by a
     /// renderer of their own, drawn only on a frame with cubes behind them: a back leg's
@@ -280,6 +284,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         cubeDepth = device.makeDepthStencilState(descriptor: depth)
         cubeVertices = device.makeBuffer(bytes: CubeMesh.unit, length: CubeMesh.unit.count * MemoryLayout<CubeVertex>.stride)
         sphereVertices = device.makeBuffer(bytes: SphereMesh.unit, length: SphereMesh.unit.count * MemoryLayout<CubeVertex>.stride)
+        diamondVertices = device.makeBuffer(bytes: DiamondMesh.unit, length: DiamondMesh.unit.count * MemoryLayout<CubeVertex>.stride)
+        diamondInstanceBuffers = (0..<3).compactMap { _ in
+            device.makeBuffer(length: GlowRenderer.diamondCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
+        }
         sphereInstanceBuffers = (0..<3).compactMap { _ in
             device.makeBuffer(length: GlowRenderer.sphereCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
         }
@@ -505,9 +513,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private func drawCubes(_ commands: MTLCommandBuffer, into target: MTLTexture, depth: MTLTexture, frame: Int, now: CFTimeInterval) {
         let cubes = Array(scene.cubeInstances.prefix(GlowRenderer.cubeCapacity))
         let spheres = Array(scene.sphereInstances.prefix(GlowRenderer.sphereCapacity))
-        guard !cubes.isEmpty || !spheres.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
+        let diamonds = Array(scene.diamondInstances.prefix(GlowRenderer.diamondCapacity))
+        guard !cubes.isEmpty || !spheres.isEmpty || !diamonds.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
               let occluderTexture else { return }
-        if cubes.contains(where: { $0.flags.x > 0.5 }) {
+        if cubes.contains(where: { $0.flags.x > 0.5 }) || diamonds.contains(where: { $0.flags.x > 0.5 }) {
             // The bodies as they stand, for the cubes behind them to keep out of.
             occluderScene.mirror(scene.occluderSnapshots, flat: scene.rimSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
             occluderRenderer.update(atTime: now)
@@ -576,6 +585,14 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             encoder.setVertexBuffer(sphereVertices, offset: 0, index: 0)
             encoder.setVertexBuffer(sphereBuffer, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: SphereMesh.unit.count, instanceCount: spheres.count)
+        }
+        if !diamonds.isEmpty, let diamondVertices, !diamondInstanceBuffers.isEmpty {
+            let diamondBuffer = diamondInstanceBuffers[frame % diamondInstanceBuffers.count]
+            diamondBuffer.contents().copyMemory(from: diamonds, byteCount: diamonds.count * MemoryLayout<CubeInstance>.stride)
+            encoder.setCullMode(.back)
+            encoder.setVertexBuffer(diamondVertices, offset: 0, index: 0)
+            encoder.setVertexBuffer(diamondBuffer, offset: 0, index: 1)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: DiamondMesh.unit.count, instanceCount: diamonds.count)
         }
         encoder.endEncoding()
     }

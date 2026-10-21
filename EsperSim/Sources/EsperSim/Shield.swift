@@ -49,6 +49,8 @@ public struct Shield: Equatable {
     public var lifeFrames: Int { planted ? ShieldRules.shelterLingerFrames : ShieldRules.flipFrames + lingerFrames }
     /// Whether it's lingering: the arc done, left where it ended.
     public var lingering: Bool { planted || age >= ShieldRules.flipFrames }
+    /// The shieldflip's own shield, round the shielder's body through the flip: not one left behind.
+    public var isShieldflips: Bool { !planted && !guardOnly && !lingering }
     /// Whether it's still in its first frames, where a ball's stopped and popped up.
     public var inPerfectWindow: Bool { !planted && age < ShieldRules.perfectFrames }
     /// The age its place and face are read at: held at the arc's end while it lingers, and
@@ -216,7 +218,7 @@ extension Match {
             events.append(.shieldBroken(player: index, at: centre))
             events.append(.shieldClashed(at: at, first: other, second: shield))
             clashAt = at
-            holdHitStop(HitStopRules.shieldClashFrames)
+            holdHitStop(HitStopRules.clashFrames)
             return
         }
         shields.append(shield)
@@ -261,7 +263,10 @@ extension Match {
         for (number, by) in broken.reversed() where shields.indices.contains(number) {
             let shield = shields.remove(at: number)
             events.append(.shieldBroken(player: shield.owner, at: shield.centre))
-            counter(shield.owner, by: by)
+            // The shielder's stunned only through the shieldflip's own shield, round the body as it
+            // flips: one left behind (Shelter Seltzer's planted one, its snatch's guard) just breaks,
+            // whoever raised it far off.
+            if shield.isShieldflips { counter(shield.owner, by: by) }
         }
     }
 
@@ -295,6 +300,7 @@ extension Match {
     /// The parry's stun on `loser`: knocked away from `winner`, nothing answering through the
     /// stun and on past it (`ParryRules`). Every counter's, and Pulsepistol's repelling snipe's.
     mutating func stunAsParried(_ loser: Int, by winner: Int) {
+        guard !untouchable(loser) else { return }
         let away = players[loser].position.x >= players[winner].position.x ? 1.0 : -1.0
         strip(loser, by: winner, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), flo: 0)
         players[loser].attackLockout = players[loser].hitStun + ParryRules.attackLockoutAfterStunFrames

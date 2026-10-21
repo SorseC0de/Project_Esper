@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// The settings, over the title or the pause: full screen on the screens' ground, each row's
-/// name and its choices, the picked one plum; BACK at the bottom. The cursor is on a row: left
-/// and right change it, up and down move between rows; a tap picks a choice outright.
+/// The settings, over the title or the pause: full screen on the screens' ground. Its categories
+/// side by side, each frame 6 without its tail; one opened slides aside, its rows fan down under it,
+/// indented, and a mask drawn back to the right shows their tails and choices; tapped again, it all
+/// goes back the way it came. A row's picked choice is plum. PLAYER VISIBILITY draws the players
+/// again: the loading bar up, everything dim and waiting till it's done.
 struct SettingsScreen: View {
     @ObservedObject var flow: FlowState
     @ObservedObject private var tuning = UITuning.shared
@@ -16,22 +18,76 @@ struct SettingsScreen: View {
                 .contentShape(Rectangle())
                 .onTapGesture {}
             GeometryReader { geometry in
-                // Each row as tall as fits the screen, its title in frame 6 turned round and its
-                // choices as words, the titles stacked with no room between.
-                let rows = GameSettings.Row.allCases
+                let size = geometry.size
+                // Each row as tall as fits the most a category has under the categories' row, its title
+                // in frame 6 turned round, the rows stacked with no room between.
+                let most = GameSettings.Category.allCases.map { GameSettings.Row.rows(in: $0).count }.max() ?? 1
                 let titleImage = Futuristic.image("6")
                 let rowHeight = SettingsScreen.boxShare * min(SettingsScreen.rowHeightMost * scale(.buttons),
-                                    (geometry.size.height * SettingsScreen.rowsShare - 2 * SettingsScreen.titleHeight * scale(.titles)) / CGFloat(rows.count))
+                                    (size.height * SettingsScreen.rowsShare - 2 * SettingsScreen.titleHeight * scale(.titles)) / CGFloat(most + 1))
                 let titleScale = rowHeight / (titleImage.size.height * titleImage.scale * Futuristic.pointsPerPixel)
-                VStack(spacing: 10 * scale(.buttons)) {
+                let frameWidth = titleImage.size.width * titleImage.scale * Futuristic.pointsPerPixel * titleScale
+                let boxWidth = frameWidth * (1 - Futuristic.sixTailSplit)
+                let titleY = size.height * SettingsScreen.titleYShare
+                let barY = titleY + SettingsScreen.titleHeight * scale(.titles) + rowHeight * SettingsScreen.barDropRows
+                let rowsLeft = size.width * SettingsScreen.rowsLeftShare
+                let indent = boxWidth * SettingsScreen.indentShare
+                ZStack {
                     FloText("SETTINGS", height: SettingsScreen.titleHeight * scale(.titles))
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                            rowView(row, index: index, rowHeight: rowHeight, titleScale: titleScale)
+                        .position(x: size.width / 2, y: titleY)
+                    // The open category's rows, under its button.
+                    ForEach(Array(flow.settingsRows.enumerated()), id: \.offset) { index, row in
+                        let left = rowsLeft + indent
+                        let rowY = barY + CGFloat(index + 1) * rowHeight
+                        let fanned = flow.settingsFanned
+                        let count = flow.settingsRows.count
+                        rowView(row, index: index, rowHeight: rowHeight, titleScale: titleScale)
+                            .frame(width: size.width - left, height: rowHeight, alignment: .leading)
+                            // Only the box till the mask draws back to the right over the tail and choices.
+                            .mask(alignment: .leading) {
+                                Rectangle().frame(width: flow.settingsRevealed ? size.width : boxWidth)
+                                    .animation(.easeOut(duration: FlowState.settingsRevealSeconds), value: flow.settingsRevealed)
+                            }
+                            .offset(x: fanned ? 0 : -indent, y: fanned ? 0 : barY - rowY)
+                            .opacity(fanned ? 1 : 0)
+                            .animation(.spring(response: FlowState.settingsFanSeconds, dampingFraction: 0.85)
+                                .delay(FlowState.settingsFanStagger * Double(fanned ? index : count - 1 - index)), value: fanned)
+                            .position(x: left + (size.width - left) / 2, y: rowY)
+                    }
+                    // The categories side by side; the open one aside, the others gone.
+                    ForEach(GameSettings.Category.allCases, id: \.rawValue) { category in
+                        let across = size.width / 2 + CGFloat(category.rawValue - 1) * (boxWidth + SettingsScreen.categoryGap * scale(.buttons))
+                        let open = flow.settingsCategory == category
+                        let aside = open && flow.settingsAside
+                        let hidden = flow.settingsCategory != nil && !open && flow.settingsAside
+                        let empty = GameSettings.Row.rows(in: category).isEmpty
+                        let lit = flow.settingsCategory == nil ? flow.settingsCategoryCursor == category.rawValue : open && flow.settingsCursor == -1
+                        Button {
+                            if open { flow.closeSettingsCategory() } else { flow.openSettingsCategory(category) }
+                        } label: {
+                            FuturisticFrame(name: "6tailless", lit: lit, scale: titleScale, mirrored: true, image: Futuristic.taillessSix) { colour in
+                                Text(category.title)
+                                    .font(Futuristic.font(size: rowHeight * SettingsScreen.titleTextShare))
+                                    .foregroundStyle(colour)
+                                    .fixedSize()
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .noSystemFocus()
+                        .opacity(hidden ? 0 : empty ? TitleOverlay.unpickedOpacity : 1)
+                        .position(x: aside ? rowsLeft + boxWidth / 2 : across, y: barY)
+                        .animation(.easeInOut(duration: FlowState.settingsAsideSeconds), value: flow.settingsAside)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(flow.settingsReloading ? SettingsScreen.reloadingDim : 1)
+                .allowsHitTesting(!flow.settingsLocked)
+                .animation(.easeOut(duration: 0.2), value: flow.settingsReloading)
+                // The players being drawn again: the loading bar, full for the last of it, the GPU's.
+                if flow.settingsReloading {
+                    LoadingBar(litSlots: flow.loadingSlots ?? FlowState.loadingSlotCount)
+                        .position(x: size.width / 2, y: size.height * SettingsScreen.barYShare)
+                        .transition(.opacity)
+                }
             }
         }
         .environment(\.colorScheme, .dark)
@@ -42,6 +98,16 @@ struct SettingsScreen: View {
     /// The tallest a row is, in points, and the share of the screen's height the rows and title fill.
     static let rowHeightMost: CGFloat = 48
     static let rowsShare: CGFloat = 0.9
+    /// Where things go: the title down the screen, the categories this many rows under it, the open
+    /// category's column in from the left and its rows in from its button, a share of the box;
+    /// the categories' gap; the loading bar down the screen; and how dim it all is meanwhile.
+    static let titleYShare: CGFloat = 0.08
+    static let barDropRows: CGFloat = 0.9
+    static let rowsLeftShare: CGFloat = 0.08
+    static let indentShare: CGFloat = 0.15
+    static let categoryGap: CGFloat = 14
+    static let barYShare: CGFloat = 0.92
+    static let reloadingDim = 0.4
 
     private func rowView(_ row: GameSettings.Row, index: Int, rowHeight: CGFloat, titleScale: CGFloat) -> some View {
         let onRow = flow.settingsCursor == index
@@ -75,9 +141,19 @@ struct SettingsScreen: View {
                 }
             }
             .animation(SettingsScreen.slide, value: row.picked)
+            // A new line for the players draws them all again.
+            if row == .playerVisibility {
+                Text("Game will need to reload visuals")
+                    .font(.system(size: rowHeight * SettingsScreen.warningTextShare).italic())
+                    .foregroundStyle(Futuristic.line.opacity(SettingsScreen.warningOpacity))
+                    .fixedSize()
+            }
         }
         .frame(height: rowHeight)
     }
+    /// PLAYER VISIBILITY's warning against a row's height, and how strong.
+    static let warningTextShare: CGFloat = 0.16
+    static let warningOpacity = 0.7
 
     /// Every row, its frame and all, a touch smaller than fits.
     static let boxShare: CGFloat = 0.88

@@ -69,11 +69,13 @@ extension FlowState {
         customizeLocal = online || turnBased ? local : 0
         customizeReady = [false, false]
         customizeLaunch = nil
+        customizeDrinking = nil
         customizeLaunched = false
         customizeDrinkPhase = false
         drinkCursors = [0, 0]
         if atDrinks, customizePicksDrink, !online {
             customizeDrinkPhase = true
+            customizeSeatedAt = Date()
             drinkCursors = customizations.indices.map { player in
                 customizations[player].drink.flatMap { sortedDrinks(player).firstIndex(of: $0) } ?? 0
             }
@@ -91,7 +93,7 @@ extension FlowState {
 
     /// RETURN: back to the title; online, out of the match.
     func closeCustomize() {
-        guard customizeLaunch == nil else { return }
+        guard !customizeLocked else { return }
         // On the drink pick, RETURN is back a step, to the customize screen.
         if customizeDrinkPhase, !customizeOnline {
             customizeDrinkPhase = false
@@ -115,7 +117,7 @@ extension FlowState {
     /// START offline, READY online: the side's figure goes to the snatch's first frame and its
     /// controls go; online READY can be taken back until both are ready. Both ready, the launch.
     func pressReady(_ player: Int) {
-        guard customizeLaunch == nil, customizeOwns(player) else { return }
+        guard !customizeLocked, customizeOwns(player) else { return }
         // Random picked: its Greateraid drawn now, as it locks in, so the other phone gets the drink.
         for side in customizations.indices where drinkRandom[side] && customizeOwns(side) && customizeDrinkPhase {
             drinkRandom[side] = false
@@ -135,7 +137,7 @@ extension FlowState {
 
     /// The other phone's READY.
     func remoteReady(_ ready: Bool) {
-        guard customizeOpen, customizeOnline, customizeLaunch == nil else { return }
+        guard customizeOpen, customizeOnline, !customizeLocked else { return }
         customizeReady[1 - customizeLocal] = ready
         checkLaunch()
     }
@@ -148,6 +150,10 @@ extension FlowState {
 
     /// Seconds the launch plays before the curtain: the snatch's two frames on, the drift to the middle.
     static let launchSeconds = 1.4
+    /// Locked in on the bottles: `player_drink` this many times through, a frame this long, before the launch.
+    static let drinkingLoops = 2
+    static let drinkingFrameSeconds = PickScreen.drinkerFrameSeconds
+    static var drinkingSeconds: Double { Double(drinkingLoops * GameScene.drinkerFrameCount) * drinkingFrameSeconds }
 
     /// Offline against the computer: the second side is its.
     private var vsComputer: Bool {
@@ -161,11 +167,14 @@ extension FlowState {
     }
 
     private func checkLaunch() {
-        guard customizeReady.allSatisfy({ $0 }), customizeLaunch == nil else { return }
+        guard customizeReady.allSatisfy({ $0 }), !customizeLocked else { return }
         // A mode that picks its drink: START first opens the bottles, the figures off to the
         // corners; ready again there, the launch.
         if customizePicksDrink, !customizeDrinkPhase {
             customizeDrinkPhase = true
+            customizeSeatedAt = Date() + DrinkPick.cornerSeconds
+            // Down in the corner: drawn again, seated.
+            DispatchQueue.main.asyncAfter(deadline: .now() + DrinkPick.cornerSeconds + 0.01) { [weak self] in self?.objectWillChange.send() }
             customizeReady = [false, false]
             // Against the computer, its side's drink is picked for it: a Greateraid at random.
             computerDrinkByHand = false
@@ -185,6 +194,21 @@ extension FlowState {
                 pickForComputer(Greateraid.offered.randomElement())
             }
         }
+        // Locked in on the bottles: a few drinks on the bench first, then the launch.
+        if customizeDrinkPhase {
+            customizeDrinking = Date()
+            DispatchQueue.main.asyncAfter(deadline: .now() + FlowState.drinkingSeconds) { [weak self] in
+                guard let self, self.customizeOpen, self.customizeDrinking != nil else { return }
+                self.customizeDrinking = nil
+                self.launchCustomize()
+            }
+            return
+        }
+        launchCustomize()
+    }
+
+    /// Both sides set: the figures off to the ball, and on into play.
+    private func launchCustomize() {
         customizeLaunch = Date()
         // Both ready: the figures set off for the ball, and the port-in with them.
         SoundBoard.shared.play(.portIn)
@@ -281,7 +305,7 @@ extension FlowState {
     func leaveCustomizePicker(_ player: Int) -> Bool {
         guard customizeOwns(player) else { return false }
         // B on the bottles: back to the customize screen offline; online, READY taken back.
-        if customizeDrinkPhase, customizeLaunch == nil {
+        if customizeDrinkPhase, !customizeLocked {
             if customizeOnline {
                 guard customizeReady[player] else { return true }
                 pressReady(player)
@@ -307,7 +331,7 @@ extension FlowState {
     /// entered, a colour picked. The outer arm and leg boxes are the shown front limbs', the
     /// inner the back's.
     func activateCustomize(_ player: Int, _ spot: CustomizeSpot) {
-        guard customizeOwns(player), customizeLaunch == nil else { return }
+        guard customizeOwns(player), !customizeLocked else { return }
         // On the bottles, the pad's pick is the bottle (or the sort) under its cursor; START confirms.
         if customizeDrinkPhase, spot != .back {
             return activateDrinkCursor(player)
@@ -344,7 +368,7 @@ extension FlowState {
 
     /// The middle button tapped: START (READY online), and on the bottles the confirm.
     func customizeStartTapped(_ player: Int) {
-        guard customizeOwns(player), customizeLaunch == nil else { return }
+        guard customizeOwns(player), !customizeLocked else { return }
         pressReady(player)
     }
 
@@ -356,7 +380,7 @@ extension FlowState {
     /// A bottle tapped: the cursor onto it, and up out of its row, or back down if it was up
     /// (none picked).
     func tapDrink(_ player: Int, _ drink: Greateraid) {
-        guard customizeOwns(player), customizeLaunch == nil, customizeDrinkPhase, !customizeReady[player] else { return }
+        guard customizeOwns(player), !customizeLocked, customizeDrinkPhase, !customizeReady[player] else { return }
         if let at = sortedDrinks(player).firstIndex(of: drink) { drinkCursors[player] = at }
         drinkRandom[player] = false
         update(player) { $0.drink = $0.drink == drink ? nil : drink }
@@ -364,14 +388,14 @@ extension FlowState {
 
     /// The small bottles over the back row: No Power, and Random, a Greateraid drawn as it locks in.
     func tapNoPower(_ player: Int) {
-        guard customizeOwns(player), customizeLaunch == nil, customizeDrinkPhase, !customizeReady[player] else { return }
+        guard customizeOwns(player), !customizeLocked, customizeDrinkPhase, !customizeReady[player] else { return }
         drinkCursors[player] = DrinkPick.noPowerCursor
         drinkRandom[player] = false
         update(player) { $0.drink = nil }
     }
 
     func tapRandom(_ player: Int) {
-        guard customizeOwns(player), customizeLaunch == nil, customizeDrinkPhase, !customizeReady[player] else { return }
+        guard customizeOwns(player), !customizeLocked, customizeDrinkPhase, !customizeReady[player] else { return }
         drinkCursors[player] = DrinkPick.randomCursor
         drinkRandom[player] = true
         update(player) { $0.drink = nil }
@@ -379,7 +403,7 @@ extension FlowState {
 
     /// The sort cycled: A to Z, Z to A, biomorphs first, boosters first; the cursor kept on its bottle.
     func cycleDrinkSort(_ player: Int) {
-        guard customizeOwns(player), customizeLaunch == nil, customizeDrinkPhase, !customizeReady[player] else { return }
+        guard customizeOwns(player), !customizeLocked, customizeDrinkPhase, !customizeReady[player] else { return }
         let was = drinkCursors[player] >= 0 ? sortedDrinks(player)[drinkCursors[player]] : nil
         drinkSorts[player] = drinkSorts[player].next
         if let was, let at = sortedDrinks(player).firstIndex(of: was) { drinkCursors[player] = at }
@@ -772,12 +796,19 @@ struct CustomizeScreen: View {
         if let portrait = flow.scene.customizePortrait(player: player, look: pick.look, sheet: figureFrame.sheet, frame: figureFrame.frame,
                                                        headNudge: CGPoint(x: headX, y: headY), headScale: headScale) {
             let side = (48 + 2 * CustomizeFigure.margin) * playerPixel
+            // On the bottles the bench is in the corner from the start, small; the figure, once down
+            // there, sits on it (`player_sit`), and locked in, drinks (`player_drink`) till the launch.
+            let seated = picking && Date() >= flow.customizeSeatedAt
+            if picking, let bench = flow.scene.customizeSeated(player: player, look: pick.look, sheet: "player_bench", frame: 0) {
+                CustomizeScreen.seatedSprite(bench, player: player, pixel: playerPixel, size: size)
+            }
             // The second side is shown turned round, its sleeves and boots swapped as drawn.
             // Ready, a quarter bigger; both ready, drifting to the middle button.
             CustomizeFigure(portrait: portrait, look: player == 1 ? pick.look.turnedRound : pick.look, pixel: playerPixel, mirrored: player == 1,
                             headNudge: CGPoint(x: headX, y: headY), headScale: headScale)
                 .frame(width: side, height: side)
                 .opacity(intro.figuresIn)
+                .opacity(seated ? 0 : 1)
                 .scaleEffect(picking ? DrinkPick.cornerScale : ready ? CustomizeScreen.readyGrowth : 1)
                 .animation(.easeOut(duration: picking ? DrinkPick.cornerSeconds : 0.2), value: ready)
                 .animation(.easeOut(duration: DrinkPick.cornerSeconds), value: picking)
@@ -787,6 +818,17 @@ struct CustomizeScreen: View {
                           y: launched ? start.midY - (CustomizeScreen.feetRow - 24 + driftY) * playerPixel
                             : picking ? DrinkPick.corner(player, size).y : figureMiddle)
                 .animation(.easeIn(duration: CustomizeScreen.driftSeconds).delay(CustomizeScreen.driftDelaySeconds), value: launched)
+            if seated {
+                TimelineView(.periodic(from: .now, by: FlowState.drinkingFrameSeconds)) { timeline in
+                    let drinking = flow.customizeDrinking
+                    let frame = drinking.map { Int(max(timeline.date.timeIntervalSince($0), 0) / FlowState.drinkingFrameSeconds) % GameScene.drinkerFrameCount } ?? 0
+                    if let image = flow.scene.customizeSeated(player: player, look: pick.look, sheet: drinking == nil ? "player_sit" : "player_drink", frame: frame) {
+                        CustomizeScreen.seatedSprite(image, player: player, pixel: playerPixel, size: size)
+                    }
+                }
+                .frame(width: size.width, height: size.height)
+                .allowsHitTesting(false)
+            }
             // From each arm and leg box to its limb on the player: the outer boxes the shown
             // front limbs', the inner the back's, as the boxes tick them. The bracers' leave the
             // box's side toward the player, level, then turn; the sleeves' its bottom, a short
@@ -1316,6 +1358,9 @@ struct CustomizeFigure: View {
     /// What play draws round the body that a portrait hasn't: the head tipped, arms of their own,
     /// afterimages, effects (the updates screen's poses).
     var extras: FigureExtras? = nil
+    /// In FloState (the updates screen's): its line in the zone's colours, round and round, and its
+    /// strings the diamonds off the chest (`FloStrings`).
+    var floState = false
     @State private var motion = CustomizeFigureMotion()
     /// The figure as last drawn, and, a pick having changed its look, the one before it, left
     /// under the new one while that fades in over it.
@@ -1342,7 +1387,9 @@ struct CustomizeFigure: View {
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                motion.advance(to: timeline.date.timeIntervalSinceReferenceDate, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale)
+                motion.advance(to: timeline.date.timeIntervalSinceReferenceDate, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale,
+                               floState: floState)
+                let rainbow = floState ? Color(uiColor: ZoneTuning.outline(at: CACurrentMediaTime())) : nil
                 var context = context
                 if mirrored {
                     context.translateBy(x: size.width, y: 0)
@@ -1354,6 +1401,7 @@ struct CustomizeFigure: View {
                     CGPoint(x: (margin + point.x) * pixel, y: (margin + 48 - point.y) * pixel)
                 }
                 for cube in motion.cubes where cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) }
+                for diamond in motion.diamonds where diamond.behind { CustomizeFigure.drawDiamond(diamond, look: look, in: context, spot: spot) }
                 let figureRect = CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel)
                 func hoodRect(_ shown: SpriteLibrary.Portrait) -> CGRect {
                     let place = CustomizeFigure.hoodPlace(shown, nudge: headNudge, scale: headScale)
@@ -1375,10 +1423,10 @@ struct CustomizeFigure: View {
                     turned.translateBy(x: -pivot.x, y: -pivot.y)
                     return turned
                 }
-                /// A white line drawn in a colour.
+                /// A white line drawn in a colour, or FloState's rainbow.
                 func drawLine(_ line: CGImage, in rect: CGRect, colour: RGB, on base: GraphicsContext) {
                     base.drawLayer { layer in
-                        layer.addFilter(.colorMultiply(Color(rgb: colour)))
+                        layer.addFilter(.colorMultiply(rainbow ?? Color(rgb: colour)))
                         layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: rect)
                     }
                 }
@@ -1458,6 +1506,7 @@ struct CustomizeFigure: View {
                     context.fill(Path(CGRect(x: at.x - pixel / 2, y: at.y - pixel / 2, width: pixel, height: pixel)), with: .color(string.accent ? accent : plain))
                 }
                 for cube in motion.cubes where !cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) }
+                for diamond in motion.diamonds where !diamond.behind { CustomizeFigure.drawDiamond(diamond, look: look, in: context, spot: spot) }
                 // The glow: what's energy again, blurred and added.
                 var glowing = context
                 glowing.blendMode = .plusLighter
@@ -1478,6 +1527,7 @@ struct CustomizeFigure: View {
                         layer.fill(Path(CGRect(x: at.x - pixel / 2, y: at.y - pixel / 2, width: pixel, height: pixel)), with: .color(string.accent ? accent : plain))
                     }
                     for cube in motion.cubes { CustomizeFigure.drawCube(cube, in: layer, at: spot(cube.position), pixel: pixel) }
+                    for diamond in motion.diamonds { CustomizeFigure.drawDiamond(diamond, look: look, in: layer, spot: spot) }
                 }
             }
         }
@@ -1489,6 +1539,22 @@ struct CustomizeFigure: View {
                 fadeStart = Date()
             }
             held = (portrait, look)
+        }
+    }
+
+    /// A string's diamond as the Metal layer shades one, its faces toward us flat, each its colour
+    /// lit toward white where it faces the light. `spot`: an art point on the canvas.
+    static func drawDiamond(_ diamond: FloStrings.Diamond, look: Look, in context: GraphicsContext, spot: (CGPoint) -> CGPoint) {
+        let rgb = FloStrings.colour(diamond, look: look)
+        let base = SIMD3<Float>(Float((rgb >> 16) & 0xFF), Float((rgb >> 8) & 0xFF), Float(rgb & 0xFF)) / 255
+        let light = simd_normalize(SIMD3<Float>(-0.4, 0.7, 0.6))
+        for face in DiamondMesh.faces(diamond) {
+            let lit = max(simd_dot(face.normal, light), 0)
+            let mixed = simd_mix(base * (0.85 + 0.15 * lit), SIMD3<Float>(repeating: 1), SIMD3<Float>(repeating: 0.35 * lit * lit))
+            var path = Path()
+            path.addLines(face.corners.map { spot(CGPoint(x: CGFloat($0.x), y: CGFloat($0.y))) })
+            path.closeSubpath()
+            context.fill(path, with: .color(Color(red: Double(mixed.x), green: Double(mixed.y), blue: Double(mixed.z))))
         }
     }
 
@@ -1541,6 +1607,9 @@ final class CustomizeFigureMotion {
 
     private let stringMotion = HoodStrings.Motion()
     private(set) var strings: [(point: CGPoint, accent: Bool)] = []
+    /// In FloState, the diamonds off the chest in place of the strings.
+    private let floStringMotion = FloStrings.Motion()
+    private(set) var diamonds: [FloStrings.Diamond] = []
     private(set) var cubes: [Cube] = []
     private var credit: [BodyPart: Double] = [:]
     private var last: Double?
@@ -1559,18 +1628,19 @@ final class CustomizeFigureMotion {
     /// `canvas`: the figure's sheet's side in art pixels; `style`: how its strings move; `turn`: the
     /// hood turned about the head's middle, radians clockwise, the strings' anchors with it.
     func advance(to time: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat,
-                 canvas: CGFloat = 48, style: HoodStrings.Style = CustomizeFigureMotion.strings, turn: CGFloat = 0) {
+                 canvas: CGFloat = 48, style: HoodStrings.Style = CustomizeFigureMotion.strings, turn: CGFloat = 0, floState: Bool = false) {
         let step = 1.0 / 60
         owed += last.map { min(time - $0, 0.1) } ?? step
         last = time
         while owed >= step {
             owed -= step
-            tick(time: time, step: step, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale, canvas: canvas, style: style, turn: turn)
+            tick(time: time, step: step, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale, canvas: canvas, style: style, turn: turn,
+                 floState: floState)
         }
     }
 
     private func tick(time: Double, step: Double, portrait: SpriteLibrary.Portrait, look: Look, headNudge: CGPoint, headScale: CGFloat,
-                      canvas: CGFloat, style: HoodStrings.Style, turn: CGFloat) {
+                      canvas: CGFloat, style: HoodStrings.Style, turn: CGFloat, floState: Bool) {
         // The strings off the hood's own anchors, wherever the hood went on the figure and at its
         // size, floating one back and one forward.
         let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: headScale)
@@ -1585,7 +1655,18 @@ final class CustomizeFigureMotion {
                 return CGPoint(x: middle.x + dx * cos(-turn) - dy * sin(-turn), y: middle.y + dx * sin(-turn) + dy * cos(-turn))
             }
         }
-        strings = stringMotion.step(anchors: anchors, style: style, facing: 1, scale: 1, time: time)
+        if floState {
+            // FloState's diamonds off the chest, where the hood went: winding nowhere, standing.
+            let chest = FloStrings.anchorPixels.map { pixel in
+                SIMD3<Float>(Float(place.origin.x + (pixel.x + 0.5) * place.scale), Float(canvas - (place.origin.y + (pixel.y + 0.5) * place.scale)), 0)
+            }
+            strings = []
+            diamonds = floStringMotion.step(anchors: chest, facing: 1, lean: 0, scale: 1, time: time, spinning: false,
+                                            middle: SIMD3<Float>(chest[0].x, chest[0].y - FloStrings.segment * 2, 0))
+        } else {
+            diamonds = []
+            strings = stringMotion.step(anchors: anchors, style: style, facing: 1, scale: 1, time: time)
+        }
 
         // Cubes off the head's crown, where the hood went, and off whatever of the limbs is
         // energy (`Dressing.cubeSources`), as a human's are in play.
@@ -1800,5 +1881,16 @@ struct CustomizeIntro {
     private static func easeOut(_ share: Double) -> CGFloat {
         let clamped = min(max(share, 0), 1)
         return 1 - pow(1 - clamped, 3)
+    }
+}
+
+extension CustomizeScreen {
+    /// A seated sheet's 48 pixels at the figure's corner and size on the bottles, the second side's turned round.
+    static func seatedSprite(_ image: UIImage, player: Int, pixel: CGFloat, size: CGSize) -> some View {
+        Image(uiImage: image).resizable().interpolation(.none)
+            .frame(width: 48 * pixel, height: 48 * pixel)
+            .scaleEffect(x: DrinkPick.cornerScale * (player == 1 ? -1 : 1), y: DrinkPick.cornerScale)
+            .position(DrinkPick.corner(player, size))
+            .allowsHitTesting(false)
     }
 }

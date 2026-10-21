@@ -51,10 +51,10 @@ final class HoodStrings {
         self.square = square
     }
 
-    /// Where each string's first pixel sits, through the hood's own placing.
-    static func anchors(on hood: SKSpriteNode, scale: CGFloat) -> [CGPoint] {
+    /// Where each string's first pixel sits, through the hood's own placing; or other pixels of its canvas.
+    static func anchors(on hood: SKSpriteNode, scale: CGFloat, pixels: [CGPoint] = anchorPixels) -> [CGPoint] {
         let canvas: CGFloat = 48
-        return anchorPixels.map { pixel in
+        return pixels.map { pixel in
             let local = CGPoint(x: (pixel.x + 0.5 - canvas * hood.anchorPoint.x) * scale * (hood.xScale < 0 ? -1 : 1),
                                 y: (canvas - pixel.y - 0.5 - canvas * hood.anchorPoint.y) * scale)
             let turn = hood.zRotation

@@ -2746,6 +2746,10 @@ answer, the app record in App Store Connect with Game Center turned on.
 
 ## Queued
 
+- (Low priority.) Club Soda, a new biomorph: "Your [Slash] becomes a giant club swing."
+- (Low priority, next batch of revisions.) Web Water's web lines drawn with FloState's string
+  code (`FloStrings`): bright-coloured diamonds in the Metal layer in place of how they're drawn
+  now, every other diamond 1.25 times the size rather than the second to last.
 - Revisit the football field's helmets now that slopes exist: they may want a shaped
   outline like the cars' rather than a square.
 

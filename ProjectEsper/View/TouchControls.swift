@@ -15,8 +15,35 @@ final class TouchControls: SKNode {
         let node: SKShapeNode
         let ring: SKSpriteNode
         let label: SKLabelNode
+        /// Drawn instead of the name where the name has an icon (`icons`).
+        let icon: SKSpriteNode
         var text: String
         let radius: CGFloat
+    }
+    /// The names shown as icons: the strike button's slash its own icon, Volta Cola's bolt a bolt.
+    static let icons: [String: String] = ["SLASH": "StrikeIcon", "BOLT": "BoltIcon"]
+    /// An icon's size against the button's diameter.
+    static let iconShare: CGFloat = 0.6
+    private static func iconTexture(_ name: String) -> SKTexture? {
+        if let made = iconTextures[name] { return made }
+        guard let source = UIImage(named: name) else { return nil }
+        let side: CGFloat = 192
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in
+            source.withTintColor(.white).draw(in: CGRect(x: 0, y: 0, width: side, height: side))
+        }
+        let made = SKTexture(image: image)
+        iconTextures[name] = made
+        return made
+    }
+    nonisolated(unsafe) private static var iconTextures: [String: SKTexture] = [:]
+    /// The button's name, or its icon in its place.
+    private static func show(_ text: String, on button: Button) {
+        button.label.text = text
+        fit(button.label, inside: button.radius)
+        let texture = icons[text].flatMap(iconTexture)
+        button.icon.texture = texture
+        button.icon.isHidden = texture == nil
+        button.label.isHidden = texture != nil
     }
     /// A name shrunk to fit inside its ring: no wider than this share of the button's diameter.
     static let labelShare: CGFloat = 0.72
@@ -223,17 +250,18 @@ final class TouchControls: SKNode {
         addChild(stickKnob)
 
         _ = Onomatopoeia.registered
-        // Throw and shoot side by side, jump below and between them, all at the tuned size:
-        // jump and throw in ring6, shoot in ring4.
+        // Strike (shoot) and Guard (throw) side by side, Strike on the left as the keyboard's J
+        // and the pad's square; jump below and between them, all at the tuned size: jump and
+        // throw in ring6, shoot in ring4.
         let k = TouchControls.scale
         let jump = makeButton("JUMP", ring: "ring6", radius: 30 * k, at: CGPoint(x: right - 76 * k, y: bottom + 26 * k)) { input, down, _ in
             input.jump = down
         }
-        let shoot = makeButton("SHOOT", ring: "ring4", radius: 30 * k, at: CGPoint(x: right - 38 * k, y: bottom + 84 * k)) { input, down, aim in
+        let shoot = makeButton("SHOOT", ring: "ring4", radius: 30 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
             input.shoot = down
             if down { input.aim = aim }
         }
-        let throwButton = makeButton("THROW", ring: "ring6", radius: 24 * k, at: CGPoint(x: right - 114 * k, y: bottom + 84 * k)) { input, down, aim in
+        let throwButton = makeButton("THROW", ring: "ring6", radius: 24 * k, at: CGPoint(x: right - 38 * k, y: bottom + 84 * k)) { input, down, aim in
             input.throwBall = down
             if down { input.aim = aim }
         }
@@ -274,8 +302,7 @@ final class TouchControls: SKNode {
     func setLabels(jump: String, shoot: String, throwBall: String) {
         for (index, text) in [jump, shoot, throwBall].enumerated() where buttons.indices.contains(index) && buttons[index].text != text {
             buttons[index].text = text
-            buttons[index].label.text = text
-            TouchControls.fit(buttons[index].label, inside: buttons[index].radius)
+            TouchControls.show(text, on: buttons[index])
         }
     }
 
@@ -296,10 +323,17 @@ final class TouchControls: SKNode {
         ring.zPosition = -1
         node.addChild(ring)
         let text = Futuristic.label(label, size: 10 * TouchControls.textScale)
-        TouchControls.fit(text, inside: radius)
         node.addChild(text)
+        let icon = SKSpriteNode()
+        let iconSide = radius * 2 * TouchControls.iconShare
+        icon.size = CGSize(width: iconSide, height: iconSide)
+        icon.color = TouchControls.line
+        icon.colorBlendFactor = 1
+        node.addChild(icon)
         addChild(node)
-        return (Button(node: node, ring: ring, label: text, text: label, radius: radius), set)
+        let button = Button(node: node, ring: ring, label: text, icon: icon, text: label, radius: radius)
+        TouchControls.show(label, on: button)
+        return (button, set)
     }
 
     // MARK: The player's layout
@@ -469,9 +503,9 @@ final class TouchControls: SKNode {
     private static let shieldHost = 2
     /// The capsule (SHIELD GAP, LENGTH, ANGLE): its band this far off the throw ring, this many
     /// degrees long, its middle this many degrees round from the right; this thick.
-    static var shieldGap: CGFloat = 5
-    static var shieldLengthDegrees: CGFloat = 120
-    static var shieldAngleDegrees: CGFloat = 80
+    static var shieldGap: CGFloat = 7
+    static var shieldLengthDegrees: CGFloat = 90
+    static var shieldAngleDegrees: CGFloat = 45
     private static let shieldThickness: CGFloat = 16
     private static var shieldArc: ClosedRange<CGFloat> {
         let middle = shieldAngleDegrees * .pi / 180, half = shieldLengthDegrees * .pi / 360
@@ -492,7 +526,9 @@ final class TouchControls: SKNode {
         }
     }
     private let shieldButton = SKShapeNode()
-    private let shieldLabel = Futuristic.label("SHIELD", size: 8)
+    /// The shield's icon on the band, upright, this share of the band's thickness.
+    private let shieldIcon = SKSpriteNode()
+    private static let shieldIconShare: CGFloat = 0.8
     private var shieldCentre = CGPoint.zero
     private var shieldBandRadius: CGFloat = 0
     private var shieldThickness: CGFloat = 0
@@ -516,15 +552,16 @@ final class TouchControls: SKNode {
         shieldButton.lineWidth = 2 * TouchControls.scale
         shieldButton.strokeColor = lit ? TouchControls.lit : TouchControls.line
         shieldButton.fillColor = lit ? TouchControls.lit.withAlphaComponent(0.3) : .clear
-        if shieldLabel.parent == nil {
-            shieldLabel.setScale(TouchControls.textScale)
-            shieldButton.addChild(shieldLabel)
+        if shieldIcon.parent == nil {
+            shieldIcon.texture = TouchControls.iconTexture("GuardIcon")
+            shieldIcon.colorBlendFactor = 1
+            shieldButton.addChild(shieldIcon)
         }
         let middle = (arc.lowerBound + arc.upperBound) / 2
-        shieldLabel.position = point(middle, shieldBandRadius)
-        shieldLabel.verticalAlignmentMode = .center
-        shieldLabel.zRotation = middle - .pi / 2
-        shieldLabel.fontColor = lit ? TouchControls.lit : TouchControls.line
+        let iconSide = shieldThickness * TouchControls.shieldIconShare
+        shieldIcon.size = CGSize(width: iconSide, height: iconSide)
+        shieldIcon.position = point(middle, shieldBandRadius)
+        shieldIcon.color = lit ? TouchControls.lit : TouchControls.line
     }
 
     /// Whether a point's on the band, a little over its edges and ends to spare.
@@ -545,6 +582,7 @@ final class TouchControls: SKNode {
         let button = buttons[index]
         button.ring.color = down ? TouchControls.lit : TouchControls.line
         button.label.fontColor = down ? TouchControls.lit : TouchControls.line
+        button.icon.color = down ? TouchControls.lit : TouchControls.line
         guard down else { return }
         button.ring.removeAction(forKey: "spin")
         button.ring.zRotation = 0
@@ -585,6 +623,8 @@ final class TouchControls: SKNode {
     @discardableResult
     func addSlider(title: String, range: ClosedRange<Float>, notch: Float, value: Float, onChange: @escaping (Float) -> Void) -> Slider {
         let slider = Slider(title: title, range: range, notch: notch, value: value, onChange: onChange)
+        // Parked: made but not put on the bench (`ParkedSliders.shown`).
+        guard ParkedSliders.shown(title) else { return slider }
         addChild(slider)
         sliders.append(slider)
         // As many to a column as fit down the screen above the pad (eight at least), the columns

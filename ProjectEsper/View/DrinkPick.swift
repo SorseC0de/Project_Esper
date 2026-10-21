@@ -104,9 +104,14 @@ struct DrinkPick: View {
             bottles(cursor: ownsCursor ? flow.drinkCursors[player] : nil)
         }
         .frame(width: size.width, height: size.height)
-        .opacity(flow.customizeReady[player] ? 0.6 : 1)
+        // Locked in, slid off the side's own edge of the screen.
+        .offset(x: flow.customizeReady[player] ? size.width * DrinkPick.lockedSlideShare * (player == 0 ? -1 : 1) : 0)
+        .animation(.easeIn(duration: DrinkPick.lockedSlideSeconds), value: flow.customizeReady[player])
         .transition(.opacity)
     }
+    /// How far the side's bottles and words slide off as it locks in, a share of the screen's width, and how fast.
+    static let lockedSlideShare: CGFloat = 0.5
+    static let lockedSlideSeconds = 0.3
 
     // MARK: The words
 
@@ -178,8 +183,7 @@ struct DrinkPick: View {
     static let noDrinkText = "FloState as itself: only its own [Slash] and [Snatch]."
     static let randomText = "A Greateraid drawn at random as you lock in."
 
-    /// A blurb in the menus' face: bracketed words in gold, [Up], [Down], [Left] and [Right] the
-    /// fat arrow turned that way, in gold.
+    /// A blurb in the menus' face: bracketed words in gold, glyphs their pictures in gold (`PickScreen.glyphs`).
     static func blurbText(_ text: String, size: CGFloat, face: Int? = nil) -> Text {
         var made = Text("")
         for (index, piece) in PickScreen.blurbPieces(text).enumerated() {
@@ -187,33 +191,33 @@ struct DrinkPick: View {
             switch piece.kind {
             case .word(let word, let lit):
                 made = made + Text(word).foregroundColor(lit ? litColour : lineColour)
-            case .arrow(let turn):
-                made = made + Text(Image(uiImage: arrow(turn: turn, side: size)).renderingMode(.template)).foregroundColor(litColour)
+            case .glyph(let image, let turn):
+                made = made + Text(Image(uiImage: glyph(image, turn: turn, side: size)).renderingMode(.template)).foregroundColor(litColour)
             }
         }
         return made.font(.custom(face.map { Futuristic.typefaces[$0] } ?? Futuristic.fontName, size: size))
     }
 
-    /// The fat arrow at a size, turned from pointing right.
-    static func arrow(turn: CGFloat, side: CGFloat) -> UIImage {
-        let key = "\(turn)|\(side)"
-        if let made = arrows[key] { return made }
-        let source = UIImage(named: "FatArrow") ?? UIImage()
+    /// A glyph's picture at a size, turned anticlockwise.
+    static func glyph(_ name: String, turn: CGFloat, side: CGFloat) -> UIImage {
+        let key = "\(name)|\(turn)|\(side)"
+        if let made = glyphs[key] { return made }
+        let source = UIImage(named: name) ?? UIImage()
         let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { context in
             context.cgContext.translateBy(x: side / 2, y: side / 2)
             // UIKit's y runs down: a turn up (anticlockwise) is the other way here.
             context.cgContext.rotate(by: -turn)
             source.withTintColor(.white).draw(in: CGRect(x: -side / 2, y: -side / 2, width: side, height: side))
         }.withRenderingMode(.alwaysTemplate)
-        arrows[key] = image
+        glyphs[key] = image
         return image
     }
-    nonisolated(unsafe) private static var arrows: [String: UIImage] = [:]
+    nonisolated(unsafe) private static var glyphs: [String: UIImage] = [:]
 
     /// Frame 6 cut at its box's left edge into its tail and its box, each turned a quarter
     /// anticlockwise: the box stretched to its fixed size, the tail under it, small. The tail's line
     /// across it, as a share from its left once turned.
-    private static let frameSplit: CGFloat = 330.0 / 1358.0
+    private static let frameSplit = Futuristic.sixTailSplit
     static let tailLineShare: CGFloat = 0.49
     static let frameTail: UIImage = turnedPart(of: Futuristic.image("6"), from: 0, to: frameSplit)
     static let frameBox: UIImage = turnedPart(of: Futuristic.image("6"), from: frameSplit, to: 1)

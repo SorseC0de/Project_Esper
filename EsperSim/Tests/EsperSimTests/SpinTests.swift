@@ -50,4 +50,21 @@ final class SpinTests: XCTestCase {
         for frame in 0..<SnatchRules.frames { match.advance(inputs: [.idle, PlayerInput(throwBall: frame == 0)]) }
         XCTAssertEqual(match.ball.holder, 0)
     }
+
+    func testNothingTouchesTheSpinnerTheWholeSpin() {
+        var match = held(flo: 0)
+        spin(&match)
+        var spun = 0
+        while match.players[0].state == .spinning {
+            XCTAssertTrue(match.players[0].spinPhasing, "phasing every frame it's drawn spinning")
+            // Every way a hit lands: a strip (a thrown ball's, a power's, a slide's), a counter's stun.
+            match.strip(0, by: 1, knock: Vec2(x: 3, y: 1))
+            match.stunAsParried(0, by: 1)
+            XCTAssertEqual(match.players[0].hitStun, 0)
+            XCTAssertEqual(match.ball.holder, 0, "the ball kept")
+            match.advance(inputs: [.idle, .idle])
+            spun += 1
+        }
+        XCTAssertGreaterThanOrEqual(spun, SpinRules.frames - 3, "the whole spin, not cut short")
+    }
 }

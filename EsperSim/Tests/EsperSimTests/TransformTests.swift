@@ -146,6 +146,52 @@ final class TransformTests: XCTestCase {
         }
     }
 
+    func testTheChangeParriesASnatchAndAThrownBallToo() {
+        // A snatch reaching the change.
+        var snatched = standing()
+        snatched.players[1].position = Vec2(x: 112, y: 10)
+        snatched.players[1].grounded = true
+        snatched.players[1].facing = .left
+        snatched.advance(inputs: [both, .idle])
+        var parried = false
+        for frame in 0..<(TransformRules.burstFrame + 2) where !parried {
+            snatched.advance(inputs: [both, PlayerInput(throwBall: frame == 0)])
+            parried = snatched.events.contains(.parried(player: 1, by: 0))
+        }
+        XCTAssertTrue(parried, "the snatcher parried")
+        XCTAssertGreaterThan(snatched.players[1].hitStun, 0)
+
+        // A thrown ball reaching it.
+        var thrown = standing()
+        thrown.players[1].position = Vec2(x: 200, y: 10)
+        thrown.advance(inputs: [both, .idle])
+        thrown.ball.holder = nil
+        thrown.ball.release(from: Vec2(x: 112, y: thrown.players[0].body.center.y), velocity: Vec2(x: -4, y: 0), by: 1, straight: true)
+        thrown.ball.strikes = true
+        var turned = false
+        for _ in 0..<(TransformRules.burstFrame + 2) where !turned {
+            thrown.advance(inputs: [both, .idle])
+            turned = thrown.events.contains(.parried(player: 1, by: 0))
+        }
+        XCTAssertTrue(turned, "the thrower parried")
+        XCTAssertGreaterThan(thrown.players[1].hitStun, 0)
+        XCTAssertFalse(thrown.ball.strikes, "the ball turned away, nobody's")
+
+        // A shieldflip's shield reaching it.
+        var shielded = standing()
+        shielded.players[1].position = Vec2(x: 118, y: 10)
+        shielded.players[1].grounded = true
+        shielded.players[1].facing = .left
+        shielded.advance(inputs: [both, PlayerInput(shield: true)])
+        var broke = shielded.events.contains(.parried(player: 1, by: 0))
+        for _ in 0..<(TransformRules.burstFrame + 2) where !broke {
+            shielded.advance(inputs: [both, .idle])
+            broke = shielded.events.contains(.parried(player: 1, by: 0))
+        }
+        XCTAssertTrue(broke, "the shielder parried")
+        XCTAssertTrue(shielded.shields.isEmpty, "the shield broken")
+    }
+
     func testTheSecondInAStanceJustTakenStillChanges() {
         var match = standing()
         match.players[0].hasBall = true

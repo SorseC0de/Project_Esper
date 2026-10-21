@@ -34,6 +34,8 @@ public enum Animation: String, CaseIterable {
     case crouchWalk = "player_crouch_walk"
     case slide = "player_slide"
     case esperSlash = "player_esperslash"
+    /// The slash in the air: the same swing, drawn for the air.
+    case esperSlashAir = "player_esperslash_air"
     case snatch = "player_snatch"
     case snatchAir = "player_snatch_air"
     /// In FloState, the snatch, on the ground or in the air, drawn in its own sheet.
@@ -42,6 +44,8 @@ public enum Animation: String, CaseIterable {
     case shield = "player_shield"
     /// The Spin Move, the ball held round in it.
     case spinBall = "player_spin_ball"
+    /// The spin with nothing in hand: the Shieldflip's, and Gale Ale's double jump without the ball.
+    case spin = "player_spin"
     /// Knocked into the air, stunned: one frame, held.
     case stunnedAir = "player_stunned_air"
     /// In FloState on the ground, the slash's step through: both swings, one attack.
@@ -74,8 +78,8 @@ public enum Animation: String, CaseIterable {
         case .shield: 3
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall, .fly, .flyBall: 3
-        case .jumpSquat, .spinBall: 4
-        case .doubleJump, .doubleJumpBall, .wallLand, .wallLandBall, .esperSlash, .dunk: 6
+        case .jumpSquat, .spinBall, .spin: 4
+        case .doubleJump, .doubleJumpBall, .wallLand, .wallLandBall, .esperSlash, .esperSlashAir, .dunk: 6
         case .snatchFloState: 7
         case .esperSlashFloState: 9
         case .land: 9
@@ -105,7 +109,7 @@ public enum Animation: String, CaseIterable {
     /// The sheet's cell, its height; and its width, which is the same but on FloState's slash,
     /// wider for its reach.
     public var pixelSize: Double {
-        [.throwForward, .throwAir, .esperSlash, .esperSlashFloState, .beam, .beamArms].contains(self) ? 64 : 48
+        [.throwForward, .throwAir, .esperSlash, .esperSlashAir, .esperSlashFloState, .beam, .beamArms].contains(self) ? 64 : 48
     }
     public var pixelWidth: Double { self == .esperSlashFloState ? 80 : pixelSize }
 }
@@ -215,10 +219,11 @@ extension Player {
             return AnimationFrame(holding ? .skidBall : .skid, 0)
         case .air:
             if doubleJumpTimer > 0 {
-                // Gale Ale at level two: the Spin Move's spin in place of the flip, at its pace, the
-                // ball lifted off without one.
+                // Gale Ale at level two: the Spin Move's spin in place of the flip, at its pace;
+                // without the ball, the empty-handed spin.
                 if power == .galeAle, powerLevel >= 2 {
-                    return AnimationFrame(.spinBall, ((30 - doubleJumpTimer) * SpinRules.sheetFramesPerSecond / 60) % Animation.spinBall.frameCount)
+                    let sheet: Animation = hasBall ? .spinBall : .spin
+                    return AnimationFrame(sheet, ((30 - doubleJumpTimer) * SpinRules.sheetFramesPerSecond / 60) % sheet.frameCount)
                 }
                 return AnimationFrame(hasBall ? .doubleJumpBall : .doubleJump, (30 - doubleJumpTimer) * 12 / 60)
             }
@@ -256,7 +261,7 @@ extension Player {
         case .slashing where floSlash:
             return AnimationFrame(.esperSlashFloState, min(t * FloSlashRules.sheetFramesPerSecond / 60, FloSlashRules.sheetFrames - 1))
         case .slashing:
-            return AnimationFrame(.esperSlash, t * SlashRules.sheetFramesPerSecond / 60)
+            return AnimationFrame(slashAirborne ? .esperSlashAir : .esperSlash, t * SlashRules.sheetFramesPerSecond / 60)
         case .rolling:
             // The double jump's somersault, run through in the roll's frames.
             return AnimationFrame(.doubleJump, t * SlashRules.sheetFramesPerSecond / 60)

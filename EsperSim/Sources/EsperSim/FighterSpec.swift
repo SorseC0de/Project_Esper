@@ -72,6 +72,8 @@ public struct FighterSpec: Equatable {
     /// the shield lingers where it ends, and at level two every snatch raises one.
     public var guarderadeLevel = 0
     public var shelterSeltzerLevel = 0
+    /// Flo-efficient Frappe: FloState burns slower, and at level two every FLO gained is more.
+    public var floFrappeLevel = 0
     /// Quake-Up Coffee's level: one, a fast fall's landing quakes the floor it's on and falls
     /// faster; two, the quake shakes every floor.
     public var quakeLevel = 0
@@ -485,6 +487,8 @@ public enum WebRules {
 /// the ball as fast as level one without, lasts longer, and the stick forward is the
 /// glide: this fast, sinking this much a frame unless up is held, diving this fast on down.
 public enum SmoothieRules {
+    /// How far up the stick must be for jump to launch: half way, so a diagonal up counts.
+    public static let launchStickUp = 0.5
     public static func flightSpeed(level: Int, withBall: Bool) -> Double {
         level >= 2 ? (withBall ? 2.0 : 3.0) : (withBall ? 1.0 : 2.0)
     }
@@ -582,16 +586,6 @@ public enum StunRules {
     public static let locksMovement = false
 }
 
-/// The throw's stance parries a slash for its first frames, as the snatch does: the
-/// slasher is stripped and knocked back and the thrower keeps the ball; a snatch still
-/// takes it. Six: the two frames an input is held online and about four more (a 65 ms
-/// trip) before the other phone's slash start arrives, the least that still leaves a read
-/// online rather than luck.
-public enum ThrowParryRules {
-    /// A third of a second: at ten it was too short to read a slash coming.
-    public static let frames = 20
-}
-
 /// A parry's reward: the parrier back in neutral at once, free to do anything, while the one
 /// parried is locked out of every input, reeling, through the stun (`BallRules.hitStunFrames`)
 /// and this long more, so the parry can be made something of: two seconds in all, every counter's.
@@ -624,11 +618,10 @@ public enum RimRules {
 /// none for a basket.
 public enum HitStopRules {
     public static let hitFrames = 8
-    /// A counter's: the rock-paper-scissors won, a parry among them.
-    public static let counterFrames = 24
-    /// A slashclash's, a snatchclash's and a shieldclash's, held long.
-    public static let slashClashFrames = 32
-    public static let shieldClashFrames = 40
+    /// A counter's: the rock-paper-scissors won, a parry among them; under a clash's.
+    public static let counterFrames = 28
+    /// Every clash's, slash, snatch or shield, held long.
+    public static let clashFrames = 40
 }
 
 /// A clash over: both bodies pushed hard down and away from where they met, nothing answering

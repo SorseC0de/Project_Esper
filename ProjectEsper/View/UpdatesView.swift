@@ -46,21 +46,49 @@ struct UpdatesView: View {
     private func list(width: CGFloat, height: CGFloat) -> some View {
         let titleSize = height * UpdatesView.titleShare
         let bulletSize = height * UpdatesView.bulletShare
-        return ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .leading, spacing: bulletSize * 0.6) {
-                    ForEach(Array(UpdatesNotes.lines.enumerated()), id: \.offset) { index, line in
-                        row(line, titleSize: titleSize, bulletSize: bulletSize, width: width).id(index)
+        return VStack(spacing: bulletSize * 0.6) {
+            tabs(size: height * UpdatesView.tabShare)
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(alignment: .leading, spacing: bulletSize * 0.6) {
+                        ForEach(Array(flow.updatesLines.enumerated()), id: \.offset) { index, line in
+                            row(line, titleSize: titleSize, bulletSize: bulletSize, width: width).id(index)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, bulletSize * 0.5)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, bulletSize * 0.5)
-            }
-            .onChange(of: flow.updatesLine) { _, line in
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(line, anchor: .top) }
+                .id(flow.updatesBuild)
+                .onChange(of: flow.updatesLine) { _, line in
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(line, anchor: .top) }
+                }
             }
         }
     }
+
+    /// The builds side by side, newest first, each its number in a circle; the shown one gold.
+    private func tabs(size: CGFloat) -> some View {
+        HStack(spacing: size * 0.4) {
+            ForEach(Array(UpdatesNotes.builds.enumerated()), id: \.offset) { index, build in
+                let shown = index == flow.updatesBuild
+                let colour = shown ? Futuristic.lit : Futuristic.line
+                Button { flow.showUpdatesBuild(index) } label: {
+                    Text("\(build.number)")
+                        .font(Futuristic.font(size: size * UpdatesView.tabNumberShare, face: UpdatesNotes.face))
+                        .foregroundStyle(colour)
+                        .frame(width: size, height: size)
+                        .overlay(Circle().stroke(colour, lineWidth: max(size * 0.06, 1.5)))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .noSystemFocus()
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+    /// A tab's circle against the box's height, and its number against the circle.
+    static let tabShare: CGFloat = 0.075
+    static let tabNumberShare: CGFloat = 0.45
 
     @ViewBuilder
     private func row(_ line: UpdatesNotes.Line, titleSize: CGFloat, bulletSize: CGFloat, width: CGFloat) -> some View {
@@ -134,8 +162,9 @@ struct UpdatesIcon: View {
                     }
                 case .pose(let pose):
                     if let shown = flow.scene.updatesPose(pose, tick: Int(time * 60)) {
-                        CustomizeFigure(portrait: shown.portrait, look: flow.scene.playerLook(0), pixel: pixel, mirrored: false,
-                                        headNudge: shown.headNudge, headScale: shown.headScale, extras: shown.extras)
+                        let look = flow.scene.playerLook(pose == .floState ? SpriteLibrary.transformedPlayer(0) : 0)
+                        CustomizeFigure(portrait: shown.portrait, look: look, pixel: pixel, mirrored: false,
+                                        headNudge: shown.headNudge, headScale: shown.headScale, extras: shown.extras, floState: pose == .floState)
                             .frame(width: canvas * pixel, height: canvas * pixel)
                             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     }

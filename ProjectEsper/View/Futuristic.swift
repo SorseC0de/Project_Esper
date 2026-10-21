@@ -96,6 +96,17 @@ enum Futuristic {
     }()
     static var taillessEightFaceY: CGFloat { (faces["8"]?.y ?? 0.5) / taillessEightRows }
 
+    /// Frame 6 cut where its box meets its tail, a share of its width from the left; and its box
+    /// alone, without the tail, the settings' categories.
+    static let sixTailSplit: CGFloat = 330.0 / 1358.0
+    @MainActor static let taillessSix: UIImage = {
+        let whole = image("6")
+        guard let picture = whole.cgImage else { return whole }
+        let left = Int(CGFloat(picture.width) * sixTailSplit)
+        guard let cut = picture.cropping(to: CGRect(x: left, y: 0, width: picture.width - left, height: picture.height)) else { return whole }
+        return UIImage(cgImage: cut, scale: whole.scale, orientation: whole.imageOrientation)
+    }()
+
     /// Frame 2 without the tail into its top left, the title's UPDATES: its picture from the thin
     /// line beside its left wall, and that line carried straight on where the tail crossed it.
     static let taillessTwoLeft = 334
@@ -184,6 +195,8 @@ enum Futuristic {
         "box4": CGPoint(x: 0.38, y: 0.50),
         // Frame 2 without its tail (`taillessTwo`).
         "2": CGPoint(x: 0.52, y: 0.65),
+        // Frame 6 without its tail (`taillessSix`): 6's face, against the box alone.
+        "6tailless": CGPoint(x: (0.62 - sixTailSplit) / (1 - sixTailSplit), y: 0.49),
     ]
 }
 

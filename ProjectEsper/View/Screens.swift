@@ -445,8 +445,7 @@ final class PickScreen: Screen {
 
     /// What the drink does in the menus' face, in as many lines as it needs, at the largest of its
     /// sizes whose lines all fit across and stack within its room. A word in brackets is lit, in
-    /// the menus' gold, the brackets not drawn; [Up], [Down], [Left] and [Right] are the fat arrow
-    /// (`fat_arrow.svg`) turned that way, in gold.
+    /// the menus' gold, the brackets not drawn; a glyph's name is its picture, in gold (`glyphs`).
     private func layBlurb(_ text: String) {
         blurb.removeAllChildren()
         let room = CGSize(width: min(PickScreen.blurbRoom.width, halfWidth * 1.6), height: PickScreen.blurbRoom.height)
@@ -455,7 +454,7 @@ final class PickScreen: Screen {
         func width(_ piece: BlurbPiece, _ size: CGFloat) -> CGFloat {
             switch piece.kind {
             case .word(let word, _): (word as NSString).size(withAttributes: [.font: font(size)]).width
-            case .arrow: Futuristic.fontSize(size) * PickScreen.arrowShare
+            case .glyph: Futuristic.fontSize(size) * PickScreen.glyphShare
             }
         }
         func space(_ size: CGFloat) -> CGFloat { (" " as NSString).size(withAttributes: [.font: font(size)]).width }
@@ -502,39 +501,48 @@ final class PickScreen: Screen {
                     label.fontColor = lit ? Futuristic.litColour : Futuristic.lineColour
                     label.position = CGPoint(x: x, y: y)
                     blurb.addChild(label)
-                case .arrow(let turn):
-                    let arrow = SKSpriteNode(texture: PickScreen.arrowTexture)
-                    arrow.size = CGSize(width: wide, height: wide)
-                    arrow.color = Futuristic.litColour
-                    arrow.colorBlendFactor = 1
-                    arrow.zRotation = turn
-                    arrow.position = CGPoint(x: x + wide / 2, y: y)
-                    blurb.addChild(arrow)
+                case .glyph(let image, let turn):
+                    let glyph = SKSpriteNode(texture: PickScreen.glyphTexture(image))
+                    glyph.size = CGSize(width: wide, height: wide)
+                    glyph.color = Futuristic.litColour
+                    glyph.colorBlendFactor = 1
+                    glyph.zRotation = turn
+                    glyph.position = CGPoint(x: x + wide / 2, y: y)
+                    blurb.addChild(glyph)
                 }
                 x += wide
             }
         }
     }
 
-    /// A piece of a blurb: a word, lit or not, or an arrow turned from pointing right; and
+    /// A piece of a blurb: a word, lit or not, or a glyph, its picture turned anticlockwise; and
     /// whether a space comes before it ("[Stun]." has none before its stop).
     struct BlurbPiece {
-        enum Kind { case word(String, lit: Bool), arrow(CGFloat) }
+        enum Kind { case word(String, lit: Bool), glyph(String, turn: CGFloat) }
         let kind: Kind
         let spaced: Bool
     }
-    /// The arrow's size against the lettering's.
-    static let arrowShare: CGFloat = 0.9
-    static let arrowTurns: [String: CGFloat] = ["Right": 0, "Up": .pi / 2, "Left": .pi, "Down": -.pi / 2]
-    /// The fat arrow, white, for the blurb to colour.
-    static let arrowTexture: SKTexture = {
-        let source = UIImage(named: "FatArrow") ?? UIImage()
+    /// A glyph's size against the lettering's.
+    static let glyphShare: CGFloat = 0.9
+    /// The names drawn as pictures: the directions the fat arrow (`fat_arrow.svg`) turned that
+    /// way, and the buttons their icons.
+    static let glyphs: [String: (image: String, turn: CGFloat)] = [
+        "Right": ("FatArrow", 0), "Up": ("FatArrow", .pi / 2), "Left": ("FatArrow", .pi), "Down": ("FatArrow", -.pi / 2),
+        "Strike": ("StrikeIcon", 0), "Guard": ("GuardIcon", 0),
+    ]
+    /// A glyph's picture, white, for the blurb to colour.
+    static func glyphTexture(_ name: String) -> SKTexture {
+        if let made = glyphTextures[name] { return made }
+        let source = UIImage(named: name) ?? UIImage()
         let side: CGFloat = 64
         let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in
             source.withTintColor(.white).draw(in: CGRect(x: 0, y: 0, width: side, height: side))
         }
-        return SKTexture(image: image)
-    }()
+        let made = SKTexture(image: image)
+        glyphTextures[name] = made
+        return made
+    }
+    nonisolated(unsafe) private static var glyphTextures: [String: SKTexture] = [:]
 
     /// A blurb's pieces: its words, the bracketed ones lit and the arrows' names arrows.
     static func blurbPieces(_ text: String) -> [BlurbPiece] {
@@ -555,8 +563,8 @@ final class PickScreen: Screen {
             words(rest[..<open], lit: false)
             guard let close = rest[open...].firstIndex(of: "]") else { break }
             let inside = rest[rest.index(after: open)..<close]
-            if let turn = arrowTurns[String(inside)] {
-                pieces.append(BlurbPiece(kind: .arrow(turn), spaced: spaced || pieces.isEmpty == false && spaced))
+            if let glyph = glyphs[String(inside)] {
+                pieces.append(BlurbPiece(kind: .glyph(glyph.image, turn: glyph.turn), spaced: spaced || pieces.isEmpty == false && spaced))
                 spaced = false
             } else {
                 words(inside, lit: true)

@@ -292,6 +292,168 @@ extension Opponent {
     static let settleFrames: ClosedRange<Int> = 8...27
     static let settleAwayChance: UInt32 = 40
 
+    /// In close on the ball's holder, the swing: the snatch at the hand, the shield on them (it
+    /// shoves them and knocks the ball loose, though a throw breaks it), or the slash.
+    mutating func defensiveSwing(gap: Double, into input: inout PlayerInput) {
+        let pick = roll(100)
+        if abs(gap) <= Opponent.swingSnatchReach, pick < Opponent.swingSnatchChance {
+            tapThrow(&input)
+        } else if pick < Opponent.swingSnatchChance + Opponent.swingShieldChance {
+            input.shield = !pressed.shield
+        } else {
+            tapShoot(&input)
+        }
+    }
+    static let swingSnatchReach = 12.0
+    static let swingSnatchChance: UInt32 = 35
+    static let swingShieldChance: UInt32 = 30
+
+    /// The Wreck Center's belts carry a loose ball to their end, where it drops into the rim below
+    /// and scores. Riding toward the rim it guards, the ball's not chased up there: it waits under
+    /// the drop and goes up to meet it as it falls, the shield or the slash, decided once a drop,
+    /// and a frame or two early or late as a person is.
+    mutating func guardTheBeltDrop(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) -> Bool {
+        let ball = match.ball
+        func onBelt(_ belt: Conveyor) -> Bool {
+            abs(ball.position.y - BallRules.radius - belt.box.max.y) < 0.5
+                && ball.position.x + BallRules.radius > belt.box.min.x && ball.position.x - BallRules.radius < belt.box.max.x
+        }
+        let rim = hoop(scoredOnBy: human.index, in: match).position
+        // Riding a belt, or just off its end and falling into the rim.
+        let riding = ball.velocity.y == 0 ? match.stage.conveyors.first(where: onBelt) : nil
+        let falling = beltPick != nil && ball.velocity.y < 0 && ball.position.y > rim.y - 10 && abs(ball.position.x - rim.x) < 30
+        guard ball.isLive, ball.holder == nil, !me.holding, ball.lastTouched != index, riding != nil || falling else {
+            beltPick = nil
+            beltClimb = nil
+            return false
+        }
+        if falling { beltClimb = nil }
+        var due = 0.0, dropX = ball.position.x
+        // Met at the top of its highest jump, where the shield's reach round its middle and the
+        // blade's from its chest come up over the rim; the ball falling into that.
+        let lift = me.fullHopVelocity, gravity = max(me.gravity, 0.01), second = me.spec.doubleJumpVelocity
+        let twice = me.jumpsLeft > 1
+        let topFeet = me.position.y + lift * lift / (2 * gravity) + (twice ? second * second / (2 * gravity) : 0)
+        let meetY = min(topFeet + BallRules.chestHeight * me.spec.scale + Opponent.beltMeetOverChest, rim.y + Opponent.beltMeetOverRim)
+        if let belt = riding {
+            // Its end: along the belts joined to it the same way.
+            var end = belt.way > 0 ? belt.box.max.x : belt.box.min.x
+            while let next = match.stage.conveyors.first(where: { $0.way == belt.way && abs($0.box.max.y - belt.box.max.y) < 0.5
+                && abs((belt.way > 0 ? $0.box.min.x : $0.box.max.x) - end) < 0.5 }) {
+                end = belt.way > 0 ? next.box.max.x : next.box.min.x
+            }
+            guard abs(end - rim.x) < Opponent.beltRimReach, rim.y < belt.box.max.y else {
+                beltPick = nil
+                return false
+            }
+            dropX = end + belt.way * BallRules.radius
+            let toEnd = max((end - ball.position.x) * belt.way + BallRules.radius, 0) / WreckCenterRules.beltSpeed
+            if climbToTheBelt(match, me: me, top: belt.box.max.y, face: end, way: belt.way, ballX: ball.position.x, toEnd: toEnd, into: &input) { return true }
+            let fall = max(belt.box.max.y + BallRules.radius - meetY, 0)
+            due = toEnd + (2 * fall / BallRules.gravity).squareRoot()
+        }
+        if beltPick == nil {
+            beltPick = roll(100)
+            beltSlop = Int(roll(5)) - 2
+        }
+        let pick = beltPick ?? 0
+        if !me.grounded {
+            // Up: under it, the second jump at the top if the first won't get the hands there, and
+            // in reach, the answer.
+            let toDrop = (falling ? ball.position.x : dropX) - me.position.x
+            if abs(toDrop) > 2 { input.stick = Vec2(x: toDrop > 0 ? 1 : -1, y: 0) }
+            // Each answer pressed its own startup early, where the ball will be by then in its reach:
+            // the shield's round the body's middle, the blade's and the hand's out front.
+            let snatching = pick < Opponent.beltSnatchChance
+            let shielding = !snatching && pick < Opponent.beltSnatchChance + Opponent.beltShieldChance
+            let startup = snatching ? SnatchRules.activeFrames.lowerBound : (shielding ? 1 : SlashRules.liveFrames.lowerBound)
+            let reach = shielding ? (me.spec.guarderadeLevel >= 1 ? ShieldRules.guarderadeReach : ShieldRules.reach) + BallRules.radius
+                : (snatching ? Opponent.beltHandReach : SlashRules.reach + BallRules.radius)
+            let centre = shielding ? me.body.center : me.chest
+            if ballPosition(ball, after: startup).distance(to: centre) <= reach {
+                if snatching { tapThrow(&input) } else if shielding { input.shield = !pressed.shield } else { tapShoot(&input) }
+                return true
+            }
+            if me.jumpsLeft > 0, me.velocity.y < Opponent.doubleJumpBelow, meetY > me.position.y + Opponent.handsOverFeet + 4 { tapJump(&input) }
+            return true
+        }
+        // Under the drop, then up so the top of the jump comes as it falls by.
+        let toDrop = dropX - me.position.x
+        if abs(toDrop) > 3 { input.stick = Vec2(x: toDrop > 0 ? 1 : -1, y: 0) }
+        let rise = lift / gravity + (twice ? second / gravity : 0)
+        let lead = Double(me.spec.jumpSquatFrames) + rise + Double(beltSlop)
+        if abs(toDrop) <= 8, due <= lead { fullHop(&input) }
+        return true
+    }
+    /// The ball riding a belt to its rim, with time to beat it there: up onto the middle platform,
+    /// off it at the wall under the belt (the block's face and the backboard's under it) with both
+    /// jumps, off the wall at every cling till over the lip, and up there in the ball's way, where
+    /// it's caught. `face`: the wall's, the belt's end; `way`: the belt's, toward it from the wall.
+    mutating func climbToTheBelt(_ match: Match, me: Player, top: Double, face: Double, way: Double, ballX: Double,
+                                 toEnd: Double, into input: inout PlayerInput) -> Bool {
+        let side = -way
+        // Up on it: in the ball's way.
+        if me.grounded, abs(me.position.y - top) < 1, (me.position.x - face) * side > 0 {
+            beltClimb = nil
+            let toBall = ballX - me.position.x
+            if abs(toBall) > 4 { input.stick = Vec2(x: toBall > 0 ? 1 : -1, y: 0) }
+            return true
+        }
+        guard let platform = match.stage.dropPlatforms.first else { return false }
+        let platformTop = platform.top
+        let firstColumn = match.stage.dropPlatforms.map { $0.columns.lowerBound }.min() ?? 0
+        let lastColumn = match.stage.dropPlatforms.map { $0.columns.upperBound }.max() ?? 0
+        let platformSpan = Double(firstColumn) * Stage.tileSize...Double(lastColumn + 1) * Stage.tileSize
+        let onPlatform = me.grounded && abs(me.position.y - platformTop) < 1 && platformSpan.contains(me.position.x)
+        // Back down on the floor partway: the climb's over, or begun again if there's still time.
+        if me.grounded, me.position.y < platformTop - 1, beltClimb != nil, beltClimb != .mounting { beltClimb = nil }
+        if case .climbing(let frames)? = beltClimb {
+            beltClimb = .climbing(frames: frames + 1)
+            input.stick = Vec2(x: side, y: 0)
+            if frames == 0 { fullHop(&input) }
+            if frames == Opponent.climbSecondJump || (me.state == .wallLand && me.stateTimer >= Opponent.climbCling) { tapJump(&input) }
+            return true
+        }
+        let middle = (platformSpan.lowerBound + platformSpan.upperBound) / 2
+        let mount = onPlatform ? 0 : abs(middle - me.position.x) / max(me.spec.runSpeed, 0.1) + Opponent.climbMountFrames
+        if onPlatform {
+            guard mount + Opponent.climbFrames <= toEnd else { return false }
+            beltClimb = .climbing(frames: 0)
+            input.stick = Vec2(x: side, y: 0)
+            fullHop(&input)
+            return true
+        }
+        guard beltClimb == .mounting || (me.grounded && me.position.y < platformTop && mount + Opponent.climbFrames <= toEnd) else { return false }
+        // Onto the platform: under its middle, up through it, the second jump just high enough to clear it.
+        beltClimb = .mounting
+        let toMiddle = middle - me.position.x
+        if abs(toMiddle) > 3 { input.stick = Vec2(x: toMiddle > 0 ? 1 : -1, y: 0) }
+        if me.grounded {
+            if abs(toMiddle) <= 12 { fullHop(&input) }
+        } else if me.jumpsLeft > 0, me.position.y < platformTop, me.position.y >= platformTop - Opponent.mountSecondJumpUnder {
+            tapJump(&input)
+        }
+        return true
+    }
+    /// The climb's timings, off the sim from anywhere on the platform: the second jump this many
+    /// frames after the first, off the wall this many into a cling; the frames up from the
+    /// platform at worst, and onto it from under its middle, the second jump this far under its top.
+    static let climbSecondJump = 22
+    static let climbCling = 2
+    static let climbFrames = 130.0
+    static let climbMountFrames = 40.0
+    static let mountSecondJumpUnder = 22.0
+
+    /// Where it meets a belt's drop, over the rim; how near the rim a belt's end must be to drop
+    /// into it; the snatch's reach from the chest; and the answers' shares.
+    static let beltMeetOverRim = 14.0
+    static let beltMeetOverChest = 8.0
+    static let beltRimReach = 40.0
+    static let beltHandReach = 24.0
+    /// The snatch's hand is out front at the chest, under a drop's reach: none.
+    static let beltSnatchChance: UInt32 = 0
+    static let beltShieldChance: UInt32 = 70
+
     /// The other's shot on its way: gone after from the ground, as a person goes after every one.
     /// The earliest point along its flight it can get under and up to in time is run to, and the
     /// jump goes as the ball's due there; in the air the shield, the slash or the snatch picked for

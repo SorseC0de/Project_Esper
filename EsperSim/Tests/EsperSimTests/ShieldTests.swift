@@ -109,8 +109,8 @@ final class ShieldTests: XCTestCase {
         raise(&match)
         XCTAssertTrue(match.shields.isEmpty, "both broken")
         XCTAssertTrue(match.events.contains { if case .shieldClashed = $0 { return true } else { return false } })
-        XCTAssertEqual(match.hitStop, HitStopRules.shieldClashFrames)
-        for _ in 0..<HitStopRules.shieldClashFrames { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.hitStop, HitStopRules.clashFrames)
+        for _ in 0..<HitStopRules.clashFrames { match.advance(inputs: [.idle, .idle]) }
         XCTAssertLessThan(match.players[0].velocity.x, 0)
         XCTAssertGreaterThan(match.players[1].velocity.x, 0)
         XCTAssertEqual(match.players[0].state, .air, "off the flip")
@@ -369,6 +369,30 @@ final class ShieldTests: XCTestCase {
         XCTAssertTrue((ShieldRules.loopFrames.lowerBound...ShieldRules.sheetFrames - 1).contains(match.shields.first!.sheetFrame))
         for _ in 0..<ShieldRules.shelterLingerFrames { match.advance(inputs: [.idle, .idle]) }
         XCTAssertTrue(match.shields.isEmpty, "gone after its second")
+    }
+
+    func testSnatchingAPlantedShieldBreaksItWithoutStunningItsRaiser() {
+        var match = drinking(.shelterSeltzer, level: 1)
+        match.advance(inputs: [PlayerInput(shield: true), .idle])
+        while match.shields.first.map({ !$0.planted }) ?? false { match.advance(inputs: [.idle, .idle]) }
+        guard let planted = match.shields.first, planted.planted else { return XCTFail("planted") }
+        // The raiser well away; the other snatching at the planted shield.
+        match.players[0].position.x = 30
+        match.players[1].position = Vec2(x: planted.pivot.x + 12, y: planted.pivot.y - 10)
+        match.players[1].facing = .left
+        match.players[1].hasBall = false
+        for frame in 0..<SnatchRules.frames { match.advance(inputs: [.idle, PlayerInput(throwBall: frame == 0)]) }
+        XCTAssertTrue(match.shields.isEmpty, "the snatch breaks it")
+        XCTAssertEqual(match.players[0].hitStun, 0, "its raiser, far off, isn't stunned")
+        XCTAssertFalse(match.players[0].parryLocked)
+    }
+
+    func testScorelockedNoShieldIsRaised() {
+        var match = court()
+        match.players[0].pickupLockout = 30
+        match.advance(inputs: [PlayerInput(shield: true), .idle])
+        XCTAssertTrue(match.shields.isEmpty, "scorelocked, as the slash is")
+        XCTAssertNotEqual(match.players[0].state, .flipJump)
     }
 
     func testShelterSeltzerPlantsAStillShieldOnlyAsTheFlipsLeaves() {

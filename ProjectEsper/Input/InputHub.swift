@@ -91,7 +91,7 @@ final class InputHub {
             controller.extendedGamepad?.buttonMenu.pressedChangedHandler = { [weak self] _, _, pressed in
                 if pressed { MainActor.assumeIsolated { self?.pausePressed = true } }
             }
-            // B is a shoot button here; unclaimed, the TV reads it as back and leaves the app.
+            // B is Guard here; unclaimed, the TV reads it as back and leaves the app.
             controller.extendedGamepad?.buttonB.pressedChangedHandler = { _, _, _ in }
         }
         #endif
@@ -216,8 +216,8 @@ final class InputHub {
         return hitboxTogglePressed
     }
 
-    /// A: jump. B and the right bumper: shoot, each its own button so a second one cancels a
-    /// shot. X: throw. Y: taunt. Up and X, on defence: the shield. The left bumper steps the POWER
+    /// A: jump. X (square) and the right bumper: Strike, each its own button so a second one cancels a
+    /// shot. B (circle): Guard. Y: taunt. Up and B, on defence: the shield. As the keyboard's J and K, left and right. The left bumper steps the POWER
     /// picker, the menu button pauses, and clicking the right stick switches the computer.
     /// The right stick aims a stance; failing that, the left stick does.
     private func read(_ pad: GCExtendedGamepad) -> PlayerInput {
@@ -228,8 +228,8 @@ final class InputHub {
         var input = PlayerInput(stick: stick)
         input.aim = rightStick.length >= BallRules.flickThreshold ? rightStick : stick
         input.jump = pad.buttonA.isPressed
-        input.shootButtons = (pad.buttonB.isPressed ? 1 : 0) | (pad.rightShoulder.isPressed ? 2 : 0)
-        input.throwBall = pad.buttonX.isPressed
+        input.shootButtons = (pad.buttonX.isPressed ? 1 : 0) | (pad.rightShoulder.isPressed ? 2 : 0)
+        input.throwBall = pad.buttonB.isPressed
         input.taunt = pad.buttonY.isPressed
         return input
     }

@@ -283,6 +283,17 @@ final class GameScene: SKScene {
     private static let hoodLineZ: CGFloat = -0.001
     private var hoodFlashes: [SKSpriteNode] = []
     private var hoodStrings: [HoodStrings] = []
+    /// FloState's strings, diamonds in the Metal layer (`FloStrings`): each player's cords, and
+    /// what they drew this frame.
+    private var floStringMotions: [FloStrings.Motion] = []
+    private var floStringInstances: [[CubeInstance]] = []
+    /// Each diamond's footprint for the glow's mask.
+    private var floStringGlows: [[BodySnapshot]] = []
+    var diamondInstances: [CubeInstance] {
+        floStringInstances.indices.filter { index in
+            index < playerNodes.count && !playerNodes[index].isHidden && (index >= figureLayers.count || !figureLayers[index].isHidden)
+        }.flatMap { floStringInstances[$0] }
+    }
     /// Each body's front leg drawn over its ball in hand, on the sheets that pass the ball behind it.
     private var legsOverBall: [SKSpriteNode] = []
     private var armsOverHood: [SKSpriteNode] = []
@@ -504,6 +515,10 @@ final class GameScene: SKScene {
     /// where they met, the screen's colours split in the two energies; eased in and back out.
     private var clashAt: Vec2?
     private var clashShare: CGFloat = 0
+    /// A parry's colour split, as a clash's but with no close-in: where, how far in, and its clock.
+    private var parryAt: Vec2?
+    private var parryShare: CGFloat = 0
+    private var parryLastTime: CFTimeInterval?
     private var clashLastTime: CFTimeInterval?
     private static let clashZoom: CGFloat = 0.9
     /// The share of the way the camera leans to where they met.
@@ -761,7 +776,9 @@ final class GameScene: SKScene {
             node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
                                             size: node.size, zRotation: node.zRotation) }
         }
-        return strings + apart + strikes + beam
+        // FloState's strings' diamonds, over the body too, as the strings were.
+        let diamonds = floStringGlows.indices.filter { !greyedOut.contains($0) }.flatMap { floStringGlows[$0] }
+        return strings + apart + strikes + beam + diamonds
     }
     var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
     /// The players whose hooded head is FloState's, its face energy.
@@ -792,6 +809,13 @@ final class GameScene: SKScene {
             for texture in [body.texture, outline.isHidden ? nil : outline.texture].compactMap({ $0 }) {
                 bodies.append(BodySnapshot(texture: texture, position: body.position, anchor: body.anchorPoint, xScale: body.xScale,
                                            size: body.size, zRotation: body.zRotation))
+            }
+        }
+        // The hooded heads and the energy form's own, so what's behind a player (FloState's far string) is behind its head too.
+        for node in hoodNodes + headNodes where !node.isHidden && node.parent != nil {
+            if let texture = node.texture {
+                bodies.append(BodySnapshot(texture: texture, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
+                                           size: node.size, zRotation: node.zRotation))
             }
         }
         return bodies
@@ -1372,6 +1396,9 @@ final class GameScene: SKScene {
             figure.addChild(hoodFlash)
             hoodFlashes.append(hoodFlash)
             hoodStrings.append(HoodStrings(parent: figure, square: sprites.flatSquare(size: 1, alpha: 1)))
+            floStringMotions.append(FloStrings.Motion())
+            floStringInstances.append([])
+            floStringGlows.append([])
             let eyes = SKSpriteNode()
             eyes.zPosition = 0.035
             eyes.isHidden = true
@@ -3871,17 +3898,18 @@ final class GameScene: SKScene {
             controls.addSlider(title: "\(name) HEAD X", range: -12...12, notch: 1, value: Float(pose.x)) { GameScene.headPoses[name]?.x = CGFloat($0); GameScene.keepHeadPoses() }
             controls.addSlider(title: "\(name) HEAD Y", range: -12...12, notch: 1, value: Float(pose.y)) { GameScene.headPoses[name]?.y = CGFloat($0); GameScene.keepHeadPoses() }
         }
-        // The touch pad's shield capsule round the throw button: its gap, its length and where round.
-        if GameScene.touchControlsShown {
-            controls.addSlider(title: "SHIELD BTN GAP", range: 0...40, notch: 1, value: Float(TouchControls.shieldGap)) { [weak controls] in
-                TouchControls.shieldGap = CGFloat($0); controls?.relayoutShield()
-            }
-            controls.addSlider(title: "SHIELD BTN LENGTH", range: 20...340, notch: 5, value: Float(TouchControls.shieldLengthDegrees)) { [weak controls] in
-                TouchControls.shieldLengthDegrees = CGFloat($0); controls?.relayoutShield()
-            }
-            controls.addSlider(title: "SHIELD BTN ANGLE", range: 0...360, notch: 5, value: Float(TouchControls.shieldAngleDegrees)) { [weak controls] in
-                TouchControls.shieldAngleDegrees = CGFloat($0); controls?.relayoutShield()
-            }
+        // FloState's strings (`FloStrings`): the tip's heading, a diamond's size, spacing and length, and how many.
+        func keep(_ value: Float, _ key: String) { UserDefaults.standard.set(Double(value), forKey: key) }
+        controls.addSlider(title: "STRING TIP ANGLE", range: 60...270, notch: 5, value: FloStrings.tipAngle) { FloStrings.tipAngle = $0; keep($0, FloStrings.tipAngleKey) }
+        controls.addSlider(title: "DIAMOND SIZE", range: 0.6...4, notch: 0.1, value: FloStrings.width) { FloStrings.width = $0; keep($0, FloStrings.sizeKey) }
+        controls.addSlider(title: "DIAMOND SPACING", range: 1...6, notch: 0.25, value: FloStrings.segment) { FloStrings.segment = $0; keep($0, FloStrings.spacingKey) }
+        controls.addSlider(title: "DIAMOND LENGTH", range: 1...3, notch: 0.05, value: FloStrings.lengthShare) { FloStrings.lengthShare = $0; keep($0, FloStrings.lengthKey) }
+        controls.addSlider(title: "STRINGS X", range: -16...16, notch: 1, value: FloStrings.offsetX) { FloStrings.offsetX = $0; keep($0, FloStrings.offsetXKey) }
+        controls.addSlider(title: "STRINGS Y", range: -16...16, notch: 1, value: FloStrings.offsetY) { FloStrings.offsetY = $0; keep($0, FloStrings.offsetYKey) }
+        controls.addSlider(title: "STRINGS TURN", range: -180...180, notch: 5, value: FloStrings.turn) { FloStrings.turn = $0; keep($0, FloStrings.turnKey) }
+        controls.addSlider(title: "STRING LENGTH", range: 3...20, notch: 1, value: Float(FloStrings.diamonds)) { value in
+            FloStrings.diamonds = Int(value.rounded())
+            UserDefaults.standard.set(FloStrings.diamonds, forKey: FloStrings.countKey)
         }
         // The preset arc, a shot with no flick: its peak over the release and its length, in units.
         // Aimed at the shooter's rim (ARC DISTANCE unused), or fixed the way the body faces.
@@ -4082,26 +4110,44 @@ final class GameScene: SKScene {
             let right = pad.stick.x >= 0.5 && menuLast.stick.x < 0.5, left = pad.stick.x <= -0.5 && menuLast.stick.x > -0.5
             let down = pad.stick.y <= -0.5 && menuLast.stick.y > -0.5, up = pad.stick.y >= 0.5 && menuLast.stick.y < 0.5
             if let flowState, flowState.updatesOpen {
-                // What's new, over everything: up and down scroll it, jump or back puts it away.
+                // What's new, over everything: up and down scroll it, left and right across the
+                // builds' tabs (newest on the left), jump or back puts it away.
                 if down { flowState.scrollUpdates(1) }
                 if up { flowState.scrollUpdates(-1) }
+                if right { flowState.showUpdatesBuild(flowState.updatesBuild + 1) }
+                if left { flowState.showUpdatesBuild(flowState.updatesBuild - 1) }
                 if picked || backed {
                     menuNeedsRelease = true
                     flowState.closeUpdates()
                 }
             } else if let flowState, flowState.settingsOpen {
-                // The settings, over the title or the pause: up and down a row, left and right
-                // its choice, jump on BACK or B to shut them.
-                if down { flowState.moveSettingsCursor(1) }
-                if up { flowState.moveSettingsCursor(-1) }
-                if right { flowState.stepSetting(1) }
-                if left { flowState.stepSetting(-1) }
-                if picked {
-                    menuNeedsRelease = true
-                    if flowState.settingsCursor >= GameSettings.Row.allCases.count { flowState.closeSettings() } else { flowState.stepSetting(1) }
-                } else if backed {
-                    menuNeedsRelease = true
-                    flowState.closeSettings()
+                // The settings, over the title or the pause. The categories: left and right across
+                // them, jump opens one. One open: up and down its rows (up past the first onto its
+                // button), left and right a row's choice, jump on its button or B shuts it; B again
+                // shuts the screen. Nothing while a category opens or shuts or the players reload.
+                if flowState.settingsLocked {
+                } else if flowState.settingsCategory == nil {
+                    if right { flowState.moveSettingsCategoryCursor(1) }
+                    if left { flowState.moveSettingsCategoryCursor(-1) }
+                    if picked, let category = GameSettings.Category(rawValue: flowState.settingsCategoryCursor) {
+                        menuNeedsRelease = true
+                        flowState.openSettingsCategory(category)
+                    } else if backed {
+                        menuNeedsRelease = true
+                        flowState.closeSettings()
+                    }
+                } else {
+                    if down { flowState.moveSettingsCursor(1) }
+                    if up { flowState.moveSettingsCursor(-1) }
+                    if right { flowState.stepSetting(1) }
+                    if left { flowState.stepSetting(-1) }
+                    if picked {
+                        menuNeedsRelease = true
+                        if flowState.settingsCursor < 0 { flowState.closeSettingsCategory() } else { flowState.stepSetting(1) }
+                    } else if backed {
+                        menuNeedsRelease = true
+                        flowState.closeSettingsCategory()
+                    }
                 }
             } else if let screen {
                 if right || down { screen.move(1) }
@@ -5100,6 +5146,9 @@ final class GameScene: SKScene {
                 say(.spike, at: at, away: side(at, from: players[index].chest), rise: -15)
             case .countered(_, let by, let at):
                 say(.parry, at: at, away: side(at, from: players[by].chest), rise: 25)
+                parryAt = at
+                parryShare = 0
+                parryLastTime = nil
             case .slashClanked(let index):
                 // Where the blade meets the wall, back off it.
                 let player = players[index]
@@ -5398,7 +5447,7 @@ final class GameScene: SKScene {
     private func pickScreenFrames() -> [SKTexture] {
         match.players.indices.flatMap { drinkerFrames($0) + [benchFrame($0)] + drinkingFrames($0) + transformingFrames($0) }
     }
-    private static let drinkerFrameCount = 2
+    static let drinkerFrameCount = 2
 
     /// The screen for the flow, built for the view's size.
     private func presentScreen() {
@@ -5764,6 +5813,29 @@ final class GameScene: SKScene {
                                 headNudge: headNudge, headScale: headScale)
     }
 
+    /// The customize screen's figure on the bottles, a sheet outside play's (`player_sit`, `player_drink`,
+    /// `player_bench`) drawn as the Greateraid pick draws it, in the side's look as shown; made once a look.
+    func customizeSeated(player: Int, look: Look, sheet: String, frame: Int) -> UIImage? {
+        setCustomizeLook(look, for: player)
+        let shown = player == 1 ? look.turnedRound : look
+        let key = "\(player)_\(sheet)_\(frame)"
+        if let kept = customizeSeatedImages[key], kept.look == shown { return kept.image }
+        let slot = SpriteLibrary.customizePlayer(player)
+        let texture = sheet == "player_drink"
+            ? sprites.standalone(sheet, frame: frame, player: slot, headTilt: PickScreen.drinkHeadTilts[min(frame, PickScreen.drinkHeadTilts.count - 1)],
+                                 overHood: PickScreen.drinkOverHood)
+            : sprites.standalone(sheet, frame: frame, player: slot)
+        let image = UIImage(cgImage: texture.cgImage())
+        customizeSeatedImages[key] = (shown, image)
+        return image
+    }
+    private var customizeSeatedImages: [String: (look: Look, image: UIImage)] = [:]
+
+    /// PLAYER VISIBILITY changed: the match's players drawn again in its line, all of it ready on the GPU at `completion`.
+    func reloadPlayerVisibility(completion: @escaping () -> Void) {
+        sprites.reloadMatchLines(players: match.players.count, completion: completion)
+    }
+
     /// A side's look onto the customize screen's figure, only while the screen is open: drawn again
     /// as it fades out, a changed look rebuilt its figure and hood on the main thread as play began.
     private func setCustomizeLook(_ look: Look, for player: Int) {
@@ -5837,9 +5909,9 @@ final class GameScene: SKScene {
     func updatesPose(_ pose: UpdatesNotes.Pose, tick: Int) -> UpdatesPoseFrame? {
         let place = SpriteLibrary.customizeHeadPlace
         var sheetFrame = GameScene.hoodDrawnFor
-        func portrait(_ animation: Animation, _ frame: Int) -> SpriteLibrary.Portrait? {
+        func portrait(_ animation: Animation, _ frame: Int, player: Int = 0) -> SpriteLibrary.Portrait? {
             sheetFrame = AnimationFrame(animation, frame)
-            return sprites.portrait(animation.rawValue, frame: frame, player: 0, headDrawnFor: GameScene.hoodDrawnFor, headNudge: place.nudge, headScale: place.scale)
+            return sprites.portrait(animation.rawValue, frame: frame, player: player, headDrawnFor: GameScene.hoodDrawnFor, headNudge: place.nudge, headScale: place.scale)
         }
         var extras = FigureExtras()
         if let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: 0) {
@@ -5865,7 +5937,9 @@ final class GameScene: SKScene {
             for step in 0...now { tip += ((sheetFrame(step) != nil ? upTip : 0) - tip) * GameScene.headTipEase }
             if let blastFrame = sheetFrame(now) {
                 shown = portrait(.blast, blastFrame)
-                let arms = GameScene.zTeaArms(AnimationFrame(.blast, blastFrame), sprites: sprites, player: 0, blastTurn: .pi / 4,
+                // The arms from the customize screen's slot in this look, their line Normal as off the court everywhere.
+                sprites.setCustomizeLook(sprites.look(for: 0), for: 0)
+                let arms = GameScene.zTeaArms(AnimationFrame(.blast, blastFrame), sprites: sprites, player: SpriteLibrary.customizePlayer(0), blastTurn: .pi / 4,
                                               image: { key, make in self.updatesImage(key, make) })
                 extras.behind = arms.behind
                 extras.over = arms.over
@@ -5910,6 +5984,9 @@ final class GameScene: SKScene {
             let firing = now - GameScene.updatesSnipeAim
             shown = portrait(.gunSnipe, firing < 0 ? 0 : min(firing * 15 / 60, Animation.gunSnipe.frameCount - 1))
             extras.frontArmOverHood = GameScene.frontArmOverHood(AnimationFrame(.gunSnipe, 0))
+        case .floState:
+            // Standing in FloState: the idle, in the energy form and its hood.
+            shown = portrait(.idle, (tick * 12 / 60) % Animation.idle.frameCount, player: SpriteLibrary.transformedPlayer(0))
         }
         guard let shown else { return nil }
         // The sheet's own turn and the head moved on its frame, as play has them.
@@ -6060,6 +6137,7 @@ final class GameScene: SKScene {
         if let flowState, flowState.customizeOpen, flowState.customizeOnline {
             flowState.customizeOpen = false
             flowState.customizeLaunch = nil
+            flowState.customizeDrinking = nil
         }
         applySavedColours()
         session.stopAt = nil
@@ -6261,6 +6339,17 @@ final class GameScene: SKScene {
 
     /// The clash's close-in: eased in while the hit stop holds, back out after, the HUD kept its size.
     private func stepClashCamera() {
+        // A parry's split: in through the hit stop, out after, the camera left where it is.
+        if parryAt != nil {
+            let now = CACurrentMediaTime()
+            let step = CGFloat(min(now - (parryLastTime ?? now), 0.1) / GameScene.clashEaseSeconds)
+            parryLastTime = now
+            parryShare = match.hitStop > 0 ? min(parryShare + step, 1) : max(parryShare - step, 0)
+            if parryShare == 0, match.hitStop == 0 {
+                parryAt = nil
+                parryLastTime = nil
+            }
+        }
         if match.hitStop == 0, !clashHeld.isEmpty || !clashShields.isEmpty || !clashSlashers.isEmpty { releaseClash() }
         guard let at = clashAt else { return }
         let now = CACurrentMediaTime()
@@ -6283,11 +6372,14 @@ final class GameScene: SKScene {
     /// The colours split for the clash, for the glow's composite: where they met on the screen, as
     /// a share of it, y down; the split's reach and strength; the two players' energy colours.
     var clashAberration: (centre: SIMD2<Float>, split: Float, fringe: Float, first: RGB, second: RGB)? {
-        guard let at = clashAt, clashShare > 0, match.players.count >= 2 else { return nil }
+        // A clash's, or else a parry's.
+        let shown: (at: Vec2, share: CGFloat)? = clashAt.flatMap { clashShare > 0 ? ($0, clashShare) : nil }
+            ?? parryAt.flatMap { parryShare > 0 ? ($0, parryShare) : nil }
+        guard let (at, share) = shown, match.players.count >= 2 else { return nil }
         let point = SpriteLibrary.point(at)
         let seenWidth = max(size.width * cameraNode.xScale, 1), seenHeight = max(size.height * cameraNode.yScale, 1)
         let centre = SIMD2(Float(0.5 + (point.x - cameraNode.position.x) / seenWidth), Float(0.5 - (point.y - cameraNode.position.y) / seenHeight))
-        let eased = Float(clashShare * clashShare * (3 - 2 * clashShare))
+        let eased = Float(share * share * (3 - 2 * share))
         return (centre, GameScene.clashSplit * eased, GameScene.clashFringe * eased, sprites.look(for: 0).glow, sprites.look(for: 1).glow)
     }
 
@@ -6356,6 +6448,7 @@ final class GameScene: SKScene {
             }
             clashPlayout[index] = nil
         }
+        if let flip = ShieldflipSpin.frame(player) { return flip }
         return player.animationFrame
     }
     /// Sliding back off a clash along the ground: a trail of dash sparks, in the energy's colour,
@@ -6869,11 +6962,11 @@ final class GameScene: SKScene {
         .ledge: 0...4,
         .dunk: 1...5,
         .catchGround: 0...2, .catchAir: 0...2,
-        .esperSlash: 2...4,
+        .esperSlash: 2...4, .esperSlashAir: 2...4,
         .snatchFloState: 2...6,
         .transform: 0...2,
         .gunSnipe: 0...9,
-        .spinBall: 0...3,
+        .spinBall: 0...3, .spin: 0...3,
         .beam: 3...9,
     ]
     /// The frames where the front arm crosses the hooded head, so the sheet's front arm and hand
@@ -6882,7 +6975,7 @@ final class GameScene: SKScene {
     static let frontArmOverHood: [Animation: ClosedRange<Int>] = [
         .shoot: 0...9, .shootAir: 0...10,
         .doubleJump: 0...5, .doubleJumpBall: 0...5,
-        .esperSlash: 0...5,
+        .esperSlash: 0...5, .esperSlashAir: 0...5,
         .throwForward: 4...7, .throwAir: 4...7,
         .crouch: 0...9, .crouchWalk: 0...9,
         .ledge: 0...4,
@@ -6933,7 +7026,7 @@ final class GameScene: SKScene {
     /// Hooded heads moved on single frames, art pixels the way the body faces and up: set in the
     /// player gallery's HEAD X and Y (`PlayerGallery`), frames 0-based.
     static let headNudges: [Animation: [Int: CGPoint]] = [
-        .spinBall: [1: CGPoint(x: 1, y: -1), 3: CGPoint(x: 1, y: -1)],
+        .spinBall: [1: CGPoint(x: 1, y: -1), 3: CGPoint(x: 1, y: -1)], .spin: [1: CGPoint(x: 1, y: -1), 3: CGPoint(x: 1, y: -1)],
         .pivot: [1: CGPoint(x: 0, y: 1), 2: CGPoint(x: 1, y: 0)],
         .beam: Dictionary(uniqueKeysWithValues: (3...8).map { ($0, CGPoint(x: 1, y: 1)) }),
     ]
@@ -7163,8 +7256,15 @@ final class GameScene: SKScene {
     }
     /// The Spin Move: tilted back this far, and with the FLO paid flashing the energy colour, this many frames on and off.
     static let spinTilt: CGFloat = 10 * .pi / 180
+    /// The air slash's lean forward, from this sheet frame (0-based; the third), and the share of
+    /// the way it goes each frame, in and back out.
+    static let airSlashLean: CGFloat = 30 * .pi / 180
+    static let airSlashLeanFrom = 2
+    static let airSlashLeanEase: CGFloat = 0.3
+    /// Each player's air-slash lean now, eased.
+    private var slashLean: [Int: CGFloat] = [:]
     static let spinFlashFrames = 4
-    /// Tumbling's outline: black and bright by turns, this many frames each.
+    /// Tumbling's flash: black, this many frames on and off, as the scoring lockout's.
     static let tumbleFlashFrames = 4
     static let perfectShineScale: CGFloat = 2
     private var shieldNodes: [SKSpriteNode] = []
@@ -9099,7 +9199,7 @@ final class GameScene: SKScene {
                 arm.zRotation = player.blastUp ? .pi / 4 * facing : 0
                 if !front { arm.zPosition = node.zPosition - 0.001 }
             }
-            // In the throw stance's parry frames, and growing, white; spinning with the FLO paid,
+            // Growing, white; spinning with the FLO paid,
             // flashing the energy colour.
             let spinFlash = player.spinPhasing && match.frame / GameScene.spinFlashFrames % 2 == 0
             // Just flashed in, silhouetted in the energy colour (`reappearUntil`).
@@ -9107,7 +9207,7 @@ final class GameScene: SKScene {
             let tint: SKColor = spinFlash || reappearing ? SKColor(rgb: sprites.look(for: index).glow) : .white
             // And all white, glowing, on the change's fifth frame.
             let flashWhite = changing && frame.frame == GameScene.transformWhiteFrame
-            let tintShare: CGFloat = growing || flashWhite ? 1 : (reappearing ? GameScene.reappearTint : (player.throwParrying || spinFlash ? 0.85 : 0))
+            let tintShare: CGFloat = growing || flashWhite ? 1 : (reappearing ? GameScene.reappearTint : (spinFlash ? 0.85 : 0))
             node.color = tint
             node.colorBlendFactor = tintShare
             if hoodNodes.indices.contains(index) {
@@ -9144,6 +9244,18 @@ final class GameScene: SKScene {
             // The Spin Move tilts back, at once.
             if player.state == .spinning { bodyTilt[index] = GameScene.spinTilt * CGFloat(player.facing.sign) }
             node.zRotation = bodyTilt[index]
+            // The air slash leans forward from its third frame, eased in and back out.
+            let leaning = frame.animation == .esperSlashAir && frame.frame >= GameScene.airSlashLeanFrom
+            slashLean[index, default: 0] += ((leaning ? -GameScene.airSlashLean * CGFloat(player.facing.sign) : 0) - slashLean[index, default: 0]) * GameScene.airSlashLeanEase
+            if abs(slashLean[index, default: 0]) < 0.001 { slashLean[index] = 0 }
+            // The Shieldflip's spin turns the body backward about its middle, the air slash's lean forward.
+            let middleTurn = (ShieldflipSpin.turn(player) ?? 0) + slashLean[index, default: 0]
+            if middleTurn != 0 {
+                let turn = middleTurn
+                let middle = node.position + SpriteLibrary.point(Vec2(x: 0, y: player.spec.bodyHeight * player.spec.scale / 2)) - SpriteLibrary.point(.zero)
+                node.position = rotated(node.position, about: middle, by: turn)
+                node.zRotation += turn
+            }
             // Hanging on a rim the body turns with it, about the rim's back.
             if player.state == .dunking, player.dunkHoop < rimDip.count, player.dunkHoop < match.stage.hoops.count {
                 let turn = rimTurn(player.dunkHoop)
@@ -9152,11 +9264,12 @@ final class GameScene: SKScene {
             }
 
             // Hit by the blade, the body and head flicker a dark shade of their energy, every
-            // other pair of frames; locked out after a 47 basket, black, every other four.
+            // other pair of frames; locked out after a 47 basket or tumbling after the shield, black, every other four.
             // Parried, the whole lockout, palette 2 every other pair of frames.
             let parried = player.parryLocked && (player.attackLockout / 2) % 2 == 0
             let stunned = parried || (!player.parryLocked && player.hitStun > 0 && (player.hitStun / 2) % 2 == 0)
-            let lockedOut = player.hitStun == 0 && !player.parryLocked && player.pickupLockout > 0 && (player.pickupLockout / 4) % 2 == 0
+            let tumbling = player.state == .tumbling && (player.stateTimer / GameScene.tumbleFlashFrames) % 2 == 0
+            let lockedOut = player.hitStun == 0 && !player.parryLocked && (player.pickupLockout > 0 && (player.pickupLockout / 4) % 2 == 0 || tumbling)
             // Taking a FLO orb, the whole body flashes its energy's own colour.
             let absorbing = floFlash.indices.contains(index) && floFlash[index] > 0
             let flashColour = absorbing ? SKColor(rgb: sprites.look(for: index).glow)
@@ -9236,15 +9349,10 @@ final class GameScene: SKScene {
                 // The zone's colours cycle round it in the zone and in FloState.
                 let cycling = ZoneTuning.inTheZone || floStateLine
                 let lineColour = cycling ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
-                // In the parry frames the line goes the bright version of the body's colour.
-                // Tumbling, it flashes black against the bright version of the body's colour; in the
-                // shield's backflip it's the energy's colour.
-                let tumbleFlash = player.state == .tumbling
-                    ? (match.frame / GameScene.tumbleFlashFrames % 2 == 0 ? SKColor.black : SKColor(rgb: sprites.look(for: index).bright))
-                    : player.state == .flipJump ? SKColor(rgb: sprites.look(for: index).glow) : nil
+                // In the shield's backflip the line's the energy's colour.
+                let tumbleFlash = player.state == .flipJump ? SKColor(rgb: sprites.look(for: index).glow) : nil
                 outlineNode.color = growing ? .white
-                    : tumbleFlash ?? (player.throwParrying ? SKColor(rgb: sprites.look(for: index).bright)
-                    : (player.frozen > 0 ? SKColor(rgb: Look.ice.outline) : lineColour))
+                    : tumbleFlash ?? (player.frozen > 0 ? SKColor(rgb: Look.ice.outline) : lineColour)
             } else {
                 outlineNode.isHidden = true
             }
@@ -9264,7 +9372,7 @@ final class GameScene: SKScene {
             } else {
                 energyNode.isHidden = true
             }
-            let tilt = bodyTilt[index]
+            let tilt = bodyTilt[index] + (ShieldflipSpin.turn(player) ?? 0) + slashLean[index, default: 0]
             func leaned(_ offset: CGPoint) -> CGPoint {
                 CGPoint(x: offset.x * cos(tilt) - offset.y * sin(tilt), y: offset.x * sin(tilt) + offset.y * cos(tilt))
             }
@@ -9286,11 +9394,8 @@ final class GameScene: SKScene {
                 let skin = sprites.look(for: index).dressing.skinTone
                 let frozen = player.frozen > 0
                 let view = HoodView.of(frame)
-                // In FloState on the sheets it's worn on (`flowingHoodSheets`), the hood blowing: `player_flowing_hood` round and round.
-                let flowing = energyForm && !changing && SpriteLibrary.flowingHoodFrames > 0 && SpriteLibrary.flowingHoodSheets.contains(frame.animation)
-                    ? match.frame * SpriteLibrary.flowingHoodFramesPerSecond / 60 % SpriteLibrary.flowingHoodFrames : nil
                 let hoodHead = frozen ? sprites.hoodHead(skin: skin, player: SpriteLibrary.icePlayer, view: view)
-                    : sprites.hoodHead(skin: skin, player: index, energy: energyForm, view: view, flowing: flowing)
+                    : sprites.hoodHead(skin: skin, player: index, energy: energyForm, view: view)
                 hood.texture = hoodHead.drawn
                 hoodMasks[index] = (hoodHead.hood, hoodHead.face)
                 hood.zPosition = GameScene.hoodUpZ
@@ -9324,11 +9429,14 @@ final class GameScene: SKScene {
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
                 // And the sheet's own turn, the double jump's tumble, clockwise facing right.
                 let sheetTurn = GameScene.hoodTurn(frame)
-                if abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame), let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
+                // The air slash's lean taken back off the head, so it still faces straight ahead.
+                let counterLean = -slashLean[index, default: 0]
+                if abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame) || counterLean != 0,
+                   let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
                     let anim = GameScene.hoodDrawnFor.animation
                     let middle = CGPoint(x: anim.pixelSize / 2 + head.x, y: anim.pixelSize - anim.feetFromBottom - head.y)
                     let tip = headTip[index, default: 0]
-                    turn(hood, about: middle, by: (tip - sheetTurn) * CGFloat(player.facing.sign), scale: drawScale)
+                    turn(hood, about: middle, by: (tip - sheetTurn) * CGFloat(player.facing.sign) + counterLean, scale: drawScale)
                     if let pose = GameScene.headPose(frame) {
                         hood.position.x += pose.x * CGFloat(player.facing.sign) * drawScale
                         hood.position.y += pose.y * drawScale
@@ -9355,9 +9463,11 @@ final class GameScene: SKScene {
             }
             // Tipped, the hood carries its own line: the body's is drawn without the hood's place.
             let hoodLine = hoodLineNodes[index]
-            let tipped = !hood.isHidden && (abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame)) && !outlineNode.isHidden && !floStateLine
+            let tipped = !hood.isHidden && (abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame) || slashLean[index, default: 0] != 0)
+                && !outlineNode.isHidden && !floStateLine
             if tipped, let bare = sprites.bareOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted),
-               let line = sprites.hoodLine(skin: sprites.look(for: index).dressing.skinTone, view: HoodView.of(frame)) {
+               let line = sprites.hoodLine(skin: sprites.look(for: index).dressing.skinTone, view: HoodView.of(frame), energy: energyForm && player.frozen == 0,
+                                          style: SpriteLibrary.lineStyle(for: index)) {
                 outlineNode.texture = bare
                 hoodLine.isHidden = false
                 hoodLine.texture = line
@@ -9386,7 +9496,46 @@ final class GameScene: SKScene {
             // Its strings, off the hood, over the body: behind it, the hood down's were lost under
             // the torso. Toned as the hood's white and its palette 37 are. None where the arms
             // would cover them (`stringsUnderArms`).
-            if hood.isHidden || player.frozen > 0 || GameScene.stringsUnderArms(frame) {
+            // In FloState, the strings are the diamonds off the chest instead (`FloStrings`), wherever the arms are.
+            let floStrings = energyForm && !hood.isHidden && player.frozen == 0
+            if floStrings {
+                hoodStrings[index].hide()
+                if !held {
+                    let lean = Float(tilt)
+                    let anchors = HoodStrings.anchors(on: hood, scale: drawScale, pixels: FloStrings.anchorPixels)
+                        .map { SIMD3<Float>(Float($0.x), Float($0.y), 0) }
+                    let middle = SpriteLibrary.point(Vec2(x: player.position.x, y: player.position.y + player.spec.bodyHeight * player.spec.scale / 2))
+                    let spinning = player.state == .spinning || player.state == .flipJump
+                        || (player.power == .galeAle && player.powerLevel >= 2 && player.doubleJumpTimer > 0 && !player.grounded)
+                    let diamonds = floStringMotions[index].step(anchors: anchors, facing: Float(player.facing.sign), lean: lean, scale: Float(drawScale),
+                                                                time: CACurrentMediaTime(), spinning: spinning,
+                                                                middle: SIMD3<Float>(Float(middle.x), Float(middle.y), 0),
+                                                                flying: player.state == .flying)
+                    let look = sprites.look(for: index)
+                    floStringInstances[index] = diamonds.map { diamond in
+                        let rgb = lockoutOn ? GameScene.lockoutGrey : FloStrings.colour(diamond, look: look)
+                        let colour = SIMD4<Float>(Float((rgb >> 16) & 0xFF) / 255, Float((rgb >> 8) & 0xFF) / 255, Float(rgb & 0xFF) / 255, 1)
+                        let model = simd_float4x4.translation(diamond.centre) * simd_float4x4(diamond.orientation)
+                            * simd_float4x4.scale(SIMD3<Float>(diamond.length, diamond.width, diamond.width))
+                        return CubeInstance(model: model, color: colour, flags: SIMD4<Float>(diamond.behind ? 1 : 0, 0, 0, 0))
+                    }
+                    // Glowing as the strings did: each one not behind the body, its footprint along its length.
+                    let square = sprites.flatSquare(size: 1, alpha: 1)
+                    floStringGlows[index] = diamonds.filter { !$0.behind }.map { diamond in
+                        let axis = diamond.orientation.act(SIMD3<Float>(1, 0, 0))
+                        return BodySnapshot(texture: square, position: CGPoint(x: CGFloat(diamond.centre.x), y: CGFloat(diamond.centre.y)),
+                                            anchor: CGPoint(x: 0.5, y: 0.5), xScale: 1,
+                                            size: CGSize(width: CGFloat(diamond.length) * 0.75, height: CGFloat(diamond.width) * 0.75),
+                                            zRotation: CGFloat(atan2(axis.y, axis.x)))
+                    }
+                }
+            } else if !floStringInstances[index].isEmpty {
+                floStringInstances[index] = []
+                floStringGlows[index] = []
+                floStringMotions[index].reset()
+            }
+            if floStrings {
+            } else if hood.isHidden || player.frozen > 0 || GameScene.stringsUnderArms(frame) {
                 hoodStrings[index].hide()
             } else if !held {
                 let look = sprites.look(for: index)

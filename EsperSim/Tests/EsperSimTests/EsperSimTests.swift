@@ -345,7 +345,6 @@ final class BallTests: XCTestCase {
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true), .idle])
         XCTAssertEqual(match.players[0].state, .stepback)
         XCTAssertTrue(match.events.contains(.steppedBack(player: 0)))
-        XCTAssertTrue(match.players[0].throwParrying, "a counter the whole way")
         let back = run(&match, frames: StepbackRules.frames + 2, input: { _ in PlayerInput(stick: Vec2(x: 0, y: -1), throwBall: true) }) {
             $0.players[0].state != .stepback
         }
@@ -1878,45 +1877,21 @@ final class FootsiesTests: XCTestCase {
         XCTAssertEqual(match.ball.holder, 0, "the slasher catches it, not the one slashed")
     }
 
-    func testAThrowStanceParriesASlashInItsOpeningFrames() {
-        func slashed(stanceFramesBefore: Int) -> Match {
-            var match = defending(otherAt: 150)
-            match.players[1].facing = .left
-            // The holder takes the throw stance, then the slash comes in.
-            for _ in 0..<stanceFramesBefore { match.advance(inputs: [.idle, PlayerInput(throwBall: true)]) }
-            match.advance(inputs: [PlayerInput(shoot: true), PlayerInput(throwBall: true)])
-            for _ in 0..<SlashRules.frames {
-                match.advance(inputs: [.idle, PlayerInput(throwBall: true)])
-                if match.events.contains(where: { if case .parried = $0 { return true }; if case .popped = $0 { return true }; return false }) { break }
-            }
-            return match
-        }
-        let early = slashed(stanceFramesBefore: 1)
-        XCTAssertTrue(early.events.contains(.parried(player: 0, by: 1)), "early in the stance it's a parry")
-        XCTAssertTrue(early.players[1].hasBall)
-        // Its window a third of a second: a slash met fifteen frames in is still parried.
-        XCTAssertTrue(slashed(stanceFramesBefore: 12).events.contains(.parried(player: 0, by: 1)))
-        let late = slashed(stanceFramesBefore: 24)
-        XCTAssertTrue(late.events.contains(.popped(player: 1, by: 0)), "long into it the slash lands")
-    }
-
-    func testAParryPutsTheParrierBackInNeutralAndLocksTheSlasherOutPastTheStun() {
+    func testAParryLocksTheSlasherOutPastTheStun() {
         var match = defending(otherAt: 150)
         match.players[1].facing = .left
-        match.advance(inputs: [.idle, PlayerInput(throwBall: true)])
-        match.advance(inputs: [PlayerInput(shoot: true), PlayerInput(throwBall: true)])
+        match.players[1].hasBall = false
+        match.ball.holder = nil
+        match.ball.position = Vec2(x: 20, y: 10)
+        // The shield up, the slash into it.
+        match.advance(inputs: [.idle, PlayerInput(shield: true)])
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
         var parried = false
         for _ in 0..<SlashRules.frames where !parried {
-            match.advance(inputs: [.idle, PlayerInput(throwBall: true)])
+            match.advance(inputs: [.idle, .idle])
             parried = match.events.contains(.parried(player: 0, by: 1))
         }
         XCTAssertTrue(parried)
-        // The parrier out of the stance at once, ball in hand, no throw made.
-        XCTAssertEqual(match.players[1].state, .idle)
-        XCTAssertTrue(match.players[1].hasBall)
-        for _ in 0..<5 { match.advance(inputs: [.idle, PlayerInput(throwBall: true)]) }
-        XCTAssertEqual(match.players[1].state, .idle, "the held button wants a fresh press")
-        XCTAssertTrue(match.players[1].hasBall)
         // The slasher: stunned, then locked out of everything for half a second more, reeling.
         XCTAssertGreaterThan(match.players[0].hitStun, 0)
         XCTAssertTrue(match.players[0].parryLocked)
@@ -2545,9 +2520,9 @@ final class OpponentTests: XCTestCase {
         play(&match, &brain, frames: 60, input: { _ in .idle })
         XCTAssertTrue(match.players[1].position.x > 200 || abs(match.players[0].position.x - match.players[1].position.x) < startGap - 20,
                       "neither guarding the rim nor on them")
-        // The human walks up to it: a swing or a snatch comes.
+        // The human walks up to it: a swing, a snatch or a shield comes.
         let swung = play(&match, &brain, frames: 400, input: { _ in PlayerInput(stick: Vec2(x: 0.6, y: 0)) }) {
-            $0.events.contains(.slashed(player: 1)) || $0.players[1].state == .snatching
+            $0.events.contains(.slashed(player: 1)) || $0.players[1].state == .snatching || $0.events.contains { if case .shieldRaised(player: 1, _) = $0 { return true } else { return false } }
         }
         XCTAssertLessThan(swung, 400, "never went for the ball in reach")
     }
@@ -2558,7 +2533,7 @@ final class OpponentTests: XCTestCase {
         match.players[0].hasBall = true
         match.ball.holder = 0
         let came = play(&match, &brain, frames: 600, input: { _ in .idle }) {
-            $0.events.contains(.slashed(player: 1)) || $0.players[1].state == .snatching
+            $0.events.contains(.slashed(player: 1)) || $0.players[1].state == .snatching || $0.events.contains { if case .shieldRaised(player: 1, _) = $0 { return true } else { return false } }
         }
         XCTAssertLessThan(came, 600, "it should come and take a swing at a body standing about")
     }

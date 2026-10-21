@@ -157,25 +157,95 @@ final class FlowState: ObservableObject {
 
     // MARK: The settings
 
-    /// The settings screen, over the title or the pause; its cursor's row (the last past the
-    /// rows is BACK), and a count bumped when a choice changes, so the screen redraws.
+    /// The settings screen, over the title or the pause. Its categories side by side, the cursor on
+    /// one; a category open, its button aside and its rows fanned down under it, the cursor on a row
+    /// (-1 its button); and a count bumped when a choice changes, so the screen redraws.
     @Published var settingsOpen = false
+    @Published var settingsCategoryCursor = 0
+    @Published var settingsCategory: GameSettings.Category?
     @Published var settingsCursor = 0
     @Published var settingsVersion = 0
+    /// A category opening, in three steps (its button aside, its rows fanned down, their tails and
+    /// choices revealed), or closing back through them; input waits meanwhile.
+    @Published var settingsAside = false
+    @Published var settingsFanned = false
+    @Published var settingsRevealed = false
+    @Published var settingsAnimating = false
+    /// The players drawn again for PLAYER VISIBILITY: the bar up, the buttons dim, input waits.
+    @Published var settingsReloading = false
+    var settingsLocked: Bool { settingsAnimating || settingsReloading }
+    var settingsRows: [GameSettings.Row] { settingsCategory.map(GameSettings.Row.rows) ?? [] }
+    /// The steps' lengths, and each row's fan behind the one above it.
+    static let settingsAsideSeconds = 0.25
+    static let settingsFanSeconds = 0.3
+    static let settingsRevealSeconds = 0.3
+    static let settingsFanStagger = 0.04
 
     func openSettings() {
         settingsOpen = true
+        settingsCategory = nil
+        settingsCategoryCursor = 0
         settingsCursor = 0
+        settingsAside = false
+        settingsFanned = false
+        settingsRevealed = false
+        settingsAnimating = false
     }
 
+    /// Back: an open category shut; with none, the screen.
     func closeSettings() {
+        guard !settingsLocked else { return }
+        if settingsCategory != nil { return closeSettingsCategory() }
         SoundBoard.shared.play(.menuBack)
         settingsOpen = false
     }
 
-    /// Up or down a row; back is the corner arrow, or B.
+    /// A category opened: aside, fanned, revealed, one after another. Other Stuff has nothing yet.
+    func openSettingsCategory(_ category: GameSettings.Category) {
+        guard !settingsLocked, settingsCategory == nil, !GameSettings.Row.rows(in: category).isEmpty else { return }
+        SoundBoard.shared.play(SoundBoard.navigate)
+        settingsCategory = category
+        settingsCategoryCursor = category.rawValue
+        settingsCursor = 0
+        settingsAnimating = true
+        settingsAside = true
+        let fanned = FlowState.settingsAsideSeconds
+        let fanEnd = fanned + FlowState.settingsFanSeconds + FlowState.settingsFanStagger * Double(settingsRows.count)
+        DispatchQueue.main.asyncAfter(deadline: .now() + fanned) { [weak self] in self?.settingsFanned = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + fanEnd) { [weak self] in self?.settingsRevealed = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + fanEnd + FlowState.settingsRevealSeconds) { [weak self] in self?.settingsAnimating = false }
+    }
+
+    /// The open category shut, back through its steps: hidden, folded up into its button, back in its place.
+    func closeSettingsCategory() {
+        guard !settingsLocked, settingsCategory != nil else { return }
+        SoundBoard.shared.play(.menuBack)
+        settingsAnimating = true
+        settingsRevealed = false
+        let folded = FlowState.settingsRevealSeconds
+        let foldEnd = folded + FlowState.settingsFanSeconds + FlowState.settingsFanStagger * Double(settingsRows.count)
+        DispatchQueue.main.asyncAfter(deadline: .now() + folded) { [weak self] in self?.settingsFanned = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + foldEnd) { [weak self] in self?.settingsAside = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + foldEnd + FlowState.settingsAsideSeconds) { [weak self] in
+            guard let self else { return }
+            self.settingsCategory = nil
+            self.settingsAnimating = false
+        }
+    }
+
+    /// Across the categories, with none open.
+    func moveSettingsCategoryCursor(_ step: Int) {
+        guard !settingsLocked, settingsCategory == nil else { return }
+        let next = min(max(settingsCategoryCursor + step, 0), GameSettings.Category.allCases.count - 1)
+        guard next != settingsCategoryCursor else { return }
+        settingsCategoryCursor = next
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
+    /// Up or down a row of the open category, up past the first onto its button; back is the corner arrow, or B.
     func moveSettingsCursor(_ step: Int) {
-        let next = min(max(settingsCursor + step, 0), GameSettings.Row.allCases.count - 1)
+        guard !settingsLocked, settingsCategory != nil else { return }
+        let next = min(max(settingsCursor + step, -1), settingsRows.count - 1)
         guard next != settingsCursor else { return }
         settingsCursor = next
         SoundBoard.shared.play(SoundBoard.navigate)
@@ -183,20 +253,26 @@ final class FlowState: ObservableObject {
 
     /// The cursor's row on to its next choice, or back, round the ends.
     func stepSetting(_ step: Int) {
-        let rows = GameSettings.Row.allCases
-        guard rows.indices.contains(settingsCursor) else { return }
+        let rows = settingsRows
+        guard !settingsLocked, rows.indices.contains(settingsCursor) else { return }
         let row = rows[settingsCursor]
         pickSetting(row: settingsCursor, option: (row.picked + step + row.options.count) % row.options.count)
     }
 
-    /// A choice picked, by a tap or the pad.
+    /// A choice picked, by a tap or the pad. A new PLAYER VISIBILITY draws the players again,
+    /// everything waiting till it's all made and on the GPU.
     func pickSetting(row index: Int, option: Int) {
-        let rows = GameSettings.Row.allCases
-        guard rows.indices.contains(index) else { return }
+        let rows = settingsRows
+        guard !settingsLocked, rows.indices.contains(index) else { return }
         settingsCursor = index
+        let changed = rows[index].picked != option
         rows[index].picked = option
         settingsVersion += 1
         SoundBoard.shared.play(SoundBoard.navigate)
+        if rows[index] == .playerVisibility, changed {
+            settingsReloading = true
+            scene.reloadPlayerVisibility { [weak self] in self?.settingsReloading = false }
+        }
     }
 
     // MARK: The customize screen
@@ -208,6 +284,9 @@ final class FlowState: ObservableObject {
     /// notes; and the line the pad has scrolled it to.
     @Published var updatesOpen = UpdatesNotes.unseen
     @Published var updatesLine = 0
+    /// The build whose notes are shown, its tab: 0 the newest (`UpdatesNotes.builds`).
+    @Published var updatesBuild = 0
+    var updatesLines: [UpdatesNotes.Line] { UpdatesNotes.builds.indices.contains(updatesBuild) ? UpdatesNotes.builds[updatesBuild].lines : [] }
     /// ZONES' screen over play, while a game's on.
     @Published var zonesHud: ZonesHud?
     @Published var customizeCursors: [CustomizeSpot] = [.skin, .skin]
@@ -232,6 +311,12 @@ final class FlowState: ObservableObject {
     @Published var drinkSorts: [DrinkSort] = [.aToZ, .aToZ]
     var customizePicksDrink: Bool { customizeMode == .fortySeven }
     @Published var customizeLaunch: Date?
+    /// Both locked in on the bottles: drinking on the bench (`player_drink`) since then, before the launch.
+    @Published var customizeDrinking: Date?
+    /// When the figures are down in their corners on the bottles, seated.
+    var customizeSeatedAt = Date.distantPast
+    /// Locked in: drinking, or launched; nothing more is picked.
+    var customizeLocked: Bool { customizeLaunch != nil || customizeDrinking != nil }
     /// Online: the launch animation's played through; the series can start.
     var customizeLaunched = false
 
@@ -384,6 +469,7 @@ final class FlowState: ObservableObject {
     func openUpdates() {
         scene.resetUpdatesIcons()
         updatesLine = 0
+        updatesBuild = 0
         updatesOpen = true
     }
 
@@ -397,7 +483,15 @@ final class FlowState: ObservableObject {
 
     /// The updates screen's list stepped a line by the pad.
     func scrollUpdates(_ by: Int) {
-        updatesLine = min(max(updatesLine + by, 0), UpdatesNotes.lines.count - 1)
+        updatesLine = min(max(updatesLine + by, 0), max(updatesLines.count - 1, 0))
+    }
+
+    /// Another build's notes, from its tab or the pad across them; shown from their top.
+    func showUpdatesBuild(_ index: Int) {
+        guard UpdatesNotes.builds.indices.contains(index), index != updatesBuild else { return }
+        updatesBuild = index
+        updatesLine = 0
+        SoundBoard.shared.play(SoundBoard.navigate)
     }
 
     func moveTitleCursor(across: Int, down: Int) {

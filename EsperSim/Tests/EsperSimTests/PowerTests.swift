@@ -32,11 +32,11 @@ final class PowerTests: XCTestCase {
             match.events.contains { if case .slashClashed = $0 { return true } else { return false } }
         }
         XCTAssertLessThan(clashed, SlashRules.frames)
-        XCTAssertEqual(match.hitStop, HitStopRules.slashClashFrames)
+        XCTAssertEqual(match.hitStop, HitStopRules.clashFrames)
         XCTAssertEqual(match.players[0].hitStun, 0, "nobody's struck")
         XCTAssertEqual(match.players[1].hitStun, 0)
         XCTAssertEqual(match.players[0].state, .slashing, "held in the swing through the hit stop")
-        run(&match, frames: HitStopRules.slashClashFrames, input: { _ in .idle })
+        run(&match, frames: HitStopRules.clashFrames, input: { _ in .idle })
         XCTAssertEqual(match.hitStop, 0)
         XCTAssertNotEqual(match.players[0].state, .slashing, "the rest of the swing cancelled")
         XCTAssertNotEqual(match.players[1].state, .slashing)
@@ -81,8 +81,8 @@ final class PowerTests: XCTestCase {
             $0.events.contains { if case .snatchClashed = $0 { return true } else { return false } }
         }
         XCTAssertLessThan(clashed, 20)
-        XCTAssertEqual(match.hitStop, HitStopRules.slashClashFrames)
-        run(&match, frames: HitStopRules.slashClashFrames, input: { _ in .idle })
+        XCTAssertEqual(match.hitStop, HitStopRules.clashFrames)
+        run(&match, frames: HitStopRules.clashFrames, input: { _ in .idle })
         XCTAssertTrue(match.players[0].clashPushed)
         XCTAssertLessThan(match.players[0].velocity.x, 0)
         XCTAssertGreaterThan(match.players[1].velocity.x, 0)

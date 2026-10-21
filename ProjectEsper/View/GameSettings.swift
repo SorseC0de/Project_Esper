@@ -38,10 +38,37 @@ enum GameSettings {
         set { UserDefaults.standard.set(newValue, forKey: "esper.settings.screenShake") }
     }
 
+    /// How the players' line is drawn in a match (`SpriteLibrary.LineStyle`): Normal, Semibold, Bold.
+    /// Everywhere else it's Normal.
+    static var playerVisibility: SpriteLibrary.LineStyle {
+        get { SpriteLibrary.LineStyle(rawValue: UserDefaults.standard.integer(forKey: "esper.settings.playerVisibility")) ?? .normal }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "esper.settings.playerVisibility") }
+    }
+
     /// The screen's rows, top to bottom.
+    /// The screen's categories, side by side; each opens onto its rows.
+    enum Category: Int, CaseIterable {
+        case visuals, sound, other
+        var title: String {
+            switch self {
+            case .visuals: "VISUALS"
+            case .sound: "SOUND"
+            case .other: "OTHER STUFF"
+            }
+        }
+    }
+
     @MainActor
     enum Row: CaseIterable {
-        case words, wordStyle, wordLanguage, walkTrails, sound, ambience, screenShake
+        case words, wordStyle, wordLanguage, walkTrails, screenShake, playerVisibility, sound, ambience
+
+        var category: Category {
+            switch self {
+            case .words, .wordStyle, .wordLanguage, .walkTrails, .screenShake, .playerVisibility: .visuals
+            case .sound, .ambience: .sound
+            }
+        }
+        static func rows(in category: Category) -> [Row] { allCases.filter { $0.category == category } }
 
         var title: String {
             switch self {
@@ -52,6 +79,7 @@ enum GameSettings {
             case .sound: "SOUND"
             case .ambience: "AMBIENCE"
             case .screenShake: "SCREEN SHAKE"
+            case .playerVisibility: "PLAYER VISIBILITY"
             }
         }
 
@@ -62,6 +90,7 @@ enum GameSettings {
             case .wordLanguage: Onomatopoeia.Language.allCases.map(\.label)
             case .walkTrails, .ambience, .screenShake: ["ON", "OFF"]
             case .sound: ["OFF", "LOW", "MID", "FULL"]
+            case .playerVisibility: ["NORMAL", "SEMIBOLD", "BOLD"]
             }
         }
 
@@ -76,6 +105,7 @@ enum GameSettings {
                 case .sound: GameSettings.soundLevel
                 case .ambience: GameSettings.ambience ? 0 : 1
                 case .screenShake: GameSettings.screenShake ? 0 : 1
+                case .playerVisibility: GameSettings.playerVisibility.rawValue
                 }
             }
             nonmutating set {
@@ -92,6 +122,7 @@ enum GameSettings {
                     GameSettings.ambience = index == 0
                     Ambience.shared.applySetting()
                 case .screenShake: GameSettings.screenShake = index == 0
+                case .playerVisibility: GameSettings.playerVisibility = SpriteLibrary.LineStyle(rawValue: index) ?? .normal
                 }
             }
         }

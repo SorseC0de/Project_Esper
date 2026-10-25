@@ -103,6 +103,9 @@ struct GlowUniforms {
     var aberration: SIMD4<Float> = .zero
     var aberrationFirst: SIMD4<Float> = .zero
     var aberrationSecond: SIMD4<Float> = .zero
+    /// A wash over the whole world, its colour and its strength in w, left off what the mask has in
+    /// yellow; none at 0.
+    var wash: SIMD4<Float> = .zero
 }
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.
@@ -174,7 +177,13 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     /// FloState's strings' diamonds, drawn by the cubes' pipeline.
     private let diamondVertices: MTLBuffer?
     private var diamondInstanceBuffers: [MTLBuffer] = []
-    private static let diamondCapacity = 128
+    private static let diamondCapacity = 512
+    /// 47's locked rims' hexagons (`HexSphere`), drawn last, added on as light, writing no depth.
+    private let hexVertices: MTLBuffer?
+    private var hexInstanceBuffers: [MTLBuffer] = []
+    private static let hexCapacity = 256
+    private let translucentDepth: MTLDepthStencilState?
+    private let hexPipeline: MTLRenderPipelineState?
     private static let cubeCapacity = 2048
     /// The players' bodies and lines in white and the rims' art in green, on black, by a
     /// renderer of their own, drawn only on a frame with cubes behind them: a back leg's
@@ -278,10 +287,20 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         cubeDescriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
         cubeDescriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
         cubePipeline = try? device.makeRenderPipelineState(descriptor: cubeDescriptor)
+        // The hexagons the same, but added onto what's under them, as light.
+        cubeDescriptor.colorAttachments[0].destinationRGBBlendFactor = .one
+        cubeDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .one
+        hexPipeline = try? device.makeRenderPipelineState(descriptor: cubeDescriptor)
         let depth = MTLDepthStencilDescriptor()
         depth.depthCompareFunction = .less
         depth.isDepthWriteEnabled = true
         cubeDepth = device.makeDepthStencilState(descriptor: depth)
+        depth.isDepthWriteEnabled = false
+        translucentDepth = device.makeDepthStencilState(descriptor: depth)
+        hexVertices = device.makeBuffer(bytes: HexSphere.tile, length: HexSphere.tile.count * MemoryLayout<CubeVertex>.stride)
+        hexInstanceBuffers = (0..<3).compactMap { _ in
+            device.makeBuffer(length: GlowRenderer.hexCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
+        }
         cubeVertices = device.makeBuffer(bytes: CubeMesh.unit, length: CubeMesh.unit.count * MemoryLayout<CubeVertex>.stride)
         sphereVertices = device.makeBuffer(bytes: SphereMesh.unit, length: SphereMesh.unit.count * MemoryLayout<CubeVertex>.stride)
         diamondVertices = device.makeBuffer(bytes: DiamondMesh.unit, length: DiamondMesh.unit.count * MemoryLayout<CubeVertex>.stride)
@@ -422,7 +441,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.syncStatic(scene.staticFlats, version: scene.staticFlatsVersion)
-        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.cutOutSnapshots, hoods: scene.hoodSnapshots, shield: scene.shieldedSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
+        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.cutOutSnapshots, hoods: scene.hoodSnapshots, shield: scene.shieldedSnapshots,
+                         washFree: scene.washFreeSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
         maskRenderer.update(atTime: now)
         let maskPass = MTLRenderPassDescriptor()
         maskPass.colorAttachments[0].texture = bodyMask
@@ -458,6 +478,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             uniforms.waterBottom = SIMD4(GlowRenderer.channels(water.bottom), 0)
         }
         uniforms.hood = SIMD4(scene.hoodGlowShare, 0, 0, 0)
+        if let wash = scene.worldWash { uniforms.wash = SIMD4(GlowRenderer.channels(wash.colour), Float(wash.alpha)) }
 
         pass(glowCommands, pipeline: bright, into: glowA, sources: [sceneTexture, bodyMask], uniforms: uniforms)
         for _ in 0..<GlowSettings.blurPasses {
@@ -514,7 +535,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         let cubes = Array(scene.cubeInstances.prefix(GlowRenderer.cubeCapacity))
         let spheres = Array(scene.sphereInstances.prefix(GlowRenderer.sphereCapacity))
         let diamonds = Array(scene.diamondInstances.prefix(GlowRenderer.diamondCapacity))
-        guard !cubes.isEmpty || !spheres.isEmpty || !diamonds.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
+        let hexes = Array(scene.hexInstances.prefix(GlowRenderer.hexCapacity))
+        guard !cubes.isEmpty || !spheres.isEmpty || !diamonds.isEmpty || !hexes.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
               let occluderTexture else { return }
         if cubes.contains(where: { $0.flags.x > 0.5 }) || diamonds.contains(where: { $0.flags.x > 0.5 }) {
             // The bodies as they stand, for the cubes behind them to keep out of.
@@ -593,6 +615,17 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             encoder.setVertexBuffer(diamondVertices, offset: 0, index: 0)
             encoder.setVertexBuffer(diamondBuffer, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: DiamondMesh.unit.count, instanceCount: diamonds.count)
+        }
+        if !hexes.isEmpty, let hexVertices, let translucentDepth, let hexPipeline, !hexInstanceBuffers.isEmpty {
+            let hexBuffer = hexInstanceBuffers[frame % hexInstanceBuffers.count]
+            hexBuffer.contents().copyMemory(from: hexes, byteCount: hexes.count * MemoryLayout<CubeInstance>.stride)
+            // Both sides of every tile, the far half through the gaps of the near.
+            encoder.setRenderPipelineState(hexPipeline)
+            encoder.setCullMode(.none)
+            encoder.setDepthStencilState(translucentDepth)
+            encoder.setVertexBuffer(hexVertices, offset: 0, index: 0)
+            encoder.setVertexBuffer(hexBuffer, offset: 0, index: 1)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: HexSphere.tile.count, instanceCount: hexes.count)
         }
         encoder.endEncoding()
     }

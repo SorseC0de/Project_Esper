@@ -89,6 +89,8 @@ struct UpdatesView: View {
     /// A tab's circle against the box's height, and its number against the circle.
     static let tabShare: CGFloat = 0.075
     static let tabNumberShare: CGFloat = 0.45
+    /// A headline bullet's highlight's strength.
+    static let featureHighlight: Double = 0.2
 
     @ViewBuilder
     private func row(_ line: UpdatesNotes.Line, titleSize: CGFloat, bulletSize: CGFloat, width: CGFloat) -> some View {
@@ -113,6 +115,19 @@ struct UpdatesView: View {
                 UpdatesNotes.text(name, size: bulletSize, tone: .plain)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        case .feature(let text):
+            // Gold on a gold highlight.
+            HStack(alignment: .center, spacing: bulletSize * 0.5) {
+                Text(Futuristic.bullet(face: UpdatesNotes.face)).font(Futuristic.font(size: bulletSize, face: UpdatesNotes.face)).foregroundStyle(Futuristic.lit)
+                Text(text)
+                    .font(Futuristic.font(size: bulletSize, face: UpdatesNotes.face))
+                    .foregroundStyle(Futuristic.lit)
+                    .padding(.horizontal, bulletSize * 0.3)
+                    .padding(.vertical, bulletSize * 0.1)
+                    .background(RoundedRectangle(cornerRadius: bulletSize * 0.2).fill(Futuristic.lit.opacity(UpdatesView.featureHighlight)))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             }
         case .bullet(let text, let depth, let icon, let tone):
             HStack(alignment: .center, spacing: bulletSize * 0.5) {

@@ -33,16 +33,19 @@ final class ZTeaTests: XCTestCase {
         XCTAssertGreaterThan(match.players[1].position.x, 250, "knocked along the beam")
     }
 
-    func testTheStickTurnsItWhileFiringToAnyAngleWithin45Degrees() {
+    func testTheBeamFiresStraightThenEasesTowardTheStickWithin45Degrees() {
         var match = court(level: 1)
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
-        for _ in 0..<5 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1)), .idle]) }
-        XCTAssertEqual(match.players[0].beamAim, ZRules.aimRate * 5, accuracy: 1e-9, "a little way up, not snapped")
-        for _ in 0..<ZRules.chargeFrames { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1)), .idle]) }
-        XCTAssertEqual(match.players[0].beamAim, ZRules.aimRange, accuracy: 1e-9)
+        for _ in 0..<ZRules.chargeFrames * 2 where !match.players[0].firingBeam {
+            match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle])
+        }
         XCTAssertTrue(match.players[0].firingBeam)
-        for _ in 0..<5 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1)), .idle]) }
-        XCTAssertEqual(match.players[0].beamAim, ZRules.aimRange - ZRules.aimRate * 5, accuracy: 1e-9, "turned while it fires")
+        XCTAssertEqual(match.players[0].beamAim, 0, accuracy: 1e-9, "straight through the charge, down held or not")
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1)), .idle])
+        XCTAssertEqual(match.players[0].beamAim, ZRules.aimRange * ZRules.aimEase, accuracy: 1e-9, "eased, not snapped")
+        for _ in 0..<60 { match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1)), .idle]) }
+        XCTAssertEqual(match.players[0].beamAim, ZRules.aimRange, accuracy: 1e-3, "up to 45 degrees, no further")
+        XCTAssertLessThanOrEqual(match.players[0].beamAim, ZRules.aimRange)
         XCTAssertEqual(match.beams.first?.direction ?? .zero, match.players[0].beamDirection)
     }
 
@@ -185,8 +188,8 @@ final class ZTeaTests: XCTestCase {
         XCTAssertEqual(fired.map(\.frame), [ZRules.blastBackArmRelease, ZRules.blastFrontArmRelease], "let go fully out")
         XCTAssertEqual(frames.last, 2, "ends on the neutral frame")
         XCTAssertNil(match.players[0].blastStep)
-        // Grounded, it went 45 degrees up.
-        XCTAssertGreaterThan(match.blasts.first?.velocity.y ?? 0, 0)
+        // Grounded, the first goes straight.
+        XCTAssertEqual(match.blasts.first?.velocity.y ?? 1, 0)
     }
 
     func testAShieldFlipMidWindupLetsNoBlastGo() {

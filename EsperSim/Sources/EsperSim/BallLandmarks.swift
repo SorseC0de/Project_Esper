@@ -74,6 +74,7 @@ public enum BallLandmarks {
         "player_spin_ball_1": Vec2(x: 0.00, y: 20.00),
         "player_spin_ball_2": Vec2(x: -6.34, y: 21.23),
         "player_spin_ball_3": Vec2(x: -3.50, y: 20.50),
+        "player_swing_ball_0": Vec2(x: 5.18, y: 13.86),
         "player_taunt_0": Vec2(x: 11.00, y: 9.00),
         "player_taunt_1": Vec2(x: 12.00, y: 11.00),
         "player_taunt_10": Vec2(x: 11.00, y: 9.00),

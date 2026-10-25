@@ -723,16 +723,18 @@ final class PowerTests: XCTestCase {
         XCTAssertEqual(drunk([.titanTea, .jumperJuice]).spec.jumps, plain.jumps)
         XCTAssertEqual(titan.runSpeed, plain.runSpeed * 0.9, accuracy: 0.0001)
         XCTAssertEqual(titan.dashInitialVelocity, titan.runSpeed + 0.4, accuracy: 0.0001)
-        XCTAssertEqual(drunk([.titanTea, .titanTea]).spec.runSpeed, plain.runSpeed, "level two has no slowdown")
+        XCTAssertEqual(drunk([.titanTea, .titanTea]).spec.runSpeed, plain.runSpeed * 0.9, accuracy: 0.0001, "level two still runs slower")
     }
 
-    func testTitanTeaIsStrippedButNeverStunned() {
+    func testTitanTeaIsStrippedAndStunned() {
         var match = titan()
+        match.players[0].hasBall = true
+        match.ball.holder = 0
         match.players[1].position.x = match.players[0].position.x + 20
         match.players[1].facing = .left
         match.advance(inputs: [.idle, PlayerInput(shoot: true)])
         run(&match, frames: SlashRules.frames, input: { _ in .idle }) { $0.events.contains(.struck(player: 0, by: 1)) }
-        XCTAssertEqual(match.players[0].hitStun, 0)
+        XCTAssertGreaterThan(match.players[0].hitStun, 0)
     }
 
     func testTitanTeaCannotCrouch() {

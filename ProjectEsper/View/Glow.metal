@@ -30,6 +30,8 @@ struct GlowUniforms {
     float4 aberration;
     float4 aberrationFirst;
     float4 aberrationSecond;
+    // A wash over the whole world: its colour, its strength in w; left off what the mask has in yellow.
+    float4 wash;
 };
 
 struct FullScreen {
@@ -143,6 +145,9 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
     float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
     // None spreads onto what's shielded: the face in a hood's opening.
     float3 mask = bodies.sample(linear, uv).rgb;
+    // The world's wash, but over what's marked yellow (the far lightning), under the glow.
+    float washFree = step(0.9, mask.r) * step(0.9, mask.g) * step(mask.b, 0.05);
+    color.rgb = mix(color.rgb, u.wash.rgb, u.wash.a * (1 - washFree));
     float shielded = step(0.9, mask.r) * step(mask.g, 0.05) * step(mask.b, 0.05);
     return float4(color.rgb + bloom * (1 - shielded), 1);
 }

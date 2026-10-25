@@ -18,7 +18,7 @@ reference player) are in `notes.md`. ✅ done, ⏳ to do.
 - ✅ Energy colours: three tones each from `Energy_Palette.png`
 - ✅ Emerald on the wheel; teal is now Larimar's light blue
 - ✅ The blade, drink and drink choice sheets
-- ⏳ `player_hoodheads_v2`: still painted in AAP-64 skin and greys (swapped in code)
+- ✅ `player_hoodheads_v2`: repainted in EDG64, the first skin and EDG64's greys
 - ⏳ The ice look (frozen bodies, Frost Tea clones): still AAP-64 57 / 49 / 22
 
 ## Ball

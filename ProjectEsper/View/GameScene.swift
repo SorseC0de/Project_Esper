@@ -189,13 +189,17 @@ final class GameScene: SKScene {
     var onLoading: ((Double?) -> Void)? {
         didSet { sprites.onLoading = { [weak self] _ in self?.reportLoading() } }
     }
-    /// Anything loading: the sprites' rebuilds or a stage's warm-up.
-    var loading: Bool { sprites.loadingCounts != nil || stageWarm != nil }
+    /// Anything loading: the sprites' rebuilds, a stage's warm-up, or the launch's.
+    var loading: Bool { sprites.loadingCounts != nil || stageWarm != nil || warmingUp }
+    /// The launch's warm-up underway: till it's done no frame steps, so no screen of the scene's
+    /// can be used.
+    var warmingUp: Bool { !ready }
 
     /// One count over everything loading, pieces made of all of them: each texture the stage
     /// sends a piece, as each sprite made is.
     private func reportLoading() {
-        let parts = [sprites.loadingCounts, stageWarm].compactMap { $0 }
+        let launchWarm: (made: Int, all: Int)? = ready ? nil : (preloaded ? 1 : 0, 2)
+        let parts = [sprites.loadingCounts, stageWarm, launchWarm].compactMap { $0 }
         let all = parts.reduce(0) { $0 + $1.all }
         onLoading?(parts.isEmpty ? nil : Double(parts.reduce(0) { $0 + $1.made }) / Double(max(all, 1)))
     }
@@ -213,6 +217,8 @@ final class GameScene: SKScene {
         enumerateChildNodes(withName: "//*") { node, _ in
             if let texture = (node as? SKSpriteNode)?.texture { textures.append(texture) }
         }
+        // What comes on later but isn't in the scene yet: Anozira's billboards.
+        textures += anoziraArt?.billboardPictures ?? []
         afterStageWarm = then
         stageWarm = (0, textures.count + GameScene.stageWarmFrames)
         reportLoading()
@@ -234,7 +240,9 @@ final class GameScene: SKScene {
         guard stageWarmFramesLeft == 0 else { return reportLoading() }
         let then = afterStageWarm
         afterStageWarm = nil
-        then?()
+        // Not before the players' frames are rebuilt too (a colour changed on the way in): the
+        // count waits under the curtain with them.
+        sprites.afterRebuilds { then?() }
         stageWarm = nil
         reportLoading()
     }
@@ -292,7 +300,83 @@ final class GameScene: SKScene {
     var diamondInstances: [CubeInstance] {
         floStringInstances.indices.filter { index in
             index < playerNodes.count && !playerNodes[index].isHidden && (index >= figureLayers.count || !figureLayers[index].isHidden)
-        }.flatMap { floStringInstances[$0] }
+        }.flatMap { floStringInstances[$0] } + webInstances.flatMap { $0 }
+    }
+    /// 47's locked rims: each a sphere of hexagons in the net's energy (`HexSphere`), over the
+    /// light behind it showing through the gaps; the tiles grow in and shrink away over a few frames.
+    var hexInstances: [CubeInstance] {
+        let spin = Float(stageClock.truncatingRemainder(dividingBy: 1000)) * HexSphere.spinRate
+        return match.stage.hoops.filter { $0.lockFrames > 0 }.flatMap { hoop -> [CubeInstance] in
+            let centre = SpriteLibrary.point(RimLockRules.centre(of: hoop))
+            // The net's colour, the other side's: the one defending the rim.
+            let look = sprites.look(for: 1 - hoop.lockedBy)
+            func channels(_ rgb: RGB) -> SIMD4<Float> {
+                SIMD4<Float>(Float((rgb >> 16) & 0xFF) / 255, Float((rgb >> 8) & 0xFF) / 255, Float(rgb & 0xFF) / 255, 1)
+            }
+            return HexSphere.instances(centre: SIMD3<Float>(Float(centre.x), Float(centre.y), 0),
+                                       radius: Float(RimLockRules.radius * SpriteLibrary.pixelsPerUnit),
+                                       tileShare: Float(GameScene.rimLockShare(hoop)), spin: spin,
+                                       colour: channels(look.glow), flash: channels(look.bright), time: stageClock)
+        }
+    }
+    /// A locked rim's size as it comes and goes: grown in over its first frames, shrunk away over its last.
+    static func rimLockShare(_ hoop: Hoop) -> CGFloat {
+        let since = FortySevenRules.rimLockFrames - hoop.lockFrames
+        return CGFloat(min(since, hoop.lockFrames, GameScene.rimLockGrowFrames)) / CGFloat(GameScene.rimLockGrowFrames)
+    }
+    static let rimLockGrowFrames = 8
+    /// The light behind each locked rim's hexagons, by hoop; how much wider than the sphere, and how bright.
+    private var rimLockGlows: [SKSpriteNode] = []
+    static let rimLockGlowWidth: CGFloat = 1.5
+    static let rimLockGlowAlpha: CGFloat = 0.5
+
+    private func drawRimLockGlows() {
+        let hoops = match.stage.hoops
+        while rimLockGlows.count < hoops.count {
+            let glow = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
+            glow.colorBlendFactor = 1
+            glow.blendMode = .add
+            glowers.addChild(glow)
+            rimLockGlows.append(glow)
+        }
+        for (index, glow) in rimLockGlows.enumerated() {
+            guard hoops.indices.contains(index), hoops[index].lockFrames > 0 else {
+                glow.isHidden = true
+                continue
+            }
+            let hoop = hoops[index]
+            let width = CGFloat(RimLockRules.radius * SpriteLibrary.pixelsPerUnit) * 2 * GameScene.rimLockGlowWidth
+            glow.isHidden = false
+            glow.position = SpriteLibrary.point(RimLockRules.centre(of: hoop))
+            glow.size = CGSize(width: width, height: width)
+            glow.color = SKColor(rgb: sprites.look(for: 1 - hoop.lockedBy).glow)
+            glow.alpha = GameScene.rimLockGlowAlpha * GameScene.rimLockShare(hoop)
+        }
+    }
+
+    /// Web Water's lines, the swing's and the shot's, as diamonds (`FloStrings.line`), and their glow's footprints.
+    private var webInstances: [[CubeInstance]] = []
+    private var webGlows: [[BodySnapshot]] = []
+
+    /// A web line's diamonds from `from` to `to` in the player's bright energy, as instances and their glow's footprints.
+    private func webDiamonds(_ index: Int, from: CGPoint, to: CGPoint, scale: CGFloat) -> (instances: [CubeInstance], glows: [BodySnapshot]) {
+        let diamonds = FloStrings.line(from: SIMD3<Float>(Float(from.x), Float(from.y), 0), to: SIMD3<Float>(Float(to.x), Float(to.y), 0),
+                                       scale: Float(scale), time: CACurrentMediaTime())
+        let rgb = sprites.look(for: index).bright
+        let colour = SIMD4<Float>(Float((rgb >> 16) & 0xFF) / 255, Float((rgb >> 8) & 0xFF) / 255, Float(rgb & 0xFF) / 255, 1)
+        let square = sprites.flatSquare(size: 1, alpha: 1)
+        let instances = diamonds.map { diamond in
+            CubeInstance(model: simd_float4x4.translation(diamond.centre) * simd_float4x4(diamond.orientation)
+                            * simd_float4x4.scale(SIMD3<Float>(diamond.length, diamond.width, diamond.width)), color: colour)
+        }
+        let glows = diamonds.map { diamond in
+            let axis = diamond.orientation.act(SIMD3<Float>(1, 0, 0))
+            return BodySnapshot(texture: square, position: CGPoint(x: CGFloat(diamond.centre.x), y: CGFloat(diamond.centre.y)),
+                                anchor: CGPoint(x: 0.5, y: 0.5), xScale: 1,
+                                size: CGSize(width: CGFloat(diamond.length) * 0.75, height: CGFloat(diamond.width) * 0.75),
+                                zRotation: CGFloat(atan2(axis.y, axis.x)))
+        }
+        return (instances, glows)
     }
     /// Each body's front leg drawn over its ball in hand, on the sheets that pass the ball behind it.
     private var legsOverBall: [SKSpriteNode] = []
@@ -304,7 +388,7 @@ final class GameScene: SKScene {
     /// The sheets that hold the ball behind the whole body, every frame: the double jump's; and
     /// single frames that tuck it there: the spin's last.
     static let ballBehindBodySheets: Set<Animation> = [.doubleJumpBall]
-    static let ballBehindBodyFrames: [Animation: Set<Int>] = [.spinBall: [3]]
+    static let ballBehindBodyFrames: [Animation: Set<Int>] = [.spinBall: [3], .swingBall: [0]]
     static func ballBehindBody(_ frame: AnimationFrame) -> Bool {
         ballBehindBodySheets.contains(frame.animation) || ballBehindBodyFrames[frame.animation]?.contains(frame.frame) == true
     }
@@ -500,6 +584,39 @@ final class GameScene: SKScene {
         return arms
     }
 
+    /// Web Water's swing's arm on each body, over it, hung by its shoulder so it turns about it,
+    /// toward where the line's hung; and where its hand is this frame, for the line to leave from.
+    private var swingArmNodes: [Int: SKSpriteNode] = [:]
+    private var swingHands: [Int: CGPoint] = [:]
+    /// On `player_swing_arm`'s canvas, art pixels from the top left: the shoulder it turns about and the hand.
+    static let swingArmShoulder = CGPoint(x: 19.5, y: 21)
+    static let swingArmHand = CGPoint(x: 16, y: 8)
+    /// Where a swing's line is drawn from: straight over its pivot, just off the top of the screen.
+    private func swingSkyPoint(_ anchor: Vec2) -> CGPoint {
+        let hung = SpriteLibrary.point(anchor)
+        let top = cameraNode.position.y + size.height * cameraNode.yScale / 2 + 16
+        return CGPoint(x: hung.x, y: max(top, hung.y))
+    }
+    private func swingArm(_ index: Int, on body: SKSpriteNode) -> SKSpriteNode {
+        guard let figure = body.parent else { return SKSpriteNode() }
+        if let arm = swingArmNodes[index], arm.parent === figure { return arm }
+        let side = CGFloat(Animation.swingArm.pixelSize)
+        let anchor = CGPoint(x: GameScene.swingArmShoulder.x / side, y: (side - GameScene.swingArmShoulder.y) / side)
+        let arm = SKSpriteNode()
+        arm.anchorPoint = anchor
+        arm.zPosition = GameScene.hoodUpZ + 0.002
+        arm.isHidden = true
+        let line = SKSpriteNode()
+        line.name = "line"
+        line.anchorPoint = anchor
+        line.colorBlendFactor = 1
+        line.zPosition = -0.0005
+        arm.addChild(line)
+        figure.addChild(arm)
+        swingArmNodes[index] = arm
+        return arm
+    }
+
     /// The tornado's sheet squeezed to the gale's shape: two thirds as high, a third wider.
     private static let galeScale = CGSize(width: 4.0 / 3, height: 2.0 / 3)
     private var flameNodes: [Int: SKSpriteNode] = [:]
@@ -572,6 +689,8 @@ final class GameScene: SKScene {
     private static let dribbleFrameSeconds = 0.2
     /// Turns a second a shot or a throw leaves the hand spinning, backwards, and the most the ball ever turns.
     private static let backspinTurnsPerSecond = 1.5
+    /// The up-throw's (the floater's) backspin, much more, the way its thrower faces whichever way it drifts.
+    private static let floaterBackspinTurnsPerSecond = 4.0
     private static let mostSpinTurnsPerSecond = 4.0
     /// The loose ball's spin: its angle and rate (counter-clockwise up, radians), the frame it turns on,
     /// and what it was doing last update, to tell a launch and a bounce from a fall.
@@ -777,7 +896,7 @@ final class GameScene: SKScene {
                                             size: node.size, zRotation: node.zRotation) }
         }
         // FloState's strings' diamonds, over the body too, as the strings were.
-        let diamonds = floStringGlows.indices.filter { !greyedOut.contains($0) }.flatMap { floStringGlows[$0] }
+        let diamonds = floStringGlows.indices.filter { !greyedOut.contains($0) }.flatMap { floStringGlows[$0] } + webGlows.flatMap { $0 }
         return strings + apart + strikes + beam + diamonds
     }
     var shieldedSnapshots: [BodySnapshot] { hoodMaskSnapshots(\.face) }
@@ -826,7 +945,7 @@ final class GameScene: SKScene {
     /// long and 2 pixels thick, fading in and out along its length in their energy. Neither
     /// draws the arcs.
     private var portableThreeLine: [SKSpriteNode] = []
-    static let portableThreeLooks: [StageLook] = [.hoopfishHideaway, .kAndA]
+    static let portableThreeLooks: [StageLook] = [.hoopfishHideaway, .kAndA, .anozira]
     private var portableThrees: Bool { GameScene.portableThreeLooks.contains(match.stage.features.look) && match.stage.features.threes }
     private static let portableThreeSegments = 20
     private static let portableThreeLength: CGFloat = 80
@@ -843,8 +962,8 @@ final class GameScene: SKScene {
                 return segment
             }
         }
-        // Hoopfish Hideaway's one rim, or K&A's the local player scores on.
-        let hoop = match.stage.hoops.first { $0.shared || $0.owner == localIndex }
+        // Hoopfish Hideaway's one rim, K&A's the local player scores on, or Anozira's truck's (not the Phoenix's).
+        let hoop = match.stage.hoops.first { !$0.bonus && ($0.shared || $0.owner == localIndex) }
         let aiming = match.players.indices.contains(localIndex) && match.players[localIndex].state == .shootStance
         guard gameMode == .fortySeven, portableThrees, aiming, let hoop, !hoop.rimless, hoop.position != HighwayRules.parked else {
             portableThreeLine.forEach { $0.isHidden = true }
@@ -873,9 +992,18 @@ final class GameScene: SKScene {
     /// How the Hoopfish's antenna nods this frame, as a turn of a world point about where it
     /// meets the body, mirrored as the fish faces; none off Hoopfish Hideaway or with no fish.
     private func hoopfishNod(_ hoop: Int) -> (angle: CGFloat, turn: (CGPoint) -> CGPoint) {
+        // Anozira's rim leans with the truck's pole, about its own art point (the sim's rim has leaned already).
+        if match.stage.features.look == .anozira, match.stage.hoops.indices.contains(hoop) {
+            let angle = CGFloat(match.anoziraTruck.lean)
+            let pivot = GameScene.hoopArtPoint(for: match.stage.hoops[hoop], on: .anozira)
+            return (angle, { point in
+                let offset = point - pivot
+                return CGPoint(x: pivot.x + offset.x * cos(angle) - offset.y * sin(angle), y: pivot.y + offset.x * sin(angle) + offset.y * cos(angle))
+            })
+        }
         guard hoop == 0, let fish = match.hoopfish, let node = hoopfishHideawayArt?.hoopfish, !wholeStageView else { return (0, { $0 }) }
         let dunkedOn = match.players.contains { $0.state == .dunking }
-        let angle = HoopfishHideawayArt.antennaTurn(at: CACurrentMediaTime(), dunkedOn: dunkedOn) * (fish.facesRight ? -1 : 1)
+        let angle = HoopfishHideawayArt.antennaTurn(at: stageClock, dunkedOn: dunkedOn) * (fish.facesRight ? -1 : 1)
         let pivot = CGPoint(x: node.position.x + HoopfishHideawayArt.antennaPivot.x * node.xScale, y: node.position.y + HoopfishHideawayArt.antennaPivot.y)
         return (angle, { point in
             let offset = point - pivot
@@ -884,17 +1012,21 @@ final class GameScene: SKScene {
     }
 
     /// Hoopfish Hideaway's sway over the whole screen, but not in the map maker: its reach in the
-    /// drawable's pixels, how many waves down the screen, and where it is in them.
+    /// drawable's pixels, how many waves down the screen, and where it is in them. Anozira's heat
+    /// haze is the same, while it's dry: gone as the sky turns.
     /// The score's band across the top doesn't sway: how far down the screen it reaches, as a share.
     var screenWave: (reach: Double, waves: Double, phase: Double, calmTop: Double)? {
-        guard match.stage.features.look == .hoopfishHideaway, !wholeStageView else { return nil }
+        let look = match.stage.features.look
+        guard look == .hoopfishHideaway || look == .anozira, !wholeStageView else { return nil }
+        let dry = look == .anozira ? 1 - match.overcast : 1
+        guard dry > 0 else { return nil }
         let pixelsPerGamePixel = Double(displayScale / cameraNode.xScale)
         let calm = (safeInsets.top / hudScale + 40) * hudScale / max(size.height, 1)
-        return (WaterTuning.swayPixels * pixelsPerGamePixel, WaterTuning.swayWaves, CACurrentMediaTime() * WaterTuning.swaySpeed, Double(calm))
+        return (WaterTuning.swayPixels * pixelsPerGamePixel * dry, WaterTuning.swayWaves, stageClock * WaterTuning.swaySpeed, Double(calm))
     }
 
     /// The Elements' flat background, which never glows; nil elsewhere.
-    var unglowedBackground: SKColor? { [StageLook.elements, .hoopfishHideaway, .flightB411, .kAndA].contains(match.stage.features.look) ? backgroundColor : nil }
+    var unglowedBackground: SKColor? { [StageLook.elements, .hoopfishHideaway, .flightB411, .kAndA, .anozira].contains(match.stage.features.look) ? backgroundColor : nil }
 
     /// The water's tint over the world, for what's drawn apart from the scene (the cubes) and for
     /// what glows through it; nil elsewhere (K&A's wash is under what it would touch).
@@ -910,6 +1042,12 @@ final class GameScene: SKScene {
         if let art = hoopfishHideawayArt { return art.fishGlowParts }
         // The Wreck Center's possession pixels and its displays' lit ones, over its flat art.
         if let art = wreckCenterArt { return art.glowing }
+        // Anozira's car and truck lights in the holder's colour.
+        if let art = anoziraArt {
+            return art.glowing.compactMap { node in
+                node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
+            }
+        }
         // Flight B411's NO DUNKING sign and its red "no", glowing through the backdrop's flat;
         // the seatbelt sign, and the 2X or the 3X, while lit.
         guard let holder = noDunkingNode, !holder.isHidden else { return [] }
@@ -983,6 +1121,31 @@ final class GameScene: SKScene {
     var soundWordSnapshots: [BodySnapshot] {
         var flat: [BodySnapshot] = supportNodes.filter { !$0.isHidden }.compactMap { node in
             node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size) }
+        }
+        // Anozira's sliding layers, its idling car and truck and the truck's flag: painted, not lit.
+        if let art = anoziraArt {
+            for node in art.flats + (ballTruckArt?.flats ?? []) where !node.isHidden {
+                if let texture = node.texture {
+                    flat.append(BodySnapshot(texture: texture, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
+                                             size: node.size, zRotation: node.zRotation))
+                }
+            }
+        }
+        if let decal = ballTruckArt?.decalSnapshot { flat.append(decal) }
+        // The football field's pixel turf and its numbers, as painted: lit, they blow out.
+        if let turf = fieldTurf, let texture = turf.texture {
+            flat.append(BodySnapshot(texture: texture, position: turf.position, anchor: turf.anchorPoint, xScale: 1, size: turf.size))
+            for zone in fieldEndZones.map(\.node) {
+                if let texture = zone.texture { flat.append(BodySnapshot(texture: texture, position: zone.position, anchor: zone.anchorPoint, xScale: 1, size: zone.size)) }
+            }
+            for group in yardNumbers {
+                for case let sprite as SKSpriteNode in group.children {
+                    if let texture = sprite.texture {
+                        flat.append(BodySnapshot(texture: texture, position: group.position + sprite.position * group.xScale, anchor: sprite.anchorPoint, xScale: 1,
+                                                 size: CGSize(width: sprite.size.width * group.xScale, height: sprite.size.height * group.yScale)))
+                    }
+                }
+            }
         }
         // K&A's drifting clouds and its broken car, whose hood springs: night, not lit; behind the bodies.
         if let art = kAndAArt {
@@ -1270,7 +1433,10 @@ final class GameScene: SKScene {
         addChild(glowHud)
 
         // Every frame in both looks, made before anything is drawn, then drawn once each.
-        sprites.warmUp(players: match.players.count) { [weak self] in self?.preloaded = true }
+        sprites.warmUp(players: match.players.count) { [weak self] in
+            self?.preloaded = true
+            self?.reportLoading()
+        }
         for texture in sprites.allTextures {
             let sprite = SKSpriteNode(texture: texture)
             sprite.size = CGSize(width: 1, height: 1)
@@ -1519,7 +1685,7 @@ final class GameScene: SKScene {
 
         ballNode = SKSpriteNode(texture: sprites.basketballFrames[0])
         ballNode.size = GameScene.basketballSize
-        ballNode.zPosition = 6
+        ballNode.zPosition = GameScene.ballZ
         glowers.addChild(ballNode)
         ballHalo = makeHalo(ballTeam)
         ballHalo.zPosition = -1
@@ -2176,7 +2342,121 @@ final class GameScene: SKScene {
     /// The Elements' placed tiles, while it's the stage drawn; Hoopfish Hideaway's props likewise.
     private var elementsArt: ElementsArt.Handles?
     private var flightB411Art: FlightB411Art.Handles?
+    /// A skid spark (`dust_skid`, looping) under each vehicle's near wheel, behind it as it drives
+    /// right; and in the rain, veering, afterimages off them: palette 11 ovals left behind every few
+    /// frames, fading as they slide away with the road.
+    private var wheelSparks: [SKSpriteNode] = []
+    /// The spark twice as fast as its sheet, a wheel's width back, two thirds seen.
+    static let wheelSparkSpeed = 2.0
+    static let wheelSparkBack: CGFloat = -8
+    static let wheelSparkAlpha: CGFloat = 0.66
+    static let afterimageEveryFrames = 1
+    static let afterimageColour: RGB = PixelPalette.colours[11]
+    static let afterimageSize = CGSize(width: 6, height: 3)
+    static let afterimageReach: CGFloat = 48
+    static let wheelAfterimageAlpha: CGFloat = 0.9
+    private var lastAfterimageFrame = -1
+    /// Anozira's lightning far off in the rain, behind the mountains: when the next comes, and the
+    /// bolts' frames (the score's sheets, the full-frame flashes left out).
+    private var nextDistantLightning: CFTimeInterval = 0
+    private lazy var distantLightningFrames: [[SKTexture]] = EnergyEffect.strikes.map { bolt in
+        (0..<bolt.frameCount).filter { !EnergyEffect.strikeFlashFrames.contains($0) }.map { sprites.texture(bolt.name, $0) }
+    }
+    static let distantLightningGap: ClosedRange<Double> = 1.5...5
+    static let distantLightningAlpha: ClosedRange<CGFloat> = 0.25...0.75
+    static let distantLightningWidth: ClosedRange<CGFloat> = 0.5...0.8
+    /// Its bolts' feet, behind the mountains, up from the stage's foot.
+    static let distantLightningFoot: CGFloat = 120
+    /// Anozira's rain and wind not drawn under the second row of tiles from the bottom: the road's top.
+    static let anoziraWeatherFloor = ElementsArt.tileSide * CGFloat(AnoziraRules.floorRows)
+    /// A pothole shakes the screen this much (the plane's turbulence is 6).
+    static let potholeShake = 3
+
+    private func driveVehicleWheels() {
+        let contacts = (anoziraArt?.wheelContacts ?? []) + (ballTruckArt?.wheelContacts.map { ($0, BallTruckArt.z + 0.04) } ?? [])
+        while wheelSparks.count < contacts.count, Effect.dustSkid.available {
+            let frames = sprites.frames(Effect.dustSkid.name, count: Effect.dustSkid.frameCount)
+            let spark = SKSpriteNode(texture: frames.first)
+            spark.anchorPoint = Effect.dustSkid.anchor
+            spark.setScale(DustTuning.scale(.dustSkid))
+            spark.alpha = GameScene.wheelSparkAlpha
+            spark.run(.repeatForever(.animate(with: frames, timePerFrame: 1 / (Effect.dustSkid.fps * GameScene.wheelSparkSpeed))))
+            stageGround.addChild(spark)
+            wheelSparks.append(spark)
+        }
+        for (index, spark) in wheelSparks.enumerated() {
+            spark.isHidden = index >= contacts.count
+            guard !spark.isHidden else { continue }
+            spark.position = contacts[index].at + CGPoint(x: GameScene.wheelSparkBack, y: 0)
+            spark.zPosition = contacts[index].z
+        }
+        guard match.stage.features.look == .anozira, !stageHeld else { return }
+        // Afterimages off the wheels as they veer in the rain.
+        if match.rain > 0.2, match.frame % GameScene.afterimageEveryFrames == 0, match.frame != lastAfterimageFrame {
+            lastAfterimageFrame = match.frame
+            let seconds = Double(GameScene.afterimageReach / AnoziraArt.roadSpeed)
+            for contact in contacts {
+                let oval = SKShapeNode(ellipseOf: GameScene.afterimageSize)
+                oval.fillColor = SKColor(rgb: GameScene.afterimageColour)
+                oval.strokeColor = .clear
+                oval.position = contact.at
+                oval.zPosition = contact.z - 0.02
+                oval.alpha = GameScene.wheelAfterimageAlpha * CGFloat(match.rain)
+                oval.run(.sequence([.group([.moveBy(x: -GameScene.afterimageReach, y: 0, duration: seconds), .fadeOut(withDuration: seconds)]),
+                                    .removeFromParent()]))
+                stageGround.addChild(oval)
+            }
+        }
+        // Lightning far off, now and then, the harder it rains the more often.
+        if match.rain > 0.3, stageClock >= nextDistantLightning {
+            nextDistantLightning = stageClock + Double.random(in: GameScene.distantLightningGap) / match.rain
+            strikeDistantLightning()
+        }
+    }
+
+    /// A bolt far off behind the mountains, from over the top of the screen down to behind them,
+    /// at a strength and width at random, drawn only.
+    /// The far lightning on the go, for the mask: the rain's wash is left off it.
+    private var distantBolts: [SKSpriteNode] = []
+    var washFreeSnapshots: [BodySnapshot] {
+        distantBolts.removeAll { $0.parent == nil }
+        return distantBolts.compactMap { bolt in
+            bolt.texture.map { BodySnapshot(texture: $0, position: bolt.position, anchor: bolt.anchorPoint, xScale: bolt.xScale < 0 ? -1 : 1,
+                                            size: CGSize(width: $0.size().width * abs(bolt.xScale), height: $0.size().height * bolt.yScale)) }
+        }
+    }
+    /// A wash the composite lays over the whole world, its colour and how strong: Anozira's rain's.
+    var worldWash: (colour: RGB, alpha: CGFloat)? {
+        guard match.stage.features.look == .anozira, match.rain > 0 else { return nil }
+        return (AnoziraArt.rainWashColour, AnoziraArt.rainWashAlpha * CGFloat(match.rain))
+    }
+
+    private func strikeDistantLightning() {
+        guard let frames = distantLightningFrames.randomElement(), let first = frames.first else { return }
+        let bolt = SKSpriteNode(texture: first)
+        bolt.anchorPoint = CGPoint(x: 0.5, y: 0)
+        let halfWidth = size.width * cameraNode.xScale / 2
+        let top = cameraNode.position.y + size.height * cameraNode.yScale / 2
+        bolt.position = CGPoint(x: cameraNode.position.x + .random(in: -halfWidth...halfWidth), y: GameScene.distantLightningFoot)
+        bolt.xScale = .random(in: GameScene.distantLightningWidth) * (Bool.random() ? 1 : -1)
+        bolt.yScale = max((top - GameScene.distantLightningFoot) * 1.1 / first.size().height, 1)
+        bolt.alpha = .random(in: GameScene.distantLightningAlpha)
+        bolt.zPosition = AnoziraArt.lightningZ
+        bolt.run(.sequence([.animate(with: frames, timePerFrame: 1.0 / 24), .removeFromParent()]))
+        stageGround.addChild(bolt)
+        distantBolts.append(bolt)
+    }
+    /// The stage's own clock, for what moves on it by itself (belts, water, scenery, nets, wind,
+    /// rain): it stops while the world's held, paused or in hit-stop. And whether it's held now.
+    private var stageClock: CFTimeInterval = 0
+    private var stageClockLast: CFTimeInterval?
+    private var stageHeld = false
+
+    /// The ball's place among the glowers.
+    static let ballZ: CGFloat = 6
     private var kAndAArt: KAndAArt.Handles?
+    private var anoziraArt: AnoziraArt.Handles?
+    private var ballTruckArt: BallTruckArt.Handles?
     /// The Wreck Center's art, its possession pixels tinted the court's colour.
     private var wreckCenterArt: WreckCenterArt.Handles?
     /// K&A's red car: how far its body sags, in art pixels, where it's going, the frames to its
@@ -2261,6 +2541,10 @@ final class GameScene: SKScene {
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: 1, size: node.size) }
             }
         }
+        // Anozira's background and sky stand still and don't glow.
+        if let background = anoziraArt?.background, let texture = background.texture {
+            flats.append(BodySnapshot(texture: texture, position: background.position, anchor: background.anchorPoint, xScale: 1, size: background.size))
+        }
         // Flight B411's tiles are painted, not lit: none of them glows.
         if let art = flightB411Art {
             flats += [art.backdrop, art.front].compactMap { $0 }.compactMap { node in
@@ -2290,11 +2574,14 @@ final class GameScene: SKScene {
         let isHoopfishHideaway = stage.features.look == .hoopfishHideaway
         backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : (isHoopfishHideaway ? SKColor(rgb: HoopfishHideawayArt.waterTop)
             : (stage.features.look == .flightB411 ? SKColor(rgb: FlightB411Art.beyond)
-               : (stage.features.look == .kAndA ? SKColor(rgb: KAndAArt.beyond) : GameScene.background)))
+               : (stage.features.look == .kAndA ? SKColor(rgb: KAndAArt.beyond)
+                  : (stage.features.look == .anozira ? SKColor(rgb: AnoziraArt.beyond) : GameScene.background))))
         elementsArt = nil
         hoopfishHideawayArt = nil
         flightB411Art = nil
         kAndAArt = nil
+        anoziraArt = nil
+        ballTruckArt = nil
         wreckCenterArt = nil
         cartNode = nil
         cartWheels = []
@@ -2317,6 +2604,10 @@ final class GameScene: SKScene {
         // The Elements' tornados over the players live outside the stage's ground: gone with any other stage.
         tornadoOverlays.removeAllChildren()
         tornadoOverlays.maskNode = isElements ? overLava : nil
+        // The rain stops at the Elements' lava; elsewhere it falls all the way down.
+        rainLayer.maskNode?.position.y = isElements ? ElementsArt.lavaSurfaceLine
+            : (stage.features.look == .anozira ? GameScene.anoziraWeatherFloor : -50_000)
+        wheelSparks = []
         stageFront.removeAllChildren()
         if isHoopfishHideaway {
             hoopfishHideawayArt = HoopfishHideawayArt.build(stage: stage, map: StageMap.current[.hoopfishHideaway], into: stageGround)
@@ -2335,6 +2626,10 @@ final class GameScene: SKScene {
             }
             kAndACloudIn = Int.random(in: KAndAArt.cloudGapFrames)
         }
+        if stage.features.look == .anozira {
+            anoziraArt = AnoziraArt.build(into: stageGround, glowers: stageGlowers)
+        }
+        if stage.features.ballTruck { ballTruckArt = BallTruckArt.build(into: stageGround, ball: sprites.basketballFrames[0]) }
         if stage.features.look == .flightB411 {
             flightB411Art = FlightB411Art.build(into: stageGround, front: stageFront)
             let cart = FlightB411Art.cart()
@@ -2421,7 +2716,12 @@ final class GameScene: SKScene {
             }
             for panel in lightPanels { panel.fillColor = courtColour }
             yardNumbers = handles.numbers
-            for number in yardNumbers { number.setScale(HelmetTuning.numberScale) }
+            fieldTurf = handles.turf
+            // Each end zone its guard's: the left one the side that defends the left rim.
+            fieldEndZones = zip(handles.endZones, [Facing.left, .right]).compactMap { zone, end in
+                stage.hoops.first { $0.backboard == end }.map { (zone, 1 - $0.owner) }
+            }
+            colourEndZones()
             for bloom in fieldBlooms { bloom.color = courtColour }
             // Chevrons along the rail, pointing at the rim the holder attacks.
             for (rail, line) in FieldArt.railLines.enumerated() {
@@ -2527,14 +2827,14 @@ final class GameScene: SKScene {
         }
         // Under the floor's row, the outline black, all the way down and out.
         if !stage.features.scenic && !isElements {
-            let under = SKSpriteNode(color: SKColor(rgb: PixelPalette.aap64Outline), size: CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 4000, height: 2000))
+            let under = SKSpriteNode(color: SKColor(rgb: PixelPalette.outline), size: CGSize(width: CGFloat(stage.columns) * GameScene.pixelsPerTile + 4000, height: 2000))
             under.anchorPoint = CGPoint(x: 0.5, y: 1)
             under.position = CGPoint(x: CGFloat(stage.columns) * GameScene.pixelsPerTile / 2, y: 0)
             under.zPosition = -20
             stageGround.addChild(under)
         }
         loadMark("lines")
-        for hoop in stage.hoops {
+        for hoop in stage.hoops where !hoop.bonus {
             let radius = CGFloat(FortySevenRules.threePointRadius(for: hoop, on: stage) * SpriteLibrary.pixelsPerUnit)
             let facingMiddle: CGFloat = hoop.backboard == .left ? 0 : .pi
             // Each end runs on straight to the screen's edge on the rim's side, well past the
@@ -2566,11 +2866,13 @@ final class GameScene: SKScene {
             backboard.xScale = hoop.backboard == .left ? -1 : 1
             // Hoopfish Hideaway's rim rides the Hoopfish, with no backboard; Flight B411's hangs
             // in a hoopcase, which draws its own ring.
-            backboard.isHidden = stage.features.look == .hoopfishHideaway || stage.features.look == .flightB411
+            // Anozira's Phoenix's ring is its own art (`AnoziraArt`): no hoop drawn for it.
+            backboard.isHidden = stage.features.look == .hoopfishHideaway || stage.features.look == .flightB411 || hoop.bonus
             stageGround.addChild(backboard)
             backboardNodes.append(backboard)
-            // The Wreck Center's supports, and K&A's, which hang its hoops from the bridge on the same beams.
-            if stage.features.look == .court || stage.features.look == .kAndA {
+            // The Wreck Center's supports, and K&A's, which hang its hoops from the bridge on the same beams;
+            // Anozira's pole assembly, on the truck.
+            if HoopSupport.Layout(look: stage.features.look) != nil {
                 let support = SKSpriteNode()
                 support.zPosition = 4.9
                 stageGround.addChild(support)
@@ -2581,7 +2883,7 @@ final class GameScene: SKScene {
             rim.xScale = hoop.backboard == .left ? -1 : 1
             rim.zPosition = 6
             // ZONES: a rimless board has no rim drawn.
-            rim.isHidden = hoop.rimless || stage.features.look == .flightB411
+            rim.isHidden = hoop.rimless || stage.features.look == .flightB411 || hoop.bonus
             stageGround.addChild(rim)
             rimNodes.append(rim)
             if let outline = madeShotOutline(rim: art.rim) {
@@ -2595,7 +2897,7 @@ final class GameScene: SKScene {
             // A straight rim's front lip again over the ball, so the ball goes down through it.
             let front = SKSpriteNode(texture: art.rim == "hoop_straight" ? frontLip(of: sprites.texture(art.rim, 0)) : nil)
             front.zPosition = GameScene.rimFrontZ
-            front.isHidden = front.texture == nil || hoop.rimless
+            front.isHidden = front.texture == nil || hoop.rimless || hoop.bonus
             glowers.addChild(front)
             rimFronts.append(front)
             rimFlash.append(0)
@@ -2605,10 +2907,10 @@ final class GameScene: SKScene {
             rimSpin.append(0)
             nets.append(HoopNet(at: GameScene.netPoint(for: hoop, on: stage.features.look), mirrored: hoop.backboard == .left, colour: netColour(for: hoop),
                                 into: stageGround, depth: 5.5))
-            nets[nets.count - 1].hidden = hoop.rimless || netless
+            nets[nets.count - 1].hidden = hoop.rimless || netless || hoop.bonus
         }
         loadMark("hoops")
-        refreshSupports(HoopSupport.pieces)
+        if let layout = HoopSupport.Layout(look: stage.features.look) { refreshSupports(HoopSupport.pieces(layout)) }
         loadMark("supports")
         warmDrawnArt()
         loadMark("warm drawn art")
@@ -2620,9 +2922,9 @@ final class GameScene: SKScene {
 
     /// The supports' picture again, for a layout.
     private func refreshSupports(_ pieces: [HoopSupport.Piece]) {
-        let assembled = HoopSupport.assembled(pieces)
-        for node in supportNodes {
-            node.isHidden = assembled == nil
+        let assembled = HoopSupport.assembled(pieces, layout: HoopSupport.Layout(look: match.stage.features.look) ?? .wreckCenter)
+        for (index, node) in supportNodes.enumerated() {
+            node.isHidden = assembled == nil || (match.stage.hoops.indices.contains(index) && match.stage.hoops[index].bonus)
             guard let assembled else { continue }
             node.texture = assembled.texture
             node.xScale = 1
@@ -2663,6 +2965,8 @@ final class GameScene: SKScene {
         hoopfishHideawayArt = nil
         flightB411Art = nil
         kAndAArt = nil
+        anoziraArt = nil
+        ballTruckArt = nil
         wreckCenterArt = nil
         cartNode = nil
         cartWheels = []
@@ -2684,6 +2988,8 @@ final class GameScene: SKScene {
         fieldBlooms = []
         lightPanels = []
         yardNumbers = []
+        fieldTurf = nil
+        fieldEndZones = []
         railCalls = []
         railChevrons = []
         railChevronHomes = []
@@ -2775,17 +3081,23 @@ final class GameScene: SKScene {
     private func blowWind() {
         windPuffs.back.removeAll { $0.parent == nil }
         windPuffs.front.removeAll { $0.parent == nil }
-        guard match.stage.features.look == .elements, let count = EffectSheets.frames["wind"] else { return }
+        // The Elements' and Anozira's, the highway's over everything only.
+        let look = match.stage.features.look
+        guard look == .elements || look == .anozira, let count = EffectSheets.frames["wind"] else { return }
         windClock += GameScene.stepSeconds
-        guard windClock >= GameScene.windSecondsBetween else { return }
+        // Anozira's picks up in the rain: up to four times as often.
+        let gusting = look == .anozira ? 1 + 3 * match.rain : 1
+        guard windClock >= GameScene.windSecondsBetween / gusting else { return }
         windClock = 0
         let frames = (0..<count).map { sprites.texture("wind", $0) }
         let seconds = Double(count) / GameScene.windFramesPerSecond
         let halfWidth = size.width * cameraNode.xScale / 2, halfHeight = size.height * cameraNode.yScale / 2
-        for front in [false, true] {
+        for front in look == .anozira ? [true] : [false, true] {
             let puff = SKSpriteNode(texture: frames[0])
             puff.position = CGPoint(x: cameraNode.position.x + .random(in: -halfWidth...halfWidth),
                                     y: cameraNode.position.y + .random(in: -halfHeight...halfHeight))
+            // Anozira's above the second row of tiles from the bottom.
+            if look == .anozira { puff.position.y = max(puff.position.y, GameScene.anoziraWeatherFloor + puff.size.height / 2) }
             puff.alpha = [1, 0.75, 0.5].randomElement()!
             puff.run(.sequence([
                 .group([.animate(with: frames, timePerFrame: 1 / GameScene.windFramesPerSecond),
@@ -2825,7 +3137,7 @@ final class GameScene: SKScene {
         format.scale = 1
         let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
             for _ in 0..<streaks {
-                let colour = SKColor(rgb: PixelPalette.aap64[Bool.random() ? 48 : 22])
+                let colour = SKColor(rgb: Bool.random() ? PixelPalette.colours[15] : PixelPalette.colours[16])
                 colour.withAlphaComponent(.random(in: 0.2...1)).setFill()
                 let x = Int.random(in: 0..<side), y = Int.random(in: 0..<side)
                 let length = Int.random(in: 2...5)
@@ -2841,8 +3153,11 @@ final class GameScene: SKScene {
     }
 
     private func fallRain() {
-        let raining = match.stage.features.look == .elements
+        // The Elements' rain always; Anozira's when it rains there, as hard as it does.
+        let anozira = match.stage.features.look == .anozira
+        let raining = match.stage.features.look == .elements || (anozira && match.rain > 0)
         rainLayer.isHidden = !raining
+        rainLayer.alpha = anozira ? CGFloat(match.rain) : 1
         guard raining else { return }
         let side = CGFloat(GameScene.rainTileSide)
         let halfWidth = size.width * cameraNode.xScale / 2, halfHeight = size.height * cameraNode.yScale / 2
@@ -2858,7 +3173,7 @@ final class GameScene: SKScene {
                 rainTiles[layer].append(tile)
             }
             // Slid down and left, whole pixels, wrapping every tile.
-            let travel = (CGFloat(CACurrentMediaTime()) * GameScene.rainSpeeds[layer]).truncatingRemainder(dividingBy: side)
+            let travel = (CGFloat(stageClock) * GameScene.rainSpeeds[layer]).truncatingRemainder(dividingBy: side)
             let originX = ((left + travel) / side).rounded(.down) * side - travel
             let originY = ((bottom + travel) / side).rounded(.down) * side - travel
             for (index, tile) in rainTiles[layer].enumerated() {
@@ -2877,6 +3192,12 @@ final class GameScene: SKScene {
 
     private func findRainSplashSpots() {
         rainSplashSpots = []
+        // Anozira's: along the road, under the near lane's wheels.
+        if match.stage.features.look == .anozira {
+            let top = CGFloat(AnoziraRules.floorRows) * ElementsArt.tileSide
+            rainSplashSpots.append((0...CGFloat(match.stage.width * SpriteLibrary.pixelsPerUnit), { _ in top }, 0))
+            return
+        }
         guard match.stage.features.look == .elements else { return }
         let map = StageMap.current[.elements], tile = ElementsArt.tileSide, stage = match.stage
         for wall in map.walls where wall.cell.row < stage.rows - 1 {
@@ -3068,8 +3389,11 @@ final class GameScene: SKScene {
     /// Splashes here and there, at random, on what's on screen.
     private func splashRain() {
         rainSplashes.removeAll { $0.parent == nil }
-        guard match.stage.features.look == .elements, !rainSplashSpots.isEmpty, let count = EffectSheets.frames["splash"],
-              Double.random(in: 0..<1) < GameScene.rainSplashesPerSecond * GameScene.stepSeconds else { return }
+        // Anozira's as hard as it's raining there.
+        let hard = match.stage.features.look == .anozira ? match.rain : 1
+        guard match.stage.features.look == .elements || match.stage.features.look == .anozira, !rainSplashSpots.isEmpty,
+              let count = EffectSheets.frames["splash"],
+              Double.random(in: 0..<1) < GameScene.rainSplashesPerSecond * GameScene.stepSeconds * hard else { return }
         let halfWidth = size.width * cameraNode.xScale / 2
         let seen = rainSplashSpots.filter { abs($0.x.lowerBound - cameraNode.position.x) < halfWidth }
         guard let spot = seen.randomElement() else { return }
@@ -3198,7 +3522,7 @@ final class GameScene: SKScene {
         }()
         let at = SpriteLibrary.point(jelly.position)
         node.position = CGPoint(x: at.x.rounded(), y: at.y.rounded())
-        node.texture = sprites.texture("jellyfish", Int(CACurrentMediaTime() * 8) % Effect.frameCount(named: "jellyfish"))
+        node.texture = sprites.texture("jellyfish", Int(stageClock * 8) % Effect.frameCount(named: "jellyfish"))
         trailBubble(behind: node, heading: CGFloat(jelly.heading), perSecond: 3)
     }
 
@@ -3341,10 +3665,19 @@ final class GameScene: SKScene {
             }
         }
         stepJellyfishNode()
-        HoopfishHideawayArt.animate(hoopfishHideawayArt?.hoopfish, at: CACurrentMediaTime(), dunkedOn: match.players.contains { $0.state == .dunking })
-        if let art = wreckCenterArt { WreckCenterArt.animate(art, at: CACurrentMediaTime(), match: match) }
+        HoopfishHideawayArt.animate(hoopfishHideawayArt?.hoopfish, at: stageClock, dunkedOn: match.players.contains { $0.state == .dunking })
+        if let art = wreckCenterArt { WreckCenterArt.animate(art, at: stageClock, match: match) }
+        if let art = anoziraArt {
+            let holderColours = match.ball.holder.map { holder -> AnoziraArt.Colours in
+                let look = sprites.look(for: holder)
+                return AnoziraArt.Colours(car: SKColor(rgb: look.glow), light: SKColor(rgb: look.bright), dark: SKColor(rgb: look.glow))
+            }
+            AnoziraArt.animate(art, match: match, holderColours: holderColours, at: stageClock)
+        }
+        if let art = ballTruckArt { BallTruckArt.animate(art, match: match, at: stageClock) }
+        driveVehicleWheels()
         drawShields()
-        HoopfishHideawayArt.sway(hoopfishHideawayArt?.props ?? [], at: CACurrentMediaTime())
+        HoopfishHideawayArt.sway(hoopfishHideawayArt?.props ?? [], at: stageClock)
         swimmers = swimmers.compactMap { swimmer in
             var swimmer = swimmer
             swimmer.age += step
@@ -3490,7 +3823,11 @@ final class GameScene: SKScene {
             let dt = CGFloat(min(max(now - seen.time, 0), 0.05))
             if seen.held, ball.velocity.length > 1 {
                 ballSpin.frame = Int.random(in: 0..<SpriteLibrary.basketballFrameCount)
-                ballSpin.rate = CGFloat(ball.velocity.x < 0 ? -1 : 1) * GameScene.backspinTurnsPerSecond * turnsToRadians
+                if ball.floaterShot, let thrower = ball.lastTouched, match.players.indices.contains(thrower) {
+                    ballSpin.rate = CGFloat(match.players[thrower].facing.sign) * GameScene.floaterBackspinTurnsPerSecond * turnsToRadians
+                } else {
+                    ballSpin.rate = CGFloat(ball.velocity.x < 0 ? -1 : 1) * GameScene.backspinTurnsPerSecond * turnsToRadians
+                }
             } else if abs(ball.velocity.x - seen.velocity.x) > 0.25 || ball.velocity.y - seen.velocity.y > 0.5 {
                 ballSpin.rate = ballSpin.rate * 0.5 + rolling(ball.velocity) * 0.5
             } else if abs(ball.position.y - seen.y) < 0.01, abs(ball.velocity.y) < 0.2, match.stage.isGrounded(ball.box) {
@@ -3717,6 +4054,13 @@ final class GameScene: SKScene {
             self?.applyPower()
         }
         // The shield added on, or drawn over plain, to compare.
+        // Dunk mode: player 1 held hung on the right rim as Titan Tea, DUNK FRAME up; off, the round again.
+        controls.addPicker(title: "DUNK MODE", options: ["OFF", "ON"], selected: DunkTuning.enabled ? 1 : 0) { [weak self] index in
+            guard let self, self.online == nil else { return }
+            DunkTuning.enabled = index == 1
+            if !DunkTuning.enabled { self.reset() }
+            if self.built { self.layout(displayScale: self.framingScale) }
+        }
         controls.addPicker(title: "DUMMY", options: TrainingDummy.Routine.allCases.map(\.label), selected: trainingDummy.routine.rawValue) { [weak self] index in
             self?.trainingDummy.routine = TrainingDummy.Routine(rawValue: index) ?? .idle
         }
@@ -3746,8 +4090,23 @@ final class GameScene: SKScene {
         }
         // The hoop support builder, on the Wreck Center.
         #if !os(tvOS)
-        if match.stage.features.look == .court, online == nil {
-            controls.addPicker(title: "SUPPORT", options: ["OFF", "ON"], selected: supportBuilder == nil ? 0 : 1) { [weak self] index in
+        // The football field's yard numbers' face.
+        if match.stage.features.look == .footballField {
+            controls.addPicker(title: "YARD FONT", options: FieldArt.NumberFont.allCases.map(\.label), selected: FieldArt.numberFont.rawValue) { [weak self] index in
+                FieldArt.numberFont = FieldArt.NumberFont(rawValue: index)!
+                self?.yardNumbers.forEach(FieldArt.letter)
+                self?.ballCamStale = true
+            }
+        }
+        // Anozira's weather, offline: as it comes, or held raining or dry.
+        if match.stage.features.look == .anozira, online == nil {
+            let options = ["AUTO", "ON", "OFF"]
+            controls.addPicker(title: "RAIN", options: options, selected: AnoziraRules.rainForced.map { $0 > 0 ? 1 : 2 } ?? 0) { index in
+                AnoziraRules.rainForced = index == 0 ? nil : (index == 1 ? 1 : 0)
+            }
+        }
+        if let layout = HoopSupport.Layout(look: match.stage.features.look), match.stage.features.look != .kAndA, online == nil {
+            controls.addPicker(title: layout == .anozira ? "POLE" : "SUPPORT", options: ["OFF", "ON"], selected: supportBuilder == nil ? 0 : 1) { [weak self] index in
                 index == 1 ? self?.openSupportBuilder() : self?.closeSupportBuilder()
             }
         }
@@ -3916,6 +4275,8 @@ final class GameScene: SKScene {
         controls.addPicker(title: "ARC AIM", options: ["RIM", "FIXED"], selected: BallRules.presetAimsAtRim ? 0 : 1) { index in
             BallRules.presetAimsAtRim = index == 0
         }
+        // 47's locked rim's sphere, art pixels up from the rim's middle.
+        controls.addSlider(title: "HEX SHIELD Y", range: -24...24, notch: 1, value: Float((-RimLockRules.drop * 1.6).rounded())) { RimLockRules.drop = -Double($0) / 1.6 }
         controls.addSlider(title: "AIM RANGE", range: 40...400, notch: 5, value: Float(BallRules.autoAimRange)) { BallRules.autoAimRange = Double($0) }
         controls.addSlider(title: "ARC HEIGHT", range: 10...120, notch: 1, value: Float(BallRules.presetArcHeight)) { BallRules.presetArcHeight = Double($0) }
         controls.addSlider(title: "ARC DISTANCE", range: 40...300, notch: 1, value: Float(BallRules.presetArcDistance)) { BallRules.presetArcDistance = Double($0) }
@@ -3985,8 +4346,6 @@ final class GameScene: SKScene {
                 HoopTuning.set(CGPoint(x: HoopTuning.offset(for: look).x, y: CGFloat($0)), for: look)
             }
             if look != .footballField { addNetSliders(look) }
-            controls.addSlider(title: "TITAN DUNK X", range: -32...32, notch: 1, value: Float(DunkArt.titanOffset.x)) { DunkArt.titanOffset.x = CGFloat($0) }
-            controls.addSlider(title: "TITAN DUNK Y", range: -32...32, notch: 1, value: Float(DunkArt.titanOffset.y)) { DunkArt.titanOffset.y = CGFloat($0) }
             controls.addSlider(title: "DUNK FRAME", range: 0...last, notch: 1, value: Float(DunkTuning.frame)) { value in
                 DunkTuning.frame = Int(value)
                 xSlider.set(Float(DunkArt.offsets(for: dunkLook)[DunkTuning.frame].x))
@@ -4028,27 +4387,35 @@ final class GameScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         defer { lastTime = currentTime }
+        if let lastTime, currentTime - lastTime > LoadTrace.longFrame {
+            LoadTrace.mark(String(format: "long frame %.0f ms on %@", (currentTime - lastTime) * 1000, "\(flow)"))
+        }
         stepStageWarm()
         if !ready {
-            // Hold until the textures have all been drawn once.
+            // Hold play until the textures have all been drawn once; the screens before it (the
+            // title, customize, the stage select, the preview) go on meanwhile, read off the pads
+            // and keys, nobody drawn, the preview's loading bar the warm-up's.
             if preloaded, warmFramesLeft > 0 { warmFramesLeft -= 1 }
             if preloaded, warmFramesLeft == 0 {
                 warmNode.removeFromParent()
                 ready = true
+                reportLoading()
             }
-            return
+            guard ready || flow != .playing else { return }
         }
         // Only what's made once play is underway is a miss; loading and the screens build on purpose.
         sprites.reportsMisses = flow == .playing
         guard let last = lastTime else { return }
         #if !os(tvOS)
         if mapEditor != nil || supportBuilder != nil {
+            if !stageVotes.isEmpty { LoadTrace.note("waiting: map editor") }
             // The match held still while the map or the supports are being laid out.
             render()
             return
         }
         #endif
         if DunkTuning.enabled {
+            if !stageVotes.isEmpty { LoadTrace.note("waiting: dunk mode") }
             holdDunkPose()
             render()
             return
@@ -4095,7 +4462,7 @@ final class GameScene: SKScene {
                 enter(.playing)
             }
         }
-        if flow == .stageSelect { tickStageSelect(inputs) }
+        if flow == .stageSelect { tickStageSelect(inputs) } else if !stageVotes.isEmpty { LoadTrace.note("waiting: flow is \(flow)") }
         if flow == .preview { stepPreview(accumulator) }
         if flow != .playing {
             // A screen is up: the stick moves its cursor and jump picks; the sim waits. On
@@ -4257,7 +4624,10 @@ final class GameScene: SKScene {
                 send(.inputs(session.outgoing()), reliable: false)
             } else {
                 var remote = inputs.count > 1 ? inputs[1] : .idle
-                if aiOn { remote = opponent.decide(match) }
+                if aiOn {
+                    remote = opponent.decide(match)
+                    if DebugUI.enabled, let report = opponent.takeShieldReport() { print("[CPU] shield: \(report)") }
+                }
                 if match.stage.features.testCenter {
                     var dummyInput = PlayerInput.idle
                     session.mutate { dummyInput = trainingDummy.decide(&$0) }
@@ -4335,15 +4705,25 @@ final class GameScene: SKScene {
     /// The dunk tuning pose: the match held still, player 1 hanging on the right rim at the
     /// sliders' offset, facing the backboard, the ball out of the way.
     private func holdDunkPose() {
-        let hoop = match.stage.hoops.first { $0.owner == 0 } ?? match.stage.hoops[0]
+        let hoopIndex = match.stage.hoops.firstIndex { $0.owner == 0 } ?? 0
+        let hoop = match.stage.hoops[hoopIndex]
         flowState?.showsTitle = false
         screen?.removeFromParent()
         screen = nil
         controls?.isHidden = !GameScene.touchControlsShown
+        // As Titan Tea, at its full size.
+        var titan = Drinks.none
+        titan.biomorph = .titanTea
+        titan.biomorphLevel = 1
+        if titanGrowth.indices.contains(0) { titanGrowth[0] = 1 }
         session.mutate { match in
             match.countdown = 0
-            match.players[0].position = hoop.position + Vec2(x: BallRules.dunkOffset.x * hoop.backboard.sign, y: BallRules.dunkOffset.y)
+            match.players[0].spec = match.stage.sized(titan.spec())
+            match.players[0].power = titan.power
+            match.players[0].powerLevel = titan.powerLevel
+            match.players[0].position = match.players[0].dunkPlace(on: hoop)
             match.players[0].facing = hoop.backboard
+            match.players[0].dunkHoop = hoopIndex
             match.players[0].hasBall = DunkTuning.frame < 3
             match.players[0].state = .dunking
             match.players[0].stateTimer = Animation.dunkStart(of: DunkTuning.frame)
@@ -4766,6 +5146,13 @@ final class GameScene: SKScene {
     /// Every frame on the stage select: the second pad's cursor offline, the other phone's
     /// vote, the settle, and the coin flip.
     private func tickStageSelect(_ inputs: [PlayerInput]) {
+        if !stageVotes.isEmpty {
+            let waiting = stageVoters.filter { stageVotes[$0] == nil }
+            LoadTrace.note(!(screen is StageSelectScreen) ? "waiting: screen is \(screen.map { "\(type(of: $0))" } ?? "none")"
+                : stageSettling ? "waiting: settling" : stageLanding != nil ? "waiting: coin flip"
+                : !waiting.isEmpty ? "waiting: voters \(waiting) of \(stageVoters), second pad \(hub.playerTwoHasController)"
+                : online != nil && !session.settled ? "waiting: online settle" : "all in")
+        }
         guard let select = screen as? StageSelectScreen, !stageSettling else { return }
         if online == nil, stageVoters.contains(1), inputs.count > 1 {
             let pad = inputs[1]
@@ -4817,6 +5204,7 @@ final class GameScene: SKScene {
     private func voteStage(_ choice: StageChoice, by voter: Int) {
         guard flow == .stageSelect, stageVoters.contains(voter), stageVotes[voter] == nil else { return }
         stageVotes[voter] = choice
+        LoadTrace.mark("voted \(choice)")
         if online != nil { send(.stage(stagesPlayed: series.stagesPlayed, choice: choice.rawValue), reliable: true) }
     }
 
@@ -4825,6 +5213,7 @@ final class GameScene: SKScene {
     private func settleStage(_ choice: StageChoice) {
         guard !stageSettling else { return }
         stageSettling = true
+        LoadTrace.mark("settling \(choice)")
         stageLanding = nil
         if series.rounds.isEmpty {
             series.stage = choice
@@ -4835,6 +5224,7 @@ final class GameScene: SKScene {
         // The fresh match made now, off the series' dice as ever, but put in only as the stage it's
         // on is built: drawn before that, the old stage's rims and nets would be on the new one's hoops.
         let fresh = freshMatch()
+        LoadTrace.mark("fresh match made")
         let swapIn = { [weak self] in
             self?.session.mutate { match in
                 let frame = match.frame
@@ -4843,10 +5233,20 @@ final class GameScene: SKScene {
             }
         }
         if pickAfterStage {
-            swapIn()
-            showStage()
-            freshRoundView()
-            enter(.picking)
+            // Into the drink pick behind the curtain, the stage built and warmed under its loading bar.
+            let change = { [weak self] in
+                guard let self else { return }
+                swapIn()
+                self.showStage()
+                self.freshRoundView()
+                self.warmStage { [weak self] in self?.enter(.picking) }
+            }
+            if let flowState { flowState.transition(.fade, holdsForLoading: true, change) } else {
+                swapIn()
+                showStage()
+                freshRoundView()
+                enter(.picking)
+            }
             return
         }
         // Into the match behind the curtain: the stage built and warmed there, the curtain held
@@ -4869,23 +5269,33 @@ final class GameScene: SKScene {
         if previewDue, let flowState {
             // The preview's own time spent loading: the stage built behind a quick curtain, the
             // preview straight on with the loading bar over it, held on its full page till done.
+            LoadTrace.mark("curtain asked for, preview due")
             flowState.transition(.fade) { [weak self] in
                 guard let self else { return }
+                LoadTrace.mark("curtain down")
                 swapIn()
                 self.showStage()
+                LoadTrace.mark("stage shown")
                 self.freshRoundView()
+                LoadTrace.mark("round view fresh")
                 self.warmStage()
                 play()
+                LoadTrace.mark("change done")
             }
             return
         }
         let change = { [weak self] in
             guard let self else { return }
+            LoadTrace.mark("curtain down")
             swapIn()
             self.showStage()
+            LoadTrace.mark("stage shown")
             self.freshRoundView()
-            self.warmStage(then: play)
+            LoadTrace.mark("round view fresh")
+            self.warmStage { LoadTrace.mark("stage warm"); play() }
+            LoadTrace.mark("change done")
         }
+        LoadTrace.mark("curtain asked for, held for loading")
         if let flowState { flowState.transition(.fade, holdsForLoading: true, change) } else {
             swapIn()
             showStage()
@@ -5068,6 +5478,7 @@ final class GameScene: SKScene {
     private static let footfallsPerWord = 2
     private func stepFootfalls() {
         guard !wholeStageView else { return }
+        driveRoadRunSparks()
         for (index, player) in match.players.enumerated() {
             let running = player.state == .run || player.state == .dash
             guard player.grounded, running || player.state == .walk else { footPhases[index] = nil; footfallCounts[index] = 0; continue }
@@ -5076,7 +5487,7 @@ final class GameScene: SKScene {
             guard footPhases[index] != frame, (running ? GameScene.runFootfalls : GameScene.walkFootfalls).contains(frame) else { continue }
             let dust: Effect = running ? (Effect.dustRun3.available ? .dustRun3 : .dustRun) : .dustWalk
             // A power's own trail, Blazing Boba's flames, stands in for the dust.
-            if dust.available, GameSettings.walkTrails, !match.stage.features.underwater, !player.layingFlames {
+            if dust.available, GameSettings.walkTrails, !match.stage.features.underwater, !player.layingFlames, !player.roadRunning {
                 if dust == .dustRun3 {
                     spawnDust(.dustRun3, of: index)
                 } else {
@@ -5097,6 +5508,33 @@ final class GameScene: SKScene {
     }
     /// How far behind the feet the dust starts, in units.
     private static let dustBehind = 2.0
+
+    /// Running on Anozira's road: one run spark (`dust_run3`) at the feet, looping at its sheet's own
+    /// rate, as the wheels' skid sparks do, in place of a puff every footfall.
+    private var roadRunSparks: [Int: SKSpriteNode] = [:]
+    private func driveRoadRunSparks() {
+        let effect: Effect = Effect.dustRun3.available ? .dustRun3 : .dustRun
+        for (index, player) in match.players.enumerated() {
+            let shown = player.roadRunning && player.grounded && effect.available && GameSettings.walkTrails
+            if shown, roadRunSparks[index]?.parent == nil {
+                let frames = sprites.effectFrames(effect, player: index)
+                let spark = SKSpriteNode(texture: frames.first)
+                spark.anchorPoint = effect.anchor
+                spark.zPosition = 30
+                spark.run(.repeatForever(.animate(with: frames, timePerFrame: 1 / effect.fps)))
+                glowers.addChild(spark)
+                roadRunSparks[index] = spark
+            }
+            guard let spark = roadRunSparks[index] else { continue }
+            spark.isHidden = !shown
+            guard shown else { continue }
+            let offset = DustTuning.offset(effect)
+            let scale = DustTuning.scale(effect) * bodyScale(index)
+            spark.position = SpriteLibrary.point(player.position + Vec2(x: Double(offset.x) * player.facing.sign, y: Double(offset.y)) * Double(bodyScale(index)) / SpriteLibrary.pixelsPerUnit)
+            spark.xScale = (player.facing == .left ? -1 : 1) * effect.scale * scale
+            spark.yScale = effect.scale * scale
+        }
+    }
 
     /// A sound word out of where its sound is made, Jump Ultimate Stars style: small at the
     /// source, growing `away` (1 right, -1 left), turned up `rise` degrees as it goes; turned
@@ -5254,7 +5692,10 @@ final class GameScene: SKScene {
             finale = nil
             world.isPaused = false
         }
-        flowState?.stageSelectBack = next == .stageSelect && zonesOnline == nil && (online != nil || series.rounds.isEmpty)
+        // The back arrow on the stage select only where back goes somewhere: online (out of the
+        // match), or offline on the first select before anything's been played. Between sets, none.
+        flowState?.stageSelectBack = next == .stageSelect && zonesOnline == nil
+            && (online != nil || (series.rounds.isEmpty && series.stagesPlayed == 0))
         // A stage's first count waits for its preview.
         if next == .playing, previewDue, startPreview() { return }
         // The ball cam's edge is in the HUD, so it goes with the screens that aren't play.
@@ -5361,7 +5802,7 @@ final class GameScene: SKScene {
     /// The stage select's back: online, out of the match; offline, the customize screen again for
     /// the same mode.
     func backFromStageSelect() {
-        guard flow == .stageSelect, !stageSettling else { return }
+        guard flow == .stageSelect, !stageSettling, online != nil || (series.stagesPlayed == 0 && series.rounds.isEmpty) else { return }
         SoundBoard.shared.play(.menuBack)
         if online != nil { return leaveToTitle() }
         let mode = gameMode
@@ -5486,9 +5927,9 @@ final class GameScene: SKScene {
             select.onRaised = { [weak select] index in
                 select?.showWindow(index.flatMap { listed.indices.contains($0) ? StageShots.shared.texture(for: listed[$0]) : nil })
             }
-            // Back to the title from the first pick offline, before anything's been played.
-            // Back off the first select, offline: to the customize screen, picks kept.
-            if online == nil, series.stagesPlayed == 0 {
+            // Back off the first select, offline, before anything's been played: to the customize
+            // screen, picks kept. Between stages (a round already won) there's no going back.
+            if online == nil, series.stagesPlayed == 0, series.rounds.isEmpty {
                 select.back = { [weak self] in
                     guard let self, let flowState = self.flowState else { return }
                     let mode = self.gameMode
@@ -5499,6 +5940,7 @@ final class GameScene: SKScene {
                 }
             }
             screen = select
+            LoadTrace.begin("stage select up")
         case .paused:
             // ZONES: the turn's own choices on the pause, for the pad.
             var extras: [(String, () -> Void)] = []
@@ -5542,8 +5984,8 @@ final class GameScene: SKScene {
         controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
         flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen || screen is WaitScreen
         flowState?.gridGround = screen is StageSelectScreen
-        // The score kept on the win screen, over its veil.
-        circlesOverCam.isHidden = !ballCamEnabled && flow != .won
+        // The score kept on the win screen and the stage select, over their veils.
+        circlesOverCam.isHidden = !ballCamEnabled && flow != .won && flow != .stageSelect
         flowState?.winFigure = (screen as? WinScreen)?.figure
         flowState?.veiled = screen != nil
     }
@@ -5578,6 +6020,9 @@ final class GameScene: SKScene {
     /// colour; and to either side of them each side's drinks, with their levels.
     private static let roundRings = 7
     private static let roundLightShare: CGFloat = 0.5
+    /// A lit round's halo where the glow pass doesn't reach: against the ring's size, and how strong.
+    private static let blipHaloScale: CGFloat = 2
+    private static let blipHaloAlpha: CGFloat = 0.8
     private func drawSeries() {
         threePointArcs.isHidden = (gameMode != .fortySeven && previewing != .hud) || GameScene.portableThreeLooks.contains(match.stage.features.look) || !match.stage.features.threes
         for arc in threePointArcSides { arc.node.lineWidth = ThreePointTuning.lineWidth }
@@ -5653,6 +6098,16 @@ final class GameScene: SKScene {
                 lit.strokeColor = .clear
                 lit.position = ring.position
                 circles.addChild(lit)
+                // Over the ball cam and the screens (the stage select, the win screen), where the glow
+                // pass doesn't reach: its own halo in the winner's colour under the copy.
+                let halo = SKSpriteNode(texture: sprites.softGlow(diameter: 32))
+                halo.size = CGSize(width: radius * 2 * GameScene.blipHaloScale, height: radius * 2 * GameScene.blipHaloScale)
+                halo.color = lit.fillColor
+                halo.colorBlendFactor = 1
+                halo.blendMode = .add
+                halo.alpha = GameScene.blipHaloAlpha
+                halo.position = ring.position
+                circlesOverCam.addChild(halo)
                 circlesOverCam.addChild(lit.copy() as! SKShapeNode)
             }
         }
@@ -6080,6 +6535,7 @@ final class GameScene: SKScene {
         for (index, web) in shotWebs.enumerated() { web.strokeColor = SKColor(rgb: sprites.look(for: index).glow) }
         for tile in blockTiles { tile.node.color = SKColor(rgb: CourtLook.shaded(sprites.look(for: tile.side).glow)) }
         for arc in threePointArcSides { arc.node.strokeColor = SKColor(rgb: sprites.look(for: arc.side).glow) }
+        colourEndZones()
         for (index, label) in sideLabels.enumerated() { label.fontColor = SKColor(rgb: sprites.look(for: index).glow) }
         for (net, hoop) in zip(nets, match.stage.hoops) { net.recolour(netColour(for: hoop)) }
         warmDrawnArt()
@@ -6207,7 +6663,6 @@ final class GameScene: SKScene {
             // Every counter's sound is the slashclash's.
             case .countered(_, _, let at): play(.slashClash, at: at)
             case .shieldClashed(let at, _, _), .snatchClashed(let at): play(.slashClash, at: at)
-            case .dunked: dunkScoring = true
             // Quiet for a soft bounce, silent once it's only settling.
             case .ballBounced(let position, let speed) where speed > GameScene.bounceSoundFloor:
                 play(.ballBounce, at: position, volume: Float(min(speed / GameScene.bounceSoundFull, 1)))
@@ -6228,8 +6683,6 @@ final class GameScene: SKScene {
         let beyond = max(abs(at.x - cameraNode.position.x) - halfWidth, abs(at.y - cameraNode.position.y) - halfHeight, 0)
         return Float(max(1 - beyond / GameScene.soundFadeMargin, 0))
     }
-    /// A dunk went down, so the point it scores sounds as one.
-    private var dunkScoring = false
 
     /// The announcer's odds: the generic score's weight, a unique line's, and a unique line's
     /// where it fits best (a dunk's on a dunk, the wrist work on a floater, 47's three).
@@ -6574,12 +7027,11 @@ final class GameScene: SKScene {
     private func confirm(_ frames: [FrameEvents]) {
         for frameEvents in frames {
             for case .stolen in frameEvents.events { announceSteal() }
-            for case .scored(let scorer, let hoop, let entry, let points, let floater) in frameEvents.events {
+            for case .scored(let scorer, let hoop, let entry, let points, let floater, let dunk) in frameEvents.events {
                 rimFlash[hoop] = 8
-                let dunk = dunkScoring
                 // A three is a three before any doubling.
                 let shotPoints = gameMode == .fortySeven && match.stage.features.doublePoints ? points / 2 : points
-                strike(hoop: hoop, by: scorer, entry: entry)
+                strike(hoop: hoop, by: scorer, entry: entry, dunk: dunk)
                 // No banner across the screen: the word at the hoop says it.
                 if gameMode == .fortySeven {
                     fortySevenScored(by: scorer, points: points, at: frameEvents.frame)
@@ -6852,6 +7304,8 @@ final class GameScene: SKScene {
                 splashLava(at: at, ball: isBall)
             case .icicleShattered(let at):
                 shatterIcicle(at: at)
+            case .potholeBump:
+                if GameSettings.screenShake { shake = max(shake, GameScene.potholeShake) }
             case .lightningFlashed:
                 flashLightning()
             case .lightningStruck(let at):
@@ -7056,6 +7510,20 @@ final class GameScene: SKScene {
         return CGPoint(x: art.x + (pivot.x - 0.5) * abs(size.width) * CGFloat(hoop.backboard.sign), y: art.y + (pivot.y - 0.5) * abs(size.height))
     }
 
+    /// Where the plain body's front hand holds the rim on a dunk entry, in art pixels off the rim's
+    /// middle, across toward the way it faces. The entries before the hang take the hang's first.
+    private func dunkGrip(entry: Int, player: Player) -> CGPoint? {
+        guard match.stage.hoops.indices.contains(player.dunkHoop) else { return nil }
+        let hangEntry = Animation.dunkEntry(at: BallRules.dunkFrames / 2).index + 1
+        let held = min(max(entry, hangEntry), Animation.dunkSequence.count - 1)
+        guard let hand = sprites.centre(.frontHand, in: Animation.dunkSequence[held].frame) else { return nil }
+        let nudge = DunkArt.offsets(for: match.stage.features.look)[held]
+        // The feet's place off the rim, across toward the backboard; the art's across, the way it faces.
+        let towardBoard = CGFloat(match.stage.hoops[player.dunkHoop].backboard.sign * player.facing.sign)
+        let feet = SpriteLibrary.point(BallRules.dunkOffset)
+        return CGPoint(x: feet.x * towardBoard + nudge.x + hand.x, y: feet.y + nudge.y + hand.y)
+    }
+
     private func rotated(_ point: CGPoint, about centre: CGPoint, by angle: CGFloat) -> CGPoint {
         let dx = point.x - centre.x, dy = point.y - centre.y
         return CGPoint(x: centre.x + dx * cos(angle) - dy * sin(angle), y: centre.y + dx * sin(angle) + dy * cos(angle))
@@ -7147,10 +7615,9 @@ final class GameScene: SKScene {
     /// that lean. On the sheet's two full-frame flash frames the whole screen flashes in
     /// the same tone and the floor and walls go white, fading back. `score_strike` erupts off
     /// the rim with it.
-    private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2) {
+    private func strike(hoop: Int, by scorer: Int, entry velocity: Vec2, dunk: Bool) {
         // A shot goes in with the net's swish, a dunk with its slam.
-        play(dunkScoring ? .dunkSlam : .swish, at: match.stage.hoops[hoop].position)
-        dunkScoring = false
+        play(dunk ? .dunkSlam : .swish, at: match.stage.hoops[hoop].position)
         let rim = SpriteLibrary.point(match.stage.hoops[hoop].position)
         let lean = min(max(atan2(velocity.x, -velocity.y) * GameScene.strikeLeanShare, -GameScene.strikeMaxLean), GameScene.strikeMaxLean)
         let bolt = EnergyEffect.strikes.randomElement()!
@@ -7382,7 +7849,9 @@ final class GameScene: SKScene {
             var colour = cube.colour
             colour.w = Float(node.alpha)
             return CubeInstance(model: model, color: colour, flags: SIMD4<Float>(particle.behind ? 1 : 0, 0, 0, 0))
-        } + (NetTuning.cylinder && !netless ? nets.enumerated().flatMap { index, net in
+        } + (NetTuning.cylinder && !netless ? nets.enumerated().flatMap { index, net -> [CubeInstance] in
+            // A hidden net (Anozira's Phoenix's ring has none) isn't drawn as the cylinder either.
+            guard !net.hidden else { return [] }
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             net.colour.getRed(&r, green: &g, blue: &b, alpha: &a)
             // Hung from the rim as it's turned, and turned with it.
@@ -7963,15 +8432,44 @@ final class GameScene: SKScene {
     private var supportBuilder: SupportBuilder?
 
     private func openSupportBuilder() {
-        guard supportBuilder == nil, online == nil, match.stage.features.look == .court,
+        let look = match.stage.features.look
+        guard supportBuilder == nil, online == nil, let layout = HoopSupport.Layout(look: look), look != .kAndA,
               let right = match.stage.hoops.first(where: { $0.backboard == .right }) else { return }
         let scale = hudScale * cameraNode.xScale
         let artPoint = { [weak self] in
-            GameScene.hoopArtPoint(for: self?.match.stage.hoops.first { $0.backboard == .right } ?? right, on: .court)
+            GameScene.hoopArtPoint(for: self?.match.stage.hoops.first { $0.backboard == .right } ?? right, on: look)
         }
+        // The Wreck Center's hoop and its blocks; Anozira's rim on the truck, art pixels from its picture's bottom left.
+        let settings: [SupportBuilder.Setting] = layout == .anozira ? [
+            .init(title: "RIM X", range: -16...64, value: Float(AnoziraRules.rimInTruck.x)) { [weak self] value in
+                AnoziraRules.rimInTruck.x = Double(value)
+                self?.session.mutate { $0.placeAnoziraTruck() }
+            },
+            .init(title: "RIM Y", range: 64...176, value: Float(AnoziraRules.rimInTruck.y)) { [weak self] value in
+                AnoziraRules.rimInTruck.y = Double(value)
+                self?.session.mutate { $0.placeAnoziraTruck() }
+            },
+        ] : [
+            .init(title: "RIM DROP", range: 0...40, value: Float(Stage.courtRimDrop)) { [weak self] value in
+                Stage.courtRimDrop = Double(value)
+                self?.moveCourtRims()
+            },
+            .init(title: "RIM DEPTH", range: -20...20, value: Float(Stage.courtRimDepth)) { [weak self] value in
+                Stage.courtRimDepth = Double(value)
+                self?.moveCourtRims()
+            },
+            // The backboard blocks, whole tiles, toward the wall and up.
+            .init(title: "BLOCK X", range: -10...2, value: Float(Stage.courtBlockShift.toWall)) { [weak self] value in
+                Stage.courtBlockShift.toWall = Int(value)
+                self?.moveCourtBlocks()
+            },
+            .init(title: "BLOCK Y", range: -7...5, value: Float(Stage.courtBlockShift.up)) { [weak self] value in
+                Stage.courtBlockShift.up = Int(value)
+                self?.moveCourtBlocks()
+            },
+        ]
         let builder = SupportBuilder(
-            top: controls?.slidersBottom ?? size.height / 2 / hudScale - 40, artPixelsPerHud: scale,
-            rimDrop: Stage.courtRimDrop, rimDepth: Stage.courtRimDepth, blockShift: Stage.courtBlockShift,
+            layout: layout, top: controls?.slidersBottom ?? size.height / 2 / hudScale - 40, artPixelsPerHud: scale, settings: settings,
             fromHud: { [weak self] point in
                 guard let self else { return .zero }
                 return CGPoint(x: self.cameraNode.position.x + point.x * scale, y: self.cameraNode.position.y + point.y * scale) - artPoint()
@@ -7982,16 +8480,6 @@ final class GameScene: SKScene {
                 return CGPoint(x: (world.x - self.cameraNode.position.x) / scale, y: (world.y - self.cameraNode.position.y) / scale)
             },
             onChange: { [weak self] pieces in self?.refreshSupports(pieces) },
-            onMoveRims: { [weak self] drop, depth in
-                if let drop { Stage.courtRimDrop = drop }
-                if let depth { Stage.courtRimDepth = depth }
-                self?.moveCourtRims()
-            },
-            onMoveBlocks: { [weak self] toWall, up in
-                if let toWall { Stage.courtBlockShift.toWall = toWall }
-                if let up { Stage.courtBlockShift.up = up }
-                self?.moveCourtBlocks()
-            },
             onClose: { [weak self] in self?.closeSupportBuilder() })
         hud.addChild(builder)
         supportBuilder = builder
@@ -8398,6 +8886,16 @@ final class GameScene: SKScene {
         }
     }
     private var yardNumbers: [SKNode] = []
+    /// The football field's turf, painted, not lit.
+    private var fieldTurf: SKSpriteNode?
+    /// Its end zones, each with the side whose it is: in that side's darkest tone, its back limbs'.
+    private var fieldEndZones: [(node: SKSpriteNode, side: Int)] = []
+    private func colourEndZones() {
+        for zone in fieldEndZones {
+            let glow = sprites.look(for: zone.side).glow
+            zone.node.color = SKColor(rgb: EnergyColour.withGlow(glow)?.backLimbs ?? glow)
+        }
+    }
     private var railChevrons: [SKSpriteNode] = []
     /// The down marker, stood on the top of the grass under a loose ball at rest.
     private var downMarker: SKSpriteNode?
@@ -8470,6 +8968,33 @@ final class GameScene: SKScene {
             && player.position.x >= left && player.position.x <= left + Double(KAndAArt.brokenHoodWidth) / SpriteLibrary.pixelsPerUnit
     }
 
+    /// Anozira: whoever stands on the car or the truck drawn with it, idling, dipping, jumping and
+    /// shrinking or growing as it veers: how far they're moved, and the size they're drawn at;
+    /// nil standing on neither.
+    private func anoziraRide(_ player: Player) -> (offset: CGPoint, scale: CGFloat)? {
+        guard player.grounded, player.position.y > Double(AnoziraRules.floorRows) * Stage.tileSize + 0.5 else { return nil }
+        let feet = SpriteLibrary.point(player.position)
+        func ride(foot: CGPoint, width: CGFloat, lift: CGFloat) -> (offset: CGPoint, scale: CGFloat) {
+            let scale = AnoziraArt.scale(veered: foot.y)
+            let anchor = CGPoint(x: foot.x + width / 2, y: foot.y)
+            let drawn = CGPoint(x: anchor.x + (feet.x - anchor.x) * scale, y: anchor.y + (feet.y - anchor.y + lift) * scale)
+            return (drawn - feet, scale)
+        }
+        if AnoziraArt.standsOnCar(player, match: match) {
+            return ride(foot: SpriteLibrary.point(match.anoziraCar), width: 128,
+                        lift: AnoziraArt.carIdle(at: match.frame, ridden: true) + AnoziraArt.carJump(match))
+        }
+        let truck = match.anoziraTruck
+        let truckLeft = truck.standing.x
+        guard player.position.x >= truckLeft, player.position.x <= truckLeft + AnoziraRules.truckWidth / SpriteLibrary.pixelsPerUnit else { return nil }
+        let standing = SpriteLibrary.point(truck.standing)
+        return ride(foot: standing, width: CGFloat(AnoziraRules.truckWidth),
+                    lift: SpriteLibrary.point(truck.origin).y - standing.y + AnoziraArt.jump(since: match.truckBumpAt, frame: match.frame))
+    }
+    /// Each body's size off a vehicle it rides, easing to it and back to whole once off it.
+    private var riderScales: [CGFloat] = []
+    static let riderScaleEase: CGFloat = 0.2
+
     private func standsOnCar(_ player: Player) -> Bool {
         player.grounded && player.position.y > Double(KAndARules.floorRows) * Stage.tileSize + 0.5
             && player.position.x >= KAndARules.carLeft && player.position.x <= KAndARules.carRight
@@ -8514,7 +9039,7 @@ final class GameScene: SKScene {
         if KAndAArt.brokenCarFrames.indices.contains(brokenHoodFrame) { art.brokenCar?.texture = KAndAArt.brokenCarFrames[brokenHoodFrame] }
         // The clouds on, on whole pixels; one gone off the right, and the next due with room for it.
         let across = CGFloat(match.stage.width * SpriteLibrary.pixelsPerUnit)
-        for index in kAndAClouds.indices {
+        for index in kAndAClouds.indices where !stageHeld {
             kAndAClouds[index].x += kAndAClouds[index].speed
             kAndAClouds[index].node.position.x = kAndAClouds[index].x.rounded()
         }
@@ -8523,12 +9048,13 @@ final class GameScene: SKScene {
             cloud.node.removeFromParent()
             return true
         }
-        if kAndACloudIn > 0 { kAndACloudIn -= 1 }
-        if kAndACloudIn == 0, kAndAClouds.count < KAndAArt.cloudsMost {
+        if kAndACloudIn > 0, !stageHeld { kAndACloudIn -= 1 }
+        if kAndACloudIn == 0, kAndAClouds.count < KAndAArt.cloudsMost, !stageHeld {
             sendKAndACloud(at: nil)
             kAndACloudIn = Int.random(in: KAndAArt.cloudGapFrames)
         }
-        for (index, cone) in art.cones.enumerated() where index < lampFlicker.count {
+        // The street lights' flicker holds with the pause, as the clouds do.
+        for (index, cone) in art.cones.enumerated() where index < lampFlicker.count && !stageHeld {
             if lampFlicker[index] > 0 {
                 lampFlicker[index] -= 1
                 cone.alpha = lampFlicker[index] % 4 < 2 ? KAndAArt.coneAlpha * 0.3 : KAndAArt.coneAlpha
@@ -8608,7 +9134,8 @@ final class GameScene: SKScene {
                                   out: CGFloat(match.bins[bin].caseOut), anchor: line + jitter, swing: -tilt * FlightB411Art.caseSwing + wobble)
         }
         skyNode.position = cameraNode.position
-        for index in clouds.indices {
+        // Flight B411's clouds hold with the pause.
+        for index in clouds.indices where !stageHeld {
             clouds[index].node.position.x += clouds[index].speed
             if clouds[index].node.position.x - clouds[index].node.size.width / 2 > GameScene.cloudReach(size) { placeCloud(index, fromTheLeft: true) }
         }
@@ -8951,7 +9478,7 @@ final class GameScene: SKScene {
         }
 
         seen = []
-        let galeFrame = Int(CACurrentMediaTime() / ElementsArt.tornadoFrameSeconds)
+        let galeFrame = Int(stageClock / ElementsArt.tornadoFrameSeconds)
         for gale in match.gales {
             seen.insert(gale.id)
             let node = galeNodes[gale.id] ?? {
@@ -9076,8 +9603,14 @@ final class GameScene: SKScene {
     private func render() {
         sectionMark = CACurrentMediaTime()
         // Hit-stop holds the world's look with the match: every effect's action, the orbs, the
-        // cubes, the strings and the water's life, not only the bodies.
-        let held = match.hitStop > 0
+        // cubes, the strings and the water's life, not only the bodies; and so does the pause,
+        // the stage's own motion with it (`stageClock`); and a preview's panel once it's played,
+        // frozen with its throwaway match (Anozira's road would slide on under a still pothole).
+        let held = match.hitStop > 0 || flow == .paused || (stagePreview != nil && mangaPage?.settled == true)
+        stageHeld = held
+        let now = CACurrentMediaTime()
+        if !held { stageClock += min(now - (stageClockLast ?? now), 0.1) }
+        stageClockLast = now
         world.speed = held ? 0 : 1
         strokeFloMeters()
         stepFloSparkles()
@@ -9086,13 +9619,15 @@ final class GameScene: SKScene {
         section("flo hud")
         if !held { stepFloOrbs() }
         for index in floFlash.indices where floFlash[index] > 0 { floFlash[index] -= 1 }
+        drawRimLockGlows()
         section("orbs")
         if !held { stepHeadParticles() }
         section("particles")
         // The figure in front: the one with the ball, else the last to touch it.
         if let front = match.ball.holder ?? match.ball.lastTouched { frontFigure = front }
         for (index, figure) in figureLayers.enumerated() { figure.zPosition = index == frontFigure ? 0.5 : 0 }
-        for (index, player) in match.players.enumerated() {
+        // Nobody's drawn till the launch's warm-up is done: their frames are still being made.
+        for (index, player) in match.players.enumerated() where ready {
             let node = playerNodes[index]
             let frame = shownFrame(index, player)
             trailClashSlide(index, player)
@@ -9123,7 +9658,11 @@ final class GameScene: SKScene {
             } else if titanGrowth[index] < 1 {
                 titanGrowth[index] = min(titanGrowth[index] + 1 / CGFloat(GameScene.titanGrowFrames), 1)
             }
-            let drawScale = bodyScale(index)
+            // Riding one of Anozira's vehicles, sized with it.
+            let ride = anoziraArt != nil ? anoziraRide(player) : nil
+            while riderScales.count <= index { riderScales.append(1) }
+            riderScales[index] += ((ride?.scale ?? 1) - riderScales[index]) * GameScene.riderScaleEase
+            let drawScale = bodyScale(index) * riderScales[index]
             let growing = player.spec.scale != 1 && titanGrowth[index] < 1
             node.size = node.texture!.size().scaled(by: drawScale)
             node.anchorPoint = sprites.anchor(for: frame.animation)
@@ -9139,14 +9678,19 @@ final class GameScene: SKScene {
             // K&A: standing on the red car, carried down with its sag.
             // The roof's own pixel is in the map already: carried by the sag less that.
             if kAndAArt != nil, standsOnCar(player) { node.position.y += min(carSag + 1, 0) }
+            // Anozira: on the car or the truck, moved with it.
+            if let ride { node.position = node.position + ride.offset }
             // Held a few pixels up off the ground the whole change.
             if changing { node.position.y += GameScene.transformLift }
             if player.state == .dunking {
                 // Each frame of the dunk sits where its art was placed on the rim.
-                // Titan Tea's whole dunk moved again by its own offset.
-                let titan = player.power == .titanTea ? DunkArt.titanOffset : .zero
-                let nudge = DunkArt.offsets(for: match.stage.features.look)[Animation.dunkEntry(at: player.stateTimer).index] + titan
+                // A bigger body is the plain one scaled up about the hand it hangs by, so the hands meet the rim alike.
+                let entry = Animation.dunkEntry(at: player.stateTimer).index
+                let nudge = DunkArt.offsets(for: match.stage.features.look)[entry]
                 node.position = node.position + CGPoint(x: nudge.x * CGFloat(player.facing.sign), y: nudge.y) * drawScale
+                if drawScale != 1, let grip = dunkGrip(entry: entry, player: player) {
+                    node.position = node.position + CGPoint(x: grip.x * CGFloat(player.facing.sign), y: grip.y) * (1 - drawScale)
+                }
             }
             node.xScale = CGFloat(player.facing.sign)
             // Firing Z Tea's beam, its arms over the body, turned with the aim about the shoulder.
@@ -9170,8 +9714,42 @@ final class GameScene: SKScene {
                 arms.xScale = facing
                 arms.zRotation = CGFloat(player.beamAim) * facing
             }
+            // Web Water's swing: the front arm apart, from the shoulder toward where the line's hung,
+            // the body upright under it.
+            let swingArmNode = swingArm(index, on: node)
+            if player.state == .webSwing, let hung = player.webAnchor, !node.isHidden {
+                swingArmNode.isHidden = false
+                let armFrame = AnimationFrame(.swingArm, 0)
+                swingArmNode.texture = sprites.texture(armFrame, player: drawnAs)
+                swingArmNode.size = swingArmNode.texture!.size().scaled(by: drawScale)
+                if let line = swingArmNode.childNode(withName: "line") as? SKSpriteNode {
+                    line.texture = sprites.outlineTexture(armFrame, player: drawnAs)
+                    line.isHidden = line.texture == nil
+                    line.size = swingArmNode.size
+                    line.color = outlineNodes[index].isHidden ? SKColor(rgb: sprites.look(for: index).outline) : outlineNodes[index].color
+                }
+                let facing = CGFloat(player.facing.sign)
+                let side = CGFloat(Animation.swingArm.pixelSize), feet = CGFloat(Animation.swingArm.feetFromBottom)
+                // The shoulder off the feet, art pixels across (the way it faces) and up.
+                let shoulder = node.position + CGPoint(x: (GameScene.swingArmShoulder.x - side / 2) * drawScale * facing,
+                                                       y: (side - GameScene.swingArmShoulder.y - feet) * drawScale)
+                swingArmNode.position = shoulder
+                swingArmNode.xScale = facing
+                // The arm as drawn points this way from the shoulder (up and a little back); turned to the line's anchor.
+                let drawn = CGVector(dx: (GameScene.swingArmHand.x - GameScene.swingArmShoulder.x) * facing, dy: GameScene.swingArmShoulder.y - GameScene.swingArmHand.y)
+                // Aimed at the line's top, the sky point over the pivot, so the arm and the line agree.
+                let toAnchor = swingSkyPoint(hung) - shoulder
+                let turn = atan2(toAnchor.y, toAnchor.x) - atan2(drawn.dy, drawn.dx)
+                swingArmNode.zRotation = turn
+                let reach = hypot(drawn.dx, drawn.dy) * drawScale
+                let heading = atan2(toAnchor.y, toAnchor.x)
+                swingHands[index] = CGPoint(x: shoulder.x + cos(heading) * reach, y: shoulder.y + sin(heading) * reach)
+            } else {
+                swingArmNode.isHidden = true
+                swingHands[index] = nil
+            }
             // Z Tea's blast: its arms, both on one sheet, cut apart, the back behind the body and the
-            // front over it, turned 45 degrees up about the shoulder off the ground.
+            // front over it, turned up about the shoulder by the blast's aim.
             let blastArms = blastPoseArms(index, on: node)
             let blastFrame = Player.blastPoseStates.contains(player.state) ? player.blastSheetFrame : nil
             for (arm, front) in [(blastArms.front, true), (blastArms.back, false)] {
@@ -9191,12 +9769,13 @@ final class GameScene: SKScene {
                 line?.size = arm.size
                 line?.color = outlineNodes[index].isHidden ? SKColor(rgb: sprites.look(for: index).outline) : outlineNodes[index].color
                 let facing = CGFloat(player.facing.sign)
-                // Turned up, the front arm moved besides.
-                let nudge = front && player.blastUp ? GameScene.blastUpFrontArmNudge : .zero
+                // Turned up, the front arm moved besides, all of it at full up, in whole pixels.
+                let upShare = CGFloat(max(player.blastAngle / ZRules.aimRange, 0))
+                let nudge = front ? CGPoint(x: (GameScene.blastUpFrontArmNudge.x * upShare).rounded(), y: (GameScene.blastUpFrontArmNudge.y * upShare).rounded()) : .zero
                 let shoulder = GameScene.blastArmShoulder + nudge
                 arm.position = node.position + CGPoint(x: shoulder.x * drawScale * facing, y: shoulder.y * drawScale)
                 arm.xScale = facing
-                arm.zRotation = player.blastUp ? .pi / 4 * facing : 0
+                arm.zRotation = CGFloat(player.blastAngle) * facing
                 if !front { arm.zPosition = node.zPosition - 0.001 }
             }
             // Growing, white; spinning with the FLO paid,
@@ -9256,25 +9835,29 @@ final class GameScene: SKScene {
                 node.position = rotated(node.position, about: middle, by: turn)
                 node.zRotation += turn
             }
-            // Hanging on a rim the body turns with it, about the rim's back.
+            // Hanging on a rim the body turns with it, about the rim's back; on Anozira's, with the pole.
             if player.state == .dunking, player.dunkHoop < rimDip.count, player.dunkHoop < match.stage.hoops.count {
                 let turn = rimTurn(player.dunkHoop)
                 node.position = rotated(node.position, about: rimPivot(player.dunkHoop), by: turn)
                 node.zRotation += turn
+                if match.stage.features.look == .anozira {
+                    let nod = hoopfishNod(player.dunkHoop)
+                    node.position = nod.turn(node.position)
+                    node.zRotation += nod.angle
+                }
             }
 
             // Hit by the blade, the body and head flicker a dark shade of their energy, every
-            // other pair of frames; locked out after a 47 basket or tumbling after the shield, black, every other four.
-            // Parried, the whole lockout, palette 2 every other pair of frames.
+            // other pair of frames; tumbling after the shield, EDG64 8, every other four.
+            // Parried, the whole lockout, EDG64 8 every other pair of frames, as the tumble's.
             let parried = player.parryLocked && (player.attackLockout / 2) % 2 == 0
             let stunned = parried || (!player.parryLocked && player.hitStun > 0 && (player.hitStun / 2) % 2 == 0)
             let tumbling = player.state == .tumbling && (player.stateTimer / GameScene.tumbleFlashFrames) % 2 == 0
-            let lockedOut = player.hitStun == 0 && !player.parryLocked && (player.pickupLockout > 0 && (player.pickupLockout / 4) % 2 == 0 || tumbling)
+            let lockedOut = player.hitStun == 0 && !player.parryLocked && tumbling
             // Taking a FLO orb, the whole body flashes its energy's own colour.
             let absorbing = floFlash.indices.contains(index) && floFlash[index] > 0
             let flashColour = absorbing ? SKColor(rgb: sprites.look(for: index).glow)
-                : parried ? SKColor(rgb: PixelPalette.aap64[2])
-                : lockedOut ? SKColor(rgb: PixelPalette.aap64Outline) : SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
+                : parried || lockedOut ? SKColor(rgb: PixelPalette.colours[8]) : SKColor(rgb: sprites.look(for: index).energyTone(luminance: 0.15))
             for (flash, source) in [(stunBodies[index], node), (stunHeads[index], headNodes[index])] {
                 flash.isHidden = !(stunned || lockedOut || absorbing) || source.isHidden
                 guard stunned || lockedOut || absorbing else { continue }
@@ -9349,8 +9932,8 @@ final class GameScene: SKScene {
                 // The zone's colours cycle round it in the zone and in FloState.
                 let cycling = ZoneTuning.inTheZone || floStateLine
                 let lineColour = cycling ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).outline)
-                // In the shield's backflip the line's the energy's colour.
-                let tumbleFlash = player.state == .flipJump ? SKColor(rgb: sprites.look(for: index).glow) : nil
+                // Through the Spin Move's protection the line's the energy's colour: nothing lands on them.
+                let tumbleFlash = player.spinPhasing ? SKColor(rgb: sprites.look(for: index).glow) : nil
                 outlineNode.color = growing ? .white
                     : tumbleFlash ?? (player.frozen > 0 ? SKColor(rgb: Look.ice.outline) : lineColour)
             } else {
@@ -9418,11 +10001,11 @@ final class GameScene: SKScene {
                 // Z Tea's beam aimed up, the head tips back with it, down, forward: as far as
                 // flying's tip at the aim's limit.
                 // Only firing: through the charge it stays level.
-                // Z Tea's blasts fired off the ground, 45 degrees up: the head tips as the beam's aimed full
-                // up, held through a run of them and let back down as the pose ends.
-                let blastFiring = player.blastUp && Player.blastPoseStates.contains(player.state) && player.blastStep != nil
+                // Z Tea's blasts aimed: the head tips as the beam's would at that aim, held through a
+                // run of them and let back down as the pose ends.
+                let blastFiring = player.blastAngle != 0 && Player.blastPoseStates.contains(player.state) && player.blastStep != nil
                 let aiming = player.firingBeam || blastFiring
-                let aimShare = player.firingBeam ? CGFloat(player.beamAim / ZRules.aimRange) : 1
+                let aimShare = CGFloat((player.firingBeam ? player.beamAim : player.blastAngle) / ZRules.aimRange)
                 let wantedTip: CGFloat = aiming ? aimShare * GameScene.flightHeadTip * (aimShare < 0 ? BeamHeadTuning.downTurn : BeamHeadTuning.upTurn)
                     : player.state != .flying ? 0
                     : (diving ? -GameScene.flightHeadTip : (rising ? GameScene.flightHeadTip : 0))
@@ -9452,8 +10035,9 @@ final class GameScene: SKScene {
                         hood.position.y += BeamHeadTuning.lift * abs(aimed) * drawScale
                         // Z Tea's blasts fired up: the head's own place on the blast, in with the tip.
                         if blastFiring {
-                            hood.position.x += GameScene.blastUpHeadNudge.x * aimed * CGFloat(player.facing.sign) * drawScale
-                            hood.position.y += GameScene.blastUpHeadNudge.y * aimed * drawScale
+                            let upAimed = max(aimed, 0)
+                            hood.position.x += GameScene.blastUpHeadNudge.x * upAimed * CGFloat(player.facing.sign) * drawScale
+                            hood.position.y += GameScene.blastUpHeadNudge.y * upAimed * drawScale
                         }
                     }
                 }
@@ -9666,6 +10250,10 @@ final class GameScene: SKScene {
             section("hood")
             let halo = handHalos[index]
             let handBall = handBalls[index]
+            // Sized with a body riding one of Anozira's vehicles.
+            let riderScale = riderScales.indices.contains(index) ? riderScales[index] : 1
+            handBall.setScale(riderScale)
+            halo.setScale(riderScale)
             // A fireball in hand rides where the ball would, in fire.
             // In the zone the ball in hand runs the zone's colours.
             let teamColour = ZoneTuning.inTheZone ? ZoneTuning.outline(at: CACurrentMediaTime()) : SKColor(rgb: sprites.look(for: index).glow)
@@ -9946,18 +10534,19 @@ final class GameScene: SKScene {
             rider.node.xScale = player.facing == .left ? -1 : 1
         }
 
-        // The webs: a swing's from its anchor, a shot's to whatever it holds.
+        // The webs: a swing's from its anchor, a shot's to whatever it holds; drawn as diamonds.
+        while webInstances.count < match.players.count { webInstances.append([]); webGlows.append([]) }
         for (index, player) in match.players.enumerated() {
             let chest = SpriteLibrary.point(player.chest)
             let swing = swingWebs[index]
+            var lines: [(from: CGPoint, to: CGPoint)] = []
             if let anchor = player.webAnchor {
-                swing.isHidden = false
-                // Drawn on past the anchor off the top of the screen, as if hung from the sky.
-                let hung = SpriteLibrary.point(anchor)
-                let top = cameraNode.position.y + size.height * cameraNode.yScale / 2 + 16
-                let rise = hung.y - chest.y
-                let reach = rise > 0 ? max((top - chest.y) / rise, 1) : 1
-                swing.path = line(from: CGPoint(x: chest.x + (hung.x - chest.x) * reach, y: chest.y + rise * reach), to: chest)
+                swing.isHidden = true
+                // Straight from the swing arm's hand to the sky point over the pivot, off the top of
+                // the screen, as if hung from the sky: the pivot never moves through a swing, so
+                // neither does the line's top. The swing itself turns about the pivot as ever.
+                let hand = swingHands[index] ?? chest
+                lines.append((hand, swingSkyPoint(anchor)))
             } else {
                 swing.isHidden = true
             }
@@ -9977,24 +10566,30 @@ final class GameScene: SKScene {
                 case .ball: end = SpriteLibrary.point(match.ball.position)
                 case .opponent: end = SpriteLibrary.point(match.players[1 - index].chest)
                 }
-                shot.isHidden = false
-                shot.path = line(from: chest, to: end)
+                shot.isHidden = true
+                lines.append((chest, end))
             } else {
                 shot.isHidden = true
             }
+            let made = lines.map { webDiamonds(index, from: $0.from, to: $0.to, scale: bodyScale(index)) }
+            webInstances[index] = made.flatMap(\.instances)
+            webGlows[index] = made.flatMap(\.glows)
         }
 
         drawPlatforms()
         placeStageFireball()
-        blowWind()
+        if !held { blowWind() }
         if !held { stepWater() }
         stepFootfalls()
-        splashRain()
-        sizzleRain()
-        riseLightningDots()
+        // The Elements' rain's splashes and sizzles and the lightning's warning dots hold with the pause.
+        if !held {
+            splashRain()
+            sizzleRain()
+            riseLightningDots()
+        }
         placeIcicles()
         fallRain()
-        elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: CACurrentMediaTime(),
+        elementsArt?.placeTornados(match.tornadoBoxes, fire: TornadoRules.isFire(at: match.frame), time: stageClock,
                                    burstFrame: TornadoRules.burstFrame(at: match.frame),
                                    hoverLap: Double(match.frame) / 60 / GameScene.hoverSeconds * 2 * .pi)
         section("webs")
@@ -10005,6 +10600,9 @@ final class GameScene: SKScene {
         ballNode.position = SpriteLibrary.point(ball.position)
         // On the Hoopfish's antenna it nods with it.
         if match.hoopfish?.carrying == .ball, ball.holder == nil { ballNode.position = hoopfishNod(0).turn(ballNode.position) }
+        // In the ball truck, or coming out of it, under its door and its cargo.
+        ballNode.zPosition = BallTruckArt.ballInTruck(at: ballNode.position, radius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit, match: match)
+            ? BallTruckArt.ballUnderDoorZ - glowers.zPosition : GameScene.ballZ
         // Frozen it goes ice; burning it goes fire.
         let colour = ball.frozen > 0 ? GameScene.ice : (ball.burning ? GameScene.fireballColour : ballColour)
         // A frozen ball takes no glow: it washes it out.
@@ -10035,7 +10633,7 @@ final class GameScene: SKScene {
         if !wholeStageView, [StageLook.footballField, .elements].contains(match.stage.features.look) { cameraBase.x += (cameraTargetX() - cameraBase.x) * GameScene.cameraEase }
         placeBallCamFrame()
         // Over the ball cam, and on the win screen, whose veil covers the glowing ones.
-        circlesOverCam.isHidden = !ballCamEnabled && flow != .won
+        circlesOverCam.isHidden = !ballCamEnabled && flow != .won && flow != .stageSelect
         // 47's lines breathe, slowly, between gone and a quarter.
         drawPortableThreeLine()
         if !threePointArcs.isHidden {
@@ -10121,7 +10719,8 @@ final class GameScene: SKScene {
         ballTrail.position = ballNode.position
         // A perfect-shielded ball trails white the whole way down.
         ballTrail.particleColor = excluded ? .white : colour
-        ballTrail.particleBirthRate = ball.isLive && !ball.resting && (ball.velocity.length > 1 || excluded) ? 90 : 0
+        // The ball truck's toss into someone's hands trails as a throw does.
+        ballTrail.particleBirthRate = (ball.isLive && !ball.resting && (ball.velocity.length > 1 || excluded)) || match.ballTossing ? 90 : 0
         // Blazing Boba's burning shot trails the head's fire as well.
         if ball.burning, ball.holder == nil, ball.isLive, !ball.resting, ball.velocity.length > 1 {
             emitHeadParticles(ball.lastTouched ?? 0, power: .blazingBoba, at: ballNode.position,
@@ -10192,7 +10791,9 @@ final class GameScene: SKScene {
                 // The rim's spring: toward its rest, or held down while someone dunks on it.
                 // The rim gives only for the dunk's last two frames.
                 let dunkedOn = match.players.contains { $0.state == .dunking && $0.dunkHoop == index && Animation.dunkEntry(at: $0.stateTimer).index >= Animation.dunkSequence.count - 2 }
-                rimSpin[index] += ((dunkedOn ? RimLook.dunkDip : 0) - rimDip[index]) * RimLook.stiffness - rimSpin[index] * RimLook.damping
+                // Anozira's rim gives with its pole instead, in the match (`Match.hoopTruckPull`).
+                let dip = dunkedOn && match.stage.features.look != .anozira ? RimLook.dunkDip : 0
+                rimSpin[index] += (dip - rimDip[index]) * RimLook.stiffness - rimSpin[index] * RimLook.damping
                 // The slam shakes the backboard too, the rim riding it.
                 if dunkedOn { boardJitter[index] = RimLook.jitterFrames }
                 rimDip[index] += rimSpin[index]
@@ -10213,14 +10814,33 @@ final class GameScene: SKScene {
                 rimNodes[index].zRotation += nod.angle
                 backboardNodes[index].position = artPoint + boardShake
                 backboardNodes[index].xScale = rimNodes[index].xScale
+                backboardNodes[index].zRotation = nod.angle
                 // Laid out round the right hoop, mirrored at the left.
                 if index < supportNodes.count {
                     supportNodes[index].position = artPoint
                     supportNodes[index].xScale = match.stage.hoops[index].backboard == .left ? -1 : 1
+                    supportNodes[index].zRotation = nod.angle
+                }
+                // Anozira's hoop on its truck as it's drawn: sized with it as it veers in the rain, and
+                // moved with it, its scale and its jolt over a pothole, as the pole is; drawn only, the
+                // match's rim where it is.
+                let hoopScale = match.stage.features.look == .anozira ? AnoziraArt.scale(veered: SpriteLibrary.point(match.anoziraTruck.standing).y) : 1
+                if match.stage.features.look == .anozira {
+                    rimNodes[index].position = AnoziraArt.onTruck(rimNodes[index].position, match: match)
+                    backboardNodes[index].position = AnoziraArt.onTruck(backboardNodes[index].position, match: match)
+                    if index < supportNodes.count { supportNodes[index].position = AnoziraArt.onTruck(supportNodes[index].position, match: match) }
+                }
+                rimNodes[index].xScale *= hoopScale
+                rimNodes[index].yScale = hoopScale
+                backboardNodes[index].xScale *= hoopScale
+                backboardNodes[index].yScale = hoopScale
+                if index < supportNodes.count {
+                    supportNodes[index].xScale *= hoopScale
+                    supportNodes[index].yScale = hoopScale
                 }
                 // The Hoopfish's spin has the rim in it: its own art and net out of sight meanwhile.
                 let spinning = index == 0 && (match.hoopfish?.spin ?? 0) > 0
-                rimNodes[index].isHidden = spinning || match.stage.features.tilts
+                rimNodes[index].isHidden = spinning || match.stage.features.tilts || match.stage.hoops[index].bonus
                 // The front lip over the ball, wherever and however the rim is.
                 if index < rimFronts.count, rimFronts[index].texture != nil {
                     let front = rimFronts[index], rim = rimNodes[index]
@@ -10229,18 +10849,21 @@ final class GameScene: SKScene {
                     front.anchorPoint = rim.anchorPoint
                     front.position = rim.position
                     front.xScale = rim.xScale
+                    front.yScale = rim.yScale
                     front.zRotation = rim.zRotation
                     front.color = rim.color
                     front.colorBlendFactor = rim.colorBlendFactor
                 }
-                if index < nets.count { nets[index].hidden = spinning || netless }
+                if index < nets.count { nets[index].hidden = spinning || netless || match.stage.hoops[index].bonus }
                 if index < nets.count {
                     // The Elements' wind blows the nets leftward, in gusts; elsewhere a light breeze sways them.
-                    let time = CACurrentMediaTime() * GameScene.netGustRate
+                    let time = stageClock * GameScene.netGustRate
                     let gust = 0.7 + 0.3 * sin(time)
                     nets[index].wind = match.stage.features.look == .elements ? -GameScene.netWind * CGFloat(gust)
                         : GameScene.netBreeze * CGFloat(sin(time + Double(index)))
-                    nets[index].step(rim: nod.turn(GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look)), ball: ballNode.isHidden ? nil : ballNode.position,
+                    let netRim = nod.turn(GameScene.netPoint(for: match.stage.hoops[index], on: match.stage.features.look))
+                    nets[index].step(rim: match.stage.features.look == .anozira ? AnoziraArt.onTruck(netRim, match: match) : netRim,
+                                     ball: ballNode.isHidden ? nil : ballNode.position,
                                      ballRadius: CGFloat(BallRules.radius) * SpriteLibrary.pixelsPerUnit + 1,
                                      bodies: match.players.map { SpriteLibrary.point($0.chest) })
                     // Someone hanging on this rim: its net flares out at the bottom, easing in and back.
@@ -10664,7 +11287,7 @@ extension GameScene {
             && GameScene.previewLooks.contains(series.stage.stage.features.look)
     }
     /// The stages with a preview.
-    fileprivate static let previewLooks: [StageLook] = [.flightB411, .hoopfishHideaway, .kAndA, .court, .elements, .footballField]
+    fileprivate static let previewLooks: [StageLook] = [.flightB411, .hoopfishHideaway, .kAndA, .court, .elements, .footballField, .anozira]
 
     /// Into the preview in play's place: the session held where it is (the same frame on both
     /// phones online, a round's first), a throwaway copy of the match for the cuts, its bodies
@@ -10684,6 +11307,7 @@ extension GameScene {
         base.ball.respawn(at: Vec2(x: -600, y: -600))
         base.ball.frozen = 1_000_000
         stagePreview = StagePreview(shots: shots, base: base, title: series.stage.name.uppercased())
+        LoadTrace.mark("preview started")
         flowState?.previewing = true
         previewShotStage = series.stage
         flow = .preview
@@ -10793,6 +11417,7 @@ extension GameScene {
         case .court: return wreckCenterShots() + [whole]
         case .elements: return elementsShots() + [whole]
         case .footballField: return longballShots() + [whole]
+        case .anozira: return anoziraShots() + [whole]
         default: return []
         }
     }
@@ -10869,6 +11494,60 @@ extension GameScene {
             if frame % 3 == 0 { scene.previewBubble(at: SpriteLibrary.point(plantFoot + Vec2(x: Double.random(in: -12...12), y: Double.random(in: 0...10)))) }
         }
         return [fish, pile, school, bubbles]
+    }
+
+    private func anoziraShots() -> [PreviewShot] {
+        let unit = 1 / Double(SpriteLibrary.pixelsPerUnit)
+        // The two cacti on the foreground, followed as the road takes them by: where the nearest copy
+        // of them is as the cut starts, then on at the layer's speed.
+        let cactiX = 36.0, cactiY = 72.0
+        let speed = Double(AnoziraArt.slidingLayers.first { $0.name == "AnoziraForeground" }?.speed ?? AnoziraArt.roadSpeed)
+        let layerWidth = 512.0
+        var cactiFrom: (clock: Double, x: Double)?
+        let cacti = PreviewShot(following: { [weak self] _ in
+            guard let self else { return .zero }
+            let clock = Double(self.stageClock)
+            if cactiFrom == nil {
+                let slid = (clock * speed).truncatingRemainder(dividingBy: layerWidth)
+                let copies = [cactiX - layerWidth - slid, cactiX - slid, cactiX + layerWidth - slid]
+                cactiFrom = (clock, copies.min { abs($0 - 360) < abs($1 - 360) } ?? cactiX)
+            }
+            guard let from = cactiFrom else { return .zero }
+            return Vec2(x: (from.x - (clock - from.clock) * speed) * unit, y: cactiY * unit)
+        }, view: CGSize(width: 60, height: 40), frames: 36)
+        // The hoop truck, home, its flag going and its pole leaning.
+        var truck = PreviewShot(following: { match in
+            match.anoziraTruck.origin + Vec2(x: AnoziraRules.truckWidth / 2 * unit, y: 40)
+        }, view: CGSize(width: 100, height: 90), frames: 36)
+        truck.prepare = { match in
+            match.anoziraStart = match.frame
+            match.hoopTruckArrives = match.frame - AnoziraRules.truckEnterFrames - 1
+        }
+        // Traffic in the rain: the weather run on to its full rain, and a vehicle sent along the far
+        // lane at once, followed.
+        let rainingAt = stride(from: 0, to: 60 * 60 * 20, by: 30).first { AnoziraRules.weather(at: $0).rain >= 1 } ?? 0
+        var traffic = PreviewShot(following: { [weak self] _ in
+            guard let vehicle = self?.anoziraArt?.traffic.last else { return Vec2(x: 400 * unit, y: 50) }
+            return Vec2(x: Double(vehicle.position.x - vehicle.size.width / 2) * unit, y: Double(vehicle.position.y + vehicle.size.height / 2) * unit)
+        }, view: CGSize(width: 90, height: 50), frames: 36)
+        traffic.prepare = { match in match.anoziraStart = match.frame - rainingAt }
+        traffic.begin = { scene in scene.anoziraArt?.nextVehicleAt = 0 }
+        // The Phoenix, mid-crossing, while it's dry.
+        let phoenixAt = Int(((200 + AnoziraRules.phoenixWidth) / AnoziraRules.phoenixSpeed).rounded())
+        let phoenixMiddle = Vec2(x: AnoziraRules.phoenixWidth / 2, y: 16) * unit
+        // Its panel's the triangle, whose middle is a ninth of its box's width left of the box's and a
+        // sixth of its height lower: the view moved so the bird sits there, not at the box's middle.
+        let phoenixView = CGSize(width: 60, height: 45)
+        let triangle = MangaPage.centroidShare(MangaPage.bigPanel - 1)
+        let viewOffBird = Vec2(x: -Double(triangle.x * phoenixView.width), y: -Double(triangle.y * phoenixView.height))
+        var phoenix = PreviewShot(following: { match in
+            (match.phoenix.flatMap { AnoziraRules.phoenix($0, at: match.frame) }.map { $0 + phoenixMiddle } ?? Vec2(x: 200 * unit, y: 130)) + viewOffBird
+        }, view: phoenixView, frames: 36)
+        phoenix.prepare = { match in
+            match.anoziraStart = match.frame
+            match.phoenix = AnoziraRules.Phoenix(start: match.frame - phoenixAt)
+        }
+        return [cacti, truck, traffic, phoenix]
     }
 
     private func kAndAShots() -> [PreviewShot] {

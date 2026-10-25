@@ -113,7 +113,7 @@ final class NetDropTests: XCTestCase {
         var entry: Vec2?
         for _ in 0..<20 where entry == nil {
             match.advance(inputs: [.idle, .idle])
-            for case .scored(_, _, let came, _, _) in match.events { entry = came }
+            for case .scored(_, _, let came, _, _, _) in match.events { entry = came }
         }
         XCTAssertEqual(match.scores[0], 1)
         XCTAssertEqual(match.ball.position.x, hoop.position.x, accuracy: 1e-9, "held at the rim's middle")

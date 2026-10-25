@@ -854,7 +854,7 @@ final class BallTests: XCTestCase {
             match.advance(inputs: [.idle, .idle])
         }
         XCTAssertEqual(match.scores, [1, 0])
-        XCTAssertTrue(match.events.contains { if case .scored(player: 0, hoop: 1, _, _, _) = $0 { return true } else { return false } })
+        XCTAssertTrue(match.events.contains { if case .scored(player: 0, hoop: 1, _, _, _, _) = $0 { return true } else { return false } })
         // No hit-stop for a basket: straight to the restart.
         XCTAssertEqual(match.hitStop, 0)
         match.advance(inputs: [.idle, .idle])

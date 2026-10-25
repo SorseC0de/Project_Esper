@@ -11,6 +11,10 @@ public struct Ball: Equatable {
     public var floater = 0
     /// Let go as a floater, until it's next let go or knocked: for the view's announcer.
     public var floaterShot = false
+    /// Put down through the rim by a dunk that counts, until it's next let go or knocked: a
+    /// dunk's point, for its sound and the announcer. Only a dunk that lands sets it, so one that
+    /// doesn't (the Hoopfish's spin, Anozira's bounce) leaves nothing behind.
+    public var dunkShot = false
     /// Released by a throw and not yet caught.
     public var thrown = false
     /// A throw sideways or down is a projectile: the other body it meets is stripped and
@@ -119,7 +123,7 @@ public struct Ball: Equatable {
             // Held in a tornado: drawn to its middle, gravity off. Carried over a rim it scores
             // on, the rim draws it out and down into it, a shot again.
             velocity = (centre - position) * TornadoRules.pullShare
-            if let hoop = stage.hoops.first(where: { !$0.rimless && ($0.shared || lastTouched == nil || $0.owner == lastTouched)
+            if let hoop = stage.hoops.first(where: { !$0.rimless && !$0.bonus && ($0.shared || lastTouched == nil || $0.owner == lastTouched)
                 && abs($0.position.x - position.x) <= BallRules.hoopReach && position.y > $0.position.y && position.y - $0.position.y <= BallRules.hoopReach }) {
                 tornadoCentre = nil
                 drawnFromTornado = true
@@ -349,6 +353,7 @@ public struct Ball: Equatable {
         returning = false
         floater = 0
         floaterShot = false
+        dunkShot = false
         scoring = false
         thrown = straight
         steers = !straight
@@ -418,6 +423,7 @@ public struct Ball: Equatable {
         straight = false
         floater = BallRules.popFloatFrames
         floaterShot = false
+        dunkShot = false
         thrown = false
         steers = false
         shotInFlight = false
@@ -455,6 +461,7 @@ public struct Ball: Equatable {
         pace = 1
         burning = false
         floaterShot = false
+        dunkShot = false
         strikes = false
         returning = false
         frozen = 0

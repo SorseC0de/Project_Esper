@@ -2,6 +2,8 @@
 
 Usage: aseprite.py file.aseprite            lists the layers (visible, opacity, blend, cel sizes)
        aseprite.py file.aseprite out.png [layer ...]   flattens the first frame; named layers only, if given
+       aseprite.py --frames file.aseprite out.png [layer ...]   every frame flattened (named layers only, if
+                                                given), one under the next, in a strip
 Visible layers only, in their stacking order; normal blending with each layer's and cel's opacity;
 32-bit RGBA, 16-bit grayscale and indexed (8-bit, index 0 clear) pixels; compressed, raw and linked cels.
 """
@@ -9,12 +11,12 @@ import struct, sys, zlib
 sys.path.insert(0, __import__("os").path.dirname(__file__))
 from pngio import write_png
 
-def read(path):
+def read(path, want=0):
     data = open(path, "rb").read()
     size, magic, frames, w, h, depth, flags, _, _, _, transparent, ncolors = struct.unpack("<IHHHHHIHIIB3xH", data[:34])
     assert magic == 0xA5E0, "not an aseprite file"
     pos = 128
-    layers, palette, cels = [], [(0, 0, 0, 255)] * 256, []
+    layers, palette, cels = [], [(0, 0, 0, 255)] * 256, {}
     new_palette = False
     for frame in range(frames):
         fsize, fmagic, old_chunks, _, new_chunks = struct.unpack("<IHHH2xI", data[pos:pos+16])
@@ -27,7 +29,7 @@ def read(path):
                 lflags, ltype, child, _, _, blend, opacity = struct.unpack("<HHHHHHB", body[:13])
                 nlen = struct.unpack("<H", body[16:18])[0]; name = body[18:18+nlen].decode("utf-8", "replace")
                 layers.append(dict(name=name, visible=bool(lflags & 1), group=ltype == 1, child=child, blend=blend, opacity=opacity, ref=bool(lflags & 64)))
-            elif ctype == 0x2005 and frame == 0:
+            elif ctype == 0x2005 and frame <= want:
                 layer, x, y, opacity, kind, zindex = struct.unpack("<HhhBHh", body[:11])
                 cel = dict(layer=layer, x=x, y=y, opacity=opacity, kind=kind)
                 if kind in (0, 2):
@@ -36,7 +38,7 @@ def read(path):
                     cel.update(w=cw, h=ch, px=px)
                 elif kind == 1:
                     cel["link"] = struct.unpack("<H", body[16:18])[0]
-                cels.append(cel)
+                cels[(frame, layer)] = cel
             elif ctype == 0x2019:
                 new_palette = True
                 n, first, last = struct.unpack("<III", body[:12]); q = 20
@@ -55,7 +57,13 @@ def read(path):
                         if i < 256: palette[i] = (body[q] << shift, body[q+1] << shift, body[q+2] << shift, 255)
                         q += 3
         pos += fsize
-    return dict(w=w, h=h, depth=depth, transparent=transparent, layers=layers, cels=cels, palette=palette)
+    # The wanted frame's cels, a linked one standing for the cel it links to in its own frame.
+    wanted = []
+    for (frame, layer), cel in cels.items():
+        if frame != want: continue
+        if cel["kind"] == 1: cel = dict(cels.get((cel["link"], layer), cel), layer=layer)
+        wanted.append(cel)
+    return dict(w=w, h=h, depth=depth, transparent=transparent, layers=layers, cels=wanted, palette=palette, frames=frames)
 
 def visible(layers, index):
     """A layer shows when it and every group over it do."""
@@ -102,6 +110,15 @@ def flatten(doc, only=None):
     return bytes(out)
 
 if __name__ == "__main__":
+    if sys.argv[1] == "--frames":
+        count = read(sys.argv[2])["frames"]
+        strip = []
+        for frame in range(count):
+            doc = read(sys.argv[2], frame)
+            px = flatten(doc, sys.argv[4:] or None)
+            strip += [tuple(px[i:i+4]) for i in range(0, len(px), 4)]
+        write_png(sys.argv[3], doc["w"], doc["h"] * count, strip)
+        sys.exit()
     doc = read(sys.argv[1])
     if len(sys.argv) < 3:
         print(f"{doc['w']}x{doc['h']} {doc['depth']}bpp")

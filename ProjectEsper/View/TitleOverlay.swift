@@ -88,8 +88,14 @@ final class FlowState: ObservableObject {
             self?.curtainHeld = false
             lift()
         }
+        liftAfterHoldLimit()
+    }
+    /// The held curtain up after `loadingHoldLimit` regardless; but never over the launch's warm-up,
+    /// which nothing under it can be used without.
+    private func liftAfterHoldLimit() {
         DispatchQueue.main.asyncAfter(deadline: .now() + FlowState.loadingHoldLimit) { [weak self] in
             guard let self, let held = self.heldLift else { return }
+            if self.scene.warmingUp { return self.liftAfterHoldLimit() }
             self.heldLift = nil
             held()
         }
@@ -110,7 +116,7 @@ final class FlowState: ObservableObject {
     /// off the win screen), leaving the curtain drawn down, black and taking every touch, though
     /// its value was back at 0.
     private var curtainTimer: Timer?
-    private func moveCurtain(to target: Double, over seconds: Double, easeIn: Bool) {
+    private func moveCurtain(to target: Double, over seconds: Double, easeIn: Bool, done: (() -> Void)? = nil) {
         curtainTimer?.invalidate()
         let from = curtain, start = CACurrentMediaTime()
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
@@ -121,6 +127,7 @@ final class FlowState: ObservableObject {
             if share >= 1 {
                 timer.invalidate()
                 self.curtainTimer = nil
+                done?()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -129,30 +136,40 @@ final class FlowState: ObservableObject {
 
     func transition(_ style: ScreenTransition = .fade, holdsForLoading: Bool = false, _ change: @escaping () -> Void) {
         guard !curtainBusy else {
+            LoadTrace.mark("curtain busy: queued")
             curtainQueue.append((style, holdsForLoading, change))
             return
         }
         curtainBusy = true
         curtainStyle = style
-        moveCurtain(to: 1, over: style.downSeconds, easeIn: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + style.downSeconds + 0.05) { [weak self] in
+        // The change only once the curtain's all the way down and drawn so: a heavy one (a stage
+        // built) made on a busy main thread before the curtain caught up held the old screen up,
+        // frozen, with no loading bar.
+        moveCurtain(to: 1, over: style.downSeconds, easeIn: true) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + FlowState.curtainDrawnSeconds) { self?.curtainDown(style, holdsForLoading: holdsForLoading, change) }
+        }
+    }
+    /// A display frame or two for the curtain's full cover to be on the screen before the change.
+    static let curtainDrawnSeconds = 0.05
+
+    /// The curtain down: the change made under it, then up again, held for loading if it's to be.
+    private func curtainDown(_ style: ScreenTransition, holdsForLoading: Bool, _ change: @escaping () -> Void) {
+        change()
+        // Held down over anything the change set loading, the bar filling on it, if it's to be.
+        let lift = { [weak self] in
             guard let self else { return }
-            change()
-            // Held down over anything the change set loading, the bar filling on it, if it's to be.
-            let lift = { [weak self] in
+            self.moveCurtain(to: 0, over: style.upSeconds, easeIn: false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds) { [weak self] in
                 guard let self else { return }
-                self.moveCurtain(to: 0, over: style.upSeconds, easeIn: false)
-                DispatchQueue.main.asyncAfter(deadline: .now() + style.upSeconds) { [weak self] in
-                    guard let self else { return }
-                    self.curtainBusy = false
-                    if !self.curtainQueue.isEmpty {
-                        let next = self.curtainQueue.removeFirst()
-                        self.transition(next.0, holdsForLoading: next.1, next.2)
-                    }
+                self.curtainBusy = false
+                if !self.curtainQueue.isEmpty {
+                    let next = self.curtainQueue.removeFirst()
+                    self.transition(next.0, holdsForLoading: next.1, next.2)
                 }
             }
-            if holdsForLoading { self.whenLoaded(lift) } else { lift() }
         }
+        LoadTrace.mark(holdsForLoading ? "change made, curtain held for loading" : "change made, curtain lifting")
+        if holdsForLoading { self.whenLoaded { LoadTrace.mark("loaded, curtain lifting"); lift() } } else { lift() }
     }
 
     // MARK: The settings

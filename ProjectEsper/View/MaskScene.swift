@@ -24,6 +24,8 @@ final class MaskScene: SKScene {
     private var shielded: [SKSpriteNode] = []
     private var flats: [SKSpriteNode] = []
     private var underFlats: [SKSpriteNode] = []
+    /// What the world's wash is left off, in yellow, over the still layer and under what's in front of it.
+    private var washFree: [SKSpriteNode] = []
     /// What glows though it's over something that doesn't, as the Hoopfish's rings over Hoopfish
     /// Hideaway's background: drawn blue over the still layer, so the plain threshold holds there
     /// again, and the glow takes its colour from under the water's tint.
@@ -68,6 +70,8 @@ final class MaskScene: SKScene {
     private static let flatBlack = flat(SIMD4<Float>(0, 0, 0, 1))
     private static let flatRed = flat(SIMD4<Float>(1, 0, 0, 1))
     private static let flatMagenta = flat(SIMD4<Float>(1, 0, 1, 1))
+    /// Yellow: left out of the world's wash in the composite (Anozira's far lightning).
+    private static let flatYellow = flat(SIMD4<Float>(1, 1, 0, 1))
 
     /// The stage's still, non-glowing art in green, redone when `version` changes.
     func syncStatic(_ flats: [BodySnapshot], version: Int) {
@@ -90,6 +94,7 @@ final class MaskScene: SKScene {
     /// `hoods`: drawn magenta with the cut-outs: the plain threshold, at the hood's share.
     func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], under: [BodySnapshot] = [], through: [BodySnapshot] = [],
                 throughFront: [BodySnapshot] = [], throughNets: [CGPath] = [], cutOut: [BodySnapshot] = [], hoods: [BodySnapshot] = [], shield: [BodySnapshot] = [],
+                washFree: [BodySnapshot] = [],
                 size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat, cameraRotation: CGFloat = 0) {
         if self.size != size { self.size = size }
         cameraNode.position = cameraPosition
@@ -101,6 +106,7 @@ final class MaskScene: SKScene {
         place(hoods, in: &self.hoods, green: false, depth: 3, shader: MaskScene.flatMagenta)
         place(flat, in: &flats, green: true)
         place(under, in: &underFlats, green: true, depth: -0.5)
+        place(washFree, in: &self.washFree, green: false, depth: -0.9, shader: MaskScene.flatYellow)
         place(through, in: &glowingThrough, green: false, depth: -0.75, shader: MaskScene.flatBlue)
         place(throughFront, in: &glowingThroughFront, green: false, depth: -0.25, shader: MaskScene.flatBlue)
         while netStrands.count < throughNets.count {

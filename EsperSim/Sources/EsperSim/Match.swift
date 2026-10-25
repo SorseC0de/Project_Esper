@@ -57,6 +57,25 @@ public struct Match: Equatable {
     /// The Wreck Center's one-way platforms: each one's frames left of its turn, 0 while it's still.
     public var dropPlatformFrames: [Int] = []
     public var cartHitFrames: [Int] = []
+    /// The ball truck's (`BallTruck.swift`): the ball in its hands, waiting or on its way to whoever's
+    /// to have it; the frame it was let out on. And the frame Anozira's hoop truck starts in on.
+    public var ballInTruck = false
+    public var ballOutAt: Int?
+    public var ballTruckReceiver: Int?
+    public var hoopTruckArrives: Int?
+    /// Anozira: the frame its vehicles' clock started on; how far a dunker hanging on the rim pulls
+    /// the pole down, and whether anyone stood on the hoop truck last frame, which dips it.
+    public var anoziraStart: Int?
+    public var hoopTruckPull = 0.0
+    /// Anozira's Phoenix, while it's flying by (`AnoziraRules.Phoenix`).
+    public var phoenix: AnoziraRules.Phoenix?
+    /// Anozira's potholes' middles across, units, and the frames the car, the hoop truck and the
+    /// ball truck last went over one.
+    public var potholes: [Double] = []
+    public var carBumpAt: Int?
+    public var truckBumpAt: Int?
+    public var ballTruckBumpAt: Int?
+    public var hoopTruckRidden = false
     /// Its overhead bins, and the bin the ball waits in through the count.
     public var bins: [Bin] = []
     public var ballBin: Int?
@@ -115,6 +134,7 @@ public struct Match: Equatable {
             cartHitFrames = players.map { _ in 0 }
             startFlightB411()
         }
+        if stage.features.ballTruck { shutBallInTruck(for: nil) }
         if let fish = stage.hoopfishStart {
             if stage.hoopfishStationary {
                 // ZONES: in place, facing left, the rim on its antenna.
@@ -158,6 +178,7 @@ public struct Match: Equatable {
         frame += 1
         events = []
         if scoreLockout > 0 { scoreLockout -= 1 }
+        for index in stage.hoops.indices where stage.hoops[index].lockFrames > 0 { stage.hoops[index].lockFrames -= 1 }
         if hitStop > 0 {
             hitStop -= 1
             if hitStop == 0, slashClashRecovery {
@@ -193,6 +214,7 @@ public struct Match: Equatable {
         stepFlightB411()
         stepTornados()
         stepHoopfish()
+        placeAnoziraTruck()
         stepJellyfish()
         gatherFloBundles()
         stepStageFireball()
@@ -217,10 +239,12 @@ public struct Match: Equatable {
                                                    events: &events) else { continue }
             perform(action, by: index)
         }
+        markEdgeDribbles()
         turnDroppedPlatforms()
         stepShields()
         burnInLava()
         burnDribbles()
+        spillOnRoad()
         resolveSlashClash()
         resolveSnatchClash()
         resolveParries()
@@ -241,6 +265,12 @@ public struct Match: Equatable {
         }
         snagWithLingeringLines()
         reelBall()
+        // A line on the ball only while the ball's loose and tethered to its shooter: the tether
+        // dropped any other way (the ball reset, caught by someone else, frozen) takes the line with it.
+        if let puller = ball.tether, ball.holder != nil, ball.holder != puller { ball.tether = nil }
+        for index in players.indices where players[index].webLine?.target == .ball {
+            if ball.tether != index || ball.holder != nil || !ball.isLive { players[index].webLine = nil }
+        }
 
         if ball.frozen > 0 {
             // Frost Tea: the ball hangs where it is, but a hand can still take it.
@@ -250,6 +280,9 @@ public struct Match: Equatable {
             // On the Hoopfish's antenna, where a hand can take it off.
             tryCatch()
             if ball.holder != nil { hoopfish?.carrying = .nothing }
+        } else if ballInTruck, ball.holder == nil {
+            // In the ball truck's hands through the count: let out, or tossed to whoever's to have it.
+            holdBallInTruck()
         } else if let waiting = ballBin, countdown > 0, ball.holder == nil {
             // Flight B411: shut in its bin through the count, still, till the count's done.
             ball.position = FlightB411Rules.ballSpot(in: waiting)
@@ -261,20 +294,31 @@ public struct Match: Equatable {
             let before = ball.position
             let scored = ball.step(stage: ballStage, events: &events)
             shieldTheBall(from: before)
-            if let hoop = scored, scoreLockout == 0 {
+            lockedRimsTurnTheBall(from: before)
+            if let hoop = scored, scoreLockout == 0, !stage.hoops[hoop].locked(to: ball.lastTouched) {
                 // A few frames after a point no other counts: a rim on the move can take the
                 // same ball through twice.
                 scoreLockout = BallRules.scoreLockoutFrames
                 // A shared rim's point goes to whoever put the ball through.
                 let owner = stage.hoops[hoop].shared ? (ball.lastTouched ?? stage.hoops[hoop].owner) : stage.hoops[hoop].owner
+                // Through the Phoenix's tail: off it goes, up and away.
+                if stage.hoops[hoop].bonus, var flying = phoenix, flying.swoopAt == nil {
+                    flying.swoopAt = frame
+                    phoenix = flying
+                }
                 if mode == .fortySeven {
                     // 47: the points by where the ball left a hand, and play on, the scorer
                     // kept off the ball a while.
-                    let points = FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage) * pointValue
+                    let points = stage.hoops[hoop].bonus ? AnoziraRules.phoenixPoints
+                        : FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage) * pointValue
                     scores[owner] += points
-                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: points, floater: ball.floaterShot))
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: points, floater: ball.floaterShot, dunk: ball.dunkShot))
                     if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, at: stage.hoops[hoop].position) }
-                    players[owner].pickupLockout = FortySevenRules.scorerLockoutFrames
+                    // The Phoenix's ring isn't locked: it's away.
+                    if !stage.hoops[hoop].bonus {
+                        stage.hoops[hoop].lockFrames = FortySevenRules.rimLockFrames
+                        stage.hoops[hoop].lockedBy = owner
+                    }
                     flightB411Scored(on: hoop)
                     ball.launchPoint = nil
                     // Through the net it's nobody's shot any more: anyone but the scorer can take it.
@@ -283,14 +327,14 @@ public struct Match: Equatable {
                 } else if mode == .zones {
                     // ZONES: the shot's in; the run's done, nothing restarts.
                     scores[owner] += 1
-                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot))
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot, dunk: ball.dunkShot))
                     ball.shotInFlight = false
                 } else {
                     scores[owner] += 1
                     // Level after a point, the next is the stage's decider: it starts from the ball in
                     // neutral rather than in the hands of whoever was just scored on.
                     let tiedDecider = scores[0] == scores[1]
-                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot))
+                    events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot, dunk: ball.dunkShot))
                     // FloState ends with the point, its FLO kept, not burned behind the menus.
                     for player in players.indices { players[player].leaveFloStateForPoint() }
                     if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, at: stage.hoops[hoop].position) }
@@ -361,6 +405,9 @@ public struct Match: Equatable {
             // Flight B411: as a fresh match starts, level and every bin shut; in neutral the ball
             // back in the middle bin.
             restartFlightB411(ballInBin: holder == nil)
+        } else if stage.features.ballTruck {
+            // The ball truck brings it back: let out loose in neutral, or tossed into the hands it's given to.
+            shutBallInTruck(for: holder)
         } else if holder == nil, hoopfish != nil {
             // In neutral on Hoopfish Hideaway is back on the Hoopfish's antenna.
             hoopfish?.carrying = .ball
@@ -472,10 +519,17 @@ public struct Match: Equatable {
             players[index].grounded = false
             players[index].enter(.air)
             events.append(.hoopfishSpun)
+        case .dunk(let hoop) where stage.features.dunksBounce:
+            // Anozira's: the slam lands, but the ball bounces off the rim, up and away from the
+            // backboard; the dunker hangs on.
+            let rim = stage.hoops[hoop]
+            ball.release(from: rim.position + Vec2(x: 0, y: BallRules.radius + 2), velocity: AnoziraRules.dunkBounce(off: rim), by: index, straight: false)
+            ball.scoring = false
         case .dunk(let hoop):
             // Its bottom just over the rim, so it comes down through it.
             ball.release(from: stage.hoops[hoop].position + Vec2(x: 0, y: BallRules.radius + 2), velocity: Vec2(x: 0, y: -2), by: index, straight: false)
             ball.scoring = true
+            ball.dunkShot = true
         case .webLine(let direction):
             webLine(from: index, direction: direction)
         case .makePlatform:
@@ -555,11 +609,14 @@ public struct Match: Equatable {
             players[index].tear = nil
             hand(ballTo: index)
         }
-        // Titan Tea at level two: running or dashing into the other strips them, once a contact.
+        // Titan Tea at level two: running or dashing into the other strips them, once a contact, not
+        // one still stunned or in its grace (`StunGraceRules`); in FloState, earning no FLO.
         if player.power == .titanTea, player.powerLevel >= 2, let other {
             let touching = player.body.overlaps(players[other].body)
-            if touching, !player.trampling, player.grounded, player.state == .run || player.state == .dash, players[other].frozen == 0 {
-                strip(other, by: index, knock: nil)
+            if touching, !player.trampling, player.grounded, player.state == .run || player.state == .dash, players[other].frozen == 0,
+               players[other].hitStun == 0, players[other].stunGrace == 0 {
+                strip(other, by: index, knock: nil, flo: player.inFloState ? 0 : FloRules.hit)
+                players[other].stunGrace = players[other].hitStun + StunGraceRules.frames
             }
             players[index].trampling = touching
         }
@@ -661,7 +718,7 @@ public struct Match: Equatable {
             // A burning ball is the thrower's alone.
             // One off a perfect shield is the shielder's alone till it bounces.
             // A burning ball is the thrower's alone, but to another Blazing Boba drinker.
-            let allowed = (!ball.burning || ball.lastTouched == index || player.power == .blazingBoba || held != nil) && (held != nil || player.pickupLockout == 0)
+            let allowed = (!ball.burning || ball.lastTouched == index || player.power == .blazingBoba || held != nil)
                 && (held != nil || ball.exclusiveTo == nil || ball.exclusiveTo == index)
             if player.power == .frostTea, let other, players[other].frozen == 0, players[other].state != .stepback, !untouchable(other),
                player.snatchReaches(box: players[other].body),
@@ -809,6 +866,22 @@ public struct Match: Equatable {
 
     /// On a lava stage, a dribble bouncing down off a ledge into the lava loses the ball to it,
     /// back to where it starts, as a loose ball falling in does.
+    /// On Anozira and the Elements, standing with the ball at an edge: the idle dribble's bounce
+    /// would come down off it, so the ball's kept between the legs instead, the taunt's dribble
+    /// (`Player.edgeDribble`), never over the drop to burn or spill.
+    private mutating func markEdgeDribbles() {
+        let edgy = stage.features.roadSlides || stage.features.lavaSurface != nil
+        for index in players.indices {
+            let player = players[index]
+            guard edgy, player.hasBall, player.grounded, player.state == .idle else {
+                players[index].edgeDribble = false
+                continue
+            }
+            let ballX = player.position.x + Player.idleDribbleReach / 1.6 * player.spec.scale * player.facing.sign
+            players[index].edgeDribble = stage.drop(fromX: ballX, y: player.position.y) > Stage.tileSize
+        }
+    }
+
     private mutating func burnDribbles() {
         guard let lava = stage.features.lavaSurface, let holder = ball.holder else { return }
         let player = players[holder]
@@ -858,6 +931,10 @@ public struct Match: Equatable {
 
     /// Where a player starts: the stage's spot, lifted onto whatever stands there, such as a car.
     func spawnPoint(_ index: Int) -> Vec2 {
+        // Anozira's on its car, wherever it's got to.
+        if stage.features.look == .anozira, index < AnoziraRules.carSpawns.count {
+            return anoziraCar + AnoziraRules.carSpawns[index]
+        }
         var at = stage.playerSpawns[index]
         let spec = players[index].spec
         for _ in 0..<8 {
@@ -1264,9 +1341,13 @@ public struct Match: Equatable {
             ball.steers = false
             ball.resting = false
         }
+        // Not one still stunned or in its grace (`StunGraceRules`), so a quake can't chain a stun; and
+        // Titan Tea's in FloState earns no FLO, so it can't keep itself there.
         if let other = players.indices.first(where: { $0 != index }), players[other].grounded, players[other].frozen == 0,
+           players[other].hitStun == 0, players[other].stunGrace == 0,
            whole || abs(players[other].position.y - me.position.y) <= QuakeRules.sameFloorSlack {
-            strip(other, by: index, knock: QuakeRules.knock)
+            strip(other, by: index, knock: QuakeRules.knock, flo: me.power == .titanTea && me.inFloState ? 0 : FloRules.hit)
+            players[other].stunGrace = players[other].hitStun + StunGraceRules.frames
         }
     }
 
@@ -1507,7 +1588,10 @@ public struct Match: Equatable {
         clones = kept
     }
 
-    /// Blazing Boba's flames strip the other body that steps in one, once each.
+    /// Blazing Boba's flames strip the other body that steps in one, once each; but not again
+    /// till `StunGraceRules.frames` after the last such stun is over, room to jump out of
+    /// a trail they're stuck in (sliding on Anozira's road under a FloState drinker, whose hits
+    /// earned FLO faster than FloState spent it).
     private mutating func stepFlames() {
         var kept: [Flame] = []
         for var flame in flames {
@@ -1517,8 +1601,9 @@ public struct Match: Equatable {
                 continue
             }
             if let other = players.indices.first(where: { $0 != flame.owner }), players[other].frozen == 0,
-               players[other].hitStun == 0, players[other].body.overlaps(flame.box) {
+               players[other].hitStun == 0, players[other].stunGrace == 0, players[other].body.overlaps(flame.box) {
                 strip(other, by: flame.owner, knock: BlazeRules.flameKnock)
+                players[other].stunGrace = players[other].hitStun + StunGraceRules.frames
                 continue
             }
             kept.append(flame)
@@ -1611,9 +1696,8 @@ public struct Match: Equatable {
         events.append(.caught(player: catcher))
     }
 
-    /// Web Water's line: the first thing along it wins. The line bends toward a ball or
-    /// body within the assist angle of the aim first, and a miss leaves it showing, live,
-    /// for a few frames.
+    /// Web Water's line: the ball over the other over a wall (`snag`). It bends to the ball within
+    /// the assist angle of the aim, else to a body there, and a miss leaves it showing, live, for a few frames.
     private mutating func webLine(from index: Int, direction aimed: Vec2) {
         let origin = players[index].chest
         let opponent = players.indices.first { $0 != index }
@@ -1621,7 +1705,12 @@ public struct Match: Equatable {
         var bestTurn = WebRules.assistAngle
         var candidates: [Vec2] = []
         if ball.isLive { candidates.append(ball.position) }
-        if let opponent { candidates.append(players[opponent].chest) }
+        // The ball within the angle wins outright; only without it does the body draw the line.
+        let ballInReach = ball.isLive && (ball.position - origin).length <= WebRules.lineRange && {
+            let toward = ball.position - origin
+            return abs(Trig.atan2(toward.x * aimed.y - toward.y * aimed.x, toward.x * aimed.x + toward.y * aimed.y)) < WebRules.assistAngle
+        }()
+        if let opponent, !ballInReach { candidates.append(players[opponent].chest) }
         for candidate in candidates {
             let toward = candidate - origin
             guard toward.length <= WebRules.lineRange, toward.length > 1 else { continue }
@@ -1638,47 +1727,58 @@ public struct Match: Equatable {
         events.append(.webLine(player: index, hit: hit))
     }
 
-    /// Walks a line out from `origin` and takes the first thing on it. A wall reels the
-    /// shooter to it, unless the line is one that already ended and is only lingering; a
-    /// loose ball is tethered; the other holding the ball loses it to the tether; the other
-    /// without it is reeled to a spot in front of the shooter. True when something was taken.
+    /// Walks a line out from `origin` as far as the first wall, and takes by priority, wherever each
+    /// is along it short of that: the ball (loose and tethered, or the other's, lost to the tether),
+    /// then the other without it (reeled to a spot in front of the shooter), then the wall (the
+    /// shooter reeled to it, unless the line is one that already ended and is only lingering).
+    /// True when something was taken.
     private mutating func snag(by index: Int, from origin: Vec2, direction: Vec2, range: Double, throughSolids: Bool) -> Bool {
         let opponent = players.indices.first { $0 != index }
-        var travelled = 0.0
-        while travelled <= range {
-            let point = origin + direction * travelled
-            if !throughSolids, stage.overlapsSolid(Box(center: point, width: 1, height: 1)) {
-                let landing = origin + direction * max(travelled - 4, 0)
-                players[index].startPull(to: landing, byOther: false)
-                players[index].webLine = WebLine(target: .point(point), frames: WebRules.pullMaxFrames)
-                return true
-            }
-            if ball.isLive, ball.exclusiveTo == nil || ball.exclusiveTo == index, ball.position.distance(to: point) <= BallRules.radius + WebRules.snapRadius {
+        let all = stride(from: 0.0, through: range, by: 2).map { (along: $0, point: origin + direction * $0) }
+        // A wall stops the line where it's met.
+        let wall = throughSolids ? nil : all.first { stage.overlapsSolid(Box(center: $0.point, width: 1, height: 1)) }
+        let points = wall.map { hit in all.filter { $0.along < hit.along } } ?? all
+        // The ball, loose and open to the shooter.
+        if ball.isLive, ball.holder == nil, ball.exclusiveTo == nil || ball.exclusiveTo == index,
+           points.contains(where: { ball.position.distance(to: $0.point) <= BallRules.radius + WebRules.snapRadius }) {
+            tetherBall(to: index)
+            return true
+        }
+        // The other body: losing the ball it holds to the tether, or reeled in without one.
+        if let opponent, points.contains(where: { players[opponent].body.overlaps(Box(center: $0.point, width: WebRules.snapRadius * 2, height: WebRules.snapRadius * 2)) }) {
+            if players[opponent].hasBall {
+                players[opponent].loseBall()
+                ball.holder = nil
+                ball.position = players[opponent].chest
+                ball.velocity = .zero
                 ball.tether = index
-                ball.thrown = false
-                ball.pace = 1
                 players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
-                return true
+            } else {
+                let shooter = players[index]
+                let drop = Vec2(x: shooter.position.x + shooter.facing.sign * WebRules.dropDistance, y: shooter.position.y)
+                players[opponent].startPull(to: drop, byOther: true)
+                players[index].webLine = WebLine(target: .opponent, frames: WebRules.pullMaxFrames)
             }
-            if let opponent, players[opponent].body.overlaps(Box(center: point, width: WebRules.snapRadius * 2, height: WebRules.snapRadius * 2)) {
-                if players[opponent].hasBall {
-                    players[opponent].loseBall()
-                    ball.holder = nil
-                    ball.position = players[opponent].chest
-                    ball.velocity = .zero
-                    ball.tether = index
-                    players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
-                } else {
-                    let shooter = players[index]
-                    let drop = Vec2(x: shooter.position.x + shooter.facing.sign * WebRules.dropDistance, y: shooter.position.y)
-                    players[opponent].startPull(to: drop, byOther: true)
-                    players[index].webLine = WebLine(target: .opponent, frames: WebRules.pullMaxFrames)
-                }
-                return true
-            }
-            travelled += 2
+            return true
+        }
+        // The wall it stopped at: the shooter reeled to it.
+        if let hit = wall {
+            let landing = origin + direction * max(hit.along - 4, 0)
+            players[index].startPull(to: landing, byOther: false)
+            players[index].webLine = WebLine(target: .point(hit.point), frames: WebRules.pullMaxFrames)
+            return true
         }
         return false
+    }
+
+    /// The loose ball on `index`'s line, coming to them; whoever else they were reeling let go,
+    /// one thing pulled at a time.
+    private mutating func tetherBall(to index: Int) {
+        ball.tether = index
+        ball.thrown = false
+        ball.pace = 1
+        players[index].webLine = WebLine(target: .ball, frames: WebRules.pullMaxFrames)
+        for other in players.indices where other != index && players[other].state == .webbed { players[other].pullTarget = nil }
     }
 
     /// A line that hit nothing stays live for as long as it shows: the ball or the other
@@ -1805,19 +1905,24 @@ public struct Match: Equatable {
         return range.upperBound
     }
 
-    /// The auto-aimed shot onto a rim that swims (Hoopfish Hideaway's), as the computer aims its
+    /// The auto-aimed shot onto a rim that moves (Hoopfish Hideaway's, Anozira's on its truck), as the computer aims its
     /// own: the rim followed frame by frame to where it'll be as the ball comes down, the arc
     /// aimed there, a few heights round ARC HEIGHT played out against the moving rim, the first
     /// that goes in taken (else the plain lead). The release velocity with the pace in it, or nil
     /// for a shot that isn't auto-aimed at a moving rim.
     func ledShot(for index: Int) -> Vec2? {
         let player = players[index]
-        guard player.presetShot || player.shotAim == .zero, player.aimedRim != nil, var fish = hoopfish,
-              let hoop = stage.hoops.firstIndex(where: { !$0.rimless && ($0.shared || $0.owner == index) }) else { return nil }
+        guard player.presetShot || player.shotAim == .zero, player.aimedRim != nil, hoopfish != nil || stage.features.look == .anozira,
+              let hoop = stage.hoops.firstIndex(where: { !$0.rimless && !$0.bonus && ($0.shared || $0.owner == index) }) else { return nil }
         var path: [Vec2] = []
-        for _ in 0..<Match.ledShotLookAhead {
-            fish.step(on: stage)
-            path.append(fish.carrying == .hoop && !fish.away && fish.spin == 0 ? fish.antenna : HighwayRules.parked)
+        if var fish = hoopfish {
+            for _ in 0..<Match.ledShotLookAhead {
+                fish.step(on: stage)
+                path.append(fish.carrying == .hoop && !fish.away && fish.spin == 0 ? fish.antenna : HighwayRules.parked)
+            }
+        } else {
+            // Anozira's rim on its truck, as the truck's shifting, veering and leaning will have it.
+            path = (1...Match.ledShotLookAhead).map { AnoziraRules.rim(on: anoziraTruck(at: frame + $0)) }
         }
         let from = shotRelease(of: player)
         let pace = player.spec.shotPace

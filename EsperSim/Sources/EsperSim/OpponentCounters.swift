@@ -106,6 +106,7 @@ extension Opponent {
         case .shield:
             guard !me.holding else { counterPlan = nil; return false }
             input.shield = !pressed.shield
+            shieldWhy = "counter"
             counterPlan = nil
         case .slash, .snatch:
             guard !me.holding else { counterPlan = nil; return false }
@@ -242,6 +243,7 @@ extension Opponent {
         let intent = intend(-ball.flight - 1, Opponent.blockChance, slop: -2...3)
         guard intent.will, meets <= Opponent.blockLead + intent.slop else { return false }
         input.shield = !pressed.shield
+        shieldWhy = "block shot"
         shieldIntent?.will = false
         return true
     }
@@ -265,6 +267,7 @@ extension Opponent {
             return false
         }
         input.shield = !pressed.shield
+        shieldWhy = "contest \(human.state)"
         shieldIntent?.will = false
         return true
     }
@@ -300,6 +303,7 @@ extension Opponent {
             tapThrow(&input)
         } else if pick < Opponent.swingSnatchChance + Opponent.swingShieldChance {
             input.shield = !pressed.shield
+            shieldWhy = "defensive swing"
         } else {
             tapShoot(&input)
         }
@@ -371,7 +375,7 @@ extension Opponent {
                 : (snatching ? Opponent.beltHandReach : SlashRules.reach + BallRules.radius)
             let centre = shielding ? me.body.center : me.chest
             if ballPosition(ball, after: startup).distance(to: centre) <= reach {
-                if snatching { tapThrow(&input) } else if shielding { input.shield = !pressed.shield } else { tapShoot(&input) }
+                if snatching { tapThrow(&input) } else if shielding { input.shield = !pressed.shield; shieldWhy = "belt drop" } else { tapShoot(&input) }
                 return true
             }
             if me.jumpsLeft > 0, me.velocity.y < Opponent.doubleJumpBelow, meetY > me.position.y + Opponent.handsOverFeet + 4 { tapJump(&input) }
@@ -468,7 +472,7 @@ extension Opponent {
             let soon = ballPosition(ball, after: Opponent.airLead)
             if ball.position.distance(to: me.chest) < Opponent.attemptReach, race.spike != nil || race.snatch {
                 switch race.spike {
-                case .shield?: input.shield = !pressed.shield
+                case .shield?: input.shield = !pressed.shield; shieldWhy = "goaltend"
                 case .slash?: tapShoot(&input)
                 default: tapThrow(&input)
                 }

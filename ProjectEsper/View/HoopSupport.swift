@@ -1,3 +1,4 @@
+import EsperSim
 import SpriteKit
 import UIKit
 
@@ -34,7 +35,33 @@ enum HoopSupport {
         }
     }
 
-    /// The layout baked in, from the builder's COPY. Only the Wreck Center has supports, for now.
+    /// Each stage's own layout: the Wreck Center's bars (K&A hangs its hoops on the same), and
+    /// Anozira's pole assembly, from the truck's pole to its backboard.
+    enum Layout {
+        case wreckCenter, anozira
+
+        init?(look: StageLook) {
+            switch look {
+            case .court, .kAndA: self = .wreckCenter
+            case .anozira: self = .anozira
+            default: return nil
+            }
+        }
+
+        var baked: [Piece] { self == .anozira ? HoopSupport.anoziraBaked : HoopSupport.baked }
+        var bakedName: String { self == .anozira ? "anoziraBaked" : "baked" }
+        /// v2: the first layouts were made with the pieces drawn a third of their size.
+        var savedKey: String { self == .anozira ? "esper.hoopSupport.anozira" : "esper.hoopSupport.v2" }
+        /// Its pieces' colours swapped for the ones round them: Anozira's for the truck pole's greys
+        /// (palette 13, 12 and 11 to 59, 60 and 61), after the dark ones' ramp down.
+        var colours: [RGB: RGB] {
+            self == .anozira ? [PixelPalette.colours[13]: PixelPalette.colours[59], PixelPalette.colours[12]: PixelPalette.colours[60],
+                                PixelPalette.colours[11]: PixelPalette.colours[61]] : [:]
+        }
+        var key: Int { self == .anozira ? 4 : 0 }
+    }
+
+    /// The Wreck Center's layout baked in, from the builder's COPY.
     static let baked: [Piece] = [
         .init(dark: true, half: false, x: 28, y: 15, rotation: 90),
         .init(dark: true, half: false, x: 20, y: 1, rotation: -25),
@@ -48,30 +75,38 @@ enum HoopSupport {
         .init(dark: false, half: false, x: 23, y: 5, rotation: -25),
     ]
 
-    /// v2: the first layouts were made with the pieces drawn a third of their size.
-    private static let savedKey = "esper.hoopSupport.v2"
-    static var pieces: [Piece] {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: savedKey),
-                  let saved = try? JSONDecoder().decode([Piece].self, from: data) else { return baked }
-            return saved
-        }
-        set { if let data = try? JSONEncoder().encode(newValue) { UserDefaults.standard.set(data, forKey: savedKey) } }
+    /// Anozira's pole assembly baked in, from the builder's COPY.
+    static let anoziraBaked: [Piece] = [
+        .init(dark: true, half: false, x: 15, y: 7, rotation: -30),
+        .init(dark: true, half: false, x: 13, y: -6, rotation: 15),
+        .init(dark: false, half: false, x: 18, y: 7, rotation: -45),
+        .init(dark: false, half: false, x: 15, y: -9, rotation: 20),
+    ]
+
+    /// A stage's layout: the builder's, kept, or the baked one.
+    static func pieces(_ layout: Layout) -> [Piece] {
+        guard let data = UserDefaults.standard.data(forKey: layout.savedKey),
+              let saved = try? JSONDecoder().decode([Piece].self, from: data) else { return layout.baked }
+        return saved
+    }
+    static func keep(_ pieces: [Piece], for layout: Layout) {
+        if let data = try? JSONEncoder().encode(pieces) { UserDefaults.standard.set(data, forKey: layout.savedKey) }
     }
 
-    /// The layout as Swift, for `baked`.
-    static func source(_ pieces: [Piece]) -> String {
+    /// The layout as Swift, for its baked one.
+    static func source(_ pieces: [Piece], for layout: Layout) -> String {
         let lines = pieces.map { "        .init(dark: \($0.dark), half: \($0.half), x: \($0.x), y: \($0.y), rotation: \($0.rotation)),"}
-        return (["    static let baked: [Piece] = ["] + lines + ["    ]"]).joined(separator: "\n")
+        return (["    static let \(layout.bakedName): [Piece] = ["] + lines + ["    ]"]).joined(separator: "\n")
     }
 
-    /// A piece's picture, as painted or ramped down, whole or half.
-    static func picture(dark: Bool, half: Bool = false) -> CGImage? {
-        let key = (dark ? 1 : 0) + (half ? 2 : 0)
+    /// A piece's picture, as painted or ramped down, whole or half, in its layout's colours.
+    static func picture(dark: Bool, half: Bool = false, layout: Layout = .wreckCenter) -> CGImage? {
+        let key = (dark ? 1 : 0) + (half ? 2 : 0) + layout.key
         if let made = pictures[key] { return made }
         let texture = SKTextureAtlas(named: "Sprites").textureNamed("hoop_support_0")
         let painted = texture.cgImage()
-        let coloured = dark ? rampedDown(painted) : painted
+        let ramped = dark ? swapped(painted, [PixelPalette.colours[13]: PixelPalette.colours[12], PixelPalette.colours[12]: PixelPalette.colours[11]]) : painted
+        let coloured = layout.colours.isEmpty ? ramped : ramped.flatMap { swapped($0, layout.colours) }
         let made = half ? coloured.flatMap(halved) : coloured
         pictures[key] = made
         return made
@@ -91,14 +126,13 @@ enum HoopSupport {
         return context.makeImage()
     }
 
-    /// Palette 13 to 12 and 12 to 11 (#657392 to #424C6E to #2A2F4E), the rest as it is.
-    private static func rampedDown(_ image: CGImage) -> CGImage? {
+    /// Colours swapped, all at once (the dark ramp's 13 to 12 and 12 to 11 don't chain), the rest as it is.
+    private static func swapped(_ image: CGImage, _ swaps: [RGB: RGB]) -> CGImage? {
         let width = image.width, height = image.height
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
               let pixels = context.data?.bindMemory(to: UInt8.self, capacity: width * height * 4) else { return nil }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let swaps = [PixelPalette.colours[13]: PixelPalette.colours[12], PixelPalette.colours[12]: PixelPalette.colours[11]]
         for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] == 255 {
             let index = pixel * 4
             let rgb = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
@@ -112,7 +146,7 @@ enum HoopSupport {
 
     /// The whole layout as one picture, each piece turned about its middle without smoothing;
     /// where the hoop's art point sits in it, as an anchor. Nil with nothing laid out.
-    static func assembled(_ pieces: [Piece]) -> (texture: SKTexture, size: CGSize, anchor: CGPoint)? {
+    static func assembled(_ pieces: [Piece], layout: Layout = .wreckCenter) -> (texture: SKTexture, size: CGSize, anchor: CGPoint)? {
         guard !pieces.isEmpty, let side = picture(dark: false).map({ CGFloat(max($0.width, $0.height)) }) else { return nil }
         // Room for any turn of a piece round its middle.
         let reach = (side * 0.75).rounded(.up)
@@ -125,7 +159,7 @@ enum HoopSupport {
             let cg = context.cgContext
             cg.interpolationQuality = .none
             for piece in pieces {
-                guard let picture = picture(dark: piece.dark, half: piece.half) else { continue }
+                guard let picture = picture(dark: piece.dark, half: piece.half, layout: layout) else { continue }
                 cg.saveGState()
                 // The picture's y runs down: the hoop's up is its down.
                 cg.translateBy(x: CGFloat(piece.x) - left, y: top - CGFloat(piece.y))

@@ -298,10 +298,10 @@ public enum BallRules {
     /// picker's FIXED), it peaks ARC HEIGHT over the release and goes ARC DISTANCE the way the body faces.
     public static var presetAimsAtRim = true
     /// The auto-aim only within this far across of the rim (AIM RANGE), and only facing it;
-    /// otherwise the fixed arc the way the body faces. Never closer than three tiles: nearer, its
+    /// otherwise the fixed arc the way the body faces. Never closer than five tiles: nearer, its
     /// arc goes up high and narrow, and it's the floater's and the layup's ground.
-    public static var autoAimRange = 160.0
-    public static let autoAimMinimum = 3 * Stage.tileSize
+    public static var autoAimRange = 144.0
+    public static let autoAimMinimum = 5 * Stage.tileSize
     /// The preset arc's release from `from`, peaking ARC HEIGHT over the higher of it and `rim`
     /// and coming down at `rim`: up fast enough for the peak, across fast enough to be over the
     /// rim as it falls to its height.

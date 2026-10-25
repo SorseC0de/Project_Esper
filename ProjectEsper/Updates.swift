@@ -9,7 +9,7 @@ import SwiftUI
 /// black, a list scrolling inside it, left-aligned and bulleted, some lines with a moving icon.
 /// A new set of notes gets a new `id`, so it shows again.
 enum UpdatesNotes {
-    static let id = "2026-10-20 build 12"
+    static let id = "2026-10-24 build 13"
     static let seenKey = "esper.updates.seen"
     static var unseen: Bool { UserDefaults.standard.string(forKey: seenKey) != id }
 
@@ -37,6 +37,8 @@ enum UpdatesNotes {
         case bullet(String, depth: Int = 0, icon: Icon? = nil, tone: Tone = .plain)
         /// A Greateraid's name, its bottle tilted in place of the bullet.
         case drink(String, Greateraid)
+        /// A headline bullet: gold, on a gold highlight.
+        case feature(String)
         case divider
     }
 
@@ -49,6 +51,31 @@ enum UpdatesNotes {
         let lines: [Line]
     }
     static let builds: [Build] = [
+        Build(number: 13, lines: [
+            .title("Core Changes"),
+            .feature("New Stage: Anozira"),
+            .bullet("Scoring now locks the rim for 2s: a [Hex Shield] covers it, and the scorer can still fight for the ball but can't score again till it opens.", tone: .nerf),
+            .bullet("A ball bouncing square off the [Hex Shield] is nudged toward the other rim."),
+            .bullet("[Shield] no longer pushes players; it still knocks the ball loose and reflects it."),
+            .bullet("[Exclusion] lasts longer: 1s ➜ 1.5s"),
+            .bullet("[Auto-aim] range 160 ➜ 144, and it now needs at least 5 tiles of distance (was 3)"),
+            .divider,
+            .title("Greateraid Changes"),
+            .drink("Titan Tea", .titanTea),
+            .bullet("Gains no [FLO] in [FloState] from its quakes or [Trample]", depth: 1, tone: .nerf),
+            .bullet("Quakes and [Trample] can't re-stun a body that's still stunned", depth: 1, tone: .nerf),
+            .bullet("Its slower movement now lasts through level 2", depth: 1, tone: .nerf),
+            .drink("Z-Tea", .zTea),
+            .bullet("You stay planted while firing [Blasts]: the first straight, then the aim eases toward the stick, up to 45°", depth: 1),
+            .bullet("[Beam] charges faster: 60 ➜ 40 frames", depth: 1, tone: .buff),
+            .drink("Volta Cola", .voltaCola),
+            .bullet("You can change direction while firing bolts", depth: 1),
+            .drink("Blazing Boba", .blazingBoba),
+            .bullet("Flames no longer stun-lock: a short grace after each stun", depth: 1, tone: .nerf),
+            .divider,
+            .title("Fixes"),
+            .bullet("A basket after a failed [Dunk] no longer counts as a dunk"),
+        ]),
         Build(number: 12, lines: [
             .title("Core Changes"),
             .bullet("Major movement and control feel overhaul", tone: .buff),

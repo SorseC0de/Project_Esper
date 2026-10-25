@@ -19,6 +19,13 @@ public struct Hoop: Equatable {
     /// How far the rim moved over the last frame: the Hoopfish's as it swims, for a shot's
     /// correction to lead it; still everywhere else.
     public var velocity = Vec2.zero
+    /// 47: scored on, shut in its sphere (`RimLockRules`) this many frames more, against the scorer.
+    public var lockFrames = 0
+    public var lockedBy = 0
+    /// A bonus ring, not a hoop (Anozira's Phoenix's tail): a rim to score through and bounce off,
+    /// worth its own points in 47, but no backboard, no dunk on it, no pull on a shot near it and
+    /// never aimed at.
+    public var bonus = false
 
     public init(position: Vec2, owner: Int, backboard: Facing, shared: Bool = false) {
         self.position = position
@@ -26,6 +33,23 @@ public struct Hoop: Equatable {
         self.backboard = backboard
         self.shared = shared
     }
+
+    /// Shut to this player: an owned rim to everyone (only its owner scores on it), a shared one to its scorer alone.
+    public func locked(to player: Int?) -> Bool {
+        lockFrames > 0 && (!shared || player == lockedBy)
+    }
+}
+
+/// 47's locked rim: a sphere round the rim, art pixels across and down from the rim's middle; the
+/// drop on HEX SHIELD Y.
+public enum RimLockRules {
+    public static let radius = 20 / 1.6
+    public static var drop = 0.0
+    /// A bounce off it counts as head-on with the ball's way along its face under this share of its
+    /// speed (about 15 degrees); then it's nudged this fast across, toward the other rim.
+    public static let headOnShare = 0.25
+    public static let headOnNudge = 1.0
+    public static func centre(of hoop: Hoop) -> Vec2 { hoop.position - Vec2(x: 0, y: drop) }
 }
 
 /// An axis-aligned box in units.
@@ -150,8 +174,15 @@ public struct Stage: Equatable {
     /// Whether a rim can be dunked on where it is: not on a stage without dunks, and not in the
     /// stage's first or last column, which a swimming one passes through on its way off.
     public func dunkable(_ hoop: Hoop) -> Bool {
-        features.dunks && hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
+        features.dunks && !hoop.bonus && hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
     }
+
+    /// One-way boxes off the grid, landed on from above and passed through otherwise, as a one-way
+    /// tile is: what moves, as Anozira's truck does.
+    public var oneWayBoxes: [Box] = []
+    /// One-way walls: solid only to a body moving right into them from their left; not stood on,
+    /// not climbed, not jumped off, passed through every other way (Anozira's backboard).
+    public var rightwardWalls: [Box] = []
 
     /// The Wreck Center's belts, the top a body or the ball rides along and which way, and its
     /// one-way platforms, standable only while they're still (`WreckCenter.swift`).
@@ -391,6 +422,11 @@ public struct Stage: Equatable {
                 break
             }
         }
+        // A one-way wall stops one coming at it from its left, and nothing else.
+        for wall in rightwardWalls where direction == .right && spansY(wall, box) && wall.min.x >= leading - Stage.edge && wall.min.x - leading < moved {
+            moved = max(wall.min.x - leading, 0)
+            blocked = direction
+        }
         // A slope's straight side is a wall: a rising one's on its right, a falling one's on
         // its left; its diagonal side is climbed, not bumped. A one-way slope is no wall at all.
         for slope in slopes where !slope.oneWay && spansY(slope.box, box) && box.min.y < slope.box.max.y - Stage.edge {
@@ -466,6 +502,10 @@ public struct Stage: Equatable {
                 moved = min(extra.max.y - feet, 0)
                 landed = true
             }
+            for top in oneWayBoxes where oneWays && spansX(top, box) && top.max.y <= feet + Stage.edge && top.max.y - feet > moved {
+                moved = min(top.max.y - feet, 0)
+                landed = true
+            }
             // A ceiling slope's flat top.
             for slope in ceilingSlopes where spansX(slope.box, box) && slope.box.max.y <= feet + Stage.edge && slope.box.max.y - feet > moved {
                 moved = min(slope.box.max.y - feet, 0)
@@ -531,6 +571,7 @@ public struct Stage: Equatable {
         }
         if let surface = slopeSurface(under: box, reach: 0.01), abs(surface - feet) < 0.01 { return true }
         if ceilingSlopes.contains(where: { spansX($0.box, box) && abs($0.box.max.y - feet) < 0.01 }) { return true }
+        if oneWays, oneWayBoxes.contains(where: { spansX($0, box) && abs($0.max.y - feet) < 0.01 }) { return true }
         return extras.contains { spansX($0, box) && abs($0.max.y - feet) < 0.01 }
     }
 
@@ -566,8 +607,13 @@ public struct Stage: Equatable {
             }
             row -= 1
         }
-        for extra in extras where extra.min.x <= x && x < extra.max.x && extra.max.y <= y + Stage.edge {
+        for extra in extras + oneWayBoxes where extra.min.x <= x && x < extra.max.x && extra.max.y <= y + Stage.edge {
             nearest = min(nearest, y - extra.max.y)
+        }
+        // A slope's surface under it too, one-way or not: a dribble on a car's windshield meets the glass.
+        for slope in slopes where slope.box.min.x <= x && x <= slope.box.max.x {
+            let surface = slope.surface(at: x)
+            if surface <= y + Stage.edge { nearest = min(nearest, y - surface) }
         }
         return nearest
     }
@@ -685,7 +731,7 @@ public struct Stage: Equatable {
     /// last frame of the moving rim it's for (the Hoopfish's), so over the whole flight it drifts as
     /// far as the rim swims and comes down where the rim's gone; nothing with every rim still.
     public func shotLead(by player: Int) -> Vec2 {
-        guard let hoop = hoops.first(where: { $0.velocity != .zero && ($0.shared || $0.owner == player) }) else { return .zero }
+        guard let hoop = hoops.first(where: { $0.velocity != .zero && !$0.bonus && ($0.shared || $0.owner == player) }) else { return .zero }
         return Vec2(x: hoop.velocity.x, y: 0)
     }
 
@@ -698,6 +744,7 @@ public struct Stage: Equatable {
     public func backboard(at position: Vec2) -> Int? {
         hoops.indices.first { index in
             let hoop = hoops[index]
+            guard !hoop.bonus else { return false }
             let out = (position.x - hoop.position.x) * hoop.backboard.sign
             let up = position.y - hoop.position.y
             return out >= Stage.backboardFace - BallRules.radius - 1 && out <= Stage.backboardFace + Stage.backboardDepth + BallRules.radius + 1
@@ -854,6 +901,23 @@ public struct Stage: Equatable {
         }
     }
 
+    /// A car's collision (`CarRules`) with its picture's bottom-left cell here; facing right
+    /// (Anozira's), mirrored from K&A's red car, which faces left.
+    mutating func layCar(column: Int, row: Int, facesRight: Bool = false) {
+        let size = Stage.tileSize
+        let last = CarRules.lastColumn
+        func across(_ cell: (column: Int, row: Int)) -> (column: Int, row: Int) { facesRight ? (last - cell.column, cell.row) : cell }
+        func square(_ cell: (column: Int, row: Int), across shift: Double = 0) -> Box {
+            let cell = across(cell)
+            return Box(min: Vec2(x: Double(column + cell.column) * size + shift, y: Double(row + cell.row) * size),
+                       max: Vec2(x: Double(column + cell.column + 1) * size + shift, y: Double(row + cell.row + 1) * size))
+        }
+        for cell in CarRules.oneWays.map(across) { set(.oneWay, column: column + cell.column, row: row + cell.row) }
+        let inset = facesRight ? -CarRules.windshieldInset : CarRules.windshieldInset
+        fixedSlopes.append(Slope(box: square(CarRules.windshield, across: inset), rising: !facesRight, oneWay: true))
+        fixedSlopes.append(Slope(box: square(CarRules.backWindow), rising: facesRight, oneWay: true))
+    }
+
     /// Flight B411: the aisle of a plane, 19 and a half tiles by 9 (`FlightB411Rules`), as its art is
     /// drawn: two rows of floor, the rims at the ends, the starts in from them, the ball in the
     /// open bin over the middle; it pitches, and a cart rolls with the pitch.
@@ -909,6 +973,7 @@ public struct Stage: Equatable {
             ballSpawn: Vec2(x: (Double(map.ball.column) + 0.5) * tileSize, y: (Double(map.ball.row) + 0.5) * tileSize)
         )
         stage.lay(map.walls)
+        stage.layCar(column: Int((KAndARules.carLeft / tileSize).rounded()), row: KAndARules.floorRows)
         stage.slopes = stage.fixedSlopes
         // The backboards solid from under the rim up to the stage's ceiling: the bridge isn't, so
         // stopped at it they left a way over the top.
@@ -1035,14 +1100,14 @@ public struct Stage: Equatable {
 /// The stages to pick from, in the order the select screen shows them; the wire carries
 /// the raw value.
 public enum StageChoice: Int, CaseIterable, Codable {
-    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flightB411, kAndA
+    case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flightB411, kAndA, anozira
     /// Debug only, never on the select's own lists.
     case testCenter
 
     /// The stages on the select, in its order: Slamstill Traffic and Sky Net (not made yet) parked off it.
-    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .hoopfishHideaway, .flightB411, .kAndA]
+    public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .hoopfishHideaway, .flightB411, .kAndA, .anozira]
     /// The stages 47 plays on.
-    public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway, .flightB411, .kAndA]
+    public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway, .flightB411, .kAndA, .anozira]
 
     public var name: String {
         switch self {
@@ -1054,6 +1119,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .hoopfishHideaway: "Hoopfish Hideaway"
         case .flightB411: "Flight B411"
         case .kAndA: "K&A"
+        case .anozira: "Anozira"
         case .testCenter: "Test Center"
         }
     }
@@ -1069,6 +1135,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .hoopfishHideaway: .hoopfishHideaway
         case .flightB411: .flightB411
         case .kAndA: .kAndA
+        case .anozira: .anozira
         case .testCenter: .testCenter
         }
     }

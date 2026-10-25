@@ -91,6 +91,16 @@ public struct Opponent: Equatable {
     var settling = 0
     var settlesAway = false
     var wasStunned = false
+    /// The ball just taken off it: frames before it's noticed, as a person takes a moment to (the
+    /// stage's colours, the announcer), carrying on the way it was going with no button pressed
+    /// meanwhile; the stick it was holding; frames after, sometimes, before it answers; and frames since.
+    var realizing = 0
+    var holdingOff = 0
+    var stickBeforeNoticing = Vec2.zero
+    var sinceLostBall = Int.max
+    /// The last shield's why, for the debug log (`takeShieldReport`).
+    var shieldWhy = ""
+    var shieldReport: String?
     /// Getting unstuck (`unstick`): where it stood last frame, frames pushing without moving, tries
     /// at a hop out, frames backing away after giving up, and frames stood still on defence.
     var lastPosition: Vec2?
@@ -124,6 +134,12 @@ public struct Opponent: Equatable {
     private var humanFloFrames = 0
     /// Whether this run at the rim takes the floater with nobody on it: rolled once a run.
     private var floaterAnyway: Bool?
+    /// Anozira (`OpponentAnozira`): the top it's hopping up onto off the road, by its place in the
+    /// stage's one-way boxes; the shot under way at the Phoenix's tail rather than the rim; and
+    /// whether the shot under way hops before its stance, off the road, where no stance is taken.
+    var mount: Int?
+    var aimAtBonus = false
+    var hopFirstShot = false
 
     /// When it goes into FloState, decided for a whole match: as soon as it can; answering the
     /// other's, after; kept to break out of a stun or a tumble; kept till it's behind; whenever, at
@@ -195,6 +211,7 @@ public struct Opponent: Equatable {
             pressed = .idle
             return .idle
         }
+        if me.state != .shootStance, plan != .shoot { aimAtBonus = false }
         humanStill = abs(human.velocity.x) < 0.2 && (human.state == .idle || human.state == .crouch) ? humanStill + 1 : 0
         noteStarts(match, me: me, human: human)
         if human.state == .throwStance {
@@ -212,6 +229,14 @@ public struct Opponent: Equatable {
             watchingHolder = true
             lastHolder = holder
         }
+        if sinceLostBall < Int.max { sinceLostBall += 1 }
+        if holder == human.index, lastHolder == index {
+            // Taken off it: noticed a moment later, and then not always gone after at once.
+            sinceLostBall = 0
+            realizing = Opponent.stealNoticeFrames.lowerBound + Int(roll(UInt32(Opponent.stealNoticeFrames.count)))
+            stickBeforeNoticing = pressed.stick
+            holdingOff = chance(Opponent.stealAnswerChance) ? 0 : Opponent.settleFrames.lowerBound + Int(roll(UInt32(Opponent.settleFrames.count)))
+        }
         if holder == human.index, lastHolder != human.index {
             // On the court, where the rim's to be guarded; the stages it reads keep their own defence.
             protectsRim = !Opponent.readsStage(match) && chance(50)
@@ -224,12 +249,14 @@ public struct Opponent: Equatable {
         let readsStage = Opponent.readsStage(match)
         // Its rim's shot spots, found by trying shots, on every stage.
         let scoringHoop = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
-        if match.hoopfish == nil, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
+        if match.hoopfish == nil, match.stage.features.look != .anozira, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
         if readsStage, leaveTornado(match, me: me, toward: me.hasBall ? hoop(scoredOnBy: index, in: match).position : match.ball.position, into: &input) {
             // Out of a tornado before it lets go.
         } else if me.state == .jumpSquat {
             // Through the squat the button stays down for a full hop, or up for a short one.
             input.jump = wantsFullHop
+        } else if keepOffTheRoad(match, me: me, into: &input) {
+            // Anozira's road out of FLO, or the ball about to spill on it: up onto the car or the truck.
         } else if clearHelmet(match, me: me, heading: heading(match, me: me, human: human), into: &input) {
             // A helmet bearing down: up and onto it, whatever else it was doing.
         } else if askForFloState(match, me: me, human: human, into: &input) {
@@ -252,7 +279,25 @@ public struct Opponent: Equatable {
             keepOffTheLava(match, me: me, into: &input)
         }
         settleAfterStun(me: me, human: human, into: &input)
+        if realizing > 0 {
+            realizing -= 1
+            input = PlayerInput(stick: stickBeforeNoticing)
+            // Noticed, and answering: straight back at them with any of the three ways to take it.
+            if realizing == 0, holdingOff == 0, counterPlan == nil {
+                counterPlan = CounterPlan(move: Opponent.takeBackMoves[Int(roll(UInt32(Opponent.takeBackMoves.count)))], at: match.frame + 1)
+            }
+        } else if holdingOff > 0 {
+            holdingOff -= 1
+            input = PlayerInput(stick: input.stick)
+        }
+        if input.shield, !pressed.shield {
+            shieldReport = "\(shieldWhy), \(sinceLostBall == Int.max ? "never had the ball" : "\(sinceLostBall) frames after losing the ball")"
+        }
         unstick(match, me: me, human: human, into: &input)
+        hopThePotholes(match, me: me, into: &input)
+        if me.state != .jumpSquat { keepTheDribbleOnTheTop(match, me: me, into: &input) }
+        keepTheStanceOnTheTop(match, me: me, into: &input)
+        hopTheVehicleBump(match, me: me, into: &input)
         aimTheFlash(me: me, into: &input)
         pressed = input
         return input
@@ -392,27 +437,43 @@ public struct Opponent: Equatable {
 
     // MARK: With the ball
 
+    /// No rim to score on for now: the ball kept, away from them, out of any shot stance.
+    private mutating func keepTheBall(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) {
+        readSpot = nil
+        if !Opponent.committedStates.contains(me.state), me.state != .shootStance, me.state != .throwStance {
+            let away: Double = me.position.x >= human.position.x ? 1 : -1
+            go(to: Vec2(x: me.position.x + away * 40, y: me.position.y), match: match, me: me, into: &input)
+        } else if me.state == .shootStance {
+            input.stick = Vec2(x: 0, y: -1)
+        }
+    }
+
     private mutating func offence(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) {
         var hoop = hoop(scoredOnBy: index, in: match)
         let readsStage = Opponent.readsStage(match)
         let hoopIndex = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
+        // 47: its rim locked after its basket, nothing to shoot at till it opens: the ball kept, away from them.
+        if hoop.locked(to: index) {
+            keepTheBall(match, me: me, human: human, into: &input)
+            return
+        }
         let rimPath = readsStage ? hoopPath(match) : nil
         if let rimPath {
             // A rim on the move is played where it'll be in a moment, or where it comes back in.
             guard let coming = rimPath.prefix(20).last(where: { $0 != HighwayRules.parked }) ?? rimPath.first(where: { $0 != HighwayRules.parked }) else {
                 // None for a while: the ball kept, away from them.
-                readSpot = nil
-                if !Opponent.committedStates.contains(me.state), me.state != .shootStance, me.state != .throwStance {
-                    let away: Double = me.position.x >= human.position.x ? 1 : -1
-                    go(to: Vec2(x: me.position.x + away * 40, y: me.position.y), match: match, me: me, into: &input)
-                } else if me.state == .shootStance {
-                    input.stick = Vec2(x: 0, y: -1)
-                }
+                keepTheBall(match, me: me, human: human, into: &input)
                 return
             }
             hoop.position = coming
         }
-        // The Hoopfish's rim is never dunked on: it spins the dunk away.
+        // Anozira's Phoenix's tail, while it flies straight on, and the road, where no stance is taken
+        // on the ground: every shot from it a hop and the stance in the air.
+        let bonusPath = match.stage.features.look == .anozira ? hoopPath(match, hoop: 1) : nil
+        let onRoad = Opponent.onRoad(me, match: match)
+        let aimIndex = aimAtBonus ? 1 : hoopIndex
+        let aimPath = aimAtBonus ? bonusPath : rimPath
+        // The Hoopfish's rim is never dunked on: it spins the dunk away; nor Anozira's, where a dunk bounces.
         let rimOut = rimPath != nil
         let inward = -hoop.backboard.sign
         let toHoop = hoop.position.x - me.position.x
@@ -470,7 +531,7 @@ public struct Opponent: Equatable {
                     input.shoot = true
                     if stanceFrames > BallRules.shotWindupFrames { fullHop(&input) }
                 } else {
-                    guard let aim = aimShotOnce(match, me: me, hoop: hoopIndex, path: rimPath) else {
+                    guard let aim = aimShotOnce(match, me: me, hoop: aimIndex, path: aimPath) else {
                         // Nothing goes in from here: the stance called off, the ball kept, and the
                         // spot given up, so it doesn't come back for the same shot.
                         input.shoot = true
@@ -485,7 +546,7 @@ public struct Opponent: Equatable {
                 }
                 return
             }
-            if let aim = aimShotOnce(match, me: me, hoop: hoopIndex, path: rimPath) {
+            if let aim = aimShotOnce(match, me: me, hoop: aimIndex, path: aimPath) {
                 input.aim = aim
                 input.shoot = stanceFrames <= BallRules.shotWindupFrames + 1 && !(inReach && !committed)
             } else {
@@ -524,16 +585,24 @@ public struct Opponent: Equatable {
         } else if plan != .none {
             plan = .none
         }
-        // A rim on the move: wherever it is, a shot that goes in from right here is taken now.
-        if let rimPath, plan != .shoot, me.grounded, [.idle, .walk, .run, .dash].contains(me.state), match.frame % 3 == 0 {
-            let standing = !scoringAngles(match, body: me, jumpShot: false, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
-            let jumping = !standing && !scoringAngles(match, body: me, jumpShot: true, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
-            if standing || jumping {
-                readSpot = ShotSpot(feet: me.position, jumpShot: jumping)
-                readSpotFrames = 90
-                plan = .shoot
-                planFrames = 90
-                jumpShot = jumping
+        // A rim on the move: wherever it is, a shot that goes in from right here is taken now; on
+        // Anozira the Phoenix's tail first, while it flies by.
+        if plan != .shoot, me.grounded, [.idle, .walk, .run, .dash].contains(me.state), match.frame % 3 == 0 {
+            let targets = [(1, bonusPath), (hoopIndex, rimPath)].filter { $0.1 != nil }
+            for (target, path) in targets {
+                let standing = !onRoad && !scoringAngles(match, body: me, jumpShot: false, stanceSoFar: 0, hoop: target, path: path, stopAtFirst: true).isEmpty
+                let jumping = !standing && !scoringAngles(match, body: me, jumpShot: true, stanceSoFar: 0, hoop: target, path: path, stopAtFirst: true,
+                                                          hopFirst: onRoad).isEmpty
+                if standing || jumping {
+                    readSpot = ShotSpot(feet: me.position, jumpShot: jumping)
+                    readSpotFrames = 90
+                    plan = .shoot
+                    planFrames = 90
+                    jumpShot = jumping
+                    hopFirstShot = onRoad
+                    aimAtBonus = target == 1
+                    break
+                }
             }
         }
         // A spot among those its shots were found to go in from, picked afresh now and then; a
@@ -592,12 +661,14 @@ public struct Opponent: Equatable {
             } else if atSpot, let rimPath {
                 // A rim on the move: only the shot that, played out, goes in from here and now;
                 // none does, and it waits for the rim to come round.
-                let standing = !scoringAngles(match, body: me, jumpShot: false, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
-                let jumping = !standing && !scoringAngles(match, body: me, jumpShot: true, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
+                let standing = !onRoad && !scoringAngles(match, body: me, jumpShot: false, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
+                let jumping = !standing && !scoringAngles(match, body: me, jumpShot: true, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true,
+                                                          hopFirst: onRoad).isEmpty
                 if standing || jumping {
                     plan = .shoot
                     planFrames = 90
                     jumpShot = jumping
+                    hopFirstShot = onRoad
                     dances = 0
                 } else {
                     plan = .hold
@@ -694,6 +765,11 @@ public struct Opponent: Equatable {
             dances = 0
             dashDanceLeft = 0
         }
+        // On Anozira's road every shot is a hop first, the stance in the air.
+        if plan == .shoot, me.grounded, me.state != .jumpSquat {
+            hopFirstShot = onRoad
+            if onRoad { jumpShot = true }
+        }
         switch plan {
         case .hold:
             break
@@ -738,6 +814,14 @@ public struct Opponent: Equatable {
                 dashDanceFrame = 0
                 dashDanceLeft -= 1
                 dashDanceDirection = -dashDanceDirection
+            }
+        case .shoot where hopFirstShot:
+            // Off the road: the hop, then the stance on a press on the way up.
+            if me.grounded, me.state != .jumpSquat {
+                if pressed.jump { break }
+                if !atSpot || !onRoad { plan = .none } else { fullHop(&input) }
+            } else if me.state == .air, me.velocity.y > 0 {
+                tapShoot(&input)
             }
         case .shoot:
             // Pressed afresh: a stance only starts on a press.
@@ -992,6 +1076,17 @@ public struct Opponent: Equatable {
     /// The chase after the ball's taken off it, or picked up beside it: frames, how near it keeps,
     /// and how near a pickup counts as beside it.
     static let chaseAfterSteal = 150
+    /// The ball taken off it is noticed this many frames later, a quick player's reaction; then gone
+    /// after at once this often, by one of the three, else it settles a beat first (`settleFrames`).
+    static let stealNoticeFrames: ClosedRange<Int> = 10...14
+    static let stealAnswerChance: UInt32 = 50
+    static let takeBackMoves: [Counter] = [.slash, .snatch, .shield]
+
+    /// The last shield raised and why, once: for the debug log.
+    public mutating func takeShieldReport() -> String? {
+        defer { shieldReport = nil }
+        return shieldReport
+    }
     static let chaseAfterPickup = 90
     static let chaseDistance = 22.0
     static let contestedPickup = 100.0
@@ -1236,7 +1331,7 @@ public struct Opponent: Equatable {
             return true
         } else if inBlade, contested || (ball.shotInFlight && ball.lastTouched != index), let spike = race.spike {
             // The spike: the slash, or the shield's face to flick it off.
-            if spike == .shield, !me.holding { input.shield = !pressed.shield } else { tapShoot(&input) }
+            if spike == .shield, !me.holding { input.shield = !pressed.shield; shieldWhy = "spike" } else { tapShoot(&input) }
             race.spiked()
             self.race = race
             return true

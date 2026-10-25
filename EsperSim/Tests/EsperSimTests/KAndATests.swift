@@ -62,11 +62,12 @@ final class KAndATests: XCTestCase {
         XCTAssertEqual(rise.moved, 8, accuracy: 1e-9)
         XCTAssertFalse(rise.ceiling)
         XCTAssertFalse(stage.overlapsSolid(Box(min: Vec2(x: 59, y: 41), max: Vec2(x: 69, y: 58))), "nothing solid in it")
-        // Falling from over it, the box lands on its surface at its middle: 44 at x 64.
+        // Falling from over it, the box lands on its surface at its middle: 44 at x 64, less the
+        // windshield's inset onto the glass.
         let above = Box(min: Vec2(x: 59, y: 52), max: Vec2(x: 69, y: 69))
         let fall = stage.sweepVertically(above, by: -12)
         XCTAssertTrue(fall.landed)
-        XCTAssertEqual(above.min.y + fall.moved, 44, accuracy: 1e-9)
+        XCTAssertEqual(above.min.y + fall.moved, 44 - CarRules.windshieldInset, accuracy: 1e-9)
         // Dropping through, it's passed like a one-way block.
         XCTAssertFalse(stage.sweepVertically(above, by: -12, oneWays: false).landed)
         // Its straight side is no wall: a box walking left into it from the roof goes on.

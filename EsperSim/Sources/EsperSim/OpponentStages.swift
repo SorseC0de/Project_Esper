@@ -435,8 +435,19 @@ extension Opponent {
     }
 
     /// Where a rim that moves will be, a frame at a time: Hoopfish Hideaway's on the Hoopfish,
-    /// parked off the stage while it isn't carrying it.
-    func hoopPath(_ match: Match, frames: Int = Opponent.lookAheadFrames) -> [Vec2]? {
+    /// parked off the stage while it isn't carrying it; Anozira's on its truck, as the truck's
+    /// shifting, veering and leaning will have it (`Match.anoziraTruck(at:)`), and its Phoenix's
+    /// tail while it flies straight on.
+    func hoopPath(_ match: Match, hoop index: Int = 0, frames: Int = Opponent.lookAheadFrames) -> [Vec2]? {
+        if match.stage.features.look == .anozira {
+            if index == 1 {
+                guard let flying = match.phoenix, flying.swoopAt == nil else { return nil }
+                return (1...frames).map { ahead in
+                    AnoziraRules.phoenix(flying, at: match.frame + ahead).map { $0 + AnoziraRules.phoenixRing / 1.6 } ?? HighwayRules.parked
+                }
+            }
+            return (1...frames).map { AnoziraRules.rim(on: match.anoziraTruck(at: match.frame + $0)) }
+        }
         guard var fish = match.hoopfish else { return nil }
         return (0..<frames).map { _ in
             fish.step(on: match.stage)
@@ -468,18 +479,25 @@ extension Opponent {
 
     /// `steps`: only these of the angles, counted from the lowest.
     func scoringAngles(_ match: Match, body: Player, jumpShot: Bool, stanceSoFar: Int, hoop index: Int, path: [Vec2]?, stopAtFirst: Bool,
-                       steps: Range<Int>? = nil) -> [Double] {
+                       steps: Range<Int>? = nil, hopFirst: Bool = false) -> [Double] {
         var stage = match.stage
         stage.extras += stage.ballBlockers + stage.ceilingSlopes.map(\.box)
         guard (path?.contains { $0 != HighwayRules.parked } ?? true), stage.hoops[index].position != HighwayRules.parked || path != nil else { return [] }
         let sign = aimSide(match, from: body.position, hoop: index, path: path)
+        // A rim that moves leads the shot by how it's moving when the ball's let go (`Stage.shotLead`):
+        // Anozira's truck jostles and swerves, so its lead then, not now.
+        let leadPath = match.stage.features.look == .anozira ? (index == 0 ? path : hoopPath(match)) : nil
+        func lead(releasedIn frames: Int) -> Vec2 {
+            guard let leadPath, frames >= 2, frames - 1 < leadPath.count else { return match.stage.shotLead(by: body.index) }
+            return Vec2(x: leadPath[frames - 1].x - leadPath[frames - 2].x, y: 0)
+        }
         var angles: [Double] = []
         for step in steps ?? 0..<Opponent.shotAngleCount {
             let angle = BallRules.shotAngleMin + Double(step) * degrees(5)
             let aim = Vec2(x: Trig.cos(angle) * sign, y: Trig.sin(angle))
-            if let (release, velocity, frames) = shotRelease(body, stage: match.stage, aim: aim, jumpShot: jumpShot, stanceSoFar: stanceSoFar) {
+            if let (release, velocity, frames) = shotRelease(body, stage: match.stage, aim: aim, jumpShot: jumpShot, stanceSoFar: stanceSoFar, hopFirst: hopFirst) {
                 var ball = Ball(position: release)
-                ball.release(from: release, velocity: velocity + match.stage.shotLead(by: body.index), by: body.index, straight: false, pace: body.spec.shotPace)
+                ball.release(from: release, velocity: velocity + lead(releasedIn: frames), by: body.index, straight: false, pace: body.spec.shotPace)
                 ball.shotInFlight = true
                 ball.scoring = true
                 var events: [MatchEvent] = []
@@ -501,8 +519,9 @@ extension Opponent {
     /// The shot as this body lets it go with this aim, played the way the computer plays it: the
     /// stance taken if it isn't in one, held through the windup, then let go; or for a jump shot,
     /// up out of the stance after the windup and let go once the rise slows. Where the ball
-    /// leaves the hand, how fast, and how many frames from now.
-    func shotRelease(_ start: Player, stage: Stage, aim: Vec2, jumpShot: Bool, stanceSoFar: Int) -> (Vec2, Vec2, Int)? {
+    /// leaves the hand, how fast, and how many frames from now. `hopFirst`, where no stance is taken
+    /// on the ground (Anozira's road): the hop, then the stance in the air, let go as a jump shot's.
+    func shotRelease(_ start: Player, stage: Stage, aim: Vec2, jumpShot: Bool, stanceSoFar: Int, hopFirst: Bool = false) -> (Vec2, Vec2, Int)? {
         var body = start
         var stance = stanceSoFar
         var events: [MatchEvent] = []
@@ -521,6 +540,15 @@ extension Opponent {
                 } else {
                     input.shoot = stance <= BallRules.shotWindupFrames + 1
                 }
+            } else if hopFirst, body.state != .shooting {
+                // Up off the road, the button held through the squat; off it, the stance on a press.
+                if body.grounded || body.state == .jumpSquat {
+                    input.jump = true
+                } else {
+                    input.shoot = frame % 2 == 0
+                }
+                // Back down without a shot: none from here.
+                if frame > 4, body.grounded, body.state != .jumpSquat { return nil }
             } else if body.state != .shooting {
                 input.shoot = frame % 2 == 0
             }

@@ -302,14 +302,12 @@ final class ShieldTests: XCTestCase {
         XCTAssertEqual(match.players[0].hitStun, 0, "the shielder untouched")
     }
 
-    func testABodyInsideItIsShovedOut() {
+    func testABodyInsideItIsLeftWhereItIs() {
         var match = court()
         match.players[1].position = Vec2(x: 130, y: 10)
         match.shields.append(Shield(owner: 0, pivot: match.players[0].body.center, side: 1))
         for _ in 0..<10 { match.advance(inputs: [.idle, .idle]) }
-        guard let shield = match.shields.first else { return XCTFail("gone") }
-        XCTAssertGreaterThanOrEqual(match.players[1].body.distance(to: shield.pivot), ShieldRules.reach, "out to the reach's edge")
-        XCTAssertGreaterThan(match.players[1].position.x, 130)
+        XCTAssertEqual(match.players[1].position.x, 130, accuracy: 0.01, "not shoved out")
     }
 
     // MARK: Guarderade and Shelter Seltzer
@@ -385,14 +383,6 @@ final class ShieldTests: XCTestCase {
         XCTAssertTrue(match.shields.isEmpty, "the snatch breaks it")
         XCTAssertEqual(match.players[0].hitStun, 0, "its raiser, far off, isn't stunned")
         XCTAssertFalse(match.players[0].parryLocked)
-    }
-
-    func testScorelockedNoShieldIsRaised() {
-        var match = court()
-        match.players[0].pickupLockout = 30
-        match.advance(inputs: [PlayerInput(shield: true), .idle])
-        XCTAssertTrue(match.shields.isEmpty, "scorelocked, as the slash is")
-        XCTAssertNotEqual(match.players[0].state, .flipJump)
     }
 
     func testShelterSeltzerPlantsAStillShieldOnlyAsTheFlipsLeaves() {

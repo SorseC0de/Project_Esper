@@ -156,6 +156,12 @@ public enum FrostRules {
 /// snatch it. Level two: shoot and throw together with nothing in hand makes a fireball
 /// in hand, shot or thrown like the ball but under this share of its gravity, that
 /// bursts on whatever it meets, stripping and knocking everything within this reach.
+/// The repeating stuns of the powers (Blazing Boba's flames, Titan Tea's quake and trample): once
+/// one's stun is over, this long before any of them can stun the same body again, room to get out.
+public enum StunGraceRules {
+    public static let frames = 30
+}
+
 public enum BlazeRules {
     public static let flameEveryFrames = 4
     public static let flameWidth = 6.0
@@ -296,7 +302,7 @@ public enum ZRules {
     public static let blastSize = Vec2(x: 14, y: 10)
     public static let blastSpeed = 6.0
     public static let blastFrames = 60
-    public static let chargeFrames = 60
+    public static let chargeFrames = 40
     public static let fireFrames = 30
     /// On past that, costing nothing, three seconds at most; the slash or the snatch calls it off
     /// any time after the first second. Whoever and whatever is along it past its own time is hit
@@ -310,9 +316,9 @@ public enum ZRules {
     /// The beam's sheet is 16 pixels thick.
     public static let halfThickness = 5.0
     public static let aimRange = degrees(45)
-    /// Up and down on the stick turn the aim this far a frame at full tilt, through the charge
-    /// and while it fires.
-    public static let aimRate = degrees(2)
+    /// The aim's share of the way to where the stick points, a frame, while the beam fires and
+    /// through a held run of blasts; through the charge it stays straight.
+    public static let aimEase = 0.15
     /// The blast's arms turn about the shoulder, this many art pixels over the feet, and reach
     /// this far from it, where the beam leaves.
     public static let shoulderHeight = 18.0

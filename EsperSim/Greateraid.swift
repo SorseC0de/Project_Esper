@@ -268,9 +268,9 @@ public struct Drinks: Equatable {
         spec.fallGravityShare = 1 - 0.25 * Double(level(of: .featherFresca))
         if biomorph == .titanTea {
             // Titan Tea: twice the size, half the knock, a fifth more gravity falling (the jumps
-            // as high as ever) and a fifth more fall speed; at
-            // level one a tenth off the walk and run, the dash still 0.4 over the run, and
-            // actions a tenth slower. One jump, unless Jumper Juice gives the rest back.
+            // as high as ever) and a fifth more fall speed; a tenth off the walk and run, the
+            // dash still 0.4 over the run, and at level one actions a tenth slower. One jump,
+            // unless Jumper Juice gives the rest back.
             spec.scale = 2
             spec.bodyWidth *= 2
             spec.bodyHeight *= 2
@@ -284,12 +284,10 @@ public struct Drinks: Equatable {
             spec.doubleJumpVelocity *= Drinks.titanJumpShare
             spec.thirdJumpVelocity *= Drinks.titanJumpShare
             spec.jumps = jumper == 0 ? 1 : spec.jumps
-            if biomorphLevel < 2 {
-                spec.walkMaxSpeed *= 0.9
-                spec.runSpeed *= 0.9
-                spec.dashInitialVelocity = spec.runSpeed + 0.4
-                spec.actionHoldInterval = 10
-            }
+            spec.walkMaxSpeed *= 0.9
+            spec.runSpeed *= 0.9
+            spec.dashInitialVelocity = spec.runSpeed + 0.4
+            if biomorphLevel < 2 { spec.actionHoldInterval = 10 }
         }
         return spec
     }

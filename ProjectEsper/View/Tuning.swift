@@ -63,9 +63,6 @@ enum DunkArt {
         CGPoint(x: -3, y: 3), CGPoint(x: -1, y: -1), CGPoint(x: -1, y: -1),
     ]
     static func offsets(for look: StageLook) -> [CGPoint] { look.tiltedHoop ? stadiumOffsets : courtOffsets }
-    /// Titan Tea's whole dunk moved by this on top of each frame's, on every stage; on
-    /// TITAN DUNK X and Y with `DunkTuning` on.
-    nonisolated(unsafe) static var titanOffset = CGPoint(x: -5, y: -11)
     static func set(_ offset: CGPoint, frame: Int, for look: StageLook) {
         if look.tiltedHoop { stadiumOffsets[frame] = offset } else { courtOffsets[frame] = offset }
     }
@@ -145,7 +142,6 @@ enum HelmetTuning {
     static let tilt: CGFloat = .pi / 6 + .pi / 18
     /// Each helmet bobs round a circle this many art pixels across, as a hover does.
     static let orbit: CGFloat = 2
-    static let numberScale: CGFloat = 1.5
 }
 
 /// The backboard, a cluster of flashes behind each rim: its place against the rim, in art
@@ -361,8 +357,9 @@ enum FloTuning {
 }
 
 enum DunkTuning {
-    /// On to place dunk art: the game holds a body hung on the right rim, with sliders.
-    static let enabled = false
+    /// On to place dunk art: the game holds a body hung on the right rim, with sliders. The debug
+    /// bench's DUNK MODE: player 1 held there as Titan Tea, frame by frame on DUNK FRAME.
+    nonisolated(unsafe) static var enabled = false
     /// The stage the tuning starts on, since the held match can't reach the stage select.
     static let stage = StageChoice.wreckCenter
     nonisolated(unsafe) static var frame = 0
@@ -373,7 +370,7 @@ enum DunkTuning {
 /// Debug strip sliders put away once tuned; their values stay as baked.
 enum ParkedSliders {
     /// Only these sliders on the debug bench for now: FloState's strings' and the shot arc's.
-    static let showing = ["STRING", "DIAMOND", "ARC HEIGHT", "ARC DISTANCE", "AIM RANGE"]
+    static let showing = ["STRING", "DIAMOND", "ARC HEIGHT", "ARC DISTANCE", "AIM RANGE", "DUNK FRAME", "HEX SHIELD"]
     static func shown(_ title: String) -> Bool { showing.contains { title.hasPrefix($0) } }
     static let net = true
     static let flo = true

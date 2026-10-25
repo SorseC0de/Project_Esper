@@ -2,14 +2,15 @@
 /// The body flipjumps back, a preset arc gravity doesn't touch, then tumbles till it lands. The
 /// shield goes round the body, travelling with it, out the way it faced: from straight below to
 /// straight above, its face turning from 60 degrees down through straight out to 60 up (the plate
-/// 30 off flat at either end). Another's body inside its reach is shoved out. Its reach is a circle round the body's middle (SHIELD REACH). A
+/// 30 off flat at either end). Its reach is a circle round the body's middle (SHIELD REACH). A
 /// loose ball coming in is flicked off along the shield's face as it is then; met in its first
 /// frames, the perfect shield, the ball's stopped and popped up a little to be caught. A blade in
 /// it parries the swinger. A snatch or a thrown ball (not a floater) breaks it and stuns the
 /// shielder: snatch beats shield, shield beats slash, slash beats snatch. Thrown powers stop on
 /// it, or perfectly met turn back the way they came, the shielder's. Another player's shield
-/// where it's raised is a shieldclash. Raised on another body, it pushes it away, without a hit.
-/// It's solid to the other's body, so they can't dunk through it, and shoves one inside it out.
+/// where it's raised is a shieldclash. Raised on another body holding the ball, the ball's knocked
+/// loose, without a hit; the body isn't moved. It's solid to the other's body, so they can't dunk
+/// through it, but one already inside it isn't shoved out.
 public struct Shield: Equatable {
     public let owner: Int
     /// Its middle, and its reach's: the raiser's body's, wherever it's got to.
@@ -134,9 +135,10 @@ public struct Shield: Equatable {
 
 /// Exclusion: a ball only one player can take, by hand, snatch or slash, for a while loose; off
 /// a perfect shield, or sniped by Pulsepistol Punch. It glows and trails white meanwhile.
+/// Exclusion: the ball one player's alone to take for a while, wherever it's given (a perfect
+/// shield, Pulsepistol's snipe). A second and a half, long enough to finish a shieldflip and come back.
 public enum ExclusionRules {
-    /// A second.
-    public static let frames = 60
+    public static let frames = 90
 }
 
 public enum ShieldRules {
@@ -180,8 +182,6 @@ public enum ShieldRules {
     /// Met in this many frames of its raising, the ball's stopped and popped up this fast.
     public static let perfectFrames = 6
     public static let perfectPop = 3.0
-    /// Another's body inside its reach is shoved out this far a frame at most.
-    public static let shoveSpeed = 4.0
     /// A beam turned back off a perfect shield fires this long.
     public static let turnedBeamFrames = 30
 
@@ -222,9 +222,10 @@ extension Match {
             return
         }
         shields.append(shield)
-        // Raised on another body, it's pushed, unhit, the ball let go of; shoved out of the reach
-        // as the shields step. Not a snatch's guard.
-        for other in players.indices where other != index && !shield.guardOnly && shield.overlaps(players[other].body) {
+        // Raised on another body, the ball it holds is knocked loose, unhit; the body stays where it
+        // is. Not a snatch's guard.
+        // One snatching isn't: the snatch beats the shield, and breaks it as the shields step.
+        for other in players.indices where other != index && !shield.guardOnly && players[other].shieldSnatchReach == nil && shield.overlaps(players[other].body) {
             strip(other, by: index, knock: nil, stun: false)
         }
     }
@@ -247,7 +248,6 @@ extension Match {
         let planting = shields.filter { $0.leavesPlanted && $0.age >= $0.lifeFrames }.map(\.plantedCopy)
         shields.removeAll { $0.age >= $0.lifeFrames }
         shields += planting
-        shoveOutOfShields()
         var broken: [(number: Int, by: Int)] = []
         for (number, shield) in shields.enumerated() {
             for other in players.indices where other != shield.owner {
@@ -255,7 +255,7 @@ extension Match {
                     players[other].slashHit = true
                     parry(other, by: shield.owner)
                     if players.indices.contains(shield.owner), players[shield.owner].state == .flipJump { players[shield.owner].shieldParried = true }
-                } else if let reach = players[other].snatchHitbox, shield.overlaps(reach) || shield.touches(players[other].handCatchPoint, radius: BallRules.handCatchRadius) {
+                } else if let reach = players[other].shieldSnatchReach, shield.overlaps(reach) || shield.touches(players[other].handCatchPoint, radius: BallRules.handCatchRadius) {
                     broken.append((number, other))
                 }
             }
@@ -267,23 +267,6 @@ extension Match {
             // flips: one left behind (Shelter Seltzer's planted one, its snatch's guard) just breaks,
             // whoever raised it far off.
             if shield.isShieldflips { counter(shield.owner, by: by) }
-        }
-    }
-
-    /// Another's body inside a shield's reach shoved out sideways, up to `shoveSpeed` a frame, away
-    /// from its middle; never into a wall. Never up, which off a reach round the whole body would
-    /// launch one standing close.
-    mutating func shoveOutOfShields() {
-        for shield in shields where !shield.guardOnly {
-            for other in players.indices where other != shield.owner && shield.overlaps(players[other].body) {
-                let body = players[other].body
-                let away = body.center.x - shield.pivot.x
-                let side = Swift.abs(away) > 0.01 ? (away > 0 ? 1.0 : -1.0) : shield.side
-                let clear = side > 0 ? shield.pivot.x + shield.reach - body.min.x : body.max.x - (shield.pivot.x - shield.reach)
-                let step = Swift.min(Swift.max(clear, 0), ShieldRules.shoveSpeed) * side
-                guard step != 0, !stage.overlapsSolid(body.offset(by: Vec2(x: step, y: 0))) else { continue }
-                players[other].position.x += step
-            }
         }
     }
 
@@ -389,6 +372,35 @@ extension Match {
             // Flicked off along the shield's face as it is now, at least the flick's speed.
             ball.flick(along: shield.normal, speed: ShieldRules.flickSpeed)
             events.append(.shieldReflected(player: shield.owner, at: ball.position))
+        }
+    }
+
+    /// 47's locked rims: the ball coming at one's sphere, from outside it, turned back off its face as
+    /// off a shield's. One already inside (the basket just made) leaves as it likes. One meeting it
+    /// head-on is nudged off toward the other rim (either way, at random, on a stage with one), so
+    /// it can't sit bouncing on top till it opens.
+    mutating func lockedRimsTurnTheBall(from start: Vec2) {
+        guard ball.isLive, ball.holder == nil, ball.tether == nil, ball.frozen == 0 else { return }
+        let reach = RimLockRules.radius + BallRules.radius
+        for (number, hoop) in stage.hoops.enumerated() where hoop.locked(to: ball.lastTouched) {
+            let centre = RimLockRules.centre(of: hoop)
+            guard start.distance(to: centre) >= reach else { continue }
+            let path = ball.position - start
+            let steps = Swift.max(Int(path.length.rounded(.up)), 1)
+            guard let step = (1...steps).first(where: { (start + path * (Double($0) / Double(steps))).distance(to: centre) < reach }) else { continue }
+            let at = start + path * (Double(step - 1) / Double(steps))
+            let normal = (at - centre).normalized
+            ball.position = at
+            guard ball.velocity.dot(normal) < 0 else { return }
+            let along = ball.velocity - normal * ball.velocity.dot(normal)
+            let headOn = along.length < ball.velocity.length * RimLockRules.headOnShare
+            ball.reflect(off: normal)
+            if headOn {
+                let other = stage.hoops.indices.first { $0 != number }.map { stage.hoops[$0].position.x }
+                let toward: Double = other.map { $0 >= hoop.position.x ? 1 : -1 } ?? (fieldDice.roll(2) == 0 ? -1 : 1)
+                ball.velocity.x += toward * RimLockRules.headOnNudge
+            }
+            return
         }
     }
 }

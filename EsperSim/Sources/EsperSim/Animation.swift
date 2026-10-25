@@ -64,6 +64,11 @@ public enum Animation: String, CaseIterable {
     /// Z Tea's beam: the body, and its arms drawn over it apart so they turn with the aim.
     case beam = "player_beam"
     case beamArms = "player_beam_arms"
+    /// Web Water's swing: the body upright under the line, the ball held behind it or not, and
+    /// the front arm on its own sheet, turned about the shoulder toward where the line's hung.
+    case swing = "player_swing"
+    case swingBall = "player_swing_ball"
+    case swingArm = "player_swing_arm"
     /// Z Tea's blast: the body, and its arms drawn over it apart so they turn 45 degrees up on the ground.
     case blast = "player_blast_body"
     case blastArms = "player_blast_arms"
@@ -73,7 +78,7 @@ public enum Animation: String, CaseIterable {
         case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir, .gunSnipe: 10
         case .transform: 9
         case .beam: 10
-        case .beamArms, .stunnedAir: 1
+        case .beamArms, .stunnedAir, .swing, .swingBall, .swingArm: 1
         case .blast, .blastArms: 12
         case .shield: 3
         case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
@@ -96,7 +101,7 @@ public enum Animation: String, CaseIterable {
     public var holdsBall: Bool {
         switch self {
         case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .flyBall, .wallLandBall, .shoot, .shootAir, .throwForward,
-             .catchGround, .catchAir, .skidBall, .taunt, .layup, .doubleJumpBall, .spinBall: true
+             .catchGround, .catchAir, .skidBall, .taunt, .layup, .doubleJumpBall, .spinBall, .swingBall: true
         default: false
         }
     }
@@ -177,8 +182,10 @@ extension Player {
         if webLinePose > 0, state != .webSwing, state != .webPull, state != .webbed {
             return AnimationFrame(.throwForward, 4)
         }
-        // Stunned in the air: its own pose, till the stun's done or it lands.
+        // Stunned in the air: its own pose, till the stun's done or it lands; and a moment of it
+        // spilling the ball onto a road.
         if hitStun > 0, !grounded, state == .air { return AnimationFrame(.stunnedAir, 0) }
+        if roadSpill > 0 { return AnimationFrame(.stunnedAir, 0) }
         switch state {
         case .idle:
             if previousState == .run || previousState == .dash || previousState == .slide, t < 15 {
@@ -187,6 +194,7 @@ extension Player {
             if previousState == .land, t + spec.landingLagFrames < 22 {
                 return AnimationFrame(.land, (t + spec.landingLagFrames) * 24 / 60)
             }
+            if holding, edgeDribble { return AnimationFrame(.taunt, (t * 15 / 60) % Animation.taunt.frameCount) }
             return AnimationFrame(holding ? .dribbleIdle : .idle, (t * 12 / 60) % 10)
         case .walk:
             return AnimationFrame(holding ? .dribbleWalk : .walk, Int(animationPhase) % 8)
@@ -208,7 +216,8 @@ extension Player {
         case .crouchWalk:
             return AnimationFrame(.crouchWalk, Int(animationPhase) % 10)
         case .slide:
-            return AnimationFrame(.slide, t * 24 / 60)
+            // Looping, for the slides that outlast the sheet: down a slope, on a road.
+            return AnimationFrame(.slide, (t * 24 / 60) % Animation.slide.frameCount)
         case .pivot:
             // The whole sheet over the turn, however short it is.
             let frames = Animation.pivot.frameCount
@@ -226,6 +235,11 @@ extension Player {
                     return AnimationFrame(sheet, ((30 - doubleJumpTimer) * SpinRules.sheetFramesPerSecond / 60) % sheet.frameCount)
                 }
                 return AnimationFrame(hasBall ? .doubleJumpBall : .doubleJump, (30 - doubleJumpTimer) * 12 / 60)
+            }
+            // Off a web swing, spinning as it falls, the ball in hand or not.
+            if spinningOut {
+                let sheet: Animation = hasBall ? .spinBall : .spin
+                return AnimationFrame(sheet, (t * SpinRules.sheetFramesPerSecond / 60) % sheet.frameCount)
             }
             let phase = velocity.y > 0.3 ? 0 : (abs(velocity.y) <= 0.3 ? 1 : 2)
             return AnimationFrame(hasBall ? .airBall : .air, phase)
@@ -263,8 +277,9 @@ extension Player {
         case .slashing:
             return AnimationFrame(slashAirborne ? .esperSlashAir : .esperSlash, t * SlashRules.sheetFramesPerSecond / 60)
         case .rolling:
-            // The double jump's somersault, run through in the roll's frames.
-            return AnimationFrame(.doubleJump, t * SlashRules.sheetFramesPerSecond / 60)
+            // Out of an air slash, the spin, as it falls on after it too (`spinningOut`).
+            let sheet: Animation = hasBall ? .spinBall : .spin
+            return AnimationFrame(sheet, (t * SpinRules.sheetFramesPerSecond / 60) % sheet.frameCount)
         case .spinning:
             let count = Animation.spinBall.frameCount
             return AnimationFrame(.spinBall, min(t * SpinRules.sheetFramesPerSecond / 60, count * SpinRules.turns - 1) % count)
@@ -287,7 +302,9 @@ extension Player {
             return AnimationFrame(.ledge, 2 + (t - 1) * 3 / LedgeRules.climbFrames)
         case .taunt:
             return AnimationFrame(.taunt, t * 15 / 60)
-        case .webSwing, .webPull:
+        case .webSwing:
+            return AnimationFrame(hasBall ? .swingBall : .swing, 0)
+        case .webPull:
             return AnimationFrame(hasBall ? .airBall : .air, 0)
         case .webbed:
             return AnimationFrame(hasBall ? .airBall : .air, 2)

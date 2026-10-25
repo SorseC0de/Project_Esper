@@ -59,6 +59,12 @@ public struct StageFeatures: Equatable {
     public var threeRadius: Double?
     /// Seen whole: the camera fitted to the stage, not by whole screen pixels, as the plane and K&A are.
     public var seenWhole = false
+    /// The ball truck brings the ball in at the start of the match and of each Rounds round (`BallTruck.swift`).
+    public var ballTruck = false
+    /// The floor's a road: whoever's on it slides left with it (`Player`'s forced slide), Anozira's.
+    public var roadSlides = false
+    /// A dunk lands but scores nothing: the ball bounces off the rim, the dunker hanging on (Anozira's moving rim).
+    public var dunksBounce = false
     /// Whether a body can land on the stage's walls and jump off them: not the plane's.
     public var wallJumps = true
     /// Whether a rim's top turns back a ball not scoring and a body coming down on it: not the
@@ -85,7 +91,7 @@ public struct StageFeatures: Equatable {
 
 /// The scenery a stage is drawn with.
 public enum StageLook: Equatable {
-    case court, footballField, highway, elements, hoopfishHideaway, flightB411, kAndA
+    case court, footballField, highway, elements, hoopfishHideaway, flightB411, kAndA, anozira
 }
 
 extension StageFeatures {

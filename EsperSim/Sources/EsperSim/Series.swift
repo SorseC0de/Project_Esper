@@ -80,10 +80,11 @@ public enum GameMode: UInt8, CaseIterable {
 
 /// 47's numbers. A basket from outside the three-point line, a circle round the rim out
 /// to the middle platform's nearest edge, is three; from inside it, or a dunk, two. The
-/// scorer can't take the ball for a second after, so play goes the other way.
+/// rim scored on is locked to the scorer for two seconds after: they play on for the ball, but
+/// can't score again till it opens.
 public enum FortySevenRules {
     public static let target = 47
-    public static let scorerLockoutFrames = 120
+    public static let rimLockFrames = 120
     /// Without a one-way platform to reach, this far.
     public static let fallbackRadius = 90.0
 

@@ -238,6 +238,26 @@ enum FloStrings {
         }
     }
 
+    /// Web Water's line as diamonds: laid straight from `from` to `to`, a string's spacing apart,
+    /// rolling as the strings' do, every other one this much bigger.
+    static let webBigScale: Float = 1.25
+    static func line(from: SIMD3<Float>, to: SIMD3<Float>, scale: Float, time: Double) -> [Diamond] {
+        let apart = to - from
+        let length = simd_length(apart)
+        let segment = FloStrings.segment * scale
+        guard length > segment else { return [] }
+        let along = apart / length
+        let count = Int(length / segment)
+        return (0..<count).map { index in
+            let roll = Float(time) * FloStrings.rollPerSecond + Float(index) * FloStrings.rollStep
+            let size: Float = index % 2 == 1 ? FloStrings.webBigScale : 1
+            let width = FloStrings.width * scale * size
+            return Diamond(centre: from + along * (segment * (Float(index) + 0.5)),
+                           orientation: simd_quatf(angle: roll, axis: along) * simd_quatf(from: SIMD3<Float>(1, 0, 0), to: along),
+                           length: width * FloStrings.lengthShare, width: width, far: false, behind: false)
+        }
+    }
+
     /// A diamond's colour: the near string the energy form's own, its hood's and clothes' (the
     /// brighter), the far one the energy colour.
     static func colour(_ diamond: Diamond, look: Look) -> RGB {

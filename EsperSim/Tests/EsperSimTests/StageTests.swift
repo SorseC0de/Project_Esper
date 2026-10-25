@@ -458,7 +458,7 @@ final class HighwayTests: XCTestCase {
         XCTAssertEqual(FortySevenRules.points(from: nil, through: left, on: stage), 2)
     }
 
-    func testFortySevenPlaysOnAndKeepsTheScorerOffTheBall() {
+    func testFortySevenPlaysOnAndLocksTheRimToTheScorer() {
         var match = Match(stage: .court, mode: .fortySeven)
         let right = match.stage.hoops.firstIndex { $0.owner == 0 }!
         let rim = match.stage.hoops[right].position
@@ -471,27 +471,30 @@ final class HighwayTests: XCTestCase {
         var scored: Int?
         for _ in 0..<20 where scored == nil {
             match.advance(inputs: [.idle, .idle])
-            for case .scored(_, _, _, let points, _) in match.events { scored = points }
+            for case .scored(_, _, _, let points, _, _) in match.events { scored = points }
         }
         XCTAssertEqual(scored, 3)
         XCTAssertEqual(match.scores, [3, 0])
         XCTAssertEqual(match.countdown, 0, "no restart: play goes on")
-        XCTAssertGreaterThan(match.players[0].pickupLockout, 0)
-        XCTAssertFalse(match.players[0].canCatch(ballAt: match.players[0].chest), "the scorer can't take it yet")
+        XCTAssertTrue(match.stage.hoops[right].locked(to: 0), "the rim shut to the scorer")
+        XCTAssertTrue(match.players[0].canCatch(ballAt: match.players[0].chest), "the scorer still plays for the ball")
         XCTAssertFalse(match.ball.shotInFlight, "out of the net it's anyone's")
         XCTAssertTrue(match.players[1].canCatch(ballAt: match.players[1].chest, shotInFlight: match.ball.shotInFlight), "the other can take it")
     }
 
-    func testFortySevensScorerCantSlashWhileKeptOffTheBall() {
+    func testFortySevensLockedRimTurnsTheScorersBallBack() {
         var match = Match(stage: .court, mode: .fortySeven)
         match.countdown = 0
-        match.players[0].pickupLockout = FortySevenRules.scorerLockoutFrames
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        XCTAssertNotEqual(match.players[0].state, .slashing, "no slash to knock it loose")
-        match.players[0].pickupLockout = 0
-        for _ in 0..<2 { match.advance(inputs: [.idle, .idle]) }
-        match.advance(inputs: [PlayerInput(shoot: true), .idle])
-        XCTAssertEqual(match.players[0].state, .slashing, "and back once it runs out")
+        let right = match.stage.hoops.firstIndex { $0.owner == 0 }!
+        match.stage.hoops[right].lockFrames = FortySevenRules.rimLockFrames
+        match.stage.hoops[right].lockedBy = 0
+        let rim = match.stage.hoops[right].position
+        match.ball.respawn(at: rim + Vec2(x: 0, y: 30))
+        match.ball.lastTouched = 0
+        match.ball.velocity = Vec2(x: 0, y: -3)
+        match.ball.scoring = true
+        for _ in 0..<40 { match.advance(inputs: [.idle, .idle]) }
+        XCTAssertEqual(match.scores, [0, 0], "off the sphere, not through the rim")
     }
 
     // MARK: Dropping through
@@ -552,7 +555,8 @@ final class CarBoundsTests: XCTestCase {
     }
 }
 
-/// The Elements: a dribble bouncing off a ledge down into the lava loses the ball to it.
+/// The Elements: a dribble bouncing off a ledge down into the lava loses the ball to it, but
+/// standing still at the edge the ball's kept between the legs.
 final class LavaDribbleTests: XCTestCase {
     private func dribbling(at x: Double) -> Match {
         var match = Match(stage: .elements, specs: [.starting, .starting])
@@ -565,16 +569,19 @@ final class LavaDribbleTests: XCTestCase {
         return match
     }
 
-    func testADribbleOverTheLavaLosesTheBall() {
+    /// Standing at the ledge, the idle dribble would come down in the lava: the ball's kept
+    /// between the legs instead (`Player.edgeDribble`), and never splashes.
+    func testStandingAtTheLavasEdgeKeepsTheBallBetweenTheLegs() {
         var match = dribbling(at: 155)
         var splashed = false
         for _ in 0..<120 where !splashed {
             match.advance(inputs: [.idle, .idle])
             splashed = match.events.contains { if case .lavaSplashed(_, true) = $0 { return true } else { return false } }
         }
-        XCTAssertTrue(splashed)
-        XCTAssertNil(match.ball.holder)
-        XCTAssertFalse(match.players[0].hasBall)
+        XCTAssertFalse(splashed)
+        XCTAssertEqual(match.ball.holder, 0)
+        XCTAssertTrue(match.players[0].edgeDribble)
+        XCTAssertEqual(match.players[0].animationFrame.animation, .taunt)
     }
 
     func testADribbleOverTheRockKeepsIt() {

@@ -313,7 +313,7 @@ public struct ZonesRecorder: Equatable {
             // The shot: made as it goes through; missed once the ball's falling wholly under
             // the rim it can't drop into any more (a floater's still rising), or caught or
             // gone; or not settled in time.
-            if match.events.contains(where: { if case .scored(let who, _, _, _, _) = $0 { return who == player } else { return false } }) {
+            if match.events.contains(where: { if case .scored(let who, _, _, _, _, _) = $0 { return who == player } else { return false } }) {
                 outcome = .made
             } else if frame - shotFrame > ZonesRules.shotSettleFrames {
                 outcome = .missed

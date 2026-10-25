@@ -241,7 +241,7 @@ public struct StageMap: Equatable, Codable {
     public static func bakedVersion(_ stage: MapStage) -> Int {
         switch stage {
         case .elements, .hoopfishHideaway: 5
-        case .kAndA: 5
+        case .kAndA: 6
         case .wreckCenter: 2
         }
     }
@@ -277,17 +277,15 @@ public struct StageMap: Equatable, Codable {
                         tornados: [])
     }
 
-    /// K&A as laid out in the map maker (the builder's COPY): three rows of ground, the two cars'
-    /// roofs as one-ways (their ends one-way slopes), the rims, the starts and the ball where
-    /// they were put.
+    /// K&A as laid out in the map maker (the builder's COPY): three rows of ground, the broken car's
+    /// roof as one-ways (its ends one-way slopes), the rims, the starts and the ball where they
+    /// were put. The red car's collision is the car's shape (`CarRules`), not the map's.
     private static func kAndADefaultMap() -> StageMap {
         var walls: [Wall] = []
         for row in 0..<KAndARules.floorRows { for column in 0..<KAndARules.columns { walls.append(Wall(Cell(column, row), .solid)) } }
         walls += [
-            Wall(Cell(4, 3), .oneWay), Wall(Cell(5, 3), .oneWay), Wall(Cell(11, 3), .oneWay),
-            Wall(Cell(24, 3), .oneWay), Wall(Cell(25, 3), .oneWay), Wall(Cell(6, 4), .oneWayLowerRight),
-            Wall(Cell(7, 4), .oneWay), Wall(Cell(8, 4), .oneWay), Wall(Cell(9, 4), .oneWay),
-            Wall(Cell(10, 4), .oneWayLowerLeft), Wall(Cell(24, 4), .oneWay), Wall(Cell(26, 4), .oneWayLowerRight),
+            Wall(Cell(24, 3), .oneWay), Wall(Cell(25, 3), .oneWay),
+            Wall(Cell(24, 4), .oneWay), Wall(Cell(26, 4), .oneWayLowerRight),
             Wall(Cell(27, 4), .oneWay), Wall(Cell(28, 4), .oneWay), Wall(Cell(29, 4), .oneWay),
             Wall(Cell(30, 4), .oneWayLowerLeft),
         ]

@@ -2,14 +2,20 @@
 its backdrop, the layers over them into its front, by Tools/aseprite.py.
 
 A dict in place of a list, {"layers": [...], "only": 0xRRGGBB}, is those layers' pixels of the one
-colour alone, in white: what the game tints (the Wreck Center's possession colours). "under": True
-or False keeps only the ones under or out from under the stage's darkening wash.
+colour alone (or of any of a list of them), in white: what the game tints (the Wreck Center's
+possession colours). "under": True or False keeps only the ones under or out from under the
+stage's darkening wash. {"layers": [...], "except": [0xRRGGBB, ...]} is those layers but the pixels
+of those colours. {"layers": [one], "cel": True} is that layer cut to its cel's rows, the
+canvas's whole width, for a picture laid again beside itself (Anozira's sliding layers: Aseprite
+trims a cel to what's drawn in it, which would leave a seam). {"frames": True} is every
+frame of the stage's file, one under the next (its "layers" alone, if given).
 
 A stage's "darken" names its wash layer, Aseprite's Darken blend at the layer's opacity: it's
 baked into every picture drawn under it, as Aseprite draws it, since SpriteKit can't darken; and
 written alone as `<Stage>Darken`, its coverage, for what the game places under it.
 
-Usage: import_stage_art.py flight|kanda|wreck [...]      (no name: every stage)
+Usage: import_stage_art.py flight|kanda|wreck|redcar|anozira|anozira_car|anozira_truck|balltruck|anozira_pothole|anozira_hub|anozira_phoenix|anozira_flag|anozira_billboard [...]
+       (no name: every stage)
 """
 import os, shutil, subprocess, sys
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -55,6 +61,81 @@ STAGES = {
         "KAndACarBody": ["Body"],
         "KAndACarWheels": ["Wheels"],
     },
+    "anozira": {
+        # The whole file, 512 by 352, the stage its [DO NOT DRAW] box: 512 by 256 at 0, 80. The
+        # background and sky stand still; the mountains, rocks, sand, foreground and road each cut
+        # to their rows, laid again beside themselves and slid left (`AnoziraArt`). The sky's two
+        # warm colours alone in white, for the rain to turn (palette 37 and 34).
+        "file": "Anozira/Anozira.aseprite",
+        "AnoziraBackground": ["Background", "Sky"],
+        "AnoziraSkyOrange": {"layers": ["Background", "Sky"], "only": 0xE07438},
+        "AnoziraSkyYellow": {"layers": ["Background", "Sky"], "only": 0xFFC825},
+        "AnoziraMountains": {"layers": ["Mountains"], "cel": True},
+        "AnoziraRocks": {"layers": ["Rocks"], "cel": True},
+        "AnoziraSand": {"layers": ["Sand"], "cel": True},
+        "AnoziraForeground": {"layers": ["Foreground"], "cel": True},
+        "AnoziraRoad": {"layers": ["Road"], "cel": True},
+    },
+    "anozira_car": {
+        "file": "Anozira/Car_v4.aseprite",
+        "AnoziraCarBody": ["Body"],
+        # The body for the holder's colour, but its grey-blue frame along the bottom, which stays as painted.
+        "AnoziraCarTint": {"layers": ["Body"], "except": [0x424C6E, 0x657392, 0x92A1B9]},
+        "AnoziraCarWheels": ["Wheels"],
+    },
+    "anozira_truck": {
+        # 128 by 176, each part the whole canvas so they lay over each other; the head and tail
+        # lights, the body's palette 3 and 4 (used nowhere else on it), each alone in white, for the
+        # holder's two colours, or grey.
+        "file": "Anozira/Truck.aseprite",
+        "AnoziraTruckBody": ["Body"],
+        "AnoziraTruckWheels": ["Wheels"],
+        "AnoziraTruckBar": ["Hoop Bar"],
+        "AnoziraTruckLightsLight": {"layers": ["Body"], "only": 0xE69C69},
+        "AnoziraTruckLightsDark": {"layers": ["Body"], "only": 0xBF6F4A},
+    },
+    "balltruck": {
+        # The ball truck, any stage's that has one (Anozira's for now): 160 by 80, each part the whole
+        # canvas so they lay over each other, back to front: the far wheels, the cargo door (shown
+        # open once the ball's let out), the cargo, the near wheels, the body.
+        "file": "Anozira/BallTruck.aseprite",
+        "BallTruckWheelsBack": ["Wheels Back"],
+        "BallTruckDoor": ["Cargo Door"],
+        "BallTruckCargo": ["Cargo"],
+        "BallTruckWheelsFront": ["Wheels Front"],
+        "BallTruckBody": ["Body"],
+    },
+    "anozira_pothole": {
+        "file": "Anozira/pothole.aseprite",
+        "AnoziraPothole": ["Layer 1"],
+    },
+    "anozira_hub": {
+        # Over the near wheels of the car and the trucks, turning: any vehicle's.
+        "file": "Anozira/Car_v4.aseprite",
+        "WheelHub": "Anozira/wheel_hub.png",
+    },
+    "anozira_phoenix": {
+        # 48 by 32, six frames down each strip: the tail's ring's back, under the ball; the bird; the
+        # ring's front, over the ball.
+        "file": "Anozira/Phoenix.aseprite",
+        "AnoziraPhoenixRing": {"frames": True, "layers": ["Hoop"]},
+        "AnoziraPhoenix": {"frames": True, "layers": ["Phoenix"]},
+        "AnoziraPhoenixFront": {"frames": True, "layers": ["Front Rim"]},
+    },
+    "anozira_flag": {
+        "file": "Anozira/flag.aseprite",
+        "AnoziraFlag": {"frames": True},
+    },
+    "anozira_billboard": {
+        # The roadside billboard, its 126 by 62 face blank, and the five ads for it.
+        "file": "Anozira/Billboard.png",
+        "AnoziraBillboard": "Anozira/Billboard.png",
+        "AnoziraAd1": "Anozira/ad1.png",
+        "AnoziraAd2": "Anozira/ad2.png",
+        "AnoziraAd3": "Anozira/ad3.png",
+        "AnoziraAd4": "Anozira/ad4.png",
+        "AnoziraAd5": "Anozira/ad5.png",
+    },
 }
 
 def darken(colour, wash, alpha):
@@ -71,15 +152,40 @@ def write(name, layers, source, wash=None):
     if isinstance(layers, str):
         shutil.copyfile(os.path.join(ART, layers), os.path.join(folder, name + ".png"))
         layers = [layers]
+    elif isinstance(layers, dict) and layers.get("frames"):
+        out = os.path.join(folder, name + ".png")
+        subprocess.run([sys.executable, ASEPRITE, "--frames", source, out] + layers.get("layers", []), check=True)
+        layers = ["every frame"]
+    elif isinstance(layers, dict) and layers.get("except"):
+        out = os.path.join(folder, name + ".png")
+        subprocess.run([sys.executable, ASEPRITE, source, out] + layers["layers"], check=True)
+        w, h, px = read_png(out)
+        cut = layers["except"]
+        write_png(out, w, h, [(0, 0, 0, 0) if p[3] and (p[0] << 16 | p[1] << 8 | p[2]) in cut else p for p in px])
+        layers = layers["layers"]
+    elif isinstance(layers, dict) and layers.get("cel"):
+        out = os.path.join(folder, name + ".png")
+        subprocess.run([sys.executable, ASEPRITE, source, out] + layers["layers"], check=True)
+        import aseprite
+        doc = aseprite.read(source)
+        index = next(i for i, l in enumerate(doc["layers"]) if l["name"] == layers["layers"][0])
+        cel = next(c for c in doc["cels"] if c["layer"] == index)
+        w, h, px = read_png(out)
+        # Its rows within the canvas (a cel can run off it), the canvas's whole width.
+        left, top = 0, max(cel["y"], 0)
+        cw, ch = w, min(cel["y"] + cel["h"], h) - top
+        write_png(out, cw, ch, [px[(top + row) * w + left + col] for row in range(ch) for col in range(cw)])
+        print(f"{name}: its cel {cw} by {ch} at {left}, {top}")
+        layers = layers["layers"]
     elif isinstance(layers, dict):
         out = os.path.join(folder, name + ".png")
         subprocess.run([sys.executable, ASEPRITE, source, out] + layers["layers"], check=True)
         w, h, px = read_png(out)
-        only = layers["only"]
+        only = layers["only"] if isinstance(layers["only"], list) else [layers["only"]]
         under = layers.get("under")
         def kept(i):
             return under is None or wash is None or (wash[i][3] > 0) == under
-        write_png(out, w, h, [(255, 255, 255, 255) if p[3] and (p[0] << 16 | p[1] << 8 | p[2]) == only and kept(i) else (0, 0, 0, 0)
+        write_png(out, w, h, [(255, 255, 255, 255) if p[3] and (p[0] << 16 | p[1] << 8 | p[2]) in only and kept(i) else (0, 0, 0, 0)
                               for i, p in enumerate(px)])
         layers = layers["layers"]
     else:

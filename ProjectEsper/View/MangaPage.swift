@@ -25,6 +25,14 @@ enum MangaPage {
         return CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
     }
 
+    /// Where a panel's middle (its corners' average) is off its box's, as shares of the box: x right,
+    /// y up the screen.
+    static func centroidShare(_ panel: Int) -> CGPoint {
+        let points = panels[panel], box = bounds(panel)
+        let middle = CGPoint(x: points.map(\.x).reduce(0, +) / CGFloat(points.count), y: points.map(\.y).reduce(0, +) / CGFloat(points.count))
+        return CGPoint(x: (middle.x - box.midX) / box.width, y: (box.midY - middle.y) / box.height)
+    }
+
     /// The page fitted whole to a screen: its scale, and where its top left lands.
     static func fit(in screen: CGSize) -> (scale: CGFloat, origin: CGPoint) {
         let scale = min(screen.width / size.width, screen.height / size.height)

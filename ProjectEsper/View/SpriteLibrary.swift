@@ -974,8 +974,8 @@ final class SpriteLibrary {
 
     /// The hood's greys a touch down the ramp, nearer the legs' plain colour.
     static let hoodLevel = 0.9
-    /// The skin `player_hoodheads_v2` is drawn in, AAP-64's first, swapped for the player's.
-    static let hoodHeadsSkin: (front: RGB, back: RGB) = (0xF4D29C, 0xDBA463)
+    /// The skin `player_hoodheads_v2` is drawn in, EDG64's first, swapped for the player's.
+    static let hoodHeadsSkin: (front: RGB, back: RGB) = (0xF6CA9F, 0xE69C69)
 
     /// The hooded head, a frame of `player_hoodheads` for one skin: its hood, the white and the
     /// cool greys, toned through the player's energy ramp, the skin left as drawn; and the hood
@@ -1018,7 +1018,7 @@ final class SpriteLibrary {
     /// The hooded head's three pictures from its sheet's frame: as drawn, its hood alone and its
     /// face alone in white. Touches nothing kept, so it can be made off the main thread.
     private func makeHoodHead(source image: CGImage, skin: Int, look: Look, ice: Bool, energy: Bool) -> (drawn: CGImage, hood: CGImage, face: CGImage)? {
-        // Every view drawn in one skin, AAP-64's first, its two tones swapped for this one's.
+        // Every view drawn in one skin, EDG64's first, its two tones swapped for this one's.
         let from = SpriteLibrary.hoodHeadsSkin, to = HumanLook.everySkinTone[min(max(skin, 0), HumanLook.everySkinTone.count - 1)]
         let faceSwaps: [RGB: RGB] = from == to ? [:] : [from.front: to.front, from.back: to.back]
         let width = image.width, height = image.height
@@ -1474,6 +1474,41 @@ final class SpriteLibrary {
             }
         }
         return found.mapValues { CGPoint(x: CGFloat($0.xs.reduce(0, +)) / CGFloat($0.xs.count) + 0.5, y: CGFloat($0.row) + 0.5) }
+    }
+
+    /// A part's middle on a sheet frame, in art pixels from the feet as landmarks are: the sheet's
+    /// alone, the same in every look, so asking makes no texture.
+    private var partCentres: [String: [BodyPart: CGPoint]] = [:]
+    func centre(_ part: BodyPart, in frame: AnimationFrame) -> CGPoint? {
+        let key = "\(frame.animation.rawValue)_\(frame.frame)"
+        if let found = partCentres[key] { return found[part] }
+        let size = frame.animation.pixelSize, width = frame.animation.pixelWidth
+        let centres = SpriteLibrary.partCentres(sourceImage(key)).mapValues { centre in
+            CGPoint(x: centre.x - width / 2, y: size - centre.y - frame.animation.feetFromBottom)
+        }
+        partCentres[key] = centres
+        return centres[part]
+    }
+
+    /// The parts' middles on a sheet frame, in its pixels from the top left.
+    static func partCentres(_ image: CGImage) -> [BodyPart: CGPoint] {
+        let width = image.width, height = image.height
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let data = context.data else { return [:] }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        var sums: [BodyPart: (x: CGFloat, y: CGFloat, count: CGFloat)] = [:]
+        for y in 0..<height {
+            for x in 0..<width where pixels[(y * width + x) * 4 + 3] == 255 {
+                let index = (y * width + x) * 4
+                guard let part = BodyPart.owning(RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])) else { continue }
+                let sum = sums[part] ?? (0, 0, 0)
+                sums[part] = (sum.x + CGFloat(x) + 0.5, sum.y + CGFloat(y) + 0.5, sum.count + 1)
+            }
+        }
+        return sums.mapValues { CGPoint(x: $0.x / $0.count, y: $0.y / $0.count) }
     }
 
     func landmark(_ part: BodyPart, in frame: AnimationFrame, player: Int) -> CGPoint? {

@@ -508,7 +508,10 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 - Blazing Boba (J). It comes into a round in `explosion_v2`, painted, on the feet, in place of the
   port-in's cluster. A run at full speed or a slide leaves a flame every 4 frames, six
   wide and four tall at the feet, for 45 frames; the other body in one is stripped and
-  the flame is spent. Shots and throws set the ball alight until its first bounce, and
+  the flame is spent. Not again, though, till 30 frames after that stun's over
+  (`StunGraceRules.frames`, the quake's and trample's too): room to jump out of a trail, where a chain of them kept
+  the other stunned for good (two sliding together on Anozira's road, the burner in
+  FloState earning FLO off each hit faster than it spent it). Shots and throws set the ball alight until its first bounce, and
   nobody but the thrower can catch or snatch it; the slash still can. Level two: throw
   with down held and nothing in hand makes a fireball in hand, fire swirling into
   it, crouched too (down held first is a crouch; protocol 96); it leaves at one and a half times the ball's speed; shot it arcs under half the ball's gravity with the aiming dots, but a quick shot's takes the quick shot's preset arc, at the ball's speed and gravity, from where the ball leaves; thrown it flies
@@ -566,15 +569,18 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   feet off the rim at twice the offset and reaches twice as far, so the hands meet it. Twice the size: the body box, its reaches (the blade, the snatch, the
   slide's leg, the catch rings), the ledge hang and the heights the hands hold and let go
   of the ball at, all doubled, and drawn at double size. Heavier: half of any knock, and a
-  fifth more gravity falling (not rising), fall speed and fast fall. It's stripped, the ball popping free, but
-  never stunned. One jump, no double jump unless Jumper Juice gives it back, and no
+  fifth more gravity falling (not rising), fall speed and fast fall. It's stripped and stunned as anyone is
+  One jump, no double jump unless Jumper Juice gives it back, and no
   crouch. Every landing of its own is Quake-Up's level-one quake on the same floor, whatever
-  the level; a landing from a knock isn't, or two Titans would knock each other up forever. Its running steps shake the screen a little (3). At level one the walk and run
-  are a tenth slower, the dash still 0.4 over the run, and its actions (the stances, shot,
+  the level; a landing from a knock isn't, or two Titans would knock each other up forever. A
+  quake (anyone's) and the trample don't stun a body still stunned, nor for 30 frames after its
+  stun's over (`StunGraceRules`, shared with Blazing Boba's flames), so they can't chain a stun;
+  and in FloState Titan Tea earns no FLO from its quakes or trample, only what everyone earns from. Its running steps shake the screen a little (3). The walk and run
+  are a tenth slower at both levels, the dash still 0.4 over the run; at level one its actions (the stances, shot,
   throw, dunk, catch, slide, slash, roll, snatch, wall and gun) a tenth slower: through one
   the state's clock holds one frame in ten (`FighterSpec.actionHoldInterval`), and a check
   for reaching a frame (`Player.reached`) ignores a held one so nothing fires twice. Level
-  two drops the slowdown, and running or dashing into the other strips them, once a
+  two drops the actions' slowdown (not the walk's and run's), and running or dashing into the other strips them, once a
   contact. It comes into a round on the old lightning entry at the ordinary size, then
   grows to double over 30 frames drawn white.
   Everything drawn off the body goes at its size too: the jump, dash, slide, wall and skid
@@ -1021,10 +1027,15 @@ aims a shot, a stretch of it 5 tiles long and 2 pixels thick shows round the rim
 toward them, clear at both ends and their energy's colour in the middle, `drawPortableThreeLine`,
 `portableThreeLooks`), no stage
 select, no drinks and no powers. The title has 47 beside BEST OF 7. A basket doesn't
-reset anything: the points go up and play goes on, the scorer unable to take the ball,
-by hand or by snatch, or to slash (a slash knocking it loose bought the time to take it back;
-protocol 98), for 120 frames (`pickupLockout`), flickering black (#242234)
-every other four frames while it lasts, so it goes the other way;
+reset anything: the points go up and play goes on, and the rim scored on is locked to the
+scorer for 120 frames (`FortySevenRules.rimLockFrames`, `Hoop.lockFrames`): a sphere of
+hexagons round the rim and its net (`RimLockRules`, 20 art pixels across round the rim's
+middle; RingOut's energy sphere, `HexSphere`) in the scorer's energy, over a light showing
+through its gaps, growing in and shrinking away over 8 frames. The ball coming at it is
+turned back off its face as off a shield's, no basket counts through it, and no dunk goes on
+it. An owned rim is shut to everyone (only its owner scores there); a shared one to its
+scorer alone. The scorer plays for the ball as ever, but can't score on it till it opens;
+the computer keeps the ball away meanwhile;
 through the net the ball is nobody's shot any more, so the other can take it at once. A
 basket is three from outside the three-point line, two from inside it or off a dunk,
 judged by where the ball last left a hand, or was knocked or swatted from
@@ -1255,7 +1266,7 @@ and a second pick (the clock's, at zero) doesn't land.
 - Frost Tea: the freezing snatch and the endless slide; level two adds the ice clones.
 - Blazing Boba: the flames and the burning ball; level two adds the fireball.
 - Pulsepistol Punch: the pulse; level two shoots on the run and adds the pull.
-- Titan Tea: the size and weight, slowed; level two at full speed, with the trample.
+- Titan Tea: the size and weight, slowed; level two still walks and runs slower, its actions at full speed, with the trample.
 - Gale Ale: the double jump's still tornado; level two adds the snatch's tornado that carries the ball off.
 - Z Tea: the slash's beam, on the ground or in the air, aimed; level two keeps a full charge for the next slash to fire.
 Parked out of the offers for now (`Greateraid.parked`, protocol 155): Surf Soda; the debug picker still gives it.
@@ -1787,10 +1798,17 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   toward the rim the holder attacks, and with it loose runs "⬩ GET THE BALL! ⬩", one
   rail's lettering one way and the other's the other; the floodlights' blooms take the same colour, purple
   when nobody has it, and so do the panels the lamps sit on, trapezoids wider at the top;
-  the yard numbers at one and a half times; the down marker (`football_marker`, 48 tall) stood on the top
+  the down marker (`football_marker`, 48 tall) stood on the top
   edge of the grass where a loose ball last came to rest, staying there until the next
-  rest or the point's restart; the turf's five-yard stripes,
-  leaning yard lines, hashes and numbers with their arrows. Goalposts: a padded base in the
+  rest or the point's restart; the turf in art pixels (`FieldArt.turfTexture`, EDG64 28 and 27
+  for the stripes, 16 for the chalk): its five-yard stripes, the yard lines (ten-yard 2 wide,
+  five-yard 1) leaning in as staggered whole-pixel rows, each row's step joined to the next, hashes,
+  and the numbers in a pixel face at twice its own size (YARD FONT on the debug strip: BoldPixels,
+  7pixelsOfPerfection, Upheaval), the 50's two digits either side of its line, 4 pixels off
+  it, every other number beside its ten-yard line on the middle's side, its pixel arrow between
+  pointing at the line (toward the nearer goal), the tip 4 pixels off it, and laid on the turf, each row
+  slid with the line's lean; past each goal line, above the sideline, the end zone in the darkest tone (back limbs')
+  of the side that guards that end, not glowing. Goalposts: a padded base in the
   colour of the side that guards it, as the court's blocks are, the pole's width and five more, behind the rim, the gold pole bending forward to the crossbar under it, two uprights.
 - The ball cam (`StageFeatures.ballCam`, the view's alone): a close view of the ball,
   128 by 80 art pixels round it, only in play, hanging over the upper screen as a
@@ -2332,6 +2350,145 @@ bridge, which is no wall (protocol 119). The starts 150 and 220 along, on
 the ground; the ball over the middle at 100. ZONES keeps the right rim, the left backboard
 rimless, the run starting on the ground. Dunks and threes as on the court.
 
+## Anozira
+
+A desert highway at sunset (`AnoziraRules`, `AnoziraArt`), from `Anozira/` in the stage art:
+`Anozira.aseprite` (512 by 352; its [DO NOT DRAW] box, 512 by 256 at 0, 80, is the stage: 32
+tiles by 16, the Wreck Center's height and two tiles narrower), `Car_v4`, `Truck`, `BallTruck`,
+`flag` and `wheel_hub`, imported by `Tools/import_stage_art.py anozira anozira_car anozira_truck
+balltruck anozira_hub anozira_flag`. 47 plays on it.
+
+The road (`RoadRules`). Two rows of it for floor. Whoever's on it with FLO runs on it, spending a
+FLO every 18 frames (FloState's rate): facing right, the run's cycle at 30 a second, the stick
+moving them freely either way at up to run speed; a jump (an aerial buffered into it) and the
+shield's flipjump, but no grounded attack and no shooting or throwing stance (they'd stand still on
+the moving road); they may hold, catch and dribble the ball. One run spark (`dust_run3`) loops at
+their feet at its sheet's rate, in place of the footfalls' puffs. Out of FLO they slide left with it (`StageFeatures.roadSlides`,
+the slide slopes' forced slide): no attack, no getting up and no taking the ball, only a jump out. Whoever slides on it holding the ball (out of FLO)
+spills it, sent up and back, north-west, (-1.5, 3.5) units a frame, stunned and flashing, in the stunned-in-the-air pose for 12 frames,
+then sliding, still flashing; a dribble bouncing down off the car or the truck onto it goes out of
+the hands, the same bounce, as a dribble into the Elements' lava does. Standing still with the
+ball at an edge, here or on the Elements, the idle dribble is the taunt's, the ball kept between
+the legs (`Player.edgeDribble`), so it never comes down off the edge. The background and sky
+stand still; the mountains, rocks, sand, foreground and road are each laid three times side by
+side and slid left forever, cut to the canvas's whole width so they stitch: the foreground with the
+road at 384 art pixels a second, the sand 192, the rocks 96, the mountains 48.
+
+Potholes (`pothole.aseprite`) come in now and then (one frame in 200, off the frame alone) in the
+near lane, each drawn its own way up to 8 art pixels above or below the lane's middle, and slide left with the road. A near wheel of the car, the hoop truck or the ball truck
+going over one jumps it: the hoop truck's pole and rim 6, 7, 6, 5, 4, 3, 2, 1 art pixels up in its
+bed, the car's and the ball truck's bodies 2, 3, 3, 2, 1, shaking a pixel either way meanwhile;
+whoever stands on it then is stripped, and so is whoever runs or slides into one on the road, tripped into the forced slide, FLO or not,
+till they jump and land again; either
+shakes the screen a little (3).
+
+The layers under the road (not the sky) have a third of palette 8 over them, kept back as the Wreck Center's are.
+
+Now and then (30 to 90 seconds apart) the plane (`FlightB411Plane`, a sixteenth size) crosses far
+off between the mountains and the rocks, from a side at random, coming down from 260 to 100 art
+pixels over its crossing at 24 a second, nose down along its path. Billboards (`Billboard.png`, one of
+`ad1`...`ad5` at random on its 126 by 62 face, at 4, 11 from its top left; imported by
+`import_stage_art.py anozira_billboard`) at half size stand between the sand and the foreground,
+their feet in the foreground's ground, sliding by at 288 art pixels a second; one comes with one in
+20 of the vehicles in the traffic, as rare as the cargo truck. Both have the layers' wash.
+
+The weather (`AnoziraRules.weather`, the match's time alone): dry 40 to 90 seconds, then overcast
+25 to 45. The sky turns first, over 4 seconds, its palette 37 to 12 and 34 to 11: the warning. Only
+once it's fully turned does the rain come, on over a second, and it's off a second before the sky
+clears. While it rains, as hard as it does: a third of palette 10 over the whole world; the
+Elements' rain falls, splashing on the road, it and the wind never under the road's top;
+lightning (the score's four sheets, their full-frame flashes left out) strikes far off behind the
+mountains, from over the top of the screen, a quarter to three quarters seen, one to one and a half
+wide, drawn only; the wind blows up to four times as often; every vehicle veers about in its own
+lane, up to 6 art pixels either way, a new way every 45 frames, eased, smaller veered up the lane
+and larger down it, 10% at most each way (the truck's hoop too, drawn only); and the car and the
+truck swerve across, up to 8 art pixels either way, a new way every 20 frames. The car's and the
+trucks' veer and swerve are the match's: their collision, their rim and whoever's on them move with
+it, so shots and riders go with it. Riders, and the ball in their hands, are drawn sized with what
+they ride, easing back to whole off it. Palette 11 ovals are left behind their near wheels every
+frame, nine tenths seen, fading as they slide away. RAIN on the debug strip holds it on or off,
+offline. On the far lane, their
+bottoms on the third row of tiles, oncoming traffic, drawn only: white trucks (`Truck`, no pole, its
+lights grey) half of it, cars (`Car_v4`, its greys and white in one of eight four-tone colour ramps
+at random) 45 in a hundred, and cargo trucks (`BallTruck`, door shut, no ball on its side) the rest,
+facing left at three quarters size, a third of palette 8 over them, one every 1 to 3.5
+seconds at 640 art pixels a second.
+
+The car (`Car_v4`) faces right on the road, with the car's collision mirrored (`CarRules`, K&A's
+red car's, which faces left: one-way hood, roof and trunk, one-way slopes at the windshield,
+brought 4 pixels in onto the glass, and the back window), moving with it off the grid
+(`CarRules.collision`) and carrying whoever stands on it. Its left edge holds 32 art pixels along
+through the match's first count, then it speeds up and slows down: a new place between 16 and 112
+every 4 seconds, eased there over 2. For now the players start on it, the first on its trunk, the
+second on its hood, wherever it's got to.
+
+Every vehicle idles a pixel up and down every 4 frames (the car a frame out of step), its body
+alone: its wheels stand, their near hubs turning clockwise as a wheel 16 art pixels across rolling
+at the road's speed (`WheelHub`), one skid spark (`dust_skid`, looping, twice as fast, a wheel's width behind it, two thirds seen) under each; over a pothole the wheels jump with their bodies. Anyone on the car or the hoop truck dips it a pixel more, and is
+drawn idling and dipping with it.
+
+The ball comes in on the ball truck (`BallTruck.swift`, `BallTruckArt`; any stage's with
+`StageFeatures.ballTruck`) at the start of the match and of every Rounds round: 160 by 80, it waits
+through the count 16 art pixels in from the stage's right, the ball shut in its cargo. In neutral
+its cargo door shows open as the count ends ("Ball Out"), drawn over the ball and under the truck,
+and the ball's let out the back at (-2.5, 1.5) units a frame, drawn under the door and the cargo
+till it's past the door's left edge. Going to the side just scored on, the door opens 30 frames
+into the count and the ball's tossed into their hands over 40 frames, arcing 24 art pixels up,
+trailing as a throw does. 40 frames after the door opens the truck pulls away right, speeding up
+0.04 a frame, off the stage within the count when it's tossed. On its side, in the gap in the
+cargo's stripes, the ball's sprite at 16 across, palette 58, turned 45 degrees and then squeezed
+to 0.9 across.
+
+One rim, both players', on the hoop truck (`Truck`; `Stage.anozira`, its rim and collision placed
+each frame by `Match.placeAnoziraTruck`). Three seconds after the first Ball Out it comes in from
+off the right over 6 seconds to 320 art pixels from the left, then shifts about: a new place
+between 224 and 400 every 3 seconds, eased there over 1.5. Its pole leans anticlockwise about its foot, up to 10 degrees, a new lean every
+20 frames off the frame alone, eased, the rim, backboard and pole assembly leaning with it; over a
+pothole (one stretch of 90 frames in 4 has one) the pole and rim jump up in its bed 3, 3, 2, 2, 1,
+1 art pixels. The hoop is the straight one, its two pieces. It's semi-solid as the car is, at its
+art's whole tile heights (`AnoziraRules.truckOneWays`): the bed and the hood one-ways two tiles up,
+the cab roof three, the windshield a one-way slope between, moving with it (`Stage.oneWayBoxes`,
+one-way boxes off the grid) and carrying whoever stands on them; the pole isn't solid. A dunk
+lands but scores nothing (`StageFeatures.dunksBounce`): the ball bounces off the rim, away from
+the backboard and up, and the dunker hangs on, pulling the pole down up to 10 degrees more, a
+degree a frame, till the hang's over or they let go with down. All of it is the match's alone, so
+it's the same online. The truck's flag on its roof at half size, at 20 frames a second. While someone holds the ball the
+car takes their energy colour, glowing, all but its grey-blue frame along the bottom
+(`AnoziraCarTint`), and the truck's head and tail lights (its palette 3 and 4, used nowhere else on
+it) their bright and their glow, glowing, eased in and out; nobody holding it, the car as painted
+and the lights grey (#858585 and #5D5D5D, off the car's paint). The truck is white, and doesn't
+glow. The Elements' wind blows in front of everything. Its pole assembly is the support builder's
+(POLE on the debug strip there): its own layout (`HoopSupport.anoziraBaked`), its bars in the
+pole's greys (palette 13, 12 and 11 to 59, 60 and 61), RIM X and RIM Y the rim on the truck (4,
+110). Its backboard is a one-way wall (`Stage.rightwardWalls`): solid to a body jumping into it
+from the left, never stood on, climbed or jumped off; the ball isn't stopped by it. In 47 its
+three-point line is the floating one (`GameScene.portableThreeLooks`), round the truck's rim.
+
+While it's dry, Hoopfish Hideaway's sway over the screen, a heat haze, as much less as the sky has
+turned, gone in the overcast.
+
+The Phoenix (`Phoenix.aseprite`; `AnoziraRules.phoenix`, `Match.flyPhoenix`): now and then while
+it's dry (one frame in 1800, not till 30 seconds after the count, off the frame alone, and only with the dry spell long
+enough for the whole crossing and the sky's turn), in off the stage's left, slowly across near the
+top at 40 art pixels a second, its picture's foot 200 up, drifting 10 up and down every 3 seconds,
+and off the right; always gone before the rain. Three pieces, six frames each at 10 a second
+(`AnoziraPhoenixRing` under the ball, `AnoziraPhoenix`, `AnoziraPhoenixFront` over it), glowing,
+sparkles falling off it. Its tail's ring (11.5, 11.5 on its picture) is a bonus rim (`Hoop.bonus`,
+the stage's second): it steers a shot coming down by it into it, as a rim does, but no auto-aim to it, no dunking it, no backboard, no hoop art. Through it is 5
+points in 47 (its ring never locked) and a basket in Rounds. Through it, the sky starting to turn,
+or someone with the ball reaching to dunk near it, and it swoops up and away (3 across a frame,
+speeding up 0.25 a frame up), never scored on twice.
+
+The computer on Anozira (`OpponentAnozira`, with the stage reader): it follows the truck's rim
+ahead (`Match.anoziraTruck(at:)`) and the Phoenix's tail while it flies straight, leading each
+shot by how the rim will be moving when the ball's let go; takes a shot at the tail whenever one
+from where it stands goes in; never dunks the truck's rim; on the road every shot is a hop and the
+stance in the air; hops every pothole coming at it, and off a vehicle with the ball before a
+pothole jumps it; out of FLO on the road, or holding the ball there with 3 or less, or coming down
+onto it so, hops up onto the nearest top of the car or the truck; and on a top keeps its dribble
+off the road, hopping down instead of walking off the edge, and calling off a stance at the edge
+in the air.
+
 ## Stage preview
 
 Before a stage's first count in a series (not ZONES), a manga page of it plays to
@@ -2362,6 +2519,9 @@ The cuts (`previewShots`):
   fish swimming by (`previewSchool`); bubbles going up in front of a plant (`previewBubble`).
 - K&A: the first street light flickering; along the car on the right; the white building's sign;
   along the trash by it.
+- Anozira: the two cacti on the foreground, followed as the road takes them by; the hoop truck at
+  home, its flag going; a vehicle sent along the far lane in full rain (the weather run on to it),
+  followed; the Phoenix mid-crossing while it's dry.
 - The Wreck Center: the hoop; the floor changing colour (one side's ball, then the other's);
   the left hoop; the middle platform, the view drawing back from it.
 - The Elements: a fire tornado rising out of the lava (the fourth rise); lightning striking (the
@@ -2635,7 +2795,8 @@ size, in its raiser's energy colours, added on, turned to its tilt; its reach sh
   so a ball falling into a rim under it goes out, not back down through it.
 - A shot or loose ball meeting its face reflects, nobody's shot any more; met within its first
   6 frames, the perfect shield, the ball's stopped and popped up at 3 to be caught (shine.png at
-  twice its size, the slashclash's sound till its own).
+  twice its size, the slashclash's sound till its own), the shielder's alone for 90 frames
+  (Exclusion, `ExclusionRules.frames`, the snipe's too; a second and a half, to finish the flip and come back).
 - A blade on it parries the swinger, as a snatch's parry does.
 - Solid to the other's body (its reach's square, but where they already stand in it), and a dunk
   doesn't start through it: the body's path to the rim mustn't cross it.
@@ -2645,7 +2806,8 @@ size, in its raiser's energy colours, added on, turned to its tilt; its reach sh
   respawn); that flight passes it after, so it can't be bounced between the shield and the ground
   or a body over and over; the next shot it turns again. It's met along the ball's whole path
   through the frame, so a fast one can't jump past it.
-- Raised on another body, it pushes it away (3, a unit up), unhit, as the change's burst does.
+- Raised on another body, it knocks the ball they hold loose, unhit; the body itself isn't pushed or
+  shoved out, only kept from coming in through it.
 - Up or down: its raiser hops the floater's half hop (the layup's), no jump spent, the pose kept.
 - Its sound is shield.wav. The computer doesn't shield yet: its snatch presses let go of the stick.
 
@@ -2747,9 +2909,6 @@ answer, the app record in App Store Connect with Game Center turned on.
 ## Queued
 
 - (Low priority.) Club Soda, a new biomorph: "Your [Slash] becomes a giant club swing."
-- (Low priority, next batch of revisions.) Web Water's web lines drawn with FloState's string
-  code (`FloStrings`): bright-coloured diamonds in the Metal layer in place of how they're drawn
-  now, every other diamond 1.25 times the size rather than the second to last.
 - Revisit the football field's helmets now that slopes exist: they may want a shaped
   outline like the cars' rather than a square.
 

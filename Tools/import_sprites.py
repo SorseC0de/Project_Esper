@@ -87,7 +87,8 @@ ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball", "player_fly_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
                "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk",
-               "player_throw", "player_throw_air", "player_layup", "player_dbl_jump_ball", "player_spin_ball"}
+               "player_throw", "player_throw_air", "player_layup", "player_dbl_jump_ball", "player_spin_ball",
+               "player_swing_ball"}
 
 # Frames whose ball is tucked behind the body, too little of it showing to find: its centre
 # given, art pixels from the feet, facing right. SpriteLibrary.tuckedBalls has to agree.

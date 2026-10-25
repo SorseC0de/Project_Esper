@@ -2,15 +2,18 @@ import SpriteKit
 import UIKit
 
 #if !os(tvOS)
-/// The hoop support builder, on the Wreck Center: `hoop_support` pieces laid out round the right
-/// hoop, its mirror drawn at the left one as it goes. Press where nothing is to put a piece down
+/// The hoop support builder: `hoop_support` pieces laid out round a hoop, the stage's own layout
+/// (`HoopSupport.Layout`): the Wreck Center's round its right hoop, mirrored at the left one as it
+/// goes, or Anozira's pole assembly on the truck. Press where nothing is to put a piece down
 /// there, in the kind picked (LIGHT, or DARK, ramped down, each whole or half as long); press a
 /// piece to pick it, and drag to move it. The arrows nudge the picked one a pixel, TURN turns it,
-/// FWD and BACK move it a step up or down the layering, DEL takes it away, UNDO steps back. RIM DROP
-/// and RIM DEPTH move the whole hoop, backboard and net with it; BLOCK X and BLOCK Y the blocks
-/// that hold them, by whole tiles, toward the wall and up. COPY puts the layout on the
-/// clipboard as Swift for `HoopSupport.baked`. The match holds still meanwhile.
+/// FWD and BACK move it a step up or down the layering, DEL takes it away, UNDO steps back. The
+/// stage's own sliders beside TURN: the Wreck Center's RIM DROP and RIM DEPTH, which move the
+/// whole hoop, and BLOCK X and BLOCK Y, the blocks that hold them; Anozira's RIM X and RIM Y, the
+/// rim on the truck. COPY puts the layout on the clipboard as Swift for its baked one. The match
+/// holds still meanwhile.
 final class SupportBuilder: SKNode {
+    private let layout: HoopSupport.Layout
     private var pieces: [HoopSupport.Piece]
     private var picked: Int?
     private var dark = false
@@ -25,8 +28,6 @@ final class SupportBuilder: SKNode {
     private let toHud: (CGPoint) -> CGPoint
     private let artPixelsPerHud: CGFloat
     private let onChange: ([HoopSupport.Piece]) -> Void
-    private let onMoveRims: (Double?, Double?) -> Void
-    private let onMoveBlocks: (Int?, Int?) -> Void
     private let onClose: () -> Void
     private var buttons: [(node: SKNode, action: () -> Void)] = []
     private var kindButtons: [(node: SKSpriteNode, dark: Bool, half: Bool)] = []
@@ -34,19 +35,24 @@ final class SupportBuilder: SKNode {
     private var turnSlider: Slider?
     private let outline = SKShapeNode()
 
+    /// A stage's own slider: its title, range, value now, and what it moves.
+    struct Setting {
+        var title: String
+        var range: ClosedRange<Float>
+        var value: Float
+        var changed: (Float) -> Void
+    }
+
     /// Laid out about the middle from `top` down: the kinds and buttons, then the sliders.
-    init(top: CGFloat, artPixelsPerHud: CGFloat, rimDrop: Double, rimDepth: Double,
-         blockShift: (toWall: Int, up: Int),
+    init(layout: HoopSupport.Layout, top: CGFloat, artPixelsPerHud: CGFloat, settings: [Setting],
          fromHud: @escaping (CGPoint) -> CGPoint, toHud: @escaping (CGPoint) -> CGPoint,
-         onChange: @escaping ([HoopSupport.Piece]) -> Void, onMoveRims: @escaping (Double?, Double?) -> Void,
-         onMoveBlocks: @escaping (Int?, Int?) -> Void, onClose: @escaping () -> Void) {
-        pieces = HoopSupport.pieces
+         onChange: @escaping ([HoopSupport.Piece]) -> Void, onClose: @escaping () -> Void) {
+        self.layout = layout
+        pieces = HoopSupport.pieces(layout)
         self.artPixelsPerHud = artPixelsPerHud
         self.fromHud = fromHud
         self.toHud = toHud
         self.onChange = onChange
-        self.onMoveRims = onMoveRims
-        self.onMoveBlocks = onMoveBlocks
         self.onClose = onClose
         super.init()
         zPosition = 500
@@ -59,7 +65,7 @@ final class SupportBuilder: SKNode {
         let rowY = top - 16
         var row: [(node: SKNode, width: CGFloat)] = []
         for (kindIsDark, kindIsHalf) in [(false, false), (true, false), (false, true), (true, true)] {
-            let picture = HoopSupport.picture(dark: kindIsDark, half: kindIsHalf)
+            let picture = HoopSupport.picture(dark: kindIsDark, half: kindIsHalf, layout: layout)
             let swatch = SKSpriteNode(texture: picture.map { SKTexture(cgImage: $0) })
             swatch.texture?.filteringMode = .nearest
             swatch.size = CGSize(width: kindIsHalf ? 12 : 24, height: 24)
@@ -89,20 +95,15 @@ final class SupportBuilder: SKNode {
             item.node.position = CGPoint(x: x + item.width / 2, y: rowY)
             x += item.width + gap
         }
-        // Under it, the turn and the hoop's place, side by side about the middle.
+        // Under it, the turn and the stage's own, side by side about the middle.
         let turn = Slider(title: "TURN", range: -180...180, notch: 1, value: 0) { [weak self] value in self?.turnPicked(to: Int(value)) }
-        let drop = Slider(title: "RIM DROP", range: 0...40, notch: 1, value: Float(rimDrop)) { [weak self] in
-            self?.onMoveRims(Double($0), nil)
-            self?.show()
+        let own = settings.map { setting in
+            Slider(title: setting.title, range: setting.range, notch: 1, value: setting.value) { [weak self] in
+                setting.changed($0)
+                self?.show()
+            }
         }
-        let depth = Slider(title: "RIM DEPTH", range: -20...20, notch: 1, value: Float(rimDepth)) { [weak self] in
-            self?.onMoveRims(nil, Double($0))
-            self?.show()
-        }
-        // The backboard blocks, whole tiles, toward the wall and up.
-        let blockX = Slider(title: "BLOCK X", range: -10...2, notch: 1, value: Float(blockShift.toWall)) { [weak self] in self?.onMoveBlocks(Int($0), nil) }
-        let blockY = Slider(title: "BLOCK Y", range: -7...5, notch: 1, value: Float(blockShift.up)) { [weak self] in self?.onMoveBlocks(nil, Int($0)) }
-        for (slot, slider) in [turn, drop, depth, blockX, blockY].enumerated() {
+        for (slot, slider) in ([turn] + own).enumerated() {
             let column = CGFloat(slot % 3) - 1, line = CGFloat(slot / 3)
             slider.position = CGPoint(x: column * (Slider.size.width + 14), y: rowY - 38 - line * 22)
             addChild(slider)
@@ -133,7 +134,7 @@ final class SupportBuilder: SKNode {
     }
 
     private func changed() {
-        HoopSupport.pieces = pieces
+        HoopSupport.keep(pieces, for: layout)
         onChange(pieces)
         show()
     }
@@ -183,7 +184,7 @@ final class SupportBuilder: SKNode {
     }
 
     private func copy() {
-        UIPasteboard.general.string = HoopSupport.source(pieces)
+        UIPasteboard.general.string = HoopSupport.source(pieces, for: layout)
     }
 
     /// The newest piece under a point, within its picture's middle.

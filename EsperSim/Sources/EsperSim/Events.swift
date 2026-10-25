@@ -21,8 +21,8 @@ public enum MatchEvent: Equatable {
     case beamFired(player: Int, from: Vec2, direction: Vec2)
     case swatted(player: Int, hit: Bool)
     /// `entry` is the ball's velocity as it went through; `points` what it was worth.
-    /// `floater`: the ball went in as a floater, for the announcer.
-    case scored(player: Int, hoop: Int, entry: Vec2, points: Int, floater: Bool)
+    /// `floater`: the ball went in as a floater, for the announcer; `dunk`: put down by a dunk.
+    case scored(player: Int, hoop: Int, entry: Vec2, points: Int, floater: Bool, dunk: Bool)
     /// `speed`: how fast it met the surface, across it.
     case ballBounced(position: Vec2, speed: Double)
     /// A body or a ball came down on a rim's top and bounced off it; how fast it came.
@@ -63,6 +63,10 @@ public enum MatchEvent: Equatable {
     case floGained(player: Int, amount: Int, at: Vec2)
     /// The ball knocked out of `player`'s hands by `by`.
     case popped(player: Int, by: Int)
+    /// The ball spilled out of `player`'s hands onto a road (`RoadRules`).
+    case roadSpilled(player: Int)
+    /// A vehicle, or someone sliding on a road, went over a pothole there (Anozira's).
+    case potholeBump(at: Vec2)
     /// The ball taken out of `from`'s hands by `player`'s snatch: a steal, for the announcer.
     case stolen(player: Int, from: Int)
     /// Flight B411's cart rolled into a body, where it was.

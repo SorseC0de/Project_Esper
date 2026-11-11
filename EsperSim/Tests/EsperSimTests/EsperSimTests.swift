@@ -888,10 +888,10 @@ final class BallTests: XCTestCase {
         match.advance(inputs: [.idle, .idle])
         XCTAssertGreaterThan(match.players[0].position.distance(to: began), 0)
         XCTAssertLessThan(match.players[0].position.distance(to: began), 6, "it should glide, not jump")
-        let scored = run(&match, frames: BallRules.dunkFrames, input: { _ in .idle }) { $0.scores[0] == 1 }
-        XCTAssertLessThan(scored, BallRules.dunkFrames)
+        let scored = run(&match, frames: BallRules.dunkSlamFrame * 2, input: { _ in .idle }) { $0.scores[0] == 1 }
+        XCTAssertLessThan(scored, BallRules.dunkSlamFrame * 2)
         // One frame already went to the glide check above.
-        XCTAssertGreaterThanOrEqual(scored + 2, BallRules.dunkFrames / 2)
+        XCTAssertGreaterThanOrEqual(scored + 2, BallRules.dunkSlamFrame)
         XCTAssertEqual(match.players[0].position.x, rim.x + BallRules.dunkOffset.x, accuracy: 0.001)
         XCTAssertEqual(match.players[0].position.y, rim.y + BallRules.dunkOffset.y, accuracy: 0.001)
         XCTAssertEqual(match.players[0].animationFrame.animation, .dunk)
@@ -1588,15 +1588,14 @@ final class ShakeTests: XCTestCase {
         XCTAssertEqual(match.players[0].jumpsLeft, match.players[0].spec.jumps)
     }
 
-    func testPlatformDissipatesAndYouFall() {
+    func testPlatformStandsTillSomethingBreaksIt() {
         var match = shaken()
         fastFallFromTheApex(&match)
         run(&match, frames: 10, input: { _ in .idle }) { $0.players[0].grounded }
         let standing = match.players[0].position.y
-        run(&match, frames: ShakeRules.platformFrames + 2, input: { _ in .idle })
-        XCTAssertTrue(match.platforms.isEmpty)
-        run(&match, frames: 5, input: { _ in .idle })
-        XCTAssertLessThan(match.players[0].position.y, standing)
+        run(&match, frames: 600, input: { _ in .idle })
+        XCTAssertEqual(match.platforms.count, 1)
+        XCTAssertEqual(match.players[0].position.y, standing, accuracy: 0.001)
     }
 
     func testAnotherPlatformWaitsForTheCooldown() {
@@ -1616,9 +1615,10 @@ final class ShakeTests: XCTestCase {
         fastFallFromTheApex(&match)
         run(&match, frames: 10, input: { _ in .idle }) { $0.players[0].grounded }
         XCTAssertEqual(match.platforms.count, 1)
-        // Stand on it till it goes, drop to the floor, and wait out the cooldown.
+        // Broken under the feet: drop to the floor, and wait out the cooldown.
+        match.platforms = []
+        match.refreshExtras()
         run(&match, frames: 200, input: { _ in .idle }) { $0.players[0].grounded && $0.players[0].position.y < 15 && $0.players[0].platformCooldown == 0 }
-        XCTAssertTrue(match.platforms.isEmpty)
         // Up in the air with no jump, holding down: still nothing.
         match.players[0].position.y = 60
         match.players[0].grounded = false
@@ -1642,8 +1642,7 @@ final class ShakeTests: XCTestCase {
         XCTAssertEqual(wall.width, ShakeRules.wallWidth, accuracy: 0.001)
         XCTAssertEqual(wall.min.y, 10, accuracy: 0.001)
         XCTAssertEqual(wall.height, ShakeRules.wallHeight, accuracy: 0.001)
-        XCTAssertEqual(match.players[0].wallCooldown, ShakeRules.cooldownFrames)
-        XCTAssertEqual(match.players[0].platformCooldown, 0, "a wall leaves the slab alone")
+        XCTAssertEqual(match.players[0].platformCooldown, ShakeRules.cooldownFrames, "a wall starts the slab's cooldown too")
         // Walking into it stops at it.
         run(&match, frames: 40, input: { _ in PlayerInput(stick: Vec2(x: 1, y: 0)) })
         XCTAssertLessThanOrEqual(match.players[0].body.max.x, wall.min.x + 0.001)
@@ -2175,11 +2174,10 @@ final class FootsiesTests: XCTestCase {
         player.enter(.dunking)
         player.stateTimer = 1
         XCTAssertEqual(player.animationFrame, AnimationFrame(.throwForward, 3))
-        player.stateTimer = BallRules.dunkFrames / 2
-        XCTAssertEqual(player.animationFrame, AnimationFrame(.dunk, 2), "the slam on the release frame")
-        player.stateTimer = BallRules.dunkFrames + BallRules.dunkHangFrames - 1
-        XCTAssertEqual(player.animationFrame, AnimationFrame(.dunk, 5))
-        XCTAssertEqual(Animation.dunkStart(of: 3), BallRules.dunkFrames / 2)
+        player.stateTimer = BallRules.dunkSlamFrame
+        XCTAssertEqual(player.animationFrame, Animation.dunkSequence[Animation.dunkSlamEntry].frame, "the slam on the release frame")
+        player.stateTimer = BallRules.dunkSlamFrame + BallRules.dunkSlamToHangFrames + BallRules.dunkHangFrames - 1
+        XCTAssertEqual(player.animationFrame, Animation.dunkSequence[Animation.dunkSequence.count - 1].frame)
     }
 }
 

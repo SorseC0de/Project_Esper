@@ -171,7 +171,7 @@ struct UpdatesIcon: View {
                     let frame = Int(time * pose.framesPerSecond) % max(pose.animation.frameCount, 1)
                     if let shown = flow.scene.winPortrait(player: 0, pose: pose, frame: frame) {
                         CustomizeFigure(portrait: shown.portrait, look: flow.scene.playerLook(0), pixel: pixel, mirrored: false,
-                                        headNudge: shown.headNudge, headScale: shown.headScale, ball: shown.ball, overBall: shown.overBall)
+                                        headNudge: shown.headNudge, headScale: shown.headScale, ball: shown.ball, overBall: shown.overBall, overBallLine: shown.overBallLine)
                             .frame(width: canvas * pixel, height: canvas * pixel)
                             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     }

@@ -1,10 +1,10 @@
 import XCTest
 @testable import EsperSim
 
-/// The Test Center's dummy does its one move over and over.
+/// The Tutorial's dummy does its one move over and over.
 final class TrainingDummyTests: XCTestCase {
     private func events(_ routine: TrainingDummy.Routine, frames: Int = 600) -> (events: [MatchEvent], match: Match) {
-        var match = Match(stage: .testCenter, specs: [.starting, .starting])
+        var match = Match(stage: .tutorial, specs: [.starting, .starting])
         match.countdown = 0
         match.ball.holder = nil
         match.players.indices.forEach { match.players[$0].hasBall = false }
@@ -19,7 +19,7 @@ final class TrainingDummyTests: XCTestCase {
     }
 
     func testTheShieldGoesUpFacingEachWayInTurn() {
-        var match = Match(stage: .testCenter, specs: [.starting, .starting])
+        var match = Match(stage: .tutorial, specs: [.starting, .starting])
         match.countdown = 0
         match.ball.holder = nil
         match.players.indices.forEach { match.players[$0].hasBall = false }

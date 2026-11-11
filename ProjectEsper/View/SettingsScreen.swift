@@ -203,9 +203,8 @@ struct SettingsScreen: View {
         case .daruma: .englishDarumadrop
         case .dela: .englishDela
         }
-        let line = PixelPalette.aap64[Onomatopoeia.lineIndex]
         let word = Onomatopoeia.picture("STYLE " + String(UnicodeScalar(UInt8(65 + letter))), face: face,
-                                        colours: Onomatopoeia.Colours(upper: 0xFFFFFF, lower: EsperPalette.blue.highlight, lineUpper: line, lineLower: line),
+                                        colours: Onomatopoeia.Colours(upper: 0xFFFFFF, lower: EsperPalette.blue.highlight, lineUpper: Onomatopoeia.lineUpper, lineLower: Onomatopoeia.lineLower),
                                         growsLeft: false, height: height)
         let ruleColour = cursor && picked ? Futuristic.lit : Futuristic.line
         return Button(action: action) {

@@ -32,6 +32,9 @@ struct GlowUniforms {
     float4 aberrationSecond;
     // A wash over the whole world: its colour, its strength in w; left off what the mask has in yellow.
     float4 wash;
+    // Each energy colour's two hood tones, Diamond's too, its light and its shadow, in the same order.
+    float4 hoodLight[10];
+    float4 hoodShadow[10];
 };
 
 struct FullScreen {
@@ -48,52 +51,32 @@ vertex FullScreen glowVertex(uint id [[vertex_id]]) {
     return out;
 }
 
-// What glows: everything above the brightness threshold (its brightest channel), eased in over `softness`. Where
-// the body mask is set the body's own, higher threshold applies instead.
-fragment float4 glowBright(FullScreen in [[stage_in]],
-                           texture2d<float> scene [[texture(0)]],
-                           texture2d<float> bodies [[texture(1)]],
-                           sampler linear [[sampler(0)]],
-                           constant GlowUniforms &u [[buffer(0)]]) {
-    float4 color = scene.sample(linear, in.uv);
-    // The mask is the bodies on black, so anything with light in it is body; pure green
-    // marks what must not glow at all.
-    float3 mask = bodies.sample(linear, in.uv).rgb;
+// One full-size pixel's glow, by its own colour and its own mask, never a blend of its neighbours':
+// the customize screen's way, the glowing pixels alone, then blurred. Above the brightness threshold
+// (its brightest channel), eased in over `softness`; a body's own, higher threshold where the mask is set.
+static float3 glowOfPixel(float3 color, float3 mask, float2 uv, constant GlowUniforms &u) {
     float body = dot(mask, float3(0.2126, 0.7152, 0.0722));
-    // Pure red, shielded, as the face in a hood's opening: it doesn't glow either.
-    float shielded = step(0.9, mask.r) * step(mask.g, 0.05) * step(mask.b, 0.05);
-    float flat = max(step(0.5, mask.g) * step(mask.r, 0.05) * step(mask.b, 0.05), shielded);
-    // Blue glows through the flats under it, from its colour before the water's tint. It can be
-    // a single art pixel wide, so any blue at all counts, and the brightest of the full-size
-    // pixels under this half-size one is taken rather than their blend with the flats.
+    // Red to magenta: a hood (magenta), glowing at its share, and the face in its opening (red), not at all.
+    float hooded = step(0.5, mask.r) * step(mask.g, 0.5);
+    float hood = hooded * mask.b;
+    float flat = step(0.5, mask.g) * step(mask.r, 0.5) * step(mask.b, 0.5);
+    // Blue glows through the flats under it, from its colour before the water's tint.
     float through = step(0.1, mask.b) * step(mask.r, 0.05);
-    // Magenta, a hood: the plain threshold, its glow at a share.
-    float hood = step(0.9, mask.r) * step(mask.g, 0.05) * step(0.9, mask.b);
-    float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body) * (1 - through) * (1 - hood));
-    if (through > 0) {
-        float2 halfTexel = 0.5 / float2(scene.get_width(), scene.get_height());
-        float brightest = -1;
-        for (int corner = 0; corner < 4; corner++) {
-            float2 offset = float2(corner % 2 == 0 ? -1 : 1, corner < 2 ? -1 : 1) * halfTexel;
-            float3 sampled = scene.sample(linear, in.uv + offset).rgb;
-            if (u.waterTop.a > 0 && u.waterTop.a < 1) {
-                float3 water = mix(u.waterTop.rgb, u.waterBottom.rgb, in.uv.y);
-                sampled = saturate((sampled - water * u.waterTop.a) / (1 - u.waterTop.a));
-            }
-            float sampledBrightness = max(sampled.r, max(sampled.g, sampled.b));
-            if (sampledBrightness > brightest) { brightest = sampledBrightness; color.rgb = sampled; }
-        }
+    float threshold = mix(u.threshold, u.bodyThreshold, step(0.05, body) * (1 - through) * (1 - hooded));
+    if (through > 0 && u.waterTop.a > 0 && u.waterTop.a < 1) {
+        float3 water = mix(u.waterTop.rgb, u.waterBottom.rgb, uv.y);
+        color = saturate((color - water * u.waterTop.a) / (1 - u.waterTop.a));
     }
     // By its brightest channel, not its luminance: a deep blue, purple, green, orange or red at
     // full strength glows as a light one does.
     float brightness = max(color.r, max(color.g, color.b));
-    float background = u.unglowed.a * step(distance(color.rgb, u.unglowed.rgb), 0.01);
+    float background = u.unglowed.a * step(distance(color, u.unglowed.rgb), 0.01);
     float amount = smoothstep(threshold - u.softness, threshold + u.softness, brightness) * (1 - flat) * (1 - background)
-        * mix(1.0, u.hood.x, hood);
+        * mix(1.0, hood * u.hood.x, hooded);
     // An energy colour's own gain: the one nearest in hue, the colour over its brightest
     // channel, if near enough; whites and greys are none of them.
     if (brightness > 0.05) {
-        float3 hue = color.rgb / brightness;
+        float3 hue = color / brightness;
         float nearest = 1e9, gain = 1;
         for (int index = 0; index < 9; index++) {
             float3 apart = hue - u.energy[index].rgb;
@@ -102,7 +85,29 @@ fragment float4 glowBright(FullScreen in [[stage_in]],
         }
         if (nearest < 0.1) amount *= gain;
     }
-    return float4(color.rgb * amount, 1);
+    return color * amount;
+}
+
+// What glows, at half size: the four full-size pixels under each, their glows averaged. What glows
+// through the flats can be a single art pixel wide, so its brightest is taken whole.
+fragment float4 glowBright(FullScreen in [[stage_in]],
+                           texture2d<float> scene [[texture(0)]],
+                           texture2d<float> bodies [[texture(1)]],
+                           sampler linear [[sampler(0)]],
+                           constant GlowUniforms &u [[buffer(0)]]) {
+    float2 halfTexel = 0.5 / float2(scene.get_width(), scene.get_height());
+    float3 total = float3(0);
+    float3 brightestThrough = float3(0);
+    for (int corner = 0; corner < 4; corner++) {
+        float2 at = in.uv + float2(corner % 2 == 0 ? -1 : 1, corner < 2 ? -1 : 1) * halfTexel;
+        float3 mask = bodies.sample(linear, at).rgb;
+        float3 glow = glowOfPixel(scene.sample(linear, at).rgb, mask, in.uv, u);
+        total += glow;
+        if (mask.b >= 0.1 && mask.r <= 0.05 && max(glow.r, max(glow.g, glow.b)) > max(brightestThrough.r, max(brightestThrough.g, brightestThrough.b))) {
+            brightestThrough = glow;
+        }
+    }
+    return float4(max(total / 4, brightestThrough), 1);
 }
 
 // A nine-tap Gaussian along `direction`; run once across and once down.
@@ -149,7 +154,24 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
     float washFree = step(0.9, mask.r) * step(0.9, mask.g) * step(mask.b, 0.05);
     color.rgb = mix(color.rgb, u.wash.rgb, u.wash.a * (1 - washFree));
     float shielded = step(0.9, mask.r) * step(mask.g, 0.05) * step(mask.b, 0.05);
-    return float4(color.rgb + bloom * (1 - shielded), 1);
+    float3 lit = color.rgb + bloom * (1 - shielded);
+    // A hood's shadow keeps its step down from the hood's light: where the glow would close it
+    // (a light already near white in a channel, teal's), the shadow is held that far under the lit light.
+    float hood = step(0.5, mask.r) * step(mask.g, 0.5) * step(0.5, mask.b);
+    if (hood > 0) {
+        const float3 weights = float3(0.2126, 0.7152, 0.0722);
+        for (int index = 0; index < 10; index++) {
+            float3 shadow = u.hoodShadow[index].rgb;
+            if (distance(color.rgb, shadow) > 0.1) continue;
+            float3 light = color.rgb + (u.hoodLight[index].rgb - shadow);
+            float drop = dot(light - color.rgb, weights);
+            float litShadow = dot(saturate(lit), weights);
+            float wanted = dot(saturate(light + bloom), weights) - drop;
+            if (litShadow > wanted && litShadow > 0) lit = saturate(lit) * (wanted / litShadow);
+            break;
+        }
+    }
+    return float4(lit, 1);
 }
 
 // The ball cam: its texture on a trapezoid over the screen, wider at the top. Each corner
@@ -180,7 +202,7 @@ fragment float4 ballCamFragment(BallCamOut in [[stage_in]],
                                 constant GlowUniforms &u [[buffer(0)]]) {
     float2 uv = in.uvq.xy / in.uvq.z;
     float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
-    return float4(cam.sample(nearest, uv).rgb + bloom, 0.33);
+    return float4(cam.sample(nearest, uv).rgb + bloom, 0.66);
 }
 
 // The head's energy as small cubes turning in 3D, borrowed from Project RingOut: one unit
@@ -246,6 +268,59 @@ fragment float4 cube_fragment(CubeFragment in [[stage_in]],
         colour = mix(colour, mix(uniforms.waterTop.rgb, uniforms.waterBottom.rgb, down), uniforms.waterTop.a);
     }
     return float4(colour, in.color.a);
+}
+
+// Platform Protein Shake's slabs and walls: a unit cube sized and slanted to a block of energy,
+// every face drawn and added on as light, bright along its edges, a slow shimmer up its faces.
+struct BlockFragment {
+    float4 position [[position]];
+    float3 normal;
+    float3 local;
+    float3 localNormal;
+    float3 size;
+    float4 color;
+    float behind;
+    float time;
+};
+
+vertex BlockFragment block_vertex(uint vid [[vertex_id]],
+                                  uint iid [[instance_id]],
+                                  const device CubeVertex *vertices [[buffer(0)]],
+                                  const device CubeInstance *instances [[buffer(1)]],
+                                  constant CubeUniforms &uniforms [[buffer(2)]]) {
+    CubeVertex v = vertices[vid];
+    CubeInstance inst = instances[iid];
+    BlockFragment out;
+    out.position = uniforms.viewProjection * (inst.model * float4(v.position.xyz, 1));
+    out.normal = normalize((inst.model * float4(v.normal.xyz, 0)).xyz);
+    out.local = v.position.xyz;
+    out.localNormal = v.normal.xyz;
+    // Width and height off the model's axes; the depth is its third axis's own share, the slant aside.
+    out.size = float3(length(inst.model[0].xyz), length(inst.model[1].xyz), abs(inst.model[2].z));
+    out.color = inst.color;
+    out.behind = inst.flags.x;
+    out.time = inst.flags.w;
+    return out;
+}
+
+fragment float4 block_fragment(BlockFragment in [[stage_in]],
+                               constant CubeUniforms &uniforms [[buffer(2)]],
+                               texture2d<float, access::read> bodies [[texture(0)]]) {
+    float3 cover = bodies.read(uint2(in.position.xy)).rgb;
+    if (in.behind > 0.5 && cover.r > 0.5) discard_fragment();
+    // How far in from the face's nearest edge, in the scene's pixels: the face's own two axes.
+    float3 inside = (0.5 - abs(in.local)) * in.size;
+    float3 facing = abs(in.localNormal);
+    float edgeDistance = facing.x > 0.5 ? min(inside.y, inside.z) : (facing.y > 0.5 ? min(inside.x, inside.z) : min(inside.x, inside.y));
+    float edge = 1.0 - smoothstep(0.0, 1.5, edgeDistance);
+    float shimmer = 0.5 + 0.5 * sin((in.local.y * in.size.y + in.local.x * in.size.x * 0.5) * 0.4 - in.time * 4.0);
+    float lit = max(dot(normalize(in.normal), normalize(uniforms.light.xyz)), 0.0);
+    float3 colour = mix(in.color.rgb, float3(1.0), 0.5 * edge + 0.15 * lit);
+    if (uniforms.waterTop.a > 0.0) {
+        float down = clamp(in.position.y / max(uniforms.waterBottom.a, 1.0), 0.0, 1.0);
+        colour = mix(colour, mix(uniforms.waterTop.rgb, uniforms.waterBottom.rgb, down), uniforms.waterTop.a);
+    }
+    return float4(colour, in.color.a * (0.2 + 0.1 * shimmer + 0.7 * edge));
 }
 
 // The stage preview's page: a panel's cut taken from the frame (a quad over the panel's own

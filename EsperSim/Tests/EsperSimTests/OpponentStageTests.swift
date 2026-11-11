@@ -36,23 +36,16 @@ final class OpponentStageTests: XCTestCase {
     func testTheTerrainReadsEachStage() {
         for stage in [Stage.elements, .hoopfishHideaway, .footballField] {
             let match = Match(stage: stage, specs: [.starting, .starting])
-            let terrain = Terrain(stage: match.stage, player: match.players[1])
-            var frames = 0
-            while !terrain.ready {
-                terrain.prepare(budget: Opponent.readingBudget)
-                frames += 1
-            }
+            let terrain = Terrain.whole(stage: match.stage, player: match.players[1])
+            XCTAssertTrue(terrain.ready)
             XCTAssertFalse(terrain.surfaces.isEmpty)
             XCTAssertGreaterThan(terrain.rise, 30)
-            // Read over the countdown, not the match.
-            XCTAssertLessThan(frames, 60, "\(stage.features.look)")
         }
     }
 
     func testOnTheElementsTheWayDownToItsRimRunsThroughTheTornados() {
         let match = Match(stage: .elements, specs: [.starting, .starting])
-        let terrain = Terrain(stage: match.stage, player: match.players[1])
-        while !terrain.ready { terrain.prepare(budget: Opponent.readingBudget) }
+        let terrain = Terrain.whole(stage: match.stage, player: match.players[1])
         let room = terrain.surface(under: Vec2(x: 200, y: 150))!, platform = terrain.surface(under: Vec2(x: 60, y: 100))!
         let way = terrain.route(from: room, to: platform) { _, _ in true }
         XCTAssertNotNil(way)
@@ -116,8 +109,7 @@ final class OpponentCourtTests: XCTestCase {
 
     func testTheTerrainFindsTheWallUpOntoEachBlock() {
         let match = court()
-        let terrain = Terrain(stage: match.stage, player: match.players[1])
-        while !terrain.ready { terrain.prepare(budget: Opponent.readingBudget) }
+        let terrain = Terrain.whole(stage: match.stage, player: match.players[1])
         let floor = terrain.surface(under: Vec2(x: 170, y: 10))!
         for blockTop in [Vec2(x: 40, y: 100), Vec2(x: 300, y: 100)] {
             let block = terrain.surface(under: blockTop)!

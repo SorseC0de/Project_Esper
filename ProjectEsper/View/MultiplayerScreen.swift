@@ -137,7 +137,7 @@ struct MultiplayerScreen: View {
         let picked = GameScene.savedOnlineMode == mode
         let parked = GameMode.parked.contains(mode)
         return Button { flow.activate(.mode(mode)) } label: {
-            Text(mode == .rounds ? "ROUNDS" : mode == .zones ? "ZONES" : "47")
+            Text(mode.title)
                 .font(Futuristic.font(size: 18 * scale(.text)))
                 .foregroundStyle(lit && !parked ? Futuristic.lit : Futuristic.line.opacity(picked ? 1 : TitleOverlay.unpickedOpacity))
                 .fixedSize()

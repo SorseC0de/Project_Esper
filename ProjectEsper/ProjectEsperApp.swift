@@ -6,6 +6,9 @@ struct ProjectEsperApp: App {
     init() {
         // Before anything reads what's kept.
         StorageReset.runIfNeeded()
+        #if !os(tvOS)
+        FloTextExporter.exportIfRequested()
+        #endif
     }
 
     var body: some Scene {

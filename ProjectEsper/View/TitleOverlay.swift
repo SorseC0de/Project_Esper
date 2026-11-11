@@ -26,9 +26,18 @@ final class FlowState: ObservableObject {
     /// The UI tuning panel is open.
     @Published var tuningOpen = false
     var startSeries: ((GameMode) -> Void)?
+    /// HOW TO PLAY: the Tutorial, straight from the title.
+    var startTutorial: (() -> Void)?
     /// The title's cursor, the game's own on every platform: a pad moves it and A picks,
     /// and a tap picks straight away and moves it there.
     @Published var titleCursor = TitleItem.bestOfSeven
+    /// The mode ring's turn in steps, never wrapped, so every turn animates the way it went.
+    @Published var modeTurn = 0
+    /// The mode at the front of the ring.
+    var frontMode: TitleItem {
+        let count = TitleItem.modeRing.count
+        return TitleItem.modeRing[(modeTurn % count + count) % count]
+    }
 
     init() {
         scene.flowState = self
@@ -317,6 +326,8 @@ final class FlowState: ObservableObject {
     /// ZONES online: this phone's side only, the other's look as their last turn sent it.
     @Published var customizeTurnBased = false
     var customizeLocal = 0
+    /// The side the first pad's cursor is on: its own, or against the computer on one pad, the computer's.
+    @Published var customizePadSide = 0
     /// Each side's READY, and the moment both were, when the launch animation starts.
     @Published var customizeReady = [false, false]
     /// A mode that picks its drink before play (47): after START, each side's bottles (`DrinkPick`);
@@ -326,7 +337,7 @@ final class FlowState: ObservableObject {
     /// Each side's Random bottle picked: a Greateraid drawn for it as it locks in.
     @Published var drinkRandom = [false, false]
     @Published var drinkSorts: [DrinkSort] = [.aToZ, .aToZ]
-    var customizePicksDrink: Bool { customizeMode == .fortySeven }
+    var customizePicksDrink: Bool { customizeMode.picksDrinkAhead }
     @Published var customizeLaunch: Date?
     /// Both locked in on the bottles: drinking on the bench (`player_drink`) since then, before the launch.
     @Published var customizeDrinking: Date?
@@ -517,22 +528,53 @@ final class FlowState: ObservableObject {
             titleCursor = .bestOfSeven
             return
         }
+        if across != 0, TitleItem.isModeRow(rows[row]) { return stepModeRing(across) }
         var next = titleCursor
         if across != 0 {
             next = rows[row][min(max(column + across, 0), rows[row].count - 1)]
         } else if down != 0 {
             let target = min(max(row + down, 0), rows.count - 1)
-            // The same share of the way along the row.
-            let share = rows[row].count > 1 ? Double(column) / Double(rows[row].count - 1) : 0.5
-            next = rows[target][Int((share * Double(rows[target].count - 1)).rounded())]
+            if TitleItem.isModeRow(rows[target]) {
+                next = frontMode
+            } else {
+                // The same share of the way along the row; from the ring, its middle.
+                let share = TitleItem.isModeRow(rows[row]) || rows[row].count < 2 ? 0.5 : Double(column) / Double(rows[row].count - 1)
+                next = rows[target][Int((share * Double(rows[target].count - 1)).rounded())]
+            }
         }
         guard next != titleCursor else { return }
         titleCursor = next
         SoundBoard.shared.play(SoundBoard.navigate)
     }
 
-    /// What picking an item does, from the pad or a tap.
+    /// The next open mode round the ring brought to the front, the cursor with it.
+    func stepModeRing(_ way: Int) {
+        guard let choices = TitleItem.rows.first(where: TitleItem.isModeRow), !choices.isEmpty else { return }
+        let from = choices.firstIndex(of: frontMode) ?? 0
+        let next = choices[((from + way) % choices.count + choices.count) % choices.count]
+        titleCursor = next
+        guard next != frontMode else { return }
+        turnModeRing(to: next, way: way)
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
+    /// The ring turned till `item` is at the front: `way`'s way round, or the short way without one.
+    private func turnModeRing(to item: TitleItem, way: Int = 0) {
+        let ring = TitleItem.modeRing
+        guard let target = ring.firstIndex(of: item), let front = ring.firstIndex(of: frontMode) else { return }
+        var steps = ((target - front) % ring.count + ring.count) % ring.count
+        if way < 0, steps > 0 { steps -= ring.count } else if way == 0, steps * 2 > ring.count { steps -= ring.count }
+        withAnimation(TitleOverlay.ringTurn) { modeTurn += steps }
+    }
+
+    /// What picking an item does, from the pad or a tap. A mode off the front of the ring is turned to first.
     func activate(_ item: TitleItem) {
+        if TitleItem.modeRing.contains(item), item != frontMode {
+            titleCursor = item
+            turnModeRing(to: item)
+            SoundBoard.shared.play(SoundBoard.navigate)
+            return
+        }
         titleCursor = item
         let busy: Bool
         switch net.state {
@@ -542,24 +584,35 @@ final class FlowState: ObservableObject {
         }
         let defaults = UserDefaults.standard
         switch item {
-        case .bestOfSeven, .fortySeven, .zones:
+        case .bestOfSeven, .fortySeven, .zones, .breakerBall:
             guard !busy, !(item == .zones && GameMode.parked.contains(.zones)) else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
-            let mode: GameMode = item == .bestOfSeven ? .rounds : item == .fortySeven ? .fortySeven : .zones
+            let mode: GameMode = switch item {
+            case .bestOfSeven: .rounds
+            case .fortySeven: .fortySeven
+            case .breakerBall: .breakerBall
+            default: .zones
+            }
             transition { [weak self] in self?.openCustomize(mode) }
-        case .vsCPU, .vsHuman:
-            guard !busy else { return }
-            defaults.set(item == .vsCPU, forKey: GameScene.vsCPUKey)
-            SoundBoard.shared.play(SoundBoard.navigate)
         case .multiplayer:
             guard !busy else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
             transition { [weak self] in self?.openMultiplayer() }
+        case .howToPlay:
+            guard !busy else { return }
+            SoundBoard.shared.play(SoundBoard.confirm)
+            transition(holdsForLoading: true) { [weak self] in self?.startTutorial?() }
         case .updates:
             SoundBoard.shared.play(SoundBoard.confirm)
             openUpdates()
         case .tuning:
             tuningOpen.toggle()
+        case .capture:
+            defaults.set(!defaults.bool(forKey: GameScene.captureModeKey), forKey: GameScene.captureModeKey)
+            SoundBoard.shared.play(SoundBoard.navigate)
+        case .cpuVersusCPU:
+            defaults.set(!defaults.bool(forKey: GameScene.cpuVersusCPUKey), forKey: GameScene.cpuVersusCPUKey)
+            SoundBoard.shared.play(SoundBoard.navigate)
         case .titleFont:
             // The menus' face on to the next, A to K round (`Futuristic.typefaces`), everything in it drawn again.
             Futuristic.typefacePick = (Futuristic.typefacePick + 1) % Futuristic.typefaces.count
@@ -581,38 +634,45 @@ final class FlowState: ObservableObject {
 
 /// Everything on the title the cursor can land on, row by row as they're laid out.
 enum TitleItem: Hashable {
-    case bestOfSeven, fortySeven, zones, vsCPU, vsHuman, multiplayer
+    case bestOfSeven, fortySeven, zones, breakerBall, multiplayer
+    /// The Tutorial, over the title.
+    case howToPlay
     /// What's new for testers, opened again.
     case updates
     case tuning
     /// The menus' face, stepped on A to K.
     case titleFont
+    /// Capture Mode on and off (`GameScene.captureModeKey`), and CPU VS CPU (`GameScene.cpuVersusCPUKey`).
+    case capture, cpuVersusCPU
     /// The gear in the upper right corner, opening the settings; the speaker in the upper left, muting everything.
     case settings, mute
 
+    /// The modes round the title's ring, in order; new modes join it.
+    static let modeRing: [TitleItem] = [.bestOfSeven, .fortySeven, .zones, .breakerBall]
+    static func isModeRow(_ row: [TitleItem]) -> Bool { row.contains { modeRing.contains($0) } }
+
     static let rows: [[TitleItem]] = [
         [.mute, .settings],
+        [.updates, .howToPlay],
         // A parked mode stays shown, greyed, but the cursor passes it by.
-        [.bestOfSeven, .fortySeven] + (GameMode.parked.contains(.zones) ? [] : [.zones]),
-        [.vsCPU, .vsHuman],
-        [.updates, .multiplayer],
+        [.bestOfSeven, .fortySeven] + (GameMode.parked.contains(.zones) ? [] : [.zones]) + [.breakerBall],
+        [.multiplayer],
     ] + (DebugUI.enabled ? debugRows : [])
 
-    /// The UI and FONT switches, in a debug build.
+    /// The UI, FONT, CAPTURE and CPU VS CPU switches, in a debug build.
     static let debugRows: [[TitleItem]] = [
-        [.tuning, .titleFont],
+        [.tuning, .titleFont, .capture, .cpuVersusCPU],
     ]
 }
 
 /// The title screen, in `Futuristic_UI.svg`'s pieces on the customize screen's ground: the gear in frame 1 in the
-/// upper right; the name over rule4; ROUNDS, 47 and ZONES in frames 7, 9 and 6; VS CPU and
-/// VS HUMAN between rule5s with rule6 between them; MULTIPLAYER in box4, which opens the
-/// multiplayer screen, with Game Center's word under it. What the cursor's on is gold.
+/// upper right; UPDATES and HOW TO PLAY; the Variaball logo; the modes on a turning ring (`ModeRing`);
+/// ONLINE in box4, which opens the multiplayer screen, with Game Center's word under it. What the cursor's on is gold.
 struct TitleOverlay: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
-    /// Offline, whether the computer plays player 2 or a second pad does.
-    @AppStorage(GameScene.vsCPUKey) private var vsCPU = true
+    @AppStorage(GameScene.captureModeKey) private var captureMode = false
+    @AppStorage(GameScene.cpuVersusCPUKey) private var cpuVersusCPU = false
     @ObservedObject private var tuning = UITuning.shared
     private func scale(_ part: UIPart) -> CGFloat { tuning.scale(.title, part) }
 
@@ -665,51 +725,37 @@ struct TitleOverlay: View {
                     if DebugUI.enabled { frameSliders }
                 }
             VStack(spacing: 14 * scale(.buttons)) {
-                VStack(spacing: 6 * scale(.buttons)) {
-                    if DebugUI.enabled {
-                        Image(uiImage: UIImage(named: "variaball_logo") ?? UIImage())
-                            .resizable()
-                            .interpolation(.high)
-                            .aspectRatio(contentMode: .fit)
-                            .frame(height: TitleOverlay.logoHeight * scale(.titles))
-                    } else {
-                        Text("PROJECT ESPER")
-                            .font(Futuristic.font(size: 52 * scale(.titles)))
-                            .foregroundStyle(Futuristic.line)
-                    }
-                    // Two, the left one mirrored, meeting in the middle as one.
-                    FuturisticPiece(image: Futuristic.mirroredPair("rule4"), scale: scale(.buttons))
+                // UPDATES left of HOW TO PLAY, and room as wide on its right, so it stays in the middle.
+                let updatesWidth = FuturisticPiece(image: Futuristic.taillessTwo, scale: TitleOverlay.updatesScale * scale(.buttons)).size.width
+                let updatesGap = TitleOverlay.updatesGap * scale(.buttons)
+                HStack(spacing: 0) {
+                    framed("UPDATES", in: "2", item: .updates, frameScale: TitleOverlay.updatesScale, textSize: TitleOverlay.updatesTextSize,
+                           frameImage: Futuristic.taillessTwo, fitWidth: updatesWidth * TitleOverlay.updatesTextShare, waitsOnNet: false)
+                        .padding(.trailing, updatesGap)
+                    howToPlay
+                    Spacer(minLength: updatesWidth + updatesGap).frame(width: updatesWidth + updatesGap)
                 }
-                // ROUNDS in ZONES' frame turned round, 47 in ring5, between arrow2s pointing out.
+                Image(uiImage: UIImage(named: "variaball_logo") ?? UIImage())
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: TitleOverlay.logoHeight * scale(.titles))
+                // The modes on a turning ring, the picked one at its front, between arrow2s that turn it.
                 HStack(spacing: 18 * scale(.buttons)) {
-                    FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons)).scaleEffect(x: -1)
-                    framed("ROUNDS", in: "6", mirrored: true, item: .bestOfSeven, frameScale: TitleOverlay.sideModeScale)
-                    framed("47", in: "ring5", item: .fortySeven, frameScale: TitleOverlay.fortySevenScale)
-                    framed("ZONES", in: "6", item: .zones, frameScale: TitleOverlay.sideModeScale, available: !GameMode.parked.contains(.zones))
-                    FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons))
-                }
-                HStack(spacing: 12 * scale(.buttons)) {
-                    rule("rule5", width: TitleOverlay.endRuleWidth).scaleEffect(x: -1, y: -1)
-                    plain("VS CPU", picked: vsCPU, item: .vsCPU)
-                    rule("rule6", width: TitleOverlay.middleRuleWidth)
-                    plain("VS HUMAN", picked: !vsCPU, item: .vsHuman)
-                    rule("rule5", width: TitleOverlay.endRuleWidth)
+                    ringArrow(way: -1)
+                    let cardWidth = FuturisticPiece(image: Futuristic.taillessSix, scale: TitleOverlay.sideModeScale * scale(.buttons)).size.width
+                    let radius = cardWidth * TitleOverlay.ringRadiusShare
+                    ModeRing(turn: Double(flow.modeTurn), count: TitleItem.modeRing.count, radius: radius) { index in
+                        modeCard(TitleItem.modeRing[index])
+                    }
+                    .frame(width: 2 * radius + cardWidth)
+                    ringArrow(way: 1)
                 }
                 VStack(spacing: 6) {
-                    // UPDATES left of MULTIPLAYER, its lettering fitted to its box, and room as wide on
-                    // MULTIPLAYER's right, so it stays in the middle.
-                    let updatesWidth = FuturisticPiece(image: Futuristic.taillessTwo, scale: TitleOverlay.updatesScale * scale(.buttons)).size.width
-                    let updatesGap = TitleOverlay.updatesGap * scale(.buttons)
-                    HStack(spacing: 12 * scale(.buttons)) {
-                        framed("UPDATES", in: "2", item: .updates, frameScale: TitleOverlay.updatesScale, textSize: TitleOverlay.updatesTextSize,
-                               frameImage: Futuristic.taillessTwo, fitWidth: updatesWidth * TitleOverlay.updatesTextShare, waitsOnNet: false)
-                            .padding(.trailing, updatesGap)
-                        framed("MULTIPLAYER", in: "box4", item: .multiplayer, textSize: TitleOverlay.multiplayerTextSize,
-                               icon: "futuristic_icon_multiplayer",
-                               iconPlace: CGSize(width: multiplayerIconX, height: multiplayerIconY), iconScale: multiplayerIconScale)
-                            .opacity(busy ? 0.5 : 1)
-                        Spacer(minLength: updatesWidth + updatesGap).frame(width: updatesWidth + updatesGap)
-                    }
+                    framed("ONLINE", in: "box4", item: .multiplayer, textSize: TitleOverlay.multiplayerTextSize,
+                           icon: "futuristic_icon_multiplayer",
+                           iconPlace: CGSize(width: multiplayerIconX, height: multiplayerIconY), iconScale: multiplayerIconScale)
+                        .opacity(busy ? 0.5 : 1)
                     if let caption = net.state.caption {
                         Text(caption)
                             .font(Futuristic.font(size: 12 * scale(.text)))
@@ -721,8 +767,68 @@ struct TitleOverlay: View {
         .environment(\.colorScheme, .dark)
     }
 
-    /// The Variaball logo standing in for the name in a debug build.
+    /// The Variaball logo, the game's name over the ring.
     static let logoHeight: CGFloat = 64
+
+    /// HOW TO PLAY over the title: tailless frame 8 stretched across, in its own blue, lit gold under the cursor.
+    static let howToPlayScale: CGFloat = 0.4
+    static let howToPlayStretch: CGFloat = 1.6
+    static let howToPlayColour = Color(rgb: 0x4C53E7)
+    /// Its lettering at the size UPDATES comes out at, shrunk to fit its frame.
+    private var updatesShownTextSize: CGFloat {
+        let size = TitleOverlay.updatesTextSize * scale(.text)
+        let fitWidth = FuturisticPiece(image: Futuristic.taillessTwo, scale: TitleOverlay.updatesScale * scale(.buttons)).size.width * TitleOverlay.updatesTextShare
+        _ = Onomatopoeia.registered
+        guard let face = UIFont(name: Futuristic.fontName, size: Futuristic.fontSize(size)) else { return size }
+        let width = ("UPDATES" as NSString).size(withAttributes: [.font: face]).width
+        return width > fitWidth ? size * fitWidth / width : size
+    }
+    private var howToPlay: some View {
+        let lit = flow.titleCursor == .howToPlay
+        let natural = FuturisticPiece(image: Futuristic.taillessEight, scale: TitleOverlay.howToPlayScale * scale(.buttons)).size
+        let size = CGSize(width: natural.width * TitleOverlay.howToPlayStretch, height: natural.height)
+        return Button { flow.activate(.howToPlay) } label: {
+            FuturisticPiece(image: Futuristic.taillessEight, colour: lit ? Futuristic.lit : TitleOverlay.howToPlayColour,
+                            scale: TitleOverlay.howToPlayScale * scale(.buttons), stretched: size)
+                .overlay {
+                    Text("How To Play")
+                        .font(Futuristic.font(size: updatesShownTextSize))
+                        .foregroundStyle(lit ? Futuristic.lit : Futuristic.line)
+                        .fixedSize()
+                        .offset(y: (Futuristic.taillessEightFaceY - 0.5) * size.height)
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+        .noSystemFocus()
+    }
+
+    /// One mode's frame on the ring: 47 in ring5, the rest in frame 6 without its tail.
+    @ViewBuilder
+    private func modeCard(_ item: TitleItem) -> some View {
+        switch item {
+        case .bestOfSeven: framed("ROUNDS", in: "6tailless", item: item, frameScale: TitleOverlay.sideModeScale, frameImage: Futuristic.taillessSix)
+        case .fortySeven: framed("47", in: "ring5", item: item, frameScale: TitleOverlay.fortySevenScale)
+        case .zones: framed("ZONES", in: "6tailless", item: item, frameScale: TitleOverlay.sideModeScale,
+                            available: !GameMode.parked.contains(.zones), frameImage: Futuristic.taillessSix)
+        default: framed("BREAKER", in: "6tailless", item: item, frameScale: TitleOverlay.sideModeScale, frameImage: Futuristic.taillessSix)
+        }
+    }
+
+    /// An arrow2 beside the ring, pointing out, turning it that way.
+    private func ringArrow(way: Int) -> some View {
+        Button { flow.stepModeRing(way) } label: {
+            FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons))
+                .scaleEffect(x: CGFloat(way))
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+        .noSystemFocus()
+    }
+
+    /// The ring's turn; its radius against a side mode's frame width.
+    static let ringTurn = Animation.spring(response: 0.45, dampingFraction: 0.8)
+    static let ringRadiusShare: CGFloat = 0.9
 
     /// The settings gear and its frame against the other pieces.
     static let settingsScale: CGFloat = 0.5
@@ -737,10 +843,6 @@ struct TitleOverlay: View {
     @AppStorage("titleMultiplayerIconX") private var multiplayerIconX = 60.0
     @AppStorage("titleMultiplayerIconY") private var multiplayerIconY = 0.0
     @AppStorage("titleMultiplayerIconScale") private var multiplayerIconScale = 1.75
-
-    /// The opponent row's rules, by their width in points.
-    static let endRuleWidth: CGFloat = 110
-    static let middleRuleWidth: CGFloat = 120
 
     /// MULTIPLAYER's lettering, a little smaller than the modes', under its icon.
     static let multiplayerTextSize: CGFloat = 20
@@ -796,20 +898,6 @@ struct TitleOverlay: View {
         .noSystemFocus()
     }
     static let parkedOpacity = 0.35
-
-    /// One of the opponent row's words: white when it's the one picked, dim otherwise.
-    private func plain(_ text: String, picked: Bool, item: TitleItem) -> some View {
-        let lit = flow.titleCursor == item
-        return Button { flow.activate(item) } label: {
-            Text(text)
-                .font(Futuristic.font(size: 18 * scale(.text)))
-                .foregroundStyle(lit ? Futuristic.lit : Futuristic.line.opacity(picked ? 1 : TitleOverlay.unpickedOpacity))
-                .fixedSize()
-        }
-        .buttonStyle(.plain)
-        .disabled(busy)
-        .noSystemFocus()
-    }
 
     static let unpickedOpacity = 0.4
 
@@ -875,6 +963,8 @@ struct TitleOverlay: View {
             HStack(spacing: 16) {
                 debugSwitch("UI", picked: flow.tuningOpen, item: .tuning)
                 debugSwitch("FONT " + String(UnicodeScalar(UInt8(65 + Futuristic.typefacePick))), picked: true, item: .titleFont)
+                debugSwitch("CAPTURE", picked: captureMode, item: .capture)
+                debugSwitch("CPU VS CPU", picked: cpuVersusCPU, item: .cpuVersusCPU)
             }
         }
         .padding(.bottom, 20)
@@ -904,5 +994,41 @@ extension View {
 extension Color {
     init(rgb: RGB) {
         self.init(red: Double((rgb >> 16) & 0xFF) / 255, green: Double((rgb >> 8) & 0xFF) / 255, blue: Double(rgb & 0xFF) / 255)
+    }
+}
+
+
+/// The title's modes round a ring seen from the side: each placed by its angle from the front,
+/// smaller, dimmer and turned away toward the back, the back one gone behind the front.
+/// Animatable, so the turn eases through every angle and the depth order follows it.
+struct ModeRing<Card: View>: View, Animatable {
+    var turn: Double
+    let count: Int
+    let radius: CGFloat
+    @ViewBuilder let card: (Int) -> Card
+
+    var animatableData: Double {
+        get { turn }
+        set { turn = newValue }
+    }
+
+    /// At the back: its size, and its turn away at the sides, in degrees.
+    static var backScale: CGFloat { 0.55 }
+    static var sideTilt: Double { 40 }
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<count, id: \.self) { index in
+                let angle = (Double(index) - turn) * 2 * .pi / Double(count)
+                let depth = (cos(angle) + 1) / 2
+                card(index)
+                    .rotation3DEffect(.degrees(-sin(angle) * ModeRing.sideTilt), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
+                    .scaleEffect(ModeRing.backScale + (1 - ModeRing.backScale) * depth)
+                    .opacity(min(depth * 2, 1))
+                    .offset(x: sin(angle) * radius)
+                    .zIndex(depth)
+                    .allowsHitTesting(depth > 0.25)
+            }
+        }
     }
 }

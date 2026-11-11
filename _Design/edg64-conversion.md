@@ -52,4 +52,5 @@ reference player) are in `notes.md`. ✅ done, ⏳ to do.
 - ⏳ Slamstill Traffic
 
 ## Interface
-- ⏳ The UI art and the colours drawn in code (`EsperPalette`, Onomatopoeia, Zones' colours)
+- ✅ The sound words (Onomatopoeia): their fills, and the outline in 11 over 10
+- ⏳ The UI art and the colours drawn in code (`EsperPalette`, Zones' colours)

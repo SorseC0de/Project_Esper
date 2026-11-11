@@ -18,7 +18,11 @@ struct PlayerCustomization: Codable, Equatable {
     /// What a side last picked; before any, the title's colour for the first and teal for the second.
     static func saved(_ player: Int) -> PlayerCustomization {
         if let data = UserDefaults.standard.data(forKey: key(player)),
-           let kept = try? JSONDecoder().decode(PlayerCustomization.self, from: data) { return kept }
+           var kept = try? JSONDecoder().decode(PlayerCustomization.self, from: data) {
+            // A colour the picker doesn't offer in this build (Diamond, picked in a debug build) isn't worn.
+            if !EnergyColour.wheel.contains(kept.energy) { kept.energy = player == 0 ? .orange : .teal }
+            return kept
+        }
         return PlayerCustomization(energy: player == 0 ? EnergyColour.saved : .teal)
     }
 
@@ -42,6 +46,8 @@ struct PlayerCustomization: Codable, Equatable {
 /// the middle, are the front limbs'; the outer ones, past the halo, the back's.
 enum CustomizeSpot: Hashable {
     case skin, arms, legs, hood, start, back, outerArms, outerLegs
+    /// Under the bottom line: whether the side is played by a person (1P, 2P) or the computer.
+    case controlledBy
     /// On a column of the skin's or the hood's picker, in the display.
     case skinPicker(Int), hoodPicker(Int)
 
@@ -87,7 +93,9 @@ extension FlowState {
         } else {
             customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
         }
-        customizeCursors = [.start, .start]
+        // Each side's own cursor on the colours, at its colour; a side this phone doesn't play waits on START.
+        customizeCursors = customizations.indices.map { customizeOwns($0) ? enterPicker($0, .hood) : .start }
+        customizePadSide = customizeLocal
         customizeOpen = true
     }
 
@@ -156,8 +164,40 @@ extension FlowState {
     static var drinkingSeconds: Double { Double(drinkingLoops * GameScene.drinkerFrameCount) * drinkingFrameSeconds }
 
     /// Offline against the computer: the second side is its.
-    private var vsComputer: Bool {
-        !customizeOnline && (UserDefaults.standard.object(forKey: GameScene.vsCPUKey) as? Bool ?? true)
+    private var vsComputer: Bool { customizeChoosesControl && customizeComputerPlays(1) }
+
+    /// Offline, each side picks who plays it under the bottom line: 1P or 2P, or CPU.
+    var customizeChoosesControl: Bool { !customizeOnline && !customizeTurnBased }
+    /// Whether the computer plays a side: the first's off by default, the second's on.
+    func customizeComputerPlays(_ player: Int) -> Bool {
+        player == 0 ? UserDefaults.standard.bool(forKey: GameScene.playerOneCPUKey)
+            : UserDefaults.standard.object(forKey: GameScene.vsCPUKey) as? Bool ?? true
+    }
+    func setCustomizeComputerPlays(_ player: Int, _ computer: Bool) {
+        guard customizeChoosesControl, !customizeLocked, !customizeReady[player], customizeComputerPlays(player) != computer else { return }
+        UserDefaults.standard.set(computer, forKey: player == 0 ? GameScene.playerOneCPUKey : GameScene.vsCPUKey)
+        customizeCursors[player] = .controlledBy
+        objectWillChange.send()
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
+    /// Against the computer on one pad: on START, toward the computer's side, the pad takes the
+    /// computer's cursor, as if it had come off START itself; and back the same way.
+    private func crossCustomizeSide(_ player: Int, across: Int) -> Bool {
+        guard vsComputer, !customizeTurnBased, !scene.secondPadConnected, player == customizePadSide else { return false }
+        let inward = player == 0 ? across : -across
+        guard inward > 0 else { return false }
+        let other = 1 - player
+        if customizeDrinkPhase {
+            guard drinkCursors[player] == DrinkPick.startCursor else { return false }
+            drinkCursors[other] = DrinkPick.startCursor
+        } else {
+            guard customizeCursors[player] == .start else { return false }
+            customizeCursors[other] = .start
+        }
+        customizePadSide = other
+        moveCustomize(other, across: across, down: 0)
+        return true
     }
 
     /// The computer's drink, kept as a pick is.
@@ -172,6 +212,7 @@ extension FlowState {
         // corners; ready again there, the launch.
         if customizePicksDrink, !customizeDrinkPhase {
             customizeDrinkPhase = true
+            customizePadSide = customizeLocal
             customizeSeatedAt = Date() + DrinkPick.cornerSeconds
             // Down in the corner: drawn again, seated.
             DispatchQueue.main.asyncAfter(deadline: .now() + DrinkPick.cornerSeconds + 0.01) { [weak self] in self?.objectWillChange.send() }
@@ -180,6 +221,10 @@ extension FlowState {
             computerDrinkByHand = false
             drinkRandom = [false, false]
             if vsComputer { pickForComputer(Greateraid.offered.randomElement()) }
+            if customizeChoosesControl, customizeComputerPlays(0) {
+                customizations[0].drink = Greateraid.offered.randomElement()
+                customizations[0].save(as: 0)
+            }
             drinkCursors = customizations.indices.map { player in
                 customizations[player].drink.flatMap { sortedDrinks(player).firstIndex(of: $0) } ?? 0
             }
@@ -248,13 +293,15 @@ extension FlowState {
     /// Both sides as they'll play, the clash settled.
     var shownCustomizations: [PlayerCustomization] { PlayerCustomization.clashed(customizations) }
 
-    /// A side's cursor moved by its stick. Up and down the inner column (skin, arms, legs, the
-    /// hood, START, RETURN, and from the skin up round to START) or the outer arms and legs; out
-    /// from the inner arms and legs to the outer, in to START; out from the skin or the hood into
-    /// its picker, at the picked colour. In a picker, across along the colours (past the inner
-    /// end back to its box) and up back to its box.
+    /// A side's cursor moved by its stick. Up and down the inner column (skin, arms, legs, START,
+    /// RETURN, and from the skin up round to START) or the outer one (the hood over the player, the
+    /// outer arms and legs, who plays the side under the bottom line); out from the inner arms and
+    /// legs to the outer, in to START; out from the skin to the hood, out from the hood into its
+    /// picker at the picked colour; RETURN and who plays the side across to each other. In a picker,
+    /// across along the colours (past the inner end back to its box) and up back to its box.
     func moveCustomize(_ player: Int, across: Int, down: Int) {
         guard customizeOwns(player), !customizeReady[player] else { return }
+        if crossCustomizeSide(player, across: across) { return }
         if customizeDrinkPhase { return moveDrinkCursor(player, across: across, down: down) }
         let spot = customizeCursors[player]
         // Toward the middle: right for the first side, left for the second.
@@ -262,13 +309,15 @@ extension FlowState {
         var next: CustomizeSpot?
         if across != 0 {
             switch spot {
-            case .skin, .hood: next = inward > 0 ? .start : enterPicker(player, spot)
+            case .skin: next = inward > 0 ? .start : .hood
+            case .hood: next = inward > 0 ? .skin : enterPicker(player, spot)
             case .arms: next = inward > 0 ? .start : .outerArms
             case .legs: next = inward > 0 ? .start : .outerLegs
             case .outerArms: next = inward > 0 ? .arms : nil
             case .outerLegs: next = inward > 0 ? .legs : nil
-            case .start: next = inward < 0 ? .hood : nil
-            case .back: next = nil
+            case .start: next = inward < 0 ? .legs : nil
+            case .back: next = inward < 0 && customizeChoosesControl ? .controlledBy : nil
+            case .controlledBy: next = inward > 0 ? .back : nil
             case .skinPicker(let column), .hoodPicker(let column):
                 let count = spot.owner == .skin ? HumanLook.skinTones.count : EnergyColour.wheel.count
                 let moved = column + across
@@ -279,10 +328,12 @@ extension FlowState {
                 }
             }
         } else if down != 0 {
-            let column: [CustomizeSpot] = [.skin, .arms, .legs, .hood, .start, .back]
+            let column: [CustomizeSpot] = [.skin, .arms, .legs, .start, .back]
             switch spot {
-            case .outerArms: next = down > 0 ? .outerLegs : .skin
-            case .outerLegs: next = down > 0 ? .hood : .outerArms
+            case .hood: next = down > 0 ? .outerArms : nil
+            case .outerArms: next = down > 0 ? .outerLegs : .hood
+            case .outerLegs: next = down > 0 ? (customizeChoosesControl ? .controlledBy : nil) : .outerArms
+            case .controlledBy: next = down < 0 ? .outerLegs : nil
             case .skin where down < 0: next = .start
             case .skinPicker, .hoodPicker: next = down < 0 ? spot.owner : nil
             default:
@@ -349,9 +400,25 @@ extension FlowState {
         case .outerLegs: update(player) { if flipped { $0.dressing.backBoot.toggle() } else { $0.dressing.frontBoot.toggle() } }
         case .legs: update(player) { if flipped { $0.dressing.frontBoot.toggle() } else { $0.dressing.backBoot.toggle() } }
         case .skinPicker(let column): update(player) { $0.dressing.skinTone = column }
-        case .hoodPicker(let column): update(player) { $0.energy = EnergyColour.wheel[column] }
+        case .hoodPicker(let column):
+            // A colour confirmed: on to the middle button.
+            update(player, sound: false) { $0.energy = EnergyColour.wheel[column] }
+            customizeCursors[player] = .start
+            SoundBoard.shared.play(SoundBoard.confirm)
         case .start: pressReady(player)
         case .back: closeCustomize()
+        case .controlledBy: setCustomizeComputerPlays(player, !customizeComputerPlays(player))
+        }
+    }
+
+    /// A finger sliding along a picker: each colour picked as it's reached, the cursor staying on the picker.
+    func slideCustomizePicker(_ player: Int, _ spot: CustomizeSpot) {
+        guard customizeOwns(player), !customizeLocked, !customizeReady[player], !customizeDrinkPhase else { return }
+        customizeCursors[player] = spot
+        switch spot {
+        case .skinPicker(let column): update(player) { $0.dressing.skinTone = column }
+        case .hoodPicker(let column): update(player) { $0.energy = EnergyColour.wheel[column] }
+        default: break
         }
     }
 
@@ -419,9 +486,9 @@ extension FlowState {
     }
 
     /// The pad's cursor on the bottles: across along a row, up a row behind, down a row in front;
-    /// up past the back row onto the sort, down off it onto the back row; out past a row's outer
+    /// down past the front row onto the sort, up off it onto the front row; out past a row's outer
     /// end onto the small bottles in the gutter under the figure, Random off the front row and No
-    /// Power off the rest, up and down between them, and back in onto the rows.
+    /// Power off the rest, up and down between them, down off Random onto the sort, and back in onto the rows.
     private func moveDrinkCursor(_ player: Int, across: Int, down: Int) {
         let count = sortedDrinks(player).count
         let perRow = DrinkPick.perRow
@@ -436,14 +503,14 @@ extension FlowState {
             // Past a row's inner end: START.
             at = DrinkPick.startCursor
         } else if at == DrinkPick.noPowerCursor || at == DrinkPick.randomCursor {
-            // The small bottles: No Power over Random; up off No Power onto the sort; in onto the
+            // The small bottles: No Power over Random; down off Random onto the sort; in onto the
             // outer end of the back row (from No Power) or the front row (from Random).
             let backRow = (count - 1) / perRow
             func outerEnd(_ row: Int) -> Int { player == 0 ? row * perRow : min(row * perRow + perRow - 1, count - 1) }
             if down > 0 {
-                at = DrinkPick.randomCursor
+                at = at == DrinkPick.noPowerCursor ? DrinkPick.randomCursor : -1
             } else if down < 0 {
-                at = at == DrinkPick.randomCursor ? DrinkPick.noPowerCursor : -1
+                at = DrinkPick.noPowerCursor
             } else if inward > 0 {
                 at = outerEnd(at == DrinkPick.noPowerCursor ? backRow : 0)
             }
@@ -451,15 +518,16 @@ extension FlowState {
             // Out past a row's outer end: the small bottles, Random off the front row.
             at = at / perRow == 0 ? DrinkPick.randomCursor : DrinkPick.noPowerCursor
         } else if at < 0 {
-            guard down > 0 else { return }
-            at = min(((count - 1) / perRow) * perRow, count - 1)
+            guard down < 0 else { return }
+            at = 0
         } else if across != 0 {
             let row = at / perRow
             at = min(max(at + across, row * perRow), min(row * perRow + perRow - 1, count - 1))
         } else if down < 0 {
-            at = at + perRow < count ? at + perRow : -1
+            guard at + perRow < count else { return }
+            at = at + perRow
         } else if down > 0 {
-            at = max(at - perRow, at % perRow)
+            at = at < perRow ? -1 : at - perRow
         }
         guard at != drinkCursors[player] else { return }
         drinkCursors[player] = at
@@ -507,17 +575,14 @@ struct CustomizeScreen: View {
     @AppStorage("esper.customize.headX") private var headX = 1.0
     @AppStorage("esper.customize.headY") private var headY = 1.0
     @AppStorage("esper.customize.headScale") private var headScale = 1.0
-    /// The colour's name's middle over the player's middle, in art pixels.
-    @AppStorage("esper.customize.nameY.2") private var nameY = 26.0
     /// The face of everything but START and the big H.O.O.D., one of the finalists (`CustomizeFont`).
     @AppStorage("esper.customize.font.3") private var fontPick = CustomizeFont.kapel.rawValue
     private var font: CustomizeFont { CustomizeFont(rawValue: fontPick).flatMap { CustomizeFont.finalists.contains($0) ? $0 : nil } ?? .bmArmy }
     /// The space between the side labels' letters, stacked one over the next, in points of the
     /// screen at 1080 high.
     @AppStorage("esper.customize.letterGap.2") private var letterGap = -15.0
-    /// How much further from the screen's middle each side's H.O.O.D. and its words sit, in
-    /// points of the screen at 1080 high.
-    @AppStorage("esper.customize.hoodSpread.2") private var hoodSpread = 112.0
+    /// The H.O.O.D. box's middle over each player, in points down the screen at 1080 high: level with SKIN's.
+    @AppStorage("esper.customize.hoodY") private var hoodY = 214.0
     /// Where the figures stand after the launch's drift, in art pixels up from the middle button's centre.
     @AppStorage("esper.customize.driftY.2") private var driftY = -16.0
     /// When the screen appeared, for its entrance (`CustomizeIntro`), and whether that's played.
@@ -535,6 +600,10 @@ struct CustomizeScreen: View {
     /// An art pixel as a share of the screen's width; the projector is drawn at a quarter of it,
     /// 7 down from the ring, and the player at twice it, 6 up from the lens.
     static let artPixelShare: CGFloat = 0.168 / 64
+    /// The colour's name's middle over the player's middle, and where H.O.O.D.'s line ends up from
+    /// the head's middle, in art pixels.
+    static let nameY: CGFloat = 23
+    static let hoodLineEnd: CGFloat = 5
     /// START off the cursor: its rings at this share, its lettering in gold's and blue's shadows.
     static let startUnlitOpacity = 0.5
     static let startUnlitColours = Onomatopoeia.Colours(upper: EsperPalette.gold.shadow, lower: EsperPalette.blue.shadow,
@@ -584,10 +653,22 @@ struct CustomizeScreen: View {
     /// their end dots as big as theirs, shares of the screen's height.
     static let connectorWidthShare: CGFloat = 0.0032
     static let connectorDotShare: CGFloat = 0.0041
-    /// The words under H.O.O.D.'s letters, and MODEL, as a share of the screen's height.
-    static let hoodWordShare: CGFloat = 0.018
-    /// What H.O.O.D. stands for, a word a letter.
-    static let hoodWords = ["Hyper-", "Osmotic", "Output", "Driver"]
+    /// "Game Mode:" and MODEL, as a share of the screen's height.
+    static let subtitleShare: CGFloat = 0.018
+    /// The connectors fading out and back in, together, over this many seconds.
+    static let connectorFadeSeconds = 4.0
+    /// 1P or 2P, and CPU: their lettering as a share of the screen's height, apart by this share,
+    /// their middle this far under the bottom line; the picked one's rule5 under it, this far down.
+    static let controlledByTextShare: CGFloat = 0.045
+    static let controlledByGapShare: CGFloat = 0.075
+    static let controlledByDropShare: CGFloat = 0.05
+    static let controlledByRuleDropShare: CGFloat = 0.009
+    static let controlledByUnpickedOpacity = 0.4
+    /// The bottom line's slope either side of RETURN, art pixels of its picture: its outer end and
+    /// the start of its bend, across and down.
+    static let bottomLineOuterEnd = CGPoint(x: 60, y: 73)
+    static let bottomLineBend = CGPoint(x: 960, y: 29.5)
+    static let bottomLinePicture = CGSize(width: 2419, height: 83)
     /// The space between CUSTOMIZE's letters, a share of each one's size.
     static let headingSpacing: CGFloat = 0.08
     /// The ground: the vector's gradient (in the menus' colours), out to the screen's edges, and
@@ -616,6 +697,10 @@ struct CustomizeScreen: View {
     static let returnLine: RGB = Futuristic.lineRGB
     /// "Game Mode:" over the mode's name, its middle down the screen.
     static let gameModeLabelY: CGFloat = 0.135
+    /// A two-word mode's lines apart: the gap against the capitals' height.
+    static let titleLineGapShare: CGFloat = 0.25
+    /// On the bottles, the mode's widest word fills this share of the room between the two sides' words.
+    static let titleBetweenBoxesShare: CGFloat = 0.9
     /// A ticked box's ring, a share of the box's height.
     static let tickShare: CGFloat = 0.6
 
@@ -707,24 +792,6 @@ struct CustomizeScreen: View {
         FloText(text, height: height, fontName: ownFace ? font.fontName : nil, maxWidth: maxWidth, spacing: spacing, colours: colours)
     }
 
-    /// Bigdex as `title`, in `upper`, its lower half in `lower`.
-    private func twoTone(_ text: String, size: CGFloat, upper: RGB, lower: RGB) -> some View {
-        Text(text)
-            .font(.custom(CustomizeFont.bigdex.fontName, size: size))
-            .foregroundStyle(Color(rgb: upper))
-            .fixedSize()
-            .overlay {
-                Text(text)
-                    .font(.custom(CustomizeFont.bigdex.fontName, size: size))
-                    .foregroundStyle(Color(rgb: lower))
-                    .fixedSize()
-                    .mask(VStack(spacing: 0) {
-                        Color.clear
-                        Color.black
-                    })
-            }
-    }
-
     private func subtitle(_ text: String, size: CGFloat) -> some View {
         Text(text)
             .font(.custom(font.fontName, size: font.size(size)))
@@ -736,10 +803,26 @@ struct CustomizeScreen: View {
     private func heading(_ size: CGSize) -> some View {
         litTitle("CUSTOMIZE", height: size.height * 0.025, spacing: CustomizeScreen.headingSpacing)
             .position(x: size.width / 2, y: size.height * 0.078)
-        subtitle("Game Mode:", size: size.height * CustomizeScreen.hoodWordShare)
+        subtitle("Game Mode:", size: size.height * CustomizeScreen.subtitleShare)
             .position(x: size.width / 2, y: size.height * CustomizeScreen.gameModeLabelY)
-        title(flow.customizeMode == .rounds ? "ROUNDS" : flow.customizeMode == .zones ? "ZONES" : "47", size: size.height * 0.08)
-            .position(x: size.width / 2, y: size.height * 0.19)
+        // A word a line, the first where a one-word name sits, the rest hanging under it, a share of the
+        // capitals' height between one line's foot and the next's top.
+        let lineSize = size.height * 0.08
+        let face = UIFont(name: font.fontName, size: font.size(lineSize))
+        let lineHeight = face?.lineHeight ?? font.size(lineSize), capHeight = face?.capHeight ?? font.size(lineSize)
+        let words = flow.customizeMode.title.split(separator: " ").map(String.init)
+        // On the bottles, shrunk to fit between the two sides' words.
+        let widestWord = words.map { ($0 as NSString).size(withAttributes: [.font: face ?? UIFont.systemFont(ofSize: lineSize)]).width }.max() ?? 0
+        let roomBetweenBoxes = size.width * (1 - 2 * DrinkPick.sideRange.inner) * CustomizeScreen.titleBetweenBoxesShare
+        let drinkPhaseScale = flow.customizeDrinkPhase ? min(roomBetweenBoxes / max(widestWord, 1), 1) : 1
+        VStack(spacing: CustomizeScreen.titleLineGapShare * capHeight - (lineHeight - capHeight)) {
+            ForEach(Array(words.enumerated()), id: \.offset) { _, word in
+                title(word, size: lineSize)
+            }
+        }
+        .scaleEffect(drinkPhaseScale, anchor: .top)
+        .frame(height: lineHeight, alignment: .top)
+        .position(x: size.width / 2, y: size.height * 0.19)
     }
 
     // MARK: A side
@@ -850,19 +933,27 @@ struct CustomizeScreen: View {
                         .opacity(intro.figuresIn)
                 }
             }
+            // From under H.O.O.D.'s box straight down onto the hood, in the box's own line colour.
+            if !ready, let head = portrait.centres[.head] {
+                let hood = hoodBoxLine(player, size, over: ring.x).offsetBy(dx: slide, dy: 0)
+                let target = CGPoint(x: hood.midX, y: figureMiddle + (head.y - 24 - CustomizeScreen.hoodLineEnd) * playerPixel)
+                connector(from: CGPoint(x: hood.midX, y: hood.maxY), to: target, drop: 0, size: size, lit: cursor == .hood, glow: glow,
+                          unlit: CustomizeScreen.hoodLine)
+                    .opacity(intro.figuresIn)
+            }
         }
         // The colour's name over the player, lettered as CUSTOMIZE is, a period between its letters,
         // While the hood's colours are being picked; gone with the controls once the side's ready or on the bottles.
         if cursor.owner == .hood, !ready {
             // MODEL, as the words under H.O.O.D. are, centred against it.
             HStack(alignment: .center, spacing: size.height * 0.01) {
-                subtitle("MODEL", size: size.height * CustomizeScreen.hoodWordShare)
+                subtitle("MODEL", size: size.height * CustomizeScreen.subtitleShare)
                 // A new colour's name rolls in letter by letter, as Apple's numbers do.
                 FloRollText(pick.energy.name.uppercased(), height: size.height * 0.025, fontName: font.fontName,
                             maxWidth: halo.width * CustomizeScreen.nameMaxWidthShare, spacing: CustomizeScreen.headingSpacing)
             }
             .fixedSize()
-            .position(x: ring.x, y: figureMiddle - nameY * playerPixel)
+            .position(x: ring.x, y: figureMiddle - CustomizeScreen.nameY * playerPixel)
         }
 
         let side = CustomizeScreen.sideLabelShare
@@ -903,7 +994,10 @@ struct CustomizeScreen: View {
         box(player, .outerLegs, tag + "legs", mirroredAbout: halo.midX, label: "BRACER", labelShare: side, labelBeside: ring.x, size: size, glow: glow, cursor: cursor, slide: slide) {
             tick(flow.customizeTicked(player, .outerLegs), $0, lit: cursor == .outerLegs, glow: glow)
         }
-        box(player, .hood, tag + "hood", label: "H.O.O.D", size: size, glow: glow, cursor: cursor, slide: slide) { frame in
+        let hoodLine = hoodBoxLine(player, size, over: ring.x)
+        box(player, .hood, tag + "hood", label: "H.O.O.D", labelOutward: player == 0 ? -1 : 1, centredOn: CGPoint(x: hoodLine.midX, y: hoodLine.midY),
+            size: size, glow: glow,
+            cursor: cursor, slide: slide) { frame in
             if let hood = flow.scene.customizeHood(player: player, look: pick.look) {
                 Image(uiImage: UIImage(cgImage: hood)).resizable().interpolation(.none).aspectRatio(contentMode: .fit)
                     .frame(width: frame.width * 0.7, height: frame.height * 0.7)
@@ -913,21 +1007,60 @@ struct CustomizeScreen: View {
         if cursor.owner == .skin || cursor.owner == .hood {
             picker(player, tag + "display", size: size, cursor: cursor, pick: pick, glow: glow, slide: slide)
         }
+        if flow.customizeChoosesControl {
+            controlledBy(player, size, under: ring.x, glow: glow, cursor: cursor, slide: slide)
         }
-        if cursor.owner == .hood, !ready {
-            // What the H.O.O.D. is, over the player: each word of it under its letter.
-            HStack(alignment: .top, spacing: size.height * 0.012) {
-                ForEach(Array(CustomizeScreen.hoodWords.enumerated()), id: \.offset) { index, word in
-                    VStack(spacing: size.height * 0.004) {
-                        twoTone(String(word.prefix(1)) + (index < CustomizeScreen.hoodWords.count - 1 ? "." : ""), size: size.height * 0.08,
-                                upper: pick.look.bright, lower: pick.energy.rampDown)
-                        subtitle(word, size: size.height * CustomizeScreen.hoodWordShare)
+        }
+    }
+
+    /// The H.O.O.D. box's line, moved off the vector's place to over the player, at HOOD Y.
+    private func hoodBoxLine(_ player: Int, _ size: CGSize, over x: CGFloat) -> CGRect {
+        let line = rect("customize_p\(player + 1)_hood_line", size)
+        return line.offsetBy(dx: x - line.midX, dy: hoodY * size.height / 1080 - line.midY)
+    }
+
+    /// Under the bottom line, under the side's player: 1P (2P) and CPU, the picked one in the
+    /// side's colour with a rule5 under it, the other dim; leaning as the line does there, and
+    /// glowing under the side's cursor.
+    @ViewBuilder
+    private func controlledBy(_ player: Int, _ size: CGSize, under x: CGFloat, glow: RGB, cursor: CustomizeSpot, slide: CGFloat) -> some View {
+        let computer = flow.customizeComputerPlays(player)
+        let line = rect("customize_bottom_line", size)
+        let picture = CustomizeScreen.bottomLinePicture
+        let outer = CustomizeScreen.bottomLineOuterEnd, bend = CustomizeScreen.bottomLineBend
+        // The line's slope there, down the screen for each point across; the second side's mirrored.
+        let slope = (bend.y - outer.y) / (bend.x - outer.x) * (line.height / picture.height) / (line.width / picture.width) * (player == 0 ? 1 : -1)
+        let across = (player == 0 ? x - line.minX : line.maxX - x) / line.width * picture.width
+        let lineY = line.minY + (outer.y + (across - outer.x) * (bend.y - outer.y) / (bend.x - outer.x)) / picture.height * line.height
+        let textSize = size.height * CustomizeScreen.controlledByTextShare
+        let width = size.width * 0.2, height = textSize * 3
+        let lit = cursor == .controlledBy
+        HStack(spacing: size.height * CustomizeScreen.controlledByGapShare) {
+            ForEach([false, true], id: \.self) { isComputer in
+                let picked = isComputer == computer
+                title(isComputer ? "CPU" : "\(player + 1)P", size: textSize)
+                    .colorMultiply(picked ? Color(rgb: glow) : .white)
+                    .opacity(picked ? 1 : CustomizeScreen.controlledByUnpickedOpacity)
+                    .overlay(alignment: .bottom) {
+                        if picked {
+                            Image(uiImage: Futuristic.image("rule5"))
+                                .resizable()
+                                .interpolation(.high)
+                                .aspectRatio(contentMode: .fit)
+                                .colorMultiply(Color(rgb: glow))
+                                .offset(y: size.height * CustomizeScreen.controlledByRuleDropShare)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                    .fixedSize()
-                }
+                    .contentShape(Rectangle())
+                    .onTapGesture { flow.setCustomizeComputerPlays(player, isComputer) }
             }
-            .position(x: ring.x + (player == 0 ? -1 : 1) * hoodSpread * size.height / 1080, y: halo.minY - size.height * 0.04)
         }
+        .energyGlow(radius: lit ? textSize * 0.3 : 0)
+        .frame(width: width, height: height)
+        // Leaning with the line: sheared down the screen about its middle.
+        .transformEffect(CGAffineTransform(a: 1, b: slope, c: 0, d: 1, tx: 0, ty: -slope * width / 2))
+        .position(x: x + slide, y: lineY + size.height * CustomizeScreen.controlledByDropShare)
     }
 
     /// A box's tick: Futuristic_UI's ring8 always, in its box's line's colour, the side's under the
@@ -959,7 +1092,8 @@ struct CustomizeScreen: View {
     /// straight down out of it first, a dot there. In
     /// the small boxes' cyan, or lit in the side's colour, glowing, with the box.
     @ViewBuilder
-    private func connector(from origin: CGPoint, to target: CGPoint, drop: CGFloat, size: CGSize, lit: Bool, glow: RGB) -> some View {
+    private func connector(from origin: CGPoint, to target: CGPoint, drop: CGFloat, size: CGSize, lit: Bool, glow: RGB,
+                           unlit: RGB = CustomizeScreen.smallBoxLine) -> some View {
         let start = CGPoint(x: origin.x, y: origin.y + drop)
         let across = target.x - start.x, down = target.y - start.y
         let slant = min(abs(across), abs(down))
@@ -967,19 +1101,25 @@ struct CustomizeScreen: View {
         // Down, level, then 45 degrees.
         let points = [origin, start, CGPoint(x: target.x - slant * sideways, y: start.y), CGPoint(x: target.x, y: start.y + slant * downward), target]
         let tip = target
-        let colour = Color(rgb: lit ? glow : CustomizeScreen.smallBoxLine)
+        let colour = Color(rgb: lit ? glow : unlit)
         let dot = size.height * CustomizeScreen.connectorDotShare
-        ZStack {
-            Path { path in
-                path.addLines(points)
+        // Fading out to nothing and back, every connector together, off the clock.
+        TimelineView(.animation) { timeline in
+            let turn = timeline.date.timeIntervalSinceReferenceDate / CustomizeScreen.connectorFadeSeconds
+            ZStack {
+                Path { path in
+                    path.addLines(points)
+                }
+                .stroke(colour, style: StrokeStyle(lineWidth: size.height * CustomizeScreen.connectorWidthShare, lineCap: .round, lineJoin: .round))
+                Circle().fill(colour)
+                    .frame(width: dot * 2, height: dot * 2)
+                    .position(tip)
             }
-            .stroke(colour, style: StrokeStyle(lineWidth: size.height * CustomizeScreen.connectorWidthShare, lineCap: .round, lineJoin: .round))
-            Circle().fill(colour)
-                .frame(width: dot * 2, height: dot * 2)
-                .position(tip)
+            .frame(width: size.width, height: size.height)
+            .energyGlow(radius: lit ? dot * 2 : 0)
+            .opacity(0.5 - 0.5 * cos(2 * .pi * turn))
         }
         .frame(width: size.width, height: size.height)
-        .energyGlow(radius: lit ? dot * 2 : 0)
         .allowsHitTesting(false)
         .position(x: size.width / 2, y: size.height / 2)
     }
@@ -989,17 +1129,21 @@ struct CustomizeScreen: View {
     /// its side's cursor the line thickens and lights in the side's colour, glowing.
     @ViewBuilder
     private func box(_ player: Int, _ spot: CustomizeSpot, _ name: String, mirroredAbout axis: CGFloat? = nil, label: String,
-                     labelShare: CGFloat = CustomizeScreen.labelShare, labelBeside playerX: CGFloat? = nil,
+                     labelShare: CGFloat = CustomizeScreen.labelShare, labelBeside playerX: CGFloat? = nil, labelOutward: CGFloat? = nil,
+                     centredOn centre: CGPoint? = nil,
                      size: CGSize, glow: RGB, cursor: CustomizeSpot, slide: CGFloat = 0,
                      @ViewBuilder content: (CGRect) -> some View) -> some View {
         let flip: CGFloat = axis == nil ? 1 : -1
-        let fill = rect(name, size, mirroredAbout: axis).offsetBy(dx: slide, dy: 0)
-        let line = rect(name + "_line", size, mirroredAbout: axis).offsetBy(dx: slide, dy: 0)
+        // `centredOn`: the box moved off the vector's place, its line's middle there.
+        let placed = rect(name + "_line", size, mirroredAbout: axis)
+        let moved = centre.map { CGPoint(x: $0.x - placed.midX, y: $0.y - placed.midY) } ?? .zero
+        let fill = rect(name, size, mirroredAbout: axis).offsetBy(dx: slide + moved.x, dy: moved.y)
+        let line = placed.offsetBy(dx: slide + moved.x, dy: moved.y)
         let lit = cursor == spot
         content(fill)
             .position(x: fill.midX, y: fill.midY)
         if lit {
-            let thick = rect(name + "_lit", size, mirroredAbout: axis).offsetBy(dx: slide, dy: 0)
+            let thick = rect(name + "_lit", size, mirroredAbout: axis).offsetBy(dx: slide + moved.x, dy: moved.y)
             picture(name + "_lit").resizable().scaleEffect(x: flip)
                 .colorMultiply(Color(rgb: glow))
                 .frame(width: thick.width, height: thick.height)
@@ -1020,6 +1164,13 @@ struct CustomizeScreen: View {
             }
             .frame(width: 0, height: 0, alignment: right ? .leading : .trailing)
             .position(x: right ? line.maxX + gap : line.minX - gap, y: line.midY)
+        } else if let labelOutward {
+            // Level with the box, off its side away from the middle (-1 left, 1 right).
+            let gap = line.width * CustomizeScreen.sideLabelGapShare
+            title(label, size: line.height * labelShare)
+                .fixedSize()
+                .frame(width: 0, height: 0, alignment: labelOutward > 0 ? .leading : .trailing)
+                .position(x: labelOutward > 0 ? line.maxX + gap : line.minX - gap, y: line.midY)
         } else {
             // Hung from just under the box.
             title(label, size: line.height * labelShare)
@@ -1075,11 +1226,14 @@ struct CustomizeScreen: View {
         }
         .frame(width: inner.width, height: inner.height)
         .contentShape(Rectangle())
-        .pickerTouches(columns: columns.count, width: inner.width) { index in
-            // Tapped, or slid along: each column picked as the finger reaches it.
+        .pickerTouches(columns: columns.count, width: inner.width, picked: picked, pick: { index in
+            // Tapped or slid along: each column picked as the finger reaches it.
             guard index != picked else { return }
-            flow.activateCustomize(player, skin ? .skinPicker(index) : .hoodPicker(index))
-        }
+            flow.slideCustomizePicker(player, skin ? .skinPicker(index) : .hoodPicker(index))
+        }, confirmed: skin ? nil : { index in
+            // The picked colour tapped again: confirmed, on to the middle button.
+            flow.activateCustomize(player, .hoodPicker(index))
+        })
         .position(x: frame.midX, y: frame.midY - frame.height * 0.08)
     }
 
@@ -1089,8 +1243,8 @@ struct CustomizeScreen: View {
         let start = rect("customize_start", size)
         // The local side's cursor: the other side's waits on START, unmoved, unless a second pad drives it.
         // On the drink pick it's lit with the drink cursor on it.
-        let lit = flow.customizeDrinkPhase ? flow.drinkCursors[flow.customizeLocal] == DrinkPick.startCursor
-            : flow.customizeCursors[flow.customizeLocal] == .start
+        let lit = flow.customizeDrinkPhase ? flow.drinkCursors[flow.customizePadSide] == DrinkPick.startCursor
+            : flow.customizeCursors[flow.customizePadSide] == .start
         // The rings turn only while START's lit, held where they stopped otherwise.
         return TimelineView(.animation(paused: !lit)) { timeline in
             let seconds = spunSeconds + (spinningSince.map { timeline.date.timeIntervalSince($0) } ?? 0)
@@ -1112,11 +1266,20 @@ struct CustomizeScreen: View {
                         .rotationEffect(.degrees(DrinkPick.startBottleLean))
                         .opacity(flow.customizeReady[flow.customizeLocal] ? 0.5 : (lit ? 1 : 0.6))
                         .position(x: start.midX, y: start.midY)
-                } else if flow.customizeLaunch == nil {
-                    // Lettered as FLO is lit while START's lit, in its two tones' darkest otherwise.
-                    litTitle(flow.customizeOnline ? "READY" : "START", height: size.height * 0.035, ownFace: false,
+                } else if flow.customizeLaunch == nil, flow.customizeOnline {
+                    // Lettered as FLO is lit while READY's lit, in its two tones' darkest otherwise.
+                    litTitle("READY", height: size.height * 0.035, ownFace: false,
                              colours: lit ? FloTuning.colours : CustomizeScreen.startUnlitColours)
-                        .opacity(flow.customizeOnline && flow.customizeReady[flow.customizeLocal] ? 0.5 : 1)
+                        .opacity(flow.customizeReady[flow.customizeLocal] ? 0.5 : 1)
+                        .position(x: start.midX, y: start.midY)
+                } else if flow.customizeLaunch == nil {
+                    // On to the stage select: its icon on the ball, as the bottle is, in place of START.
+                    Image(uiImage: UIImage(named: "stage_select_icon") ?? UIImage())
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: size.height * DrinkPick.startBottleShare)
+                        .opacity(lit ? 1 : 0.6)
                         .position(x: start.midX, y: start.midY)
                 }
             }
@@ -1172,12 +1335,11 @@ struct CustomizeScreen: View {
                     tuningButton("▶") { fontPick = CustomizeFont.finalist(after: font, by: 1).rawValue }
                 }
                 tuningRow("LETTER GAP", value: $letterGap, step: 1, range: -20...20, format: "%.0f")
-                tuningRow("HOOD SPREAD", value: $hoodSpread, step: 1, range: -200...200, format: "%.0f")
+                tuningRow("HOOD Y", value: $hoodY, step: 1, range: 120...400, format: "%.0f")
                 tuningRow("DRIFT Y", value: $driftY, step: 1, range: -64...64, format: "%.0f")
                 tuningRow("HEAD X", value: $headX, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD Y", value: $headY, step: 1, range: -16...16, format: "%.0f")
                 tuningRow("HEAD SCALE", value: $headScale, step: 0.1, range: 0.5...2, format: "×%.1f")
-                tuningRow("NAME Y", value: $nameY, step: 1, range: -64...64, format: "%.0f")
             }
         }
         .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -1209,16 +1371,14 @@ struct CustomizeScreen: View {
 }
 
 extension View {
-    /// A row of `columns` picked by a touch: where it lands, and where it slides to. The TV has
-    /// no touch; its remote's cursor does the picking.
+    /// A row of `columns` picked by a touch: where it lands, and where it slides to; `confirmed`, a
+    /// tap on the column already picked. The TV has no touch; its remote's cursor does the picking.
     @ViewBuilder
-    func pickerTouches(columns: Int, width: CGFloat, pick: @escaping (Int) -> Void) -> some View {
+    func pickerTouches(columns: Int, width: CGFloat, picked: Int, pick: @escaping (Int) -> Void, confirmed: ((Int) -> Void)? = nil) -> some View {
         #if os(tvOS)
         self
         #else
-        gesture(DragGesture(minimumDistance: 0).onChanged { touch in
-            pick(min(max(Int(touch.location.x / width * CGFloat(columns)), 0), columns - 1))
-        })
+        modifier(PickerTouches(columns: columns, width: width, picked: picked, pick: pick, confirmed: confirmed))
         #endif
     }
 
@@ -1352,9 +1512,10 @@ struct CustomizeFigure: View {
     let headNudge: CGPoint
     let headScale: CGFloat
     /// The ball in hand, its picture and its middle in art pixels from the canvas's bottom left;
-    /// and the front leg drawn again over it where the sheet passes it behind (the win screen's).
+    /// and what the sheet draws in front of it, and that part's line in white, again over it (the win screen's).
     var ball: (image: CGImage, centre: CGPoint)? = nil
     var overBall: CGImage? = nil
+    var overBallLine: CGImage? = nil
     /// What play draws round the body that a portrait hasn't: the head tipped, arms of their own,
     /// afterimages, effects (the updates screen's poses).
     var extras: FigureExtras? = nil
@@ -1476,12 +1637,13 @@ struct CustomizeFigure: View {
                 if let previous, fade < 1 { drawFigure(previous.portrait, previous.look, opacity: 1) }
                 drawFigure(portrait, look, opacity: fade)
                 if let ball {
-                    let side = CGFloat(ball.image.width) * pixel
+                    let width = CGFloat(ball.image.width) * pixel, height = CGFloat(ball.image.height) * pixel
                     let at = spot(ball.centre)
                     context.draw(Image(decorative: ball.image, scale: 1).interpolation(.none),
-                                 in: CGRect(x: at.x - side / 2, y: at.y - side / 2, width: side, height: side))
+                                 in: CGRect(x: at.x - width / 2, y: at.y - height / 2, width: width, height: height))
                 }
                 if let overBall { context.draw(Image(decorative: overBall, scale: 1).interpolation(.none), in: figureRect) }
+                if let overBallLine { drawLine(overBallLine, in: figureRect, colour: look.outline, on: context) }
                 for layer in extras?.over ?? [] { drawLayer(layer, on: context) }
                 // Effects, a soft halo in their glow colour added under each.
                 for effect in extras?.effects ?? [] {
@@ -1677,6 +1839,7 @@ final class CustomizeFigureMotion {
              limb.fromTop ? portrait.tops[limb.part] : portrait.centres[limb.part])
         }
         let sources = [(BodyPart.head, CustomizeFigureMotion.headCubeRate, ParticleLook.cubeSize, ParticleLook.cubeSpread, GameScene.crownLift, head)] + limbs
+        let rainbowCubes = EnergyColour.withGlow(look.glow)?.rainbowCubes == true
         for source in sources {
             guard let centre = source.at else { continue }
             credit[source.part, default: 0] += source.rate * step
@@ -1692,8 +1855,10 @@ final class CustomizeFigureMotion {
                                   life: Double(ParticleLook.cubeTrail) / speed + .random(in: -0.05...0.05),
                                   orientation: simd_quatf(angle: .random(in: 0..<(2 * .pi)), axis: axis),
                                   spin: SIMD3<Float>.random(in: -ParticleLook.cubeSpin...ParticleLook.cubeSpin),
-                                  // The head's in the energy's colour; the limbs' in theirs.
-                                  size: CGFloat(source.size), colour: source.part == .head ? look.glow : (look.colours[source.part] ?? look.glow),
+                                  // The head's in the energy's colour, the limbs' in theirs; Diamond's all FloState's rainbow.
+                                  size: CGFloat(source.size),
+                                  colour: rainbowCubes ? ZoneTuning.colours.randomElement() ?? look.glow
+                                      : source.part == .head ? look.glow : (look.colours[source.part] ?? look.glow),
                                   behind: source.part.isBack))
             }
         }
@@ -1786,7 +1951,7 @@ struct MenuGround: View {
     /// The gradient and its glows; without, the grid on black alone.
     var glows = true
 
-    /// The grid on black as a picture this size, for the Test Center's backdrop.
+    /// The grid on black as a picture this size, for the Tutorial's backdrop.
     @MainActor static func gridOnBlack(size: CGSize, scale: CGFloat) -> CGImage? {
         let renderer = ImageRenderer(content: MenuGround(glows: false).frame(width: size.width, height: size.height))
         renderer.scale = scale
@@ -1894,3 +2059,33 @@ extension CustomizeScreen {
             .allowsHitTesting(false)
     }
 }
+
+#if !os(tvOS)
+/// `pickerTouches`' gesture: a touch that lands on the picked column and lifts there without
+/// leaving it confirms; any other picks as it goes.
+private struct PickerTouches: ViewModifier {
+    let columns: Int
+    let width: CGFloat
+    let picked: Int
+    let pick: (Int) -> Void
+    let confirmed: ((Int) -> Void)?
+    /// Whether the touch under way can still confirm: it landed on the pick and hasn't left it.
+    @State private var confirming: Bool?
+
+    private func column(_ x: CGFloat) -> Int { min(max(Int(x / width * CGFloat(columns)), 0), columns - 1) }
+
+    func body(content: Content) -> some View {
+        content.gesture(DragGesture(minimumDistance: 0)
+            .onChanged { touch in
+                let start = column(touch.startLocation.x), at = column(touch.location.x)
+                if confirming == nil { confirming = start == picked }
+                if at != start { confirming = false }
+                pick(at)
+            }
+            .onEnded { touch in
+                if confirming == true { confirmed?(column(touch.location.x)) }
+                confirming = nil
+            })
+    }
+}
+#endif

@@ -84,6 +84,7 @@ final class MaskScene: SKScene {
             node.anchorPoint = flat.anchor
             node.position = flat.position
             node.size = flat.size
+            node.xScale = flat.xScale
             staticLayer.addChild(node)
         }
     }

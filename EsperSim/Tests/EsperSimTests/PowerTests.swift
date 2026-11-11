@@ -213,15 +213,16 @@ final class PowerTests: XCTestCase {
         run(&match, frames: 2, input: { _ in .idle })
         XCTAssertEqual(match.platforms.count, 0)
         run(&match, frames: ShakeRules.wallFrames, input: { _ in .idle })
-        let first = match.platforms.count
-        XCTAssertEqual(first, 1)
+        XCTAssertEqual(match.platforms.count, 1)
+        let first = match.platforms[0].id
         run(&match, frames: ShakeRules.cooldownFrames, input: { _ in .idle })
         match.players[0].position.y = max(match.players[0].position.y, 60)
         match.players[0].velocity = .zero
         match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: 1), shoot: true), .idle])
         run(&match, frames: ShakeRules.wallFrames, input: { _ in .idle })
         XCTAssertTrue(match.events.contains(.platformMade(player: 0)) || match.platforms.count >= 1)
-        XCTAssertEqual(match.players[0].state == .walling || match.platforms.contains { $0.framesLeft > ShakeRules.platformFrames - ShakeRules.wallFrames - 2 }, true, "a second wall with no landing between")
+        XCTAssertEqual(match.players[0].state == .walling || match.platforms.contains { $0.id != first }, true, "a second wall with no landing between")
+        XCTAssertLessThanOrEqual(match.platforms.count, 1, "the second wall breaks the first")
     }
 
     func testTheDefenderRunsATenthFaster() {
@@ -685,7 +686,7 @@ final class PowerTests: XCTestCase {
         XCTAssertEqual(one.players[0].velocity.y, 0, accuracy: 0.001)
     }
 
-    // MARK: Feather Fresca and Titan Tea
+    // MARK: Feather Float and Titan Tea
 
     private func drunk(_ drinks: [Greateraid]) -> (spec: FighterSpec, drinks: Drinks) {
         var had = Drinks()
@@ -700,8 +701,8 @@ final class PowerTests: XCTestCase {
     }
 
     func testFeatherFrescaFallsSlowerButFastFallsTheSame() {
-        XCTAssertEqual(drunk([.featherFresca]).spec.fallGravityShare, 0.75)
-        XCTAssertEqual(drunk([.featherFresca, .featherFresca]).spec.fallGravityShare, 0.5)
+        XCTAssertEqual(drunk([.featherFloat]).spec.fallGravityShare, 0.75)
+        XCTAssertEqual(drunk([.featherFloat, .featherFloat]).spec.fallGravityShare, 0.5)
         func landingFrames(_ spec: FighterSpec, fastFall: Bool) -> Int {
             var match = Match()
             match.players[0].spec = spec
@@ -710,7 +711,7 @@ final class PowerTests: XCTestCase {
             match.players[0].state = .air
             return run(&match, frames: 600, input: { _ in fastFall ? PlayerInput(stick: Vec2(x: 0, y: -1)) : .idle }) { $0.players[0].grounded }
         }
-        let plain = drunk([]).spec, feather = drunk([.featherFresca, .featherFresca]).spec
+        let plain = drunk([]).spec, feather = drunk([.featherFloat, .featherFloat]).spec
         XCTAssertGreaterThan(landingFrames(feather, fastFall: false), landingFrames(plain, fastFall: false))
         XCTAssertEqual(landingFrames(feather, fastFall: true), landingFrames(plain, fastFall: true))
     }

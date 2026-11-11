@@ -80,7 +80,7 @@ struct WinStage: View {
                     let frame = Int(timeline.date.timeIntervalSinceReferenceDate * figure.pose.framesPerSecond) % max(frameCount, 1)
                     if let shown = flow.scene.winPortrait(player: figure.player, pose: figure.pose, frame: frame) {
                         CustomizeFigure(portrait: shown.portrait, look: flow.scene.playerLook(figure.player), pixel: pixel, mirrored: false,
-                                        headNudge: shown.headNudge, headScale: shown.headScale, ball: shown.ball, overBall: shown.overBall)
+                                        headNudge: shown.headNudge, headScale: shown.headScale, ball: shown.ball, overBall: shown.overBall, overBallLine: shown.overBallLine)
                             .frame(width: (48 + 2 * CustomizeFigure.margin) * pixel, height: (48 + 2 * CustomizeFigure.margin) * pixel)
                             .position(x: ring.x, y: figureMiddle)
                     }

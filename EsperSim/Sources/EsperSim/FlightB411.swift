@@ -72,6 +72,10 @@ public enum FlightB411Rules {
     /// empty in a row.
     public static let binOpenFrames = 600
     public static let emptyRunMost = 1
+    /// Breaker Ball's: both hoopcases out of their own bins together, an empty bin with them one time in
+    /// `breakerEmptyOdds`, all in and shut, then `breakerWaitFrames` before they're out again, reshuffled.
+    public static let breakerEmptyOdds = 3
+    public static let breakerWaitFrames = 120
     /// 47's 2X and 3X signs: after the start's level spell, every 5 to 15 seconds the dice pick
     /// neither, 2X or 3X, a third each; one lit stays lit 3 seconds, a basket meanwhile worth
     /// that many times its points.
@@ -98,6 +102,8 @@ public struct Bin: Equatable {
     }
     public var open = false
     public var load = Load.empty
+    /// Breaker Ball: which of the match's rims its hoopcase carries.
+    public var hoop = 0
     public var framesLeft = 0
     /// Frames of the case's slide done, out of `FlightB411Rules.caseSlideFrames`.
     public var caseFrames = 0
@@ -234,6 +240,11 @@ extension Match {
                 }
             }
         }
+        if mode == .breakerBall {
+            // Breaker Ball's old hoopcases out of the bins: off for the posture rules, the rims over the stunned.
+            // reshuffleBreakerBins()
+            return
+        }
         // None open, past the start's spell, and the ball out of its bin: the next, any but the
         // last; empty one time in three but never twice running, the hoop otherwise.
         if frame >= flightStartsAt, ballBin == nil, !bins.contains(where: \.open) {
@@ -248,6 +259,34 @@ extension Match {
         }
         let holding = bins.indices.first { bins[$0].hoopLive }
         for hoop in stage.hoops.indices {
+            stage.hoops[hoop].position = holding.map(FlightB411Rules.rimSpot) ?? HighwayRules.parked
+        }
+    }
+
+    /// Breaker Ball's bins: every one shut, a wait, then both hoopcases out of two bins off the dice,
+    /// which rim in which off the dice too, and now and then an empty one with them; each rim where
+    /// its case hangs once it's all the way out, away otherwise.
+    private mutating func reshuffleBreakerBins() {
+        if frame >= flightStartsAt, ballBin == nil, !bins.contains(where: \.open) {
+            if breakerBinWait > 0 {
+                breakerBinWait -= 1
+            } else {
+                var choices = Array(bins.indices)
+                var picked: [Int] = []
+                let count = stage.hoops.count + (fieldDice.roll(FlightB411Rules.breakerEmptyOdds) == 0 ? 1 : 0)
+                for _ in 0..<min(count, choices.count) { picked.append(choices.remove(at: fieldDice.roll(choices.count))) }
+                let first = fieldDice.roll(2)
+                for (place, index) in picked.enumerated() {
+                    bins[index].open = true
+                    bins[index].framesLeft = FlightB411Rules.binOpenFrames
+                    bins[index].load = place < stage.hoops.count ? .hoop : .empty
+                    bins[index].hoop = (place + first) % 2
+                }
+                breakerBinWait = FlightB411Rules.breakerWaitFrames
+            }
+        }
+        for hoop in stage.hoops.indices {
+            let holding = bins.indices.first { bins[$0].hoopLive && bins[$0].hoop == hoop }
             stage.hoops[hoop].position = holding.map(FlightB411Rules.rimSpot) ?? HighwayRules.parked
         }
     }
@@ -311,7 +350,7 @@ extension Match {
         if abs(cart.velocity) >= FlightB411Rules.cartHitSpeed {
             let way: Double = cart.velocity < 0 ? -1 : 1
             for index in players.indices where !riders.contains(index) && cartHitFrames.indices.contains(index) && cartHitFrames[index] == 0
-                && players[index].body.overlaps(cart.box) {
+                && !players[index].phantomMode && players[index].hurt(by: cart.box) {
                 cartHitFrames[index] = FlightB411Rules.cartHitFrames
                 if ball.holder == index {
                     let from = players[index].heldBallPoint

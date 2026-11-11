@@ -224,7 +224,8 @@ struct Look: Hashable {
 /// two sides pick the same, the one that gives way takes the opposite.
 enum EnergyColour: String, CaseIterable, Codable {
     /// Teal is light blue now (EDG64 has no teal), its name kept so saved picks still read.
-    case orange, teal, red, lime, green, pink, blue, gold, purple
+    /// Diamond, white, is the backers' colour: last, so the others keep their places online.
+    case orange, teal, red, lime, green, pink, blue, gold, purple, diamond
 
     /// Its three tones, `_Graphic Assets/Energy_Palette.png`: the glow, the hood's shadow, and
     /// the back sleeve, boot and shoe.
@@ -239,6 +240,22 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .blue: (0x0098DC, 0x0069AA, 0x00396D)
         case .pink: (0xF389F5, 0xCA52C9, 0x93388F)
         case .purple: (0x93388F, 0x622461, 0x3B1443)
+        case .diamond: (0xFFFFFF, 0xC7CFDD, 0x92A1B9)
+        }
+    }
+    /// Its Breaker Ball's three tones, lightest first, EDG64, as the user painted them.
+    var breakerBallTones: (light: RGB, middle: RGB, dark: RGB) {
+        switch self {
+        case .red: (0xEA323C, 0xC42430, 0x891E2B)
+        case .orange: (0xFFA214, 0xED7614, 0xFF5000)
+        case .gold: (0xFFEB57, 0xFFC825, 0xFFA214)
+        case .lime: (0xD3FC7E, 0x99E65F, 0x5AC54F)
+        case .green: (0x5AC54F, 0x33984B, 0x1E6F50)
+        case .teal: (0x94FDFF, 0x0CF1FF, 0x00CDF9)
+        case .blue: (0x00CDF9, 0x0098DC, 0x0069AA)
+        case .pink: (0xF389F5, 0xCA52C9, 0x93388F)
+        case .purple: (0x93388F, 0x622461, 0x3B1443)
+        case .diamond: (0xFFFFFF, 0xC7CFDD, 0x92A1B9)
         }
     }
     var glow: RGB { tones.glow }
@@ -260,6 +277,7 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .green: "Emerald"
         case .teal: "Larimar"
         case .gold: "Citrine"
+        case .diamond: "Diamond"
         }
     }
 
@@ -270,8 +288,23 @@ enum EnergyColour: String, CaseIterable, Codable {
     /// The shade down its ramp: the customize screen's second row, the hood's shadow.
     var rampDown: RGB { hoodShadow }
 
-    /// The customize screen's picker, round the colour wheel.
-    static let wheel: [EnergyColour] = [.red, .orange, .gold, .lime, .green, .teal, .blue, .purple, .pink]
+    /// The customize screen's picker, round the colour wheel; Diamond after it, in debug builds
+    /// only until it's unlocked by in-app purchase.
+    static var wheel: [EnergyColour] {
+        #if DEBUG
+        [.red, .orange, .gold, .lime, .green, .teal, .blue, .pink, .purple, .diamond]
+        #else
+        [.red, .orange, .gold, .lime, .green, .teal, .blue, .pink, .purple]
+        #endif
+    }
+
+    /// The nine with a hue, for the glow's per-colour gain: Diamond's white is none, as the glow
+    /// takes whites and greys to be none of them.
+    static let hued: [EnergyColour] = allCases.filter { $0 != .diamond }
+
+    /// Diamond's own: its cubes always FloState's rainbow, and its Breaker barrier's tiles mixed with the rainbow's.
+    var rainbowCubes: Bool { self == .diamond }
+    var mixedBarrier: Bool { self == .diamond }
 
     var opposite: EnergyColour {
         switch self {
@@ -284,6 +317,7 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .orange: .blue
         case .blue: .orange
         case .green: .pink
+        case .diamond: .purple
         }
     }
 
@@ -298,7 +332,7 @@ enum EnergyColour: String, CaseIterable, Codable {
     /// What this phone picked, kept between launches.
     static let storageKey = "esper.energyColour"
     static var saved: EnergyColour {
-        UserDefaults.standard.string(forKey: storageKey).flatMap(EnergyColour.init(rawValue:)) ?? .orange
+        UserDefaults.standard.string(forKey: storageKey).flatMap(EnergyColour.init(rawValue:)).flatMap { wheel.contains($0) ? $0 : nil } ?? .orange
     }
 }
 
@@ -351,7 +385,7 @@ enum HumanLook {
     /// The three to be unlocked, after them: silver, gold and onyx. Not on the customize screen yet.
     static let lockedSkinTones: [(front: RGB, back: RGB)] = [(0xB4B4B4, 0x858585), (0xEDAB50, 0xE07438), (0x657392, 0x424C6E)]
     static var everySkinTone: [(front: RGB, back: RGB)] { skinTones + lockedSkinTones }
-    /// Onyx: the Test Center's dummy's.
+    /// Onyx: the Tutorial's dummy's.
     static var onyxSkinTone: Int { skinTones.count + 2 }
     /// The second, the bodies' before the customize screen.
     static let defaultSkinTone = 1

@@ -1,4 +1,4 @@
-/// The Test Center's training dummy: the other side, doing one thing over and over where it
+/// The Tutorial's training dummy: the other side, doing one thing over and over where it
 /// stands, picked with the debug buttons. Each move waits till the body's settled on the ground
 /// a moment, then goes again.
 public struct TrainingDummy: Equatable {
@@ -99,7 +99,7 @@ public struct TrainingDummy: Equatable {
 }
 
 extension Match {
-    /// The ball into a player's hands from wherever it is: the Test Center's dummy's.
+    /// The ball into a player's hands from wherever it is: the Tutorial's dummy's.
     public mutating func giveBall(to index: Int) {
         guard players.indices.contains(index), ball.holder == nil else { return }
         ball.tornadoCentre = nil

@@ -8,9 +8,9 @@
 /// it parries the swinger. A snatch or a thrown ball (not a floater) breaks it and stuns the
 /// shielder: snatch beats shield, shield beats slash, slash beats snatch. Thrown powers stop on
 /// it, or perfectly met turn back the way they came, the shielder's. Another player's shield
-/// where it's raised is a shieldclash. Raised on another body holding the ball, the ball's knocked
-/// loose, without a hit; the body isn't moved. It's solid to the other's body, so they can't dunk
-/// through it, but one already inside it isn't shoved out.
+/// where it's raised is a shieldclash: both held out upright to meet between the bodies, which
+/// stop, and once both are whole they break against each other. A ball held is left alone: only a loose one is turned. It's
+/// solid to the other's body, so they can't dunk through it, but one already inside it isn't shoved out.
 public struct Shield: Equatable {
     public let owner: Int
     /// Its middle, and its reach's: the raiser's body's, wherever it's got to.
@@ -30,15 +30,16 @@ public struct Shield: Equatable {
     /// Shelter Seltzer's snatch's guard: frames it lingers on once the arc's time is done, left
     /// at the hand, still a shield.
     public var lingerFrames = 0
-    /// Shelter Seltzer's shieldflip: as this one leaves, a planted one is left where it ended.
-    public var leavesPlanted = false
-    /// That planted one: already whole, at the arc's end and its last angle, still, for
-    /// `ShieldRules.shelterLingerFrames`, then it plays out. No perfect window of its own.
+    /// Shelter Seltzer's shieldflip's planted one, left where the flip was raised: already whole,
+    /// at the arc's end and its last angle, still, for `ShieldRules.shelterLingerFrames`, then it
+    /// plays out. No perfect window of its own.
     public var planted = false
     /// Shelter Seltzer's raised by a snatch: a guard only, neither solid to the other's body nor
     /// shoving it, nor pushing it as it goes up, so the snatch can still reach them; raised where
     /// the hand was as the snatch went out, and left there, its picture on that spot.
     public var guardOnly = false
+    /// In a shieldclash: held out upright toward this point, where it meets the other's.
+    public var clashMeet: Vec2?
 
     public init(owner: Int, pivot: Vec2, side: Double) {
         self.owner = owner
@@ -58,7 +59,7 @@ public struct Shield: Equatable {
     /// there all along when it's planted.
     private var arcAge: Int { planted ? ShieldRules.flipFrames - 1 : min(age, ShieldRules.flipFrames - 1) }
 
-    /// The planted shield a Shelter Seltzer shieldflip leaves where it ended.
+    /// The planted shield a Shelter Seltzer shieldflip leaves where it's raised.
     public var plantedCopy: Shield {
         var copy = Shield(owner: owner, pivot: pivot, side: side)
         copy.reach = reach
@@ -100,6 +101,7 @@ public struct Shield: Equatable {
         degrees(ShieldRules.endFaceDegrees * (2 * share(atAge: age) - 1))
     }
     public var centre: Vec2 {
+        if let meet = clashMeet { return Vec2(x: meet.x - side * ShieldRules.clashHalfWidth * pictureScale, y: meet.y) }
         guard !guardOnly else { return pivot }
         let place = Shield.place(atAge: arcAge)
         return pivot + Vec2(x: Trig.cos(place) * side, y: Trig.sin(place)) * ShieldRules.arcRadius
@@ -107,11 +109,11 @@ public struct Shield: Equatable {
     /// The way its face points: the way the ball off it goes.
     public var normal: Vec2 {
         // A snatch's guard stands upright, facing straight out, the whole time.
-        let angle = guardOnly ? 0 : Shield.faceAngle(atAge: arcAge)
+        let angle = guardOnly || clashMeet != nil ? 0 : Shield.faceAngle(atAge: arcAge)
         return Vec2(x: Trig.cos(angle) * side, y: Trig.sin(angle))
     }
     /// Its turn from upright, radians, anticlockwise, mirrored for facing left.
-    public var tilt: Double { guardOnly ? 0 : Shield.faceAngle(atAge: arcAge) * side }
+    public var tilt: Double { guardOnly || clashMeet != nil ? 0 : Shield.faceAngle(atAge: arcAge) * side }
 
     /// Whether a circle here this big touches its reach.
     public func touches(_ point: Vec2, radius other: Double) -> Bool {
@@ -171,7 +173,7 @@ public enum ShieldRules {
     /// Guarderade: the shield's reach, and its picture half again as big.
     public static let guarderadeReach = 24.0
     public static let guarderadePictureScale = 1.5
-    /// Shelter Seltzer: frames the shield lingers where its arc ended.
+    /// Shelter Seltzer: frames the shield lingers where it was raised.
     public static let shelterLingerFrames = 60
     nonisolated(unsafe) public static var sheetFramesPerSecond = 36.0
     public static var lifeFrames: Int { flipFrames }
@@ -181,6 +183,10 @@ public enum ShieldRules {
     }
     /// Met in this many frames of its raising, the ball's stopped and popped up this fast.
     public static let perfectFrames = 6
+    /// A shieldclash's shields, held out upright: half a plate's width, in units, so the two meet
+    /// face to face; and the sheet's first whole frame, when they do.
+    public static let clashHalfWidth = 3.0
+    public static let wholeSheetFrame = 5
     public static let perfectPop = 3.0
     /// A beam turned back off a perfect shield fires this long.
     public static let turnedBeamFrames = 30
@@ -204,30 +210,47 @@ extension Match {
             shield.guardOnly = true
             shield.pivot = player.handCatchPoint
             if player.spec.shelterSeltzerLevel >= 1 { shield.lingerFrames = ShieldRules.shelterLingerFrames }
-        } else if player.spec.shelterSeltzerLevel >= 1 {
-            shield.leavesPlanted = true
         }
-        let centre = shield.centre
-        events.append(.shieldRaised(player: index, at: centre))
-        // Two in one place, a shieldclash: both break, a long hit stop, then both pushed apart.
-        // Two of one player's don't.
-        if let met = shields.firstIndex(where: { $0.owner != index && $0.overlaps(shield) }) {
-            let other = shields.remove(at: met)
-            let at = (other.centre + centre) * 0.5
-            events.append(.shieldBroken(player: other.owner, at: other.centre))
-            events.append(.shieldBroken(player: index, at: centre))
-            events.append(.shieldClashed(at: at, first: other, second: shield))
-            clashAt = at
-            holdHitStop(HitStopRules.clashFrames)
+        events.append(.shieldRaised(player: index, at: shield.centre))
+        // Two in one place, a shieldclash: both held out to meet between the bodies, which stop where
+        // they are; once both shields are whole they break, a long hit stop, then both pushed apart
+        // (`meetClashingShields`). Two of one player's don't.
+        if let met = shields.firstIndex(where: { $0.owner != index && $0.clashMeet == nil && $0.overlaps(shield) }) {
+            let meet = (shields[met].pivot + shield.pivot) * 0.5
+            shields[met].clashMeet = meet
+            shield.clashMeet = meet
+            shields.append(shield)
+            for owner in [shields[met].owner, index] where players.indices.contains(owner) { players[owner].shieldClashHold = true }
             return
         }
         shields.append(shield)
-        // Raised on another body, the ball it holds is knocked loose, unhit; the body stays where it
-        // is. Not a snatch's guard.
-        // One snatching isn't: the snatch beats the shield, and breaks it as the shields step.
-        for other in players.indices where other != index && !shield.guardOnly && players[other].shieldSnatchReach == nil && shield.overlaps(players[other].body) {
-            strip(other, by: index, knock: nil, stun: false)
+        if player.spec.shelterSeltzerLevel >= 1, !shield.guardOnly { shields.append(shield.plantedCopy) }
+    }
+
+    /// A shieldclash's two shields, once both are whole and meeting: both broken, the long hit stop,
+    /// the bodies let go to be pushed apart as it ends. One left without the other just goes on as a shield.
+    mutating func meetClashingShields() {
+        let clashing = shields.indices.filter { shields[$0].clashMeet != nil }
+        guard !clashing.isEmpty else { return }
+        guard clashing.count == 2, shields[clashing[0]].owner != shields[clashing[1]].owner else {
+            for number in clashing { release(shieldClashOf: shields[number].owner); shields[number].clashMeet = nil }
+            return
         }
+        guard clashing.allSatisfy({ shields[$0].sheetFrame >= ShieldRules.wholeSheetFrame }) else { return }
+        let first = shields[clashing[0]], second = shields[clashing[1]]
+        let at = (first.centre + second.centre) * 0.5
+        shields.remove(at: clashing[1])
+        shields.remove(at: clashing[0])
+        events.append(.shieldBroken(player: first.owner, at: first.centre))
+        events.append(.shieldBroken(player: second.owner, at: second.centre))
+        events.append(.shieldClashed(at: at, first: first, second: second))
+        for owner in [first.owner, second.owner] { release(shieldClashOf: owner) }
+        clashAt = at
+        holdHitStop(HitStopRules.clashFrames)
+    }
+
+    private mutating func release(shieldClashOf owner: Int) {
+        if players.indices.contains(owner) { players[owner].shieldClashHold = false }
     }
 
     /// The shields age and go; a blade on one parries its swinger, a snatch on one breaks it and
@@ -244,10 +267,8 @@ extension Match {
                 shields[index].pivot = players[owner].body.center
             }
         }
-        // A Shelter Seltzer shieldflip leaving leaves its planted shield where it ended.
-        let planting = shields.filter { $0.leavesPlanted && $0.age >= $0.lifeFrames }.map(\.plantedCopy)
         shields.removeAll { $0.age >= $0.lifeFrames }
-        shields += planting
+        meetClashingShields()
         var broken: [(number: Int, by: Int)] = []
         for (number, shield) in shields.enumerated() {
             for other in players.indices where other != shield.owner {
@@ -260,20 +281,24 @@ extension Match {
                 }
             }
         }
-        for (number, by) in broken.reversed() where shields.indices.contains(number) {
-            let shield = shields.remove(at: number)
-            events.append(.shieldBroken(player: shield.owner, at: shield.centre))
-            // The shielder's stunned only through the shieldflip's own shield, round the body as it
-            // flips: one left behind (Shelter Seltzer's planted one, its snatch's guard) just breaks,
-            // whoever raised it far off.
-            if shield.isShieldflips { counter(shield.owner, by: by) }
-        }
+        for (number, by) in broken.reversed() where shields.indices.contains(number) { breakShield(number, by: by) }
+    }
+
+    /// A shield broken by a snatch, at hand or Web Water's at range. The shielder's stunned only
+    /// through the shieldflip's own shield, round the body as it flips: one left behind (Shelter
+    /// Seltzer's planted one, its snatch's guard) just breaks, whoever raised it far off.
+    mutating func breakShield(_ number: Int, by breaker: Int) {
+        guard shields.indices.contains(number) else { return }
+        let shield = shields.remove(at: number)
+        events.append(.shieldBroken(player: shield.owner, at: shield.centre))
+        if shield.isShieldflips { counter(shield.owner, by: breaker) }
     }
 
     /// Every counter, the rock-paper-scissors won (a parry among them): `loser` stunned, knocked
     /// away and nothing answering through the stun and on past it; `winner` earns the counter's
     /// FLO; a long hit stop.
     mutating func counter(_ loser: Int, by winner: Int) {
+        guard parryable(loser, by: winner) else { return }
         stunAsParried(loser, by: winner)
         events.append(.countered(player: loser, by: winner, at: players[loser].chest))
         earnFlo(FloRules.counter, by: winner, at: players[loser].chest)
@@ -283,16 +308,23 @@ extension Match {
     /// The parry's stun on `loser`: knocked away from `winner`, nothing answering through the
     /// stun and on past it (`ParryRules`). Every counter's, and Pulsepistol's repelling snipe's.
     mutating func stunAsParried(_ loser: Int, by winner: Int) {
-        guard !untouchable(loser) else { return }
+        guard parryable(loser, by: winner) else { return }
         let away = players[loser].position.x >= players[winner].position.x ? 1.0 : -1.0
-        strip(loser, by: winner, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), flo: 0)
-        players[loser].attackLockout = players[loser].hitStun + ParryRules.attackLockoutAfterStunFrames
+        strip(loser, by: winner, knock: Vec2(x: SnatchRules.parryKnock.x * away, y: SnatchRules.parryKnock.y), flo: 0, parried: true)
+        if mode == .breakerBall {
+            players[loser].hitStun = BreakerRules.stunFrames
+            players[loser].attackLockout = BreakerRules.stunFrames
+        } else {
+            players[loser].attackLockout = players[loser].hitStun + ParryRules.attackLockoutAfterStunFrames
+        }
+        // Breaker Ball: stunned, the barrier shatters.
+        shatterPosture(loser)
     }
 
     /// A thrown power at `point`, this big, fired by `firer`, meeting another's shield: whose, and
     /// whether met in its first frames, to be turned back.
     mutating func shieldMeets(_ point: Vec2, radius: Double, firedBy firer: Int) -> (owner: Int, perfect: Bool)? {
-        guard let shield = shields.first(where: { $0.owner != firer && $0.touches(point, radius: radius) }) else { return nil }
+        guard let shield = shields.first(where: { $0.owner != firer && !phantomApart($0.owner, firer) && $0.touches(point, radius: radius) }) else { return nil }
         let perfect = shield.inPerfectWindow
         events.append(perfect ? .shieldPerfect(player: shield.owner, at: point) : .powerBlocked(player: shield.owner, at: point))
         return (shield.owner, perfect)
@@ -304,7 +336,7 @@ extension Match {
         var travelled = 0.0
         while travelled <= beam.reach {
             let at = beam.origin + beam.direction * travelled
-            if let number = shields.firstIndex(where: { $0.owner != beam.owner && $0.touches(at, radius: ZRules.halfThickness) }) {
+            if let number = shields.firstIndex(where: { $0.owner != beam.owner && !phantomApart($0.owner, beam.owner) && $0.touches(at, radius: ZRules.halfThickness) }) {
                 let shield = shields[number]
                 if !shield.metBeams.contains(beam.id) {
                     shields[number].metBeams.append(beam.id)

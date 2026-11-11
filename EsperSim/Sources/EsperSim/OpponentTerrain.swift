@@ -290,6 +290,26 @@ final class Terrain: Equatable {
     /// Whether every surface's links have been found.
     var ready: Bool { nextSource >= surfaces.count }
 
+    /// Whole readings kept by what they were made from: a stage is read once per body, and a
+    /// reading is always whole when it's used, however it was come by.
+    nonisolated(unsafe) private static var wholeReadings: [Terrain] = []
+    private static let wholeReadingsLock = NSLock()
+    private static let wholeReadingsKept = 8
+    static func whole(stage: Stage, player: Player) -> Terrain {
+        let wanted = signature(of: stage, for: player)
+        wholeReadingsLock.lock()
+        let kept = wholeReadings.first { $0.signature == wanted }
+        wholeReadingsLock.unlock()
+        if let kept { return kept }
+        let made = Terrain(stage: stage, player: player)
+        made.prepare(budget: .max)
+        wholeReadingsLock.lock()
+        wholeReadings.append(made)
+        if wholeReadings.count > wholeReadingsKept { wholeReadings.removeFirst() }
+        wholeReadingsLock.unlock()
+        return made
+    }
+
     /// Finds more links, playing moves until about `budget` frames of the body have been stepped.
     func prepare(budget: Int) {
         var steps = 0

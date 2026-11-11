@@ -10,6 +10,7 @@ enum EffectSheets {
         "backboard_straight": 1,
         "backboards": 3,
         "basketball": 1,
+        "basketball_colorless": 1,
         "basketball_ice": 1,
         "beam": 3,
         "blast": 1,
@@ -104,6 +105,7 @@ enum EffectSheets {
         "backboard_straight": 0.5000,
         "backboards": 0.5000,
         "basketball": 0.5000,
+        "basketball_colorless": 0.5000,
         "basketball_ice": 0.5000,
         "beam": 0.0000,
         "blast": 0.0000,
@@ -194,6 +196,7 @@ enum EffectSheets {
     ]
 
     static let toned: Set<String> = [
+        "basketball_colorless",
         "beam",
         "bubble_particle",
         "bubbles",

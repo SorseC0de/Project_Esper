@@ -78,7 +78,11 @@ struct HudView: UIViewRepresentable {
         view.preferredFramesPerSecond = 60
         view.ignoresSiblingOrder = true
         view.game = scene
+        // Footage: the Metal view draws the HUD into the video itself, at the video's size; this
+        // view kept for its texture snapshots but never drawing, or the scene draws twice a frame.
+        if FootageRun.requested { scene.hudScene.scaleMode = .fill }
         view.presentScene(scene.hudScene)
+        if FootageRun.requested { view.isPaused = true }
         return view
     }
 

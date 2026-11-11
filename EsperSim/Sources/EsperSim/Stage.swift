@@ -26,6 +26,18 @@ public struct Hoop: Equatable {
     /// worth its own points in 47, but no backboard, no dunk on it, no pull on a shot near it and
     /// never aimed at.
     public var bonus = false
+    /// The Tutorial's hub's hoops, on its back wall, seen from the front: bounced off, dunked on
+    /// and scored through as any rim, but no backboard, drawn as the front-facing hoop.
+    public var frontFacing = false
+    /// Breaker Ball: what's left of the barrier round it, out of `BreakerRules.full`, nil in every other
+    /// mode; shattered and not yet mended whole; parked where its defender left it, not following.
+    public var barrier: Double?
+    public var barrierBroken = false
+    public var parked = false
+    /// A barrier up round it: nothing goes in, nobody dunks on it.
+    public var barrierStanding: Bool { (barrier ?? 0) > 0 && !barrierBroken }
+    /// A side-on hoop with its board: neither a bonus ring nor front-facing.
+    public var hasBackboard: Bool { !bonus && !frontFacing }
 
     public init(position: Vec2, owner: Int, backboard: Facing, shared: Bool = false) {
         self.position = position
@@ -154,6 +166,9 @@ public struct Stage: Equatable {
     /// This stage's rows of sky: the usual ten, or none where the ceiling is the stage's top, as
     /// in the plane. Flat in the sim whatever the lean, which only the view turns.
     public var skyRows = Stage.skyRows
+    /// Columns besides the end walls that run on up through the sky: the Tutorial's walls between
+    /// its rooms, so no one jumps over into the next.
+    public var skyWallColumns: [Int] = []
 
     public let columns: Int
     public let rows: Int
@@ -174,7 +189,7 @@ public struct Stage: Equatable {
     /// Whether a rim can be dunked on where it is: not on a stage without dunks, and not in the
     /// stage's first or last column, which a swimming one passes through on its way off.
     public func dunkable(_ hoop: Hoop) -> Bool {
-        features.dunks && !hoop.bonus && hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
+        features.dunks && !hoop.bonus && !hoop.barrierStanding && hoop.position.x >= Stage.tileSize && hoop.position.x <= width - Stage.tileSize
     }
 
     /// One-way boxes off the grid, landed on from above and passed through otherwise, as a one-way
@@ -191,9 +206,13 @@ public struct Stage: Equatable {
     /// and apart, for a dunk's path to the rim.
     public var shieldWalls: [Box] = []
 
-    /// Whether a straight path crosses a shield wall.
-    public func shieldBlocks(from start: Vec2, to end: Vec2) -> Bool {
-        shieldWalls.contains { box in
+    /// Platform Protein Shake's slabs and walls standing: in its extras too, and apart, for a dunk's path to the rim.
+    public var platformBoxes: [Box] = []
+
+    /// Whether a dunk's straight path to the rim crosses the other's shield or a slab or a wall:
+    /// the body glides there, never through one.
+    public func dunkBlocked(from start: Vec2, to end: Vec2) -> Bool {
+        (shieldWalls + platformBoxes).contains { box in
             var low = 0.0, high = 1.0
             for (from, to, min, max) in [(start.x, end.x, box.min.x, box.max.x), (start.y, end.y, box.min.y, box.max.y)] {
                 let along = to - from
@@ -225,8 +244,14 @@ public struct Stage: Equatable {
     public var unridable: [Box] = []
     /// What the stage has beyond its tiles.
     public var features = StageFeatures()
+    /// The rims where the stage laid them, when they've since left (Breaker Ball's float off), for what's
+    /// built round them: Longball's goalposts.
+    public var homeHoops: [Hoop] = []
+    public var goalpostHoops: [Hoop] { homeHoops.isEmpty ? hoops : homeHoops }
     /// Boxes solid to the ball alone, such as the field's backboards.
     public var ballBlockers: [Box] = []
+    /// Breaker Ball's floating backboards: walls a body can cling to and jump off, never in its way.
+    public var wallJumpBoards: [Box] = []
     /// Slopes that come and go with what's standing, such as a car's, plus `fixedSlopes`.
     public var slopes: [Slope] = []
     /// One-way springs on the stage as it is this frame (the jellyfish's bell), as a rim's top is.
@@ -265,7 +290,7 @@ public struct Stage: Equatable {
     public func tile(column: Int, row: Int) -> Tile {
         guard column >= 0, column < columns, row >= 0 else { return .solid }
         guard row < rows else {
-            return column == 0 || column == columns - 1 || row >= rows + skyRows ? .solid : .empty
+            return column == 0 || column == columns - 1 || row >= rows + skyRows || skyWallColumns.contains(column) ? .solid : .empty
         }
         return tiles[row * columns + column]
     }
@@ -665,6 +690,12 @@ public struct Stage: Equatable {
             if abs(extra.min.x - box.max.x) < 0.01 { return .right }
             if abs(extra.max.x - box.min.x) < 0.01 { return .left }
         }
+        // A board a body passes into: its face counts from touching it to halfway through.
+        for board in wallJumpBoards where !riding && spansY(board, box) {
+            let halfway = (board.max.x - board.min.x) / 2
+            if box.max.x >= board.min.x - 0.01, box.max.x <= board.min.x + halfway { return .right }
+            if box.min.x <= board.max.x + 0.01, box.min.x >= board.max.x - halfway { return .left }
+        }
         return nil
     }
 
@@ -744,7 +775,7 @@ public struct Stage: Equatable {
     public func backboard(at position: Vec2) -> Int? {
         hoops.indices.first { index in
             let hoop = hoops[index]
-            guard !hoop.bonus else { return false }
+            guard hoop.hasBackboard else { return false }
             let out = (position.x - hoop.position.x) * hoop.backboard.sign
             let up = position.y - hoop.position.y
             return out >= Stage.backboardFace - BallRules.radius - 1 && out <= Stage.backboardFace + Stage.backboardDepth + BallRules.radius + 1
@@ -752,10 +783,39 @@ public struct Stage: Equatable {
         }
     }
 
-    /// The Wreck Center's court, marked for the Test Center's drawing and dummy.
-    public static var testCenter: Stage {
-        var stage = court
-        stage.features.testCenter = true
+    /// The Tutorial (`TutorialRules`): rooms side by side, each the Wreck Center's court and blocks,
+    /// the first with its right rim alone (anyone's, the net white); doors in the openings at the
+    /// ends of each room's floor, shut (the walls whole); and a belt the whole floor's length,
+    /// carrying right, stopped till it's started.
+    public static var tutorial: Stage {
+        let shift = courtBlockShift
+        let rim = courtRimHeight + Double(shift.up) * tileSize - courtRimDrop
+        let inset = courtRimInset - courtRimDepth - Double(shift.toWall) * tileSize
+        let room = TutorialRules.roomColumns, columns = room * TutorialRules.rooms
+        var stage = Stage(
+            columns: columns, rows: 16,
+            hoops: TutorialRules.hoops(rim: Vec2(x: Double(room) * tileSize - inset, y: rim)),
+            playerSpawns: [Vec2(x: 130, y: 10), Vec2(x: 210, y: 10)],
+            playerFacings: [.right, .left],
+            ballSpawn: Vec2(x: 170, y: 80)
+        )
+        stage.fill(.solid, columns: 0...(columns - 1), rows: 0...0)
+        let rows = (8 + shift.up)...(9 + shift.up)
+        for first in stride(from: 0, to: columns, by: room) {
+            stage.fill(.solid, columns: first...first, rows: 0...15)
+            stage.fill(.solid, columns: (first + room - 1)...(first + room - 1), rows: 0...15)
+            stage.fill(.solid, columns: (first + max(1 - shift.toWall, 1))...(first + 4 - shift.toWall), rows: rows)
+            stage.fill(.solid, columns: (first + 29 + shift.toWall)...(first + min(32 + shift.toWall, 32)), rows: rows)
+        }
+        TutorialRules.backboardUnderside = Double(rows.lowerBound) * tileSize
+        TutorialRules.blockColumns = [max(1 - shift.toWall, 1)...(4 - shift.toWall), (29 + shift.toWall)...min(32 + shift.toWall, 32)]
+        TutorialRules.blockRows = rows
+        stage.skyWallColumns = (1..<TutorialRules.rooms).flatMap { [$0 * room - 1, $0 * room] }
+        // The first room a lesson's, its rim up; the game lays the rooms as the lessons go.
+        stage.layTutorialRoom(0, as: .rim)
+        stage.conveyors = [Conveyor(box: Box(min: Vec2(x: -tileSize, y: 0), max: Vec2(x: Double(columns + 1) * tileSize, y: tileSize)), way: 1,
+                                    running: false, speed: TutorialRules.beltSpeed)]
+        stage.features.tutorial = true
         return stage
     }
 
@@ -823,18 +883,18 @@ public struct Stage: Equatable {
     }
 
     /// The football field: seven courts long and 20 rows high, flat and empty but for the
-    /// floor and the end walls. The rims float between the goalposts' uprights, four tiles
-    /// higher than the court's, six tiles in from each wall. Each player starts under the
-    /// rim they guard, and the ball starts in someone's hands by the coin flip. Helmets
-    /// sweep it and a portal hangs over it.
-    /// The field's rims: their height and how far in from each wall.
-    public static let fieldRimHeight = 107.0
-    public static let fieldRimInset = 66.0
-    /// The goalposts stand this far in from each wall, apart from the rims.
-    public static let fieldPostInset = 60.0
+    /// floor and the end walls. The rims sit on the goalposts' crossbars, five and a half tiles in
+    /// from each wall. Each player starts under the rim they guard, and the ball starts in
+    /// someone's hands by the coin flip. Helmets sweep it and a portal hangs over it.
+    ///
+    /// The field's rims: how far in from each wall, a whole art pixel, and their height, on top of
+    /// the goalposts as drawn (`FieldRules.crossbarFootPixels`).
+    public static let fieldRimInset = 55.0
+    public static var fieldRimHeight: Double { Double(FieldRules.crossbarFootPixels + FieldRules.rimOverCrossbarFootPixels) / 1.6 }
+    public static let fieldColumns = 238, fieldRows = 20
 
     public static var footballField: Stage {
-        let columns = 238, rows = 20
+        let columns = fieldColumns, rows = fieldRows
         let width = Double(columns) * Stage.tileSize
         let inset = fieldRimInset
         var stage = Stage(
@@ -853,7 +913,7 @@ public struct Stage: Equatable {
         // No wall landing on its end walls: up to a rim is off a helmet.
         stage.features = StageFeatures(helmets: true, portals: true, startsHeld: true, shadows: true, ballCam: true, look: .footballField,
                                        tileWallsHold: false)
-        stage.features.autoAimMaxRise = FieldRules.autoAimMaxRise
+        stage.features.autoAims = false
         // The backboards: behind each rim and above it, solid to the ball up to the energy fence's
         // top, and on back to the end wall so nothing gets in behind them.
         stage.ballBlockers = stage.hoops.map { hoop in
@@ -1055,7 +1115,9 @@ public struct Stage: Equatable {
         let underside = Double(rows - 1) * tileSize
         stage.icicleSockets = (0..<socketCount).compactMap { index in
             let left = (stage.width - Double(socketCount) * IcicleRules.socketWidth) / 2 + Double(index) * IcicleRules.socketWidth
-            let firstColumn = Int(left / tileSize), lastColumn = Int((left + IcicleRules.socketWidth) / tileSize) - 1
+            // The columns it covers, any part of one counting: rounded down, its right edge let one
+            // reach into a free column, an extra icicle on the right.
+            let firstColumn = Int(left / tileSize), lastColumn = Int(((left + IcicleRules.socketWidth) / tileSize).rounded(.up)) - 1
             guard firstColumn > IcicleRules.freeColumns, lastColumn < columns - 1 - IcicleRules.freeColumns else { return nil }
             return Vec2(x: left + IcicleRules.socketWidth / 2, y: underside - IcicleRules.hangLength)
         }
@@ -1102,12 +1164,14 @@ public struct Stage: Equatable {
 public enum StageChoice: Int, CaseIterable, Codable {
     case wreckCenter, longballStadium, slamstillTraffic, theElements, skyNet, hoopfishHideaway, flightB411, kAndA, anozira
     /// Debug only, never on the select's own lists.
-    case testCenter
+    case tutorial
 
     /// The stages on the select, in its order: Slamstill Traffic and Sky Net (not made yet) parked off it.
     public static let selectable: [StageChoice] = [.wreckCenter, .longballStadium, .theElements, .hoopfishHideaway, .flightB411, .kAndA, .anozira]
     /// The stages 47 plays on.
     public static let fortySeven: [StageChoice] = [.wreckCenter, .hoopfishHideaway, .flightB411, .kAndA, .anozira]
+    /// Breaker Ball's: every one, each made over for it (`Stage.forBreakerBall`).
+    public static let breakerBall: [StageChoice] = selectable
 
     public var name: String {
         switch self {
@@ -1120,7 +1184,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .flightB411: "Flight B411"
         case .kAndA: "K&A"
         case .anozira: "Anozira"
-        case .testCenter: "Test Center"
+        case .tutorial: "Tutorial"
         }
     }
 
@@ -1136,7 +1200,7 @@ public enum StageChoice: Int, CaseIterable, Codable {
         case .flightB411: .flightB411
         case .kAndA: .kAndA
         case .anozira: .anozira
-        case .testCenter: .testCenter
+        case .tutorial: .tutorial
         }
     }
 }

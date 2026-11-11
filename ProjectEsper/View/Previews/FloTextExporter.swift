@@ -15,16 +15,15 @@ struct FloTextExporter: View {
     @State private var capHeight: CGFloat = 256
     @State private var status = ""
 
+    private var picture: UIImage? { FloTextExporter.picture(text, capHeight: capHeight) }
+
     /// The word's picture at `capHeight` pixels, one pixel a point.
-    private var picture: UIImage? {
+    static func picture(_ text: String, capHeight: CGFloat) -> UIImage? {
         let word = text.trimmingCharacters(in: .whitespaces)
         guard !word.isEmpty else { return nil }
-        let drawn = Onomatopoeia.picture(word, face: .englishDex, colours: FloTuning.colours, growsLeft: true, height: capHeight).image
-        let size = CGSize(width: (drawn.size.width * drawn.scale).rounded(), height: (drawn.size.height * drawn.scale).rounded())
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = false
-        return UIGraphicsImageRenderer(size: size, format: format).image { _ in drawn.draw(in: CGRect(origin: .zero, size: size)) }
+        // Its pixels as drawn, one a point: no second drawing to soften it.
+        return Onomatopoeia.savedPicture(word, face: .englishDex, colours: FloTuning.colours, growsLeft: true, height: capHeight)
+            .cgImage.map { UIImage(cgImage: $0) }
     }
 
     var body: some View {
@@ -54,8 +53,7 @@ struct FloTextExporter: View {
     private func export() {
         guard let picture, let data = picture.pngData() else { return }
         let folder = PlayerGalleryOutput.folder
-        let name = "flotext_" + text.trimmingCharacters(in: .whitespaces)
-            .map { $0.isLetter || $0.isNumber ? String($0) : "_" }.joined()
+        let name = FloTextExporter.fileName(text)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let file = folder.appendingPathComponent("\(name).png")
@@ -64,6 +62,27 @@ struct FloTextExporter: View {
         } catch {
             status = "Couldn't save: \(error.localizedDescription)"
         }
+    }
+
+    static func fileName(_ text: String) -> String {
+        "flotext_" + text.trimmingCharacters(in: .whitespaces).map { $0.isLetter || $0.isNumber ? String($0) : "_" }.joined()
+    }
+
+    /// Debug builds launched with `debug.exportFloText` set to a list of words: each saved at
+    /// 256 px into the app's temporary folder, `FloText/`, then the setting's cleared.
+    static func exportIfRequested() {
+        #if DEBUG
+        guard let words = UserDefaults.standard.stringArray(forKey: "debug.exportFloText") else { return }
+        UserDefaults.standard.removeObject(forKey: "debug.exportFloText")
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("FloText", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for word in words {
+            guard let data = picture(word, capHeight: 256)?.pngData() else { continue }
+            try? data.write(to: folder.appendingPathComponent("\(fileName(word)).png"))
+        }
+        try? "done".write(to: folder.appendingPathComponent("done"), atomically: true, encoding: .utf8)
+        #endif
     }
 }
 #endif

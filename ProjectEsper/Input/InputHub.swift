@@ -8,8 +8,9 @@ import UIKit
 /// lone controller player 1. A keyboard, on an
 /// iPad or a Mac, is player 0 too: WASD moves, space jumps, J shoots, K throws, shift
 /// steps the power like the left bumper, delete pauses like the start button, M shows the
-/// hitboxes like the left trigger; the arrows move player 1, whom the computer plays unless
-/// it's switched off. Everything is read as held state each frame,
+/// hitboxes; the arrows move player 1, whom the computer plays unless
+/// it's switched off. In Capture Mode a pad's left bumper makes the computer slash, Y makes it
+/// shieldflip, F puts it in FloState and the left trigger hands player one the ball. Everything is read as held state each frame,
 /// so nothing queues and nothing is lost between frames.
 @MainActor
 final class InputHub {
@@ -17,8 +18,19 @@ final class InputHub {
     var touch = PlayerInput.idle
     private(set) var controllers: [GCController] = []
     /// A pad's menu button or delete went down since the last check; the left bumper
-    /// likewise, the right stick's click, which switches the computer on and off, and the
-    /// left trigger, which shows the hitboxes.
+    /// likewise, the right stick's click, which switches the computer on and off, and M,
+    /// which shows the hitboxes.
+    /// How player one last played: on the keyboard, a controller or the touch controls. Starts
+    /// as the device suggests (a controller if one's there, the keyboard on a Mac, touch on a phone or iPad, a controller on the TV).
+    enum Source { case keyboard, controller, touch }
+    private(set) var lastSource: Source = {
+        #if os(tvOS)
+        return .controller
+        #else
+        if !GCController.controllers().isEmpty { return .controller }
+        return InputHub.onDesk ? .keyboard : .touch
+        #endif
+    }()
     private(set) var pausePressed = false
     private(set) var cyclePressed = false
     private(set) var aiTogglePressed = false
@@ -28,6 +40,15 @@ final class InputHub {
     private var stickClickWasDown = false
     private var deleteWasDown = false
     private var hitboxKeyWasDown = false
+    /// Capture Mode: the pad's left bumper, Y and left trigger are its commands, not the
+    /// POWER picker, the taunt and nothing. What was asked since the last check.
+    var capturing = false
+    private(set) var forceSlashPressed = false
+    private(set) var forceShieldflipPressed = false
+    private(set) var takeBallPressed = false
+    private(set) var forceFloStatePressed = false
+    private var captureButtonsWereDown: (bumper: Bool, y: Bool, trigger: Bool) = (false, false, false)
+    private var floStateKeyWasDown = false
     /// Testing FLO: 1 fills the first player's, 2 sets it to half, 3 empties it; 4, 5 and 6 the
     /// same for the second's. What was asked since the last check: whose, and to what.
     private(set) var floSetPressed: (player: Int, flo: Int)?
@@ -35,6 +56,9 @@ final class InputHub {
     private var observers: [NSObjectProtocol] = []
 
     static let stickDeadzone = 0.2
+    /// How far the keyboard's aim travels a frame toward the keys' way while shoot's held: the KEY AIM STEP slider.
+    static var keyAimStep = 0.1
+    private var keyAim = Vec2.zero
     /// The title's VS CPU / VS HUMAN toggle, which the scene also reads.
     static let vsCPUKey = "esper.vsCPU"
 
@@ -110,9 +134,24 @@ final class InputHub {
         if deleteDown, !deleteWasDown { pausePressed = true }
         deleteWasDown = deleteDown
         let shiftDown = keys.map { $0.button(forKeyCode: .leftShift)?.isPressed ?? false || $0.button(forKeyCode: .rightShift)?.isPressed ?? false } ?? false
-        let bumperDown = shiftDown || controllers.contains { $0.extendedGamepad?.leftShoulder.isPressed ?? false }
+        let padBumperDown = controllers.contains { $0.extendedGamepad?.leftShoulder.isPressed ?? false }
+        let bumperDown = shiftDown || (padBumperDown && !capturing)
         if bumperDown, !bumperWasDown { cyclePressed = true }
         bumperWasDown = bumperDown
+        if capturing {
+            let yDown = controllers.contains { $0.extendedGamepad?.buttonY.isPressed ?? false }
+            let leftTriggerDown = controllers.contains { $0.extendedGamepad?.leftTrigger.isPressed ?? false }
+            if padBumperDown, !captureButtonsWereDown.bumper { forceSlashPressed = true }
+            if yDown, !captureButtonsWereDown.y { forceShieldflipPressed = true }
+            if leftTriggerDown, !captureButtonsWereDown.trigger { takeBallPressed = true }
+            captureButtonsWereDown = (padBumperDown, yDown, leftTriggerDown)
+            let floStateKeyDown = keys?.button(forKeyCode: .keyF)?.isPressed ?? false
+            if floStateKeyDown, !floStateKeyWasDown { forceFloStatePressed = true }
+            floStateKeyWasDown = floStateKeyDown
+        } else {
+            captureButtonsWereDown = (false, false, false)
+            floStateKeyWasDown = false
+        }
         let stickClickDown = controllers.contains { $0.extendedGamepad?.rightThumbstickButton?.isPressed ?? false }
         if stickClickDown, !stickClickWasDown { aiTogglePressed = true }
         stickClickWasDown = stickClickDown
@@ -129,7 +168,10 @@ final class InputHub {
         return (0..<players).map { index in
             let pad = controller(for: index).map { read($0.extendedGamepad!) } ?? PlayerInput.idle
             switch index {
-            case 0: return merge(merge(touch, keyboard()), pad)
+            case 0:
+                let keys = keyboard()
+                if keys != .idle { lastSource = .keyboard } else if pad != .idle { lastSource = .controller } else if touch != .idle { lastSource = .touch }
+                return merge(merge(touch, keys), pad)
             case 1: return merge(arrows(), pad)
             default: return pad
             }
@@ -146,9 +188,16 @@ final class InputHub {
         let y = (down(.keyW) ? 1.0 : 0) - (down(.keyS) ? 1.0 : 0)
         let stick = Vec2(x: x, y: y).clamped(to: 1)
         var input = PlayerInput(stick: stick)
-        input.aim = stick
         input.jump = down(.spacebar)
         input.shoot = down(.keyJ)
+        // With shoot held the aim travels to the keys' way as a stick would, through the angles between.
+        if input.shoot {
+            let gap = stick - keyAim
+            keyAim = gap.length <= InputHub.keyAimStep ? stick : keyAim + gap.normalized * InputHub.keyAimStep
+        } else {
+            keyAim = stick
+        }
+        input.aim = keyAim
         input.throwBall = down(.keyK)
         return input
     }
@@ -216,6 +265,24 @@ final class InputHub {
         return hitboxTogglePressed
     }
 
+    /// Capture Mode's commands, each true once per press.
+    func consumeForceSlash() -> Bool {
+        defer { forceSlashPressed = false }
+        return forceSlashPressed
+    }
+    func consumeForceShieldflip() -> Bool {
+        defer { forceShieldflipPressed = false }
+        return forceShieldflipPressed
+    }
+    func consumeTakeBall() -> Bool {
+        defer { takeBallPressed = false }
+        return takeBallPressed
+    }
+    func consumeForceFloState() -> Bool {
+        defer { forceFloStatePressed = false }
+        return forceFloStatePressed
+    }
+
     /// A: jump. X (square) and the right bumper: Strike, each its own button so a second one cancels a
     /// shot. B (circle): Guard. Y: taunt. Up and B, on defence: the shield. As the keyboard's J and K, left and right. The left bumper steps the POWER
     /// picker, the menu button pauses, and clicking the right stick switches the computer.
@@ -230,7 +297,7 @@ final class InputHub {
         input.jump = pad.buttonA.isPressed
         input.shootButtons = (pad.buttonX.isPressed ? 1 : 0) | (pad.rightShoulder.isPressed ? 2 : 0)
         input.throwBall = pad.buttonB.isPressed
-        input.taunt = pad.buttonY.isPressed
+        input.taunt = pad.buttonY.isPressed && !capturing
         return input
     }
 

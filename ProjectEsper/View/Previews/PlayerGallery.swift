@@ -8,8 +8,8 @@ import EsperSim
 /// (its look's colours, the neck filled, the line round it, the hooded head where the frame's
 /// head is, the strings hanging off it, the cubes off its head and its boots and sleeves, and
 /// the glow as the customize screen draws it), playing at a chosen rate or stepped a frame at a
-/// time, and saved out as PNG sheets on #FF00FF at any scale. A tool for looking at the art,
-/// not a part of the game.
+/// time, and saved out as PNG sheets, or a folder of a sheet's frames, on #FF00FF, #00FF00 or
+/// nothing, at any scale. A tool for looking at the art, not a part of the game.
 #Preview("Player sheets") {
     PlayerGallery()
 }
@@ -22,13 +22,38 @@ enum PlayerGalleryOutput {
         for _ in 0..<4 { root.deleteLastPathComponent() }
         return root.appendingPathComponent("_Graphic Assets/Pixel Art/Assembled", isDirectory: true)
     }()
-    static let background = RGB(0xFF00FF)
+}
+
+/// What a sheet's drawn and saved on: magenta, green, or nothing.
+enum GalleryBackground: String, CaseIterable {
+    case magenta = "MAGENTA", green = "GREEN", none = "NONE"
+    var rgb: RGB? {
+        switch self {
+        case .magenta: RGB(0xFF00FF)
+        case .green: RGB(0x00FF00)
+        case .none: nil
+        }
+    }
+    var color: Color { rgb.map { Color(rgb: $0) } ?? .clear }
+    /// A canvas of `size` filled with it, or left clear.
+    func render(_ size: CGSize, draw: (UIGraphicsImageRendererContext) -> Void) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = rgb != nil
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            if let rgb {
+                UIColor(rgb: rgb).setFill()
+                context.fill(CGRect(origin: .zero, size: size))
+            }
+            draw(context)
+        }
+    }
 }
 
 /// One frame of a sheet as the game assembles it, on a canvas `pad` art pixels bigger each side
 /// than the sheet's cell, at `pixel` points an art pixel. `motion` carries the strings and cubes
-/// between frames; `time` drives them and the strings' wave. `armOverHood`: the front arm drawn
-/// again over the hood, as `GameScene.frontArmOverHood` has it in play.
+/// between frames; `time` drives them and the strings' wave. `armOverHood`: the arms drawn
+/// again over the hood, as `GameScene.armPartsOverHood` has them in play.
 struct AssembledFrame: View {
     let portrait: SpriteLibrary.Portrait
     let look: Look
@@ -107,6 +132,7 @@ struct AssembledFrame: View {
             }
             if cubes { for cube in motion.cubes where cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) } }
             func drawLine(_ line: CGImage, in context: GraphicsContext, turned: Bool) {
+                guard look.outlineWidth > 0 else { return }
                 context.drawLayer { layer in
                     layer.addFilter(.colorMultiply(Color(rgb: look.outline)))
                     if turned { drawHood(line, in: layer) } else { layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect) }
@@ -114,15 +140,26 @@ struct AssembledFrame: View {
             }
             // Turned, the hood carries its own line, under the body so only what's outside it shows,
             // and the body's line is drawn without the hood's place; else one line runs round both.
-            let hoodTurned = (turn != 0 || headNudge != .zero || headShift != .zero) && portrait.bareLine != nil && portrait.hoodLine != nil
-            // The ball where the game has it in the hand, behind the body on the frames that tuck it there.
-            let ballAt = ball ? BallLandmarks.table["\(frame.animation.rawValue)_\(frame.frame)"].map {
-                spot(CGPoint(x: canvasWidth / 2 + $0.x, y: frame.animation.feetFromBottom + $0.y))
-            } : nil
+            let hoodTurned = (turn != 0 || headShift != .zero) && portrait.bareLine != nil && portrait.hoodLine != nil
+            // The ball where the game has it in the hand, behind the body on the frames that tuck it there;
+            // on the art's own pixels where the round ball fits its white, painted where the sheet reshapes it.
+            let sheetBall = ball ? SpriteLibrary.fittedBall(frame, source: GalleryDrawing.source(frame)) : nil
+            let ballCentre = sheetBall.map { SpriteLibrary.sheetBallCentre($0, in: frame) }
+                ?? BallLandmarks.table["\(frame.animation.rawValue)_\(frame.frame)"].map { CGPoint(x: $0.x, y: $0.y) }
+            let ballAt = ball ? ballCentre.map { spot(CGPoint(x: canvasWidth / 2 + $0.x, y: frame.animation.feetFromBottom + $0.y)) } : nil
             func drawBall() {
-                guard let at = ballAt, let image = GalleryDrawing.ballImage else { return }
-                let side = GalleryDrawing.ballPixels * pixel
-                context.draw(Image(decorative: image, scale: 1).interpolation(.none), in: CGRect(x: at.x - side / 2, y: at.y - side / 2, width: side, height: side))
+                guard let at = ballAt, let art = GalleryDrawing.ballImage(spin: 0) else { return }
+                let image = sheetBall.flatMap { $0.roundAt == nil ? SpriteLibrary.paintBall($0, art: art) : GalleryDrawing.ballImage(spin: SpriteLibrary.roundBallSpin(frame, source: GalleryDrawing.source) ?? 0) } ?? art
+                let width = CGFloat(image.width) * pixel, height = CGFloat(image.height) * pixel
+                context.draw(Image(decorative: image, scale: 1).interpolation(.none), in: CGRect(x: at.x - width / 2, y: at.y - height / 2, width: width, height: height))
+                // What the sheet draws in front of the round ball, and its line, again over it.
+                guard let sheetBall, sheetBall.roundAt != nil else { return }
+                if let over = SpriteLibrary.picked(portrait.image, pixels: sheetBall.covering) {
+                    context.draw(Image(decorative: over, scale: 1).interpolation(.none), in: figureRect)
+                }
+                if let line = hoodTurned ? portrait.bareLine : portrait.line, let over = SpriteLibrary.picked(line, pixels: sheetBall.covering) {
+                    drawLine(over, in: context, turned: false)
+                }
             }
             /// An arm of its own, its line under it, moved and turned about its pivot.
             func drawArms(_ layer: FigureLayer) {
@@ -204,6 +241,7 @@ struct GalleryDrawing {
     var cubes = true
     var glow = true
     var ball = true
+    var background = GalleryBackground.magenta
     /// The blast fired up off the ground: its arms 45 degrees up and the head tipped back, as play has it.
     var blastUp = false
     func headTip(_ frame: AnimationFrame) -> CGFloat { blastUp && frame.animation == .blast ? GameScene.blastUpTip : 0 }
@@ -211,12 +249,18 @@ struct GalleryDrawing {
     /// The hooded heads moved, by sheet and frame: the game's table to start, changed here.
     var headNudges: [EsperSim.Animation: [Int: CGPoint]] = GameScene.headNudges
     func headNudge(_ frame: AnimationFrame) -> CGPoint { headNudges[frame.animation]?[frame.frame] ?? .zero }
-    /// The ball's first frame, and its size in art pixels.
-    static let ballImage: CGImage? = UIImage(named: "Basketball")?.cgImage?.cropping(to: CGRect(x: 0, y: 0, width: 8, height: 8))
-    static let ballPixels: CGFloat = 8
+    /// One of the ball's frames.
+    static func ballImage(spin: Int) -> CGImage? {
+        UIImage(named: "Basketball")?.cgImage?.cropping(to: CGRect(x: spin * 8, y: 0, width: 8, height: 8))
+    }
+    /// A player frame as the sheet has it, before any recolouring.
+    static func source(_ frame: AnimationFrame) -> CGImage {
+        SKTextureAtlas(named: "Sprites").textureNamed("\(frame.animation.rawValue)_\(frame.frame)").cgImage()
+    }
     /// The frames whose front arm goes over the hood, by sheet: the game's table to start,
     /// changed frame by frame here.
-    var armOverHood: [EsperSim.Animation: Set<Int>] = Dictionary(uniqueKeysWithValues: GameScene.frontArmOverHood.map { ($0.key, Set($0.value)) })
+    var armOverHood: [EsperSim.Animation: Set<Int>] = GameScene.frontArmOverHood.mapValues { Set($0) }
+        .merging(GameScene.bothArmsOverHood.mapValues { Set($0) }) { $0.union($1) }
 
     func armOverHood(_ frame: AnimationFrame) -> Bool { armOverHood[frame.animation]?.contains(frame.frame) ?? false }
 }
@@ -229,12 +273,22 @@ final class PlayerGallerySheets: ObservableObject {
     @Published var pick = PlayerCustomization.saved(0)
     @Published var status = ""
 
-    var look: Look { pick.look }
+    /// The gallery's OUTLINE: off, the look drawn with no line at all, outside or between parts,
+    /// so every pixel keeps its recoloured colour.
+    @Published var outlined = true
+    var look: Look {
+        guard !outlined else { return pick.look }
+        var unlined = pick.look
+        unlined.outlineWidth = 0
+        unlined.strokedGroups = []
+        return unlined
+    }
 
-    func portrait(_ frame: AnimationFrame) -> SpriteLibrary.Portrait? {
+    /// A frame's portrait, its line and neck made for the hood moved by `headNudge`, as play bakes it.
+    func portrait(_ frame: AnimationFrame, headNudge: CGPoint) -> SpriteLibrary.Portrait? {
         sprites.setCustomizeLook(look, for: 0)
         return sprites.portrait(frame.animation.rawValue, frame: frame.frame, player: SpriteLibrary.customizePlayer(0),
-                                headDrawnFor: SpriteLibrary.hoodDrawnFor, headNudge: .zero, headScale: 1, holdsBall: frame.animation.holdsBall)
+                                headDrawnFor: SpriteLibrary.hoodDrawnFor, headNudge: headNudge, headScale: 1, holdsBall: frame.animation.holdsBall)
     }
 
     /// What play draws round the figure on a sheet's frame: the shield on its arc for the shield's
@@ -260,27 +314,121 @@ final class PlayerGallerySheets: ObservableObject {
                                   image: { _, make in make()?.cgImage() })
     }
 
+    /// The sheets outside play's, on the chair as the Greateraid pick draws them: the drinker
+    /// choosing and the drinker drinking, each over `player_bench`.
+    enum Seated: String, CaseIterable {
+        case drinkChoice = "player_drinkchoice", drink = "player_drink"
+        var name: String { self == .drinkChoice ? "Drink Choice + Chair" : "Drink + Chair" }
+        /// Its frames, as many as the atlas has.
+        var frameCount: Int {
+            let names = Set(SKTextureAtlas(named: "Sprites").textureNames)
+            return max((0..<64).prefix { names.contains("\(rawValue)_\($0)") || names.contains("\(rawValue)_\($0).png") }.count, 1)
+        }
+    }
+
+    /// A seated frame in the look, as the pick draws it: the chair, and the figure on it (the
+    /// drink's head tipped back and its bottle over the hood, frame by frame).
+    func seated(_ sheet: Seated, frame: Int) -> (chair: CGImage, figure: CGImage) {
+        sprites.setCustomizeLook(look, for: 0)
+        let slot = SpriteLibrary.customizePlayer(0)
+        let chair = sprites.standalone("player_bench", frame: 0, player: slot).cgImage()
+        let figure = sheet == .drink
+            ? sprites.standalone(sheet.rawValue, frame: frame, player: slot, headTilt: PickScreen.drinkHeadTilts[min(frame, PickScreen.drinkHeadTilts.count - 1)],
+                                 overHood: PickScreen.drinkOverHood)
+            : sprites.standalone(sheet.rawValue, frame: frame, player: slot)
+        return (chair, figure.cgImage())
+    }
+
+    /// The gallery's OLD LINE: the line drawn as before build 12 (Semibold, corners too), or as now.
+    func useOldLine(_ old: Bool) {
+        sprites.setCustomizeLineStyle(old ? .semibold : nil)
+        objectWillChange.send()
+    }
+
+    /// A seated sheet's frames at `scale`, each on its own canvas, clear, `pad` art pixels round each.
+    func seatedFrames(_ sheet: Seated, scale: CGFloat, pad: CGFloat) -> [UIImage] {
+        let frames = (0..<sheet.frameCount).map { seated(sheet, frame: $0) }
+        let art = GallerySeatedFrame.canvas(frames.first)
+        let cell = CGSize(width: (art.width + 2 * pad) * scale, height: (art.height + 2 * pad) * scale)
+        return frames.map { frame in
+            GalleryBackground.none.render(cell) { context in
+                context.cgContext.interpolationQuality = .none
+                for (image, origin) in GallerySeatedFrame.layers(frame, canvas: art) {
+                    UIImage(cgImage: image).draw(in: CGRect(x: (pad + origin.x) * scale, y: (pad + origin.y) * scale,
+                                                            width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale))
+                }
+            }
+        }
+    }
+
+    func saveSeated(_ sheet: Seated, scale: CGFloat, strip: Strip, pad: CGFloat, background: GalleryBackground) {
+        write("\(sheet.rawValue)_chair", frames: seatedFrames(sheet, scale: scale, pad: pad), strip: strip, background: background,
+              saved: "Saved \(sheet.name) at ×\(Int(scale))")
+    }
+
+    func exportSeatedFrames(_ sheet: Seated, scale: CGFloat, pad: CGFloat, background: GalleryBackground) {
+        writeFrames("\(sheet.rawValue)_chair", frames: seatedFrames(sheet, scale: scale, pad: pad), background: background, scale: scale)
+    }
+
+    /// Frames laid one after another, down or across, on the background.
+    static func strip(_ frames: [UIImage], strip: Strip, background: GalleryBackground) -> UIImage? {
+        guard let cell = frames.first?.size else { return nil }
+        let count = CGFloat(frames.count)
+        let size = strip == .across ? CGSize(width: cell.width * count, height: cell.height) : CGSize(width: cell.width, height: cell.height * count)
+        return background.render(size) { _ in
+            for (index, image) in frames.enumerated() {
+                let at = strip == .across ? CGPoint(x: cell.width * CGFloat(index), y: 0) : CGPoint(x: 0, y: cell.height * CGFloat(index))
+                image.draw(in: CGRect(origin: at, size: cell))
+            }
+        }
+    }
+
+    /// A sheet's frames saved as one PNG named for it, in the output folder.
+    private func write(_ name: String, frames: [UIImage], strip: Strip, background: GalleryBackground, saved: String) {
+        let folder = PlayerGalleryOutput.folder
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            guard let data = PlayerGallerySheets.strip(frames, strip: strip, background: background)?.pngData() else { return }
+            try data.write(to: folder.appendingPathComponent("\(name).png"))
+            status = "\(saved) to \(folder.path)"
+        } catch {
+            status = "Couldn't save: \(error.localizedDescription)"
+        }
+    }
+
+    /// A sheet's frames saved one PNG each, `name_01.png` on, in a folder named for the sheet in
+    /// the output folder, emptied first.
+    private func writeFrames(_ name: String, frames: [UIImage], background: GalleryBackground, scale: CGFloat) {
+        let folder = PlayerGalleryOutput.folder.appendingPathComponent(name, isDirectory: true)
+        do {
+            try? FileManager.default.removeItem(at: folder)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for (index, frame) in frames.enumerated() {
+                guard let data = background.render(frame.size, draw: { _ in frame.draw(at: .zero) }).pngData() else { continue }
+                try data.write(to: folder.appendingPathComponent(String(format: "%@_%02d.png", name, index + 1)))
+            }
+            status = "Exported \(frames.count) frames at ×\(Int(scale)) to \(folder.path)"
+        } catch {
+            status = "Couldn't export: \(error.localizedDescription)"
+        }
+    }
+
     /// Which way a sheet's frames run.
     enum Strip: String, CaseIterable {
         case down = "DOWN", across = "ACROSS"
     }
 
-    /// A sheet of every frame of `animation` at `scale` pixels an art pixel, on #FF00FF: the
-    /// strings and cubes moved on between frames as the frames play at the drawing's rate.
-    func sheet(_ animation: EsperSim.Animation, scale: CGFloat, strip: Strip, drawing: GalleryDrawing) -> UIImage? {
+    /// Every frame of `animation` at `scale` pixels an art pixel, each clear: the strings and
+    /// cubes moved on between frames as the frames play at the drawing's rate.
+    func frames(_ animation: EsperSim.Animation, scale: CGFloat, drawing: GalleryDrawing) -> [UIImage]? {
         let motion = CustomizeFigureMotion()
         let pad = drawing.pad(for: animation)
-        let cell = CGSize(width: (CGFloat(animation.pixelWidth) + 2 * pad) * scale, height: (CGFloat(animation.pixelSize) + 2 * pad) * scale)
         let count = GallerySheets.frameCount(animation)
-        let size = strip == .across ? CGSize(width: cell.width * CGFloat(count), height: cell.height) : CGSize(width: cell.width, height: cell.height * CGFloat(count))
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = true
         let start = Date().timeIntervalSinceReferenceDate
         var frames: [UIImage] = []
         for index in 0..<count {
             let frame = GallerySheets.frame(animation, index)
-            guard let portrait = portrait(frame) else { return nil }
+            guard let portrait = portrait(frame, headNudge: drawing.headNudge(frame)) else { return nil }
             let arms = arms(frame, blastUp: drawing.blastUp)
             let view = AssembledFrame(portrait: portrait, look: look, frame: frame, pixel: scale, pad: pad, mirrored: drawing.mirrored,
                                       strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
@@ -293,14 +441,7 @@ final class PlayerGallerySheets: ObservableObject {
             guard let image = renderer.uiImage else { return nil }
             frames.append(image)
         }
-        return UIGraphicsImageRenderer(size: size, format: format).image { context in
-            UIColor(rgb: PlayerGalleryOutput.background).setFill()
-            context.fill(CGRect(origin: .zero, size: size))
-            for (index, image) in frames.enumerated() {
-                let at = strip == .across ? CGPoint(x: cell.width * CGFloat(index), y: 0) : CGPoint(x: 0, y: cell.height * CGFloat(index))
-                image.draw(in: CGRect(origin: at, size: cell))
-            }
-        }
+        return frames
     }
 
     /// `animations`' sheets saved as PNGs named for their sheets, in the output folder.
@@ -310,7 +451,8 @@ final class PlayerGallerySheets: ObservableObject {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             var saved = 0
             for animation in animations {
-                guard let sheet = sheet(animation, scale: scale, strip: strip, drawing: drawing), let data = sheet.pngData() else { continue }
+                guard let frames = frames(animation, scale: scale, drawing: drawing),
+                      let data = PlayerGallerySheets.strip(frames, strip: strip, background: drawing.background)?.pngData() else { continue }
                 try data.write(to: folder.appendingPathComponent("\(animation.rawValue).png"))
                 saved += 1
             }
@@ -319,13 +461,19 @@ final class PlayerGallerySheets: ObservableObject {
             status = "Couldn't save: \(error.localizedDescription)"
         }
     }
+
+    /// `animation`'s frames, a PNG each, in a folder named for the sheet in the output folder.
+    func exportFrames(_ animation: EsperSim.Animation, scale: CGFloat, drawing: GalleryDrawing) {
+        guard let frames = frames(animation, scale: scale, drawing: drawing) else { return status = "Couldn't draw \(GallerySheets.name(animation))" }
+        writeFrames(animation.rawValue, frames: frames, background: drawing.background, scale: scale)
+    }
 }
 
 /// The sheets as the gallery lists them: by name in words, the idles first.
 enum GallerySheets {
     static let first: [EsperSim.Animation] = [.idle, .dribbleIdle]
     /// Z Tea's arms' sheets aren't listed: the beam and the blast are drawn with theirs on.
-    static let armsAlone: [EsperSim.Animation] = [.beamArms, .blastArms]
+    static let armsAlone: [EsperSim.Animation] = [.beamArms, .blastArms, .webshootBackArm, .webshootFrontArm, .webshootWallArm]
     static let listed: [EsperSim.Animation] = first + EsperSim.Animation.allCases.filter { !first.contains($0) && !armsAlone.contains($0) }
         .sorted { name($0).localizedStandardCompare(name($1)) == .orderedAscending }
 
@@ -353,16 +501,60 @@ enum GallerySheets {
     }
 }
 
+/// A seated frame drawn as the pick lays it: the chair and the figure each anchored at the same
+/// feet (`PickScreen.drinkerFeet` up, the middle across), on one canvas that holds both.
+struct GallerySeatedFrame: View {
+    let frame: (chair: CGImage, figure: CGImage)
+    let pixel: CGFloat
+    let pad: CGFloat
+
+    /// The canvas both fit on, art pixels.
+    static func canvas(_ frame: (chair: CGImage, figure: CGImage)?) -> CGSize {
+        guard let frame else { return CGSize(width: 48, height: 48) }
+        return CGSize(width: CGFloat(max(frame.chair.width, frame.figure.width)), height: CGFloat(max(frame.chair.height, frame.figure.height)))
+    }
+
+    /// Each picture with its top left on the canvas, art pixels from the canvas's top left: the
+    /// chair under, the figure over, their feet together.
+    static func layers(_ frame: (chair: CGImage, figure: CGImage), canvas: CGSize) -> [(CGImage, CGPoint)] {
+        let feet = CGPoint(x: canvas.width / 2, y: canvas.height * (1 - PickScreen.drinkerFeet))
+        return [frame.chair, frame.figure].map { image in
+            let width = CGFloat(image.width), height = CGFloat(image.height)
+            return (image, CGPoint(x: (feet.x - width / 2).rounded(), y: (feet.y - height * (1 - PickScreen.drinkerFeet)).rounded()))
+        }
+    }
+
+    var body: some View {
+        let art = GallerySeatedFrame.canvas(frame)
+        Canvas { context, _ in
+            for (image, origin) in GallerySeatedFrame.layers(frame, canvas: art) {
+                context.draw(Image(decorative: image, scale: 1).interpolation(.none),
+                             in: CGRect(x: (pad + origin.x) * pixel, y: (pad + origin.y) * pixel, width: CGFloat(image.width) * pixel, height: CGFloat(image.height) * pixel))
+            }
+        }
+        .frame(width: (art.width + 2 * pad) * pixel, height: (art.height + 2 * pad) * pixel)
+    }
+}
+
+/// What the gallery's sheet list picks: one of play's sheets, or a seated one on its chair.
+enum GalleryEntry: Hashable {
+    case sheet(EsperSim.Animation)
+    case seated(PlayerGallerySheets.Seated)
+}
+
 /// The frame last drawn while playing, for the pause to hold on.
 final class Playhead {
     var shown = 0
 }
 
-/// The gallery: a sheet playing or stepped, its look, pace and padding, the per-frame arm
-/// over the hood, and the save controls.
+/// The gallery: the sheet picked at the top, the frame playing or stepped under it, then the
+/// controls in sections: how it's drawn, this frame's tweaks, the view, and saving.
 struct PlayerGallery: View {
     @StateObject private var sheets = PlayerGallerySheets()
     @State private var animation: EsperSim.Animation = .idle
+    /// A seated sheet shown in the sheet's place, or none.
+    @State private var seated: PlayerGallerySheets.Seated?
+    @State private var oldLine = false
     @State private var drawing = GalleryDrawing()
     @State private var pixel = 6.0
     @State private var saveScale = 4.0
@@ -373,88 +565,219 @@ struct PlayerGallery: View {
     @State private var playhead = Playhead()
 
     private static let saveScales: [Double] = [1, 2, 3, 4, 6, 8]
+    private static let stageHeight: CGFloat = 320
+    private static let controlFont = Font.system(size: 12, weight: .semibold, design: .monospaced)
+
+    private var frameCount: Int { seated?.frameCount ?? GallerySheets.frameCount(animation) }
+    private var sheetName: String { seated?.name ?? GallerySheets.name(animation) }
+    private var shownIndex: Int { paused ? held : playhead.shown }
 
     var body: some View {
-        VStack(spacing: 14) {
-            Text("PLAYER SHEETS")
-                .font(.system(size: 11, weight: .heavy, design: .monospaced))
-                .tracking(4)
-                .foregroundStyle(.secondary)
-            TimelineView(.animation(paused: paused)) { timeline in
-                let time = timeline.date.timeIntervalSinceReferenceDate
-                let index = paused ? held : Int(time * drawing.fps) % GallerySheets.frameCount(animation)
-                let frame = GallerySheets.frame(animation, index)
-                let _ = playhead.shown = index
-                // Room for what's round the figure, the figure shrunk to keep the view's size.
-                let pad = drawing.pad(for: animation)
-                let shown = pixel * (CGFloat(animation.pixelSize) + 2 * drawing.pad) / (CGFloat(animation.pixelSize) + 2 * pad)
-                ZStack {
-                    Color(rgb: PlayerGalleryOutput.background)
-                    if let portrait = sheets.portrait(frame) {
-                        let arms = sheets.arms(frame, blastUp: drawing.blastUp)
-                        AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: shown, pad: pad, mirrored: drawing.mirrored,
-                                       strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
-                                       headNudge: drawing.headNudge(frame), ball: drawing.ball, armsBehind: arms.behind, armsOver: arms.over,
-                                       headTip: drawing.headTip(frame), headShift: drawing.headShift(frame),
-                                       props: sheets.props(animation, index),
-                                       motion: motion, time: time)
-                    }
+        ScrollView {
+            VStack(spacing: 16) {
+                sheetPicker
+                stage
+                transport
+                GallerySection("DRAW") { drawControls }
+                if seated == nil {
+                    GallerySection("FRAME \(shownIndex + 1)") { frameControls }
                 }
-                .frame(width: (CGFloat(animation.pixelWidth) + 2 * pad) * shown, height: (CGFloat(animation.pixelSize) + 2 * pad) * shown)
-                .overlay(alignment: .bottomTrailing) {
-                    Text("\(GallerySheets.name(animation))  \(index + 1)/\(GallerySheets.frameCount(animation))")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .padding(4)
-                        .background(.black.opacity(0.6))
-                        .foregroundStyle(.white)
-                }
+                GallerySection("VIEW") { viewControls }
+                GallerySection("SAVE") { saveControls }
             }
-            transport
-            controls
-            Text(sheets.status)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 360)
+            .font(PlayerGallery.controlFont)
+            .padding(16)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
         }
-        .padding(16)
         .onChange(of: animation) { held = 0 }
+        .onChange(of: seated) { held = 0 }
+        .onChange(of: oldLine) { sheets.useOldLine(oldLine) }
+        .onDisappear { sheets.useOldLine(false) }
     }
 
-    /// Play or pause, and a frame back or on (which pauses); the arm over the hood for this frame.
-    private var transport: some View {
-        let shown = paused ? held : playhead.shown
-        let frame = GallerySheets.frame(animation, shown)
-        return VStack(spacing: 8) {
-            HStack(spacing: 12) {
-                Button("\u{25C0}") { step(-1) }
-                Button(paused ? "\u{25B6} PLAY" : "\u{23F8} PAUSE") {
-                    if !paused { held = playhead.shown }
-                    paused.toggle()
-                }
-                .frame(width: 110)
-                Button("\u{25B6}") { step(1) }
+    /// The sheet, play's then the seated ones on their chair, in one list; and the energy colour.
+    private var sheetPicker: some View {
+        HStack {
+            Picker("Sheet", selection: Binding<GalleryEntry>(
+                get: { seated.map(GalleryEntry.seated) ?? .sheet(animation) },
+                set: { entry in
+                    switch entry {
+                    case .sheet(let sheet): seated = nil; animation = sheet
+                    case .seated(let sheet): seated = sheet
+                    }
+                })) {
+                ForEach(GallerySheets.listed, id: \.self) { Text(GallerySheets.name($0)).tag(GalleryEntry.sheet($0)) }
+                ForEach(PlayerGallerySheets.Seated.allCases, id: \.self) { Text($0.name).tag(GalleryEntry.seated($0)) }
             }
-            .buttonStyle(.bordered)
-            Toggle("ARM OVER HOOD, FRAME \(shown + 1)", isOn: Binding(
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Picker("Colour", selection: $sheets.pick.energy) {
+                ForEach(EnergyColour.wheel, id: \.self) { Text($0.rawValue.uppercased()).tag($0) }
+            }
+        }
+        .pickerStyle(.menu)
+    }
+
+    /// The frame on its background, centred on a stage of fixed height so the controls under it
+    /// stay put; its name and number under it.
+    private var stage: some View {
+        VStack(spacing: 6) {
+            TimelineView(.animation(paused: paused)) { timeline in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                let index = paused ? held : Int(time * drawing.fps) % frameCount
+                let _ = playhead.shown = index
+                picture(index: index, time: time)
+                    .background { GalleryBackdrop(background: drawing.background) }
+                    .frame(maxWidth: .infinity, minHeight: PlayerGallery.stageHeight)
+            }
+            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            Text("\(sheetName)   \(shownIndex + 1) / \(frameCount)")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func picture(index: Int, time: Double) -> some View {
+        if let seated {
+            GallerySeatedFrame(frame: sheets.seated(seated, frame: index), pixel: pixel, pad: drawing.pad)
+        } else {
+            let frame = GallerySheets.frame(animation, index)
+            // Room for what's round the figure, the figure shrunk to keep the view's size.
+            let pad = drawing.pad(for: animation)
+            let shown = pixel * (CGFloat(animation.pixelSize) + 2 * drawing.pad) / (CGFloat(animation.pixelSize) + 2 * pad)
+            if let portrait = sheets.portrait(frame, headNudge: drawing.headNudge(frame)) {
+                let arms = sheets.arms(frame, blastUp: drawing.blastUp)
+                AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: shown, pad: pad, mirrored: drawing.mirrored,
+                               strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
+                               headNudge: drawing.headNudge(frame), ball: drawing.ball, armsBehind: arms.behind, armsOver: arms.over,
+                               headTip: drawing.headTip(frame), headShift: drawing.headShift(frame),
+                               props: sheets.props(animation, index),
+                               motion: motion, time: time)
+            }
+        }
+    }
+
+    /// A frame back, play or pause, a frame on (stepping pauses); and the rate.
+    private var transport: some View {
+        HStack(spacing: 10) {
+            Button { step(-1) } label: { Image(systemName: "backward.frame.fill") }
+            Button {
+                if !paused { held = playhead.shown }
+                paused.toggle()
+            } label: {
+                Image(systemName: paused ? "play.fill" : "pause.fill").frame(width: 44)
+            }
+            Button { step(1) } label: { Image(systemName: "forward.frame.fill") }
+            Spacer()
+            Stepper("FPS \(Int(drawing.fps))", value: $drawing.fps, in: 1...60)
+                .fixedSize()
+        }
+        .buttonStyle(.bordered)
+    }
+
+    /// What's drawn: the toggles in an even grid, then the background.
+    private var drawControls: some View {
+        VStack(spacing: 10) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                GalleryToggle("MIRROR", isOn: $drawing.mirrored)
+                GalleryToggle("STRINGS", isOn: $drawing.strings)
+                GalleryToggle("CUBES", isOn: $drawing.cubes)
+                GalleryToggle("GLOW", isOn: $drawing.glow)
+                GalleryToggle("BALL", isOn: $drawing.ball)
+                GalleryToggle("OLD LINE", isOn: $oldLine)
+                GalleryToggle("OUTLINE", isOn: $sheets.outlined)
+                if seated == nil && animation == .blast { GalleryToggle("BLAST UP", isOn: $drawing.blastUp) }
+            }
+            GalleryRow("BACKGROUND") {
+                Picker("Background", selection: $drawing.background) {
+                    ForEach(GalleryBackground.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+    }
+
+    /// The shown frame's own tweaks, and every head moved so far to report.
+    private var frameControls: some View {
+        let frame = GallerySheets.frame(animation, shownIndex)
+        return VStack(spacing: 10) {
+            GalleryToggle("ARM OVER HOOD", isOn: Binding(
                 get: { drawing.armOverHood(frame) },
                 set: { on in
                     var frames = drawing.armOverHood[animation] ?? []
                     if on { frames.insert(frame.frame) } else { frames.remove(frame.frame) }
                     drawing.armOverHood[animation] = frames.isEmpty ? nil : frames
                 }))
-            .toggleStyle(.button)
-            // The hooded head moved on this frame, and every move so far, frames from 1, to report.
-            HStack(spacing: 12) {
-                Stepper("HEAD X \(Int(drawing.headNudge(frame).x))", value: headNudgeBinding(frame, \.x), in: -12...12)
-                Stepper("HEAD Y \(Int(drawing.headNudge(frame).y))", value: headNudgeBinding(frame, \.y), in: -12...12)
+            GalleryRow("HEAD X") {
+                Stepper("\(Int(drawing.headNudge(frame).x))", value: headNudgeBinding(frame, \.x), in: -12...12)
+            }
+            GalleryRow("HEAD Y") {
+                Stepper("\(Int(drawing.headNudge(frame).y))", value: headNudgeBinding(frame, \.y), in: -12...12)
             }
             Text(headNudgeSummary)
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .font(.system(size: 12, weight: .bold, design: .monospaced))
+    }
+
+    private var viewControls: some View {
+        VStack(spacing: 10) {
+            GalleryRow("PAD") { Stepper("\(Int(drawing.pad)) px", value: $drawing.pad, in: 0...32) }
+            GalleryRow("ZOOM") { Stepper("×\(Int(pixel))", value: $pixel, in: 1...12) }
+        }
+    }
+
+    /// The scale and the strip's way, then what to save: this sheet as one PNG, its frames as a
+    /// folder of PNGs, or every sheet; and what happened.
+    private var saveControls: some View {
+        VStack(spacing: 10) {
+            GalleryRow("SCALE") {
+                Picker("Save scale", selection: $saveScale) {
+                    ForEach(PlayerGallery.saveScales, id: \.self) { Text("×\(Int($0))").tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
+            GalleryRow("STRIP") {
+                Picker("Strip", selection: $strip) {
+                    ForEach(PlayerGallerySheets.Strip.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
+            HStack(spacing: 8) {
+                Button { saveSheet() } label: { Text("SAVE SHEET").frame(maxWidth: .infinity) }
+                Button { exportFrames() } label: { Text("EXPORT FRAMES").frame(maxWidth: .infinity) }
+            }
+            .buttonStyle(.borderedProminent)
+            Button { sheets.save(GallerySheets.listed, scale: saveScale, strip: strip, drawing: drawing) } label: {
+                Text("SAVE ALL \(GallerySheets.listed.count) SHEETS").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            if !sheets.status.isEmpty {
+                Text(sheets.status)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func saveSheet() {
+        if let seated {
+            sheets.saveSeated(seated, scale: saveScale, strip: strip, pad: drawing.pad, background: drawing.background)
+        } else {
+            sheets.save([animation], scale: saveScale, strip: strip, drawing: drawing)
+        }
+    }
+
+    private func exportFrames() {
+        if let seated {
+            sheets.exportSeatedFrames(seated, scale: saveScale, pad: drawing.pad, background: drawing.background)
+        } else {
+            sheets.exportFrames(animation, scale: saveScale, drawing: drawing)
+        }
     }
 
     private func headNudgeBinding(_ frame: AnimationFrame, _ axis: WritableKeyPath<CGPoint, CGFloat>) -> Binding<CGFloat> {
@@ -473,58 +796,87 @@ struct PlayerGallery: View {
             "\(GallerySheets.name(sheet.key)): " + sheet.value.sorted { $0.key < $1.key }
                 .map { "\($0.key + 1) (\(Int($0.value.x)), \(Int($0.value.y)))" }.joined(separator: ", ")
         }
-        return lines.isEmpty ? "head: none moved" : "head x, y (frames from 1): " + lines.joined(separator: "  ·  ")
+        return lines.isEmpty ? "No heads moved." : "Heads moved, x, y (frames from 1):\n" + lines.joined(separator: "\n")
     }
 
     private func step(_ by: Int) {
         if !paused { held = playhead.shown; paused = true }
-        let count = GallerySheets.frameCount(animation)
-        held = (held + by + count) % count
+        held = (held + by + frameCount) % frameCount
     }
+}
 
-    private var controls: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Picker("Sheet", selection: $animation) {
-                    ForEach(GallerySheets.listed, id: \.self) { Text(GallerySheets.name($0)).tag($0) }
-                }
-                Picker("Colour", selection: $sheets.pick.energy) {
-                    ForEach(EnergyColour.wheel, id: \.self) { Text($0.rawValue.uppercased()).tag($0) }
-                }
-            }
-            HStack(spacing: 12) {
-                Toggle("MIRROR", isOn: $drawing.mirrored)
-                Toggle("STRINGS", isOn: $drawing.strings)
-                Toggle("CUBES", isOn: $drawing.cubes)
-                Toggle("GLOW", isOn: $drawing.glow)
-                Toggle("BALL", isOn: $drawing.ball)
-                if animation == .blast { Toggle("UP", isOn: $drawing.blastUp) }
-            }
-            .toggleStyle(.button)
-            HStack {
-                Stepper("FPS \(Int(drawing.fps))", value: $drawing.fps, in: 1...60)
-                Stepper("PAD \(Int(drawing.pad))", value: $drawing.pad, in: 0...32)
-                Stepper("VIEW ×\(Int(pixel))", value: $pixel, in: 1...12)
-            }
-            HStack {
-                Picker("Save scale", selection: $saveScale) {
-                    ForEach(PlayerGallery.saveScales, id: \.self) { Text("×\(Int($0))").tag($0) }
-                }
-                .pickerStyle(.segmented)
-                Picker("Strip", selection: $strip) {
-                    ForEach(PlayerGallerySheets.Strip.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 150)
-            }
-            HStack(spacing: 12) {
-                Button("SAVE THIS SHEET") { sheets.save([animation], scale: saveScale, strip: strip, drawing: drawing) }
-                Button("SAVE ALL \(GallerySheets.listed.count)") { sheets.save(GallerySheets.listed, scale: saveScale, strip: strip, drawing: drawing) }
-            }
-            .buttonStyle(.borderedProminent)
+/// A titled group of the gallery's controls on a quiet panel.
+struct GallerySection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                .tracking(2)
+                .foregroundStyle(.secondary)
+            content
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
         }
-        .font(.system(size: 12, weight: .bold, design: .monospaced))
-        .frame(maxWidth: 520)
+    }
+}
+
+/// A control with its label in a fixed column on the left.
+struct GalleryRow<Content: View>: View {
+    let label: String
+    @ViewBuilder let content: Content
+    init(_ label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .foregroundStyle(.secondary)
+                .frame(width: 96, alignment: .leading)
+            content
+        }
+    }
+}
+
+/// An on/off button filling its column.
+struct GalleryToggle: View {
+    let label: String
+    @Binding var isOn: Bool
+    init(_ label: String, isOn: Binding<Bool>) {
+        self.label = label
+        _isOn = isOn
+    }
+    var body: some View {
+        Toggle(isOn: $isOn) { Text(label).frame(maxWidth: .infinity) }
+            .toggleStyle(.button)
+    }
+}
+
+/// What's behind the picture: the background's colour, or a checkerboard for none.
+struct GalleryBackdrop: View {
+    let background: GalleryBackground
+    var body: some View {
+        if background == .none {
+            Canvas { context, size in
+                let square: CGFloat = 8
+                for row in 0..<Int((size.height / square).rounded(.up)) {
+                    for column in 0..<Int((size.width / square).rounded(.up)) where (row + column) % 2 == 0 {
+                        context.fill(Path(CGRect(x: CGFloat(column) * square, y: CGFloat(row) * square, width: square, height: square)),
+                                     with: .color(.gray.opacity(0.35)))
+                    }
+                }
+            }
+            .background(Color.white)
+        } else {
+            background.color
+        }
     }
 }
 #endif

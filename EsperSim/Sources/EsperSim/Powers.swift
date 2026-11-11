@@ -316,8 +316,8 @@ public enum ZRules {
     /// The beam's sheet is 16 pixels thick.
     public static let halfThickness = 5.0
     public static let aimRange = degrees(45)
-    /// The aim's share of the way to where the stick points, a frame, while the beam fires and
-    /// through a held run of blasts; through the charge it stays straight.
+    /// The beam's aim's share of the way to where the stick points, a frame, while it fires;
+    /// through the charge it stays straight.
     public static let aimEase = 0.15
     /// The blast's arms turn about the shoulder, this many art pixels over the feet, and reach
     /// this far from it, where the beam leaves.

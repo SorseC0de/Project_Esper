@@ -19,7 +19,7 @@ neutral to get a shot off; catch it and the roles reverse.
   a controller plays player 0 with them by default; only VS HUMAN makes a lone controller
   player 1, two controllers then players 0 and 1; on the TV and on a Mac, with no touch,
   the controllers are players 0 and 1. VS CPU, the default, has the computer on player 1
-  whatever pads are in; VS HUMAN gives player 1 to the second pad. A keyboard on an iPad or a Mac is player 0 as well: WASD, space to jump, J to shoot,
+  whatever pads are in; VS HUMAN gives player 1 to the second pad. A keyboard on an iPad or a Mac is player 0 as well: WASD (with J held, the aim travels 0.1 a frame toward the keys' way, through the angles between: KEY AIM STEP), space to jump, J to shoot,
   K to throw, shift as the left bumper, delete as the start button, M as the left trigger (the
   hitboxes), Esc quits on a Mac or in the simulator; the arrow keys move player 1 when the
   computer's off. The HUD is laid out in the phone's points and
@@ -55,11 +55,16 @@ neutral to get a shot off; catch it and the roles reverse.
   the customize screen draws it (`CustomizeArt.glowStrength`, `glowPixels`), playing at a
   picked rate on #FF00FF, or paused and stepped a frame at a time; ARM OVER HOOD, FRAME N
   draws the sheet's front arm and hand again over the hood for that frame, as the game does on
-  the frames `GameScene.frontArmOverHood` names (`SpriteLibrary.frontArmTexture`: both shots, the
+  the frames `GameScene.frontArmOverHood` names (`SpriteLibrary.armsOverHoodTexture`: both shots, the
   double jump, the slash, the throws from 4, both crouches, the ledge, every gun sheet, the change,
   the dunk, the slide, the pivot, the walk and both dribbling walk and run; the gallery shows its
-  table to copy into the game), with its own line (`frontArmLineTexture`, in the body's line colour):
-  round the arm and hand wherever they meet open air, the sheet's head or the hood as worn. The arm,
+  table to copy into the game), and both arms on the frames `GameScene.bothArmsOverHood` names (the
+  Spin Move's frames 1-3, with and without the ball, and the spin dunk's 1-2), with their own line
+  (`armsOverHoodLineTexture`, in the body's line colour): round the arms and hands wherever they meet
+  open air, the sheet's head or the hood as worn. A frame's HEAD X and Y (`GameScene.headNudges`) are
+  baked into its line and neck, so a nudged hood is lined with the body as one, not as a moved hood.
+  Every held ball sits where the round ball fits the sheet's white (`SpriteLibrary.fittedBall`), on
+  whole art pixels, with what the sheet draws in front of it drawn again over it. The arm,
   its line and its glowing parts are made with the frame itself (`makeFrame`), off the main thread
   in a look's rebuild, and the hooded heads (every view, plain, FloState's and frozen, with the
   hood's line and K&A's face) once it lands (`warmHoods`): none is first made mid-match. So are
@@ -79,7 +84,7 @@ neutral to get a shot off; catch it and the roles reverse.
   30, 90, 135, then -90 twice; `player_dbl_jump_ball`, the same with the ball, takes the same
   tables, its ball drawn behind the whole body on every frame, `ballBehindBodySheets`, protocol 152), its strings' anchors turning with it and the hood carrying its own
   line as when it tips in flight; and `SpriteLibrary.armColoursSwapped`, the front and back arm
-  and hand colours swapped where the sheet draws the back arm in front (the ground throw from 4). SAVE THIS SHEET or SAVE ALL writes each sheet as a PNG strip, down or
+  and hand colours swapped where the sheet draws the back arm in front (the ground throw from 4); `armSkinSwapped`, only the bare skin's two tones swapped, the sleeves kept on their own arms (spin with the ball frame 3, spin dunk frame 2); and `handsLitArmsShaded`, facing out, both hands in the skin's light tone and the rest of both bare arms in its shadow (spin with the ball frame 2, spin dunk frame 1). SAVE THIS SHEET or SAVE ALL writes each sheet as a PNG strip, down or
   across, at ×1 to ×8, its cells the sheet's cell plus PAD art pixels each side (8 to start), on
   #FF00FF, to `_Graphic Assets/Pixel Art/Assembled/` named for the sheet; the strings and cubes
   move on between a sheet's frames as it plays.
@@ -144,6 +149,10 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   20-frame windup ends. Let go after that but before the windup ends and it's a cancel.
   Holding past the windup and releasing without a flick is the pump fake, and so is a second shoot button or the throw button pressed during the
   stance; after a cancel the buttons involved have to come up before another stance.
+  The throw charges as its stance is held past the 12-frame windup, full 70 frames in, where the charge's
+  swirl starts its loop (`ThrowChargeRules`): 4 units a frame uncharged to 8 at full, the old 7 at three
+  quarters. Fully charged it's nobody's but the thrower's to catch or snatch till it bounces; Breaker Ball's damage goes 5 to 10 with it. Not the floater's (up), which
+  drifts at 1.5 as ever.
   Shoot pressed during a throw stance cancels the throw the same way, and jump cancels it into
   a jump (on the ground the jump squat; in the air the air's jump, if one is left), the throw
   button up before another stance. Protocol 16. On the ground, jump during the stance
@@ -163,16 +172,18 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   jump's somersault over 18 frames at the same pace with normal gravity and air drift, so
   the whole thing is a commitment; on the ground it's over when the swing is. Not in
   neutral.
-- Down lets go of any hang: the wall cling (unless a web line is being aimed), the ledge
-  hang, which it drops off rather than climbing, and the rim after a dunk's slam; neither
-  the wall nor the ledge can be taken again at once.
+- Down lets go of the ledge hang, which it drops off rather than climbing, and the rim after a
+  dunk's slam; the ledge can't be taken again at once. On the wall cling, down held into the
+  wall slides it (Web Water's cling slides only so); the stick let go or pushed away lets go.
+  Coming off the cling into anything, the body faces away from the wall.
 - The change (`PlayerState.transforming`, `TransformRules`, protocol 44): throw and shoot together,
   from anything free, or within four frames of the stance, slash or snatch the first of them
   started (so the two a frame apart still do it), change the human form
   into the energy form; the same again in it changes straight back. The change holds the body still where it
   is, gravity off, while `player_transform` (nine 48 pixel frames at ten a second, read straight
   from `Player_Transform.aseprite` by the importer, its `Layer 1` as `transform_eyes`) plays; then
-  it's in FloState (`Player.inFloState`, protocol 79): only with a full meter (`floStateReady`, protocol 81), and
+  it's in FloState (`Player.inFloState`, protocol 79): only with a full meter (`floStateReady`, protocol 81),
+  never in the Tutorial or Breaker Ball (`Match.floStateAllowed`, set on the bodies every frame), and
   never left early: in it the pair does nothing, and it lasts till the FLO's spent (protocol 142); with
   FLO that never runs out, ZONES' (`unlimitedFlo`), the pair is still the way out.
   On a touch screen a tap on your own FLO meter (or within 12 points of it) is throw and shoot
@@ -198,7 +209,18 @@ Tap is instant, hold is a stance, flick or release resolves it. Same on touch an
   (`Dressing.energyFormBare`, the glow mask's skin green as a human's); so
   clothes picked later follow on their own. The face's lightest tone is held to a grey level of 0.6
   (`SpriteLibrary.energyFaceLevel`): lime's, at 0.76, burned the features out in the glow (gold and
-  teal come down a touch). The snatch in FloState, on the ground or in the air (protocol 144; in the air gravity cut to the slash's share), is drawn from
+  teal come down a touch). With the ball in FloState, standing is `player_idle_ball_flostate`
+  (ten frames at twelve a second), the ball floating behind the body where the sheet's white puts
+  it, turning through its three frames as a dribble's does (`SpriteLibrary.roundBallSpin`), and the
+  idle's edge dribble never needed; running and dashing is `player_run_ball_flostate`, which draws no
+  ball: it rides a ring round the body seen edge on, a line slanted 15 degrees, front end down,
+  20 art pixels out, slid along it and scaled up a quarter passing in front, down a quarter behind,
+  once round every two run cycles (`BallRing`, the RING sliders). The walk still dribbles. The taunt in FloState spins the
+  ball rather than dribbling it (`player_taunt2`, ten frames at fifteen a second, its last held to
+  the taunt's end): its FLO the same, on the same frame as the dribble's first bounce, rising off the
+  ball. The ball is painted on a layer of its own (`player_taunt2_ball`, `SpriteLibrary.ballLayers`),
+  its landmarks the middle of its painted pixels (the importer's `BALL_LAYERS`), its tones swapped
+  for each look's as the look's ball has them pixel for pixel (`ballToneSwaps`). The snatch in FloState, on the ground or in the air (protocol 144; in the air gravity cut to the slash's share), is drawn from
   `player_snatch_flostate`, seven frames at the snatch's own timing, its last held (protocol 101):
   a step-through, the body carried 96 art pixels forward over the snatch, two of the sheets'
   48-pixel boxes (`SnatchRules.floStateTravel`, protocol 117), through the other; the whole way the
@@ -341,6 +363,13 @@ whatever lands on it came at, held down 12° while someone
   `stadiumOffsets`); Longball Stadium's as placed: (-6, 10), (-4, 12), (-2, 16), (2, 1), (-3, 3),
   (-1, -1), (-1, -1); Wreck Center's start there, to be placed for the straight hoop, the tuning
   starting on it (`DunkTuning.stage`).
+  The spin dunk (`player_dunk2`, `Animation.dunkSpins`; false brings the plain dunk back) replaces
+  it: the throw stance's frame, then ten sheet frames at a steady 15 fps (4 sim frames each),
+  the ball leaving at frame 8 (`Animation.dunkSlamEntry`, 36 frames in; protocol 226), the frame shown wherever the dunk freezes: Phantom's pass and a
+  game-winner. The hang lasts 20 then 45 frames from the slam either way (`BallRules.dunkSlamToHangFrames`).
+  Its first three frames are the Spin Move's turn, heads and hood tables taken from it, and lean
+  forward 10 degrees (`GameScene.spinDunkTilt`). Its offsets are their own (`DunkArt.spinCourtOffsets`,
+  `spinStadiumOffsets`), seeded from the plain dunk's matching poses.
   A tap, or letting go before the 12-frame windup ends, throws when the windup ends where
   the stick pointed. The dunk shows the ledge sheet's first two frames until it has art.
   A ledge is a solid tile's corner on a face at least three tiles tall (`Stage.ledgeTiles`,
@@ -429,19 +458,33 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   happens; holding jump keeps swinging, up to 1.6 times the arc and never over the anchor.
   The exit keeps the arc's direction but is
   capped to air speed across and a full hop up, so the stick can turn it. The swing is on
-  a cooldown of a full swing's frames, 28, from the moment one ends, however it ends,
+  a cooldown of 20 frames (WEB SWING GAP; it was a full swing's, 28) from the moment one ends, however it ends,
   cleared on landing; it neither spends nor needs the double jump, so a swing let go early
   doesn't lock the next one out until landing, and no swing chains straight into another.
-  It works with the ball. The wall cling never slides. The throw button without the ball
+  It works with the ball. The wall cling slides only with down held. The throw button without the ball
   is the web line, from the ground, the air or a wall: held, it aims along the stick with
-  twelve dots out to its reach, like the shot's; let go, it fires, 120 units, a miss drawn
-  going out to its tip over four frames and back over four. It bends to a loose ball or the opponent within
+  twelve dots out to its reach, like the shot's, the body on `player_webshoot`'s 3rd frame (on a
+  wall `player_webshoot_wall`'s 1st), its arms on sheets of their own turned about Z Tea's blast
+  shoulder toward the aim; let go, the sheet plays on at 15 a second, the line going out on the
+  5th frame (the wall's 3rd) from the back arm's hand and taking what it's on at the 7th (the
+  wall's 5th). It's the snatch at range (as Volta Cola's bolt is the slash at range): it takes what it meets
+  as it goes out, the ball caught on the line, a held ball stolen as the snatch steals it (the
+  holder stunned, a hit stop, the snatch's FLO), a shield nearer than anything broken as the snatch
+  breaks it, the shieldflip's shielder countered, the line stopping there; whatever it took is held
+  on the line till it pulls. The other body is taken with both arms
+  and a second line from the front hand, drawn behind the bodies where the first is over them;
+  anything else with the back arm alone, the front held as on the hold. A wall shot has the
+  one arm. A miss drawn going out to its tip over four frames and back over four; any line gone
+  breaks as the parked chain does, its links thrown off, the swing's too. It bends to a loose ball or the opponent within
   15° of the aim, and the first thing within 8 units of its tip wins. A miss shows for 8
   frames and is live the whole time: the ball or the opponent crossing it in those frames
   is taken as if it had just been fired. A loose ball is reeled in and caught whatever its speed or facing. The opponent
-  holding the ball loses it to the reel. The opponent without it is reeled to 12 units in
-  front of the shooter and dropped. A wall or block reels the shooter to it. With the ball
-  the throw button is the ordinary throw. Numbers in `WebRules`.
+  holding the ball has it stolen to the reel. The opponent without it is reeled to 12 units in
+  front of the shooter and dropped. A wall or block reels the shooter to it, and on a wall the
+  shooter clings there at once, held with the stick let go till it's pushed off. In Breaker Ball
+  it catches a Breaker Ball in flight not the shooter's before the body, its thrower struck as a
+  snatch's catch strikes them, and steals the other's out of their hands as the snatch does: the
+  ball's the shooter's from then, in their energy, reeled to their hands. With the ball the throw button is the ordinary throw. Numbers in `WebRules`.
 - Super Smoothie (C). A fresh jump press in the air, held, is flight: the stick moves the body
   in any direction with gravity off, slowly with the ball and twice as fast without, for two seconds of budget per airtime, refilled on landing.
   Let go or run out and it falls. The body leans up to thirty degrees into its motion,
@@ -461,15 +504,22 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   position per frame comes from `BallLandmarks.swift`, which the importer generates from
   the sheets.
 - Platform Protein Shake (E). A fast fall makes a slab under the feet, three tiles wide
-  and a tile thick, that stands for a second: solid to everyone, so it blocks the ball and
+  and a tile thick, that stands till something breaks it or its maker's next slab replaces it
+  (one slab or wall each, the same power laid flat or upright: the next of either breaks the last): solid to everyone, so it blocks the ball and
   the opponent, and a floor to land on, jumps refreshed. With or without the ball.
   Without the ball, in neutral or on defence, a shoot button makes a wall instead, a
   tile thick and three tall just in front of the feet, on the snatch's reach, appearing
-  at the hand's full stretch; there's no slash. A wall can come 75 frames after the last wall, on its
-  own cooldown and with no arming. A slab can come only 75 frames after the last slab,
-  and only after a jump, a double jump, a wall jump or a wall land since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
+  at the hand's full stretch; there's no slash. Slab and wall share one cooldown: either can come
+  75 frames after the last of either. A wall needs no arming; a slab comes only
+  after a jump, a double jump, a wall jump or a wall land since it: holding down through a fall makes one, not a stream, and jump, slab, jump,
   slab still works. The stage carries standing slabs as `extras`, which every collision
-  query sees. Numbers in `ShakeRules`.
+  query sees, and apart as `platformBoxes`: a dunk's glide to the rim doesn't go through one,
+  as it doesn't through the other's shield (`Stage.dunkBlocked`). Numbers in `ShakeRules`.
+  Anything but a shot ball breaks one, which takes the hit: a blade (spent on it; not one under the
+  feet), a throw, a bolt, a blast, a fireball, a moving tornado, the beam (stopped there that frame),
+  Volta Cola's strike; and Blazing Boba's burning shot, Titan Tea landing on one (through it, its
+  quake waiting for the floor), Pulsepistol Punch's repulsion snipe (`PlatformBreaking.swift`). Its maker's
+  own hits leave it standing; a thrown Breaker Ball breaks the other's (protocol 224).
   Super Smoothie's flight is drawn on its own sheets, `player_fly` and `player_fly_ball` (frame 0
   hovering or going back, up or not, 1 going forward or up, 2 going down more than forward; under 0.3 a frame
   counts as still, `FlightSheet`, protocol 92), streams its hood's strings out behind, and hovering
@@ -530,13 +580,35 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
 
   Level two also snipes: with nothing in hand, down held in a crouch 30 frames (the crouch's
   first frame held meanwhile) goes prone into `player_gun_snipe`, its first frame held. A
-  crosshair (`crosshair.svg`, 20 art pixels, out of the glow) starts 60 ahead of the hand and
+  crosshair (`crosshair_new_1`, the square ones 20 art pixels wide, in the drinker's energy, glowing;
+  firing flashes `crosshair_new_2` then `_3`, four frames each) starts 60 ahead of the hand and
   the stick moves it anywhere on the stage, 3 a frame, not the body; shoot fires a repulsion and
   throw an attraction at it (the sheet played through, the shot on its third frame, the pulse's
   cooldown): whatever is within 12 of the cursor is sent the shot's way, from the hand to the
   cursor, or back toward the shooter, a body knocked 3 with 1.5 of lift (a held ball popping, no
   stun), the ball at 5. As kinetic and unseen as the pulse. Jump gets up; being hit or stunned
   ends it (`SnipeRules`).
+
+  The repulsion, pulse or snipe, turns back what the other fired as a perfect shield does: a bolt,
+  a blast, a fireball or a moving tornado it meets is the shooter's, flying straight back the way
+  it came (`Match.reflectFired`).
+- Phantom Frappe (N, a biomorph). The Spin Move or the taunt turns the body phantom, or back; the
+  taunt as it pays, on its first bounce, so one cancelled into a grounded Spin Move leaves it to the spin. A
+  phantom and a solid body pass through each other and all the other does: blades, snatches,
+  throws, powers, clashes. A phantom passes through the stage's hazards and through every wall and
+  floor but the stage's four outermost, the grid's edge tiles (`Stage.phantomShell`); it moves
+  through lava as through Hoopfish Hideaway's water, unburned, and so does a phantom ball. Inside a
+  wall or a floor it can't turn back solid: the spin or the taunt goes, the form stays. A dunk glides to
+  the rim and, at the slam, falls through it in the slam's pose, the ball kept; that rim can't be dunked
+  again till the body's out of its reach (`Player.passedHoop`). The
+  ball a phantom holds is phantom, and let go stays so: through the same walls, through the rims
+  without scoring, only a phantom's to take. A phantom only while the ball is, and the ball only
+  while someone is (`Match.settlePhantoms`), so a reset ball or a lost FloState never leaves either
+  stranded. Online, with the power not FloState's, the form ends unseen after 10 seconds
+  (`PhantomRules.failsafeFrames`). Level two: a second Spin Move before landing. Drawn at half,
+  a third toward the energy, its line the energy's, rows of pixels jumping sideways, the head's
+  cubes off the whole body (`PhantomLook`). The CPU, should it end up phantom, taunts back solid
+  with the ball in hand.
 - Surf Soda (K). Running, the body
   rides a board, the skid sheet's first frame still, leaning back 45° in a wheelie on the
   board's tail so the board stands up ahead as a shield, easing there and, stopping, back
@@ -631,19 +703,23 @@ in the air, catching it, carrying on. On the POWER picker, A is none.
   hands breathing from skin to near-white over a second (the frame's hands alone, `_hands`, made
   with the frame; over the hood with the arm that crosses it), until the next slash fires it at once.
 
-Hits share the strip: the victim is stunned 60 frames, every button dead (the stick
-too, when `StunRules.locksMovement` is on; it's parked off while a harder knockback is
-tried), and any ball they hold pops free; the slide's leg stuns a body without the ball
+Hits close together grow a grace (`HitGraceRules`, protocol 223): each stunning hit within 120 frames of
+the last (HIT CHAIN WINDOW) adds 30 frames (HIT GRACE STEP) to the grace after it, 0 after the first, in
+which every attack passes through and the figure blinks at half, so a chain in a corner can't trap: the
+fourth hit's 90 outlasts the stun. Every mode. If it doesn't hold, Smash's knockback growth is next.
+
+Hits share the strip: the victim is stunned 60 frames, every attack button dead, the stick
+and jump free (both lockable, `StunRules.locksMovement` and `locksJump`, protocol 223; moving
+but not jumping felt like a bug), and any ball they hold pops free; the slide's leg stuns a body without the ball
 too; the slash, the parry, the bolt, the burst and the pulse knock the body away as
 well (`Player.knock`), and the pulse doesn't stun. The slash strips a body with or
 without the ball, knocking it 4 along the swing and 2 up. The snatch has no
-cooldown, as the slash has none, and meeting a live blade it's the parry: the slasher
-is the one stripped and knocked back, the blade spent, resolved before the blades so it
-always wins. The throw stance parries too, over its first twenty frames, a third of a second
-(`ThrowParryRules`, ten was too short to read a slash coming; protocol 120),
-the body flashing white and its line the bright version of its colour: a slash meeting it strips the slasher and the thrower keeps the
-ball. A snatch still takes the ball through it. A parry's reward (`ParryRules`, protocol 120):
-the parrier is back in neutral at once, out of the snatch, the throw's stance or the stepback,
+cooldown, as the slash has none. The shield is the slash's counter: a live blade meeting
+it is parried (`Match.stepShields`), and the snatch is the shield's counter. (The snatch
+parrying a blade and the throw stance's twenty-frame parry, `ThrowParryRules`, are retired:
+neither is in the code.) A parry's reward (`ParryRules`, protocol 120):
+the parrier is held through the parry's hit stop, its hand or blade showing, then back in neutral as it
+ends, out of whatever it was doing (all but the change into FloState, which runs on; `Match.parryRecoveries`, protocol 219),
 the ball kept, no throw made, the buttons wanting a fresh press (`Player.recoverFromParry`); the
 one parried is stunned as ever and locked out of every input, stick and buttons, through the stun
 and 30 frames past it (60 at first, too long), drawn reeling in the ledge sheet's last frame and
@@ -682,9 +758,13 @@ plate, what the cursor's on turns gold (gold's light, the customize screen's top
 tenth. The title, the first done: the gear in frame 1, upper right, at half the others' size; the name over
 rule4 and a mirrored rule4 left of it, joined as one image with the meeting end's soft edge cut
 (`Futuristic.mirroredPair`), in a debug build the Variaball logo in the name's place (`variaball_logo`,
-rendered by the same tool); ROUNDS in frame 6 turned round (`FuturisticFrame.mirrored`), 47 in
-ring5 and ZONES in frame 6, ROUNDS' and ZONES' frames at 0.8 and 47's at 0.66, between arrow2s at
-0.6 pointing out; VS CPU and VS HUMAN as plain words, blue when
+rendered by the same tool); the modes on a ring turning on its upright (`ModeRing`), the
+picked one at the front, the rest placed by their angle round it, smaller (to 0.55 at the back), dimmer
+and turned away (40° at the sides) toward the back, its radius 0.9 of a side frame's width; new modes join
+the ring (`TitleItem.modeRing`). 47 in ring5, ROUNDS, ZONES and BREAKER in frame 6 without
+its tail (`taillessSix`), frame 6 at 0.8 and 47's at 0.66. Left and right on the pad turn it, round
+and round, past a parked mode; a tap on a side mode turns it to the front, the short way, and a tap on the
+front picks it. The arrow2s either side, at 0.6 pointing out, turn it a step; VS CPU and VS HUMAN as plain words, blue when
 picked and dim when not, with rule6 between them and rule5 at each end, the left one flipped both
 ways; MULTIPLAYER in box4, a little smaller, under svgrepo's multiplayer icon
 (`futuristic_icon_multiplayer`, from `Vectors/multiplayer.svg` by the same tool); the grid on black
@@ -809,7 +889,11 @@ or the pad's start) goes on to the stage select, RETURN or B back to the title. 
 (`PlayerCustomization`) are kept between rounds and launches, under `esper.customize.p1`/`p2`;
 the first side's colour is also this phone's (`EnergyColour.storageKey`), so the debug COLOUR
 and multiplayer's hello still read it. Offline both sides play in their picks; when the two pick
-the same colour, the second takes the opposite, as before.
+the same colour, the second takes the opposite, as before. Against the computer on one pad, the
+cursor on START going toward the computer's side takes the computer's cursor (`customizePadSide`),
+onto its hood, or on the bottles its front row's inner end; back the same way. On the bottles each row
+stands straight above the one in front, the sort under them, and the mode's name shrinks to fit
+between the two sides' words.
 
 Online the screen is shared: once two phones are connected (MULTIPLAYER, the mode, PLAY NOW or an
 invite, the wait) both open it, each on its own side (`customizeLocal`, the host's the left),
@@ -883,8 +967,11 @@ A disconnect on the screen closes it to the title.
   beam and the projector's light) flicker on, off at first, and each side's boxes, their
   connectors and the colour display slide in from that side's edge of the screen.
   RotateMeCCW and RotateMeCW turn about START's middle, 24 and 36 degrees a second, only while
-  START's under a cursor, held where they stopped otherwise; START's lettering lit as FLO's then, as
-  the FLO word's short of full otherwise (`FloTuning.shortColours`). The screen's lettering, the
+  START's under a cursor, held where they stopped otherwise. Offline, in place of START's lettering
+  the stage select's icon (`stage_select_icon`, from `stage_select_icon.svg` in its own colours),
+  as tall as the Greateraid bottle on the ball, 0.6 off the cursor: on the bottles in a mode that
+  picks its drink, on the customize screen in one that doesn't (Rounds). Online it's READY, lit as
+  FLO's under the cursor, as the FLO word's short of full otherwise (`FloTuning.shortColours`). The screen's lettering, the
   labels and the mode's name, in the menus' blue, no drop shadows; "Game Mode:" small over the
   mode's name (0.135 down).
 - Over the middle: CUSTOMIZE, no plate behind it (cap height 0.025 of the screen, its letters
@@ -912,7 +999,7 @@ A disconnect on the screen closes it to the title.
   lens, 6 up from it (`CustomizeScreen.projectorScale` and the rest).
 - The player's line a whole art pixel thick, drawn apart from the figure in the look's line colour.
 - Tuning, low in the middle (HIDE/TUNE), kept between launches: HEAD X and HEAD Y in art pixels
-  and HEAD SCALE in tenths (1, 1, 1 to start); NAME Y (26); DRIFT Y, where the figures stand after
+  and HEAD SCALE in tenths (1, 1, 1 to start); DRIFT Y, where the figures stand after
   the launch's drift, art pixels up from the middle button's centre (-16, level with the ball); FONT, cycling the face of everything
   but START and the big H.O.O.D. between the finalists (`CustomizeFont.finalists`, alphabetically:
   BM Army, Board of Directors, Kapel, Upheaval, Kapel to start), each sized so its capitals stand
@@ -929,16 +1016,16 @@ A disconnect on the screen closes it to the title.
   column lined in the side's colour, past the inner end back to the box), jump picks, up or B goes
   back to the box. SKIN's are `player_hoodheads`' six skins and the robot's, 38 over 39, drawn from the fourth
   frame with its tones swapped (`HumanLook.skinTones`, `_Design/skin-tones.md`); the accent is the
-  back tone. H.O.O.D.'s are the energy colours round the wheel (red, orange, gold, lime, teal,
-  blue, purple, pink), the accent the shade down the AAP-64 ramp (`EnergyColour.rampDown`); on it,
+  back tone. H.O.O.D.'s are the energy colours round the wheel (red, orange, gold, lime, green,
+  teal, blue, pink, purple), the accent the shade down the AAP-64 ramp (`EnergyColour.rampDown`); on it,
   H.O.O.D. shows large over the player, centred on it, two-toned (its lower half the energy
   ramp's lightest, `Look.bright`), each word of "Hyper- Osmotic Output Driver" small under its
   letter; and over the player the colour's gem name lettered as CUSTOMIZE is (RUBY; a new colour's name rolls in a letter at a time as Apple's numeric text does, each changed letter sliding up and out blurring as its new one slides up in from below and clears, the rest moving to their places: `FloRollText`, from the word's letters drawn apart, `Onomatopoeia.letterPictures`, every outline under every fill so at rest it's the word's own picture), after MODEL in the face and size of the words under H.O.O.D., centred
-  against it, a name wider than 0.35 of the halo scaled down to it; NAME Y art pixels over the
+  against it, a name wider than 0.35 of the halo scaled down to it; 23 art pixels over the
   player's middle, only while the hood's colours are picked. The arm and leg boxes are ticks (Futuristic_UI's ring8 at 0.6 of the box's height, in the box's line's colour, the side's under the cursor), a
   sleeve or a boot each (`Dressing`), labelled SLEEVE or BRACER; those and SKIN have their letters
-  stacked down the box's side away from the player, at 0.25 of its height (H.O.O.D.'s under its
-  box, at 0.4). Each arm and leg box has a line from it to its limb's middle on the player, run as
+  stacked down the box's side away from the player, at 0.25 of its height (H.O.O.D.'s level with its
+  box, off its side away from the middle, at 0.4; its line straight down from the box onto the hood, ending 5 art pixels over the head's middle, in the box's purple). Each arm and leg box has a line from it to its limb's middle on the player, run as
   the screen's top and bottom lines are, a dot at the end: a bracer's level out of the box's side
   toward the player, then 45 degrees onto the limb; a sleeve's out of the box's bottom, a short way
   straight down (0.2 of the box's height), then level, then 45 degrees onto the arm; in the boxes' cyan or, under the cursor, the side's colour, glowing: the outer ones, past the halo, the front limbs as the side is shown, the inner ones, beside
@@ -1053,6 +1140,112 @@ it again from nothing. Online, the host's mode is played: the multiplayer screen
 The score on the plate: each side's points either side of its middle in CardCourt's seven-segment
 digits (`SegmentDigits`), always two, 10 by 20 points, the lit segments in the side's colour with a
 core and a halo of glow round them, the unlit faint.
+
+## Breaker Ball
+
+The fighting mode (`BreakerRules`, `BreakerPosture.swift`). BREAKER on the title, after ZONES; the drink
+picked ahead, as in 47, but awake from the start and for good, at its second level, as FloState would
+wake it (`Match.wakeBreakerDrinks`): no FloState here, no FLO earned, the corners showing the barriers in
+FLO's place. Every stage, each made over (`Stage.forBreakerBall`): the backboard columns and walls that
+stood where the rims began gone (Wreck Center, K&A, Longball), no Hoopfish, no aim assist, no ball.
+The first rules, a barrier round a rim floating after each player on a chain, every snatch parking it,
+are commented out, not removed (the chains, parking, the following rims, the push out of a barrier,
+Flight B411's hoopcases, the Phoenix's ball).
+
+Breaker Balls. Both start dribbling one, a basketball in their energy (the basketball palette-swapped to the user's three tones per
+energy, `EnergyColour.breakerBallTones`, as painted in `breaker_balls.png`), glowing. Guard with nothing in
+hand and no side on the stick summons one (`Player.summonsBreakerBall`): straight into the throw's
+stance, its charge the summon, the burst at a third of its size in the energy riding the ball in hand; tapped, let go
+inside the windup, it's kept in hand and nothing's thrown (protocol 220); let go after, it's thrown; jump
+or Strike cancel it into a dribble as ever. Up or down is still the shield; only with a side is Guard the snatch
+(Web Water's web line takes the side, the summon the rest). A Breaker Ball's let go as the ball is, a
+flight of its own (`BreakerFlight`), flying as the ball flies and pulled by the rims as other modes'
+are; it bursts, the hit spark, on the first thing it meets but a backboard's glass or a rim: a wall, the
+floor, a shield (a perfect one sends it back, the shielder's), a board, the lava, or after 600 frames.
+Into the other's body it hits them, a throw's knock, for a throw 5 to 10 by its charge, a shot 10 (a
+full throw's: slower and harder to land). Knocked out of a hand it pops up, nobody's, and bursts where it
+comes down. A snatch takes any not its own out of the air (not a full charge's, nobody's but its
+thrower's) and hits its thrower for it, 10, as a catch puts a dodgeball thrower out; a ball reaching the
+barrier on the hand's side while the snatch is live is caught too, so a fast one can't pass the hand
+between frames (protocol 222); or the other's out of their hands, stunning them a moment. Either is the snatcher's from then, in their energy.
+
+The barrier. Round each body, 47's sphere of hexes 24 art pixels out (BREAKER BARRIER), its posture.
+Everything passes through it; the hexes within 16 art pixels of its middle (BREAKER CLEAR) are drawn at
+0.3 of their alpha, so the body shows. It's the body's hitbox too: every attack, power and hazard lands
+on its circle rather than the body's box (`Player.hurt(by:)`, `hurtDistance(to:)`; `BreakerRules.roundHurtbox`
+false puts the box back; protocol 221). Hits on the body wear it down: a Breaker Ball as above, a slash 10 (a
+full throw's, so closing in pays; protocol 222), Volta's
+bolt 1.5 and strike 4, Z Tea's blast 1.5 and beam 0.125 a frame it's on the body, Blazing Boba's fireball
+7.5 and flames 0.05 a frame, a tornado 0.125 a frame, Pulsepistol's push 1.5. A hit lights the hexes on
+its side toward the striker, shakes tiles in and out, holds the sphere's turn, knocks it away and springs
+it back (the BREAKER NUDGE sliders); 2 or more knocks out the three tiles nearest, back after 40 frames.
+Whenever the body's stunned as a parry stuns (`Match.stunAsParried`: every counter, the repelling snipe),
+it shatters, and at 0 the body's stunned that way, here for five seconds, every input dead
+(`BreakerRules.stunFrames`, 300), no later hit cutting it short: the game holds 30 frames, its tiles burst out, hang
+turning and go, the crowd gasps, the announcer's line to come. Their rim appears over their head, its
+ring over the head's top, 32 art pixels up (BREAKER HOOP ABOVE), the backboard behind them, following
+them, the heal's beams round it in their energy (no sparkles; the cubes thrown off it commented out). A basket through it scores, and
+the rim's gone at once, so nothing scores through it twice, shattering as glass (`GlassShatter`: cracks out from the
+rim's middle, rings across them, its rim and board in random pieces bursting, hanging and going as the
+barrier's tiles do, at twice their pace, GLASS SPEED), a dunker still hanging on it letting go where they are; the game
+holds 30 frames on them, held in their stunned pose, a flash of the scorer's energy (the scored-on freeze; to be
+described), their stun ending as it does; then the barrier's restored.
+While shattered, every attack passes through the body (`Match.barrierDown`, protocol 223). The stun running out restores it
+too. A restore raises beams of light and sparkles round the body, Smash's heal, the hexes growing back
+in and the percentage counting up from 0, 4 points a frame. Three baskets win.
+
+Stages:
+- Hoopfish Hideaway: no Hoopfish; its look and its water.
+- Flight B411: its bins stay shut.
+- Anozira: no trucks. A second car in the hoop truck's place, a car each, each in its player's ramp (back
+  limbs, hood shadow, glow, body), the holder's glowing in their bright. Sliding on the road wears your
+  own barrier 0.1 a frame; a pothole under your car 1, sliding or running into one 6, and loses the
+  Breaker Ball as the ball would be lost.
+- The Elements: its lightning 10 to a body it strikes; its tornados 0.125 a frame to a body in one, fire
+  ones 0.25; its fireball 7.5; an icicle 5; the lava 0.2 a frame to a barrier dipping into it. Burned
+  while shattered (lava or fire tornado), the body comes back with its barrier at 1, not refilled (protocol 224).
+- Longball: a helmet out of a goalpost off the dice every five seconds, its colour off the dice too; one
+  meeting a body breaks on it, 15.
+
+The percentage sits under the body's feet (BREAKER PERCENT Y, 16 art pixels), Smash Ultimate's: the
+whole number big and leaning, the tenths and the sign small, the sign 2 art pixels off the tenths, the
+two after the point nudged on 1 (BREAKER DECIMAL NUDGE), each character over the one before and the
+point over everything, a two-colour fill over a thick dark line and a drop shadow, a sprite a
+character (`BreakerPercent`). By tens: white over light grey at 90 to 100, through yellow, orange and
+red, to dark red over off-black under 10. A hit shakes each character its own way by its damage, with a
+pop; a restore jitters them. A larger copy sits in each top corner over `shatter.svg` in the player's
+energy, where FLO was: the percentage 24 in and 32 down off the corner (BREAKER HUD X and Y), as a
+40-point icon's middle would be, the icon off it right and down, the same way for both sides, not
+mirrored (BREAKER HUD ICON SIZE, X and Y, 40 and 0 and 0), the percentage's size (BREAKER HUD PERCENT).
+
+The stock ticker, on the scoreboard in place of the rounds' circles (STOCK TICKER, on the tuning panel):
+three icons a side either side of the middle, lit in the side's energy from the middle out, the rest
+faint. HEART (`mineral_heart.svg`, the default): three lit, each basket scored on you puts one of yours
+out. SLASH and CROSS (`cross_slash.svg`, `split_cross.svg`, turned 15 degrees counter-clockwise): three
+dark, each basket scored on you lights one of yours. MOEBIUS (`moebius_triangle.svg`): three dark, each
+basket you score lights one of yours, as the rounds do. The icons come in through
+`Tools/import_futuristic.py`, white, to be coloured.
+
+The computer (`OpponentBreaker.swift`). It goes 75 across off the other and throws into their body: the
+throw found by playing it out from there, standing, off a short or full hop, or the hop and the double
+jump, the stance pressed at a few heights (a Breaker Ball summoned by it with empty hands) and held
+charging while it hovers, the ball's straight line tried against their body as it'll be (their motion
+led 8 frames), one way a frame in turn, the best three releases of it; with the other within 70 across,
+or 35 in 100 throws anyway, the least charged throw that hits, otherwise the most charged; then the
+planned inputs kept to, frame by frame, dropped if it's knocked off course. 120 frames at the distance
+with no throw found, it comes in to 50 for 90. A throw found is given up 30 in 100 times for a rush in at
+them for the slash (150 frames at most); their throw or shot charging, or their swing spent, within 90
+across, a rush starts 8 in 100 frames. Their Breaker Balls coming at it, decided once a ball: empty-handed,
+snatched 35 in 100 (pressed 13 frames before it meets the barrier), shielded 25 (4 frames before),
+hopped over 25 (16 before, the double jump 8 before in the air), the rest taken; a full charge's,
+shielded 45 or hopped 40; holding, hopped 55. Up close (52 across), decided once while they're near: their
+throw charging or their swing spent, the slash 75 in 100, else it backs off; holding, it stands to throw
+from there (from 20 across) half the time, else backs off; otherwise the slash 40, backing off 45, standing
+15. Backing off runs to 85 across, over them if it's against a wall; the slash goes in once the blade
+reaches the barrier. Close to them holding one and facing them, it snatches theirs now and then. The
+counters (`OpponentCounters`) answer their slashes, snatches and shields as in the other modes. Their barrier shattered, it sees it 15 to 30 frames after the hit stop, a
+person's reaction, carrying on as it was till then; then it summons a ball and keeps it, and shoots at the
+rim over them as a rim on the move. Its powers aim at them.
 
 ## FLO
 
@@ -1252,14 +1445,15 @@ and a second pick (the clock's, at zero) doesn't land.
   spot, only faster, velocity up by the pace and gravity by its square; it's an ordinary
   ball again from its first bounce.
 - Slide Cider: eight frames of slide a drink, so further.
-- Feather Fresca: falling, a quarter of gravity gone a drink (×0.75, then ×0.5); a fast
+- Feather Float: falling, a quarter of gravity gone a drink (×0.75, then ×0.5); a fast
   fall is untouched, so it still lands quickly.
 - Web Water: the swing; level two adds the web line. The swing's line is drawn on past its anchor off
   the top of the screen, the view's alone.
 - Super Smoothie: flight; level two flies faster, with the ball as fast as level one
   without, lasts 180 frames rather than 120, and glides forward. Flight B411 needs no second
   jump.
-- Flash Fizz: the flash on jump, five tiles, tearing; level two gives two a cooldown.
+- Flash Fizz: the flash on jump, five tiles, tearing; level two gives two a cooldown. Too deep in a solid or past the
+  stage's edge to be nudged clear, it lands back along its way toward the start (`Player.warp`, protocol 223).
 - Platform Protein Shake: the slab; level two adds the wall.
 - Quake-Up Coffee: the quake on the same floor; level two the whole screen.
 - Volta Cola: the bolt; level two adds the strike on throw.
@@ -1269,6 +1463,7 @@ and a second pick (the clock's, at zero) doesn't land.
 - Titan Tea: the size and weight, slowed; level two still walks and runs slower, its actions at full speed, with the trample.
 - Gale Ale: the double jump's still tornado; level two adds the snatch's tornado that carries the ball off.
 - Z Tea: the slash's beam, on the ground or in the air, aimed; level two keeps a full charge for the next slash to fire.
+- Phantom Frappe: the phantom form on the Spin Move or the taunt; level two a second Spin Move before landing.
 Parked out of the offers for now (`Greateraid.parked`, protocol 155): Surf Soda; the debug picker still gives it.
 
 ## Tuning pickers
@@ -1294,8 +1489,8 @@ folded to start); the corner text under the pickers moves with them.
 - HEAD: how the detached head follows the body. Both close half the gap each frame. B,
   the default, leads sideways instead of trailing, the offset reversed across only.
 - POWER, with LEVEL beside it (1 or 2): A none, B Web Water, C Super Smoothie, D Flash Fizz, E Platform Protein
-  Shake, F Quake-Up Coffee, G Volta Cola, H Frost Tea, I Blazing Boba, J Pulsepistol
-  Punch, K Surf Soda, L Titan Tea, M Gale Ale, N Z Tea, at the level LEVEL picks, on this phone's player only, the
+  Shake, F Volta Cola, G Frost Tea, H Blazing Boba, I Pulsepistol Punch, J Surf Soda, K Titan Tea, L Gale Ale,
+  M Z Tea, N Phantom Frappe, at the level LEVEL picks, on this phone's player only, the
   other side keeping its drinks, with the body the power brings; A by default. The left bumper always steps POWER; the local side's power
   and level are lettered under the pickers.
 - The field's goalposts, settled: the rims 107 high and 66 in from each wall, the posts
@@ -1360,8 +1555,8 @@ six skins as a strip, and the robot's drawn from the fourth; the player's own, `
 on the frames `HoodView.frames` names it's turned away from the camera instead, side on (view 1) or
 further round (view 2) — FloState's slash 1, 2, 2, 1 over frames 1 to 4, the dunk and every gun sheet
 all 1, the blast 1 from 3, the ledge 1, 1, 1, 2, 1, the layup 1 on 2 and 3 and 2 from 4, the slash 1 on
-2 to 4, the shot 1 from 2, the air shot 1 from 1, both throws 1, 2, 2, 1 over 4 to 7 (0-based) — and on the frames `HoodView.flipped`
-names (FloState's snatch's 2, the pivot's 2) it's mirrored, looking back; the body's line, neck and
+2 to 4, the shot 1 from 2, the air shot 1 from 1, both throws 1, 2, 2, 1 over 4 to 7, FloState's snatch 1, 0, 1, 2, 1, 1 over 0 to 5 (0-based) — and on the frames `HoodView.flipped`
+names (FloState's snatch's 1 and 2, the pivot's 1, every wall cling frame, looking away from the wall) it's mirrored, looking back; the body's line, neck and
 the hood's own line are made to the hood as worn, view and mirror alike, from `player_hoodheads_v2`'s second and third frames, drawn in
 the first skin and swapped into the player's two tones, its outline, neck and line made to it:
 its hood, the white and the cool greys, toned ahead of time through the energy ramp at nine
@@ -1429,6 +1624,15 @@ or the pick's opposite if the pick is teal. Online the colour rides in the hello
 host, player one, keeps theirs, and the other takes the opposite if they match. Any two
 different colours can meet.
 
+Diamond, white, is the backers' tenth colour (added 2026-11-09): glow #FFFFFF, its hood's shadow
+the hood art's grey #C7CFDD, its back sleeve, boot and shoe #92A1B9; its Breaker Ball the same three
+(the bottom row of `breaker_balls.png`); its opposite purple. Its cubes are always FloState's
+rainbow, and a quarter of its Breaker barrier's tiles (`BarrierLook.accentShare`) are the rainbow's
+colours, the same tiles always, kept as they shatter. It's in the picker in debug builds only, until
+its in-app purchase is made; a Release build wears a saved Diamond pick as the default colour. It's
+last among the colours so the others keep their numbers online, and it stays out of the glow's
+per-colour gains, white having no hue.
+
 ## Opponent
 
 `Opponent.swift`. Powerless for now: it runs, walks, jumps, slides, slashes, snatches,
@@ -1490,7 +1694,7 @@ through a one-way, if there is one: down with the ball standing is the taunt.
   top if short, walking off an edge (the second jump once it's fallen a way, or none), or down
   through a one-way; each tried with a copy of its body on the stage, and from 3 units either
   side of the takeoff, and kept only if all three land where they're for. Its jump is measured
-  the same way, under water too. Read 1500 body frames at a time, over the countdown.
+  the same way, under water too. Read whole on the loading screen (`Terrain.whole`).
 - Getting about (`go`): along a surface, or across the cheapest way of moves, walking to each
   takeoff and playing the move as it was tried; a move that fails 150 frames past what it
   should need is given up on for two seconds. The way is timed (`Terrain.route`, each move's
@@ -1535,9 +1739,10 @@ through a one-way, if there is one: down with the ball standing is the taunt.
   up, held through its windup and let go, then the floater's flight, `floaterScores`) and taken if it
   goes in: always with the other near or swinging, and on a third of its runs at the rim anyway
   (rolled once a run, `floaterAnyway`), rather than walking back out to a set spot.
-- Its reading of the stage (`readStage`, 2000 body-frames a frame) happens over the countdown, and
-  a new point keeps it (`Opponent.forNewRound`): before, it ran in the first seconds of every
-  point, 40 to 75 ms a frame in a debug build.
+- Its reading of the stage is made whole off the main thread while the stage loads (`Opponent.readAhead`,
+  kept by stage and body in `Terrain.whole`), so a reading is always whole when it's used. Read over the
+  countdown before, it cost the Elements up to 6.5 ms a frame of the count on a Mac, the only stage it
+  showed on; a new point keeps it (`Opponent.forNewRound`).
 - Walking to a point it stops rather than turning when it has slid past at more than a walk
   (`Opponent.overshooting`), and the hover's distance off the rim is picked once a hover, not every
   frame: both had it flicking the stick back and forth, a dash dance by accident. On purpose, a
@@ -1861,8 +2066,10 @@ puts the ball in one pair of hands. A ball that leaves the world comes back at c
   sliders read);
   solid to the ball from the backboard's bottom up to the energy fence's top, the prongs' (`FieldRules.fenceTop`, 170;
   `ballBlockers`), from the backboard's face all the way back to the end wall, so nothing gets behind it.
-  Platform Protein Shake's slabs and walls are the same flash clusters, filling their box
-  in the maker's energy.
+  Platform Protein Shake's slabs and walls are blocks of the maker's energy in the Metal layer
+  (`block_fragment`), added on as the locked rims' hexagons are, behind the bodies: the front face
+  the box, its depth slanted up and back, bright at the edges, a shimmer up the faces, giving off
+  the maker's cubes; broken, they burst into cubes that float up and fade (`PlatformLook`).
 - A global stage rule: the invisible bounds outside a stage's grid are never a wall to land on or
   jump off (`Stage.wall(beside:)`, protocol 36).
 - A ball held up at a slope's foot, on the corner of the block under the slope above it, is
@@ -2489,6 +2696,61 @@ onto it so, hops up onto the nearest top of the car or the truck; and on a top k
 off the road, hopping down instead of walking off the edge, and calling off a stance at the edge
 in the air.
 
+## Tutorial
+
+HOW TO PLAY over the title (tailless frame 8 stretched across, #4C53E7) goes straight onto it, as 47, no customize screen or stage select; it's off the stage select (`Stage.tutorial`, `TutorialRules`): rooms side by side,
+each the Wreck Center's court and blocks drawn from `Tutorial/Tutorial_Map.aseprite`
+(`import_stage_art.py tutorial`, its back wall left out, the menus' grid on black behind), the map
+drawn again for each room so the way on is one hall. The first room has the right rim alone,
+anyone's, its net and 47's line white. Doors (`Door.png`, 16 frames of 32 by 64) stand in the
+openings at the ends of each room's floor, all facing left, shut on their first frame, the wall
+solid behind them. A belt (the Wreck Center's conveyor pieces) runs the whole floor, carrying right
+at six times the Wreck Center's, still till it's started. The other side is parked out of bounds,
+frozen, till a lesson wants a second player (none yet), and no chevron points at it.
+
+The lettering on the back wall (`TutorialText`, TUTORIAL FONT on the debug strip) is a pixel face
+in white at its own size, typed at 30 characters a second, always ending in an underscore, solid
+while it types and flashing half a second on and off once it's out. `[left]` and `[right]` are what
+player one last played with: A and D in keycaps on the keyboard, arrows on a controller or touch.
+
+It plays as 47 whatever the mode (`Match.mode`), its baskets worth nothing: no round, no drink,
+no score, no rim lock; the ball goes through as ever and the announcer calls it. The FLO meters and
+FLO's orbs are hidden till its FLO lesson (none yet). The player starts with the ball in hand and is
+handed it again as the belt starts.
+
+The run (`TutorialRun`): the lesson on the wall and its count; done, the belt starts, the player's
+input is held while it carries them on, the camera following, each door opening as they come within
+60 units of it (its art at 30 frames a second, the opening left open in the sim once it's open) and
+shutting once they're 24 past; at the next room's middle the belt stops and everything is moved back
+a room (the rooms are identical), the next lesson now the first room's. The first time through:
+1. How To Move: "Press [left] or [right] to move", 47 steps (footfalls).
+2. How To Jump: "Press [jump] to jump", 3 jumps; then "Press [jump] again in the air to double jump", 3 double jumps.
+3. How To Shoot: "Press [shoot] to shoot", 3 shots made (not layups or dunks).
+4. The hub. Its back wall holds front-facing hoops (`Hoop_front.aseprite`, `Hoop.frontFacing`,
+   their nets white) in two staggered rows, three over four, each row hanging on a belt of the Wreck
+   Center's conveyor pieces (not glowing; HUB BELT Y 30), behind the tiles, its ends under the walls.
+   Standing, a hoop's board and rim back are under the ball, its rim front over it, the bodies over
+   both. They bounce, take dunks and score as side rims do, with no backboard; bounced or dunked on,
+   a rim drops (2 art pixels at the dunk's deepest) and past half of that pinches in a pixel each
+   side, its net dropping with it. The hoops come in pages, the page's title large
+   over "Shoot a hoop to pick a lesson": The Basics (Moving, Jumping, Shooting, Layups, Dunking) and
+   More (lessons TBD). The side rims are back, with their boards and supports: a basket on the right
+   turns to the next page, on the left to the one before, round; each side's beam names the page it
+   turns to, white on black. A page turn carries the top row off to the right and the bottom row to the
+   left a whole lap in 1.5 seconds (`TutorialRun.pageTurnFrames`), back a page the other way, the
+   belts running, each hoop round behind the tiles and walls and back on with the new page's title;
+   the player is held meanwhile. No three-point lines on the Tutorial, and the walls between its rooms
+   run up through the sky. A basket
+   through a titled hoop loads that lesson as the next room; a lesson done goes back to the hub. The
+   hub's room has none of the map's extras; its hoops' nets hang behind both rim layers and the tiles
+   and over the board, tuned apart (FRONT NET sliders), the spacing on HUB COLUMNS and HUB ROWS;
+   aiming, a shot near a hub hoop is turned (up to 10 degrees, 2 at a time) to go in, and the rim it'll
+   go through is outlined green. No scoreboard on the Tutorial. A lesson done turns its hoop's board
+   green (EDG64 15, 14, 13 to 30, 29, 28), glowing. Layups: "Hold [up] and press [throw] to layup", 3.
+   Dunking: "Jump at the rim and press [throw] to dunk", 3.
+Lessons done and reaching the hub are kept (`tutorial.completed`, `tutorial.reachedHub`); once the hub's
+been reached, a run starts there.
+
 ## Stage preview
 
 Before a stage's first count in a series (not ZONES), a manga page of it plays to
@@ -2766,7 +3028,8 @@ iPad's and Mac's button scale (2.5) and taken at any as the same share of its fr
 ## The win screen's score
 
 The score stays up on the HUD's scoreboard over the win screen's veil (`circlesOverCam`, the ball
-cam's copy, shown on the win screen too); the win screen's own score frame is left empty for now.
+cam's copy, shown on the win screen too); the win screen's own score frame is left empty for now. The stage select shows it only in
+Rounds, once a round's been played.
 
 ## Stunned in the air
 
@@ -2938,6 +3201,56 @@ wears the gear's frame turned round.
 The customize screen's boxes: ring 8 in each, a teal blip half its width when ticked (as the
 Rounds lights are); the skin's box ring 3 round a disc of its two tones split at 45 degrees; the
 H.O.O.D letters in the side's energy colour over its shade down the ramp.
+
+## Footage capture
+
+Trailer footage is shot by the game itself. Launched with `-footage <plan>` (or `debug.footage`
+in the defaults), the Mac build plays the scenes in `EsperSim/Sources/EsperSim/Footage.swift` one
+after another: each a match set up a certain way (stage, mode, colours, drinks, Anozira's weather
+held, the bodies placed, the ball handed over) and both sides driven frame by frame by a script,
+or a side left to the computer. The scripted scenes are the shot list (jump shots from three
+ranges on every stage, Longball's off a wall jump from a passing helmet; dunks; floaters, off
+the glass too; Z Tea's beam wiggled after a jumping body to a Break on Anozira under a clear sky;
+blasts; the Elements' swing across and back; Super Smoothie's swat; slash-, shield- and
+snatchclashes on the ground and in the air, in Anozira's rain too; the change into FloState in
+every colour and each drink's power in it), and eight computer-against-computer games of 47 and
+Breaker Ball. The plan is `all`, `scripted`, `cpu`, or words a scene's name must contain.
+The scenes are proved headlessly first: a scratch executable on the package runs each and prints
+its events, so a scene is tuned until its moment happens before anything is drawn; the app then
+plays the very match the probe did (`FootageScene.makeMatch`, its seed and specs), so what landed
+there lands on film.
+
+Nobody stands about: the side not showing off is the computer's (`nil` in the script), seeded per
+scene (`FootageScene.seeds`, `FootageScenes.provenSeeds`) with a pair the probe found that lets the
+moment happen anyway, contested. Clashes come out of play: the computer plays both sides a couple of
+seconds, then they square up and meet; on Anozira's car and in the Hideaway's water, where it can't
+keep its feet near the other, a played-out exchange of hops and steps (`clashFeints`) leads in
+instead. Anozira's hoop truck is in from the start (the ball's handed over, so the ball truck's
+release that calls it never comes). The Elements and Longball draw no three-point line: 47 isn't
+played there outside footage.
+
+The view draws at 1080p whatever the window, as the TV does (`GameMetalView`, `FootageRun.videoSize`),
+the drawable readable, and every drawn frame goes off it into the scene's H.264 file a sixtieth
+apart (`FootageRecorder`): the sim steps once a drawn frame and the drawing's clock is the run's
+own, as the transform capture's is, so the video is 60 a second however slowly the frames come.
+The sound isn't recorded: every sound the board plays is logged by frame with its loudness and
+pan (`logSound`, `logLoop`), and `Tools/highlights.py` mixes the wavs back under each recording,
+the Elements' thunderstorm with them. The HUD is off as in Capture Mode. Each scene's events are
+logged beside its video with their time in the recording (`NN_scene.jsonl`), in the app's
+`tmp/Footage/`, and `done` ends the run and quits the app. `highlights.py` cuts a clip round
+every logged moment by kind into `_Graphic Assets/_Kickstarter Campaign/FOOTAGE/<kind>/`, the whole scripted
+scenes into `FOOTAGE/scenes/`, the computer games into `FOOTAGE/games/`, and mash-ups into `FOOTAGE/`.
+
+Running it: `./Tools/shoot.sh <plan> [--build] [--fresh]`, in the iOS Simulator, not on the Mac.
+A Mac build asks Gatekeeper's leave on every new binary (the Developer Tools list can't hold an
+app that doesn't exist yet, and `open` goes through LaunchServices anyway), and the Mac's
+container hangs a shell on a privacy prompt. The script builds Release for the simulator into
+`/tmp/esper-dd-sim` when asked, installs it on a booted iPad (else boots the iPad Pro 13-inch),
+launches with `-footage <plan>`, waits for `done` and runs `highlights.py`. A scene whose video
+closed leaves `NN_scene.ok` beside it; if the app dies the script relaunches it and the run
+carries on past the scenes with an `.ok` (`--fresh` starts the folder over). The recorder copies
+the drawable onto the pixel buffer's IOSurface through a texture of its own: a texture-cache
+texture was freed under the drawing's autorelease pool in the simulator, a crash at a scene change.
 
 ## The Wreck Center's map (EDG64)
 

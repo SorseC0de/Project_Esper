@@ -19,16 +19,17 @@ public struct Dice: Equatable {
 /// to two drinks; Biomorphs are the powers, one at a time, and the one in hand comes
 /// round again as a second sip that raises it to level two.
 public enum Greateraid: CaseIterable, Equatable, Hashable, Codable {
-    case hastyHorchata, jumperJuice, cannonCola, slideCider, featherFresca, quakeUp, guarderade, shelterSeltzer, floFrappe
+    case hastyHorchata, jumperJuice, cannonCola, slideCider, featherFloat, quakeUp, guarderade, shelterSeltzer, flobackFresca
     case webWater, superSmoothie, flashFizz, platformShake
-    case voltaCola, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
+    case voltaCola, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea, phantomFrappe
 
     public enum Kind: Equatable { case booster, biomorph }
 
-    public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .cannonCola, .slideCider, .featherFresca, .quakeUp,
-                                                .guarderade, .shelterSeltzer, .floFrappe]
+    public static let boosters: [Greateraid] = [.hastyHorchata, .jumperJuice, .cannonCola, .slideCider, .featherFloat, .quakeUp,
+                                                .guarderade, .shelterSeltzer, .flobackFresca]
     public static let biomorphs: [Greateraid] = [.webWater, .superSmoothie, .flashFizz, .platformShake,
-                                                 .voltaCola, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle, .zTea]
+                                                 .voltaCola, .frostTea, .blazingBoba, .pulsepistol, .surfSoda, .titanTea, .galeAle, .zTea,
+                                                 .phantomFrappe]
     /// Drinks kept out of the offers for now, still drinkable by the debug picker.
     public static let parked: Set<Greateraid> = [.surfSoda]
     /// Every drink that can be offered or picked: all but the parked.
@@ -44,7 +45,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable, Codable {
         case .jumperJuice: "Jumper Juice"
         case .cannonCola: "Cannon Cola"
         case .slideCider: "Slide Cider"
-        case .featherFresca: "Feather Fresca"
+        case .featherFloat: "Feather Float"
         case .webWater: "Web Water"
         case .superSmoothie: "Super Smoothie"
         case .flashFizz: "Flash Fizz"
@@ -52,7 +53,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable, Codable {
         case .quakeUp: "Quake-Up Coffee"
         case .guarderade: "Guarderade"
         case .shelterSeltzer: "Shelter Seltzer"
-        case .floFrappe: "Flo-efficient Frappe"
+        case .flobackFresca: "Floback Fresca"
         case .voltaCola: "Volta Cola"
         case .frostTea: "Frost Tea"
         case .blazingBoba: "Blazing Boba"
@@ -61,6 +62,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable, Codable {
         case .titanTea: "Titan Tea"
         case .galeAle: "Gale Ale"
         case .zTea: "Z Tea"
+        case .phantomFrappe: "Phantom Frappe"
         }
     }
 
@@ -83,6 +85,7 @@ public enum Greateraid: CaseIterable, Equatable, Hashable, Codable {
         case .titanTea: .titanTea
         case .galeAle: .galeAle
         case .zTea: .zTea
+        case .phantomFrappe: .phantomFrappe
         default: nil
         }
     }
@@ -99,18 +102,19 @@ public enum Greateraid: CaseIterable, Equatable, Hashable, Codable {
         case .flashFizz: "Now you see me, now I dunk"
         case .platformShake: "From staring up to the basket to stairing up to the basket"
         case .quakeUp: "Suddenly everyone around you seems so grounded"
-        case .guarderade: "..."
-        case .shelterSeltzer: "..."
-        case .floFrappe: "..."
+        case .guarderade: "The sweet taste of rejection"
+        case .shelterSeltzer: "In your defense, the aftertaste does linger"
+        case .flobackFresca: "The sweet taste of payback"
         case .voltaCola: "A shocking amount of flavor"
         case .frostTea: "Not to be confused with the gas station beverage"
         case .blazingBoba: "...Wait are those fireballs?"
         case .pulsepistol: "For those gunning for first place"
         case .surfSoda: "..."
-        case .featherFresca: "Slowly fall with every sip"
+        case .featherFloat: "Slowly fall with every sip"
         case .titanTea: "An attack on heightlessness"
         case .galeAle: "Wind did things become such a breeze?"
         case .zTea: "Your opponent will have a blast with this one"
+        case .phantomFrappe: "Goes right through you"
         }
     }
 
@@ -121,25 +125,27 @@ public enum Greateraid: CaseIterable, Equatable, Hashable, Codable {
         case .jumperJuice: ("Increased [Jump Height].", "Increased [Jump Height] + an [Extra Jump].")
         case .cannonCola: ("[Shooting Speed] Up.", "[Shooting Speed] Up.")
         case .slideCider: ("Your [Slides] have increased knockback and can catch the ball.", "Your [Slides] cause [Stun].")
-        case .webWater: ("Your [Double Jump] becomes a [Web Swing]", "Press [Guard] to fire a [Web Line] that can grab the ball.")
+        case .webWater: ("Your [Double Jump] becomes a [Web Swing]", "Your [Snatch] becomes a pulling [Web Line].")
         case .superSmoothie: ("Hold [Jump] in the air to [Fly] in any direction.", "From grounded, hold [Up] + [Jump] to [Super Jump] into [Flight].")
-        case .flashFizz: ("Your [Double Jump] becomes a [Teleport]. Press [Up] or [Down] + [Strike] to [Teleport] to the ball after throwing or shooting it.", "[Teleport] a second time with [Jump]. Press [Up] or [Down] + [Strike] to [Teleport] to the ball any time it's loose.")
+        case .flashFizz: ("Your [Double Jump] becomes a [Teleport]. Press [Up] or [Down] + [Strike] to [Teleport] to the ball after a [Shot] or [Throw].", "You can [Teleport] a second time with [Jump]. You can [Teleport] to a loose ball.")
         case .platformShake: ("[Fast Fall] to create a [Platform] below.", "Press [Up] or [Down] + [Strike] to create a vertical [Platform] in front.")
         case .quakeUp: ("Your [Fast Fall] causes a [Quake] to shared ground.", "Your [Fast Fall] causes a [Quake] to ground anywhere.")
         case .guarderade: ("Your [Shield] is bigger.", "[Shield] a second time before you land.")
-        case .shelterSeltzer: ("Your [Shield] lingers where it ends.", "Your [Snatches] raise a [Shield].")
-        case .floFrappe: ("Your [FloState] lasts longer.", "Gain more [FLO] from all sources.")
-        case .voltaCola: ("Press [Strike] becomes a [Lightning Bolt] throw.", "Your [Throws] call down a [Lightning Strike] on the ball.")
-        case .frostTea: ("Your [Snatches] cause [Freeze] and you can [Slide] indefinitely", "[Double Jump] or [Slide] to leave an [Ice Clone] that freezes on touch.")
+        case .shelterSeltzer: ("Your [Shield] lingers where it's created.", "Your [Snatches] raise a [Shield].")
+        case .flobackFresca: ("Gain [FLO] when hit or [Stripped].", "Gain [FLO] when [Throwing] the ball")
+        case .voltaCola: ("[Strike] becomes a [Lightning Bolt] throw.", "Your [Throws] call down a [Lightning Strike] on the ball.")
+        case .frostTea: ("Your [Snatches] cause [Freeze]", "[Double Jump] and [Slide] leave an [Ice Clone] that freezes on touch.")
         case .blazingBoba: ("Your [Shots] and [Throws] are too hot to catch or [Snatch].", "Press [Up] or [Down] + [Strike] to create a [Fireball].")
         case .pulsepistol: ("[Up] or [Down] + [Strike] fires a [Kinesis Pulse].", "You can fire [Kinesis Pulses] while moving. Hold [Down] while grounded to [Kinesis Snipe].")
         case .surfSoda: ("Ride a board: jumps are a crescent, and in the air you flip it to shield yourself.", "...")
-        case .featherFresca: ("You [Weigh Less].", "You [Weigh Less].")
+        case .featherFloat: ("You [Weigh Less].", "You [Weigh Less].")
         case .titanTea: ("You become [Giant] but cannot [Double Jump].",
                          "[Trample] the opponent to [Strip] them of the ball.")
         case .galeAle: ("Your [Double Jumps] leave a [Tornado].", "Press [Up] or [Down] + [Strike] to fire a moving [Tornado].")
-        case .zTea: ("Press [Up] + [Strike] to fire a [Blast]. Press [Down] + [Strike] to charge and fire an aimable full-screen [Beam].",
-                     "You fire [Blasts] faster and can [Store] a charged [Beam] to release freely with [Down] + [Strike].")
+        case .zTea: ("Press [Up] + [Strike] to fire a [Blast]. Press [Down] + [Strike] to charge and fire an aimable [Beam].",
+                     "You fire [Blasts] faster and can [Store] a charged [Beam] to release at any time")
+        case .phantomFrappe: ("[Spin Move] or [Taunt] to toggle [Phantom Mode]: you phase through everything including walls, floors, and attacks.",
+                              "You can [Spin Move] a second time before landing.")
         }
     }
 }
@@ -261,11 +267,11 @@ public struct Drinks: Equatable {
         spec.slideCiderLevel = level(of: .slideCider)
         spec.guarderadeLevel = level(of: .guarderade)
         spec.shelterSeltzerLevel = level(of: .shelterSeltzer)
-        spec.floFrappeLevel = level(of: .floFrappe)
+        spec.flobackFrescaLevel = level(of: .flobackFresca)
         // Quake-Up Coffee: a fast fall's landing quakes the floor; at level two, all of it.
         spec.quakeLevel = level(of: .quakeUp)
-        // Feather Fresca: falling, a quarter of gravity gone a drink.
-        spec.fallGravityShare = 1 - 0.25 * Double(level(of: .featherFresca))
+        // Feather Float: falling, a quarter of gravity gone a drink.
+        spec.fallGravityShare = 1 - 0.25 * Double(level(of: .featherFloat))
         if biomorph == .titanTea {
             // Titan Tea: twice the size, half the knock, a fifth more gravity falling (the jumps
             // as high as ever) and a fifth more fall speed; a tenth off the walk and run, the

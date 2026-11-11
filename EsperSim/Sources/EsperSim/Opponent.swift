@@ -3,8 +3,8 @@ import Foundation
 /// The computer's player. It reads the whole match each frame and gives one frame of
 /// input, the way a pad would, so it sits outside the sim like a controller does; with
 /// its own little random stream it is deterministic, so it could live inside the sim
-/// later. Powerless for now: it runs, walks, jumps, slides, slashes, snatches, throws
-/// and catches.
+/// later. It runs, walks, jumps, slides, slashes, snatches, throws and catches, and uses
+/// its biomorph (`OpponentPowers`).
 ///
 /// With the ball it works toward one of its shot spots, two on the floor in front of
 /// its rim and one up on the ledge, and shoots from there, standing or off a jump. When
@@ -132,6 +132,8 @@ public struct Opponent: Equatable {
     /// The match's gameplan for FloState, rolled once (`FloPlan`), and how long the other's been in theirs.
     public internal(set) var floPlan: FloPlan?
     private var humanFloFrames = 0
+    /// Off in Capture Mode, where FloState is only ever forced on it.
+    public var floStateOnItsOwn = true
     /// Whether this run at the rim takes the floater with nobody on it: rolled once a run.
     private var floaterAnyway: Bool?
     /// Anozira (`OpponentAnozira`): the top it's hopping up onto off the road, by its place in the
@@ -140,6 +142,29 @@ public struct Opponent: Equatable {
     var mount: Int?
     var aimAtBonus = false
     var hopFirstShot = false
+    /// The biomorph's use (`OpponentPowers`): a move of it under way, and frames before it looks for another.
+    var powerMove: PowerMove?
+    var powerRest = 0
+    /// Breaker Ball (`OpponentBreaker`): the throw at the barrier under way; frames at a throwing
+    /// distance without one found; and frames still shooting at the barrier instead.
+    var breakerThrow: BreakerThrow?
+    var breakerStuck = 0
+    var breakerShooting = 0
+    /// The way of throwing (`breakerTries`) to be tried next.
+    var breakerTry = 0
+    /// The last of the other's Breaker Balls it decided on, and how it meets it.
+    var breakerCatchFlight: Int?
+    var breakerAnswer: BreakerAnswer = .take
+    /// The other up close: what it's decided to do while they're near.
+    var breakerCloseCall: BreakerCloseCall?
+    /// Frames still rushing in at them for the slash.
+    var breakerRush = 0
+    /// The next throw let go as soon as it hits, rather than charged.
+    var breakerQuick = false
+    /// Frames still to go before it reacts to the other's rim out over them.
+    var breakerRimReaction: Int?
+    /// Which few angles (`movingRimAnglesPerFrame`) of the shot at a rim on the move are tried next.
+    var movingRimSweep = 0
 
     /// When it goes into FloState, decided for a whole match: as soon as it can; answering the
     /// other's, after; kept to break out of a stun or a tumble; kept till it's behind; whenever, at
@@ -238,23 +263,47 @@ public struct Opponent: Equatable {
             holdingOff = chance(Opponent.stealAnswerChance) ? 0 : Opponent.settleFrames.lowerBound + Int(roll(UInt32(Opponent.settleFrames.count)))
         }
         if holder == human.index, lastHolder != human.index {
-            // On the court, where the rim's to be guarded; the stages it reads keep their own defence.
-            protectsRim = !Opponent.readsStage(match) && chance(50)
+            // On the court, where the rim's to be guarded; the stages it reads keep their own defence;
+            // Breaker Ball's rim rides on its back.
+            protectsRim = !Opponent.readsStage(match) && !Opponent.breaker(match) && chance(50)
             if protectsRim {
             } else if lastHolder == index { chaseFrames = Opponent.chaseAfterSteal }
             else if abs(human.position.x - me.position.x) < Opponent.contestedPickup { chaseFrames = Opponent.chaseAfterPickup }
         }
         if holder != human.index { chaseFrames = 0 }
         lastHolder = holder
+        // Breaker Ball, the other's rim out over them: everything else dropped for the basket.
+        // Seen a reaction time after the hit stop: the old plan carried on until then.
+        let breakerRimShowing = Opponent.breakerRimOpen(match, defender: human.index)
+        if !breakerRimShowing {
+            breakerRimReaction = nil
+        } else if breakerRimReaction == nil {
+            breakerRimReaction = Opponent.breakerReactionFrames.lowerBound + Int(roll(UInt32(Opponent.breakerReactionFrames.count)))
+        } else if match.hitStop == 0, let left = breakerRimReaction, left > 0 {
+            breakerRimReaction = left - 1
+        }
+        let breakerRimOpen = breakerRimShowing && breakerRimReaction == 0
+        if breakerRimOpen { breakerThrow = nil }
+        // A throw at a Breaker barrier played out ahead: kept to, frame by frame, while it's on course.
+        if let planned = continueBreakerThrow(match, me: me) {
+            pressed = planned
+            return planned
+        }
         let readsStage = Opponent.readsStage(match)
         // Its rim's shot spots, found by trying shots, on every stage.
         let scoringHoop = match.stage.hoops.firstIndex { $0.owner == index } ?? 0
-        if match.hoopfish == nil, match.stage.features.look != .anozira, match.stage.hoops.indices.contains(scoringHoop) { searchSpots(match, me: me, hoop: scoringHoop) }
+        if match.hoopfish == nil, match.stage.features.look != .anozira, !Opponent.breaker(match), match.stage.hoops.indices.contains(scoringHoop) {
+            searchSpots(match, me: me, hoop: scoringHoop)
+        }
         if readsStage, leaveTornado(match, me: me, toward: me.hasBall ? hoop(scoredOnBy: index, in: match).position : match.ball.position, into: &input) {
             // Out of a tornado before it lets go.
         } else if me.state == .jumpSquat {
             // Through the squat the button stays down for a full hop, or up for a short one.
             input.jump = wantsFullHop
+        } else if breakerRimOpen, breakerPlay(match, me: me, human: human, into: &input) {
+            // Breaker Ball: at the rim over the stunned other.
+        } else if breakerRimOpen, me.hasBall {
+            offence(match, me: me, human: human, into: &input)
         } else if keepOffTheRoad(match, me: me, into: &input) {
             // Anozira's road out of FLO, or the ball about to spill on it: up onto the car or the truck.
         } else if clearHelmet(match, me: me, heading: heading(match, me: me, human: human), into: &input) {
@@ -263,6 +312,10 @@ public struct Opponent: Equatable {
             // Into FloState: throw and shoot together.
         } else if counter(match, me: me, human: human, into: &input) {
             // The rock-paper-scissors: spam punished, a move answered once it's seen.
+        } else if usePower(match, me: me, human: human, into: &input) {
+            // The biomorph in hand, when there's a chance for it.
+        } else if breakerPlay(match, me: me, human: human, into: &input) {
+            // Breaker Ball: the barrier worn down, their barrier swung at, its parked rim taken back.
         } else if me.hasBall {
             offence(match, me: me, human: human, into: &input)
         } else if human.hasBall {
@@ -331,7 +384,7 @@ public struct Opponent: Equatable {
         guard !Opponent.committedStates.contains(me.state) || me.state == .slide else { return false }
         let feet = me.position.y
         // Stood on its top: the body's grounded flag can lag a frame behind one that moves.
-        if let standing = match.helmets.first(where: { abs($0.box.max.y - feet) < 0.5 && me.velocity.y <= 0
+        if let standing = match.helmets.filter({ $0.phase == .travelling }).first(where: { abs($0.box.max.y - feet) < 0.5 && me.velocity.y <= 0
             && me.position.x >= $0.box.min.x && me.position.x <= $0.box.max.x }) {
             riddenHelmet = standing.id
         } else if me.grounded {
@@ -340,7 +393,7 @@ public struct Opponent: Equatable {
         let standingTop = feet + me.spec.bodyHeight
         let crouchedTop = feet + me.spec.bodyHeight / 2
         let halfWidth = me.spec.bodyWidth / 2
-        let coming = match.helmets.first { helmet in
+        let coming = match.helmets.filter({ $0.phase == .travelling }).first { helmet in
             let ahead = (me.position.x - helmet.box.center.x) * (helmet.speed > 0 ? 1 : -1)
             let gap = ahead - helmet.box.width / 2 - halfWidth
             // At its height, or up in the air over it on the way down onto it.
@@ -411,11 +464,11 @@ public struct Opponent: Equatable {
     }
 
     /// The states a body can't act out of.
-    private static let committedStates: [PlayerState] = [.slashing, .rolling, .snatching, .slide, .catching, .land, .walling, .shooting, .throwing, .ledgeHang, .ledgeClimb]
+    static let committedStates: [PlayerState] = [.slashing, .rolling, .snatching, .slide, .catching, .land, .walling, .shooting, .throwing, .ledgeHang, .ledgeClimb]
 
     /// Whether a body's swing or reach is still live: a slash before its blade is spent, a
     /// snatch with the hand still out, a slide.
-    private static func dangerous(_ player: Player) -> Bool {
+    static func dangerous(_ player: Player) -> Bool {
         switch player.state {
         case .slashing: player.stateTimer < SlashRules.liveFrames.upperBound
         case .snatching: player.stateTimer < SnatchRules.activeFrames.upperBound
@@ -426,7 +479,7 @@ public struct Opponent: Equatable {
 
     /// Whether a body is committed and spent: in the recovery of a swing or a reach, the
     /// roll, a landing, a catch. The moment to go past it, or at it.
-    private static func open(_ player: Player) -> Bool {
+    static func open(_ player: Player) -> Bool {
         switch player.state {
         case .slashing: player.stateTimer >= SlashRules.liveFrames.upperBound
         case .snatching: player.stateTimer >= SnatchRules.activeFrames.upperBound
@@ -457,7 +510,8 @@ public struct Opponent: Equatable {
             keepTheBall(match, me: me, human: human, into: &input)
             return
         }
-        let rimPath = readsStage ? hoopPath(match) : nil
+        // Breaker Ball's rim floats after its defender: played as a rim on the move.
+        let rimPath = breakerRimPath(match, hoop: hoopIndex) ?? (readsStage ? hoopPath(match) : nil)
         if let rimPath {
             // A rim on the move is played where it'll be in a moment, or where it comes back in.
             guard let coming = rimPath.prefix(20).last(where: { $0 != HighwayRules.parked }) ?? rimPath.first(where: { $0 != HighwayRules.parked }) else {
@@ -587,13 +641,21 @@ public struct Opponent: Equatable {
         }
         // A rim on the move: wherever it is, a shot that goes in from right here is taken now; on
         // Anozira the Phoenix's tail first, while it flies by.
-        if plan != .shoot, me.grounded, [.idle, .walk, .run, .dash].contains(me.state), match.frame % 3 == 0 {
+        // A few angles a frame, the standing shot's first, then the jump shot's.
+        if plan != .shoot, me.grounded, [.idle, .walk, .run, .dash].contains(me.state) {
             let targets = [(1, bonusPath), (hoopIndex, rimPath)].filter { $0.1 != nil }
+            let perFrame = Opponent.movingRimAnglesPerFrame
+            let slices = (Opponent.shotAngleCount + perFrame - 1) / perFrame
+            var sweep = movingRimSweep % (slices * 2)
+            if onRoad, sweep < slices { sweep = slices }
+            movingRimSweep = sweep + 1
+            let jumping = sweep >= slices
+            let first = (sweep % slices) * perFrame
+            let steps = first..<min(first + perFrame, Opponent.shotAngleCount)
             for (target, path) in targets {
-                let standing = !onRoad && !scoringAngles(match, body: me, jumpShot: false, stanceSoFar: 0, hoop: target, path: path, stopAtFirst: true).isEmpty
-                let jumping = !standing && !scoringAngles(match, body: me, jumpShot: true, stanceSoFar: 0, hoop: target, path: path, stopAtFirst: true,
-                                                          hopFirst: onRoad).isEmpty
-                if standing || jumping {
+                if !scoringAngles(match, body: me, jumpShot: jumping, stanceSoFar: 0, hoop: target, path: path, stopAtFirst: true,
+                                  steps: steps, hopFirst: jumping && onRoad).isEmpty {
+                    movingRimSweep = 0
                     readSpot = ShotSpot(feet: me.position, jumpShot: jumping)
                     readSpotFrames = 90
                     plan = .shoot
@@ -660,19 +722,27 @@ public struct Opponent: Equatable {
                 planFrames = 6
             } else if atSpot, let rimPath {
                 // A rim on the move: only the shot that, played out, goes in from here and now;
-                // none does, and it waits for the rim to come round.
-                let standing = !onRoad && !scoringAngles(match, body: me, jumpShot: false, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true).isEmpty
-                let jumping = !standing && !scoringAngles(match, body: me, jumpShot: true, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true,
-                                                          hopFirst: onRoad).isEmpty
-                if standing || jumping {
+                // none does, and it waits for the rim to come round. A few angles a frame, the
+                // standing shot's first, then the jump shot's.
+                let perFrame = Opponent.movingRimAnglesPerFrame
+                let slices = (Opponent.shotAngleCount + perFrame - 1) / perFrame
+                var sweep = movingRimSweep % (slices * 2)
+                if onRoad, sweep < slices { sweep = slices }
+                movingRimSweep = sweep + 1
+                let jumping = sweep >= slices
+                let first = (sweep % slices) * perFrame
+                let steps = first..<min(first + perFrame, Opponent.shotAngleCount)
+                if !scoringAngles(match, body: me, jumpShot: jumping, stanceSoFar: 0, hoop: hoopIndex, path: rimPath, stopAtFirst: true,
+                                  steps: steps, hopFirst: jumping && onRoad).isEmpty {
                     plan = .shoot
                     planFrames = 90
                     jumpShot = jumping
                     hopFirstShot = onRoad
                     dances = 0
+                    movingRimSweep = 0
                 } else {
                     plan = .hold
-                    planFrames = 4
+                    planFrames = 1
                 }
             } else if atSpot, !dancedForShot, chance(Opponent.dashDanceChance) {
                 // Now and then a dash dance first, back and forth so it ends where it began.
@@ -942,6 +1012,11 @@ public struct Opponent: Equatable {
         if rest > 0 { rest -= 1 }
         if Opponent.committedStates.contains(me.state) { return }
         if planFrames > 0 { planFrames -= 1 } else if plan != .none { plan = .none }
+        // Breaker Ball, its rim on its back: nothing to stand guard over; after them.
+        if Opponent.rimFollows(match, defender: index), [.none, .guardSpot, .hover].contains(plan) {
+            plan = .pressure
+            planFrames = 90
+        }
         if contestWithShield(match, me: me, human: human, into: &input) { return }
 
         // A throw charged at it for more than a few frames is telegraphed: it squares up
@@ -1157,7 +1232,7 @@ public struct Opponent: Equatable {
     private mutating func askForFloState(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) -> Bool {
         let free: [PlayerState] = [.idle, .walk, .dash, .run, .pivot, .land, .crouch, .crouchWalk, .air]
         humanFloFrames = human.inFloState ? humanFloFrames + 1 : 0
-        guard me.floStateReady, !me.inFloState else {
+        guard floStateOnItsOwn, me.floStateReady, !me.inFloState else {
             if !me.floStateReady { floStateWait = nil }
             return false
         }
@@ -1238,7 +1313,8 @@ public struct Opponent: Equatable {
         // A throw coming at it: it stands its ground, facing it, and the snatch goes out so
         // the hand is live as the ball arrives. Charged more than a few frames it was
         // telegraphed and the snatch comes every time; a quick throw gets by seven in ten.
-        if ball.strikes, ball.velocity.x != 0, abs(ball.position.y - me.chest.y) < 14,
+        // Its own throw back off a Breaker barrier is its own to take on the body: no snatch, which would park its rim.
+        if ball.strikes, !(Opponent.breaker(match) && ball.lastTouched == index), ball.velocity.x != 0, abs(ball.position.y - me.chest.y) < 14,
            (ball.position.x < me.position.x) == (ball.velocity.x > 0) {
             if throwRead == nil {
                 throwRead = lastThrowCharge > 6 || chance(30)

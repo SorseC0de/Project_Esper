@@ -30,8 +30,8 @@ enum DrinkSort: CaseIterable {
 /// The drink pick, in a mode that picks its drink before play (47): after START the figures go
 /// off to the corners, and each side has, top to bottom, the raised drink's name and what it does
 /// at its second level (both of its sentences), in frame 6 turned on end, its tail up as drawn and
-/// its box stretched round the words; its sort; and every bottle, small, in rows like crayons in a
-/// box, upright, the front row's leftmost first. A tap pulls a bottle up out
+/// its box stretched round the words; every bottle, small, in rows like crayons in a box, each row
+/// straight above the one in front, the front row's leftmost first; and its sort under them. A tap pulls a bottle up out
 /// of its row (or puts it back, none picked); the bottle on the ball confirms.
 struct DrinkPick: View {
     @ObservedObject var flow: FlowState
@@ -40,7 +40,7 @@ struct DrinkPick: View {
     /// Redrawn as the UI tuning panel's DRINKS scales change.
     @ObservedObject private var tuning = UITuning.shared
 
-    /// Bottles to a row, and how the rows stack: each one behind a little higher and half a step over.
+    /// Bottles to a row; each row behind stands a little higher, straight above the one in front.
     static let perRow = 5
     /// The figures off in the corners: their size, and where, as shares of the screen.
     static let cornerScale: CGFloat = 0.5
@@ -60,7 +60,7 @@ struct DrinkPick: View {
     static let smallBottleScale: CGFloat = 0.6
     static let noPowerFootShare: CGFloat = 0.62
     static let randomFootShare: CGFloat = 0.82
-    /// The side's room: across, and the box's top, the sort's line and the bottles' foot, down.
+    /// The side's room: across, and the box's top, the bottles' foot and the sort's line, down.
     static let sideRange: (outer: CGFloat, inner: CGFloat) = (0.05, 0.41)
     /// The words' box, a fixed size: its left edge, top and height as shares of the screen; its tail
     /// under it, this share of the box's width.
@@ -68,8 +68,8 @@ struct DrinkPick: View {
     static let boxTopShare: CGFloat = 0.1
     static let boxHeightShare: CGFloat = 0.38
     static let tailShare: CGFloat = 0.3
-    static let sortShare: CGFloat = 0.56
-    static let bottlesFootShare: CGFloat = 0.95
+    static let bottlesFootShare: CGFloat = 0.9
+    static let sortShare: CGFloat = 0.955
     static let bottleHeightShare: CGFloat = 0.2
     /// Bottles across a row this share of a bottle's height apart: close, overlapping.
     static let bottleStepShare: CGFloat = 0.3
@@ -265,7 +265,7 @@ struct DrinkPick: View {
         let rows = (drinks.count + DrinkPick.perRow - 1) / DrinkPick.perRow
         let step = height * DrinkPick.bottleStepShare
         // The group centred under the words' box: the bottles' middles across the widest row.
-        let span = (CGFloat(min(drinks.count, DrinkPick.perRow) - 1) + CGFloat(max(rows - 1, 0)) * 0.5) * step
+        let span = CGFloat(min(drinks.count, DrinkPick.perRow) - 1) * step
         let first = boxMiddle - span / 2
         // The small bottles in the gutter under the figure, one over the other.
         let gutter = DrinkPick.corner(player, size).x
@@ -285,7 +285,7 @@ struct DrinkPick: View {
                 let raised = drink == picked
                 let image = DrinkPick.bottleImage(drink)
                 let aspect = image.size.width / max(image.size.height, 1)
-                let x = first + (CGFloat(column) + CGFloat(row) * 0.5) * step
+                let x = first + CGFloat(column) * step
                 let foot = size.height * DrinkPick.bottlesFootShare - CGFloat(row) * size.height * DrinkPick.rowRiseShare
                     - (raised ? size.height * DrinkPick.raiseShare : 0)
                 ZStack {

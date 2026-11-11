@@ -1,4 +1,5 @@
 import MetalKit
+import MetalPerformanceShaders
 import simd
 import SpriteKit
 import SwiftUI
@@ -39,6 +40,12 @@ final class GameMetalView: MTKView {
         // is, a quarter of the work; the camera's framing is the screen's own scale's either way.
         if GameMetalView.onMac { layer.magnificationFilter = .nearest }
         #endif
+        if FootageRun.requested {
+            // Footage: drawn at the video's size whatever the window, the drawable readable for the recorder.
+            autoResizeDrawable = false
+            drawableSize = FootageRun.videoSize
+            framebufferOnly = false
+        }
         isUserInteractionEnabled = false
         delegate = renderer
     }
@@ -56,12 +63,12 @@ final class GameMetalView: MTKView {
     var framingScale: CGFloat { 1 }
     func applyRenderShare() {}
     #else
-    /// The screen's own scale, the camera's framing's.
-    var framingScale: CGFloat { traitCollection.displayScale > 0 ? traitCollection.displayScale : contentScaleFactor }
+    /// The screen's own scale, the camera's framing's; 1 for footage, as the TV's.
+    var framingScale: CGFloat { FootageRun.requested ? 1 : (traitCollection.displayScale > 0 ? traitCollection.displayScale : contentScaleFactor) }
     /// On a Mac the drawable kept at the scene's render share of the screen's scale; the window's
     /// screen sets it back on a move or a resize. Checked every frame, cheaply.
     func applyRenderShare() {
-        guard GameMetalView.onMac, framingScale >= 2 else { return }
+        guard !FootageRun.requested, GameMetalView.onMac, framingScale >= 2 else { return }
         let wanted = framingScale * scene.renderShare
         if contentScaleFactor != wanted { contentScaleFactor = wanted }
     }
@@ -78,7 +85,7 @@ final class GameMetalView: MTKView {
         #if os(tvOS)
         1
         #else
-        contentScaleFactor
+        FootageRun.requested ? 1 : contentScaleFactor
         #endif
     }
 }
@@ -106,6 +113,9 @@ struct GlowUniforms {
     /// A wash over the whole world, its colour and its strength in w, left off what the mask has in
     /// yellow; none at 0.
     var wash: SIMD4<Float> = .zero
+    /// Each energy colour's hood tones, its light and its shadow, so the glow keeps the shadow under the light.
+    var hoodLight = GlowSettings.hoodLightUniforms
+    var hoodShadow = GlowSettings.hoodShadowUniforms
 }
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.
@@ -181,9 +191,17 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     /// 47's locked rims' hexagons (`HexSphere`), drawn last, added on as light, writing no depth.
     private let hexVertices: MTLBuffer?
     private var hexInstanceBuffers: [MTLBuffer] = []
-    private static let hexCapacity = 256
+    private static let hexCapacity = 384
+    /// Scored-on rims' glass (`GlassShatter`), drawn as the hexagons are.
+    private let glassVertices: MTLBuffer?
+    private var glassInstanceBuffers: [MTLBuffer] = []
+    private static let glassCapacity = 256
     private let translucentDepth: MTLDepthStencilState?
     private let hexPipeline: MTLRenderPipelineState?
+    /// Platform Protein Shake's blocks, cubes sized to the slabs, added on as the hexagons are.
+    private let blockPipeline: MTLRenderPipelineState?
+    private var blockInstanceBuffers: [MTLBuffer] = []
+    private static let blockCapacity = 32
     private static let cubeCapacity = 2048
     /// The players' bodies and lines in white and the rims' art in green, on black, by a
     /// renderer of their own, drawn only on a frame with cubes behind them: a back leg's
@@ -206,8 +224,11 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     /// Each stage's CPU time on this thread and GPU time in its own command buffer, summed
     /// over the second and shown under the frame rate as milliseconds a frame.
     private var cpuTotals: [String: Double] = [:]
+    /// The last frame's own laps and update sections, and the worst frame's of this second, named.
+    private var frameLaps: [String: Double] = [:]
+    private var worstBreakdown = ""
     private let gpuTotals = StageTimes()
-    private static let stageOrder = ["update", "scene", "mask", "glow", "cam", "comp"]
+    private static let stageOrder = ["update", "scene", "nets", "occl", "cubes", "mask", "glow", "cam", "comp"]
     private var sceneTexture: MTLTexture?
     /// The bodies alone, for the glow's per-object threshold.
     private var bodyMask: MTLTexture?
@@ -220,6 +241,14 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private var shotTexture: MTLTexture?
     private var panelTextures: [MTLTexture] = []
     private let mangaPipeline: MTLRenderPipelineState
+    /// Footage: the HUD's scene drawn into the video by a renderer of its own, over the world blurred
+    /// and washed while a screen with the pause's ground is up, the veil's share faded in and out.
+    private var hudRenderer: SKRenderer?
+    private var footageBlurred: MTLTexture?
+    private var footageWash: SKSpriteNode?
+    private var footageVeil = 0.0
+    /// The recording the veil's share belongs to: a new scene's starts clear.
+    private var footageVeilRecording: ObjectIdentifier?
 
     init(scene: GameScene, device: MTLDevice) {
         self.scene = scene
@@ -291,6 +320,12 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         cubeDescriptor.colorAttachments[0].destinationRGBBlendFactor = .one
         cubeDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .one
         hexPipeline = try? device.makeRenderPipelineState(descriptor: cubeDescriptor)
+        cubeDescriptor.vertexFunction = library.makeFunction(name: "block_vertex")
+        cubeDescriptor.fragmentFunction = library.makeFunction(name: "block_fragment")
+        blockPipeline = try? device.makeRenderPipelineState(descriptor: cubeDescriptor)
+        blockInstanceBuffers = (0..<3).compactMap { _ in
+            device.makeBuffer(length: GlowRenderer.blockCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
+        }
         let depth = MTLDepthStencilDescriptor()
         depth.depthCompareFunction = .less
         depth.isDepthWriteEnabled = true
@@ -298,6 +333,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         depth.isDepthWriteEnabled = false
         translucentDepth = device.makeDepthStencilState(descriptor: depth)
         hexVertices = device.makeBuffer(bytes: HexSphere.tile, length: HexSphere.tile.count * MemoryLayout<CubeVertex>.stride)
+        glassVertices = device.makeBuffer(bytes: ShardMesh.unit, length: ShardMesh.unit.count * MemoryLayout<CubeVertex>.stride)
+        glassInstanceBuffers = (0..<3).compactMap { _ in
+            device.makeBuffer(length: GlowRenderer.glassCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
+        }
         hexInstanceBuffers = (0..<3).compactMap { _ in
             device.makeBuffer(length: GlowRenderer.hexCapacity * MemoryLayout<CubeInstance>.stride, options: .storageModeShared)
         }
@@ -344,6 +383,65 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         glowB = makeTexture(width: Int(size.width) / 2, height: Int(size.height) / 2)
     }
 
+    /// Footage: what the HUD's view and the screens' ground lay over the world on the screen, laid
+    /// onto the video's frame instead, the HUD's actions on the footage's clock.
+    private func layFootageHud(_ commands: MTLCommandBuffer, onto target: MTLTexture, depth: MTLTexture, now: CFTimeInterval, recording: ObjectIdentifier) {
+        let hudScene = scene.hudScene
+        let renderer = hudRenderer ?? {
+            let made = SKRenderer(device: device)
+            made.scene = hudScene
+            made.ignoresSiblingOrder = true
+            hudRenderer = made
+            return made
+        }()
+        let wash = footageWash ?? {
+            let made = SKSpriteNode(color: .black, size: CGSize(width: 100_000, height: 100_000))
+            // Under the HUD's own layer.
+            made.zPosition = hudScene.hud.zPosition - 1
+            hudScene.addChild(made)
+            footageWash = made
+            return made
+        }()
+        hudScene.isPaused = false
+        if footageVeilRecording != recording {
+            footageVeilRecording = recording
+            footageVeil = scene.footageVeiled ? 1 : 0
+        }
+        let step = 1 / FootageRun.veilFrames
+        footageVeil = scene.footageVeiled ? min(footageVeil + step, 1) : max(footageVeil - step, 0)
+        wash.alpha = FootageRun.veilWash * footageVeil
+        renderer.update(atTime: now)
+        if footageVeil > 0 {
+            if footageBlurred.map({ $0.width != target.width || $0.height != target.height }) ?? true {
+                let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: target.pixelFormat, width: target.width, height: target.height, mipmapped: false)
+                descriptor.usage = [.shaderRead, .shaderWrite]
+                descriptor.storageMode = .private
+                footageBlurred = device.makeTexture(descriptor: descriptor)
+            }
+            if let blurred = footageBlurred {
+                let blur = MPSImageGaussianBlur(device: device, sigma: Float(FootageRun.veilBlur * footageVeil))
+                blur.edgeMode = .clamp
+                blur.encode(commandBuffer: commands, sourceTexture: target, destinationTexture: blurred)
+                if let blit = commands.makeBlitCommandEncoder() {
+                    blit.copy(from: blurred, to: target)
+                    blit.endEncoding()
+                }
+            }
+        }
+        guard scene.footageShowsHud || footageVeil > 0 else { return }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = target
+        pass.colorAttachments[0].loadAction = .load
+        pass.colorAttachments[0].storeAction = .store
+        pass.depthAttachment.texture = depth
+        pass.depthAttachment.loadAction = .clear
+        pass.depthAttachment.storeAction = .dontCare
+        pass.stencilAttachment.texture = depth
+        pass.stencilAttachment.loadAction = .clear
+        pass.stencilAttachment.storeAction = .dontCare
+        renderer.render(withViewport: CGRect(x: 0, y: 0, width: target.width, height: target.height), commandBuffer: commands, renderPassDescriptor: pass)
+    }
+
     private func makeTexture(width: Int, height: Int, pixelFormat: MTLPixelFormat = .bgra8Unorm) -> MTLTexture {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: pixelFormat, width: max(width, 1), height: max(height, 1), mipmapped: false)
         descriptor.usage = pixelFormat == .bgra8Unorm ? [.renderTarget, .shaderRead] : [.renderTarget]
@@ -361,13 +459,26 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
               let sceneTexture, let sceneDepthStencil, let bodyMask, let glowA, let glowB,
               let commands = queue.makeCommandBuffer() else { return }
 
-        if scene.size != view.bounds.size || scene.safeInsets != view.safeAreaInsets {
-            scene.attach(size: view.bounds.size, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor,
-                         framingScale: (view as? GameMetalView)?.framingScale, insets: view.safeAreaInsets)
+        // Footage is framed and drawn at the video's size, whatever the window's.
+        let viewSize = FootageRun.requested ? FootageRun.videoSize : view.bounds.size
+        let insets = FootageRun.requested ? UIEdgeInsets.zero : view.safeAreaInsets
+        if scene.size != viewSize || scene.safeInsets != insets {
+            scene.attach(size: viewSize, displayScale: (view as? GameMetalView)?.renderScale ?? view.contentScaleFactor,
+                         framingScale: (view as? GameMetalView)?.framingScale, insets: insets)
         }
-        let now = CACurrentMediaTime()
+        let now = scene.transformCapture?.tick() ?? scene.footage?.tick() ?? CACurrentMediaTime()
         framesDrawn += 1
-        worstGap = max(worstGap, now - lastDraw)
+        let lastFrameSections = scene.takeFrameSectionTimes()
+        if now - lastDraw > worstGap {
+            worstGap = now - lastDraw
+            func named(_ times: [String: Double]) -> String {
+                times.filter { $0.value >= 0.0005 }.sorted { $0.value > $1.value }.prefix(5)
+                    .map { "\($0.key) \(String(format: "%.1f", $0.value * 1000))" }.joined(separator: " ")
+            }
+            let ours = frameLaps.values.reduce(0, +) * 1000
+            worstBreakdown = String(format: "worst %.1f, ours %.1f: ", worstGap * 1000, ours) + named(frameLaps) + "\n  update: " + named(lastFrameSections)
+        }
+        frameLaps = [:]
         lastDraw = now
         if now - fpsWindowStart >= 1 {
             scene.framesPerSecond = Int((Double(framesDrawn) / (now - fpsWindowStart)).rounded())
@@ -389,6 +500,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             scene.frameReadout = "cpu  \(line(cpuTotals))\nupdate  \(sections)\n\(readout)\ngpu  \(line(gpu))\ngpu frame \(span)  \n\(Int(view.drawableSize.width))x\(Int(view.drawableSize.height))  glow \(glowA.width)x\(glowA.height)"
                 + "\nnodes scene \(GlowRenderer.nodeCount(scene))  mask \(GlowRenderer.nodeCount(maskScene))  hud \(GlowRenderer.nodeCount(scene.hudScene))"
                 + "\n\(GlowRenderer.machineReadout())"
+                + "\n\(worstBreakdown)"
             cpuTotals = [:]
             framesDrawn = 0
             worstGap = 0
@@ -398,6 +510,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         func lap(_ name: String) {
             let time = CACurrentMediaTime()
             cpuTotals[name, default: 0] += time - mark
+            frameLaps[name, default: 0] += time - mark
             mark = time
         }
         frameNumber += 1
@@ -426,7 +539,13 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         let background = scene.backgroundColor
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 1
         background.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        scenePass.colorAttachments[0].clearColor = MTLClearColor(red: red, green: green, blue: blue, alpha: 1)
+        // Capturing, over black, or white for the frame's second drawing.
+        if let capture = scene.transformCapture {
+            let white: Double = capture.drawsOverWhite ? 1 : 0
+            scenePass.colorAttachments[0].clearColor = MTLClearColor(red: white, green: white, blue: white, alpha: 1)
+        } else {
+            scenePass.colorAttachments[0].clearColor = MTLClearColor(red: red, green: green, blue: blue, alpha: 1)
+        }
         scenePass.depthAttachment.texture = sceneDepthStencil
         scenePass.depthAttachment.loadAction = .clear
         scenePass.depthAttachment.storeAction = .dontCare
@@ -435,9 +554,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         scenePass.stencilAttachment.storeAction = .dontCare
         skRenderer.render(withViewport: CGRect(x: 0, y: 0, width: sceneTexture.width, height: sceneTexture.height),
                           commandBuffer: sceneCommands, renderPassDescriptor: scenePass)
-        drawCubes(sceneCommands, into: sceneTexture, depth: sceneDepthStencil, frame: frame, now: now)
-        sceneCommands.commit()
         lap("scene")
+        drawCubes(sceneCommands, into: sceneTexture, depth: sceneDepthStencil, frame: frame, now: now, lap: lap)
+        sceneCommands.commit()
+        lap("cubes")
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.syncStatic(scene.staticFlats, version: scene.staticFlatsVersion)
@@ -468,7 +588,10 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             softness: GlowSettings.softness,
             intensity: GlowSettings.intensity,
             tint: GlowSettings.tint)
-        if let background = scene.unglowedBackground {
+        if scene.transformCapture?.drawsOverWhite == true {
+            // The white the capture's second drawing goes over doesn't glow.
+            uniforms.unglowed = SIMD4(1, 1, 1, 1)
+        } else if let background = scene.unglowedBackground {
             var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
             background.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
             uniforms.unglowed = SIMD4(Float(red), Float(green), Float(blue), 1)
@@ -517,13 +640,32 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             // for the stage select's window.
             if let stage = scene.previewShotStage, page.shown >= MangaPage.panels.count, page.settled {
                 scene.previewShotStage = nil
-                keep(panelTextures[MangaPage.bigPanel], with: commands) { image in StageShots.shared.store(image, for: stage) }
+                keep(panelTextures[MangaPage.bigPanel], with: commands) { image in
+                    StageShots.shared.store(image, for: stage)
+                    FootageRun.keepStill(image, named: "preview_\(stage)")
+                }
             }
         } else {
             pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms,
                  then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)
+            // Footage: the frame as shown, the HUD and its screens over it, off the drawable into the scene's video.
+            if let recorder = scene.footage?.recorder {
+                layFootageHud(commands, onto: drawable.texture, depth: sceneDepthStencil, now: now, recording: ObjectIdentifier(recorder))
+                recorder.capture(drawable.texture, with: commands)
+            }
         }
 
+        if let capture = scene.transformCapture, let shotTexture, let taken = capture.take() {
+            // The frame again into a texture that can be read.
+            let shotPass = MTLRenderPassDescriptor()
+            shotPass.colorAttachments[0].texture = shotTexture
+            shotPass.colorAttachments[0].loadAction = .dontCare
+            shotPass.colorAttachments[0].storeAction = .store
+            pass(commands, pipeline: composite, descriptor: shotPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms)
+            readBack([shotTexture], with: commands) { pictures, width, height in
+                capture.save(taken.index, overWhite: taken.overWhite, composite: pictures[0], width: width, height: height)
+            }
+        }
         commands.present(drawable)
         commands.commit()
         lap("comp")
@@ -531,14 +673,19 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
     /// The scene's cubes over what SpriteKit drew, on the scene's camera: orthographic, one
     /// art pixel to the scene's, depth only sorting a cube's own faces; lit from above left.
-    private func drawCubes(_ commands: MTLCommandBuffer, into target: MTLTexture, depth: MTLTexture, frame: Int, now: CFTimeInterval) {
+    /// `lap` closes the CPU timer's stages inside it: the instances built ("nets", the cylinder nets most of it), the bodies' occluder pass ("occl"), apart from the cubes drawn.
+    private func drawCubes(_ commands: MTLCommandBuffer, into target: MTLTexture, depth: MTLTexture, frame: Int, now: CFTimeInterval, lap: (String) -> Void) {
         let cubes = Array(scene.cubeInstances.prefix(GlowRenderer.cubeCapacity))
         let spheres = Array(scene.sphereInstances.prefix(GlowRenderer.sphereCapacity))
         let diamonds = Array(scene.diamondInstances.prefix(GlowRenderer.diamondCapacity))
         let hexes = Array(scene.hexInstances.prefix(GlowRenderer.hexCapacity))
-        guard !cubes.isEmpty || !spheres.isEmpty || !diamonds.isEmpty || !hexes.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
+        let blocks = Array(scene.platformInstances.prefix(GlowRenderer.blockCapacity))
+        let glass = Array(scene.glassInstances.prefix(GlowRenderer.glassCapacity))
+        lap("nets")
+        guard !cubes.isEmpty || !spheres.isEmpty || !diamonds.isEmpty || !hexes.isEmpty || !blocks.isEmpty || !glass.isEmpty, let cubePipeline, let cubeDepth, let cubeVertices, !cubeInstanceBuffers.isEmpty,
               let occluderTexture else { return }
-        if cubes.contains(where: { $0.flags.x > 0.5 }) || diamonds.contains(where: { $0.flags.x > 0.5 }) {
+        if cubes.contains(where: { $0.flags.x > 0.5 }) || diamonds.contains(where: { $0.flags.x > 0.5 }) || blocks.contains(where: { $0.flags.x > 0.5 })
+            || hexes.contains(where: { $0.flags.x > 0.5 }) {
             // The bodies as they stand, for the cubes behind them to keep out of.
             occluderScene.mirror(scene.occluderSnapshots, flat: scene.rimSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
             occluderRenderer.update(atTime: now)
@@ -556,6 +703,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             occluderRenderer.render(withViewport: CGRect(x: 0, y: 0, width: occluderTexture.width, height: occluderTexture.height),
                                     commandBuffer: commands, renderPassDescriptor: occluderPass)
         }
+        lap("occl")
         let buffer = cubeInstanceBuffers[frame % cubeInstanceBuffers.count]
         buffer.contents().copyMemory(from: cubes, byteCount: cubes.count * MemoryLayout<CubeInstance>.stride)
         let descriptor = MTLRenderPassDescriptor()
@@ -616,6 +764,17 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             encoder.setVertexBuffer(diamondBuffer, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: DiamondMesh.unit.count, instanceCount: diamonds.count)
         }
+        if !blocks.isEmpty, let translucentDepth, let blockPipeline, !blockInstanceBuffers.isEmpty {
+            let blockBuffer = blockInstanceBuffers[frame % blockInstanceBuffers.count]
+            blockBuffer.contents().copyMemory(from: blocks, byteCount: blocks.count * MemoryLayout<CubeInstance>.stride)
+            // Every face, the far ones through the near.
+            encoder.setRenderPipelineState(blockPipeline)
+            encoder.setCullMode(.none)
+            encoder.setDepthStencilState(translucentDepth)
+            encoder.setVertexBuffer(cubeVertices, offset: 0, index: 0)
+            encoder.setVertexBuffer(blockBuffer, offset: 0, index: 1)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: CubeMesh.unit.count, instanceCount: blocks.count)
+        }
         if !hexes.isEmpty, let hexVertices, let translucentDepth, let hexPipeline, !hexInstanceBuffers.isEmpty {
             let hexBuffer = hexInstanceBuffers[frame % hexInstanceBuffers.count]
             hexBuffer.contents().copyMemory(from: hexes, byteCount: hexes.count * MemoryLayout<CubeInstance>.stride)
@@ -626,6 +785,16 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
             encoder.setVertexBuffer(hexVertices, offset: 0, index: 0)
             encoder.setVertexBuffer(hexBuffer, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: HexSphere.tile.count, instanceCount: hexes.count)
+        }
+        if !glass.isEmpty, let glassVertices, let translucentDepth, let hexPipeline, !glassInstanceBuffers.isEmpty {
+            let glassBuffer = glassInstanceBuffers[frame % glassInstanceBuffers.count]
+            glassBuffer.contents().copyMemory(from: glass, byteCount: glass.count * MemoryLayout<CubeInstance>.stride)
+            encoder.setRenderPipelineState(hexPipeline)
+            encoder.setCullMode(.none)
+            encoder.setDepthStencilState(translucentDepth)
+            encoder.setVertexBuffer(glassVertices, offset: 0, index: 0)
+            encoder.setVertexBuffer(glassBuffer, offset: 0, index: 1)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: ShardMesh.unit.count, instanceCount: glass.count)
         }
         encoder.endEncoding()
     }
@@ -728,6 +897,30 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
     /// A picture off the GPU: copied to a texture the CPU can read, read once the copy's done, and
     /// handed over on the main thread.
+    /// Textures of one size read back as BGRA bytes once the commands are done.
+    private func readBack(_ textures: [MTLTexture], with commands: MTLCommandBuffer, then: @escaping @MainActor ([[UInt8]], Int, Int) -> Void) {
+        guard let first = textures.first, let blit = commands.makeBlitCommandEncoder() else { return }
+        let width = first.width, height = first.height
+        let readable = textures.compactMap { texture -> MTLTexture? in
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: texture.pixelFormat, width: width, height: height, mipmapped: false)
+            descriptor.storageMode = .shared
+            descriptor.usage = [.shaderRead]
+            guard let copy = device.makeTexture(descriptor: descriptor) else { return nil }
+            blit.copy(from: texture, to: copy)
+            return copy
+        }
+        blit.endEncoding()
+        guard readable.count == textures.count else { return }
+        commands.addCompletedHandler { _ in
+            let pictures = readable.map { texture in
+                var bytes = [UInt8](repeating: 0, count: width * height * 4)
+                texture.getBytes(&bytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+                return bytes
+            }
+            DispatchQueue.main.async { then(pictures, width, height) }
+        }
+    }
+
     private func keep(_ texture: MTLTexture, with commands: MTLCommandBuffer, then: @escaping @MainActor (CGImage) -> Void) {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: texture.pixelFormat, width: texture.width, height: texture.height, mipmapped: false)
         descriptor.storageMode = .shared

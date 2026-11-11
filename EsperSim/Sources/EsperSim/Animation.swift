@@ -30,6 +30,9 @@ public enum Animation: String, CaseIterable {
     case skid = "player_skid"
     case skidBall = "player_skid_ball"
     case taunt = "player_taunt"
+    /// In FloState, the taunt spins the ball rather than dribbling it: the body here, the ball on a
+    /// layer of its own (`player_taunt2_ball`), its landmarks the layer's.
+    case tauntFloState = "player_taunt2"
     case crouch = "player_crouch"
     case crouchWalk = "player_crouch_walk"
     case slide = "player_slide"
@@ -40,6 +43,10 @@ public enum Animation: String, CaseIterable {
     case snatchAir = "player_snatch_air"
     /// In FloState, the snatch, on the ground or in the air, drawn in its own sheet.
     case snatchFloState = "player_snatch_flostate"
+    /// In FloState with the ball: standing, it floats behind the body; running, it rides a ring
+    /// round it, drawn by the app (`BallRing`), the sheet drawing none.
+    case idleBallFloState = "player_idle_ball_flostate"
+    case runBallFloState = "player_run_ball_flostate"
     /// Shielding's: forward (and back, turned round), up and down.
     case shield = "player_shield"
     /// The Spin Move, the ball held round in it.
@@ -52,6 +59,8 @@ public enum Animation: String, CaseIterable {
     case esperSlashFloState = "player_esperslash_flostate"
     case ledge = "player_ledge"
     case dunk = "player_dunk"
+    /// The dunk with a spin into it, drawn in place of `dunk` while `Animation.dunkSpins` is on.
+    case spinDunk = "player_dunk2"
     case gunShoot = "player_gun_shoot"
     case gunShootAir = "player_gun_shoot_air"
     case gunSnipe = "player_gun_snipe"
@@ -72,16 +81,25 @@ public enum Animation: String, CaseIterable {
     /// Z Tea's blast: the body, and its arms drawn over it apart so they turn 45 degrees up on the ground.
     case blast = "player_blast_body"
     case blastArms = "player_blast_arms"
+    /// Web Water's line: the body, and its arms on sheets of their own, turned with the aim about
+    /// the blast's shoulder; on a wall, the one arm.
+    case webshoot = "player_webshoot"
+    case webshootBackArm = "player_webshoot_back_arm"
+    case webshootFrontArm = "player_webshoot_front_arm"
+    case webshootWall = "player_webshoot_wall"
+    case webshootWallArm = "player_webshoot_wall_arm"
 
     public var frameCount: Int {
         switch self {
-        case .idle, .dribbleIdle, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir, .gunSnipe: 10
+        case .idle, .dribbleIdle, .idleBallFloState, .tauntFloState, .crouch, .crouchWalk, .snatch, .snatchAir, .gunShoot, .gunShootAir, .gunSnipe, .spinDunk: 10
         case .transform: 9
         case .beam: 10
         case .beamArms, .stunnedAir, .swing, .swingBall, .swingArm: 1
         case .blast, .blastArms: 12
+        case .webshoot, .webshootBackArm, .webshootFrontArm: 8
+        case .webshootWall, .webshootWallArm: 6
         case .shield: 3
-        case .walk, .dribbleWalk, .run, .dribbleRun, .slide, .gunRun, .gunRunShoot: 8
+        case .walk, .dribbleWalk, .run, .dribbleRun, .runBallFloState, .slide, .gunRun, .gunRunShoot: 8
         case .pivot, .air, .airBall, .catchGround, .catchAir, .skid, .skidBall, .fly, .flyBall: 3
         case .jumpSquat, .spinBall, .spin: 4
         case .doubleJump, .doubleJumpBall, .wallLand, .wallLandBall, .esperSlash, .esperSlashAir, .dunk: 6
@@ -89,19 +107,36 @@ public enum Animation: String, CaseIterable {
         case .esperSlashFloState: 9
         case .land: 9
         case .shoot: 10
-        case .shootAir, .taunt: 11
+        case .shootAir: 10
+        case .taunt: 11
         case .throwForward, .throwAir: 8
         case .layup: 9
         case .ledge: 5
         }
     }
 
+    /// A shot sheet's frame held while it's aimed (0-based): the ground's second; the air's fifth,
+    /// its third to fifth played in the aim rather than the shot, for the look of the jump.
+    public var shotHoldFrame: Int { self == .shootAir ? 4 : 1 }
+    /// Where a shot sheet smears the release (0-based): its seventh frame.
+    public static let shotSmearFrame = 6
+    /// A shot sheet's frame `t` frames into the shot: the frames between the hold and the smear spread
+    /// over the frames before the ball leaves (`BallRules.shotReleaseFrames`), so the smear lands on the
+    /// release; on from it at 24 a second, held on the last while the shot's watched.
+    public func shotFrame(_ t: Int) -> Int {
+        let first = shotHoldFrame + 1
+        guard t < BallRules.shotReleaseFrames else {
+            return min(Animation.shotSmearFrame + (t - BallRules.shotReleaseFrames) * 24 / 60, frameCount - 1)
+        }
+        return first + t * (Animation.shotSmearFrame - first) / BallRules.shotReleaseFrames
+    }
+
     /// Whether the sheet draws the ball in hand. Only these are searched for it; on the
     /// rest every white pixel is energy. The importer's `BALL_SHEETS` has to agree.
     public var holdsBall: Bool {
         switch self {
-        case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .flyBall, .wallLandBall, .shoot, .shootAir, .throwForward,
-             .catchGround, .catchAir, .skidBall, .taunt, .layup, .doubleJumpBall, .spinBall, .swingBall: true
+        case .dribbleIdle, .dribbleWalk, .dribbleRun, .airBall, .flyBall, .wallLandBall, .shoot, .shootAir, .throwForward, .throwAir,
+             .catchGround, .catchAir, .skidBall, .taunt, .layup, .doubleJumpBall, .spinBall, .swingBall, .snatchFloState, .idleBallFloState: true
         default: false
         }
     }
@@ -120,10 +155,19 @@ public enum Animation: String, CaseIterable {
 }
 
 extension Animation {
+    /// The spin dunk (`player_dunk2`) in place of the plain one; false puts the plain one back.
+    public static let dunkSpins = true
+
     /// The dunk, frame by frame from the throw stance it starts in: each entry a frame and
     /// how many sim frames it holds; the last holds through the hang. The ball leaves the
-    /// hand at the slam, the third dunk frame, which starts at the dunk's release frame.
-    public static let dunkSequence: [(frame: AnimationFrame, frames: Int)] = [
+    /// hand at the slam, `dunkSlamEntry`.
+    public static var dunkSequence: [(frame: AnimationFrame, frames: Int)] { dunkSpins ? spinDunkSequence : plainDunkSequence }
+    /// The slam's entry: the plain dunk's third sheet frame, the spin dunk's eighth. Where the dunk
+    /// freezes on one frame (Phantom's pass through the rim, a game-winner), it's this one.
+    public static var dunkSlamEntry: Int { dunkSpins ? 8 : 3 }
+    public static var dunkSlamFrame: Int { dunkStart(of: dunkSlamEntry) }
+
+    static let plainDunkSequence: [(frame: AnimationFrame, frames: Int)] = [
         (AnimationFrame(.throwForward, 3), 8),
         (AnimationFrame(.dunk, 0), 6),
         (AnimationFrame(.dunk, 1), 6),
@@ -131,6 +175,20 @@ extension Animation {
         (AnimationFrame(.dunk, 3), 8),
         (AnimationFrame(.dunk, 4), 8),
         (AnimationFrame(.dunk, 5), 1),
+    ]
+    /// A steady 15 fps: 4 sim frames to a sheet frame.
+    static let spinDunkSequence: [(frame: AnimationFrame, frames: Int)] = [
+        (AnimationFrame(.throwForward, 3), 8),
+        (AnimationFrame(.spinDunk, 0), 4),
+        (AnimationFrame(.spinDunk, 1), 4),
+        (AnimationFrame(.spinDunk, 2), 4),
+        (AnimationFrame(.spinDunk, 3), 4),
+        (AnimationFrame(.spinDunk, 4), 4),
+        (AnimationFrame(.spinDunk, 5), 4),
+        (AnimationFrame(.spinDunk, 6), 4),
+        (AnimationFrame(.spinDunk, 7), 4),
+        (AnimationFrame(.spinDunk, 8), 4),
+        (AnimationFrame(.spinDunk, 9), 1),
     ]
 
     /// Which entry of the dunk sequence shows `frames` in: its index and its frame.
@@ -179,8 +237,12 @@ extension Player {
             // The fireball gathers in the throw's hold frame.
             return AnimationFrame(grounded ? .throwForward : .throwAir, 3)
         }
-        if webLinePose > 0, state != .webSwing, state != .webPull, state != .webbed {
-            return AnimationFrame(.throwForward, 4)
+        // Web Water's line: aimed, held on the hold frame; let go, played out at 15 a second.
+        if power == .webWater, webAiming, Player.webShotPoseStates.contains(state) {
+            return state == .wallLand ? AnimationFrame(.webshootWall, 0) : AnimationFrame(.webshoot, 2)
+        }
+        if let age = webShotAge, Player.webShotPoseStates.contains(state) {
+            return webShotFromWall ? AnimationFrame(.webshootWall, 1 + age * 15 / 60) : AnimationFrame(.webshoot, 3 + age * 15 / 60)
         }
         // Stunned in the air: its own pose, till the stun's done or it lands; and a moment of it
         // spilling the ball onto a road.
@@ -194,6 +256,8 @@ extension Player {
             if previousState == .land, t + spec.landingLagFrames < 22 {
                 return AnimationFrame(.land, (t + spec.landingLagFrames) * 24 / 60)
             }
+            // In FloState the ball floats rather than bouncing, so no edge needs the taunt's dribble.
+            if holding, inFloState { return AnimationFrame(.idleBallFloState, (t * 12 / 60) % Animation.idleBallFloState.frameCount) }
             if holding, edgeDribble { return AnimationFrame(.taunt, (t * 15 / 60) % Animation.taunt.frameCount) }
             return AnimationFrame(holding ? .dribbleIdle : .idle, (t * 12 / 60) % 10)
         case .walk:
@@ -205,6 +269,7 @@ extension Player {
             // Firing on the run: the shooting sheet, whose legs are the run's frame for frame, on
             // the run's own cycle, so the stride carries on through the shot rather than restarting.
             if gunRunTimer > 0 { return AnimationFrame(.gunRunShoot, Int(animationPhase) % 8) }
+            if holding, inFloState { return AnimationFrame(.runBallFloState, Int(animationPhase) % 8) }
             return AnimationFrame(holding ? .dribbleRun : .run, Int(animationPhase) % 8)
         case .crouch:
             // Pulsepistol Punch at level two holds the crouch's first frame on the way into the snipe.
@@ -248,13 +313,12 @@ extension Player {
         case .land:
             return AnimationFrame(.land, t * 24 / 60)
         case .shootStance:
-            // The ground sheet has one more windup frame before the set pose.
-            return grounded ? AnimationFrame(.shoot, min(t * 12 / 60, 4)) : AnimationFrame(.shootAir, min(t * 12 / 60, 3))
+            // Aimed holding the sheet's hold frame (`shotHoldFrame`), reached at 12 a second.
+            let sheet: Animation = grounded ? .shoot : .shootAir
+            return AnimationFrame(sheet, min(t * 12 / 60, sheet.shotHoldFrame))
         case .shooting:
-            // Both sheets smear the release on frame 6, where the ball leaves.
-            // Held on the last while the shot's watched.
-            return grounded ? AnimationFrame(.shoot, min(4 + t * 24 / 60, Animation.shoot.frameCount - 1))
-                : AnimationFrame(.shootAir, min(3 + t * 30 / 60, Animation.shootAir.frameCount - 1))
+            let sheet: Animation = grounded ? .shoot : .shootAir
+            return AnimationFrame(sheet, sheet.shotFrame(t))
         case .throwStance:
             // Frame 3 is the set pose with the ring on the ball; 4 is the release smear.
             return AnimationFrame(grounded ? .throwForward : .throwAir, min(t * BallRules.throwSheetFramesPerSecond / 60, 3))
@@ -269,7 +333,7 @@ extension Player {
             // recovery ends with the last shown three sim frames rather than four.
             return AnimationFrame(grounded ? .throwForward : .throwAir, min(4 + t * BallRules.throwSheetFramesPerSecond / 60, 7))
         case .dunking:
-            return Animation.dunkEntry(at: t).frame
+            return Animation.dunkEntry(at: dunkSheetTimer).frame
         case .catching:
             return AnimationFrame(grounded ? .catchGround : .catchAir, t * 12 / 60)
         case .slashing where floSlash:
@@ -301,6 +365,8 @@ extension Player {
         case .ledgeClimb:
             return AnimationFrame(.ledge, 2 + (t - 1) * 3 / LedgeRules.climbFrames)
         case .taunt:
+            // FloState's, a frame shorter than the taunt, holds its last.
+            if inFloState { return AnimationFrame(.tauntFloState, min(t * 15 / 60, Animation.tauntFloState.frameCount - 1)) }
             return AnimationFrame(.taunt, t * 15 / 60)
         case .webSwing:
             return AnimationFrame(hasBall ? .swingBall : .swing, 0)

@@ -13,7 +13,7 @@ final class SpriteLibrary {
     /// Frames whose ball is tucked behind the body, too little of it showing to find: the white
     /// that shows is the ball, and its centre is given, art pixels from the feet, facing right.
     /// The importer's TUCKED_BALLS has to agree.
-    static let tuckedBalls: [String: CGPoint] = ["player_spin_ball_3": CGPoint(x: -3.5, y: 20.5)]
+    static let tuckedBalls: [String: CGPoint] = ["player_spin_ball_3": CGPoint(x: -3.5, y: 20.5), "player_dunk2_2": CGPoint(x: -3.5, y: 21.5)]
     static func tuckedBall(_ frame: AnimationFrame) -> CGPoint? { tuckedBalls["\(frame.animation.rawValue)_\(frame.frame)"] }
 
     private let atlas = SKTextureAtlas(named: "Sprites")
@@ -113,7 +113,16 @@ final class SpriteLibrary {
     /// The style a player slot's line is drawn in: the setting's for those in the match (the
     /// sides, the ice look, FloState's and the turned), Normal for the customize screen's and on.
     static func lineStyle(for player: Int) -> LineStyle {
-        player < customizePlayer(0) ? GameSettings.playerVisibility : .normal
+        player < customizePlayer(0) ? GameSettings.playerVisibility : (customizeLineStyle ?? .normal)
+    }
+    /// The player gallery's OLD LINE: the customize sides drawn in another style (Semibold, the
+    /// line before build 12, corners and all); nil, Normal.
+    nonisolated(unsafe) static var customizeLineStyle: LineStyle?
+    /// The customize sides' line style changed, their frames dropped to be drawn again in it.
+    func setCustomizeLineStyle(_ style: LineStyle?) {
+        guard style != SpriteLibrary.customizeLineStyle else { return }
+        SpriteLibrary.customizeLineStyle = style
+        for side in 0..<2 { dropPlayer(SpriteLibrary.customizePlayer(side)) }
     }
     /// The pixels round `mask`, `passes` deep, each pass the pixels next to the last (`LineStyle.reaches`)
     /// where `open` allows: a line round it.
@@ -457,11 +466,27 @@ final class SpriteLibrary {
     static let basketballFrameCount = 3
     private(set) lazy var basketballFrames: [SKTexture] = SpriteLibrary.cutBall("Basketball")
     private(set) lazy var basketballIceFrames: [SKTexture] = SpriteLibrary.cutBall("BasketballIce")
+    /// Breaker Ball's balls: the basketball's two lightest shades in the energy's
+    /// `breakerBallTones` light, its middle in the middle, its two darkest in the dark.
+    private(set) lazy var breakerBallFrames: [EnergyColour: [SKTexture]] = Dictionary(uniqueKeysWithValues: EnergyColour.allCases.map { colour in
+        let tones = colour.breakerBallTones
+        let swaps: [RGB: RGB] = [0xFFA214: tones.light, 0xED7614: tones.light, 0xC64524: tones.middle, 0x8A4836: tones.dark, 0x5D2C28: tones.dark]
+        return (colour, basketballFrames.map { SpriteLibrary.swapped($0, swaps) })
+    })
+    /// A player's Breaker Ball look, in their energy.
+    func breakerBallLook(for player: Int) -> BallLook? {
+        guard let colour = EnergyColour.withGlow(look(for: player).glow), breakerBallFrames[colour] != nil else { return nil }
+        return .breaker(colour)
+    }
     /// Blazing Boba's fireball: the basketball's every shade a step up the fire ramp, its seams
     /// with its shadow and its outline the red under them, so it reads hot rather than as the ball.
     private(set) lazy var basketballFireFrames: [SKTexture] = basketballFrames.map { frame in
-        let swaps: [RGB: RGB] = [0xFFA214: PixelPalette.fire[0], 0xED7614: PixelPalette.fire[1], 0xC64524: PixelPalette.fire[2],
-                                 0x8A4836: PixelPalette.fire[2], 0x5D2C28: PixelPalette.fire[3]]
+        SpriteLibrary.swapped(frame, [0xFFA214: PixelPalette.fire[0], 0xED7614: PixelPalette.fire[1], 0xC64524: PixelPalette.fire[2],
+                                      0x8A4836: PixelPalette.fire[2], 0x5D2C28: PixelPalette.fire[3]])
+    }
+
+    /// A ball frame with its colours swapped, the rest as it was.
+    private static func swapped(_ frame: SKTexture, _ swaps: [RGB: RGB]) -> SKTexture {
         let picture = frame.cgImage()
         let width = picture.width, height = picture.height
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
@@ -498,6 +523,327 @@ final class SpriteLibrary {
     /// level-two double jump, which spins on it with or without the ball.
     static let liftsBall: Set<Animation> = [.snatchFloState, .spinBall]
 
+    // MARK: The sheet's own ball
+
+    /// The sheets whose ball is read off each frame as drawn. Where it's the plain round ball, the
+    /// ball's drawn there with what the sheet puts in front of it drawn again over it; where the
+    /// sheet reshapes it, its white is painted from the ball's art, stretched to fit.
+    static let sheetBallSheets: Set<Animation> = [.taunt, .dribbleIdle, .dribbleWalk, .dribbleRun, .spinDunk, .idleBallFloState, .shoot, .shootAir]
+    /// White off the biggest blob joins the ball while the two together stay this many pixels
+    /// across and high: the ball split by a leg in front of it, not a streak beside it.
+    static let sheetBallReach = 9
+
+    /// A frame's ball as the sheet draws it, on the canvas, counted from the top left: its pixels
+    /// and their bounds; where the round ball fits over them whole, its top left (nil where the
+    /// sheet reshapes it); and the sheet's pixels inside the round ball that aren't it, in front of it.
+    struct SheetBall {
+        let pixels: Set<Int>
+        let canvasWidth: Int
+        let bounds: (x: Int, y: Int, width: Int, height: Int)
+        let roundAt: (x: Int, y: Int)?
+        let covering: [Int]
+    }
+
+    /// The round ball's shape, its first frame's pixels, from the top left.
+    static let roundBall: (mask: [Bool], side: Int) = {
+        guard let art = UIImage(named: "Basketball")?.cgImage?.cropping(to: CGRect(x: 0, y: 0, width: 8, height: 8)),
+              let (context, pixels) = canvas(width: art.width, height: art.height) else { return ([Bool](repeating: true, count: 64), 8) }
+        context.draw(art, in: CGRect(x: 0, y: 0, width: art.width, height: art.height))
+        return ((0..<(art.width * art.height)).map { pixels[$0 * 4 + 3] > 0 }, art.width)
+    }()
+
+    nonisolated(unsafe) private static var sheetBalls: [String: SheetBall?] = [:]
+    private static let sheetBallLock = NSLock()
+    static func sheetBall(_ frame: AnimationFrame, source: CGImage) -> SheetBall? {
+        guard sheetBallSheets.contains(frame.animation) else { return nil }
+        let key = "\(frame.animation.rawValue)_\(frame.frame)"
+        sheetBallLock.lock()
+        if let made = sheetBalls[key] {
+            sheetBallLock.unlock()
+            return made
+        }
+        sheetBallLock.unlock()
+        let made = findSheetBall(source)
+        sheetBallLock.lock()
+        sheetBalls[key] = made
+        sheetBallLock.unlock()
+        return made
+    }
+
+    /// The round ball's place over a frame's white on every sheet that holds the ball, so the ball in
+    /// hand sits on the art's pixels and what the sheet draws in front of it is drawn again over it:
+    /// the sheet's own ball where the sheet's ball is read off the frame, else the round fit, nil
+    /// where the round ball doesn't fit the white.
+    nonisolated(unsafe) private static var fittedBalls: [String: SheetBall?] = [:]
+    static func fittedBall(_ frame: AnimationFrame, source: CGImage) -> SheetBall? {
+        if sheetBallSheets.contains(frame.animation) { return sheetBall(frame, source: source) }
+        guard frame.animation.holdsBall else { return nil }
+        let key = "\(frame.animation.rawValue)_\(frame.frame)"
+        sheetBallLock.lock()
+        if let made = fittedBalls[key] {
+            sheetBallLock.unlock()
+            return made
+        }
+        sheetBallLock.unlock()
+        let found = findSheetBall(source)
+        let made = found?.roundAt != nil ? found : nil
+        sheetBallLock.lock()
+        fittedBalls[key] = made
+        sheetBallLock.unlock()
+        return made
+    }
+
+    private static func findSheetBall(_ source: CGImage) -> SheetBall? {
+        let width = source.width, height = source.height, count = width * height
+        guard let (context, pixels) = canvas(width: width, height: height) else { return nil }
+        context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let opaque = (0..<count).map { pixels[$0 * 4 + 3] == 255 }
+        let white = (0..<count).map { pixel in
+            opaque[pixel] && BodyPart.owning(RGB(pixels[pixel * 4]) << 16 | RGB(pixels[pixel * 4 + 1]) << 8 | RGB(pixels[pixel * 4 + 2])) == .ball
+        }
+        // The white in 8-connected blobs, biggest first.
+        var label = [Int](repeating: -1, count: count)
+        var blobs: [[Int]] = []
+        for start in 0..<count where white[start] && label[start] < 0 {
+            var blob: [Int] = []
+            var stack = [start]
+            label[start] = blobs.count
+            while let pixel = stack.popLast() {
+                blob.append(pixel)
+                let x = pixel % width, y = pixel / width
+                for dy in -1...1 {
+                    for dx in -1...1 where dx != 0 || dy != 0 {
+                        let nx = x + dx, ny = y + dy
+                        guard nx >= 0, ny >= 0, nx < width, ny < height else { continue }
+                        let neighbour = ny * width + nx
+                        if white[neighbour], label[neighbour] < 0 {
+                            label[neighbour] = blobs.count
+                            stack.append(neighbour)
+                        }
+                    }
+                }
+            }
+            blobs.append(blob)
+        }
+        blobs.sort { $0.count > $1.count }
+        guard let biggest = blobs.first, biggest.count >= ballMinPixels else { return nil }
+        func bounds(_ pixels: [Int]) -> (minX: Int, minY: Int, maxX: Int, maxY: Int) {
+            pixels.reduce((Int.max, Int.max, Int.min, Int.min)) { box, pixel in
+                (min(box.0, pixel % width), min(box.1, pixel / width), max(box.2, pixel % width), max(box.3, pixel / width))
+            }
+        }
+        var ball = biggest
+        for blob in blobs.dropFirst() {
+            let joined = bounds(ball + blob)
+            if joined.maxX - joined.minX < sheetBallReach, joined.maxY - joined.minY < sheetBallReach { ball += blob }
+        }
+        let box = bounds(ball)
+        // The round ball's place over it whole, nearest its middle, where every pixel of the round
+        // ball is the sheet's white or something in front of it: a squash smaller than it isn't it.
+        let side = roundBall.side
+        let middleX = ball.reduce(0.0) { $0 + Double($1 % width) + 0.5 } / Double(ball.count)
+        let middleY = ball.reduce(0.0) { $0 + Double($1 / width) + 0.5 } / Double(ball.count)
+        var roundAt: (x: Int, y: Int)?
+        var nearest = Double.infinity
+        if box.maxX - box.minX < side, box.maxY - box.minY < side {
+            for y in (box.maxY - side + 1)...box.minY {
+                for x in (box.maxX - side + 1)...box.minX {
+                    let whole = (0..<(side * side)).allSatisfy { spot in
+                        let spotX = x + spot % side, spotY = y + spot / side
+                        return !roundBall.mask[spot] || (spotX >= 0 && spotY >= 0 && spotX < width && spotY < height && opaque[spotY * width + spotX])
+                    }
+                    let fits = whole && ball.allSatisfy { roundBall.mask[(($0 / width) - y) * side + ($0 % width) - x] }
+                    let distance = hypot(Double(x + side / 2) - middleX, Double(y + side / 2) - middleY)
+                    if fits, distance < nearest {
+                        nearest = distance
+                        roundAt = (x, y)
+                    }
+                }
+            }
+        }
+        let pixelSet = Set(ball)
+        var covering: [Int] = []
+        if let roundAt {
+            for my in 0..<side {
+                for mx in 0..<side where roundBall.mask[my * side + mx] {
+                    let x = roundAt.x + mx, y = roundAt.y + my
+                    guard x >= 0, y >= 0, x < width, y < height else { continue }
+                    let pixel = y * width + x
+                    if opaque[pixel], !pixelSet.contains(pixel) { covering.append(pixel) }
+                }
+            }
+        }
+        return SheetBall(pixels: pixelSet, canvasWidth: width,
+                         bounds: (box.minX, box.minY, box.maxX - box.minX + 1, box.maxY - box.minY + 1), roundAt: roundAt, covering: covering)
+    }
+
+    /// The painted ball's picture, its bounds made even each way so its middle sits on a pixel's edge.
+    static func paintedBallSize(_ ball: SheetBall) -> (width: Int, height: Int) {
+        (ball.bounds.width + ball.bounds.width % 2, ball.bounds.height + ball.bounds.height % 2)
+    }
+
+    /// Where a frame's ball sits, art pixels from the feet, facing right: the round ball's middle,
+    /// or the painted one's.
+    static func sheetBallCentre(_ ball: SheetBall, in frame: AnimationFrame) -> CGPoint {
+        let side = CGFloat(roundBall.side)
+        let painted = paintedBallSize(ball)
+        let middle = ball.roundAt.map { CGPoint(x: CGFloat($0.x) + side / 2, y: CGFloat($0.y) + side / 2) }
+            ?? CGPoint(x: CGFloat(ball.bounds.x) + CGFloat(painted.width) / 2, y: CGFloat(ball.bounds.y) + CGFloat(painted.height) / 2)
+        return CGPoint(x: middle.x - frame.animation.pixelWidth / 2, y: frame.animation.pixelSize - middle.y - frame.animation.feetFromBottom)
+    }
+
+    /// A reshaped ball's white painted from one of the ball's frames, the art stretched over its
+    /// bounds; a pixel the stretch puts off the round art takes the nearest of it.
+    static func paintBall(_ ball: SheetBall, art: CGImage) -> CGImage? {
+        let side = art.width
+        guard art.height == side, let (artContext, artPixels) = canvas(width: side, height: side) else { return nil }
+        artContext.draw(art, in: CGRect(x: 0, y: 0, width: side, height: side))
+        let filled = (0..<(side * side)).filter { artPixels[$0 * 4 + 3] > 0 }
+        guard !filled.isEmpty else { return nil }
+        let size = paintedBallSize(ball)
+        guard let (context, pixels) = canvas(width: size.width, height: size.height) else { return nil }
+        for pixel in ball.pixels {
+            let x = pixel % ball.canvasWidth - ball.bounds.x, y = pixel / ball.canvasWidth - ball.bounds.y
+            let u = x * side / ball.bounds.width, v = y * side / ball.bounds.height
+            var from = v * side + u
+            if artPixels[from * 4 + 3] == 0 {
+                from = filled.min { hypot(Double($0 % side - u), Double($0 / side - v)) < hypot(Double($1 % side - u), Double($1 / side - v)) }!
+            }
+            for channel in 0..<4 { pixels[(y * size.width + x) * 4 + channel] = artPixels[from * 4 + channel] }
+        }
+        return context.makeImage()
+    }
+
+    /// Only `pixels` of a picture on the sheet's canvas: what the sheet draws in front of its ball.
+    static func picked(_ image: CGImage, pixels chosen: [Int]) -> CGImage? {
+        let width = image.width, height = image.height
+        guard !chosen.isEmpty, let (sourceContext, sourcePixels) = canvas(width: width, height: height),
+              let (context, pixels) = canvas(width: width, height: height) else { return nil }
+        sourceContext.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var any = false
+        for pixel in chosen where pixel < width * height && sourcePixels[pixel * 4 + 3] > 0 {
+            for channel in 0..<4 { pixels[pixel * 4 + channel] = sourcePixels[pixel * 4 + channel] }
+            any = true
+        }
+        return any ? context.makeImage() : nil
+    }
+
+    /// The ball in hand's look: the basketball, Blazing Boba's fireball, or frozen.
+    enum BallLook: Hashable {
+        case plain, fire, ice, breaker(EnergyColour)
+        static let unbroken: [BallLook] = [.plain, .fire, .ice]
+    }
+    func ballFrames(_ look: BallLook) -> [SKTexture] {
+        switch look {
+        case .plain: basketballFrames
+        case .fire: basketballFireFrames
+        case .ice: basketballIceFrames
+        case .breaker(let colour): breakerBallFrames[colour] ?? basketballFrames
+        }
+    }
+
+    /// A reshaped frame's ball painted in a look and one of the ball's spin frames; nil where the
+    /// frame's ball is the round one.
+    func paintedBallTexture(_ frame: AnimationFrame, look: BallLook, spin: Int) -> SKTexture? {
+        let key = "paintedball_\(frame.animation.rawValue)_\(frame.frame)_\(look)_\(spin)"
+        if let made = cache[key] { return made }
+        guard !emptyPieces.contains(key) else { return nil }
+        guard let ball = SpriteLibrary.sheetBall(frame, source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)")), ball.roundAt == nil,
+              let image = SpriteLibrary.paintBall(ball, art: ballFrames(look)[spin].cgImage()) else {
+            emptyPieces.insert(key)
+            return nil
+        }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .nearest
+        cache[key] = made
+        return made
+    }
+
+    /// A dribbled sheet's round ball, and FloState's floating one, takes the ball's frames in turn, one per frame it appears on,
+    /// round again after the last, except a last appearance that would match the loop's first takes
+    /// the second: this frame's, or nil where its ball isn't the round one.
+    func roundBallSpin(_ frame: AnimationFrame) -> Int? {
+        SpriteLibrary.roundBallSpin(frame) { self.sourceImage("\($0.animation.rawValue)_\($0.frame)") }
+    }
+    static func roundBallSpin(_ frame: AnimationFrame, source: (AnimationFrame) -> CGImage) -> Int? {
+        guard Animation.dribbles.contains(frame.animation) || frame.animation == .taunt || frame.animation == .idleBallFloState else { return nil }
+        func round(_ index: Int) -> Bool {
+            let sheet = AnimationFrame(frame.animation, index)
+            return sheetBall(sheet, source: source(sheet))?.roundAt != nil
+        }
+        guard round(frame.frame) else { return nil }
+        let appearance = (0..<frame.frame).filter(round).count
+        let appearances = (0..<frame.animation.frameCount).filter(round).count
+        let spin = appearance % basketballFrameCount
+        return appearances > 1 && appearance == appearances - 1 && spin == 0 ? 1 : spin
+    }
+
+    /// The sheets whose ball is painted on a layer of their own, in the ball's tones, and that layer.
+    static let ballLayers: [Animation: String] = [.tauntFloState: "player_taunt2_ball"]
+
+    /// A ball layer's frame in a look: each of the ball's tones swapped for the one the look's ball
+    /// has in its place.
+    func ballLayerTexture(_ sheet: String, _ frame: Int, look: BallLook) -> SKTexture {
+        let key = "balllayer_\(sheet)_\(frame)_\(look)"
+        if let made = cache[key] { return made }
+        let painted = texture(sheet, frame)
+        let made = look == .plain ? painted : SpriteLibrary.swapped(painted, ballToneSwaps(look))
+        cache[key] = made
+        return made
+    }
+
+    /// Each of the plain ball's tones, and the tone the look's ball most often has at the same pixel.
+    private var ballToneSwapsByLook: [BallLook: [RGB: RGB]] = [:]
+    private func ballToneSwaps(_ look: BallLook) -> [RGB: RGB] {
+        if let known = ballToneSwapsByLook[look] { return known }
+        var counts: [RGB: [RGB: Int]] = [:]
+        for (plainFrame, lookFrame) in zip(basketballFrames, ballFrames(look)) {
+            let lookTones = SpriteLibrary.opaqueTones(lookFrame)
+            for (pixel, tone) in SpriteLibrary.opaqueTones(plainFrame) {
+                if let lookTone = lookTones[pixel] { counts[tone, default: [:]][lookTone, default: 0] += 1 }
+            }
+        }
+        let swaps = counts.compactMapValues { tally in tally.max { $0.value < $1.value }?.key }
+        ballToneSwapsByLook[look] = swaps
+        return swaps
+    }
+
+    /// A frame's opaque pixels' colours, by pixel index.
+    private static func opaqueTones(_ frame: SKTexture) -> [Int: RGB] {
+        let picture = frame.cgImage()
+        let width = picture.width, height = picture.height
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let pixels = context.data?.bindMemory(to: UInt8.self, capacity: width * height * 4) else { return [:] }
+        context.draw(picture, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var tones: [Int: RGB] = [:]
+        for pixel in 0..<(width * height) where pixels[pixel * 4 + 3] == 255 {
+            let index = pixel * 4
+            tones[pixel] = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
+        }
+        return tones
+    }
+
+    /// Every reshaped ball in every look and spin, made ahead of play; Breaker Ball's in the players' energies too.
+    /// The ball layers' frames in every look with them.
+    func warmPaintedBalls(breakerPlayers: [Int] = []) {
+        let looks = BallLook.unbroken + breakerPlayers.compactMap { breakerBallLook(for: $0) }
+        for (animation, layer) in SpriteLibrary.ballLayers {
+            for index in 0..<animation.frameCount {
+                for look in looks { _ = ballLayerTexture(layer, index, look: look) }
+            }
+        }
+        for animation in SpriteLibrary.sheetBallSheets {
+            for index in 0..<animation.frameCount {
+                for look in looks {
+                    for spin in 0..<SpriteLibrary.basketballFrameCount {
+                        _ = paintedBallTexture(AnimationFrame(animation, index), look: look, spin: spin)
+                    }
+                }
+            }
+        }
+    }
+
     /// A player frame's key in the cache: with `ballAsEnergy` the sheet's whites are all energy,
     /// with `ballLifted` its ball is lifted off and not drawn.
     static func frameKey(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool, ballLifted: Bool) -> String {
@@ -532,15 +878,33 @@ final class SpriteLibrary {
     /// throw's follow-through, 5 on, where the back arm comes forward over the head. Their front
     /// and back arm and hand colours swap.
     static let armColoursSwapped: [Animation: ClosedRange<Int>] = [.throwForward: 4...7]
+    /// The frames whose bare arms and hands take each other's skin tone, the sleeves left on their
+    /// own arms: the spin turned away, the far arm brought round in front.
+    static let armSkinSwapped: [Animation: Set<Int>] = [.spinBall: [2], .spinDunk: [1]]
+    /// The frames facing out: both hands in the skin's light tone, the rest of both bare arms in its shadow.
+    static let handsLitArmsShaded: [Animation: Set<Int>] = [.spinBall: [1], .spinDunk: [0]]
     static func look(_ look: Look, for frame: AnimationFrame) -> Look {
-        guard armColoursSwapped[frame.animation]?.contains(frame.frame) == true else { return look }
-        var swapped = look
-        for (front, back) in [(BodyPart.frontArm, BodyPart.backArm), (.frontHand, .backHand)] {
-            let was = swapped.colours[front]
-            swapped.colours[front] = swapped.colours[back]
-            swapped.colours[back] = was
+        var adjusted = look
+        if armColoursSwapped[frame.animation]?.contains(frame.frame) == true {
+            for (front, back) in [(BodyPart.frontArm, BodyPart.backArm), (.frontHand, .backHand)] {
+                let was = adjusted.colours[front]
+                adjusted.colours[front] = adjusted.colours[back]
+                adjusted.colours[back] = was
+            }
         }
-        return swapped
+        let skinSwapped = armSkinSwapped[frame.animation]?.contains(frame.frame) == true
+        let handsLit = handsLitArmsShaded[frame.animation]?.contains(frame.frame) == true
+        if skinSwapped || handsLit {
+            let skin = look.dressing.skin
+            let tone = look.dressing.tone
+            for part in [BodyPart.frontArm, .backArm, .frontHand, .backHand] {
+                // Only what's showing its skin: a sleeve, or a look that isn't a human's, stays as it is.
+                guard let own = skin[part], look.colours[part] == own else { continue }
+                let hand = part == .frontHand || part == .backHand
+                adjusted.colours[part] = handsLit ? (hand ? tone.front : tone.back) : (part.isBack ? tone.front : tone.back)
+            }
+        }
+        return adjusted
     }
 
     private func makeFrame(_ frame: AnimationFrame, source: CGImage, look: Look, holdsBall: Bool, lineStyle: LineStyle)
@@ -548,9 +912,12 @@ final class SpriteLibrary {
         var madeImages: [String: CGImage] = [:]
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
         let look = SpriteLibrary.look(look, for: frame)
+        let sheetBall = holdsBall ? SpriteLibrary.sheetBall(frame, source: source) : nil
+        let fittedBall = holdsBall ? SpriteLibrary.fittedBall(frame, source: source) : nil
         let result = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
-                              tucked: SpriteLibrary.tuckedBall(frame) != nil,
+                              tucked: SpriteLibrary.tuckedBall(frame) != nil, ballPixels: sheetBall?.pixels,
                               hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame, energy: look.energyForm),
+                              hoodNudge: GameScene.headNudge(frame),
                               // On every frame: a tipped head eases back level over whatever comes next.
                               bareLine: !look.energyForm, lineStyle: lineStyle)
         var textures = ["": result.texture]
@@ -562,17 +929,18 @@ final class SpriteLibrary {
         if let glowMask = result.glowMask { textures["_glowmask"] = glowMask }
         if let skin = result.skin { textures["_skin"] = skin }
         if let thinOutline = result.thinOutline { textures["_thinoutline"] = thinOutline }
-        // The front arm laid over the hood, its glowing parts and its own line, on the frames it
-        // crosses the head: made with the frame, so none is first made mid-match.
+        // The arms laid over the hood, their glowing parts and their own line, on the frames they
+        // cross the head: made with the frame, so none is first made mid-match.
         var empty: [String] = []
         // FloState's look too: its hood is worn, though its look isn't a human's.
-        if GameScene.frontArmOverHood(frame), let images = result.images {
-            let arm: Set<BodyPart> = [.frontArm, .frontHand]
+        let armsOverHood = GameScene.armPartsOverHood(frame)
+        if !armsOverHood.isEmpty, let images = result.images {
             let pieces: [(String, CGImage?)] = [
-                ("_frontarm", SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: arm, style: lineStyle)),
-                ("_frontarmglowing", images.glowing.flatMap { SpriteLibrary.partsImage(drawn: $0, source: source, parts: arm, style: lineStyle) }),
-                ("_frontarmline", SpriteLibrary.partsLine(source: source, parts: arm,
-                                                          hood: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame, energy: look.energyForm), style: lineStyle)),
+                ("_armsoverhood", SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: armsOverHood, style: lineStyle)),
+                ("_armsoverhoodglowing", images.glowing.flatMap { SpriteLibrary.partsImage(drawn: $0, source: source, parts: armsOverHood, style: lineStyle) }),
+                ("_armsoverhoodline", SpriteLibrary.partsLine(source: source, parts: armsOverHood,
+                                                              hood: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame, energy: look.energyForm),
+                                                              hoodNudge: GameScene.headNudge(frame), style: lineStyle)),
             ]
             for (suffix, image) in pieces {
                 if let image { textures[suffix] = SKTexture(cgImage: image) } else { empty.append(suffix) }
@@ -603,14 +971,15 @@ final class SpriteLibrary {
                 empty.append("_hands")
             }
         }
-        // The front leg laid over the ball the sheet passes behind it (`GameScene.ballBehindLegSheets`).
-        if GameScene.ballBehindLegSheets.contains(frame.animation), let images = result.images {
-            let leg = SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: [.frontThigh, .frontLeg, .frontFoot], style: lineStyle)
-            if let leg {
-                textures["_frontleg"] = SKTexture(cgImage: leg)
-                madeImages["_frontleg"] = leg
-            } else {
-                empty.append("_frontleg")
+        // What the sheet draws in front of its round ball, and its line, laid over the ball in hand.
+        if let fittedBall, fittedBall.roundAt != nil, let images = result.images {
+            if let over = SpriteLibrary.picked(images.drawn, pixels: fittedBall.covering) {
+                textures["_overball"] = SKTexture(cgImage: over)
+                madeImages["_overball"] = over
+            }
+            if let line = images.outline.flatMap({ SpriteLibrary.picked($0, pixels: fittedBall.covering) }) {
+                textures["_overballline"] = SKTexture(cgImage: line)
+                madeImages["_overballline"] = line
             }
         }
         for texture in textures.values { texture.filteringMode = .nearest }
@@ -619,6 +988,7 @@ final class SpriteLibrary {
             CGPoint(x: centre.x - width / 2, y: size - centre.y - frame.animation.feetFromBottom)
         }
         if holdsBall, let tucked = SpriteLibrary.tuckedBall(frame) { landmarks[.ball] = tucked }
+        if let fittedBall { landmarks[.ball] = SpriteLibrary.sheetBallCentre(fittedBall, in: frame) }
         return (textures, landmarks, empty, madeImages)
     }
 
@@ -660,17 +1030,34 @@ final class SpriteLibrary {
         return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_glowing"]
     }
 
-    /// The glowing parts of the front arm and hand alone (a sleeve), for K&A's wash: drawn again
-    /// unwashed over the front arm laid over the hood, as the body's are over the body.
-    func frontArmGlowingTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_frontarmglowing"
+    /// The glowing parts of the arms laid over the hood alone (a sleeve), for K&A's wash: drawn again
+    /// unwashed over those arms, as the body's are over the body.
+    func armsOverHoodGlowingTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_armsoverhoodglowing"
         if let made = cache[key] { return made }
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
         guard !emptyPieces.contains(key) else { return nil }
         guard let glowing = glowingPartsTexture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted),
               let image = SpriteLibrary.partsImage(drawn: glowing.cgImage(), source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)"),
-                                                   parts: [.frontArm, .frontHand], style: SpriteLibrary.lineStyle(for: player)) else {
+                                                   parts: GameScene.armPartsOverHood(frame), style: SpriteLibrary.lineStyle(for: player)) else {
+            emptyPieces.insert(key)
+            return nil
+        }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .nearest
+        cache[key] = made
+        return made
+    }
+
+    /// The back hand alone, as drawn, on the body's canvas: Breaker Ball's, lit in the energy while it holds its chain.
+    func backHandTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_backhand"
+        if let made = cache[key] { return made }
+        guard !emptyPieces.contains(key) else { return nil }
+        guard let drawn = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).cgImage() as CGImage?,
+              let image = SpriteLibrary.partsImage(drawn: drawn, source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)"),
+                                                   parts: [.backHand], lined: false, style: SpriteLibrary.lineStyle(for: player)) else {
             emptyPieces.insert(key)
             return nil
         }
@@ -721,10 +1108,13 @@ final class SpriteLibrary {
         if let made = cache[key + "_bareoutline"] { return made }
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key + "_bareoutline", since: missStart) }
-        let result = recolour(image: sourceImage("\(frame.animation.rawValue)_\(frame.frame)"), look: SpriteLibrary.look(look, for: frame),
-                              holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted, detach: true,
+        let source = sourceImage("\(frame.animation.rawValue)_\(frame.frame)")
+        let holdsBall = (frame.animation.holdsBall && !ballAsEnergy) || ballLifted
+        let result = recolour(image: source, look: SpriteLibrary.look(look, for: frame),
+                              holdsBall: holdsBall, detach: true,
                               tucked: SpriteLibrary.tuckedBall(frame) != nil,
-                              hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame), bareLine: true,
+                              ballPixels: holdsBall ? SpriteLibrary.sheetBall(frame, source: source)?.pixels : nil,
+                              hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame), hoodNudge: GameScene.headNudge(frame), bareLine: true,
                               lineStyle: SpriteLibrary.lineStyle(for: player))
         result.bareOutline?.filteringMode = .nearest
         cache[key + "_bareoutline"] = result.bareOutline
@@ -780,20 +1170,24 @@ final class SpriteLibrary {
         return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_skin"]
     }
 
-    /// The sheet's front leg alone from a player frame (its thigh, leg and foot) as drawn, and the
-    /// line drawn round it, on the body's canvas: laid over the ball in hand where the sheet passes
-    /// the ball behind that leg (the taunt's and the dribble walk's), the real ball drawn over the
-    /// body otherwise. The sheet's front leg whichever way the body faces: turned round, the node's
-    /// mirrored and only the clothes' colours swap. Nil with no front leg in the frame.
-    /// The front leg's picture as made, read back only if it wasn't kept.
-    func frontLegImage(_ frame: AnimationFrame, player: Int) -> CGImage? {
-        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: false) + "_frontleg"
-        if let kept = keptImages[key] { return kept }
-        return frontLegTexture(frame, player: player)?.cgImage()
+    /// What the sheet draws in front of its round ball (a hand, an arm, a leg) as drawn, on the
+    /// body's canvas, and that part's line in white: laid over the ball in hand. Nil where nothing's
+    /// in front of it, or the frame's ball isn't the round one.
+    func overBallTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_overball"]
     }
 
-    func frontLegTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        partsTexture(frame, player: player, parts: [.frontThigh, .frontLeg, .frontFoot], suffix: "_frontleg", ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    func overBallLineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_overballline"]
+    }
+
+    /// The same as pictures, as made.
+    func overBallImages(_ frame: AnimationFrame, player: Int) -> (body: CGImage?, line: CGImage?) {
+        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: false)
+        _ = texture(frame, player: player)
+        return (keptImages[key + "_overball"], keptImages[key + "_overballline"])
     }
 
     /// The hands alone as drawn, unlined, on the body's canvas: made with the frame. Nil with none in it.
@@ -802,9 +1196,14 @@ final class SpriteLibrary {
         return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_hands"]
     }
 
+    /// The arms `GameScene.armPartsOverHood` names for the frame, as drawn with the line round them,
+    /// on the body's canvas: laid over the hooded head where they cross it. Nil with none in the frame.
+    func armsOverHoodTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        partsTexture(frame, player: player, parts: GameScene.armPartsOverHood(frame), suffix: "_armsoverhood", ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    }
+
     /// The sheet's front arm alone (its arm and hand) as drawn with the line round it, on the body's
-    /// canvas: laid over the hooded head on the frames `GameScene.frontArmOverHood` names, where the
-    /// arm crosses the head. Nil with no front arm in the frame.
+    /// canvas: Z Tea's blast's. Nil with no front arm in the frame.
     func frontArmTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
         partsTexture(frame, player: player, parts: [.frontArm, .frontHand], suffix: "_frontarm", ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
     }
@@ -819,19 +1218,19 @@ final class SpriteLibrary {
         partsTexture(frame, player: player, parts: [.backArm, .backHand], suffix: "_backarm", ballAsEnergy: false, ballLifted: false)
     }
 
-    /// The front arm's own line, in white, for the line's node colour: round the arm and hand
-    /// wherever they meet the hooded head or open air, so the arm laid over the hood is lined.
-    func frontArmLineTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
+    /// The arms over the hood's own line, in white, for the line's node colour: round the arms and
+    /// hands wherever they meet the hooded head or open air, so the arms laid over the hood are lined.
+    func armsOverHoodLineTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
         let look = look(for: player)
-        let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)_frontarmline"
+        let key = "p\(player)_\(frame.animation.rawValue)_\(frame.frame)_armsoverhoodline"
         if let made = cache[key] { return made }
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
         guard !emptyPieces.contains(key) else { return nil }
         let source = sourceImage("\(frame.animation.rawValue)_\(frame.frame)")
-        guard let image = SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
+        guard let image = SpriteLibrary.partsLine(source: source, parts: GameScene.armPartsOverHood(frame),
                                                   hood: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame, energy: look.energyForm),
-                                                  style: SpriteLibrary.lineStyle(for: player)) else {
+                                                  hoodNudge: GameScene.headNudge(frame), style: SpriteLibrary.lineStyle(for: player)) else {
             emptyPieces.insert(key)
             return nil
         }
@@ -843,7 +1242,7 @@ final class SpriteLibrary {
 
     /// The line round `parts` on a sheet frame, in white: each pixel next to them that isn't them and
     /// is open air, the sheet's head, or under the hooded head placed as the game places it.
-    static func partsLine(source: CGImage, parts: Set<BodyPart>, hood: CGImage?, style: LineStyle = .normal) -> CGImage? {
+    static func partsLine(source: CGImage, parts: Set<BodyPart>, hood: CGImage?, hoodNudge: CGPoint = .zero, style: LineStyle = .normal) -> CGImage? {
         let width = source.width, height = source.height
         guard let (sourceContext, sourcePixels) = canvas(width: width, height: height),
               let (lineContext, linePixels) = canvas(width: width, height: height) else { return nil }
@@ -864,7 +1263,7 @@ final class SpriteLibrary {
         var underHood = [Bool](repeating: false, count: width * height)
         if let hood, heads > 0, let there = hoodDrawnForHead, let (hoodContext, hoodPixels) = canvas(width: hood.width, height: hood.height) {
             hoodContext.draw(hood, in: CGRect(x: 0, y: 0, width: hood.width, height: hood.height))
-            let offsetX = Int((headSum.x / CGFloat(heads) - there.x).rounded()), offsetY = Int((headSum.y / CGFloat(heads) - there.y).rounded())
+            let offsetX = Int((headSum.x / CGFloat(heads) - there.x).rounded() + hoodNudge.x), offsetY = Int((headSum.y / CGFloat(heads) - there.y).rounded() - hoodNudge.y)
             for y in 0..<hood.height {
                 for x in 0..<hood.width where hoodPixels[(y * hood.width + x) * 4 + 3] != 0 {
                     let fx = x + offsetX, fy = y + offsetY
@@ -1106,14 +1505,25 @@ final class SpriteLibrary {
     /// sheet's pixels in `overHood`'s colours are drawn again over the hood.
     /// The sheets drawn with props in them, kept as drawn: the drink's bottle, the drink choice's towel.
     static let propSheets: Set<String> = ["player_drink", "player_drinkchoice"]
+    /// The drink's splashes, white, kept out of the line and laid back on as drawn.
+    static let unlinedSplashSheets: Set<String> = ["player_drink"]
+    static let splash: Set<RGB> = [0xFFFFFF]
     func standalone(_ name: String, frame: Int, player: Int, headTilt: CGFloat = 0, overHood: Set<RGB> = []) -> SKTexture {
         let key = "p\(player)_standalone_\(name)_\(frame)_\(headTilt)"
         if let made = cache[key] { return made }
         let look = look(for: player)
         let source = sourceImage("\(name)_\(frame)")
-        let body = recolour(image: source, look: look, holdsBall: false, detach: false,
-                            hoodShape: !look.energyForm ? SpriteLibrary.plainHoodShape : nil,
-                            keepsProps: SpriteLibrary.propSheets.contains(name))
+        let keepsProps = SpriteLibrary.propSheets.contains(name), lineStyle = SpriteLibrary.lineStyle(for: player)
+        let lined = SpriteLibrary.unlinedSplashSheets.contains(name) ? SpriteLibrary.clearing(source, SpriteLibrary.splash) ?? source : source
+        // Without the hood's cut: where the head is, and what's drawn again over the hood.
+        let uncut = recolour(image: lined, look: look, holdsBall: false, detach: false, hoodShape: nil, keepsProps: keepsProps, lineStyle: lineStyle)
+        // The hood's shape tipped as the hood is drawn, about the same middle, so its cut and line fit it.
+        var hoodShape: CGImage? = look.energyForm ? nil : SpriteLibrary.plainHoodShape
+        if headTilt != 0, let shape = hoodShape, let here = uncut.centres[.head], let there = SpriteLibrary.hoodDrawnForHead {
+            let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
+            hoodShape = SpriteLibrary.turned(shape, by: headTilt, about: CGPoint(x: here.x - offset.x, y: here.y - offset.y)) ?? shape
+        }
+        let body = recolour(image: lined, look: look, holdsBall: false, detach: false, hoodShape: hoodShape, keepsProps: keepsProps, lineStyle: lineStyle)
         var made = body.texture
         let image = body.texture.cgImage()
         if let (context, pixels) = makeCanvas(width: image.width, height: image.height),
@@ -1145,7 +1555,8 @@ final class SpriteLibrary {
             }
             context.draw(hood, in: CGRect(x: offset.x, y: -offset.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
             if var composed = context.makeImage() {
-                if !overHood.isEmpty, let over = overlaid(composed, from: made.cgImage(), where: source, in: overHood) { composed = over }
+                // From the body before the hood's cut: the cut takes the bottle and hand where they cross the head.
+                if !overHood.isEmpty, let over = overlaid(composed, from: uncut.texture.cgImage(), where: source, in: overHood) { composed = over }
                 made = SKTexture(cgImage: composed)
             }
         }
@@ -1190,13 +1601,14 @@ final class SpriteLibrary {
         let skin = look.dressing.skinTone
         let headKey = SpriteLibrary.hoodHeadKey(skin: skin, player: headPlayer, energy: energy, view: view)
         _ = hoodHead(skin: skin, player: headPlayer, energy: energy, view: view)
+        let style = SpriteLibrary.lineStyle(for: player)
         if let drawn = keptImages[headKey], let mask = keptImages[headKey + "_hood"] {
-            let lineKey = "hoodline_\(skin)_\(view)" + (energy ? "_energy" : "")
-            hood = (drawn, mask, keptImages[lineKey] ?? hoodLine(skin: skin, view: view, energy: energy)?.cgImage())
+            let lineKey = SpriteLibrary.hoodLineKey(skin: skin, view: view, energy: energy, style: style)
+            hood = (drawn, mask, keptImages[lineKey] ?? hoodLine(skin: skin, view: view, energy: energy, style: style)?.cgImage())
         }
         guard let made = makePortrait(name, frame: frame, look: look, source: sourceImage("\(name)_\(frame)"),
                                       drawnFor: sourceImage("\(headDrawnFor.animation.rawValue)_\(headDrawnFor.frame)"),
-                                      hood: hood, headNudge: headNudge, headScale: headScale, holdsBall: holdsBall) else { return nil }
+                                      hood: hood, headNudge: headNudge, headScale: headScale, holdsBall: holdsBall, lineStyle: style) else { return nil }
         keep(portrait: made, key: key)
         return made
     }
@@ -1216,20 +1628,21 @@ final class SpriteLibrary {
     /// so it can be made off the main thread.
     private func makePortrait(_ name: String, frame: Int, look: Look, source: CGImage, drawnFor drawnForSource: CGImage,
                               hood givenHood: (drawn: CGImage, hood: CGImage, line: CGImage?)?, headNudge: CGPoint, headScale: CGFloat,
-                              holdsBall: Bool) -> Portrait? {
+                              holdsBall: Bool, lineStyle: LineStyle = .normal) -> Portrait? {
         let sheetFrame = Animation(rawValue: name).map { AnimationFrame($0, frame) }
         let view = sheetFrame.map(HoodView.of) ?? 0
         let flipped = sheetFrame.map(HoodView.isFlipped) ?? false
         /// The hooded head as this frame wears it: its view, mirrored where it looks back.
         func wornHood(_ image: CGImage) -> CGImage { flipped ? SpriteLibrary.mirrored(image) ?? image : image }
-        let plain = recolour(image: source, look: look, holdsBall: holdsBall, detach: false)
-        let drawnFor = recolour(image: drawnForSource, look: look, holdsBall: false, detach: false)
+        let ballPixels = holdsBall ? sheetFrame.flatMap { SpriteLibrary.sheetBall($0, source: source) }?.pixels : nil
+        let plain = recolour(image: source, look: look, holdsBall: holdsBall, detach: false, ballPixels: ballPixels, lineStyle: lineStyle)
+        let drawnFor = recolour(image: drawnForSource, look: look, holdsBall: false, detach: false, lineStyle: lineStyle)
         var figure = plain
         if let givenHood, let here = plain.centres[.head], let there = drawnFor.centres[.head] {
             let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             let place = SpriteLibrary.hoodPlace(head: here, offset: offset, nudge: headNudge, scale: headScale)
-            figure = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
-                              hood: (wornHood(givenHood.drawn), place.origin, place.scale))
+            figure = recolour(image: source, look: look, holdsBall: holdsBall, detach: true, ballPixels: ballPixels,
+                              hood: (wornHood(givenHood.drawn), place.origin, place.scale), lineStyle: lineStyle)
         }
         guard var body = figure.images?.drawn else { return nil }
         // What play draws apart from the body, over it and under the hood: the blade, the gun,
@@ -1269,13 +1682,15 @@ final class SpriteLibrary {
         if let energy { glowContext.draw(energy, in: CGRect(x: 0, y: 0, width: width, height: height)) }
         guard let glowing = glowContext.makeImage() else { return nil }
         let hoodShape = SpriteLibrary.hoodShape(skin: look.dressing.skinTone, view: view, flipped: flipped, energy: look.energyForm)
-        let bare = givenHood != nil ? recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
-                                               hoodShape: hoodShape, bareLine: true).images?.bareOutline : nil
+        let bare = givenHood != nil ? recolour(image: source, look: look, holdsBall: holdsBall, detach: true, ballPixels: ballPixels,
+                                               hoodShape: hoodShape, hoodNudge: headNudge, bareLine: true, lineStyle: lineStyle).images?.bareOutline : nil
+        // The arms play lays over the hood on this frame; the front one where it lays none.
+        let armsOverHood = sheetFrame.map(GameScene.armPartsOverHood).flatMap { $0.isEmpty ? nil : $0 } ?? [.frontArm, .frontHand]
         return Portrait(image: body, glowing: glowing, hood: hood, hoodGlowing: hoodGlowing, hoodOffset: offset,
                         centres: figure.centres, tops: SpriteLibrary.partTops(source),
-                        line: figure.images?.outline, frontArm: SpriteLibrary.partsImage(drawn: body, source: source, parts: [.frontArm, .frontHand]),
-                        frontArmLine: SpriteLibrary.partsLine(source: source, parts: [.frontArm, .frontHand],
-                                                              hood: givenHood != nil ? hoodShape : nil),
+                        line: figure.images?.outline, frontArm: SpriteLibrary.partsImage(drawn: body, source: source, parts: armsOverHood, style: lineStyle),
+                        frontArmLine: SpriteLibrary.partsLine(source: source, parts: armsOverHood,
+                                                              hood: givenHood != nil ? hoodShape : nil, hoodNudge: headNudge, style: lineStyle),
                         bareLine: bare, hoodLine: givenHood?.line)
     }
 
@@ -1411,6 +1826,27 @@ final class SpriteLibrary {
         hoodShape(skin: skin, view: HoodView.of(frame), flipped: HoodView.isFlipped(frame), energy: energy)
     }
     /// An image turned round left to right about its middle.
+    /// An image turned anticlockwise by `degrees` about `point` (pixels, rows down), unsmoothed.
+    static func turned(_ image: CGImage, by degrees: CGFloat, about point: CGPoint) -> CGImage? {
+        guard let (context, _) = canvas(width: image.width, height: image.height) else { return nil }
+        context.interpolationQuality = .none
+        context.translateBy(x: point.x, y: CGFloat(image.height) - point.y)
+        context.rotate(by: degrees * .pi / 180)
+        context.translateBy(x: -point.x, y: -(CGFloat(image.height) - point.y))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()
+    }
+    /// An image with its pixels in `colours` cleared.
+    static func clearing(_ image: CGImage, _ colours: Set<RGB>) -> CGImage? {
+        guard let (context, pixels) = canvas(width: image.width, height: image.height) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        for pixel in 0..<(image.width * image.height) where pixels[pixel * 4 + 3] == 255 {
+            let index = pixel * 4
+            guard colours.contains(RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])) else { continue }
+            for channel in 0..<4 { pixels[index + channel] = 0 }
+        }
+        return context.makeImage()
+    }
     static func mirrored(_ image: CGImage) -> CGImage? {
         guard let (context, _) = canvas(width: image.width, height: image.height) else { return nil }
         context.translateBy(x: CGFloat(image.width), y: 0)
@@ -1626,8 +2062,8 @@ final class SpriteLibrary {
     /// drawn for by how far this frame's head is from that one's: the sheet's head is kept under
     /// it as its neck, in the skin's shadow tone, and the outside line runs round the body and
     /// the hood together, the hood's own pixels left clear for it to be drawn in.
-    private func recolour(image: CGImage, look: Look, holdsBall: Bool, detach: Bool, tucked: Bool = false,
-                          hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil,
+    private func recolour(image: CGImage, look: Look, holdsBall: Bool, detach: Bool, tucked: Bool = false, ballPixels: Set<Int>? = nil,
+                          hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil, hoodNudge: CGPoint = .zero,
                           bareLine: Bool = false, keepsProps: Bool = false, lineStyle: LineStyle = .normal) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?, outline: CGImage?, bareOutline: CGImage?, energy: CGImage?)?) {
         let texture = SKTexture(cgImage: image)
         let width = image.width, height = image.height
@@ -1647,7 +2083,7 @@ final class SpriteLibrary {
             let part = BodyPart.owning(colour)
             parts[pixel] = keepsProps && (part == .ball || part == .slash) ? nil : part
         }
-        markEnergy(&parts, holdsBall: holdsBall, minPixels: tucked ? 1 : SpriteLibrary.ballMinPixels, width: width, height: height)
+        markEnergy(&parts, holdsBall: holdsBall, ballPixels: ballPixels, minPixels: tucked ? 1 : SpriteLibrary.ballMinPixels, width: width, height: height)
         // Where the hood will be drawn over this canvas, if it's given or its shape is.
         var hood = given
         if hood == nil, let hoodShape, let there = SpriteLibrary.hoodDrawnForHead {
@@ -1658,10 +2094,11 @@ final class SpriteLibrary {
                 heads += 1
             }
             if heads > 0 {
-                hood = (hoodShape, CGPoint(x: (sum.x / CGFloat(heads) - there.x).rounded(), y: (sum.y / CGFloat(heads) - there.y).rounded()), 1)
+                hood = (hoodShape, CGPoint(x: (sum.x / CGFloat(heads) - there.x).rounded() + hoodNudge.x, y: (sum.y / CGFloat(heads) - there.y).rounded() - hoodNudge.y), 1)
             }
         }
         var hoodCover = [Bool](repeating: false, count: count)
+        var headTakenOut: [Int] = []
         if let hood, let (shapeContext, shapePixels) = makeCanvas(width: hood.shape.width, height: hood.shape.height) {
             shapeContext.draw(hood.shape, in: CGRect(x: 0, y: 0, width: hood.shape.width, height: hood.shape.height))
             for pixel in 0..<count {
@@ -1669,6 +2106,12 @@ final class SpriteLibrary {
                 let y = Int(((CGFloat(pixel / width) + 0.5 - hood.origin.y) / hood.scale).rounded(.down))
                 guard (0..<hood.shape.width).contains(x), (0..<hood.shape.height).contains(y) else { continue }
                 hoodCover[pixel] = shapePixels[(y * hood.shape.width + x) * 4 + 3] > 0
+            }
+            // The hooded head replaces the sheet's: any of the sheet's head showing past the hood is taken out.
+            for pixel in 0..<count where parts[pixel] == .head && !hoodCover[pixel] {
+                headTakenOut.append(pixel)
+                parts[pixel] = nil
+                for channel in 0..<4 { pixels[pixel * 4 + channel] = 0 }
             }
         }
 
@@ -1889,13 +2332,21 @@ final class SpriteLibrary {
             }
             for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
                 let index = pixel * 4
-                let skin = !look.energyForm ? parts[pixel].map { look.dressing.skin[$0] != nil } == true : bareSkin(parts[pixel])
-                maskPixels[index] = skin ? 0 : 255
-                maskPixels[index + 1] = 255
+                // Skin is green, never glowing; the neck under the hood red, shielded as the face over it is,
+                // so the hood's bloom lights neither and no edge shows between them.
+                let skin = bareSkin(parts[pixel])
+                let neck = skin && parts[pixel] == .head
+                maskPixels[index] = skin && !neck ? 0 : 255
+                maskPixels[index + 1] = neck ? 0 : 255
                 maskPixels[index + 2] = skin ? 0 : 255
                 maskPixels[index + 3] = 255
             }
-            glowMask = maskContext.makeImage().map { SKTexture(cgImage: $0) }
+            // Pixel-exact, as the body's drawn: smoothed, its edges blended skin into body and glowed.
+            glowMask = maskContext.makeImage().map { image in
+                let texture = SKTexture(cgImage: image)
+                texture.filteringMode = .nearest
+                return texture
+            }
         }
 
         // A human's skin alone in white, as it's drawn: for the
@@ -1915,6 +2366,15 @@ final class SpriteLibrary {
         }
 
         guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
+        // The head's middle as the sheet draws it, what was taken out still counted: the hood was placed by it.
+        if !headTakenOut.isEmpty, var head = sums[.head] {
+            for pixel in headTakenOut {
+                head.x += CGFloat(pixel % width) + 0.5
+                head.y += CGFloat(pixel / width) + 0.5
+                head.n += 1
+            }
+            sums[.head] = head
+        }
         let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
         return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline, glowingParts,
                 (recoloured, glowingImage, outlineImage, bareOutlineImage, energyImage))
@@ -1924,9 +2384,14 @@ final class SpriteLibrary {
     /// it's the biggest 8-connected blob of white in the frame and big enough to be one;
     /// every other white pixel becomes energy: the skid's puffs, a release's streaks, the
     /// slide's speed lines.
-    private func markEnergy(_ parts: inout [BodyPart?], holdsBall: Bool, minPixels: Int, width: Int, height: Int) {
+    /// `ballPixels`: the ball as `sheetBall` found it, taken as it is.
+    private func markEnergy(_ parts: inout [BodyPart?], holdsBall: Bool, ballPixels: Set<Int>?, minPixels: Int, width: Int, height: Int) {
         guard holdsBall else {
             for pixel in parts.indices where parts[pixel] == .ball { parts[pixel] = .energy }
+            return
+        }
+        if let ballPixels {
+            for pixel in parts.indices where parts[pixel] == .ball && !ballPixels.contains(pixel) { parts[pixel] = .energy }
             return
         }
         var label = [Int](repeating: 0, count: parts.count)
@@ -2175,9 +2640,12 @@ enum HoodView {
     static let count = 3
     static let frames: [Animation: [Int: Int]] = [
         .esperSlashFloState: [1: 1, 2: 2, 3: 2, 4: 1],
+        .snatchFloState: [0: 1, 2: 1, 3: 2, 4: 1, 5: 1],
         .spinBall: [0: 1, 1: 0, 2: 1, 3: 2], .spin: [0: 1, 1: 0, 2: 1, 3: 2],
         .pivot: [2: 1],
         .dunk: [0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1],
+        // The spin dunk's spin as the Spin Move's frames 1-3, then side on.
+        .spinDunk: [1: 1, 2: 2, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
         .beam: [3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
         // The blast's arms firing, side on; opening and at neutral, the plain view.
         .blast: [3: 1, 4: 1, 5: 1, 6: 1, 8: 1, 9: 1, 10: 1, 11: 1],
@@ -2187,7 +2655,7 @@ enum HoodView {
         .layup: [2: 1, 3: 1, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2],
         .esperSlash: [2: 1, 3: 1, 4: 1], .esperSlashAir: [2: 1, 3: 1, 4: 1],
         .shoot: [2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
-        .shootAir: [1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1],
+        .shootAir: [2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
         .throwForward: [4: 1, 5: 2, 6: 2, 7: 1], .throwAir: [4: 1, 5: 2, 6: 2, 7: 1],
     ]
     private static func every(_ view: Int, of animation: Animation) -> [Int: Int] {
@@ -2195,8 +2663,10 @@ enum HoodView {
     }
     static func of(_ frame: AnimationFrame) -> Int { frames[frame.animation]?[frame.frame] ?? 0 }
     /// The frames the hooded head is mirrored on, looking back the other way: FloState's snatch
-    /// over its step-through, the pivot as it turns.
-    static let flipped: [Animation: Set<Int>] = [.snatchFloState: [2], .pivot: [1], .spinBall: [1, 2], .spin: [1, 2]]
+    /// over its step-through, the pivot as it turns, the wall cling looking away from the wall.
+    static let flipped: [Animation: Set<Int>] = [.snatchFloState: [1, 2], .pivot: [1], .spinBall: [1, 2], .spin: [1, 2], .spinDunk: [0, 1],
+                                                 .wallLand: Set(0..<Animation.wallLand.frameCount), .wallLandBall: Set(0..<Animation.wallLandBall.frameCount),
+                                                 .webshootWall: Set(0..<Animation.webshootWall.frameCount)]
     static func isFlipped(_ frame: AnimationFrame) -> Bool { flipped[frame.animation]?.contains(frame.frame) ?? false }
 }
 

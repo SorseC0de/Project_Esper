@@ -76,6 +76,11 @@ public enum GameMode: UInt8, CaseIterable {
     case rounds, fortySeven
     /// HORSE on a grid, turn by turn: `ZonesGame`.
     case zones
+    /// A barrier round each rim, the rim floating with the one defending it; one basket wins (`BreakerRules`).
+    case breakerBall
+
+    /// The drink picked on the customize screen before play, dormant till FloState.
+    public var picksDrinkAhead: Bool { self == .fortySeven || self == .breakerBall }
 }
 
 /// 47's numbers. A basket from outside the three-point line, a circle round the rim out

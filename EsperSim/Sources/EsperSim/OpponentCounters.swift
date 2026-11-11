@@ -324,7 +324,7 @@ extension Opponent {
         }
         let rim = hoop(scoredOnBy: human.index, in: match).position
         // Riding a belt, or just off its end and falling into the rim.
-        let riding = ball.velocity.y == 0 ? match.stage.conveyors.first(where: onBelt) : nil
+        let riding = ball.velocity.y == 0 ? match.stage.conveyors.first(where: { $0.running && onBelt($0) }) : nil
         let falling = beltPick != nil && ball.velocity.y < 0 && ball.position.y > rim.y - 10 && abs(ball.position.x - rim.x) < 30
         guard ball.isLive, ball.holder == nil, !me.holding, ball.lastTouched != index, riding != nil || falling else {
             beltPick = nil

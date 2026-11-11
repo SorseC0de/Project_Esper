@@ -69,6 +69,8 @@ final class SoundBoard {
         case nabbed = "announcer_nabbed", nabbed2 = "announcer_nabbed2", nabbed3 = "announcer_nabbed3"
         case knicked = "announcer_knicked", knicked2 = "announcer_knicked2", knicked3 = "announcer_knicked3"
         case whatWillYouDo = "announcer_whatwillyoudo", whatWillTheyDo = "announcer_whatwilltheydo", toughChoice = "announcer_atoughchoice"
+        /// Breaker Ball's barrier shattered: the line's still to be recorded, silent till its file is imported.
+        case shattered = "announcer_shattered"
         case crowdCheer = "crowd_cheer"
         case crowdGasp = "crowd_gasp"
     }
@@ -298,6 +300,7 @@ final class SoundBoard {
         voice.volume = volume
         voice.pan = pan
         voice.scheduleBuffer(buffer, at: nil, options: interrupting ? .interrupts : [])
+        FootageRun.active?.logSound(effect.rawValue, volume: volume, pan: pan)
     }
 
     /// A sound played round and round on `key`'s loop voice until `endLoop`; asked again while it
@@ -313,6 +316,7 @@ final class SoundBoard {
         guard looping[key] != effect, voice.isPlaying else { return }
         looping[key] = effect
         voice.scheduleBuffer(buffer, at: nil, options: [.loops, .interrupts])
+        FootageRun.active?.logLoop(effect.rawValue, key: key, volume: volume, on: true)
     }
 
     /// `key`'s loop cut off: a moment's silence scheduled to interrupt it, never a stop, which
@@ -321,6 +325,7 @@ final class SoundBoard {
         guard looping[key] != nil, loopVoices.indices.contains(key), engine.isRunning,
               let silence = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1) else { return }
         looping[key] = nil
+        FootageRun.active?.logLoop("", key: key, volume: 0, on: false)
         silence.frameLength = 1
         if let samples = silence.floatChannelData?[0] { samples[0] = 0 }
         loopVoices[key].scheduleBuffer(silence, at: nil, options: .interrupts)

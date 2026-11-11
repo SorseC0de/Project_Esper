@@ -12,12 +12,11 @@ enum WreckCenterArt {
     static let origin = CGPoint(x: -16, y: -16)
     /// Past the art: its background's colour.
     static let beyond: RGB = 0x2A2F4E
-    /// The possession pixels unheld: the tiles' palette 59, the back wall's palette 60. Held, the
-    /// energy set's colour and its third tone (the back limbs'); a glow outside the sets, the back wall at 60's share of 59.
+    /// The possession pixels unheld: the tiles' palette 59, held the energy set's colour. The back
+    /// wall's, palette 60, stay their grey.
     static let tilesNeutral: RGB = 0x5D5D5D
     static let backNeutral: RGB = 0x3D3D3D
-    static let backShare: CGFloat = CGFloat(0x3D) / CGFloat(0x5D)
-    /// Possession colours that read too bright on the floor's stripe and the back wall, taken down
+    /// Possession colours that read too bright on the floor's stripe, taken down
     /// to this share of their brightness.
     static let possessionShare: [EnergyColour: Double] = [.pink: 0.8]
     /// 47's three-point lines drawn on the back wall: over its possession pixels, under the tiles.
@@ -115,6 +114,12 @@ enum WreckCenterArt {
         fileprivate var displayColour = SKColor.white
         /// Whether the court's held: neutral, the possession pixels stay out of the glow.
         fileprivate(set) var held = false
+        /// The Tutorial's second copy of its map (its tiles and extras, and its tiles' possession
+        /// pixels), its doors and its floor's belt, each piece with its frames.
+        var copies: [SKSpriteNode] = []
+        var tilesLitCopy: SKSpriteNode?
+        var doors: [SKSpriteNode] = []
+        var belt: [(node: SKSpriteNode, frames: [SKTexture])] = []
 
         init(flats: [SKSpriteNode], backLit: SKSpriteNode, backLitDarkened: SKSpriteNode?, tilesLit: SKSpriteNode, parent: SKNode) {
             self.flats = flats
@@ -128,13 +133,15 @@ enum WreckCenterArt {
         var pieceFlats: [BodySnapshot] {
             pieces.compactMap { piece in
                 piece.base.texture.map { BodySnapshot(texture: $0, position: piece.base.position, anchor: .zero, xScale: piece.base.xScale, size: WreckCenterArt.size(piece.kind)) }
+            } + (copies + doors + belt.map(\.node)).compactMap { node in
+                node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: .zero, xScale: node.xScale, size: node.size) }
             }
         }
 
         /// What glows through the flats under it: the possession pixels, while the court's held.
         var glowing: [BodySnapshot] {
             guard held else { return [] }
-            return [backLit, backLitDarkened, tilesLit].compactMap { $0 }.compactMap { node in
+            return [tilesLit, tilesLitCopy].compactMap { $0 }.filter { !$0.isHidden }.compactMap { node in
                 node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: .zero, xScale: 1, size: node.size) }
             }
         }
@@ -277,6 +284,12 @@ enum WreckCenterArt {
     /// platform on its first frame, or where its turn in the sim has it.
     static func animate(_ handles: Handles, at time: TimeInterval, match: Match) {
         let tick = Int(time * piecesPerSecond)
+        // The Tutorial's belt, running, as fast as it carries (its art moves the Wreck Center belt's
+        // 2 pixels a frame, so its frames come that many times as often); still, on its first.
+        if let belt = match.stage.conveyors.first, !handles.belt.isEmpty {
+            let beltTick = belt.running ? Int(time * piecesPerSecond * belt.speed / WreckCenterRules.beltSpeed) : 0
+            for piece in handles.belt where !piece.frames.isEmpty { piece.node.texture = piece.frames[beltTick % piece.frames.count] }
+        }
         for piece in handles.pieces {
             let frames = piece.frames, cell = piece.cell
             guard !frames.isEmpty else { continue }
@@ -291,39 +304,117 @@ enum WreckCenterArt {
         }
     }
 
-    /// `bare`: the Test Center's, the tiles alone, no back wall, its possession pixels or the extras.
-    static func build(into parent: SKNode, bare: Bool = false) -> Handles? {
-        guard UIImage(named: "WreckCenterBack") != nil else { return nil }
+    /// `map`: the pictures' names' start, "WreckCenter", or "Tutorial" for the Tutorial's map
+    /// (no back wall, so none of its possession pixels: those nodes left empty and hidden).
+    static func build(into parent: SKNode, map: String = "WreckCenter") -> Handles? {
+        guard UIImage(named: "\(map)Back") != nil else { return nil }
         func picture(_ name: String, z: CGFloat) -> SKSpriteNode {
-            let texture = SKTexture(imageNamed: name)
-            texture.filteringMode = .nearest
-            let node = SKSpriteNode(texture: texture)
+            let node = SKSpriteNode()
+            if UIImage(named: name) != nil {
+                let texture = SKTexture(imageNamed: name)
+                texture.filteringMode = .nearest
+                node.texture = texture
+                node.size = texture.size()
+            } else {
+                node.isHidden = true
+            }
             node.anchorPoint = .zero
             node.position = origin
             node.zPosition = z
             parent.addChild(node)
             return node
         }
-        let back = picture("WreckCenterBack", z: -8.0)
-        let backLit = picture("WreckCenterBackLit", z: -7.9)
+        let back = picture("\(map)Back", z: -8.0)
+        let backLit = picture("\(map)BackLit", z: -7.9)
         backLit.colorBlendFactor = 1
-        let backLitDarkened = UIImage(named: "WreckCenterBackLitDarkened") == nil ? nil : picture("WreckCenterBackLitDarkened", z: -7.9)
+        let backLitDarkened = UIImage(named: "\(map)BackLitDarkened") == nil ? nil : picture("\(map)BackLitDarkened", z: -7.9)
         backLitDarkened?.colorBlendFactor = 1
-        let tiles = picture("WreckCenterTiles", z: -7.8)
-        let tilesLit = picture("WreckCenterTilesLit", z: -7.7)
+        let tiles = picture("\(map)Tiles", z: -7.8)
+        let tilesLit = picture("\(map)TilesLit", z: -7.7)
         tilesLit.colorBlendFactor = 1
-        let extras = picture("WreckCenterExtras", z: -7.6)
-        if bare { [back, backLit, extras].forEach { $0.isHidden = true }; backLitDarkened?.isHidden = true }
+        let extras = picture("\(map)Extras", z: -7.6)
         _ = (sources, wash)
         return Handles(flats: [back, tiles, extras], backLit: backLit, backLitDarkened: backLitDarkened, tilesLit: tilesLit, parent: parent)
     }
 
-    /// The possession pixels in the court's colours: the tiles' and the back wall's each their
-    /// own; the displays' at the tiles' at full brightness, so the neutral grey leaves them as drawn.
-    static func tint(_ handles: Handles, _ colour: SKColor, back: SKColor) {
+    /// The Tutorial: its map again to the right of the first (`copyShift` along), so the way on reads
+    /// as one hall; its doors (`TutorialDoor`, 16 frames of 32 by 64 down the strip), all facing
+    /// left, in the openings at each end of the floor, the copies' shared one between them; and its
+    /// belt the floor's whole length under both, the Wreck Center's conveyor pieces end to end (L,
+    /// the Ms, R), their tops the floor's. Doors and belt in play, over the wash; the doors shut and
+    /// the belt still, on their first frames.
+    static let doorFrames: [SKTexture] = {
+        let sheet = SKTexture(imageNamed: "TutorialDoor")
+        sheet.filteringMode = .nearest
+        let count = max(Int(sheet.size().height / 64), 1)
+        return (0..<count).map { row in
+            let cell = SKTexture(rect: CGRect(x: 0, y: CGFloat(count - 1 - row) / CGFloat(count), width: 1, height: 1 / CGFloat(count)), in: sheet)
+            cell.filteringMode = .nearest
+            return cell
+        }
+    }()
+    static let doorSize = CGSize(width: 32, height: 64)
+    /// The door's frames: shut on the first, open on `doorOpenFrame` (0-based), shut again by the last.
+    static let doorOpenFrame = 11
+    /// The second copy's shift: one court along, so its left wall is the first's right.
+    static let copyShift: CGFloat = 544
+    /// The doors' bottom lefts, stage art pixels, on the floor: in the first copy's left opening,
+    /// between the copies, and in the second's right.
+    static let doorOrigins: [CGPoint] = [CGPoint(x: -16, y: 16), CGPoint(x: 528, y: 16), CGPoint(x: 528 + copyShift, y: 16)]
+    /// The belt's columns, a piece every two, from one before the first copy's left wall to one past the second's right.
+    static let beltColumns = stride(from: -1, through: 67, by: 2)
+
+    static func layTutorial(_ handles: Handles) {
+        // The map again, one court on: its tiles, their possession pixels and its extras.
+        for (flat, z) in [(handles.flats[1], CGFloat(-7.8)), (handles.flats[2], CGFloat(-7.6))] {
+            let copy = SKSpriteNode(texture: flat.texture)
+            copy.anchorPoint = .zero
+            copy.size = flat.size
+            copy.position = CGPoint(x: flat.position.x + copyShift, y: flat.position.y)
+            copy.zPosition = z
+            copy.isHidden = flat.isHidden
+            handles.parent.addChild(copy)
+            handles.copies.append(copy)
+        }
+        let lit = SKSpriteNode(texture: handles.tilesLit.texture)
+        lit.anchorPoint = .zero
+        lit.size = handles.tilesLit.size
+        lit.position = CGPoint(x: handles.tilesLit.position.x + copyShift, y: handles.tilesLit.position.y)
+        lit.zPosition = handles.tilesLit.zPosition
+        lit.colorBlendFactor = 1
+        handles.parent.addChild(lit)
+        handles.tilesLitCopy = lit
+        for origin in doorOrigins {
+            let door = SKSpriteNode(texture: doorFrames.first)
+            door.anchorPoint = .zero
+            door.size = doorSize
+            door.position = origin
+            door.zPosition = inPlayZ
+            handles.parent.addChild(door)
+            handles.doors.append(door)
+        }
+        let columns = Array(beltColumns)
+        for (index, column) in columns.enumerated() {
+            let kind: StageMap.PropKind = index == 0 ? .conveyorL : index == columns.count - 1 ? .conveyorR : .conveyorM
+            guard let frames = frames[kind] else { continue }
+            let piece = SKSpriteNode(texture: frames.first)
+            piece.anchorPoint = .zero
+            piece.size = size(kind)
+            piece.position = CGPoint(x: CGFloat(column) * 16, y: 16 - piece.size.height)
+            piece.zPosition = inPlayZ
+            handles.parent.addChild(piece)
+            handles.belt.append((piece, frames))
+        }
+    }
+
+    /// The tiles' possession pixels in the court's colour, the back wall's in their grey; the
+    /// displays' at the tiles' at full brightness, so the neutral grey leaves them as drawn.
+    static func tint(_ handles: Handles, _ colour: SKColor) {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         colour.getRed(&r, green: &g, blue: &b, alpha: &a)
         handles.tilesLit.color = colour
+        handles.tilesLitCopy?.color = colour
+        let back = SKColor(rgb: backNeutral)
         handles.backLit.color = back
         var backRed: CGFloat = 0, backGreen: CGFloat = 0, backBlue: CGFloat = 0
         back.getRed(&backRed, green: &backGreen, blue: &backBlue, alpha: &a)

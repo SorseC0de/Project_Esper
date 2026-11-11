@@ -24,9 +24,9 @@ enum PowerLevelVariant: Int, CaseIterable {
 
 /// The powers on the picker. A is none.
 enum PowerVariant: Int, CaseIterable {
-    case none, webWater, superSmoothie, flashFizz, platformShake, voltaCola, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea
+    case none, webWater, superSmoothie, flashFizz, platformShake, voltaCola, frostTea, blazingBoba, pulsepistol, surfSoda, titanTea, galeAle, zTea, phantomFrappe
 
-    var label: String { ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M"][rawValue] }
+    var label: String { ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N"][rawValue] }
 
     var power: Power {
         switch self {
@@ -43,6 +43,7 @@ enum PowerVariant: Int, CaseIterable {
         case .titanTea: .titanTea
         case .galeAle: .galeAle
         case .zTea: .zTea
+        case .phantomFrappe: .phantomFrappe
         }
     }
 }
@@ -50,7 +51,7 @@ enum PowerVariant: Int, CaseIterable {
 /// How each frame of the dunk sequence is drawn: nudged from the body's place on the rim
 /// by this many art pixels, across (mirrored for the other rim) and up. Found on the
 /// sliders with `DunkTuning` on, as the user placed them: the throw stance, then the
-/// six sheet frames.
+/// sheet's frames.
 enum DunkArt {
     /// Per stage, since each stage's hoop art is its own: Wreck Center's for the straight-on
     /// hoop (starting from Stadium's, to be tuned), and Longball Stadium's.
@@ -62,9 +63,39 @@ enum DunkArt {
         CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -2, y: 16), CGPoint(x: 2, y: 1),
         CGPoint(x: -3, y: 3), CGPoint(x: -1, y: -1), CGPoint(x: -1, y: -1),
     ]
-    static func offsets(for look: StageLook) -> [CGPoint] { look.tiltedHoop ? stadiumOffsets : courtOffsets }
-    static func set(_ offset: CGPoint, frame: Int, for look: StageLook) {
-        if look.tiltedHoop { stadiumOffsets[frame] = offset } else { courtOffsets[frame] = offset }
+    /// The spin dunk's (`Animation.dunkSpins`): the court's as the user placed them on Wreck Center;
+    /// the stadium's still seeded from the plain dunk's matching poses.
+    nonisolated(unsafe) static var spinCourtOffsets: [CGPoint] = [
+        CGPoint(x: 0, y: 0), CGPoint(x: -6, y: 8), CGPoint(x: -6, y: 12), CGPoint(x: -6, y: 14), CGPoint(x: -2, y: 12),
+        CGPoint(x: -2, y: 12), CGPoint(x: -2, y: 10), CGPoint(x: 0, y: 6), CGPoint(x: -2, y: 0), CGPoint(x: -3, y: 0),
+        CGPoint(x: -3, y: 0),
+    ]
+    nonisolated(unsafe) static var spinStadiumOffsets: [CGPoint] = [
+        CGPoint(x: -6, y: 10), CGPoint(x: -4, y: 12), CGPoint(x: -4, y: 12), CGPoint(x: -4, y: 12), CGPoint(x: -4, y: 12),
+        CGPoint(x: -4, y: 12), CGPoint(x: -3, y: 14), CGPoint(x: -2, y: 16), CGPoint(x: -3, y: 3), CGPoint(x: -3, y: 3),
+        CGPoint(x: -1, y: -1),
+    ]
+    /// The Tutorial hub's front-facing hoops' (`Hoop.frontFacing`): the court's to the slam, then its own.
+    nonisolated(unsafe) static var spinFrontOffsets: [CGPoint] = [
+        CGPoint(x: 0, y: 0), CGPoint(x: -6, y: 8), CGPoint(x: -6, y: 12), CGPoint(x: -6, y: 14), CGPoint(x: -2, y: 12),
+        CGPoint(x: -2, y: 12), CGPoint(x: -2, y: 10), CGPoint(x: 0, y: 6), CGPoint(x: -2, y: 1), CGPoint(x: -1, y: 2),
+        CGPoint(x: -1, y: 2),
+    ]
+    nonisolated(unsafe) static var frontOffsets: [CGPoint] = courtOffsets
+    static func offsets(for look: StageLook, frontFacing: Bool) -> [CGPoint] {
+        if frontFacing { return Animation.dunkSpins ? spinFrontOffsets : frontOffsets }
+        if Animation.dunkSpins { return look.tiltedHoop ? spinStadiumOffsets : spinCourtOffsets }
+        return look.tiltedHoop ? stadiumOffsets : courtOffsets
+    }
+    static func set(_ offset: CGPoint, frame: Int, for look: StageLook, frontFacing: Bool) {
+        switch (Animation.dunkSpins, frontFacing, look.tiltedHoop) {
+        case (true, true, _): spinFrontOffsets[frame] = offset
+        case (false, true, _): frontOffsets[frame] = offset
+        case (true, false, true): spinStadiumOffsets[frame] = offset
+        case (true, false, false): spinCourtOffsets[frame] = offset
+        case (false, false, true): stadiumOffsets[frame] = offset
+        case (false, false, false): courtOffsets[frame] = offset
+        }
     }
 }
 
@@ -150,8 +181,42 @@ enum HelmetTuning {
 /// the local player sends it sliding to the next zone.
 /// The chevrons over the basket the ball's holder scores on: the top one this many art
 /// pixels over the rim, on the BASKET CHEVRON Y debug slider with `slider`.
+/// A score's orb and its bolt's foot, art pixels up off the rim (STRIKE Y, parked).
+enum StrikeTuning {
+    nonisolated(unsafe) static var lift: CGFloat = 16
+}
+
+/// FloState's run with the ball, whose sheet draws none: the ball rides a ring round the body,
+/// seen edge on as a line slanted `tiltDegrees`, its front end down; slid along it and scaled up
+/// passing in front, down passing behind. Art pixels from the feet, facing right.
+enum BallRing {
+    nonisolated(unsafe) static var tiltDegrees: CGFloat = 15
+    nonisolated(unsafe) static var radiusPixels: CGFloat = 20
+    nonisolated(unsafe) static var centreHeightPixels: CGFloat = 16
+    /// Scale added at the front of the ring, taken away at the back.
+    nonisolated(unsafe) static var depthScale: CGFloat = 0.25
+    nonisolated(unsafe) static var orbitsPerRunCycle: CGFloat = 0.5
+
+    static func place(runPhase: Double) -> (offset: CGPoint, scale: CGFloat, inFront: Bool) {
+        let runCycle = CGFloat(EsperSim.Animation.runBallFloState.frameCount)
+        let angle = CGFloat(runPhase) / runCycle * orbitsPerRunCycle * 2 * .pi
+        let tilt = tiltDegrees * .pi / 180
+        let along = radiusPixels * cos(angle)
+        let depth = sin(angle)
+        let offset = CGPoint(x: (along * cos(tilt)).rounded(), y: (centreHeightPixels - along * sin(tilt)).rounded())
+        return (offset, 1 + depthScale * depth, depth > 0)
+    }
+}
+
 enum ChevronTuning {
     nonisolated(unsafe) static var basketLift: CGFloat = 18
+    /// Longball's tilted hoops' own, HOOP CHEVRON X and Y: up from the rim, and across it toward its
+    /// backboard, in art pixels.
+    nonisolated(unsafe) static var stadiumLift: CGFloat = 14
+    nonisolated(unsafe) static var stadiumAcross: CGFloat = -6
+    static func offset(for look: StageLook) -> CGPoint {
+        look.tiltedHoop ? CGPoint(x: stadiumAcross, y: stadiumLift) : CGPoint(x: 0, y: basketLift)
+    }
     static let slider = false
 }
 
@@ -252,6 +317,32 @@ enum HoopTuning {
     }
 }
 
+/// Platform Protein Shake's blocks: their depth, slanted up and back this far a pixel of it, in
+/// the scene's pixels; their energy's strength; the cubes they give off, and break into.
+enum PlatformLook {
+    static let depth: Float = 8
+    static let slant = SIMD2<Float>(0.5, 0.5)
+    static let alpha: Float = 0.66
+    static let cubesPerSecond = 8.0
+    static let shatterCubesPerArea: CGFloat = 1.0 / 20
+    static let shatterCubes = 12...48
+    static let shatterRise: ClosedRange<CGFloat> = 20...40
+    static let shatterLife: ClosedRange<Double> = 0.6...0.9
+}
+
+/// Phantom Frappe's form: half seen, a third of the way to the energy; its glitch's rows this many
+/// pixels high, this share of them jumping up to this many pixels sideways, this many times a second;
+/// its head's cubes off the body at this share of the head's rate.
+enum PhantomLook {
+    static let alpha: CGFloat = 0.5
+    static let tint = 0.33
+    static let glitchRowHeight = 2.0
+    static let glitchRowShare = 0.15
+    static let glitchShift: CGFloat = 3
+    static let glitchRate = 12.0
+    static let cubeRateScale = 0.25
+}
+
 enum BackboardTuning {
     static let x: CGFloat = 10
     static let y: CGFloat = 24
@@ -261,23 +352,9 @@ enum BackboardTuning {
     static let columns = 3
     static let rows = 4
     static let spacing: CGFloat = 9
-}
-
-/// The goalposts: the crossbar's height below the rim and the uprights' length above it,
-/// in art pixels, and the crossbar's tilt in degrees, on the CROSSBAR ANGLE slider until
-/// it's settled; the far end rises, and its upright with it.
-enum GoalpostTuning {
-    static let crossbarBelowRim: CGFloat = 20
-    static let prongHeight: CGFloat = 100
-    nonisolated(unsafe) static var crossbarAngle: CGFloat = 25
-    /// The stands, sky, rails and floodlights above the turf covered in flat black, so tuning
-    /// sliders read over it; off, they show.
-    static let sceneryHidden = false
-    /// The gold's width, and the black line round it and round the light panels.
-    static let thickness: CGFloat = 8
-    static let outline: CGFloat = 1
-    /// The height, in units, the goalposts are drawn for, apart from the rims.
-    static let postRimHeight = 120.0
+    /// The fence's sparks past its middle three columns, at this share; a hit's spark fading out over this.
+    static let outerScale: CGFloat = 0.75
+    static let hitFade: TimeInterval = 1.5
 }
 
 /// Tuning the dunk's frames: with this on, the match doesn't run; player 1 is held on the
@@ -358,19 +435,23 @@ enum FloTuning {
 
 enum DunkTuning {
     /// On to place dunk art: the game holds a body hung on the right rim, with sliders. The debug
-    /// bench's DUNK MODE: player 1 held there as Titan Tea, frame by frame on DUNK FRAME.
+    /// bench's DUNK MODE: player 1 held there at plain size, frame by frame on DUNK FRAME.
     nonisolated(unsafe) static var enabled = false
     /// The stage the tuning starts on, since the held match can't reach the stage select.
-    static let stage = StageChoice.wreckCenter
+    static var stage: StageChoice { frontFacing ? .tutorial : .wreckCenter }
+    /// Hung on a Tutorial hub hoop, the front-facing kind, instead of a side rim.
+    static let frontFacing = true
     nonisolated(unsafe) static var frame = 0
+    /// Held as Titan Tea instead of plain.
+    static let titan = false
 }
 
 /// The glow, as GameMaker's Glow filter had it: what counts as bright, how soft the cut is,
 /// how far it spreads, how strong it comes back, and its colour.
 /// Debug strip sliders put away once tuned; their values stay as baked.
 enum ParkedSliders {
-    /// Only these sliders on the debug bench for now: FloState's strings' and the shot arc's.
-    static let showing = ["STRING", "DIAMOND", "ARC HEIGHT", "ARC DISTANCE", "AIM RANGE", "DUNK FRAME", "HEX SHIELD"]
+    /// Only these sliders on the debug bench for now: the hub's spacing, Breaker's, Web Water's swing gap and FloState's ball ring's height and depth scale.
+    static var showing: [String] { ["HUB", "BREAKER", "WEB", "RING HEIGHT", "RING DEPTH"] + (DunkTuning.enabled ? ["DUNK"] : []) }
     static func shown(_ title: String) -> Bool { showing.contains { title.hasPrefix($0) } }
     static let net = true
     static let flo = true
@@ -392,18 +473,28 @@ enum GlowSettings {
             for colour in [EnergyColour.teal, .lime] { UserDefaults.standard.removeObject(forKey: energyGainKey(colour)) }
             UserDefaults.standard.set(true, forKey: resetKey)
         }
-        return Dictionary(uniqueKeysWithValues: EnergyColour.wheel.map { colour in
+        return Dictionary(uniqueKeysWithValues: EnergyColour.hued.map { colour in
             (colour, (UserDefaults.standard.object(forKey: energyGainKey(colour)) as? Double).map(Float.init) ?? energyGainDefaults[colour] ?? 1)
         })
     }()
-    /// The nine for the glow pass, in the wheel's order: each colour over its brightest channel,
-    /// its gain in w.
+    /// The nine hued colours for the glow pass: each colour over its brightest channel, its gain in w.
     static var energyUniforms: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) {
-        let packed = EnergyColour.wheel.map { colour -> SIMD4<Float> in
+        let packed = EnergyColour.hued.map { colour -> SIMD4<Float> in
             let rgb = SIMD3<Float>(Float((colour.glow >> 16) & 0xFF), Float((colour.glow >> 8) & 0xFF), Float(colour.glow & 0xFF)) / 255
             return SIMD4(rgb / max(rgb.max(), 0.001), energyGains[colour] ?? 1)
         }
         return (packed[0], packed[1], packed[2], packed[3], packed[4], packed[5], packed[6], packed[7], packed[8])
+    }
+    /// Every colour's hood tones for the composite, Diamond's too, the light and the shadow in the same order.
+    static var hoodLightUniforms: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) {
+        ten(EnergyColour.allCases.map(\.glow))
+    }
+    static var hoodShadowUniforms: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) {
+        ten(EnergyColour.allCases.map(\.hoodShadow))
+    }
+    private static func ten(_ colours: [RGB]) -> (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) {
+        let packed = colours.map { SIMD4<Float>(Float(($0 >> 16) & 0xFF) / 255, Float(($0 >> 8) & 0xFF) / 255, Float($0 & 0xFF) / 255, 1) }
+        return (packed[0], packed[1], packed[2], packed[3], packed[4], packed[5], packed[6], packed[7], packed[8], packed[9])
     }
     /// Luminance above which a pixel glows, and the higher bar the bodies have to clear.
     static let threshold: Float = 0.2

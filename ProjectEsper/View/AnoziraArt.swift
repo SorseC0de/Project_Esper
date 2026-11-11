@@ -19,6 +19,13 @@ enum AnoziraArt {
         var carWheels: SKSpriteNode?
         var carBody: SKSpriteNode?
         var carTint: SKSpriteNode?
+        /// Breaker Ball's second car, in the hoop truck's place, and its hubs; each car's glow eased on
+        /// while its own player holds the ball.
+        var secondCarWheels: SKSpriteNode?
+        var secondCarBody: SKSpriteNode?
+        var secondCarTint: SKSpriteNode?
+        var secondCarHubs: [SKSpriteNode] = []
+        var carTintShares: [CGFloat] = [0, 0]
         var truckBar: SKSpriteNode?
         var truckWheels: SKSpriteNode?
         var truckBody: SKSpriteNode?
@@ -58,11 +65,13 @@ enum AnoziraArt {
         var tintColours = Colours(car: .white, light: .white, dark: .white)
         /// The nodes drawn as painted, which mustn't glow, and the tinted ones, which do.
         var flats: [SKSpriteNode] {
-            ([carWheels, carBody, truckBar, truckWheels, truckBody, flag] + sliding.flatMap(\.copies)).compactMap { $0 } + carHubs + truckHubs + traffic
+            ([carWheels, carBody, truckBar, truckWheels, truckBody, flag, secondCarWheels, secondCarBody] + sliding.flatMap(\.copies)).compactMap { $0 }
+                .filter { !$0.isHidden } + carHubs + (truckHubs + secondCarHubs).filter { !$0.isHidden } + traffic
                 + potholes.filter { !$0.isHidden } + billboards + [plane].compactMap { $0 }.filter { !$0.isHidden }
         }
         var glowing: [SKSpriteNode] {
-            (tintShare > 0 ? [carTint].compactMap { $0 } + truckLights : []) + phoenix.filter { !$0.isHidden } + phoenixSparkles.map(\.node)
+            (tintShare > 0 ? [carTint].compactMap { $0 } + truckLights.filter { !$0.isHidden } : []) + phoenix.filter { !$0.isHidden } + phoenixSparkles.map(\.node)
+                + [secondCarTint].compactMap { $0 }.filter { !$0.isHidden && $0.alpha > 0 }
         }
     }
 
@@ -251,6 +260,28 @@ enum AnoziraArt {
         node.yScale = scale
     }
 
+    /// Breaker Ball's cars, each painted in its player's ramp, dark to light, in place of its greys.
+    static func paintCars(_ handles: Handles, ramps: [[RGB]]) {
+        guard let body = SKTexture(imageNamed: "AnoziraCarBody").cgImage() as CGImage? else { return }
+        for (node, ramp) in zip([handles.carBody, handles.secondCarBody], ramps) {
+            var swaps: [RGB: RGB] = [:]
+            for (grey, colour) in zip(carGreys, ramp) { swaps[grey] = colour }
+            guard let painted = recoloured(body, swaps: swaps) else { continue }
+            let texture = SKTexture(cgImage: painted)
+            texture.filteringMode = .nearest
+            node?.texture = texture
+        }
+    }
+
+    /// On Breaker Ball's second car, where it is.
+    static func standsOnSecondCar(_ player: Player, match: Match) -> Bool {
+        let car = CarRules.collision(at: match.anoziraSecondCar, facesRight: true)
+        let body = player.body, middle = (body.min.x + body.max.x) / 2
+        return player.grounded
+            && (car.tops.contains { body.min.x < $0.max.x && body.max.x > $0.min.x && abs($0.max.y - body.min.y) < 0.01 }
+                || car.slopes.contains { $0.box.min.x <= middle && middle <= $0.box.max.x && abs($0.surface(at: middle) - body.min.y) < 0.01 })
+    }
+
     /// Whether anyone stands on the car, which dips it.
     static func carRidden(_ match: Match) -> Bool { match.players.contains(where: { standsOnCar($0, match: match) }) }
     /// On the car's tops or slopes, where it is.
@@ -319,7 +350,14 @@ enum AnoziraArt {
             lights.colorBlendFactor = 1
             return lights
         }
+        handles.secondCarWheels = picture("AnoziraCarWheels", z: carZ)
+        handles.secondCarBody = picture("AnoziraCarBody", z: carZ + 0.01)
+        let secondTint = picture("AnoziraCarTint", z: carZ + 0.02 - 21, into: glowers)
+        secondTint.colorBlendFactor = 1
+        secondTint.alpha = 0
+        handles.secondCarTint = secondTint
         handles.carHubs = WheelHub.nodes(carHubMiddles.count, z: carZ + 0.005, into: parent)
+        handles.secondCarHubs = WheelHub.nodes(carHubMiddles.count, z: carZ + 0.005, into: parent)
         handles.truckHubs = WheelHub.nodes(truckHubMiddles.count, z: truckZ - 0.005, into: parent)
         handles.trafficPictures = trafficPictures()
         handles.billboardPictures = billboardPictures()
@@ -514,7 +552,7 @@ enum AnoziraArt {
 
     /// A frame on: the layers slid, the car and the truck where the match has them, idling, and the
     /// holder's colour eased on or off.
-    static func animate(_ handles: Handles, match: Match, holderColours: Colours?, at time: CFTimeInterval) {
+    static func animate(_ handles: Handles, match: Match, holderColours: Colours?, breakerBrights: [SKColor] = [], at time: CFTimeInterval) {
         driveTraffic(handles, into: handles.background?.parent, at: time, rain: match.rain)
         flyPlane(handles, at: time)
         for layer in handles.sliding {
@@ -555,6 +593,40 @@ enum AnoziraArt {
         for (hub, middle) in zip(handles.carHubs, carHubMiddles) {
             lay(hub, at: carJumped, width: 128, scale: carSize, offset: middle)
             hub.zRotation = turn
+        }
+        // Breaker Ball: no truck, a second car in its place, each car glowing in its own player's bright
+        // while they hold the ball.
+        let breaker = match.mode == .breakerBall
+        for node in [handles.truckBar, handles.truckWheels, handles.truckBody, handles.flag].compactMap({ $0 }) + handles.truckLights + handles.truckHubs {
+            node.isHidden = breaker
+        }
+        for node in [handles.secondCarWheels, handles.secondCarBody, handles.secondCarTint].compactMap({ $0 }) + handles.secondCarHubs {
+            node.isHidden = !breaker
+        }
+        if breaker {
+            let secondWheelsAt = SpriteLibrary.point(match.anoziraSecondCar)
+            let secondSize = scale(veered: secondWheelsAt.y)
+            let secondJumped = secondWheelsAt + CGPoint(x: shake(since: match.secondCarBumpAt, frame: match.frame, lasting: AnoziraRules.carJump.count),
+                                                        y: jump(since: match.secondCarBumpAt, frame: match.frame))
+            let secondRidden = match.players.contains { standsOnSecondCar($0, match: match) }
+            let secondAt = secondJumped + CGPoint(x: 0, y: carIdle(at: match.frame + 1, ridden: secondRidden))
+            lay(handles.secondCarWheels, at: secondJumped, width: 128, scale: secondSize)
+            for node in [handles.secondCarBody, handles.secondCarTint] { lay(node, at: secondAt, width: 128, scale: secondSize) }
+            for (hub, middle) in zip(handles.secondCarHubs, carHubMiddles) {
+                lay(hub, at: secondJumped, width: 128, scale: secondSize, offset: middle)
+                hub.zRotation = turn
+            }
+            handles.wheelContacts = (carHubMiddles.map { (CGPoint(x: carWheelsAt.x + 64 + ($0.x - 64) * carSize, y: carWheelsAt.y), carZ + 0.03) }
+                + carHubMiddles.map { (CGPoint(x: secondWheelsAt.x + 64 + ($0.x - 64) * secondSize, y: secondWheelsAt.y), carZ + 0.03) })
+            flyPhoenix(handles, match: match, at: time)
+            for (index, tint) in [handles.carTint, handles.secondCarTint].enumerated() {
+                handles.carTintShares[index] += ((match.ball.holder == index ? 1 : 0) - handles.carTintShares[index]) * tintEase
+                if handles.carTintShares[index] < 0.01 { handles.carTintShares[index] = 0 }
+                if let colour = breakerBrights.indices.contains(index) ? breakerBrights[index] : nil { tint?.color = colour }
+                tint?.alpha = handles.carTintShares[index]
+            }
+            handles.tintShare = handles.carTintShares[0]
+            return
         }
         let truck = match.anoziraTruck
         let truckJolt = CGPoint(x: shake(since: match.truckBumpAt, frame: match.frame, lasting: AnoziraRules.hoopJump.count),

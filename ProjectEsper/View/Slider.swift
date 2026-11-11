@@ -4,6 +4,8 @@ import SpriteKit
 final class Slider: SKNode {
     static let size = CGSize(width: 90, height: 10)
 
+    /// Half-clear black under the title and the track, so they read over anything.
+    private let underlay = SKSpriteNode(color: .init(white: 0, alpha: 0.5), size: CGSize(width: Slider.size.width + 14, height: 16))
     private let track = SKShapeNode(rectOf: CGSize(width: Slider.size.width, height: 2), cornerRadius: 1)
     private let knob = SKShapeNode(circleOfRadius: 4)
     private let label = SKLabelNode()
@@ -21,6 +23,9 @@ final class Slider: SKNode {
         self.value = value
         self.onChange = onChange
         super.init()
+        underlay.position = CGPoint(x: 0, y: 3)
+        underlay.zPosition = -0.1
+        addChild(underlay)
         track.fillColor = .init(white: 1, alpha: 0.25)
         track.strokeColor = .clear
         addChild(track)

@@ -12,9 +12,10 @@ frame of the stage's file, one under the next (its "layers" alone, if given).
 
 A stage's "darken" names its wash layer, Aseprite's Darken blend at the layer's opacity: it's
 baked into every picture drawn under it, as Aseprite draws it, since SpriteKit can't darken; and
-written alone as `<Stage>Darken`, its coverage, for what the game places under it.
+written alone as `<Stage>Darken`, its coverage, for what the game places under it (no name: not kept).
+{"layers": [...], "over": [...]} is those layers, then the "over" ones laid on them out of the wash's reach.
 
-Usage: import_stage_art.py flight|kanda|wreck|redcar|anozira|anozira_car|anozira_truck|balltruck|anozira_pothole|anozira_hub|anozira_phoenix|anozira_flag|anozira_billboard [...]
+Usage: import_stage_art.py flight|kanda|wreck|tutorial|longball|hoopfront|redcar|anozira|anozira_car|anozira_truck|balltruck|anozira_pothole|anozira_hub|anozira_phoenix|anozira_flag|anozira_billboard [...]
        (no name: every stage)
 """
 import os, shutil, subprocess, sys
@@ -55,6 +56,34 @@ STAGES = {
         "WreckCenterTiles": ["Tiles"],
         "WreckCenterTilesLit": {"layers": ["Tiles"], "only": 0x5D5D5D},
         "WreckCenterExtras": ["Extras", "Extras2"],
+    },
+    "tutorial": {
+        # The Wreck Center's map again, the back wall left out (hidden in the file), one rim; an
+        # opening at each end for the door (`Door.png`, 16 frames of 32 by 64 down the strip).
+        "file": "Tutorial/Tutorial_Map.aseprite",
+        "darken": ("Background Dimmer", "TutorialDarken"),
+        "TutorialBack": ["Background"],
+        "TutorialTiles": ["Tiles"],
+        "TutorialTilesLit": {"layers": ["Tiles"], "only": 0x5D5D5D},
+        "TutorialExtras": ["Extras", "Extras2"],
+        "TutorialDoor": "Tutorial/Door.png",
+    },
+    "longball": {
+        # The stands under the shadow (Darken, its layer), then the display strips over it; the field
+        # and the goalposts the game draws (their layers hidden), and the lights over this (`LongballArt`).
+        "file": "Longball Stadium/LongballStadium_Map.aseprite",
+        "darken": ("Shadow [Do Not Draw]", None),
+        "LongballStadiumBackdrop": {"layers": ["Background", "Tiles"], "over": ["Displays"]},
+        "LongballStadiumLight": "Longball Stadium/Stadium Light.png",
+        "LongballDownMarker": "Longball Stadium/DownMarker.png",
+    },
+    "hoopfront": {
+        # The front-facing hoop, 48 by 48, on the Tutorial hub's back wall: its board, the rim's
+        # back (under the ball) and its front (over it).
+        "file": "Hoop_front.aseprite",
+        "HoopFrontBoard": ["backboard"],
+        "HoopFrontBackRim": ["back rim"],
+        "HoopFrontFrontRim": ["front rim"],
     },
     "redcar": {
         "file": "K&A/red_car.aseprite",
@@ -177,6 +206,21 @@ def write(name, layers, source, wash=None):
         write_png(out, cw, ch, [px[(top + row) * w + left + col] for row in range(ch) for col in range(cw)])
         print(f"{name}: its cel {cw} by {ch} at {left}, {top}")
         layers = layers["layers"]
+    elif isinstance(layers, dict) and layers.get("over"):
+        out = os.path.join(folder, name + ".png")
+        subprocess.run([sys.executable, ASEPRITE, source, out] + layers["layers"], check=True)
+        w, h, px = read_png(out)
+        if wash is not None:
+            px = [darken(p[:3], wash[i][:3], wash[i][3]) + (p[3],) if p[3] and wash[i][3] else p for i, p in enumerate(px)]
+        subprocess.run([sys.executable, ASEPRITE, source, out] + layers["over"], check=True)
+        top = read_png(out)[2]
+        def lay(under, over):
+            a = over[3] / 255
+            if a == 0: return under
+            alpha = over[3] + under[3] * (1 - a)
+            return tuple(int(round((o * over[3] + u * under[3] * (1 - a)) / alpha)) for o, u in zip(over[:3], under[:3])) + (int(round(alpha)),)
+        write_png(out, w, h, [lay(u, o) for u, o in zip(px, top)])
+        layers = layers["layers"] + layers["over"]
     elif isinstance(layers, dict):
         out = os.path.join(folder, name + ".png")
         subprocess.run([sys.executable, ASEPRITE, source, out] + layers["layers"], check=True)
@@ -207,11 +251,17 @@ def main():
         wash = None
         if "darken" in plan:
             layer, name = plan["darken"]
-            write(name, [layer], source)
             sys.path.insert(0, os.path.dirname(__file__))
             from pngio import read_png
             # Its own colour at the layer's opacity, as the flattener leaves it.
-            wash = read_png(os.path.join(CATALOG, name + ".imageset", name + ".png"))[2]
+            if name:
+                write(name, [layer], source)
+                wash = read_png(os.path.join(CATALOG, name + ".imageset", name + ".png"))[2]
+            else:
+                import tempfile
+                out = os.path.join(tempfile.mkdtemp(), "wash.png")
+                subprocess.run([sys.executable, ASEPRITE, source, out, layer], check=True)
+                wash = read_png(out)[2]
         for name, layers in plan.items():
             if name not in ("file", "darken"):
                 write(name, layers, source, wash)

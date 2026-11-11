@@ -16,6 +16,7 @@ public enum Power: Equatable, Hashable, Codable {
     case titanTea
     case galeAle
     case zTea
+    case phantomFrappe
 
     /// Powers whose shoot button, without the ball, is something other than the slash.
     public var takesShoot: Bool {
@@ -28,12 +29,25 @@ public enum WebTarget: Equatable {
     case point(Vec2)
     case ball
     case opponent
+    /// Breaker Ball: a Breaker Ball in flight, by its id.
+    case breakerBall(id: Int)
 }
 
 public struct WebLine: Equatable {
     public var target: WebTarget
     /// Frames left to show, for a line to nothing; a pull's line lasts as long as the pull.
     public var frames: Int
+    /// A shot line: frames till it's out (drawn and live), and till it takes what it's on
+    /// (`Match.latchWeb`), as the shot's pose shoots and pulls; and off a wall, where the
+    /// shooter's reeled to then.
+    public var outIn = 0
+    public var pullIn = 0
+    public var landing: Vec2?
+    /// Going out, the way it's aimed, till it meets what it meets (`Match.hitWeb`).
+    public var aim: Vec2?
+    /// A miss that crosses something in its frames takes it; one a shield stopped doesn't.
+    public var lingers = true
+    public var out: Bool { outIn == 0 }
 }
 
 /// Flash Fizz's tear in space, left where a flash came out: a loose ball within reach of
@@ -158,10 +172,11 @@ public struct Player: Equatable {
     /// Whether the state's clock moved this frame: not on the frames it's held (under water, Titan Tea).
     public var clockTicked: Bool { timerStep == 1 }
 
-    /// Where a shot lets go: the ball where the stance's hold frame draws it (the ground sheet's
-    /// fifth, the air's fourth), the arc's preview starting there too.
+    /// Where a shot lets go, the arc's preview starting there too: on the ground, the ball where the
+    /// sheet last draws it in hand, its sixth frame, before the release smear; in the air, where its
+    /// hold frame draws it, the fifth, the ball's place the air shot has always let go from.
     public var shotReleasePoint: Vec2 {
-        let hold = grounded ? AnimationFrame(.shoot, 4) : AnimationFrame(.shootAir, 3)
+        let hold = grounded ? AnimationFrame(.shoot, Animation.shotSmearFrame - 1) : AnimationFrame(.shootAir, Animation.shootAir.shotHoldFrame)
         guard let offset = BallLandmarks.offset(hold) else { return position + Vec2(x: 0, y: BallRules.shotReleaseHeight * spec.scale) }
         return position + Vec2(x: offset.x / 1.6 * spec.scale * facing.sign, y: offset.y / 1.6 * spec.scale)
     }
@@ -177,7 +192,7 @@ public struct Player: Equatable {
     }
 
     /// Out of the stance into the throw; a layup goes up off its half jump, off the ground if on it.
-    private mutating func startThrowing() {
+    private mutating func startThrowing(events: inout [MatchEvent]) {
         // Down: the Spin Move, not a throw, once an airtime; spent, nothing, the ball kept.
         if hasBall, !hasFireball, throwDirection == Vec2(x: 0, y: -1) {
             if spinUsed {
@@ -189,7 +204,10 @@ public struct Player: Equatable {
             }
             return
         }
+        throwCharge = ThrowChargeRules.charge(heldFrames: stateTimer)
         enter(.throwing)
+        // Floback Fresca at level two: FLO as the ball's thrown, but up.
+        if spec.flobackFrescaLevel >= 2, hasBall, !hasFireball, !layingUp { gainFlo(FlobackRules.flo, at: heldBallPoint, events: &events) }
         guard layingUp else { return }
         fastFalling = false
         grounded = false
@@ -226,6 +244,8 @@ public struct Player: Equatable {
     public var floStateLockout = 0
     /// ZONES: FLO never runs out, though the lockout between activations still runs.
     public var unlimitedFlo = false
+    /// Capture Mode: no FLO gained, and none left behind where it burns.
+    public var earnsFlo = true
     /// ZONES: the power picked for FloState, on while it's on and gone with it.
     public var floStatePower = Power.none
     /// The drink picked for the series (47): dormant till FloState, then at its second level,
@@ -236,7 +256,9 @@ public struct Player: Equatable {
     /// Frames in FloState since its last FLO spent.
     var floStateClock = 0
     /// Entered only at full; left any time.
-    public var floStateReady: Bool { flo >= FloRules.full && floStateLockout == 0 }
+    public var floStateReady: Bool { !floStateBarred && flo >= FloRules.full && floStateLockout == 0 }
+    /// No FloState in this match, however full the meter (`Match.floStateAllowed`).
+    public var floStateBarred = false
     /// This taunt's FLO paid, at the ball's first touch of the floor.
     var tauntPaid = false
     /// The swing's web, while swinging: where it's anchored, and the arc.
@@ -255,8 +277,14 @@ public struct Player: Equatable {
     public var swingCooldown = 0
     /// Where a reel is taking this body.
     public var pullTarget: Vec2?
-    /// Frames the line's pose shows.
-    public var webLinePose = 0
+    /// Web Water's line let go: frames since, while its pose plays out (`WebRules.shotPoseFrames`),
+    /// and whether it was shot from a wall cling, which has its own sheet.
+    public var webShotAge: Int?
+    public var webShotFromWall = false
+    /// The line's on the other body, or the ball it held: both arms and two lines.
+    public var webShotBothArms = false
+    /// Clung by a zip to the wall: the cling holds with the stick let go, till it's pushed away.
+    public var zipCling = false
     /// Super Smoothie: frames of flight left this airtime.
     public var flightLeft = SmoothieRules.flightFrames(level: 1)
     /// Flash Fizz: frames until the next flash; where a warp decided this step is going
@@ -271,8 +299,7 @@ public struct Player: Equatable {
     /// wall land since the last.
     public var wantsPlatform = false
     public var platformArmed = true
-    /// Frames until the next wall; walls need no arming.
-    public var wallCooldown = 0
+    /// Frames until the next slab or wall, one cooldown for both; walls need no arming.
     public var platformCooldown = 0
     /// The slide's leg and the slash's blade each hit once.
     public var slideHit = false
@@ -296,11 +323,19 @@ public struct Player: Equatable {
     public var roadSpill = 0
     /// Frames left before a power's repeating stun can stun this body again (`StunGraceRules`).
     public var stunGrace = 0
+    /// Hits taken in a row (`HitGraceRules`), frames left for another to add to them, and frames left in which attacks pass through.
+    public var chainedHits = 0
+    public var chainWindow = 0
+    public var hitGrace = 0
     /// Held in a tornado: where its middle is, for the body's middle to be drawn to; and
     /// frames left before a tornado can take the body again after it jumped out.
     public var tornadoCentre: Vec2?
     public var tornadoCooldown = 0
     public var slashHit = false
+    /// Breaker Ball: this swing has worn a barrier down, once a swing, the body still to hit.
+    public var slashMetBarrier = false
+    /// The charge of the throw under way (`ThrowChargeRules`).
+    public var throwCharge = 0.0
     /// This slash is FloState's step-through, on the ground or in the air (`FloSlashRules`).
     public var floSlash = false
     /// This snatch has taken the ball, or had it taken off it by another's: it takes nothing more. Two
@@ -318,7 +353,11 @@ public struct Player: Equatable {
     /// was knocked or taken out of the hands; the stick still works.
     public var hitStun = 0 {
         // Nobody super armoured is stunned.
-        didSet { if superArmoured, hitStun > 0 { hitStun = 0 } }
+        didSet {
+            if superArmoured, hitStun > 0 { hitStun = 0 }
+            // Breaker Ball: a fresh hit never cuts a shatter's longer stun short.
+            else if summonsBreakerBall, hitStun > 0, hitStun < oldValue - 1 { hitStun = oldValue }
+        }
     }
     /// Nothing stuns or knocks them: Z Tea firing its beam, and the change into FloState, so its
     /// burst always comes.
@@ -335,6 +374,12 @@ public struct Player: Equatable {
     /// The rim being dunked on, and where the body was when the dunk began, to glide from.
     public var dunkHoop = 0
     public var dunkFrom = Vec2.zero
+    /// Phantom, past the slam: falling through the rim in the slam's pose, the ball still in hand.
+    public var dunkPassing = false
+    /// The rim a phantom just dunked through: no dunk onto it again till the body's out of its reach.
+    public var passedHoop: Int?
+    /// Where the dunk's sheet is: held at the slam while passing through.
+    public var dunkSheetTimer: Int { dunkPassing ? BallRules.dunkSlamFrame : stateTimer }
     /// Frames of double-jump animation left.
     public var doubleJumpTimer = 0
     /// Cannon Cola's spare clock: the share of a frame the shot's pose is ahead.
@@ -346,18 +391,16 @@ public struct Player: Equatable {
     public var presetRim: Vec2?
     /// The rim the preset arc comes down on, if it's aimed and the rim's somewhere on the stage
     /// (a moving rim not yet in place leaves the arc fixed).
-    /// Only facing it, five tiles across at least and within AIM RANGE, and on a stage with a
-    /// limit, not too far under it.
+    /// Only facing it, five tiles across at least and within AIM RANGE, on a stage that aims.
     var aimedRim: Vec2? {
-        guard BallRules.presetAimsAtRim, let rim = presetRim, rim.x > -100, rim.y < 1000 else { return nil }
+        guard BallRules.presetAimsAtRim, autoAims, let rim = presetRim, rim.x > -100, rim.y < 1000 else { return nil }
         let from = shotReleasePoint
         let across = (rim.x - from.x) * facing.sign
         guard across >= BallRules.autoAimMinimum, across <= BallRules.autoAimRange else { return nil }
-        if let rise = autoAimMaxRise, rim.y - from.y > rise { return nil }
         return rim
     }
-    /// The stage's limit on how far under the rim the auto-aim works from, kept each frame.
-    public var autoAimMaxRise: Double?
+    /// Whether the stage aims the preset arc, kept each frame.
+    public var autoAims = true
 
     /// The last way aimed (the flick, or the stick), and how many frames ago.
     public var recentAim = Vec2.zero
@@ -374,6 +417,13 @@ public struct Player: Equatable {
 
     /// Spinning with the FLO paid: snatches and slashes pass through.
     public var spinPhasing = false
+    /// Phantom Frappe's form (`PhantomFrappe.swift`), and how long it's been held.
+    public var phantomMode = false
+    public var phantomFrames = 0
+    /// The Spin Move or the taunt asked for the form to change this step.
+    public var phantomToggleAsked = false
+    /// Spin Moves this airtime, against the one allowed, two at Phantom Frappe's level two.
+    public var spinsTaken = 0
     /// How long the shot just let go holds its pose: its ball's flight to the rim and a beat (`Match`).
     public var shotPoseFrames = BallRules.shotPoseHoldFrames
     /// The shot was let go in the air, and has since landed still in its pose.
@@ -383,6 +433,8 @@ public struct Player: Equatable {
     public var spinUsed = false
     /// This flip's shield parried a slash: it ends in the air, not the tumble.
     public var shieldParried = false
+    /// In a shieldclash, shield out: the flip held where it is till the shields meet.
+    public var shieldClashHold = false
     /// Guarderade at level two: the shield's second, out of the tumble, spent till it lands.
     public var secondShieldUsed = false
     /// A forced slide's frames without moving, and where it was last frame.
@@ -394,6 +446,8 @@ public struct Player: Equatable {
     /// Pushed off a clash: no input till it's landed and slid to a stop, at this speed along the ground.
     public var clashPushed = false
     public var clashSlideSpeed = 0.0
+    /// Capture Mode's move, made at the start of the next step (`Capture.swift`).
+    public var forcedMove: ForcedMove?
     /// Frames a jump press stays live waiting for something to spend it.
     public var jumpBuffer = 0
     /// A shield raised in the air: the stick steers the flip sideways on top of its arc.
@@ -421,6 +475,23 @@ public struct Player: Equatable {
     public var frozen = 0
     /// Blazing Boba's fireball in hand, shot or thrown like the ball.
     public var hasFireball = false
+    /// Breaker Ball: Guard with nothing in hand and no side on the stick summons a Breaker Ball into the
+    /// throw's stance (`hasBall` holds it); only with a side is it the snatch.
+    public var summonsBreakerBall = false
+    /// Hits landing on the barrier's circle round the body, in Breaker Ball (`BreakerRules.roundHurtbox`).
+    public var roundHurtbox: Bool { summonsBreakerBall && BreakerRules.roundHurtbox }
+    /// Whether `box` lands on the body: the barrier's circle or the body's own box.
+    public func hurt(by box: Box) -> Bool {
+        roundHurtbox ? box.distance(to: body.center) <= BreakerRules.postureRadius : body.overlaps(box)
+    }
+    /// How far `point` is off the body: off the barrier's circle or the body's own box.
+    public func hurtDistance(to point: Vec2) -> Double {
+        roundHurtbox ? max(point.distance(to: body.center) - BreakerRules.postureRadius, 0) : body.distance(to: point)
+    }
+    /// This step's stick, as it was given, for what reads it outside the step's input.
+    var stepStick = Vec2.zero
+    /// The throw's stance under way is a summon's: Guard let go inside its windup keeps the ball, thrown nowhere.
+    var summonedStance = false
     /// Something in hand, the ball or a fireball: what the stances and the sheets go by.
     public var holding: Bool { hasBall || hasFireball }
     /// Frames until the next bolt, strike or pulse.
@@ -499,13 +570,13 @@ public struct Player: Equatable {
     public var blastQueued = false
     public var blastReleased = false
     public var blastAngle = 0.0
-    /// Z Tea's Strike held since the run's first blast, firing on till it's let go; and whether
-    /// the run is past its first, aimed on the stick.
-    public var blastHeld = false
+    /// Z Tea's run of blasts past its first, aimed on the stick.
     public var blastRunAimed = false
 
     /// The states the blast's pose is drawn in, over the body as it moves.
     public static let blastPoseStates: [PlayerState] = [.idle, .walk, .run, .dash, .air, .land]
+    /// Where Web Water's line's pose is drawn: aimed, and played out after; a zip's start too.
+    public static let webShotPoseStates: [PlayerState] = [.idle, .walk, .run, .dash, .air, .land, .wallLand, .crouch, .crouchWalk, .webPull]
     /// This blast's sheet frames, 0-based: opened, the first two then neutral; then the back arm's
     /// four and the neutral after, or the front arm's four and the neutral after. It always ends
     /// on a neutral frame.
@@ -629,10 +700,19 @@ public struct Player: Equatable {
     private var stanceTimerJustEntered: Bool { reached(1) }
 
     public mutating func enter(_ next: PlayerState) {
+        // Out of a wall cling into anything else, facing away from the wall the cling faces.
+        if state == .wallLand, next != .wallLand {
+            facing = facing.flipped
+            // A wall shot's pose is the wall's: off it, the pose goes.
+            if webShotFromWall { webShotAge = nil }
+        }
+        zipCling = false
         previousState = state
         state = next
         stateTimer = 0
+        summonedStance = false
         if next == .taunt { tauntPaid = false }
+        if next == .jumpSquat { cancelBlastPose() }
         if next == .snatching {
             snatchSpent = false
             sinceSnatch = 0
@@ -711,6 +791,7 @@ public struct Player: Equatable {
                               ballHolder: Int? = nil, ballOwner: Int? = nil, events: inout [MatchEvent]) -> PlayerAction? {
         // Parried or pushed off a clash: every input held off, stick and buttons, till it's done.
         var input = parryLocked || clashPushed ? PlayerInput.idle : given
+        stepStick = input.stick
         // The flipjump holds off every input; tumbling, all but left and right.
         let flipLocked = state == .flipJump || state == .tumbling
         if state == .flipJump { input = .idle }
@@ -735,6 +816,10 @@ public struct Player: Equatable {
             enter(.transforming)
             input = .idle
         }
+        if let hoop = passedHoop, hoop >= sharedStage.hoops.count
+            || sharedStage.hoops[hoop].position.distance(to: chest) > BallRules.dunkRadius * spec.scale {
+            passedHoop = nil
+        }
         underwater = sharedStage.features.underwater
         tiltPull = sharedStage.tiltPull
         tiltDown = sharedStage.tiltDown
@@ -749,6 +834,27 @@ public struct Player: Equatable {
             frozen -= 1
             lastInput = input
             return nil
+        }
+        if let move = forcedMove {
+            forcedMove = nil
+            hitStun = 0
+            attackLockout = 0
+            clashPushed = false
+            strikeBuffer = 0
+            guardBuffer = 0
+            switch move {
+            case .slash: startSlash(events: &events)
+            case .shieldflip: startShield()
+            case .floState:
+                if !inFloState, state != .transforming {
+                    flo = FloRules.full
+                    floStateLockout = 0
+                    velocity = .zero
+                    orbitHit = false
+                    enter(.transforming)
+                }
+            }
+            input = .idle
         }
         // Titan Tea's actions run slower: one frame in `actionHoldInterval` the clock holds.
         if spec.actionHoldInterval > 0, state.isAction {
@@ -795,6 +901,8 @@ public struct Player: Equatable {
         if catchCooldown > 0 { catchCooldown -= 1 }
         if roadSpill > 0 { roadSpill -= 1 }
         if stunGrace > 0 { stunGrace -= 1 }
+        if chainWindow > 0 { chainWindow -= 1 } else { chainedHits = 0 }
+        if hitGrace > 0 { hitGrace -= 1 }
         if wallLandCooldown > 0 { wallLandCooldown -= 1 }
         if webLineCooldown > 0 { webLineCooldown -= 1 }
         if swingCooldown > 0 { swingCooldown -= 1 }
@@ -804,10 +912,10 @@ public struct Player: Equatable {
         }
         if let open = tear { tear = open.framesLeft > 1 ? Tear(position: open.position, framesLeft: open.framesLeft - 1) : nil }
         if platformCooldown > 0 { platformCooldown -= 1 }
-        if wallCooldown > 0 { wallCooldown -= 1 }
-        if webLinePose > 0 { webLinePose -= 1 }
-        if let line = webLine, case .point = line.target, state != .webPull {
-            webLine = line.frames > 1 ? WebLine(target: line.target, frames: line.frames - 1) : nil
+        if let age = webShotAge { webShotAge = age + 1 < WebRules.shotPoseFrames ? age + 1 : nil }
+        if var line = webLine, case .point = line.target, state != .webPull, line.out, line.pullIn == 0 {
+            line.frames -= 1
+            webLine = line.frames > 0 ? line : nil
         }
         if airControlLock > 0 { airControlLock -= 1 }
         if tornadoCooldown > 0 { tornadoCooldown -= 1 }
@@ -819,18 +927,21 @@ public struct Player: Equatable {
         if attackLockout > 0 { attackLockout -= 1 }
         if ledgeCooldown > 0 { ledgeCooldown -= 1 }
         if hitStun > 0 {
-            // Stunned: no button answers; with the lock on, the stick doesn't either. It ends a snipe.
+            // Hit: no attack or other button answers, but the body moves and jumps freely; with the locks on,
+            // the stick and the jump don't either. It ends a snipe.
             if state == .gunSnipe { enter(.idle) }
             hitStun -= 1
             if StunRules.locksMovement {
                 input.stick = .zero
                 input.aim = .zero
             }
-            input.jump = false
+            if StunRules.locksJump {
+                input.jump = false
+                jumpBuffer = 0
+            }
             input.shootButtons = 0
             input.throwBall = false
             input.taunt = false
-            jumpBuffer = 0
             strikeBuffer = 0
             guardBuffer = 0
         }
@@ -862,8 +973,8 @@ public struct Player: Equatable {
             startShield()
             shieldRaised = true
         }
-        presetRim = stage.hoops.first { !$0.rimless && !$0.bonus && ($0.shared || $0.owner == index) }?.position
-        autoAimMaxRise = stage.features.autoAimMaxRise
+        presetRim = stage.hoops.first { !$0.rimless && $0.hasBackboard && ($0.shared || $0.owner == index) }?.position
+        autoAims = stage.features.autoAims
         // The last way aimed, and how many frames ago, for the throw's buffer.
         let aimedNow = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
         if aimedNow.length >= 0.5 {
@@ -1140,7 +1251,7 @@ public struct Player: Equatable {
                     pendingAerial = nil
                     switch aerial {
                     case .slash: startSlash(events: &events)
-                    case .snatch: startSnatch()
+                    case .snatch: startSnatch(events: &events)
                     }
                 }
             }
@@ -1198,7 +1309,7 @@ public struct Player: Equatable {
                 throwStanceEntrySpeed = velocity.x
                 enter(.throwStance)
             } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
-                startSnatch()
+                startSnatch(events: &events)
             } else if !holding, shootPressed, slashAllowed {
                 startSlash(events: &events)
             }
@@ -1259,10 +1370,10 @@ public struct Player: Equatable {
             } else if !holding, fireballAsked(input, shootPressed: shootPressed) {
                 summonFireball(events: &events)
             } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
-                startSnatch()
+                startSnatch(events: &events)
             } else if !holding, shootPressed, power == .galeAle, powerLevel >= 2, Player.verticalAsked(input) {
                 fireBlast()
-            } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, Player.verticalAsked(input), wallCooldown == 0 {
+            } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, Player.verticalAsked(input), platformCooldown == 0 {
                 startWall()
             } else if !holding, shootPressed, power == .voltaCola, boltCooldown == 0 {
                 fireBolt(input)
@@ -1288,7 +1399,9 @@ public struct Player: Equatable {
             // Into a wall on the way, the cling, the rest of the flip dropped.
             let frames = Double(max(ShieldRules.flipFrames, 1))
             let side = facing.sign
-            if let wall = wallSide, wall.sign == -side, stateTimer > 0 {
+            if shieldClashHold {
+                velocity = .zero
+            } else if let wall = wallSide, wall.sign == -side, stateTimer > 0 {
                 facing = wall
                 velocity = .zero
                 platformArmed = true
@@ -1327,15 +1440,12 @@ public struct Player: Equatable {
 
         case .wallLand:
             // Silksong's rule: the slide lasts as long as the stick is held into the wall.
-            // Web Water doesn't slide at all.
-            velocity = Vec2(x: 0, y: power == .webWater ? 0 : -spec.wallSlideSpeed)
+            // Web Water doesn't slide on its own; down held slides it, as it does anyone.
+            let sliding = power != .webWater || (input.stick.y <= -0.5 && !webAiming)
+            velocity = Vec2(x: 0, y: sliding ? -spec.wallSlideSpeed : 0)
             if jumpPressed {
                 wallJump(off: facing, events: &events)
-            } else if input.stick.y <= -0.5, !webAiming {
-                // Down lets go, and the wall can't be clung to again at once.
-                wallLandCooldown = spec.wallLandCooldownFrames
-                enter(.air)
-            } else if wallSide == nil || (stickFacing(input) != facing && !webAiming) {
+            } else if wallSide == nil || (stickFacing(input) != facing && !webAiming && !(zipCling && stickFacing(input) == nil)) {
                 // Aiming a web line holds the cling whatever the stick does.
                 enter(.air)
             }
@@ -1483,7 +1593,7 @@ public struct Player: Equatable {
                Player.throwWay(aim).y > 0 || !grounded || input.aim.length >= BallRules.flickThreshold {
                 throwDirection = Player.throwWay(aim)
                 throwReady = false
-                startThrowing()
+                startThrowing(events: &events)
                 break
             }
             if aim.length >= 0.5, !stepbackAimLocked, !quickThrow, input.throwBall || throwDirection == .zero,
@@ -1500,29 +1610,34 @@ public struct Player: Equatable {
                 wanted = .strikeBolt(x: ball.x, bottom: ball.y)
             }
             if hasBall, stateTimer >= BallRules.dunkStanceFrames, let hoop = stage.hoops.indices.first(where: { !stage.hoops[$0].rimless && stage.hoops[$0].position.distance(to: chest) <= BallRules.dunkRadius * spec.scale && stage.dunkable(stage.hoops[$0])
-                && !stage.hoops[$0].locked(to: index)
-                // The body glides there: not through the other's shield.
-                && !stage.shieldBlocks(from: chest, to: dunkPlace(on: stage.hoops[$0])) }) {
+                && !stage.hoops[$0].locked(to: index) && $0 != passedHoop
+                // The body glides there: not through the other's shield, nor a slab or a wall.
+                && !stage.dunkBlocked(from: chest, to: dunkPlace(on: stage.hoops[$0])) }) {
                 // Onto the rim: the feet at the dunk's place on it, facing the backboard.
                 // Turned to the backboard; the body glides to its place on the rim through
                 // the wind-up, so it never jumps there.
-                facing = stage.hoops[hoop].backboard
+                facing = dunkFacing(on: stage.hoops[hoop])
                 velocity = .zero
                 dunkHoop = hoop
                 dunkFrom = position
+                dunkPassing = false
                 enter(.dunking)
             } else if !input.throwBall, !quickThrow {
                 // Let go: never the layup or the Spin Move, which only go with the button held.
                 if throwDirection.x == 0 { throwDirection = .zero }
                 if stateTimer >= BallRules.throwWindupFrames {
-                    startThrowing()
+                    startThrowing(events: &events)
+                } else if summonedStance {
+                    // A summon's tap: the ball kept in hand, nothing thrown, Guard wanting a fresh press.
+                    throwReady = false
+                    enter(grounded ? .idle : .air)
                 } else {
                     // Let go early: the throw goes when the windup ends, where the stick pointed.
                     quickThrow = true
                 }
             }
             if quickThrow, stateTimer >= BallRules.throwWindupFrames {
-                startThrowing()
+                startThrowing(events: &events)
             }
 
         case .throwing:
@@ -1552,7 +1667,7 @@ public struct Player: Equatable {
                 } else {
                     hasBall = false
                     catchCooldown = BallRules.catchCooldownFrames
-                    action = .releaseThrow(velocity: direction * BallRules.throwSpeed)
+                    action = .releaseThrow(velocity: direction * ThrowChargeRules.speed(throwCharge))
                     events.append(.thrown(player: index))
                 }
             } else if stateTimer >= (layingUp ? BallRules.layupRecoveryFrames : BallRules.throwRecoveryFrames),
@@ -1564,21 +1679,34 @@ public struct Player: Equatable {
         case .dunking:
             // To the rim over the wind-up, there by the slam, then hanging through the dunk
             // and the beat after, until the point restarts; the ball leaves the hand at the slam.
-            velocity = .zero
             let rim = stage.hoops[dunkHoop]
+            if dunkPassing {
+                fall(.idle)
+                if grounded || body.max.y < rim.position.y {
+                    passedHoop = dunkHoop
+                    dunkPassing = false
+                    enter(grounded ? .idle : .air)
+                }
+                break
+            }
+            velocity = .zero
             // The feet's place off the rim, at the body's size, so the hands still meet it.
             let place = dunkPlace(on: rim)
-            let slam = BallRules.dunkFrames / 2
+            let slam = BallRules.dunkSlamFrame
             let share = min(Double(stateTimer) / Double(slam), 1)
             position = dunkFrom + (place - dunkFrom) * share
-            if reached(BallRules.dunkFrames / 2) {
+            if phantomMode, reached(slam) {
+                // Phantom: at the slam, down through the rim.
+                grounded = false
+                dunkPassing = true
+            } else if reached(slam) {
                 hasBall = false
                 catchCooldown = BallRules.catchCooldownFrames
                 events.append(.dunked(player: index))
                 action = .dunk(hoop: dunkHoop)
-            } else if stateTimer >= BallRules.dunkFrames + BallRules.dunkHangFrames
-                        || stateTimer > BallRules.dunkFrames / 2 && input.stick.y <= -0.5 {
-                // Hung on the rim through the beat after, or let go with down once it's slammed.
+            } else if stateTimer >= slam + BallRules.dunkSlamToHangFrames + BallRules.dunkHangFrames
+                        || stateTimer >= BallRules.dunkLetGoFrame && input.stick.y <= -0.5 {
+                // Hung on the rim through the beat after, or let go with down a few frames into the hang.
                 enter(grounded ? .idle : .air)
             }
 
@@ -1608,7 +1736,7 @@ public struct Player: Equatable {
                 // summon still comes first, and the fireball in hand stands it up.
                 summonFireball(events: &events)
             } else if throwPressed, snatchCooldown == 0, throwIsSnatch {
-                startSnatch()
+                startSnatch(events: &events)
             } else if shootPressed, groundActions(input, jumpPressed: false, shootPressed: true, throwPressed: false, tauntPressed: false,
                                                   onDefence: onDefence, events: &events) {
                 // Shoot while crouched: what it does standing, the powers' down and shoot among them.
@@ -1673,7 +1801,7 @@ public struct Player: Equatable {
                 if jumpPressed {
                     enter(.jumpSquat)
                 } else if throwPressed, snatchCooldown == 0 {
-                    startSnatch()
+                    startSnatch(events: &events)
                 } else if shootPressed, slashAllowed {
                     startSlash(events: &events)
                 } else if !crouchAsked(input) || (input.stick.x != 0 && !stickForward(input)) {
@@ -1696,6 +1824,7 @@ public struct Player: Equatable {
             // The second swing: the blade live again for a second hit, and swung, heard.
             if reached(FloSlashRules.secondSwingFrame) {
                 slashHit = false
+                slashMetBarrier = false
                 events.append(.slashed(player: index))
             }
             if stateTimer >= FloSlashRules.lastingFrames {
@@ -1803,11 +1932,15 @@ public struct Player: Equatable {
 
         case .taunt:
             // The sauce is only for show: anything cancels it, the stick walks out of it. Its
-            // FLO comes as the ball first meets the floor, there.
+            // FLO comes as the ball first meets the floor, there; in FloState, on the same frame, at the spun ball.
             velocity.x = 0
             if !tauntPaid, Player.tauntBounces.contains(animationFrame.frame), let offset = BallLandmarks.offset(animationFrame) {
                 tauntPaid = true
-                gainFlo(FloRules.taunt, at: Vec2(x: position.x + offset.x / 1.6 * spec.scale * facing.sign, y: position.y), events: &events)
+                // Phantom Frappe's taunt counts here, as it pays: one cancelled sooner, into the
+                // grounded Spin Move that down then throw makes, leaves the toggle to the spin.
+                if power == .phantomFrappe { phantomToggleAsked = true }
+                let ballHeight = inFloState ? offset.y / 1.6 * spec.scale : 0
+                gainFlo(FloRules.taunt, at: Vec2(x: position.x + offset.x / 1.6 * spec.scale * facing.sign, y: position.y + ballHeight), events: &events)
             }
             if groundActions(input, jumpPressed: jumpPressed, shootPressed: shootPressed, throwPressed: throwPressed,
                              tauntPressed: false, onDefence: onDefence, events: &events) {
@@ -1883,7 +2016,7 @@ public struct Player: Equatable {
                 enter(.throwStance)
             } else if !holding, throwPressed, snatchCooldown == 0 {
                 // Flight cancels into the snatch or the slash as the air does.
-                startSnatch()
+                startSnatch(events: &events)
             } else if !holding, shootPressed {
                 startSlash(events: &events)
             } else if !input.jump || flightLeft <= 0 {
@@ -1986,7 +2119,7 @@ public struct Player: Equatable {
                 throwStanceEntrySpeed = velocity.x
                 enter(.throwStance)
             } else if !holding, throwPressed, snatchCooldown == 0 {
-                startSnatch()
+                startSnatch(events: &events)
             } else if !holding, shootPressed {
                 startSlash(events: &events)
             }
@@ -2089,8 +2222,11 @@ public struct Player: Equatable {
     /// Whether throw without the ball is the snatch: Web Water's line and Pulsepistol's
     /// pull take the button at level two.
     private var throwIsSnatch: Bool {
-        !(power == .webWater && powerLevel >= 2)
+        !(power == .webWater && powerLevel >= 2) || summonAsked
     }
+
+    /// Breaker Ball's Guard with nothing in hand and no side on the stick: the summon, not the snatch.
+    private var summonAsked: Bool { summonsBreakerBall && abs(stepStick.x) < 0.5 }
 
     /// Blazing Boba: a flame every few frames of a full run or a slide.
     public var layingFlames: Bool {
@@ -2116,6 +2252,21 @@ public struct Player: Equatable {
         throwReady = false
     }
 
+    /// Breaker Ball's summon: the ball in hand at once, straight into the throw's stance, its
+    /// charge the summon; let go inside the windup (a tap), it's kept in hand, after it, thrown;
+    /// jump or Strike cancel it into a dribble as ever.
+    private mutating func summonBreakerBall(events: inout [MatchEvent]) {
+        guardBuffer = 0
+        fastFalling = false
+        hasBall = true
+        throwDirection = .zero
+        quickThrow = false
+        throwStanceEntrySpeed = velocity.x
+        enter(.throwStance)
+        summonedStance = true
+        events.append(.breakerBallSummoned(player: index))
+    }
+
     private mutating func summonFireball(events: inout [MatchEvent]) {
         strikeBuffer = 0
         spinningOut = false
@@ -2129,15 +2280,18 @@ public struct Player: Equatable {
 
     /// Z Tea's blast: straight ahead the way the body faces; one a cooldown, a third as long at
     /// level two. Out of the pose, it opens on the sheet's first two frames and the back arm
-    /// fires; in it, the next waits for this one's neutral frame and goes off the other arm.
-    /// Strike held through the first fires on, standing, off the ground eased toward the stick's aim,
-    /// till it's let go.
+    /// fires. Strike pressed again before the pose is over keeps it: the next waits for this one's
+    /// neutral frame and the cooldown, and goes off the other arm, aimed on the stick on the ground.
     /// Gale Ale's moving tornado (level two) is thrown in the same pose, straight ahead, each off
     /// the arm the last one wasn't, in the pose or not, so a run of them alternates.
     private mutating func fireBlast() {
         strikeBuffer = 0
         spinningOut = false
         let gale = power == .galeAle
+        if !gale, blastStep != nil {
+            blastQueued = true
+            return
+        }
         guard blastCooldown == 0 else { return }
         blastCooldown = gale ? GaleRules.castCooldownFrames : (powerLevel >= 2 ? ZRules.blastCooldownFramesLevelTwo : ZRules.blastCooldownFrames)
         if blastStep != nil {
@@ -2149,26 +2303,33 @@ public struct Player: Equatable {
         blastHand = gale ? 1 - blastHand : 0
         blastReleased = false
         blastAngle = 0
-        blastHeld = !gale
         blastRunAimed = false
+    }
+
+    /// Z Tea's pose called off by a jump, any blast not yet let go with it.
+    private mutating func cancelBlastPose() {
+        guard power == .zTea else { return }
+        blastStep = nil
+        blastQueued = false
     }
 
 
     /// The blast's pose a frame on: the blast let go as the arm's fully out; at its neutral, the
     /// next if one's waiting, off the other arm; held there a moment, then over.
     private mutating func stepBlastPose(_ input: PlayerInput) {
-        if blastHeld, !input.shoot { blastHeld = false }
         guard var step = blastStep else { return }
         // Out of the states it's drawn in (a shield's flip, a hit, anything else), or stunned: the
         // pose is over, any blast not yet let go with it.
         guard Player.blastPoseStates.contains(state) || state == .jumpSquat, hitStun == 0, !parryLocked, frozen == 0 else {
             blastStep = nil
             blastQueued = false
-            blastHeld = false
             return
         }
-        // Past the first of a held run, eased toward the stick's aim as it's held, straight in the air.
-        if blastRunAimed { blastAngle = grounded ? Player.easedAim(blastAngle, input) : 0 }
+        // Z Tea turns on the stick; past the first of a run, aimed where it points, straight in the air.
+        if power == .zTea {
+            if abs(input.stick.x) >= 0.3 { facing = input.stick.x > 0 ? .right : .left }
+            if blastRunAimed { blastAngle = grounded ? Player.stickAim(input) : 0 }
+        }
         step += 1
         let sequence = blastSequence
         let at = step / blastFrameLength
@@ -2182,21 +2343,21 @@ public struct Player: Equatable {
                 wanted = .zBlast(direction: Vec2(x: Trig.cos(blastAngle) * facing.sign, y: Trig.sin(blastAngle)), hand: blastHand)
             }
         }
-        // Held, the next goes as soon as the cooldown's up, the pose kept on its neutral till then.
-        let heldOn = blastHeld && power == .zTea
-        if at >= sequence.count - 1, heldOn, !blastQueued, blastCooldown == 0 {
-            blastCooldown = powerLevel >= 2 ? ZRules.blastCooldownFramesLevelTwo : ZRules.blastCooldownFrames
-            blastQueued = true
-            blastRunAimed = true
-        }
-        if at >= sequence.count - 1, blastQueued {
+        // Z Tea's next waits on its neutral for the cooldown.
+        let zTea = power == .zTea
+        let waiting = zTea && blastQueued && blastCooldown > 0
+        if at >= sequence.count - 1, blastQueued, !waiting {
+            if zTea {
+                blastCooldown = powerLevel >= 2 ? ZRules.blastCooldownFramesLevelTwo : ZRules.blastCooldownFrames
+                blastRunAimed = true
+            }
             blastQueued = false
             blastOpened = false
             blastHand = 1 - blastHand
             blastReleased = false
             if power == .galeAle || !grounded { blastAngle = 0 }
             blastStep = 0
-        } else if heldOn, at >= sequence.count - 1 {
+        } else if waiting, at >= sequence.count - 1 {
             blastStep = step
         } else if step >= sequence.count * blastFrameLength + ZRules.blastNeutralHoldFrames {
             blastStep = nil
@@ -2277,10 +2438,10 @@ public struct Player: Equatable {
             // or walking, for show. A run holding down brakes instead.
             enter(.taunt)
         } else if !holding, throwPressed, snatchCooldown == 0, throwIsSnatch {
-            startSnatch()
+            startSnatch(events: &events)
         } else if !holding, shootPressed, power == .galeAle, powerLevel >= 2, Player.verticalAsked(input) {
             fireBlast()
-        } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, Player.verticalAsked(input), wallCooldown == 0 {
+        } else if !holding, shootPressed, power == .platformShake, powerLevel >= 2, Player.verticalAsked(input), platformCooldown == 0 {
             startWall()
         } else if !holding, shootPressed, power == .voltaCola, boltCooldown == 0 {
             fireBolt(input)
@@ -2337,7 +2498,7 @@ public struct Player: Equatable {
         strikeBuffer = 0
         // Z Tea: up and slash fires a blast; down and slash the beam, on the ground or in the
         // air, charged, or a stored charge (level two) fired at once. Plain slash is the slash.
-        if power == .zTea, Player.verticalAsked(stepInput), stepInput.stick.y > 0 {
+        if power == .zTea, blastStep != nil || Player.verticalAsked(stepInput) && stepInput.stick.y > 0 {
             fireBlast()
             return
         }
@@ -2353,6 +2514,7 @@ public struct Player: Equatable {
             return
         }
         slashHit = false
+        slashMetBarrier = false
         fastFalling = false
         slashAirborne = !grounded
         if !grounded { velocity.y = max(velocity.y, SlashRules.lift) }
@@ -2367,9 +2529,13 @@ public struct Player: Equatable {
         enter(grounded ? .idle : .rolling)
     }
 
-    private mutating func startSnatch() {
+    private mutating func startSnatch(events: inout [MatchEvent]) {
         // Parried a moment ago: the throw button does nothing yet.
         guard attackLockout == 0 else { return }
+        if summonAsked, !holding {
+            summonBreakerBall(events: &events)
+            return
+        }
         guardBuffer = 0
         fastFalling = false
         enter(.snatching)
@@ -2388,6 +2554,7 @@ public struct Player: Equatable {
         flipDrift = 0
         velocity = .zero
         shieldParried = false
+        shieldClashHold = false
         enter(.flipJump)
         wanted = .raiseShield
     }
@@ -2402,14 +2569,28 @@ public struct Player: Equatable {
         velocity.y = fullHopVelocity * BallRules.layupHopShare
         enter(.spinning)
         spinPhasing = true
-        spinUsed = true
+        spinsTaken += 1
+        spinUsed = spinsTaken >= (power == .phantomFrappe && powerLevel >= 2 ? PhantomRules.levelTwoSpinsPerAirtime : 1)
         wanted = .spin
+        if power == .phantomFrappe { phantomToggleAsked = true }
+    }
+
+    /// Phantom Frappe: into the phantom form, or back out of it (`Match`, once it's seen there's room).
+    mutating func togglePhantom() {
+        phantomMode.toggle()
+        phantomFrames = 0
     }
 
     /// The Spin Move's extended foot and its reach, where the body is now.
     public var spinFoot: (centre: Vec2, radius: Double) {
         let scale = spec.scale / SpinRules.pixelsPerUnit
         return (position + Vec2(x: SpinRules.footPixels.x * facing.sign, y: SpinRules.footPixels.y) * scale, SpinRules.footRadiusPixels * scale)
+    }
+
+    /// Titan Tea through the slab it broke landing: falling on, as off an edge.
+    public mutating func fallThroughBrokenPlatform() {
+        grounded = false
+        if state == .land { enter(.air) }
     }
 
     /// The Spin Move's foot: a hop from it is the full one.
@@ -2419,7 +2600,14 @@ public struct Player: Equatable {
 
     /// The feet's place off a rim for the dunk, at the body's size, so the hands still meet it.
     public func dunkPlace(on rim: Hoop) -> Vec2 {
-        rim.position + Vec2(x: BallRules.dunkOffset.x * rim.backboard.sign, y: BallRules.dunkOffset.y) * spec.scale
+        rim.position + Vec2(x: BallRules.dunkOffset.x * dunkFacing(on: rim).sign, y: BallRules.dunkOffset.y) * spec.scale
+    }
+    /// The way a dunk on the rim faces: toward its backboard; on a front-facing one, across it
+    /// from the side the body comes from, kept through the dunk.
+    public func dunkFacing(on rim: Hoop) -> Facing {
+        guard rim.frontFacing else { return rim.backboard }
+        if state == .dunking { return facing }
+        return position.x <= rim.position.x ? .right : .left
     }
 
     /// A slashclash's or a snatchclash's hit stop over: out of the swing or the snatch at once, back in neutral.
@@ -2435,10 +2623,18 @@ public struct Player: Equatable {
         clashSlideSpeed = velocity.x
     }
 
-    /// Having parried: out of the snatch, the throw's stance or the stepback at once, back in
-    /// neutral to do anything, the ball kept if held; the buttons wanting a fresh press.
+    /// Having parried: as the parry's hit stop ends, out of whatever it was doing, back in neutral
+    /// to do anything, the ball kept if held; the buttons wanting a fresh press.
+    /// Hanging on a rim that's gone (Breaker Ball's, its stun over): let go of it.
+    public mutating func letGoOfRim(_ hoop: Int) {
+        guard state == .dunking, dunkHoop == hoop else { return }
+        dunkPassing = false
+        enter(grounded ? .idle : .air)
+    }
+
     public mutating func recoverFromParry() {
-        guard [.snatching, .throwStance, .stepback].contains(state) else { return }
+        // The change into FloState runs on through its burst's parry.
+        guard state != .transforming else { return }
         shootReady = false
         throwReady = false
         quickThrow = false
@@ -2459,12 +2655,15 @@ public struct Player: Equatable {
         wanted = .fireBeam
     }
 
-    /// The beam's aim and a held run of blasts': a share of the way a frame from where it is to
-    /// where the stick points, within 45 degrees up or down; straight with the stick let go.
+    /// Where the stick points, within 45 degrees up or down; straight with it let go. A run of
+    /// blasts takes it as it is.
+    static func stickAim(_ input: PlayerInput) -> Double {
+        input.stick.length < 0.3 ? 0 : min(max(Trig.atan2(input.stick.y, abs(input.stick.x)), -ZRules.aimRange), ZRules.aimRange)
+    }
+
+    /// The beam's aim: a share of the way a frame from where it is to where the stick points.
     static func easedAim(_ aim: Double, _ input: PlayerInput) -> Double {
-        let wanted = input.stick.length < 0.3 ? 0
-            : min(max(Trig.atan2(input.stick.y, abs(input.stick.x)), -ZRules.aimRange), ZRules.aimRange)
-        return aim + (wanted - aim) * ZRules.aimEase
+        aim + (stickAim(input) - aim) * ZRules.aimEase
     }
 
     /// Firing Z Tea's beam: not its recovery after.
@@ -2594,7 +2793,7 @@ public struct Player: Equatable {
     /// Web Water's line, on the throw button with no ball: held, it aims along the stick;
     /// let go, it fires that way, or forward if the stick never moved.
     private mutating func webLineIfAsked(_ input: PlayerInput, throwPressed: Bool) -> PlayerAction? {
-        guard power == .webWater, powerLevel >= 2, !holding else { webAiming = false; return nil }
+        guard power == .webWater, powerLevel >= 2, !holding, webAiming || !summonAsked else { webAiming = false; return nil }
         if throwPressed, webLineCooldown == 0, !webAiming {
             guardBuffer = 0
             webAiming = true
@@ -2610,7 +2809,8 @@ public struct Player: Equatable {
         guard !input.throwBall else { return nil }
         webAiming = false
         webLineCooldown = WebRules.lineCooldownFrames
-        webLinePose = 8
+        webShotAge = 0
+        webShotFromWall = state == .wallLand
         spinningOut = false
         return .webLine(direction: webAimDirection)
     }
@@ -2644,7 +2844,7 @@ public struct Player: Equatable {
         if floStateLockout > 0 { floStateLockout -= 1 }
         guard inFloState, !unlimitedFlo else { return }
         floStateClock += 1
-        if floStateClock >= (spec.floFrappeLevel >= 1 ? FrappeRules.spendFrames : FloStateRules.spendFrames) {
+        if floStateClock >= FloStateRules.spendFrames {
             floStateClock = 0
             flo -= 1
         }
@@ -2680,9 +2880,8 @@ public struct Player: Equatable {
     }
 
     mutating func gainFlo(_ amount: Int, at source: Vec2, events: inout [MatchEvent]) {
-        let bonus = amount > 0 && spec.floFrappeLevel >= 2 ? FrappeRules.bonus : 0
-        let gained = min(amount + bonus, FloRules.full - flo)
-        guard gained > 0 else { return }
+        let gained = min(amount, FloRules.full - flo)
+        guard earnsFlo, gained > 0 else { return }
         flo += gained
         events.append(.floGained(player: index, amount: gained, at: source))
     }
@@ -2772,16 +2971,32 @@ public struct Player: Equatable {
 
     private mutating func endPull() {
         pullTarget = nil
-        if state == .webPull { webLine = nil }
         velocity = .zero
-        enter(grounded ? .idle : .air)
+        guard state == .webPull else { return enter(grounded ? .idle : .air) }
+        webLine = nil
+        // Zipped to a wall: clung to it at once, held there till the stick pushes off it.
+        if let wall = wallSide, !grounded {
+            facing = wall
+            platformArmed = true
+            enter(.wallLand)
+            zipCling = true
+        } else {
+            enter(grounded ? .idle : .air)
+        }
     }
 
     /// Flash Fizz: put down at the ball, nudged clear of anything solid, still, in the air
     /// or on the floor as it lands.
     public mutating func warp(to feet: Vec2, in stage: Stage) {
-        position = feet
-        position += stage.pushOut(body, reach: FizzRules.flashDistance + Stage.tileSize)
+        // Too deep in a solid or past the stage's edge to be nudged clear: back along the way toward the start till clear.
+        let start = position
+        let steps = 16
+        for step in 0...steps {
+            position = start + (feet - start) * (1 - Double(step) / Double(steps))
+            position += stage.pushOut(body, reach: FizzRules.flashDistance + Stage.tileSize)
+            if !stage.overlapsSolid(body) { break }
+        }
+        if stage.overlapsSolid(body) { position = start }
         velocity = .zero
         fastFalling = false
         webAnchor = nil
@@ -2816,7 +3031,7 @@ public struct Player: Equatable {
         jumpsLeft = max(jumpsLeft, spec.jumps - 1)
         platformArmed = true
         velocity = Vec2(x: wallJumpHorizontal * -wall.sign, y: wallJumpVertical)
-        facing = wall.flipped
+        // Turned away from the wall by leaving the cling (`enter`).
         fastFalling = false
         wallLandCooldown = spec.wallLandCooldownFrames
         airControlLock = spec.wallJumpControlLockFrames
@@ -2903,6 +3118,7 @@ public struct Player: Equatable {
         jumpsLeft -= 1
         fastFalling = false
         doubleJumpTimer = 30
+        cancelBlastPose()
         spinningOut = false
         if let direction = stickFacing(input) { facing = direction }
         events.append(.doubleJumped(player: index))
@@ -2953,7 +3169,7 @@ public struct Player: Equatable {
             if power == .platformShake, platformArmed, platformCooldown == 0, dropThrough == 0 { wantsPlatform = true }
         }
         let floor = fastFalling ? -fastFall : -fallSpeed
-        // Feather Fresca floats down; a fast fall doesn't.
+        // Feather Float floats down; a fast fall doesn't.
         let gravity = velocity.y <= 0 && !fastFalling ? gravity * spec.fallGravityShare : gravity
         // On a pitched stage gravity leans: a share of it sideways, in the air.
         velocity.y = max(velocity.y - gravity * tiltDown, floor)
@@ -3089,7 +3305,10 @@ public struct Player: Equatable {
                 wanted = .quake
             }
             knockedAloft = false
-            if state != .spinning { spinUsed = false }
+            if state != .spinning {
+                spinUsed = false
+                spinsTaken = 0
+            }
             secondShieldUsed = false
             flungFrames = 0
             jumpsLeft = spec.jumps
@@ -3138,6 +3357,7 @@ public struct Player: Equatable {
         hasBall = true
         // The ball had again: the Spin Move's back too.
         spinUsed = false
+        spinsTaken = 0
         if state == .snatching {
             snatchCooldown = SnatchRules.cooldownFrames
             // FloState's step-through carries on with the ball in hand, through the other.
@@ -3229,11 +3449,9 @@ public enum SpinRules {
     public static let push = 3.0
 }
 
-/// Flo-efficient Frappe: in FloState a FLO goes every this many frames rather than every 18, a
-/// full bar lasting 35 seconds rather than 30; at level two each FLO gained is this much more.
-public enum FrappeRules {
-    public static let spendFrames = 21
-    public static let bonus = 5
+/// Floback Fresca: FLO gained when hit or snatched, and at level two on throwing the ball.
+public enum FlobackRules {
+    public static let flo = 5
 }
 
 public enum FloRules {

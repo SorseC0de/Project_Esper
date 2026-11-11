@@ -62,6 +62,21 @@ public enum AnoziraRules {
         return Vec2(x: left, y: Double(floorRows) * 16) / 1.6 + Vec2(x: swerve, y: veer)
     }
 
+    /// Breaker Ball's second car, in the hoop truck's place: home and its spread, art pixels, on its own clock.
+    public static let secondCarHome = 320.0
+    public static let secondCarLeftMost = 256.0
+    public static let secondCarRightMost = 368.0
+    public static func secondCar(at frame: Int, running: Int?, veer: Double = 0, swerve: Double = 0) -> Vec2 {
+        let left = shifted(running.map { frame - $0 } ?? -1, home: secondCarHome, low: secondCarLeftMost, high: secondCarRightMost,
+                           stretch: carShiftFrames, moving: carMoveFrames, salt: 0x2CA7)
+        return Vec2(x: left, y: Double(floorRows) * 16) / 1.6 + Vec2(x: swerve, y: veer)
+    }
+    /// Breaker Ball's ball comes in under the Phoenix, let go over the stage's middle as the count ends:
+    /// frames of its crossing till its ring's there.
+    public static var phoenixToMiddleFrames: Int {
+        Int(((Double(columns) * 16 / 2 - phoenixRing.x + phoenixWidth) / phoenixSpeed).rounded())
+    }
+
     /// Idling: a pixel up every other `bobFrames`, in units.
     public static func idle(at frame: Int) -> Double { (frame / bobFrames) % 2 == 0 ? 0 : 1 / 1.6 }
     /// Idling, up a pixel and back every `bobFrames`.
@@ -348,6 +363,92 @@ extension Match {
     }
     public var anoziraCar: Vec2 { anoziraCar(at: frame) }
 
+    /// Breaker Ball's second car on a frame, as the first is, on its own clock and in the truck's lane.
+    func anoziraSecondCar(at frame: Int) -> Vec2 {
+        AnoziraRules.secondCar(at: frame, running: anoziraStart.map { $0 + countdownLength }, veer: veer(at: frame, salt: Match.truckVeerSalt),
+                               swerve: swerve(at: frame, salt: Match.truckVeerSalt))
+    }
+    public var anoziraSecondCar: Vec2 { anoziraSecondCar(at: frame) }
+
+    /// Breaker Ball's Anozira: the Phoenix crosses with the ball on its ring, there over the middle as the count ends.
+    mutating func sendBallWithPhoenix() {
+        phoenix = AnoziraRules.Phoenix(start: frame + countdownLength - AnoziraRules.phoenixToMiddleFrames)
+        ballOnPhoenix = true
+        if let ring = phoenixRing { ball.respawn(at: ring) }
+    }
+
+    /// Where the Phoenix's tail's ring is this frame, if it's flying.
+    var phoenixRing: Vec2? {
+        phoenix.flatMap { AnoziraRules.phoenix($0, at: frame) }.map { $0 + AnoziraRules.phoenixRing / 1.6 }
+    }
+
+    /// Breaker Ball's Anozira a frame on: two cars and no trucks, whoever stands on either carried, the
+    /// potholes under both; the Phoenix with the ball, letting it go as the count ends.
+    mutating func placeBreakerCars() {
+        let car = anoziraCar, second = anoziraSecondCar
+        let wasFirst = CarRules.collision(at: anoziraCar(at: frame - 1), facesRight: true)
+        let wasSecond = CarRules.collision(at: anoziraSecondCar(at: frame - 1), facesRight: true)
+        let firstRiders = riders(tops: wasFirst.tops, slopes: wasFirst.slopes)
+        let secondRiders = riders(tops: wasSecond.tops, slopes: wasSecond.slopes)
+        for index in firstRiders { players[index].position += car - anoziraCar(at: frame - 1) }
+        for index in secondRiders { players[index].position += second - anoziraSecondCar(at: frame - 1) }
+        stepPotholes(cars: [(car, firstRiders, false), (second, secondRiders, true)])
+        let first = CarRules.collision(at: car, facesRight: true), next = CarRules.collision(at: second, facesRight: true)
+        stage.oneWayBoxes = first.tops + next.tops
+        stage.rightwardWalls = []
+        stage.slopes = stage.fixedSlopes + first.slopes + next.slopes
+        if phoenix != nil, phoenixRing == nil { phoenix = nil }
+        if ballOnPhoenix {
+            if countdown > 0, let ring = phoenixRing {
+                ball.position = ring
+                ball.velocity = .zero
+            } else {
+                ballOnPhoenix = false
+            }
+        }
+        // Sliding on the road wears your own barrier down.
+        for index in players.indices where players[index].roadSliding {
+            damageOwnBarrier(of: index, by: BreakerRules.roadSlideDamagePerFrame, at: players[index].position)
+        }
+    }
+
+    /// The potholes under Breaker Ball's two cars, the second's jump kept apart; who rides one over a
+    /// pothole, or slides or runs into one, loses the ball as ever and wears their own barrier down.
+    mutating func stepPotholes(cars: [(origin: Vec2, riders: [Int], second: Bool)]) {
+        let speed = AnoziraRules.potholeSpeed
+        let was = potholes
+        potholes = potholes.map { $0 - speed }.filter { $0 > -Stage.tileSize }
+        if AnoziraRules.mixed(frame, salt: 0x9077) % AnoziraRules.potholeOdds == 0 { potholes.append(stage.width + Stage.tileSize) }
+        func crossed(_ x: Double) -> Bool { was.contains { $0 > x && $0 - speed <= x } }
+        func spill(_ index: Int) {
+            // Breaker Ball's Breaker Ball is lost as the ball is.
+            guard players[index].hasBall, ball.holder == index || mode == .breakerBall, !players[index].phantomMode else { return }
+            let from = players[index].heldBallPoint
+            players[index].loseBall()
+            players[index].hitStun = BallRules.hitStunFrames
+            if mode == .breakerBall { loseBreakerBall(from: from, colour: index) } else { ball.pop(from: from) }
+            events.append(.roadSpilled(player: index))
+        }
+        for car in cars where AnoziraRules.carWheels.contains(where: { crossed(car.origin.x + $0 / 1.6) }) {
+            if car.second { secondCarBumpAt = frame } else { carBumpAt = frame }
+            // Worn down once a pothole, as its front wheel goes over: the road comes from the right.
+            let front = AnoziraRules.carWheels.max().map { crossed(car.origin.x + $0 / 1.6) } ?? false
+            for index in car.riders {
+                spill(index)
+                if front { damageOwnBarrier(of: index, by: BreakerRules.potholeRidingDamage, at: players[index].position) }
+            }
+            events.append(.potholeBump(at: car.origin))
+        }
+        for index in players.indices where (players[index].roadSliding || players[index].roadRunning) && !players[index].roadTripped {
+            let body = players[index].body
+            guard was.contains(where: { $0 - speed >= body.min.x && $0 - speed <= body.max.x && !($0 >= body.min.x && $0 <= body.max.x) }) else { continue }
+            spill(index)
+            players[index].roadTripped = true
+            damageOwnBarrier(of: index, by: BreakerRules.potholeSlidingDamage, at: players[index].position)
+            events.append(.potholeBump(at: players[index].position))
+        }
+    }
+
     /// The hoop truck as it stands on a frame.
     func anoziraTruck(at frame: Int) -> AnoziraRules.Truck {
         AnoziraRules.truck(at: frame, arrival: hoopTruckArrives, pull: hoopTruckPull, ridden: hoopTruckRidden, bumped: truckBumpAt,
@@ -370,8 +471,12 @@ extension Match {
     public mutating func placeAnoziraTruck() {
         guard stage.features.look == .anozira, !stage.hoops.isEmpty else { return }
         if anoziraStart == nil { anoziraStart = frame }
+        if mode == .breakerBall {
+            placeBreakerCars()
+            return
+        }
         // A dunker hanging on, past the slam, pulls the pole down; let go, it comes back up.
-        let hanging = players.contains { $0.state == .dunking && $0.dunkHoop == 0 && $0.stateTimer >= BallRules.dunkFrames / 2 }
+        let hanging = players.contains { $0.state == .dunking && !$0.dunkPassing && $0.dunkHoop == 0 && $0.stateTimer >= BallRules.dunkSlamFrame }
         let pullTo = hanging ? AnoziraRules.hangPullMost : 0
         hoopTruckPull += min(max(pullTo - hoopTruckPull, -AnoziraRules.hangPullRate), AnoziraRules.hangPullRate)
         let truck = anoziraTruck
@@ -436,11 +541,12 @@ extension Match {
         if AnoziraRules.mixed(frame, salt: 0x9077) % AnoziraRules.potholeOdds == 0 { potholes.append(stage.width + Stage.tileSize) }
         func crossed(_ x: Double) -> Bool { was.contains { $0 > x && $0 - speed <= x } }
         func strip(_ index: Int) {
-            guard players[index].hasBall, ball.holder == index else { return }
+            // Breaker Ball's Breaker Ball is lost as the ball is.
+            guard players[index].hasBall, ball.holder == index || mode == .breakerBall, !players[index].phantomMode else { return }
             let from = players[index].heldBallPoint
             players[index].loseBall()
             players[index].hitStun = BallRules.hitStunFrames
-            ball.pop(from: from)
+            if mode == .breakerBall { loseBreakerBall(from: from, colour: index) } else { ball.pop(from: from) }
             events.append(.roadSpilled(player: index))
         }
         if AnoziraRules.carWheels.contains(where: { crossed(car.x + $0 / 1.6) }) {

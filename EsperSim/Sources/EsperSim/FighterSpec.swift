@@ -69,18 +69,18 @@ public struct FighterSpec: Equatable {
     /// Slide Cider's level: one, the slide knocks harder and catches the ball; two, it stuns too.
     public var slideCiderLevel = 0
     /// Guarderade: a bigger shield, and at level two a second before landing. Shelter Seltzer:
-    /// the shield lingers where it ends, and at level two every snatch raises one.
+    /// the shield lingers where it's raised, and at level two every snatch raises one.
     public var guarderadeLevel = 0
     public var shelterSeltzerLevel = 0
-    /// Flo-efficient Frappe: FloState burns slower, and at level two every FLO gained is more.
-    public var floFrappeLevel = 0
+    /// Floback Fresca: FLO when hit or snatched, and at level two when throwing the ball.
+    public var flobackFrescaLevel = 0
     /// Quake-Up Coffee's level: one, a fast fall's landing quakes the floor it's on and falls
     /// faster; two, the quake shakes every floor.
     public var quakeLevel = 0
     public var slideFriction = 0.02
     /// A third jump's speed, when there is one: Jumper Juice's second drink.
     public var thirdJumpVelocity = 0.0
-    /// Share of gravity felt falling, not fast falling: Feather Fresca's float.
+    /// Share of gravity felt falling, not fast falling: Feather Float's float.
     public var fallGravityShare = 1.0
     /// Share of any knock the body takes: Titan Tea's weight.
     public var knockbackShare = 1.0
@@ -394,14 +394,18 @@ public enum BallRules {
     public static let layupRecoveryFrames = 9 * 60 / layupFramesPerSecond
     public static let layupHopShare = 0.7071067811865476
     /// A throw stance with the chest this close to a rim becomes a dunk, wider than the
-    /// basket. The ball goes in halfway through the dunk's frames, and the dunker hangs
-    /// on the rim for this long after before the point restarts.
+    /// basket. The ball goes in at the slam, and the dunker hangs on the rim for
+    /// `dunkSlamToHangFrames` and then `dunkHangFrames` before letting go.
     public static let dunkRadius = 25.0
     /// Frames in the throw stance before one by a rim becomes a dunk, so a throw let go
     /// in passing doesn't.
     public static let dunkStanceFrames = 3
-    public static let dunkFrames = 40
+    public static var dunkSlamFrame: Int { Animation.dunkSlamFrame }
+    public static let dunkSlamToHangFrames = 20
     public static let dunkHangFrames = 45
+    /// Frames stuck in the dunk's last frame, the rim hang, before down lets go.
+    public static let dunkLetGoDelayFrames = 3
+    public static var dunkLetGoFrame: Int { Animation.dunkStart(of: Animation.dunkSequence.count - 1) + dunkLetGoDelayFrames }
     /// Where the dunker's feet go on the rim, from the rim's centre, for a rim with its
     /// backboard on the right; across is mirrored for the other. 16 art pixels back and
     /// 24 down, as the user placed it on the sliders.
@@ -462,11 +466,10 @@ public enum WebRules {
     public static let swingOvershoot = 1.0
     public static let swingMaxArcShare = 1.6
     public static let swingMaxAngle = 1.4
-    /// A swing can't start again for this long after one ends: the frames a full swing
-    /// takes, the least arc's frames times the max share plus the ease-in's frame and a
-    /// half. It neither spends nor needs the double jump, so a swing let go early doesn't
+    /// A swing can't start again for this long after one ends (WEB SWING GAP; was a full swing's
+    /// frames, 28). It neither spends nor needs the double jump, so a swing let go early doesn't
     /// lock the next one out until landing.
-    public static let swingCooldownFrames = Int((Double(swingFrames) * swingMaxArcShare + 1.5).rounded(.up))
+    nonisolated(unsafe) public static var swingCooldownFrames = 20
     /// The line reaches this far, bends to a ball or body within this angle of the aim,
     /// snaps to one within this of its tip, reels at this speed, can't repeat for this long,
     /// and a miss shows for this many frames, live the whole time.
@@ -480,6 +483,11 @@ public enum WebRules {
     /// gives up after this many frames.
     public static let dropDistance = 12.0
     public static let pullMaxFrames = 40
+    /// The shot's pose, let go, plays its four frames after the hold at 15 a second: the line goes
+    /// out on the second (the sheet's 5th, the wall's 3rd) and pulls on the fourth (7th, 5th).
+    public static let shotOutFrames = 4
+    public static let shotPullFrames = 12
+    public static let shotPoseFrames = 20
 }
 
 /// Super Smoothie's numbers: slow flight in any direction, gravity off, for a budget per
@@ -521,16 +529,15 @@ public enum FizzRules {
     public static let tearRadius = 15.0
 }
 
-/// Platform Protein Shake's numbers: a fast fall makes a slab under the feet this wide,
-/// this thick, for this long. Without the ball, shoot makes a wall in front this thick
+/// Platform Protein Shake's numbers: a fast fall makes a slab under the feet this wide and
+/// this thick, standing till it's broken or the next, slab or wall, replaces it. Without the ball, shoot makes a wall in front this thick
 /// and this tall on the snatch's reach, over this many frames, appearing on this one.
-/// Either can be made again only this long after the last, and only after a jump, a
-/// wall jump or a wall land since it, so holding down through a fall makes one, not a
+/// Either can be made only this long after the last of either; a slab only after a jump, a
+/// wall jump or a wall land since it too, so holding down through a fall makes one, not a
 /// stream, and jump, slab, jump, slab still works.
 public enum ShakeRules {
     public static let platformWidth = 30.0
     public static let platformThickness = 10.0
-    public static let platformFrames = 120
     public static let cooldownFrames = 75
     public static let wallWidth = 10.0
     public static let wallHeight = 30.0
@@ -584,6 +591,16 @@ public enum SlashRules {
 /// instead; the lock stays, one switch away.
 public enum StunRules {
     public static let locksMovement = false
+    /// Off: a hit body jumps as it moves, so movement is all free or all locked, never half.
+    public static let locksJump = false
+}
+
+/// Hits taken close together: each one within `windowFrames` of the last makes the next grace
+/// longer, `stepFrames` a hit past the first, in which attacks pass through, so a chain can't trap.
+public enum HitGraceRules {
+    public static var windowFrames = 120
+    public static var stepFrames = 30
+    public static func graceFrames(chainedHits: Int) -> Int { max(chainedHits - 1, 0) * stepFrames }
 }
 
 /// A parry's reward: the parrier back in neutral at once, free to do anything, while the one
@@ -622,6 +639,8 @@ public enum HitStopRules {
     public static let counterFrames = 28
     /// Every clash's, slash, snatch or shield, held long.
     public static let clashFrames = 40
+    /// A Breaker Ball barrier shattering.
+    public static let shatterFrames = 30
 }
 
 /// A clash over: both bodies pushed hard down and away from where they met, nothing answering
@@ -714,4 +733,20 @@ func simFrames(_ sheetFrames: Int, at sheetFramesPerSecond: Int) -> Int {
 /// The sim frames a range of sheet frames covers, at the sheet's rate.
 func simFrames(_ sheetFrames: Range<Int>, at sheetFramesPerSecond: Int) -> Range<Int> {
     simFrames(sheetFrames.lowerBound, at: sheetFramesPerSecond)..<simFrames(sheetFrames.upperBound, at: sheetFramesPerSecond)
+}
+
+/// A throw's charge: the stance held past its windup, full after `fullFrames` in it (where the charge's
+/// swirl starts its loop). The speed runs from `leastSpeed` to `mostSpeed` (`BallRules.throwSpeed`,
+/// as throws were, at three quarters), still well over a floater's; at full, none but the thrower takes it
+/// till it bounces. Not the floater's.
+public enum ThrowChargeRules {
+    public static let fullFrames = 70
+    public static let leastSpeed = 4.0
+    public static let mostSpeed = 8.0
+
+    /// The charge, 0 to 1, for a stance held this long.
+    public static func charge(heldFrames: Int) -> Double {
+        min(max(Double(heldFrames - BallRules.throwWindupFrames) / Double(fullFrames - BallRules.throwWindupFrames), 0), 1)
+    }
+    public static func speed(_ charge: Double) -> Double { leastSpeed + (mostSpeed - leastSpeed) * charge }
 }

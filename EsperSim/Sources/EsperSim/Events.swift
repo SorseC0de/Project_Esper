@@ -37,6 +37,8 @@ public enum MatchEvent: Equatable {
     case portalOpened(at: Vec2)
     case portalClosed(at: Vec2)
     case portalWarped(from: Vec2, to: Vec2)
+    /// A player without the ball through the portal, their feet from and to.
+    case portalCarried(player: Int, from: Vec2, to: Vec2)
     case helicopterArrived(hoop: Int)
     case surfLanded(player: Int)
     /// Something the other threw or fired stopped on Surf Soda's board.
@@ -48,6 +50,31 @@ public enum MatchEvent: Equatable {
     /// Flash Fizz's flash without the ball: the tear left at `to` pulls a loose ball in.
     case flashed(player: Int, from: Vec2, to: Vec2)
     case platformMade(player: Int)
+    /// A slab or a wall broken, or replaced by its maker's next: its box, for the cubes it breaks into.
+    case platformShattered(player: Int, box: Box)
+    /// Phantom Frappe: a body into its phantom form, or back out of it.
+    case phantomToggled(player: Int, phantom: Bool)
+    /// Pulsepistol Punch's repulsion turning something fired back on its firer, where.
+    case pulseReflected(player: Int, at: Vec2)
+    /// Breaker Ball: `player`'s barrier, their posture, worn down this much, where they were hit; at 0
+    /// it shatters, as it does when they're stunned, their rim appears over them, and it's restored
+    /// once they're scored on or the stun ends.
+    case barrierHit(player: Int, at: Vec2, damage: Double)
+    case barrierShattered(player: Int, at: Vec2)
+    case barrierRestored(player: Int)
+    /// Breaker Ball: `player`'s rim appearing over them as their barrier shatters.
+    case breakerHoopAppeared(player: Int, hoop: Int)
+    /// Breaker Ball: `player` scored on, held still a moment.
+    case scoredOnFreeze(player: Int)
+    /// Breaker Ball's Breaker Balls: one summoned into `player`'s hands; one taken out of the air by a
+    /// snatch, `from` its thrower (hit for it) if anyone's; one bursting where it met something.
+    case breakerBallSummoned(player: Int)
+    case breakerBallCaught(player: Int, from: Int?)
+    case breakerBallBurst(at: Vec2, colour: Int)
+    /// A basket through `player`'s own rim mending their barrier this much.
+    case barrierHealed(player: Int, amount: Double)
+    /// Breaker Ball's snatch: `player`'s rim left where it is, or taken back with a touch.
+    case hoopParked(player: Int, parked: Bool)
     case slid(player: Int)
     case slashed(player: Int)
     /// The blade met a wall on its first live frame.
@@ -61,6 +88,8 @@ public enum MatchEvent: Equatable {
     /// FLO earned, this much, from a play there: the rim of a basket, a counter, a snatch, a
     /// pop, a taunt's ball on the floor.
     case floGained(player: Int, amount: Int, at: Vec2)
+    /// The change into FloState's burst went off: the body is becoming energy.
+    case transformed(player: Int)
     /// The ball knocked out of `player`'s hands by `by`.
     case popped(player: Int, by: Int)
     /// The ball spilled out of `player`'s hands onto a road (`RoadRules`).

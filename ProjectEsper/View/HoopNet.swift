@@ -52,10 +52,10 @@ enum NetTuning {
     /// the net goes where the stage's hoop art does against the court's too.
     static func offsetXKey(for look: StageLook) -> String { look == .flightB411 ? offsetXKey + ".flight" : look.tiltedHoop ? offsetXKey + ".stadium" : offsetXKey }
     static func offsetYKey(for look: StageLook) -> String { look == .flightB411 ? offsetYKey + ".flight" : look.tiltedHoop ? offsetYKey + ".stadium" : offsetYKey }
-    /// What NET X and NET Y are set to on a stage: Longball Stadium's (-1, -5) as tuned.
+    /// What NET X and NET Y are set to on a stage: the perspective hoop's (-1, -3) as tuned on Longball Stadium.
     static func setting(for look: StageLook) -> CGPoint {
         // Flight B411's hangs from the hoopcase's ring, which is the rim's point itself.
-        let placed = look == .flightB411 ? CGPoint(x: 0, y: 0) : look.tiltedHoop ? CGPoint(x: -1, y: -5) : offset
+        let placed = look == .flightB411 ? CGPoint(x: 0, y: 0) : look.tiltedHoop ? CGPoint(x: -1, y: -3) : offset
         return CGPoint(x: stored(offsetXKey(for: look)) ?? placed.x, y: stored(offsetYKey(for: look)) ?? placed.y)
     }
     /// Where the net hangs against the rim: the setting, moved as far as the stage's hoop art is from `HoopTuning.netReference`.
@@ -85,6 +85,37 @@ enum NetTuning {
     static let tiltKey = "ui.net.cylinder.tilt"
     static let turnKey = "ui.net.cylinder.turn"
     static let rollKey = "ui.net.cylinder.roll"
+    /// The Tutorial hub's front-facing hoops' nets, tuned apart (the FRONT NET sliders): each of the
+    /// cylinder's and the chevrons' settings under its own key, the side nets' to start; and how far
+    /// under the ring it hangs.
+    static let frontSuffix = ".front"
+    static func frontValue(_ key: String, _ side: CGFloat, start: CGFloat? = nil) -> CGFloat { stored(key + frontSuffix) ?? start ?? side }
+    static var frontOffsetY: CGFloat { stored(offsetYKey + frontSuffix) ?? -2 }
+    /// The perspective hoop's nets (Longball Stadium's, tuned on its NET sliders), every stage with that hoop:
+    /// each of the cylinder's and the chevrons' settings under its own key, as tuned on the right hoop (the left's is its mirror).
+    static let perspectiveSuffix = ".perspective"
+    static func perspectiveValue(_ key: String, _ tuned: CGFloat) -> CGFloat { stored(key + perspectiveSuffix) ?? tuned }
+    /// A cylinder's settings, a side net's or a front-facing one's.
+    struct Shape: Equatable {
+        var radiusTop, radiusBottom, rings, around, tilt, turn, roll, rowSpacing, topScale, bottomScale: CGFloat
+    }
+    static func shape(front: Bool, perspective: Bool = false) -> Shape {
+        if perspective, !front {
+            return Shape(radiusTop: perspectiveValue(radiusTopKey, 8), radiusBottom: perspectiveValue(radiusBottomKey, 5),
+                         rings: perspectiveValue(ringsKey, 7), around: perspectiveValue(aroundKey, 9), tilt: perspectiveValue(tiltKey, -30),
+                         turn: perspectiveValue(turnKey, 0), roll: perspectiveValue(rollKey, -2), rowSpacing: perspectiveValue(rowSpacingKey, 2),
+                         topScale: perspectiveValue(topScaleKey, 1), bottomScale: perspectiveValue(bottomScaleKey, 0.25))
+        }
+        guard front else {
+            return Shape(radiusTop: radiusTop, radiusBottom: radiusBottom, rings: rings, around: around, tilt: tilt, turn: turn, roll: roll,
+                         rowSpacing: rowSpacing, topScale: topScale, bottomScale: bottomScale)
+        }
+        // As tuned on the FRONT NET sliders.
+        return Shape(radiusTop: frontValue(radiusTopKey, radiusTop), radiusBottom: frontValue(radiusBottomKey, radiusBottom),
+                     rings: frontValue(ringsKey, rings, start: 7), around: frontValue(aroundKey, around, start: 10), tilt: frontValue(tiltKey, tilt, start: -25),
+                     turn: frontValue(turnKey, turn, start: -10), roll: frontValue(rollKey, roll, start: 6), rowSpacing: frontValue(rowSpacingKey, rowSpacing, start: 2),
+                     topScale: frontValue(topScaleKey, topScale), bottomScale: frontValue(bottomScaleKey, bottomScale))
+    }
     static var radiusTop: CGFloat { stored(radiusTopKey) ?? 7.5 }
     static var radiusBottom: CGFloat { stored(radiusBottomKey) ?? 4.5 }
     static var rings: CGFloat { stored(ringsKey) ?? 7 }
@@ -96,12 +127,19 @@ enum NetTuning {
     /// here come back over whatever a slider last saved.
     static let bakedVersion = 1
     private static let bakedVersionKey = "ui.net.bakedVersion"
+    /// NET ROLL Z, the side net's, nudged by accident on the dunk bench: dropped once, back to the baked roll.
+    private static let rollDroppedKey = "ui.net.rollDropped"
     static func dropSavedIfStale() {
         let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: rollDroppedKey) {
+            defaults.removeObject(forKey: rollKey)
+            defaults.set(true, forKey: rollDroppedKey)
+        }
         guard defaults.integer(forKey: bakedVersionKey) != bakedVersion else { return }
         let looks: [StageLook] = [.court, .footballField]
-        let keys = [topScaleKey, bottomScaleKey, spreadKey, rowSpacingKey, weaveKey, taperKey, skewKey,
-                    radiusTopKey, radiusBottomKey, ringsKey, aroundKey, tiltKey, turnKey, rollKey]
+        let shapeKeys = [topScaleKey, bottomScaleKey, spreadKey, rowSpacingKey, weaveKey, taperKey, skewKey,
+                         radiusTopKey, radiusBottomKey, ringsKey, aroundKey, tiltKey, turnKey, rollKey]
+        let keys = shapeKeys + shapeKeys.map { $0 + perspectiveSuffix }
             + looks.flatMap { [offsetXKey(for: $0), offsetYKey(for: $0)] }
         for key in keys { defaults.removeObject(forKey: key) }
         defaults.set(bakedVersion, forKey: bakedVersionKey)
@@ -109,8 +147,20 @@ enum NetTuning {
 
     /// What the mesh is built from; a change rebuilds it.
     static var meshValues: [CGFloat] { [spread, rowSpacing, weave, taper, skew] }
+    /// Read off the defaults once each, every frame's nets reading them many times over; forgotten
+    /// whenever the defaults change, as a slider sets them.
+    nonisolated(unsafe) private static var storedValues: [String: CGFloat?] = [:]
+    nonisolated(unsafe) private static var forgetsOnChange: NSObjectProtocol?
     private static func stored(_ key: String) -> CGFloat? {
-        (UserDefaults.standard.object(forKey: key) as? Double).map { CGFloat($0) }
+        if forgetsOnChange == nil {
+            forgetsOnChange = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: nil) { _ in
+                NetTuning.storedValues = [:]
+            }
+        }
+        if let value = storedValues[key] { return value }
+        let value = (UserDefaults.standard.object(forKey: key) as? Double).map { CGFloat($0) }
+        storedValues[key] = value
+        return value
     }
 }
 
@@ -161,8 +211,13 @@ final class HoopNet {
     private var lastBall: CGPoint?
     private var swish: Swish?
     /// A left backboard mirrors the skew.
-    private let facing: CGFloat
+    private var facing: CGFloat
     private var builtSpacing: [CGFloat] = []
+    /// The deepest knot's depth under the rim at rest, and each row's knots.
+    private var restDepth: CGFloat = 1
+    private var rowKnots: [[Int]] = []
+    /// The cylinder's strokes as last built.
+    let cylinderCache = CylinderNet.Cache()
     private var drawnScales: [CGFloat] = []
 
     /// The strands as drawn this frame, in the parent's space; nil while hidden.
@@ -222,9 +277,19 @@ final class HoopNet {
             let across = (0..<columns).map { index[$0][row] }.sorted { knots[$0].at.x < knots[$1].at.x }
             for (a, b) in zip(across, across.dropFirst()) { tie(a, b) }
         }
+        restDepth = max(-(knots.map(\.home.y).min() ?? -1), 1)
+        rowKnots = (0..<rows).map { row in knots.indices.filter { knots[$0].row == row } }
         awake = true
         stillFrames = 0
         place()
+    }
+
+    /// Turned with a backboard that's changed sides, Breaker Ball's following its defender: hung again.
+    func face(mirrored: Bool) {
+        let wanted: CGFloat = mirrored ? -1 : 1
+        guard wanted != facing else { return }
+        facing = wanted
+        buildMesh()
     }
 
     func recolour(_ colour: SKColor) {
@@ -241,11 +306,13 @@ final class HoopNet {
     var mirrored: Bool { facing < 0 }
     var colour: SKColor { shape.strokeColor }
     var rowSways: [CGPoint] {
-        (0..<NetTuning.chevronsPerColumn).map { row in
-            let inRow = knots.filter { $0.row == row }
+        rowKnots.map { inRow in
             guard !inRow.isEmpty else { return .zero }
-            let total = inRow.reduce(CGPoint.zero) { sum, knot in
-                CGPoint(x: sum.x + knot.at.x - rim.x - knot.home.x, y: sum.y + knot.at.y - rim.y - knot.home.y)
+            var total = CGPoint.zero
+            for index in inRow {
+                let knot = knots[index]
+                total.x += knot.at.x - rim.x - knot.home.x
+                total.y += knot.at.y - rim.y - knot.home.y
             }
             return CGPoint(x: total.x / CGFloat(inRow.count), y: total.y / CGFloat(inRow.count))
         }
@@ -253,10 +320,14 @@ final class HoopNet {
     /// Each row's width against its width at rest: a ball through the middle spreads the
     /// row both ways, which its sway, the average, doesn't show.
     var rowSpreads: [CGFloat] {
-        (0..<NetTuning.chevronsPerColumn).map { row in
-            let inRow = knots.filter { $0.row == row }
-            guard let restLeft = inRow.map(\.home.x).min(), let restRight = inRow.map(\.home.x).max(), restRight - restLeft > 0.01,
-                  let left = inRow.map(\.at.x).min(), let right = inRow.map(\.at.x).max() else { return 1 }
+        rowKnots.map { inRow in
+            var restLeft = CGFloat.infinity, restRight = -CGFloat.infinity, left = CGFloat.infinity, right = -CGFloat.infinity
+            for index in inRow {
+                let knot = knots[index]
+                restLeft = min(restLeft, knot.home.x); restRight = max(restRight, knot.home.x)
+                left = min(left, knot.at.x); right = max(right, knot.at.x)
+            }
+            guard restRight - restLeft > 0.01 else { return 1 }
             return (right - left) / (restRight - restLeft)
         }
     }
@@ -290,7 +361,7 @@ final class HoopNet {
         defer { lastBall = ball }
         guard awake else {
             // Asleep, it still redraws for the tuning panel.
-            if drawnScales != [NetTuning.topScale, NetTuning.bottomScale] { place() }
+            if !shape.isHidden, drawnScales != [NetTuning.topScale, NetTuning.bottomScale] { place() }
             return
         }
 
@@ -304,8 +375,7 @@ final class HoopNet {
             }
             let velocity = CGPoint(x: (knot.at.x - knot.was.x) * NetTuning.damping, y: (knot.at.y - knot.was.y) * NetTuning.damping)
             knots[index].was = knot.at
-            let depth = max(-(knots.map(\.home.y).min() ?? -1), 1)
-            let push = wind * min(max(-knot.home.y / depth, 0), 1)
+            let push = wind * min(max(-knot.home.y / restDepth, 0), 1)
             knots[index].at = CGPoint(x: knot.at.x + velocity.x + push + (home.x - knot.at.x) * NetTuning.settle,
                                       y: knot.at.y + velocity.y + (home.y - knot.at.y) * NetTuning.settle)
         }
@@ -316,7 +386,7 @@ final class HoopNet {
             carried.at = CGPoint(x: carried.at.x + carried.velocity.x, y: carried.at.y + carried.velocity.y)
             carried.framesLeft -= 1
             sweep = (carried.was, carried.at)
-            let bottom = rim.y + (knots.map(\.home.y).min() ?? 0) - ballRadius
+            let bottom = rim.y - restDepth - ballRadius
             swish = carried.framesLeft > 0 && carried.at.y > bottom ? carried : nil
         } else if ballNear, let ball {
             sweep = (lastBall ?? ball, ball)
@@ -397,6 +467,8 @@ final class HoopNet {
 
     /// A chevron on every knot, smaller a step at a time down the column.
     private func place() {
+        // Only the flat net's drawn here; the cylinder's drawn from the knots by the Metal layer.
+        guard !shape.isHidden else { return }
         let topScale = NetTuning.topScale, bottomScale = NetTuning.bottomScale
         drawnScales = [topScale, bottomScale]
         let lastRow = CGFloat(max(NetTuning.chevronsPerColumn - 1, 1))

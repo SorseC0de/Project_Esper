@@ -16,6 +16,12 @@ where it's the biggest blob of white in the frame and at least BALL_MIN_PIXELS; 
 of the white is energy, the skid's puffs, a release's streaks, the slide's speed lines,
 which the app draws in the team colour. The sim's Animation.holdsBall and SpriteLibrary
 apply the same rule. Run it again whenever the art changes.
+
+    ./Tools/import_sprites.py                          # every sheet
+    ./Tools/import_sprites.py --keep player_shoot_air  # those named left as last imported
+
+`--keep` (comma-separated) holds sheets mid-edit back: their frames in the atlas and their ball
+landmarks stay as the last import left them, while everything else comes in fresh.
 """
 from pngio import read_png as read_rgba, write_png as write_rgba
 import glob
@@ -86,19 +92,23 @@ ANCHOR_OVERRIDE = {"fire_skid": 0.0, "fireball_summon": 0.5, "fire_particle": 0.
                    "dust_walk": 0.0, "dust_run": 0.0}
 BALL_SHEETS = {"player_dribble_idle", "player_dribble_walk", "player_dribble_run", "player_air_ball", "player_fly_ball",
                "player_wall_land_ball", "player_shoot", "player_shoot_air", "player_throw_forward",
-               "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk",
+               "player_catch", "player_catch_air", "player_skid_ball", "player_taunt", "player_dunk", "player_dunk2",
                "player_throw", "player_throw_air", "player_layup", "player_dbl_jump_ball", "player_spin_ball",
-               "player_swing_ball"}
+               "player_swing_ball", "player_snatch_flostate", "player_idle_ball_flostate"}
+
+# Balls painted on a layer of their own, in the ball's tones, beside the body's sheet: the layer's
+# landmarks go under the body's name, the middle of each frame's painted pixels.
+BALL_LAYERS = {"player_taunt2_ball": "player_taunt2"}
 
 # Frames whose ball is tucked behind the body, too little of it showing to find: its centre
 # given, art pixels from the feet, facing right. SpriteLibrary.tuckedBalls has to agree.
-TUCKED_BALLS = {"player_spin_ball_3": (-3.5, 20.5)}
+TUCKED_BALLS = {"player_spin_ball_3": (-3.5, 20.5), "player_dunk2_2": (-3.5, 21.5)}
 
 SKIP = {"spr_player_hurt", "Sprite22", "Sprite22_1", "sprite1", "sprite2", "sprite2_1",
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",
         "spr_box", "spr_floor"}
 # Strips in _Graphic Assets that nothing draws yet, kept out of the app until they're wired.
-HELD_BACK = {"dust_run2", "player_hurt", "player_flowing_hood", "player_idle_8x"}   # player_hurt: taken out of the game; the flowing hood: replaced by player_hoodheads_flostate; idle_8x: a picture
+HELD_BACK = {"dust_run2", "player_hurt", "player_flowing_hood", "player_idle_8x", "breaker_balls"}   # player_hurt: taken out of the game; the flowing hood: replaced by player_hoodheads_flostate; idle_8x: a picture; breaker_balls: the design the code's swaps were read from
 
 
 def load_yy(path):
@@ -165,7 +175,9 @@ def read_png(path):
 
 # Aseprite files read directly, each layer named here a vertical strip of its own, as if
 # exported; a PNG of the same name in Pixel Art wins.
-ASEPRITE = {"Player_Transform.aseprite": {"Sprite Sheet": "player_transform", "Layer 1": "transform_eyes"}}
+ASEPRITE = {"Player_Transform.aseprite": {"Sprite Sheet": "player_transform", "Layer 1": "transform_eyes"},
+            "player_webshoot.aseprite": {"Body": "player_webshoot", "Back Arm": "player_webshoot_back_arm", "Front Arm": "player_webshoot_front_arm"},
+            "player_webshoot_wall.aseprite": {"Body": "player_webshoot_wall", "Back Arm": "player_webshoot_wall_arm"}}
 
 
 def read_aseprite(path):
@@ -259,6 +271,16 @@ def box_down(width, height, bpp, rows, factor):
                 line[ox * 4:ox * 4 + 4] = bytes((r // a, g // a, b // a, a // (factor * factor)))
         out.append(bytes(line))
     return out_width, out_height, out
+
+
+def layer_centre(width, height, bpp, rows, feet_from_bottom):
+    """A ball layer's frame: the middle of its painted pixels' bounds in art pixels from the feet, or None."""
+    painted = [(x, y) for y, row in enumerate(rows) for x in range(width) if bpp != 4 or row[x * bpp + 3] >= 128]
+    if not painted:
+        return None
+    left, right = min(x for x, _ in painted), max(x for x, _ in painted) + 1
+    top, bottom = min(y for _, y in painted), max(y for _, y in painted) + 1
+    return ((left + right) / 2 - width / 2, height - (top + bottom) / 2 - feet_from_bottom)
 
 
 def ball_centre(width, height, bpp, rows, feet_from_bottom):
@@ -400,8 +422,33 @@ def write_root_images():
                   open(os.path.join(imageset, "Contents.json"), "w"), indent=2)
 
 
+def kept_landmarks(names):
+    """The ball landmarks the last import wrote for sheets in `names` (a ball layer's under its sheet's name)."""
+    if not names or not os.path.exists(LANDMARKS):
+        return []
+    owners = names | {BALL_LAYERS[name] for name in names if name in BALL_LAYERS}
+    found = []
+    for key, x, y in re.findall(r'"([a-z0-9_]+)": Vec2\(x: ([-0-9.]+), y: ([-0-9.]+)\)', open(LANDMARKS).read()):
+        if any(re.fullmatch(re.escape(owner) + r"_\d+", key) for owner in owners):
+            found.append((key, (float(x), float(y))))
+    return found
+
+
 def main():
+    keep = set()
+    if "--keep" in sys.argv:
+        keep = {name.strip().lower() for name in sys.argv[sys.argv.index("--keep") + 1].split(",") if name.strip()}
     landmarks = []
+    kept_marks = kept_landmarks(keep)
+    # Sheets held back with --keep: their imagesets set aside before the atlas is cleared, put back after.
+    kept_folder = tempfile.mkdtemp()
+    for name in keep:
+        frames = glob.glob(os.path.join(ATLAS, f"{name}_*.imageset"))
+        frames = [f for f in frames if re.fullmatch(re.escape(name) + r"_\d+\.imageset", os.path.basename(f))]
+        if not frames:
+            sys.exit(f"--keep {name}: nothing of it in the atlas to keep")
+        for frame in frames:
+            shutil.copytree(frame, os.path.join(kept_folder, os.path.basename(frame)))
     # The atlas's own Contents.json is kept as Xcode last wrote it.
     contents_path = os.path.join(ATLAS, "Contents.json")
     contents = open(contents_path).read() if os.path.exists(contents_path) else None
@@ -458,6 +505,19 @@ def main():
         if short in HELD_BACK:
             print(f"held back {short!r}: nothing draws it yet")
             continue
+        if short in keep:
+            frames = sorted(f for f in os.listdir(kept_folder) if re.fullmatch(re.escape(short) + r"_\d+\.imageset", f))
+            # Whatever the GMS2 pass wrote under its name gives way to the kept frames.
+            for written in os.listdir(ATLAS):
+                if re.fullmatch(re.escape(short) + r"_\d+\.imageset", written):
+                    shutil.rmtree(os.path.join(ATLAS, written))
+            for frame in frames:
+                shutil.copytree(os.path.join(kept_folder, frame), os.path.join(ATLAS, frame))
+            landmarks = [mark for mark in landmarks if not mark[0].startswith(short + "_")] + [mark for mark in kept_marks if mark[0].startswith(short + "_")]
+            if short in BALL_LAYERS:
+                landmarks += [mark for mark in kept_marks if mark[0].startswith(BALL_LAYERS[short] + "_")]
+            print(f"kept   {short}: {len(frames)} frames as last imported (--keep)")
+            continue
         width, height, ctype, bpp, rows = read_png(strip)
         if not short.startswith("player_"):
             effects[short] = sheet_facts(short, width, height, bpp, rows)
@@ -469,6 +529,10 @@ def main():
         count = height // tall
         feet = FEET_FROM_BOTTOM_BY_SIZE.get(size, 8)
         landmarks = [mark for mark in landmarks if not mark[0].startswith(short + "_")]
+        # A strip replaces the GMS2 sprite of its name whole: none of the old frames past its own left behind.
+        for written in os.listdir(ATLAS):
+            if re.fullmatch(re.escape(short) + r"_\d+\.imageset", written):
+                shutil.rmtree(os.path.join(ATLAS, written))
         for index in range(count):
             frame_rows = rows[index * tall:(index + 1) * tall]
             write_imageset(short, index, png_writer=lambda path, r=frame_rows: write_png(path, size, tall, ctype, r))
@@ -476,6 +540,10 @@ def main():
                 centre = TUCKED_BALLS.get(f"{short}_{index}") or ball_centre(size, tall, bpp, frame_rows, feet)
                 if centre:
                     landmarks.append((f"{short}_{index}", centre))
+            elif short in BALL_LAYERS:
+                centre = layer_centre(size, tall, bpp, frame_rows, feet)
+                if centre:
+                    landmarks.append((f"{BALL_LAYERS[short]}_{index}", centre))
         table[short] = (size, tall, count, size // 2, tall - feet, STRIP_FPS)
         print(f"strip  {short}: {count} frames of {size}x{tall}px")
 

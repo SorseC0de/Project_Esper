@@ -9,7 +9,7 @@ import SwiftUI
 /// black, a list scrolling inside it, left-aligned and bulleted, some lines with a moving icon.
 /// A new set of notes gets a new `id`, so it shows again.
 enum UpdatesNotes {
-    static let id = "2026-10-24 build 13"
+    static let id = "2026-11-11 build 14"
     static let seenKey = "esper.updates.seen"
     static var unseen: Bool { UserDefaults.standard.string(forKey: seenKey) != id }
 
@@ -51,6 +51,50 @@ enum UpdatesNotes {
         let lines: [Line]
     }
     static let builds: [Build] = [
+        Build(number: 14, lines: [
+            .title("Core Changes"),
+            .feature("New Mode: Breaker Ball (offline)"),
+            .bullet("Wear down your opponent's [Barrier] with Breaker Balls and attacks, then score through the rim that appears over their head. First to 3 wins.", depth: 1),
+            .feature("How To Play: a [Tutorial] from the title screen"),
+            .bullet("Modes now sit on a turning ring on the title screen; VS CPU is picked per side on the customize screen."),
+            .bullet("[Throws] are now chargeable. A full-charge throw can't be caught or snatched until it bounces."),
+            .bullet("New [Dunk] animation"),
+            .bullet("You can jump during [Hit Stun]", tone: .buff),
+            .bullet("Repeated hits within 2s give growing invulnerability", tone: .buff),
+            .bullet("[Shield] no longer knocks the ball out of a carrier's hands."),
+            .bullet("Ground [Shots] release from higher up."),
+            .bullet("Landing a [Parry] now returns you to neutral from any action."),
+            .bullet("The CPU now uses its drink's powers."),
+            .bullet("Drink picker layout changed."),
+            .divider,
+            .title("Stages"),
+            .bullet("Longball Stadium"),
+            .bullet("New stadium and goalpost art", depth: 1),
+            .bullet("The portal carries players too", depth: 1),
+            .bullet("No [Auto-aim] on shots", depth: 1, tone: .nerf),
+            .bullet("The Elements: icicles evened out, 16 ➜ 15"),
+            .bullet("The Wreck Center: the back wall no longer changes colour"),
+            .divider,
+            .title("Greateraid Changes"),
+            .drink("Phantom Frappe (New Biomorph)", .phantomFrappe),
+            .bullet("Level 1: [Spin Move] or taunt toggles [Phantom Mode]: pass through players, attacks and walls", depth: 1),
+            .bullet("Level 2: a second [Spin Move] per jump", depth: 1),
+            .drink("Floback Fresca (was Flo-efficient Frappe)", .flobackFresca),
+            .bullet("Level 1: +5 [FLO] when you're hit", depth: 1),
+            .bullet("Level 2: +5 [FLO] when you throw", depth: 1),
+            .drink("Platform Protein Shake", .platformShake),
+            .bullet("Slabs stay until broken or replaced (lasted 2s); slab and wall share one cooldown", depth: 1),
+            .drink("Web Water", .webWater),
+            .bullet("The Level 2 [Web Line] can break shields", depth: 1),
+            .bullet("Swing cooldown 28 ➜ 20 frames", depth: 1, tone: .buff),
+            .drink("Z-Tea", .zTea),
+            .bullet("No more hold-to-autofire: tap [Strike] to queue the next [Blast]; jumping cancels it", depth: 1),
+            .drink("Feather Float", .featherFloat),
+            .bullet("Renamed from Feather Fresca", depth: 1),
+            .divider,
+            .title("Fixes"),
+            .bullet("[Flash Fizz] warps no longer leave you stuck in walls"),
+        ]),
         Build(number: 13, lines: [
             .title("Core Changes"),
             .feature("New Stage: Anozira"),
@@ -85,7 +129,7 @@ enum UpdatesNotes {
             .bullet("Entering [FloState] now [Parries] [Throw], [Shieldflip], and [Snatch] in addition to [Slash].", tone: .buff),
             .divider,
             .title("Greateraid Changes"),
-            .drink("Flo-efficient Frappe (New Booster)", .floFrappe),
+            .drink("Flo-efficient Frappe (New Booster)", .flobackFresca),
             .bullet("Level 1: Your [FloState] lasts longer", depth: 1, icon: .pose(.floState)),
             .bullet("Level 2: Gain more [FLO] from all sources", depth: 1),
             .drink("Super Smoothie", .superSmoothie),

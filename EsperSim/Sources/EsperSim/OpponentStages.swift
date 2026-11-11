@@ -62,17 +62,18 @@ extension Opponent {
     mutating func readStage(_ match: Match, me: Player) {
         let signature = Terrain.signature(of: match.stage, for: me)
         if terrain?.signature != signature {
-            terrain = Terrain(stage: match.stage, player: me)
+            terrain = Terrain.whole(stage: match.stage, player: me)
             journey = nil
             givenUp = []
             spotSearch = nil
         }
         givenUp.removeAll { $0.until <= match.frame }
-        terrain?.prepare(budget: Opponent.readingBudget)
     }
 
-    /// Frames of a body stepped each frame finding the stage's links, until they're all found.
-    static let readingBudget = 2000
+    /// The stage read for every player on the loading screen, so no frame of play pays for it.
+    public static func readAhead(_ match: Match) {
+        for player in match.players { _ = Terrain.whole(stage: match.stage, player: player) }
+    }
 
     /// Whether a link can be taken leaving and landing so many frames from now: not given up on;
     /// out of a tornado only while it's up, not sinking or rising; into one only if it's up when
@@ -475,6 +476,8 @@ extension Opponent {
 
     /// The shot angles, five degrees apart through the shot's range, that go in.
     /// How many shot angles there are, five degrees apart through the shot's range.
+    /// A rim on the move: this many of the shot's angles tried a frame, round them all in turn.
+    static let movingRimAnglesPerFrame = 2
     static var shotAngleCount: Int { Int(((BallRules.shotAngleMax - BallRules.shotAngleMin) / degrees(5) + 0.001).rounded(.down)) + 1 }
 
     /// `steps`: only these of the angles, counted from the lowest.

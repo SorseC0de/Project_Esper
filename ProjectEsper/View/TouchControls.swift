@@ -187,6 +187,8 @@ final class TouchControls: SKNode {
         didSet { UserDefaults.standard.set(slidersOpen, forKey: TouchControls.slidersOpenKey); refreshBenches() }
     }
     private var online = false
+    /// Capture Mode: the benches gone, tabs and all.
+    var capturing = false { didSet { if capturing != oldValue { refreshBenches() } } }
     /// A bench opened or folded: what sits under the pickers moves with them.
     var onBenchesChanged: (() -> Void)?
     static let benchTabSize = CGSize(width: 76, height: 16)
@@ -211,10 +213,11 @@ final class TouchControls: SKNode {
     private func refreshBenches() {
         (pickerTab.childNode(withName: "label") as? SKLabelNode)?.text = "PICKERS " + (pickersOpen ? "▾" : "▸")
         (sliderTab.childNode(withName: "label") as? SKLabelNode)?.text = "SLIDERS " + (slidersOpen ? "▾" : "▸")
-        pickerTab.isHidden = online || pickers.isEmpty
-        sliderTab.isHidden = online || sliders.isEmpty
-        for picker in pickers { picker.isHidden = online || !pickersOpen }
-        for slider in sliders { slider.isHidden = online || !slidersOpen }
+        let away = online || capturing
+        pickerTab.isHidden = away || pickers.isEmpty
+        sliderTab.isHidden = away || sliders.isEmpty
+        for picker in pickers { picker.isHidden = away || !pickersOpen }
+        for slider in sliders { slider.isHidden = away || !slidersOpen }
         onBenchesChanged?()
     }
     private var sliderTouches: [UITouch: Slider] = [:]

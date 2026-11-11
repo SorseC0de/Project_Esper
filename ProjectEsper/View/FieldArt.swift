@@ -1,14 +1,12 @@
 import SpriteKit
 import EsperSim
 
-/// The football field's scenery, drawn once from flat shapes in art pixels: a night sky
-/// with floodlight banks, the stands with their fanning lines and rail, and the turf with
-/// its stripes, yard lines, hashes and numbers. The floor players walk on is invisible and
-/// runs through the middle of the turf. Nothing here touches the match.
+/// The football field's scenery, drawn once in art pixels: the stands as painted
+/// (`LongballArt.stadium`), and the turf with its stripes, yard lines, hashes and numbers.
+/// The floor players walk on is invisible and runs through the middle of the turf. Nothing
+/// here touches the match.
 enum FieldArt {
     static let sky = SKColor(red: 0.04, green: 0.08, blue: 0.16, alpha: 1)
-    static let stands = SKColor(red: 0.09, green: 0.21, blue: 0.29, alpha: 1)
-    static let standLine = SKColor(red: 0.20, green: 0.45, blue: 0.54, alpha: 1)
     /// The turf's stripes and its chalk, EDG64 28, 27 and 16; below the sideline the lighter green.
     static let turfLight: RGB = PixelPalette.colours[28]
     static let turfDark: RGB = PixelPalette.colours[27]
@@ -25,9 +23,6 @@ enum FieldArt {
     static let turfLean: CGFloat = 0.12
     /// The floor line the feet stand on, in art pixels.
     static let floorLine: CGFloat = 16
-    /// The down marker's height, standing on the top of the grass, in art pixels; its
-    /// width follows the vector's 121 by 512.
-    static let markerHeight: CGFloat = 48
 
     /// Sideways shift per pixel of height at `x`, the yard lines' slope there: positive up
     /// toward the middle. A shadow cast down takes it the other way.
@@ -40,40 +35,25 @@ enum FieldArt {
         let height = point.y - floorLine
         return CGPoint(x: point.x - slope(at: point.x, centre: centre) * height, y: floorLine - height)
     }
-    static let gold = SKColor(red: 0.93, green: 0.70, blue: 0.29, alpha: 1)
-    static let pad = SKColor(red: 0.06, green: 0.13, blue: 0.31, alpha: 1)
 
     /// Art pixels, the floor's top at 16: the turf from `turfBottom` to `turfTop`, the
-    /// floor line through its middle, the stands above to `standsTop`, and the lights over them.
-    static let turfBottom: CGFloat = -24
-    static let turfTop: CGFloat = 56
-    static let standsTop: CGFloat = 192
-    static let railY: CGFloat = 136
-    static let lightsBottom: CGFloat = 210
+    /// floor line through its middle, the stands above.
+    static let turfBottom: CGFloat = -16
+    static let turfTop: CGFloat = 48
     /// How far down the camera looks below the floor, in art pixels, so the turf shows round
     /// the players.
     static let viewBelowFloor: CGFloat = 32
 
-    /// What the scene keeps hold of: the rail under the stands, which wears the possession's
-    /// colour like the court's walls; the floodlights' blooms, likewise; and each yard
-    /// number with its arrow, for the size slider.
+    /// What the scene keeps hold of: the stands and their lights, and each yard number with its
+    /// arrow, for the size slider.
     struct Handles {
-        /// The two rails under the stands, one over the other.
-        var rails: [SKSpriteNode]
-        var blooms: [SKSpriteNode] = []
-        /// The panels the lamps sit on, which also wear the possession's colour.
-        var panels: [SKShapeNode] = []
+        var stadium: LongballArt.Stadium
         var numbers: [SKNode] = []
         /// The turf's picture, which doesn't glow; the end zones past its goal lines, left and right,
         /// white, for the scene to tint each its side's darkest tone.
         var turf: SKSpriteNode?
         var endZones: [SKSpriteNode] = []
     }
-
-    static let railHeight: CGFloat = 12
-    static let railGap: CGFloat = 4
-    /// The bottoms of the two rails.
-    static var railLines: [CGFloat] { [railY, railY - railHeight - railGap] }
 
     /// The turf's picture: from `turfLeft` along and from `turfBelow` up to `turfTop`, the stage's
     /// width and `turfOverhang` each side.
@@ -282,94 +262,10 @@ enum FieldArt {
         group.addChild(sprite)
     }
 
-    static func build(for stage: Stage, into parent: SKNode, flat: (CGFloat) -> SKTexture, glow: SKTexture) -> Handles {
+    static func build(for stage: Stage, into parent: SKNode) -> Handles {
         let width = CGFloat(stage.columns) * 16
-        let top = CGFloat(stage.rows + stage.skyRows) * 16
         let centre = width / 2
-        @discardableResult
-        func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ colour: SKColor, z: CGFloat = -10) -> SKSpriteNode {
-            let node = SKSpriteNode(texture: flat(4))
-            node.anchorPoint = .zero
-            node.position = CGPoint(x: x, y: y)
-            node.size = CGSize(width: w, height: h)
-            node.color = colour
-            node.colorBlendFactor = 1
-            node.zPosition = z
-            parent.addChild(node)
-            return node
-        }
-        func quad(_ points: [CGPoint], _ colour: SKColor, z: CGFloat) {
-            let path = CGMutablePath()
-            path.addLines(between: points)
-            path.closeSubpath()
-            let node = SKShapeNode(path: path)
-            node.fillColor = colour
-            node.strokeColor = .clear
-            node.zPosition = z
-            parent.addChild(node)
-        }
-        // Lines lean toward a vanishing point over the middle: the higher, the nearer centre.
-        func lean(_ x: CGFloat, at y: CGFloat, from bottom: CGFloat, to top: CGFloat, share: CGFloat) -> CGFloat {
-            let rise = (y - bottom) / (top - bottom)
-            return x + (centre - x) * share * rise
-        }
-
-        // Sky and stands.
-        rect(-200, standsTop, width + 400, top - standsTop + 200, sky, z: -20)
-        rect(-200, turfTop, width + 400, standsTop - turfTop, stands, z: -19)
-        let standSpacing: CGFloat = 160
-        var x: CGFloat = centre.truncatingRemainder(dividingBy: standSpacing)
-        while x < width {
-            let bottomLeft = x - 3, bottomRight = x + 3
-            let topLeft = lean(x - 2, at: standsTop, from: turfTop, to: standsTop, share: 0.35)
-            let topRight = lean(x + 2, at: standsTop, from: turfTop, to: standsTop, share: 0.35)
-            quad([CGPoint(x: bottomLeft, y: turfTop), CGPoint(x: bottomRight, y: turfTop),
-                  CGPoint(x: topRight, y: standsTop), CGPoint(x: topLeft, y: standsTop)], standLine, z: -18)
-            x += standSpacing
-        }
-        // The rails: two bands in the possession's colour, a small gap between; the scene
-        // fills them with chevrons.
-        var handles = Handles(rails: railLines.map { rect(-200, $0, width + 400, railHeight, .black, z: -17) })
-        // A dark shadow where the stands meet the turf.
-        rect(-200, turfTop - 4, width + 400, 6, SKColor(white: 0, alpha: 0.6), z: -12)
-
-        // Floodlight banks: a grid of soft lamps on a dark panel, a glow behind.
-        var bank: CGFloat = 60
-        while bank < width {
-            // A wide soft bloom round the bank, spilling down onto the stands.
-            let bloom = SKSpriteNode(texture: glow)
-            bloom.size = CGSize(width: 300, height: 200)
-            bloom.position = CGPoint(x: bank + 60, y: lightsBottom + 12)
-            bloom.color = SKColor(red: 0.45, green: 0.75, blue: 1, alpha: 1)
-            bloom.colorBlendFactor = 1
-            bloom.alpha = 0.45
-            bloom.blendMode = .add
-            bloom.zPosition = -15
-            parent.addChild(bloom)
-            handles.blooms.append(bloom)
-            // The panel, a trapezoid wider at the top.
-            let panelPath = CGMutablePath()
-            panelPath.addLines(between: [CGPoint(x: bank + 4, y: lightsBottom), CGPoint(x: bank + 116, y: lightsBottom),
-                                         CGPoint(x: bank + 124, y: lightsBottom + 44), CGPoint(x: bank - 4, y: lightsBottom + 44)])
-            panelPath.closeSubpath()
-            let panel = SKShapeNode(path: panelPath)
-            panel.strokeColor = SKColor(rgb: PixelPalette.aap64Outline)
-            panel.lineWidth = GoalpostTuning.outline
-            panel.zPosition = -14
-            parent.addChild(panel)
-            handles.panels.append(panel)
-            for row in 0..<4 {
-                for column in 0..<9 {
-                    let lamp = SKShapeNode(circleOfRadius: 4)
-                    lamp.fillColor = SKColor(white: 0.95 - CGFloat(row) * 0.05, alpha: 1)
-                    lamp.strokeColor = .clear
-                    lamp.position = CGPoint(x: bank + 8 + CGFloat(column) * 13, y: lightsBottom + 7 + CGFloat(row) * 10)
-                    lamp.zPosition = -13
-                    parent.addChild(lamp)
-                }
-            }
-            bank += 360
-        }
+        var handles = Handles(stadium: LongballArt.stadium(into: parent))
 
         // The turf, drawn in art pixels; its numbers apart, for the face picker.
         let textures = turfTextures(width: width, centre: centre)
@@ -404,63 +300,5 @@ enum FieldArt {
             handles.numbers.append(group)
         }
         return handles
-    }
-
-    /// A goalpost at a rim: the padded base behind it on the floor, the gold pole bending
-    /// forward to the crossbar under the rim, and the two uprights rising from its ends.
-    /// With `shadowOf`, the field's middle, it draws the goalpost's shadow instead: every
-    /// point mirrored under the floor and sheared with the turf, all in the shadow colour.
-    static func goalpost(at rim: CGPoint, backboard: Facing, into parent: SKNode, crossbarBelowRim: CGFloat, prongHeight: CGFloat,
-                         angle: CGFloat, thickness: CGFloat, outline: CGFloat, padColour: SKColor, shadowOf centre: CGFloat? = nil) {
-        let cast: (CGPoint) -> CGPoint = { point in centre.map { shadowPoint(point, centre: $0) } ?? point }
-        let back = CGFloat(backboard.sign)
-        let floor: CGFloat = 16
-        let baseX = rim.x + back * 26
-        let crossbarY = rim.y - crossbarBelowRim
-        let halfSpan: CGFloat = 24
-        // The pad is the pole's width and five more.
-        let padHalf = (thickness + 5) / 2
-        let padPath = CGMutablePath()
-        padPath.addLines(between: [CGPoint(x: baseX - padHalf, y: floor), CGPoint(x: baseX + padHalf, y: floor),
-                                   CGPoint(x: baseX + padHalf, y: floor + 40), CGPoint(x: baseX - padHalf, y: floor + 40)].map(cast))
-        padPath.closeSubpath()
-        let base = SKShapeNode(path: padPath)
-        base.fillColor = centre == nil ? padColour : shadow
-        base.strokeColor = centre == nil ? SKColor(rgb: PixelPalette.aap64Outline) : .clear
-        base.lineWidth = outline
-        base.zPosition = -5
-        parent.addChild(base)
-        // The back rod, from the pad bending forward to the crossbar's middle.
-        let rod = CGMutablePath()
-        rod.move(to: cast(CGPoint(x: baseX, y: floor + 40)))
-        rod.addLine(to: cast(CGPoint(x: baseX, y: crossbarY - 30)))
-        rod.addQuadCurve(to: cast(CGPoint(x: rim.x, y: crossbarY)), control: cast(CGPoint(x: baseX, y: crossbarY)))
-        // The crossbar and its uprights, outlined on their own over the rod.
-        let path = CGMutablePath()
-        // The crossbar tilts about its middle, the end toward the field rising; each upright
-        // stands on its end of it.
-        let rise = tan(angle) * halfSpan * -back
-        let ends = [(x: rim.x - halfSpan, y: crossbarY - rise), (x: rim.x + halfSpan, y: crossbarY + rise)]
-        path.move(to: cast(CGPoint(x: ends[0].x, y: ends[0].y)))
-        path.addLine(to: cast(CGPoint(x: ends[1].x, y: ends[1].y)))
-        for end in ends {
-            path.move(to: cast(CGPoint(x: end.x, y: end.y)))
-            path.addLine(to: cast(CGPoint(x: end.x, y: end.y + prongHeight)))
-        }
-        // Each part the gold over a black line as wide as it plus the outline each side.
-        let layers: [(SKColor, CGFloat, CGFloat)] = centre == nil
-            ? [(SKColor(rgb: PixelPalette.aap64Outline), thickness + outline * 2, 0), (gold, thickness, 0.05)]
-            : [(shadow, thickness, 0)]
-        for (part, z) in [(rod as CGPath, CGFloat(-4.6)), (path as CGPath, CGFloat(-4.4))] {
-            for (colour, width, lift) in layers {
-                let post = SKShapeNode(path: part)
-                post.strokeColor = colour
-                post.lineWidth = width
-                post.lineCap = .round
-                post.lineJoin = .round
-                post.zPosition = z + lift
-                parent.addChild(post)
-            }
-        }
     }
 }

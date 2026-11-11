@@ -107,40 +107,40 @@ enum Onomatopoeia {
         case beam, quake, freeze, explosion
         case sizzle, shatter, thunder
 
-        /// English, Japanese, then Spanish; the palette indexes over and under each letter's
+        /// English, Japanese, then Spanish; the EDG64 indexes over and under each letter's
         /// middle; the cap height in the world, in art pixels.
         private var spelling: (english: String, japanese: String, spanish: String, upper: Int, lower: Int, height: CGFloat) {
             switch self {
             // Baskets: the net, and the rim taking a dunk.
-            case .swish: ("SWISH!", "パサッ！", "¡SHUAS!", 22, 19, 16)
-            case .three: ("SWOOSH!!", "ザシュッ！！", "¡¡SHUAAAS!!", 22, 19, 16)
-            case .dunk: ("SLAM!!", "ドガァン！！", "¡¡CATAPUM!!", 8, 6, 16)
+            case .swish: ("SWISH!", "パサッ！", "¡SHUAS!", 30, 29, 16)
+            case .three: ("SWOOSH!!", "ザシュッ！！", "¡¡SHUAAAS!!", 16, 20, 16)
+            case .dunk: ("SLAM!!", "ドガァン！！", "¡¡CATAPUM!!", 34, 32, 16)
             // Bodies and the ball.
-            case .hit: ("WHAM!", "ドゴッ！", "¡ZAS!", 22, 5, 16)
-            case .steal: ("SMACK!", "バシッ！", "¡PAF!", 22, 26, 16)
-            case .spike: ("THWACK!", "バチィン！", "¡ZASCA!", 9, 5, 16)
-            // Any counter, the biggest word, teal over blue.
-            case .parry: ("COUNTER!!", "カウンター！！", "¡¡CONTRA!!", 20, 18, 20)
-            case .clang: ("CLANG", "ガキン", "CLANC", 39, 41, 14)
-            case .squeak: ("SQUEAK", "キュッ", "ÑIC", 22, 37, 5)
+            case .hit: ("WHAM!", "ドゴッ！", "¡ZAS!", 16, 43, 16)
+            case .steal: ("SMACK!", "バシッ！", "¡PAF!", 16, 45, 16)
+            case .spike: ("THWACK!", "バチィン！", "¡ZASCA!", 35, 43, 16)
+            // Any counter, the biggest word, cyan over purple.
+            case .parry: ("COUNTER!!", "カウンター！！", "¡¡CONTRA!!", 18, 54, 20)
+            case .clang: ("CLANG", "ガキン", "CLANC", 14, 13, 14)
+            case .squeak: ("SQUEAK", "キュッ", "ÑIC", 15, 14, 5)
             // Footsteps, small by the feet.
-            case .walk: ("TAP", "テク", "TAC", 22, 37, 4)
-            case .run: ("THUMP", "ダッ", "PUM", 22, 37, 5)
+            case .walk: ("TAP", "テク", "TAC", 15, 14, 4)
+            case .run: ("THUMP", "ダッ", "PUM", 15, 14, 5)
             // The loose ball off the floor or a wall.
-            case .bounce: ("BOMP", "ダム", "POM", 22, 6, 8)
+            case .bounce: ("BOMP", "ダム", "POM", 16, 32, 8)
             // A dribble's, as small as a footstep.
-            case .dribble: ("BOMP", "ダム", "POM", 22, 6, 5)
-            // A body or the ball springing off a rim's top, as small as a squeak, white over teal.
-            case .boing: ("BOING!", "ボヨーン！", "¡BOING!", 22, 20, 5)
+            case .dribble: ("BOMP", "ダム", "POM", 16, 32, 5)
+            // A body or the ball springing off a rim's top, as small as a squeak, white over grey.
+            case .boing: ("BOING!", "ボヨーン！", "¡BOING!", 16, 15, 5)
             // Powers.
-            case .beam: ("VWOOOM", "ズドドドド", "ZUUUUM", 9, 7, 16)
-            case .quake: ("RUMBLE", "ゴゴゴゴ", "BRRRUM", 36, 34, 16)
-            case .freeze: ("CRACK!", "ピキッ！", "¡CRAC!", 22, 21, 16)
-            case .explosion: ("KABOOM!", "ドカーン！", "¡CABUM!", 8, 5, 16)
+            case .beam: ("VWOOOM", "ズドドドド", "ZUUUUM", 16, 18, 16)
+            case .quake: ("RUMBLE", "ゴゴゴゴ", "BRRRUM", 2, 4, 16)
+            case .freeze: ("CRACK!", "ピキッ！", "¡CRAC!", 16, 17, 16)
+            case .explosion: ("KABOOM!", "ドカーン！", "¡CABUM!", 34, 43, 16)
             // The stages.
-            case .sizzle: ("SIZZLE", "ジュウゥ", "CHSSS", 7, 5, 16)
-            case .shatter: ("CRASH", "パリーン", "¡CRAS!", 22, 19, 16)
-            case .thunder: ("KRAKOOM!", "バリバリッ", "¡CATACRAC!", 9, 8, 16)
+            case .sizzle: ("SIZZLE", "ジュウゥ", "CHSSS", 33, 43, 16)
+            case .shatter: ("CRASH", "パリーン", "¡CRAS!", 16, 20, 16)
+            case .thunder: ("KRAKOOM!", "バリバリッ", "¡CATACRAC!", 35, 33, 16)
             }
         }
 
@@ -165,15 +165,14 @@ enum Onomatopoeia {
             let spelling = spelling
             let lettering = Onomatopoeia.lettering
             let japanese = lettering.plainBangs ? spelling.japanese.replacingOccurrences(of: "！", with: "!") : spelling.japanese
-            let line = PixelPalette.aap64[Onomatopoeia.lineIndex]
             let text = switch Onomatopoeia.language {
             case .english: spelling.english
             case .japanese: japanese
             case .spanish: spelling.spanish
             }
             return Word(text: text, lettering: lettering,
-                        colours: Colours(upper: PixelPalette.aap64[spelling.upper], lower: PixelPalette.aap64[spelling.lower],
-                                         lineUpper: line, lineLower: line),
+                        colours: Colours(upper: PixelPalette.colours[spelling.upper], lower: PixelPalette.colours[spelling.lower],
+                                         lineUpper: Onomatopoeia.lineUpper, lineLower: Onomatopoeia.lineLower),
                         height: spelling.height, growsLeft: growsLeft)
         }
     }
@@ -186,8 +185,9 @@ enum Onomatopoeia {
         var lineUpper: RGB
         var lineLower: RGB
     }
-    /// The sound words' outline and drop: palette 29.
-    static let lineIndex = 29
+    /// The sound words' outline and drop: EDG64 11 over 10, the players' outline.
+    static let lineUpper = PixelPalette.colours[11]
+    static let lineLower = PixelPalette.outline
 
     struct Word: Hashable {
         let text: String
@@ -317,6 +317,14 @@ enum Onomatopoeia {
         return (made.image, height * face.scale / made.capShare)
     }
 
+    /// Lettering for saving, at the size it's shown at for a cap height of `height` points: set
+    /// in a font that size and drawn one pixel a point, nothing scaled after.
+    static func savedPicture(_ text: String, face: Lettering, colours: Colours, growsLeft: Bool, height: CGFloat) -> UIImage {
+        let word = Word(text: text, lettering: face, colours: colours, height: height, growsLeft: growsLeft)
+        let laid = layout(word)
+        return drawn(word, size: drawSize * height * face.scale / laid.capShare / laid.canvas.height, scale: 1).image
+    }
+
     /// A sprite's warp: its left and right ends `left` and `right` times its middle's height,
     /// the height between running straight from one to the other, and its middle raised `bend`
     /// of its height (lowered, under 0), easing to nothing at the ends.
@@ -364,7 +372,8 @@ enum Onomatopoeia {
         let capShare: CGFloat
     }
 
-    private static func layout(_ word: Word) -> Layout {
+    /// `size`: the letters' font size, points; the outline, drop and canvas all follow it.
+    private static func layout(_ word: Word, size drawSize: CGFloat = drawSize) -> Layout {
         _ = registered
         func font(_ size: CGFloat) -> UIFont { UIFont(name: word.face ?? word.lettering.fontName, size: size) ?? TitleText.font(size: size, italic: true) }
         let reference = word.lettering.reference
@@ -448,10 +457,10 @@ enum Onomatopoeia {
     }
 
     /// A word drawn: its picture and its capitals' share of the canvas's height.
-    private static func drawn(_ word: Word) -> (image: UIImage, capShare: CGFloat) {
-        let laid = layout(word)
+    private static func drawn(_ word: Word, size: CGFloat = drawSize, scale: CGFloat = renderScale) -> (image: UIImage, capShare: CGFloat) {
+        let laid = layout(word, size: size)
         let format = UIGraphicsImageRendererFormat()
-        format.scale = renderScale
+        format.scale = scale
         let image = UIGraphicsImageRenderer(size: laid.canvas, format: format).image { context in
             // Every letter's drop and outline, then every fill over them all.
             draw(laid.letters, of: word, laid: laid, into: context.cgContext, offset: .zero, outline: true, fill: false)

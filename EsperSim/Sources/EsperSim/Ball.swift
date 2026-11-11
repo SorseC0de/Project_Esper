@@ -46,8 +46,14 @@ public struct Ball: Equatable {
     /// to slash, for `exclusionFrames` more frames loose.
     public var exclusiveTo: Int?
     /// Whether `player` may touch it at all, by hand or by anything they do: under Exclusion, only
-    /// the one it's exclusive to.
-    public func isOpen(to player: Int) -> Bool { exclusiveTo == nil || exclusiveTo == player }
+    /// the one it's exclusive to; phantom, only a phantom, and solid, only the solid.
+    public func isOpen(to player: Int) -> Bool {
+        (exclusiveTo == nil || exclusiveTo == player) && phantom == ((phantomPlayers >> player) & 1 == 1)
+    }
+    /// Phantom Frappe's: let go by a phantom, passing through the walls and the rims (`PhantomFrappe.swift`).
+    public var phantom = false
+    /// Which players are phantom, a bit each, kept by the match.
+    public var phantomPlayers = 0
     public var exclusionFrames = 0
     /// Drawn out of a tornado by a rim: no tornado takes it back till a hand or a release does.
     public var drawnFromTornado = false
@@ -60,6 +66,9 @@ public struct Ball: Equatable {
     public var owner: Int? { owned ? lastTouched : nil }
     /// Frost Tea: held exactly where it is for this many frames more.
     public var frozen = 0
+    /// A throw's charge (`ThrowChargeRules`), 0 to 1; at full, nobody but the thrower takes it till it bounces.
+    public var throwCharge = 0.0
+    public var unstoppable: Bool { thrown && owned && throwCharge >= 1 }
     /// Blazing Boba: alight from a shot or a throw until the first bounce; nobody but the
     /// thrower can catch or snatch it.
     public var burning = false
@@ -113,9 +122,11 @@ public struct Ball: Equatable {
         }
 
         // Only the rim it's meant for pulls it in: the one whoever last touched it scores on. An
-        // own basket can still drop, but nothing draws it there.
+        // own basket can still drop, but nothing draws it there; but in Breaker Ball, where an own
+        // basket mends, your own rim pulls too, and the other's only once its barrier's down.
         for hoop in stage.hoops where steers && velocity.y < 0 && position.y > hoop.position.y && !hoop.rimless
-            && (hoop.shared || lastTouched == nil || hoop.owner == lastTouched) {
+            && (hoop.barrier == nil ? hoop.shared || lastTouched == nil || hoop.owner == lastTouched
+                : lastTouched == nil || hoop.owner != lastTouched || !hoop.barrierStanding) {
             steer(toward: hoop, gravityShare: Ball.gravityShare(stage))
         }
 
@@ -356,6 +367,7 @@ public struct Ball: Equatable {
         dunkShot = false
         scoring = false
         thrown = straight
+        throwCharge = 0
         steers = !straight
         shotInFlight = false
         lastTouched = player
@@ -452,6 +464,7 @@ public struct Ball: Equatable {
 
     public mutating func respawn(at spawn: Vec2) {
         flight &+= 1
+        phantom = false
         launchPoint = nil
         position = spawn
         previousY = spawn.y

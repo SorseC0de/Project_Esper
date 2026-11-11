@@ -21,11 +21,21 @@ RENDERER = ROOT / "Tools" / "render_svg.swift"
 LOGO = ROOT / "_Graphic Assets" / "Vectors" / "Variaball Logo.svg"
 LOGO_OUT = ROOT / "ProjectEsper" / "UI" / "variaball_logo.png"
 LOGO_WIDTH = 1600
+# The stage select's icon, in its own colours: the middle button's on the bottles, and on Rounds' customize screen.
+STAGE_ICON = ROOT / "_Graphic Assets" / "Vectors" / "stage_select_icon.svg"
+STAGE_ICON_OUT = ROOT / "ProjectEsper" / "UI" / "stage_select_icon.png"
+STAGE_ICON_WIDTH = 1024
 # bar4, the loading bar: its frame and slot outlines without the vector's fills, uncropped, and
 # its sixteen slots' insides, as shares of that frame, written to FuturisticMeter.swift.
 METER = "bar4"
 # Icons from svgrepo, black on clear, brought in white to be coloured: (vector, published name, width).
-ICONS = [(ROOT / "_Graphic Assets" / "Vectors" / "multiplayer.svg", "futuristic_icon_multiplayer", 512)]
+ICONS = [(ROOT / "_Graphic Assets" / "Vectors" / "multiplayer.svg", "futuristic_icon_multiplayer", 512),
+         # Breaker Ball's HUD: the barrier's backing, and the stock ticker's four choices.
+         (ROOT / "_Graphic Assets" / "Vectors" / "shatter.svg", "futuristic_icon_shatter", 512),
+         (ROOT / "_Graphic Assets" / "Vectors" / "mineral_heart.svg", "futuristic_icon_mineral_heart", 256),
+         (ROOT / "_Graphic Assets" / "Vectors" / "cross_slash.svg", "futuristic_icon_cross_slash", 256),
+         (ROOT / "_Graphic Assets" / "Vectors" / "split_cross.svg", "futuristic_icon_split_cross", 256),
+         (ROOT / "_Graphic Assets" / "Vectors" / "moebius_triangle.svg", "futuristic_icon_moebius_triangle", 256)]
 METER_LAYOUT = ROOT / "ProjectEsper" / "View" / "FuturisticMeter.swift"
 # The finding pass's width, and the whole vector's width the kept pass renders at.
 FIND_WIDTH = 2560
@@ -176,6 +186,9 @@ def main():
         logo = re.search(r'viewBox="([^"]+)"', LOGO.read_text()).group(1).split()
         _, _, lw, lh = render(renderer, LOGO, LOGO_OUT, LOGO_WIDTH, round(LOGO_WIDTH * float(logo[3]) / float(logo[2])))
         print(f"{LOGO_OUT.stem:22s} {lw}x{lh}")
+        icon = re.search(r'viewBox="([^"]+)"', STAGE_ICON.read_text()).group(1).split()
+        _, _, sw, sh = render(renderer, STAGE_ICON, STAGE_ICON_OUT, STAGE_ICON_WIDTH, round(STAGE_ICON_WIDTH * float(icon[3]) / float(icon[2])))
+        print(f"{STAGE_ICON_OUT.stem:22s} {sw}x{sh}")
     wanted = {f"futuristic_{group}.png" for group in groups} | {f"futuristic_{METER}_frame.png"} | {f"{name}.png" for _, name, _ in ICONS}
     for stale in OUT.glob("*.png"):
         if stale.name not in wanted:

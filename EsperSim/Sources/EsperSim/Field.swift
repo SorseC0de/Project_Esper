@@ -12,7 +12,16 @@ public struct Helmet: Equatable {
     public var owner: Int
     /// Which of the three helmet drawings.
     public var variant: Int
+    /// Coming out of its goalpost's prongs' middle (`gate`, the line it comes through) toward the
+    /// field until clear of the goalpost, then up or down to `bottom`, then across; at the other
+    /// goalpost back to the prongs' height and in through theirs (`gate` then theirs). Solid only
+    /// while it travels.
+    public var phase: HelmetPhase = .travelling
+    public var gate: Double = 0
+    public var bottom: Double = 0
 }
+
+public enum HelmetPhase: Equatable { case emerging, settling, travelling, returning, entering }
 
 public struct Portal: Equatable {
     public var id: Int
@@ -70,12 +79,11 @@ public struct StageFeatures: Equatable {
     /// Whether a rim's top turns back a ball not scoring and a body coming down on it: not the
     /// plane's, whose rims hang in their cases with no net.
     public var rimBounce = true
-    /// How far under the rim the ball can be let go for the auto-aimed shot, if there's a limit:
-    /// Longball's rims are reached off a helmet, so the aim only helps from up there.
-    public var autoAimMaxRise: Double?
-    /// The Test Center, debug only: the Wreck Center's court with no back wall or extras drawn,
-    /// and the training dummy as the other side.
-    public var testCenter = false
+    /// Whether a shot's preset arc aims itself at the rim: not on Longball.
+    public var autoAims = true
+    /// The Tutorial (`Stage.tutorial`), debug only for now: the Wreck Center's court from its own
+    /// map, one rim, a door at each end and a belt along the floor; the training dummy the other side.
+    public var tutorial = false
     public init(helmets: Bool = false, portals: Bool = false, startsHeld: Bool = false, traffic: Bool = false,
                 shadows: Bool = false, ballCam: Bool = false, look: StageLook = .court, tileWallsHold: Bool = true) {
         self.helmets = helmets
@@ -106,8 +114,6 @@ extension StageFeatures {
 /// seconds each, the next as soon as it goes; a shot or throw through it comes out ten
 /// yards toward the shooter's rim with a lift.
 public enum FieldRules {
-    /// The auto-aimed shot only from no more than this far under the rim: up off a helmet.
-    public static let autoAimMaxRise = 30.0
     public static let helmetSize = 40.0
     public static let helmetSpawnFrames = 150
     public static let helmetSpeed = 2.0
@@ -128,9 +134,32 @@ public enum FieldRules {
     /// the drawing's 10 and 24 art pixels.
     public static let backboardOffset = Vec2(x: 6.25, y: 15)
     public static let backboardSize = Vec2(x: 4, y: 20)
-    /// The energy fence's top, in units: the goalposts' prongs' tops over the backboard, where
-    /// the drawn fence stops. The ball's blocker runs from the backboard's bottom up to here.
-    public static let fenceTop = 170.0
+    /// The goalposts as drawn, in art pixels: the base's 64-pixel frame on the floor's bottom, GOALPOST
+    /// HEIGHT stems of 16 over it, the 16-pixel bend on them, and the crossbar's 48-pixel frame centred
+    /// on the bend's, its foot 16 under the bend's; the hoop's frame shares that foot, the rim 14 up it,
+    /// raised HOOP LIFT tiles off it. FORK HEIGHT forks of 16 stand on each end of the crossbar.
+    nonisolated(unsafe) public static var goalpostStems = 8
+    nonisolated(unsafe) public static var goalpostForks = 8
+    nonisolated(unsafe) public static var hoopLiftTiles = 0
+    public static let goalpostFootPixels = 0
+    public static var crossbarFootPixels: Int { goalpostFootPixels + 64 + 16 * goalpostStems - 16 }
+    public static var rimOverCrossbarFootPixels: Int { 14 + 16 * hoopLiftTiles }
+    /// The goalpost's picture's far side, 24 pixels in front of its rim, and its width.
+    public static let goalpostFrontOfRimPixels = 24
+    public static let goalpostWidthPixels = 80
+    /// The middle between the prongs, in units: behind the rim across, and up from the floor's
+    /// foot (the forks' middle, the far ones 48 over the crossbar's foot, the near ones 16).
+    public static var prongsBehindRim: Double { Double(goalpostWidthPixels / 2 - goalpostFrontOfRimPixels) / 1.6 }
+    public static var prongsHeight: Double { Double(crossbarFootPixels + 32 + 8 * goalpostForks) / 1.6 }
+    public static var goalpostFrontOfRim: Double { Double(goalpostFrontOfRimPixels) / 1.6 }
+    /// A rim's goalpost's prongs' middle, and its front toward the field, across, in units.
+    public static func prongsGate(of hoop: Hoop) -> Double { hoop.position.x + hoop.backboard.sign * prongsBehindRim }
+    public static func goalpostFront(of hoop: Hoop) -> Double { hoop.position.x - hoop.backboard.sign * goalpostFrontOfRim }
+    /// The energy fence's top, in units: the uprights' tops over the backboard, where the drawn
+    /// fence stops. The far cap's top is 56 over the crossbar's foot and the near one's 32, 66 pixels
+    /// apart; the backboard stands 30 in from the far one, so 45 plus the forks. The ball's blocker
+    /// runs from the backboard's bottom up to here.
+    public static var fenceTop: Double { Double(crossbarFootPixels + 16 * goalpostForks + 45) / 1.6 }
 }
 
 extension Match {
@@ -142,8 +171,16 @@ extension Match {
     }
 
     private mutating func stepHelmets() {
-        // The spawn clock runs only while someone has the ball.
-        if let holder = ball.holder, let defender = players.indices.first(where: { $0 != holder }) {
+        if mode == .breakerBall {
+            // Breaker Ball: the clock runs whoever has the ball, and each comes off the dice, its end and its colour.
+            helmetClock += 1
+            if helmetClock >= FieldRules.helmetSpawnFrames, !players.isEmpty {
+                helmetClock = 0
+                let holder = fieldDice.roll(players.count)
+                spawnHelmet(against: holder, wearing: fieldDice.roll(players.count))
+            }
+        } else if let holder = ball.holder, let defender = players.indices.first(where: { $0 != holder }) {
+            // The spawn clock runs only while someone has the ball.
             helmetClock += 1
             if helmetClock >= FieldRules.helmetSpawnFrames {
                 helmetClock = 0
@@ -152,6 +189,14 @@ extension Match {
         }
         var kept: [Helmet] = []
         for var helmet in helmets {
+            guard helmet.phase == .travelling else {
+                if passThrough(&helmet) {
+                    kept.append(helmet)
+                } else {
+                    events.append(.helmetRemoved(at: Vec2(x: helmet.gate, y: FieldRules.prongsHeight), owner: helmet.owner))
+                }
+                continue
+            }
             // Who stands on it rides it; who is in its way is pushed ahead of it, unless
             // that would put them in a wall, and then it passes through them.
             let riders = players.indices.filter { stands(players[$0], on: helmet.box) }
@@ -162,15 +207,38 @@ extension Match {
                 events.append(.helmetRemoved(at: helmet.box.center, owner: helmet.owner))
                 continue
             }
+            // Breaker Ball: it breaks on a barrier, wearing it down hard.
+            // if mode == .breakerBall, stage.hoops.contains(where: { $0.barrierStanding && helmet.box.distance(to: $0.position) <= barrierRadius($0) }) {
+            //     stageHitsBarriers(helmet.box, damage: BreakerRules.helmetDamage)
+            //     events.append(.helmetRemoved(at: helmet.box.center, owner: helmet.owner))
+            //     continue
+            // }
+            // Breaker Ball: it breaks on a body, wearing their barrier down hard.
+            if mode == .breakerBall, let index = players.indices.first(where: { !riders.contains($0) && !players[$0].phantomMode && players[$0].hurt(by: helmet.box) }) {
+                wearPosture(index, by: BreakerRules.helmetDamage, from: nil, at: helmet.box.center)
+                events.append(.helmetRemoved(at: helmet.box.center, owner: helmet.owner))
+                continue
+            }
             for index in players.indices where !riders.contains(index) && players[index].body.overlaps(helmet.box) {
                 push(index, ahead: helmet)
             }
             if ball.holder == nil, ball.isLive, ball.frozen == 0, ball.box.overlaps(helmet.box) {
                 pushBall(ahead: helmet)
             }
-            // Gone at the far wall.
-            let far = helmet.speed > 0 ? helmet.box.max.x >= stage.width - Stage.tileSize : helmet.box.min.x <= Stage.tileSize
-            if far {
+            // At the other goalpost, on its way into it; gone at the far wall, should it get there.
+            let forward = helmet.speed > 0 ? 1.0 : -1.0
+            let lead = forward > 0 ? helmet.box.max.x : helmet.box.min.x
+            if let far = stage.goalpostHoops.first(where: { $0.backboard.sign == forward }),
+               (lead - FieldRules.goalpostFront(of: far)) * forward >= 0 {
+                helmet.box = helmet.box.offset(by: Vec2(x: FieldRules.goalpostFront(of: far) - lead, y: 0))
+                helmet.gate = FieldRules.prongsGate(of: far)
+                helmet.bottom = FieldRules.prongsHeight - FieldRules.helmetSize / 2
+                helmet.phase = .returning
+                kept.append(helmet)
+                continue
+            }
+            let atWall = helmet.speed > 0 ? helmet.box.max.x >= stage.width - Stage.tileSize : helmet.box.min.x <= Stage.tileSize
+            if atWall {
                 events.append(.helmetRemoved(at: helmet.box.center, owner: helmet.owner))
             } else {
                 kept.append(helmet)
@@ -178,8 +246,8 @@ extension Match {
         }
         // Two going opposite ways that meet take each other out.
         var gone = Set<Int>()
-        for first in kept.indices {
-            for second in kept.indices where second > first && kept[first].speed.sign != kept[second].speed.sign {
+        for first in kept.indices where kept[first].phase == .travelling {
+            for second in kept.indices where second > first && kept[second].phase == .travelling && kept[first].speed.sign != kept[second].speed.sign {
                 if kept[first].box.overlaps(kept[second].box) {
                     gone.insert(first)
                     gone.insert(second)
@@ -192,18 +260,52 @@ extension Match {
         refreshExtras()
     }
 
-    /// From the end the defender guards, the rim the holder scores on, toward the other.
+    /// From the end the defender guards, the rim the holder scores on, toward the other: out of
+    /// that goalpost's prongs' middle, wholly behind it to start.
     private mutating func spawnHelmet(against holder: Int, wearing defender: Int) {
-        let target = stage.hoops.first { $0.owner == holder } ?? stage.hoops[0]
-        let fromRight = target.position.x > stage.width / 2
+        let target = stage.goalpostHoops.first { $0.owner == holder } ?? stage.goalpostHoops[0]
+        let back = target.backboard.sign
         let bottom = FieldRules.helmetHeights[fieldDice.roll(FieldRules.helmetHeights.count)]
         let size = FieldRules.helmetSize
-        // Just clear of its own wall, so it isn't gone the frame it comes.
-        let x = fromRight ? stage.width - Stage.tileSize - size - 1 : Stage.tileSize + 1
-        let box = Box(min: Vec2(x: x, y: bottom), max: Vec2(x: x + size, y: bottom + size))
-        helmets.append(Helmet(id: stampId(), box: box, speed: FieldRules.helmetSpeed * (fromRight ? -1 : 1),
-                              owner: defender, variant: fieldDice.roll(FieldRules.helmetVariants)))
-        events.append(.helmetSpawned(at: box.center, owner: defender))
+        let gate = FieldRules.prongsGate(of: target)
+        let x = back > 0 ? gate : gate - size
+        let y = FieldRules.prongsHeight - size / 2
+        let box = Box(min: Vec2(x: x, y: y), max: Vec2(x: x + size, y: y + size))
+        helmets.append(Helmet(id: stampId(), box: box, speed: -back * FieldRules.helmetSpeed, owner: defender,
+                              variant: fieldDice.roll(FieldRules.helmetVariants), phase: .emerging, gate: gate, bottom: bottom))
+        events.append(.helmetSpawned(at: Vec2(x: gate, y: FieldRules.prongsHeight), owner: defender))
+    }
+
+    /// A frame of a helmet's way out of a goalpost or into one, at its speed: out toward the field
+    /// until its back clears the goalpost's front, then to its height; at the other end to the
+    /// prongs' height, then in until its back is through. False once it's gone in.
+    private func passThrough(_ helmet: inout Helmet) -> Bool {
+        let pace = abs(helmet.speed)
+        let forward = helmet.speed > 0 ? 1.0 : -1.0
+        let back = forward > 0 ? helmet.box.min.x : helmet.box.max.x
+        func slide(to x: Double) -> Bool {
+            let step = min(pace, max((x - back) * forward, 0))
+            helmet.box = helmet.box.offset(by: Vec2(x: forward * step, y: 0))
+            return step < pace
+        }
+        func rise() -> Bool {
+            let rise = helmet.bottom - helmet.box.min.y
+            helmet.box = helmet.box.offset(by: Vec2(x: 0, y: max(-pace, min(pace, rise))))
+            return abs(rise) <= pace
+        }
+        switch helmet.phase {
+        case .emerging:
+            if slide(to: helmet.gate + forward * (FieldRules.prongsBehindRim + FieldRules.goalpostFrontOfRim)) { helmet.phase = .settling }
+        case .settling:
+            if rise() { helmet.phase = .travelling }
+        case .returning:
+            if rise() { helmet.phase = .entering }
+        case .entering:
+            if slide(to: helmet.gate) { return false }
+        case .travelling:
+            break
+        }
+        return true
     }
 
     func stands(_ player: Player, on box: Box) -> Bool {
@@ -262,9 +364,22 @@ extension Match {
             portal = Portal(id: stampId(), centre: Vec2(x: x, y: FieldRules.portalHeight), framesLeft: FieldRules.portalFrames)
             events.append(.portalOpened(at: portal!.centre))
         }
-        // A shot or a throw, still its thrower's, through the loop: ten yards toward their rim.
-        guard let open = portal, ball.isLive, ball.holder == nil, let shooter = ball.owner else { return }
+        guard let open = portal else { return }
         let loop = Box(center: open.centre, width: FieldRules.portalHalfWidth * 2, height: FieldRules.portalHalfHeight * 2)
+        // A player without the ball through it, likewise ten yards toward their rim, going on as they were.
+        for index in players.indices where !players[index].hasBall && players[index].body.overlaps(loop) {
+            let target = stage.hoops.first { $0.owner == index } ?? stage.hoops[0]
+            let sign: Double = target.position.x > players[index].position.x ? 1 : -1
+            let from = players[index].position
+            let half = players[index].spec.bodyWidth / 2
+            let low = Stage.tileSize + half, high = stage.width - Stage.tileSize - half
+            let velocity = players[index].velocity
+            players[index].warp(to: Vec2(x: min(max(from.x + sign * FieldRules.warpYards * FieldRules.yard(in: stage), low), high), y: from.y), in: stage)
+            players[index].velocity = velocity
+            events.append(.portalCarried(player: index, from: from, to: players[index].position))
+        }
+        // A shot or a throw, still its thrower's, through the loop: ten yards toward their rim.
+        guard ball.isLive, ball.holder == nil, let shooter = ball.owner else { return }
         guard ball.box.overlaps(loop), portalCooldown == 0 else { return }
         let target = stage.hoops.first { $0.owner == shooter } ?? stage.hoops[0]
         let sign: Double = target.position.x > ball.position.x ? 1 : -1

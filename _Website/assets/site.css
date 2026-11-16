@@ -188,7 +188,10 @@ main {
 .brand-icon { display: block; width: 38px; height: 38px; }
 .brand-logo { display: block; height: 22px; width: auto; }
 
-.nav-links { display: flex; gap: 24px; }
+.nav-links { display: flex; align-items: center; gap: 24px; }
+
+/* Between the game's links and the rest. */
+.nav-rule { width: 1px; height: 20px; background: rgba(136, 215, 237, 0.3); }
 
 .nav-link {
   font-family: "BMarmy", monospace;

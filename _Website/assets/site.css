@@ -19,6 +19,7 @@
   --name-outline: #6d417d;
   --name-shadow: #4d13a4;
   --column: 640px;
+  --nav-height: 56px;
 }
 
 * { box-sizing: border-box; }
@@ -37,7 +38,7 @@ body {
 main {
   max-width: var(--column);
   margin: 0 auto;
-  padding: 24px 16px 64px;
+  padding: calc(var(--nav-height) + 24px) 16px 64px;
 }
 
 .page-header {
@@ -152,4 +153,48 @@ main {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* The navbar on every page: dark glass pinned to the top, the icon and logo at its left, the pages at its right. */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  height: var(--nav-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: rgba(8, 12, 20, 0.55);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid rgba(136, 215, 237, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-icon { display: block; width: 38px; height: 38px; }
+.brand-logo { display: block; height: 22px; width: auto; }
+
+.nav-links { display: flex; gap: 24px; }
+
+.nav-link {
+  font-family: "BMarmy", monospace;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text);
+  transition: color 0.15s, text-shadow 0.15s;
+}
+.nav-link:hover,
+.nav-link[aria-current="page"] {
+  color: var(--blip);
+  text-shadow: 0 0 8px rgba(12, 241, 255, 0.6);
 }

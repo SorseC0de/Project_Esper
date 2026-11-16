@@ -6,6 +6,7 @@
   top: 0;
   height: 100vh;
   height: 100svh;
+  padding-top: var(--nav-height);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -14,7 +15,8 @@
 /* Every layer is cut from Hero2 in one shared frame, so stacked at the same size they rebuild it. */
 .lineup-art {
   position: relative;
-  width: min(100vw, 100svh * 10300 / 4060);
+  --chevron-room: 96px;
+  width: min(100vw, (100svh - var(--nav-height) - 2 * var(--chevron-room)) * 10300 / 4060);
   aspect-ratio: 10300 / 4060;
 }
 
@@ -36,13 +38,31 @@
 }
 .logo img { display: block; width: 100%; height: auto; }
 
-.home-links {
-  display: flex;
-  justify-content: center;
-  padding: 48px 16px 96px;
+/* Three chevrons of light under the logo, pulsing downward until the scrolling starts. */
+.chevrons {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: calc((1522 + 60 + 7195 / 2) / 10300 * 100%);
+  width: 52px;
+  transform: translateX(-50%);
+  overflow: visible;
+  fill: none;
+  stroke: #e9feff;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px #0cf1ff) drop-shadow(0 0 6px #0cf1ff) drop-shadow(0 0 16px rgba(12, 241, 255, 0.7));
+  pointer-events: none;
 }
-.home-links img {
-  display: block;
-  width: min(100%, 340px);
-  height: auto;
+.chevrons polyline { animation: chevron-pulse 1.5s ease-in-out infinite; }
+.chevrons polyline:nth-child(2) { animation-delay: 0.2s; }
+.chevrons polyline:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes chevron-pulse {
+  0%, 100% { opacity: 0.25; }
+  35% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevrons polyline { animation: none; }
 }

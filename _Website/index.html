@@ -5,10 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Variaball</title>
     <meta name="description" content="Variaball: a basketball platformer.">
+    <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="stylesheet" href="assets/site.css">
     <link rel="stylesheet" href="assets/home.css">
   </head>
   <body>
+    <header class="navbar">
+      <a class="brand" href="/" aria-label="Variaball home">
+        <img class="brand-icon" src="/assets/icon.svg" width="38" height="38" alt="">
+        <img class="brand-logo" src="/assets/home/logo.svg" alt="Variaball">
+      </a>
+      <nav class="nav-links">
+        <a class="nav-link" href="/stages/">Stages</a>
+      </nav>
+    </header>
     <!-- The players slide in from the right, one per stretch of scrolling, until the row stands over the logo. -->
     <section class="lineup" id="lineup">
       <div class="lineup-stage">
@@ -24,13 +36,14 @@
           <img class="layer" style="--slide: 2" src="assets/home/effects_blue.svg" alt="">
           <img class="layer" style="--slide: 4" src="assets/home/effects_red.svg" alt="">
           <h1 class="logo"><img src="assets/home/logo.svg" alt="Variaball"></h1>
+          <svg class="chevrons" id="chevrons" viewBox="0 0 60 84" aria-hidden="true">
+            <polyline points="6,6 30,26 54,6"/>
+            <polyline points="6,32 30,52 54,32"/>
+            <polyline points="6,58 30,78 54,58"/>
+          </svg>
         </div>
       </div>
     </section>
-
-    <nav class="home-links">
-      <a href="/stages/"><img src="assets/ui/stages_button.png" width="680" height="499" alt="Stages"></a>
-    </nav>
 
     <script src="assets/home.js"></script>
   </body>

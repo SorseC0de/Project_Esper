@@ -82,8 +82,8 @@
    so the filter never meets the edge of the box. */
 .chevrons {
   display: block;
-  width: 108px;
-  margin-top: -16px;
+  width: 163px;
+  margin-top: -44px;
   overflow: hidden;
   fill: none;
   stroke: #e9feff;

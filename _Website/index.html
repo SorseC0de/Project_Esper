@@ -4,10 +4,34 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Variaball</title>
-    <meta http-equiv="refresh" content="0; url=/stages/">
-    <link rel="canonical" href="/stages/">
+    <meta name="description" content="Variaball: a basketball platformer.">
+    <link rel="stylesheet" href="assets/site.css">
+    <link rel="stylesheet" href="assets/home.css">
   </head>
   <body>
-    <p><a href="/stages/">Stages</a></p>
+    <!-- The players slide in from the right, one per stretch of scrolling, until the row stands over the logo. -->
+    <section class="lineup" id="lineup">
+      <div class="lineup-stage">
+        <div class="lineup-art">
+          <img class="layer" style="--slide: 0" src="assets/home/card_green.svg" alt="">
+          <img class="layer" style="--slide: 3" src="assets/home/card_orange.svg" alt="">
+          <img class="layer" style="--slide: 1" src="assets/home/card_purple.svg" alt="">
+          <img class="layer" style="--slide: 2" src="assets/home/card_blue.svg" alt="">
+          <img class="layer" style="--slide: 4" src="assets/home/card_red.svg" alt="">
+          <img class="layer" style="--slide: 0" src="assets/home/effects_green.svg" alt="">
+          <img class="layer" style="--slide: 3" src="assets/home/effects_orange.svg" alt="">
+          <img class="layer" style="--slide: 1" src="assets/home/effects_purple.svg" alt="">
+          <img class="layer" style="--slide: 2" src="assets/home/effects_blue.svg" alt="">
+          <img class="layer" style="--slide: 4" src="assets/home/effects_red.svg" alt="">
+          <h1 class="logo"><img src="assets/home/logo.svg" alt="Variaball"></h1>
+        </div>
+      </div>
+    </section>
+
+    <nav class="home-links">
+      <a href="/stages/"><img src="assets/ui/stages_button.png" width="680" height="499" alt="Stages"></a>
+    </nav>
+
+    <script src="assets/home.js"></script>
   </body>
 </html>

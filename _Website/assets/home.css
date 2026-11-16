@@ -1,0 +1,48 @@
+/* The home page's lineup: the scroll runs the length of the section while the art stays pinned on screen. */
+.lineup { height: 400vh; }
+
+.lineup-stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+/* Every layer is cut from Hero2 in one shared frame, so stacked at the same size they rebuild it. */
+.lineup-art {
+  position: relative;
+  width: min(100vw, 100svh * 10300 / 4060);
+  aspect-ratio: 10300 / 4060;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+/* Where Hero2 draws its logo, in the same frame. */
+.logo {
+  position: absolute;
+  left: calc((1522 + 60) / 10300 * 100%);
+  top: calc((3500 - 700) / 4060 * 100%);
+  width: calc(7195 / 10300 * 100%);
+  margin: 0;
+}
+.logo img { display: block; width: 100%; height: auto; }
+
+.home-links {
+  display: flex;
+  justify-content: center;
+  padding: 48px 16px 96px;
+}
+.home-links img {
+  display: block;
+  width: min(100%, 340px);
+  height: auto;
+}

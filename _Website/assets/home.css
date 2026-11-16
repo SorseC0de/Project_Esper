@@ -39,16 +39,25 @@
 }
 .logo img { display: block; width: 100%; height: auto; }
 
-/* The tagline and the chevrons, centred under the logo and at least as wide as it. */
+/* Under the logo: the chevrons first, then the tagline and the Kickstarter banner in the same place once the row is
+   complete; one fades out as the other fades in. The block is centred under the logo and at least as wide as it. */
 .below-logo {
   position: absolute;
   top: calc(100% + 8px);
   left: calc((1522 + 60 + 7195 / 2) / 10300 * 100%);
   width: max(calc(7195 / 10300 * 100%), min(92vw, 560px));
   transform: translateX(-50%);
+  display: grid;
+  place-items: start center;
+}
+.below-logo > * { grid-area: 1 / 1; }
+
+.finale {
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  opacity: 0;
 }
 
 .tagline {
@@ -62,20 +71,11 @@
 }
 .tagline-shout { color: var(--name-top); }
 
-/* The chevrons and the Kickstarter banner share the space under the tagline: one fades out as the other fades in. */
-.after-tagline {
-  display: grid;
-  place-items: start center;
-  width: 100%;
-}
-.after-tagline > * { grid-area: 1 / 1; }
-
 .kickstarter-banner {
   display: block;
   width: 100%;
   height: auto;
   margin-top: 16px;
-  opacity: 0;
 }
 
 /* Three chevrons of light, pulsing downward until the scrolling starts. The viewBox's margin holds the glow,

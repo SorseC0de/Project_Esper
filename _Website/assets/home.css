@@ -78,8 +78,8 @@
   margin-top: 16px;
 }
 
-/* Three chevrons of light, pulsing downward until the scrolling starts. The viewBox's margin holds the glow,
-   so the filter never meets the edge of the box. */
+/* Three chevrons of light, pulsing downward until the scrolling starts. Each carries its own glow filter (in the
+   SVG); the viewBox's margin holds the glow's full reach. */
 .chevrons {
   display: block;
   width: 163px;
@@ -90,12 +90,11 @@
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 2px #0cf1ff) drop-shadow(0 0 6px #0cf1ff) drop-shadow(0 0 16px rgba(12, 241, 255, 0.7));
   pointer-events: none;
 }
 .chevrons polyline { animation: chevron-pulse 1.5s ease-in-out infinite; }
-.chevrons polyline:nth-child(2) { animation-delay: 0.2s; }
-.chevrons polyline:nth-child(3) { animation-delay: 0.4s; }
+.chevrons polyline:nth-of-type(2) { animation-delay: 0.2s; }
+.chevrons polyline:nth-of-type(3) { animation-delay: 0.4s; }
 
 @keyframes chevron-pulse {
   0%, 100% { opacity: 0.25; }
@@ -106,8 +105,10 @@
   .chevrons polyline { animation: none; }
 }
 
-/* The teaser, once the lineup lets go of the screen. */
+/* The teaser follows the banner; home.js pulls it up into the pinned screen's empty bottom on tall screens. */
 .teaser {
+  position: relative;
+  z-index: 1;
   padding: 0 16px 96px;
 }
 .video-frame {

@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="stylesheet" href="assets/site.css?v=2">
-    <link rel="stylesheet" href="assets/home.css?v=3">
+    <link rel="stylesheet" href="assets/home.css?v=4">
   </head>
   <body>
     <header class="navbar">
@@ -38,9 +38,27 @@
           <h1 class="logo"><img src="assets/home/logo.svg" alt="Variaball"></h1>
           <div class="below-logo">
             <svg class="chevrons" id="chevrons" viewBox="-64 -64 188 212" aria-hidden="true">
-              <polyline points="6,6 30,26 54,6"/>
-              <polyline points="6,32 30,52 54,32"/>
-              <polyline points="6,58 30,78 54,58"/>
+              <defs>
+                <!-- The glow sits on each chevron, so a chevron's whole glow repaints with it as it pulses. -->
+                <filter id="chevron-glow" filterUnits="userSpaceOnUse" x="-64" y="-64" width="188" height="212">
+                  <feFlood flood-color="#0cf1ff" result="cyan"/>
+                  <feComposite in="cyan" in2="SourceAlpha" operator="in" result="tint"/>
+                  <feGaussianBlur in="tint" stdDeviation="1" result="glowTight"/>
+                  <feGaussianBlur in="tint" stdDeviation="4" result="glowMid"/>
+                  <feGaussianBlur in="tint" stdDeviation="10" result="glowWide"/>
+                  <feComponentTransfer in="glowWide" result="glowWideSoft"><feFuncA type="linear" slope="0.8"/></feComponentTransfer>
+                  <feMerge>
+                    <feMergeNode in="glowWideSoft"/>
+                    <feMergeNode in="glowMid"/>
+                    <feMergeNode in="glowMid"/>
+                    <feMergeNode in="glowTight"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+              <polyline filter="url(#chevron-glow)" points="6,6 30,26 54,6"/>
+              <polyline filter="url(#chevron-glow)" points="6,32 30,52 54,32"/>
+              <polyline filter="url(#chevron-glow)" points="6,58 30,78 54,58"/>
             </svg>
             <div class="finale" id="finale">
               <p class="tagline">Power up &amp; throw it down in a classic arcade basketball shootout packed with comic book superpowers and unexpected places to <span class="tagline-shout">BALL OUT!!</span></p>
@@ -57,6 +75,6 @@
       </div>
     </section>
 
-    <script src="assets/home.js?v=2"></script>
+    <script src="assets/home.js?v=3"></script>
   </body>
 </html>

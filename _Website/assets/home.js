@@ -8,6 +8,9 @@
   const chevronFadeLength = 0.08;
   const finale = document.getElementById("finale");
   const finaleFadeStart = 0.9;
+  const lineupStage = lineup.querySelector(".lineup-stage");
+  const teaser = document.querySelector(".teaser");
+  const teaserGapBelowFinale = 64;
   const slideCount = 5;
   const slideStagger = 0.18;
   const slideLength = 1 - slideStagger * (slideCount - 1);
@@ -34,10 +37,22 @@
       layer.style.transform = `translateX(${(1 - arrived) * offscreenDistance}px)`;
     }
   }
+  // The pinned screen keeps its full height under the finale; on a tall screen that leaves empty space before the
+  // teaser, so the teaser is pulled up to sit a fixed gap under the banner.
+  function placeTeaser() {
+    const finaleRect = finale.getBoundingClientRect();
+    const finaleShift = new DOMMatrixReadOnly(getComputedStyle(finale).transform).m42;
+    const emptyBelowFinale = lineupStage.getBoundingClientRect().bottom - (finaleRect.bottom - finaleShift);
+    teaser.style.marginTop = `${-Math.max(0, emptyBelowFinale - teaserGapBelowFinale)}px`;
+  }
+
   function queue() {
     if (!queued) { queued = true; requestAnimationFrame(place); }
   }
   window.addEventListener("scroll", queue, { passive: true });
-  window.addEventListener("resize", queue);
+  window.addEventListener("resize", () => { placeTeaser(); queue(); });
+  window.addEventListener("load", placeTeaser);
+  document.fonts.ready.then(placeTeaser);
+  placeTeaser();
   place();
 })();

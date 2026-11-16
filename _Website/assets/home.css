@@ -2,11 +2,13 @@
 .lineup { height: 400vh; }
 
 .lineup-stage {
+  --below-logo-room: clamp(180px, 28svh, 260px);
   position: sticky;
   top: 0;
   height: 100vh;
   height: 100svh;
   padding-top: var(--nav-height);
+  padding-bottom: var(--below-logo-room);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -15,8 +17,7 @@
 /* Every layer is cut from Hero2 in one shared frame, so stacked at the same size they rebuild it. */
 .lineup-art {
   position: relative;
-  --chevron-room: 96px;
-  width: min(100vw, (100svh - var(--nav-height) - 2 * var(--chevron-room)) * 10300 / 4060);
+  width: min(100vw, (100svh - var(--nav-height) - var(--below-logo-room) - 24px) * 10300 / 4060);
   aspect-ratio: 10300 / 4060;
 }
 
@@ -38,14 +39,42 @@
 }
 .logo img { display: block; width: 100%; height: auto; }
 
-/* Three chevrons of light under the logo, pulsing downward until the scrolling starts. */
-.chevrons {
+@font-face {
+  font-family: "Board of Directors";
+  src: url("fonts/BoardOfDirectors-Hv.otf") format("opentype");
+  font-display: swap;
+}
+
+/* The tagline and the chevrons, centred under the logo and at least as wide as it. */
+.below-logo {
   position: absolute;
-  top: calc(100% + 12px);
+  top: calc(100% + 8px);
   left: calc((1522 + 60 + 7195 / 2) / 10300 * 100%);
-  width: 52px;
+  width: max(calc(7195 / 10300 * 100%), min(92vw, 560px));
   transform: translateX(-50%);
-  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tagline {
+  margin: 0;
+  font-family: "Board of Directors", sans-serif;
+  font-size: clamp(15px, 1.6vw, 24px);
+  line-height: 1.25;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 3px 0 var(--name-shadow);
+}
+.tagline-shout { color: var(--name-top); }
+
+/* Three chevrons of light, pulsing downward until the scrolling starts. The viewBox's margin holds the glow,
+   so the filter never meets the edge of the box. */
+.chevrons {
+  display: block;
+  width: 108px;
+  margin-top: -16px;
+  overflow: hidden;
   fill: none;
   stroke: #e9feff;
   stroke-width: 4;

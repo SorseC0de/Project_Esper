@@ -213,3 +213,31 @@ main {
   font-style: italic;
   font-size: 22px;
 }
+
+/* The support and privacy page: plain reading text under a campaign-lettered title. */
+.legal h1 { margin-bottom: 32px; }
+.legal h2 {
+  margin: 40px 0 8px;
+  font-family: "BMarmy", monospace;
+  font-weight: normal;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blip);
+}
+.legal a { color: var(--line); }
+.legal ul { padding-left: 20px; }
+.legal li { margin: 10px 0; }
+.legal-updated { margin-top: 48px; font-size: 13px; opacity: 0.6; }
+
+/* The line at the foot of every page. */
+.site-footer {
+  padding: 24px 16px 40px;
+  text-align: center;
+  font-family: "BMarmy", monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.site-footer a { color: var(--line); text-decoration: none; opacity: 0.7; }
+.site-footer a:hover { opacity: 1; color: var(--blip); }

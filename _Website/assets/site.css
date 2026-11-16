@@ -9,6 +9,12 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Board of Directors";
+  src: url("fonts/BoardOfDirectors-Hv.otf") format("opentype");
+  font-display: swap;
+}
+
 :root {
   --background: #0a111c;
   --text: #dfe7ef;
@@ -197,4 +203,13 @@ main {
 .nav-link[aria-current="page"] {
   color: var(--blip);
   text-shadow: 0 0 8px rgba(12, 241, 255, 0.6);
+}
+
+/* The line closing the stages page. */
+.more-to-come {
+  margin: 0;
+  text-align: center;
+  font-family: "Board of Directors", sans-serif;
+  font-style: italic;
+  font-size: 22px;
 }

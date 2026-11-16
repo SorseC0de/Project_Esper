@@ -39,12 +39,6 @@
 }
 .logo img { display: block; width: 100%; height: auto; }
 
-@font-face {
-  font-family: "Board of Directors";
-  src: url("fonts/BoardOfDirectors-Hv.otf") format("opentype");
-  font-display: swap;
-}
-
 /* The tagline and the chevrons, centred under the logo and at least as wide as it. */
 .below-logo {
   position: absolute;

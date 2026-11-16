@@ -105,3 +105,20 @@
 @media (prefers-reduced-motion: reduce) {
   .chevrons polyline { animation: none; }
 }
+
+/* The teaser, once the lineup lets go of the screen. */
+.teaser {
+  padding: 0 16px 96px;
+}
+.video-frame {
+  width: min(100%, 960px);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  box-shadow: 0 0 0 1px rgba(136, 215, 237, 0.14), 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.video-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}

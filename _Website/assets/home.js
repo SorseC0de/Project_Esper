@@ -1,11 +1,13 @@
 // Each player slides in from beyond the right edge over its own stretch of the lineup's scroll, left to right;
-// the chevrons fade out over the first stretch.
+// the chevrons fade out over the first stretch and the Kickstarter banner fades in as the row completes.
 (() => {
   const lineup = document.getElementById("lineup");
   const art = lineup.querySelector(".lineup-art");
   const layers = [...lineup.querySelectorAll(".layer")];
   const chevrons = document.getElementById("chevrons");
   const chevronFadeLength = 0.08;
+  const banner = document.getElementById("kickstarterBanner");
+  const bannerFadeStart = 0.9;
   const slideCount = 5;
   const slideStagger = 0.18;
   const slideLength = 1 - slideStagger * (slideCount - 1);
@@ -21,7 +23,10 @@
     const scrollable = lineup.offsetHeight - window.innerHeight;
     const progress = clamp(-lineup.getBoundingClientRect().top / scrollable);
     chevrons.style.opacity = 1 - clamp(progress / chevronFadeLength);
-    if (reduceMotion) return;
+    if (reduceMotion) { banner.style.opacity = 1; return; }
+    const bannerShown = easeOut(clamp((progress - bannerFadeStart) / (1 - bannerFadeStart)));
+    banner.style.opacity = bannerShown;
+    banner.style.transform = `translateY(${(1 - bannerShown) * 12}px)`;
     const offscreenDistance = window.innerWidth - art.getBoundingClientRect().left;
     for (const layer of layers) {
       const slide = Number(layer.style.getPropertyValue("--slide"));

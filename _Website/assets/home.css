@@ -68,6 +68,22 @@
 }
 .tagline-shout { color: var(--name-top); }
 
+/* The chevrons and the Kickstarter banner share the space under the tagline: one fades out as the other fades in. */
+.after-tagline {
+  display: grid;
+  place-items: start center;
+  width: 100%;
+}
+.after-tagline > * { grid-area: 1 / 1; }
+
+.kickstarter-banner {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 16px;
+  opacity: 0;
+}
+
 /* Three chevrons of light, pulsing downward until the scrolling starts. The viewBox's margin holds the glow,
    so the filter never meets the edge of the box. */
 .chevrons {

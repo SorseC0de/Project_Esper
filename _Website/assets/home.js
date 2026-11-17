@@ -1,11 +1,11 @@
 // Each player slides in from beyond the right edge over its own stretch of the lineup's scroll, left to right;
-// the chevrons fade out over the first stretch, and the tagline and Kickstarter banner fade in as the row completes.
+// the opening banner and chevrons fade out over the first stretch, and the tagline and Kickstarter banner fade in as the row completes.
 (() => {
   const lineup = document.getElementById("lineup");
   const art = lineup.querySelector(".lineup-art");
   const layers = [...lineup.querySelectorAll(".layer")];
-  const chevrons = document.getElementById("chevrons");
-  const chevronFadeLength = 0.08;
+  const opening = document.getElementById("opening");
+  const openingFadeLength = 0.08;
   const finale = document.getElementById("finale");
   const finaleFadeStart = 0.9;
   const lineupStage = lineup.querySelector(".lineup-stage");
@@ -25,7 +25,7 @@
     queued = false;
     const scrollable = lineup.offsetHeight - window.innerHeight;
     const progress = clamp(-lineup.getBoundingClientRect().top / scrollable);
-    chevrons.style.opacity = 1 - clamp(progress / chevronFadeLength);
+    opening.style.opacity = 1 - clamp(progress / openingFadeLength);
     if (reduceMotion) { finale.style.opacity = 1; return; }
     const finaleShown = easeOut(clamp((progress - finaleFadeStart) / (1 - finaleFadeStart)));
     finale.style.opacity = finaleShown;

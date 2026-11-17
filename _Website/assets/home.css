@@ -39,7 +39,7 @@
 }
 .logo img { display: block; width: 100%; height: auto; }
 
-/* Under the logo: the chevrons first, then the tagline and the Kickstarter banner in the same place once the row is
+/* Under the logo: the Kickstarter banner and the chevrons first, then the tagline and the Kickstarter banner in the same place once the row is
    complete; one fades out as the other fades in. The block is centred under the logo and at least as wide as it. */
 .below-logo {
   position: absolute;
@@ -76,6 +76,19 @@
   width: 100%;
   height: auto;
   margin-top: 16px;
+}
+
+/* The opening view's Kickstarter banner, over the chevrons; it fades out with them. Reduced motion shows the
+   finale's from the start, so this one stays out. */
+.opening {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.opening-banner { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .opening-banner { display: none; }
 }
 
 /* Three chevrons of light, pulsing downward until the scrolling starts. Each carries its own glow filter (in the

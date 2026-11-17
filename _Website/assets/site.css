@@ -208,6 +208,16 @@ main {
   text-shadow: 0 0 8px rgba(12, 241, 255, 0.6);
 }
 
+/* On a phone, the brand smaller and the links closer, so all of it fits across. */
+@media (max-width: 600px) {
+  .navbar { padding: 0 14px; }
+  .brand { gap: 8px; }
+  .brand-icon { width: 30px; height: 30px; }
+  .brand-logo { height: 14px; }
+  .nav-links { gap: 14px; }
+  .nav-link { font-size: 12px; }
+}
+
 /* The line closing the stages page. */
 .more-to-come {
   margin: 0;

@@ -71,6 +71,7 @@
 }
 .tagline-shout { color: var(--name-top); }
 
+.kickstarter-link { display: block; width: 100%; }
 .kickstarter-banner {
   display: block;
   width: 100%;

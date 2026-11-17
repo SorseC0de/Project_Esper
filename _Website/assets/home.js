@@ -25,10 +25,14 @@
     queued = false;
     const scrollable = lineup.offsetHeight - window.innerHeight;
     const progress = clamp(-lineup.getBoundingClientRect().top / scrollable);
-    opening.style.opacity = 1 - clamp(progress / openingFadeLength);
-    if (reduceMotion) { finale.style.opacity = 1; return; }
+    const openingShown = 1 - clamp(progress / openingFadeLength);
+    opening.style.opacity = openingShown;
+    // Only the block that's showing takes clicks, so the banner's link under the cursor is the one seen.
+    opening.style.pointerEvents = openingShown > 0.5 ? "auto" : "none";
+    if (reduceMotion) { finale.style.opacity = 1; finale.style.pointerEvents = "auto"; return; }
     const finaleShown = easeOut(clamp((progress - finaleFadeStart) / (1 - finaleFadeStart)));
     finale.style.opacity = finaleShown;
+    finale.style.pointerEvents = finaleShown > 0.5 ? "auto" : "none";
     finale.style.transform = `translateY(${(1 - finaleShown) * 12}px)`;
     const offscreenDistance = window.innerWidth - art.getBoundingClientRect().left;
     for (const layer of layers) {

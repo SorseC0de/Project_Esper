@@ -16,6 +16,8 @@ struct SpriteSnapshot {
     var blendMode: SKBlendMode = .alpha
     var shader: SKShader?
     var warp: SKWarpGeometry?
+    /// A player map's attributes (`PlayerArt`), so it's drawn in its look.
+    var attributes: [String: SKAttributeValue] = [:]
 }
 
 /// The ball cam: a close view of the ball, drawn by its own renderer into a small texture
@@ -84,6 +86,7 @@ final class BallCamScene: SKScene {
             node.zPosition = snapshot.zPosition
             node.blendMode = snapshot.blendMode
             node.shader = snapshot.shader
+            node.attributeValues = snapshot.attributes
             node.warpGeometry = snapshot.warp
         }
     }

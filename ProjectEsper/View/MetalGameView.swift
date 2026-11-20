@@ -26,7 +26,14 @@ final class GameMetalView: MTKView {
         let device = MTLCreateSystemDefaultDevice()!
         renderer = GlowRenderer(scene: scene, device: device)
         super.init(frame: .zero, device: device)
-        colorPixelFormat = .bgra8Unorm
+        colorPixelFormat = GlowRenderer.screenFormat
+        #if !os(tvOS)
+        if GlowRenderer.edr, let metalLayer = layer as? CAMetalLayer {
+            // Past white where the screen can show it: what glows is drawn brighter than its colour.
+            metalLayer.wantsExtendedDynamicRangeContent = true
+            metalLayer.colorspace = CGColorSpace(name: CGColorSpace.extendedSRGB)
+        }
+        #endif
         preferredFramesPerSecond = 60
         #if os(tvOS)
         // 1080p, whatever the TV: the pixel art doubles exactly onto a 4K screen, unsmoothed.
@@ -116,10 +123,31 @@ struct GlowUniforms {
     /// Each energy colour's hood tones, its light and its shadow, so the glow keeps the shadow under the light.
     var hoodLight = GlowSettings.hoodLightUniforms
     var hoodShadow = GlowSettings.hoodShadowUniforms
+    /// x: what glows, this many times brighter in light, past white on an EDR screen; 1 for none.
+    var edr = SIMD4<Float>(1, 0, 0, 0)
 }
 
 /// Draws the scene, then the glow: bright pass at half size, a few blurs, and the composite.
 final class GlowRenderer: NSObject, MTKViewDelegate {
+    /// The screen drawn past white (EDR) on iPhone, iPad and Mac, so what glows can be brighter than
+    /// its colour: half floats in extended sRGB. Not the TV's, nor footage's, which the recorder reads in 8 bits.
+    static let edr: Bool = {
+        #if os(iOS)
+        FootageRun.plan == nil
+        #else
+        false
+        #endif
+    }()
+    static let screenFormat: MTLPixelFormat = edr ? .rgba16Float : .bgra8Unorm
+    /// How many times past white the view's screen can show now, in light; 1 where it can't.
+    static func headroom(of view: MTKView) -> Float {
+        #if os(iOS)
+        guard edr, let screen = view.window?.windowScene?.screen else { return 1 }
+        return Float(max(screen.currentEDRHeadroom, 1))
+        #else
+        return 1
+        #endif
+    }
     /// The machine as the readout shows it: its thermal state, Low Power Mode, and this app's memory
     /// footprint. Every CPU section and GPU pass slowing together at once is the machine, not the
     /// game: throttled hot, saving power, or short of memory.
@@ -174,6 +202,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private let bright: MTLRenderPipelineState
     private let blur: MTLRenderPipelineState
     private let composite: MTLRenderPipelineState
+    /// The composite onto the screen, in the screen's format.
+    private let compositeScreen: MTLRenderPipelineState
     private let sampler: MTLSamplerState
     /// The head's energy cubes, drawn into the scene after SpriteKit, before the glow.
     private let cubePipeline: MTLRenderPipelineState?
@@ -241,6 +271,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
     private var shotTexture: MTLTexture?
     private var panelTextures: [MTLTexture] = []
     private let mangaPipeline: MTLRenderPipelineState
+    /// The page laid onto the screen, in the screen's format.
+    private let mangaScreenPipeline: MTLRenderPipelineState
     /// Footage: the HUD's scene drawn into the video by a renderer of its own, over the world blurred
     /// and washed while a screen with the pause's ground is up, the veil's share faded in and out.
     private var hudRenderer: SKRenderer?
@@ -264,17 +296,17 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         occluderRenderer.scene = occluderScene
 
         let library = device.makeDefaultLibrary()!
-        func pipeline(_ fragment: String) -> MTLRenderPipelineState {
+        func pipeline(_ fragment: String, format: MTLPixelFormat = .bgra8Unorm) -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = library.makeFunction(name: "glowVertex")
             descriptor.fragmentFunction = library.makeFunction(name: fragment)
-            descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+            descriptor.colorAttachments[0].pixelFormat = format
             return try! device.makeRenderPipelineState(descriptor: descriptor)
         }
         let camDescriptor = MTLRenderPipelineDescriptor()
         camDescriptor.vertexFunction = library.makeFunction(name: "ballCamVertex")
         camDescriptor.fragmentFunction = library.makeFunction(name: "ballCamFragment")
-        camDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        camDescriptor.colorAttachments[0].pixelFormat = GlowRenderer.screenFormat
         // Laid over the screen at two thirds.
         camDescriptor.colorAttachments[0].isBlendingEnabled = true
         camDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
@@ -293,9 +325,12 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         mangaDescriptor.fragmentFunction = library.makeFunction(name: "mangaFragment")
         mangaDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
         mangaPipeline = try! device.makeRenderPipelineState(descriptor: mangaDescriptor)
+        mangaDescriptor.colorAttachments[0].pixelFormat = GlowRenderer.screenFormat
+        mangaScreenPipeline = try! device.makeRenderPipelineState(descriptor: mangaDescriptor)
         bright = pipeline("glowBright")
         blur = pipeline("glowBlur")
         composite = pipeline("glowComposite")
+        compositeScreen = pipeline("glowComposite", format: GlowRenderer.screenFormat)
 
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .linear
@@ -561,8 +596,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
 
         // The bodies alone, mirrored into their own scene and drawn by their own renderer.
         maskScene.syncStatic(scene.staticFlats, version: scene.staticFlatsVersion)
-        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.cutOutSnapshots, hoods: scene.hoodSnapshots, shield: scene.shieldedSnapshots,
-                         washFree: scene.washFreeSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
+        maskScene.mirror(scene.bodySnapshots, flat: scene.flatSnapshots + scene.unglowingBodySnapshots, under: scene.tornadoSnapshots + scene.soundWordSnapshots, through: scene.glowThroughSnapshots, throughFront: scene.glowThroughFrontSnapshots, throughNets: scene.glowThroughNets, cutOut: scene.cutOutSnapshots, hoods: scene.hoodSnapshots, shield: scene.shieldedSnapshots,
+                         washFree: scene.washFreeSnapshots, lines: scene.lineSnapshots, linesOver: scene.lineOverSnapshots, size: scene.size, cameraPosition: scene.cameraPosition, cameraScale: scene.cameraScale, cameraRotation: scene.cameraRotation)
         maskRenderer.update(atTime: now)
         let maskPass = MTLRenderPassDescriptor()
         maskPass.colorAttachments[0].texture = bodyMask
@@ -646,7 +681,9 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
                 }
             }
         } else {
-            pass(commands, pipeline: composite, descriptor: screenPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms,
+            // What glows past white, as far as the screen can show it now.
+            uniforms.edr.x = min(GlowSettings.edrBoost, GlowRenderer.headroom(of: view))
+            pass(commands, pipeline: compositeScreen, descriptor: screenPass, sources: [sceneTexture, glowA, bodyMask], uniforms: uniforms,
                  then: camReady ? { [weak self] encoder in self?.layBallCam(encoder, aspect: Float(view.drawableSize.width / max(view.drawableSize.height, 1))) } : nil)
             // Footage: the frame as shown, the HUD and its screens over it, off the drawable into the scene's video.
             if let recorder = scene.footage?.recorder {
@@ -656,7 +693,8 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         }
 
         if let capture = scene.transformCapture, let shotTexture, let taken = capture.take() {
-            // The frame again into a texture that can be read.
+            // The frame again into a texture that can be read, in 8 bits: nothing past white.
+            uniforms.edr.x = 1
             let shotPass = MTLRenderPassDescriptor()
             shotPass.colorAttachments[0].texture = shotTexture
             shotPass.colorAttachments[0].loadAction = .dontCare
@@ -970,7 +1008,7 @@ final class GlowRenderer: NSObject, MTKViewDelegate {
         descriptor.colorAttachments[0].clearColor = MTLClearColor(red: Double((ground >> 16) & 0xFF) / 255, green: Double((ground >> 8) & 0xFF) / 255,
                                                                   blue: Double(ground & 0xFF) / 255, alpha: 1)
         guard let encoder = commands.makeRenderCommandEncoder(descriptor: descriptor) else { return }
-        encoder.setRenderPipelineState(mangaPipeline)
+        encoder.setRenderPipelineState(mangaScreenPipeline)
         encoder.setFragmentSamplerState(sampler, index: 0)
         let fit = MangaPage.fit(in: screen)
         for panel in 0..<min(shown, panelTextures.count) {

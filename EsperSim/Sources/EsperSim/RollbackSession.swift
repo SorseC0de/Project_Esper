@@ -56,6 +56,15 @@ public struct RollbackSession {
     private var eventsByFrame: [Int: [MatchEvent]] = [:]
     private var pendingShown: [FrameEvents] = []
     private var confirmedHandedOut = -1
+    /// The session as played, for a replay, once `startRecording` is called.
+    public private(set) var recording: SessionRecording?
+    /// Which session this is, the app's way to tell a fresh one from the one it had.
+    public let serial = RollbackSession.nextSerial()
+    nonisolated(unsafe) private static var serialCount = 0
+    private static func nextSerial() -> Int {
+        serialCount += 1
+        return serialCount
+    }
 
     public init(match: Match, localIndex: Int, delay: Int = 0, window: Int = NetRules.predictionWindow) {
         self.match = match
@@ -163,6 +172,13 @@ public struct RollbackSession {
         change(&match)
         snapshots = [:]
         usedRemote = [:]
+        recording?.changes.append(SessionRecording.Change(frame: frame, match: match))
+    }
+
+    /// Records from here on: the match as it stands, every change made to it, and both sides'
+    /// inputs as each frame confirms.
+    public mutating func startRecording() {
+        recording = SessionRecording(start: match)
     }
 
     /// Every frame before the next one is known on both sides.
@@ -223,6 +239,7 @@ public struct RollbackSession {
 
     private mutating func updateConfirmed() {
         confirmedFrame = min(frame - 1, remoteKnownThrough)
+        if recording != nil { recordConfirmedInputs() }
         for old in snapshots.keys where old < confirmedFrame { snapshots[old] = nil }
         for old in usedRemote.keys where old < confirmedFrame { usedRemote[old] = nil }
     }
@@ -241,6 +258,20 @@ public struct RollbackSession {
     }
 
     func snapshotForTesting(_ at: Int) -> Match? { snapshots[at] }
+
+    /// Each newly confirmed frame's real inputs, player one's first.
+    private mutating func recordConfirmedInputs() {
+        guard var kept = recording else { return }
+        var at = kept.start.frame + kept.inputs.count
+        while at <= confirmedFrame {
+            var inputs = [PlayerInput](repeating: .idle, count: match.players.count)
+            if localIndex < inputs.count { inputs[localIndex] = at < localInputs.count ? localInputs[at] : .idle }
+            if remoteIndex < inputs.count { inputs[remoteIndex] = at < remoteInputs.count ? remoteInputs[at] ?? .idle : .idle }
+            kept.inputs.append(inputs)
+            at += 1
+        }
+        recording = kept
+    }
 
     /// The events in `now` that weren't in `before`, as a multiset.
     static func difference(_ now: [MatchEvent], _ before: [MatchEvent]) -> [MatchEvent] {

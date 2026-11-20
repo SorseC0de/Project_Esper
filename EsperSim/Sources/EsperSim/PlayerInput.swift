@@ -58,3 +58,5 @@ public enum Facing: Int, Hashable {
     public var sign: Double { Double(rawValue) }
     public var flipped: Facing { self == .left ? .right : .left }
 }
+
+extension Facing: Codable {}

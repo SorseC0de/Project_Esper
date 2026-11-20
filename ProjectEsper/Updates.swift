@@ -9,7 +9,7 @@ import SwiftUI
 /// black, a list scrolling inside it, left-aligned and bulleted, some lines with a moving icon.
 /// A new set of notes gets a new `id`, so it shows again.
 enum UpdatesNotes {
-    static let id = "2026-11-11 build 14"
+    static let id = "2026-11-20 build 15"
     static let seenKey = "esper.updates.seen"
     static var unseen: Bool { UserDefaults.standard.string(forKey: seenKey) != id }
 
@@ -51,6 +51,33 @@ enum UpdatesNotes {
         let lines: [Line]
     }
     static let builds: [Build] = [
+        Build(number: 15, lines: [
+            .title("Core Changes"),
+            .feature("Shots always face the hoop you can score on"),
+            .feature("Moving on the ground builds [FLO]"),
+            .bullet("Dashing builds it fastest, and it builds a little faster without the ball.", depth: 1),
+            .feature("Being scored on gives you +20 [FLO]"),
+            .bullet("The scorer no longer gets it.", depth: 1),
+            .feature("Fadeaway"),
+            .bullet("Hold away from the hoop during an air shot to drift back and lean.", depth: 1),
+            .feature("New: V-TV"),
+            .bullet("SAVE a match from the win screen (online matches too), then watch it back from V-TV on the title. Pause during a replay to RESTART or EXIT.", depth: 1),
+            .feature("New title screen, menus on the jumbotron, and THEME to set the menus' color"),
+            .feature("Faster loading"),
+            .bullet("[Stepback] is now back on the stick (was down). Down still works when there's no hoop to face."),
+            .bullet("An air shot stance is cancelled on landing instead of becoming a ground shot."),
+            .bullet("Shots and floaters can only be caught with [Snatch] mid-flight, until they bounce or lose the shooter's color."),
+            .bullet("Two [Slides] meeting now clash, as slashes do."),
+            .bullet("New air [Slash] animation. You no longer spin out of an air slash."),
+            .bullet("The [FloState] taunt is slower and lasts its full animation."),
+            .bullet("[Exclusion] is in the owner's energy color."),
+            .bullet("The CPU no longer shields to contest shot stances or approaches."),
+            .bullet("Your chosen Greateraid bottle and name are now in the HUD."),
+            .divider,
+            .title("Other"),
+            .bullet("Music in the Tutorial"),
+            .bullet("Amethyst's purples refreshed"),
+        ]),
         Build(number: 14, lines: [
             .title("Core Changes"),
             .feature("New Mode: Breaker Ball (offline)"),
@@ -73,7 +100,7 @@ enum UpdatesNotes {
             .bullet("The portal carries players too", depth: 1),
             .bullet("No [Auto-aim] on shots", depth: 1, tone: .nerf),
             .bullet("The Elements: icicles evened out, 16 ➜ 15"),
-            .bullet("The Wreck Center: the back wall no longer changes colour"),
+            .bullet("The Wreck Center: the back wall no longer changes color"),
             .divider,
             .title("Greateraid Changes"),
             .drink("Phantom Frappe (New Biomorph)", .phantomFrappe),

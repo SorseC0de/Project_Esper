@@ -10,6 +10,9 @@ final class FlowState: ObservableObject {
     let scene = GameScene()
     let net = GameCenter()
     @Published var showsTitle = true
+    /// The title screen, before the main menu, up from launch until a tap or a button.
+    @Published var titleScreenUp = true
+    private var leavingTitleScreen = false
     @Published var veiled = false
     /// BALL OUT called: its Z card across the screen, once a call, gone when it's crossed.
     @Published var ballOutCall: UUID?
@@ -30,13 +33,44 @@ final class FlowState: ObservableObject {
     var startTutorial: (() -> Void)?
     /// The title's cursor, the game's own on every platform: a pad moves it and A picks,
     /// and a tap picks straight away and moves it there.
-    @Published var titleCursor = TitleItem.bestOfSeven
-    /// The mode ring's turn in steps, never wrapped, so every turn animates the way it went.
-    @Published var modeTurn = 0
-    /// The mode at the front of the ring.
-    var frontMode: TitleItem {
-        let count = TitleItem.modeRing.count
-        return TitleItem.modeRing[(modeTurn % count + count) % count]
+    @Published var titleCursor = TitleItem.play
+    /// The jumbotron's main menu screens' turn in steps, never wrapped, so every turn animates the
+    /// way it went; and the swapped-in set's, put back to its first screen at the front each time it goes.
+    @Published var screenTurn = 0
+    @Published var subTurn = 0
+    /// The jumbotron's sets of screens swapped so far, never wrapped: even shows the main menu's,
+    /// odd the swapped-in set, `subRing`'s (`JumbotronScreens`).
+    @Published var screenSwaps = 0
+    /// A swap's flight under way: the screens take nothing till it's done.
+    @Published var screensInFlight = false
+    /// The set swapped in for the main menu's: PLAY's modes, or VTV's saved replays; each with BACK.
+    enum SubRing { case play, vtv }
+    @Published var subRing = SubRing.play
+    /// VTV's saved replays, newest first, read as VTV opens.
+    @Published var replays: [ReplaySummary] = []
+    /// VTV's replays being read, before its screens swap in.
+    private var replaysLoading = false
+    /// A replay picked on VTV being read before it plays.
+    private var replayOpening = false
+    var subRingShown: Bool { screenSwaps % 2 != 0 }
+    var subRingItems: [TitleItem] { subRing == .play ? TitleItem.playRing : replays.indices.map(TitleItem.replay) + [.back] }
+    /// A set of screens by its place in `JumbotronScreens`: the main menu's first, then the swapped-in one.
+    func screenSet(_ set: Int) -> [TitleItem] { set == 0 ? TitleItem.mainRing : subRingItems }
+    /// The screens round the jumbotron now, and their turn.
+    var screenRing: [TitleItem] { subRingShown ? subRingItems : TitleItem.mainRing }
+    var shownTurn: Int { subRingShown ? subTurn : screenTurn }
+    /// The screen at the front of the jumbotron.
+    var frontScreen: TitleItem {
+        let ring = screenRing, count = ring.count
+        return ring[(shownTurn % count + count) % count]
+    }
+    /// The title's rows, the screens shown in theirs.
+    var titleRows: [[TitleItem]] { TitleItem.rows(screens: screenRing) }
+    /// The lower rung's turn in steps, as the screens'; and the option at its front.
+    @Published var lowerTurn = 0
+    var frontLower: TitleItem {
+        let count = TitleItem.lowerRung.count
+        return TitleItem.lowerRung[(lowerTurn % count + count) % count]
     }
 
     init() {
@@ -48,6 +82,8 @@ final class FlowState: ObservableObject {
             DispatchQueue.main.async { if slots != self.loadingSlots { self.loadingSlots = slots } }
         }
         SoundBoard.shared.prepare()
+        watchLaunch()
+        MemoryTrace.startSampling()
         // An invite accepted from outside the game opens the multiplayer screen on the joining.
         net.onInviteAccepted = { [weak self] in self?.multiplayerOpen = true }
         // Signed in with the ZONES matches waiting on it: the list.
@@ -128,15 +164,18 @@ final class FlowState: ObservableObject {
     private func moveCurtain(to target: Double, over seconds: Double, easeIn: Bool, done: (() -> Void)? = nil) {
         curtainTimer?.invalidate()
         let from = curtain, start = CACurrentMediaTime()
+        // On the main run loop, so on the main actor.
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
-            guard let self else { return timer.invalidate() }
-            let share = seconds > 0 ? min((CACurrentMediaTime() - start) / seconds, 1) : 1
-            let eased = easeIn ? share * share : 1 - (1 - share) * (1 - share)
-            self.curtain = from + (target - from) * eased
-            if share >= 1 {
-                timer.invalidate()
-                self.curtainTimer = nil
-                done?()
+            MainActor.assumeIsolated {
+                guard let self else { return timer.invalidate() }
+                let share = seconds > 0 ? min((CACurrentMediaTime() - start) / seconds, 1) : 1
+                let eased = easeIn ? share * share : 1 - (1 - share) * (1 - share)
+                self.curtain = from + (target - from) * eased
+                if share >= 1 {
+                    timer.invalidate()
+                    self.curtainTimer = nil
+                    done?()
+                }
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -179,6 +218,176 @@ final class FlowState: ObservableObject {
         }
         LoadTrace.mark(holdsForLoading ? "change made, curtain held for loading" : "change made, curtain lifting")
         if holdsForLoading { self.whenLoaded { LoadTrace.mark("loaded, curtain lifting"); lift() } } else { lift() }
+    }
+
+    // MARK: The launch
+
+    /// The splash held over everything from launch (`LaunchCover`) until the launch's loading is done
+    /// and the main thread has kept time under it a moment, so the title screen shows already moving.
+    @Published var launchCovered = true
+    /// Ticks in a row on time before the cover lifts, and the longest gap that's on time.
+    static let launchSteadyTicks = 20
+    static let launchSteadyGap = 0.05
+    /// The longest the cover waits for steady ticks once loading's done.
+    static let launchSettleLimit = 2.0
+    private var launchTimer: Timer?
+    private var launchLastTick = 0.0
+    private var launchSteadyCount = 0
+    private var launchLoadedAt: Double?
+
+    private func watchLaunch() {
+        launchLastTick = CACurrentMediaTime()
+        // On the main run loop, so a held main thread shows as a late tick.
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self else { return timer.invalidate() }
+                let now = CACurrentMediaTime()
+                self.launchSteadyCount = now - self.launchLastTick < FlowState.launchSteadyGap ? self.launchSteadyCount + 1 : 0
+                self.launchLastTick = now
+                guard !self.scene.launchLoading else {
+                    self.launchSteadyCount = 0
+                    return
+                }
+                if self.launchLoadedAt == nil {
+                    LoadTrace.mark("launch loaded, warming the menus")
+                    self.prewarmMenus()
+                    LoadTrace.mark("menus warm, waiting for steady frames")
+                }
+                let loadedAt = self.launchLoadedAt ?? CACurrentMediaTime()
+                self.launchLoadedAt = loadedAt
+                guard self.launchSteadyCount >= FlowState.launchSteadyTicks || now - loadedAt > FlowState.launchSettleLimit else { return }
+                timer.invalidate()
+                self.launchTimer = nil
+                LoadTrace.mark("launch loaded, cover lifting")
+                self.launchCovered = false
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        launchTimer = timer
+    }
+
+    /// What the customize screen's drink select would otherwise make on the main thread as it opens,
+    /// made under the launch's splash: the bottles, and each side's figure on the bench, sitting and drinking.
+    private func prewarmMenus() {
+        let size = CustomizeScreen.fitted(UIScreen.main.bounds.size)
+        DrinkPick.prewarm(drinks: sortedDrinks(0), in: size)
+        for (player, pick) in shownCustomizations.enumerated() {
+            _ = scene.customizeSeated(player: player, look: pick.look, sheet: "player_bench", frame: 0, warming: true)
+            for frame in 0..<GameScene.drinkerFrameCount {
+                _ = scene.customizeSeated(player: player, look: pick.look, sheet: "player_sit", frame: frame, warming: true)
+                _ = scene.customizeSeated(player: player, look: pick.look, sheet: "player_drink", frame: frame, warming: true)
+            }
+        }
+    }
+
+    // MARK: The title screen
+
+    /// On from the title screen to the main menu, under the curtain.
+    func leaveTitleScreen() {
+        guard titleScreenUp, !leavingTitleScreen, !launchCovered else { return }
+        leavingTitleScreen = true
+        SoundBoard.shared.play(SoundBoard.confirm)
+        transition { [weak self] in
+            self?.titleScreenUp = false
+            self?.leavingTitleScreen = false
+        }
+    }
+
+    // MARK: The V-Key
+
+    /// The V-Key's screen, over whatever asked for it: a locked mode, stage or colour. The cursor
+    /// on UNLOCK (0) or RESTORE (1).
+    @Published var vKeyOpen = false
+    @Published var vKeyCursor = 0
+    static let vKeyButtons = 2
+
+    func openVKey() {
+        guard !vKeyOpen else { return }
+        SoundBoard.shared.play(SoundBoard.confirm)
+        VKeyStore.shared.note = nil
+        vKeyCursor = 0
+        vKeyOpen = true
+    }
+
+    func closeVKey() {
+        guard vKeyOpen, !VKeyStore.shared.busy else { return }
+        SoundBoard.shared.play(.menuBack)
+        vKeyOpen = false
+    }
+
+    /// Bought: the screen goes, and a stage select that's up shows every stage open.
+    func vKeyBought() {
+        vKeyOpen = false
+        scene.showVKeyBought()
+        objectWillChange.send()
+    }
+
+    func moveVKeyCursor(_ step: Int) {
+        let next = min(max(vKeyCursor + step, 0), FlowState.vKeyButtons - 1)
+        guard next != vKeyCursor else { return }
+        vKeyCursor = next
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
+    func activateVKey(_ button: Int) {
+        guard !VKeyStore.shared.busy else { return }
+        vKeyCursor = button
+        SoundBoard.shared.play(SoundBoard.confirm)
+        if button == 0 { VKeyStore.shared.buy() } else { VKeyStore.shared.restore() }
+    }
+
+    // MARK: VTV
+
+    /// VTV's screens in round the jumbotron: a screen a saved replay, newest first, and BACK; read first, then swapped in.
+    func openVTV() {
+        guard !subRingShown, !screensInFlight, !replaysLoading else { return }
+        replaysLoading = true
+        SoundBoard.shared.play(SoundBoard.confirm)
+        ReplaySummary.load { [weak self] summaries in
+            guard let self else { return }
+            self.replaysLoading = false
+            guard !self.subRingShown, !self.screensInFlight else { return }
+            self.replays = summaries
+            self.subRing = .vtv
+            self.swapScreenSets(1)
+        }
+    }
+
+    // MARK: THEME
+
+    /// THEME's picker under the jumbotron, the hood picker's colors; and the pad's cursor along it,
+    /// a place in `MenuTheme.choices`, picking as it moves.
+    @Published var themePickerOpen = false
+    @Published var themeCursor = 0
+
+    func openThemePicker() {
+        themeCursor = MenuTheme.choices.firstIndex(of: MenuTheme.colour) ?? 0
+        withAnimation(.easeOut(duration: TitleOverlay.themePickerFadeSeconds)) { themePickerOpen = true }
+    }
+
+    /// Out of the picker, back to THEME.
+    func closeThemePicker(sound: SoundBoard.Effect? = .menuBack) {
+        guard themePickerOpen else { return }
+        if let sound { SoundBoard.shared.play(sound) }
+        withAnimation(.easeOut(duration: TitleOverlay.themePickerFadeSeconds)) { themePickerOpen = false }
+    }
+
+    /// The pad's cursor a step along the picker, the color under it picked.
+    func moveThemeCursor(_ step: Int) {
+        let next = min(max(themeCursor + step, 0), MenuTheme.choices.count - 1)
+        guard next != themeCursor else { return }
+        pickTheme(next)
+    }
+
+    /// The menus in the wheel's color at `column`, kept: everything up drawn again in it.
+    func pickTheme(_ column: Int) {
+        guard MenuTheme.choices.indices.contains(column) else { return }
+        themeCursor = column
+        guard MenuTheme.choices[column] != MenuTheme.colour else { return }
+        MenuTheme.colour = MenuTheme.choices[column]
+        SoundBoard.shared.play(SoundBoard.navigate)
+        UITuning.shared.touch()
+        objectWillChange.send()
     }
 
     // MARK: The settings
@@ -334,8 +543,9 @@ final class FlowState: ObservableObject {
     /// each side's cursor on its bottles in the order shown (-1 its sort button) and that order.
     @Published var customizeDrinkPhase = false
     @Published var drinkCursors = [0, 0]
-    /// Each side's Random bottle picked: a Greateraid drawn for it as it locks in.
-    @Published var drinkRandom = [false, false]
+    /// Each side's dice rolling: the bottles raised in turn at random (`rollDrink`) before one stays picked.
+    @Published var drinkRolling = [false, false]
+    var drinkRolls: [Task<Void, Never>?] = [nil, nil]
     @Published var drinkSorts: [DrinkSort] = [.aToZ, .aToZ]
     var customizePicksDrink: Bool { customizeMode.picksDrinkAhead }
     @Published var customizeLaunch: Date?
@@ -428,6 +638,7 @@ final class FlowState: ObservableObject {
         switch item {
         case .mode(let mode):
             guard !GameMode.parked.contains(mode) else { return }
+            guard VKey.opens(mode) else { return openVKey() }
             UserDefaults.standard.set(Int(mode.rawValue), forKey: GameScene.onlineModeKey)
             SoundBoard.shared.play(SoundBoard.navigate)
             if mode == .zones { net.loadTurnMatches() }
@@ -523,22 +734,26 @@ final class FlowState: ObservableObject {
     }
 
     func moveTitleCursor(across: Int, down: Int) {
-        let rows = TitleItem.rows
+        let rows = titleRows
         guard let row = rows.firstIndex(where: { $0.contains(titleCursor) }), let column = rows[row].firstIndex(of: titleCursor) else {
-            titleCursor = .bestOfSeven
+            titleCursor = frontScreen
             return
         }
-        if across != 0, TitleItem.isModeRow(rows[row]) { return stepModeRing(across) }
+        if across != 0, TitleItem.isScreenRow(rows[row]) { return stepScreenRing(across) }
+        if across != 0, TitleItem.isLowerRungRow(rows[row]) { return stepLowerRung(across) }
         var next = titleCursor
         if across != 0 {
             next = rows[row][min(max(column + across, 0), rows[row].count - 1)]
         } else if down != 0 {
             let target = min(max(row + down, 0), rows.count - 1)
-            if TitleItem.isModeRow(rows[target]) {
-                next = frontMode
+            if TitleItem.isScreenRow(rows[target]) {
+                next = frontScreen
+            } else if TitleItem.isLowerRungRow(rows[target]) {
+                next = frontLower
             } else {
-                // The same share of the way along the row; from the ring, its middle.
-                let share = TitleItem.isModeRow(rows[row]) || rows[row].count < 2 ? 0.5 : Double(column) / Double(rows[row].count - 1)
+                // The same share of the way along the row; from either ring, its middle.
+                let ringRow = TitleItem.isScreenRow(rows[row]) || TitleItem.isLowerRungRow(rows[row])
+                let share = ringRow || rows[row].count < 2 ? 0.5 : Double(column) / Double(rows[row].count - 1)
                 next = rows[target][Int((share * Double(rows[target].count - 1)).rounded())]
             }
         }
@@ -547,31 +762,87 @@ final class FlowState: ObservableObject {
         SoundBoard.shared.play(SoundBoard.navigate)
     }
 
-    /// The next open mode round the ring brought to the front, the cursor with it.
-    func stepModeRing(_ way: Int) {
-        guard let choices = TitleItem.rows.first(where: TitleItem.isModeRow), !choices.isEmpty else { return }
-        let from = choices.firstIndex(of: frontMode) ?? 0
+    /// The lower rung turned a step, its next option to the front, the cursor with it.
+    func stepLowerRung(_ way: Int) {
+        closeThemePicker(sound: nil)
+        withAnimation(TitleOverlay.ringTurn) { lowerTurn += way }
+        titleCursor = frontLower
+        SoundBoard.shared.play(SoundBoard.navigate)
+    }
+
+    /// The next open screen round the jumbotron brought to the front, the cursor with it.
+    func stepScreenRing(_ way: Int) {
+        let choices = screenRing
+        guard !screensInFlight, !choices.isEmpty else { return }
+        closeThemePicker(sound: nil)
+        let from = choices.firstIndex(of: frontScreen) ?? 0
         let next = choices[((from + way) % choices.count + choices.count) % choices.count]
         titleCursor = next
-        guard next != frontMode else { return }
-        turnModeRing(to: next, way: way)
+        guard next != frontScreen else { return }
+        turnScreenRing(to: next, way: way)
         SoundBoard.shared.play(SoundBoard.navigate)
     }
 
     /// The ring turned till `item` is at the front: `way`'s way round, or the short way without one.
-    private func turnModeRing(to item: TitleItem, way: Int = 0) {
-        let ring = TitleItem.modeRing
-        guard let target = ring.firstIndex(of: item), let front = ring.firstIndex(of: frontMode) else { return }
+    private func turnScreenRing(to item: TitleItem, way: Int = 0) {
+        let ring = screenRing
+        guard let target = ring.firstIndex(of: item), let front = ring.firstIndex(of: frontScreen) else { return }
         var steps = ((target - front) % ring.count + ring.count) % ring.count
         if way < 0, steps > 0 { steps -= ring.count } else if way == 0, steps * 2 > ring.count { steps -= ring.count }
-        withAnimation(TitleOverlay.ringTurn) { modeTurn += steps }
+        withAnimation(TitleOverlay.ringTurn) {
+            if subRingShown { subTurn += steps } else { screenTurn += steps }
+        }
     }
 
-    /// What picking an item does, from the pad or a tap. A mode off the front of the ring is turned to first.
+    /// The jumbotron's sets swapped, `way` 1 `subRing`'s in, -1 back out to the main menu's: the going set
+    /// flies out round the spindle, fading, and the coming one in after it; the cursor on its front screen.
+    private func swapScreenSets(_ way: Int) {
+        guard !screensInFlight else { return }
+        screensInFlight = true
+        withAnimation(TitleOverlay.screenSwap) { screenSwaps += way }
+        titleCursor = frontScreen
+        DispatchQueue.main.asyncAfter(deadline: .now() + TitleOverlay.screenSwapSeconds) { [weak self] in
+            guard let self else { return }
+            self.screensInFlight = false
+            // The swapped-in set back to its first screen at the front, out of sight, for next time.
+            if !self.subRingShown { self.subTurn = 0 }
+        }
+    }
+
+    /// PLAY's screens in round the jumbotron: the modes, and BACK.
+    func openPlayRing() {
+        guard !subRingShown, !screensInFlight, !replaysLoading else { return }
+        SoundBoard.shared.play(SoundBoard.confirm)
+        subRing = .play
+        swapScreenSets(1)
+    }
+
+    /// Back out of PLAY's or VTV's screens to the main menu's, the one left at the front and the cursor on it.
+    func leaveSubRing() {
+        guard subRingShown, !screensInFlight else { return }
+        SoundBoard.shared.play(.menuBack)
+        swapScreenSets(-1)
+    }
+
+    /// What picking an item does, from the pad or a tap. A screen or a lower rung option off the
+    /// front is turned to first.
     func activate(_ item: TitleItem) {
-        if TitleItem.modeRing.contains(item), item != frontMode {
+        if item != .theme { closeThemePicker(sound: nil) }
+        // A screen not round the jumbotron now, or any while a swap's flying, takes nothing.
+        if TitleItem.isScreen(item), !screenRing.contains(item) || screensInFlight { return }
+        if screenRing.contains(item), item != frontScreen {
             titleCursor = item
-            turnModeRing(to: item)
+            turnScreenRing(to: item)
+            SoundBoard.shared.play(SoundBoard.navigate)
+            return
+        }
+        if TitleItem.lowerRung.contains(item), item != frontLower {
+            let count = TitleItem.lowerRung.count
+            var steps = ((TitleItem.lowerRung.firstIndex(of: item) ?? 0) - (TitleItem.lowerRung.firstIndex(of: frontLower) ?? 0) + count) % count
+            // The short way round.
+            if steps * 2 > count { steps -= count }
+            withAnimation(TitleOverlay.ringTurn) { lowerTurn += steps }
+            titleCursor = item
             SoundBoard.shared.play(SoundBoard.navigate)
             return
         }
@@ -586,14 +857,32 @@ final class FlowState: ObservableObject {
         switch item {
         case .bestOfSeven, .fortySeven, .zones, .breakerBall:
             guard !busy, !(item == .zones && GameMode.parked.contains(.zones)) else { return }
-            SoundBoard.shared.play(SoundBoard.confirm)
             let mode: GameMode = switch item {
             case .bestOfSeven: .rounds
             case .fortySeven: .fortySeven
             case .breakerBall: .breakerBall
             default: .zones
             }
+            guard VKey.opens(mode) else { return openVKey() }
+            SoundBoard.shared.play(SoundBoard.confirm)
             transition { [weak self] in self?.openCustomize(mode) }
+        case .play:
+            guard !busy else { return }
+            openPlayRing()
+        case .back:
+            leaveSubRing()
+        case .vtv:
+            openVTV()
+        case .replay(let index):
+            guard !busy, !replayOpening, replays.indices.contains(index) else { return }
+            replayOpening = true
+            SoundBoard.shared.play(SoundBoard.confirm)
+            replays[index].read { [weak self] file in
+                guard let self else { return }
+                self.replayOpening = false
+                guard let file else { return SoundBoard.shared.play(.menuBack) }
+                self.transition(holdsForLoading: true) { [weak self] in self?.scene.watchReplay(file) }
+            }
         case .multiplayer:
             guard !busy else { return }
             SoundBoard.shared.play(SoundBoard.confirm)
@@ -605,6 +894,13 @@ final class FlowState: ObservableObject {
         case .updates:
             SoundBoard.shared.play(SoundBoard.confirm)
             openUpdates()
+        case .theme:
+            if themePickerOpen {
+                closeThemePicker(sound: SoundBoard.confirm)
+            } else {
+                SoundBoard.shared.play(SoundBoard.confirm)
+                openThemePicker()
+            }
         case .tuning:
             tuningOpen.toggle()
         case .capture:
@@ -613,6 +909,10 @@ final class FlowState: ObservableObject {
         case .cpuVersusCPU:
             defaults.set(!defaults.bool(forKey: GameScene.cpuVersusCPUKey), forKey: GameScene.cpuVersusCPUKey)
             SoundBoard.shared.play(SoundBoard.navigate)
+        case .vKeyLocked:
+            VKeyStore.shared.debugToggleLocked()
+            SoundBoard.shared.play(SoundBoard.navigate)
+            objectWillChange.send()
         case .titleFont:
             // The menus' face on to the next, A to K round (`Futuristic.typefaces`), everything in it drawn again.
             Futuristic.typefacePick = (Futuristic.typefacePick + 1) % Futuristic.typefaces.count
@@ -625,7 +925,7 @@ final class FlowState: ObservableObject {
         case .mute:
             GameSettings.muted.toggle()
             SoundBoard.shared.applyVolume()
-            Ambience.shared.applySetting()
+            LoopedTrack.applySettings()
             SoundBoard.shared.play(SoundBoard.navigate)
             objectWillChange.send()
         }
@@ -634,40 +934,56 @@ final class FlowState: ObservableObject {
 
 /// Everything on the title the cursor can land on, row by row as they're laid out.
 enum TitleItem: Hashable {
-    case bestOfSeven, fortySeven, zones, breakerBall, multiplayer
+    /// The main menu's screens: PLAY's own screens in, ONLINE, and VTV's replays in.
+    case play, multiplayer, vtv
+    /// VTV's screens: a saved replay each, by its place in `FlowState.replays`; BACK after them.
+    case replay(Int)
+    /// PLAY's screens: the modes, and BACK out to the main menu's. ZONES is parked off both.
+    case bestOfSeven, fortySeven, zones, breakerBall, back
     /// The Tutorial, over the title.
     case howToPlay
-    /// What's new for testers, opened again.
+    /// What's new for testers, opened again: CHANGELOG on the rung.
     case updates
+    /// The menus' color, picked under the jumbotron (`MenuTheme`).
+    case theme
     case tuning
     /// The menus' face, stepped on A to K.
     case titleFont
-    /// Capture Mode on and off (`GameScene.captureModeKey`), and CPU VS CPU (`GameScene.cpuVersusCPUKey`).
-    case capture, cpuVersusCPU
+    /// Capture Mode on and off (`GameScene.captureModeKey`), CPU VS CPU (`GameScene.cpuVersusCPUKey`), and the
+    /// V-Key taken away to see free to try (`VKey.debugLockedKey`).
+    case capture, cpuVersusCPU, vKeyLocked
     /// The gear in the upper right corner, opening the settings; the speaker in the upper left, muting everything.
     case settings, mute
 
-    /// The modes round the title's ring, in order; new modes join it.
-    static let modeRing: [TitleItem] = [.bestOfSeven, .fortySeven, .zones, .breakerBall]
-    static func isModeRow(_ row: [TitleItem]) -> Bool { row.contains { modeRing.contains($0) } }
+    /// The jumbotron's screens round it, in order: the main menu's, and PLAY's, its modes then BACK;
+    /// new modes join PLAY's.
+    static let mainRing: [TitleItem] = [.play, .multiplayer, .vtv]
+    static let playRing: [TitleItem] = [.bestOfSeven, .fortySeven, .breakerBall, .back]
+    static func isScreen(_ item: TitleItem) -> Bool {
+        if case .replay = item { return true }
+        return mainRing.contains(item) || playRing.contains(item)
+    }
+    static func isScreenRow(_ row: [TitleItem]) -> Bool { row.contains(where: isScreen) }
+    /// The lower rung's options round it; more will join.
+    static let lowerRung: [TitleItem] = [.updates, .howToPlay, .theme]
+    static func isLowerRungRow(_ row: [TitleItem]) -> Bool { row.contains { lowerRung.contains($0) } }
 
-    static let rows: [[TitleItem]] = [
-        [.mute, .settings],
-        [.updates, .howToPlay],
-        // A parked mode stays shown, greyed, but the cursor passes it by.
-        [.bestOfSeven, .fortySeven] + (GameMode.parked.contains(.zones) ? [] : [.zones]) + [.breakerBall],
-        [.multiplayer],
-    ] + (DebugUI.enabled ? debugRows : [])
+    /// The rows with `screens` the jumbotron's shown.
+    static func rows(screens: [TitleItem]) -> [[TitleItem]] {
+        [[.mute, .settings], screens, lowerRung] + (DebugUI.enabled ? debugRows : [])
+    }
 
-    /// The UI, FONT, CAPTURE and CPU VS CPU switches, in a debug build.
+    /// The UI, FONT, CAPTURE, CPU VS CPU and V-KEY switches, in a debug build.
     static let debugRows: [[TitleItem]] = [
-        [.tuning, .titleFont, .capture, .cpuVersusCPU],
+        [.tuning, .titleFont, .capture, .cpuVersusCPU, .vKeyLocked],
     ]
 }
 
-/// The title screen, in `Futuristic_UI.svg`'s pieces on the customize screen's ground: the gear in frame 1 in the
-/// upper right; UPDATES and HOW TO PLAY; the Variaball logo; the modes on a turning ring (`ModeRing`);
-/// ONLINE in box4, which opens the multiplayer screen, with Game Center's word under it. What the cursor's on is gold.
+/// The main menu, on the customize screen's ground: the mute and the gear in frame 1 in the upper
+/// corners; the jumbotron (`Jumbotron.swift`), its screens PLAY, ONLINE and VTV, PLAY and VTV swapping
+/// them for the modes or the saved replays, and BACK, turned by the arrow2s either side or left and right with them under the
+/// cursor, and its lower rung CHANGELOG, HOW TO PLAY and THEME, turned on its own, THEME's picker
+/// under it; the Variaball logo small, bottom left. What the cursor's on is gold.
 struct TitleOverlay: View {
     @ObservedObject var flow: FlowState
     @ObservedObject var net: GameCenter
@@ -719,184 +1035,369 @@ struct TitleOverlay: View {
                     .padding(.leading, 18)
                 }
                 .overlay(alignment: .bottomLeading) {
-                    if DebugUI.enabled { debugSwitches }
+                    VStack(alignment: .leading, spacing: 10) {
+                        Image(uiImage: UIImage(named: "variaball_logo") ?? UIImage())
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(contentMode: .fit)
+                            .frame(height: TitleOverlay.logoHeight * scale(.titles))
+                            .padding(.leading, 24)
+                            .padding(.bottom, (DebugUI.enabled ? 0 : 20) + TitleOverlay.logoLift)
+                        if DebugUI.enabled { debugSwitches }
+                    }
                 }
-                .overlay(alignment: .bottomTrailing) {
-                    if DebugUI.enabled { frameSliders }
-                }
-            VStack(spacing: 14 * scale(.buttons)) {
-                // UPDATES left of HOW TO PLAY, and room as wide on its right, so it stays in the middle.
-                let updatesWidth = FuturisticPiece(image: Futuristic.taillessTwo, scale: TitleOverlay.updatesScale * scale(.buttons)).size.width
-                let updatesGap = TitleOverlay.updatesGap * scale(.buttons)
-                HStack(spacing: 0) {
-                    framed("UPDATES", in: "2", item: .updates, frameScale: TitleOverlay.updatesScale, textSize: TitleOverlay.updatesTextSize,
-                           frameImage: Futuristic.taillessTwo, fitWidth: updatesWidth * TitleOverlay.updatesTextShare, waitsOnNet: false)
-                        .padding(.trailing, updatesGap)
-                    howToPlay
-                    Spacer(minLength: updatesWidth + updatesGap).frame(width: updatesWidth + updatesGap)
-                }
-                Image(uiImage: UIImage(named: "variaball_logo") ?? UIImage())
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: TitleOverlay.logoHeight * scale(.titles))
-                // The modes on a turning ring, the picked one at its front, between arrow2s that turn it.
-                HStack(spacing: 18 * scale(.buttons)) {
+            GeometryReader { geometry in
+                let layout = JumbotronLayout(size: geometry.size)
+                ZStack(alignment: .topLeading) {
+                    JumbotronScreens(turns: AnimatablePair(Double(flow.screenTurn), Double(flow.subTurn)), swaps: Double(flow.screenSwaps),
+                                     counts: [flow.screenSet(0).count, flow.screenSet(1).count], layout: layout) { set, index, size in
+                        jumbotronScreen(screenItem(set, index), size: size, unit: layout.unit)
+                    } picture: { set, index, size in
+                        jumbotronPicture(screenItem(set, index), size: size, unit: layout.unit)
+                    }
+                    LowerRung(turn: Double(flow.lowerTurn), labels: TitleItem.lowerRung.map(TitleOverlay.lowerRungLabel),
+                              lit: TitleItem.lowerRung.contains(flow.titleCursor) && !flow.themePickerOpen, layout: layout)
+                    if flow.themePickerOpen {
+                        themePicker(layout)
+                            .transition(.opacity)
+                    }
+                    #if os(iOS)
+                    tapCatcher(layout)
+                        .offset(x: layout.point(JumbotronLayout.centreX - JumbotronLayout.screensTopRadius, 0).x,
+                                y: layout.point(0, JumbotronLayout.screensTopY - JumbotronLayout.screensTopBow).y)
+                    #endif
                     ringArrow(way: -1)
-                    let cardWidth = FuturisticPiece(image: Futuristic.taillessSix, scale: TitleOverlay.sideModeScale * scale(.buttons)).size.width
-                    let radius = cardWidth * TitleOverlay.ringRadiusShare
-                    ModeRing(turn: Double(flow.modeTurn), count: TitleItem.modeRing.count, radius: radius) { index in
-                        modeCard(TitleItem.modeRing[index])
-                    }
-                    .frame(width: 2 * radius + cardWidth)
+                        .position(layout.point(JumbotronLayout.centreX - JumbotronLayout.screensTopRadius - JumbotronLayout.arrowGap, JumbotronLayout.arrowY))
                     ringArrow(way: 1)
+                        .position(layout.point(JumbotronLayout.centreX + JumbotronLayout.screensTopRadius + JumbotronLayout.arrowGap, JumbotronLayout.arrowY))
                 }
-                VStack(spacing: 6) {
-                    framed("ONLINE", in: "box4", item: .multiplayer, textSize: TitleOverlay.multiplayerTextSize,
-                           icon: "futuristic_icon_multiplayer",
-                           iconPlace: CGSize(width: multiplayerIconX, height: multiplayerIconY), iconScale: multiplayerIconScale)
-                        .opacity(busy ? 0.5 : 1)
-                    if let caption = net.state.caption {
-                        Text(caption)
-                            .font(Futuristic.font(size: 12 * scale(.text)))
-                            .foregroundStyle(Futuristic.line.opacity(0.8))
-                    }
-                }
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             }
+            .ignoresSafeArea()
         }
         .environment(\.colorScheme, .dark)
     }
 
-    /// The Variaball logo, the game's name over the ring.
-    static let logoHeight: CGFloat = 64
+    /// The Variaball logo, small in the bottom left corner.
+    static let logoHeight: CGFloat = 24
+    /// How far it sits up off the bottom, over what's there already.
+    static let logoLift: CGFloat = 48
 
-    /// HOW TO PLAY over the title: tailless frame 8 stretched across, in its own blue, lit gold under the cursor.
-    static let howToPlayScale: CGFloat = 0.4
-    static let howToPlayStretch: CGFloat = 1.6
-    static let howToPlayColour = Color(rgb: 0x4C53E7)
-    /// Its lettering at the size UPDATES comes out at, shrunk to fit its frame.
-    private var updatesShownTextSize: CGFloat {
-        let size = TitleOverlay.updatesTextSize * scale(.text)
-        let fitWidth = FuturisticPiece(image: Futuristic.taillessTwo, scale: TitleOverlay.updatesScale * scale(.buttons)).size.width * TitleOverlay.updatesTextShare
-        _ = Onomatopoeia.registered
-        guard let face = UIFont(name: Futuristic.fontName, size: Futuristic.fontSize(size)) else { return size }
-        let width = ("UPDATES" as NSString).size(withAttributes: [.font: face]).width
-        return width > fitWidth ? size * fitWidth / width : size
-    }
-    private var howToPlay: some View {
-        let lit = flow.titleCursor == .howToPlay
-        let natural = FuturisticPiece(image: Futuristic.taillessEight, scale: TitleOverlay.howToPlayScale * scale(.buttons)).size
-        let size = CGSize(width: natural.width * TitleOverlay.howToPlayStretch, height: natural.height)
-        return Button { flow.activate(.howToPlay) } label: {
-            FuturisticPiece(image: Futuristic.taillessEight, colour: lit ? Futuristic.lit : TitleOverlay.howToPlayColour,
-                            scale: TitleOverlay.howToPlayScale * scale(.buttons), stretched: size)
-                .overlay {
-                    Text("How To Play")
-                        .font(Futuristic.font(size: updatesShownTextSize))
-                        .foregroundStyle(lit ? Futuristic.lit : Futuristic.line)
-                        .fixedSize()
-                        .offset(y: (Futuristic.taillessEightFaceY - 0.5) * size.height)
-                }
-        }
-        .buttonStyle(.plain)
-        .disabled(busy)
-        .noSystemFocus()
-    }
-
-    /// One mode's frame on the ring: 47 in ring5, the rest in frame 6 without its tail.
-    @ViewBuilder
-    private func modeCard(_ item: TitleItem) -> some View {
+    static func lowerRungLabel(_ item: TitleItem) -> String {
         switch item {
-        case .bestOfSeven: framed("ROUNDS", in: "6tailless", item: item, frameScale: TitleOverlay.sideModeScale, frameImage: Futuristic.taillessSix)
-        case .fortySeven: framed("47", in: "ring5", item: item, frameScale: TitleOverlay.fortySevenScale)
-        case .zones: framed("ZONES", in: "6tailless", item: item, frameScale: TitleOverlay.sideModeScale,
-                            available: !GameMode.parked.contains(.zones), frameImage: Futuristic.taillessSix)
-        default: framed("BREAKER", in: "6tailless", item: item, frameScale: TitleOverlay.sideModeScale, frameImage: Futuristic.taillessSix)
+        case .updates: "CHANGELOG"
+        case .theme: "THEME"
+        default: "HOW TO PLAY"
         }
     }
 
-    /// An arrow2 beside the ring, pointing out, turning it that way.
-    private func ringArrow(way: Int) -> some View {
-        Button { flow.stepModeRing(way) } label: {
-            FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons))
-                .scaleEffect(x: CGFloat(way))
+    static func screenTitle(_ item: TitleItem) -> String {
+        switch item {
+        case .play: "PLAY"
+        case .vtv: "V-TV"
+        case .bestOfSeven: "ROUNDS"
+        case .fortySeven: "47"
+        case .zones: "ZONES"
+        case .breakerBall: "BREAKER BALL"
+        case .back: "BACK"
+        case .replay: "REPLAY"
+        default: "ONLINE"
         }
-        .buttonStyle(.plain)
-        .disabled(busy)
-        .noSystemFocus()
     }
 
-    /// The ring's turn; its radius against a side mode's frame width.
-    static let ringTurn = Animation.spring(response: 0.45, dampingFraction: 0.8)
-    static let ringRadiusShare: CGFloat = 0.9
+    /// A set's screen at its place, BACK where the set's changed under it.
+    private func screenItem(_ set: Int, _ index: Int) -> TitleItem {
+        let items = flow.screenSet(set)
+        return items.indices.contains(index) ? items[index] : .back
+    }
 
-    /// The settings gear and its frame against the other pieces.
-    static let settingsScale: CGFloat = 0.5
+    /// A VTV screen's replay.
+    private func replaySummary(_ item: TitleItem) -> ReplaySummary? {
+        guard case .replay(let index) = item, flow.replays.indices.contains(index) else { return nil }
+        return flow.replays[index]
+    }
 
-    /// The mode frames' size, as tuned, their lettering keeping its own; the arrows either side.
-    static let sideModeScale: CGFloat = 0.8
-    static let fortySevenScale: CGFloat = 0.66
-    static let arrowScale: CGFloat = 0.6
-    /// MULTIPLAYER's icon moved and sized on the debug sliders, bottom right, kept between launches.
-    /// The icon's place, in points at the button scale it was tuned at, the iPad's and Mac's.
-    static let iconPlaceTunedAt: CGFloat = 2.5
-    @AppStorage("titleMultiplayerIconX") private var multiplayerIconX = 60.0
-    @AppStorage("titleMultiplayerIconY") private var multiplayerIconY = 0.0
-    @AppStorage("titleMultiplayerIconScale") private var multiplayerIconScale = 1.75
-
-    /// MULTIPLAYER's lettering, a little smaller than the modes', under its icon.
-    static let multiplayerTextSize: CGFloat = 20
-    /// UPDATES' frame, tailless frame 2, smaller than ROUNDS' and ZONES', and its lettering.
-    static let updatesScale: CGFloat = 0.5
-    static let updatesTextSize: CGFloat = 24
-    /// The lettering's widest, against the frame's; and the room between it and MULTIPLAYER, in points.
-    static let updatesTextShare: CGFloat = 0.7
-    static let updatesGap: CGFloat = 24
-    static let iconHeight: CGFloat = 26
-
-    /// A lettered button in one of the vector's frames, an icon over the lettering if it has one.
-    private func framed(_ text: String, in frame: String, mirrored: Bool = false, item: TitleItem, frameScale: CGFloat = 1,
-                        textSize: CGFloat = 24, icon: String? = nil, iconPlace: CGSize = .zero, iconScale: CGFloat = 1,
-                        available: Bool = true, frameImage: UIImage? = nil, fitWidth: CGFloat? = nil, waitsOnNet: Bool = true) -> some View {
-        Button { flow.activate(item) } label: {
-            FuturisticFrame(name: frame, lit: flow.titleCursor == item, scale: scale(.buttons), frameScale: frameScale, mirrored: mirrored,
-                            image: frameImage) { colour in
-                VStack(spacing: 4 * scale(.buttons)) {
-                    if let icon {
-                        Image(uiImage: UIImage(named: icon) ?? UIImage())
+    /// The mode's name at the top, its description under it, its art below: laid out flat for the
+    /// jumbotron to map onto the screen's trapezoid. Gold under the cursor; a parked mode greyed.
+    /// No descriptions or art yet: their places are marked. ONLINE's description is Game Center's word.
+    /// A replay's: when it was played, and who against whom, the ONLINE icon by it where it was online.
+    private func jumbotronScreen(_ item: TitleItem, size: CGSize, unit: CGFloat) -> some View {
+        let lit = flow.titleCursor == item
+        let colour = lit ? Futuristic.lit : JumbotronLayout.line
+        let parked = item == .zones && GameMode.parked.contains(.zones)
+        let content = size.width / JumbotronLayout.screenContentSize.width
+        let replay = replaySummary(item)
+        return VStack(spacing: 5 * content) {
+            Text(replay?.dateLine ?? TitleOverlay.screenTitle(item))
+                .font(Futuristic.font(size: 15 * content))
+                .foregroundStyle(colour)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            if let replay {
+                HStack(spacing: 3 * content) {
+                    if replay.online {
+                        Image(uiImage: UIImage(named: "futuristic_icon_multiplayer") ?? UIImage())
                             .resizable()
                             .interpolation(.high)
                             .aspectRatio(contentMode: .fit)
                             .colorMultiply(colour)
-                            .frame(height: TitleOverlay.iconHeight * iconScale * scale(.buttons))
-                            // Tuned at the Mac's and iPad's button scale: as big a share of the frame at any.
-                            .offset(CGSize(width: iconPlace.width * scale(.buttons) / TitleOverlay.iconPlaceTunedAt,
-                                           height: iconPlace.height * scale(.buttons) / TitleOverlay.iconPlaceTunedAt))
+                            .frame(height: 9 * content)
                     }
-                    if let fitWidth {
-                        // Shrunk to fit inside its box.
-                        Text(text)
-                            .font(Futuristic.font(size: textSize * scale(.text)))
-                            .foregroundStyle(colour)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.2)
-                            .frame(width: fitWidth)
-                    } else {
-                        Text(text)
-                            .font(Futuristic.font(size: textSize * scale(.text)))
-                            .foregroundStyle(colour)
-                            .fixedSize()
-                    }
+                    Text(replay.matchup)
+                        .font(Futuristic.font(size: 9 * content, face: TitleOverlay.subtextFace))
+                        .foregroundStyle(JumbotronLayout.line.opacity(0.8))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                }
+            } else if item == .multiplayer {
+                if let subtext = onlineSubtext {
+                    Text(subtext)
+                        .font(Futuristic.font(size: 9 * content, face: TitleOverlay.subtextFace))
+                        .foregroundStyle(JumbotronLayout.line.opacity(0.8))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                }
+            } else if item != .back {
+                // BACK has no description: its picture's all it says.
+                Capsule().fill(JumbotronLayout.line.opacity(0.3)).frame(width: size.width * 0.75, height: 7 * content)
+                Capsule().fill(JumbotronLayout.line.opacity(0.3)).frame(width: size.width * 0.52, height: 7 * content)
+            }
+            // The picture's place, left to `jumbotronPicture` floating in front.
+            Spacer(minLength: 0)
+        }
+        .padding(7 * content)
+        .frame(width: size.width, height: size.height)
+        // The dark thin material, tinted with the light, or gold under the cursor.
+        .background {
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial).opacity(JumbotronLayout.materialOpacity)
+                Rectangle().fill((lit ? Futuristic.lit : JumbotronLayout.light).opacity(lit ? 0.08 : 0.07))
+            }
+        }
+        .overlay(Rectangle().strokeBorder(lit ? Futuristic.lit : JumbotronLayout.line.opacity(0.85), lineWidth: JumbotronLayout.lineWidth * content))
+        .saturation(parked ? 0 : 1)
+        .opacity(parked ? TitleOverlay.parkedOpacity : (busy && TitleOverlay.heldWhileBusy(item) ? 0.5 : 1))
+    }
+
+    /// The screens that take nothing while a match is being found or played online: the modes, and PLAY into them.
+    static func heldWhileBusy(_ item: TitleItem) -> Bool {
+        [.play, .bestOfSeven, .fortySeven, .zones, .breakerBall].contains(item)
+    }
+
+    /// The screens' descriptions in a face against the titles': BoldPixels, as the lists' and descriptions' elsewhere.
+    static let subtextFace = Futuristic.listFace
+
+    /// A screen's picture, flat and unskewed, floating in front of it: its icon where it has one;
+    /// the other modes' art to come, its place marked. Gold under the cursor, as its screen.
+    @ViewBuilder
+    private func jumbotronPicture(_ item: TitleItem, size: CGSize, unit: CGFloat) -> some View {
+        let colour = flow.titleCursor == item ? Futuristic.lit : JumbotronLayout.line
+        let parked = item == .zones && GameMode.parked.contains(.zones)
+        Group {
+            if let replay = replaySummary(item) {
+                replayPicture(replay, lit: flow.titleCursor == item, size: size, unit: unit)
+            } else if item == .back, let icon = TitleOverlay.screenIcon(item) {
+                // Its chevrons turned from pointing left to up: laid out in the box turned, then turned into it.
+                Image(uiImage: UIImage(named: icon) ?? UIImage())
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .colorMultiply(colour)
+                    .frame(width: size.height, height: size.width)
+                    .rotationEffect(.degrees(90))
+            } else if let icon = TitleOverlay.screenIcon(item) {
+                Image(uiImage: UIImage(named: icon) ?? UIImage())
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .colorMultiply(colour)
+            } else {
+                Rectangle()
+                    .strokeBorder(JumbotronLayout.line.opacity(0.5),
+                                  style: StrokeStyle(lineWidth: JumbotronLayout.faintLineWidth * unit, dash: [4 * unit, 3 * unit]))
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .saturation(parked ? 0 : 1)
+        .opacity(parked ? TitleOverlay.parkedOpacity : 1)
+    }
+
+    /// A replay's picture: the shot of the stage it ended on, and over it player one on the bottom
+    /// left corner and player two on the top right, each centred on its corner.
+    private func replayPicture(_ replay: ReplaySummary, lit: Bool, size: CGSize, unit: CGFloat) -> some View {
+        let pixel = size.height * TitleOverlay.replayFigureHeight / 48
+        let side = (48 + 2 * CustomizeFigure.margin) * pixel
+        let corners = [CGPoint(x: 0, y: size.height), CGPoint(x: size.width, y: 0)]
+        return ZStack(alignment: .topLeading) {
+            Group {
+                if let shot = StageShots.shared.picture(for: replay.stage) {
+                    Image(uiImage: shot).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
+                } else {
+                    // A stage whose preview hasn't played here has no shot yet.
+                    Rectangle().fill(JumbotronLayout.light.opacity(0.15))
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .clipped()
+            .overlay(Rectangle().strokeBorder(lit ? Futuristic.lit : JumbotronLayout.line, lineWidth: JumbotronLayout.lineWidth * unit))
+            ForEach(0..<min(replay.sides.count, 2), id: \.self) { index in
+                let look = replay.sides[index].look
+                if let figure = flow.scene.replayFigure(side: index, look: look) {
+                    let shown = figure.frame
+                    // What's drawn centred on the corner, mirrored for player two, then turned about that middle.
+                    let middleX = index == 1 ? 48 - figure.middle.x : figure.middle.x
+                    CustomizeFigure(portrait: shown.portrait, look: index == 1 ? look.turnedRound : look, pixel: pixel, mirrored: index == 1,
+                                    headNudge: shown.headNudge, headScale: shown.headScale, ball: shown.ball, ballAura: shown.ballAura,
+                                    overBall: shown.overBall, overBallLine: shown.overBallLine, still: true)
+                        .frame(width: side, height: side)
+                        .offset(x: (24 - middleX) * pixel, y: (24 - figure.middle.y) * pixel)
+                        .rotationEffect(.degrees(TitleOverlay.replayFigureTurn))
+                        .position(corners[index])
                 }
             }
         }
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+    }
+    /// A replay picture's figures: their art's 48 pixels this share of its height, each centred on its
+    /// corner, turned this many degrees anticlockwise (player one to face up and right, player two down and left).
+    static let replayFigureHeight: CGFloat = 0.6
+    static let replayFigureTurn: Double = -45
+
+    /// The icon floating in front of a screen, where it has one: Breaker Ball's is its HUD barrier, 47's
+    /// the Moebius triangle.
+    static func screenIcon(_ item: TitleItem) -> String? {
+        switch item {
+        case .play: "futuristic_icon_play"
+        case .multiplayer: "futuristic_icon_multiplayer"
+        case .vtv: "futuristic_icon_vtv"
+        case .bestOfSeven: "futuristic_icon_rounds"
+        case .fortySeven: "futuristic_icon_moebius_triangle"
+        case .breakerBall: "futuristic_icon_shatter"
+        case .back: "futuristic_icon_screen_back"
+        default: nil
+        }
+    }
+
+    /// THEME's picker under the lower rung, the customize screen's hood picker in its first side's
+    /// display: every color but white free, the pick and the pad's cursor in white. A tap or a slide picks;
+    /// the pick tapped again puts it away.
+    private func themePicker(_ layout: JumbotronLayout) -> some View {
+        let frames = SwatchPicker.firstSideFrames(centre: layout.point(JumbotronLayout.centreX, JumbotronLayout.themePickerY),
+                                                  width: JumbotronLayout.themePickerWidth * layout.unit)
+        let picked = MenuTheme.choices.firstIndex(of: MenuTheme.colour) ?? 0
+        return ZStack(alignment: .topLeading) {
+            SwatchPicker(display: "customize_p1_display", displayFrame: frames.display, barFrame: frames.bar,
+                         barColour: MenuTheme.colour.glow, columns: MenuTheme.choices.map { (top: $0.glow, accent: $0.rampDown) },
+                         picked: picked, hovered: flow.themeCursor, cursorColour: 0xFFFFFF,
+                         pick: { index in flow.pickTheme(index) },
+                         confirmed: { _ in flow.closeThemePicker(sound: SoundBoard.confirm) })
+        }
+        .frame(width: layout.size.width, height: layout.size.height, alignment: .topLeading)
+    }
+
+    /// THEME's picker coming and going.
+    static let themePickerFadeSeconds = 0.2
+
+    /// ONLINE's description: Game Center's word, signed out what the screen does.
+    private var onlineSubtext: String? {
+        if case .signedOut = net.state { return "SIGNS IN TO GAME CENTER" }
+        return net.state.caption
+    }
+
+    #if os(iOS)
+    /// Taps and swipes on the jumbotron. A tap: a screen facing out is picked (turned to first, if it
+    /// isn't at the front); on the lower rung, the front option's picked and either end turns it.
+    /// A swipe across either ring turns it a step, the way the finger went.
+    private func tapCatcher(_ layout: JumbotronLayout) -> some View {
+        // Over the jumbotron alone, so the corners' buttons still take their own taps.
+        let topLeft = layout.point(JumbotronLayout.centreX - JumbotronLayout.screensTopRadius,
+                                   JumbotronLayout.screensTopY - JumbotronLayout.screensTopBow)
+        let bottomRight = layout.point(JumbotronLayout.centreX + JumbotronLayout.screensTopRadius,
+                                       JumbotronLayout.rungBottomY + JumbotronLayout.rungBow)
+        let area = CGRect(x: topLeft.x, y: topLeft.y, width: bottomRight.x - topLeft.x, height: bottomRight.y - topLeft.y)
+        return Color.clear
+            .contentShape(Rectangle())
+            .frame(width: area.width, height: area.height)
+            // One drag reads both, so neither gesture swallows the other.
+            .gesture(DragGesture(minimumDistance: 0).onEnded { drag in
+                let start = CGPoint(x: drag.startLocation.x + area.minX, y: drag.startLocation.y + area.minY)
+                let horizontalTravel = drag.translation.width, verticalTravel = drag.translation.height
+                if hypot(horizontalTravel, verticalTravel) < TitleOverlay.tapSlop {
+                    tapped(at: start, layout)
+                } else if abs(horizontalTravel) >= TitleOverlay.swipeDistance, abs(horizontalTravel) > abs(verticalTravel) {
+                    // Swiped left, the next option on the right comes round to the front.
+                    swiped(from: start, way: horizontalTravel < 0 ? 1 : -1, layout)
+                }
+            })
+    }
+
+    private func onLowerRung(_ point: CGPoint, _ layout: JumbotronLayout) -> Bool {
+        let rungLeft = layout.point(JumbotronLayout.centreX - JumbotronLayout.rungRadius, 0).x
+        let rungRight = layout.point(JumbotronLayout.centreX + JumbotronLayout.rungRadius, 0).x
+        let rungTop = layout.point(0, JumbotronLayout.rungTopY - JumbotronLayout.rungBow).y
+        let rungBottom = layout.point(0, JumbotronLayout.rungBottomY + JumbotronLayout.rungBow).y
+        return (rungLeft...rungRight).contains(point.x) && (rungTop...rungBottom).contains(point.y)
+    }
+
+    private func tapped(at point: CGPoint, _ layout: JumbotronLayout) {
+        if onLowerRung(point, layout) {
+            let across = (point.x - layout.point(JumbotronLayout.centreX, 0).x) / (JumbotronLayout.rungRadius * layout.unit)
+            if abs(across) < TitleOverlay.rungFrontShare { flow.activate(flow.frontLower) } else { flow.stepLowerRung(across > 0 ? 1 : -1) }
+            return
+        }
+        // The screens at rest only: none mid-swap.
+        guard !flow.screensInFlight else { return }
+        let ring = flow.screenRing
+        let count = ring.count
+        let span = JumbotronLayout.screenSpan(count: count)
+        let facingOut = (0..<count)
+            .map { (index: $0, angle: JumbotronScreens<EmptyView, EmptyView>.angle(of: $0, turn: Double(flow.shownTurn), count: count)) }
+            .filter { cos($0.angle) > 0.05 }
+            .sorted { cos($0.angle) > cos($1.angle) }
+        if let hit = facingOut.first(where: { JumbotronLayout.contains(layout.screenCorners(angle: $0.angle, span: span), point) }) {
+            flow.activate(ring[hit.index])
+        }
+    }
+
+    /// The ring the swipe started on turned a step; the screens held still while busy, as their arrows are.
+    private func swiped(from point: CGPoint, way: Int, _ layout: JumbotronLayout) {
+        if onLowerRung(point, layout) {
+            flow.stepLowerRung(way)
+        } else if !busy, !flow.screensInFlight {
+            flow.stepScreenRing(way)
+        }
+    }
+
+    /// The middle of the lower rung, a share of its half width, that picks the front option.
+    static let rungFrontShare: CGFloat = 0.6
+    /// A touch that moves less than this, in points, is a tap.
+    static let tapSlop: CGFloat = 10
+    /// How far across a swipe goes, in points, to turn a ring.
+    static let swipeDistance: CGFloat = 30
+    #endif
+
+    /// An arrow2 beside the jumbotron, pointing out, turning its screens that way.
+    private func ringArrow(way: Int) -> some View {
+        Button { flow.stepScreenRing(way) } label: {
+            FuturisticPiece(name: "arrow2", scale: TitleOverlay.arrowScale * scale(.buttons))
+                .scaleEffect(x: CGFloat(way))
+        }
         .buttonStyle(.plain)
-        .disabled((waitsOnNet && busy) || !available)
-        // Not open yet: greyed, and nothing happens.
-        .saturation(available ? 1 : 0)
-        .opacity(available ? 1 : TitleOverlay.parkedOpacity)
+        .disabled(busy || flow.screensInFlight)
         .noSystemFocus()
     }
+
+    /// The jumbotron's turn, its screens' and its lower rung's.
+    static let ringTurn = Animation.spring(response: 0.45, dampingFraction: 0.8)
+    /// A swap of the jumbotron's sets, out and in: quickening as the going set flies out, slowing as
+    /// the coming one comes to rest (`JumbotronLayout.flightSpread`, `flightTurn`).
+    static let screenSwapSeconds = 0.7
+    static let screenSwap = Animation.easeInOut(duration: screenSwapSeconds)
+
+    /// The settings gear and its frame against the other pieces.
+    static let settingsScale: CGFloat = 0.5
+    static let arrowScale: CGFloat = 0.6
+
     static let parkedOpacity = 0.35
 
     static let unpickedOpacity = 0.4
@@ -911,32 +1412,6 @@ struct TitleOverlay: View {
             .colorMultiply(Futuristic.line)
             .frame(width: width, height: width * image.size.height / max(image.size.width, 1))
     }
-
-    /// MULTIPLAYER's icon's sliders, bottom right: its place in points and its size.
-    @ViewBuilder
-    private var frameSliders: some View {
-        #if os(iOS)
-        VStack(alignment: .trailing, spacing: 4) {
-            frameSlider("ICON X", $multiplayerIconX, -200...200)
-            frameSlider("ICON Y", $multiplayerIconY, -100...100)
-            frameSlider("ICON SCALE", $multiplayerIconScale, 0.25...2)
-        }
-        .padding(8)
-        .background(.black.opacity(0.6))
-        .padding(.bottom, 20)
-        .padding(.trailing, 24)
-        #endif
-    }
-
-    #if os(iOS)
-    private func frameSlider(_ label: String, _ value: Binding<Double>, _ range: ClosedRange<Double>) -> some View {
-        HStack(spacing: 6) {
-            pickerLabel("\(label) \(String(format: range.upperBound > 2 ? "%.0f" : "%.2f", value.wrappedValue))")
-            SwiftUI.Slider(value: value, in: range, step: range.upperBound > 2 ? 1 : 0.01)
-                .frame(width: 140)
-        }
-    }
-    #endif
 
     /// A debug corner switch: its word over rule8, white when it's on, dim otherwise, gold under the cursor.
     private func debugSwitch(_ text: String, picked: Bool, item: TitleItem) -> some View {
@@ -965,17 +1440,11 @@ struct TitleOverlay: View {
                 debugSwitch("FONT " + String(UnicodeScalar(UInt8(65 + Futuristic.typefacePick))), picked: true, item: .titleFont)
                 debugSwitch("CAPTURE", picked: captureMode, item: .capture)
                 debugSwitch("CPU VS CPU", picked: cpuVersusCPU, item: .cpuVersusCPU)
+                debugSwitch("V-KEY", picked: VKey.owned, item: .vKeyLocked)
             }
         }
         .padding(.bottom, 20)
         .padding(.leading, 24)
-    }
-
-    private func pickerLabel(_ text: String) -> some View {
-        Text(text)
-            .font(TitleText.switchFont(size: 10))
-            .foregroundStyle(.white)
-            .shadow(color: .black, radius: 0, x: 1, y: 1)
     }
 }
 
@@ -994,41 +1463,5 @@ extension View {
 extension Color {
     init(rgb: RGB) {
         self.init(red: Double((rgb >> 16) & 0xFF) / 255, green: Double((rgb >> 8) & 0xFF) / 255, blue: Double(rgb & 0xFF) / 255)
-    }
-}
-
-
-/// The title's modes round a ring seen from the side: each placed by its angle from the front,
-/// smaller, dimmer and turned away toward the back, the back one gone behind the front.
-/// Animatable, so the turn eases through every angle and the depth order follows it.
-struct ModeRing<Card: View>: View, Animatable {
-    var turn: Double
-    let count: Int
-    let radius: CGFloat
-    @ViewBuilder let card: (Int) -> Card
-
-    var animatableData: Double {
-        get { turn }
-        set { turn = newValue }
-    }
-
-    /// At the back: its size, and its turn away at the sides, in degrees.
-    static var backScale: CGFloat { 0.55 }
-    static var sideTilt: Double { 40 }
-
-    var body: some View {
-        ZStack {
-            ForEach(0..<count, id: \.self) { index in
-                let angle = (Double(index) - turn) * 2 * .pi / Double(count)
-                let depth = (cos(angle) + 1) / 2
-                card(index)
-                    .rotation3DEffect(.degrees(-sin(angle) * ModeRing.sideTilt), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
-                    .scaleEffect(ModeRing.backScale + (1 - ModeRing.backScale) * depth)
-                    .opacity(min(depth * 2, 1))
-                    .offset(x: sin(angle) * radius)
-                    .zIndex(depth)
-                    .allowsHitTesting(depth > 0.25)
-            }
-        }
     }
 }

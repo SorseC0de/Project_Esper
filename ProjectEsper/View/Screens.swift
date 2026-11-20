@@ -661,25 +661,38 @@ final class WinScreen: Screen {
     static let optionTextSize: CGFloat = 10
     static var optionGap: CGFloat { 6 * layout }
     static var scoreScale: CGFloat { 0.4 * layout }
+    /// SAVE's VTV icon: as tall as the options' frames.
+    static var saveScale: CGFloat { 0.8 * layout }
     static let scoreTextSize: CGFloat = 16
 
     /// `score` is each side's, player one's first, as the match ended.
-    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, player: Int, score: [Int], again: String,
-         onAgain: @escaping () -> Void, onTitle: @escaping () -> Void) {
-        figure = WinFigure(player: player, pose: .taunt)
+    /// `onSaveReplay`, where the match can be saved, puts SAVE between the two in place of the empty frame.
+    init(halfWidth: CGFloat, halfHeight: CGFloat, winner: String, player: Int, pose: WinPose, score: [Int], again: String,
+         onAgain: @escaping () -> Void, onTitle: @escaping () -> Void, onSaveReplay: ((@escaping (Bool) -> Void) -> Void)? = nil, replaySaved: Bool = false) {
+        figure = WinFigure(player: player, pose: pose)
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .win)
         let name = FloText.node("\(winner) Wins", height: WinScreen.nameHeight)
         name.position = CGPoint(x: 0, y: WinScreen.nameY)
         addChild(name)
         let width = Futuristic.sprite("4", scale: WinScreen.optionScale).size.width
         let scoreWidth = Futuristic.sprite("box2", scale: WinScreen.scoreScale).size.width
-        // The score's frame, empty: the score stays up on the HUD's scoreboard.
-        addPlate("", frame: "box2", scale: WinScreen.scoreScale,
-                 textSize: WinScreen.scoreTextSize, at: CGPoint(x: 0, y: WinScreen.optionsY))
         let across = scoreWidth / 2 + WinScreen.optionGap + width / 2
         // The left one turned round, its lead out to the right.
         addFramed(again, frame: "4", scale: WinScreen.optionScale, mirroredX: true, textSize: WinScreen.optionTextSize,
                   at: CGPoint(x: -across, y: WinScreen.optionsY), action: onAgain)
+        if let onSaveReplay {
+            // Between the two, in the middle of the cursor's way: SAVE in the VTV icon's screen, SAVED once it's done.
+            var saveButton: SKNode?
+            saveButton = addFramed(replaySaved ? "SAVED" : "SAVE", frame: "icon_vtv", scale: WinScreen.saveScale, textSize: WinScreen.optionTextSize,
+                                   at: CGPoint(x: 0, y: WinScreen.optionsY)) {
+                guard let label = saveButton?.children.compactMap({ $0 as? SKLabelNode }).first, label.text != "SAVED" else { return }
+                onSaveReplay { saved in if saved { label.text = "SAVED" } }
+            }
+        } else {
+            // The score's frame, empty: the score stays up on the HUD's scoreboard.
+            addPlate("", frame: "box2", scale: WinScreen.scoreScale,
+                     textSize: WinScreen.scoreTextSize, at: CGPoint(x: 0, y: WinScreen.optionsY))
+        }
         addFramed("TITLE", frame: "4", scale: WinScreen.optionScale, textSize: WinScreen.optionTextSize,
                   at: CGPoint(x: across, y: WinScreen.optionsY), sound: .menuBack, action: onTitle)
         waiting.position = CGPoint(x: 0, y: WinScreen.optionsY - Futuristic.sprite("4", scale: WinScreen.optionScale).size.height / 2 - 14)
@@ -707,6 +720,11 @@ final class StageSelectScreen: Screen {
     private var tilePlates: [SKSpriteNode] = []
     /// Each stage's name in its lines, two when it has a space to break at, in the menus' face.
     private var tileLabels: [[SKLabelNode]] = []
+    /// The stages the V-Key opens, by their place: red, pixel_lock in the upper right corner; raised
+    /// and previewed as any, but picking one asks for the key (`onLockedPick`).
+    private let locked: Set<Int>
+    private var tileLocks: [Int: SKSpriteNode] = [:]
+    private let onLockedPick: (() -> Void)?
     private var tileSize = CGSize.zero
     private var cursors: [Int: Int] = [:]
     private var picks: [Int: Int] = [:]
@@ -750,7 +768,9 @@ final class StageSelectScreen: Screen {
 
     /// `onPick` gets the voter and the stage's place in the row.
     init(halfWidth: CGFloat, halfHeight: CGFloat, stages: [String], voters: [Int], localVoters: [Int], colours: [SKColor],
-         heading: String?, start: Int, onPick: @escaping (Int, Int) -> Void) {
+         heading: String?, start: Int, locked: Set<Int> = [], onLockedPick: (() -> Void)? = nil, onPick: @escaping (Int, Int) -> Void) {
+        self.locked = locked
+        self.onLockedPick = onLockedPick
         self.voters = voters
         self.localVoters = localVoters
         self.colours = colours
@@ -813,6 +833,18 @@ final class StageSelectScreen: Screen {
                 tile.addChild(label)
                 labels.append(label)
             }
+            if locked.contains(index) {
+                let lockImage = Futuristic.image("icon_pixel_lock")
+                let lock = SKSpriteNode(texture: SKTexture(image: lockImage))
+                lock.texture?.filteringMode = .nearest
+                let lockHeight = tileSize.height * StageSelectScreen.lockHeightShare
+                lock.size = CGSize(width: lockHeight * lockImage.size.width / max(lockImage.size.height, 1), height: lockHeight)
+                lock.colorBlendFactor = 1
+                let inset = tileSize.height * StageSelectScreen.lockInsetShare
+                lock.position = CGPoint(x: tileSize.width / 2 - inset - lock.size.width / 2, y: tileSize.height / 2 - inset - lock.size.height / 2)
+                tile.addChild(lock)
+                tileLocks[index] = lock
+            }
             addChild(tile)
             tiles.append(tile)
             tilePlates.append(plate)
@@ -834,6 +866,10 @@ final class StageSelectScreen: Screen {
 
     /// A row holds this many stages at most before they go in two.
     static let oneRowMost = 4
+    /// A locked stage's: the lock's height and its inset from the box's upper right corner, shares of the box's height; its red.
+    static let lockHeightShare: CGFloat = 0.22
+    static let lockInsetShare: CGFloat = 0.14
+    static let lockedColour = SKColor(rgb: EsperPalette.red.light)
     /// The name's lines' spacing, a share of the lettering's size.
     static let lineShare: CGFloat = 1.05
     /// STAGE SELECT's cap height, in points, and its middle down from the screen's, a share of half its height.
@@ -917,6 +953,10 @@ final class StageSelectScreen: Screen {
 
     func lock(voter: Int) {
         guard picks[voter] == nil, flipLit == nil, let at = cursors[voter] else { return }
+        if locked.contains(at) {
+            if let onLockedPick { onLockedPick() } else { SoundBoard.shared.play(.menuBack) }
+            return
+        }
         picks[voter] = at
         SoundBoard.shared.play(SoundBoard.confirm)
         refresh()
@@ -964,8 +1004,10 @@ final class StageSelectScreen: Screen {
         let raised: Set<Int> = flipLit.map { [$0] } ?? Set(voters.compactMap { picks[$0] ?? cursors[$0] })
         for index in tiles.indices {
             let lit = raised.contains(index)
-            tilePlates[index].color = lit ? Futuristic.litColour : Futuristic.lineColour
-            for label in tileLabels[index] { label.fontColor = lit ? Futuristic.litColour : Futuristic.lineColour }
+            let colour = lit ? Futuristic.litColour : (locked.contains(index) ? StageSelectScreen.lockedColour : Futuristic.lineColour)
+            tilePlates[index].color = colour
+            for label in tileLabels[index] { label.fontColor = colour }
+            tileLocks[index]?.color = colour
         }
         // Each voter's circle in the bottom-right corner of their stage, the second beside the first.
         var taken: [Int: Int] = [:]
@@ -1009,12 +1051,14 @@ final class PauseScreen: Screen {
     static let washOpacity = 0.33
 
     /// `extras`: a game's own choices, ZONES' turn's, over the rest. `resumeAt`: the pause
-    /// icon's frame, in the HUD's points.
-    init(halfWidth: CGFloat, halfHeight: CGFloat, resumeAt: CGRect, onRestart: @escaping () -> Void, onSettings: @escaping () -> Void,
-         onTitle: @escaping () -> Void, onResume: @escaping () -> Void, extras: [(String, () -> Void)] = []) {
+    /// icon's frame, in the HUD's points. No `onSettings`, no gear (a replay's pause); `restartText`
+    /// and `titleText` the two last choices' words.
+    init(halfWidth: CGFloat, halfHeight: CGFloat, resumeAt: CGRect, onRestart: @escaping () -> Void, onSettings: (() -> Void)?,
+         onTitle: @escaping () -> Void, onResume: @escaping () -> Void, extras: [(String, () -> Void)] = [],
+         restartText: String = "RESTART MATCH", titleText: String = "TITLE SCREEN") {
         super.init(halfWidth: halfWidth, halfHeight: halfHeight, kind: .pause)
         let options: [(text: String, sound: SoundBoard.Effect, action: () -> Void)] =
-            extras.map { ($0.0, SoundBoard.confirm, $0.1) } + [("RESTART MATCH", SoundBoard.confirm, onRestart), ("TITLE SCREEN", .menuBack, onTitle)]
+            extras.map { ($0.0, SoundBoard.confirm, $0.1) } + [(restartText, SoundBoard.confirm, onRestart), (titleText, .menuBack, onTitle)]
         let image = Futuristic.image("8")
         // The BUTTONS scale, no taller as a column than most of the screen.
         let natural = image.size.height * image.scale * Futuristic.pointsPerPixel * PauseScreen.optionScale
@@ -1048,6 +1092,10 @@ final class PauseScreen: Screen {
         arrow.size = CGSize(width: faceHeight * arrowImage.size.width / max(arrowImage.size.height, 1), height: faceHeight)
         let resume = addFramed(nil, frame: "1", scale: iconScale, icon: arrow, at: CGPoint(x: resumeAt.midX, y: resumeAt.midY),
                                sound: .menuBack, action: onResume)
+        guard let onSettings else {
+            place(cursor: options.count)
+            return
+        }
         // The gear under it: frame 9 upside down, centred under RESUME's face.
         let gearFrame = Futuristic.image("9")
         let gearSize = CGSize(width: gearFrame.size.width * gearFrame.scale * Futuristic.pointsPerPixel * iconScale,

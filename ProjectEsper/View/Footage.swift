@@ -8,10 +8,11 @@ import UIKit
 /// `-footage` as an argument) to a plan, the scenes in `FootageScenes` are played one after another,
 /// each recorded to its own video (`FootageRecorder`) with a log of its events beside it, in the
 /// app's temporary folder, `Footage/`, and a `done` file once the last is over. The plan is `all`,
-/// `scripted`, `cpu`, or a comma-separated list of words a scene's name must contain.
+/// `scripted`, `cpu`, a comma-separated list of words a scene's name must contain, or `replay` (every
+/// saved replay in `MatchReplayFile.folder`) or `replay:words` (those whose file name has a word).
 @MainActor
 final class FootageRun {
-    static let defaultsKey = "debug.footage"
+    nonisolated static let defaultsKey = "debug.footage"
     /// Release builds too: a launch argument or a stored default nobody sets by accident, and the
     /// optimised build is what keeps the recording at 60.
     static var requested: Bool { plan != nil && !over }
@@ -19,7 +20,7 @@ final class FootageRun {
     private(set) static weak var active: FootageRun?
     /// Once a run's done: no second one from the same launch argument, and the app quits.
     private(set) static var over = false
-    static var plan: String? {
+    nonisolated static var plan: String? {
         if let argument = ProcessInfo.processInfo.arguments.firstIndex(of: "-footage"), ProcessInfo.processInfo.arguments.indices.contains(argument + 1) {
             return ProcessInfo.processInfo.arguments[argument + 1]
         }
@@ -34,6 +35,17 @@ final class FootageRun {
             if sides.count == 2 { return CGSize(width: sides[0], height: sides[1]) }
         }
         return CGSize(width: 1920, height: 1080)
+    }()
+    /// A portrait video, or `-footageFollow`: the camera close in at `followZoom` (`-footageZoom N`),
+    /// following the ball, in place of the stage's own framing.
+    nonisolated static let followsAction: Bool = plan != nil
+        && (videoSize.height > videoSize.width || ProcessInfo.processInfo.arguments.contains("-footageFollow"))
+    nonisolated static let followZoom: CGFloat = {
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-footageZoom"), arguments.indices.contains(index + 1), let zoom = Double(arguments[index + 1]) {
+            return CGFloat(zoom.rounded())
+        }
+        return 5
     }()
     /// Frames the view holds on a scripted scene's end, and on a game's win screen, before the next.
     static let scriptedTail = 60
@@ -58,6 +70,9 @@ final class FootageRun {
     nonisolated static let veilBlur = 12.0
     nonisolated static let veilWash = 0.45
     var recorder: FootageRecorder?
+    /// The saved matches the plan plays back, by their scene's name, and the one playing now.
+    var replayFiles: [String: MatchReplayFile] = [:]
+    var replay: MatchReplayPlayer?
     private var log: FileHandle?
     private let captureModeWas: Bool
     /// The drawing's clock: a sixtieth on for every frame drawn, so everything drawn by time keeps
@@ -84,6 +99,20 @@ final class FootageRun {
         let plan = FootageRun.plan ?? "all"
         var picked: [FootageScene] = []
         switch plan {
+        case _ where plan.hasPrefix("replay"):
+            let words = plan.dropFirst("replay".count).drop { $0 == ":" }.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            for (url, file) in MatchReplayFile.all() {
+                let name = url.deletingPathExtension().lastPathComponent
+                guard words.isEmpty || words.contains(where: { name.contains($0) }) else { continue }
+                if file.protocolVersion != NetRules.protocolVersion || file.build != MatchReplayFile.currentBuild {
+                    NSLog("[REPLAY] %@ was made on build %@ (protocol %d), this is %@ (%d): it may part from the match", name, file.build,
+                          Int(file.protocolVersion), MatchReplayFile.currentBuild, Int(NetRules.protocolVersion))
+                }
+                let sceneName = "replay_" + name.replacingOccurrences(of: " ", with: "_")
+                replayFiles[sceneName] = file
+                picked.append(FootageScene(name: sceneName, stage: file.series.stage, mode: file.mode, colours: file.sides.map(\.energy.rawValue),
+                                           maxFrames: Int.max))
+            }
         case "all": picked = FootageScenes.scripted + FootageScenes.cpuMatches
         case "scripted": picked = FootageScenes.scripted
         case "cpu": picked = FootageScenes.cpuMatches
@@ -102,7 +131,7 @@ final class FootageRun {
     /// The scene's inputs for a sim frame, nil for a side the computer plays; what the scene holds in
     /// place applied to the match first.
     func inputs(match: Match, mutate: ((inout Match) -> Void) -> Void) -> [PlayerInput?] {
-        guard let scene = current, !scene.cpuMatch else { return [nil, nil] }
+        guard let scene = current, !scene.cpuMatch, replay == nil else { return [nil, nil] }
         // The tail after the scene's moment: the computer's, playing on to the cut.
         guard ending == nil else { return [nil, nil] }
         if let eachFrame = scene.eachFrame { mutate(eachFrame) }
@@ -116,6 +145,7 @@ final class FootageRun {
     /// Whether the scene has shown what it's for.
     func sceneDone(won: Bool, match: Match) -> Bool {
         guard let scene = current, ending == nil else { return false }
+        if let replay { return won || replay.over(frame: match.frame) }
         if scene.cpuMatch { return won || frames >= scene.maxFrames }
         return director.finished || scene.done(director, match) || frames >= scene.maxFrames
     }
@@ -243,6 +273,11 @@ extension GameScene {
             enter(.title)
             return
         }
+        footage.replay = footage.replayFiles[scene.name].map { MatchReplayPlayer(file: $0, name: scene.name) }
+        if let replay = footage.replay {
+            startReplay(replay)
+            return
+        }
         gameMode = scene.mode
         series = Series(seed: UInt32(truncatingIfNeeded: footage.index + 1) &* 7919)
         series.stage = scene.stage
@@ -291,9 +326,101 @@ extension GameScene {
         enter(.playing)
     }
 
+    /// A saved match begun as it began: the sides dressed as they were, and the series off its seed,
+    /// onto its stage select or straight into play; the replay lays its recording over the rest.
+    func startReplay(_ replay: MatchReplayPlayer) {
+        guard let footage else { return }
+        footage.director = FootageDirector()
+        footage.frames = 0
+        footage.ending = nil
+        beginReplay(replay)
+        if let device = MTLCreateSystemDefaultDevice() { footage.beginRecording(device: device) }
+    }
+
+    /// VTV's replay watched: played back as it was played, the computer playing neither side and
+    /// the pad's presses going nowhere but the pause.
+    func watchReplay(_ file: MatchReplayFile) {
+        guard !playingOnline, footage == nil else { return }
+        matchRecorder = nil
+        watchedReplay = MatchReplayPlayer(file: file, name: "VTV")
+        beginReplay(watchedReplay!)
+    }
+
+    /// The pause's RESTART and the win screen's WATCH AGAIN: the replay from its start.
+    func restartWatchedReplay() {
+        guard let file = watchedReplay?.file else { return }
+        flowState?.transition { [weak self] in self?.watchReplay(file) }
+    }
+
+    /// The pause's EXIT and the win screen's TITLE: out to VTV's replays, the sides dressed as saved again.
+    func leaveWatchedReplay() {
+        flowState?.transition { [weak self] in self?.enter(.title) }
+    }
+
+    /// A saved match begun as it began, under footage or watched.
+    private func beginReplay(_ replay: MatchReplayPlayer) {
+        let file = replay.file
+        gameMode = file.mode
+        applyColours(file.sides.map(\.energy), looks: file.sides.map(\.look))
+        pickedDrinks = file.sides.map(\.drink)
+        pickedWinPoses = file.sides.map(\.winPose)
+        AnoziraRules.rainForced = nil
+        switch file.start {
+        case .series(let seed):
+            startSeries(seed: seed)
+        case .restart(let seed, let stage):
+            firstStage = stage
+            restartMatch(seed: seed)
+            previewedStage = stage
+        }
+        series = file.series
+    }
+
+    /// The replay's next pick made as the match made it, once its screen's up: the stage settled at
+    /// once (no preview), a drink after a beat on the pick; the series then as the match left it.
+    private func stepReplayDecisions(_ replay: MatchReplayPlayer) {
+        // The match reset its round there: so does the replay, onto the next session.
+        if flow == .playing, replay.wantsNextSession(frame: session.frame) {
+            startRound()
+            return
+        }
+        if stageSelectOpen {
+            guard let decision = replay.pendingDecision, case .stage(let choice) = decision.kind else {
+                NSLog("[REPLAY] the stage select's up with no stage pick next; settling on %@", "\(series.stage)")
+                previewedStage = series.stage
+                settleStage(series.stage)
+                return
+            }
+            replay.nextDecision += 1
+            previewedStage = choice
+            settleStage(choice)
+            series = decision.seriesAfter
+            return
+        }
+        guard let screen = footagePickScreen else {
+            replay.pickFrames = 0
+            return
+        }
+        replay.pickFrames += 1
+        guard replay.pickFrames == FootageRun.pickBeat else { return }
+        guard let decision = replay.pendingDecision, case .drink(let choice) = decision.kind else {
+            NSLog("[REPLAY] a drink pick's up with no drink pick next; taking the one under the cursor")
+            screen.fire()
+            return
+        }
+        replay.nextDecision += 1
+        applyPick(choice: choice)
+        series = decision.seriesAfter
+    }
+
     /// A frame of the run: the scene's end noticed, the tail after it, and the next scene.
     func stepFootage() {
+        if let watched = watchedReplay, footage == nil {
+            stepReplayDecisions(watched)
+            return
+        }
         guard let footage else { return }
+        if let replay = footage.replay, footage.ending == nil { stepReplayDecisions(replay) }
         if let left = footage.ending {
             if left <= 1 {
                 if flow == .won, let flowState {

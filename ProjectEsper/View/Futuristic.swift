@@ -6,9 +6,9 @@ import SwiftUI
 /// frames and rules on the customize screen's ground (`MenuGround`), lettered in Upheaval. Pieces come in white and are multiplied
 /// by the vector's cyan, or by gold when highlighted, when they also grow a tenth.
 enum Futuristic {
-    /// The menus' blue, their pieces' and their lettering's.
-    static let lineRGB: RGB = 0x88D7ED
-    static let line = Color(rgb: lineRGB)
+    /// The menus' blue, their pieces' and their lettering's: THEME's color (`MenuTheme`).
+    static var lineRGB: RGB { MenuTheme.lineRGB }
+    static var line: Color { Color(rgb: lineRGB) }
     /// The customize screen's top line.
     static let lit = Color(rgb: EsperPalette.gold.light)
     /// The menus' face: the debug strip's UI FONT pick, A to K, Upheaval to start; kept.
@@ -140,7 +140,7 @@ enum Futuristic {
 
     /// The same for SpriteKit: the blue and the gold, and a piece as a sprite at `scale` of the
     /// menus' size, in the blue.
-    static let lineColour = SKColor(rgb: lineRGB)
+    static var lineColour: SKColor { SKColor(rgb: lineRGB) }
     static let litColour = SKColor(rgb: EsperPalette.gold.light)
     static func sprite(_ piece: String, scale: CGFloat) -> SKSpriteNode {
         sprite(image: image(piece), scale: scale)
@@ -193,6 +193,8 @@ enum Futuristic {
         "12": CGPoint(x: 0.48, y: 0.38),
         "4": CGPoint(x: 0.60, y: 0.38),
         "box4": CGPoint(x: 0.38, y: 0.50),
+        // The VTV icon's screen, under its antenna.
+        "icon_vtv": CGPoint(x: 0.50, y: 0.60),
         // Frame 2 without its tail (`taillessTwo`).
         "2": CGPoint(x: 0.52, y: 0.65),
         // Frame 6 without its tail (`taillessSix`): 6's face, against the box alone.

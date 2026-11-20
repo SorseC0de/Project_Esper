@@ -330,3 +330,15 @@ public enum ZRules {
     public static let bodyLift = 1.5
     public static let ballSpeed = 7.0
 }
+
+extension Beam: Codable {}
+
+extension Bolt: Codable {}
+
+extension Fireball: Codable {}
+
+extension Flame: Codable {}
+
+extension Gale: Codable {}
+
+extension IceClone: Codable {}

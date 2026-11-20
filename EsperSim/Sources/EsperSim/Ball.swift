@@ -26,8 +26,8 @@ public struct Ball: Equatable {
     /// anything but a backboard's glass, which it can bank off and still be drawn in. A thrown ball never steers, so scoring off a throw is the ball going
     /// through on its own.
     public var steers = false
-    /// A shot still in flight, before its first bounce: the rings don't take it; only a
-    /// snatch does. Bodies never deflect the ball; it goes through anyone not catching it.
+    /// A shot or floater still in flight, in its shooter's color, before its first bounce: the
+    /// rings don't take it; only a snatch does. Bodies never deflect the ball; it goes through anyone not catching it.
     public var shotInFlight = false
     /// Let go as a shot, a floater or a dunk, and kept through its bounces: it can go down
     /// through a rim. Anything else, thrown or knocked loose, bounces off the rim's top.
@@ -304,10 +304,12 @@ public struct Ball: Equatable {
         }
     }
 
-    /// The first bounce ends a paced shot: an ordinary ball's speed from here.
+    /// The first bounce ends a paced shot: an ordinary ball's speed from here, and the shooter's
+    /// color gone, anyone's to catch.
     private mutating func settlePace() {
         burning = false
         owned = false
+        shotInFlight = false
         strikes = false
         returning = false
         guard pace != 1 else { return }
@@ -379,13 +381,14 @@ public struct Ball: Equatable {
     }
 
     /// The floater: a soft drift up that ignores gravity for a while, carrying the
-    /// thrower's sideways speed, then a normal fall the rims steer.
+    /// thrower's sideways speed, then a normal fall the rims steer. A shot in flight: only a snatch takes it.
     public mutating func releaseFloater(from position: Vec2, sideways: Double, by player: Int) {
         release(from: position, velocity: Vec2(x: sideways, y: BallRules.upThrowSpeed), by: player, straight: false)
         thrown = true
         floater = BallRules.floaterFrames
         floaterShot = true
         scoring = true
+        shotInFlight = true
     }
 
     /// Knocked out of a holder's hands: a short floater straight up, then a normal fall,
@@ -495,3 +498,7 @@ public struct Ball: Equatable {
         tornadoCentre = nil
     }
 }
+
+extension Ball: Codable {}
+
+extension Ball.NetDrop: Codable {}

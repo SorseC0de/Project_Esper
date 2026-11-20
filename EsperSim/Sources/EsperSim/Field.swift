@@ -407,3 +407,13 @@ extension Match {
         }
     }
 }
+
+extension Helmet: Codable {}
+
+extension Portal: Codable {}
+
+extension HelmetPhase: Codable {}
+
+extension StageFeatures: Codable {}
+
+extension StageLook: Codable {}

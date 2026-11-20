@@ -109,7 +109,7 @@ struct UpdatesView: View {
                 .padding(.vertical, bulletSize * 0.5)
         case .drink(let name, let drink):
             HStack(alignment: .center, spacing: bulletSize * 0.5) {
-                Image(uiImage: DrinkPick.bottleImage(drink)).resizable().aspectRatio(contentMode: .fit)
+                Image(uiImage: DrinkPick.bottleImage(drink, height: bulletSize * UpdatesView.bottleLines)).resizable().aspectRatio(contentMode: .fit)
                     .frame(height: bulletSize * UpdatesView.bottleLines)
                     .rotationEffect(.degrees(-UpdatesView.bottleTilt))
                 UpdatesNotes.text(name, size: bulletSize, tone: .plain)

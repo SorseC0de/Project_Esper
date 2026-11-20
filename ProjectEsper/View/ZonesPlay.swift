@@ -451,6 +451,12 @@ final class ZonesPlay {
         group.zPosition = ghost ? -0.6 : -0.5
         for source in [body, hood] where !source.isHidden && source.texture != nil {
             let copy = SKSpriteNode(texture: source.texture)
+            // A player map draws through its shader, in its look.
+            // TODO (ZONES parked): the texture rework broke this. a_look reads the live palette, so when the follower's
+            // try puts their look in slot 0 (zonesLooks → setLook), the leader's phantoms turn the follower's colors
+            // under the leader's baked hood. Fix: bake the body to a picture at the drop, as before the rework.
+            copy.shader = source.shader
+            copy.attributeValues = source.attributeValues
             copy.size = CGSize(width: abs(source.size.width), height: abs(source.size.height))
             copy.anchorPoint = source.anchorPoint
             // Where it sits off the body, turned about the body if the sim's facing differs.

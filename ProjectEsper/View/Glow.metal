@@ -35,6 +35,8 @@ struct GlowUniforms {
     // Each energy colour's two hood tones, Diamond's too, its light and its shadow, in the same order.
     float4 hoodLight[10];
     float4 hoodShadow[10];
+    // x: what glows, this many times brighter in light, past white on an EDR screen; 1 for none.
+    float4 edr;
 };
 
 struct FullScreen {
@@ -51,10 +53,20 @@ vertex FullScreen glowVertex(uint id [[vertex_id]]) {
     return out;
 }
 
+// sRGB's curve, both ways: an encoded colour into light, and back.
+static float3 linearSRGB(float3 c) {
+    return select(pow((c + 0.055) / 1.055, 2.4), c / 12.92, c <= 0.04045);
+}
+static float3 encodedSRGB(float3 c) {
+    return select(1.055 * pow(c, 1.0 / 2.4) - 0.055, c * 12.92, c <= 0.0031308);
+}
+
 // One full-size pixel's glow, by its own colour and its own mask, never a blend of its neighbours':
 // the customize screen's way, the glowing pixels alone, then blurred. Above the brightness threshold
 // (its brightest channel), eased in over `softness`; a body's own, higher threshold where the mask is set.
-static float3 glowOfPixel(float3 color, float3 mask, float2 uv, constant GlowUniforms &u) {
+// `glows`: how far the pixel glows at all, its energy's gain and the hood's share aside, for the
+// composite to keep the bloom off it; `boostShare`: the same with the hood's share, for EDR.
+static float3 glowOfPixel(float3 color, float3 mask, float2 uv, constant GlowUniforms &u, thread float &glows, thread float &boostShare) {
     float body = dot(mask, float3(0.2126, 0.7152, 0.0722));
     // Red to magenta: a hood (magenta), glowing at its share, and the face in its opening (red), not at all.
     float hooded = step(0.5, mask.r) * step(mask.g, 0.5);
@@ -71,8 +83,10 @@ static float3 glowOfPixel(float3 color, float3 mask, float2 uv, constant GlowUni
     // full strength glows as a light one does.
     float brightness = max(color.r, max(color.g, color.b));
     float background = u.unglowed.a * step(distance(color, u.unglowed.rgb), 0.01);
-    float amount = smoothstep(threshold - u.softness, threshold + u.softness, brightness) * (1 - flat) * (1 - background)
-        * mix(1.0, hood * u.hood.x, hooded);
+    float base = smoothstep(threshold - u.softness, threshold + u.softness, brightness) * (1 - flat) * (1 - background);
+    glows = base * mix(1.0, hood, hooded);
+    boostShare = base * mix(1.0, hood * u.hood.x, hooded);
+    float amount = boostShare;
     // An energy colour's own gain: the one nearest in hue, the colour over its brightest
     // channel, if near enough; whites and greys are none of them.
     if (brightness > 0.05) {
@@ -86,6 +100,11 @@ static float3 glowOfPixel(float3 color, float3 mask, float2 uv, constant GlowUni
         if (nearest < 0.1) amount *= gain;
     }
     return color * amount;
+}
+
+static float3 glowOfPixel(float3 color, float3 mask, float2 uv, constant GlowUniforms &u) {
+    float glows, boostShare;
+    return glowOfPixel(color, mask, uv, u, glows, boostShare);
 }
 
 // What glows, at half size: the four full-size pixels under each, their glows averaged. What glows
@@ -136,6 +155,13 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
     float2 uv = in.uv;
     uv.x += u.wave.x * sin(uv.y * u.wave.y * 6.2831853 + u.wave.z) * smoothstep(u.wave.w, u.wave.w + 0.04, uv.y);
     float4 color = scene.sample(linear, uv);
+    float3 mask = bodies.sample(linear, uv).rgb;
+    // How much this pixel glows itself: the glow lands round what glows, not over it, so what glows
+    // keeps its own tones (added over, a light energy's light and shadow both went to the same colour).
+    float ownShare, boostShare;
+    glowOfPixel(color.rgb, mask, uv, u, ownShare, boostShare);
+    // A player's line, marked in the mask apart from the other flats: drawn over the bloom, last.
+    float line = step(0.15, mask.r) * step(mask.r, 0.45) * step(0.5, mask.g) * step(mask.b, 0.05);
     // A clash: the scene's edges fringed out from its centre, one way in one player's energy,
     // the other way in the other's.
     if (u.aberration.z > 0) {
@@ -147,12 +173,11 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
         color.rgb = saturate(color.rgb + (max(inward - here, 0.0) * u.aberrationFirst.rgb
                                           + max(outward - here, 0.0) * u.aberrationSecond.rgb) * u.aberration.w);
     }
-    float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity;
-    // None spreads onto what's shielded: the face in a hood's opening.
-    float3 mask = bodies.sample(linear, uv).rgb;
+    float3 bloom = glow.sample(linear, uv).rgb * u.tint.rgb * u.intensity * (1 - ownShare) * (1 - line);
     // The world's wash, but over what's marked yellow (the far lightning), under the glow.
     float washFree = step(0.9, mask.r) * step(0.9, mask.g) * step(mask.b, 0.05);
     color.rgb = mix(color.rgb, u.wash.rgb, u.wash.a * (1 - washFree));
+    // None spreads onto what's shielded: the face in a hood's opening.
     float shielded = step(0.9, mask.r) * step(mask.g, 0.05) * step(mask.b, 0.05);
     float3 lit = color.rgb + bloom * (1 - shielded);
     // A hood's shadow keeps its step down from the hood's light: where the glow would close it
@@ -171,6 +196,11 @@ fragment float4 glowComposite(FullScreen in [[stage_in]],
             break;
         }
     }
+    // Everything up to white, as an 8-bit screen shows it; then what glows past it, on a screen that
+    // can (EDR): multiplied in light, so its light and shadow keep their proportions and its hue.
+    lit = saturate(lit);
+    float boost = mix(1.0, u.edr.x, boostShare * (1 - shielded));
+    if (boost > 1) lit = encodedSRGB(linearSRGB(lit) * boost);
     return float4(lit, 1);
 }
 

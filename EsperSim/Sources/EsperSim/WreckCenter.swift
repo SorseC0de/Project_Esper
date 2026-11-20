@@ -235,3 +235,7 @@ extension Stage {
 extension Match {
     public mutating func layTutorialRoom(_ room: Int, as layout: TutorialRoomLayout, slide: Double = 0) { stage.layTutorialRoom(room, as: layout, slide: slide) }
 }
+
+extension Conveyor: Codable {}
+
+extension DropPlatform: Codable {}

@@ -321,6 +321,15 @@ extension GameCenter {
         match.status == .open && match.currentParticipant?.player?.gamePlayerID == GKLocalPlayer.local.gamePlayerID
     }
 
+    /// Both sides' names in the match being played, player one's first: this phone's at `localIndex`.
+    func sideNames(localIndex: Int) -> [String]? {
+        guard let other = match?.players.first, localIndex == 0 || localIndex == 1 else { return nil }
+        var names = ["", ""]
+        names[localIndex] = GKLocalPlayer.local.displayName
+        names[1 - localIndex] = other.displayName
+        return names
+    }
+
     /// The other side's name, or who they'll be.
     func otherName(in match: GKTurnBasedMatch) -> String {
         let local = localIndex(in: match)

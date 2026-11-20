@@ -1204,3 +1204,13 @@ public enum StageChoice: Int, CaseIterable, Codable {
         }
     }
 }
+
+extension Stage: Codable {}
+
+extension Box: Codable {}
+
+extension Hoop: Codable {}
+
+extension Slope: Codable {}
+
+extension Tile: Codable {}

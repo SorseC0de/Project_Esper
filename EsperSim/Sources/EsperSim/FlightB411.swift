@@ -366,3 +366,9 @@ extension Match {
         }
     }
 }
+
+extension Bin: Codable {}
+
+extension Cart: Codable {}
+
+extension Bin.Load: Codable {}

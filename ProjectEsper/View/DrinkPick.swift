@@ -84,8 +84,8 @@ struct DrinkPick: View {
     static let face = Futuristic.listFace
     static let flavourSize: CGFloat = 9
     static let nameSize: CGFloat = 16
-    static let lineColour = Color(rgb: Futuristic.lineRGB)
-    static let tealColour = Color(rgb: Futuristic.lineRGB)
+    static var lineColour: Color { Color(rgb: Futuristic.lineRGB) }
+    static var tealColour: Color { Color(rgb: Futuristic.lineRGB) }
     static let litColour = Color(rgb: EsperPalette.gold.light)
 
     /// The side's room, mirrored for the second side.
@@ -95,6 +95,22 @@ struct DrinkPick: View {
     /// The lettering's size for the screen (DRINKS TEXT on the UI tuning panel), and the bottles' (DRINKS BUTTONS).
     private var textScale: CGFloat { size.height / 430 * UITuning.shared.scale(.drinks, .text) }
     private var bottleScale: CGFloat { UITuning.shared.scale(.drinks, .buttons) }
+    /// A bottle's height on the drink select, in the customize screen's `size`.
+    static func bottleHeight(in size: CGSize) -> CGFloat {
+        size.height * bottleHeightShare * UITuning.shared.scale(.drinks, .buttons)
+    }
+
+    /// Everything the drink select would otherwise make as it opens, made in the launch's loading:
+    /// each bottle at the size it's shown, raised, and its outline; the small bottles' outlines.
+    static func prewarm(drinks: [Greateraid], in size: CGSize) {
+        let height = bottleHeight(in: size) * raisedScale
+        for drink in drinks {
+            _ = bottleImage(drink, height: height)
+            _ = silhouette(drink)
+        }
+        _ = cachedSilhouette(of: noPowerImage)
+        _ = cachedSilhouette(of: diceImage)
+    }
 
     var body: some View {
         let ownsCursor = !flow.customizeOnline || player == flow.customizeLocal
@@ -121,7 +137,6 @@ struct DrinkPick: View {
         let width = right - left
         let height = size.height * DrinkPick.boxHeightShare
         let drink = flow.shownCustomizations[player].drink
-        let random = flow.drinkRandom[player]
         let inset = width * 0.12
         let scale = textScale
         let tailWidth = width * DrinkPick.tailShare
@@ -130,18 +145,18 @@ struct DrinkPick: View {
         return VStack(spacing: 0) {
             VStack(spacing: size.height * 0.01) {
                 // The name in teal, rule 6, the quote in italics, rule 6, what it does.
-                Text(random ? "RANDOM" : drink?.name.uppercased() ?? "NO POWER")
+                Text(drink?.name.uppercased() ?? "NO POWER")
                     .font(.custom(Futuristic.fontName, size: Futuristic.fontSize(DrinkPick.nameSize) * scale))
                     .foregroundStyle(DrinkPick.tealColour)
                 rule(width: width - inset * 2)
-                Text(random ? " " : drink.map { "\u{201C}\($0.comment)\u{201D}" } ?? " ")
+                Text(drink.map { "\u{201C}\($0.comment)\u{201D}" } ?? " ")
                     .font(.system(size: DrinkPick.flavourSize * scale).italic())
                     .foregroundStyle(DrinkPick.lineColour.opacity(0.8))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 rule(width: width - inset * 2)
                 // What it does, a bulleted line a level, left-aligned, in face E.
-                let lines = random ? [DrinkPick.randomText] : drink.map { [$0.blurbs.first, $0.blurbs.second] } ?? [DrinkPick.noDrinkText]
+                let lines = drink.map { [$0.blurbs.first, $0.blurbs.second] } ?? [DrinkPick.noDrinkText]
                 let textSize = Futuristic.fontSize(DrinkPick.textSize, face: DrinkPick.face) * scale
                 VStack(alignment: .leading, spacing: textSize * 0.4) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
@@ -181,7 +196,6 @@ struct DrinkPick: View {
             .colorMultiply(DrinkPick.lineColour)
     }
     static let noDrinkText = "FloState as itself: only its own [Slash] and [Snatch]."
-    static let randomText = "A Greateraid drawn at random as you lock in."
 
     /// A blurb in the menus' face: bracketed words in gold, glyphs their pictures in gold (`PickScreen.glyphs`).
     static func blurbText(_ text: String, size: CGFloat, face: Int? = nil) -> Text {
@@ -253,15 +267,30 @@ struct DrinkPick: View {
 
     // MARK: The bottles
 
-    /// A drink's bottle: its own from the catalog, else its kind's.
-    static func bottleImage(_ drink: Greateraid) -> UIImage {
+    /// A drink's bottle, the vector: its own from the catalog, else its kind's.
+    static func bottleSource(_ drink: Greateraid) -> UIImage {
         UIImage(named: drink.bottleArt) ?? UIImage(named: drink.kind == .booster ? "Greateraid" : "Greateraid-Gold") ?? UIImage()
     }
+
+    /// A drink's bottle drawn once at `height` points, at the screen's scale, and kept: shown as the
+    /// vector itself, each came out 917 by 2059 at the screen's scale, about 30 MB a bottle on the
+    /// TV, and the drink select shows them all at once.
+    static func bottleImage(_ drink: Greateraid, height: CGFloat) -> UIImage {
+        let height = height.rounded(.up)
+        let key = "\(drink.name)|\(height)"
+        if let made = bottleImages[key] { return made }
+        let source = bottleSource(drink)
+        let size = CGSize(width: height * source.size.width / max(source.size.height, 1), height: height)
+        let image = UIGraphicsImageRenderer(size: size).image { _ in source.draw(in: CGRect(origin: .zero, size: size)) }
+        bottleImages[key] = image
+        return image
+    }
+    nonisolated(unsafe) private static var bottleImages: [String: UIImage] = [:]
 
     private func bottles(cursor: Int?) -> some View {
         let drinks = flow.sortedDrinks(player)
         let picked = flow.shownCustomizations[player].drink
-        let height = size.height * DrinkPick.bottleHeightShare * bottleScale
+        let height = DrinkPick.bottleHeight(in: size)
         let rows = (drinks.count + DrinkPick.perRow - 1) / DrinkPick.perRow
         let step = height * DrinkPick.bottleStepShare
         // The group centred under the words' box: the bottles' middles across the widest row.
@@ -269,21 +298,18 @@ struct DrinkPick: View {
         let first = boxMiddle - span / 2
         // The small bottles in the gutter under the figure, one over the other.
         let gutter = DrinkPick.corner(player, size).x
-        let random = flow.drinkRandom[player]
-        let noPower = picked == nil && !random
+        let noPower = picked == nil
         return ZStack(alignment: .topLeading) {
             smallBottle(DrinkPick.noPowerImage, lit: cursor == DrinkPick.noPowerCursor, raised: noPower, height: height,
                         at: CGPoint(x: gutter, y: size.height * DrinkPick.noPowerFootShare)) {
                 flow.tapNoPower(player)
             }
-            smallBottle(DrinkPick.randomImage, lit: cursor == DrinkPick.randomCursor, raised: random, height: height,
-                        at: CGPoint(x: gutter, y: size.height * DrinkPick.randomFootShare)) {
-                flow.tapRandom(player)
-            }
+            dice(lit: cursor == DrinkPick.randomCursor, height: height, at: CGPoint(x: gutter, y: size.height * DrinkPick.randomFootShare))
             ForEach(Array(drinks.enumerated()), id: \.element) { index, drink in
                 let row = index / DrinkPick.perRow, column = index % DrinkPick.perRow
                 let raised = drink == picked
-                let image = DrinkPick.bottleImage(drink)
+                // Drawn at the raised size, so the raised one is as crisp.
+                let image = DrinkPick.bottleImage(drink, height: height * DrinkPick.raisedScale)
                 let aspect = image.size.width / max(image.size.height, 1)
                 let x = first + CGFloat(column) * step
                 let foot = size.height * DrinkPick.bottlesFootShare - CGFloat(row) * size.height * DrinkPick.rowRiseShare
@@ -332,8 +358,40 @@ struct DrinkPick: View {
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: raised)
     }
 
-    /// No Power's bottle: the plain one, emptied grey and dim. Random's: the gold one, a question
-    /// mark over it. Stand-ins till they're drawn.
+    /// The dice, in the menus' teal, under No Power: tapped (or confirmed on), a Greateraid rolled on
+    /// the spot, picked but not locked in. Outlined under the cursor; it turns while it rolls.
+    private func dice(lit: Bool, height bottle: CGFloat, at foot: CGPoint) -> some View {
+        let side = bottle * DrinkPick.diceScale
+        let rolling = flow.drinkRolling[player]
+        return TimelineView(.animation(paused: !rolling)) { timeline in
+            let turn = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: DrinkPick.diceTurnSeconds) / DrinkPick.diceTurnSeconds
+            ZStack {
+                if lit {
+                    Image(uiImage: DrinkPick.cachedSilhouette(of: DrinkPick.diceImage))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: side * (1 + DrinkPick.outlineShare * 2), height: side * (1 + DrinkPick.outlineShare * 2))
+                        .colorMultiply(DrinkPick.litColour)
+                }
+                Image(uiImage: DrinkPick.diceImage).resizable().interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .colorMultiply(DrinkPick.tealColour)
+                    .frame(width: side, height: side)
+            }
+            .rotationEffect(.degrees(rolling ? turn * 360 : 0))
+        }
+        .frame(width: side * 1.5, height: side * 1.5)
+        .contentShape(Rectangle())
+        .onTapGesture { flow.tapRandom(player) }
+        .position(x: foot.x, y: foot.y - side / 2)
+        .zIndex(2000)
+    }
+    /// The dice's size against a bottle's height, and how long a turn takes while it rolls.
+    static let diceScale: CGFloat = 0.4
+    static let diceTurnSeconds = 0.4
+    static let diceImage = Futuristic.image("icon_dice")
+
+    /// No Power's bottle: the plain one, emptied grey and dim. A stand-in till it's drawn.
     static let noPowerImage: UIImage = {
         // Each pixel to its own grey, at under half its strength; the clear around it left clear.
         guard let source = UIImage(named: "Greateraid")?.cgImage else { return UIImage() }
@@ -353,26 +411,12 @@ struct DrinkPick: View {
         return UIImage(cgImage: made)
     }()
     static let noPowerStrength = 0.45
-    static let randomImage: UIImage = {
-        let source = UIImage(named: "Greateraid-Gold") ?? UIImage(named: "Greateraid") ?? UIImage()
-        return UIGraphicsImageRenderer(size: source.size).image { _ in
-            source.draw(at: .zero)
-            let mark = NSAttributedString(string: "?", attributes: [
-                .font: UIFont.systemFont(ofSize: source.size.height * 0.4, weight: .black),
-                .foregroundColor: UIColor.white,
-                .strokeColor: UIColor.black,
-                .strokeWidth: -4,
-            ])
-            let markSize = mark.size()
-            mark.draw(at: CGPoint(x: (source.size.width - markSize.width) / 2, y: (source.size.height - markSize.height) / 2))
-        }
-    }()
 
     /// A bottle's silhouette in white, a little bigger all round, for its outline: copies of it
     /// round a circle, filled white where they drew.
     static func silhouette(_ drink: Greateraid) -> UIImage {
         if let made = silhouettes[drink] { return made }
-        let image = silhouette(of: bottleImage(drink))
+        let image = silhouette(of: bottleSource(drink))
         silhouettes[drink] = image
         return image
     }

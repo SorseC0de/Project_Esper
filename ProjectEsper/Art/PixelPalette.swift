@@ -1,8 +1,11 @@
 import Foundation
 
-/// EDG64 (`~/Library/Application Support/Aseprite/palettes/EDG64.aseprite`): the game's pixel
-/// palette, for everything drawn in the world. In Aseprite's order, index 0 its transparent
-/// black, so an index here is the one Aseprite shows (59, the Wreck Center's tiles, #5D5D5D).
+/// VARIA64 (V64): the game's pixel palette, for everything drawn in the world. EDG64
+/// (`~/Library/Application Support/Aseprite/palettes/EDG64.aseprite`) with its two unused blues
+/// taken out and Amethyst's three purples in 51 to 53: 51 indigo (#5D04C3), 52 purple (EDG64's
+/// #7A09FA, moved down from 53), 53 violet (#953CFB). In Aseprite's
+/// order, index 0 its transparent black, so an index here is the one Aseprite shows (59, the
+/// Wreck Center's tiles, #5D5D5D).
 enum PixelPalette {
     static let colours: [RGB] = [
         0x000000, 0xF9E6CF, 0xF6CA9F, 0xE69C69, 0xBF6F4A, 0x8A4836, 0x5D2C28, 0x391F21,
@@ -11,7 +14,7 @@ enum PixelPalette {
         0x0C2E44, 0x134C4C, 0x1E6F50, 0x33984B, 0x5AC54F, 0x99E65F, 0xD3FC7E, 0xFF5000,
         0xED7614, 0xFFA214, 0xFFC825, 0xFFEB57, 0xEDAB50, 0xE07438, 0xC64524, 0x8E251D,
         0x571C27, 0x891E2B, 0xC42430, 0xEA323C, 0xF5555D, 0xF68187, 0xC85086, 0xCA52C9,
-        0x93388F, 0x622461, 0x3B1443, 0x0C0293, 0x3003D9, 0x7A09FA, 0xDB3FFD, 0xF389F5,
+        0x93388F, 0x622461, 0x3B1443, 0x5D04C3, 0x7A09FA, 0x953CFB, 0xDB3FFD, 0xF389F5,
         0xFDD2ED, 0xB4B4B4, 0x858585, 0x5D5D5D, 0x3D3D3D, 0x272727, 0x1B1B1B, 0x131313,
         0xFF0040,
     ]

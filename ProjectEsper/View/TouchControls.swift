@@ -55,7 +55,7 @@ final class TouchControls: SKNode {
     static let ringSpinSeconds = 0.35
     /// A ring's diameter over the button's.
     static let ringShare: CGFloat = 1.1
-    private static let line = SKColor(rgb: Futuristic.lineRGB)
+    private static var line: SKColor { SKColor(rgb: Futuristic.lineRGB) }
     private static let lit = SKColor(rgb: EsperPalette.gold.light)
     private var buttonSets: [(inout PlayerInput, Bool, Vec2) -> Void] = []
 
@@ -115,7 +115,7 @@ final class TouchControls: SKNode {
     }
 
     /// Frame 1 at `pauseScale` of the menus' size, in their blue, two bars in its face.
-    private static func pauseIcon() -> SKSpriteNode {
+    static func pauseIcon() -> SKSpriteNode {
         let image = Futuristic.image("1")
         let frame = SKSpriteNode(texture: SKTexture(image: image))
         frame.size = CGSize(width: image.size.width * image.scale * Futuristic.pointsPerPixel * pauseScale,

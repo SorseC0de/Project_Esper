@@ -21,7 +21,7 @@ final class FloTests: XCTestCase {
         XCTAssertEqual(match.players[0].flo, FloRules.taunt)
     }
 
-    func testABasketEarnsTwentyAndAPointKeepsIt() {
+    func testABasketGivesTheScoredOnTwentyAndAPointKeepsIt() {
         var match = Match()
         match.countdown = 0
         match.ball.respawn(at: match.stage.hoops[1].position + Vec2(x: 0, y: 12))
@@ -31,15 +31,16 @@ final class FloTests: XCTestCase {
         var earned = 0
         for _ in 0..<60 where match.scores[0] == 0 {
             match.advance(inputs: [.idle, .idle])
-            earned += gains(match).filter { $0.player == 0 }.map(\.amount).reduce(0, +)
+            earned += gains(match).filter { $0.player == 1 }.map(\.amount).reduce(0, +)
         }
         XCTAssertEqual(match.scores[0], 1)
         XCTAssertEqual(earned, FloRules.madeShot)
+        XCTAssertEqual(match.players[0].flo, 0, "the scorer earns none")
         match.restart(ballTo: 1)
-        XCTAssertEqual(match.players[0].flo, FloRules.madeShot, "kept through the restart")
+        XCTAssertEqual(match.players[1].flo, FloRules.madeShot, "kept through the restart")
     }
 
-    func testAnOwnBasketEarnsTheOtherNothing() {
+    func testABasketOffTheOtherStillGivesThemTheFlo() {
         var match = Match()
         match.countdown = 0
         match.ball.respawn(at: match.stage.hoops[1].position + Vec2(x: 0, y: 12))
@@ -48,7 +49,8 @@ final class FloTests: XCTestCase {
         match.ball.lastTouched = 1
         for _ in 0..<60 where match.scores[0] == 0 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.scores[0], 1, "the point still counts")
-        XCTAssertEqual(match.players[0].flo, 0, "but only your own baskets earn FLO")
+        XCTAssertEqual(match.players[0].flo, 0)
+        XCTAssertEqual(match.players[1].flo, FloRules.madeShot, "the basket's FLO, whoever touched it last")
     }
 
     func testFloStopsAtFull() {

@@ -374,11 +374,13 @@ final class BallTests: XCTestCase {
     }
 
     func testDownBeforeTheShotsHoldStepsBackOnceItsHeld() {
-        // Down never cancels a stance: pressed early, the stepback waits for the hold.
+        // Back (away from the rim) never cancels a stance: pressed early, the stepback waits for the hold.
         var match = matchWithBallHeld()
+        // Two frames in: back held on the stance's first frame is taken as held from before it.
+        match.advance(inputs: [PlayerInput(shoot: true), .idle])
         match.advance(inputs: [PlayerInput(shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .shootStance)
-        match.advance(inputs: [PlayerInput(stick: Vec2(x: 0, y: -1), shoot: true), .idle])
+        match.advance(inputs: [PlayerInput(stick: Vec2(x: -match.players[0].facing.sign, y: 0), shoot: true), .idle])
         XCTAssertEqual(match.players[0].state, .shootStance)
         let stepped = run(&match, frames: BallRules.shotWindupFrames + 2, input: { _ in PlayerInput(shoot: true) }) { $0.players[0].state == .stepback }
         XCTAssertLessThanOrEqual(stepped, BallRules.shotWindupFrames)
@@ -396,7 +398,8 @@ final class BallTests: XCTestCase {
             match.players[1].facing = .left
             match.players[0].facing = .right
             for _ in 0..<BallRules.shotWindupFrames + 1 { match.advance(inputs: [.idle, PlayerInput(shoot: true)]) }
-            let holder = PlayerInput(stick: Vec2(x: 0, y: stepping ? -1 : 0), shoot: true)
+            // Back, away from the rim the stance faces.
+            let holder = PlayerInput(stick: Vec2(x: stepping ? -match.players[1].facing.sign : 0, y: 0), shoot: true)
             // The snatch's hand is out within the slide's frames; after it, the ball's fair game.
             XCTAssertLessThan(SnatchRules.activeFrames.lowerBound, StepbackRules.frames)
             for frame in 0..<(stepping ? StepbackRules.frames : SnatchRules.activeFrames.upperBound) {

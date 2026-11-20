@@ -4,10 +4,12 @@
 #   ./Tools/shoot.sh <plan> [--build] [--fresh] [--no-cut]
 #
 # plan      all | scripted | cpu | comma-separated words a scene's name must contain
+#           | replay (every saved match in _Replays/) | replay:words (those whose file name has one)
 # --build   build the Release simulator app first (otherwise the last build is installed)
 # --fresh   start the footage folder over (otherwise a run carries on past scenes already recorded)
 # --no-cut  leave highlights.py for later
-# --size WxH  the video's size, framed as a screen that shape frames it (default 1920x1080)
+# --size WxH  the video's size, framed as a screen that shape frames it (default 1920x1080);
+#             a portrait size (1080x1920) follows the ball at 5x (-footageZoom N for another)
 #
 # The app is relaunched if it dies before writing `done`; each launch skips the scenes already recorded.
 set -u
@@ -52,6 +54,12 @@ FOLDER="$DATA/tmp/Footage"
 if (( FRESH )); then rm -rf "$FOLDER"; fi
 mkdir -p "$FOLDER"
 rm -f "$FOLDER/done"
+# Saved matches for `replay` plans: _Replays/ into the app's Documents/Replays.
+if [[ $PLAN == replay* ]]; then
+    mkdir -p "$DATA/Documents/Replays"
+    cp _Replays/*.variaballreplay "$DATA/Documents/Replays/" 2>/dev/null
+    echo "replays: $(ls "$DATA/Documents/Replays" | grep -c '\.variaballreplay$')"
+fi
 
 for (( launch = 0; launch <= RELAUNCHES; launch++ )); do
     xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null

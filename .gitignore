@@ -23,3 +23,6 @@ EsperSim/.build/
 _Graphic Assets/Screengrabs/
 _Backup/
 Asset Packs 1-5/
+
+# Saved matches for replay footage (build-specific)
+_Replays/

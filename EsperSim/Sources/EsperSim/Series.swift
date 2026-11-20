@@ -116,3 +116,7 @@ public enum FortySevenRules {
         return launch.distance(to: hoop.position) > threePointRadius(for: hoop, on: stage) ? 3 : 2
     }
 }
+
+extension GameMode: Codable {}
+
+extension Series: Codable {}

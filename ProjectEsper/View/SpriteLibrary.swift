@@ -1,5 +1,8 @@
+import Accelerate
 import CoreGraphics
+import CoreImage
 import EsperSim
+import QuartzCore
 import SpriteKit
 
 /// Every frame in the atlas, looked up by the importer's names, drawn as pixels. Player
@@ -37,6 +40,36 @@ final class SpriteLibrary {
         return found
     }
     private var cache: [String: SKTexture] = [:]
+    /// How many textures are kept, for `MemoryTrace`.
+    var cachedCount: Int { cache.count }
+    /// For `MemoryTrace`: the cache's textures by kind, how many and their MB as pixels, largest
+    /// first, and the kept pictures behind them.
+    func memoryBreakdown() -> String {
+        let kinds = ["_halo", "_head", "_hands", "_armsoverhood", "_armsoverhoodglowing", "_armsoverhoodline", "_overball", "_overballline"]
+        var totals: [String: (count: Int, bytes: Double)] = [:]
+        func add(_ kind: String, _ texture: SKTexture) {
+            let size = texture.size()
+            totals[kind, default: (0, 0)].count += 1
+            totals[kind, default: (0, 0)].bytes += Double(size.width * size.height * 4)
+        }
+        for (key, texture) in cache {
+            add(kinds.first { key.hasSuffix($0) } ?? (key.hasPrefix("p") || key.contains("_standalone_") ? "piece" : "other"), texture)
+        }
+        for maps in frameMaps.values {
+            add("_map", maps.map)
+            add("_coverage", maps.coverage)
+            if let thin = maps.thinLine { add("_thinline", thin) }
+        }
+        var distinct = Set<ObjectIdentifier>(), distinctBytes = 0.0
+        for texture in allTextures where distinct.insert(ObjectIdentifier(texture)).inserted {
+            distinctBytes += Double(texture.size().width * texture.size().height * 4)
+        }
+        let kept = keptImages.values.reduce(0.0) { $0 + Double($1.bytesPerRow * $1.height) }
+        let parts = totals.sorted { $0.value.bytes > $1.value.bytes }
+            .map { String(format: "%@ %d/%.0f MB", $0.key, $0.value.count, $0.value.bytes / 1_048_576) }
+        return String(format: "distinct %d/%.0f MB; ", distinct.count, distinctBytes / 1_048_576) + parts.joined(separator: ", ")
+            + String(format: "; kept pictures %d/%.0f MB", keptImages.count, kept / 1_048_576)
+    }
     /// The pictures behind some of the cache's textures, kept as made, so what draws them again
     /// (the win screen, a hood's line) never reads one back off the GPU, which opens a context and
     /// logs a leak each time. Dropped with the player's cache.
@@ -49,6 +82,7 @@ final class SpriteLibrary {
     /// sleeves and boots swap over to stay on the same arm and leg; then each side as the
     /// customize screen shows it.
     private var looks = Look.byPlayer + [Look.ice] + Look.byPlayer.map(\.transformed) + Look.byPlayer.map(\.turnedRound) + Look.byPlayer
+        + Look.byPlayer
     static let icePlayer = Look.byPlayer.count
     /// A player's energy form, asked for as a player of its own.
     static func transformedPlayer(_ player: Int) -> Int { icePlayer + 1 + player }
@@ -57,6 +91,8 @@ final class SpriteLibrary {
     /// A side as the customize screen shows it, asked for as a player of its own: only what that
     /// screen draws is made in it, so a pick never rebuilds the game's frames.
     static func customizePlayer(_ player: Int) -> Int { icePlayer + 1 + 2 * Look.byPlayer.count + player }
+    /// A side as a saved replay's VTV screen shows it, a player of its own like the customize screen's.
+    static func replayPlayer(_ player: Int) -> Int { customizePlayer(Look.byPlayer.count) + player }
 
     /// Who a player's body is drawn as facing this way: turned round facing left, where that
     /// changes anything.
@@ -71,6 +107,10 @@ final class SpriteLibrary {
 
     /// Changes what a player is drawn in; everything in their old look is dropped and rebuilt
     /// in the new one off the main thread.
+    init() {
+        artShaders.setLooks(looks)
+    }
+
     func setLook(_ look: Look, for player: Int) {
         guard look != looks[player] else { return }
         looks[player] = look
@@ -78,6 +118,7 @@ final class SpriteLibrary {
         looks[energyForm] = look.transformed
         let turned = SpriteLibrary.turnedPlayer(player)
         looks[turned] = look.turnedRound
+        looksChanged()
         dropPlayer(player)
         dropPlayer(energyForm)
         dropPlayer(turned)
@@ -87,12 +128,34 @@ final class SpriteLibrary {
         if looks[turned] != look { rewarm(player: turned) }
     }
 
+    /// The player gallery's FloState: player 0 in `look` and its energy form in its transformed
+    /// self, as `setLook` has them, what it drew in the last look dropped and nothing made ahead.
+    func setGalleryLook(_ look: Look) {
+        guard look != looks[0] else { return }
+        looks[0] = look
+        let energyForm = SpriteLibrary.transformedPlayer(0)
+        looks[energyForm] = look.transformed
+        looksChanged()
+        dropPlayer(0)
+        dropPlayer(energyForm)
+    }
+
     /// The customize screen's side drawn in `look`, as shown (the second side's turned round):
     /// what it drew in the last look dropped, nothing else made or touched.
     func setCustomizeLook(_ look: Look, for player: Int) {
         let slot = SpriteLibrary.customizePlayer(player)
         guard look != looks[slot] else { return }
         looks[slot] = look
+        looksChanged()
+        dropPlayer(slot)
+    }
+
+    /// A replay's side drawn in `look` for VTV: what it drew in the last look dropped, nothing else made or touched.
+    func setReplayLook(_ look: Look, for player: Int) {
+        let slot = SpriteLibrary.replayPlayer(player)
+        guard look != looks[slot] else { return }
+        looks[slot] = look
+        looksChanged()
         dropPlayer(slot)
     }
 
@@ -102,14 +165,7 @@ final class SpriteLibrary {
     /// body, above or below it, never at a corner alone, as drawn by hand. Semibold: one pixel,
     /// corners too (the stepped line). Bold: two pixels, as Normal's grown again.
     /// Settings' PLAYER VISIBILITY picks the in-match players'; everywhere else it's Normal.
-    enum LineStyle: Int, CaseIterable {
-        case normal, semibold, bold
-        /// Whether a pixel this far off a body's pixel is next to it, for its line.
-        func reaches(_ dx: Int, _ dy: Int) -> Bool { self == .semibold ? dx != 0 || dy != 0 : abs(dx) + abs(dy) == 1 }
-        var width: Int { self == .bold ? 2 : 1 }
-        /// A key's mark for the style: none for Normal.
-        var keyMark: String { self == .normal ? "" : "_line\(rawValue)" }
-    }
+    typealias LineStyle = PlayerLineStyle
     /// The style a player slot's line is drawn in: the setting's for those in the match (the
     /// sides, the ice look, FloState's and the turned), Normal for the customize screen's and on.
     static func lineStyle(for player: Int) -> LineStyle {
@@ -122,6 +178,7 @@ final class SpriteLibrary {
     func setCustomizeLineStyle(_ style: LineStyle?) {
         guard style != SpriteLibrary.customizeLineStyle else { return }
         SpriteLibrary.customizeLineStyle = style
+        looksChanged()
         for side in 0..<2 { dropPlayer(SpriteLibrary.customizePlayer(side)) }
     }
     /// The pixels round `mask`, `passes` deep, each pass the pixels next to the last (`LineStyle.reaches`)
@@ -155,6 +212,7 @@ final class SpriteLibrary {
         for key in cache.keys where key.hasPrefix("hoodline_") && key.contains("_line") { cache[key] = nil }
         for key in keptImages.keys where key.hasPrefix("hoodline_") && key.contains("_line") { keptImages[key] = nil }
         for player in looks.indices where player < SpriteLibrary.customizePlayer(0) { dropPlayer(player) }
+        looksChanged()
         warmUp(players: players, completion: completion)
     }
 
@@ -184,8 +242,14 @@ final class SpriteLibrary {
         if let kept { return kept }
         // Read with the lock let go: the read goes through SpriteKit's renderer, which the main
         // thread may be holding mid-render while it asks for a frame here. Held across it, the two wait on each other.
-        let texture = given ?? (atlasNames.contains(key) ? atlasTexture(key) : SKTexture(imageNamed: key))
-        let image = texture.cgImage()
+        // The catalog's own picture of an atlas frame, read straight from the asset catalog: read out of
+        // SpriteKit's packed atlas instead, the launch's few hundred took seconds.
+        let image: CGImage
+        if atlasNames.contains(key), let catalogued = UIImage(named: key)?.cgImage {
+            image = catalogued
+        } else {
+            image = (given ?? (atlasNames.contains(key) ? atlasTexture(key) : SKTexture(imageNamed: key))).cgImage()
+        }
         sourceImageLock.lock()
         defer { sourceImageLock.unlock() }
         if let raced = sourceImages[key] { return raced }
@@ -209,6 +273,8 @@ final class SpriteLibrary {
     private func dropPlayer(_ player: Int) {
         if reportsMisses, DebugUI.enabled { print("dropped p\(player)'s pieces") }
         cache = cache.filter { !$0.key.hasPrefix("p\(player)_") }
+        // Its frames counted unmade (`maps`): its maps may stay, shared by its shape, but its halos and pieces go.
+        landmarks = landmarks.filter { !$0.key.hasPrefix("p\(player)_") }
         keptImages = keptImages.filter { !$0.key.hasPrefix("p\(player)_") }
         portraits = portraits.filter { !$0.key.hasPrefix("p\(player)_") }
         emptyPieces = emptyPieces.filter { !$0.hasPrefix("p\(player)_") }
@@ -232,6 +298,7 @@ final class SpriteLibrary {
     private func beginRebuilding(_ player: Int, pieces: Int) {
         if let overtaken = rebuilding[player] { rebuilt += overtaken.all }
         rebuilding[player] = (0, pieces)
+        LoadTrace.mark("rebuild player \(player) begun, \(pieces) pieces")
         onLoading?(loadingCounts)
     }
 
@@ -240,6 +307,7 @@ final class SpriteLibrary {
         if let made {
             rebuilding[player]?.made = made
         } else {
+            LoadTrace.mark("rebuild player \(player) landed")
             rebuilding[player] = nil
             rebuilt += entry.all
             if rebuilding.isEmpty { rebuilt = 0 }
@@ -251,6 +319,9 @@ final class SpriteLibrary {
             waiting.forEach { $0() }
         }
     }
+    /// The launch's rebuilds of anything but the sides' own looks, held till those have landed;
+    /// nil once they have.
+    private var heldForLaunch: Set<Int>? = []
     /// What waits for every rebuild underway to land: the launch's warm-up.
     private var whenRebuilt: [() -> Void] = []
     /// Work run once every rebuild underway has landed, or now with none: what reads its pieces.
@@ -270,19 +341,28 @@ final class SpriteLibrary {
     /// first made mid-match. Anything asked for before it lands is made as it always was;
     /// a newer change supersedes it.
     private func rewarm(player: Int) {
+        // At launch the sides' own looks go first, alone on the cores; the rest wait their turn.
+        if let held = heldForLaunch, player >= SpriteLibrary.icePlayer {
+            heldForLaunch = held.union([player])
+            return
+        }
         let look = look(for: player)
         let lineStyle = SpriteLibrary.lineStyle(for: player)
         let generation = (rewarmGeneration[player] ?? 0) + 1
         rewarmGeneration[player] = generation
-        var frameJobs: [(key: String, frame: AnimationFrame, source: SKTexture, holdsBall: Bool)] = []
+        // Each frame's maps made only where its shape's aren't yet: another slot's look may share them.
+        var frameJobs: [(key: String, frame: AnimationFrame, source: SKTexture, holdsBall: Bool, mapKey: String, mapMade: Bool)] = []
         for animation in Animation.allCases {
             for index in 0..<animation.frameCount {
                 let frame = AnimationFrame(animation, index)
                 let source = atlasTexture("\(animation.rawValue)_\(index)")
-                let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: false)
-                frameJobs.append((key, frame, source, animation.holdsBall))
-                if animation.holdsBall { frameJobs.append((SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: true, ballLifted: false), frame, source, false)) }
-                if SpriteLibrary.liftsBall.contains(animation) { frameJobs.append((SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: true), frame, source, true)) }
+                for (ballAsEnergy, ballLifted) in [(false, false)] + (animation.holdsBall ? [(true, false)] : []) + (SpriteLibrary.liftsBall.contains(animation) ? [(false, true)] : []) {
+                    let mapKey = mapKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+                    let mapMade = frameMaps[mapKey] != nil || mapsUnderway.contains(mapKey)
+                    if !mapMade { mapsUnderway.insert(mapKey) }
+                    frameJobs.append((SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted), frame, source,
+                                      (animation.holdsBall && !ballAsEnergy) || ballLifted, mapKey, mapMade))
+                }
             }
         }
         var tonedJobs: [(key: String, source: SKTexture, capped: Bool)] = []
@@ -318,11 +398,12 @@ final class SpriteLibrary {
             }
             if player < Look.byPlayer.count {
                 let place = SpriteLibrary.customizeHeadPlace
-                let pose = WinPose.taunt.animation
-                for frame in 0..<pose.frameCount {
-                    let sheet = AnimationFrame(pose, frame)
-                    portraitJobs.append((SpriteLibrary.portraitKey(pose.rawValue, frame: frame, player: player, headNudge: place.nudge, headScale: place.scale),
-                                         pose.rawValue, frame, texture(pose.rawValue, frame), HoodView.of(sheet), SpriteLibrary.look(look, for: sheet)))
+                for pose in WinPose.winning.map(\.animation) {
+                    for frame in 0..<pose.frameCount {
+                        let sheet = AnimationFrame(pose, frame)
+                        portraitJobs.append((SpriteLibrary.portraitKey(pose.rawValue, frame: frame, player: player, headNudge: place.nudge, headScale: place.scale),
+                                             pose.rawValue, frame, texture(pose.rawValue, frame), HoodView.of(sheet), SpriteLibrary.look(look, for: sheet)))
+                    }
                 }
             }
         }
@@ -339,12 +420,15 @@ final class SpriteLibrary {
             var builtImages: [String: CGImage] = [:]
             var builtHoods: [String: (drawn: CGImage, hood: CGImage, face: CGImage)] = [:]
             var builtPortraits: [String: Portrait] = [:]
+            var builtMaps: [String: PlayerFrameMaps] = [:]
             var made = 0
             let lock = NSLock()
             /// One piece made, kept under the lock: the pieces are made on every core at once.
             func keep(_ textures: [String: SKTexture], landmarks: (key: String, marks: [BodyPart: CGPoint])? = nil, empty: [String] = [],
-                      tops: (key: String, marks: [BodyPart: CGPoint])? = nil, images: [String: CGImage] = [:], portrait: (key: String, made: Portrait)? = nil) {
+                      tops: (key: String, marks: [BodyPart: CGPoint])? = nil, images: [String: CGImage] = [:], portrait: (key: String, made: Portrait)? = nil,
+                      maps: (key: String, made: PlayerFrameMaps)? = nil) {
                 lock.lock()
+                if let maps { builtMaps[maps.key] = maps.made }
                 builtImages.merge(images) { _, new in new }
                 if let portrait { builtPortraits[portrait.key] = portrait.made }
                 if let tops { builtTops[tops.key] = tops.marks }
@@ -365,12 +449,23 @@ final class SpriteLibrary {
             func source(_ key: String, _ texture: SKTexture) -> CGImage {
                 self.sourceImage(key, texture: texture)
             }
+            // Each phase's wall time, for the launch's [LOAD] lines.
+            var phaseStart = CACurrentMediaTime()
+            var phases: [String] = []
+            func phaseDone(_ name: String) {
+                let now = CACurrentMediaTime()
+                phases.append(String(format: "%@ %.0f", name, (now - phaseStart) * 1000))
+                phaseStart = now
+            }
             let frameSources = frameJobs.map { source("\($0.frame.animation.rawValue)_\($0.frame.frame)", $0.source) }
             let tonedSources = tonedJobs.map { source(String($0.key.split(separator: "_", maxSplits: 2).last ?? ""), $0.source) }
             let silhouetteSources = silhouetteJobs.map { source(String($0.key.split(separator: "_", maxSplits: 2).last ?? ""), $0.source) }
+            phaseDone("sources")
+            let mapsToMake = frameJobs.filter { !$0.mapMade }.count
             DispatchQueue.concurrentPerform(iterations: frameJobs.count) { index in
                 let job = frameJobs[index]
-                let frameMade = self.makeFrame(job.frame, source: frameSources[index], look: look, holdsBall: job.holdsBall, lineStyle: lineStyle)
+                let frameMade = self.makeFrame(job.frame, source: frameSources[index], look: look, holdsBall: job.holdsBall, lineStyle: lineStyle,
+                                               makesMap: !job.mapMade, key: job.key)
                 // The limbs' tops too, the same for every look, where the cubes come off.
                 let size = job.frame.animation.pixelSize, width = job.frame.animation.pixelWidth
                 let tops = SpriteLibrary.partTops(frameSources[index]).mapValues { top in
@@ -378,14 +473,17 @@ final class SpriteLibrary {
                 }
                 keep(Dictionary(uniqueKeysWithValues: frameMade.textures.map { (job.key + $0.key, $0.value) }), landmarks: (job.key, frameMade.landmarks),
                      empty: frameMade.empty.map { job.key + $0 }, tops: ("\(job.frame.animation.rawValue)_\(job.frame.frame)", tops),
-                     images: Dictionary(uniqueKeysWithValues: frameMade.images.map { (job.key + $0.key, $0.value) }))
+                     images: Dictionary(uniqueKeysWithValues: frameMade.images.map { (job.key + $0.key, $0.value) }),
+                     maps: frameMade.maps.map { (job.mapKey, $0) })
             }
+            phaseDone("frames(\(frameJobs.count), \(mapsToMake) maps)")
             DispatchQueue.concurrentPerform(iterations: tonedJobs.count) { index in
                 keep([tonedJobs[index].key: self.makeToned(image: tonedSources[index], look: look, capped: tonedJobs[index].capped)])
             }
             DispatchQueue.concurrentPerform(iterations: silhouetteJobs.count) { index in
                 keep([silhouetteJobs[index].key: self.makeSilhouette(image: silhouetteSources[index], look: look)])
             }
+            phaseDone("toned+silhouettes(\(tonedJobs.count + silhouetteJobs.count))")
             // The hoods, then each view's line and face from its plain head, then the portraits wearing them.
             let hoodSources = hoodJobs.map { source($0.sourceName, $0.source) }
             for (job, image) in zip(hoodJobs, hoodSources) {
@@ -412,6 +510,7 @@ final class SpriteLibrary {
                     }
                 }
             }
+            phaseDone("hoods(\(hoodJobs.count))")
             let portraitSources = portraitJobs.map { source("\($0.name)_\($0.frame)", $0.source) }
             let drawnForSource = portraitJobs.isEmpty ? nil : source("\(GameScene.hoodDrawnFor.animation.rawValue)_\(GameScene.hoodDrawnFor.frame)", drawnForTexture)
             DispatchQueue.concurrentPerform(iterations: portraitJobs.count) { index in
@@ -421,7 +520,15 @@ final class SpriteLibrary {
                                                                       holdsBall: WinPose.taunt.holdsBall) else { keep([:]); return }
                 keep([:], portrait: (job.key, made))
             }
+            phaseDone("portraits(\(portraitJobs.count))")
+            let workerPhases = phases.joined(separator: ", ")
+            let landing = CACurrentMediaTime()
             DispatchQueue.main.async {
+                LoadTrace.mark(String(format: "rebuild player %d made: %@; waited %.0f ms for the main thread", player, workerPhases,
+                                      (CACurrentMediaTime() - landing) * 1000))
+                // Its maps kept whatever became of its look: other slots' rebuilds of the shape left them to this one.
+                for (key, maps) in builtMaps where self.frameMaps[key] == nil { self.frameMaps[key] = maps }
+                self.mapsUnderway.subtract(frameJobs.filter { !$0.mapMade }.map(\.mapKey))
                 guard self.rewarmGeneration[player] == generation else { return }
                 // Its look changed since without a new rebuild (a turned look no longer differing): nothing to keep.
                 guard self.look(for: player) == look else {
@@ -443,8 +550,7 @@ final class SpriteLibrary {
                 }
                 for (key, head) in builtHoods where self.cache[key] == nil { self.keep(hoodHead: head, key: key) }
                 for (key, portrait) in builtPortraits where self.portraits[key] == nil { self.keep(portrait: portrait, key: key) }
-                for job in frameJobs { self.pairGlowMask(job.key) }
-                SKTexture.preload(Array(built.values) + self.warmHoods(player: player)) {
+                SKTexture.preload(Array(built.values) + builtMaps.values.flatMap(\.textures) + self.warmHoods(player: player)) {
                     DispatchQueue.main.async { self.reportRebuilding(player, generation: generation, made: nil) }
                 }
             }
@@ -528,7 +634,7 @@ final class SpriteLibrary {
     /// The sheets whose ball is read off each frame as drawn. Where it's the plain round ball, the
     /// ball's drawn there with what the sheet puts in front of it drawn again over it; where the
     /// sheet reshapes it, its white is painted from the ball's art, stretched to fit.
-    static let sheetBallSheets: Set<Animation> = [.taunt, .dribbleIdle, .dribbleWalk, .dribbleRun, .spinDunk, .idleBallFloState, .shoot, .shootAir]
+    static let sheetBallSheets: Set<Animation> = [.taunt, .dribbleIdle, .dribbleWalk, .dribbleRun, .spinDunk, .idleBallFloState, .shoot, .shootAir, .tauntFloState]
     /// White off the biggest blob joins the ball while the two together stay this many pixels
     /// across and high: the ball split by a leg in front of it, not a streak beside it.
     static let sheetBallReach = 9
@@ -749,13 +855,14 @@ final class SpriteLibrary {
         if let made = cache[key] { return made }
         guard !emptyPieces.contains(key) else { return nil }
         guard let ball = SpriteLibrary.sheetBall(frame, source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)")), ball.roundAt == nil,
-              let image = SpriteLibrary.paintBall(ball, art: ballFrames(look)[spin].cgImage()) else {
+              let image = SpriteLibrary.paintBall(ball, art: ballPicture(look, spin: spin)) else {
             emptyPieces.insert(key)
             return nil
         }
         let made = SKTexture(cgImage: image)
         made.filteringMode = .nearest
         cache[key] = made
+        keptImages[key] = image
         return made
     }
 
@@ -783,6 +890,21 @@ final class SpriteLibrary {
 
     /// A ball layer's frame in a look: each of the ball's tones swapped for the one the look's ball
     /// has in its place.
+    /// `paintedBallTexture`'s picture as made, never read back off the GPU.
+    func paintedBallPicture(_ frame: AnimationFrame, look: BallLook, spin: Int) -> CGImage? {
+        guard paintedBallTexture(frame, look: look, spin: spin) != nil else { return nil }
+        return keptImages["paintedball_\(frame.animation.rawValue)_\(frame.frame)_\(look)_\(spin)"]
+    }
+
+    /// A ball frame's picture, read once and kept: a read back off the GPU logs and allocates every time.
+    func ballPicture(_ look: BallLook, spin: Int) -> CGImage {
+        let key = "ballpicture_\(look)_\(spin)"
+        if let kept = keptImages[key] { return kept }
+        let picture = ballFrames(look)[spin].cgImage()
+        keptImages[key] = picture
+        return picture
+    }
+
     func ballLayerTexture(_ sheet: String, _ frame: Int, look: BallLook) -> SKTexture {
         let key = "balllayer_\(sheet)_\(frame)_\(look)"
         if let made = cache[key] { return made }
@@ -791,6 +913,166 @@ final class SpriteLibrary {
         cache[key] = made
         return made
     }
+
+    /// The aura round a ball layer's ball, held by energy rather than a hand: its silhouette in white,
+    /// blurred `ballAuraBlur` art pixels, on the layer's cell padded `ballAuraPad` art pixels each side,
+    /// `ballAuraResolution` texels an art pixel so the blur is smooth. The node colours it in the energy.
+    static let ballAuraBlur: CGFloat = 2
+    static let ballAuraStrength: CGFloat = 0.8
+    static let ballAuraPad = 6
+    static let ballAuraResolution = 4
+    func ballLayerAura(_ sheet: String, _ frame: Int) -> SKTexture? {
+        let key = "ballaura_\(sheet)_\(frame)"
+        if let made = cache[key] { return made }
+        guard let image = SpriteLibrary.ballAuraImage(sourceImage("\(sheet)_\(frame)")) else { return nil }
+        let made = SKTexture(cgImage: image)
+        made.filteringMode = .linear
+        cache[key] = made
+        return made
+    }
+
+    private static let auraContext = CIContext()
+    static func ballAuraImage(_ layer: CGImage) -> CGImage? {
+        let resolution = ballAuraResolution
+        let width = (layer.width + ballAuraPad * 2) * resolution, height = (layer.height + ballAuraPad * 2) * resolution
+        guard let (context, _) = canvas(width: width, height: height) else { return nil }
+        let cell = CGRect(x: ballAuraPad * resolution, y: ballAuraPad * resolution, width: layer.width * resolution, height: layer.height * resolution)
+        context.interpolationQuality = .none
+        context.draw(layer, in: cell)
+        context.setBlendMode(.sourceIn)
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        guard let silhouette = context.makeImage() else { return nil }
+        let source = CIImage(cgImage: silhouette)
+        let blurred = source.applyingGaussianBlur(sigma: Double(ballAuraBlur) * Double(resolution))
+        return auraContext.createCGImage(blurred, from: source.extent)
+    }
+
+    /// A player's halo (`GlowSettings.playerHalo`): what glows, blurred `CustomizeArt.glowPixels` art
+    /// pixels as the customize screen blurs it, with what glows itself cut out, so the halo lands round
+    /// it and its own tones stay as painted. On the canvas padded `haloPad` art pixels each side, at
+    /// `haloResolution` texels an art pixel so the blur is smooth.
+    static let haloPad = 8
+    static let haloResolution = 2
+    static func haloImage(_ glowing: CGImage) -> CGImage? {
+        let resolution = haloResolution
+        let width = (glowing.width + haloPad * 2) * resolution, height = (glowing.height + haloPad * 2) * resolution
+        guard let (context, pixels) = canvas(width: width, height: height) else { return nil }
+        let cell = CGRect(x: haloPad * resolution, y: haloPad * resolution, width: glowing.width * resolution, height: glowing.height * resolution)
+        context.interpolationQuality = .none
+        context.draw(glowing, in: cell)
+        // Three box blurs, near enough a Gaussian of the customize screen's radius.
+        let sigma = Double(CustomizeArt.glowPixels) * Double(resolution)
+        let box = UInt32((sqrt(4 * sigma * sigma + 1)).rounded()) | 1
+        let rowBytes = width * 4
+        guard let scratch = malloc(rowBytes * height) else { return nil }
+        defer { free(scratch) }
+        var image = vImage_Buffer(data: pixels, height: vImagePixelCount(height), width: vImagePixelCount(width), rowBytes: rowBytes)
+        var spare = vImage_Buffer(data: scratch, height: vImagePixelCount(height), width: vImagePixelCount(width), rowBytes: rowBytes)
+        for _ in 0..<3 {
+            vImageBoxConvolve_ARGB8888(&image, &spare, nil, 0, 0, box, box, nil, vImage_Flags(kvImageEdgeExtend))
+            swap(&image, &spare)
+        }
+        if image.data != UnsafeMutableRawPointer(pixels) { memcpy(pixels, image.data, rowBytes * height) }
+        context.setBlendMode(.destinationOut)
+        context.draw(glowing, in: cell)
+        return context.makeImage()
+    }
+    /// One texture for pixel-identical pictures: much of what a frame is made into comes out the same in
+    /// every look (its masks, its uncoloured lines), and each copy cost its share of the TV's memory.
+    /// Held weakly, so a texture goes once nothing uses it; matched on size and two hashes of the pixels.
+    nonisolated(unsafe) private static let sharedTextures = NSMapTable<NSString, SKTexture>.strongToWeakObjects()
+    private static let sharedTextureLock = NSLock()
+    static func sharedTexture(_ image: CGImage) -> SKTexture {
+        guard let data = image.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { return SKTexture(cgImage: image) }
+        let pixels = UnsafeRawBufferPointer(start: bytes, count: CFDataGetLength(data))
+        var first = Hasher()
+        first.combine(bytes: pixels)
+        var second = Hasher()
+        second.combine(0x9E37_79B9_7F4A_7C15 as UInt64)
+        second.combine(bytes: pixels)
+        let key = "\(image.width)x\(image.height)x\(image.bytesPerRow)_\(first.finalize())_\(second.finalize())" as NSString
+        sharedTextureLock.lock()
+        defer { sharedTextureLock.unlock() }
+        if let found = sharedTextures.object(forKey: key) { return found }
+        let texture = SKTexture(cgImage: image)
+        sharedTextures.setObject(texture, forKey: key)
+        return texture
+    }
+
+    /// The halo cut to where it shows, a clear texel kept round it so its edge blends as the whole
+    /// canvas's would, and where it sits on that canvas (`haloPiece(of:)`): most of the padded canvas
+    /// is clear, and the halos were the largest thing the game kept.
+    static func haloTexture(_ glowing: CGImage) -> SKTexture? {
+        guard let image = haloImage(glowing), let (piece, place) = trimmedHalo(image) else { return nil }
+        let texture = SKTexture(cgImage: piece)
+        texture.filteringMode = .linear
+        haloPieceLock.lock()
+        haloPieces.setObject(HaloPiece(canvas: CGSize(width: image.width, height: image.height), place: place), forKey: texture)
+        haloPieceLock.unlock()
+        return texture
+    }
+
+    /// Where a halo's piece sits on its whole canvas, in texels from the canvas's bottom left.
+    final class HaloPiece {
+        let canvas: CGSize
+        let place: CGRect
+        init(canvas: CGSize, place: CGRect) {
+            self.canvas = canvas
+            self.place = place
+        }
+    }
+    /// Made on the rebuild's cores, read on the main thread.
+    nonisolated(unsafe) private static let haloPieces = NSMapTable<SKTexture, HaloPiece>.weakToStrongObjects()
+    private static let haloPieceLock = NSLock()
+    static func haloPiece(of texture: SKTexture) -> HaloPiece {
+        haloPieceLock.lock()
+        defer { haloPieceLock.unlock() }
+        if let piece = haloPieces.object(forKey: texture) { return piece }
+        let size = texture.size()
+        return HaloPiece(canvas: size, place: CGRect(origin: .zero, size: size))
+    }
+
+    /// `image` cut to its painted texels and one clear texel round them, and that piece's place on
+    /// it from the bottom left; nil if nothing's painted.
+    private static func trimmedHalo(_ image: CGImage) -> (CGImage, CGRect)? {
+        let width = image.width, height = image.height
+        guard let (context, pixels) = canvas(width: width, height: height) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        // The buffer's rows run top down.
+        var left = width, right = -1, top = height, bottom = -1
+        for row in 0..<height {
+            for column in 0..<width where pixels[(row * width + column) * 4 + 3] != 0 {
+                left = min(left, column)
+                right = max(right, column)
+                top = min(top, row)
+                bottom = max(bottom, row)
+            }
+        }
+        guard right >= left, bottom >= top else { return nil }
+        left = max(left - 1, 0)
+        top = max(top - 1, 0)
+        right = min(right + 1, width - 1)
+        bottom = min(bottom + 1, height - 1)
+        let pieceWidth = right - left + 1, pieceHeight = bottom - top + 1
+        // Copied into its own canvas: a cropped image keeps the whole one's pixels alive.
+        guard let (pieceContext, piecePixels) = canvas(width: pieceWidth, height: pieceHeight) else { return nil }
+        for row in 0..<pieceHeight {
+            memcpy(piecePixels + row * pieceWidth * 4, pixels + ((top + row) * width + left) * 4, pieceWidth * 4)
+        }
+        guard let piece = pieceContext.makeImage() else { return nil }
+        return (piece, CGRect(x: left, y: height - 1 - bottom, width: pieceWidth, height: pieceHeight))
+    }
+
+    /// A frame's halo, the piece of its canvas padded `haloPad` art pixels that shows (`haloPiece(of:)`); nil where nothing glows.
+    func haloTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
+        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_halo"]
+    }
+
+    /// A hooded head's halo, its hood's glowing pixels blurred, looked up by the texture the hood shows.
+    private let hoodHalos = NSMapTable<SKTexture, SKTexture>.weakToStrongObjects()
+    func hoodHalo(for drawn: SKTexture) -> SKTexture? { hoodHalos.object(forKey: drawn) }
 
     /// Each of the plain ball's tones, and the tone the look's ball most often has at the same pixel.
     private var ballToneSwapsByLook: [BallLook: [RGB: RGB]] = [:]
@@ -825,12 +1107,13 @@ final class SpriteLibrary {
     }
 
     /// Every reshaped ball in every look and spin, made ahead of play; Breaker Ball's in the players' energies too.
-    /// The ball layers' frames in every look with them.
+    /// The ball layers' frames in every look with them, and their auras.
     func warmPaintedBalls(breakerPlayers: [Int] = []) {
         let looks = BallLook.unbroken + breakerPlayers.compactMap { breakerBallLook(for: $0) }
         for (animation, layer) in SpriteLibrary.ballLayers {
             for index in 0..<animation.frameCount {
                 for look in looks { _ = ballLayerTexture(layer, index, look: look) }
+                _ = ballLayerAura(layer, index)
             }
         }
         for animation in SpriteLibrary.sheetBallSheets {
@@ -847,33 +1130,78 @@ final class SpriteLibrary {
     /// A player frame's key in the cache: with `ballAsEnergy` the sheet's whites are all energy,
     /// with `ballLifted` its ball is lifted off and not drawn.
     static func frameKey(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool, ballLifted: Bool) -> String {
-        "p\(player)_\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + (ballLifted ? "_balllifted" : "")
+        "p\(player)_" + frameName(frame, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    }
+    static func frameName(_ frame: AnimationFrame, ballAsEnergy: Bool, ballLifted: Bool) -> String {
+        "\(frame.animation.rawValue)_\(frame.frame)" + (ballAsEnergy ? "_whole" : "") + (ballLifted ? "_balllifted" : "")
+    }
+
+    /// Every frame's maps, by its look's shape and the frame (`mapKey`): one for every slot whose look
+    /// has that shape, its colours the slot's own palette's.
+    private var frameMaps: [String: PlayerFrameMaps] = [:]
+    /// Maps a rebuild underway is making, so another slot's rebuild of the same shape leaves them to it.
+    private var mapsUnderway: Set<String> = []
+    /// The map shaders and the palette, each slot's look in its block.
+    let artShaders = PlayerArtShaders()
+    /// Each slot's shape's name, for its maps' keys; dropped as its look or line changes.
+    private var shapeNames: [Int: String] = [:]
+    private func shapeName(_ player: Int) -> String {
+        if let name = shapeNames[player] { return name }
+        let name = PlayerMap.ShapeKey(look(for: player), lineStyle: SpriteLibrary.lineStyle(for: player)).name
+        shapeNames[player] = name
+        return name
+    }
+    private func mapKey(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool, ballLifted: Bool) -> String {
+        shapeName(player) + "|" + SpriteLibrary.frameName(frame, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    }
+    /// A look changed: the palette made again, and the maps no slot's shape uses any more let go.
+    private func looksChanged() {
+        shapeNames = [:]
+        artShaders.setLooks(looks)
+        let shapes = Set(looks.indices.map(shapeName))
+        frameMaps = frameMaps.filter { shapes.contains(String($0.key.prefix { $0 != "|" })) }
     }
 
     /// A player frame in that player's look, without its head or its energy.
     /// With `ballAsEnergy`, a sheet that draws the ball has its whites taken as energy,
     /// ball and all, for a throw made with nothing in hand. With `ballLifted`, the ball the
     /// sheet draws is lifted off and not drawn, for a snatch that took nothing.
-    func texture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture {
+    func texture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt {
+        PlayerArt(frame: maps(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted), layer: .body, look: player, shaders: artShaders)
+    }
+
+    /// A frame's maps in the player's shape, and everything kept of it in their look (its halo, its
+    /// pieces, its landmarks): made now if they aren't yet.
+    private func maps(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool, ballLifted: Bool) -> PlayerFrameMaps {
         let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
-        if let texture = cache[key] { return texture }
+        let mapKey = mapKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        if landmarks[key] != nil, let made = frameMaps[mapKey] { return made }
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
         let made = makeFrame(frame, source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)"),
                              look: look(for: player), holdsBall: (frame.animation.holdsBall && !ballAsEnergy) || ballLifted,
-                             lineStyle: SpriteLibrary.lineStyle(for: player))
+                             lineStyle: SpriteLibrary.lineStyle(for: player), makesMap: frameMaps[mapKey] == nil, key: key)
         for (suffix, texture) in made.textures { cache[key + suffix] = texture }
         for suffix in made.empty { emptyPieces.insert(key + suffix) }
         for (suffix, image) in made.images { keptImages[key + suffix] = image }
         landmarks[key] = made.landmarks
-        pairGlowMask(key)
-        return cache[key]!
+        if frameMaps[mapKey] == nil, let maps = made.maps { frameMaps[mapKey] = maps }
+        return frameMaps[mapKey]!
     }
 
-    /// A player frame recoloured in a look: the body under "", and "_head" and "_energy"
-    /// where the frame has them; and where its glowing parts sit. `holdsBall`: the sheet's
-    /// ball is the ball, lifted off to be drawn apart, rather than energy. Touches nothing
-    /// kept, so it can be made off the main thread.
+    /// One layer of a frame in the player's look, nil where the frame has none.
+    private func art(_ layer: PlayerMapShaders.Layer, _ frame: AnimationFrame, player: Int, ballAsEnergy: Bool, ballLifted: Bool) -> PlayerArt? {
+        texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).layer(layer)
+    }
+
+    /// The palette row a frame's colours are on (`PlayerRecolour.adjusted`), as `look(_:for:)` adjusts its look.
+    static func paletteRow(_ frame: AnimationFrame) -> Int {
+        if armColoursSwapped[frame.animation]?.contains(frame.frame) == true { return 1 }
+        if armSkinSwapped[frame.animation]?.contains(frame.frame) == true { return 2 }
+        if handsLitArmsShaded[frame.animation]?.contains(frame.frame) == true { return 3 }
+        return 0
+    }
+
     /// The frames whose arms are drawn the other way round, the front arm behind: the ground
     /// throw's follow-through, 5 on, where the back arm comes forward over the head. Their front
     /// and back arm and hand colours swap.
@@ -907,37 +1235,60 @@ final class SpriteLibrary {
         return adjusted
     }
 
-    private func makeFrame(_ frame: AnimationFrame, source: CGImage, look: Look, holdsBall: Bool, lineStyle: LineStyle)
-        -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint], empty: [String], images: [String: CGImage]) {
-        var madeImages: [String: CGImage] = [:]
+    /// A frame recoloured in the look as play draws it, every layer a picture; with `map`, its map too.
+    private func pictures(_ frame: AnimationFrame, source: CGImage, look baseLook: Look, holdsBall: Bool, lineStyle: LineStyle,
+                          sheetBall: SheetBall?, map: Bool) -> PlayerRecolour.Layers {
         // A human's frame with its neck filled and its line round the hood, where the hood goes on it.
-        let look = SpriteLibrary.look(look, for: frame)
+        let look = SpriteLibrary.look(baseLook, for: frame)
+        return PlayerRecolour.recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
+                                       tucked: SpriteLibrary.tuckedBall(frame) != nil, ballPixels: sheetBall?.pixels,
+                                       hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame, energy: look.energyForm),
+                                       hoodNudge: GameScene.headNudge(frame),
+                                       // On every frame: a tipped head eases back level over whatever comes next.
+                                       bareLine: !look.energyForm, lineStyle: lineStyle, hoodDrawnForHead: SpriteLibrary.hoodDrawnForHead,
+                                       ballMinPixels: SpriteLibrary.ballMinPixels,
+                                       map: map ? (SpriteLibrary.paletteRow(frame), PlayerMap.palette(baseLook), true) : nil)
+    }
+
+    /// A player frame's pictures in the player's look, made now and not kept: for the pieces made
+    /// after the frame (`partsTexture`), so nothing's read back off the GPU.
+    private func pictures(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool, ballLifted: Bool) -> PlayerRecolour.Layers {
+        let source = sourceImage("\(frame.animation.rawValue)_\(frame.frame)")
+        let holdsBall = (frame.animation.holdsBall && !ballAsEnergy) || ballLifted
+        return pictures(frame, source: source, look: look(for: player), holdsBall: holdsBall, lineStyle: SpriteLibrary.lineStyle(for: player),
+                        sheetBall: holdsBall ? SpriteLibrary.sheetBall(frame, source: source) : nil, map: false)
+    }
+
+    /// A player frame recoloured in a look: its maps in the look's shape (`makesMap`), and what's kept
+    /// in the look itself: its halo, its pieces (the arms over the hood, the hands, what's over the
+    /// ball), and where its glowing parts sit. `holdsBall`: the sheet's ball is the ball, lifted off to
+    /// be drawn apart, rather than energy. Touches nothing kept, so it can be made off the main thread.
+    private func makeFrame(_ frame: AnimationFrame, source: CGImage, look baseLook: Look, holdsBall: Bool, lineStyle: LineStyle, makesMap: Bool, key: String)
+        -> (textures: [String: SKTexture], landmarks: [BodyPart: CGPoint], empty: [String], images: [String: CGImage], maps: PlayerFrameMaps?) {
+        var madeImages: [String: CGImage] = [:]
+        let look = SpriteLibrary.look(baseLook, for: frame)
         let sheetBall = holdsBall ? SpriteLibrary.sheetBall(frame, source: source) : nil
         let fittedBall = holdsBall ? SpriteLibrary.fittedBall(frame, source: source) : nil
-        let result = recolour(image: source, look: look, holdsBall: holdsBall, detach: true,
-                              tucked: SpriteLibrary.tuckedBall(frame) != nil, ballPixels: sheetBall?.pixels,
-                              hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame, energy: look.energyForm),
-                              hoodNudge: GameScene.headNudge(frame),
-                              // On every frame: a tipped head eases back level over whatever comes next.
-                              bareLine: !look.energyForm, lineStyle: lineStyle)
-        var textures = ["": result.texture]
-        if let bareOutline = result.bareOutline { textures["_bareoutline"] = bareOutline }
-        if let glowingParts = result.glowingParts { textures["_glowing"] = glowingParts }
-        if let head = result.head { textures["_head"] = head }
-        if let energy = result.energy { textures["_energy"] = energy }
-        if let outline = result.outline { textures["_outline"] = outline }
-        if let glowMask = result.glowMask { textures["_glowmask"] = glowMask }
-        if let skin = result.skin { textures["_skin"] = skin }
-        if let thinOutline = result.thinOutline { textures["_thinoutline"] = thinOutline }
+        let result = pictures(frame, source: source, look: baseLook, holdsBall: holdsBall, lineStyle: lineStyle, sheetBall: sheetBall, map: makesMap)
+        var maps: PlayerFrameMaps?
+        if makesMap, let map = result.map {
+            if map.faults > 0 { print("PlayerMap: \(key) left \(map.faults) pixels out") }
+            maps = PlayerFrameMaps(map, thinLine: look.energyForm ? result.thinOutline : nil)
+        }
+        var textures: [String: SKTexture] = [:]
+        if let glowing = result.glowing, let halo = SpriteLibrary.haloTexture(glowing) { textures["_halo"] = halo }
+        if let head = result.head { textures["_head"] = SpriteLibrary.sharedTexture(head) }
+        // Web Water's swing arm's sleeve, for the glow's mask: blended as a picture's alpha is.
+        if frame.animation == .swingArm, let glowing = result.glowing { textures["_glowingpicture"] = SpriteLibrary.sharedTexture(glowing) }
         // The arms laid over the hood, their glowing parts and their own line, on the frames they
         // cross the head: made with the frame, so none is first made mid-match.
         var empty: [String] = []
         // FloState's look too: its hood is worn, though its look isn't a human's.
         let armsOverHood = GameScene.armPartsOverHood(frame)
-        if !armsOverHood.isEmpty, let images = result.images {
+        if !armsOverHood.isEmpty {
             let pieces: [(String, CGImage?)] = [
-                ("_armsoverhood", SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: armsOverHood, style: lineStyle)),
-                ("_armsoverhoodglowing", images.glowing.flatMap { SpriteLibrary.partsImage(drawn: $0, source: source, parts: armsOverHood, style: lineStyle) }),
+                ("_armsoverhood", SpriteLibrary.partsImage(drawn: result.drawn, source: source, parts: armsOverHood, style: lineStyle)),
+                ("_armsoverhoodglowing", result.glowing.flatMap { SpriteLibrary.partsImage(drawn: $0, source: source, parts: armsOverHood, style: lineStyle) }),
                 ("_armsoverhoodline", SpriteLibrary.partsLine(source: source, parts: armsOverHood,
                                                               hood: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame, energy: look.energyForm),
                                                               hoodNudge: GameScene.headNudge(frame), style: lineStyle)),
@@ -948,15 +1299,15 @@ final class SpriteLibrary {
         }
         // Z Tea's blast's arms, both on one sheet: each lined on its own, the back drawn behind the
         // body and the front over it.
-        if frame.animation == .blastArms, let images = result.images {
+        if frame.animation == .blastArms {
             for (suffix, arm) in [("_frontarm", Set<BodyPart>([.frontArm, .frontHand])), ("_backarm", Set<BodyPart>([.backArm, .backHand]))] {
-                if let image = SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: arm, style: lineStyle) {
+                if let image = SpriteLibrary.partsImage(drawn: result.drawn, source: source, parts: arm, style: lineStyle) {
                     textures[suffix] = SKTexture(cgImage: image)
                 } else {
                     empty.append(suffix)
                 }
                 // Each arm's own share of the frame's line, drawn round it apart.
-                if let outline = result.outline?.cgImage(), let line = SpriteLibrary.partsImage(drawn: outline, source: source, parts: arm, style: lineStyle) {
+                if let outline = result.outline, let line = SpriteLibrary.partsImage(drawn: outline, source: source, parts: arm, style: lineStyle) {
                     textures[suffix + "outline"] = SKTexture(cgImage: line)
                 } else {
                     empty.append(suffix + "outline")
@@ -964,70 +1315,83 @@ final class SpriteLibrary {
             }
         }
         // The hands alone, unlined: Z Tea's kept charge breathes them white.
-        if let images = result.images {
-            if let hands = SpriteLibrary.partsImage(drawn: images.drawn, source: source, parts: [.frontHand, .backHand], lined: false) {
-                textures["_hands"] = SKTexture(cgImage: hands)
-            } else {
-                empty.append("_hands")
-            }
+        if let hands = SpriteLibrary.partsImage(drawn: result.drawn, source: source, parts: [.frontHand, .backHand], lined: false) {
+            textures["_hands"] = SKTexture(cgImage: hands)
+        } else {
+            empty.append("_hands")
         }
         // What the sheet draws in front of its round ball, and its line, laid over the ball in hand.
-        if let fittedBall, fittedBall.roundAt != nil, let images = result.images {
-            if let over = SpriteLibrary.picked(images.drawn, pixels: fittedBall.covering) {
+        if let fittedBall, fittedBall.roundAt != nil {
+            if let over = SpriteLibrary.picked(result.drawn, pixels: fittedBall.covering) {
                 textures["_overball"] = SKTexture(cgImage: over)
                 madeImages["_overball"] = over
             }
-            if let line = images.outline.flatMap({ SpriteLibrary.picked($0, pixels: fittedBall.covering) }) {
+            if let line = result.outline.flatMap({ SpriteLibrary.picked($0, pixels: fittedBall.covering) }) {
                 textures["_overballline"] = SKTexture(cgImage: line)
                 madeImages["_overballline"] = line
             }
         }
         for texture in textures.values { texture.filteringMode = .nearest }
+        textures["_halo"]?.filteringMode = .linear
         let size = frame.animation.pixelSize, width = frame.animation.pixelWidth
         var landmarks = result.centres.mapValues { centre in
             CGPoint(x: centre.x - width / 2, y: size - centre.y - frame.animation.feetFromBottom)
         }
         if holdsBall, let tucked = SpriteLibrary.tuckedBall(frame) { landmarks[.ball] = tucked }
         if let fittedBall { landmarks[.ball] = SpriteLibrary.sheetBallCentre(fittedBall, in: frame) }
-        return (textures, landmarks, empty, madeImages)
+        return (textures, landmarks, empty, madeImages, maps)
     }
 
-    /// Each body texture's glow mask, where it has one, looked up by the texture a node shows.
-    private let glowMasks = NSMapTable<SKTexture, SKTexture>.weakToStrongObjects()
-    private func pairGlowMask(_ key: String) {
-        if let body = cache[key], let mask = cache[key + "_glowmask"] { glowMasks.setObject(mask, forKey: body) }
+    /// A player frame as play draws it, and its line in white, as pictures: for a screen that lays
+    /// out a figure of its own (the updates screen's, the gallery's).
+    func framePicture(_ frame: AnimationFrame, player: Int) -> CGImage {
+        pictures(frame, player: player, ballAsEnergy: false, ballLifted: false).drawn
+    }
+    func outlinePicture(_ frame: AnimationFrame, player: Int) -> CGImage? {
+        pictures(frame, player: player, ballAsEnergy: false, ballLifted: false).outline
     }
 
-    /// What the glow's mask draws for a body texture: its glow mask if it has glowing
-    /// parts, else itself.
-    func glowMask(for body: SKTexture) -> SKTexture { glowMasks.object(forKey: body) ?? body }
+    /// What the glow's mask draws for a body with the players' halo off: its glow mask where it has
+    /// glowing parts, else the body itself.
+    func glowMask(for body: PlayerArt) -> PlayerArt { body.layer(.glowMask) ?? body }
+
+    /// Web Water's swing arm's glowing parts as a picture, for the glow's mask; nil where it has none.
+    func glowingPicture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
+        _ = maps(frame, player: player, ballAsEnergy: false, ballLifted: false)
+        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: false, ballLifted: false) + "_glowingpicture"]
+    }
 
     /// The head alone from a player frame, on the same canvas as the body, if the frame has one.
     func headTexture(_ frame: AnimationFrame, player: Int) -> SKTexture? {
-        _ = texture(frame, player: player)
+        _ = maps(frame, player: player, ballAsEnergy: false, ballLifted: false)
         return cache["p\(player)_\(frame.animation.rawValue)_\(frame.frame)_head"]
     }
 
     /// The energy alone from a player frame, on the same canvas as the body: the slash's
-    /// blade, the skid's puffs, a release's streaks. In grey, for the view's energy tone
-    /// (`Look.energyTone` in a shader) in the look's colour or the zone's. Nil when the
-    /// frame has none.
-    func energyTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
-        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_energy"]
+    /// blade, the skid's puffs, a release's streaks. Toned through the energy ramp's colours, the
+    /// node's own (`GameScene.setEnergyRamp`). Nil when the frame has none.
+    func energyTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt? {
+        art(.energy, frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
     }
 
-    /// The line round a player frame alone, in white, on the same canvas as the body, for
-    /// the view to colour. Nil when the frame has none.
-    func outlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
-        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_outline"]
+    /// The line round a player frame alone, white, for the node's colour. Nil when the frame has none.
+    func outlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt? {
+        art(.line, frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
     }
 
-    /// A frame's glowing parts alone, as drawn, on the body's canvas; nil where it has none.
-    func glowingPartsTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
-        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_glowing"]
+    /// The share of a frame's line round its glowing parts, white; nil where it has none.
+    func glowLineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt? {
+        art(.glowLine, frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    }
+
+    /// The same without the hood's ring, for a tipped hood that carries its own line; nil where it has none.
+    func bareGlowLineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt? {
+        art(.bareGlowLine, frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+    }
+
+    /// A frame's glowing parts alone, as drawn; nil where it has none.
+    func glowingPartsTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt? {
+        art(.glowing, frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
     }
 
     /// The glowing parts of the arms laid over the hood alone (a sleeve), for K&A's wash: drawn again
@@ -1038,8 +1402,8 @@ final class SpriteLibrary {
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
         guard !emptyPieces.contains(key) else { return nil }
-        guard let glowing = glowingPartsTexture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted),
-              let image = SpriteLibrary.partsImage(drawn: glowing.cgImage(), source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)"),
+        guard let glowing = pictures(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).glowing,
+              let image = SpriteLibrary.partsImage(drawn: glowing, source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)"),
                                                    parts: GameScene.armPartsOverHood(frame), style: SpriteLibrary.lineStyle(for: player)) else {
             emptyPieces.insert(key)
             return nil
@@ -1055,8 +1419,8 @@ final class SpriteLibrary {
         let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_backhand"
         if let made = cache[key] { return made }
         guard !emptyPieces.contains(key) else { return nil }
-        guard let drawn = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).cgImage() as CGImage?,
-              let image = SpriteLibrary.partsImage(drawn: drawn, source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)"),
+        let drawn = pictures(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).drawn
+        guard let image = SpriteLibrary.partsImage(drawn: drawn, source: sourceImage("\(frame.animation.rawValue)_\(frame.frame)"),
                                                    parts: [.backHand], lined: false, style: SpriteLibrary.lineStyle(for: player)) else {
             emptyPieces.insert(key)
             return nil
@@ -1098,27 +1462,10 @@ final class SpriteLibrary {
     }
 
     /// The line round a human's frame without the hood's place in it, for a tipped hood that
-    /// carries its own line (`hoodLine`). Made with the frame on the sheets the head tips on,
-    /// on the spot elsewhere; nil for a look with no hood.
-    func bareOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        let look = look(for: player)
-        guard !look.energyForm else { return nil }
-        let key = SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
-        if let made = cache[key + "_bareoutline"] { return made }
-        let missStart = CACurrentMediaTime()
-        defer { reportMiss(key + "_bareoutline", since: missStart) }
-        let source = sourceImage("\(frame.animation.rawValue)_\(frame.frame)")
-        let holdsBall = (frame.animation.holdsBall && !ballAsEnergy) || ballLifted
-        let result = recolour(image: source, look: SpriteLibrary.look(look, for: frame),
-                              holdsBall: holdsBall, detach: true,
-                              tucked: SpriteLibrary.tuckedBall(frame) != nil,
-                              ballPixels: holdsBall ? SpriteLibrary.sheetBall(frame, source: source)?.pixels : nil,
-                              hoodShape: SpriteLibrary.hoodShape(skin: look.dressing.skinTone, for: frame), hoodNudge: GameScene.headNudge(frame), bareLine: true,
-                              lineStyle: SpriteLibrary.lineStyle(for: player))
-        result.bareOutline?.filteringMode = .nearest
-        cache[key + "_bareoutline"] = result.bareOutline
-        return result.bareOutline
+    /// carries its own line (`hoodLine`); nil for a look with no hood.
+    func bareOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt? {
+        guard !look(for: player).energyForm else { return nil }
+        return art(.bareLine, frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
     }
 
     /// The line round the hooded head alone, in white, on its canvas, a pixel out from it: drawn
@@ -1157,17 +1504,17 @@ final class SpriteLibrary {
         return lineContext.makeImage()
     }
 
-    /// The line round a player frame at half its thickness, in white, on a canvas twice as fine.
-    func thinOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
-        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_thinoutline"]
+    /// The line round a player frame at half its thickness, in white, on a canvas twice as fine: an
+    /// energy form's alone, FloState's.
+    func thinOutlineTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt? {
+        let made = maps(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
+        return made.thinLine == nil ? nil : PlayerArt(frame: made, layer: nil, look: player, shaders: artShaders)
     }
 
     /// A human's clothes alone from a player frame, the dark ones and the energy's (the shoes), in
-    /// white, on the same canvas as the body: the FloState lockout's flash. Nil when the frame shows none.
-    func clothesTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> SKTexture? {
-        _ = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
-        return cache[SpriteLibrary.frameKey(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted) + "_skin"]
+    /// white: the FloState lockout's flash. Nil when the frame shows none.
+    func clothesTexture(_ frame: AnimationFrame, player: Int, ballAsEnergy: Bool = false, ballLifted: Bool = false) -> PlayerArt? {
+        art(.clothes, frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted)
     }
 
     /// What the sheet draws in front of its round ball (a hand, an arm, a leg) as drawn, on the
@@ -1289,7 +1636,7 @@ final class SpriteLibrary {
         let missStart = CACurrentMediaTime()
         defer { reportMiss(key, since: missStart) }
         guard !emptyPieces.contains(key) else { return nil }
-        let drawn = texture(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).cgImage()
+        let drawn = pictures(frame, player: player, ballAsEnergy: ballAsEnergy, ballLifted: ballLifted).drawn
         let source = sourceImage("\(frame.animation.rawValue)_\(frame.frame)")
         guard let image = SpriteLibrary.partsImage(drawn: drawn, source: source, parts: parts, style: SpriteLibrary.lineStyle(for: player)) else { emptyPieces.insert(key); return nil }
         let made = SKTexture(cgImage: image)
@@ -1397,6 +1744,18 @@ final class SpriteLibrary {
         return (cache[key]!, cache[key + "_hood"]!, cache[key + "_face"]!)
     }
 
+    /// The hooded head as drawn, from the picture kept when it was made, so nothing's read back off
+    /// the GPU; the same picture each time until the head is made again.
+    func hoodHeadPicture(skin: Int, player: Int) -> CGImage {
+        let made = hoodHead(skin: skin, player: player)
+        if let kept = keptImages[SpriteLibrary.hoodHeadKey(skin: skin, player: player, energy: false, view: 0)] { return kept }
+        let key = "hoodpicture_\(ObjectIdentifier(made.drawn).hashValue)"
+        if let read = keptImages[key] { return read }
+        let read = made.drawn.cgImage()
+        keptImages[key] = read
+        return read
+    }
+
     static func hoodHeadKey(skin: Int, player: Int, energy: Bool, view: Int) -> String {
         "p\(player)_hoodhead_\(skin)" + (view == 0 ? "" : "_v\(view)") + (energy ? "_energy" : "")
     }
@@ -1411,6 +1770,14 @@ final class SpriteLibrary {
             texture.filteringMode = .nearest
             cache[key + suffix] = texture
             keptImages[key + suffix] = image
+        }
+        // The hood's glowing pixels as drawn: the drawing kept only where the hood's mask is.
+        if let drawn = cache[key], let (context, _) = makeCanvas(width: made.drawn.width, height: made.drawn.height) {
+            let rect = CGRect(x: 0, y: 0, width: made.drawn.width, height: made.drawn.height)
+            context.draw(made.drawn, in: rect)
+            context.setBlendMode(.destinationIn)
+            context.draw(made.hood, in: rect)
+            if let glowing = context.makeImage(), let halo = SpriteLibrary.haloTexture(glowing) { hoodHalos.setObject(halo, forKey: drawn) }
         }
     }
 
@@ -1524,8 +1891,11 @@ final class SpriteLibrary {
             hoodShape = SpriteLibrary.turned(shape, by: headTilt, about: CGPoint(x: here.x - offset.x, y: here.y - offset.y)) ?? shape
         }
         let body = recolour(image: lined, look: look, holdsBall: false, detach: false, hoodShape: hoodShape, keepsProps: keepsProps, lineStyle: lineStyle)
+        // Each step from the pictures as made, never read back off the GPU: a read back logs and
+        // allocates every time, and the lock-in and the stage's load made dozens at once.
         var made = body.texture
-        let image = body.texture.cgImage()
+        let image = body.images?.drawn ?? body.texture.cgImage()
+        var madeImage = image
         if let (context, pixels) = makeCanvas(width: image.width, height: image.height),
            let (sourceContext, sourcePixels) = makeCanvas(width: source.width, height: source.height) {
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
@@ -1537,12 +1907,15 @@ final class SpriteLibrary {
                 guard towel.contains(colour) else { continue }
                 for channel in 0..<4 { pixels[index + channel] = sourcePixels[index + channel] }
             }
-            if let composed = context.makeImage() { made = SKTexture(cgImage: composed) }
+            if let composed = context.makeImage() {
+                made = SKTexture(cgImage: composed)
+                madeImage = composed
+            }
         }
         if !look.energyForm, let here = body.centres[.head], let there = SpriteLibrary.hoodDrawnForHead,
            let (context, _) = makeCanvas(width: image.width, height: image.height) {
-            context.draw(made.cgImage(), in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-            let hood = hoodHead(skin: look.dressing.skinTone, player: player).drawn.cgImage()
+            context.draw(madeImage, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            let hood = hoodHeadPicture(skin: look.dressing.skinTone, player: player)
             // The offset counts rows down; the context's run up.
             let offset = CGPoint(x: (here.x - there.x).rounded(), y: (here.y - there.y).rounded())
             if headTilt != 0 {
@@ -1556,13 +1929,21 @@ final class SpriteLibrary {
             context.draw(hood, in: CGRect(x: offset.x, y: -offset.y, width: CGFloat(hood.width), height: CGFloat(hood.height)))
             if var composed = context.makeImage() {
                 // From the body before the hood's cut: the cut takes the bottle and hand where they cross the head.
-                if !overHood.isEmpty, let over = overlaid(composed, from: uncut.texture.cgImage(), where: source, in: overHood) { composed = over }
+                if !overHood.isEmpty, let over = overlaid(composed, from: uncut.images?.drawn ?? uncut.texture.cgImage(), where: source, in: overHood) { composed = over }
                 made = SKTexture(cgImage: composed)
+                madeImage = composed
             }
         }
         made.filteringMode = .nearest
         cache[key] = made
+        keptImages[key] = madeImage
         return made
+    }
+
+    /// `standalone`'s picture as made, for a SwiftUI screen to show without reading it back off the GPU.
+    func standalonePicture(_ name: String, frame: Int, player: Int, headTilt: CGFloat = 0, overHood: Set<RGB> = []) -> CGImage {
+        let made = standalone(name, frame: frame, player: player, headTilt: headTilt, overHood: overHood)
+        return keptImages["p\(player)_standalone_\(name)_\(frame)_\(headTilt)"] ?? made.cgImage()
     }
 
     /// `top` with `under`'s pixels laid back over it wherever `source` is painted in one of `colours`.
@@ -1977,7 +2358,7 @@ final class SpriteLibrary {
     }
 
     /// Everything made so far.
-    var allTextures: [SKTexture] { Array(cache.values) }
+    var allTextures: [SKTexture] { Array(cache.values) + frameMaps.values.flatMap(\.textures) }
 
     /// A human player's hooded heads made ahead, every view, plain, in FloState and frozen, with the
     /// hood's line and K&A's face: none first made mid-match. What was made, to send to the GPU.
@@ -1991,7 +2372,7 @@ final class SpriteLibrary {
             // Plain, in FloState, and frozen in this skin.
             for head in [hoodHead(skin: skin, player: player, view: view), hoodHead(skin: skin, player: player, energy: true, view: view),
                          hoodHead(skin: skin, player: SpriteLibrary.icePlayer, view: view)] {
-                made += [head.drawn, head.hood, head.face]
+                made += [head.drawn, head.hood, head.face] + [hoodHalo(for: head.drawn)].compactMap { $0 }
             }
             let style = SpriteLibrary.lineStyle(for: player)
             made += [hoodLine(skin: skin, view: view, style: style), hoodLine(skin: skin, view: view, energy: true, style: style),
@@ -2001,25 +2382,44 @@ final class SpriteLibrary {
     }
 
     /// Builds every frame of every player up front and sends them to the GPU, so nothing
-    /// is made mid-draw.
-    func warmUp(players: Int, completion: @escaping () -> Void) {
-        // Every look's frames, the ice look's, each player's energy form's and turned one's,
-        // built off the main thread on every core as a look change's are (`rewarm`): built here
+    /// is made mid-draw. The sides' own looks first, `essentials` told once they've landed (the
+    /// launch's splash lifts there); then the ice look, each side's energy form and turned one,
+    /// built behind the menus, `completion` once everything's on the GPU.
+    func warmUp(players: Int, essentials: (() -> Void)? = nil, completion: @escaping () -> Void) {
+        // Built off the main thread on every core as a look change's are (`rewarm`): built here
         // on the main thread they held it seconds at launch, and the system ended the app for it.
-        let turned = (0..<players).map(SpriteLibrary.turnedPlayer).filter { look(for: $0) != look(for: $0 - SpriteLibrary.turnedPlayer(0)) }
-        for drawn in Array(0..<players) + [SpriteLibrary.icePlayer] + (0..<players).map(SpriteLibrary.transformedPlayer) + turned
-        where rebuilding[drawn] == nil && cache[SpriteLibrary.frameKey(AnimationFrame(.idle, 0), player: drawn, ballAsEnergy: false, ballLifted: false)] == nil {
-            rewarm(player: drawn)
+        func needsBuilding(_ drawn: Int) -> Bool {
+            rebuilding[drawn] == nil && landmarks[SpriteLibrary.frameKey(AnimationFrame(.idle, 0), player: drawn, ballAsEnergy: false, ballLifted: false)] == nil
         }
-        if rebuilding.isEmpty {
-            finishWarmUp(completion: completion)
-        } else {
-            whenRebuilt.append { [weak self] in self?.finishWarmUp(completion: completion) }
+        for drawn in 0..<players where needsBuilding(drawn) { rewarm(player: drawn) }
+        afterRebuilds { [weak self] in
+            guard let self else { return }
+            LoadTrace.mark("warm-up: the sides' own looks landed")
+            essentials?()
+            let held = self.heldForLaunch ?? []
+            self.heldForLaunch = nil
+            let turned = (0..<players).map(SpriteLibrary.turnedPlayer).filter { self.look(for: $0) != self.look(for: $0 - SpriteLibrary.turnedPlayer(0)) }
+            // The frozen look isn't among them: built only once Frost Tea's in play (`warmIceLook`).
+            let rest = (0..<players).map(SpriteLibrary.transformedPlayer) + turned
+            for drawn in rest where needsBuilding(drawn) { self.rewarm(player: drawn) }
+            // Asked for while held (a look set at launch), and not already rebuilt above.
+            for drawn in held.sorted() where self.rebuilding[drawn] == nil { self.rewarm(player: drawn) }
+            self.afterRebuilds { [weak self] in self?.finishWarmUp(completion: completion) }
         }
+    }
+
+    /// The frozen look built and sent to the GPU, if it isn't already or underway: asked for once a
+    /// side has Frost Tea or it's on offer, so nobody's launch or match pays for it otherwise.
+    func warmIceLook() {
+        let ice = SpriteLibrary.icePlayer
+        guard rebuilding[ice] == nil,
+              landmarks[SpriteLibrary.frameKey(AnimationFrame(.idle, 0), player: ice, ballAsEnergy: false, ballLifted: false)] == nil else { return }
+        rewarm(player: ice)
     }
 
     /// The warm-up's last, small pieces, then everything sent to the GPU.
     private func finishWarmUp(completion: @escaping () -> Void) {
+        LoadTrace.mark("warm-up: every rebuild landed, preloading the atlas")
         _ = texture("ball", 0)
         _ = softGlow(diameter: 32)
         _ = softGlow(diameter: 8)
@@ -2036,7 +2436,10 @@ final class SpriteLibrary {
         SKTexture.preload(Array(cache.values)) { group.leave() }
         group.enter()
         SKTextureAtlas.preloadTextureAtlases([atlas]) { group.leave() }
-        group.notify(queue: .main, execute: completion)
+        group.notify(queue: .main) {
+            LoadTrace.mark("warm-up: atlas on the GPU")
+            completion()
+        }
     }
 
     /// A clear canvas. The memory a context is given isn't promised to be clean, and a frame
@@ -2052,376 +2455,20 @@ final class SpriteLibrary {
         return (context, data.bindMemory(to: UInt8.self, capacity: width * height * 4))
     }
 
-    /// A copy of the frame in the look: every part swapped to its colour, the stroked parts
-    /// lined where they lie over the body, the silhouette lined round the outside, and the
-    /// centre of each glowing part found. The ball is looked for only where the sheet
-    /// `holdsBall`. With `detach`, the head and the energy come back as their own textures
-    /// with no line, and the body is drawn and lined without them.
-    /// `hood`: the hooded head, its shape (`player_hoodheads`' drawn pixels) placed on the
-    /// canvas, or with `hoodShape` placed as the game places it, moved from the idle frame it's
-    /// drawn for by how far this frame's head is from that one's: the sheet's head is kept under
-    /// it as its neck, in the skin's shadow tone, and the outside line runs round the body and
-    /// the hood together, the hood's own pixels left clear for it to be drawn in.
+    /// A copy of the frame in the look, as `PlayerRecolour.recolour` makes it, with its layers as
+    /// textures: for the pictures that aren't play's (the standalone figures, the portraits).
     private func recolour(image: CGImage, look: Look, holdsBall: Bool, detach: Bool, tucked: Bool = false, ballPixels: Set<Int>? = nil,
                           hood given: (shape: CGImage, origin: CGPoint, scale: CGFloat)? = nil, hoodShape: CGImage? = nil, hoodNudge: CGPoint = .zero,
-                          bareLine: Bool = false, keepsProps: Bool = false, lineStyle: LineStyle = .normal) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, images: (drawn: CGImage, glowing: CGImage?, outline: CGImage?, bareOutline: CGImage?, energy: CGImage?)?) {
-        let texture = SKTexture(cgImage: image)
-        let width = image.width, height = image.height
-        guard let (context, pixels) = makeCanvas(width: width, height: height) else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let count = width * height
-        // The line's pixels, for `detach` to lift onto their own canvas; each energy pixel's
-        // grey, for the view to tone in any colour.
-        var lined = [Bool](repeating: false, count: count)
-        var greys = [Double](repeating: 0, count: count)
-
-        // Which part each pixel came from, before anything changes.
-        var parts = [BodyPart?](repeating: nil, count: count)
-        for pixel in 0..<count where pixels[pixel * 4 + 3] == 255 {
-            let index = pixel * 4
-            let colour = RGB(pixels[index]) << 16 | RGB(pixels[index + 1]) << 8 | RGB(pixels[index + 2])
-            let part = BodyPart.owning(colour)
-            parts[pixel] = keepsProps && (part == .ball || part == .slash) ? nil : part
-        }
-        markEnergy(&parts, holdsBall: holdsBall, ballPixels: ballPixels, minPixels: tucked ? 1 : SpriteLibrary.ballMinPixels, width: width, height: height)
-        // Where the hood will be drawn over this canvas, if it's given or its shape is.
-        var hood = given
-        if hood == nil, let hoodShape, let there = SpriteLibrary.hoodDrawnForHead {
-            var sum = CGPoint.zero, heads = 0
-            for pixel in 0..<count where parts[pixel] == .head {
-                sum.x += CGFloat(pixel % width) + 0.5
-                sum.y += CGFloat(pixel / width) + 0.5
-                heads += 1
-            }
-            if heads > 0 {
-                hood = (hoodShape, CGPoint(x: (sum.x / CGFloat(heads) - there.x).rounded() + hoodNudge.x, y: (sum.y / CGFloat(heads) - there.y).rounded() - hoodNudge.y), 1)
-            }
-        }
-        var hoodCover = [Bool](repeating: false, count: count)
-        var headTakenOut: [Int] = []
-        if let hood, let (shapeContext, shapePixels) = makeCanvas(width: hood.shape.width, height: hood.shape.height) {
-            shapeContext.draw(hood.shape, in: CGRect(x: 0, y: 0, width: hood.shape.width, height: hood.shape.height))
-            for pixel in 0..<count {
-                let x = Int(((CGFloat(pixel % width) + 0.5 - hood.origin.x) / hood.scale).rounded(.down))
-                let y = Int(((CGFloat(pixel / width) + 0.5 - hood.origin.y) / hood.scale).rounded(.down))
-                guard (0..<hood.shape.width).contains(x), (0..<hood.shape.height).contains(y) else { continue }
-                hoodCover[pixel] = shapePixels[(y * hood.shape.width + x) * 4 + 3] > 0
-            }
-            // The hooded head replaces the sheet's: any of the sheet's head showing past the hood is taken out.
-            for pixel in 0..<count where parts[pixel] == .head && !hoodCover[pixel] {
-                headTakenOut.append(pixel)
-                parts[pixel] = nil
-                for channel in 0..<4 { pixels[pixel * 4 + channel] = 0 }
-            }
-        }
-
-        // Each part to its colour; the energy to the tone of its own brightness.
-        var sums: [BodyPart: (x: CGFloat, y: CGFloat, n: Int)] = [:]
-        for pixel in 0..<count {
-            guard let part = parts[pixel] else { continue }
-            let index = pixel * 4
-            // The glowing parts' middles, and the head's however it's drawn: where the head
-            // and its particles go.
-            // And the limbs' ends, where cubes come off them; and the torso, for the hood down behind it.
-            if part.glows(energyForm: look.energyForm) || part == .head || [.frontLeg, .backLeg, .frontFoot, .backFoot, .frontHand, .backHand, .frontArm, .backArm, .torso].contains(part) {
-                var sum = sums[part] ?? (0, 0, 0)
-                sum.x += CGFloat(pixel % width) + 0.5
-                sum.y += CGFloat(pixel / width) + 0.5
-                sum.n += 1
-                sums[part] = sum
-            }
-            if part.isEnergy {
-                let grey = (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / 255
-                greys[pixel] = grey
-                paint(pixels, index, look.energyTone(luminance: grey))
-            } else if let target = look.colours[part] {
-                paint(pixels, index, target)
-            }
-        }
-
-        // The head and the energy onto their own canvases, and off this one; the ball off
-        // this one too, since it's drawn as its own sprite wherever the frame puts it.
-        var head: SKTexture?
-        var energy: SKTexture?
-        var energyImage: CGImage?
-        if detach {
-            let headCanvas = sums[.head] != nil && look.headApart ? makeCanvas(width: width, height: height) : nil
-            let energyCanvas = parts.contains { $0?.isEnergy == true } ? makeCanvas(width: width, height: height) : nil
-            for pixel in 0..<count {
-                // A human's head stays on the body.
-                guard let part = parts[pixel], (part == .head && look.headApart) || part == .ball || part.isEnergy else { continue }
-                let index = pixel * 4
-                if part == .head, let (_, headPixels) = headCanvas {
-                    paint(headPixels, index, look.colours[.head] ?? look.glow)
-                    headPixels[index + 3] = 255
-                } else if part.isEnergy, let (_, energyPixels) = energyCanvas {
-                    // In grey: the view tones it through the energy ramp in whatever colour.
-                    let level = UInt8((greys[pixel] * 255).rounded())
-                    energyPixels[index] = level
-                    energyPixels[index + 1] = level
-                    energyPixels[index + 2] = level
-                    energyPixels[index + 3] = 255
-                }
-                pixels[index] = 0
-                pixels[index + 1] = 0
-                pixels[index + 2] = 0
-                pixels[index + 3] = 0
-                parts[pixel] = nil
-            }
-            head = headCanvas?.0.makeImage().map { SKTexture(cgImage: $0) }
-            energyImage = energyCanvas?.0.makeImage()
-            energy = energyImage.map { SKTexture(cgImage: $0) }
-        }
-
-        func neighbours(_ pixel: Int, _ body: (Int) -> Bool) -> Bool {
-            let x = pixel % width, y = pixel / width
-            for dy in -1...1 {
-                for dx in -1...1 where lineStyle.reaches(dx, dy) {
-                    let nx = x + dx, ny = y + dy
-                    if nx >= 0, ny >= 0, nx < width, ny < height, body(ny * width + nx) { return true }
-                }
-            }
-            return false
-        }
-
-        /// The glowing parts get no line round them; the head under the hood is the neck, and does.
-        func lineless(_ part: BodyPart?) -> Bool {
-            guard let part else { return false }
-            return part == .head ? hood == nil && part.glows(energyForm: look.energyForm) : part.glows(energyForm: look.energyForm)
-        }
-
-        // Stroked groups: the body pixels next to one take the line, so it keeps its shape. A
-        // pixel already lined is neither lined again nor counted as the group's, so where two
-        // groups meet there's one line, not two.
-        // With the hood given, the head is only its neck: no line of its own.
-        for group in look.strokedGroups where hood == nil || !group.contains(.head) {
-            let stroked = (0..<count).map { parts[$0].map(group.contains) == true && !lined[$0] }
-            for pixel in 0..<count where parts[pixel] != nil && !stroked[pixel] && !lined[pixel] && neighbours(pixel, { stroked[$0] }) {
-                paint(pixels, pixel * 4, look.outline)
-                lined[pixel] = true
-            }
-        }
-
-        // The body's line as thick as the style's, if the look has one.
-        let lineWidth = look.outlineWidth > 0 ? lineStyle.width : 0
-
-        // With `bareLine` and the hood's place given, the same line again round the body alone,
-        // the hood's place left out of it, for a tipped hood that carries its own.
-        var bareLined: [Bool]?
-        if bareLine, detach, hood != nil, lineWidth > 0 {
-            var lineHere = lined
-            var filled = (0..<count).map { pixels[$0 * 4 + 3] != 0 }
-            var body = (0..<count).map { filled[$0] && !lineless(parts[$0]) }
-            for _ in 0..<lineWidth {
-                let grown = (0..<count).filter { !filled[$0] && neighbours($0, { body[$0] }) }
-                for pixel in grown {
-                    filled[pixel] = true
-                    body[pixel] = true
-                    lineHere[pixel] = true
-                }
-            }
-            bareLined = lineHere
-        }
-
-        // The outside line, grown a pixel at a time round the body. The glowing parts get
-        // none: a clear pixel next to nothing but the ball stays clear.
-        if lineWidth > 0 {
-            var body = (0..<count).map { (pixels[$0 * 4 + 3] != 0 && !lineless(parts[$0])) || hoodCover[$0] }
-            for _ in 0..<lineWidth {
-                var grown: [Int] = []
-                for pixel in 0..<count where pixels[pixel * 4 + 3] == 0 && !hoodCover[pixel] && neighbours(pixel, { body[$0] }) {
-                    grown.append(pixel)
-                }
-                for pixel in grown {
-                    paint(pixels, pixel * 4, look.outline)
-                    pixels[pixel * 4 + 3] = 255
-                    body[pixel] = true
-                    lined[pixel] = true
-                }
-            }
-        }
-
-        // A human's head is the view's, `player_hoodheads` over it: the sheet's own is taken
-        // out, its line left round where it was.
-        // Under the hood, the neck in the skin's shadow tone.
-        if hood != nil {
-            for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
-                // The back hand's colour: the skin's back tone, or the ice look's back colour; in
-                // FloState the skin's, as its face is.
-                paint(pixels, pixel * 4, look.energyForm ? look.dressing.tone.back : look.colours[.backHand] ?? look.dressing.tone.back)
-            }
-        }
-        if !look.energyForm, hood == nil {
-            for pixel in 0..<count where parts[pixel] == .head && !lined[pixel] {
-                for channel in 0..<4 { pixels[pixel * 4 + channel] = 0 }
-            }
-        }
-
-        // A human's energy-coloured parts glow; the energy form glows all over but its bare
-        // arms and legs, in their skin.
-        // Under the hood the head is only the neck, in skin.
-        func bareSkin(_ part: BodyPart?) -> Bool { part.map { $0 == .head ? hood != nil : look.dressing.skin[$0] != nil } == true }
-        let glowing = (0..<count).map { !look.energyForm ? parts[$0].map(look.dressing.glowing.contains) == true : parts[$0] != nil && !bareSkin(parts[$0]) }
-
-        // The line at half its thickness, on a canvas twice as fine: of each line pixel only the
-        // quarters against the body, so it hugs it. FloState's rainbow line.
-        var thinOutline: SKTexture?
-        if detach, lined.contains(true), let (thinContext, thinPixels) = makeCanvas(width: width * 2, height: height * 2) {
-            // The hood's place counts as body, so the line hugs it too.
-            let body = (0..<count).map { (pixels[$0 * 4 + 3] != 0 && !lined[$0]) || hoodCover[$0] }
-            func isBody(_ x: Int, _ y: Int) -> Bool { x >= 0 && y >= 0 && x < width && y < height && body[y * width + x] }
-            for pixel in 0..<count where lined[pixel] {
-                let x = pixel % width, y = pixel / width
-                for half in 0..<4 {
-                    let dx = half % 2 == 0 ? -1 : 1, dy = half / 2 == 0 ? -1 : 1
-                    guard isBody(x + dx, y) || isBody(x, y + dy) || isBody(x + dx, y + dy) else { continue }
-                    let index = ((y * 2 + half / 2) * width * 2 + x * 2 + half % 2) * 4
-                    for channel in 0..<4 { thinPixels[index + channel] = 255 }
-                }
-            }
-            thinOutline = thinContext.makeImage().map { SKTexture(cgImage: $0) }
-        }
-
-        // With `detach`, the line comes off onto its own canvas in white, so the view can
-        // draw it in any colour, frame by frame.
-        var outline: SKTexture?, outlineImage: CGImage?
-        if detach, lined.contains(true), let (lineContext, linePixels) = makeCanvas(width: width, height: height) {
-            for pixel in 0..<count where lined[pixel] {
-                let index = pixel * 4
-                linePixels[index] = 255
-                linePixels[index + 1] = 255
-                linePixels[index + 2] = 255
-                linePixels[index + 3] = 255
-                pixels[index] = 0
-                pixels[index + 1] = 0
-                pixels[index + 2] = 0
-                pixels[index + 3] = 0
-            }
-            outlineImage = lineContext.makeImage()
-            outline = outlineImage.map { SKTexture(cgImage: $0) }
-        }
-
-        var bareOutline: SKTexture?, bareOutlineImage: CGImage?
-        if let bareLined, let (bareContext, barePixels) = makeCanvas(width: width, height: height) {
-            for pixel in 0..<count where bareLined[pixel] {
-                for channel in 0..<4 { barePixels[pixel * 4 + channel] = 255 }
-            }
-            bareOutlineImage = bareContext.makeImage()
-            bareOutline = bareOutlineImage.map { SKTexture(cgImage: $0) }
-        }
-
-        // The glowing parts alone, as drawn: over K&A's wash, so the night doesn't dim them.
-        var glowingParts: SKTexture?
-        var glowingImage: CGImage?
-        if detach, glowing.contains(true), let (partsContext, partsPixels) = makeCanvas(width: width, height: height) {
-            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && glowing[pixel] {
-                for channel in 0..<4 { partsPixels[pixel * 4 + channel] = pixels[pixel * 4 + channel] }
-            }
-            glowingImage = partsContext.makeImage()
-            glowingParts = glowingImage.map { SKTexture(cgImage: $0) }
-        }
-
-        // The body as the glow's mask sees it, in white, the glowing pixels black so they take
-        // the glow's plain threshold rather than the body's, whatever's under them: left out, a
-        // stage's flat backdrop showed through and they didn't glow. A human's skin is green, so
-        // it never glows however light it is.
-        var glowMask: SKTexture?
-        if detach, glowing.contains(true), let (maskContext, maskPixels) = makeCanvas(width: width, height: height) {
-            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && glowing[pixel] {
-                maskPixels[pixel * 4 + 3] = 255
-            }
-            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !glowing[pixel] {
-                let index = pixel * 4
-                // Skin is green, never glowing; the neck under the hood red, shielded as the face over it is,
-                // so the hood's bloom lights neither and no edge shows between them.
-                let skin = bareSkin(parts[pixel])
-                let neck = skin && parts[pixel] == .head
-                maskPixels[index] = skin && !neck ? 0 : 255
-                maskPixels[index + 1] = neck ? 0 : 255
-                maskPixels[index + 2] = skin ? 0 : 255
-                maskPixels[index + 3] = 255
-            }
-            // Pixel-exact, as the body's drawn: smoothed, its edges blended skin into body and glowed.
-            glowMask = maskContext.makeImage().map { image in
-                let texture = SKTexture(cgImage: image)
-                texture.filteringMode = .nearest
-                return texture
-            }
-        }
-
-        // A human's skin alone in white, as it's drawn: for the
-        // FloState lockout's flash.
-        // A human's clothes alone in white, the dark ones and the energy's, as drawn: for the
-        // FloState lockout's flash.
-        var skin: SKTexture?
-        if detach, !look.energyForm, let (skinContext, skinPixels) = makeCanvas(width: width, height: height) {
-            var any = false
-            for pixel in 0..<count where pixels[pixel * 4 + 3] != 0 && !lined[pixel]
-                && parts[pixel].map({ HumanLook.clothed.contains($0) || look.dressing.glowing.contains($0) }) == true {
-                let index = pixel * 4
-                for channel in 0..<4 { skinPixels[index + channel] = 255 }
-                any = true
-            }
-            if any { skin = skinContext.makeImage().map { SKTexture(cgImage: $0) } }
-        }
-
-        guard let recoloured = context.makeImage() else { return (texture, nil, nil, nil, nil, nil, nil, [:], nil, nil, nil) }
-        // The head's middle as the sheet draws it, what was taken out still counted: the hood was placed by it.
-        if !headTakenOut.isEmpty, var head = sums[.head] {
-            for pixel in headTakenOut {
-                head.x += CGFloat(pixel % width) + 0.5
-                head.y += CGFloat(pixel / width) + 0.5
-                head.n += 1
-            }
-            sums[.head] = head
-        }
-        let centres = sums.mapValues { CGPoint(x: $0.x / CGFloat($0.n), y: $0.y / CGFloat($0.n)) }
-        return (SKTexture(cgImage: recoloured), head, energy, outline, glowMask, skin, thinOutline, centres, bareOutline, glowingParts,
-                (recoloured, glowingImage, outlineImage, bareOutlineImage, energyImage))
-    }
-
-    /// The sheets' white is the ball only on a sheet that holds it, and there only where
-    /// it's the biggest 8-connected blob of white in the frame and big enough to be one;
-    /// every other white pixel becomes energy: the skid's puffs, a release's streaks, the
-    /// slide's speed lines.
-    /// `ballPixels`: the ball as `sheetBall` found it, taken as it is.
-    private func markEnergy(_ parts: inout [BodyPart?], holdsBall: Bool, ballPixels: Set<Int>?, minPixels: Int, width: Int, height: Int) {
-        guard holdsBall else {
-            for pixel in parts.indices where parts[pixel] == .ball { parts[pixel] = .energy }
-            return
-        }
-        if let ballPixels {
-            for pixel in parts.indices where parts[pixel] == .ball && !ballPixels.contains(pixel) { parts[pixel] = .energy }
-            return
-        }
-        var label = [Int](repeating: 0, count: parts.count)
-        var sizes = [0]
-        for start in parts.indices where parts[start] == .ball && label[start] == 0 {
-            let id = sizes.count
-            sizes.append(0)
-            label[start] = id
-            var stack = [start]
-            while let pixel = stack.popLast() {
-                sizes[id] += 1
-                let x = pixel % width, y = pixel / width
-                for dy in -1...1 {
-                    for dx in -1...1 where dx != 0 || dy != 0 {
-                        let nx = x + dx, ny = y + dy
-                        guard nx >= 0, ny >= 0, nx < width, ny < height else { continue }
-                        let neighbour = ny * width + nx
-                        if parts[neighbour] == .ball, label[neighbour] == 0 {
-                            label[neighbour] = id
-                            stack.append(neighbour)
-                        }
-                    }
-                }
-            }
-        }
-        guard sizes.count > 1, let biggest = sizes.indices.dropFirst().max(by: { sizes[$0] < sizes[$1] }) else { return }
-        let ball = sizes[biggest] >= minPixels ? biggest : 0
-        for pixel in parts.indices where parts[pixel] == .ball && label[pixel] != ball {
-            parts[pixel] = .energy
-        }
+                          bareLine: Bool = false, keepsProps: Bool = false, lineStyle: LineStyle = .normal) -> (texture: SKTexture, head: SKTexture?, energy: SKTexture?, outline: SKTexture?, glowMask: SKTexture?, skin: SKTexture?, thinOutline: SKTexture?, centres: [BodyPart: CGPoint], bareOutline: SKTexture?, glowingParts: SKTexture?, glowLine: SKTexture?, bareGlowLine: SKTexture?, images: (drawn: CGImage, glowing: CGImage?, outline: CGImage?, bareOutline: CGImage?, energy: CGImage?)?) {
+        let layers = PlayerRecolour.recolour(image: image, look: look, holdsBall: holdsBall, detach: detach, tucked: tucked, ballPixels: ballPixels,
+                                             hood: given, hoodShape: hoodShape, hoodNudge: hoodNudge, bareLine: bareLine, keepsProps: keepsProps,
+                                             lineStyle: lineStyle, hoodDrawnForHead: SpriteLibrary.hoodDrawnForHead, ballMinPixels: SpriteLibrary.ballMinPixels)
+        func shared(_ image: CGImage?) -> SKTexture? { image.map { SpriteLibrary.sharedTexture($0) } }
+        let glowMask = shared(layers.glowMask)
+        glowMask?.filteringMode = .nearest
+        return (SpriteLibrary.sharedTexture(layers.drawn), shared(layers.head), shared(layers.energy), shared(layers.outline), glowMask, shared(layers.skin),
+                shared(layers.thinOutline), layers.centres, shared(layers.bareOutline), shared(layers.glowing), shared(layers.glowLine), shared(layers.bareGlowLine),
+                (layers.drawn, layers.glowing, layers.outline, layers.bareOutline, layers.energy))
     }
 
     private func paint(_ pixels: UnsafeMutablePointer<UInt8>, _ index: Int, _ colour: RGB) {
@@ -2653,7 +2700,7 @@ enum HoodView {
         .gunShoot: every(1, of: .gunShoot), .gunShootAir: every(1, of: .gunShootAir), .gunSnipe: every(1, of: .gunSnipe),
         .gunRun: every(1, of: .gunRun), .gunRunShoot: every(1, of: .gunRunShoot),
         .layup: [2: 1, 3: 1, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2],
-        .esperSlash: [2: 1, 3: 1, 4: 1], .esperSlashAir: [2: 1, 3: 1, 4: 1],
+        .esperSlash: [2: 1, 3: 1, 4: 1], .esperSlashAir: [0: 2, 1: 2, 2: 1, 3: 1, 4: 1, 5: 1],
         .shoot: [2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
         .shootAir: [2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1],
         .throwForward: [4: 1, 5: 2, 6: 2, 7: 1], .throwAir: [4: 1, 5: 2, 6: 2, 7: 1],

@@ -9,6 +9,8 @@ struct PlayerCustomization: Codable, Equatable {
     var dressing = Dressing()
     /// The drink picked for a mode that picks one before play (47), at its second level; none, none.
     var drink: Greateraid?
+    /// The pose struck on winning; none, one at random each series.
+    var winPose: WinPose?
 
     var glow: RGB { energy.glow }
     var look: Look { Look.team(glow, body: Look.lightened(glow, EnergyColour.bodyLift), dressing: dressing) }
@@ -19,8 +21,8 @@ struct PlayerCustomization: Codable, Equatable {
     static func saved(_ player: Int) -> PlayerCustomization {
         if let data = UserDefaults.standard.data(forKey: key(player)),
            var kept = try? JSONDecoder().decode(PlayerCustomization.self, from: data) {
-            // A colour the picker doesn't offer in this build (Diamond, picked in a debug build) isn't worn.
-            if !EnergyColour.wheel.contains(kept.energy) { kept.energy = player == 0 ? .orange : .teal }
+            // One tried on without the V-Key isn't worn.
+            kept.energy = kept.energy.playable(for: player)
             return kept
         }
         return PlayerCustomization(energy: player == 0 ? EnergyColour.saved : .teal)
@@ -32,10 +34,13 @@ struct PlayerCustomization: Codable, Equatable {
         if player == 0 { UserDefaults.standard.set(energy.rawValue, forKey: EnergyColour.storageKey) }
     }
 
-    /// Both sides as they play: when the two pick the same colour, the second gives way to the opposite.
-    static func clashed(_ sides: [PlayerCustomization]) -> [PlayerCustomization] {
+    /// Both sides as they play: when the two pick the same colour, the second gives way to the opposite;
+    /// a side without the V-Key gives way to one with it, to the other free colour. `unlocked`: each side's key.
+    static func clashed(_ sides: [PlayerCustomization], unlocked: [Bool] = [VKey.owned, VKey.owned]) -> [PlayerCustomization] {
         var sides = sides
-        if sides.count > 1, sides[1].energy == sides[0].energy { sides[1].energy = sides[0].energy.opposite }
+        guard sides.count > 1, sides[1].energy == sides[0].energy else { return sides }
+        let giving = unlocked.count > 1 && unlocked[1] && !unlocked[0] ? 0 : 1
+        sides[giving].energy = sides[1 - giving].energy.givingWay(unlocked: unlocked.indices.contains(giving) && unlocked[giving])
         return sides
     }
 
@@ -88,7 +93,7 @@ extension FlowState {
         }
         if online || turnBased {
             var sides = [PlayerCustomization.saved(0), PlayerCustomization.saved(0)]
-            sides[1 - local] = other ?? PlayerCustomization(energy: sides[local].energy.opposite)
+            sides[1 - local] = other ?? PlayerCustomization(energy: sides[local].energy.givingWay(unlocked: VKey.owned))
             customizations = sides
         } else {
             customizations = [PlayerCustomization.saved(0), PlayerCustomization.saved(1)]
@@ -126,11 +131,13 @@ extension FlowState {
     /// controls go; online READY can be taken back until both are ready. Both ready, the launch.
     func pressReady(_ player: Int) {
         guard !customizeLocked, customizeOwns(player) else { return }
-        // Random picked: its Greateraid drawn now, as it locks in, so the other phone gets the drink.
-        for side in customizations.indices where drinkRandom[side] && customizeOwns(side) && customizeDrinkPhase {
-            drinkRandom[side] = false
-            update(side, sound: false) { $0.drink = Greateraid.offered.randomElement() }
+        // A colour tried on without the V-Key can't be locked in: the key's screen instead. Taking READY back always can.
+        let lockingIn = !(customizeOnline && customizeReady[player])
+        if lockingIn, customizations.indices.contains(where: { customizeOwns($0) && !VKey.opens(customizations[$0].energy) }) {
+            return openVKey()
         }
+        // A roll under way stops on the bottle it's showing, sent as the pick.
+        for side in customizations.indices where drinkRolling[side] && customizeOwns(side) { finishDrinkRoll(side) }
         // No confirm on Start here: the port-in plays as both are ready and the launch begins.
         // Taking READY back, the back.
         if customizeOnline {
@@ -219,7 +226,6 @@ extension FlowState {
             customizeReady = [false, false]
             // Against the computer, its side's drink is picked for it: a Greateraid at random.
             computerDrinkByHand = false
-            drinkRandom = [false, false]
             if vsComputer { pickForComputer(Greateraid.offered.randomElement()) }
             if customizeChoosesControl, customizeComputerPlays(0) {
                 customizations[0].drink = Greateraid.offered.randomElement()
@@ -291,7 +297,7 @@ extension FlowState {
     }
 
     /// Both sides as they'll play, the clash settled.
-    var shownCustomizations: [PlayerCustomization] { PlayerCustomization.clashed(customizations) }
+    var shownCustomizations: [PlayerCustomization] { PlayerCustomization.clashed(customizations, unlocked: scene.sidesUnlocked) }
 
     /// A side's cursor moved by its stick. Up and down the inner column (skin, arms, legs, START,
     /// RETURN, and from the skin up round to START) or the outer one (the hood over the player, the
@@ -449,23 +455,61 @@ extension FlowState {
     func tapDrink(_ player: Int, _ drink: Greateraid) {
         guard customizeOwns(player), !customizeLocked, customizeDrinkPhase, !customizeReady[player] else { return }
         if let at = sortedDrinks(player).firstIndex(of: drink) { drinkCursors[player] = at }
-        drinkRandom[player] = false
+        cancelDrinkRoll(player)
         update(player) { $0.drink = $0.drink == drink ? nil : drink }
     }
 
-    /// The small bottles over the back row: No Power, and Random, a Greateraid drawn as it locks in.
+    /// The gutter under the figure: No Power's bottle, and the dice, a Greateraid rolled on the spot.
     func tapNoPower(_ player: Int) {
         guard customizeOwns(player), !customizeLocked, customizeDrinkPhase, !customizeReady[player] else { return }
         drinkCursors[player] = DrinkPick.noPowerCursor
-        drinkRandom[player] = false
+        cancelDrinkRoll(player)
         update(player) { $0.drink = nil }
     }
 
     func tapRandom(_ player: Int) {
         guard customizeOwns(player), !customizeLocked, customizeDrinkPhase, !customizeReady[player] else { return }
         drinkCursors[player] = DrinkPick.randomCursor
-        drinkRandom[player] = true
-        update(player) { $0.drink = nil }
+        rollDrink(player)
+    }
+
+    /// The seconds between the roll's bottles, slowing as it settles; the last shown is the pick.
+    static let drinkRollSteps: [Double] = [0.05, 0.05, 0.05, 0.06, 0.07, 0.08, 0.1, 0.12, 0.15, 0.19]
+
+    /// The dice: bottles raised one after another at random, never the same twice running, the
+    /// last staying picked, not locked in; again rolls again. Only the last is kept and sent.
+    func rollDrink(_ player: Int) {
+        drinkRolls[player]?.cancel()
+        drinkRolling[player] = true
+        drinkRolls[player] = Task { @MainActor [weak self] in
+            for pause in FlowState.drinkRollSteps {
+                guard let self, !Task.isCancelled else { return }
+                // Off the bottles mid-roll: nothing more of it.
+                guard self.customizeDrinkPhase else { return self.cancelDrinkRoll(player) }
+                let options = Greateraid.offered.filter { $0 != self.customizations[player].drink }
+                guard let next = options.randomElement() else { break }
+                self.customizations[player].drink = next
+                SoundBoard.shared.play(SoundBoard.navigate)
+                try? await Task.sleep(nanoseconds: UInt64(pause * 1_000_000_000))
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.finishDrinkRoll(player)
+        }
+    }
+
+    /// The roll stopped where it is: what it shows is the pick, kept and sent.
+    func finishDrinkRoll(_ player: Int) {
+        drinkRolls[player]?.cancel()
+        drinkRolls[player] = nil
+        drinkRolling[player] = false
+        update(player, sound: false) { _ in }
+    }
+
+    /// The roll dropped for another pick, which is kept in its place.
+    private func cancelDrinkRoll(_ player: Int) {
+        drinkRolls[player]?.cancel()
+        drinkRolls[player] = nil
+        drinkRolling[player] = false
     }
 
     /// The sort cycled: A to Z, Z to A, biomorphs first, boosters first; the cursor kept on its bottle.
@@ -479,7 +523,8 @@ extension FlowState {
 
     private func activateDrinkCursor(_ player: Int) {
         let at = drinkCursors[player]
-        if at == DrinkPick.startCursor || at == DrinkPick.noPowerCursor || at == DrinkPick.randomCursor { return pressReady(player) }
+        if at == DrinkPick.randomCursor { return tapRandom(player) }
+        if at == DrinkPick.startCursor || at == DrinkPick.noPowerCursor { return pressReady(player) }
         if at < 0 { return cycleDrinkSort(player) }
         // On a bottle the cursor's already picked it: the button locks it in.
         if sortedDrinks(player).indices.contains(at) { pressReady(player) }
@@ -535,14 +580,12 @@ extension FlowState {
         // Onto a bottle, it's picked: its words read as the cursor runs along the rows.
         let drinks = sortedDrinks(player)
         guard customizeOwns(player), !customizeReady[player] else { return }
-        if drinks.indices.contains(at), customizations[player].drink != drinks[at] || drinkRandom[player] {
-            drinkRandom[player] = false
+        // Onto the dice, the pick stays as it is till it's rolled.
+        if drinks.indices.contains(at), customizations[player].drink != drinks[at] || drinkRolling[player] {
+            cancelDrinkRoll(player)
             update(player, sound: false) { $0.drink = drinks[at] }
-        } else if at == DrinkPick.noPowerCursor, customizations[player].drink != nil || drinkRandom[player] {
-            drinkRandom[player] = false
-            update(player, sound: false) { $0.drink = nil }
-        } else if at == DrinkPick.randomCursor, !drinkRandom[player] {
-            drinkRandom[player] = true
+        } else if at == DrinkPick.noPowerCursor, customizations[player].drink != nil || drinkRolling[player] {
+            cancelDrinkRoll(player)
             update(player, sound: false) { $0.drink = nil }
         }
     }
@@ -691,10 +734,10 @@ struct CustomizeScreen: View {
     /// A picker's colour: its share of each column, over the accent.
     static let swatchShare: CGFloat = 0.7
     /// The small boxes' line, blue's second (the cyan); the hood's, purple's first as the vector's cyan went.
-    static let smallBoxLine: RGB = Futuristic.lineRGB
+    static var smallBoxLine: RGB { Futuristic.lineRGB }
     static let hoodLine: RGB = EsperPalette.purple.highlight
     /// RETURN's lettering and frame, the menus' blue; under the cursor, the title's gold.
-    static let returnLine: RGB = Futuristic.lineRGB
+    static var returnLine: RGB { Futuristic.lineRGB }
     /// "Game Mode:" over the mode's name, its middle down the screen.
     static let gameModeLabelY: CGFloat = 0.135
     /// A two-word mode's lines apart: the gap against the capitals' height.
@@ -1186,7 +1229,7 @@ struct CustomizeScreen: View {
 
     /// The skin's or the hood's colours in the side's display, while one is chosen: a column a
     /// colour, leaning, the colour over an accent corner to corner (a skin's back tone, a
-    /// colour's shade down its ramp); the picked column lined in white, the cursor's in the side's colour. The display's bar in
+    /// colour's shade down its ramp); the picked column lined in white (teal on white), the cursor's in the side's colour. The display's bar in
     /// the side's colour, glowing.
     @ViewBuilder
     private func picker(_ player: Int, _ name: String, size: CGSize, cursor: CustomizeSpot, pick: PlayerCustomization, glow: RGB,
@@ -1202,31 +1245,9 @@ struct CustomizeScreen: View {
             ? HumanLook.skinTones.map { ($0.front, $0.back) }
             : EnergyColour.wheel.map { ($0.glow, $0.rampDown) }
         let picked = skin ? pick.dressing.skinTone : (EnergyColour.wheel.firstIndex(of: flow.customizations[player].energy) ?? 0)
-        let inner = CGSize(width: frame.width * 0.84, height: frame.height * 0.6)
-        let split = CustomizeScreen.swatchShare
-        picture(name).resizable()
-            .frame(width: frame.width, height: frame.height)
-            .position(x: frame.midX, y: frame.midY)
-        picture(name + "_bar").resizable()
-            .colorMultiply(Color(rgb: pick.glow))
-            .frame(width: bar.width, height: bar.height)
-            .energyGlow(radius: bar.height * 0.5)
-            .position(x: bar.midX, y: bar.midY)
-        HStack(spacing: inner.width / CGFloat(columns.count) * 0.12) {
-            ForEach(columns.indices, id: \.self) { index in
-                ZStack {
-                    LeaningBand(from: 0, to: split).fill(Color(rgb: columns[index].top))
-                    LeaningBand(from: split, to: 1).fill(Color(rgb: columns[index].accent))
-                    LeaningBand(from: 0, to: 1).stroke(.white, lineWidth: index == picked ? 2.5 : 0)
-                    // The cursor's column, in the side's colour, outside the pick's line.
-                    LeaningBand(from: 0, to: 1).stroke(Color(rgb: glow), lineWidth: index == hovered ? 3 : 0).padding(-4)
-                }
-                .scaleEffect(index == hovered ? 1.15 : (index == picked ? 1.08 : 1))
-            }
-        }
-        .frame(width: inner.width, height: inner.height)
-        .contentShape(Rectangle())
-        .pickerTouches(columns: columns.count, width: inner.width, picked: picked, pick: { index in
+        SwatchPicker(display: name, displayFrame: frame, barFrame: bar, barColour: pick.glow, columns: columns, picked: picked,
+                     hovered: hovered, cursorColour: glow,
+                     pickLineColour: { index in !skin && EnergyColour.wheel[index] == .white ? EnergyColour.teal.glow : 0xFFFFFF }, pick: { index in
             // Tapped or slid along: each column picked as the finger reaches it.
             guard index != picked else { return }
             flow.slideCustomizePicker(player, skin ? .skinPicker(index) : .hoodPicker(index))
@@ -1234,7 +1255,6 @@ struct CustomizeScreen: View {
             // The picked colour tapped again: confirmed, on to the middle button.
             flow.activateCustomize(player, .hoodPicker(index))
         })
-        .position(x: frame.midX, y: frame.midY - frame.height * 0.08)
     }
 
     // MARK: The middle
@@ -1266,6 +1286,8 @@ struct CustomizeScreen: View {
                         .rotationEffect(.degrees(DrinkPick.startBottleLean))
                         .opacity(flow.customizeReady[flow.customizeLocal] ? 0.5 : (lit ? 1 : 0.6))
                         .position(x: start.midX, y: start.midY)
+                    nextLabel("Greateraid", size, under: start)
+                        .opacity(flow.customizeReady[flow.customizeLocal] ? 0.5 : (lit ? 1 : 0.6))
                 } else if flow.customizeLaunch == nil, flow.customizeOnline {
                     // Lettered as FLO is lit while READY's lit, in its two tones' darkest otherwise.
                     litTitle("READY", height: size.height * 0.035, ownFace: false,
@@ -1281,6 +1303,8 @@ struct CustomizeScreen: View {
                         .frame(height: size.height * DrinkPick.startBottleShare)
                         .opacity(lit ? 1 : 0.6)
                         .position(x: start.midX, y: start.midY)
+                    nextLabel("Stage", size, under: start)
+                        .opacity(lit ? 1 : 0.6)
                 }
             }
             .frame(width: size.width, height: size.height)
@@ -1298,6 +1322,15 @@ struct CustomizeScreen: View {
             }
         }
     }
+
+    /// What the middle button goes on to, named under its icon, in the screen's face.
+    private func nextLabel(_ text: String, _ size: CGSize, under start: CGRect) -> some View {
+        title(text, size: size.height * CustomizeScreen.nextLabelShare)
+            .position(x: start.midX, y: start.midY + size.height * (DrinkPick.startBottleShare / 2 + CustomizeScreen.nextLabelGapShare))
+    }
+    /// The middle button's label: its size, and its gap under the icon, as shares of the screen's height.
+    static let nextLabelShare: CGFloat = 0.025
+    static let nextLabelGapShare: CGFloat = 0.02
 
     /// A ring turned about START's middle.
     private func spinning(_ name: String, _ size: CGSize, about centre: CGRect, degrees: Double) -> some View {
@@ -1432,6 +1465,69 @@ enum CustomizeFont: Int, CaseIterable {
     func size(_ size: CGFloat) -> CGFloat { size * CustomizeFont.bigdex.capShare / capShare }
 }
 
+/// A picker's colours in a display: a column a colour, leaning, the colour over an accent corner to
+/// corner; the picked column lined in `pickLineColour` for its column, the cursor's in `cursorColour`; the display's bar in
+/// `barColour`, glowing. Each piece placed by `.position`, in its container's own space. The
+/// customize screen's skin and hood pickers, and the title's THEME.
+struct SwatchPicker: View {
+    /// The display's picture; its bar's is the same name with `_bar`.
+    let display: String
+    let displayFrame: CGRect
+    let barFrame: CGRect
+    let barColour: RGB
+    let columns: [(top: RGB, accent: RGB)]
+    let picked: Int
+    let hovered: Int?
+    let cursorColour: RGB
+    var pickLineColour: (Int) -> RGB = { _ in 0xFFFFFF }
+    let pick: (Int) -> Void
+    let confirmed: ((Int) -> Void)?
+
+    var body: some View {
+        let inner = CGSize(width: displayFrame.width * 0.84, height: displayFrame.height * 0.6)
+        let split = CustomizeScreen.swatchShare
+        Image(uiImage: UIImage(named: display) ?? UIImage()).resizable()
+            .frame(width: displayFrame.width, height: displayFrame.height)
+            .position(x: displayFrame.midX, y: displayFrame.midY)
+        Image(uiImage: UIImage(named: display + "_bar") ?? UIImage()).resizable()
+            .colorMultiply(Color(rgb: barColour))
+            .frame(width: barFrame.width, height: barFrame.height)
+            .energyGlow(radius: barFrame.height * 0.5)
+            .position(x: barFrame.midX, y: barFrame.midY)
+        HStack(spacing: inner.width / CGFloat(columns.count) * 0.12) {
+            ForEach(columns.indices, id: \.self) { index in
+                ZStack {
+                    LeaningBand(from: 0, to: split).fill(Color(rgb: columns[index].top))
+                    LeaningBand(from: split, to: 1).fill(Color(rgb: columns[index].accent))
+                    LeaningBand(from: 0, to: 1).stroke(Color(rgb: pickLineColour(index)), lineWidth: index == picked ? 2.5 : 0)
+                    // The cursor's column, outside the pick's line.
+                    LeaningBand(from: 0, to: 1).stroke(Color(rgb: cursorColour), lineWidth: index == hovered ? 3 : 0).padding(-4)
+                }
+                .scaleEffect(index == hovered ? 1.15 : (index == picked ? 1.08 : 1))
+            }
+        }
+        .frame(width: inner.width, height: inner.height)
+        .contentShape(Rectangle())
+        .pickerTouches(columns: columns.count, width: inner.width, picked: picked, pick: pick, confirmed: confirmed)
+        .position(x: displayFrame.midX, y: displayFrame.midY - displayFrame.height * 0.08)
+    }
+
+    /// The first side's display and its bar as the customize screen lays them out, the display
+    /// `width` wide round `centre`.
+    static func firstSideFrames(centre: CGPoint, width: CGFloat) -> (display: CGRect, bar: CGRect) {
+        let displayShare = CustomizeLayout.frames["customize_p1_display"] ?? .zero
+        let barShare = CustomizeLayout.frames["customize_p1_display_bar"] ?? .zero
+        let screenWidth = width / max(displayShare.width, 0.0001)
+        let screenHeight = screenWidth / CustomizeLayout.aspect
+        func placed(_ share: CGRect) -> CGRect {
+            CGRect(x: share.minX * screenWidth, y: share.minY * screenHeight, width: share.width * screenWidth, height: share.height * screenHeight)
+        }
+        let display = placed(displayShare)
+        let shift = CGPoint(x: centre.x - display.midX, y: centre.y - display.midY)
+        return (display.offsetBy(dx: shift.x, dy: shift.y), placed(barShare).offsetBy(dx: shift.x, dy: shift.y))
+    }
+}
+
 /// A band across a column leaning right, a fifth of its width over its height, from `from` to
 /// `to` of the way down: bands of one column meet corner to corner.
 struct LeaningBand: Shape {
@@ -1514,6 +1610,8 @@ struct CustomizeFigure: View {
     /// The ball in hand, its picture and its middle in art pixels from the canvas's bottom left;
     /// and what the sheet draws in front of it, and that part's line in white, again over it (the win screen's).
     var ball: (image: CGImage, centre: CGPoint)? = nil
+    /// The aura round a ball held by energy, centred on the ball's picture, added in the energy under it.
+    var ballAura: CGImage? = nil
     var overBall: CGImage? = nil
     var overBallLine: CGImage? = nil
     /// What play draws round the body that a portrait hasn't: the head tipped, arms of their own,
@@ -1522,6 +1620,8 @@ struct CustomizeFigure: View {
     /// In FloState (the updates screen's): its line in the zone's colours, round and round, and its
     /// strings the diamonds off the chest (`FloStrings`).
     var floState = false
+    /// Drawn once and held: no strings swaying or cubes coming off (VTV's replay pictures).
+    var still = false
     @State private var motion = CustomizeFigureMotion()
     /// The figure as last drawn, and, a pick having changed its look, the one before it, left
     /// under the new one while that fades in over it.
@@ -1545,8 +1645,49 @@ struct CustomizeFigure: View {
         SpriteLibrary.hoodPlace(head: portrait.centres[.head] ?? CGPoint(x: 24, y: 24), offset: portrait.hoodOffset, nudge: nudge, scale: scale)
     }
 
+    /// A portrait's canvas's top left on the 48-pixel figure's, art pixels down from its top left:
+    /// a bigger sheet's (the slash's 64) centred on the same feet, which sit 16 up its cell, not 8.
+    static func canvasOrigin(_ portrait: SpriteLibrary.Portrait) -> CGPoint {
+        let width = CGFloat(portrait.image.width), height = CGFloat(portrait.image.height)
+        let feet: CGFloat = height >= 64 ? 16 : 8
+        return CGPoint(x: 24 - width / 2, y: 40 + feet - height)
+    }
+    /// Where a portrait's drawn pixels lie on the 48-pixel figure, its hooded head's with them:
+    /// art pixels down from its top left.
+    static func drawnBounds(_ portrait: SpriteLibrary.Portrait, headNudge: CGPoint, headScale: CGFloat) -> CGRect? {
+        let sheet = canvasOrigin(portrait)
+        var bounds = opaqueBounds(portrait.image)?.offsetBy(dx: sheet.x, dy: sheet.y)
+        if let hood = portrait.hood, let hoodBounds = opaqueBounds(hood) {
+            let place = hoodPlace(portrait, nudge: headNudge, scale: headScale)
+            let placed = CGRect(x: sheet.x + place.origin.x + hoodBounds.minX * place.scale, y: sheet.y + place.origin.y + hoodBounds.minY * place.scale,
+                                width: hoodBounds.width * place.scale, height: hoodBounds.height * place.scale)
+            bounds = bounds.map { $0.union(placed) } ?? placed
+        }
+        return bounds
+    }
+    /// The box round an image's pixels that aren't clear, in its pixels from the top left.
+    static func opaqueBounds(_ image: CGImage) -> CGRect? {
+        let width = image.width, height = image.height
+        guard let (context, pixels) = SpriteLibrary.canvas(width: width, height: height) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var minX = width, minY = height, maxX = -1, maxY = -1
+        for y in 0..<height {
+            for x in 0..<width where pixels[(y * width + x) * 4 + 3] > 0 {
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= 0 else { return nil }
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+    }
+    static func canvasRect(_ portrait: SpriteLibrary.Portrait, margin: CGFloat, pixel: CGFloat) -> CGRect {
+        let origin = canvasOrigin(portrait)
+        return CGRect(x: (margin + origin.x) * pixel, y: (margin + origin.y) * pixel,
+                      width: CGFloat(portrait.image.width) * pixel, height: CGFloat(portrait.image.height) * pixel)
+    }
+
     var body: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: nil, paused: still)) { timeline in
             Canvas { context, size in
                 motion.advance(to: timeline.date.timeIntervalSinceReferenceDate, portrait: portrait, look: look, headNudge: headNudge, headScale: headScale,
                                floState: floState)
@@ -1563,11 +1704,12 @@ struct CustomizeFigure: View {
                 }
                 for cube in motion.cubes where cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) }
                 for diamond in motion.diamonds where diamond.behind { CustomizeFigure.drawDiamond(diamond, look: look, in: context, spot: spot) }
-                let figureRect = CGRect(x: margin * pixel, y: margin * pixel, width: 48 * pixel, height: 48 * pixel)
+                let figureRect = CustomizeFigure.canvasRect(portrait, margin: margin, pixel: pixel)
                 func hoodRect(_ shown: SpriteLibrary.Portrait) -> CGRect {
                     let place = CustomizeFigure.hoodPlace(shown, nudge: headNudge, scale: headScale)
                     let shift = extras?.headShift ?? .zero
-                    return CGRect(x: (margin + place.origin.x + shift.x) * pixel, y: (margin + place.origin.y - shift.y) * pixel,
+                    let canvas = CustomizeFigure.canvasOrigin(shown)
+                    return CGRect(x: (margin + canvas.x + place.origin.x + shift.x) * pixel, y: (margin + canvas.y + place.origin.y - shift.y) * pixel,
                                   width: 48 * place.scale * pixel, height: 48 * place.scale * pixel)
                 }
                 let headTurned = (extras?.headTurn ?? 0) != 0 || (extras?.headShift ?? .zero) != .zero
@@ -1619,6 +1761,7 @@ struct CustomizeFigure: View {
                 func drawFigure(_ shown: SpriteLibrary.Portrait, _ shownLook: Look, opacity: Double) {
                     var figure = context
                     figure.opacity = opacity
+                    let figureRect = CustomizeFigure.canvasRect(shown, margin: margin, pixel: pixel)
                     figure.draw(Image(decorative: shown.image, scale: 1).interpolation(.none), in: figureRect)
                     // Tipped, the hood carries its own line, the body's drawn without the hood's place.
                     if let line = headTurned ? (shown.bareLine ?? shown.line) : shown.line {
@@ -1639,6 +1782,7 @@ struct CustomizeFigure: View {
                 if let ball {
                     let width = CGFloat(ball.image.width) * pixel, height = CGFloat(ball.image.height) * pixel
                     let at = spot(ball.centre)
+                    if let ballAura { CustomizeFigure.drawBallAura(ballAura, at: at, colour: look.glow, pixel: pixel, in: context) }
                     context.draw(Image(decorative: ball.image, scale: 1).interpolation(.none),
                                  in: CGRect(x: at.x - width / 2, y: at.y - height / 2, width: width, height: height))
                 }
@@ -1669,17 +1813,16 @@ struct CustomizeFigure: View {
                 }
                 for cube in motion.cubes where !cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) }
                 for diamond in motion.diamonds where !diamond.behind { CustomizeFigure.drawDiamond(diamond, look: look, in: context, spot: spot) }
-                // The glow: what's energy again, blurred and added.
-                var glowing = context
-                glowing.blendMode = .plusLighter
-                glowing.opacity = CustomizeArt.glowStrength
-                glowing.drawLayer { layer in
+                // The glow: what's energy again, blurred and added round it, not over it, so the
+                // energy keeps its own tones (added over, the light ones' two tones went to one).
+                func drawBlurredGlow(in layer: GraphicsContext) {
+                    var layer = layer
                     layer.addFilter(.blur(radius: pixel * CustomizeArt.glowPixels))
                     // Through a change, the old look's glow giving way to the new's.
                     func drawGlow(_ shown: SpriteLibrary.Portrait, opacity: Double) {
                         var glow = layer
                         glow.opacity = opacity
-                        glow.draw(Image(decorative: shown.glowing, scale: 1).interpolation(.none), in: figureRect)
+                        glow.draw(Image(decorative: shown.glowing, scale: 1).interpolation(.none), in: CustomizeFigure.canvasRect(shown, margin: margin, pixel: pixel))
                         if let hood = shown.hoodGlowing { hoodContext(glow, shown).draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(shown)) }
                     }
                     if let previous, fade < 1 { drawGlow(previous.portrait, opacity: 1 - fade) }
@@ -1690,6 +1833,22 @@ struct CustomizeFigure: View {
                     }
                     for cube in motion.cubes { CustomizeFigure.drawCube(cube, in: layer, at: spot(cube.position), pixel: pixel) }
                     for diamond in motion.diamonds { CustomizeFigure.drawDiamond(diamond, look: look, in: layer, spot: spot) }
+                }
+                /// What glows itself, sharp: what the glow's kept off.
+                func drawGlowing(in context: GraphicsContext) {
+                    for shown in [portrait] + (previous.map { fade < 1 ? [$0.portrait] : [] } ?? []) {
+                        context.draw(Image(decorative: shown.glowing, scale: 1).interpolation(.none), in: CustomizeFigure.canvasRect(shown, margin: margin, pixel: pixel))
+                        if let hood = shown.hoodGlowing { hoodContext(context, shown).draw(Image(decorative: hood, scale: 1).interpolation(.none), in: hoodRect(shown)) }
+                    }
+                }
+                var glowing = context
+                glowing.blendMode = .plusLighter
+                glowing.opacity = CustomizeArt.glowStrength
+                glowing.drawLayer { halo in
+                    halo.drawLayer { drawBlurredGlow(in: $0) }
+                    var cut = halo
+                    cut.blendMode = .destinationOut
+                    cut.drawLayer { drawGlowing(in: $0) }
                 }
             }
         }
@@ -1717,6 +1876,19 @@ struct CustomizeFigure: View {
             path.addLines(face.corners.map { spot(CGPoint(x: CGFloat($0.x), y: CGFloat($0.y))) })
             path.closeSubpath()
             context.fill(path, with: .color(Color(red: Double(mixed.x), green: Double(mixed.y), blue: Double(mixed.z))))
+        }
+    }
+
+    /// A ball layer's aura (`SpriteLibrary.ballAuraImage`), its middle at `centre`, added in `colour` as play adds it.
+    static func drawBallAura(_ aura: CGImage, at centre: CGPoint, colour: RGB, pixel: CGFloat, in context: GraphicsContext) {
+        let texels = CGFloat(SpriteLibrary.ballAuraResolution)
+        let width = CGFloat(aura.width) / texels * pixel, height = CGFloat(aura.height) / texels * pixel
+        var added = context
+        added.blendMode = .plusLighter
+        added.opacity = SpriteLibrary.ballAuraStrength
+        added.drawLayer { layer in
+            layer.addFilter(.colorMultiply(Color(rgb: colour)))
+            layer.draw(Image(decorative: aura, scale: 1), in: CGRect(x: centre.x - width / 2, y: centre.y - height / 2, width: width, height: height))
         }
     }
 
@@ -1806,12 +1978,14 @@ final class CustomizeFigureMotion {
         // The strings off the hood's own anchors, wherever the hood went on the figure and at its
         // size, floating one back and one forward.
         let place = CustomizeFigure.hoodPlace(portrait, nudge: headNudge, scale: headScale)
+        // A bigger sheet's points moved onto the 48-pixel figure's.
+        let sheet = CustomizeFigure.canvasOrigin(portrait)
         var anchors = HoodStrings.anchorPixels.map { pixel in
-            CGPoint(x: place.origin.x + (pixel.x + 0.5) * place.scale, y: canvas - (place.origin.y + (pixel.y + 0.5) * place.scale))
+            CGPoint(x: sheet.x + place.origin.x + (pixel.x + 0.5) * place.scale, y: canvas - (sheet.y + place.origin.y + (pixel.y + 0.5) * place.scale))
         }
         if turn != 0, let head = portrait.centres[.head] {
             // Turned with the hood about the head's middle; y up here, so clockwise is the negative way.
-            let middle = CGPoint(x: head.x, y: canvas - head.y)
+            let middle = CGPoint(x: sheet.x + head.x, y: canvas - (sheet.y + head.y))
             anchors = anchors.map { anchor in
                 let dx = anchor.x - middle.x, dy = anchor.y - middle.y
                 return CGPoint(x: middle.x + dx * cos(-turn) - dy * sin(-turn), y: middle.y + dx * sin(-turn) + dy * cos(-turn))
@@ -1820,7 +1994,7 @@ final class CustomizeFigureMotion {
         if floState {
             // FloState's diamonds off the chest, where the hood went: winding nowhere, standing.
             let chest = FloStrings.anchorPixels.map { pixel in
-                SIMD3<Float>(Float(place.origin.x + (pixel.x + 0.5) * place.scale), Float(canvas - (place.origin.y + (pixel.y + 0.5) * place.scale)), 0)
+                SIMD3<Float>(Float(sheet.x + place.origin.x + (pixel.x + 0.5) * place.scale), Float(canvas - (sheet.y + place.origin.y + (pixel.y + 0.5) * place.scale)), 0)
             }
             strings = []
             diamonds = floStringMotion.step(anchors: chest, facing: 1, lean: 0, scale: 1, time: time, spinning: false,
@@ -1849,8 +2023,8 @@ final class CustomizeFigureMotion {
                 let angle = Double.pi / 2 + Double.random(in: -Double.pi / 28...Double.pi / 28)
                 let speed = 24 + Double.random(in: -2...2)
                 let axis = simd_normalize(SIMD3<Float>.random(in: -1...1) + SIMD3<Float>(0, 0, 0.001))
-                cubes.append(Cube(position: CGPoint(x: centre.x + .random(in: -spread...spread),
-                                                    y: canvas - centre.y + source.lift + .random(in: -spread / 2...spread / 2)),
+                cubes.append(Cube(position: CGPoint(x: sheet.x + centre.x + .random(in: -spread...spread),
+                                                    y: canvas - (sheet.y + centre.y) + source.lift + .random(in: -spread / 2...spread / 2)),
                                   velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
                                   life: Double(ParticleLook.cubeTrail) / speed + .random(in: -0.05...0.05),
                                   orientation: simd_quatf(angle: .random(in: 0..<(2 * .pi)), axis: axis),
@@ -1882,8 +2056,8 @@ enum CustomizeArt {
     private static var projectors: [RGB: UIImage] = [:]
     private static var projectorEnergies: [RGB: UIImage] = [:]
     /// The glow's copy, added over what glows at this strength; the figure's blurred this many art pixels.
-    static let glowStrength = 0.6
-    static let glowPixels: CGFloat = 2.5
+    nonisolated static let glowStrength = 0.6
+    nonisolated static let glowPixels: CGFloat = 2.5
 
     /// The projector's white alone, in an energy colour: what of it glows.
     static func projectorEnergy(_ glow: RGB) -> UIImage? {

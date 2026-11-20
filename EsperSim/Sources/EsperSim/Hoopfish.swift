@@ -107,3 +107,7 @@ public enum HoopfishRules {
         return low + (high - low) * pick
     }
 }
+
+extension Hoopfish: Codable {}
+
+extension Hoopfish.Carrying: Codable {}

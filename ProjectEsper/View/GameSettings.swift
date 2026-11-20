@@ -120,7 +120,7 @@ enum GameSettings {
                     SoundBoard.shared.applyVolume()
                 case .ambience:
                     GameSettings.ambience = index == 0
-                    Ambience.shared.applySetting()
+                    LoopedTrack.applySettings()
                 case .screenShake: GameSettings.screenShake = index == 0
                 case .playerVisibility: GameSettings.playerVisibility = SpriteLibrary.LineStyle(rawValue: index) ?? .normal
                 }

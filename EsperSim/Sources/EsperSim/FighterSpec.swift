@@ -289,6 +289,10 @@ public enum BallRules {
     public static let shotAngleMin = degrees(25)
     public static let shotAngleMax = degrees(80)
     public static let shotAngleDefault = degrees(53)
+    /// The fadeaway's lean back, a degree a frame up to its most; let go, it eases back by this share a frame.
+    public static let fadeawayLeanMax = degrees(30)
+    public static let fadeawayLeanPerFrame = degrees(1)
+    public static let fadeawayLeanEase = 0.2
     /// The preset arc, a shot with no flick (ARC HEIGHT, ARC DISTANCE): its peak this high over
     /// the release, back down to the release's height this far ahead, in units.
     public static var presetArcHeight = 50.0
@@ -637,7 +641,7 @@ public enum HitStopRules {
     public static let hitFrames = 8
     /// A counter's: the rock-paper-scissors won, a parry among them; under a clash's.
     public static let counterFrames = 28
-    /// Every clash's, slash, snatch or shield, held long.
+    /// Every clash's, slash, snatch, slide or shield, held long.
     public static let clashFrames = 40
     /// A Breaker Ball barrier shattering.
     public static let shatterFrames = 30
@@ -750,3 +754,5 @@ public enum ThrowChargeRules {
     }
     public static func speed(_ charge: Double) -> Double { leastSpeed + (mostSpeed - leastSpeed) * charge }
 }
+
+extension FighterSpec: Codable {}

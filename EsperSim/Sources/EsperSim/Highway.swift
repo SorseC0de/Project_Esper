@@ -328,3 +328,9 @@ extension Match {
         stage.unridable = cars.filter { $0.level == 0 }.flatMap(\.boxes)
     }
 }
+
+extension Car: Codable {}
+
+extension Helicopter: Codable {}
+
+extension Vehicle: Codable {}

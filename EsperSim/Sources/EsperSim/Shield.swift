@@ -436,3 +436,5 @@ extension Match {
         }
     }
 }
+
+extension Shield: Codable {}

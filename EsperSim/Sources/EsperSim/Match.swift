@@ -304,6 +304,7 @@ public struct Match: Equatable {
         spillOnRoad()
         resolveSlashClash()
         resolveSnatchClash()
+        resolveSlideClash()
         resolveParries()
         for index in players.indices {
             resolveHits(by: index)
@@ -404,7 +405,7 @@ public struct Match: Equatable {
                         : FortySevenRules.points(from: ball.launchPoint, through: stage.hoops[hoop], on: stage) * pointValue
                     scores[owner] += points
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: points, floater: ball.floaterShot, dunk: ball.dunkShot))
-                    if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, at: stage.hoops[hoop].position) }
+                    floForBasketConceded(by: owner, through: hoop)
                     // The Phoenix's ring isn't locked: it's away; nor the Tutorial's, shot at again and again.
                     if !stage.hoops[hoop].bonus, !stage.features.tutorial {
                         stage.hoops[hoop].lockFrames = FortySevenRules.rimLockFrames
@@ -428,7 +429,7 @@ public struct Match: Equatable {
                     events.append(.scored(player: owner, hoop: hoop, entry: ball.entryVelocity, points: 1, floater: ball.floaterShot, dunk: ball.dunkShot))
                     // FloState ends with the point, its FLO kept, not burned behind the menus.
                     for player in players.indices { players[player].leaveFloStateForPoint() }
-                    if ball.lastTouched == owner { earnFlo(FloRules.madeShot, by: owner, at: stage.hoops[hoop].position) }
+                    floForBasketConceded(by: owner, through: hoop)
                     if let other = players.indices.first(where: { $0 != owner }) {
                         if players.contains(where: { $0.state == .dunking && !$0.dunkPassing }) {
                             // A dunk: the dunker hangs on the rim a beat, the ball dead, then the restart.
@@ -718,19 +719,28 @@ public struct Match: Equatable {
             }
             players[index].trampling = touching
         }
-        // Slide Cider: the leg knocks the body along the slide, and at level two stuns a holder too.
+        // Slide Cider: the leg knocks the body along the slide, and at level two stuns as a parry does.
         let cider = player.spec.slideCiderLevel
         let legKnock = cider >= 1 ? Vec2(x: SlideRules.ciderKnock.x * player.facing.sign, y: SlideRules.ciderKnock.y) : nil
         if let leg = player.slideHitbox, let other, reachable(other, by: index), players[other].hasBall, players[other].grounded, players[other].hurt(by: leg) {
             players[index].slideHit = true
-            pop(from: other, by: index)
-            if let legKnock { players[other].knock(legKnock) }
-            if cider >= 2 { players[other].hitStun = BallRules.hitStunFrames }
+            if cider >= 2 {
+                stunAsParried(other, by: index)
+                earnFlo(FloRules.hit, by: index, at: players[other].chest)
+            } else {
+                pop(from: other, by: index)
+                if let legKnock { players[other].knock(legKnock) }
+            }
         } else if let leg = player.slideHitbox, let other, reachable(other, by: index), !players[other].hasBall, players[other].frozen == 0,
                   players[other].hitStun == 0, players[other].hurt(by: leg) {
             // Without the ball the leg stuns, as every other attack does.
             players[index].slideHit = true
-            strip(other, by: index, knock: legKnock)
+            if cider >= 2 {
+                stunAsParried(other, by: index)
+                earnFlo(FloRules.hit, by: index, at: players[other].chest)
+            } else {
+                strip(other, by: index, knock: legKnock)
+            }
         }
         // Breaker Ball: the ball circling the change wears the other's barrier down, again and again.
         if breakerOrbitCooldown.indices.contains(index), breakerOrbitCooldown[index] > 0 { breakerOrbitCooldown[index] -= 1 }
@@ -918,6 +928,21 @@ public struct Match: Equatable {
         let at = (players[0].handCatchPoint + players[1].handCatchPoint) * 0.5
         clashAt = at
         events.append(.snatchClashed(at: at))
+        holdHitStop(HitStopRules.clashFrames)
+    }
+
+    /// Two slides' legs meeting, neither spent: a slideclash, as the slashclash is. Both legs spent,
+    /// a long hit stop, and once it's over both out of the slide, pushed apart. Before the hits, so
+    /// neither leg stuns the other.
+    private mutating func resolveSlideClash() {
+        guard players.count == 2, !phantomApart(0, 1), let first = players[0].slideHitbox, let second = players[1].slideHitbox,
+              first.overlaps(second) else { return }
+        players[0].slideHit = true
+        players[1].slideHit = true
+        slashClashRecovery = true
+        let at = (first.center + second.center) * 0.5
+        clashAt = at
+        events.append(.slideClashed(at: at))
         holdHitStop(HitStopRules.clashFrames)
     }
 
@@ -1494,6 +1519,14 @@ public struct Match: Equatable {
     private mutating func flobackFresca(_ victim: Int) {
         guard players[victim].spec.flobackFrescaLevel >= 1 else { return }
         earnFlo(FlobackRules.flo, by: victim, at: players[victim].chest)
+    }
+
+    /// A basket's FLO goes to everyone it was scored on, whoever touched it last, so scoring never
+    /// feeds the scorer's own FloState.
+    mutating func floForBasketConceded(by scorer: Int, through hoop: Int) {
+        for player in players.indices where player != scorer {
+            earnFlo(FloRules.madeShot, by: player, at: stage.hoops[hoop].position)
+        }
     }
 
     /// FLO earned by `earner`; never taken from anyone, so FloState stays a comeback.
@@ -2448,3 +2481,8 @@ extension Match {
         return [-1, 1]
     }
 }
+extension Match: Codable {}
+
+extension Match.Icicle: Codable {}
+
+extension Platform: Codable {}

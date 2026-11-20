@@ -130,9 +130,15 @@ public struct Player: Equatable {
     /// The stance a stepback came out of and goes back to, and whether this stance has had its one.
     public var stepbackFrom: PlayerState = .shootStance
     public var stepbackUsed = false
-    /// Down pressed in this stance: the stepback, once the stance is held.
+    /// Back pressed in this stance (down, with no rim to face): the stepback, once the stance is held.
     public var stepbackAsked = false
-    /// The stick is still down from the stepback: it aims nothing until it's let go and pressed again.
+    /// Back held last frame in the stance, so only a fresh press asks for the stepback.
+    public var stanceBackWasHeld = false
+    /// The shot stance was taken in the air: landing in it cancels it.
+    public var stanceStartedAirborne = false
+    /// The fadeaway's lean back, in radians: the body and the ball in hand turned back about the feet.
+    public var fadeawayLean = 0.0
+    /// The stick is still held from the stepback: it aims nothing until it's let go and pressed again.
     public var stepbackAimLocked = false
     /// The run's speed as it last stood, for the pivot jump to carry.
     public var runMomentum = 0.0
@@ -177,8 +183,16 @@ public struct Player: Equatable {
     /// hold frame draws it, the fifth, the ball's place the air shot has always let go from.
     public var shotReleasePoint: Vec2 {
         let hold = grounded ? AnimationFrame(.shoot, Animation.shotSmearFrame - 1) : AnimationFrame(.shootAir, Animation.shootAir.shotHoldFrame)
-        guard let offset = BallLandmarks.offset(hold) else { return position + Vec2(x: 0, y: BallRules.shotReleaseHeight * spec.scale) }
-        return position + Vec2(x: offset.x / 1.6 * spec.scale * facing.sign, y: offset.y / 1.6 * spec.scale)
+        guard let offset = BallLandmarks.offset(hold) else { return position + leaned(Vec2(x: 0, y: BallRules.shotReleaseHeight * spec.scale)) }
+        return position + leaned(Vec2(x: offset.x / 1.6 * spec.scale * facing.sign, y: offset.y / 1.6 * spec.scale))
+    }
+
+    /// Turned back with the fadeaway's lean, about the feet, as the body's drawn.
+    func leaned(_ vector: Vec2) -> Vec2 {
+        guard fadeawayLean != 0 else { return vector }
+        let angle = fadeawayLean * facing.sign
+        let cos = Trig.cos(angle), sin = Trig.sin(angle)
+        return Vec2(x: vector.x * cos - vector.y * sin, y: vector.x * sin + vector.y * cos)
     }
 
     /// Where a layup lets go: at the height of the hand, as its sheet's last frame with the ball
@@ -242,6 +256,8 @@ public struct Player: Equatable {
     public var inFloState = false
     /// Frames before FloState can be entered again, from when it was left.
     public var floStateLockout = 0
+    /// Sweat worked up moving on the ground, out of FloState, in hundredths; a FLO for every `FloRules.sweatPerFlo`.
+    public var sweat = 0
     /// ZONES: FLO never runs out, though the lockout between activations still runs.
     public var unlimitedFlo = false
     /// Capture Mode: no FLO gained, and none left behind where it burns.
@@ -389,6 +405,8 @@ public struct Player: Equatable {
 
     /// The rim this player scores on, for the preset arc to come down on; kept each frame.
     public var presetRim: Vec2?
+    /// The nearest rim on the stage this player can score on, for a shot to face; kept each frame.
+    public var nearestScoringRim: Vec2?
     /// The rim the preset arc comes down on, if it's aimed and the rim's somewhere on the stage
     /// (a moving rim not yet in place leaves the arc fixed).
     /// Only facing it, five tiles across at least and within AIM RANGE, on a stage that aims.
@@ -465,6 +483,8 @@ public struct Player: Equatable {
     public var guardBuffer = 0
     /// How long a press of any button is kept for the move it asks for.
     public static let pressBufferFrames = 5
+    /// How far back the stick goes, across, to ask for the stepback: as far as down goes for it.
+    static let stepbackStickThreshold = 0.65
     /// Frames since the stick was near centre on x, for telling a smash from a tilt.
     public var stickAwayFrames = 0
     /// Walk and run cycle position, in animation frames.
@@ -879,6 +899,7 @@ public struct Player: Equatable {
         }
         stateTimer += timerStep
         stepFloState()
+        stepSweat()
         if boltCooldown > 0 { boltCooldown -= 1 }
         if strikeCooldown > 0 { strikeCooldown -= 1 }
         if pulseCooldown > 0 { pulseCooldown -= 1 }
@@ -974,6 +995,20 @@ public struct Player: Equatable {
             shieldRaised = true
         }
         presetRim = stage.hoops.first { !$0.rimless && $0.hasBackboard && ($0.shared || $0.owner == index) }?.position
+        nearestScoringRim = stage.hoops
+            .filter { !$0.rimless && ($0.shared || $0.owner == index) && $0.position.x > -100 && $0.position.y < 1000 }
+            .map(\.position)
+            .min { $0.distance(to: position) < $1.distance(to: position) }
+        // The fadeaway leans back a degree a frame while it's held, keeps its lean until the shot's over,
+        // and eases upright after.
+        if fadingAway {
+            fadeawayLean = min(fadeawayLean + BallRules.fadeawayLeanPerFrame, BallRules.fadeawayLeanMax)
+        } else if state == .shooting {
+            // Held where it got to.
+        } else if fadeawayLean != 0 {
+            fadeawayLean *= 1 - BallRules.fadeawayLeanEase
+            if fadeawayLean < BallRules.fadeawayLeanPerFrame / 10 { fadeawayLean = 0 }
+        }
         autoAims = stage.features.autoAims
         // The last way aimed, and how many frames ago, for the throw's buffer.
         let aimedNow = input.aim.length >= BallRules.flickThreshold ? input.aim : input.stick
@@ -1458,6 +1493,11 @@ public struct Player: Equatable {
 
         case .shootStance:
             if stanceTimerJustEntered { stanceButtons = input.shootButtons }
+            if stanceStartedAirborne, grounded {
+                // A stance taken in the air is dropped on landing, not carried on as a ground shot.
+                cancelShot()
+                break
+            }
             if input.shootButtons & ~stanceButtons != 0 || throwPressed {
                 // A shoot button other than the one that took the stance, or the throw: the cancel.
                 cancelShot()
@@ -1465,13 +1505,17 @@ public struct Player: Equatable {
                 guardBuffer = 0
                 break
             }
-            stanceMovement(input, airBrake: stanceAirBrake)
-            if downHeldFrames == 0 { stepbackAimLocked = false }
+            let facesRim = faceScoringRim()
+            stanceMovement(input, airBrake: stanceAirBrake, fadeaway: facesRim)
+            // The stepback's stick: back, the rim faced whatever the stick does; with none to face, down.
+            let stepbackHeld = facesRim ? input.stick.x * facing.sign <= -Player.stepbackStickThreshold : downHeldFrames > 0
+            if stanceTimerJustEntered { stanceBackWasHeld = stepbackHeld }
+            if !stepbackHeld { stepbackAimLocked = false }
             if input.aim.length >= BallRules.flickThreshold, !stepbackAimLocked {
                 shotAim = input.aim
-                if shotAim.x != 0 { facing = shotAim.x > 0 ? .right : .left }
-            } else if let direction = stickFacing(input) {
-                // The stick turns the body throughout, so touch can turn as the pad does.
+                if !facesRim, shotAim.x != 0 { facing = shotAim.x > 0 ? .right : .left }
+            } else if !facesRim, let direction = stickFacing(input) {
+                // With no rim to face, the stick turns the body throughout, so touch can turn as the pad does.
                 facing = direction
             }
             if grounded, jumpPressed {
@@ -1482,8 +1526,10 @@ public struct Player: Equatable {
                 jumpShot = true
                 events.append(.jumped(player: index))
             }
-            // Down on the ground asks for the stepback, which comes once the stance is held.
-            if grounded, downHeldFrames == 1 { stepbackAsked = true }
+            // Back pressed on the ground asks for the stepback, which comes once the stance is held;
+            // back held from before the stance, as it turned to the rim, isn't a press.
+            if grounded, stepbackHeld, !stanceBackWasHeld { stepbackAsked = true }
+            stanceBackWasHeld = stepbackHeld
             if grounded, stepbackAsked, stateTimer >= BallRules.shotWindupFrames, !stepbackUsed, hasBall || hasFireball {
                 startStepback(from: .shootStance, events: &events)
                 break
@@ -1848,9 +1894,7 @@ public struct Player: Equatable {
             airDrift(input)
             fall(.idle)
             if stateTimer >= SlashRules.rollFrames {
-                // Spinning on as it falls, till it lands or does something else.
                 enter(.air)
-                spinningOut = true
             }
 
         case .snatching:
@@ -1948,7 +1992,7 @@ public struct Player: Equatable {
             }
             if stickFacing(input) != nil, input.stick.y >= -0.65 {
                 enter(.walk)
-            } else if stateTimer >= 44 {
+            } else if stateTimer >= (inFloState ? Player.tauntFloStateFrames : 44) {
                 enter(.idle)
             }
 
@@ -2610,9 +2654,9 @@ public struct Player: Equatable {
         return position.x <= rim.position.x ? .right : .left
     }
 
-    /// A slashclash's or a snatchclash's hit stop over: out of the swing or the snatch at once, back in neutral.
+    /// A slashclash's, a snatchclash's or a slideclash's hit stop over: out of the swing, the snatch or the slide at once, back in neutral.
     public mutating func recoverFromSlashClash() {
-        guard state == .slashing || state == .snatching else { return }
+        guard state == .slashing || state == .snatching || state == .slide else { return }
         enter(grounded ? .idle : .air)
     }
 
@@ -2851,6 +2895,25 @@ public struct Player: Equatable {
         if flo <= 0 { leaveFloState() }
     }
 
+    /// Moving on the ground works up sweat, the dash most, so dash-dancing charges fastest, and more
+    /// without the ball; every `FloRules.sweatPerFlo` of it is a FLO, gained quietly. None in FloState.
+    /// Counted in hundredths, so the share without the ball stays whole.
+    private mutating func stepSweat() {
+        guard !inFloState, earnsFlo, flo < FloRules.full else { return }
+        let rate: Int
+        switch state {
+        case .walk: rate = FloRules.sweatWalking
+        case .run: rate = FloRules.sweatRunning
+        case .dash, .pivot: rate = FloRules.sweatDashing
+        default: return
+        }
+        sweat += rate * (hasBall ? 100 : FloRules.sweatWithoutBallPercent)
+        if sweat >= FloRules.sweatPerFlo * 100 {
+            sweat -= FloRules.sweatPerFlo * 100
+            flo += 1
+        }
+    }
+
     /// Out of FloState for a point scored in Rounds: the FLO left kept for the next, no lockout,
     /// none of it spent while the menus run.
     mutating func leaveFloStateForPoint() {
@@ -2887,6 +2950,8 @@ public struct Player: Equatable {
     }
     /// The taunt's frames the ball meets the floor on.
     static let tauntBounces = Animation.taunt.dribbleBounceFrames()
+    /// FloState's taunt lasts its sheet through once at its rate.
+    static let tauntFloStateFrames = Animation.tauntFloState.frameCount * 60 / Animation.tauntFloStateFramesPerSecond
 
     public func overhangBall(in stage: Stage) -> Vec2? {
         guard hasBall, grounded, state.isGroundState, let offset = BallLandmarks.offset(animationFrame) else { return nil }
@@ -2915,7 +2980,25 @@ public struct Player: Equatable {
         jumpShot = false
         shotLift = false
         stanceButtons = 0
+        stanceStartedAirborne = !grounded
+        _ = faceScoringRim()
         enter(.shootStance)
+    }
+
+    /// A shot always faces the nearest rim it can score on, whichever way the stick or the flick points;
+    /// within a tile of being under it, the way it already faces. A fireball aims where it likes.
+    /// Whether there was a rim to face.
+    private mutating func faceScoringRim() -> Bool {
+        guard !hasFireball, let rim = nearestScoringRim else { return false }
+        let across = rim.x - position.x
+        if abs(across) >= Stage.tileSize { facing = across > 0 ? .right : .left }
+        return true
+    }
+
+    /// In the air in the shot, the stick held away from the rim: the fadeaway, drifting back.
+    public var fadingAway: Bool {
+        !grounded && !hasFireball && (state == .shootStance || state == .shooting) && nearestScoringRim != nil
+            && stickFacing(lastInput) == facing.flipped
     }
 
     /// The stance dropped, ball kept, and no new stance until every shoot button is up.
@@ -3178,11 +3261,12 @@ public struct Player: Equatable {
 
     /// A stance comes to a stop on the ground and drifts down slowly in the air, its
     /// sideways speed bleeding off at `airBrake`.
-    private mutating func stanceMovement(_ input: PlayerInput, airBrake: Double) {
+    /// With `fadeaway`, the stick held back in the air drifts the body back as a slash's does.
+    private mutating func stanceMovement(_ input: PlayerInput, airBrake: Double, fadeaway: Bool = false) {
         if grounded {
             velocity.x = approach(velocity.x, 0, traction)
         } else {
-            velocity.x = approach(velocity.x, 0, airBrake)
+            velocity.x = fadeaway && stickFacing(input) == facing.flipped ? drifted(velocity.x, input) : approach(velocity.x, 0, airBrake)
             if velocity.y <= 0 {
                 velocity.y = -BallRules.stanceFallSpeed
             } else {
@@ -3200,12 +3284,13 @@ public struct Player: Equatable {
             if let rim = aimedRim {
                 return BallRules.presetArcVelocity(from: shotReleasePoint, to: rim, gravityShare: (underwater ? 0.5 : 1) * tiltDown)
             }
-            return BallRules.presetArcVelocity(sign: facing.sign)
+            return leaned(BallRules.presetArcVelocity(sign: facing.sign))
         }
         let forward = shotAim.x * facing.sign
         var angle = Trig.atan2(shotAim.y, abs(forward))
         angle = min(max(angle, BallRules.shotAngleMin), BallRules.shotAngleMax)
-        return Vec2(x: Trig.cos(angle) * facing.sign, y: Trig.sin(angle)) * spec.shotSpeed
+        // The fadeaway's lean tips the shot back with the body.
+        return leaned(Vec2(x: Trig.cos(angle) * facing.sign, y: Trig.sin(angle)) * spec.shotSpeed)
     }
 
     /// Coming down onto a rim's top from above: straight back up, never standing on it, higher
@@ -3463,6 +3548,14 @@ public enum FloRules {
     /// A thrown ball's hit and Blazing Boba's fireball's.
     public static let thrownHit = 10
     public static let taunt = 3
+    /// Sweat a frame walking, running and dashing (the pivot with it), and how much makes a FLO:
+    /// with the ball, dash-dancing fills the meter in about 33 seconds, running in 50, walking in 100.
+    /// Without it, this percent as much: about 30, 45 and 91 seconds. On the bench's SWEAT sliders.
+    nonisolated(unsafe) public static var sweatWalking = 1
+    nonisolated(unsafe) public static var sweatRunning = 2
+    nonisolated(unsafe) public static var sweatDashing = 3
+    nonisolated(unsafe) public static var sweatPerFlo = 60
+    nonisolated(unsafe) public static var sweatWithoutBallPercent = 110
     /// A burned body's FLO hovers where it went down, this far over the lava at least, and is
     /// taken by any body whose chest comes within this of it (64 art pixels).
     public static let bundleLift = 15.0
@@ -3476,3 +3569,17 @@ public struct FloBundle: Equatable {
     public var amount: Int
     public var position: Vec2
 }
+
+extension FloBundle: Codable {}
+
+extension Player: Codable {}
+
+extension Player.Aerial: Codable {}
+
+extension PlayerState: Codable {}
+
+extension Tear: Codable {}
+
+extension WebLine: Codable {}
+
+extension WebTarget: Codable {}

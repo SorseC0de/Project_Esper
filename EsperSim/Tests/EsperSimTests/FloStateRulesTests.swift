@@ -45,7 +45,7 @@ final class FloStateRulesTests: XCTestCase {
         for _ in 0..<120 where match.scores[0] == 0 { match.advance(inputs: [.idle, .idle]) }
         XCTAssertEqual(match.scores[0], 1)
         XCTAssertFalse(match.players[1].inFloState)
-        XCTAssertEqual(match.players[1].flo, 60, "kept, not burned")
+        XCTAssertEqual(match.players[1].flo, 60 + FloRules.madeShot, "kept, not burned, and the basket conceded's FLO on top")
         XCTAssertEqual(match.players[1].floStateLockout, 0, "no lockout: it wasn't left")
     }
 }

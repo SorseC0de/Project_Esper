@@ -9,6 +9,9 @@ import UIKit
 final class StageShots {
     static let shared = StageShots()
     private var textures: [StageChoice: SKTexture] = [:]
+    private var pictures: [StageChoice: UIImage] = [:]
+    /// For `MemoryTrace`.
+    var count: Int { textures.count + pictures.count }
     private let folder: URL = {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         let folder = caches.appendingPathComponent("StageShots", isDirectory: true)
@@ -59,9 +62,19 @@ final class StageShots {
         return texture
     }
 
+    /// The shot as a picture, for a SwiftUI screen (VTV's replays).
+    func picture(for stage: StageChoice) -> UIImage? {
+        if let made = pictures[stage] { return made }
+        guard let image = UIImage(contentsOfFile: file(for: stage).path)?.cgImage else { return nil }
+        let picture = UIImage(cgImage: StageShots.trimmed(image))
+        pictures[stage] = picture
+        return picture
+    }
+
     func store(_ image: CGImage, for stage: StageChoice) {
         let picture = UIImage(cgImage: StageShots.trimmed(image))
         textures[stage] = SKTexture(image: picture)
+        pictures[stage] = picture
         try? picture.pngData()?.write(to: file(for: stage))
         onStored?(stage)
     }

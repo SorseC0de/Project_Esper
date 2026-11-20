@@ -79,6 +79,8 @@ struct AssembledFrame: View {
     /// What play draws round the figure on this sheet: the shield on its arc. Added over
     /// everything, as play adds it, and glowing.
     var props: [GalleryProp] = []
+    /// In FloState, as play draws it: the energy form's line in `GalleryDrawing.floStateLine`, the diamonds off the chest.
+    var floState = false
     let motion: CustomizeFigureMotion
     let time: Double
 
@@ -92,7 +94,8 @@ struct AssembledFrame: View {
         Canvas { context, size in
             // The sheet's turn, clockwise, less any tip back.
             let turn = GameScene.hoodTurn(frame) - headTip
-            motion.advance(to: time, portrait: portrait, look: look, headNudge: headNudge, headScale: 1, canvas: canvas, style: HoodStrings.hanging, turn: turn)
+            motion.advance(to: time, portrait: portrait, look: look, headNudge: headNudge, headScale: 1, canvas: canvas, style: HoodStrings.hanging, turn: turn,
+                           floState: floState)
             var context = context
             if mirrored {
                 context.translateBy(x: size.width, y: 0)
@@ -131,10 +134,11 @@ struct AssembledFrame: View {
                 }
             }
             if cubes { for cube in motion.cubes where cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) } }
+            if strings { for diamond in motion.diamonds where diamond.behind { CustomizeFigure.drawDiamond(diamond, look: look, in: context, spot: spot) } }
             func drawLine(_ line: CGImage, in context: GraphicsContext, turned: Bool) {
                 guard look.outlineWidth > 0 else { return }
                 context.drawLayer { layer in
-                    layer.addFilter(.colorMultiply(Color(rgb: look.outline)))
+                    layer.addFilter(.colorMultiply(Color(rgb: floState ? GalleryDrawing.floStateLine : look.outline)))
                     if turned { drawHood(line, in: layer) } else { layer.draw(Image(decorative: line, scale: 1).interpolation(.none), in: figureRect) }
                 }
             }
@@ -143,11 +147,20 @@ struct AssembledFrame: View {
             let hoodTurned = (turn != 0 || headShift != .zero) && portrait.bareLine != nil && portrait.hoodLine != nil
             // The ball where the game has it in the hand, behind the body on the frames that tuck it there;
             // on the art's own pixels where the round ball fits its white, painted where the sheet reshapes it.
-            let sheetBall = ball ? SpriteLibrary.fittedBall(frame, source: GalleryDrawing.source(frame)) : nil
+            // A sheet whose ball is painted on a layer of its own (FloState's taunt): that layer's cell over
+            // the figure's, in front, its aura in the energy under it, as play draws it.
+            let ballLayer = ball ? SpriteLibrary.ballLayers[frame.animation].map { GalleryDrawing.ballLayer($0, frame.frame) } : nil
+            let sheetBall = ball && ballLayer == nil ? SpriteLibrary.fittedBall(frame, source: GalleryDrawing.source(frame)) : nil
             let ballCentre = sheetBall.map { SpriteLibrary.sheetBallCentre($0, in: frame) }
                 ?? BallLandmarks.table["\(frame.animation.rawValue)_\(frame.frame)"].map { CGPoint(x: $0.x, y: $0.y) }
             let ballAt = ball ? ballCentre.map { spot(CGPoint(x: canvasWidth / 2 + $0.x, y: frame.animation.feetFromBottom + $0.y)) } : nil
             func drawBall() {
+                if let ballLayer {
+                    if let aura = SpriteLibrary.ballAuraImage(ballLayer) {
+                        CustomizeFigure.drawBallAura(aura, at: CGPoint(x: figureRect.midX, y: figureRect.midY), colour: look.glow, pixel: pixel, in: context)
+                    }
+                    return context.draw(Image(decorative: ballLayer, scale: 1).interpolation(.none), in: figureRect)
+                }
                 guard let at = ballAt, let art = GalleryDrawing.ballImage(spin: 0) else { return }
                 let image = sheetBall.flatMap { $0.roundAt == nil ? SpriteLibrary.paintBall($0, art: art) : GalleryDrawing.ballImage(spin: SpriteLibrary.roundBallSpin(frame, source: GalleryDrawing.source) ?? 0) } ?? art
                 let width = CGFloat(image.width) * pixel, height = CGFloat(image.height) * pixel
@@ -173,7 +186,7 @@ struct AssembledFrame: View {
                 turned.draw(Image(decorative: layer.image, scale: 1).interpolation(.none), in: figureRect)
             }
             for layer in armsBehind { drawArms(layer) }
-            let ballBehind = GameScene.ballBehindBody(frame)
+            let ballBehind = ballLayer == nil && GameScene.ballBehindBody(frame)
             if ballBehind { drawBall() }
             if hoodTurned, let hoodLine = portrait.hoodLine { drawLine(hoodLine, in: context, turned: true) }
             // The figure, its line in its look's colour, and its hooded head.
@@ -202,18 +215,31 @@ struct AssembledFrame: View {
             }
             drawProps(in: context)
             if cubes { for cube in motion.cubes where !cube.behind { CustomizeFigure.drawCube(cube, in: context, at: spot(cube.position), pixel: pixel) } }
-            // The glow: what's energy again, blurred and added, as the customize screen draws it.
+            if strings { for diamond in motion.diamonds where !diamond.behind { CustomizeFigure.drawDiamond(diamond, look: look, in: context, spot: spot) } }
+            // The glow: what's energy again, blurred and added round it, not over it, as the customize screen draws it.
             guard glow else { return }
-            var glowing = context
-            glowing.blendMode = .plusLighter
-            glowing.opacity = CustomizeArt.glowStrength
-            glowing.drawLayer { layer in
+            func drawBlurredGlow(in layer: GraphicsContext) {
+                var layer = layer
                 layer.addFilter(.blur(radius: pixel * CustomizeArt.glowPixels))
                 layer.draw(Image(decorative: portrait.glowing, scale: 1).interpolation(.none), in: figureRect)
                 if let hood = portrait.hoodGlowing { drawHood(hood, in: layer) }
                 drawStrings(in: layer)
                 if cubes { for cube in motion.cubes { CustomizeFigure.drawCube(cube, in: layer, at: spot(cube.position), pixel: pixel) } }
+                if strings { for diamond in motion.diamonds { CustomizeFigure.drawDiamond(diamond, look: look, in: layer, spot: spot) } }
                 drawProps(in: layer)
+            }
+            func drawGlowing(in context: GraphicsContext) {
+                context.draw(Image(decorative: portrait.glowing, scale: 1).interpolation(.none), in: figureRect)
+                if let hood = portrait.hoodGlowing { drawHood(hood, in: context) }
+            }
+            var glowing = context
+            glowing.blendMode = .plusLighter
+            glowing.opacity = CustomizeArt.glowStrength
+            glowing.drawLayer { halo in
+                halo.drawLayer { drawBlurredGlow(in: $0) }
+                var cut = halo
+                cut.blendMode = .destinationOut
+                cut.drawLayer { drawGlowing(in: $0) }
             }
         }
         .frame(width: pictureSize.width, height: pictureSize.height)
@@ -242,6 +268,8 @@ struct GalleryDrawing {
     var glow = true
     var ball = true
     var background = GalleryBackground.magenta
+    /// FloState's line, which cycles through the zone's colours in play, held on one: the teal.
+    static let floStateLine = ZoneTuning.colours[3]
     /// The blast fired up off the ground: its arms 45 degrees up and the head tipped back, as play has it.
     var blastUp = false
     func headTip(_ frame: AnimationFrame) -> CGFloat { blastUp && frame.animation == .blast ? GameScene.blastUpTip : 0 }
@@ -252,6 +280,10 @@ struct GalleryDrawing {
     /// One of the ball's frames.
     static func ballImage(spin: Int) -> CGImage? {
         UIImage(named: "Basketball")?.cgImage?.cropping(to: CGRect(x: spin * 8, y: 0, width: 8, height: 8))
+    }
+    /// A ball layer's frame as the sheet has it.
+    static func ballLayer(_ sheet: String, _ frame: Int) -> CGImage {
+        SKTextureAtlas(named: "Sprites").textureNamed("\(sheet)_\(frame)").cgImage()
     }
     /// A player frame as the sheet has it, before any recolouring.
     static func source(_ frame: AnimationFrame) -> CGImage {
@@ -283,9 +315,19 @@ final class PlayerGallerySheets: ObservableObject {
         unlined.strokedGroups = []
         return unlined
     }
+    /// The gallery's FLOSTATE: the sheets in the look's energy form, its FloState hood, as play draws it.
+    @Published var floState = false
+    /// What the figure's drawn in: the look, or in FloState its energy form.
+    var drawnLook: Look { floState ? look.transformed : look }
 
     /// A frame's portrait, its line and neck made for the hood moved by `headNudge`, as play bakes it.
+    /// In FloState, made as play makes the energy form's: the look as player 0's, drawn as its transformed self.
     func portrait(_ frame: AnimationFrame, headNudge: CGPoint) -> SpriteLibrary.Portrait? {
+        if floState {
+            sprites.setGalleryLook(look)
+            return sprites.portrait(frame.animation.rawValue, frame: frame.frame, player: SpriteLibrary.transformedPlayer(0),
+                                    headDrawnFor: SpriteLibrary.hoodDrawnFor, headNudge: headNudge, headScale: 1, holdsBall: frame.animation.holdsBall)
+        }
         sprites.setCustomizeLook(look, for: 0)
         return sprites.portrait(frame.animation.rawValue, frame: frame.frame, player: SpriteLibrary.customizePlayer(0),
                                 headDrawnFor: SpriteLibrary.hoodDrawnFor, headNudge: headNudge, headScale: 1, holdsBall: frame.animation.holdsBall)
@@ -311,7 +353,7 @@ final class PlayerGallerySheets: ObservableObject {
     func arms(_ frame: AnimationFrame, blastUp: Bool) -> (behind: [FigureLayer], over: [FigureLayer]) {
         sprites.setCustomizeLook(look, for: 0)
         return GameScene.zTeaArms(frame, sprites: sprites, player: SpriteLibrary.customizePlayer(0), blastTurn: blastUp ? .pi / 4 : 0,
-                                  image: { _, make in make()?.cgImage() })
+                                  image: { _, make in make() })
     }
 
     /// The sheets outside play's, on the chair as the Greateraid pick draws them: the drinker
@@ -430,11 +472,11 @@ final class PlayerGallerySheets: ObservableObject {
             let frame = GallerySheets.frame(animation, index)
             guard let portrait = portrait(frame, headNudge: drawing.headNudge(frame)) else { return nil }
             let arms = arms(frame, blastUp: drawing.blastUp)
-            let view = AssembledFrame(portrait: portrait, look: look, frame: frame, pixel: scale, pad: pad, mirrored: drawing.mirrored,
+            let view = AssembledFrame(portrait: portrait, look: drawnLook, frame: frame, pixel: scale, pad: pad, mirrored: drawing.mirrored,
                                       strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
                                       headNudge: drawing.headNudge(frame), ball: drawing.ball, armsBehind: arms.behind, armsOver: arms.over,
                                       headTip: drawing.headTip(frame), headShift: drawing.headShift(frame),
-                                      props: props(animation, index),
+                                      props: props(animation, index), floState: floState,
                                       motion: motion, time: start + Double(index) / drawing.fps)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 1
@@ -590,7 +632,11 @@ struct PlayerGallery: View {
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
         }
-        .onChange(of: animation) { held = 0 }
+        .onChange(of: animation) {
+            held = 0
+            // Where play runs the sheet at one rate, the gallery plays it at that.
+            if let rate = animation.playFramesPerSecond { drawing.fps = Double(rate) }
+        }
         .onChange(of: seated) { held = 0 }
         .onChange(of: oldLine) { sheets.useOldLine(oldLine) }
         .onDisappear { sheets.useOldLine(false) }
@@ -611,7 +657,7 @@ struct PlayerGallery: View {
                 ForEach(PlayerGallerySheets.Seated.allCases, id: \.self) { Text($0.name).tag(GalleryEntry.seated($0)) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Picker("Colour", selection: $sheets.pick.energy) {
+            Picker("Color", selection: $sheets.pick.energy) {
                 ForEach(EnergyColour.wheel, id: \.self) { Text($0.rawValue.uppercased()).tag($0) }
             }
         }
@@ -647,11 +693,11 @@ struct PlayerGallery: View {
             let shown = pixel * (CGFloat(animation.pixelSize) + 2 * drawing.pad) / (CGFloat(animation.pixelSize) + 2 * pad)
             if let portrait = sheets.portrait(frame, headNudge: drawing.headNudge(frame)) {
                 let arms = sheets.arms(frame, blastUp: drawing.blastUp)
-                AssembledFrame(portrait: portrait, look: sheets.look, frame: frame, pixel: shown, pad: pad, mirrored: drawing.mirrored,
+                AssembledFrame(portrait: portrait, look: sheets.drawnLook, frame: frame, pixel: shown, pad: pad, mirrored: drawing.mirrored,
                                strings: drawing.strings, cubes: drawing.cubes, glow: drawing.glow, armOverHood: drawing.armOverHood(frame),
                                headNudge: drawing.headNudge(frame), ball: drawing.ball, armsBehind: arms.behind, armsOver: arms.over,
                                headTip: drawing.headTip(frame), headShift: drawing.headShift(frame),
-                               props: sheets.props(animation, index),
+                               props: sheets.props(animation, index), floState: sheets.floState,
                                motion: motion, time: time)
             }
         }
@@ -686,6 +732,7 @@ struct PlayerGallery: View {
                 GalleryToggle("BALL", isOn: $drawing.ball)
                 GalleryToggle("OLD LINE", isOn: $oldLine)
                 GalleryToggle("OUTLINE", isOn: $sheets.outlined)
+                GalleryToggle("FLOSTATE", isOn: $sheets.floState)
                 if seated == nil && animation == .blast { GalleryToggle("BLAST UP", isOn: $drawing.blastUp) }
             }
             GalleryRow("BACKGROUND") {

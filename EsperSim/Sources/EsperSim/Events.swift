@@ -83,6 +83,8 @@ public enum MatchEvent: Equatable {
     case slashClashed(at: Vec2)
     /// Two snatches' reaches meeting.
     case snatchClashed(at: Vec2)
+    /// Two slides' legs meeting.
+    case slideClashed(at: Vec2)
     /// The snatch's hand is at full stretch.
     case snatchReached(player: Int)
     /// FLO earned, this much, from a play there: the rim of a basket, a counter, a snatch, a
@@ -196,3 +198,7 @@ public enum PlayerAction: Equatable {
     /// A down throw with the Spin Move already spent this airtime: nothing, for its sound.
     case spinRefused
 }
+
+extension MatchEvent: Codable {}
+
+extension PlayerAction: Codable {}

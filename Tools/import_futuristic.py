@@ -17,10 +17,6 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "_Graphic Assets" / "Vectors" / "Futuristic_UI.svg"
 OUT = ROOT / "ProjectEsper" / "UI" / "Futuristic"
 RENDERER = ROOT / "Tools" / "render_svg.swift"
-# The Variaball logo, standing in for the title's name in a debug build, and its rendered width.
-LOGO = ROOT / "_Graphic Assets" / "Vectors" / "Variaball Logo.svg"
-LOGO_OUT = ROOT / "ProjectEsper" / "UI" / "variaball_logo.png"
-LOGO_WIDTH = 1600
 # The stage select's icon, in its own colours: the middle button's on the bottles, and on Rounds' customize screen.
 STAGE_ICON = ROOT / "_Graphic Assets" / "Vectors" / "stage_select_icon.svg"
 STAGE_ICON_OUT = ROOT / "ProjectEsper" / "UI" / "stage_select_icon.png"
@@ -35,7 +31,19 @@ ICONS = [(ROOT / "_Graphic Assets" / "Vectors" / "multiplayer.svg", "futuristic_
          (ROOT / "_Graphic Assets" / "Vectors" / "mineral_heart.svg", "futuristic_icon_mineral_heart", 256),
          (ROOT / "_Graphic Assets" / "Vectors" / "cross_slash.svg", "futuristic_icon_cross_slash", 256),
          (ROOT / "_Graphic Assets" / "Vectors" / "split_cross.svg", "futuristic_icon_split_cross", 256),
-         (ROOT / "_Graphic Assets" / "Vectors" / "moebius_triangle.svg", "futuristic_icon_moebius_triangle", 256)]
+         (ROOT / "_Graphic Assets" / "Vectors" / "moebius_triangle.svg", "futuristic_icon_moebius_triangle", 256),
+         # The V-Key's: the lock on a stage it opens (a 22-unit pixel grid, so twelve pixels a unit), and the key.
+         (ROOT / "_Graphic Assets" / "Vectors" / "pixel_lock.svg", "futuristic_icon_pixel_lock", 264),
+         (ROOT / "_Graphic Assets" / "Vectors" / "key_cyber.svg", "futuristic_icon_key_cyber", 512),
+         # The drink pick's dice: a Greateraid rolled on the spot.
+         (ROOT / "_Graphic Assets" / "Vectors" / "dice.svg", "futuristic_icon_dice", 256),
+         # The main menu's jumbotron: PLAY, ROUNDS, VTV, and BACK out of PLAY's screens.
+         (ROOT / "_Graphic Assets" / "Vectors" / "play_icon.svg", "futuristic_icon_play", 512),
+         (ROOT / "_Graphic Assets" / "Vectors" / "rounds_icon.svg", "futuristic_icon_rounds", 512),
+         (ROOT / "_Graphic Assets" / "Vectors" / "vtv_icon.svg", "futuristic_icon_vtv", 512),
+         (ROOT / "_Graphic Assets" / "Vectors" / "screen_back.svg", "futuristic_icon_screen_back", 512)]
+# Pictures brought in as they are: (picture, published name).
+RASTERS = [(ROOT / "_Graphic Assets" / "Rasters" / "3D_grid.jpg", "vkey_grid.jpg")]
 METER_LAYOUT = ROOT / "ProjectEsper" / "View" / "FuturisticMeter.swift"
 # The finding pass's width, and the whole vector's width the kept pass renders at.
 FIND_WIDTH = 2560
@@ -176,19 +184,19 @@ def main():
             print(f"{name:22s} {pw}x{ph}")
         meter(renderer, source, boxes[METER], FULL_WIDTH / whole_width, scratch)
         for vector, name, width in ICONS:
-            text = vector.read_text().replace('fill="#000000"', 'fill="#ffffff"')
+            text = vector.read_text().replace('fill="#000000"', 'fill="#ffffff"').replace('stroke="#000000"', 'stroke="#ffffff"')
             text = re.sub(r"((?:fill|stroke):)(#[0-9a-fA-F]{3,6})\b", grey, text)
             white = scratch / f"{name}.svg"
             white.write_text(text)
             view = [float(n) for n in re.search(r'viewBox="([^"]+)"', text).group(1).split()]
             _, _, iw, ih = render(renderer, white, OUT / f"{name}.png", width, round(width * view[3] / view[2]))
             print(f"{name:22s} {iw}x{ih}")
-        logo = re.search(r'viewBox="([^"]+)"', LOGO.read_text()).group(1).split()
-        _, _, lw, lh = render(renderer, LOGO, LOGO_OUT, LOGO_WIDTH, round(LOGO_WIDTH * float(logo[3]) / float(logo[2])))
-        print(f"{LOGO_OUT.stem:22s} {lw}x{lh}")
         icon = re.search(r'viewBox="([^"]+)"', STAGE_ICON.read_text()).group(1).split()
         _, _, sw, sh = render(renderer, STAGE_ICON, STAGE_ICON_OUT, STAGE_ICON_WIDTH, round(STAGE_ICON_WIDTH * float(icon[3]) / float(icon[2])))
         print(f"{STAGE_ICON_OUT.stem:22s} {sw}x{sh}")
+    for picture, name in RASTERS:
+        (OUT / name).write_bytes(picture.read_bytes())
+        print(f"{name:22s} copied")
     wanted = {f"futuristic_{group}.png" for group in groups} | {f"futuristic_{METER}_frame.png"} | {f"{name}.png" for _, name, _ in ICONS}
     for stale in OUT.glob("*.png"):
         if stale.name not in wanted:

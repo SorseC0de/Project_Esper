@@ -80,6 +80,14 @@ final class GameScene: SKScene {
     private var transformCaptureStarted = false
     /// Footage capture (`Footage.swift`): the scenes shot and recorded one after another, debug builds only.
     var footage: FootageRun?
+    /// The match being played, offline or online, recorded for SAVE on the win screen.
+    var matchRecorder: MatchRecorder?
+    /// A saved replay watched from VTV.
+    var watchedReplay: MatchReplayPlayer?
+    /// Watching one on a touch screen, the pad put away: the pause alone in its corner.
+    private var replayPause: SKSpriteNode?
+    /// The replay playing back, footage's or VTV's.
+    var replaying: MatchReplayPlayer? { footage?.replay ?? watchedReplay }
     /// The grid behind the Tutorial, on the camera.
     private var tutorialGrid: SKSpriteNode?
     /// Flash Fizz's flash: till this match frame, the body where it landed silhouetted in its
@@ -119,9 +127,15 @@ final class GameScene: SKScene {
         var theirRematch: UInt32?
         var theirColour: EnergyColour?
         var theirMode: GameMode?
+        /// Whether they have the V-Key, from their hello; and this phone, as its hello says, fixed as
+        /// the match begins so a purchase partway can't make the two phones disagree.
+        var theirUnlocked: Bool?
+        var unlocked = VKey.owned
         var theirStageVote: (stagesPlayed: Int, choice: Int)?
     }
     private var online: Online?
+    /// In an online match, for what lives outside this file.
+    var playingOnline: Bool { online != nil }
     private var localIndex: Int { online?.localIndex ?? 0 }
     /// Who drinks this round, and the frames left to choose online.
     private var picker = 1
@@ -149,7 +163,27 @@ final class GameScene: SKScene {
     static let onlineModeKey = "esper.onlineMode"
     static var savedOnlineMode: GameMode {
         let saved = GameMode(rawValue: UInt8(UserDefaults.standard.integer(forKey: onlineModeKey))) ?? .rounds
-        return GameMode.parked.contains(saved) ? .rounds : saved
+        return GameMode.parked.contains(saved) || !VKey.opens(saved) ? .rounds : saved
+    }
+    /// Each side's V-Key: offline both this phone's; online the other's from their hello, none till it's in.
+    var sidesUnlocked: [Bool] {
+        guard let online else { return [VKey.owned, VKey.owned] }
+        var sides = [online.unlocked, online.unlocked]
+        sides[1 - online.localIndex] = online.theirUnlocked ?? false
+        return sides
+    }
+    /// The V-Key just bought: the stage select, if it's up offline, laid out again without its locks.
+    func showVKeyBought() {
+        guard flow == .stageSelect, online == nil, screen is StageSelectScreen else { return }
+        presentScreen()
+    }
+    /// The whole game open in this match: this phone's key, and online theirs too.
+    private var matchUnlocked: Bool { sidesUnlocked.allSatisfy { $0 } }
+    /// The mode played online: the host's, or Rounds if either side is free to try.
+    private var onlineMode: GameMode {
+        guard let online else { return gameMode }
+        let hosts = online.localIndex == 0 ? GameScene.savedOnlineMode : (online.theirMode ?? .rounds)
+        return matchUnlocked ? hosts : .rounds
     }
     private var screen: Screen?
     /// The bottles on offer while picking, kept so a re-laid-out screen shows the same.
@@ -166,7 +200,7 @@ final class GameScene: SKScene {
     private var stageFlipFrames = 0
     private static let stageFlipLength = 90
     private var pickAfterStage = false
-    private var firstStage = StageChoice.wreckCenter
+    var firstStage = StageChoice.wreckCenter
     /// What the computer drank at the end of a stage, lettered once play is back.
     private var heldBanner: String?
     /// Each side's energy colour, for the names on the screens.
@@ -228,6 +262,10 @@ final class GameScene: SKScene {
     }
     /// Anything loading: the sprites' rebuilds, a stage's warm-up, or the launch's.
     var loading: Bool { sprites.loadingCounts != nil || stageWarm != nil || warmingUp }
+    /// What the launch's splash waits on: the sides' own looks and the stage; the rest of the
+    /// warm-up goes on behind the menus, play waiting on it (`warmingUp`).
+    var launchLoading: Bool { !launchEssentialsReady || stageWarm != nil }
+    private var launchEssentialsReady = false
     /// The launch's warm-up underway: till it's done no frame steps, so no screen of the scene's
     /// can be used.
     var warmingUp: Bool { !ready }
@@ -250,6 +288,7 @@ final class GameScene: SKScene {
     static let stageWarmFrames = 4
 
     private func warmStage(then: (() -> Void)? = nil) {
+        warmIceLookIfFrostTea()
         var textures: [SKTexture] = []
         enumerateChildNodes(withName: "//*") { node, _ in
             if let texture = (node as? SKSpriteNode)?.texture { textures.append(texture) }
@@ -1182,6 +1221,9 @@ final class GameScene: SKScene {
     /// The line round each body, a child of it so it rides the body exactly, drawn in white
     /// and coloured each frame: the look's outline, or the zone's.
     private var outlineNodes: [SKSpriteNode] = []
+    private var bodyHalos: [SKSpriteNode] = []
+    private var glowLineNodes: [SKSpriteNode] = []
+    private var hoodHalos: [SKSpriteNode] = []
     /// The change's eyes, `transform_eyes` in the energy's colour over the body.
     private var eyesNodes: [SKSpriteNode] = []
     /// Each player's figure, all of it, in one layer; the one in front a little higher.
@@ -1270,7 +1312,7 @@ final class GameScene: SKScene {
     /// with its line, turned by `blastTurn`. Anticlockwise, facing right. `image` makes or
     /// keeps a texture's picture.
     static func zTeaArms(_ frame: AnimationFrame, sprites: SpriteLibrary, player: Int, beamAim: CGFloat = 0, blastTurn: CGFloat = 0,
-                         image: (String, () -> SKTexture?) -> CGImage?) -> (behind: [FigureLayer], over: [FigureLayer]) {
+                         image: (String, () -> CGImage?) -> CGImage?) -> (behind: [FigureLayer], over: [FigureLayer]) {
         switch frame.animation {
         case .beam where (3...7).contains(frame.frame):
             let side = Animation.beamArms.pixelSize
@@ -1278,19 +1320,19 @@ final class GameScene: SKScene {
             let shoulder = CGPoint(x: side / 2 + blastShoulder.width, y: Animation.beam.feetFromBottom + blastShoulder.height)
             let shift = frame.frame % 2 == 0 ? blastEvenFrameShift : .zero
             let offset = CGPoint(x: shoulder.x - blastArmsAnchor.x * side + shift.x, y: shoulder.y - blastArmsAnchor.y * side + shift.y)
-            guard let arms = image("beamArms", { sprites.texture(AnimationFrame(.beamArms, 0), player: player) }) else { return ([], []) }
-            let line = image("beamArmsLine", { sprites.outlineTexture(AnimationFrame(.beamArms, 0), player: player) })
+            guard let arms = image("beamArms", { sprites.framePicture(AnimationFrame(.beamArms, 0), player: player) }) else { return ([], []) }
+            let line = image("beamArmsLine", { sprites.outlinePicture(AnimationFrame(.beamArms, 0), player: player) })
             return ([], [FigureLayer(image: arms, line: line, pivot: CGPoint(x: blastArmsAnchor.x * side, y: blastArmsAnchor.y * side), turn: beamAim, offset: offset)])
         case .blast:
             let armsFrame = AnimationFrame(.blastArms, frame.frame)
             _ = sprites.texture(armsFrame, player: player)
             let shoulder = CGPoint(x: Animation.blastArms.pixelSize / 2 + blastArmShoulder.x, y: Animation.blastArms.feetFromBottom + blastArmShoulder.y)
-            let back = image("blastBack_\(frame.frame)", { sprites.backArmTexture(armsFrame, player: player) }).map {
-                FigureLayer(image: $0, line: image("blastBackLine_\(frame.frame)", { sprites.blastArmOutlineTexture(armsFrame, player: player, front: false) }),
+            let back = image("blastBack_\(frame.frame)", { sprites.backArmTexture(armsFrame, player: player)?.cgImage() }).map {
+                FigureLayer(image: $0, line: image("blastBackLine_\(frame.frame)", { sprites.blastArmOutlineTexture(armsFrame, player: player, front: false)?.cgImage() }),
                             pivot: shoulder, turn: blastTurn)
             }
-            let front = image("blastFront_\(frame.frame)", { sprites.frontArmTexture(armsFrame, player: player) }).map {
-                FigureLayer(image: $0, line: image("blastFrontLine_\(frame.frame)", { sprites.blastArmOutlineTexture(armsFrame, player: player, front: true) }),
+            let front = image("blastFront_\(frame.frame)", { sprites.frontArmTexture(armsFrame, player: player)?.cgImage() }).map {
+                FigureLayer(image: $0, line: image("blastFrontLine_\(frame.frame)", { sprites.blastArmOutlineTexture(armsFrame, player: player, front: true)?.cgImage() }),
                             pivot: shoulder, turn: blastTurn, offset: blastTurn != 0 ? blastUpFrontArmNudge : .zero)
             }
             return (back.map { [$0] } ?? [], front.map { [$0] } ?? [])
@@ -1299,8 +1341,8 @@ final class GameScene: SKScene {
             let shoulder = CGPoint(x: Animation.webshoot.pixelSize / 2 + blastArmShoulder.x, y: Animation.webshoot.feetFromBottom + blastArmShoulder.y)
             func layer(_ sheet: Animation) -> FigureLayer? {
                 let armFrame = AnimationFrame(sheet, frame.frame)
-                return image("\(sheet.rawValue)_\(frame.frame)", { sprites.texture(armFrame, player: player) }).map {
-                    FigureLayer(image: $0, line: image("\(sheet.rawValue)Line_\(frame.frame)", { sprites.outlineTexture(armFrame, player: player) }),
+                return image("\(sheet.rawValue)_\(frame.frame)", { sprites.framePicture(armFrame, player: player) }).map {
+                    FigureLayer(image: $0, line: image("\(sheet.rawValue)Line_\(frame.frame)", { sprites.outlinePicture(armFrame, player: player) }),
                                 pivot: shoulder, turn: 0)
                 }
             }
@@ -1457,6 +1499,30 @@ final class GameScene: SKScene {
     private var hudScale: CGFloat = 1
     private var displayScale: CGFloat = 1
     private var framingScale: CGFloat = 1
+    /// Footage that follows the action: where its camera's got to, eased after the ball.
+    private var followCamera: CGPoint?
+    /// The share of the way to the ball the follow camera closes each frame.
+    static let followEase: CGFloat = 0.12
+
+    /// The follow camera a frame on: eased toward the ball, in a hand or loose, and kept inside the
+    /// stage's sides and floor and top, at whole screen pixels; a stage shorter than the view stays
+    /// as the layout centred it, up and down.
+    private func followedCameraBase() -> CGPoint {
+        var target = followCamera ?? cameraBase
+        if let holder = match.ball.holder, handBalls.indices.contains(holder), !handBalls[holder].isHidden {
+            target = handBalls[holder].position
+        } else if !ballNode.isHidden {
+            target = ballNode.position
+        }
+        var at = followCamera.map { $0 + (target - $0) * GameScene.followEase } ?? target
+        let halfSeen = CGSize(width: size.width * cameraNode.xScale / 2, height: size.height * cameraNode.yScale / 2)
+        let stageSize = SpriteLibrary.point(Vec2(x: match.stage.width, y: match.stage.height))
+        at.x = halfSeen.width * 2 >= stageSize.x ? stageSize.x / 2 : min(max(at.x, halfSeen.width), stageSize.x - halfSeen.width)
+        at.y = halfSeen.height * 2 >= stageSize.y ? cameraBase.y : min(max(at.y, halfSeen.height), stageSize.y - halfSeen.height)
+        followCamera = at
+        let screenPixel = cameraNode.xScale
+        return CGPoint(x: (at.x / screenPixel).rounded() * screenPixel, y: (at.y / screenPixel).rounded() * screenPixel)
+    }
     /// The share of the screen's scale it can be drawn at and keep every game pixel whole on the
     /// drawable: a half where the fit's screen pixels a game pixel are even, or the stage is fitted
     /// rather than drawn by whole pixels anyway; else all of it. The Mac draws at it.
@@ -1470,6 +1536,8 @@ final class GameScene: SKScene {
     /// The ball in each player's hands, its glow, and the esper energy off each head.
     private var handBalls: [SKSpriteNode] = []
     private var handHalos: [SKSpriteNode] = []
+    /// The aura round a ball held by energy (FloState's taunt), in the energy: riding the ball, behind it.
+    private var ballAuras: [SKSpriteNode] = []
     private var headEspers: [SKEmitterNode] = []
     /// A second stream off each head, for a power that mixes two particles: Frost Tea's
     /// snowflakes among the energy, Volta Cola's second bolt.
@@ -1629,7 +1697,7 @@ final class GameScene: SKScene {
     private let powerLabel = SKSpriteNode()
     private let fpsLabel = SKLabelNode()
     /// The performance readout in the corner, parked until performance is being diagnosed.
-    static let diagnosingPerformance = DebugUI.enabled
+    static let diagnosingPerformance = false
     /// The state readout down the left (state, velocity, stick, jumps, the net), parked: never used,
     /// and rewriting a label every frame costs a frame's work of its own.
     static let showsStateReadout = false
@@ -1672,7 +1740,7 @@ final class GameScene: SKScene {
     /// The hooded heads' hoods, for the glow's mask to give the hood's share of the glow; their
     /// faces, FloState's too, shielded in red (`shieldedSnapshots`), so no glow lands on them.
     var hoodSnapshots: [BodySnapshot] {
-        hoodMaskSnapshots(\.hood)
+        GlowSettings.playerHalo ? [] : hoodMaskSnapshots(\.hood)
     }
 
     /// What glows at the plain threshold wherever it is, over the stage's flats too: the hood's
@@ -1680,9 +1748,13 @@ final class GameScene: SKScene {
     /// form's head apart, each body's energy, the slash's blade and the sheets' puffs, and the score lightning.
     var cutOutSnapshots: [BodySnapshot] {
         let strings = hoodStrings.indices.filter { !greyedOut.contains($0) }.flatMap { hoodStrings[$0].snapshots }
-        let apart = (headNodes + energyNodes).filter { !$0.isHidden && $0.parent != nil }.compactMap { node in
+        let apart = headNodes.filter { !$0.isHidden && $0.parent != nil }.compactMap { node in
             node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
                                             size: node.size, zRotation: node.zRotation) }
+        } + energyNodes.filter { !$0.isHidden && $0.parent != nil }.compactMap { node in
+            // The energy's alpha, its map's coverage's green.
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
+                                            size: node.size, zRotation: node.zRotation, channel: .green) }
         }
         let strikes = scoreStrikes.filter { $0.parent != nil && !$0.isHidden }.compactMap { node in
             node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
@@ -1721,21 +1793,98 @@ final class GameScene: SKScene {
 
     /// The bodies as drawn this frame, for the mask scene to copy.
     var bodySnapshots: [BodySnapshot] {
+        guard !GlowSettings.playerHalo else { return [] }
         // Web Water's swing arm, drawn apart from the body, with it.
+        let swingArms = swingArmNodes.filter { !$0.value.isHidden && $0.value.parent != nil }.map { ($0.value, swingArmArts[$0.key]) }
+        return (playerNodes.indices.filter { !playerNodes[$0].isHidden }.map { (playerNodes[$0], bodyArts[$0]) } + swingArms).compactMap { node, art in
+            // A human's energy-coloured parts left out, so they glow.
+            art.map { sprites.glowMask(for: $0) }.map { mask in
+                BodySnapshot(texture: mask.texture, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size,
+                             zRotation: node.zRotation, shader: mask.shader, attributes: mask.attributes)
+            }
+        }
+    }
+
+    /// Each player's body and line this frame, as shown: what the glow's mask reads of them.
+    private var bodyArts: [Int: PlayerArt] = [:]
+    private var outlineArts: [Int: PlayerArt] = [:]
+    private var swingArmArts: [Int: PlayerArt] = [:]
+
+    /// A player layer on a node, the node hidden where the frame has none.
+    static func show(_ art: PlayerArt?, on node: SKSpriteNode) {
+        guard let art else {
+            node.isHidden = true
+            return
+        }
+        node.show(art)
+        node.isHidden = false
+    }
+
+    /// What a node shows, onto a copy of it (a flash, an afterimage): its texture, shader and the
+    /// shader's attributes; the energy as its grey, untoned, as the copy drew its picture.
+    private func copyArt(of source: SKSpriteNode, to copy: SKSpriteNode) {
+        copy.texture = source.texture
+        let energy = sprites.artShaders.shader(.energy)
+        copy.shader = source.shader === energy ? sprites.artShaders.shader(.energyGrey) : source.shader
+        copy.attributeValues = source.attributeValues.filter { $0.key == "a_texels" || $0.key == "a_look" }
+    }
+
+    /// A halo on the canvas it was made from, `size` on screen with that `anchor`: padded
+    /// `SpriteLibrary.haloPad` art pixels each side, the anchor kept on the same spot.
+    /// The halos: over the body's line (0.005) and its glowing parts' dark (0.0055), under everything else on the figure.
+    static let haloZ: CGFloat = 0.006
+    static func placeHalo(_ halo: SKSpriteNode, texture: SKTexture, over size: CGSize, anchor: CGPoint) {
+        // The halo's whole padded canvas round the body, and its piece where it sits on it.
+        let piece = SpriteLibrary.haloPiece(of: texture)
+        let artWidth = piece.canvas.width / CGFloat(SpriteLibrary.haloResolution) - CGFloat(SpriteLibrary.haloPad * 2)
+        let pad = CGFloat(SpriteLibrary.haloPad) * size.width / max(artWidth, 1)
+        let wholeSize = CGSize(width: size.width + pad * 2, height: size.height + pad * 2)
+        let across = wholeSize.width / max(piece.canvas.width, 1), up = wholeSize.height / max(piece.canvas.height, 1)
+        let haloSize = CGSize(width: piece.place.width * across, height: piece.place.height * up)
+        halo.isHidden = false
+        halo.texture = texture
+        halo.size = haloSize
+        halo.anchorPoint = CGPoint(x: (anchor.x * size.width + pad - piece.place.minX * across) / max(haloSize.width, 1),
+                                   y: (anchor.y * size.height + pad - piece.place.minY * up) / max(haloSize.height, 1))
+        halo.alpha = CGFloat(GlowSettings.haloStrength)
+    }
+
+    /// With the players' halo on, their bodies and hoods whole, none of them glowing in the screen's pass.
+    var unglowingBodySnapshots: [BodySnapshot] {
+        guard GlowSettings.playerHalo else { return [] }
         let swingArms = swingArmNodes.values.filter { !$0.isHidden && $0.parent != nil }
         return (playerNodes.filter { !$0.isHidden } + swingArms).compactMap { node in
-            // A human's energy-coloured parts left out, so they glow.
-            node.texture.map { BodySnapshot(texture: sprites.glowMask(for: $0), position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size, zRotation: node.zRotation) }
+            node.texture.map { BodySnapshot(texture: $0, position: node.position, anchor: node.anchorPoint, xScale: node.xScale, size: node.size, zRotation: node.zRotation) }
+        } + hoodMaskSnapshots(\.hood)
+    }
+
+    /// The bodies' lines, which never glow and are drawn over the bloom; `lineOverSnapshots`, the
+    /// ones drawn over the hood: a tipped hood's own, and the front arm's where it crosses the head.
+    var lineSnapshots: [BodySnapshot] {
+        playerNodes.indices.compactMap { index in
+            let body = playerNodes[index], outline = outlineNodes[index]
+            guard !body.isHidden, !outline.isHidden, let texture = outline.texture else { return nil }
+            return BodySnapshot(texture: texture, position: body.position, anchor: body.anchorPoint, xScale: body.xScale,
+                                size: body.size, zRotation: body.zRotation, channel: outlineArts[index]?.maskChannel ?? .alpha)
+        }
+    }
+    var lineOverSnapshots: [BodySnapshot] {
+        (hoodLineNodes + armLinesOverHood).compactMap { node in
+            guard !node.isHidden, node.parent != nil, let texture = node.texture else { return nil }
+            return BodySnapshot(texture: texture, position: node.position, anchor: node.anchorPoint, xScale: node.xScale,
+                                size: node.size, zRotation: node.zRotation)
         }
     }
 
     /// The bodies and their lines whole, for the cubes behind the players to keep out of.
     var occluderSnapshots: [BodySnapshot] {
         var bodies: [BodySnapshot] = []
-        for (body, outline) in zip(playerNodes, outlineNodes) where !body.isHidden {
-            for texture in [body.texture, outline.isHidden ? nil : outline.texture].compactMap({ $0 }) {
+        for index in playerNodes.indices where !playerNodes[index].isHidden {
+            let body = playerNodes[index], outline = outlineNodes[index]
+            let pieces = [(body.texture, MaskChannel.alpha), (outline.isHidden ? nil : outline.texture, outlineArts[index]?.maskChannel ?? .alpha)]
+            for case let (texture?, channel) in pieces {
                 bodies.append(BodySnapshot(texture: texture, position: body.position, anchor: body.anchorPoint, xScale: body.xScale,
-                                           size: body.size, zRotation: body.zRotation))
+                                           size: body.size, zRotation: body.zRotation, channel: channel))
             }
         }
         // Breaker Ball's percentages, over their barriers.
@@ -2069,13 +2218,6 @@ final class GameScene: SKScene {
                 flat.append(BodySnapshot(texture: texture, position: cursor.position, anchor: cursor.anchorPoint, xScale: 1, size: cursor.size))
             }
         }
-        // The bodies' lines, which are drawn as they are and never glow.
-        for (body, outline) in zip(playerNodes, outlineNodes) where !body.isHidden && !outline.isHidden {
-            if let texture = outline.texture {
-                flat.append(BodySnapshot(texture: texture, position: body.position, anchor: body.anchorPoint, xScale: body.xScale,
-                                         size: body.size, zRotation: body.zRotation))
-            }
-        }
         // The count, out of the glow as the banner is, at its size this moment.
         if let count = countNode, let texture = count.texture {
             let scale = glowHud.xScale
@@ -2174,7 +2316,9 @@ final class GameScene: SKScene {
                                                 size: CGSize(width: sprite.size.width / abs(xScale), height: sprite.size.height / abs(yScale)),
                                                 xScale: sprite.xScale, yScale: sprite.yScale, zRotation: sprite.zRotation,
                                                 colour: sprite.color, colourBlend: sprite.colorBlendFactor, alpha: alpha * sprite.alpha,
-                                                zPosition: depth, blendMode: sprite.blendMode, shader: sprite.shader, warp: sprite.warpGeometry))
+                                                zPosition: depth, blendMode: sprite.blendMode, shader: sprite.shader, warp: sprite.warpGeometry,
+                                                // A player map's look and size; the energy's colours never came across.
+                                                attributes: sprite.attributeValues.filter { $0.key == "a_texels" || $0.key == "a_look" }))
             }
             // A plain container (a flash cluster, the backboards) passes its place on; it's
             // skipped whole when it and its reach are nowhere near.
@@ -2297,7 +2441,8 @@ final class GameScene: SKScene {
         addChild(glowHud)
 
         // Every frame in both looks, made before anything is drawn, then drawn once each.
-        sprites.warmUp(players: match.players.count) { [weak self] in
+        LoadTrace.mark("scene set up, warm-up starting")
+        sprites.warmUp(players: match.players.count, essentials: { [weak self] in self?.launchEssentialsReady = true }) { [weak self] in
             self?.preloaded = true
             self?.reportLoading()
         }
@@ -2320,11 +2465,20 @@ final class GameScene: SKScene {
             additiveTinted.blendMode = .add
             additiveTinted.color = .white
             additiveTinted.colorBlendFactor = 1
-            // The energy's toning shader, compiled now rather than on the first slash.
+            // The energy's toning shaders, compiled now rather than on the first slash.
             let toned = SKSpriteNode(texture: sample)
             toned.shader = energyToneShader
             setGlow(toned, .white)
-            for sprite in [additive, tinted, additiveTinted, toned] {
+            // The players' map shaders, one a layer.
+            let mapped = PlayerMapShaders.Layer.allCases.map { layer in
+                let sprite = SKSpriteNode(texture: sample)
+                sprite.shader = sprites.artShaders.shader(layer)
+                sprite.setValue(SKAttributeValue(vectorFloat2: vector_float2(1, 1)), forAttribute: "a_texels")
+                if layer.paletted { sprite.setValue(SKAttributeValue(float: 0), forAttribute: "a_look") }
+                if layer == .energy { setEnergyRamp(sprite, .white) }
+                return sprite
+            }
+            for sprite in [additive, tinted, additiveTinted, toned] + mapped {
                 sprite.size = CGSize(width: 1, height: 1)
                 sprite.alpha = 0.02
                 warmNode.addChild(sprite)
@@ -2375,7 +2529,9 @@ final class GameScene: SKScene {
             let padding = SKSpriteNode(color: .clear, size: .zero)
             figure.addChild(padding)
             phantomPaddings.append(padding)
-            let node = SKSpriteNode(texture: sprites.texture(player.animationFrame, player: player.index))
+            let node = SKSpriteNode()
+            node.show(sprites.texture(player.animationFrame, player: player.index))
+            node.size = node.texture?.size() ?? .zero
             figure.addChild(node)
             playerNodes.append(node)
             let outline = SKSpriteNode()
@@ -2383,6 +2539,27 @@ final class GameScene: SKScene {
             outline.zPosition = 0.005
             node.addChild(outline)
             outlineNodes.append(outline)
+            // The glowing parts' share of the line, over the rest of it in the energy's dark.
+            let glowLine = SKSpriteNode()
+            glowLine.colorBlendFactor = 1
+            glowLine.zPosition = 0.0055
+            glowLine.isHidden = true
+            node.addChild(glowLine)
+            glowLineNodes.append(glowLine)
+            // The halo round what glows, over the body and under its line (`GlowSettings.playerHalo`);
+            // the hood's apart, under the line too, placed as the hood is.
+            let bodyHalo = SKSpriteNode()
+            bodyHalo.zPosition = GameScene.haloZ
+            bodyHalo.blendMode = .add
+            bodyHalo.isHidden = true
+            node.addChild(bodyHalo)
+            bodyHalos.append(bodyHalo)
+            let hoodHalo = SKSpriteNode()
+            hoodHalo.zPosition = GameScene.haloZ
+            hoodHalo.blendMode = .add
+            hoodHalo.isHidden = true
+            figure.addChild(hoodHalo)
+            hoodHalos.append(hoodHalo)
             // K&A: the glowing parts again over the body, untouched by the wash the body takes.
             let glowingParts = SKSpriteNode()
             glowingParts.zPosition = 0.001
@@ -2422,7 +2599,6 @@ final class GameScene: SKScene {
             let energy = SKSpriteNode()
             energy.zPosition = 0.03
             energy.isHidden = true
-            energy.shader = energyToneShader
             figure.addChild(energy)
             energyNodes.append(energy)
             let hood = SKSpriteNode()
@@ -2498,6 +2674,14 @@ final class GameScene: SKScene {
             handBall.zPosition = 0.03
             figure.addChild(handBall)
             handBalls.append(handBall)
+            let aura = SKSpriteNode()
+            aura.zPosition = -0.001
+            aura.blendMode = .add
+            aura.colorBlendFactor = 1
+            aura.alpha = SpriteLibrary.ballAuraStrength
+            aura.isHidden = true
+            handBall.addChild(aura)
+            ballAuras.append(aura)
             sprites.warmPaintedBalls(breakerPlayers: match.mode == .breakerBall ? Array(match.players.indices) : [])
             // What the sheet draws in front of the ball, and its line, again over it.
             for (layer, z) in [(\GameScene.ballCovers, CGFloat(0.031)), (\GameScene.ballCoverLines, CGFloat(0.0311))] {
@@ -2701,6 +2885,14 @@ final class GameScene: SKScene {
     /// Each bar's holder, warped, its sparkles inside it with the bar so the warp takes them too.
     private var floBarHolders: [SKEffectNode] = []
     private var floMaxWords: [SKSpriteNode] = []
+    /// Each meter's drink: its bottle and its name in a holder on the meter, and which drink they show.
+    private struct FloDrink {
+        var holder: SKNode
+        var bottle: SKSpriteNode
+        var name: SKLabelNode
+        var shown: Greateraid?
+    }
+    private var floDrinks: [FloDrink] = []
     /// Bar A's word, short of full and at it.
     private var floWordsShort: [SKSpriteNode] = []
     private var floWordsFull: [SKSpriteNode] = []
@@ -2810,6 +3002,7 @@ final class GameScene: SKScene {
             }
             // MAX, steady, while it's full.
             floMaxWords[index].isHidden = flo < FloRules.full || floMeters[index].isHidden
+            if floDrinks.indices.contains(index), floDrinks[index].shown != player.floStateDrink { showFloDrink(index, player.floStateDrink) }
             // The word lit, but in its short colours while FloState's lockout runs.
             if floWordsShort.indices.contains(index) {
                 let lit = player.floStateLockout == 0
@@ -2893,6 +3086,10 @@ final class GameScene: SKScene {
         let maxShown = floMaxWords.map(\.isHidden)
         floMaxWords.forEach { $0.isHidden = true }
         defer { for (word, hidden) in zip(floMaxWords, maxShown) { word.isHidden = hidden } }
+        // Round the bar and the word only, not the drink.
+        let drinkShown = floDrinks.map(\.holder.isHidden)
+        floDrinks.forEach { $0.holder.isHidden = true }
+        defer { for (drink, hidden) in zip(floDrinks, drinkShown) { drink.holder.isHidden = hidden } }
         guard let drawn = view.texture(from: meter) else { return nil }
         let frame = meter.calculateAccumulatedFrame()
         let picture = drawn.cgImage()
@@ -2923,6 +3120,20 @@ final class GameScene: SKScene {
         return node
     }
 
+    /// A meter's drink, its bottle and its name, or neither without one (any mode but 47).
+    private func showFloDrink(_ index: Int, _ drink: Greateraid?) {
+        guard floDrinks.indices.contains(index) else { return }
+        floDrinks[index].shown = drink
+        let holder = floDrinks[index].holder, bottle = floDrinks[index].bottle
+        holder.isHidden = drink == nil
+        guard let drink else { return }
+        // Drawn at the size it shows, in the view's points, not from the full-size vector.
+        let image = DrinkPick.bottleImage(drink, height: FloTuning.drinkBottleHeight * FloTuning.meterScale * hudScale)
+        bottle.texture = SKTexture(image: image)
+        bottle.size = CGSize(width: FloTuning.drinkBottleHeight * image.size.width / max(image.size.height, 1), height: FloTuning.drinkBottleHeight)
+        floDrinks[index].name.text = drink.name.uppercased()
+    }
+
     /// The strokes made once the meters are up and the HUD's view is there to draw them.
     private func strokeFloMeters() {
         guard floStrokes.isEmpty, FloTuning.stroke > 0, hudScene.view != nil, let first = floMeters.first, !first.isHidden else { return }
@@ -2943,6 +3154,7 @@ final class GameScene: SKScene {
         floMaxWords = []
         floWordsShort = []
         floWordsFull = []
+        floDrinks = []
         floShown = []
         guard (EffectSheets.frames["flo_meter"] ?? 0) > 0 else { return }
         // Every bar, each burn frame at each FLO, made now and sent to the GPU: draining in
@@ -3010,15 +3222,39 @@ final class GameScene: SKScene {
             full.zPosition = 2
             full.isHidden = shownFlo(index) < FloRules.full
             meter.addChild(full)
+            // The drink picked: its bottle behind the word and the bar, leaning away from the
+            // scoreboard, and its name under the bar.
+            let drinkHolder = SKNode()
+            let bottle = SKSpriteNode()
+            let wordFrame = words[0].frame
+            bottle.position = CGPoint(x: wordFrame.midX + side * FloTuning.drinkBottleX, y: wordFrame.midY + FloTuning.drinkBottleY)
+            bottle.zRotation = -side * FloTuning.drinkBottleTilt * .pi / 180
+            bottle.zPosition = -1
+            drinkHolder.addChild(bottle)
+            _ = Onomatopoeia.registered
+            let name = SKLabelNode(fontNamed: Futuristic.typefaces[FloTuning.drinkNameFace])
+            name.fontSize = Futuristic.fontSize(FloTuning.drinkNameSize, face: FloTuning.drinkNameFace)
+            name.fontColor = .white
+            name.horizontalAlignmentMode = .center
+            name.verticalAlignmentMode = .top
+            name.position = CGPoint(x: 0, y: -barHeight / 2 - FloTuning.drinkNameGap)
+            name.zPosition = 1
+            drinkHolder.addChild(name)
+            meter.addChild(drinkHolder)
+            floDrinks.append(FloDrink(holder: drinkHolder, bottle: bottle, name: name, shown: nil))
+            showFloDrink(index, match.players.indices.contains(index) ? match.players[index].floStateDrink : nil)
             meter.setScale(FloTuning.meterScale)
             hud.addChild(meter)
             // In its top corner, MAX included: the outer end and top the insets in from it; the
             // second under pause, which has the very corner offline.
             meter.position = .zero
-            let wasHidden = full.isHidden
+            // Fitted without the drink, which hangs off the meter as it may.
+            let wasHidden = full.isHidden, drinkWasHidden = drinkHolder.isHidden
             full.isHidden = false
+            drinkHolder.isHidden = true
             let drawn = meter.calculateAccumulatedFrame()
             full.isHidden = wasHidden
+            drinkHolder.isHidden = drinkWasHidden
             let outer = hudHalf.width - (mirrored ? hudInsets.right : hudInsets.left) - FloTuning.cornerInsetX
             // Both level; the second in under pause, which is drawn over it in the same corner.
             meter.position = CGPoint(x: mirrored ? outer - drawn.maxX : -outer - drawn.minX,
@@ -3046,6 +3282,19 @@ final class GameScene: SKScene {
     var hoodGlowShare: Float { GlowSettings.hoodShare(on: match.stage.features.look) }
     /// The stage whose preview's big panel the renderer is to keep, once the page is full (`StageShots`).
     var previewShotStage: StageChoice?
+    /// The pause alone in the corner while a replay plays on a touch screen, where the pad's was.
+    private func refreshReplayPause() {
+        let shown = watchedReplay != nil && flow == .playing && GameScene.touchControlsShown
+        if shown, replayPause == nil {
+            let icon = TouchControls.pauseIcon()
+            hud.addChild(icon)
+            replayPause = icon
+        }
+        replayPause?.zPosition = controls?.zPosition ?? 0
+        replayPause?.position = CGPoint(x: pauseIconFrame.midX, y: pauseIconFrame.midY)
+        replayPause?.isHidden = !shown
+    }
+
     /// The pause icon's frame in the HUD's points, the pause menu's RESUME's place.
     private var pauseIconFrame: CGRect {
         controls?.pauseFrame ?? CGRect(x: hudHalf.width - 80, y: hudHalf.height - 40, width: 68, height: 35)
@@ -3480,7 +3729,7 @@ final class GameScene: SKScene {
         let stage = match.stage
         loadMarkStart()
         let isElements = stage.features.look == .elements
-        Ambience.shared.play(isElements ? "thunderstorm" : nil)
+        playStageLoops()
         let isHoopfishHideaway = stage.features.look == .hoopfishHideaway
         backgroundColor = isElements ? SKColor(rgb: ElementsArt.background) : (isHoopfishHideaway ? SKColor(rgb: HoopfishHideawayArt.waterTop)
             : (stage.features.look == .flightB411 ? SKColor(rgb: FlightB411Art.beyond)
@@ -4941,15 +5190,18 @@ final class GameScene: SKScene {
         let stageHeight = CGFloat(match.stage.rows) * GameScene.pixelsPerTile + below
         let fitHeight = (screenScale * size.height / stageHeight).rounded(.down)
         let fitWidth = (screenScale * size.width / stageWidth).rounded(.down)
-        let screenPixelsPerGamePixel = max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
+        // Footage that follows the action is closer in, at its own zoom, whatever the stage.
+        let follows = FootageRun.followsAction
+        let screenPixelsPerGamePixel = follows ? FootageRun.followZoom : max(1, scrolls ? fitHeight : min(fitHeight, fitWidth))
         // The map maker sees the whole stage at once, as big as it fits, not by whole pixels.
         // Hoopfish Hideaway fills the screen's width, its bottom on the screen's: a phone crops blank
         // water off the top, a squarer screen shows more of it.
         // A stage seen whole (the plane at its lean, K&A) is fitted to the screen, edge to edge.
-        let fills = match.stage.features.look == .hoopfishHideaway && !wholeStageView
-        let wholePixels = !match.stage.features.seenWhole && !wholeStageView && !fills
+        let fills = match.stage.features.look == .hoopfishHideaway && !wholeStageView && !follows
+        let wholePixels = follows || (!match.stage.features.seenWhole && !wholeStageView && !fills)
         renderShare = !wholePixels || Int(screenPixelsPerGamePixel) % 2 == 0 ? 0.5 : 1
-        let pointsPerGamePixel = match.stage.features.seenWhole ? flightB411Fit(tilt: CGFloat(match.stage.tilt))
+        let pointsPerGamePixel = follows ? screenPixelsPerGamePixel / screenScale
+            : match.stage.features.seenWhole ? flightB411Fit(tilt: CGFloat(match.stage.tilt))
             : wholeStageView ? min(size.width / stageWidth, size.height / stageHeight)
             : (fills ? size.width / stageWidth : screenPixelsPerGamePixel / screenScale)
         cameraNode.setScale(1 / pointsPerGamePixel)
@@ -4960,6 +5212,7 @@ final class GameScene: SKScene {
                                       y: fills ? size.height * cameraNode.yScale / 2 - leftOver * GameScene.hoopfishBottomShare : stageHeight / 2 - below)
         if scrolls, !wholeStageView, cameraBase.x == 0 { cameraNode.position.x = cameraTargetX() }
         cameraBase = cameraNode.position
+        followCamera = nil
         // The HUD is laid out in the phone's points and scaled up for a bigger screen.
         hudScale = HudScene.scale(forHeight: size.height)
         TitleText.renderScale = hudScale
@@ -5028,7 +5281,7 @@ final class GameScene: SKScene {
             self?.previewSoundWord()
         }
         // The first side's energy colour, here rather than on the title: the customize screen picks it for play.
-        controls.addPicker(title: "COLOUR", options: EnergyColour.wheel.map { $0.rawValue.uppercased() },
+        controls.addPicker(title: "COLOR", options: EnergyColour.wheel.map { $0.rawValue.uppercased() },
                            selected: EnergyColour.wheel.firstIndex(of: PlayerCustomization.saved(0).energy) ?? 0, perRow: 4) { [weak self] index in
             var first = PlayerCustomization.saved(0)
             first.energy = EnergyColour.wheel[index]
@@ -5335,6 +5588,20 @@ final class GameScene: SKScene {
         controls.addSlider(title: "SHIELD FLICK", range: 2...12, notch: 0.25, value: Float(ShieldRules.flickSpeed)) { ShieldRules.flickSpeed = Double($0) }
         // The still afterimages: how many, and how many frames of the shield's arc apart.
         controls.addSlider(title: "SHIELD FPS", range: 6...36, notch: 1, value: Float(ShieldRules.sheetFramesPerSecond)) { ShieldRules.sheetFramesPerSecond = Double($0) }
+        // What glows, brighter than white where the screen can show it.
+        controls.addSlider(title: "GLOW EDR", range: 1...4, notch: 0.1, value: GlowSettings.edrBoost) { value in
+            GlowSettings.edrBoost = value
+            UserDefaults.standard.set(Double(value), forKey: GlowSettings.edrBoostKey)
+        }
+        // The players' halo, or the screen's glow on them as before; and the halo's strength.
+        controls.addSlider(title: "PLAYER HALO", range: 0...1, notch: 1, value: GlowSettings.playerHalo ? 1 : 0) { value in
+            GlowSettings.playerHalo = value >= 0.5
+            UserDefaults.standard.set(GlowSettings.playerHalo, forKey: GlowSettings.playerHaloKey)
+        }
+        controls.addSlider(title: "HALO STRENGTH", range: 0...1.5, notch: 0.05, value: GlowSettings.haloStrength) { value in
+            GlowSettings.haloStrength = value
+            UserDefaults.standard.set(Double(value), forKey: GlowSettings.haloStrengthKey)
+        }
         // Each energy colour's glow, times.
         for colour in EnergyColour.hued where !ParkedSliders.gemGlow {
             controls.addSlider(title: "GLOW \(colour.name.uppercased())", range: 0.5...2.5, notch: 0.05, value: GlowSettings.energyGains[colour] ?? 1) { value in
@@ -5349,6 +5616,25 @@ final class GameScene: SKScene {
             controls.addSlider(title: "BEAM DOWN TURN", range: 1...5, notch: 0.25, value: Float(BeamHeadTuning.downTurn)) { BeamHeadTuning.downTurn = CGFloat($0) }
         }
         controls.addSlider(title: "FLO SCALE", range: 0.25...3, notch: 0.05, value: Float(FloTuning.meterScale)) { FloTuning.meterScale = CGFloat($0); relayoutFlo() }
+        // The FLO meter's drink: its bottle and its name.
+        controls.addSlider(title: "DRINK BOTTLE SIZE", range: 8...80, notch: 1, value: Float(FloTuning.drinkBottleHeight)) { FloTuning.drinkBottleHeight = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "DRINK BOTTLE TILT", range: 0...45, notch: 1, value: Float(FloTuning.drinkBottleTilt)) { FloTuning.drinkBottleTilt = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "DRINK BOTTLE X", range: -40...40, notch: 1, value: Float(FloTuning.drinkBottleX)) { FloTuning.drinkBottleX = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "DRINK BOTTLE Y", range: -40...40, notch: 1, value: Float(FloTuning.drinkBottleY)) { FloTuning.drinkBottleY = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "DRINK NAME GAP", range: -10...20, notch: 1, value: Float(FloTuning.drinkNameGap)) { FloTuning.drinkNameGap = CGFloat($0); relayoutFlo() }
+        controls.addSlider(title: "DRINK NAME SIZE", range: 3...16, notch: 0.5, value: Float(FloTuning.drinkNameSize)) { FloTuning.drinkNameSize = CGFloat($0); relayoutFlo() }
+        controls.addPicker(title: "DRINK FONT", options: Futuristic.typefaces.indices.map { String(UnicodeScalar(UInt8(65 + $0))) }, selected: FloTuning.drinkNameFace) { index in
+            FloTuning.drinkNameFace = index
+            relayoutFlo()
+        }
+        // FLO from moving, offline only: both sides must agree on it online.
+        if online == nil {
+            controls.addSlider(title: "SWEAT WALK", range: 0...8, notch: 1, value: Float(FloRules.sweatWalking)) { FloRules.sweatWalking = Int($0) }
+            controls.addSlider(title: "SWEAT RUN", range: 0...8, notch: 1, value: Float(FloRules.sweatRunning)) { FloRules.sweatRunning = Int($0) }
+            controls.addSlider(title: "SWEAT DASH", range: 0...8, notch: 1, value: Float(FloRules.sweatDashing)) { FloRules.sweatDashing = Int($0) }
+            controls.addSlider(title: "SWEAT PER FLO", range: 10...240, notch: 10, value: Float(FloRules.sweatPerFlo)) { FloRules.sweatPerFlo = Int($0) }
+            controls.addSlider(title: "SWEAT NO BALL %", range: 100...300, notch: 5, value: Float(FloRules.sweatWithoutBallPercent)) { FloRules.sweatWithoutBallPercent = Int($0) }
+        }
         if !ParkedSliders.flo {
             controls.addSlider(title: "FLO MAX SCALE", range: 0.25...4, notch: 0.05, value: Float(FloTuning.cornerMaxScale)) { FloTuning.cornerMaxScale = CGFloat($0); relayoutFlo() }
             controls.addSlider(title: "FLO MAX X", range: -60...60, notch: 1, value: Float(FloTuning.cornerMaxX)) { FloTuning.cornerMaxX = CGFloat($0); relayoutFlo() }
@@ -5398,9 +5684,10 @@ final class GameScene: SKScene {
         }
         }
         controls.setOnline(online != nil)
-        controls.isHidden = !GameScene.touchControlsShown
+        controls.isHidden = !GameScene.touchControlsShown || watchedReplay != nil
         hud.addChild(controls)
         self.controls = controls
+        refreshReplayPause()
         scoreLabel.position = CGPoint(x: 0, y: halfHeight - insets.top - 8)
         circles.position = CGPoint(x: 0, y: halfHeight - insets.top - GameScene.scoreboardBelowTop)
         circlesOverCam.position = circles.position
@@ -5429,12 +5716,44 @@ final class GameScene: SKScene {
 
     // MARK: Stepping
 
+    /// For `MemoryTrace`: what the scene still holds, the world's and the HUD's nodes and the textures
+    /// they show, and its own image caches, so what a match leaves behind can be named.
+    private func memoryCensus() -> String {
+        var nodes = 0, seen = Set<ObjectIdentifier>(), bytes = 0.0
+        func walk(_ node: SKNode) {
+            nodes += 1
+            if let sprite = node as? SKSpriteNode, let texture = sprite.texture, seen.insert(ObjectIdentifier(texture)).inserted {
+                let size = texture.size()
+                bytes += Double(size.width * size.height * 4)
+            }
+            for child in node.children { walk(child) }
+        }
+        walk(self)
+        walk(hudScene)
+        return String(format: "scene %d nodes, %d textures/%.0f MB; win frames %d, seated %d, stage shots %d, updates %d",
+                      nodes, seen.count, bytes / 1_048_576, winFrames.count, customizeSeatedImages.count, StageShots.shared.count, updatesImages.count)
+    }
+
+    /// For `MemoryTrace`: the SwiftUI screens up over the scene.
+    private var memoryScreens: String {
+        guard let flowState else { return "" }
+        let screens = [("title screen", flowState.titleScreenUp), ("customize", flowState.customizeOpen), ("settings", flowState.settingsOpen),
+                       ("online", flowState.multiplayerOpen), ("v-key", flowState.vKeyOpen), ("updates", flowState.updatesOpen)]
+            .filter(\.1).map(\.0)
+        return screens.isEmpty ? "" : " (" + screens.joined(separator: ", ") + ")"
+    }
+
+    /// Any button was down last frame, for the title screen's press.
+    private var anyButtonWasDown = true
     override func update(_ currentTime: TimeInterval) {
         defer { lastTime = currentTime }
         if let lastTime, currentTime - lastTime > LoadTrace.longFrame {
             LoadTrace.mark(String(format: "long frame %.0f ms on %@", (currentTime - lastTime) * 1000, "\(flow)"))
         }
         stepStageWarm()
+        if Int(currentTime) != Int(lastTime ?? 0) {
+            MemoryTrace.check("\(flow)\(memoryScreens), \(sprites.cachedCount) textures") { sprites.memoryBreakdown() + "\n[MEM]   " + memoryCensus() }
+        }
         if !ready {
             // Hold play until the textures have all been drawn once; the screens before it (the
             // title, customize, the stage select, the preview) go on meanwhile, read off the pads
@@ -5443,6 +5762,7 @@ final class GameScene: SKScene {
             if preloaded, warmFramesLeft == 0 {
                 warmNode.removeFromParent()
                 ready = true
+                LoadTrace.mark("warm-up: drawn once, ready")
                 reportLoading()
             }
             guard ready || flow != .playing else { return }
@@ -5503,7 +5823,9 @@ final class GameScene: SKScene {
         tickOnline()
         // Start or delete pauses a match offline, and again resumes it; over the settings, it shuts them.
         if hub.consumePause(), online == nil {
-            if let flowState, flowState.customizeOpen, !flowState.settingsOpen {
+            if let flowState, flowState.vKeyOpen {
+                flowState.closeVKey()
+            } else if let flowState, flowState.customizeOpen, !flowState.settingsOpen {
                 flowState.pressReady(flowState.customizeLocal)
             } else if let flowState, flowState.settingsOpen {
                 flowState.closeSettings()
@@ -5515,7 +5837,9 @@ final class GameScene: SKScene {
                 enter(.playing)
             }
         }
-        if flow == .stageSelect { tickStageSelect(inputs) } else if !stageVotes.isEmpty { LoadTrace.note("waiting: flow is \(flow)") }
+        // A replay makes its own picks: the stage select and the drink pick take nothing from the pads.
+        let replayPicking = watchedReplay != nil && (flow == .stageSelect || flow == .picking)
+        if flow == .stageSelect, !replayPicking { tickStageSelect(inputs) } else if !stageVotes.isEmpty { LoadTrace.note("waiting: flow is \(flow)") }
         if flow == .preview { stepPreview(accumulator) }
         if flow != .playing {
             // A screen is up: the stick moves its cursor and jump picks; the sim waits. On
@@ -5529,7 +5853,15 @@ final class GameScene: SKScene {
             let backed = backDown && !backWasDown && !menuNeedsRelease
             let right = pad.stick.x >= 0.5 && menuLast.stick.x < 0.5, left = pad.stick.x <= -0.5 && menuLast.stick.x > -0.5
             let down = pad.stick.y <= -0.5 && menuLast.stick.y > -0.5, up = pad.stick.y >= 0.5 && menuLast.stick.y < 0.5
-            if let flowState, flowState.updatesOpen {
+            let anyButtonDown = hub.anyButtonDown
+            defer { anyButtonWasDown = anyButtonDown }
+            if let flowState, flowState.titleScreenUp {
+                // The title screen: any button on to the main menu, held till let go so it picks nothing there.
+                if anyButtonDown, !anyButtonWasDown {
+                    menuNeedsRelease = true
+                    flowState.leaveTitleScreen()
+                }
+            } else if let flowState, flowState.updatesOpen {
                 // What's new, over everything: up and down scroll it, left and right across the
                 // builds' tabs (newest on the left), jump or back puts it away.
                 if down { flowState.scrollUpdates(1) }
@@ -5539,6 +5871,17 @@ final class GameScene: SKScene {
                 if picked || backed {
                     menuNeedsRelease = true
                     flowState.closeUpdates()
+                }
+            } else if let flowState, flowState.vKeyOpen {
+                // The V-Key's screen, over whatever asked for it: across its two buttons, jump on one, back shuts it.
+                if right || down { flowState.moveVKeyCursor(1) }
+                if left || up { flowState.moveVKeyCursor(-1) }
+                if picked {
+                    menuNeedsRelease = true
+                    flowState.activateVKey(flowState.vKeyCursor)
+                } else if backed {
+                    menuNeedsRelease = true
+                    flowState.closeVKey()
                 }
             } else if let flowState, flowState.settingsOpen {
                 // The settings, over the title or the pause. The categories: left and right across
@@ -5569,6 +5912,7 @@ final class GameScene: SKScene {
                         flowState.closeSettingsCategory()
                     }
                 }
+            } else if replayPicking {
             } else if let screen {
                 if right || down { screen.move(1) }
                 if left || up { screen.move(-1) }
@@ -5622,6 +5966,20 @@ final class GameScene: SKScene {
                     menuNeedsRelease = true
                     flowState.multiplayerBack()
                 }
+            } else if flow == .title, online == nil, let flowState, !flowState.tuningOpen, flowState.themePickerOpen {
+                // THEME's picker: left and right along it, each color picked as the cursor reaches it;
+                // jump, back or up out of it to THEME.
+                if right { flowState.moveThemeCursor(1) }
+                if left { flowState.moveThemeCursor(-1) }
+                if picked {
+                    menuNeedsRelease = true
+                    flowState.closeThemePicker(sound: SoundBoard.confirm)
+                } else if backed {
+                    menuNeedsRelease = true
+                    flowState.closeThemePicker()
+                } else if up {
+                    flowState.closeThemePicker()
+                }
             } else if flow == .title, online == nil, let flowState, !flowState.tuningOpen {
                 if right { flowState.moveTitleCursor(across: 1, down: 0) }
                 if left { flowState.moveTitleCursor(across: -1, down: 0) }
@@ -5630,6 +5988,10 @@ final class GameScene: SKScene {
                 if picked {
                     menuNeedsRelease = true
                     flowState.activate(flowState.titleCursor)
+                } else if backed, flowState.subRingShown {
+                    // Back out of PLAY's or VTV's screens to the main menu's.
+                    menuNeedsRelease = true
+                    flowState.leaveSubRing()
                 }
             }
             menuLast = pad
@@ -5682,16 +6044,21 @@ final class GameScene: SKScene {
                 var remote = inputs.count > 1 ? inputs[1] : .idle
                 opponent.floStateOnItsOwn = !capturing || footage != nil
                 playerOneOpponent.floStateOnItsOwn = !capturing || footage != nil
-                if aiOn, !match.stage.features.tutorial, footage == nil {
+                if aiOn, !match.stage.features.tutorial, footage == nil, watchedReplay == nil {
                     remote = opponent.decide(match)
                     if DebugUI.enabled, let report = opponent.takeShieldReport() { print("[CPU] shield: \(report)") }
                 }
                 var local = inputs[0]
-                if playerOneComputer, !match.stage.features.tutorial, footage == nil {
+                if playerOneComputer, !match.stage.features.tutorial, footage == nil, watchedReplay == nil {
                     if !aiOn { remote = local }
                     local = playerOneOpponent.decide(match)
                 }
-                if let footage {
+                if let replay = replaying {
+                    // A saved match: its recording laid over the session, and its inputs.
+                    let recorded = replay.inputs(for: &session)
+                    local = recorded[0]
+                    remote = recorded.count > 1 ? recorded[1] : .idle
+                } else if let footage {
                     // The scene's inputs for each side, or the computer's where it leaves a side to it.
                     let scripted = footage.inputs(match: match) { change in session.mutate(change) }
                     local = scripted[0] ?? playerOneOpponent.decide(match)
@@ -5833,13 +6200,15 @@ final class GameScene: SKScene {
     /// stage select.
     private func startTutorial() {
         guard online == nil else { return }
+        matchRecorder = nil
         gameMode = .fortySeven
         applySavedColours()
         zonesEnd()
         pendingFlow = nil
         heldBanner = nil
         previewedStage = nil
-        series = Series(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
+        seriesSeed = UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970))
+        series = Series(seed: seriesSeed)
         series.stage = .tutorial
         firstStage = .tutorial
         opponent = Opponent(index: 1)
@@ -5865,11 +6234,12 @@ final class GameScene: SKScene {
     }
 
     /// The series, held still on the court until the first stage is chosen.
-    private func startSeries(seed: UInt32) {
+    func startSeries(seed: UInt32) {
         pendingFlow = nil
         heldBanner = nil
         previewedStage = nil
         series = Series(seed: seed)
+        seriesSeed = seed
         // A fresh mind for the computer each series, its gameplan rolled anew.
         opponent = Opponent(index: 1, seed: seed | 1)
         playerOneOpponent = Opponent(index: 0, seed: (seed &* 31) | 1)
@@ -5903,6 +6273,7 @@ final class GameScene: SKScene {
         }
         // The debug strip is built for the mode (47 has its sliders), so again for this one.
         if built { layout(displayScale: framingScale) }
+        beginMatchRecording(.series(seed: seed))
         // The port-in waits for the stage select to close.
         startRound(portingIn: false)
         session.stopAt = session.frame
@@ -6147,21 +6518,53 @@ final class GameScene: SKScene {
             startSeries()
             return
         }
+        restartMatch(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
+    }
+
+    /// A fresh best of seven on `firstStage` off the seed, straight into play.
+    func restartMatch(seed: UInt32) {
         pendingFlow = nil
         heldBanner = nil
         previewedStage = nil
-        series = Series(seed: UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970)))
+        seriesSeed = seed
+        series = Series(seed: seriesSeed)
         series.stage = firstStage
+        beginMatchRecording(.restart(seed: seed, stage: firstStage))
         startRound()
         announceDoublePoints()
         enter(.playing)
+    }
+
+    /// A recorder for the match about to start, where a match can be replayed: offline or online, not
+    /// under footage, ZONES, the Tutorial or a capture.
+    private func beginMatchRecording(_ start: MatchReplayFile.Start) {
+        let recordable = footage == nil && watchedReplay == nil && zones == nil && gameMode != .zones && transformCapture == nil
+            && !DunkTuning.enabled && firstStage != .tutorial
+        let names = online.flatMap { flowState?.net.sideNames(localIndex: $0.localIndex) }
+        matchRecorder = recordable ? MatchRecorder(mode: gameMode, sides: sideCustomizations, start: start, series: series, names: names) : nil
+    }
+
+    /// Each side's look as it's played now, for a replay to dress them the same.
+    private var sideCustomizations: [PlayerCustomization] {
+        sideColours.indices.map { index in
+            var side = appliedSides.indices.contains(index) ? appliedSides[index] : PlayerCustomization(energy: sideColours[index])
+            side.energy = sideColours[index]
+            if pickedDrinks.indices.contains(index) { side.drink = pickedDrinks[index] }
+            if pickedWinPoses.indices.contains(index) { side.winPose = pickedWinPoses[index] }
+            return side
+        }
     }
 
     /// A round: bodies with their drinks in them at their spawns, the count, and the
     /// port-in, unless a screen is to come first.
     func startRound(portingIn: Bool = true) {
         fortySevenScores = [0, 0]
+        matchRecorder?.close(session)
         session = RollbackSession(match: freshMatch(), localIndex: localIndex, delay: online == nil ? 0 : NetRules.inputDelay)
+        if let matchRecorder {
+            session.startRecording()
+            matchRecorder.liveSerial = session.serial
+        }
         // A fresh round's meters start from nothing on the way.
         floOrbs = []
         floOnTheWay = [:]
@@ -6273,7 +6676,7 @@ final class GameScene: SKScene {
                 : online != nil && !session.settled ? "waiting: online settle" : "all in")
         }
         guard let select = screen as? StageSelectScreen, !stageSettling else { return }
-        if online == nil, stageVoters.contains(1), inputs.count > 1 {
+        if online == nil, stageVoters.contains(1), inputs.count > 1, flowState?.vKeyOpen != true {
             let pad = inputs[1]
             if pad.stick.x >= 0.5, secondMenuLast.stick.x < 0.5 { select.move(voter: 1, by: 1) }
             if pad.stick.x <= -0.5, secondMenuLast.stick.x > -0.5 { select.move(voter: 1, by: -1) }
@@ -6329,7 +6732,7 @@ final class GameScene: SKScene {
 
     /// The chosen stage in: a fresh match on it in place of the stopped one, keeping the
     /// frame so the session runs on; then the drink pick if one is due, or play.
-    private func settleStage(_ choice: StageChoice) {
+    func settleStage(_ choice: StageChoice) {
         guard !stageSettling else { return }
         stageSettling = true
         LoadTrace.mark("settling \(choice)")
@@ -6340,6 +6743,7 @@ final class GameScene: SKScene {
         } else {
             series.move(to: choice)
         }
+        matchRecorder?.decided(.stage(choice), series: series)
         // The fresh match made now, off the series' dice as ever, but put in only as the stage it's
         // on is built: drawn before that, the old stage's rims and nets would be on the new one's hoops.
         let fresh = freshMatch()
@@ -6440,6 +6844,15 @@ final class GameScene: SKScene {
                 match.players[index].power = drinks[index].power
                 match.players[index].powerLevel = drinks[index].powerLevel
             }
+        }
+        warmIceLookIfFrostTea()
+    }
+
+    /// The frozen look built only once someone has Frost Tea, waited on by the stage's loading
+    /// (`warmStage`) like any rebuild; nobody with it, it's never made.
+    private func warmIceLookIfFrostTea() {
+        if match.players.contains(where: { $0.power == .frostTea }) || pickedDrinks.contains(where: { $0?.power == .frostTea }) {
+            sprites.warmIceLook()
         }
     }
 
@@ -6712,7 +7125,7 @@ final class GameScene: SKScene {
                 // Where the blade meets the wall, back off it.
                 let player = players[index]
                 say(.clang, at: player.chest + Vec2(x: player.facing.sign * GameScene.bladeReach, y: 0), away: -player.facing.sign, rise: 30)
-            case .slashClashed(let at), .snatchClashed(let at):
+            case .slashClashed(let at), .snatchClashed(let at), .slideClashed(let at):
                 say(.clang, at: at, away: 0, rise: 30)
             case .rimBounced(let hoop, let speed, _) where speed > GameScene.bounceSoundFloor:
                 // Off the rim's top, up from it, away from its backboard; a rim's once a while at most,
@@ -6810,6 +7223,11 @@ final class GameScene: SKScene {
 
     func enter(_ next: Flow) {
         headingToWin = false
+        // Out of a replay to the title: the sides dressed as saved again.
+        if next == .title, watchedReplay != nil {
+            watchedReplay = nil
+            applySavedColours()
+        }
         // Off the match, a game-winner's freeze cut short: the world moving again.
         if next != .playing, next != .paused, finale != nil {
             finale = nil
@@ -6817,7 +7235,7 @@ final class GameScene: SKScene {
         }
         // The back arrow on the stage select only where back goes somewhere: online (out of the
         // match), or offline on the first select before anything's been played. Between sets, none.
-        flowState?.stageSelectBack = next == .stageSelect && zonesOnline == nil
+        flowState?.stageSelectBack = next == .stageSelect && zonesOnline == nil && watchedReplay == nil
             && (online != nil || (series.rounds.isEmpty && series.stagesPlayed == 0))
         // A stage's first count waits for its preview.
         if next == .playing, previewDue, startPreview() { return }
@@ -6848,9 +7266,23 @@ final class GameScene: SKScene {
             // Both phones roll the same offers off the shared dice.
             pickOffers = series.offers(for: picker)
             pickFramesLeft = Series.pickSeconds * 60
+            // Frost Tea on offer: the frozen look built while the pick's up, ready if it's drunk.
+            if pickOffers.contains(where: { $0.power == .frostTea }) { sprites.warmIceLook() }
         }
         flowState?.showsTitle = next == .title
+        // Off the match: nothing more of it to save.
+        if next == .title { matchRecorder = nil }
+        // Onto the title, the match's sounds cut off, those lined up and those looping.
+        if next == .title { SoundBoard.shared.clearQueued() }
+        playStageLoops()
         presentScreen()
+    }
+
+    /// The stage's ambience and music, none on the title: the Elements' storm, the Tutorial's Wreck.
+    private func playStageLoops() {
+        let onTitle = flow == .title
+        LoopedTrack.ambience.play(!onTitle && match.stage.features.look == .elements ? "thunderstorm" : nil)
+        LoopedTrack.music.play(!onTitle && match.stage.features.tutorial ? "wreck" : nil)
     }
 
     private func sideName(_ index: Int) -> String {
@@ -6871,10 +7303,11 @@ final class GameScene: SKScene {
     }
 
     /// The round's drink onto the body, the count again, and play on.
-    private func applyPick(choice: Int) {
+    func applyPick(choice: Int) {
         guard flow == .picking, pickOffers.indices.contains(choice) else { return }
         let drink = pickOffers[choice]
         series.drink(drink, by: picker)
+        matchRecorder?.decided(.drink(choice: choice), series: series)
         // A biomorph drunk here takes over from the POWER picker's: one biomorph at a time.
         if drink.kind == .biomorph, picker == 0, online == nil, powerVariant != .none {
             powerVariant = .none
@@ -6893,6 +7326,22 @@ final class GameScene: SKScene {
     }
 
     /// NEW MATCH offline; REMATCH online, which starts once both sides have pressed it.
+    /// The win screen's SAVE REPLAY: the match as played, into the replays folder.
+    /// The match written: on the Mac to the folder granted for it (`ReplayFolder`), else to the replays folder.
+    private func saveReplay(done: @escaping (Bool) -> Void) {
+        guard let matchRecorder else { return done(false) }
+        let session = self.session, stage = series.stage
+        #if !os(tvOS)
+        if ProcessInfo.processInfo.isiOSAppOnMac {
+            ReplayFolder.withFolder { folder in
+                done(folder.map { matchRecorder.save(live: session, endingOn: stage, into: $0) != nil } ?? false)
+            }
+            return
+        }
+        #endif
+        done(matchRecorder.save(live: session, endingOn: stage) != nil)
+    }
+
     private func playAgain() {
         guard online != nil else {
             flowState?.transition { [weak self] in
@@ -6980,7 +7429,7 @@ final class GameScene: SKScene {
         case .pause:
             screen = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame, onRestart: {}, onSettings: {}, onTitle: {}, onResume: {})
         case .win:
-            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideColours.indices.contains(1) ? sideColours[1].name : sideName(1), player: 1, score: [1, 4], again: "NEW MATCH",
+            screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: sideColours.indices.contains(1) ? sideColours[1].name : sideName(1), player: 1, pose: .taunt, score: [1, 4], again: "NEW MATCH",
                                onAgain: {}, onTitle: {})
         default:
             break
@@ -7038,9 +7487,13 @@ final class GameScene: SKScene {
             let heading = online != nil && stageVoters.count == 1 ? "\(sideName(stageVoters[0])) PICKS" : nil
             // The select lists only the stages not parked, by their place in it.
             let listed = stageList
+            // Without the V-Key (online, on either side) only the Wreck Center is played; the rest
+            // show locked, and picking one offline asks for the key.
+            let locked = matchUnlocked ? [] : Set(listed.indices.filter { !VKey.freeStages.contains(listed[$0]) })
             let select = StageSelectScreen(halfWidth: halfWidth, halfHeight: halfHeight, stages: listed.map { $0.name.uppercased() },
                                            voters: stageVoters, localVoters: localStageVoters, colours: colours, heading: heading,
-                                           start: listed.firstIndex(of: series.stage) ?? 0) { [weak self] voter, index in
+                                           start: listed.firstIndex(of: series.stage) ?? 0, locked: locked,
+                                           onLockedPick: online == nil ? { [weak self] in self?.flowState?.openVKey() } : nil) { [weak self] voter, index in
                 self?.voteStage(listed.indices.contains(index) ? listed[index] : .wreckCenter, by: voter)
             }
             for (voter, vote) in stageVotes { select.show(vote: listed.firstIndex(of: vote) ?? 0, by: voter) }
@@ -7052,7 +7505,7 @@ final class GameScene: SKScene {
             }
             // Back off the first select, offline, before anything's been played: to the customize
             // screen, picks kept. Between stages (a round already won) there's no going back.
-            if online == nil, series.stagesPlayed == 0, series.rounds.isEmpty {
+            if online == nil, watchedReplay == nil, series.stagesPlayed == 0, series.rounds.isEmpty {
                 select.back = { [weak self] in
                     guard let self, let flowState = self.flowState else { return }
                     let mode = self.gameMode
@@ -7078,8 +7531,20 @@ final class GameScene: SKScene {
                 }
             }
             // A touch screen's own: the buttons laid out where the player wants them.
-            if GameScene.touchControlsShown, !InputHub.onMac {
+            if GameScene.touchControlsShown, !InputHub.onMac, watchedReplay == nil {
                 extras.append(("BUTTON LAYOUT", { [weak self] in self?.editButtonLayout() }))
+            }
+            if watchedReplay != nil {
+                // A replay's: back to its start, or out to VTV.
+                let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame,
+                                        onRestart: { [weak self] in self?.restartWatchedReplay() },
+                                        onSettings: nil,
+                                        onTitle: { [weak self] in self?.leaveWatchedReplay() },
+                                        onResume: { [weak self] in self?.enter(.playing) },
+                                        restartText: "RESTART", titleText: "EXIT")
+                pause.back = { [weak self] in self?.enter(.playing) }
+                screen = pause
+                break
             }
             let pause = PauseScreen(halfWidth: halfWidth, halfHeight: halfHeight, resumeAt: pauseIconFrame,
                                     onRestart: { [weak self] in self?.restartMatch() },
@@ -7095,16 +7560,19 @@ final class GameScene: SKScene {
             // Their hood's name, the colour's gem.
             let hoods = zones != nil ? zonesSides.map(\.energy) : sideColours
             screen = WinScreen(halfWidth: halfWidth, halfHeight: halfHeight, winner: hoods.indices.contains(winner) ? hoods[winner].name : sideName(winner),
-                               player: winner, score: gameMode == .fortySeven || gameMode == .breakerBall ? fortySevenScores : (zones?.game.letters ?? series.wins),
-                               again: online != nil ? "REMATCH" : zonesOnline != nil ? "MATCHES" : "NEW MATCH",
-                               onAgain: { [weak self] in self?.playAgain() },
-                               onTitle: { [weak self] in self?.leaveToTitle() })
+                               player: winner, pose: winPose(winner), score: gameMode == .fortySeven || gameMode == .breakerBall ? fortySevenScores : (zones?.game.letters ?? series.wins),
+                               again: watchedReplay != nil ? "WATCH AGAIN" : online != nil ? "REMATCH" : zonesOnline != nil ? "MATCHES" : "NEW MATCH",
+                               onAgain: { [weak self] in self?.watchedReplay != nil ? self?.restartWatchedReplay() : self?.playAgain() },
+                               onTitle: { [weak self] in self?.watchedReplay != nil ? self?.leaveWatchedReplay() : self?.leaveToTitle() },
+                               onSaveReplay: matchRecorder == nil ? nil : { [weak self] done in self?.saveReplay(done: done) ?? done(false) },
+                               replaySaved: matchRecorder?.saved == true)
             if online?.rematchRandom != nil { (screen as? WinScreen)?.showWaiting() }
         case .playing, .preview:
             break
         }
         if let screen { hud.addChild(screen) }
-        controls?.isHidden = flow != .playing || !GameScene.touchControlsShown
+        controls?.isHidden = flow != .playing || !GameScene.touchControlsShown || watchedReplay != nil
+        refreshReplayPause()
         flowState?.pauseGround = screen is PauseScreen || screen is WinScreen || screen is PickScreen || screen is WaitScreen
         flowState?.gridGround = screen is StageSelectScreen
         // The score kept on the win screen and the stage select, over their veils.
@@ -7118,6 +7586,8 @@ final class GameScene: SKScene {
     var footageVeiled: Bool { flowState?.veiled == true && flowState?.pauseGround == true }
     var footageShowsHud: Bool { flow != .playing }
     var footagePickScreen: Screen? { flow == .picking ? screen : nil }
+    /// The stage select, up and not yet settled, for a replay to settle as the match did.
+    var stageSelectOpen: Bool { flow == .stageSelect && screen is StageSelectScreen && !stageSettling }
 
     /// The scoreboard on the stage select: only in Rounds, once a round's been played.
     private var scoreboardOffStageSelect: Bool { flow == .stageSelect && !(gameMode == .rounds && !series.rounds.isEmpty) }
@@ -7391,8 +7861,8 @@ final class GameScene: SKScene {
                 self.online?.started = true
                 // Both sides in their picks, the clash settled the same on both phones.
                 applyCustomizations(flowState.shownCustomizations)
-                // The host's mode is played.
-                gameMode = online.localIndex == 0 ? GameScene.savedOnlineMode : (online.theirMode ?? .rounds)
+                // The host's mode is played, Rounds if either side is free to try.
+                gameMode = onlineMode
                 startSeries(seed: online.random ^ theirs)
             }
             return
@@ -7419,7 +7889,8 @@ final class GameScene: SKScene {
 
     private func sendHello(_ random: UInt32) {
         let colour = UInt8(EnergyColour.allCases.firstIndex(of: EnergyColour.saved) ?? 0)
-        send(.hello(random: random, version: NetRules.protocolVersion, colour: colour, mode: GameScene.savedOnlineMode.rawValue), reliable: true)
+        send(.hello(random: random, version: NetRules.protocolVersion, colour: colour, mode: GameScene.savedOnlineMode.rawValue,
+                    unlocked: online?.unlocked ?? VKey.owned), reliable: true)
     }
 
     // MARK: Colours
@@ -7436,9 +7907,25 @@ final class GameScene: SKScene {
         let sides = PlayerCustomization.sides
         applyColours(sides.map(\.energy), looks: sides.map(\.look))
         pickedDrinks = sides.map(\.drink)
+        pickedWinPoses = sides.map(\.winPose)
+        appliedSides = sides
     }
+    /// Both sides' customizations as last put on them: this device's saved picks, or online the two
+    /// players' own; what a replay dresses them in.
+    private var appliedSides = PlayerCustomization.sides
     /// Each side's drink picked on the customize screen, for a mode that drinks before play (47).
     var pickedDrinks: [Greateraid?] = [nil, nil]
+    /// Each side's win pose as picked, online the other's as sent; none, random.
+    var pickedWinPoses: [WinPose?] = [nil, nil]
+    /// The seed the series started on, online both phones' randoms together.
+    var seriesSeed: UInt32 = 1
+
+    /// The pose `player` strikes on the win screen: its pick, or the series' roll.
+    func winPose(_ player: Int) -> WinPose {
+        let picks = zones != nil ? zonesSides.map(\.winPose) : pickedWinPoses
+        let picked = picks.indices.contains(player) ? picks[player] : nil
+        return picked ?? WinPose.random(seed: seriesSeed, player: player)
+    }
 
     /// The customize screen's player in a pick's look with its hooded head, made apart from
     /// the game's frames: they're rebuilt in the picks as the match starts.
@@ -7452,18 +7939,24 @@ final class GameScene: SKScene {
 
     /// The customize screen's figure on the bottles, a sheet outside play's (`player_sit`, `player_drink`,
     /// `player_bench`) drawn as the Greateraid pick draws it, in the side's look as shown; made once a look.
-    func customizeSeated(player: Int, look: Look, sheet: String, frame: Int) -> UIImage? {
-        setCustomizeLook(look, for: player)
-        let shown = player == 1 ? look.turnedRound : look
-        let key = "\(player)_\(sheet)_\(frame)"
-        if let kept = customizeSeatedImages[key], kept.look == shown { return kept.image }
+    /// `warming`: made ahead under the launch's splash, in the pick's look though the screen isn't open.
+    func customizeSeated(player: Int, look: Look, sheet: String, frame: Int, warming: Bool = false) -> UIImage? {
         let slot = SpriteLibrary.customizePlayer(player)
-        let texture = sheet == "player_drink"
-            ? sprites.standalone(sheet, frame: frame, player: slot, headTilt: PickScreen.drinkHeadTilts[min(frame, PickScreen.drinkHeadTilts.count - 1)],
-                                 overHood: PickScreen.drinkOverHood)
-            : sprites.standalone(sheet, frame: frame, player: slot)
-        let image = UIImage(cgImage: texture.cgImage())
-        customizeSeatedImages[key] = (shown, image)
+        if warming {
+            sprites.setCustomizeLook(player == 1 ? look.turnedRound : look, for: player)
+        } else {
+            setCustomizeLook(look, for: player)
+        }
+        // Kept under the look it's drawn in, the slot's: with the screen closed that isn't the one asked for.
+        let drawnLook = sprites.look(for: slot)
+        let key = "\(player)_\(sheet)_\(frame)"
+        if let kept = customizeSeatedImages[key], kept.look == drawnLook { return kept.image }
+        let picture = sheet == "player_drink"
+            ? sprites.standalonePicture(sheet, frame: frame, player: slot, headTilt: PickScreen.drinkHeadTilts[min(frame, PickScreen.drinkHeadTilts.count - 1)],
+                                        overHood: PickScreen.drinkOverHood)
+            : sprites.standalonePicture(sheet, frame: frame, player: slot)
+        let image = UIImage(cgImage: picture)
+        customizeSeatedImages[key] = (drawnLook, image)
         return image
     }
     private var customizeSeatedImages: [String: (look: Look, image: UIImage)] = [:]
@@ -7471,6 +7964,7 @@ final class GameScene: SKScene {
     /// PLAYER VISIBILITY changed: the match's players drawn again in its line, all of it ready on the GPU at `completion`.
     func reloadPlayerVisibility(completion: @escaping () -> Void) {
         sprites.reloadMatchLines(players: match.players.count, completion: completion)
+        warmIceLookIfFrostTea()
     }
 
     /// A side's look onto the customize screen's figure, only while the screen is open: drawn again
@@ -7491,37 +7985,87 @@ final class GameScene: SKScene {
         let headNudge: CGPoint
         let headScale: CGFloat
         let ball: (image: CGImage, centre: CGPoint)?
+        /// The aura round a ball held by energy (taunt2's), centred on the ball's picture.
+        let ballAura: CGImage?
         let overBall: CGImage?
         let overBallLine: CGImage?
     }
     /// A frame of a side's win pose: made once and kept, as the win screen asks for one every tick.
     func winPortrait(player: Int, pose: WinPose, frame: Int) -> WinFrame? {
         let place = SpriteLibrary.customizeHeadPlace
-        let headNudge = place.nudge, headScale = Double(place.scale)
-        let key = "\(player)_\(pose)_\(frame)_\(headNudge.x)_\(headNudge.y)_\(headScale)"
+        let key = "\(player)_\(pose)_\(frame)_\(place.nudge.x)_\(place.nudge.y)_\(Double(place.scale))"
         if let made = winFrames[key] { return made }
-        let sheet = AnimationFrame(pose.animation, frame)
-        guard let portrait = sprites.portrait(pose.animation.rawValue, frame: frame, player: player, headDrawnFor: GameScene.hoodDrawnFor,
-                                              headNudge: headNudge, headScale: CGFloat(headScale), holdsBall: pose.holdsBall) else { return nil }
-        var ball: (image: CGImage, centre: CGPoint)?
-        // Where the sheet has it, or where it's tucked behind the body and too little of it shows to
-        // find; the sheet's own ball, painted, where it reshapes it.
-        let sheetBall = pose.holdsBall ? SpriteLibrary.sheetBall(sheet, source: sprites.sourceImage("\(pose.animation.rawValue)_\(frame)")) : nil
-        if let sheetBall {
-            let image = sprites.paintedBallTexture(sheet, look: .plain, spin: 0)?.cgImage()
-                ?? sprites.basketballFrames[sprites.roundBallSpin(sheet) ?? 0].cgImage()
-            let centre = SpriteLibrary.sheetBallCentre(sheetBall, in: sheet)
-            ball = (image, CGPoint(x: 24 + centre.x, y: pose.animation.feetFromBottom + centre.y))
-        } else if pose.holdsBall, let landmark = BallLandmarks.table["\(pose.animation.rawValue)_\(frame)"] ?? SpriteLibrary.tuckedBall(sheet).map({ Vec2(x: Double($0.x), y: Double($0.y)) }) {
-            ball = (winBallImage, CGPoint(x: 24 + landmark.x, y: pose.animation.feetFromBottom + landmark.y))
-        }
-        let overBall: (body: CGImage?, line: CGImage?) = pose.holdsBall ? sprites.overBallImages(sheet, player: player) : (nil, nil)
-        let made = WinFrame(portrait: portrait, headNudge: headNudge, headScale: CGFloat(headScale), ball: ball,
-                            overBall: overBall.body, overBallLine: overBall.line)
+        guard let made = posedFrame(player: player, animation: pose.animation, frame: frame, holdsBall: pose.holdsBall) else { return nil }
         winFrames[key] = made
         return made
     }
+
+    /// A sheet's frame drawn as the win screen draws its winner, in `player`'s slot's look: the
+    /// customize screen's figure, its hood where that screen's sliders put it, the ball in hand where it holds one.
+    private func posedFrame(player: Int, animation: Animation, frame: Int, holdsBall: Bool) -> WinFrame? {
+        let place = SpriteLibrary.customizeHeadPlace
+        let headNudge = place.nudge, headScale = Double(place.scale)
+        let sheet = AnimationFrame(animation, frame)
+        guard let portrait = sprites.portrait(animation.rawValue, frame: frame, player: player, headDrawnFor: GameScene.hoodDrawnFor,
+                                              headNudge: headNudge, headScale: CGFloat(headScale), holdsBall: holdsBall) else { return nil }
+        var ball: (image: CGImage, centre: CGPoint)?
+        var ballAura: CGImage?
+        // Where the sheet has it, or where it's tucked behind the body and too little of it shows to
+        // find; the sheet's own ball, painted, where it reshapes it.
+        let sheetBall = holdsBall ? SpriteLibrary.sheetBall(sheet, source: sprites.sourceImage("\(animation.rawValue)_\(frame)")) : nil
+        if holdsBall, let layer = SpriteLibrary.ballLayers[animation] {
+            // A sheet whose ball is painted apart (taunt2): the layer's whole cell, laid over the figure's.
+            let layerImage = sprites.sourceImage("\(layer)_\(frame)")
+            ball = (layerImage, CGPoint(x: CGFloat(animation.pixelWidth) / 2, y: CGFloat(animation.pixelSize) / 2))
+            ballAura = SpriteLibrary.ballAuraImage(layerImage)
+        } else if let sheetBall {
+            let image = sprites.paintedBallPicture(sheet, look: .plain, spin: 0)
+                ?? sprites.ballPicture(.plain, spin: sprites.roundBallSpin(sheet) ?? 0)
+            let centre = SpriteLibrary.sheetBallCentre(sheetBall, in: sheet)
+            ball = (image, CGPoint(x: 24 + centre.x, y: animation.feetFromBottom + centre.y))
+        } else if holdsBall, let landmark = BallLandmarks.table["\(animation.rawValue)_\(frame)"] ?? SpriteLibrary.tuckedBall(sheet).map({ Vec2(x: Double($0.x), y: Double($0.y)) }) {
+            ball = (winBallImage, CGPoint(x: 24 + landmark.x, y: animation.feetFromBottom + landmark.y))
+        }
+        let overBall: (body: CGImage?, line: CGImage?) = holdsBall ? sprites.overBallImages(sheet, player: player) : (nil, nil)
+        let made = WinFrame(portrait: portrait, headNudge: headNudge, headScale: CGFloat(headScale), ball: ball, ballAura: ballAura,
+                            overBall: overBall.body, overBallLine: overBall.line)
+        return made
+    }
     private var winFrames: [String: WinFrame] = [:]
+
+    /// A saved replay's side for its VTV screen, in the look it played in: player one in the air slash's
+    /// third frame, player two turned round in the spin dunk's fifth; made once a look. `middle`: the
+    /// middle of what's drawn, ball and hood and all, in art pixels down from the 48-pixel figure's top left.
+    struct ReplayFigure {
+        let frame: WinFrame
+        let middle: CGPoint
+    }
+    func replayFigure(side: Int, look: Look) -> ReplayFigure? {
+        let shown = side == 1 ? look.turnedRound : look
+        let key = ReplayFigureKey(side: side, look: shown)
+        if let made = replayFigures[key] { return made }
+        sprites.setReplayLook(shown, for: side)
+        let pose = side == 0 ? GameScene.replayFigureFrames.first : GameScene.replayFigureFrames.second
+        guard let frame = posedFrame(player: SpriteLibrary.replayPlayer(side), animation: pose.animation, frame: pose.frame,
+                                     holdsBall: pose.animation.holdsBall) else { return nil }
+        var bounds = CustomizeFigure.drawnBounds(frame.portrait, headNudge: frame.headNudge, headScale: frame.headScale)
+        if let ball = frame.ball {
+            let width = CGFloat(ball.image.width), height = CGFloat(ball.image.height)
+            let ballBox = CGRect(x: ball.centre.x - width / 2, y: 48 - ball.centre.y - height / 2, width: width, height: height)
+            bounds = bounds.map { $0.union(ballBox) } ?? ballBox
+        }
+        let middle = bounds.map { CGPoint(x: $0.midX, y: $0.midY) } ?? CGPoint(x: 24, y: 24)
+        let made = ReplayFigure(frame: frame, middle: middle)
+        replayFigures[key] = made
+        return made
+    }
+    /// The frames VTV's replay screens show each side in (0-based).
+    static let replayFigureFrames = (first: AnimationFrame(.esperSlashAir, 2), second: AnimationFrame(.spinDunk, 4))
+    private struct ReplayFigureKey: Hashable {
+        let side: Int
+        let look: Look
+    }
+    private var replayFigures: [ReplayFigureKey: ReplayFigure] = [:]
 
     /// The updates screen's shield icon: the shield's sheet's whole frames that loop, in the first
     /// side's energy.
@@ -7604,7 +8148,7 @@ final class GameScene: SKScene {
                 guard frame == ZRules.blastBackArmRelease || frame == ZRules.blastFrontArmRelease, release <= now else { continue }
                 let travelled = CGFloat(now - release) * pixelsPerFrame
                 guard travelled < GameScene.updatesBlastReach,
-                      let image = updatesImage("blastShot_\(effectFrame)", { self.sprites.effectTexture(EnergyEffect.zBlast.name, effectFrame, player: 0) }) else { continue }
+                      let image = updatesImage("blastShot_\(effectFrame)", { self.sprites.effectTexture(EnergyEffect.zBlast.name, effectFrame, player: 0).cgImage() }) else { continue }
                 let along = travelled / 2.squareRoot()
                 extras.effects.append(FigureEffect(image: image, centre: CGPoint(x: fingertips.x + along, y: fingertips.y + along), turn: .pi / 4,
                                                    haloColour: look.glow, haloDiameter: CGFloat(max(image.width, image.height)) * GameScene.beamGlowWidth,
@@ -7647,16 +8191,15 @@ final class GameScene: SKScene {
     static let updatesBlastReach: CGFloat = 40
     /// The updates screen's pictures, made once from their textures: dropped with the looks.
     private var updatesImages: [String: CGImage] = [:]
-    private func updatesImage(_ key: String, _ make: () -> SKTexture?) -> CGImage? {
+    private func updatesImage(_ key: String, _ make: () -> CGImage?) -> CGImage? {
         if let made = updatesImages[key] { return made }
-        guard let texture = make() else { return nil }
-        let image = texture.cgImage()
+        guard let image = make() else { return nil }
         updatesImages[key] = image
         return image
     }
     /// The updates screen's figures made again in the look as it is now.
     func resetUpdatesIcons() { updatesImages = [:] }
-    private lazy var winBallImage: CGImage = sprites.basketballFrames[0].cgImage()
+    private lazy var winBallImage: CGImage = sprites.ballPicture(.plain, spin: 0)
     /// Every frame of both sides' win pose, made with the stage and again as their looks change.
     /// Once the looks' rebuild has landed, which made the portraits on its cores: here only gathered.
     private func warmWinPoses() {
@@ -7664,7 +8207,9 @@ final class GameScene: SKScene {
         sprites.afterRebuilds { [weak self] in
             guard let self else { return }
             for player in self.match.players.indices {
-                for frame in 0..<WinPose.taunt.animation.frameCount { _ = self.winPortrait(player: player, pose: .taunt, frame: frame) }
+                for pose in WinPose.winning {
+                    for frame in 0..<pose.animation.frameCount { _ = self.winPortrait(player: player, pose: pose, frame: frame) }
+                }
             }
         }
     }
@@ -7674,6 +8219,8 @@ final class GameScene: SKScene {
         guard sides.count == 2 else { return }
         applyColours(sides.map(\.energy), looks: sides.map(\.look))
         pickedDrinks = sides.map(\.drink)
+        pickedWinPoses = sides.map(\.winPose)
+        appliedSides = sides
     }
 
     // MARK: Online customize
@@ -7700,10 +8247,17 @@ final class GameScene: SKScene {
 
     /// A side's hooded head alone in a pick's look, cut to what's drawn, for the customize
     /// screen's hood box.
+    /// Asked for on every redraw of the screen, so it's cut once per picture: reading a texture back
+    /// off the GPU each time grew memory past the TV's limit within seconds.
     func customizeHood(player: Int, look: Look) -> CGImage? {
         setCustomizeLook(look, for: player)
-        return CustomizeArt.trimmed(sprites.hoodHead(skin: look.dressing.skinTone, player: SpriteLibrary.customizePlayer(player)).drawn.cgImage())
+        let picture = sprites.hoodHeadPicture(skin: look.dressing.skinTone, player: SpriteLibrary.customizePlayer(player))
+        if let kept = customizeHoods[player], kept.picture === picture { return kept.trimmed }
+        let trimmed = CustomizeArt.trimmed(picture)
+        customizeHoods[player] = (picture, trimmed)
+        return trimmed
     }
+    private var customizeHoods: [Int: (picture: CGImage, trimmed: CGImage)] = [:]
 
     /// Both sides' colours onto everything drawn in them, in `looks` where given.
     func applyColours(_ colours: [EnergyColour], looks: [Look]? = nil) {
@@ -7742,7 +8296,7 @@ final class GameScene: SKScene {
     private func handle(_ data: Data) {
         guard online != nil, let message = NetMessage(data: data) else { return }
         switch message {
-        case .hello(let random, let version, let colour, let mode):
+        case .hello(let random, let version, let colour, let mode, let unlocked):
             guard version == NetRules.protocolVersion else {
                 endOnline("VERSIONS DIFFER")
                 return
@@ -7751,8 +8305,9 @@ final class GameScene: SKScene {
                 online?.theirRandom = random
                 online?.theirColour = EnergyColour.allCases.indices.contains(Int(colour)) ? EnergyColour.allCases[Int(colour)] : .teal
                 online?.theirMode = GameMode(rawValue: mode) ?? .rounds
-                // The host's mode is played: the customize screen says so on the other phone.
-                if online?.localIndex == 1, let theirs = online?.theirMode { flowState?.customizeMode = theirs }
+                online?.theirUnlocked = unlocked
+                // The mode played, the host's or free to try's: the customize screen says so on both phones.
+                flowState?.customizeMode = onlineMode
                 if let mine = online?.random { sendHello(mine) }
             }
         case .inputs(let packet):
@@ -7865,7 +8420,7 @@ final class GameScene: SKScene {
             case .cartSlashed(let index): play(.slashWallClank, at: body(index))
             // Every counter's sound is the slashclash's.
             case .countered(_, _, let at): play(.slashClash, at: at)
-            case .shieldClashed(let at, _, _), .snatchClashed(let at): play(.slashClash, at: at)
+            case .shieldClashed(let at, _, _), .snatchClashed(let at), .slideClashed(let at): play(.slashClash, at: at)
             // Quiet for a soft bounce, silent once it's only settling.
             case .ballBounced(let position, let speed) where speed > GameScene.bounceSoundFloor:
                 play(.ballBounce, at: position, volume: Float(min(speed / GameScene.bounceSoundFull, 1)))
@@ -7876,7 +8431,9 @@ final class GameScene: SKScene {
 
     /// A sound from somewhere in the world: full on the screen, fading out over a margin
     /// past its edge, so nothing off the screen is heard.
+    /// None on the title, where the last match is still drawn behind it and its changes would be heard.
     private func play(_ effect: SoundBoard.Effect, at point: Vec2, volume: Float = 1) {
+        guard flow != .title else { return }
         SoundBoard.shared.play(effect, volume: volume * audibility(at: point))
     }
 
@@ -8359,7 +8916,7 @@ final class GameScene: SKScene {
                 }
                 clashSlashers = Set(match.players.indices.filter { match.players[$0].state == .slashing && !match.players[$0].floSlash })
                 strikeClash(at: at)
-            case .snatchClashed(let at):
+            case .snatchClashed(let at), .slideClashed(let at):
                 // As the slashclash: the clash sheet held on its burst, the lightning.
                 if EffectSheets.frames[EnergyEffect.slashClash.name] != nil {
                     for (slot, index) in match.players.indices.enumerated() {
@@ -8914,6 +9471,7 @@ final class GameScene: SKScene {
     private func spawnAfterimage(of body: SKSpriteNode, player index: Int, colour: SKColor? = nil, above: CGFloat = 0) {
         guard let texture = body.texture, !body.isHidden else { return }
         let ghost = SKSpriteNode(texture: texture)
+        copyArt(of: body, to: ghost)
         ghost.size = CGSize(width: abs(body.size.width), height: abs(body.size.height))
         ghost.anchorPoint = body.anchorPoint
         ghost.position = body.parent.map { $0 === bodies ? body.position : $0.convert(body.position, to: bodies) } ?? body.position
@@ -8972,13 +9530,6 @@ final class GameScene: SKScene {
     static let spinTilt: CGFloat = 10 * .pi / 180
     static let spinDunkTilt: CGFloat = 10 * .pi / 180
     static let spinDunkTiltFrames = 3
-    /// The air slash's lean forward, from this sheet frame (0-based; the third), and the share of
-    /// the way it goes each frame, in and back out.
-    static let airSlashLean: CGFloat = 30 * .pi / 180
-    static let airSlashLeanFrom = 2
-    static let airSlashLeanEase: CGFloat = 0.3
-    /// Each player's air-slash lean now, eased.
-    private var slashLean: [Int: CGFloat] = [:]
     static let spinFlashFrames = 4
     /// Tumbling's flash: black, this many frames on and off, as the scoring lockout's.
     static let tumbleFlashFrames = 4
@@ -10169,6 +10720,19 @@ final class GameScene: SKScene {
         return shader
     }()
 
+    /// The energy ramp's three tones for a glow colour (`Look.energyRamp`) onto a node drawn with
+    /// the players' energy shader (`PlayerMapShaders`): the sheets' white in the glow, the blade's two
+    /// greys (EDG64's C7CFDD and 92A1B9) in the middle and deep tones, below mid-grey black up to the glow.
+    private func setEnergyRamp(_ node: SKSpriteNode, _ colour: SKColor) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        colour.getRed(&r, green: &g, blue: &b, alpha: &a)
+        func channel(_ value: CGFloat) -> RGB { RGB(min(max((value * 255).rounded(), 0), 255)) }
+        let ramp = Look.energyRamp(channel(r) << 16 | channel(g) << 8 | channel(b))
+        setTone(node, "a_glow", ramp.glow)
+        setTone(node, "a_middle", ramp.middle)
+        setTone(node, "a_deep", ramp.deep)
+    }
+
     private func setGlow(_ node: SKSpriteNode, _ colour: SKColor) {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         colour.getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -10855,11 +11419,13 @@ final class GameScene: SKScene {
                     : jumpSheets.flatMap { sheet in (0..<sheet.frameCount).map { AnimationFrame(sheet, $0) } }.randomElement()!
                 // Drawn in the ice look.
                 let ice = SpriteLibrary.icePlayer
-                let node = SKSpriteNode(texture: sprites.texture(frame, player: ice))
+                let node = SKSpriteNode()
+                node.show(sprites.texture(frame, player: ice))
                 node.size = node.texture!.size()
                 if let outline = sprites.outlineTexture(frame, player: ice) {
                     // Its line too, in the ice look's.
-                    let line = SKSpriteNode(texture: outline)
+                    let line = SKSpriteNode()
+                    line.show(outline)
                     line.size = node.size
                     line.anchorPoint = sprites.anchor(for: frame.animation)
                     line.color = SKColor(rgb: Look.ice.outline)
@@ -11122,7 +11688,9 @@ final class GameScene: SKScene {
             // Facing left, turned round where the sleeves and boots need swapping.
             let drawnAs = player.frozen > 0 ? SpriteLibrary.icePlayer
                 : (energyForm ? SpriteLibrary.transformedPlayer(index) : sprites.bodyPlayer(index, facingLeft: player.facing == .left))
-            node.texture = sprites.texture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted)
+            let bodyArt = sprites.texture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted)
+            node.show(bodyArt)
+            bodyArts[index] = bodyArt
             // Titan Tea's change: the lightning, white at the old size, then grown into the new one.
             while lastBodyScales.count <= index { lastBodyScales.append(player.spec.scale) }
             if player.power == .titanTea, player.inFloState, player.spec.scale > lastBodyScales[index] + 0.01 {
@@ -11178,11 +11746,10 @@ final class GameScene: SKScene {
             let arms = blastArms(index, on: node)
             arms.isHidden = !player.firingBeam
             if !arms.isHidden {
-                arms.texture = sprites.texture(AnimationFrame(.beamArms, 0), player: drawnAs)
+                arms.show(sprites.texture(AnimationFrame(.beamArms, 0), player: drawnAs))
                 arms.size = arms.texture!.size().scaled(by: drawScale)
                 if let line = arms.childNode(withName: "line") as? SKSpriteNode {
-                    line.texture = sprites.outlineTexture(AnimationFrame(.beamArms, 0), player: drawnAs)
-                    line.isHidden = line.texture == nil
+                    GameScene.show(sprites.outlineTexture(AnimationFrame(.beamArms, 0), player: drawnAs), on: line)
                     line.size = arms.size
                     line.color = outlineNodes[index].isHidden ? SKColor(rgb: sprites.look(for: index).outline) : outlineNodes[index].color
                 }
@@ -11201,12 +11768,13 @@ final class GameScene: SKScene {
             if player.state == .webSwing, let hung = player.webAnchor, !node.isHidden {
                 swingArmNode.isHidden = false
                 let armFrame = AnimationFrame(.swingArm, 0)
-                swingArmNode.texture = sprites.texture(armFrame, player: drawnAs)
-                swingArmGlowing[index] = sprites.glowingPartsTexture(armFrame, player: drawnAs)
+                let swingArmArt = sprites.texture(armFrame, player: drawnAs)
+                swingArmNode.show(swingArmArt)
+                swingArmArts[index] = swingArmArt
+                swingArmGlowing[index] = sprites.glowingPicture(armFrame, player: drawnAs)
                 swingArmNode.size = swingArmNode.texture!.size().scaled(by: drawScale)
                 if let line = swingArmNode.childNode(withName: "line") as? SKSpriteNode {
-                    line.texture = sprites.outlineTexture(armFrame, player: drawnAs)
-                    line.isHidden = line.texture == nil
+                    GameScene.show(sprites.outlineTexture(armFrame, player: drawnAs), on: line)
                     line.size = swingArmNode.size
                     line.color = outlineNodes[index].isHidden ? SKColor(rgb: sprites.look(for: index).outline) : outlineNodes[index].color
                 }
@@ -11290,13 +11858,12 @@ final class GameScene: SKScene {
                     arm.isHidden = true
                     continue
                 }
-                let texture = sprites.texture(AnimationFrame(sheet, sheetFrame), player: drawnAs)
+                let art = sprites.texture(AnimationFrame(sheet, sheetFrame), player: drawnAs)
                 arm.isHidden = false
-                arm.texture = texture
-                arm.size = texture.size().scaled(by: drawScale)
+                arm.show(art)
+                arm.size = art.texture.size().scaled(by: drawScale)
                 let line = arm.childNode(withName: "line") as? SKSpriteNode
-                line?.texture = sprites.outlineTexture(AnimationFrame(sheet, sheetFrame), player: drawnAs)
-                line?.isHidden = line?.texture == nil
+                if let line { GameScene.show(sprites.outlineTexture(AnimationFrame(sheet, sheetFrame), player: drawnAs), on: line) }
                 line?.size = arm.size
                 line?.color = outlineNodes[index].isHidden ? SKColor(rgb: sprites.look(for: index).outline) : outlineNodes[index].color
                 arm.position = shotShoulder
@@ -11350,7 +11917,7 @@ final class GameScene: SKScene {
             let glowingParts = glowingPartNodes[index]
             if washed, let parts = sprites.glowingPartsTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
                 glowingParts.isHidden = false
-                glowingParts.texture = parts
+                glowingParts.show(parts)
                 glowingParts.size = node.size
                 glowingParts.anchorPoint = node.anchorPoint
             } else {
@@ -11358,6 +11925,15 @@ final class GameScene: SKScene {
             }
             headNodes[index].color = tint
             headNodes[index].colorBlendFactor = tintShare
+            let bodyHalo = bodyHalos[index]
+            if GlowSettings.playerHalo, !node.isHidden, !greyedOut.contains(index),
+               let bodyHaloTexture = sprites.haloTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
+                GameScene.placeHalo(bodyHalo, texture: bodyHaloTexture, over: node.size, anchor: node.anchorPoint)
+                bodyHalo.position = .zero
+
+            } else {
+                bodyHalo.isHidden = true
+            }
 
             // In flight the body leans into its motion: forward tips it ahead, backward tips
             // it back, up to thirty degrees, eased so it doesn't snap.
@@ -11366,7 +11942,12 @@ final class GameScene: SKScene {
                 let ahead = player.velocity.x * player.facing.sign / SmoothieRules.flightSpeed(level: player.powerLevel, withBall: false)
                 wantedTilt = -CGFloat(min(max(ahead, -1), 1)) * GameScene.flightTilt * CGFloat(player.facing.sign)
             }
-            bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
+            if player.fadeawayLean != 0 {
+                // The fadeaway's lean, the sim's own, which the shot's release turns with.
+                bodyTilt[index] = CGFloat(player.fadeawayLean) * CGFloat(player.facing.sign)
+            } else {
+                bodyTilt[index] += (wantedTilt - bodyTilt[index]) * 0.2
+            }
             // The Spin Move tilts back, at once.
             if player.state == .spinning { bodyTilt[index] = GameScene.spinTilt * CGFloat(player.facing.sign) }
             // The spin dunk's spin leans forward, at once.
@@ -11375,12 +11956,8 @@ final class GameScene: SKScene {
                 bodyTilt[index] = leaning ? -GameScene.spinDunkTilt * CGFloat(player.facing.sign) : 0
             }
             node.zRotation = bodyTilt[index]
-            // The air slash leans forward from its third frame, eased in and back out.
-            let leaning = frame.animation == .esperSlashAir && frame.frame >= GameScene.airSlashLeanFrom
-            slashLean[index, default: 0] += ((leaning ? -GameScene.airSlashLean * CGFloat(player.facing.sign) : 0) - slashLean[index, default: 0]) * GameScene.airSlashLeanEase
-            if abs(slashLean[index, default: 0]) < 0.001 { slashLean[index] = 0 }
-            // The Shieldflip's spin turns the body backward about its middle, the air slash's lean forward.
-            let middleTurn = (ShieldflipSpin.turn(player) ?? 0) + slashLean[index, default: 0]
+            // The Shieldflip's spin turns the body backward about its middle.
+            let middleTurn = ShieldflipSpin.turn(player) ?? 0
             if middleTurn != 0 {
                 let turn = middleTurn
                 let middle = node.position + SpriteLibrary.point(Vec2(x: 0, y: player.spec.bodyHeight * player.spec.scale / 2)) - SpriteLibrary.point(.zero)
@@ -11414,7 +11991,7 @@ final class GameScene: SKScene {
                 flash.isHidden = !(stunned || lockedOut || absorbing) || source.isHidden
                 guard stunned || lockedOut || absorbing else { continue }
                 flash.color = flashColour
-                flash.texture = source.texture
+                copyArt(of: source, to: flash)
                 flash.size = source.size
                 flash.anchorPoint = source.anchorPoint
                 flash.position = source.position
@@ -11431,7 +12008,7 @@ final class GameScene: SKScene {
             let clothesTexture = lockoutOn ? sprites.clothesTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) : nil
             clothesFlash.isHidden = clothesTexture == nil || node.isHidden
             if let clothesTexture {
-                clothesFlash.texture = clothesTexture
+                clothesFlash.show(clothesTexture)
                 clothesFlash.size = node.size
                 clothesFlash.anchorPoint = node.anchorPoint
                 clothesFlash.position = node.position
@@ -11474,7 +12051,8 @@ final class GameScene: SKScene {
             if let outline = floStateLine ? sprites.thinOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted)
                 : sprites.outlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
                 outlineNode.isHidden = false
-                outlineNode.texture = outline
+                outlineNode.show(outline)
+                outlineArts[index] = outline
                 outlineNode.size = node.size
                 outlineNode.anchorPoint = node.anchorPoint
                 // White as the body is, growing or parrying; ice, frozen; else the look's or the zone's.
@@ -11488,6 +12066,20 @@ final class GameScene: SKScene {
                     : tumbleFlash ?? (player.frozen > 0 ? SKColor(rgb: Look.ice.outline) : lineColour)
             } else {
                 outlineNode.isHidden = true
+            }
+            // Round the glowing parts, the energy's dark, where the line's in the look's own colour.
+            let glowLineNode = glowLineNodes[index]
+            let lineInLook = !outlineNode.isHidden && !growing && !ZoneTuning.inTheZone && !floStateLine && player.frozen == 0
+                && !player.spinPhasing && !player.phantomMode
+            if lineInLook, let energy = EnergyColour.withGlow(sprites.look(for: index).glow),
+               let glowLine = sprites.glowLineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
+                glowLineNode.isHidden = false
+                glowLineNode.show(glowLine)
+                glowLineNode.size = node.size
+                glowLineNode.anchorPoint = node.anchorPoint
+                glowLineNode.color = SKColor(rgb: energy.glowLine)
+            } else {
+                glowLineNode.isHidden = true
             }
             // What the sheet draws in front of its round ball, over the ball in hand, its line as the body's.
             if ballCovers.indices.contains(index) {
@@ -11510,11 +12102,12 @@ final class GameScene: SKScene {
 
             // The frame's energy rides exactly where the body is drawn.
             let energyNode = energyNodes[index]
-            if let energy = sprites.energyTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
+            // Held on the air slash's last frame after the swing, the blade's gone.
+            if player.state != .rolling, let energy = sprites.energyTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
                 energyNode.isHidden = false
-                energyNode.texture = energy
+                energyNode.show(energy)
                 // In the zone the energy (the slash's blade among it) runs the zone's colours.
-                setGlow(energyNode, ZoneTuning.inTheZone ? ZoneTuning.outline(at: drawingClock) : SKColor(rgb: sprites.look(for: drawnAs).glow))
+                setEnergyRamp(energyNode, ZoneTuning.inTheZone ? ZoneTuning.outline(at: drawingClock) : SKColor(rgb: sprites.look(for: drawnAs).glow))
                 energyNode.size = node.size
                 energyNode.anchorPoint = node.anchorPoint
                 energyNode.position = node.position
@@ -11523,7 +12116,7 @@ final class GameScene: SKScene {
             } else {
                 energyNode.isHidden = true
             }
-            let tilt = bodyTilt[index] + (ShieldflipSpin.turn(player) ?? 0) + slashLean[index, default: 0]
+            let tilt = bodyTilt[index] + (ShieldflipSpin.turn(player) ?? 0)
             func leaned(_ offset: CGPoint) -> CGPoint {
                 CGPoint(x: offset.x * cos(tilt) - offset.y * sin(tilt), y: offset.x * sin(tilt) + offset.y * cos(tilt))
             }
@@ -11581,14 +12174,12 @@ final class GameScene: SKScene {
                 headTip[index, default: 0] += (wantedTip - headTip[index, default: 0]) * GameScene.headTipEase
                 // And the sheet's own turn, the double jump's tumble, clockwise facing right.
                 let sheetTurn = GameScene.hoodTurn(frame)
-                // The air slash's lean taken back off the head, so it still faces straight ahead.
-                let counterLean = -slashLean[index, default: 0]
-                if abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame) || counterLean != 0,
+                if abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame),
                    let head = sprites.landmark(.head, in: GameScene.hoodDrawnFor, player: index) {
                     let anim = GameScene.hoodDrawnFor.animation
                     let middle = CGPoint(x: anim.pixelSize / 2 + head.x, y: anim.pixelSize - anim.feetFromBottom - head.y)
                     let tip = headTip[index, default: 0]
-                    turn(hood, about: middle, by: (tip - sheetTurn) * CGFloat(player.facing.sign) + counterLean, scale: drawScale)
+                    turn(hood, about: middle, by: (tip - sheetTurn) * CGFloat(player.facing.sign), scale: drawScale)
                     if let pose = GameScene.headPose(frame) {
                         hood.position.x += pose.x * CGFloat(player.facing.sign) * drawScale
                         hood.position.y += pose.y * drawScale
@@ -11616,15 +12207,25 @@ final class GameScene: SKScene {
             }
             // Tipped, the hood carries its own line: the body's is drawn without the hood's place.
             let hoodLine = hoodLineNodes[index]
-            let tipped = !hood.isHidden && (abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame) || slashLean[index, default: 0] != 0)
+            let tipped = !hood.isHidden && (abs(headTip[index, default: 0]) > 0.001 || GameScene.hoodMoved(frame))
                 && !outlineNode.isHidden && !floStateLine
             if tipped, let bare = sprites.bareOutlineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted),
                let line = sprites.hoodLine(skin: sprites.look(for: index).dressing.skinTone, view: HoodView.of(frame), energy: energyForm && player.frozen == 0,
                                           style: SpriteLibrary.lineStyle(for: index)) {
-                outlineNode.texture = bare
+                outlineNode.show(bare)
+                outlineArts[index] = bare
+                // The glowing parts' dark line too without the hood's ring, the hood's own line carrying it.
+                if !glowLineNode.isHidden {
+                    if let bareGlow = sprites.bareGlowLineTexture(frame, player: drawnAs, ballAsEnergy: wholeSheet, ballLifted: ballLifted) {
+                        glowLineNode.show(bareGlow)
+                    } else {
+                        glowLineNode.isHidden = true
+                    }
+                }
                 hoodLine.isHidden = false
                 hoodLine.texture = line
-                hoodLine.color = outlineNode.color
+                // In the look's own line, the hood's is the energy's dark, as round the body's glowing parts.
+                hoodLine.color = !glowLineNode.isHidden ? glowLineNode.color : outlineNode.color
                 hoodLine.xScale = 1
                 hoodLine.size = line.size().scaled(by: drawScale)
                 hoodLine.anchorPoint = hood.anchorPoint
@@ -11633,6 +12234,17 @@ final class GameScene: SKScene {
                 hoodLine.zRotation = hood.zRotation
             } else {
                 hoodLine.isHidden = true
+            }
+            let hoodHalo = hoodHalos[index]
+            if GlowSettings.playerHalo, !hood.isHidden, !greyedOut.contains(index), let drawn = hood.texture, let hoodHaloTexture = sprites.hoodHalo(for: drawn) {
+                hoodHalo.xScale = 1
+                GameScene.placeHalo(hoodHalo, texture: hoodHaloTexture, over: drawn.size().scaled(by: drawScale), anchor: hood.anchorPoint)
+                hoodHalo.position = hood.position
+                hoodHalo.xScale = hood.xScale
+                hoodHalo.zRotation = hood.zRotation
+
+            } else {
+                hoodHalo.isHidden = true
             }
             // Greyed out of FloState, the hood's own grey over it.
             let hoodGrey = lockoutHoods[index]
@@ -11822,6 +12434,8 @@ final class GameScene: SKScene {
             section("hood")
             let halo = handHalos[index]
             let handBall = handBalls[index]
+            let aura = ballAuras[index]
+            aura.isHidden = true
             // Sized with a body riding one of Anozira's vehicles.
             let riderScale = riderScales.indices.contains(index) ? riderScales[index] : 1
             // Sized at scale 1, then scaled: a size set on a scaled node cancels its scale.
@@ -11865,6 +12479,18 @@ final class GameScene: SKScene {
                                                y: (CGFloat(frame.animation.feetFromBottom) + centre.y) / CGFloat(frame.animation.pixelSize))
                 handBall.position = at
                 ballFacing = CGFloat(player.facing.sign)
+                // Spun by energy, not a hand: its aura in the energy, the layer's cell padded round, laid where the ball's is.
+                if player.frozen == 0, let glow = sprites.ballLayerAura(layer, frame.frame) {
+                    let cell = painted.size()
+                    let pad = CGFloat(SpriteLibrary.ballAuraPad) * cell.width / CGFloat(frame.animation.pixelWidth)
+                    aura.isHidden = false
+                    aura.texture = glow
+                    aura.color = teamColour
+                    aura.size = CGSize(width: cell.width + pad * 2, height: cell.height + pad * 2)
+                    aura.anchorPoint = CGPoint(x: (handBall.anchorPoint.x * cell.width + pad) / aura.size.width,
+                                               y: (handBall.anchorPoint.y * cell.height + pad) / aura.size.height)
+                    aura.position = .zero
+                }
             } else if player.holding, frame.animation == .runBallFloState {
                 // FloState's run draws no ball: it rides its ring round the body (`BallRing`).
                 let ring = BallRing.place(runPhase: player.animationPhase)
@@ -12263,10 +12889,11 @@ final class GameScene: SKScene {
         }
         ballHalo.alpha = onAntenna ? GameScene.ballGlow + (GameScene.antennaBallGlow - GameScene.ballGlow) * swell : GameScene.ballGlow
         ballHalo.setScale(onAntenna ? GameScene.antennaBallHaloScale : 1)
-        // Off a perfect shield, the shielder's alone till it bounces: a bright white glow.
+        // Off a perfect shield, the shielder's alone till it bounces: a bright glow in their energy color.
         let excluded = ball.exclusiveTo != nil && ball.holder == nil
+        let exclusionColour = SKColor(rgb: sprites.look(for: ball.exclusiveTo ?? 0).glow)
         if excluded {
-            ballHalo.color = .white
+            ballHalo.color = exclusionColour
             ballHalo.alpha = GameScene.exclusionGlow
             ballHalo.setScale(GameScene.exclusionHaloScale)
         }
@@ -12322,6 +12949,7 @@ final class GameScene: SKScene {
             for node in handBalls { node.isHidden = true }
             if figureLayers.count > 1 { figureLayers[1].isHidden = true }
         }
+        if FootageRun.followsAction { cameraBase = followedCameraBase() }
         if shake > 0 {
             shake -= 1
             let wobble = CGFloat(shake % 2 == 0 ? 1 : -1) * CGFloat(min(shake, 4))
@@ -12372,8 +13000,8 @@ final class GameScene: SKScene {
         }
         glowHud.position = cameraNode.position
         ballTrail.position = ballNode.position
-        // A perfect-shielded ball trails white the whole way down.
-        ballTrail.particleColor = excluded ? .white : colour
+        // A perfect-shielded ball trails the shielder's energy color the whole way down.
+        ballTrail.particleColor = excluded ? exclusionColour : colour
         // The ball truck's toss into someone's hands trails as a throw does.
         ballTrail.particleBirthRate = (ball.isLive && !ball.resting && (ball.velocity.length > 1 || excluded)) || match.ballTossing ? 90 : 0
         // Blazing Boba's burning shot trails the head's fire as well.
@@ -12849,7 +13477,15 @@ final class GameScene: SKScene {
             return
         }
         if flow != .playing, let screen {
-            _ = screen.tap(at: hudPoint(point, viewSize: viewSize))
+            // A replay's picks are its own.
+            if watchedReplay == nil || (flow != .stageSelect && flow != .picking) { _ = screen.tap(at: hudPoint(point, viewSize: viewSize)) }
+            return
+        }
+        // Watching a replay, only the pause in the corner takes a touch.
+        if watchedReplay != nil {
+            if let pause = replayPause, !pause.isHidden, flow == .playing, pause.frame.insetBy(dx: -8, dy: -8).contains(hudPoint(point, viewSize: viewSize)) {
+                enter(.paused)
+            }
             return
         }
         // A tap on your own FLO meter: into FloState, or out of it, as throw and shoot together;

@@ -4,24 +4,35 @@ import SwiftUI
 
 /// What the winner does on the win screen, looping. More to come; the taunt with the ball first.
 /// The Spin Move's, for the updates screen's icon.
-enum WinPose: Equatable {
-    case taunt, spin
+enum WinPose: String, Codable {
+    case taunt, taunt2, spin
+
+    /// The poses a winner may strike: a side's pick, or one at random each series.
+    static let winning: [WinPose] = [.taunt, .taunt2]
+
+    /// A side with no pick: one of `winning` from the series' seed, the same on both phones online.
+    static func random(seed: UInt32, player: Int) -> WinPose {
+        let mixed = (seed ^ UInt32(player &* 0x9E37)) &* 2_654_435_761
+        return winning[Int(mixed >> 16) % winning.count]
+    }
 
     var animation: EsperSim.Animation {
         switch self {
         case .taunt: .taunt
+        case .taunt2: .tauntFloState
         case .spin: .spinBall
         }
     }
     var framesPerSecond: Double {
         switch self {
         case .taunt: 15
+        case .taunt2: Double(EsperSim.Animation.tauntFloStateFramesPerSecond)
         case .spin: Double(SpinRules.sheetFramesPerSecond)
         }
     }
     var holdsBall: Bool {
         switch self {
-        case .taunt, .spin: true
+        case .taunt, .taunt2, .spin: true
         }
     }
 }
@@ -80,7 +91,7 @@ struct WinStage: View {
                     let frame = Int(timeline.date.timeIntervalSinceReferenceDate * figure.pose.framesPerSecond) % max(frameCount, 1)
                     if let shown = flow.scene.winPortrait(player: figure.player, pose: figure.pose, frame: frame) {
                         CustomizeFigure(portrait: shown.portrait, look: flow.scene.playerLook(figure.player), pixel: pixel, mirrored: false,
-                                        headNudge: shown.headNudge, headScale: shown.headScale, ball: shown.ball, overBall: shown.overBall, overBallLine: shown.overBallLine)
+                                        headNudge: shown.headNudge, headScale: shown.headScale, ball: shown.ball, ballAura: shown.ballAura, overBall: shown.overBall, overBallLine: shown.overBallLine)
                             .frame(width: (48 + 2 * CustomizeFigure.margin) * pixel, height: (48 + 2 * CustomizeFigure.margin) * pixel)
                             .position(x: ring.x, y: figureMiddle)
                     }

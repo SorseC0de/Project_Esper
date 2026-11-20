@@ -9,6 +9,11 @@ struct BodySnapshot {
     var size: CGSize
     var zRotation: CGFloat = 0
     var warp: SKWarpGeometry? = nil
+    /// The channel of the texture its flat colour's drawn through: a player's map keeps some layers' alpha elsewhere.
+    var channel: MaskChannel = .alpha
+    /// Drawn through its own shader rather than its category's (a player's glow mask with the halo off).
+    var shader: SKShader? = nil
+    var attributes: [String: SKAttributeValue] = [:]
 }
 
 /// The bodies alone on black, drawn by its own renderer for the glow's mask, and in pure
@@ -23,6 +28,10 @@ final class MaskScene: SKScene {
     private var hoods: [SKSpriteNode] = []
     private var shielded: [SKSpriteNode] = []
     private var flats: [SKSpriteNode] = []
+    /// The players' lines, in a green with some red: flat, and the bloom kept off them, so they're
+    /// drawn over it. Under the hoods but for the lines drawn over them, `linesOver`.
+    private var lines: [SKSpriteNode] = []
+    private var linesOver: [SKSpriteNode] = []
     private var underFlats: [SKSpriteNode] = []
     /// What the world's wash is left off, in yellow, over the still layer and under what's in front of it.
     private var washFree: [SKSpriteNode] = []
@@ -72,6 +81,18 @@ final class MaskScene: SKScene {
     private static let flatMagenta = flat(SIMD4<Float>(1, 0, 1, 1))
     /// Yellow: left out of the world's wash in the composite (Anozira's far lightning).
     private static let flatYellow = flat(SIMD4<Float>(1, 1, 0, 1))
+    private static let flatLine = flat(SIMD4<Float>(0.3, 1, 0, 1))
+    /// A flat shader's colour through another channel than the alpha, made as first asked for.
+    private var channelFlats: [ObjectIdentifier: [MaskChannel: SKShader]] = [:]
+    private func flat(_ base: SKShader, through channel: MaskChannel) -> SKShader {
+        guard channel != .alpha else { return base }
+        if let made = channelFlats[ObjectIdentifier(base)]?[channel] { return made }
+        let colour = base.uniformNamed("u_flat")?.vectorFloat4Value ?? SIMD4<Float>(1, 1, 1, 1)
+        let made = SKShader(source: PlayerMapShaders.flatSource(channel: channel == .green ? "g" : "b"),
+                            uniforms: [SKUniform(name: "u_flat", vectorFloat4: colour)])
+        channelFlats[ObjectIdentifier(base), default: [:]][channel] = made
+        return made
+    }
 
     /// The stage's still, non-glowing art in green, redone when `version` changes.
     func syncStatic(_ flats: [BodySnapshot], version: Int) {
@@ -95,7 +116,7 @@ final class MaskScene: SKScene {
     /// `hoods`: drawn magenta with the cut-outs: the plain threshold, at the hood's share.
     func mirror(_ snapshots: [BodySnapshot], flat: [BodySnapshot], under: [BodySnapshot] = [], through: [BodySnapshot] = [],
                 throughFront: [BodySnapshot] = [], throughNets: [CGPath] = [], cutOut: [BodySnapshot] = [], hoods: [BodySnapshot] = [], shield: [BodySnapshot] = [],
-                washFree: [BodySnapshot] = [],
+                washFree: [BodySnapshot] = [], lines: [BodySnapshot] = [], linesOver: [BodySnapshot] = [],
                 size: CGSize, cameraPosition: CGPoint, cameraScale: CGFloat, cameraRotation: CGFloat = 0) {
         if self.size != size { self.size = size }
         cameraNode.position = cameraPosition
@@ -106,6 +127,8 @@ final class MaskScene: SKScene {
         place(cutOut, in: &cutOuts, green: false, depth: 3, shader: MaskScene.flatBlack)
         place(hoods, in: &self.hoods, green: false, depth: 3, shader: MaskScene.flatMagenta)
         place(flat, in: &flats, green: true)
+        place(lines, in: &self.lines, green: false, depth: 1.5, shader: MaskScene.flatLine)
+        place(linesOver, in: &self.linesOver, green: false, depth: 3.5, shader: MaskScene.flatLine)
         place(under, in: &underFlats, green: true, depth: -0.5)
         place(washFree, in: &self.washFree, green: false, depth: -0.9, shader: MaskScene.flatYellow)
         place(through, in: &glowingThrough, green: false, depth: -0.75, shader: MaskScene.flatBlue)
@@ -127,20 +150,17 @@ final class MaskScene: SKScene {
     }
 
     private func place(_ snapshots: [BodySnapshot], in nodes: inout [SKSpriteNode], green: Bool, depth: CGFloat? = nil, shader: SKShader? = nil) {
+        // Its own colour, whatever the art's. Flat through the art's alpha for the occluder: a tint
+        // multiplies the art's own colours, so a dark rim or body tinted would come out too dark to
+        // read. Pure green through the art's alpha, as the static art is: a tint multiplies, so dark
+        // art came out a dark green the glow took for a body.
+        let base = shader ?? (whiteBodies ? (green ? MaskScene.flatGreen : MaskScene.flatWhite) : (green ? MaskScene.flatGreen : nil))
         while nodes.count < snapshots.count {
             let node = SKSpriteNode()
-            if let shader { node.shader = shader }
-            if shader != nil {
-                // Its own colour, whatever the art's.
-            } else if whiteBodies {
-                // Flat through the art's alpha: a tint multiplies the art's own colours, so a
-                // dark rim or body tinted would come out too dark to read.
-                node.shader = green ? MaskScene.flatGreen : MaskScene.flatWhite
+            node.shader = base
+            if shader == nil, whiteBodies {
                 node.zPosition = green ? 1 : 2
-            } else if green {
-                // Pure green through the art's alpha, as the static art is: a tint multiplies, so
-                // dark art came out a dark green the glow took for a body.
-                node.shader = MaskScene.flatGreen
+            } else if shader == nil, green {
                 node.zPosition = 1
             }
             if let depth { node.zPosition = depth }
@@ -152,6 +172,9 @@ final class MaskScene: SKScene {
             let snapshot = snapshots[index]
             node.isHidden = false
             node.texture = snapshot.texture
+            let drawnThrough = snapshot.shader ?? base.map { flat($0, through: snapshot.channel) }
+            if node.shader !== drawnThrough { node.shader = drawnThrough }
+            if snapshot.shader != nil { node.attributeValues = snapshot.attributes }
             node.size = snapshot.size
             node.anchorPoint = snapshot.anchor
             node.position = snapshot.position

@@ -6,6 +6,8 @@ struct ProjectEsperApp: App {
     init() {
         // Before anything reads what's kept.
         StorageReset.runIfNeeded()
+        // Before macOS puts the window back.
+        MacWindowPlacement.centerSavedWindow()
         #if !os(tvOS)
         FloTextExporter.exportIfRequested()
         #endif
@@ -29,6 +31,7 @@ struct GameView: View {
     /// the material; and the title on top of everything.
     /// What the back arrow does on the screen that's up, the topmost first; nil where it's not shown.
     private var backAction: (() -> Void)? {
+        if flow.vKeyOpen { return { flow.closeVKey() } }
         if flow.settingsOpen { return { flow.closeSettings() } }
         if flow.multiplayerOpen { return { flow.multiplayerBack() } }
         if flow.customizeOpen { return { flow.activateCustomize(flow.customizeLocal, .back) } }
@@ -110,6 +113,10 @@ struct GameView: View {
                 SettingsScreen(flow: flow)
                     .transition(.opacity)
             }
+            if flow.vKeyOpen {
+                VKeyScreen(flow: flow)
+                    .transition(.opacity)
+            }
             #if os(iOS)
             // Back on a touch screen, bottom right, on the screens between the title and play.
             if let back = backAction {
@@ -124,6 +131,9 @@ struct GameView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(20)
             }
+            if flow.titleScreenUp {
+                TitleScreen(flow: flow)
+            }
             // The curtain between screens, over everything, taking the touches while it's down.
             TransitionCurtain(transition: flow.curtainStyle, cover: flow.curtain)
             // The loading bar, bottom right, while something loads: on a curtain held for it,
@@ -135,9 +145,13 @@ struct GameView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .allowsHitTesting(false)
             }
-            // What's new for testers, over everything, once a set of notes.
-            if flow.updatesOpen {
+            // What's new for testers, over everything, once a set of notes, after the title screen.
+            if flow.updatesOpen, !flow.titleScreenUp {
                 UpdatesView(flow: flow)
+                    .transition(.opacity)
+            }
+            if flow.launchCovered {
+                LaunchCover()
                     .transition(.opacity)
             }
         }
@@ -148,6 +162,30 @@ struct GameView: View {
         .animation(.easeOut(duration: 0.2), value: flow.settingsOpen)
         .animation(.easeOut(duration: 0.25), value: flow.updatesOpen)
         .animation(.easeOut(duration: 0.2), value: flow.customizeOpen)
+        .animation(.easeOut(duration: 0.2), value: flow.vKeyOpen)
+        .animation(.easeOut(duration: LaunchCover.fadeSeconds), value: flow.launchCovered)
+        .onAppear { VKeyStore.shared.start() }
+    }
+}
+
+/// The launch screen's splash carried on over everything while the launch loads (`FlowState.launchCovered`),
+/// drawn as the storyboard draws it so the hand-over can't be seen.
+struct LaunchCover: View {
+    static let fadeSeconds = 0.25
+    static let ground = Color(red: 0.13725490196078433, green: 0.12156862745098039, blue: 0.12549019607843137)
+
+    var body: some View {
+        LaunchCover.ground
+            .overlay {
+                #if os(tvOS)
+                Image("SplashscreenTV").resizable().aspectRatio(contentMode: .fill)
+                #else
+                Image("Splashscreen").resizable().aspectRatio(contentMode: .fit)
+                #endif
+            }
+            .clipped()
+            .ignoresSafeArea()
+            .contentShape(Rectangle())
     }
 }
 

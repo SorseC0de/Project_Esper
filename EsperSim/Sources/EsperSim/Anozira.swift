@@ -605,3 +605,5 @@ public enum RoadRules {
     public static let runSpendFrames = FloStateRules.spendFrames
     public static let runCycleFramesPerSecond = 30.0
 }
+
+extension AnoziraRules.Phoenix: Codable {}

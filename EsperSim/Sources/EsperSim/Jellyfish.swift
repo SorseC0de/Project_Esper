@@ -56,3 +56,7 @@ extension Match {
         } ?? []
     }
 }
+
+extension Jellyfish: Codable {}
+
+extension SpringTop: Codable {}

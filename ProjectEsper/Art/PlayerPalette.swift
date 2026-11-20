@@ -184,6 +184,14 @@ struct Look: Hashable {
         return channel(16) | channel(8) | channel(0)
     }
 
+    /// The energy's three tones, lightest first, for a glow colour: its row of `EnergyColour`'s
+    /// tones, or for a colour not among them (the ice's, the zone's) the glow at the back limbs'
+    /// share and halfway to it.
+    static func energyRamp(_ glow: RGB) -> (glow: RGB, middle: RGB, deep: RGB) {
+        if let colour = EnergyColour.withGlow(glow) { return (colour.glow, colour.hoodShadow, colour.backLimbs) }
+        return (glow, scaled(glow, (1 + HumanLook.backLegShare) / 2), scaled(glow, HumanLook.backLegShare))
+    }
+
     /// The back sleeve, boot and shoe: the energy colour's own back tone, or for a colour not
     /// among them (the ice's), two thirds of its brightness.
     static func backLimbTone(_ glow: RGB) -> RGB {
@@ -225,7 +233,7 @@ struct Look: Hashable {
 enum EnergyColour: String, CaseIterable, Codable {
     /// Teal is light blue now (EDG64 has no teal), its name kept so saved picks still read.
     /// Diamond, white, is the backers' colour: last, so the others keep their places online.
-    case orange, teal, red, lime, green, pink, blue, gold, purple, diamond
+    case orange, teal, red, lime, green, pink, blue, gold, purple, white
 
     /// Its three tones, `_Graphic Assets/Energy_Palette.png`: the glow, the hood's shadow, and
     /// the back sleeve, boot and shoe.
@@ -239,11 +247,27 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .teal: (0x0CF1FF, 0x00CDF9, 0x0098DC)
         case .blue: (0x0098DC, 0x0069AA, 0x00396D)
         case .pink: (0xF389F5, 0xCA52C9, 0x93388F)
-        case .purple: (0x93388F, 0x622461, 0x3B1443)
-        case .diamond: (0xFFFFFF, 0xC7CFDD, 0x92A1B9)
+        case .purple: (0x953CFB, 0x7A09FA, 0x5D04C3)
+        case .white: (0xFFFFFF, 0xC7CFDD, 0x92A1B9)
         }
     }
-    /// Its Breaker Ball's three tones, lightest first, EDG64, as the user painted them.
+    /// The line round its glowing parts, very dark, a VARIA64 index each, the user's picks.
+    var glowLine: RGB {
+        let index = switch self {
+        case .blue: 23
+        case .pink: 49
+        case .lime: 25
+        case .green: 24
+        case .teal: 22
+        case .white: 12
+        case .purple: 50
+        case .red: 40
+        case .gold: 6
+        case .orange: 7
+        }
+        return PixelPalette.colours[index]
+    }
+    /// Its Breaker Ball's three tones, lightest first, VARIA64, as the user painted them.
     var breakerBallTones: (light: RGB, middle: RGB, dark: RGB) {
         switch self {
         case .red: (0xEA323C, 0xC42430, 0x891E2B)
@@ -254,8 +278,8 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .teal: (0x94FDFF, 0x0CF1FF, 0x00CDF9)
         case .blue: (0x00CDF9, 0x0098DC, 0x0069AA)
         case .pink: (0xF389F5, 0xCA52C9, 0x93388F)
-        case .purple: (0x93388F, 0x622461, 0x3B1443)
-        case .diamond: (0xFFFFFF, 0xC7CFDD, 0x92A1B9)
+        case .purple: (0x953CFB, 0x7A09FA, 0x5D04C3)
+        case .white: (0xFFFFFF, 0xC7CFDD, 0x92A1B9)
         }
     }
     var glow: RGB { tones.glow }
@@ -277,7 +301,7 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .green: "Emerald"
         case .teal: "Larimar"
         case .gold: "Citrine"
-        case .diamond: "Diamond"
+        case .white: "Diamond"
         }
     }
 
@@ -288,23 +312,17 @@ enum EnergyColour: String, CaseIterable, Codable {
     /// The shade down its ramp: the customize screen's second row, the hood's shadow.
     var rampDown: RGB { hoodShadow }
 
-    /// The customize screen's picker, round the colour wheel; Diamond after it, in debug builds
-    /// only until it's unlocked by in-app purchase.
-    static var wheel: [EnergyColour] {
-        #if DEBUG
-        [.red, .orange, .gold, .lime, .green, .teal, .blue, .pink, .purple, .diamond]
-        #else
-        [.red, .orange, .gold, .lime, .green, .teal, .blue, .pink, .purple]
-        #endif
-    }
+    /// The customize screen's picker, round the colour wheel; Diamond after it. Without the V-Key
+    /// all but Topaz and Larimar can be tried on but not played.
+    static let wheel: [EnergyColour] = [.red, .orange, .gold, .lime, .green, .teal, .blue, .pink, .purple, .white]
 
     /// The nine with a hue, for the glow's per-colour gain: Diamond's white is none, as the glow
     /// takes whites and greys to be none of them.
-    static let hued: [EnergyColour] = allCases.filter { $0 != .diamond }
+    static let hued: [EnergyColour] = allCases.filter { $0 != .white }
 
     /// Diamond's own: its cubes always FloState's rainbow, and its Breaker barrier's tiles mixed with the rainbow's.
-    var rainbowCubes: Bool { self == .diamond }
-    var mixedBarrier: Bool { self == .diamond }
+    var rainbowCubes: Bool { self == .white }
+    var mixedBarrier: Bool { self == .white }
 
     var opposite: EnergyColour {
         switch self {
@@ -317,7 +335,7 @@ enum EnergyColour: String, CaseIterable, Codable {
         case .orange: .blue
         case .blue: .orange
         case .green: .pink
-        case .diamond: .purple
+        case .white: .purple
         }
     }
 
@@ -332,7 +350,7 @@ enum EnergyColour: String, CaseIterable, Codable {
     /// What this phone picked, kept between launches.
     static let storageKey = "esper.energyColour"
     static var saved: EnergyColour {
-        UserDefaults.standard.string(forKey: storageKey).flatMap(EnergyColour.init(rawValue:)).flatMap { wheel.contains($0) ? $0 : nil } ?? .orange
+        (UserDefaults.standard.string(forKey: storageKey).flatMap(EnergyColour.init(rawValue:)) ?? .orange).playable(for: 0)
     }
 }
 

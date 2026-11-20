@@ -35,3 +35,5 @@ extension Match {
         players[index].forcedMove = move
     }
 }
+
+extension ForcedMove: Codable {}

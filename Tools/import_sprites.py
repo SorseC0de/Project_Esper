@@ -108,7 +108,7 @@ SKIP = {"spr_player_hurt", "Sprite22", "Sprite22_1", "sprite1", "sprite2", "spri
         "spr_ball", "spr_ball_bak", "spr_player_shoot_BAK", "spr_player_mask", "spr_diamond",
         "spr_box", "spr_floor"}
 # Strips in _Graphic Assets that nothing draws yet, kept out of the app until they're wired.
-HELD_BACK = {"dust_run2", "player_hurt", "player_flowing_hood", "player_idle_8x", "breaker_balls"}   # player_hurt: taken out of the game; the flowing hood: replaced by player_hoodheads_flostate; idle_8x: a picture; breaker_balls: the design the code's swaps were read from
+HELD_BACK = {"dust_run2", "player_hurt", "player_flowing_hood", "player_idle_8x", "breaker_balls", "player_esperslash_air"}   # player_hurt: taken out of the game; the flowing hood: replaced by player_hoodheads_flostate; idle_8x: a picture; breaker_balls: the design the code's swaps were read from; esperslash_air: replaced by player_esperslash_air2
 
 
 def load_yy(path):

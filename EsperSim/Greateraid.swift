@@ -298,3 +298,7 @@ public struct Drinks: Equatable {
         return spec
     }
 }
+
+extension Dice: Codable {}
+
+extension Drinks: Codable {}

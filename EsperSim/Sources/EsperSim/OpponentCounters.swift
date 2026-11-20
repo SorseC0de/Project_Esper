@@ -203,7 +203,7 @@ extension Opponent {
         return made
     }
 
-    /// The shield's going up for this (a shot's flight, a stance, an approach), or not, and when.
+    /// The shield's going up for this (a shot's flight), or not, and when.
     struct ShieldIntent: Equatable {
         var key: Int
         var will: Bool
@@ -211,15 +211,10 @@ extension Opponent {
         var slop: Int
     }
     /// A shot it's in the way of is blocked this often, the shield up as the ball's this many frames
-    /// off, give or take a few; a stance close by is contested with it this often, an approach met
-    /// with it this often, inside this far.
+    /// off, give or take a few.
     static let blockChance: UInt32 = 45
     static let blockLead = 3
     static let blockLookahead = 14
-    static let contestChance: UInt32 = 25
-    static let approachChance: UInt32 = 25
-    static let approachReach = 30.0
-    static let stanceContestReach = 36.0
 
     private mutating func intend(_ key: Int, _ percent: UInt32, slop: ClosedRange<Int>) -> ShieldIntent {
         if let shieldIntent, shieldIntent.key == key { return shieldIntent }
@@ -248,30 +243,6 @@ extension Opponent {
         return true
     }
 
-    /// The shield as a tool: up in the face of a shot stance close by, after it's seen, or of the
-    /// other coming straight at it at a dash or a run, once they're in close. Raised on them it
-    /// shoves them out and knocks the ball loose. Each decided once, some of the time.
-    mutating func contestWithShield(_ match: Match, me: Player, human: Player, into input: inout PlayerInput) -> Bool {
-        guard !me.holding, me.hitStun == 0, !me.parryLocked, me.grounded, Opponent.freeToShield.contains(me.state),
-              match.shields.allSatisfy({ $0.owner != index }) else { return false }
-        let gap = human.position.x - me.position.x
-        guard abs(human.position.y - me.position.y) < 24 else { return false }
-        let started = match.frame - human.stateTimer
-        if human.state == .shootStance, abs(gap) < Opponent.stanceContestReach {
-            let intent = intend(started, Opponent.contestChance, slop: Opponent.reactionFrames)
-            guard intent.will, human.stateTimer >= intent.slop else { return false }
-        } else if [.dash, .run].contains(human.state), human.velocity.x * -gap > 0, abs(gap) < Opponent.approachReach {
-            let intent = intend(started, Opponent.approachChance, slop: 0...4)
-            guard intent.will, human.stateTimer >= intent.slop else { return false }
-        } else {
-            return false
-        }
-        input.shield = !pressed.shield
-        shieldWhy = "contest \(human.state)"
-        shieldIntent?.will = false
-        return true
-    }
-
     /// Out of a stun (struck, parried, frozen, pushed off a clash) it settles a moment, as a person
     /// gets their bearings, before it attacks again: no slash or snatch for a beat, sometimes
     /// backing off meanwhile. The shield and the spin, answers to what's coming, still go; with the
@@ -295,22 +266,18 @@ extension Opponent {
     static let settleFrames: ClosedRange<Int> = 8...27
     static let settleAwayChance: UInt32 = 40
 
-    /// In close on the ball's holder, the swing: the snatch at the hand, the shield on them (it
-    /// shoves them and knocks the ball loose, though a throw breaks it), or the slash.
+    /// In close on the ball's holder, the swing: the snatch at the hand, or the slash. Never the
+    /// shield, which leaves a held ball alone.
     mutating func defensiveSwing(gap: Double, into input: inout PlayerInput) {
         let pick = roll(100)
         if abs(gap) <= Opponent.swingSnatchReach, pick < Opponent.swingSnatchChance {
             tapThrow(&input)
-        } else if pick < Opponent.swingSnatchChance + Opponent.swingShieldChance {
-            input.shield = !pressed.shield
-            shieldWhy = "defensive swing"
         } else {
             tapShoot(&input)
         }
     }
     static let swingSnatchReach = 12.0
     static let swingSnatchChance: UInt32 = 35
-    static let swingShieldChance: UInt32 = 30
 
     /// The Wreck Center's belts carry a loose ball to their end, where it drops into the rim below
     /// and scores. Riding toward the rim it guards, the ball's not chased up there: it waits under

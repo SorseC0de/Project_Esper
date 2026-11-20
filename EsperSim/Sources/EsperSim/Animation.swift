@@ -38,7 +38,7 @@ public enum Animation: String, CaseIterable {
     case slide = "player_slide"
     case esperSlash = "player_esperslash"
     /// The slash in the air: the same swing, drawn for the air.
-    case esperSlashAir = "player_esperslash_air"
+    case esperSlashAir = "player_esperslash_air2"
     case snatch = "player_snatch"
     case snatchAir = "player_snatch_air"
     /// In FloState, the snatch, on the ground or in the air, drawn in its own sheet.
@@ -88,6 +88,13 @@ public enum Animation: String, CaseIterable {
     case webshootFrontArm = "player_webshoot_front_arm"
     case webshootWall = "player_webshoot_wall"
     case webshootWallArm = "player_webshoot_wall_arm"
+
+    /// FloState's taunt's rate, sheet frames a second: play, the win screen and the gallery.
+    public static let tauntFloStateFramesPerSecond = 10
+    /// The one rate a sheet plays at, where it has one; the gallery opens it at this.
+    public var playFramesPerSecond: Int? {
+        self == .tauntFloState ? Animation.tauntFloStateFramesPerSecond : nil
+    }
 
     public var frameCount: Int {
         switch self {
@@ -341,9 +348,12 @@ extension Player {
         case .slashing:
             return AnimationFrame(slashAirborne ? .esperSlashAir : .esperSlash, t * SlashRules.sheetFramesPerSecond / 60)
         case .rolling:
-            // Out of an air slash, the spin, as it falls on after it too (`spinningOut`).
-            let sheet: Animation = hasBall ? .spinBall : .spin
-            return AnimationFrame(sheet, (t * SpinRules.sheetFramesPerSecond / 60) % sheet.frameCount)
+            // Out of an air slash, its last frame held, the view leaving the blade off; with the ball, the air's own pose.
+            if hasBall {
+                let phase = velocity.y > 0.3 ? 0 : (abs(velocity.y) <= 0.3 ? 1 : 2)
+                return AnimationFrame(.airBall, phase)
+            }
+            return AnimationFrame(.esperSlashAir, Animation.esperSlashAir.frameCount - 1)
         case .spinning:
             let count = Animation.spinBall.frameCount
             return AnimationFrame(.spinBall, min(t * SpinRules.sheetFramesPerSecond / 60, count * SpinRules.turns - 1) % count)
@@ -366,7 +376,7 @@ extension Player {
             return AnimationFrame(.ledge, 2 + (t - 1) * 3 / LedgeRules.climbFrames)
         case .taunt:
             // FloState's, a frame shorter than the taunt, holds its last.
-            if inFloState { return AnimationFrame(.tauntFloState, min(t * 15 / 60, Animation.tauntFloState.frameCount - 1)) }
+            if inFloState { return AnimationFrame(.tauntFloState, min(t * Animation.tauntFloStateFramesPerSecond / 60, Animation.tauntFloState.frameCount - 1)) }
             return AnimationFrame(.taunt, t * 15 / 60)
         case .webSwing:
             return AnimationFrame(hasBall ? .swingBall : .swing, 0)

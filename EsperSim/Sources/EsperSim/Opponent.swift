@@ -558,7 +558,7 @@ public struct Opponent: Equatable {
             planFrames = 90
         }
         // In the stance: a fake is called off with the throw (letting go of shoot always shoots,
-        // and down is the stepback); a shot holds through the windup with the aim on the rim,
+        // and back is the stepback); a shot holds through the windup with the aim on the rim,
         // then lets go, sooner if they're closing in; a jump shot hops out of the stance after
         // the windup and lets go on the rise with the aim solved for the lift.
         if me.state == .shootStance {
@@ -1017,7 +1017,6 @@ public struct Opponent: Equatable {
             plan = .pressure
             planFrames = 90
         }
-        if contestWithShield(match, me: me, human: human, into: &input) { return }
 
         // A throw charged at it for more than a few frames is telegraphed: it squares up
         // to them and stands ready, and the snatch comes as the ball does.
@@ -1309,7 +1308,6 @@ public struct Opponent: Equatable {
         if match.ball.shotInFlight, match.ball.lastTouched == human.index, snatchOrSpike(match.ball, me: me, human: human, into: &input) { return }
         if goaltend(match, me: me, human: human, into: &input) { return }
         if guardTheBeltDrop(match, me: me, human: human, into: &input) { return }
-        if contestWithShield(match, me: me, human: human, into: &input) { return }
         // A throw coming at it: it stands its ground, facing it, and the snatch goes out so
         // the hand is live as the ball arrives. Charged more than a few frames it was
         // telegraphed and the snatch comes every time; a quick throw gets by seven in ten.

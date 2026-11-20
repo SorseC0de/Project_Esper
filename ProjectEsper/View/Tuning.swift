@@ -402,6 +402,17 @@ enum FloTuning {
     static let maxY: CGFloat = -15
     /// The stroke round the bar and the word together, in the player's glow, in points.
     static let stroke: CGFloat = 1.5
+    /// The drink picked (47): its bottle behind the word, this tall in points, leaning away from the
+    /// scoreboard by this many degrees, its middle moved from the word's, outward and up; its name
+    /// under the bar, this many points below it, its capitals this tall, in its face from
+    /// `Futuristic.typefaces` (B, Infinium Guardian, to start). On the DRINK sliders and picker.
+    nonisolated(unsafe) static var drinkBottleHeight: CGFloat = 32
+    nonisolated(unsafe) static var drinkBottleTilt: CGFloat = 25
+    nonisolated(unsafe) static var drinkBottleX: CGFloat = 25
+    nonisolated(unsafe) static var drinkBottleY: CGFloat = -1
+    nonisolated(unsafe) static var drinkNameGap: CGFloat = -10
+    nonisolated(unsafe) static var drinkNameSize: CGFloat = 5
+    nonisolated(unsafe) static var drinkNameFace = 1
 
     /// The stroke in FloState breathes from this much seen to all of it and back, over this long.
     static let strokeBreathLeast: CGFloat = 0.1
@@ -450,8 +461,8 @@ enum DunkTuning {
 /// how far it spreads, how strong it comes back, and its colour.
 /// Debug strip sliders put away once tuned; their values stay as baked.
 enum ParkedSliders {
-    /// Only these sliders on the debug bench for now: the hub's spacing, Breaker's, Web Water's swing gap and FloState's ball ring's height and depth scale.
-    static var showing: [String] { ["HUB", "BREAKER", "WEB", "RING HEIGHT", "RING DEPTH"] + (DunkTuning.enabled ? ["DUNK"] : []) }
+    /// Only these sliders on the debug bench for now: the hub's spacing, the glow's EDR boost, the players' halo, and FLO from moving.
+    static var showing: [String] { ["HUB", "GLOW EDR", "PLAYER HALO", "HALO STRENGTH", "SWEAT"] + (DunkTuning.enabled ? ["DUNK"] : []) }
     static func shown(_ title: String) -> Bool { showing.contains { title.hasPrefix($0) } }
     static let net = true
     static let flo = true
@@ -509,5 +520,18 @@ enum GlowSettings {
     /// the whole glow it went to gold; on K&A, under its wash, the whole of it.
     static let hoodShare: Float = 0.6
     static let kAndAHoodShare: Float = 1.0
+    /// What glows, this many times brighter than its painted colour, on a screen that can go past
+    /// white (EDR): multiplied in light, so its tones keep their proportions and its hue. Held to
+    /// the screen's headroom; none on a screen without it, the TV, or footage. Debug slider GLOW EDR.
+    static let edrBoostKey = "esper.glow.edrBoost"
+    nonisolated(unsafe) static var edrBoost: Float = (UserDefaults.standard.object(forKey: edrBoostKey) as? Double).map(Float.init) ?? 1.5
     static func hoodShare(on look: StageLook) -> Float { look == .kAndA ? kAndAHoodShare : hoodShare }
+    /// The players' glow as the customize screen draws it: a halo round each body's and hood's glowing
+    /// parts, over their lines, and none of the screen's glow on them. Off, the screen's glow as before.
+    /// Debug sliders PLAYER HALO (0 off, 1 on) and HALO STRENGTH, kept between launches.
+    static let playerHaloKey = "esper.glow.playerHalo"
+    nonisolated(unsafe) static var playerHalo: Bool = UserDefaults.standard.object(forKey: playerHaloKey) as? Bool ?? true
+    static let haloStrengthKey = "esper.glow.haloStrength"
+    nonisolated(unsafe) static var haloStrength: Float = (UserDefaults.standard.object(forKey: haloStrengthKey) as? Double).map(Float.init)
+        ?? Float(CustomizeArt.glowStrength)
 }

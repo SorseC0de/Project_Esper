@@ -4,7 +4,7 @@ import GameController
 import UIKit
 
 /// Where each player's input comes from: see `controller(for:)`. By default a controller
-/// plays player 0 alongside touch and the keyboard; VS HUMAN on a phone or iPad makes a
+/// plays player 0 alongside touch and the keyboard; VS HUMAN off the TV makes a
 /// lone controller player 1. A keyboard, on an
 /// iPad or a Mac, is player 0 too: WASD moves, space jumps, J shoots, K throws, shift
 /// steps the power like the left bumper, delete pauses like the start button, M shows the
@@ -103,11 +103,17 @@ final class InputHub {
         guard framesSinceLook >= 60 else { return }
         framesSinceLook = 0
         let present = GCController.controllers().filter { $0.extendedGamepad != nil }
-        if present.count != controllers.count || zip(present, controllers).contains(where: { $0 !== $1 }) { refresh() }
+        let sameControllers = present.count == controllers.count && present.allSatisfy { pad in controllers.contains { $0 === pad } }
+        if !sameControllers { refresh() }
     }
 
+    /// The pads in the order they joined: each keeps its place, whatever order the system lists them in,
+    /// so a pad never changes player mid-game. New pads join at the end.
     private func refresh() {
-        controllers = GCController.controllers().filter { $0.extendedGamepad != nil }
+        let present = GCController.controllers().filter { $0.extendedGamepad != nil }
+        var joined = controllers.filter { pad in present.contains { $0 === pad } }
+        for pad in present where !joined.contains(where: { $0 === pad }) { joined.append(pad) }
+        controllers = joined
         #if os(tvOS)
         // On the TV a menu button nobody handles sends the app home, so it's claimed
         // here: it pauses, as it does on a phone.
@@ -121,9 +127,18 @@ final class InputHub {
         #endif
     }
 
+    /// Any button held on any pad, the TV's remote included, or any key: the title screen's.
+    var anyButtonDown: Bool {
+        let pads = GCController.controllers().contains { controller in
+            controller.physicalInputProfile.allButtons.contains { $0.isPressed }
+        }
+        return pads || (GCKeyboard.coalesced?.keyboardInput?.allButtons.contains { $0.isPressed } ?? false)
+    }
+
     /// This frame's input for every player.
     func frames(players: Int) -> [PlayerInput] {
         lookForMissedPads()
+        lightPlayerIndicators()
         #if !os(tvOS)
         let menuDown = controllers.contains { $0.extendedGamepad?.buttonMenu.isPressed ?? false }
         if menuDown, !menuWasDown { pausePressed = true }
@@ -215,20 +230,29 @@ final class InputHub {
     }
 
     /// The controller that drives this player. The first is player 0, with touch and the
-    /// keyboard, unless it's VS HUMAN on a phone or iPad, where touch is player 0 and a lone
-    /// controller is player 1, so a friend can pick one up. The TV and a Mac have no touch.
+    /// keyboard, unless it's VS HUMAN off the TV: then touch or the keyboard is player 0 and a lone
+    /// controller is player 1, so a friend can pick one up.
     private func controller(for index: Int) -> GCController? {
         #if os(tvOS)
         return index < controllers.count ? controllers[index] : nil
         #else
         let vsCPU = UserDefaults.standard.object(forKey: InputHub.vsCPUKey) as? Bool ?? true
-        if InputHub.onMac || vsCPU { return index < controllers.count ? controllers[index] : nil }
+        if vsCPU { return index < controllers.count ? controllers[index] : nil }
         switch (controllers.count, index) {
         case (1, 1): return controllers[0]
         case (1, 0): return nil
         default: return index < controllers.count ? controllers[index] : nil
         }
         #endif
+    }
+
+    /// Each pad's player light shows the player it drives; a pad driving nobody is unlit.
+    private func lightPlayerIndicators() {
+        for pad in controllers {
+            let player = (0..<2).first { controller(for: $0) === pad }
+            let indicator = player.flatMap { GCControllerPlayerIndex(rawValue: $0) } ?? .indexUnset
+            if pad.playerIndex != indicator { pad.playerIndex = indicator }
+        }
     }
 
     var playerOneHasController: Bool { controller(for: 0) != nil }

@@ -732,6 +732,10 @@ they met and the `slashclash` sheet there (48 × 48, five frames at 24 a second,
 once in each side's colour, the second turned round (`EnergyEffect.slashClash`; the hit sparks until
 it's imported); as the hit stop ends both are put back in
 neutral, the rest of their swings cancelled (`Player.recoverFromSlashClash`).
+Two slides' legs meeting is a slideclash (`Match.resolveSlideClash`, after the snatchclash and before the
+hits), the fourth clash with the slash's, the snatch's and the shield's: both legs spent, nobody stunned, the
+clash's hit stop, sound, CLANG and sheet as the snatchclash's; as it ends both are out of the slide and pushed
+apart as every clash pushes.
 
 ## Interface
 
@@ -1252,12 +1256,14 @@ rim over them as a rim on the move. Its powers aim at them.
 FLO, Fuel-Laden Osmoles (drawn in through the sweat by the H.O.O.D.), is to be the energy, the super meter, for the modes past the
 plain game, 47 among them: before the match each player picks a Greateraid, and in FLO they get
 its effects. `Player.flo`, 0 to 100 (`FloRules.full`), is earned by plays (protocol 74), in the
-order of what they're worth: a made shot 20 (out of the rim; only your own: a ball the other put
-through your hoop scores you the point but earns nothing; protocol 77), a counter, a parry, 10 (out of the
+order of what they're worth: a basket conceded 20 (out of the rim, to everyone it was scored on, whoever
+touched the ball last; scoring earns the scorer nothing, so it can't feed their own FloState), a counter, a parry, 10 (out of the
 slasher's chest), a snatch that steals the ball from a holder 7 (where the hand met it), a hit, any
 blow that stuns, ball or not (not a parry's, not the stage's lightning or icicles), 5 (out of the
 victim's chest, or where the ball was held), and a taunt 3 (as and where its ball first meets the
-floor); none past full. Nothing earned is ever taken from the other player: FloState is a comeback,
+floor); and moving on the ground works up sweat, quietly, with no orbs: a FLO for every 60 (`FloRules.sweatPerFlo`), walking
+1 a frame, running 2, dashing 3, so dash-dancing charges fastest, 110% of that without the ball (`FloRules.sweatWithoutBallPercent`),
+and none in FloState. None past full. Nothing earned is ever taken from the other player: FloState is a comeback,
 and a player in it mustn't be able to beat the FLO out of the other to keep them from theirs. It's kept through a point. A burn, the lava's or a fire
 tornado's, drops it all where the body went down, hovering at least 15 over the lava
 (`Match.floBundles`), `flo_absorb` looping on it in the dropper's colour; any player whose chest

@@ -370,3 +370,5 @@ extension Match {
         holdHitStop(HitStopRules.hitFrames)
     }
 }
+
+extension BreakerFlight: Codable {}

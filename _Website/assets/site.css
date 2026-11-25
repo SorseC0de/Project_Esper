@@ -1,4 +1,9 @@
 @font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/JetBrainsMono-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
   font-family: "Lilian";
   src: url("fonts/Lilian.ttf") format("truetype");
   font-display: swap;

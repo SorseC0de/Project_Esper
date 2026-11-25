@@ -72,6 +72,9 @@
 .tagline-shout { color: var(--name-top); }
 
 .kickstarter-link { display: block; width: 100%; }
+/* The finale's TRY FOR FREE under the Kickstarter banner: the public alpha on TestFlight. */
+.try-free-link { display: block; width: 60%; max-width: 360px; margin: 20px auto 0; }
+.try-free { display: block; width: 100%; height: auto; }
 .kickstarter-banner {
   display: block;
   width: 100%;

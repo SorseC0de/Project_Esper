@@ -244,7 +244,8 @@ main {
   color: var(--blip);
 }
 .legal a { color: var(--line); }
-.legal ul { padding-left: 20px; }
+.legal ul,
+.legal ol { padding-left: 20px; }
 .legal li { margin: 10px 0; }
 .legal-updated { margin-top: 48px; font-size: 13px; opacity: 0.6; }
 
